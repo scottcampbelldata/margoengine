@@ -637,7 +637,7 @@ export class GPURenderer implements Renderer {
         const clearColor = options.clear ?? (named === false ? false : explicit || !context.view?.index),
           clearDepth = options.clearDepth ?? context.view?.clear?.depth ?? options.clear ?? true,
           // A capture's target (not this frame's own) takes the colour for its format: linear light on a float one,
-          // so the display transform encodes it once (KB-CLEAR-CAPTURE1).
+          // so the display transform encodes it once (KB-CLEAR-CAPTURE1), core's own colour too (KB-CLEAR-DEFAULT1).
           tint = captureClearColor(
             explicit ? named : undefined,
             context.color !== this.msaa && context.color !== this.resolveTarget && context.format,

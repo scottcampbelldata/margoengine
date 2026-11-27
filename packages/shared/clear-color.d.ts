@@ -8,6 +8,7 @@ export declare const toLinear: (v: number) => number;
 /**
  * The clear value of `color` for a draw that may clear a capture's target of colour format `capture` (not the
  * frame's own): decoded from sRGB for a float or `-srgb` capture, the bytes as given for anything else and for none.
+ * Core's own clear colour (`color` not a string) takes the same path.
  */
 export declare function captureClearColor(
   color: string | false | undefined,

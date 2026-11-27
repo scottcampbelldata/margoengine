@@ -1,3 +1,18 @@
+### Section 5 evidence: core's own clear colour is linear light in a linear capture (2026-11-26)
+
+GPU maths and both backends (KB-CLEAR-DEFAULT1): with no `background` set, core's clear colour (display 0.018, 0.023,
+0.035, drawn 5,6,9) was written with the same numbers to every target, so a float capture held about thirteen times
+the light the canvas shows and a tone map drew 7,20,38. `captureClearColor` now decodes it with the sRGB transfer
+function (IEC 61966-2-1) for a capture that holds linear light (a float format or an `-srgb` one), exactly as it does
+a `background`, on both clear paths and in post's material clear; the frame's own target and display-encoded captures
+keep the numbers, so a frame with no capture is unchanged. Evidence: `tests/clear-capture.test.js` (CPU) and
+`packages/post/test/scene-background-browser.mjs` on native WebGPU and on the WebGL2 layer, Intel Arc 140V: with no
+background, 5,6,9 with no effect, 0,1,4 under Tonemap and PostStack and 0,2,5 under Bloom, each within one step of a
+`#050609` background under the same effect, in an empty scene, beside a mesh and in a half-canvas view (84 cases a
+backend with the background cases). The package GPU checks that draw through a capture were run again over the new
+backdrop (docs/known-bugs.md, KB-CLEAR-DEFAULT1). Missing: other GPUs and browsers; a real XR device (the simulated
+stereo check only).
+
 ### Section 5 evidence: an `-srgb` view target is encoded once (2026-11-26)
 
 Every pass of a frame writes display colour (core's shader, its clear colour, each package's display transform), and
@@ -24,8 +39,8 @@ format) and display-encoded captures keep the bytes, so a frame with no capture 
 Evidence: `tests/clear-capture.test.js` (CPU) and `packages/post/test/scene-background-browser.mjs` on native WebGPU
 and on the WebGL2 layer, Intel Arc 140V: #808080 draws 116 under Tonemap and PostStack and 117 under Bloom
 (181 and 182 before), as ColorBackground does, and 128 with no effect, in an empty scene, beside a mesh and in a
-half-canvas view. Missing: other GPUs and browsers; core's own clear colour (no background set) is still the same
-numbers on every target (KB-CLEAR-DEFAULT1).
+half-canvas view. Missing: other GPUs and browsers. Core's own clear colour (no background set) takes the same path
+since KB-CLEAR-DEFAULT1 (the section above).
 
 ### Section 5 evidence: whole migration scenes in a browser (2026-11-26)
 

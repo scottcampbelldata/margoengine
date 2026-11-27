@@ -149,6 +149,8 @@ const hit = await engine.pick(400, 300);           // CSS pixel; picks through t
   A `background` is an sRGB colour (`#rgb` or `#rrggbb`). The canvas shows it as given. Under a post effect that
   captures the scene in linear light (tone mapping, bloom) it is light in the scene, tone-mapped with the meshes:
   `#808080` shows as 116 under the default tone map.
+  With no `background` core clears to its own dark colour (5,6,9 on the canvas), which takes the same path: 0,1,4
+  under the default tone map, as a `#050609` background.
 - Which packages are view-aware: [multi-view-roadmap.md](../../docs/multi-view-roadmap.md).
 
 ## Camera, geometry, materials and picking

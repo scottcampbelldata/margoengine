@@ -13,7 +13,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Coming from Babylon.js](docs/from-babylon.md) ·
 [Coming from PlayCanvas](docs/from-playcanvas.md)
 
-The core and the stage together are 24,905 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,910 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Build something in 5 minutes
@@ -344,7 +344,7 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,905 B | 61,194 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,910 B | 61,246 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as

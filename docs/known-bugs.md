@@ -19,6 +19,40 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   attachment added after the world began is refused with a coded error.
 - **Regression:** the test above, which fails without the region, and the frame-rate check beside it.
 
+### Open 2026-11-26: eleven package GPU checks failed in the rerun made for the clear colour fix (KB-CLEAR-CHECKS1, cause not established)
+
+- **Repro:** after `npm run build:packages`, on an Intel Arc 140V (Windows, Edge 158), with the KB-CLEAR-DEFAULT1
+  change in the tree:
+  - `node scripts/clustered-sphere-light-gpu-check.js`
+  - `node packages/dof/tests/gpu/lens-check.mjs`
+  - `node packages/biomes/tests/browser-check.mjs`
+  - `node scripts/test-browser.js --page=blend`
+  - `node packages/oit/test/gpu/real-check.mjs`
+  - `node scripts/material-back-side-gpu-check.js`
+  - `node packages/environment/tests/contact-hardening-browser.mjs --compat`
+  - `node packages/post/test/anamorphic-browser.mjs`
+  - `node packages/materials/test/instance-attributes-browser.mjs`
+  - `node scripts/ssao-gpu-check.js`
+  - `node packages/sky/test/features-check.mjs sleet astro hillaire`
+- **Cause:** not established. None was run on the parent commit, so it is not known which fail because of the new
+  backdrop under an HDR effect and which failed before it. First messages: SSAO "orthographic SSAO depends on the eye
+  position along the view"; anamorphic "the streak reaches 100 px each side: 56, 56"; lens check "three blades are
+  lopsided"; contact hardening (`--compat`) "Reflector: the far end blurs: 5.60 vs mirror 3.68"; back-side materials
+  "GPU comparisons failed"; instance attributes "WGSL compile errors"; OIT "Invalid BindGroup"; biomes "A valid
+  external Instance reference no longer exists"; sky `sleet astro hillaire` a 30 s page load timeout.
+- **Owed:** run each on the parent commit; correct a check that recorded the old backdrop to the computed value, and
+  fix any other failure in its package.
+
+### Open 2026-11-26: an `-srgb` view target without `viewFormats` fails with a raw validation error (KB-VIEW-SRGB-ERROR1, core)
+
+- **Repro:** `engine.render({ views: [{ camera: engine.camera, viewport: [0, 0, 1, 1], target: { color } }] })`
+  with `color` an `rgba8unorm-srgb` texture created without `viewFormats: ['rgba8unorm']`: native WebGPU reports a
+  validation error for `createView` and the view draws nothing; the WebGL2 layer draws it.
+- **Cause:** core draws such a target through a view in its non-srgb twin format (KB-VIEW-SRGB1), which WebGPU makes
+  only of a texture that names the twin. `GPUTexture` does not expose `viewFormats`, and core adds no check of its own.
+- **Owed:** a coded error with an errors-page link that says to add `viewFormats` (a validation error scope around
+  that `createView`), with its test.
+
 ### Open 2026-11-26: `npm run quality` is red on main at 9013114839 in physics entries (SEA-12, K2-09; solver-owned, not touched here)
 
 - **Repro:** `npm run quality` on 9013114839: sizes (the baseline holds the "feat(physics2d) vehicle" history row
@@ -918,18 +952,55 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   equipment - Colour measurement and management - Part 2-1: Default RGB colour space - sRGB" (IEC, 1999),
   https://webstore.iec.ch/en/publication/6169.
 
-### Open 2026-11-26: core's own clear colour comes out lighter and bluer once a post effect captures the scene (KB-CLEAR-DEFAULT1, core)
+### Fixed 2026-11-26: core's own clear colour came out lighter and bluer once a post effect captured the scene (KB-CLEAR-DEFAULT1, core)
 
-- **Repro:** an empty scene with no `background` draws 5,6,9. With `Tonemap.attach(engine)` it draws 7,20,38 (Intel
-  Arc 140V, Edge 158, WebGPU and the WebGL2 layer; the two `info` lines of
-  `packages/post/test/scene-background-browser.mjs`).
+- **Repro:** an empty scene with no `background` draws 5,6,9. With `Tonemap.attach(engine)` it drew 7,20,38, and the
+  same under `PostStack.attach(engine, [new Tonemap()])` (Intel Arc 140V, Edge 158, WebGPU and the WebGL2 layer; the
+  two `info` lines `packages/post/test/scene-background-browser.mjs` printed before this fix). A background of the same
+  displayed colour, `'#050609'`, draws 0,1,4 there.
 - **Cause:** core's clear colour is one set of numbers, 0.018, 0.023, 0.035 (`defaultClear`,
-  `packages/shared/clear-color.js`), written as the clear value of every target: display values on the canvas, linear
-  light in an HDR capture. KB-CLEAR-CAPTURE1 fixed this for a `background` colour and left core's own colour as it
-  was. The fix is the same decode for a capture, and it changes the backdrop of every frame under an HDR effect that
-  sets no background (to about 0,1,4 under the default tone map), so every pixel check and proof drawn over that
-  backdrop has to be run again with it. Needs a maintainer decision (frozen core, and it changes what checks accept).
-  Set `scene.background` meanwhile: a colour given there is the same colour in the scene on every target.
+  `packages/shared/clear-color.js`), and `captureClearColor` returned them untouched for every target: display values
+  on the canvas, and the same numbers read as linear light in an HDR capture, about thirteen times the light of the
+  colour the canvas shows. KB-CLEAR-CAPTURE1 gave a `background` colour the decode for a linear capture and left core's
+  own colour out of it.
+- **Fix (core):** `captureClearColor` takes core's own colour down the path of a background: on a capture that holds
+  linear light (a float format, or an `-srgb` one) it returns the colour decoded with the sRGB transfer function (IEC
+  61966-2-1), 0.00139, 0.00178, 0.00271, one array made once, so a frame allocates nothing and the clear-colour cache
+  holds one more entry; on the frame's own target and a display-encoded capture it returns the numbers as before. Both
+  of core's clear paths read it (the attachment clear of a whole view, also when it joins the next pass in an empty
+  scene, and the drawn clear of a partial view), and so does post's partial material clear (SSR, SSGI), so every
+  capture that hands core its target follows: the `SceneTarget` users (PostStack, Bloom, Tonemap, DOF, SSAO, creative
+  PostProcessing, RenderGraph, and TAA, upscaling, transitions and materials' opaque colour inside one), environment
+  captures (CubeCamera, reflectors) and XR eye views. Unchanged: a frame with no capture, byte for byte (the canvas, a
+  view's `target` of any format); display-encoded captures (FXAA, SMAA, TAA on the canvas format); the WebGL2 preview
+  renderer and sciviz tiles, which never clear a capture and keep the bytes-only `clearColorValue`; captures that clear
+  their own target (reflection probes, clustered bounce, water, the renderer of `@margoengine/xr`). No export, option
+  or shader text changes.
+- **Why core:** the value is chosen inside core's draw, where `scene.background` is unset and only core knows that its
+  own colour is about to clear a capture. A package cannot reach it: a capturing package could only set a background
+  itself (changing the scene it was asked to draw) or clear its target in a pass of its own, one more render pass per
+  capture and view each frame in every capturing package, with a capture written against the public pass context left
+  wrong. The failure it prevents: a backdrop of the wrong colour in every frame drawn through an HDR effect, a
+  reflector or a cube capture by a scene that sets no background, which is the zero-configuration default.
+- **What changes on screen:** with no `background`, a frame under an HDR effect has the backdrop a `#050609`
+  background has there: 0,1,4 under Tonemap and PostStack and 0,2,5 under Bloom (7,20,38 before), darker and no longer
+  blue-tinted. A reflector or cube capture sees the backdrop at its linear value (0.0014, 0.0018, 0.0027, for 0.018,
+  0.023, 0.035 before). With no effect nothing changes: 5,6,9.
+- **Checks drawn over the unset backdrop:** the package GPU checks that can draw core's clear into a capture were run
+  again on WebGPU and, where a check has one, its `--compat` run: 240 passed and 11 failed. No check was
+  changed. The 11 are logged open below (KB-CLEAR-CHECKS1); the run was stopped before they were attributed.
+- **Regression:** `tests/clear-capture.test.js` (the value per format for an unset colour; core's attachment and drawn
+  clears on a capture, on the canvas and on a view's own float or `-srgb` target); real GPU:
+  `packages/post/test/scene-background-browser.mjs`, on WebGPU and with `--compat`: with no background, 5,6,9 with no
+  effect, and under Tonemap, Bloom and PostStack the computed display value and the pixel a `#050609` background draws,
+  in an empty scene, beside a mesh and in a half-canvas view (21 more cases, 84 a backend). On the code before the fix
+  the CPU test fails and the 18 effect cases are wrong on both backends.
+- **Sources:** IEC 61966-2-1:1999, "Multimedia systems and equipment - Colour measurement and management - Part
+  2-1: Default RGB colour space - sRGB" (IEC, 1999), https://webstore.iec.ch/en/publication/6169; W3C, "WebGPU" (GPU
+  for the Web working group, Candidate Recommendation 2024), GPURenderPassColorAttachment `clearValue`,
+  https://www.w3.org/TR/webgpu/#dom-gpurenderpasscolorattachment-clearvalue; Khronos Group, "Khronos PBR Neutral Tone
+  Mapper" (Khronos 3D Formats working group, 2024), the curve the check computes its expected pixel with,
+  https://github.com/KhronosGroup/ToneMapping/tree/main/PBR_Neutral.
 
 ### Fixed 2026-11-26: a scene's background colour came out lighter once a post effect captured the scene (KB-CLEAR-CAPTURE1, core)
 
@@ -950,8 +1021,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   SSAO, creative PostProcessing, RenderGraph, and TAA, upscaling, transitions and materials' opaque colour inside one)
   and environment captures (CubeCamera, reflectors), in XR eye views too. A display-encoded capture (FXAA, SMAA, TAA on
   the canvas format) keeps the bytes. So does the frame's own target, the canvas or a view's `target` of any format,
-  where core's own shader writes display colour: a frame with no capture draws byte for byte as before, and an unset
-  background keeps core's clear colour on every target (KB-CLEAR-DEFAULT1). Captures that clear their own target
+  where core's own shader writes display colour: a frame with no capture draws byte for byte as before. An unset
+  background kept core's clear colour on every target until KB-CLEAR-DEFAULT1 (above). Captures that clear their own target
   (reflection probes, clustered bounce, water, the renderer of `@margoengine/xr`) never drew the background and are
   unchanged. Post's partial material clear (SSR, SSGI) passes the format too, so it writes what core's whole-view
   clear writes. Core's material colours and the clear share one decode (`toLinear`). The bytes-only

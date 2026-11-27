@@ -22,7 +22,9 @@ export function clearColorValue(color) {
 /** An sRGB byte (0 to 255) as linear light, by the sRGB transfer function (IEC 61966-2-1). */
 export const toLinear = (v) => ((v /= 255) > 0.04045 ? ((v + 0.055) / 1.055) ** 2.4 : v / 12.92);
 const byte = (v) => v / 255,
-  linear = /float$|srgb$/;
+  linear = /float$|srgb$/,
+  // Core's clear colour as linear light: its display values decoded once, one array for every linear capture.
+  linearClear = /* @__PURE__ */ defaultClear.map((v) => toLinear(v * 255));
 
 /**
  * {@link clearColorValue} for a draw that may clear a capture's target. `capture` is the colour format of that target,
@@ -30,14 +32,17 @@ const byte = (v) => v / 255,
  * decoded with the sRGB transfer function (IEC 61966-2-1): a float format (a post effect's HDR capture), which the
  * display transform encodes later, and an `-srgb` format, whose clear value the device encodes on store (WebGPU,
  * GPURenderPassColorAttachment clearValue). Any other capture, and no capture (false or undefined: the frame's own
- * target, the canvas or a view's target), takes the bytes as given, and core's clear colour is the same numbers on
- * every target. Before KB-CLEAR-CAPTURE1 every target took the bytes, so a linear capture encoded them twice (#808080
- * drew 181 under a tone map). A function of its own, so a bundle that never clears a capture carries no decode.
+ * target, the canvas or a view's target), takes the bytes as given. Core's own clear colour (any other value of
+ * `color`) takes the same path: display values as given, decoded for a linear capture, so an unset background shows as
+ * a background of the same colour does (KB-CLEAR-DEFAULT1; before, it was the same numbers on every target, 5,6,9 on
+ * the canvas and 7,20,38 under a tone map). Before KB-CLEAR-CAPTURE1 every target took the bytes, so a linear capture
+ * encoded them twice (#808080 drew 181 under a tone map). A function of its own, so a bundle that never clears a
+ * capture carries no decode.
  */
 export function captureClearColor(color, capture) {
-  if (typeof color !== 'string') return defaultClear;
-  const n = hexColor(color),
-    f = linear.test(capture) ? toLinear : byte;
+  const f = linear.test(capture) ? toLinear : byte;
+  if (typeof color !== 'string') return f === byte ? defaultClear : linearClear;
+  const n = hexColor(color);
   if (n < 0) throw new RangeError('Invalid color; use #rrggbb');
   return [f(n >> 16), f((n >> 8) & 255), f(n & 255), 1];
 }

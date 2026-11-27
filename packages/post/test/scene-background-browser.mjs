@@ -1,11 +1,14 @@
-// Real-GPU check of KB-CLEAR-CAPTURE1, built packages, on WebGPU and (--compat or MARGO_COMPAT=1) the WebGL2 layer:
+// Real-GPU check of KB-CLEAR-CAPTURE1 and KB-CLEAR-DEFAULT1, built packages, on WebGPU and (--compat or MARGO_COMPAT=1) the WebGL2 layer:
 //   node scripts/run-with-timeout.mjs -- node packages/post/test/scene-background-browser.mjs [--compat]
 // `engine.scene.background` (sRGB) is drawn with no effect, under Tonemap, Bloom and PostStack with a Tonemap, in an
 // empty scene (core's clear joins the next pass), beside a mesh (core's own pass clears) and in a view of the left half
 // of the canvas (core clears by drawing). With no effect the colour shows as given; under an effect it is linear light
 // the effect tone-maps (Khronos PBR Neutral, then the sRGB encoding, IEC 61966-2-1), the pixel ColorBackground of
 // @margoengine/environment draws. Before the fix the capture was cleared with the sRGB bytes and encoded again: #808080
-// drew 181 where 116 is right. Every case is drawn before the check fails, so one run lists all that are wrong.
+// drew 181 where 116 is right. With no background set, core's own clear colour (display 0.018, 0.023, 0.035) takes the
+// same path: 5,6,9 with no effect, and under an effect its decoded values tone-mapped, the pixel a background of
+// #050609 draws there. Before KB-CLEAR-DEFAULT1 it was written to the capture undecoded and drew 7,20,38 under Tonemap.
+// Every case is drawn before the check fails, so one run lists all that are wrong.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
@@ -15,7 +18,11 @@ import { postBrowser } from './post-browser.mjs';
 const decode = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
   encode = (v) => (v < 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055),
   bytes = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)),
-  displayed = (hex) => pbrNeutral(bytes(hex).map((b) => decode(b / 255))).map((v) => Math.round(encode(v) * 255));
+  shown = (display) => pbrNeutral(display.map(decode)).map((v) => Math.round(encode(v) * 255)),
+  displayed = (hex) => shown(bytes(hex).map((b) => b / 255));
+// Core's own clear colour (packages/shared/clear-color.js), and the background that displays as the same bytes.
+const coreClear = [0.018, 0.023, 0.035],
+  coreHex = '#050609';
 const colours = ['#808080', '#07090f', '#2a6cba'],
   effects = ['Tonemap', 'Bloom', 'PostStack'];
 
@@ -95,12 +102,17 @@ await postBrowser(
           );
         }
       }
+      // No background (KB-CLEAR-DEFAULT1): core's own clear colour as given, and under an effect as a background is.
+      check(await pixel('none', undefined, 'background', mesh, half), bytes(coreHex), `none unset ${scene}`, 0);
+      for (const effect of effects) {
+        const drawn = await pixel(effect, undefined, 'background', mesh, half),
+          label = `${effect} unset ${scene}`;
+        check(drawn, shown(coreClear), label, 1);
+        check(drawn, await pixel(effect, coreHex, 'background', mesh, half), `${label} against ${coreHex}`, 1);
+      }
     }
-    // Not asserted: core's own clear colour (no background set) is the same numbers on every target (known bugs).
-    for (const effect of ['none', 'Tonemap'])
-      console.log(`info no background, ${effect}: drew ${await pixel(effect, undefined, 'background', false)}`);
     assert.deepEqual(wrong, []);
     console.log(`ok scene background on ${compatRun() ? 'the WebGL2 layer' : 'WebGPU'}`);
   },
-  { seconds: 420 },
+  { seconds: 600 },
 );
