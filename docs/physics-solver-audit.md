@@ -1308,6 +1308,17 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   mode and increases the measured profile error. Neither footprint nor the sidewall control closes the
   held-out case. The independent geometry and forcing inputs were frozen for every comparison.
 
+  An offline body-fitted prismatic potential-flow diagnostic improves the frozen KCS signed error to
+  7.169 mm and 8.148 mm at 0.25 m and 0.125 m. Its manufactured signed trace errors refine from
+  14.70% to 7.88%, tow work stays positive, and the two predictions differ by 2.996 mm RMS.
+  Geometry, advection, regularization and predictions were frozen before scoring all 469 measured
+  stations. The fine error is above the 0.4695 mm experimental uncertainty and the aft interval has
+  a 13.87 mm error. At the raw centerline transom lip the flat free-surface model predicts 59–65 mm
+  of water above the actual solid edge with no flow reversal at the sampled probes. The experiment
+  reports wash-over and unsteady stern flow. The current runtime held-out item remains open.
+  [Kim, Van and Kim, 2001, §4.1](https://doi.org/10.1007/s003480100332)
+  [Independent KRISO signed wave cut](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/data/KCS_data/fixed/wave_cut.dat)
+
   The straight-quay coupling in `fbee5a3b75` enforces zero normal flow in the controlled reflected mode.
   The normal velocity is below 2×10⁻¹⁵ m/s, with an open-control speed of 3.88 mm/s in the live hull test.
   A separate low-crest browser fixture draws the coupled surface within 2.47×10⁻⁸ m of the solver on both renderers.
@@ -1461,6 +1472,16 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   of a uniform-layer normal mode, including a point between the free surface and first layer. A second case
   verifies the closed upper neighbour, signed volume, work and the coded error below the bed. Both memory
   modes replay exactly. This replaces uniform-depth band smearing for compatible finite-domain publishers.
+
+  The [local oblique-packet comparison](../packages/physics/scripts/measure-finite-quay-local-packet.mjs)
+  launches a 1.29 m carrier 1.84 m from the surveyed 5.72 m aperture. At 0.15 m resolution with both
+  fourth-order options, the 9 m crop's surface trace differs by up to 13 nm between an open and sealed
+  deep path. Energy closes to 3.2×10⁻¹² J and the solve replays exactly. Holding the geometry fixed and
+  widening the crop to 12 m changes the face and reflected traces by 0.065% and 0.480% RMS.
+  The reflected trace differs from the summed-image reference by 17.34% RMS and the off-ray trace
+  differs by 78%. That reference includes the initial image tail. A separate even continuation of
+  the actual incident-only launch gives 11.64% RMS for the reflected return and 24.95% for the off-ray
+  trace. These checks cover the local four-second crossing. The full trajectory and its wake remain unresolved.
 
   The 4 m full-history diagnostic used the same archived shutters and quay structure as the 8 m run,
   and both renderers sampled the accepted wave heights within 1.54×10⁻⁶ m. Wall peaks rose to 0.332 m
