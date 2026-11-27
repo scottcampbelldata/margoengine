@@ -620,10 +620,26 @@ exactly what is behind it. Display white reads as the least light that shows as 
 `shared/display.js`, about 13.5), so rough glass over a clipped white background blurs it brighter than an HDR capture
 would. A view with no capture (an environment probe face, a `createRenderer` pass) keeps the tinted blend.
 
+`Transmission.attach(engine, {depthWrite: true})` draws OPAQUE and MASK glass as a surface: unblended, writing depth,
+so a glass surface hides the glass behind it (a solid sphere's back faces and their highlights) in any draw order, and
+water, fog and OIT later see the glass depth. BLEND glass stays blended and writes none. The scene copy holds the
+opaque scene only, so glass seen through glass shows what is behind both. Default `false`, `order` default 3:
+
+```js
+import { Engine } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+import { Transmission } from '@margoengine/gltf/transmission';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+const solid = Transmission.attach(engine, { depthWrite: true });
+solid.add(await loadGLTF(engine, '/glass.glb'));
+```
+
 Transmission hook (`model.setTransmission(hook)`, `PBRTransmission` in `@margoengine/gltf/pbr`): the hook's
 `declarations`, `bindings`, `targets` and `begin` draw the model's transmissive primitives in its own pass, and its
 optional `takes(context)` says per view whether it does; where it returns false those primitives keep the tinted blend
-in the beauty pass.
+in the beauty pass. Its optional `depthWrite` asks for the unblended, depth-writing OPAQUE and MASK draws above, and
+`begin()` must then open a writable depth attachment.
 
 `loadGLTF(engine, url, {optimize: true})` runs the import step of `@margoengine/geometry/optimize` on each opaque primitive
 as it packs: the same triangles in the order the vertex cache and early depth test read fastest, with `BLEND` primitives

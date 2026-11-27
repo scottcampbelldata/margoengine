@@ -23,10 +23,16 @@ import { mipShader } from '../../shared/mipmaps.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** Options for `Transmission.attach()`: the frame graph `order` (default 3). */
+/** Options for `Transmission.attach()`: the frame graph `order` (default 3) and `depthWrite` (default false). */
 export interface TransmissionPassOptions {
   /** Frame graph order of the copy and the transmissive draws: after the opaque scene (1) and sky (2), before water (4), fog (5) and OIT (8). Default 3. */
   order?: number;
+  /**
+   * True: OPAQUE and MASK glass draws unblended and writes depth, so a glass surface hides glass behind it (a solid
+   * sphere's back faces and their highlights) whatever the draw order, and later passes (water, fog, OIT) see the glass
+   * depth. BLEND glass stays blended without writes. Default false: every surface blends, depth read-only.
+   */
+  depthWrite?: boolean;
 }
 // Group-2 bindings, clear of shadows (1-3), clustered (10-16), IBL/fog (20-25), materials (32-43) and OIT (120).
 const BINDING = 124;
@@ -128,6 +134,7 @@ let serial = 0;
 export class Transmission implements EnginePlugin, PBRTransmission {
   readonly name = 'transmission:' + serial++;
   readonly order: number;
+  readonly depthWrite: boolean;
   targets: readonly GPUColorTargetState[] = [];
   private engine?: Engine;
   /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
@@ -155,9 +162,11 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     engineRuntime(engine).use(value);
     return value;
   }
-  constructor({ order = 3 }: TransmissionPassOptions = {}) {
+  constructor({ order = 3, depthWrite = false }: TransmissionPassOptions = {}) {
     if (!Number.isFinite(order) || order <= 0) throw new RangeError('Transmission order must be a number > 0');
+    if (typeof depthWrite !== 'boolean') throw new TypeError('Transmission depthWrite must be true or false');
     this.order = order;
+    this.depthWrite = depthWrite;
   }
   /** Refracts the scene through the model's transmissive primitives (gltf\/pbr model or materials mesh). Returns a remover. */
   add(model: PBRModel): () => void {
@@ -244,7 +253,9 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     this.pass = encoder.beginRenderPass({
       label: 'transmission',
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
-      depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
+      depthStencilAttachment: this.depthWrite
+        ? { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true }
+        : { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
     });
     applyView(this.pass, c);
     return this.pass;

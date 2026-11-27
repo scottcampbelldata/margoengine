@@ -16811,8 +16811,11 @@ PostStack target) and undoes the display transform at level 0 (PBR Neutral inver
 IOR 1 glass equals the tint pixel for pixel (a plain sRGB decode left the curve in and drew 230 as 225), and
 `PBRTransmission.takes(c)` keeps the tint in views with no capture. A materials mesh with the hook asks for the
 capture as linear blends do. Regression: packages/gltf/scripts/test-screen-transmission-browser.mjs (native and
---compat, 1x and 4x), tests/display-neutral-inverse.test.js, packages/materials/test/physical.test.js. Steps 3
-(`depthWrite`) and 4 (default wiring, proofs) remain, so KB4000 stays open.
+--compat, 1x and 4x), tests/display-neutral-inverse.test.js, packages/materials/test/physical.test.js. Step 3
+(2026-11-27): `TransmissionPassOptions.depthWrite` / `PBRTransmission.depthWrite` draw OPAQUE and MASK glass unblended
+with depth writes (BLEND glass unchanged), so glass in front hides glass behind in either draw order; regression: the
+stack cases of the same browser test (green mean 115.5 with it in both orders, 3.5 blended) and physical.test.js
+"depthWrite". Step 4 (default wiring, proofs) remains, so KB4000 stays open.
 
 ### Fixed 2026-11-27: the transmission proof's viewer row was 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
 

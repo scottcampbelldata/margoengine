@@ -363,6 +363,53 @@ for (const samples of [4, 1])
     assert.equal(of(after, 'pass.drawIndexed').length, 3, 'opaque mesh, then the glass twice (tint, lit)');
   });
 
+// KB4000 step 3: depthWrite draws OPAQUE and MASK glass unblended with depth writes into a writable depth attachment;
+// BLEND glass keeps the blend and writes no depth. Default false keeps both read-only and blended.
+test('Transmission depthWrite: opaque glass writes depth unblended, BLEND glass stays blended', async () => {
+  for (const depthWrite of [false, true]) {
+    const { engine, frame } = await scene(),
+      transmission = Transmission.attach(engine, { depthWrite });
+    assert.equal(transmission.depthWrite, depthWrite);
+    const glass = (alphaMode) => {
+      const fixture = animatedTriangle();
+      delete fixture.doc.skins;
+      delete fixture.doc.animations;
+      fixture.doc.materials = [{ alphaMode, extensions: { KHR_materials_transmission: { transmissionFactor: 1 } } }];
+      fixture.doc.meshes[0].primitives[0].material = 0;
+      fixture.doc.extensionsUsed = ['KHR_materials_transmission'];
+      return parseGLTF(engine, fixture.doc, fixture.buffers, [], { materials: extendedMaterials });
+    };
+    transmission.add(glass('OPAQUE'));
+    transmission.add(glass('BLEND'));
+    const log = frame(0),
+      pass = passes(log).find((p) => p.label === 'transmission');
+    assert.deepEqual(
+      [pass.depthStencilAttachment.depthReadOnly, pass.depthStencilAttachment.depthStoreOp],
+      depthWrite ? [undefined, 'store'] : [true, undefined],
+    );
+    const glassModules = new Set(
+        of(log, 'module')
+          .filter((m) => m[2].code.includes('fn margoTransmission('))
+          .map((m) => m[1]),
+      ),
+      drawn = of(log, 'renderPipeline')
+        .map((e) => e[2])
+        .filter((p) => glassModules.has(p.fragment?.module));
+    assert.ok(drawn.length > 0, 'glass pipelines found');
+    // Distinct [depth written, blended] states of the glass pipelines (the default shares one pipeline for both).
+    const states = [
+      ...new Set(
+        drawn
+          .filter((p) => p.fragment.targets[0].format === 'rgba16float')
+          .map((p) => JSON.stringify([p.depthStencil.depthWriteEnabled, !!p.fragment.targets[0].blend])),
+      ),
+    ].sort();
+    assert.deepEqual(states, depthWrite ? ['[false,true]', '[true,false]'] : ['[false,true]']);
+    transmission.dispose();
+  }
+  assert.throws(() => new Transmission({ depthWrite: 1 }), TypeError);
+});
+
 // KB4000 step 2: a display scene is a source too (it threw "needs an HDR scene capture" before). An LDR capture (FXAA's)
 // and the native glass capture of the display target are display-encoded, so level 0 inverts the display transform;
 // the mip chain then holds scene light, as from an HDR capture.

@@ -1181,6 +1181,7 @@ interface PBRTransmission {
     takes?(context: Extract<PassContext, {
         backend: 'webgpu';
     }>): boolean;
+    readonly depthWrite?: boolean;
 }
 
 interface PBRTransparency {

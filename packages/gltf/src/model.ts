@@ -5415,6 +5415,9 @@ export class PBRModel implements EnginePlugin {
       // KB3148d: a linear layer in a hook's pass marks its pixels for the hook's linear-light composite.
       linearMark =
         through && !transmission && !linearHdr(c.format) && !!this.transparency!.linearLayers && linearBlends(m),
+      // KB4000: a transmission hook with depthWrite draws OPAQUE and MASK glass as a surface (no blend, depth written),
+      // so a glass surface hides glass behind it whatever the draw order; BLEND glass stays blended without writes.
+      written = transmission && !!(oit as PBRTransmission).depthWrite && m.settings[0] !== 2,
       tinted =
         !dual &&
         !native &&
@@ -5450,7 +5453,7 @@ export class PBRModel implements EnginePlugin {
       (topology ? ':' + topology : '') +
       (laterUV ? ':uv' : '') +
       (through || capture
-        ? ':o' + objectId((through ? oit! : hook!).targets) + ':' + kind + (linearMark ? 'l' : '')
+        ? ':o' + objectId((through ? oit! : hook!).targets) + ':' + kind + (linearMark ? 'l' : '') + (written ? 'w' : '')
         : '') +
       (tinted && (shading?.texturedTint || surfaceTint(m)) ? ':t' : '');
     let pipeline = draws.pipelines.get(key);
@@ -5490,7 +5493,9 @@ export class PBRModel implements EnginePlugin {
           },
           targets:
             through || capture
-              ? ((through ? oit! : hook!).targets as GPUColorTargetState[])
+              ? written
+                ? (oit!.targets as GPUColorTargetState[]).map(({ blend: _, ...target }) => target)
+                : ((through ? oit! : hook!).targets as GPUColorTargetState[])
               : mode === 'occlusion'
                 ? [
                     { format },
@@ -5542,6 +5547,7 @@ export class PBRModel implements EnginePlugin {
           depthWriteEnabled:
             state?.depthWrite ??
             (((mode === 'beauty' || capture) && !blend) ||
+              written ||
               (through && !transmission && !!this.transparency!.depthWrite)),
           depthCompare:
             external?.depthCompare ??

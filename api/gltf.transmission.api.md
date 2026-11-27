@@ -11,9 +11,10 @@ import { Splats } from "@margoengine/splats";
 export class Transmission implements EnginePlugin, PBRTransmission {
     readonly name: string;
     readonly order: number;
+    readonly depthWrite: boolean;
     targets: readonly GPUColorTargetState[];
     static attach(engine: EngineKernel, options?: TransmissionPassOptions): Transmission;
-    constructor({ order }?: TransmissionPassOptions);
+    constructor({ order, depthWrite }?: TransmissionPassOptions);
     add(model: PBRModel): () => void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -28,6 +29,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
 
 export interface TransmissionPassOptions {
     order?: number;
+    depthWrite?: boolean;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -1163,6 +1165,7 @@ interface PBRTransmission {
     takes?(context: Extract<PassContext, {
         backend: 'webgpu';
     }>): boolean;
+    readonly depthWrite?: boolean;
 }
 
 interface PBRTransparency {

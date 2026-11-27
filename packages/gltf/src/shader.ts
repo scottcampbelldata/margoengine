@@ -773,6 +773,12 @@ export interface PBRTransmission {
    * keep the tinted blend in the beauty pass. Omitted: always true.
    */
   takes?(context: Extract<PassContext, { backend: 'webgpu' }>): boolean;
+  /**
+   * True: OPAQUE and MASK transmissive primitives draw unblended and write depth (`begin()` opens a writable depth
+   * attachment), so glass hides the glass behind it in any draw order; BLEND ones stay blended without depth writes.
+   * Default false: every primitive blends with `targets` and depth is read-only.
+   */
+  readonly depthWrite?: boolean;
 }
 const base = '  color=layers(s,v,l,color);',
   transmitted = new Map<string, Map<string, string>>();

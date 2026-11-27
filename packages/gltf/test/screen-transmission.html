@@ -18,6 +18,19 @@ const glass=(roughness,ior,x=0,width=0.8)=>instancedGLTF([{t:[x,0,0.5],s:[width,
  pbrMetallicRoughness:{metallicFactor:0,roughnessFactor:roughness,baseColorFactor:[1,1,1,1]},
  extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_specular:{specularFactor:0},KHR_materials_ior:{ior}},
 }});
+// KB4000 step 3: two glass quads in one model, white in front (z 0.5) and red behind (z 0.2); `nearFirst` sets the draw order.
+const stack=(nearFirst)=>{
+ const near={t:[0,0,0.5],s:[0.8,0.8,1]},far={t:[0,0,0.2],s:[0.8,0.8,1]};
+ const input=instancedGLTF(nearFirst?[near,far]:[far,near],{instanced:false,material:{
+  pbrMetallicRoughness:{metallicFactor:0,roughnessFactor:0,baseColorFactor:[1,1,1,1]},
+  extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_specular:{specularFactor:0},KHR_materials_ior:{ior:1}},
+ }});
+ const doc=input.doc,red=structuredClone(doc.materials[0]);
+ red.pbrMetallicRoughness.baseColorFactor=[1,0,0,1];doc.materials.push(red);
+ doc.meshes.push({primitives:[{...doc.meshes[0].primitives[0],material:1}]});
+ doc.nodes[nearFirst?1:0].mesh=1;
+ return input;
+};
 window.screenTransmission=async()=>{
  const rows=[];
  const cases=[
@@ -27,6 +40,9 @@ window.screenTransmission=async()=>{
   {name:'pass-ior15-rough06',roughness:0.6,ior:1.5,pass:true},
   {name:'tint-rough0',roughness:0,ior:1,pass:false},
   {name:'pass-two',roughness:0,ior:1,pass:true,two:true},
+  {name:'stack-blend-near-first',pass:true,stack:true,nearFirst:true},
+  {name:'stack-write-near-first',pass:true,stack:true,nearFirst:true,depthWrite:true},
+  {name:'stack-write-far-first',pass:true,stack:true,nearFirst:false,depthWrite:true},
  ];
  for(const antialias of [false,true])for(const k of cases){
   const canvas=document.body.appendChild(document.createElement('canvas'));
@@ -36,10 +52,10 @@ window.screenTransmission=async()=>{
    engine.scene.background='#ffffff';engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([0,0,0,0]);
    const b=background();
    models.push(parseGLTF(engine,b.doc,b.buffers,[checker],{materials:extendedMaterials}));
-   for(const g of k.two?[glass(k.roughness,k.ior,-0.22,0.4),glass(k.roughness,k.ior,0.22,0.4)]:[glass(k.roughness,k.ior)])
+   for(const g of k.stack?[stack(k.nearFirst)]:k.two?[glass(k.roughness,k.ior,-0.22,0.4),glass(k.roughness,k.ior,0.22,0.4)]:[glass(k.roughness,k.ior)])
     models.push(parseGLTF(engine,g.doc,g.buffers,[],{materials:extendedMaterials}));
    let transmission;
-   if(k.pass){transmission=Transmission.attach(engine);for(const m of models.slice(1))transmission.add(m);}
+   if(k.pass){transmission=Transmission.attach(engine,{depthWrite:!!k.depthWrite});for(const m of models.slice(1))transmission.add(m);}
    const frame=async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();};
    await waitForPipelines(frame);
    // Count the scene copies of one steady frame: one mip chain per frame, not one per glass model.

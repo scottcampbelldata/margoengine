@@ -26,8 +26,14 @@ await runSuite(
       delete row.png;
       assert.equal(picture.width, 128);
       // The glass covers the centre (about 98 px square); measure the middle 64 x 64.
-      const red = [];
-      for (let y = 32; y < 96; y++) for (let x = 32; x < 96; x++) red.push(picture.data[(y * 128 + x) * 4]);
+      const red = [],
+        green = [];
+      for (let y = 32; y < 96; y++)
+        for (let x = 32; x < 96; x++) {
+          red.push(picture.data[(y * 128 + x) * 4]);
+          green.push(picture.data[(y * 128 + x) * 4 + 1]);
+        }
+      row.greenMean = green.reduce((a, b) => a + b, 0) / green.length;
       const mean = red.reduce((a, b) => a + b, 0) / red.length;
       row.mean = mean;
       // Red values seen in the glass, and in the open checker at the left edge (x 0 to 7), for the report.
@@ -70,6 +76,12 @@ await runSuite(
       assert.equal(sharp.row.copies, levels, `one copy chain per frame (${antialias})`);
       assert.equal(two.row.copies, levels, `two glass models share one copy chain (${antialias})`);
       assert.equal(tint.row.copies, 0, 'the tint route copies nothing');
+      // depthWrite: the white glass in front hides the red glass behind it in either draw order (green survives); without
+      // it the later red draw lands over the white one (green gone). The white-only frame's green mean is the target.
+      const white = sharp.row.greenMean;
+      assert.ok(at('stack-blend-near-first').row.greenMean < white / 4, `blended: the later red glass covers (${antialias})`);
+      for (const name of ['stack-write-near-first', 'stack-write-far-first'])
+        assert.ok(Math.abs(at(name).row.greenMean - white) < 1, `${name}: the front glass hides the red (${antialias})`);
     }
     console.log('screen transmission:', rows.length, 'frames passed', context.hardware.compat ? '(compat)' : '');
   },
