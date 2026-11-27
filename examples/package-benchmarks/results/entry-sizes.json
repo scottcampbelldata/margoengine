@@ -17488,12 +17488,12 @@
         "gzip": 1385
       },
       "./planet-recipes": {
-        "raw": 7383,
-        "gzip": 3216
+        "raw": 13466,
+        "gzip": 5848
       },
       "./planet": {
-        "raw": 18407,
-        "gzip": 7512
+        "raw": 19006,
+        "gzip": 7682
       },
       "./imagery": {
         "raw": 15428,
