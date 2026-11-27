@@ -2531,6 +2531,10 @@
       "types": "./dist/loaders/mmcif.d.ts",
       "import": "./dist/loaders/mmcif.js"
     },
+    "./loaders/dae-kinematics": {
+      "types": "./dist/loaders/dae-kinematics.d.ts",
+      "import": "./dist/loaders/dae-kinematics.js"
+    },
     "./lod/msft": {
       "types": "./dist/lod/msft.d.ts",
       "import": "./dist/lod/msft.js"

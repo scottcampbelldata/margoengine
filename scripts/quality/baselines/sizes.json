@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20837504,
+  "total": 20857032,
   "history": [
     {
       "date": "2026-10-24",
@@ -14377,6 +14377,12 @@
       "commit": "46d930c1a5",
       "grew": 2,
       "reason": "SEA-12 optional depth and lateral span wake transfer: physics/sea grows from 6405 to 7624 B gzip, ceiling 6661 to 7880 B. physics/seakeeping grows from 37788 to 39436 B gzip, ceiling 38618 to 40620 B. Projection uses the existing wake spectrum and source normalization; the hull uses its existing strip geometry and tick. A split would have to expose those internals and require the caller to wire a second source stage. The core and stage entries have no added imports."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "1a1b54e5d7",
+      "reason": "COLLADA kinematics: new optional entry loaders/dae-kinematics, 0 to 18959 B gzip (the DAE parser it extends included; ceiling 19528 B). A split from parseDAE would copy the parser; core plus stage unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -14984,6 +14990,7 @@
     "@margoengine/loaders/amf": 9826,
     "@margoengine/loaders/babylon": 6425,
     "@margoengine/loaders/common": 5070,
+    "@margoengine/loaders/dae-kinematics": 19528,
     "@margoengine/loaders/font": 9324,
     "@margoengine/loaders/font-opentype": 16470,
     "@margoengine/loaders/font-woff": 22190,

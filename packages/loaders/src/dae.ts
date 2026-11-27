@@ -576,18 +576,31 @@ function findNode(roots: readonly DAENode[], match: (node: DAENode) => boolean):
  * node transform elements and morph weights) and animation clips are read too. `up_axis` and `unit` are converted to
  * Y-up meters, alike for geometry, node, bind shape and inverse bind matrices. `lookat` and `skew` join the transform
  * stack; `<instance_camera>` and `<instance_light>` give `cameras` and `lights` (technique_common optics and lights)
- * with their frames. Lines, polygon holes, and cameras, lights, channels or controllers that do not fit are not
- * imported; each is reported in `warnings`. Image paths are
- * relative to the .dae folder, for the caller's resolver.
+ * with their frames. `<lines>` and `<linestrips>` come back as each geometry's `lines`. Polygon holes, and cameras,
+ * lights, channels or controllers that do not fit, are not imported; each is reported in `warnings`. Image paths are
+ * relative to the .dae folder, for the caller's resolver. Joints are read by `parseDAEKinematics` of
+ * `@margoengine/loaders/dae-kinematics`.
  */
 export function parseDAE(input: BinaryInput | string, options: DAEParseOptions = {}): LoadedDAE {
-  const limit = limits(options, F),
-    root = readXMLTree(typeof input === 'string' ? input : decodeXML(toBytes(input, F)), F, {
-      external: options.external,
-    }).children[0];
+  return readDAE(daeRoot(input, options), options);
+}
+
+/** The document's `<COLLADA>` element. */
+export function daeRoot(input: BinaryInput | string, options: DAEParseOptions): XMLElement {
+  // The limits are checked before the XML is read.
+  limits(options, F);
+  const root = readXMLTree(typeof input === 'string' ? input : decodeXML(toBytes(input, F)), F, {
+    external: options.external,
+  }).children[0];
   if (root?.name !== 'COLLADA')
     throw new LoaderError(F, 'header', `root element is <${root?.name ?? ''}>, not <COLLADA>`);
-  const warnings = new Set<string>(),
+  return root;
+}
+
+/** {@link parseDAE} of a document already read, for entries that also read other libraries of it. */
+export function readDAE(root: XMLElement, options: DAEParseOptions): LoadedDAE {
+  const limit = limits(options, F),
+    warnings = new Set<string>(),
     warn = (message: string): void => void warnings.add(message);
   const ids = new Map<string, XMLElement>(),
     images = new Map<string, string>();

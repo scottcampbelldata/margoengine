@@ -17484,3 +17484,14 @@ samples) 144 ms against 90 ms, RG1 45 against 32 ms, SC1 45 against 29 ms, MR2 (
 (262,144) 2.6 against 3.8 ms, on a machine shared with other work. The gain, 1.4 to 1.6 times, appears only above about
 1 MB of data, small slices and camera tiles are no faster, and the synchronous `decodeJPEG` and `parseTIFF` calls cannot
 load a module on demand, so Wasm would mean a second, asynchronous decoder.
+
+## COLLADA kinematics (2026-11-27)
+
+`packages/loaders/src/dae-kinematics.ts` is written from the Khronos Group's public *COLLADA Digital Asset Schema*,
+version 1.5.0 (2008), https://www.khronos.org/files/collada_schema_1_5, which gives the element structure of the
+kinematics libraries, the parameter types and the shape of a SID reference. The address rules (an id or `.` first,
+then SIDs searched breadth first, an optional member selector) are those of the *COLLADA 1.5.0 Specification* (Barnes
+and Finch, Khronos Group, 2008, https://www.khronos.org/files/collada_spec_1_5.pdf), section "Address Syntax"; that
+file was too large for the fetch tool, so the prose was not reread for this change, and the reading that a bound joint
+value replaces the node transform is this reader's own. No other engine's or library's source was read or copied, and
+no sample file from another project was used: the test documents are written from the schema.

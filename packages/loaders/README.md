@@ -72,6 +72,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVTK` | `# vtk DataFile Version` 1.0 to 5.1, ASCII or BINARY `DATASET POLYDATA`: POINTS, POLYGONS (convex ones fanned, concave ones ear-clipped), TRIANGLE_STRIPS, 5.x OFFSETS/CONNECTIVITY, point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES (v = 1 - t, as VTK puts t = 0 at the image's bottom), SCALARS |
 | `parseOBJ` (async), `parseMTL` | See [OBJ and MTL](#obj-and-mtl) |
 | `parseDAE`, `flattenDAE` | See [COLLADA](#collada) |
+| `parseDAEKinematics`, `poseDAEJoints` (`/dae-kinematics`) | See [Collada kinematics](#collada-kinematics) |
 | `parseTMX` (async), `tmxLayerQuads` | See [Tiled TMX](#tiled-tmx) |
 | `parseTTF`, `textGeometry` (`/font`) | See [Fonts and 3D text](#fonts-and-3d-text) |
 | `parseSVG` (`/svg`) | See [SVG](#svg) |
@@ -488,7 +489,7 @@ for (const path of paths) {
 - `materials`: `profile_COMMON` `constant`, `lambert`, `phong` and `blinn` with `emission`, `ambient`, `diffuse`, `specular`, `reflective` and `transparent` as `{color}` or `{texture: {path, texcoord}}` (through 1.4.1 sampler2D, surface and image, 1.5 `instance_image`, or a bare image id), `opaque`, `shininess`, `reflectivity`, `transparency`, `indexOfRefraction`.
 - `images`: the texture paths materials use, relative to the .dae folder (`file:///C:/a%20b.png` becomes `C:/a b.png`), for your resolver.
 - `nodes`: the instanced visual scene as `{id, name, matrix, instances, children}`, `matrix` being the node's matrix/translate/rotate/scale/lookat/skew stack (column-major, Y-up meters); `instances` are `{geometry, materials}` with `bind_material` symbols mapped to material indices; `instance_node` is expanded (at most 64 deep and 100,000 nodes).
-- Not imported, each reported in `warnings`: `<lines>` and `<linestrips>`, polygon holes (the outer polygon is kept), embedded image data, non-mesh geometry, cameras and lights without `technique_common` optics or light (profile-specific techniques), and the controllers, joints and animation channels described below when they do not resolve. A degenerate `lookat` (eye on the interest point, or up along the view) keeps only its eye; a degenerate `skew` is skipped; both are warned.
+- Not imported, each reported in `warnings`: polygon holes (the outer polygon is kept), embedded image data, non-mesh geometry, cameras and lights without `technique_common` optics or light (profile-specific techniques), and the controllers, joints and animation channels described below when they do not resolve. A degenerate `lookat` (eye on the interest point, or up along the view) keeps only its eye; a degenerate `skew` is skipped; both are warned.
 
 `flattenDAE(dae, pose?)` bakes the hierarchy into one `LoadedGeometry` (mirrored nodes keep outward winding) with a group per node instance and primitive, named after the node and colored with the bound material's diffuse color, so `createMeshes(engine, flattenDAE(dae))` shows the scene. Skinned and morphed instances are deformed: at rest without a pose, animated with `flattenDAE(dae, poseDAE(dae, seconds))`.
 
@@ -557,6 +558,54 @@ function frame(delta: number): void {
 ```
 
 `Skin` takes no morph targets, so a morph is blended on the CPU (`morphDAE`), and a skin over a morph re-binds with `bindDAESkin(dae, instance, {weights})` and `setGeometry`. Without the animation package, `flattenDAE(dae, poseDAE(dae, seconds))` bakes any frame on the CPU.
+
+### Collada kinematics
+
+`parseDAEKinematics` of `@margoengine/loaders/dae-kinematics` is `parseDAE` plus the COLLADA 1.5 kinematics libraries (`library_joints`, `library_kinematics_models`, `library_articulated_systems`, `library_kinematics_scenes` and `instance_kinematics_scene`), as robot and machine exporters write them. `poseDAEJoints` moves the model by joint value.
+
+```ts
+import {createMeshes, flattenDAE} from 'margoengine/loaders';
+import {parseDAEKinematics, poseDAEJoints} from 'margoengine/loaders/dae-kinematics';
+import {Engine} from 'margoengine/core';
+
+// A one-joint arm: the plate under node "arm" turns about the vertical axis.
+const text = `<COLLADA version="1.5.0">
+<library_geometries><geometry id="plate"><mesh>
+  <source id="p"><float_array id="pa" count="12">0 0 -0.2 1 0 -0.2 1 0 0.2 0 0 0.2</float_array>
+    <technique_common><accessor source="#pa" count="4" stride="3"/></technique_common></source>
+  <vertices id="v"><input semantic="POSITION" source="#p"/></vertices>
+  <polylist count="1"><input semantic="VERTEX" source="#v" offset="0"/><vcount>4</vcount><p>0 3 2 1</p></polylist>
+</mesh></geometry></library_geometries>
+<library_visual_scenes><visual_scene id="vs"><node id="arm">
+  <rotate sid="turn">0 1 0 0</rotate><instance_geometry url="#plate"/>
+</node></visual_scene></library_visual_scenes>
+<library_joints><joint id="shoulder" sid="shoulder"><revolute sid="axis0">
+  <axis>0 1 0</axis><limits><min>-120</min><max>120</max></limits>
+</revolute></joint></library_joints>
+<library_kinematics_models><kinematics_model id="model"><technique_common>
+  <instance_joint url="#shoulder" sid="shoulder"/><link sid="base"/>
+</technique_common></kinematics_model></library_kinematics_models>
+<library_kinematics_scenes><kinematics_scene id="ks">
+  <instance_kinematics_model url="#model" sid="robot"/>
+</kinematics_scene></library_kinematics_scenes>
+<scene><instance_visual_scene url="#vs"/><instance_kinematics_scene url="#ks">
+  <bind_joint_axis target="arm/turn"><axis><SIDREF>ks/robot/shoulder/axis0</SIDREF></axis>
+    <value><float>0</float></value></bind_joint_axis>
+</instance_kinematics_scene></scene></COLLADA>`;
+
+const dae = parseDAEKinematics(text);
+console.log(dae.joints.map((j) => [j.name, j.type, j.min, j.max])); // [['shoulder', 'revolute', -120, 120]]
+const pose = poseDAEJoints(dae, {shoulder: 45}); // degrees; meters for a prismatic joint
+console.log(pose.world.get(dae.nodes[0])); // the arm's matrix, for meshes of your own
+const engine = await Engine.create(document.querySelector('canvas')!);
+createMeshes(engine, flattenDAE(dae, pose));
+engine.start();
+```
+
+- `joints`: one entry per revolute or prismatic axis, in document order: `name` (the joint's SID, with the axis SID or the whole `path` added only when two would share it), `joint`, `type`, `axis` (unit, Y-up, in the driven node's frame), `min` and `max`, `value` (where the file binds it), `active`, `locked`, `index`, the motion bounds `speed`, `acceleration`, `deceleration` and `jerk`, and `targets` (the nodes and transforms `bind_joint_axis` ties to it). Revolute values are degrees and prismatic ones meters (`unit meter` applied).
+- Parameters (`newparam`, `setparam`, `param`, `SIDREF`) resolve through the instance tree, so two instances of one robot keep their own joints. `axis_info` limits replace a joint's own.
+- `poseDAEJoints(dae, values, {clamp})` returns a `DAEPose` like `poseDAE`'s. A bound `<rotate>` becomes a rotation about the joint's axis by the value, and a bound `<translate>` the axis times the value; axes you leave out stand at their `value`. Values are held inside the limits unless `clamp: false`. An unknown name, a value that is not finite or a change to a locked axis throws a `RangeError`. The pose holds joints only: it does not play the file's animations.
+- Not evaluated: `formula` (coupled or mimic joints, reported in `warnings`: pose those axes yourself), closed-loop attachments, tool frames (`frame_tip`, `frame_tcp`) and kinematics held in another file. Inverse kinematics is not part of the format.
 
 ## Motion capture (BVH)
 
