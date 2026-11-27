@@ -5,6 +5,10 @@ Each landed physics solver is judged against its catalog row in [physics-solvers
 eight-point standard in the same file, "The standard: the best solver we can build". A solver that falls short is
 REOPENED in the work queue, with its owner unchanged, and the missing pieces named here are its work list.
 
+Since 2026-11-26 the finish line is [physics-parity-bar.md](physics-parity-bar.md) (Scott: parity with Babylon.js and
+three.js, "not exceeds but must meet"). The upgrade lists below are required only where that file's row asks for
+them; the rest is a record of what a stronger solver would need.
+
 ## Method
 
 - **What was read.** For each solver: its catalog row (the phenomenon and model column and the cited methods, not the

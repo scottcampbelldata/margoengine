@@ -51,33 +51,23 @@ Never take or edit a row owned by someone else. Claim one solver at a time per w
 - Docs in the same push: a README example that runs, the clean-room record, `docs/limits.md`, `docs/known-bugs.md`,
   and `npm run api:update` for new exports. Gate before every push as AGENTS.md describes (never `npm run verify`).
 
-### The standard: the best solver we can build (Scott, 2026-11-26)
+### The standard: parity with Babylon.js and three.js (Scott, 2026-11-26)
 
-Scott: "I want every solver built to be the best most powerful we are capable of producing." Meeting the catalog row
-is the floor, not the goal. A solver is finished only when all of these hold:
+Scott: "make every one on parity with Babylon and three js not exceeds but must meet", and name "the 10-15 that
+absolutely have to be perfect for max adoption". This replaces the earlier "best most powerful" standard.
 
-1. **The strongest model.** The most accurate published model that can run at film scale, from a wide search of
-   current literature (not the first textbook model). Where fidelity and cost trade off, ship both tiers behind one
-   API: a high-fidelity tier and a fast tier, each validated, chosen by an option with a documented default.
-2. **Validated against the real world.** Several published measurements or exact solutions across the regimes the
-   films use (calm to extreme), each with its source and a derived bound, including cases not used for calibration.
-3. **Broader than any rival.** At least every capability of the best engines and specialised libraries for that
-   phenomenon (web 3D engines, Rapier, and the leading specialised libraries and research codes), and better where
-   possible. A capability another tool has and this solver lacks is a gap to build.
-4. **Fully coupled.** Two-way coupling with every neighbour the catalog names, through fields, with a coupling test
-   for each, and conserved quantities (mass, momentum, energy) accounted across the coupling.
-5. **Robust at the extremes.** No NaN, no energy gain and no blow-up across the documented range, including storms,
-   high speeds, large mass ratios, tiny and huge scales and long runs. Inputs outside the range are refused with a
-   coded error that names the fix.
-6. **Scales.** Hot loops in Rust and Wasm with SIMD, threads where the work splits, and large worlds through cells
-   and floating origin, with work counts recorded.
-7. **Directable for film.** Controls a director needs (seeds, placed events, targets, look parameters) that steer
-   the result without breaking the physics, and output the renderer draws directly.
-8. **Honest.** `docs/limits.md` states what it does not do; nothing is called finished while a known piece is missing.
+[physics-parity-bar.md](physics-parity-bar.md) holds everything each solver must have:
 
-A solver landed before this standard keeps its row and is re-audited against it (`docs/physics-solver-audit.md`).
-One that falls short goes back to its owner as REOPENED, with the missing pieces named. Solvers that block a film in
-production come first; upgrade passes follow, solver by solver.
+1. **Part 1, the baseline** every solver meets.
+2. **Part 2, the 14 that must be perfect**, each with its full checklist (the union of both rivals, plus a quick start,
+   a three.js migration note, an example page, a debug view and speed at least equal to the rival demo).
+3. **Part 3, one row per solver** with its verdict: PERFECT, GAP (a rival feature to add), MEETS (done once the
+   baseline holds) or DON'T BUILD (no rival has it; not built unless Scott or a film asks).
+
+A solver is finished when it meets its row in that file. REOPENED upgrade lists in `docs/physics-solver-audit.md`
+beyond that row are no longer required. A solver a film in production needs builds what that film's shots use, and
+the film names it. Work in this order: item 8 of the baseline on every landed row (so `main` stays green), then the
+14, then the GAP rows.
 
 ## Framework requests
 
@@ -350,7 +340,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 
 The physics engine is the whole job. It is built in two stages:
 
-1. **Now:** the 103 physics solvers in `docs/physics-solvers.md`, each to "The standard: the best solver we can build".
+1. **Now:** the 103 physics solvers in `docs/physics-solvers.md`, each to its row in `docs/physics-parity-bar.md` (see "The standard" above).
 2. **After the solvers are done:** the rest of the physics engine. That means parity rows that are not solver
    capabilities, physics tooling (replay debugger, profiler, shape cache), rollback and snapshot sync, and the
    internal refactors.
@@ -364,7 +354,7 @@ Scott: "complete wave all the way start to finish until it's done and passes all
 that it connects to." Each builder works on ONE row at a time:
 
 1. Take the next row in the order below and set it BUILDING with your name. Hold no other row BUILDING.
-2. Finish every numbered item of its list in `docs/physics-solver-audit.md` and all eight points of the standard,
+2. Finish every numbered item of its list in `docs/physics-solver-audit.md` and its row in `docs/physics-parity-bar.md`,
    in every package the solver touches: physics, water, weather, shot, renderer, README, limits and examples.
 3. Wire it into every solver and package it connects to, both ways, with a coupling test for each connection.
 4. Set it LANDED with one line per audit item naming its commit and test. The verifier checks it straight away.
@@ -383,9 +373,8 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 - Codex builds every row in the Open table below, plus the rows it has claimed.
 - Claude builds the rows in the Taken table.
 - Solvers for films in production come first.
-- When both lists are built, all 103 solvers are audited against "The standard: the best solver we can build" above
-  (`docs/physics-solver-audit.md`). Every row that falls short is REOPENED with its upgrades named, and stays open
-  until it is the best on the market.
+- When both lists are built, every solver is checked against its row in `docs/physics-parity-bar.md`. A row that
+  falls short is REOPENED with the missing parity items named, and closes when it meets that row.
 - Handed to Codex (Scott, 2026-11-26), so the Claude side stays on the film solvers: DYN-07, AERO-01 to AERO-03
   and ATMO-01 to ATMO-03. The AERO and ATMO rows are built and REOPENED; build their upgrades from
   `docs/physics-solver-audit.md`.
