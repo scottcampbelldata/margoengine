@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21099303,
+  "total": 21100015,
   "history": [
     {
       "date": "2026-10-24",
@@ -14905,6 +14905,12 @@
       "commit": "07e10e69d",
       "reason": "ONNX ImageDecoder (limits row 61): compute/onnx 12934 -> 13789 measured with the lazy image chunk; new entry decoders/pnm 1115",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "13b785b78",
+      "reason": "ONNX old-opset review (limits row 61): compute/onnx 13789 -> 14480 for the batched Scan-8 path; splitting it would duplicate the graph executor bridge",
+      "grew": 1
     }
   ],
   "items": {
@@ -15115,7 +15121,7 @@
     "@margoengine/compute/linalg": 5745,
     "@margoengine/compute/nn": 19137,
     "@margoengine/compute/nn-extra": 21385,
-    "@margoengine/compute/onnx": 14203,
+    "@margoengine/compute/onnx": 14915,
     "@margoengine/compute/quant": 4183,
     "@margoengine/compute/random": 8328,
     "@margoengine/compute/shape": 3736,

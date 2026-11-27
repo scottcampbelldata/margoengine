@@ -110,14 +110,21 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], attrs: &Attrs) -> Result<Vec
     Ok(vec![match op {
         "Identity" => x.clone(),
         "Reshape" => {
-            let s = input(inputs, 1)?;
-            if s.kind != 7 || s.shape.len() != 1 {
-                return Err(
-                    "Reshape shape must be a one-dimensional int64 tensor; supply valid dimensions"
-                        .into(),
-                );
-            }
-            let given = s.ints()?;
+            // Before opset 5 the new shape is an attribute, afterwards the second input.
+            let given = if inputs.len() == 1 {
+                attrs
+                    .ints("shape")?
+                    .ok_or("Reshape before opset 5 needs its shape attribute; supply the dimensions")?
+            } else {
+                let s = input(inputs, 1)?;
+                if s.kind != 7 || s.shape.len() != 1 {
+                    return Err(
+                        "Reshape shape must be a one-dimensional int64 tensor; supply valid dimensions"
+                            .into(),
+                    );
+                }
+                s.ints()?
+            };
             let allowzero = attrs.flag("allowzero", false)?;
             let mut shape = Vec::with_capacity(given.len());
             let mut infer = None;
@@ -278,7 +285,24 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], attrs: &Attrs) -> Result<Vec
             out
         }
         "Tile" => {
-            let repeats = shape_values(input(inputs, 1)?)?;
+            // Before opset 6 the inputs are a count and the one axis it repeats.
+            let repeats = if inputs.len() == 3 {
+                let (count, along) = (input(inputs, 1)?, input(inputs, 2)?);
+                count.numeric()?;
+                along.numeric()?;
+                if count.size() != 1 || along.size() != 1 {
+                    return Err("Tile tiles and axis each hold one number; supply scalars".into());
+                }
+                let (n, d) = (count.get(0).f(), along.get(0).f());
+                if !(0. ..=i32::MAX as f64).contains(&n) || n.fract() != 0. || d.fract() != 0. {
+                    return Err("Tile tiles and axis must be whole; supply a count and an axis".into());
+                }
+                let mut repeats = vec![1; x.shape.len()];
+                repeats[axis(d as i64, x.shape.len())?] = n as usize;
+                repeats
+            } else {
+                shape_values(input(inputs, 1)?)?
+            };
             if repeats.len() != x.shape.len() {
                 return Err(
                     "Tile repeats length must equal input rank; supply one repeat per axis".into(),

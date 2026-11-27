@@ -77,3 +77,26 @@ reader, which has its own proof.
 | A stream that cannot be decoded | empty matrix `[0, 0, channels]` |
 | Grayscale weights | none given; Rec. ITU-R BT.601 luma, https://www.itu.int/rec/R-REC-BT.601 |
 | Fancy chroma upsampling | linear filter at the stated positions; the alternating rounding is not reproduced |
+
+## Old operator versions (reviewed 2026-11-27)
+
+The attribute and input forms of default-domain operator versions 1 to 8 were compared with
+https://github.com/onnx/onnx/blob/main/docs/Changelog.md (read 2026-11-27). Each row below was rejected or computed
+wrongly before the review; `packages/compute/tests/onnx-old-opsets.test.js` holds the hand-worked cases. The review
+compared forms and the semantics named here. It is not a numeric test of every operator at every old version.
+
+| Operator versions | Old form, now read |
+| --- | --- |
+| most element-wise and variadic operators 1, Reshape 1 | the `consumed_inputs` hint (accepted, no effect) |
+| Add, Sub, Mul, Div, Pow, And, Or, Xor, Equal, Greater, Less 1-6 | B matches A unless `broadcast=1` (one element, or a run of A's axes from `axis`, suffix by default); numpy broadcasting no longer applies |
+| Gemm 1, 6 | `broadcast` (C is then broadcast to the result) |
+| PRelu 1, 6 | a slope vector holds one value per channel (axis 1) |
+| Cast 1 | `to` names the type in text |
+| Pad 1 | `paddings` |
+| Reshape 1 | the `shape` attribute, one input |
+| Tile 1 | inputs data, count and axis |
+| Split 1 | the optional lengths input |
+| LpPool 1, GlobalLpPool 1 | float `p` |
+| BatchNormalization 1, 6, 7 | `spatial=0` keeps one statistic per feature |
+| RNN, GRU, LSTM 1, 3 | `output_sequence` (accepted; the listed outputs decide) |
+| Scan 8 | batched form with `sequence_lens` and `directions` |

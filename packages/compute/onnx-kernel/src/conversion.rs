@@ -5,12 +5,31 @@ use std::sync::Arc;
 pub fn supports(op: &str) -> bool {
     matches!(op, "Cast" | "CastLike")
 }
-pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs) -> Result<Vec<Tensor>> {
+/// The TensorProto element type that a Cast before opset 6 names in text; 0 for an unknown name.
+fn named_type(name: &str) -> i64 {
+    [
+        "FLOAT", "UINT8", "INT8", "UINT16", "INT16", "INT32", "INT64", "STRING", "BOOL", "FLOAT16",
+        "DOUBLE", "UINT32", "UINT64", "COMPLEX64", "COMPLEX128",
+    ]
+    .iter()
+    .position(|&n| n == name)
+    .map_or(0, |at| at as i64 + 1)
+}
+pub fn execute(
+    op: &str,
+    inputs: &[Option<Tensor>],
+    a: &Attrs,
+    version: u32,
+) -> Result<Vec<Tensor>> {
     let x = input(inputs, 0)?;
     let kind = if op == "CastLike" {
         input(inputs, 1)?.kind
     } else {
-        let to = a.int("to", 0)?;
+        let to = if version < 6 {
+            named_type(a.string("to", "")?)
+        } else {
+            a.int("to", 0)?
+        };
         if to <= 0 || to > u32::MAX as i64 {
             return Err(
                 "Cast requires a supported TensorProto type in to; supply the destination type"
@@ -110,7 +129,7 @@ mod tests {
             entries: &e,
             store: &s,
         };
-        let y = execute("Cast", &[Some(t.clone())], &a).unwrap();
+        let y = execute("Cast", &[Some(t.clone())], &a, 22).unwrap();
         assert_eq!(*y[0].strings.as_ref().unwrap()[0], b"9007199254740993"[..]);
         let e = attrs(7);
         let a = Attrs {
@@ -118,7 +137,7 @@ mod tests {
             store: &s,
         };
         assert_eq!(
-            execute("Cast", &[Some(y[0].clone())], &a).unwrap()[0]
+            execute("Cast", &[Some(y[0].clone())], &a, 22).unwrap()[0]
                 .ints()
                 .unwrap(),
             vec![9007199254740993, -1]
@@ -128,7 +147,7 @@ mod tests {
             entries: &e,
             store: &s,
         };
-        let y = execute("Cast", &[Some(t)], &a).unwrap();
+        let y = execute("Cast", &[Some(t)], &a, 22).unwrap();
         assert_eq!(y[0].get(1).u(), 255);
         let mut t = Tensor::zeros(11, vec![3]).unwrap();
         t.set(0, Number::F(f64::NAN));
@@ -140,7 +159,7 @@ mod tests {
             store: &s,
         };
         assert_eq!(
-            *execute("Cast", &[Some(t)], &a).unwrap()[0].data,
+            *execute("Cast", &[Some(t)], &a, 22).unwrap()[0].data,
             vec![1, 0, 1]
         );
     }

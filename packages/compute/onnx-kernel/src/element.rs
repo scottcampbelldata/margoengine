@@ -192,6 +192,45 @@ pub fn maximum(a: Number, b: Number) -> Number {
     }
 }
 
+/// Add, Sub, Mul, Div, Pow, the comparisons and the logic operators before opset 7: B has A's shape unless
+/// broadcast=1, which takes one element, or a run of A's axes starting at `axis` (a suffix when it is absent).
+fn legacy_operand(a: &Tensor, b: &Tensor, attrs: &Attrs) -> Result<Tensor> {
+    let refuse = || -> String {
+        "before opset 7 the second operand must match the first, or set broadcast=1 with one element or a contiguous run of its axes; repair the shapes or attributes".into()
+    };
+    let mut y = b.clone();
+    if !attrs.flag("broadcast", false)? {
+        return if a.shape == b.shape {
+            Ok(y)
+        } else {
+            Err(refuse())
+        };
+    }
+    let (rank, own) = (a.shape.len(), b.shape.len());
+    if own > rank {
+        return Err(refuse());
+    }
+    if b.size() == 1 {
+        y.shape = vec![1; rank];
+        return Ok(y);
+    }
+    let mut start = attrs.int("axis", (rank - own) as i64)?;
+    if start < 0 {
+        start += rank as i64;
+    }
+    if start < 0 || start as usize > rank - own {
+        return Err(refuse());
+    }
+    let start = start as usize;
+    if a.shape[start..start + own] != b.shape[..] {
+        return Err(refuse());
+    }
+    let mut shape = vec![1; rank];
+    shape[start..start + own].copy_from_slice(&b.shape);
+    y.shape = shape;
+    Ok(y)
+}
+
 pub fn supports(op: &str) -> bool {
     matches!(
         op,
@@ -487,8 +526,30 @@ pub fn execute(
         }
         let mut shape = first.shape.clone();
         let mut tensors = Vec::new();
+        // The second operand as opsets before 7 align it with the first.
+        let mut aligned = None;
+        if version < 7 && !variadic && op != "PRelu" {
+            aligned = Some(legacy_operand(first, input(inputs, 1)?, attrs)?);
+        } else if version < 7 && op == "PRelu" {
+            // A slope vector holds one value per channel (axis 1), or one value for every channel.
+            let slope = input(inputs, 1)?;
+            if slope.shape.len() == 1 && slope.size() > 1 && first.shape.len() > 1 {
+                if slope.shape[0] != first.shape[1] {
+                    return Err(
+                        "PRelu slope needs one value or one per channel; repair the slope shape"
+                            .into(),
+                    );
+                }
+                let mut y = slope.clone();
+                y.shape.resize(first.shape.len() - 1, 1);
+                aligned = Some(y);
+            }
+        }
         for index in 0..inputs.len() {
-            let t = input(inputs, index)?;
+            let t = match &aligned {
+                Some(t) if index == 1 => t,
+                _ => input(inputs, index)?,
+            };
             t.numeric()?;
             if op != "Pow" {
                 same_type(first, t)?;

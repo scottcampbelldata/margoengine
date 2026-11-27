@@ -1121,6 +1121,9 @@ export class OnnxModel implements Disposable {
         }
       }
       case 'Scan': {
+        const opset = opsets[''] ?? 1;
+        if (opset < 8) invalid('Scan needs opset >=8');
+        if (opset === 8) return this.#batchScan(node, values, attrs, env, opsets, scopes, state, depth, path);
         const body = graph('body');
         const n = integer('num_scan_inputs', 0);
         if (n < 1 || n > values.length) invalid('Scan num_scan_inputs must identify its final inputs');
@@ -1188,6 +1191,91 @@ export class OnnxModel implements Disposable {
       }
       default:
         return undefined;
+    }
+  }
+  /**
+   * Scan-8: every input and output has a batch axis 0, scan inputs a sequence axis 1, and the optional first input
+   * gives each batch's length. States stop at that length; later output steps hold what the body makes of the padding,
+   * which ONNX leaves undefined.
+   */
+  async #batchScan(
+    node: Node,
+    values: readonly Value[],
+    attrs: readonly Attribute[],
+    env: Map<string, Value>,
+    opsets: Record<string, number>,
+    scopes: readonly number[],
+    state: RunState,
+    depth: number,
+    path: string,
+  ): Promise<Value[]> {
+    const attribute = attrs.find((a) => a.name === 'body');
+    if (!attribute || attribute.kind !== 5) invalid('Scan requires graph attribute body');
+    if (attrs.some((a) => !['body', 'directions', 'num_scan_inputs'].includes(a.name)))
+      invalid('unknown Scan opset 8 attribute');
+    const body = attribute.value as Graph;
+    const n = this.#int(attrs, 'num_scan_inputs', 0);
+    if (n < 1 || n > values.length - 1) invalid('Scan num_scan_inputs must identify its final inputs');
+    const count = values.length - 1 - n;
+    const initial = values.slice(1, 1 + count),
+      scans = values.slice(1 + count);
+    const outputs = node.outputs.length - count;
+    if (body.inputs.length !== count + n || outputs < 0 || body.outputs.length !== node.outputs.length)
+      invalid('Scan body input/output count differs');
+    const directions = this.#list(attrs, 'directions') ?? (Array(n).fill(0) as number[]);
+    if (directions.length !== n || directions.some((v) => v !== 0 && v !== 1))
+      invalid('Scan directions must hold one 0 or 1 per scan input');
+    const [batches, steps] = this.#shape(scans[0]).shape;
+    if (!batches || !steps) invalid('Scan opset 8 needs at least one batch and one sequence step');
+    for (const v of scans) {
+      const { shape } = this.#shape(v);
+      if (shape[0] !== batches || shape[1] !== steps) invalid('Scan batch or sequence lengths differ');
+    }
+    for (const v of initial)
+      if (this.#shape(v).shape[0] !== batches) invalid('Scan states need the batch size of the scan inputs');
+    let lengths = Array<number>(batches).fill(steps);
+    if (values[0] !== null) {
+      const t = this.#read(this.#tensor(values[0]));
+      if ((t.dtype !== 'int64' && t.dtype !== 'int32') || t.shape.length !== 1 || t.shape[0] !== batches)
+        invalid('Scan sequence_lens must be an int32 or int64 vector with one length per batch');
+      lengths = Array.from(t.data as ArrayLike<number | bigint>, Number);
+      if (lengths.some((v) => v < 0 || v > steps)) invalid('Scan sequence_lens must lie in 0..the sequence length');
+    }
+    if (batches * steps > state.max)
+      throw fault('failed', 'ONNX Scan exceeds maxIterations; increase its explicit safety bound', 'compute');
+    const finals: Value[][] = initial.map(() => []),
+      stacked: Value[][] = Array.from({ length: outputs }, () => []);
+    const roots = new Map<string, Value>([
+      ['finals', finals],
+      ['stacked', stacked],
+    ]);
+    state.frames.push(roots);
+    try {
+      for (let b = 0; b < batches; b++) {
+        let current: Value[] = initial.map((v) => this.#slice(v, 0, b, false, state));
+        const rows: Value[] = scans.map((v) => this.#slice(v, 0, b, false, state)),
+          scanned: Value[][] = Array.from({ length: outputs }, () => []),
+          length = lengths[b];
+        roots.set('current', current).set('rows', rows).set('scanned', scanned);
+        for (let step = 0; step < steps; step++) {
+          const args = new Map(env);
+          current.forEach((v, i) => args.set(body.inputs[i].name, v));
+          rows.forEach((v, i) => {
+            const at = directions[i] && step < length ? length - 1 - step : step;
+            args.set(body.inputs[count + i].name, this.#slice(v, 0, at, false, state));
+          });
+          const result = await this.#graph(body, args, opsets, scopes, state, depth + 1, path);
+          if (step < length) current = result.slice(0, count);
+          scanned.forEach((v, i) => v.push(result[count + i]));
+          roots.set('current', current);
+          this.#sweep(state);
+        }
+        current.forEach((v, i) => finals[i].push(v));
+        scanned.forEach((v, i) => stacked[i].push(this.#concat(v, 0, true, state)));
+      }
+      return [...finals, ...stacked].map((v) => this.#concat(v, 0, true, state));
+    } finally {
+      state.frames.pop();
     }
   }
   /** Execute one inference. A session rejects overlapping runs; use separate sessions for parallel inference. */

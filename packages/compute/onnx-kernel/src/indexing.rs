@@ -330,7 +330,21 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs, nout: usize) -> R
                 return Err("Split needs at least one output; name its outputs".into());
             }
             let splits = if let Some(t) = optional(inputs, 1) {
-                vector(t)?
+                // Opset 1 types the lengths like the data, so they may arrive as floating whole numbers.
+                if matches!(t.kind, 1 | 10 | 11) && t.shape.len() == 1 {
+                    (0..t.size())
+                        .map(|i| {
+                            let v = t.get(i).f();
+                            if v.fract() == 0. && (0. ..=i32::MAX as f64).contains(&v) {
+                                Ok(v as i64)
+                            } else {
+                                Err("Split lengths must be whole; supply integer lengths".into())
+                            }
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                } else {
+                    vector(t)?
+                }
             } else if let Some(v) = a.ints("split")? {
                 v
             } else {
@@ -636,8 +650,13 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs, nout: usize) -> R
             let pads = if let Some(t) = optional(inputs, 1) {
                 vector(t)?
             } else {
-                a.ints("pads")?
-                    .ok_or("Pad pads are required; supply beginning/end pads")?
+                // Opset 1 names the attribute paddings.
+                match a.ints("pads")? {
+                    Some(v) => v,
+                    None => a
+                        .ints("paddings")?
+                        .ok_or("Pad pads are required; supply beginning/end pads")?,
+                }
             };
             let axes = if let Some(t) = optional(inputs, 3) {
                 vector(t)?

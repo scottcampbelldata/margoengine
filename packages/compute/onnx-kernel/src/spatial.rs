@@ -311,8 +311,13 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs, nout: usize) -> R
     let xs = strides(spatial);
     let col_major = a.flag("storage_order", false)?;
     let include_pad = a.flag("count_include_pad", false)?;
-    let p = a.int("p", 2)?;
-    if matches!(op, "LpPool" | "GlobalLpPool") && p <= 0 {
+    // p is a float attribute in opset 1 and an integer from opset 2.
+    let p = if a.has("p") && a.value("p", 1).is_ok() {
+        a.float("p", 2.)?
+    } else {
+        a.int("p", 2)? as f64
+    };
+    if matches!(op, "LpPool" | "GlobalLpPool") && (p.is_nan() || p <= 0.) {
         return Err("LpPool p must be positive; choose a positive norm".into());
     }
     let maximum = matches!(op, "MaxPool" | "GlobalMaxPool");
@@ -388,7 +393,7 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs, nout: usize) -> R
                                 };
                             }
                         } else if matches!(op, "LpPool" | "GlobalLpPool") {
-                            sum += v.f().abs().powf(p as f64);
+                            sum += v.f().abs().powf(p);
                         } else {
                             sum += v.f();
                         }
@@ -401,7 +406,7 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs, nout: usize) -> R
                 } else if maximum {
                     best
                 } else if matches!(op, "LpPool" | "GlobalLpPool") {
-                    Number::F(sum.powf(1. / p as f64))
+                    Number::F(sum.powf(1. / p))
                 } else {
                     Number::F(
                         sum / if include_pad {

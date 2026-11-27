@@ -91,6 +91,8 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
         }
         "Clip" => (1, if version < 11 { 1 } else { 3 }),
         "Where" => (3, 3),
+        "Reshape" if version < 5 => (1, 1),
+        "Tile" if version < 6 => (3, 3),
         "SwiGLU" | "ReverseSequence" | "CenterCropPad" | "CumProd" => (2, 2),
         "Min" | "Max" | "Mean" | "Sum" | "Concat" | "Einsum" => (1, usize::MAX),
         "Reshape" | "Expand" | "Tile" | "Gather" | "GatherElements" | "GatherND" | "MatMul"
@@ -113,7 +115,9 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
             }
         }
         "Split" => {
-            if version < 13 {
+            if version < 2 {
+                (1, 2)
+            } else if version < 13 {
                 (1, 1)
             } else {
                 (1, 2)
@@ -288,8 +292,14 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
         "IsInf" => &["detect_positive", "detect_negative"],
         "Mod" => &["fmod"],
         "BitShift" => &["direction"],
-        "Add" | "Sub" | "Mul" | "Div" | "Pow" if version < 7 => &["axis", "broadcast"],
+        "Add" | "Sub" | "Mul" | "Div" | "Pow" | "And" | "Or" | "Xor" | "Equal" | "Greater"
+        | "Less"
+            if version < 7 =>
+        {
+            &["axis", "broadcast"]
+        }
         "Clip" if version < 11 => &["min", "max"],
+        "Reshape" if version < 5 => &["shape"],
         "Reshape" => &["allowzero"],
         "Flatten" | "Concat" | "Gather" | "GatherElements" | "Softmax" | "LogSoftmax"
         | "Hardmax" => &["axis"],
@@ -319,8 +329,10 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
         "OneHot" => &["axis"],
         "DepthToSpace" => &["blocksize", "mode"],
         "SpaceToDepth" => &["blocksize"],
+        "Pad" if version < 2 => &["paddings", "value", "mode"],
         "Pad" if version < 11 => &["pads", "value", "mode"],
         "Pad" => &["mode"],
+        "Gemm" if version < 7 => &["alpha", "beta", "broadcast", "transA", "transB"],
         "Gemm" => &["alpha", "beta", "transA", "transB"],
         "Einsum" => &["equation"],
         name if name.starts_with("Reduce") => {
@@ -389,6 +401,35 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
             "consumed_inputs",
         ],
         "BatchNormalization" => &["epsilon", "momentum", "training_mode"],
+        "RNN" if version < 7 => &[
+            "activation_alpha",
+            "activation_beta",
+            "activations",
+            "clip",
+            "direction",
+            "hidden_size",
+            "output_sequence",
+        ],
+        "GRU" if version < 7 => &[
+            "activation_alpha",
+            "activation_beta",
+            "activations",
+            "clip",
+            "direction",
+            "hidden_size",
+            "linear_before_reset",
+            "output_sequence",
+        ],
+        "LSTM" if version < 7 => &[
+            "activation_alpha",
+            "activation_beta",
+            "activations",
+            "clip",
+            "direction",
+            "hidden_size",
+            "input_forget",
+            "output_sequence",
+        ],
         "RNN" => &[
             "activation_alpha",
             "activation_beta",
@@ -443,5 +484,18 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
         "Upsample" => &["mode", "scales", "height_scale", "width_scale"],
         _ => &[],
     };
-    a.known(attrs)
+    let mut attrs = attrs.to_vec();
+    // Opsets before 6 (before 5 for Reshape) let a node name inputs a runtime may overwrite; the hint changes nothing.
+    let overwritable = version < 6
+        && matches!(
+            op,
+            "Abs" | "Add" | "Ceil" | "Clip" | "Div" | "Elu" | "Exp" | "Floor" | "HardSigmoid"
+                | "InstanceNormalization" | "LeakyRelu" | "Log" | "Max" | "Mean" | "Min" | "Mul"
+                | "Neg" | "PRelu" | "Reciprocal" | "Relu" | "Selu" | "Sigmoid" | "Sqrt" | "Sub"
+                | "Sum" | "Tanh"
+        );
+    if overwritable || op == "Reshape" && version < 5 {
+        attrs.push("consumed_inputs");
+    }
+    a.known(&attrs)
 }

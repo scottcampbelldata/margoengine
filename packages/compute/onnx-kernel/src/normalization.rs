@@ -212,8 +212,13 @@ pub fn execute(
             "channel normalization requires N,C,... input; supply a channel dimension".into(),
         );
     }
-    let channels = x.shape[1];
-    let inner = product(&x.shape[2..])?;
+    // BatchNormalization before opset 9 with spatial=0 keeps one statistic per feature, not one per channel.
+    let per_feature = op == "BatchNormalization" && version < 9 && !a.flag("spatial", true)?;
+    let (channels, inner) = if per_feature {
+        (product(&x.shape[1..])?, 1)
+    } else {
+        (x.shape[1], product(&x.shape[2..])?)
+    };
     let batches = x.shape[0];
     let scale = input(inputs, 1)?;
     let bias = input(inputs, 2)?;
@@ -224,8 +229,13 @@ pub fn execute(
         let var = input(inputs, 4)?;
         for t in [scale, bias, mean, var] {
             floating(t)?;
-            if t.shape != [channels] {
-                return Err("BatchNormalization affine/statistic inputs must have shape [C]; supply channel vectors".into());
+            let expected = if per_feature {
+                &x.shape[1..]
+            } else {
+                &x.shape[1..2]
+            };
+            if t.shape != expected {
+                return Err("BatchNormalization affine/statistic inputs must have shape [C], or [C, D1, ...] with spatial=0; supply matching tensors".into());
             }
         }
         let training = if version < 14 {

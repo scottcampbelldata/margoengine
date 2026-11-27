@@ -357,7 +357,7 @@ pub unsafe extern "C" fn execute(
         } else if normalization::supports(&node.op) {
             normalization::execute(&node.op, &inputs, &attrs, version, nout)
         } else if conversion::supports(&node.op) {
-            conversion::execute(&node.op, &inputs, &attrs)
+            conversion::execute(&node.op, &inputs, &attrs, version)
         } else if recurrent::supports(&node.op) {
             recurrent::execute(&node.op, &inputs, &attrs)
         } else if strings::supports(&node.op) {
