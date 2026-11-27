@@ -151,6 +151,7 @@ interface SolverDescription {
 
 interface SolverHost {
     readonly memory: WebAssembly.Memory;
+    readonly cell: Cell;
     readonly gravity: readonly [number, number, number];
     allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
     resize(region: Region, byteLength: number): Region;

@@ -2047,7 +2047,7 @@ type RegionWords = Float64Array | Float32Array | Int32Array | Uint32Array | Uint
 
 class RigidSolver implements Solver<RigidSolverParams> {
     readonly id: string;
-    constructor(id?: string);
+    constructor(id?: string, options?: RigidSolverOptions);
     describe(): SolverDescription;
     init(host: SolverHost, params: RigidSolverParams): void;
     step(_context: StepContext, dt: number): void;
@@ -2055,6 +2055,10 @@ class RigidSolver implements Solver<RigidSolverParams> {
     importPorts(_tick: number): void;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+}
+
+interface RigidSolverOptions {
+    readonly publishMobility?: boolean;
 }
 
 interface RigidSolverParams {
@@ -2217,6 +2221,7 @@ interface SolverDescription {
 
 interface SolverHost {
     readonly memory: WebAssembly.Memory;
+    readonly cell: Cell;
     readonly gravity: readonly [number, number, number];
     allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
     resize(region: Region, byteLength: number): Region;
