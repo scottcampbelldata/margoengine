@@ -1435,6 +1435,12 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   against the f32 bound of 0.01610 J, and both memory modes replay bit for bit from two checkpoints.
   The remaining First Wake issue is resolving the actual source and propagating its waves through the full scene.
 
+  `coupling/loads-quay-space-order.test.js` checks the fourth-order horizontal stencil on a diagonal
+  carrier. With the vertical grid held fixed, at 0.15 m the absolute normal-flux rate error falls
+  from 0.12977 to 0.00974 m⁻¹. This is below the 0.03261 m⁻¹ error of the default 0.075 m grid.
+  The same test checks the reciprocal flux and conservation through a partial lower opening, zero
+  cross-wall flux at a closed face and exact replay with the absorber active.
+
   The finite receiver was compared with the 26 measured Briggs M4 submerged-lee probes using an incident
   packet at the published period and height and an identical open-water normalization. At the fixed 14 s
   sample, RMS errors in relative wave height for 30°, 60° and 90° are 0.039, 0.030 and 0.056 at 0.50 m.

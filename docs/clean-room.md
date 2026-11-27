@@ -17996,6 +17996,17 @@ edge, and paired smoothing gives a symmetric preconditioner for the unchanged fi
 manufactured potential catches a wrong conductance or wet region merge.
 [Vaněk, Mandel and Brezina](https://doi.org/10.1007/BF02238511)
 
+Lele, *Compact Finite Difference Schemes with Spectral-like Resolution* (1992), §2.2 and Eq. 3.1.10,
+give the explicit fourth-order central second difference and its Fourier symbol. In a uniform layer
+the implementation rewrites that stencil for each horizontal axis as `L + L²/(12 thickness)`, with
+`L` the conductance graph Laplacian on that axis. Its correction adds `‖L u‖²/(12 thickness)` to
+the volume operator's quadratic form. The same open-face mask appears twice in `L²`, so a second
+difference stays on a wet connection and never crosses a sealed face. The shared flux reports the
+gradient of `u + L u/(12 thickness)`. Vertical conductances and the base multigrid correction stay
+as before. The fourth-order claim applies to the open uniform horizontal interior, with a separate
+connection and work check at the aperture.
+[Lele](https://doi.org/10.1016/0021-9991%2892%2990348-8)
+
 ## physics rod vortex-induced vibration calibrated and checked against towed and sheared pipes (2026-11-27)
 
 Files: `packages/physics/src/loads/segments.ts`, `packages/physics/tests/rod-viv.test.js`, `packages/physics/tests/rod.test.js`,

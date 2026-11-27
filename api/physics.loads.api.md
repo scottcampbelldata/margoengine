@@ -432,6 +432,7 @@ export interface QuayPotentialGrid {
     readonly wet?: ArrayLike<number>;
     readonly openX?: ArrayLike<number>;
     readonly openZ?: ArrayLike<number>;
+    readonly horizontalOrder?: 2 | 4;
 }
 
 export class QuayWakeBoundary implements Solver<undefined> {

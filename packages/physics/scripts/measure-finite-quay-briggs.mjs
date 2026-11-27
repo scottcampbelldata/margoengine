@@ -1,6 +1,7 @@
 // npm run build --workspace @margoengine/physics
 // node scripts/run-with-timeout.mjs --max 4 -- node packages/physics/scripts/measure-finite-quay-briggs.mjs
 // Optional --grid=coarse or --grid=fine selects one of the two fixed grid sizes.
+// Optional --horizontal-order=4 uses the higher-order interior stencil with its matching incident carrier.
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -89,10 +90,12 @@ function gridAt(cellSize, layers) {
   return { cells, cellSize, origin, depths };
 }
 
-function incidentPacket({ cells, cellSize, origin, depths }) {
+function incidentPacket({ cells, cellSize, origin, depths, horizontalOrder }) {
   const dy = depths[1];
   const rate = (k) => {
-    const horizontal = (2 / cellSize) * Math.sin((k * cellSize) / 2);
+    const secondOrder = (2 / cellSize) * Math.sin((k * cellSize) / 2);
+    const horizontal =
+      horizontalOrder === 4 ? secondOrder * Math.sqrt(1 + (cellSize * secondOrder) ** 2 / 12) : secondOrder;
     const alpha = Math.acosh(1 + 0.5 * (horizontal * dy) ** 2) / dy;
     return Math.sqrt(m4.g * (2 / dy) * Math.tanh(alpha * m4.depth) * Math.tanh((alpha * dy) / 2));
   };
@@ -219,8 +222,8 @@ function phasorMagnitude(trace, ticks) {
   return dt * Math.hypot(real, imaginary);
 }
 
-function compare(name, cellSize, layers) {
-  const grid = gridAt(cellSize, layers);
+function compare(name, cellSize, layers, horizontalOrder) {
+  const grid = { ...gridAt(cellSize, layers), horizontalOrder };
   const { carrier, initial } = incidentPacket(grid);
   const wall = run(grid, initial, true);
   const open = run(grid, initial, false);
@@ -255,10 +258,17 @@ const sizes = [
   ['coarse', 0.5, 4],
   ['fine', 0.25, 6],
 ];
-const argument = process.argv[2];
+const args = process.argv.slice(2);
+assert.ok(
+  args.every((arg) => /^--grid=(coarse|fine)$|^--horizontal-order=[24]$/.test(arg)),
+  'Use --grid=coarse or --grid=fine and --horizontal-order=2 or --horizontal-order=4.',
+);
+const argument = args.find((arg) => arg.startsWith('--grid='));
 const selected = argument ? sizes.filter(([name]) => argument === `--grid=${name}`) : sizes;
-assert.ok(selected.length, 'Use --grid=coarse or --grid=fine, or omit it to run both grids.');
+const horizontalOrder = args.includes('--horizontal-order=4') ? 4 : 2;
 const solver = createHash('sha256')
   .update(readFileSync(new URL('../dist/loads.js', import.meta.url)))
   .digest('hex');
-console.log(JSON.stringify({ inputs: m4, solver, results: selected.map((size) => compare(...size)) }, null, 2));
+console.log(
+  JSON.stringify({ inputs: m4, solver, results: selected.map((size) => compare(...size, horizontalOrder)) }, null, 2),
+);

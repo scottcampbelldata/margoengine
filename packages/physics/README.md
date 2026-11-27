@@ -5425,7 +5425,7 @@ for (let z = 2; z < 6; z++) openX[7 + z * cells[0]] = 0;
 const wake = new FiniteQuayWake();
 const world = new PhysicsWorld({rate: {num: 60, den: 1}});
 world.add(wake, {
-  cells, cellSize: 0.25, depths: [0, 0.25, 0.8], openX,
+  cells, cellSize: 0.25, depths: [0, 0.25, 0.8], openX, horizontalOrder: 4,
   initial: (x, z) => [0.04 * Math.exp(-((x - 1) ** 2 + (z - 1) ** 2) / 0.3), 0],
 });
 world.advance(120);
@@ -5433,8 +5433,9 @@ console.log(wake.sample(2.25, 1).height, wake.velocityAt(1.875, -0.5, 1));
 ```
 
 The model is linear, with a conservative pressure and volume work ledger. It resolves waves under a fixed
-apron where the geometry and layered grid leave a wet opening. Use a domain and grid refinement check for
-wave scattering. See the [finite quay limits](../../docs/limits.md#finite-quay-wake-and-under-apron-flow-sea-12).
+apron where the geometry and layered grid leave a wet opening. Set `horizontalOrder: 4` to reduce the spatial
+phase error of short waves in open, uniform layers. The default is 2. Both orders follow the same wet faces.
+Use a domain, layer and grid refinement check for wave scattering. See the [finite quay limits](../../docs/limits.md#finite-quay-wake-and-under-apron-flow-sea-12).
 
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 

@@ -13,6 +13,21 @@ export interface QuayPotentialGrid {
   readonly openX?: ArrayLike<number>;
   /** Open fraction toward +Z at each cell. Faces at the grid edge are always closed. Default 1. */
   readonly openZ?: ArrayLike<number>;
+  /** Fourth-order horizontal dispersion on open, uniform layers. Default 2. */
+  readonly horizontalOrder?: 2 | 4;
+}
+
+// A horizontal layer's graph Laplacian L has the same open-face boundaries as its gradient.
+function axisDifference(u: Float64Array, faces: Float64Array, i: number, stride: number): number {
+  const value = u[i]!;
+  const left = faces[i - stride],
+    right = faces[i];
+  return (left ? left * (value - u[i - stride]!) : 0) + (right ? right * (value - u[i + stride]!) : 0);
+}
+
+function correctedGradient(u: Float64Array, faces: Float64Array, i: number, stride: number, scale: number): number {
+  const j = i + stride;
+  return u[i]! - u[j]! + scale * (axisDifference(u, faces, i, stride) - axisDifference(u, faces, j, stride));
 }
 
 /** Finite-volume harmonic extension for a fixed, impermeable quay in a linear free surface. */
@@ -33,9 +48,12 @@ export class QuayPotential {
   private readonly applied: Float64Array;
   private readonly coarse?: QuayCoarseCorrection;
   private readonly coarseWork?: Float64Array;
+  private readonly horizontalCorrection?: Float64Array;
 
   constructor(grid: QuayPotentialGrid) {
-    const { cells, cellSize, depths, wet, openX, openZ } = grid ?? {};
+    const { cells, cellSize, depths, wet, openX, openZ, horizontalOrder = 2 } = grid ?? {};
+    if (horizontalOrder !== 2 && horizontalOrder !== 4)
+      throw invalidLoad('Set horizontalOrder to 2 or 4 for the finite quay.');
     if (
       cells?.length !== 2 ||
       cells.some((count) => !Number.isSafeInteger(count) || count < 1) ||
@@ -56,6 +74,7 @@ export class QuayPotential {
     this.cellArea = cellSize * cellSize;
     this.topDistance = depths[1]! / 2;
     this.wet = new Uint8Array(count);
+    if (horizontalOrder === 4) this.horizontalCorrection = new Float64Array(layers);
     this.diagonal = new Float64Array(count);
     this.columnInverse = new Float64Array(count);
     this.east = new Float64Array(count);
@@ -75,6 +94,12 @@ export class QuayPotential {
     }
     for (let y = 0; y < layers; y++) {
       const thickness = depths[y + 1]! - depths[y]!;
+      if (this.horizontalCorrection) {
+        const scale = 1 / 12 / thickness;
+        if (!(scale > 0 && Number.isFinite(scale)))
+          throw invalidLoad('Use finite layer thicknesses for fourth-order horizontal flux.');
+        this.horizontalCorrection[y] = scale;
+      }
       const vertical = y + 1 < layers ? (2 * this.cellArea) / (depths[y + 2]! - depths[y]!) : 0;
       if (!Number.isFinite(vertical) || (y === 0 && !Number.isFinite(this.cellArea / this.topDistance)))
         throw invalidLoad('Choose layer thicknesses that give finite face conductances.');
@@ -275,21 +300,22 @@ export class QuayPotential {
   }
 
   private multiply(u: Float64Array, out: Float64Array, top: number): number {
-    const { surfaceCells: plane, volumeCells: n, nx, wet, east, north, down } = this;
+    const { surfaceCells: plane, volumeCells: n, nx, wet, east, north, down, horizontalCorrection } = this;
     out.fill(0);
     let work = 0;
     for (let i = 0; i < n; i++) {
       const value = u[i]!;
+      const correction = horizontalCorrection?.[Math.floor(i / plane)];
       if (east[i]) {
         const difference = value - u[i + 1]!;
-        const flux = east[i]! * difference;
+        const flux = east[i]! * (correction ? correctedGradient(u, east, i, 1, correction) : difference);
         out[i]! += flux;
         out[i + 1]! -= flux;
         work += flux * difference;
       }
       if (north[i]) {
         const difference = value - u[i + nx]!;
-        const flux = north[i]! * difference;
+        const flux = north[i]! * (correction ? correctedGradient(u, north, i, nx, correction) : difference);
         out[i]! += flux;
         out[i + nx]! -= flux;
         work += flux * difference;
@@ -369,6 +395,11 @@ export class QuayPotential {
       throw invalidLoad('Query a face on a valid volume cell.');
     const [faces, offset] =
       axis === 'x' ? [this.east, 1] : axis === 'z' ? [this.north, this.nx] : [this.down, this.surfaceCells];
-    return faces[index] ? faces[index]! * (bulk[index + offset]! - bulk[index]!) : 0;
+    if (!faces[index]) return 0;
+    const correction = axis === 'down' ? undefined : this.horizontalCorrection?.[Math.floor(index / this.surfaceCells)];
+    const gradient = correction
+      ? -correctedGradient(bulk, faces, index, offset, correction)
+      : bulk[index + offset]! - bulk[index]!;
+    return faces[index]! * gradient;
   }
 }

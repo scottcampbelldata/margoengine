@@ -15371,7 +15371,13 @@ The finite quay receiver uses a still-water, cell-centred Cartesian volume with 
 arbitrary vertical layer thicknesses, static solids and optional horizontal face fractions. Closed faces
 carry zero normal flow. Adjacent wet cells exchange a shared conductance times the potential difference.
 The base and outside faces are closed. The optional perimeter sponge damps elevation and books the absorbed
-  energy and signed volume. Size its width and run a domain comparison before treating it as an open sea.
+energy and signed volume. Size its width and run a domain comparison before treating it as an open sea.
+
+`horizontalOrder: 4` uses a wider horizontal stencil along open faces and stores one additional f64
+coefficient per layer. The default uses the two-point flux. The wider stencil reduces open-water phase
+error without changing the vertical approximation or resolving sharp corners beyond the given geometry.
+Its fourth-order accuracy applies to the uniform horizontal interior. Test vertical and temporal
+dispersion independently. The optional loads entry measures 61,406 B gzip.
 
 The 60 Hz midpoint solves a Robin surface condition with preconditioned conjugate gradients. Grids with
 at least 2,048 volume cells can use a Galerkin coarse correction. The aggregates follow connected faces in

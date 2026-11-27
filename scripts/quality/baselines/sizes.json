@@ -14551,6 +14551,11 @@
     },
     {
       "date": "2026-11-27",
+      "commit": "finite-quay-horizontal-order",
+      "reason": "SEA-12 optional fourth-order horizontal potential flux changes physics/loads from 61164 to 61406 B gzip and its cap from 61338 to 63248 B. Both orders share the same boundary geometry, potential, source work and sampler, so a separate entry would duplicate that public setup. Core and Stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
       "commit": "ae3ef07e43",
       "reason": "SEA-12 connected finite wake and dry-cell clipping move optional water/wake from 2172 to 3264 B gzip and its ceiling from 2428 to 3362 B. The receiver and straight wake share the WaterWake binding. A separate entry would duplicate the attachment and buffer uploads. Core and Stage are unchanged."
     },
@@ -15459,7 +15464,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 61338,
+    "@margoengine/physics/loads": 63248,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,
