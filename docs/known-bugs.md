@@ -13515,6 +13515,9 @@ Fixed 2026-11-11 (bug sweep L3b, KB1843): the gathers are now scatter as gather 
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
 - **Rechecked 2026-11-12 (hunt K1, origin/main 25a036b46):** `scripts/support/readme-run-known.json` holds one entry, not 101:
   `ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55` ("Unknown animator clip GetUpFromBack"), which waits with physics.
+- **Rechecked 2026-11-27:** `npm run check:readme-run -- --packages=xr,headless,ragdoll` ran 44 of 45 examples; the one
+  failure is the one listed entry, now `ragdoll/readme-getting-up-margoengine-ragdoll-g-d62a73` (the same missing
+  get-up clips), none failed off the list and 2 were skipped for hardware. The older counts below are history.
 - **Current source audit (2026-11-09):** 101 entries remain after the upstream voxel-pathtracer repair, 84 labelled `sample:` and 17 labelled `example:`.
   The required-test-items scoped rerun ran 62 of 94 examples, with 32 allowed failures. It exited zero; that does not mean
   those 32 examples ran. Their missing/incompatible inputs are indexed in the missing-test-items audit.
