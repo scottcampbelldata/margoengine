@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21008148,
+  "total": 21012669,
   "history": [
     {
       "date": "2026-10-24",
@@ -14706,6 +14706,12 @@
       "commit": "lane-c4",
       "reason": "points/laz-write, new optional entry (writeLAZ and compressLAZ, LASzip-compatible LAZ for point formats 0 to 10; 9869 B with the LAS writer and header reader it shares). The decoder models moved to a module both share; points/laz stays 8668 B. Apart from the reader, so a page that only opens clouds loads none of it.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "navmesh/weighted-any-angle new at 4265 B: any-angle paths over weighted ground with a proven lower bound, its own entry sharing only the point and filter checks of the navmesh search chunk, so the exact search and the rest of navmesh carry none of it; no other entry grows for it",
+      "grew": 1
     }
   ],
   "items": {
@@ -15499,6 +15505,7 @@
     "@margoengine/navmesh/volume": 4975,
     "@margoengine/navmesh/voxel": 16957,
     "@margoengine/navmesh/wasm": 18664,
+    "@margoengine/navmesh/weighted-any-angle": 4521,
     "@margoengine/netcode": 13578,
     "@margoengine/netcode/extrapolate": 799,
     "@margoengine/netcode/generate": 5154,

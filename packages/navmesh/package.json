@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/navmesh",
   "version": "1.0.0",
-  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy), debug draw (./debug), voxel worlds (./voxel) and flying agents (./volume).",
+  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy), exact and weighted any-angle paths (./any-angle, ./weighted-any-angle), debug draw (./debug), voxel worlds (./voxel) and flying agents (./volume).",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -33,6 +33,10 @@
     "./any-angle": {
       "types": "./dist/any-angle.d.ts",
       "import": "./dist/any-angle.js"
+    },
+    "./weighted-any-angle": {
+      "types": "./dist/weighted-any-angle.d.ts",
+      "import": "./dist/weighted-any-angle.js"
     },
     "./codec": {
       "types": "./dist/codec.d.ts",

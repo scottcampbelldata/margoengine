@@ -6687,6 +6687,14 @@ partials, inter-channel phase, click placement and pre-echo, a vowel's resonance
 generated signals. No listening test, rival comparison or speed claim.
 [Limits](../limits.md#phase-vocoder-audiovocoder-2026-11-27)
 
+## Weighted any-angle navmesh paths (navmesh/weighted-any-angle)
+
+Claim: `WeightedAnyAngleSearch` returns a path over weighted ground with its cost and a lower bound that no path goes
+under; on the seeded test maps the path is within 1 percent of the least cost. The bound is not always close: its limits
+row gives the measured gaps.
+Proof: `packages/navmesh/test/weighted-any-angle.test.js` checks both against convex descent (Snell's law strips), a
+dense Steiner graph oracle and the exact search on even ground.
+
 ## Exact any-angle navmesh paths (navmesh/any-angle)
 
 The path of least ground-plane length over the walkable polygons, plus off-mesh link costs, on whole and tiled meshes.

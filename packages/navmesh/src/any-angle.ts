@@ -147,7 +147,7 @@ class Layout {
     if (cost === Infinity) return false;
     throw new RangeError(
       'An exact any-angle path is the shortest in distance and cannot weigh area costs; use Infinity to forbid ' +
-        'ground, or route() for weighted routes.',
+        'ground, or WeightedAnyAngleSearch of navmesh/weighted-any-angle for weighted ground.',
     );
   }
 

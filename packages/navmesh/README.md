@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/any-angle` finds the exact shortest path, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/any-angle` finds the exact shortest path, `@margoengine/navmesh/weighted-any-angle` finds any-angle paths over weighted ground with a proven bound, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -284,7 +284,7 @@ console.log(route?.length); // 1 + Math.SQRT2
 `route` on a mesh picks a corridor of polygons first and pulls it taut, so its path is near the shortest. `AnyAngleSearch` searches every way at once (Polyanya, Cui, Harabor and Grastien 2017) and returns the path of least length that stays on the mesh, bending only at mesh corners. It works on a `NavMesh`, a `TiledNavMesh` and a `VoxelNavMesh`, needs no preparation, and answers `{points, offMesh, length, expanded}` or null; `path` returns the points alone.
 
 - Length is measured in the ground plane (XZ), as the funnel pulls paths. An off-mesh link adds its `cost`.
-- Distance only: a filter may forbid an area (`Infinity`) but not weigh it, and a polygon whose area cost is above 1 throws a `RangeError`. Use `route` for weighted ground.
+- Distance only: a filter may forbid an area (`Infinity`) but not weigh it, and a polygon whose area cost is above 1 throws a `RangeError`. Use `WeightedAnyAngleSearch` (below) or `route` for weighted ground.
 - Two parts of a mesh that meet only in a point are not joined, as with `route`.
 - The ends are not moved onto the mesh: pass points on it (see `closestPoint`).
 - `expanded` counts search nodes. The search costs more than `route` when many ways are close to equal.
@@ -293,6 +293,39 @@ console.log(route?.length); // 1 + Math.SQRT2
 | --- | --- | --- |
 | `filter` | none | 1 or `Infinity` per area number |
 | `maxNodes` | 1000000 | search nodes one call may make before it throws a `MargoError` of code `failed` |
+
+## Weighted ground, any angle (`./weighted-any-angle`)
+
+```ts
+import {WeightedAnyAngleSearch} from 'margoengine/navmesh/weighted-any-angle';
+import {NavMesh} from 'margoengine/navmesh';
+
+// Two 1 m strips side by side; walking in the second costs three times as much per metre.
+const mesh = new NavMesh(
+  [[0, 0, 0], [0, 0, 2], [1, 0, 0], [1, 0, 2], [2, 0, 0], [2, 0, 2]],
+  [[0, 2, 3, 1], [2, 4, 5, 3]],
+);
+mesh.setAreaCost(1, 3);
+
+const search = new WeightedAnyAngleSearch(mesh); // keep it: it reads the mesh once, and again after a change
+const route = search.route([0.1, 0, 0.2], [1.9, 0, 1.8]);
+console.log(route?.points); // start, where the path bends at the boundary (Snell's law), end
+console.log(route?.cost, route?.lowerBound); // the path's cost, and the least any path could cost
+```
+
+For mud, roads, water and other ground with its own cost per metre. The path may cross each portal anywhere and bends where the weights pay for it; `route` of a mesh keeps to one corridor of polygons. The least weighted cost cannot be computed exactly (De Carufel and others 2014), so each answer is `{points, offMesh, cost, lowerBound, work}` or null: no path costs less than `lowerBound`.
+
+- The path comes first, from a Dijkstra search between points on the portals pulled tight (Lanthier, Maheshwari and Sack 2001). On the seeded test maps it is within 1 percent of the least cost.
+- Then the portals are cut into pieces and searched again, finer each round, until `cost <= lowerBound * (1 + tolerance)` or `maxWork` runs out. Check `cost / lowerBound` when you need the proof: on meshes of hundreds of polygons the default work often ends before the bound is close, although the path is.
+- Each halving of `tolerance` takes about four times the work. `maxWork: 1` asks for the path alone.
+- Cost is length in the ground plane (XZ) times area cost times filter weight (1 or more, `Infinity` walls); an off-mesh link adds its `cost`.
+- On unweighted ground use `AnyAngleSearch`, which is exact and does less work.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `filter` | none | cost per area number, as in `route` |
+| `tolerance` | 0.05 | share by which `cost` may exceed `lowerBound` when the search stops |
+| `maxWork` | 5000000 | arcs one call weighs before it stops raising the bound; the first path search always finishes |
 
 ## Debug draw (`./debug`)
 

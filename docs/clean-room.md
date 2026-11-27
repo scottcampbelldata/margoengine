@@ -18336,6 +18336,36 @@ source was read.
   links as extra arrivals with the estimate scaled by the cheapest link's cost per metre (Hart, Nilsson and Raphael
   1968). Not built: the paper's intermediate pruning, which changes the work and not the path.
 
+## navmesh weighted any-angle search (2026-11-27)
+
+`@margoengine/navmesh/weighted-any-angle`, written from the papers' descriptions. No paper's companion code and no other
+engine's source was read.
+
+- J. S. B. Mitchell and C. H. Papadimitriou, "The weighted region problem: finding shortest paths through a weighted
+  planar subdivision", J. ACM 38 (1), 1991, https://doi.org/10.1145/102782.102784: the problem, Snell's law of
+  refraction and travel along edges at the cheaper weight. Its continuous Dijkstra is not built (polynomial of high
+  degree, and approximate).
+- J.-L. De Carufel, C. Grimm, A. Maheshwari, M. Owen and M. Smid, "A note on the unsolvability of the weighted region
+  shortest path problem", Computational Geometry 47 (7), 2014, https://arxiv.org/abs/1305.5209: no exact algorithm
+  with arithmetic and roots exists. So the search brackets the least cost.
+- M. Lanthier, A. Maheshwari and J.-R. Sack, "Approximating shortest paths on weighted polyhedral surfaces",
+  Algorithmica 30, 2001, https://doi.org/10.1007/s00453-001-0027-5: points on edges joined within each face and
+  searched with Dijkstra. Used for the first path.
+- L. Aleksandrov, A. Maheshwari and J.-R. Sack, "Determining approximate shortest paths on weighted polyhedral
+  surfaces", J. ACM 52 (1), 2005, https://doi.org/10.1145/1044731.1044733: points placed closer near vertices for a
+  proved factor. Not used: its guarantee is a worst case over the whole mesh, and the bound here is measured for each
+  query.
+- K. Daniel, A. Nash, S. Koenig and A. Felner, "Theta*: any-angle path planning on grids", J. Artificial Intelligence
+  Research 39, 2010, https://arxiv.org/abs/1401.3843, section on non-uniform costs: not used, grid only and no bound.
+- D. P. Bertsekas, "Projected Newton methods for optimization problems with simple constraints", SIAM J. Control and
+  Optimization 20 (2), 1982, https://doi.org/10.1137/0320018: pulls a path tight inside its portals (a convex problem
+  with a tridiagonal Hessian).
+- Margo's own: the lower bound from pieces of portals (an arc costs the least distance between two pieces times the
+  polygon's weight, so no real path costs less than its relaxed one); the two states a piece has, so that one portal is
+  walked along only once in a row (without it touching pieces walked any edge for nothing and the bound stalled);
+  dropping every piece whose cheapest relaxed path already costs `cost / (1 + tolerance)`; splitting only the pieces
+  left, widest by weight first.
+
 ## exporters glTF line and point style extensions (2026-11-27)
 
 `exportGLB` and `exportGLTF` `styleExtensions`, written from the specification texts only; no implementation was read.
