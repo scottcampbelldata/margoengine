@@ -1472,6 +1472,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   sky 0.06 and 0.17, other 0.07 and 0.40 (0.33 early, already inside the bound; 1.06 mid). Passing as the check
   stands needs a ruling on the shot (a camera path with less parallax per frame) or on the check; until then lane A
   works the mid-probe remainder (1.06 percent) only. Script: the lane's sh2-occ.mjs split on the shot's probes.
+- **Mid remainder measured 2026-11-27 (lane A, main 24ce05b217 plus the KB-POST-GTAOFAR1 blur, which left
+  shimmerMoving at 5.09 early and 8.48 mid):** plant interiors 0.46 percent of the frame, sky 0.16, other 0.35. Of the
+  "other", 0.27 is the fire front's flame wall on the left of the frame (flame-coloured pixels, x 0 to 420), whose
+  volume changes between frames as it puffs at the Cetegen and Ahmed frequency for its size (`@margoengine/vfx`
+  fire.ts, `puffingDiameter`); the sky share is the smoke plume, and the plant share is the bounded sway (BIO-01).
+  All three are motion the scene draws on purpose, which a warp by camera motion counts as change; about 0.08 percent
+  (low rocks and logs at the bottom edge) is left that is not. So with the check and the camera path unchanged no
+  render fix reaches the 0.5 bound at mid without stilling the flames, smoke or sway. The bound stays 0.5; this needs a
+  ruling on the shot or the check.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 
