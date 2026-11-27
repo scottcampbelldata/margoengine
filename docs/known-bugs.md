@@ -6,6 +6,16 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: advancing wake transmits flow through the Wigley hull (KB-SEA04-STEM1)
+
+- **Repro.** The [Wigley comparison](../packages/physics/scripts/sea04-stem.md) drives the actual `HullSolver` and
+  `WakeSolver` with the published hull shape, draft and tow speeds. At Froude 0.267 and 0.316 the fine surface
+  source gives 16.42 and 14.53 mm at the stem, against 43.84 and 39.94 mm measured. The depth-banded source
+  gives 9.52 and 9.28 mm.
+- **Cause.** The advancing volume source displaces water but leaves the hull interior in the periodic wave domain.
+  The solver does not enforce the normal water velocity at the moving wetted sides. The fine-grid normal residual
+  remains 0.116–0.399 m/s. Refining the source strips does not recover the measured crest.
+
 ### Fixed 2026-11-27: gltf's dist carried its own copy of physics/decomposition (KB-BUILD-INLINE2, package build; gltf/physics)
 
 - **Repro:** `npm run build:packages`, `npm run quality -- --gate=sizes`: `@margoengine/gltf/physics` reads 19,953 B

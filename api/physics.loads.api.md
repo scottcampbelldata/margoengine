@@ -54,6 +54,11 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
         absorbedJoules: number;
         absorbedVolume: number;
     };
+    hullExchange(): {
+        readonly impulse: readonly [number, number, number, number, number, number];
+        readonly joules: number;
+        readonly displacedVolume: number;
+    } | undefined;
     energy(): number;
     sample(x: number, z: number, out?: WakeSample): WakeSample;
     velocityAt(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
@@ -73,6 +78,12 @@ export interface FiniteQuayWakeParams extends QuayPotentialGrid {
     };
     readonly pressureAtDepth?: boolean;
     readonly temporalOrder?: 2 | 4;
+    readonly hull?: {
+        readonly mask: Uint8Array;
+        readonly centre: readonly [number, number, number];
+        readonly velocity?: (time: number) => readonly [number, number, number, number, number, number];
+        readonly startTime?: number;
+    };
 }
 
 export interface FloodBlockageBody {

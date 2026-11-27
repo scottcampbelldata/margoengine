@@ -8,6 +8,7 @@ import {
   wakeDepths,
 } from '../sea/submerged-wake.js';
 import { WAKE_LAYOUT, WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS, type WakeSample } from '../sea/wake.js';
+import { WakeHullBoundary } from '../sea/wake-hull-boundary.js';
 import { regionWords } from '../world/memory.js';
 import type {
   FieldDescriptor,
@@ -18,6 +19,7 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
+import { rateOf } from '../world/solver.js';
 import { invalidLoad } from './errors.js';
 import { QuayPotential, type QuayPotentialGrid } from './quay-potential.js';
 
@@ -25,6 +27,7 @@ import { QuayPotential, type QuayPotentialGrid } from './quay-potential.js';
 const fourthOrderStages = [1.3512071919596575, -1.7024143839193153, 1.3512071919596575] as const;
 const midpointStages = [1] as const;
 const pointWakeQuantity = 'submergedPointSeaSource';
+const stillHull = [0, 0, 0, 0, 0, 0] as const;
 
 /** Open a layout-1 f64 source port with rows [x, z, radius, depth below still water, signed volume]. */
 export function finiteQuayPointSource(name: string): FieldDescriptor {
@@ -53,6 +56,17 @@ export interface FiniteQuayWakeParams extends QuayPotentialGrid {
   readonly pressureAtDepth?: boolean;
   /** Order of the conservative wave step with pressure held over a tick. Default 2 (one midpoint stage). */
   readonly temporalOrder?: 2 | 4;
+  /** Optional impermeable mean hull with prescribed small motion. Uses the second-order midpoint rule. */
+  readonly hull?: {
+    /** One byte per volume cell, X then Z then depth. One marks the hull's mean wetted shape. */
+    readonly mask: Uint8Array;
+    /** Mean hull centre of moment, in metres in the wake's cell, with Y positive upward. */
+    readonly centre: readonly [number, number, number];
+    /** Linear xyz in m/s then angular xyz in rad/s at an endpoint in world seconds. Omit for a fixed hull. */
+    readonly velocity?: (time: number) => readonly [number, number, number, number, number, number];
+    /** World seconds when this hull is added. Defaults to 0. Use `world.time` when attaching prescribed motion later. */
+    readonly startTime?: number;
+  };
 }
 
 /** A bounded 3D linear potential wake. Sources, wave work and the wet surface use the same finite geometry. */
@@ -78,6 +92,12 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
   private forcingPressure!: Float64Array;
   private sponge?: Float64Array;
   private stagedRise?: Float64Array;
+  private hull?: {
+    readonly boundary: WakeHullBoundary;
+    readonly velocity: NonNullable<FiniteQuayWakeParams['hull']>['velocity'];
+    readonly state: Region;
+    readonly midpoint: Float64Array;
+  };
 
   constructor(
     readonly id = 'finiteQuayWake',
@@ -140,8 +160,19 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       sponge,
       pressureAtDepth,
       temporalOrder = 2,
+      hull,
     } = params;
+    const hullStart = hull?.startTime ?? 0;
     if (temporalOrder !== 2 && temporalOrder !== 4) throw invalidLoad('Set the finite quay temporalOrder to 2 or 4.');
+    if (
+      hull &&
+      (temporalOrder !== 2 ||
+        (hull.velocity !== undefined && typeof hull.velocity !== 'function') ||
+        !(Number.isFinite(hullStart) && hullStart >= 0))
+    )
+      throw invalidLoad(
+        'Use temporalOrder 2, finite nonnegative startTime and optional endpoint velocities for a mean hull.',
+      );
     const [gx, gy, gz] = host.gravity;
     if (
       gx !== 0 ||
@@ -153,7 +184,8 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       !origin.every(Number.isFinite)
     )
       throw invalidLoad('Use downward Y gravity, positive water density and a finite XZ origin.');
-    const operator = new QuayPotential(params);
+    const boundary = hull && new WakeHullBoundary({ grid: params, hull: hull.mask, centre: hull.centre, origin });
+    const operator = new QuayPotential(boundary?.grid ?? params);
     if (
       sponge &&
       (!Number.isInteger(sponge.cells) ||
@@ -186,6 +218,13 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       allocate('work', 5),
     ];
     this.pressureHead = pressureAtDepth ? allocate('pressureHead', surfaceCells + volumeCells) : undefined;
+    this.hull = boundary &&
+      hull && {
+        boundary,
+        velocity: hull.velocity,
+        state: allocate('meanHullExchange', 15),
+        midpoint: new Float64Array(6),
+      };
     this.kick = new Float64Array(surfaceCells);
     this.bulkKick = new Float64Array(volumeCells);
     this.rise = new Float64Array(surfaceCells);
@@ -201,11 +240,22 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
         const distance = Math.min(x, cells[0] - x - 1, z, cells[1] - z - 1);
         return sponge.rate * Math.max(0, 1 - distance / sponge.cells) ** 2;
       });
-    if (initial) {
+    let initialFlux: Float64Array | undefined;
+    if (this.hull) {
+      const velocity = this.hullVelocity(hullStart);
+      const state = this.hullWords()!;
+      state.set(velocity);
+      state[14] = hullStart;
+      if (velocity.some((value) => value !== 0)) {
+        initialFlux = this.bulkKick;
+        this.hull.boundary.addMotionFlux(initialFlux, velocity);
+      }
+    }
+    if (initial || initialFlux) {
       const height = this.words(0),
         trace = this.words(1);
       for (let i = 0; i < surfaceCells; i++)
-        if (operator.wetCell(i)) {
+        if (initial && operator.wetCell(i)) {
           const value = initial(
             origin[0] + ((i % cells[0]) + 0.5) * cellSize,
             origin[1] + (Math.floor(i / cells[0]) + 0.5) * cellSize,
@@ -215,7 +265,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
           height[i] = value[0];
           trace[i] = value[1];
         }
-      operator.project(trace, this.words(3), undefined, 0, this.words(2));
+      operator.project(trace, this.words(3), initialFlux, 0, this.words(2));
       const head = this.headWords();
       if (head) {
         for (let i = 0; i < surfaceCells; i++) head[i] = this.g * height[i]!;
@@ -237,7 +287,17 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       nextHeight,
       nextBulk,
       sponge,
+      hull,
     } = this;
+    const hullState = this.hullWords();
+    const rate = hull ? rateOf(context.level) : 1;
+    const startTime = context.tick / rate;
+    const endTime = (context.tick + 1) / rate;
+    if (hull?.velocity && hullState && Math.abs(hullState[14]! - startTime) > Number.EPSILON * Math.max(1, startTime))
+      throw invalidLoad(
+        'Set hull.startTime to world.time when adding the finite wake, or restore a matching snapshot.',
+      );
+    const endVelocity = hull && this.hullVelocity(endTime);
     const height = this.words(0),
       trace = this.words(1),
       ledger = this.words(4);
@@ -262,6 +322,16 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     let absorbed = 0;
     let absorbedVolume = 0;
     const half = dt / 2;
+    let hullFlux: Float64Array | undefined;
+    let hullVolume = 0;
+    if (hull && endVelocity && hullState) {
+      for (let i = 0; i < 6; i++) hull.midpoint[i] = hullState[i]! / 2 + endVelocity[i]! / 2;
+      if (hull.midpoint.some((value) => value !== 0)) {
+        bulkKick.fill(0);
+        hullFlux = bulkKick;
+        hullVolume = dt * hull.boundary.addMotionFlux(hullFlux, hull.midpoint);
+      }
+    }
     for (let i = 0; i < height.length; i++) {
       const original = height[i]!,
         eta = this.heightBeforeKick(original, i, half),
@@ -293,7 +363,22 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       const robin = g * halfStage * halfStage;
       for (let i = 0; i < height.length; i++)
         mid[i] = endTrace[i]! - halfStage * (g * nextHeight[i]! + pressure[i]! / density);
-      iterations += operator.project(mid, rise, undefined, robin, nextBulk);
+      iterations += operator.project(mid, rise, hullFlux, robin, nextBulk);
+      if (hull && hullState && endVelocity) {
+        // The optional hull uses the one midpoint. Stage the accepted endpoint before taking the pressure difference.
+        for (let i = 0; i < oldBulk.length; i++) nextBulk[i] = 2 * nextBulk[i]! - endBulk[i]!;
+        const impulse = hull.boundary.pressureImpulse(endBulk, nextBulk, density);
+        const work = -impulse.reduce((sum, value, i) => sum + value * hull.midpoint[i]!, 0);
+        if (!Number.isFinite(hullState[12]! + work) || !Number.isFinite(hullState[13]! + hullVolume))
+          throw invalidLoad('Keep the prescribed hull velocity and its accepted exchanges at a finite scale.');
+        hullState.set(endVelocity);
+        hullState.set(impulse, 6);
+        hullState[12]! += work;
+        hullState[13]! += hullVolume;
+        hullState[14] = endTime;
+        sourceWork += work;
+        volume += hullVolume;
+      }
       if (!staged && head) {
         head.set(trace);
         head.set(oldBulk, height.length);
@@ -306,7 +391,8 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
         sourceWork -= pressure[i]! * motion * area;
         endRise[i] = 2 * rise[i]! - endRise[i]!;
       }
-      for (let i = 0; i < oldBulk.length; i++) endBulk[i] = 2 * nextBulk[i]! - endBulk[i]!;
+      if (hull) endBulk.set(nextBulk);
+      else for (let i = 0; i < oldBulk.length; i++) endBulk[i] = 2 * nextBulk[i]! - endBulk[i]!;
     }
     if (staged && head) {
       head.set(trace);
@@ -334,6 +420,17 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     ledger[2] = iterations;
     ledger[3]! += density * g * area * absorbed;
     ledger[4]! += area * absorbedVolume;
+  }
+
+  private hullVelocity(time: number): readonly [number, number, number, number, number, number] {
+    const velocity = this.hull?.velocity ? this.hull.velocity(time) : stillHull;
+    if (velocity?.length !== 6 || stillHull.some((_, i) => !Number.isFinite(velocity[i])))
+      throw invalidLoad('Return all six finite xyz linear and angular components for the prescribed hull velocity.');
+    return velocity;
+  }
+
+  private hullWords(): Float64Array | undefined {
+    return this.hull ? (regionWords(this.host.memory, this.hull.state) as Float64Array) : undefined;
   }
 
   private stamp(port: Port, context: StepContext, below: boolean): boolean {
@@ -445,6 +542,10 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     memory: WebAssembly.Memory,
     surface?: FieldDescriptor,
   ): void {
+    if (this.hull)
+      throw invalidLoad(
+        'Use either the prescribed mean hull or the free-body displacement coupling on this finite wake.',
+      );
     if (
       this.host?.memory !== memory ||
       this.sourceField?.name !== surface?.name ||
@@ -736,6 +837,23 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     };
   }
 
+  /** Last accepted dynamic body impulse, with cumulative signed work and displaced volume delivered to the water. */
+  hullExchange():
+    | {
+        readonly impulse: readonly [number, number, number, number, number, number];
+        readonly joules: number;
+        readonly displacedVolume: number;
+      }
+    | undefined {
+    const state = this.hullWords();
+    if (!state) return undefined;
+    return {
+      impulse: [state[6]!, state[7]!, state[8]!, state[9]!, state[10]!, state[11]!],
+      joules: state[12]!,
+      displacedVolume: state[13]!,
+    };
+  }
+
   /** Hamiltonian of the accepted free surface in joules. */
   energy(): number {
     const height = this.words(0),
@@ -743,7 +861,12 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       rate = this.words(3);
     let energy = 0;
     for (let i = 0; i < height.length; i++) energy += this.g * height[i]! ** 2 + rate[i]! * trace[i]!;
-    return 0.5 * this.rho * this.shape.cellSize ** 2 * energy;
+    const surfaceEnergy = 0.5 * this.rho * this.shape.cellSize ** 2 * energy;
+    const hullState = this.hullWords();
+    // Green's identity includes the moving hull's flux in addition to the free-surface contribution.
+    return this.hull && hullState
+      ? surfaceEnergy - 0.5 * this.rho * this.hull.boundary.potentialFlux(this.words(2), hullState)
+      : surfaceEnergy;
   }
 
   /** Bilinear height over visible wet cells, with centred or one-sided slopes at the wall. */
@@ -812,7 +935,13 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     const bulk = this.words(2),
       [nx] = this.shape.cells,
       dx = this.shape.cellSize;
-    const flux = (axis: 'x' | 'z' | 'down', cell: number) => (cell < 0 ? 0 : this.operator.faceFlux(axis, cell, bulk));
+    const hull = this.hull?.boundary,
+      motion = this.hullWords();
+    const flux = (axis: 'x' | 'z' | 'down', cell: number) => {
+      if (cell < 0) return 0;
+      const open = this.operator.faceFlux(axis, cell, bulk);
+      return hull && motion ? open + hull.normalFlux(axis, cell, motion) : open;
+    };
     const horizArea = dx * (this.depths[layer + 1]! - this.depths[layer]!);
     out[0] = (flux('x', at) + flux('x', at - 1)) / (2 * horizArea);
     out[2] = (flux('z', at) + flux('z', at - nx)) / (2 * horizArea);
@@ -844,7 +973,8 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
 
   importPorts(): void {}
   stateRegions(): readonly Region[] {
-    return this.pressureHead ? [...this.regions, this.pressureHead] : this.regions;
+    const water = this.pressureHead ? [...this.regions, this.pressureHead] : this.regions;
+    return this.hull ? [...water, this.hull.state] : water;
   }
   extraState(): readonly Region[] {
     return [];

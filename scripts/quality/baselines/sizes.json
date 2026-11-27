@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21037939,
+  "total": 21041756,
   "history": [
     {
       "date": "2026-10-24",
@@ -14763,6 +14763,11 @@
       "date": "2026-11-27",
       "commit": "sea-04-breaking-crest-field",
       "reason": "Physics/sea moves from 11134 to 12263 B gzip and cap 11469 to 12631 B. Physics/foam moves from 7418 to 7870 B gzip and cap 7674 to 8126 B. The optional wake-to-foam field uses the accepted wave state and the existing coverage and spray paths. Moving the detector and receiver to a separate public entry would repeat the field wiring and require a second owner for crest state. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-04-mean-hull-exchange",
+      "reason": "Physics/loads grows from 63177 to 65111 B gzip and its ceiling from 63248 to 67065 B for the optional mean hull with impermeable geometry, six-axis prescribed normal motion and reciprocal pressure. The finite wake has a single owner for the accepted bulk state and Green work. Splitting off another public entry would pass the same geometry and accepted bulk between two solver owners. Core and stage are unchanged."
     }
   ],
   "items": {
@@ -15626,7 +15631,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 63248,
+    "@margoengine/physics/loads": 67065,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,

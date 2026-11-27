@@ -12796,6 +12796,20 @@ the reported ±0.020 uncertainty on the ratio. The manufactured oblique wave and
 wake-to-foam test separately measure estimator convergence and verify exact replay.
 [Saket et al., 2018](https://arxiv.org/abs/1703.04354)
 
+#### SEA-04 pressure on a prescribed mean hull
+
+The finite wake closes the mean hull cells and places the small-motion flux
+`n dot (V + Ω cross r)` at every wetted face. This is the boundary condition
+linearized about the mean wetted surface in Cummins's equation 34. Face normals
+and their moment arms supply the transpose pressure map. The pressure impulse is
+computed from the accepted bulk-potential difference. The midpoint boundary work
+and the extra boundary term in Green's identity use the same signed flux, so the
+measured work is coupled to the actual potential. The oscillating piston and
+heave fixtures check this balance, exposed velocity, physical pressure, signed
+volume and exact seek. A fixed or oscillating mask is distinct from a translating
+hull that changes the wetted geometry.
+[Cummins, The Impulse Response Function and Ship Motions, 1962](https://dome.mit.edu/server/api/core/bitstreams/4a239966-bc09-4811-8917-d152923c167f/content)
+
 ### The sea's surface and water (`@margoengine/physics/sea`, 2026-11-25, SEA-02)
 
 `packages/physics/src/sea/surface.ts` is written from:

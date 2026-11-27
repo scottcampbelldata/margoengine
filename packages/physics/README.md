@@ -3494,8 +3494,8 @@ console.log(sea.pressure(10, -20, 0, 3.5) > 1025 * 9.81 * 19); // true: about 20
 Fourier mode of the surface is advanced exactly over a step, with the finite-depth dispersion of water waves (omega^2 =
 g k tanh(k D)), driven by the pressure and displaced volume its `sources` put on the water at each step's time (a hull's
 weight over its waterplane as `SeaSource`s). So the wake's shape comes from the physics alone: transverse waves 2 pi U^2 / g
-long behind a hull at speed U, inside the Kelvin wedge at a Froude number under about 0.5, narrowing at higher ones as
-Rabaud and Moisy (2013) observed. A border of `sponge` cells absorbs what reaches the edge. Its height and potential are
+long behind a hull at speed U, with transverse and diverging crests. The apparent crest angle depends on the forcing
+footprint and measurement window. A border of `sponge` cells absorbs what reaches the edge. Its height and potential are
 world state (snapshot, restore, hash). `sample(x, z)` gives the wake's height, slope and surface velocity; pass the solver
 to `SpectralSea` as one of its `patches` and the sea's `sample`, `elevation` and `pressure` carry it, so a hull floats on
 its own wake and on the ships around it.
@@ -3625,6 +3625,36 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
   .add(foam, { waves: { cell: [0, 0, 0], sample: () => spectrum } });
 world.advance(1);
 console.log(foam.meanCoverage()); // 0 on still water
+```
+
+The finite wake can exclude a hull's mean wetted cells and prescribe a small motion through
+the normal velocity on those faces. Its `hullExchange()` returns the accepted linear and
+angular pressure impulse, cumulative joules and displaced cubic metres. Use the midpoint
+step, and for an in-progress world set `hull.startTime` to `world.time` before adding
+the prescribed hull. A fixed hull omits `velocity`. The mask represents the mean pose over
+the run, so this setup is for fixed hulls and small motion about that pose.
+
+```ts
+import { FiniteQuayWake } from 'margoengine/physics/loads';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const cells = [16, 8] as const;
+const mask = new Uint8Array(cells[0] * cells[1] * 2);
+for (let row = 0; row < cells[1] * 2; row++) mask[7 + cells[0] * row] = 1;
+const wake = new FiniteQuayWake();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wake, {
+  cells,
+  cellSize: 0.25,
+  depths: [0, 0.5, 1],
+  pressureAtDepth: true,
+  hull: {
+    mask,
+    centre: [1.875, -0.5, 1],
+    velocity: (t) => [t < 0.1 ? 0.01 : 0, 0, 0, 0, 0, 0],
+  },
+});
+world.advance(12);
+console.log(wake.hullExchange()?.joules);
 ```
 
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
