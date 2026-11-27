@@ -6,6 +6,7 @@ import { parse3MF, readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
 import { decodeImage } from '@margoengine/decoders/image';
 import { export3MF } from '@margoengine/exporters/threemf';
+import { exportMaterialGLB } from '@margoengine/exporters/materials';
 import { png } from '../dist/png.js';
 
 // A closed box of side 1 with its corner at the origin: 8 shared corners, faces outward.
@@ -338,4 +339,205 @@ test('metalness, roughness and their map read back through parse3MFMaterials', a
     const image = await decodeImage(read.textures[metallic.roughnessTexture].data);
     assert.deepEqual([...image.data], [40, 200, 0, 255, 220, 10, 0, 255]);
   }
+});
+
+const linear = (value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+const close = (actual, expected, within, label) => {
+  assert.equal(actual.length, expected.length, label);
+  actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) <= within, `${label}: ${actual} against ${expected}`));
+};
+// One material of each kind, as data scenes and exportMaterialGLB describe them.
+const GOLD = {
+    name: 'Gold',
+    roughness: 0.25,
+    extensions: { KHR_materials_specular: { specularColorFactor: [1, 0.5, 0.25], specularFactor: 0.5 } },
+  },
+  WATER = { name: 'Water', roughness: 0.1, ior: 1.33 },
+  GEM = { name: 'Gem', ior: 0, extensions: { KHR_materials_specular: { specularColorFactor: [0.6, 0.5, 0.2] } } },
+  GLASS = {
+    name: 'Glass',
+    roughness: 0.05,
+    transmission: 1,
+    extensions: {
+      KHR_materials_volume: { thicknessFactor: 1, attenuationColor: [0.5, 0.8, 0], attenuationDistance: 0.25 },
+      KHR_materials_dispersion: { dispersion: 0.4 },
+    },
+  },
+  STEEL = { name: 'Steel', metalness: 1, roughness: 0.5 };
+const KINDS = [GOLD, WATER, GEM, GLASS, STEEL];
+const row = () => KINDS.map((material, i) => ({ translation: [2 * i, 0, 0], geometry: mesh(), material }));
+const WATER_F0 = (0.33 / 2.33) ** 2;
+// KHR_materials_ior and _specular: reflectance at normal incidence.
+const REFLECTANCE = {
+  Gold: [0.02, 0.01, 0.005],
+  Water: [WATER_F0, WATER_F0, WATER_F0],
+  Gem: [0.6, 0.5, 0.2],
+};
+// Beer-Lambert per metre; black is written as 2^-16.
+const ATTENUATION = [0.5, 0.8, 2 ** -16].map((c) => -Math.log(c) / 0.25);
+const checkKinds = (groups) => {
+  const named = Object.fromEntries(
+    groups.map((group) => [(group.specular ?? group.translucent ?? group.metallic)?.name, group]),
+  );
+  for (const [name, reflectance] of Object.entries(REFLECTANCE)) {
+    const { specular, metallic, translucent } = named[name];
+    assert.ok(!metallic && !translucent, name);
+    // The colour is written as 8-bit sRGB.
+    close(specular.specularColor.map(linear), reflectance, 0.005, name);
+  }
+  assert.deepEqual(
+    ['Gold', 'Water', 'Gem'].map((name) => named[name].specular.glossiness),
+    [0.75, 0.9, 0],
+  );
+  close(named.Glass.translucent.attenuation, ATTENUATION, 1e-4, 'attenuation per metre');
+  close(named.Glass.translucent.refractiveIndex, [1.495, 1.5, 1.505], 1e-6, 'dispersion 0.4 at index 1.5');
+  assert.equal(named.Glass.translucent.roughness, 0.05);
+  assert.deepEqual([named.Steel.metallic.metalness, named.Steel.metallic.roughness], [1, 0.5]);
+};
+
+test('specular, translucent and metallic materials each take a base material group and read back', async () => {
+  for (const assembly of [true, false, 'components']) {
+    const file = await export3MF({ nodes: row() }, { assembly }),
+      text = await model(file),
+      groups = [...text.matchAll(/<basematerials id="(\d+)" displaypropertiesid="(\d+)">/g)];
+    assert.equal(groups.length, 3, 'one group for each kind of display properties');
+    // Every resource is defined before it is named (core specification section 3.4).
+    for (const [named, , display] of groups) {
+      const defined = text.search(new RegExp(`displayproperties id="${display}"`));
+      assert.ok(defined >= 0 && defined < text.indexOf(named), named);
+    }
+    assert.equal(count(text, /<m:pbspecular /g), 3);
+    assert.equal(count(text, /<m:translucent /g), 1);
+    checkKinds((await parse3MFMaterials(file)).groups);
+  }
+  const plain = await model(await export3MF({ nodes: row() }, { displayProperties: false }));
+  assert.ok(!plain.includes('displayproperties'));
+  assert.equal(count(plain, /<basematerials /g), 1);
+});
+
+test('a GLB keeps its transmission, volume, index of refraction and specular colour into 3MF', async () => {
+  const glb = exportMaterialGLB({ nodes: row() });
+  checkKinds((await parse3MFMaterials(await export3MF(glb))).groups);
+});
+
+test('colours and textures reach a translucent material through multiproperties over its white base', async () => {
+  const colors = new Float32Array(24).fill(0.5),
+    image = await png({ width: 1, height: 1, data: new Uint8Array([200, 100, 50, 255]) }, 1, false),
+    texture = { image, mimeType: 'image/png' },
+    uvs = new Float32Array(16);
+  for (const [geometry, material] of [
+    [mesh(faces, { colors, colorSize: 3 }), GLASS],
+    [mesh(faces, { uvs }), { ...GLASS, baseColorTexture: texture }],
+    [mesh(faces, { uvs }), { ...GLASS, color: [0.5, 0.5, 0.5], baseColorTexture: texture }],
+  ]) {
+    const file = await export3MF({ nodes: [{ geometry, material }] }),
+      text = await model(file);
+    // Section 7.5.1: neither a colour group nor a texture group may take translucent display properties.
+    assert.ok(!/<m:(colorgroup|texture2dgroup)[^>]*displaypropertiesid/.test(text), text);
+    assert.match(text, /<base name="Glass" displaycolor="#FFFFFF"\/>/);
+    const read = await parse3MFMaterials(file);
+    assert.equal(read.groups.length, 1);
+    assert.equal(read.groups[0].translucent.name, 'Glass');
+    assert.equal(read.groups[0].translucent.layer, 0);
+    assert.equal(read.groups[0].texture, material.baseColorTexture ? 0 : undefined);
+    // Linear 0.5 is sRGB 0.7354, multiplied over the white base.
+    if (!material.baseColorTexture || material.color)
+      close([...read.colors.slice(0, 3)], [0.7354, 0.7354, 0.7354], 0.004, 'the tint over the white base');
+  }
+});
+
+test('specular materials with colours and maps are written as specular display properties', async () => {
+  const uvs = new Float32Array(16).fill(0.5),
+    texture = async (pixels) => ({
+      image: await png({ width: 2, height: 1, data: new Uint8Array(pixels) }, 2, false),
+      mimeType: 'image/png',
+    }),
+    base = await texture([255, 0, 0, 255, 0, 255, 0, 255]),
+    rough = await texture([0, 100, 0, 255, 0, 200, 0, 255]),
+    tinted = await texture([250, 128, 64, 255, 32, 16, 8, 255]),
+    colors = new Float32Array(24).map((_, i) => (i % 5) / 4),
+    mapped = {
+      name: 'Lacquer',
+      roughness: 0.5,
+      baseColorTexture: base,
+      metallicRoughnessTexture: rough,
+      extensions: { KHR_materials_specular: { specularColorTexture: { texture: tinted } } },
+    },
+    file = await export3MF({
+      nodes: [
+        { geometry: mesh(faces, { uvs }), material: mapped },
+        { translation: [2, 0, 0], geometry: mesh(faces, { uvs }), material: { ...WATER, baseColorTexture: base } },
+        { translation: [4, 0, 0], geometry: mesh(faces, { colors, colorSize: 3 }), material: GOLD },
+      ],
+    }),
+    text = await model(file),
+    properties = [...text.matchAll(/<m:pbspeculartexturedisplayproperties ([^>]*)\/>/g)].map(([, attributes]) =>
+      Object.fromEntries([...attributes.matchAll(/(\w+)="([^"]*)"/g)].map(([, name, value]) => [name, value])),
+    ),
+    imageOf = async (id) => {
+      const [, path] = text.match(new RegExp(`<m:texture2d id="${id}" path="/([^"]+)" contenttype="image/png"/>`));
+      return [...(await decodeImage(await part(file, path))).data];
+    };
+  assert.deepEqual(
+    properties.map((p) => [p.name, p.glossinessfactor]),
+    [
+      ['Lacquer', '1'],
+      ['Water', '0.9'],
+    ],
+  );
+  // The maps name no sampling: it is the base colour texture's (section 7.3).
+  assert.deepEqual(await imageOf(properties[0].speculartextureid), [250, 128, 64, 255, 32, 16, 8, 255]);
+  // 1 - 0.5 x 100 / 255 and 1 - 0.5 x 200 / 255, as bytes.
+  assert.deepEqual(await imageOf(properties[0].glossinesstextureid), [205, 205, 205, 255, 155, 155, 155, 255]);
+  assert.equal(properties[1].speculartextureid, properties[1].glossinesstextureid);
+  assert.deepEqual(await imageOf(properties[1].speculartextureid), [255, 255, 255, 255]);
+  const [, display] = text.match(/<m:colorgroup id="\d+" displaypropertiesid="(\d+)">/),
+    entries = text.match(
+      new RegExp(`<m:pbspeculardisplayproperties id="${display}">(.*?)</m:pbspeculardisplayproperties>`),
+    )[1];
+  assert.equal(count(entries, /<m:pbspecular name="Gold" /g), count(entries, /<m:pbspecular /g));
+  assert.ok(count(entries, /<m:pbspecular /g) > 1);
+  const read = await parse3MFMaterials(file),
+    kinds = read.groups.map((group) =>
+      JSON.stringify([group.specular?.name, group.specular?.specularTexture !== undefined, !!group.metallic]),
+    );
+  // The coloured box splits by colour; each of its groups is Gold's.
+  assert.deepEqual(
+    [...new Set(kinds)].map((kind) => JSON.parse(kind)),
+    [
+      ['Lacquer', true, false],
+      ['Water', true, false],
+      ['Gold', false, false],
+    ],
+  );
+});
+
+test('what 3MF cannot hold is warned about: partial transmission, a strength map and a map elsewhere', async () => {
+  const image = await png({ width: 1, height: 1, data: new Uint8Array(4).fill(255) }, 1, false),
+    texture = { image, mimeType: 'image/png' },
+    written = async (material) => {
+      const warnings = [],
+        file = await export3MF(
+          { nodes: [{ geometry: mesh(faces, { uvs: new Float32Array(16) }), material }] },
+          { onWarning: (warning) => warnings.push(warning.message) },
+        );
+      return { warnings, group: (await parse3MFMaterials(file)).groups[0] };
+    };
+  const mostly = await written({ transmission: 0.75 }),
+    barely = await written({ transmission: 0.25, roughness: 0.5 });
+  assert.ok(mostly.group.translucent && mostly.warnings.length === 1, mostly.warnings.join());
+  assert.ok(barely.group.metallic && !barely.group.translucent && barely.warnings.length === 1);
+  // A metal passes no light, whatever its transmission says.
+  assert.ok((await written({ transmission: 1, metalness: 1 })).group.metallic);
+  const strength = await written({ extensions: { KHR_materials_specular: { specularTexture: { texture } } } });
+  assert.match(strength.warnings.join(), /strength map/);
+  const elsewhere = await written({
+    baseColorTexture: texture,
+    extensions: { KHR_materials_specular: { specularColorTexture: { texture: { ...texture, wrapS: 'clamp' } } } },
+  });
+  assert.match(elsewhere.warnings.join(), /specular colour map/);
+  await assert.rejects(
+    written({ extensions: { KHR_materials_specular: { specularColorFactor: [1, -1, 1] } } }),
+    RangeError,
+  );
 });

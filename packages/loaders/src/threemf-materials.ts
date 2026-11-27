@@ -1,10 +1,11 @@
 // 3MF materials extension on top of parse3MF: texture2d, texture2dgroup, compositematerials, multiproperties and the
-// metallic display properties.
+// display properties (metallic, specular and translucent).
 import { LoaderError, type LoadedGroup } from './types.js';
 import type { BinaryInput } from './util.js';
 import { floats } from './util.js';
 import { SRGBToLinear, LinearToSRGB, hexColor } from '@margoengine/math/color';
 import {
+  THREEMF_UNITS,
   cornerProperty,
   read3MF,
   type ThreeMFExtension,
@@ -78,6 +79,51 @@ export interface ThreeMFMetallic {
   layer?: number;
 }
 
+/**
+ * The specular colour and glossiness a group's triangles are shown with: the materials extension's `pbspecular`, or its
+ * `pbspeculartexturedisplayproperties` (chapter 7 of the extension). The diffuse colour is the group's own colour or
+ * colour texture.
+ */
+export interface ThreeMFSpecular {
+  /** The element's `name`, usually the material's. */
+  name: string;
+  /**
+   * Reflectance at normal incidence, sRGB red, green and blue (default `#383838`, 4 % in linear light, as plastics have).
+   * With `specularTexture` it is the factor over the sampled colour (default white).
+   */
+  specularColor: [number, number, number];
+  /** Smoothness, 0 (rough, the default) to 1 (mirror). With `glossinessTexture` it is the factor (default 1). */
+  glossiness: number;
+  /** Index into `textures` of the sRGB map the specular colour is sampled from, at the group's own coordinates. */
+  specularTexture?: number;
+  /**
+   * Index into `textures` of the linear map glossiness is sampled from: the alpha channel when it is the same resource
+   * as `specularTexture`, else the red one.
+   */
+  glossinessTexture?: number;
+  /** `diffusefactor`, sRGB red, green, blue and linear alpha over the colour texture, when it is not white. */
+  diffuseFactor?: [number, number, number, number];
+  /** In a `multiproperties` stack, the index of the layer these properties come from. */
+  layer?: number;
+}
+
+/** The volume a translucent group's triangles enclose: the materials extension's `translucent` (section 7.5). */
+export interface ThreeMFTranslucent {
+  /** The element's `name`, usually the print material's. */
+  name: string;
+  /**
+   * Linear attenuation of red, green and blue per metre, whatever the model's unit: light keeps `exp(-a * t)` of itself
+   * after `t` metres inside (Beer-Lambert). 0 is clear.
+   */
+  attenuation: [number, number, number];
+  /** Index of refraction of red, green and blue. Default 1, 1, 1: light passes straight through. */
+  refractiveIndex: [number, number, number];
+  /** Roughness of the surface, 0 (the default) to 1. */
+  roughness: number;
+  /** In a `multiproperties` stack, the index of the layer these properties come from. */
+  layer?: number;
+}
+
 /** A group of {@link ThreeMFMaterials}: {@link LoadedGroup} with the texture its triangles sample. */
 export interface ThreeMFMaterialGroup extends LoadedGroup {
   /** Index into `textures`: the group's only texture, or the first texture layer of its `layers`. */
@@ -85,10 +131,15 @@ export interface ThreeMFMaterialGroup extends LoadedGroup {
   /** The whole layer stack, when the group's triangles use a `multiproperties`; `create3MFMesh` draws it. */
   layers?: ThreeMFLayer[];
   /**
-   * The metallic display properties of the group's triangles (their first corner's, as the spec says); absent when the
-   * file gives none. In a stack they are those of the lowest layer that has any. `create3MFMesh` draws them.
+   * The metallic display properties of the group's triangles (their first corner's, as the spec says). A group has at
+   * most one of `metallic`, `specular` and `translucent`, and none when the file gives no display properties. In a stack
+   * they are those of the lowest layer that has any. `create3MFMesh` draws them.
    */
   metallic?: ThreeMFMetallic;
+  /** The specular display properties of the group's triangles, chosen as `metallic` is. */
+  specular?: ThreeMFSpecular;
+  /** The translucent display properties of the group's triangles, chosen as `metallic` is. */
+  translucent?: ThreeMFTranslucent;
 }
 
 /** What {@link parse3MFMaterials} returns: {@link ThreeMFResult} with textures, and one vertex per triangle corner. */
@@ -96,6 +147,11 @@ export interface ThreeMFMaterials extends ThreeMFResult {
   groups: ThreeMFMaterialGroup[];
   /** Every texture the package declares. */
   textures: ThreeMFTexture[];
+  /**
+   * Metres in one unit of `positions`, which the reader sets: 1, or the length of the model's unit with
+   * `units: 'file'`. Default 1.
+   */
+  metresPerUnit?: number;
 }
 
 interface TextureGroup {
@@ -127,11 +183,23 @@ interface Store {
   /** The `displaypropertiesid` of single `<base>` elements, as the 3MF Consortium's metallic sample writes it. */
   bases: Map<string, Map<number, string>>;
 }
-/** `'other'`: specular and translucent properties, which are not read. */
+/** The display property kinds, each under the name of the group field that holds it. */
+interface Finishes {
+  metallic: ThreeMFMetallic;
+  specular: ThreeMFSpecular;
+  translucent: ThreeMFTranslucent;
+}
+/** A triangle's display properties: their kind and values. */
+type Finish = { [K in keyof Finishes]: [K, Finishes[K]] }[keyof Finishes];
+/** A resource of display properties: one entry for each of a property group's, or two maps over a texture group. */
 type Display =
-  | { kind: 'metallic'; entries: ThreeMFMetallic[] }
-  | { kind: 'texture'; entry: ThreeMFMetallic; metalness: string; roughness: string }
-  | { kind: 'other' };
+  | { kind: keyof Finishes; entries: Finishes[keyof Finishes][] }
+  | {
+      kind: 'metallic' | 'specular';
+      entry: ThreeMFMetallic | ThreeMFSpecular;
+      /** The two `texture2d` ids: metalness and roughness, or specular colour and glossiness. */
+      maps: [string, string];
+    };
 
 /** A display property number: `fallback` when absent, refused below 0 or above `max`. */
 function amount(value: string | undefined, fallback: number, max: number, what: string): number {
@@ -140,6 +208,23 @@ function amount(value: string | undefined, fallback: number, max: number, what: 
   if (!(Number.isFinite(number) && number >= 0 && number <= max))
     throw new LoaderError(F, 'range', `invalid ${what} "${value.slice(0, 32)}"`);
   return number;
+}
+
+/** An sRGB colour attribute, `fallback` when absent. */
+function colorOf(value: string | undefined, fallback: Color): Color {
+  if (value === undefined) return fallback;
+  const color = hexColor(value.trim());
+  if (!color) throw new LoaderError(F, 'syntax', `invalid color "${value.slice(0, 16)}"`);
+  return color;
+}
+
+/** Three numbers of 0 or more, above 0 with `positive`. */
+function triplet(value: string, what: string, positive: boolean): [number, number, number] {
+  const out = list(value, what);
+  if (out.length !== 3) throw new LoaderError(F, 'syntax', `${what} needs three numbers, not "${value.slice(0, 64)}"`);
+  if (out.some((v) => v < 0 || (positive && v === 0)))
+    throw new LoaderError(F, 'range', `invalid ${what} "${value.slice(0, 64)}"`);
+  return out as [number, number, number];
 }
 
 function list(value: string | undefined, what: string): number[] {
@@ -156,9 +241,9 @@ function required(value: string | undefined, element: string, attribute: string)
 
 /**
  * Reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup`
- * coordinates, `compositematerials` as mixed colours, `multiproperties` layers, and the metallic display properties
- * (`pbmetallic` and `pbmetallictexturedisplayproperties`) as each group's `metallic`; specular and translucent display
- * properties are not read. Every triangle corner gets its own
+ * coordinates, `compositematerials` as mixed colours, `multiproperties` layers, and the display properties as each
+ * group's `metallic` (`pbmetallic` and `pbmetallictexturedisplayproperties`), `specular` (`pbspecular` and
+ * `pbspeculartexturedisplayproperties`) or `translucent`. Every triangle corner gets its own
  * vertex, so `uvs` and `colors` can differ across a seam; `uvs` use Margo's convention, v = 1 - the file's v. `colors` is
  * present when corners of a triangle differ or a layer sets them. A group's `texture` indexes `textures`. In
  * `multiproperties` colour layers mix by their alpha, and the first texture layer sets the group's texture: draw
@@ -168,8 +253,9 @@ function required(value: string | undefined, element: string, attribute: string)
  * @param options The same options as `parse3MF`.
  * @returns The merged mesh with its coordinates, colours and images.
  * @throws LoaderError with the codes of `parse3MF`, with `range` for a property index outside its group or its display
- *   properties and for a metalness or roughness outside 0 to 1 (a texture's factor: below 0), and `syntax` for display
- *   properties that are not defined or are of a kind their group cannot take.
+ *   properties, for a metalness, roughness or glossiness outside 0 to 1 (a texture's factor: below 0), a negative
+ *   attenuation or a refractive index of 0 or less, and `syntax` for display properties that are not defined or are of a
+ *   kind their group cannot take, and for a colour or a number triplet that is not one.
  *
  * @example
  * ```ts
@@ -201,8 +287,8 @@ export async function read3MFMaterials(
   let group: TextureGroup | undefined,
     multi: Multi | undefined,
     composite: Composite | undefined,
-    /** The open `pbmetallicdisplayproperties`, and the open `basematerials` with the `<base>` elements seen in it. */
-    metals: ThreeMFMetallic[] | undefined,
+    /** The open container of display properties, and the open `basematerials` with the `<base>` elements seen in it. */
+    entries: Finishes[keyof Finishes][] | undefined,
     materialGroup: { id: string; count: number } | undefined,
     textured = false,
     varied = false,
@@ -223,14 +309,14 @@ export async function read3MFMaterials(
     }
     return found;
   };
-  /** The metallic properties of entry `index` of a property group. Read after parsing, so a later resource counts. */
-  const finish = (model: ThreeMFModel, id: string, index: number): ThreeMFMetallic | undefined => {
+  /** The display properties of entry `index` of a property group. Read after parsing, so a later resource counts. */
+  const finish = (model: ThreeMFModel, id: string, index: number): Finish | undefined => {
     const { displays, shown, bases, groups, multis, textures: known } = store(model),
       layers = multis.get(id);
     if (layers) {
       for (let layer = 0; layer < layers.pids.length; layer++) {
         const found = finish(model, layers.pids[layer], layers.rows[index]?.[layer] ?? 0);
-        if (found) return { ...found, layer };
+        if (found) return [found[0], { ...found[1], layer }] as Finish;
       }
       return undefined;
     }
@@ -242,19 +328,24 @@ export async function read3MFMaterials(
       },
       short = reference.slice(0, 32);
     if (!display) return refuse('syntax', `display properties ${short} are not defined`);
-    if (display.kind === 'other') return undefined;
-    if ((display.kind === 'texture') !== groups.has(id))
+    if ('maps' in display !== groups.has(id))
       return refuse('syntax', `property group ${id.slice(0, 32)} cannot take the kind of display properties ${short}`);
-    if (display.kind === 'metallic')
-      return (
-        display.entries[index] ?? refuse('range', `property index ${index} is outside display properties ${short}`)
-      );
-    const map = (texture: string): number =>
-      known.get(texture) ?? refuse('syntax', `texture ${texture.slice(0, 32)} is not defined`);
-    return { ...display.entry, metalnessTexture: map(display.metalness), roughnessTexture: map(display.roughness) };
+    if (!('maps' in display))
+      return [
+        display.kind,
+        display.entries[index] ?? refuse('range', `property index ${index} is outside display properties ${short}`),
+      ] as Finish;
+    const [first, second] = display.maps.map(
+        (texture) => known.get(texture) ?? refuse('syntax', `texture ${texture.slice(0, 32)} is not defined`),
+      ),
+      named =
+        display.kind === 'metallic'
+          ? { metalnessTexture: first, roughnessTexture: second }
+          : { specularTexture: first, glossinessTexture: second };
+    return [display.kind, { ...display.entry, ...named }] as Finish;
   };
-  /** A triangle's metallic properties: its first corner's. */
-  const finishAt = (...[model, object, mesh, t]: Triangle): ThreeMFMetallic | undefined => {
+  /** A triangle's display properties: its first corner's. */
+  const finishAt = (...[model, object, mesh, t]: Triangle): Finish | undefined => {
     const property = cornerProperty(model, object, mesh, t, 0);
     return property && finish(model, property.id, property.index);
   };
@@ -356,39 +447,78 @@ export async function read3MFMaterials(
           break;
         }
         case 'pbmetallicdisplayproperties':
-          metals = [];
-          store(model).displays.set(required(a.id, name, 'id'), { kind: 'metallic', entries: metals });
+        case 'pbspeculardisplayproperties':
+        case 'translucentdisplayproperties': {
+          const kind =
+            name === 'translucentdisplayproperties'
+              ? 'translucent'
+              : name === 'pbspeculardisplayproperties'
+                ? 'specular'
+                : 'metallic';
+          entries = [];
+          store(model).displays.set(required(a.id, name, 'id'), { kind, entries });
           break;
+        }
         case 'pbmetallic':
-          metals?.push({
+          entries?.push({
             name: a.name ?? '',
             metalness: amount(a.metallicness, 0, 1, 'metallicness'),
             roughness: amount(a.roughness, 1, 1, 'roughness'),
           });
           break;
+        case 'pbspecular': {
+          const [r, g, b] = colorOf(a.specularcolor, [56 / 255, 56 / 255, 56 / 255, 1]);
+          entries?.push({
+            name: a.name ?? '',
+            specularColor: [r, g, b],
+            glossiness: amount(a.glossiness, 0, 1, 'glossiness'),
+          });
+          break;
+        }
+        case 'translucent':
+          entries?.push({
+            name: a.name ?? '',
+            attenuation: triplet(required(a.attenuation, name, 'attenuation'), 'attenuation', false),
+            refractiveIndex: triplet(a.refractiveindex ?? '1 1 1', 'refractiveindex', true),
+            roughness: amount(a.roughness, 0, 1, 'roughness'),
+          });
+          break;
         case 'pbmetallictexturedisplayproperties': {
-          const factor = a.basecolorfactor === undefined ? undefined : hexColor(a.basecolorfactor.trim());
-          if (a.basecolorfactor !== undefined && !factor)
-            throw new LoaderError(F, 'syntax', `invalid color "${a.basecolorfactor.slice(0, 16)}"`);
+          const factor = colorOf(a.basecolorfactor, [1, 1, 1, 1]);
           store(model).displays.set(required(a.id, name, 'id'), {
-            kind: 'texture',
-            metalness: required(a.metallictextureid, name, 'metallictextureid'),
-            roughness: required(a.roughnesstextureid, name, 'roughnesstextureid'),
+            kind: 'metallic',
+            maps: [
+              required(a.metallictextureid, name, 'metallictextureid'),
+              required(a.roughnesstextureid, name, 'roughnesstextureid'),
+            ],
             entry: {
               name: a.name ?? '',
               // A factor above 1 brightens the sampled value, which stays at most 1.
               metalness: amount(a.metallicfactor, 1, Number.MAX_VALUE, 'metallicfactor'),
               roughness: amount(a.roughnessfactor, 1, Number.MAX_VALUE, 'roughnessfactor'),
-              ...(factor?.some((value) => value !== 1) ? { baseColorFactor: factor } : {}),
+              ...(factor.some((value) => value !== 1) ? { baseColorFactor: factor } : {}),
             },
           });
           break;
         }
-        case 'pbspeculardisplayproperties':
-        case 'pbspeculartexturedisplayproperties':
-        case 'translucentdisplayproperties':
-          store(model).displays.set(required(a.id, name, 'id'), { kind: 'other' });
+        case 'pbspeculartexturedisplayproperties': {
+          const [r, g, b] = colorOf(a.specularfactor, [1, 1, 1, 1]),
+            diffuse = colorOf(a.diffusefactor, [1, 1, 1, 1]);
+          store(model).displays.set(required(a.id, name, 'id'), {
+            kind: 'specular',
+            maps: [
+              required(a.speculartextureid, name, 'speculartextureid'),
+              required(a.glossinesstextureid, name, 'glossinesstextureid'),
+            ],
+            entry: {
+              name: a.name ?? '',
+              specularColor: [r, g, b],
+              glossiness: amount(a.glossinessfactor, 1, Number.MAX_VALUE, 'glossinessfactor'),
+              ...(diffuse.some((value) => value !== 1) ? { diffuseFactor: diffuse } : {}),
+            },
+          });
           break;
+        }
         case 'tex2coord': {
           const u = Number(a.u),
             v = Number(a.v);
@@ -465,7 +595,7 @@ export async function read3MFMaterials(
       if (name === 'texture2dgroup') group = undefined;
       else if (name === 'multiproperties') multi = undefined;
       else if (name === 'compositematerials') composite = undefined;
-      else if (name === 'pbmetallicdisplayproperties') metals = undefined;
+      else if (name.endsWith('displayproperties')) entries = undefined;
       else if (name === 'basematerials') materialGroup = undefined;
     },
     async ready(read) {
@@ -474,9 +604,9 @@ export async function read3MFMaterials(
     bucket(model, object, mesh, t) {
       const property = cornerProperty(model, object, mesh, t, 0),
         layered = property && store(model).multis.has(property.id) ? `|m${property.id}` : '';
-      const metallic = finishAt(model, object, mesh, t),
+      const found = finishAt(model, object, mesh, t),
         // The name does not change how a triangle looks, so it does not split a group.
-        shown = metallic ? `|p${JSON.stringify({ ...metallic, name: undefined })}` : '';
+        shown = found ? `|${found[0]}${JSON.stringify({ ...found[1], name: undefined })}` : '';
       return String(at(model, model, object, mesh, t, 0).texture ?? '') + layered + shown;
     },
     corner(model, object, mesh, t, k) {
@@ -517,8 +647,8 @@ export async function read3MFMaterials(
     group(target: ThreeMFMaterialGroup, model, object, mesh, t) {
       const { texture } = at(model, model, object, mesh, t, 0);
       if (texture !== undefined) target.texture = texture;
-      const metallic = finishAt(model, object, mesh, t);
-      if (metallic) target.metallic = metallic;
+      const found = finishAt(model, object, mesh, t);
+      if (found) Object.assign(target, { [found[0]]: found[1] });
       const property = cornerProperty(model, object, mesh, t, 0),
         { multis, groups, textures: known } = store(model),
         layers = property && multis.get(property.id);
@@ -569,6 +699,7 @@ export async function read3MFMaterials(
     : extension;
   const result = (await read3MF(input, options, hooks)) as ThreeMFMaterials;
   result.textures = textures;
+  result.metresPerUnit = options.units === 'file' ? THREEMF_UNITS[result.unit as keyof typeof THREEMF_UNITS] : 1;
   if (textured) result.uvs = uvs.result();
   if (varied) result.colors = colors.result();
   else delete result.colors;

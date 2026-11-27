@@ -5,7 +5,9 @@
 import { MargoError } from '@margoengine/math/errors';
 import { encodeZIP } from './archive.js';
 import { sceneOfGLB } from './glb-scene.js';
+import type { ExtendedMaterialData, MaterialTextureInfo } from './materials.js';
 import {
+  checkTexture,
   collect,
   determinant3,
   drawables,
@@ -97,9 +99,14 @@ export interface Export3MFOptions extends SceneOptions {
   /** A PNG or JPEG picture of the model, written as the package thumbnail that file browsers and slicers show. */
   thumbnail?: Uint8Array;
   /**
-   * Writes each material's metalness and roughness as the materials extension's physically based display properties,
-   * where they differ from the extension's own 0 and 1. A base colour texture's metallic-roughness map is written with
-   * it when both use the same UV set, transform and wrap. Default `true`.
+   * Writes how each material looks as the materials extension's display properties. A transmissive material (a
+   * `transmission` of at least 0.5 over its dielectric share) is `translucent`: attenuation per metre from
+   * `KHR_materials_volume` and a refractive index for red, green and blue from `ior` and `KHR_materials_dispersion`.
+   * A dielectric with `KHR_materials_specular` or an `ior` other than 1.5 is specular: its reflectance at normal
+   * incidence, and 1 - roughness as glossiness. Any other keeps its metalness and roughness, written where they differ
+   * from the extension's own 0 and 1. A base colour texture's metallic-roughness map and `specularColorTexture` are
+   * written with it when they use the same UV set, transform and wrap. The `KHR_materials_*` values are read from a
+   * material's `extensions`, as `exportMaterialGLB` takes them and a GLB holds them. Default `true`.
    */
   displayProperties?: boolean;
   /**
@@ -134,6 +141,19 @@ const colorOf = (r: number, g: number, b: number, a: number): string => {
   const alpha = Math.round(Math.min(1, Math.max(0, a)) * 255);
   return `#${hex(byte(r))}${hex(byte(g))}${hex(byte(b))}${alpha === 255 ? '' : hex(alpha)}`;
 };
+
+/** A base material: its group's resource id and its index there. */
+interface Base {
+  group: number;
+  index: number;
+}
+
+/** One `<base>` of a base material group. */
+interface BaseEntry {
+  index: number;
+  color: string;
+  material: Mat;
+}
 
 /** Vertices unique by position, in file units. */
 interface Weld {
@@ -402,28 +422,38 @@ function thumbnailType(bytes: Uint8Array): 'png' | 'jpg' {
 }
 
 /**
- * Whether a metallic-roughness map can share the base colour texture's coordinates: the materials extension samples every
- * map of a texture group at the same points, with the base texture's wrap.
+ * Whether a map can share the base colour texture's coordinates: the materials extension samples every map of a texture
+ * group at the same points, with the base texture's wrap. `transform` and `texCoord` are the map's.
  */
-function aligned(material: Mat): boolean {
-  const a = material.baseColorTexture!,
-    b = material.metallicRoughnessTexture!,
+function aligned(
+  material: Mat,
+  map: TextureData,
+  transform: Mat['baseColorTextureTransform'],
+  texCoord: number = map.texCoord ?? 0,
+): boolean {
+  const base = material.baseColorTexture!,
     place = (t: Mat['baseColorTextureTransform']): string =>
       `${t?.offset ?? [0, 0]} ${t?.scale ?? [1, 1]} ${t?.rotation ?? 0}`;
   return (
-    (a.texCoord ?? 0) === (b.texCoord ?? 0) &&
-    (a.wrapS ?? 'repeat') === (b.wrapS ?? 'repeat') &&
-    (a.wrapT ?? 'repeat') === (b.wrapT ?? 'repeat') &&
-    place(material.baseColorTextureTransform) === place(material.metallicRoughnessTextureTransform)
+    (base.texCoord ?? 0) === texCoord &&
+    (base.wrapS ?? 'repeat') === (map.wrapS ?? 'repeat') &&
+    (base.wrapT ?? 'repeat') === (map.wrapT ?? 'repeat') &&
+    place(material.baseColorTextureTransform) === place(transform)
   );
 }
+
+/** A textured material's metallic-roughness map where the extension can sample it. */
+const roughnessMap = (material: Mat): TextureData | undefined => {
+  const map = material.metallicRoughnessTexture;
+  return map && aligned(material, map, material.metallicRoughnessTextureTransform) ? map : undefined;
+};
 
 /**
  * What the display properties of a textured material sample: its own metallic-roughness map, the white map (`null`) for
  * factors alone, or nothing when it needs none or its map lies elsewhere on the surface.
  */
 function mapOf(material: Mat): TextureData | null | undefined {
-  if (material.metallicRoughnessTexture) return aligned(material) ? material.metallicRoughnessTexture : undefined;
+  if (material.metallicRoughnessTexture) return roughnessMap(material);
   return finished(material) ? null : undefined;
 }
 
@@ -431,21 +461,112 @@ function mapOf(material: Mat): TextureData | null | undefined {
 const finished = (material: Mat): boolean => material.metalness !== 0 || material.roughness !== 1;
 
 /**
- * A map as the materials extension reads one used for both values (section 7.4): roughness in red and metalness in green,
- * where glTF has them in green and blue. A 1 x 1 white map carries factors alone.
+ * A map re-encoded with `write` giving each texel from the source's four bytes at `at`. A 1 x 1 white map, `null`,
+ * carries factors alone.
  */
-async function displayMap(texture: TextureData | null, signal: AbortSignal | undefined): Promise<Uint8Array> {
+async function displayMap(
+  texture: TextureData | null,
+  signal: AbortSignal | undefined,
+  write: (source: ArrayLike<number>, at: number) => readonly [number, number, number],
+): Promise<Uint8Array> {
   const { png } = await import('./png.js');
   if (!texture) return png({ width: 1, height: 1, data: new Uint8Array([255, 255, 255, 255]) }, 1, false);
   const { decodeTexture } = await import('./texture-decode.js'),
     { width, height, data: source } = await decodeTexture(texture.image, signal),
     data = new Uint8Array(width * height * 4);
   for (let at = 0; at < data.length; at += 4) {
-    data[at] = source[at + 1];
-    data[at + 1] = source[at + 2];
+    data.set(write(source, at), at);
     data[at + 3] = 255;
   }
   return png({ width, height, data }, Math.max(width, height), false);
+}
+
+/** How a material's display properties describe it. */
+type Look =
+  | { kind: 'metallic' }
+  /** `color` is the linear reflectance at normal incidence; `map` its texture, sampled at the base colour's places. */
+  | { kind: 'specular'; color: number[]; map?: TextureData }
+  | { kind: 'translucent'; attenuation: number[]; index: number[] };
+
+/** A number of a material extension, `fallback` when absent. */
+function extensionNumber(value: unknown, fallback: number, name: string): number {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number' || !(value >= 0)) throw new RangeError(`3MF needs ${name} to be a number of 0 or more`);
+  return value;
+}
+
+/** A linear RGB triplet of a material extension, white when absent. */
+function extensionColor(value: unknown, name: string): number[] {
+  if (value === undefined) return [1, 1, 1];
+  const color = Array.from(value as ArrayLike<number>);
+  if (color.length !== 3 || !color.every((c) => Number.isFinite(c) && c >= 0))
+    throw new RangeError(`3MF needs ${name} to be three numbers of 0 or more`);
+  return color;
+}
+
+/**
+ * The display properties a material takes, by the meanings of its glTF values: translucent when mostly transmissive,
+ * specular when a dielectric gives its own reflectance, else metallic.
+ */
+function lookOf(material: Mat, warn: (message: string) => void): Look {
+  if (material.shading !== 'standard' || material.unlit) return { kind: 'metallic' };
+  const extensions = ((material.source as ExtendedMaterialData | undefined)?.extensions ?? {}) as Record<
+      string,
+      Record<string, unknown> | undefined
+    >,
+    {
+      KHR_materials_transmission: passing,
+      KHR_materials_ior: refracting,
+      KHR_materials_specular: specular,
+      KHR_materials_volume: volume,
+      KHR_materials_dispersion: dispersion,
+    } = extensions,
+    ior = extensionNumber(refracting?.ior, material.ior, 'ior'),
+    share =
+      extensionNumber(passing?.transmissionFactor, material.transmission, 'transmissionFactor') *
+      (1 - material.metalness);
+  if (share > 0 && ior >= 1) {
+    if (share < 1)
+      warn(
+        `3MF translucency is all or nothing: a material passing ${num(share)} of its light is written ${share >= 0.5 ? 'translucent' : 'opaque'}`,
+      );
+    if (share >= 0.5) {
+      const color = extensionColor(volume?.attenuationColor, 'attenuationColor'),
+        distance = extensionNumber(volume?.attenuationDistance, Infinity, 'attenuationDistance'),
+        spread = (ior - 1) * 0.025 * extensionNumber(dispersion?.dispersion, 0, 'dispersion');
+      if (!distance) throw new RangeError('3MF needs attenuationDistance above 0');
+      return {
+        kind: 'translucent',
+        // Beer-Lambert: the colour is what white keeps after the distance. 2^-16 stands for black, past 8-bit colour.
+        attenuation: color.map((c) =>
+          distance === Infinity ? 0 : Math.max(0, -Math.log(Math.min(1, Math.max(c, 2 ** -16))) / distance),
+        ),
+        index: [Math.max(1, ior - spread), ior, ior + spread],
+      };
+    }
+  }
+  if (material.metalness !== 0 || (!specular && ior === 1.5)) return { kind: 'metallic' };
+  // KHR_materials_ior and _specular: F0 = min(((ior - 1) / (ior + 1))^2 x colour, 1) x factor; ior 0 makes the first 1.
+  const reflectance = ((ior - 1) / (ior + 1)) ** 2,
+    factor = extensionNumber(specular?.specularFactor, 1, 'specularFactor'),
+    color = extensionColor(specular?.specularColorFactor, 'specularColorFactor').map(
+      (c) => Math.min(1, reflectance * c) * factor,
+    );
+  if (specular?.specularTexture) warn('3MF has no specular strength map; specularTexture is left out');
+  const info = specular?.specularColorTexture as MaterialTextureInfo | undefined;
+  if (!info) return { kind: 'specular', color };
+  const map = checkTexture(info.texture, 'specularColorTexture');
+  if (!map) throw new TypeError('3MF needs specularColorTexture as { texture: TextureData }');
+  // The transform may move the map to another UV set, over the reference's own and the texture's.
+  const transform = info.extensions?.KHR_texture_transform as
+      | (NonNullable<Mat['baseColorTextureTransform']> & { texCoord?: number })
+      | undefined,
+    texCoord = transform?.texCoord ?? info.texCoord ?? map.texCoord ?? 0;
+  if (material.baseColorTexture && aligned(material, map, transform, texCoord)) return { kind: 'specular', color, map };
+  warn(
+    '3MF samples a specular colour map at the base colour coordinates; one without a base colour texture, or with another UV set, transform or wrap, is left out',
+  );
+  return { kind: 'specular', color };
 }
 
 /** The 3 x 4 matrix of a build item, rows of a row-vector transform as 3MF lists them, with the translation in file units. */
@@ -461,7 +582,8 @@ function itemTransform(placed: readonly number[], scale: number): string {
  * item instead, one object for each geometry, and a mirroring node draws a reflected object those nodes share. Either way no
  * transform carries a reflection, so a slicer sees nothing inside out. Colours come from the material's
  * base colour and from vertex colours; the base colour texture is written as a materials-extension texture (`texture2d` and `texture2dgroup`, with its texture transform and wrap) where the geometry has the UV set it uses; a base colour factor or vertex colours that are not white are a colour group multiplied with it (`multiproperties`), their alpha left out. Metalness, roughness and a metallic-roughness map on the same coordinates
- * are written as display properties; the format has no normal, emissive or occlusion map. A node's primitives are one
+ * are written as display properties, as are specular and transmissive materials (`displayProperties`); the format has no
+ * normal, emissive or occlusion map. A node's primitives are one
  * mesh. Vertices are welded by position, but a slicer still needs
  * a closed mesh to print: an open one is written as it is.
  *
@@ -510,22 +632,22 @@ export async function export3MF(
     ),
     /** A node's primitives, which share its world matrix, are one mesh. */
     nodes = new Map<Float64Array, Drawable[]>(),
-    materials = new Map<string, { index: number; color: string; material: Mat }>(),
+    /** Base material groups, one for each kind of display properties, as a group takes one resource of them. */
+    bases = new Map<Look['kind'], { id: number; entries: Map<string, BaseEntry> }>(),
+    looks = new Map<Mat, Look>(),
     objects: string[] = [],
     groups: string[] = [],
     /** `texture2d` ids by image bytes and sampling, as materials of one file share images through their own records. */
     textures = new Map<Uint8Array, Map<string, number>>(),
     /** The PNG of each display map, then its resource id once a group samples it. */
     maps = new Map<Uint8Array | null, { image: Uint8Array; id?: number }>(),
+    /** The same for the glossiness maps of specular materials, by their source and roughness factor. */
+    glosses = new Map<Uint8Array, Map<number, { image: Uint8Array; id?: number }>>(),
     textureXml: string[] = [],
     files: { name: string; data: Uint8Array }[] = [],
     build: string[] = [],
     components: string[] = [],
-    merged: { vertices: string[]; faces: string[]; pindex: number; name?: string } = {
-      vertices: [],
-      faces: [],
-      pindex: -1,
-    },
+    merged: { vertices: string[]; faces: string[]; base?: Base; name?: string } = { vertices: [], faces: [] },
     shared = new Map<string, number>(),
     seen = new Map<object, number>(),
     numbered = (value: object): number => {
@@ -539,22 +661,45 @@ export async function export3MF(
     else nodes.set(item.world, [item]);
   }
   const together = assembly === true && nodes.size > 1;
+  const warn = (message: string): void => onWarning({ code: 'unsupported', node: null, message });
+  const look = (material: Mat): Look => {
+    let found = looks.get(material);
+    if (!found) looks.set(material, (found = displayProperties ? lookOf(material, warn) : { kind: 'metallic' }));
+    return found;
+  };
 
   // Maps are decoded and re-encoded first, as the writing below does not wait.
+  // glTF holds roughness in green; metalness in blue. The extension reads roughness in red and metalness in green.
+  const metallicTexel = (source: ArrayLike<number>, at: number) => [source[at + 1], source[at + 2], 0] as const;
   if (displayProperties)
     for (const item of items) {
       const material = item.material ?? fallback;
       if (!textureCoordinates(item.geometry, material)) continue;
-      const map = mapOf(material);
-      if (map !== undefined) {
+      const { kind } = look(material);
+      if (kind === 'translucent') continue;
+      if (material.metallicRoughnessTexture && !roughnessMap(material))
+        warn(
+          '3MF samples a metallic-roughness map at the base colour coordinates; one with another UV set, transform or wrap is left out',
+        );
+      if (kind === 'metallic') {
+        const map = mapOf(material);
+        if (map === undefined) continue;
         const source = map?.image ?? null;
-        if (!maps.has(source)) maps.set(source, { image: await displayMap(map, signal) });
-      } else if (material.metallicRoughnessTexture)
-        onWarning({
-          code: 'unsupported',
-          node: null,
-          message:
-            '3MF samples a metallic-roughness map at the base colour coordinates; one with another UV set, transform or wrap is left out',
+        if (!maps.has(source)) maps.set(source, { image: await displayMap(map, signal, metallicTexel) });
+        continue;
+      }
+      if (!maps.has(null)) maps.set(null, { image: await displayMap(null, signal, metallicTexel) });
+      const rough = roughnessMap(material);
+      if (!rough) continue;
+      let factors = glosses.get(rough.image);
+      if (!factors) glosses.set(rough.image, (factors = new Map()));
+      if (!factors.has(material.roughness))
+        factors.set(material.roughness, {
+          // 1 - factor x texel is no factor over a map, so the glossiness map holds it whole.
+          image: await displayMap(rough, signal, (source, at) => {
+            const gloss = 255 - Math.round(material.roughness * source[at + 1]);
+            return [gloss, gloss, gloss];
+          }),
         });
     }
 
@@ -563,14 +708,29 @@ export async function export3MF(
   const label = (material: Mat): string => escaped(material.name || 'Material'),
     metallic = (material: Mat): string =>
       `<m:pbmetallic name="${label(material)}" metallicness="${num(material.metalness)}" roughness="${num(material.roughness)}"/>`;
-  const materialIndex = (material: Mat): number => {
+  const lookXml = (material: Mat): string => {
+    const found = look(material);
+    if (found.kind === 'metallic') return metallic(material);
+    if (found.kind === 'specular') {
+      const [r, g, b] = found.color;
+      return `<m:pbspecular name="${label(material)}" specularcolor="${colorOf(r, g, b, 1)}" glossiness="${num(1 - material.roughness)}"/>`;
+    }
+    return `<m:translucent name="${label(material)}" attenuation="${found.attenuation.map(num).join(' ')}" refractiveindex="${found.index.map(num).join(' ')}" roughness="${num(material.roughness)}"/>`;
+  };
+  /**
+   * The base material of a part. `white` is a translucent material under colours or a texture, which multiply it in a
+   * `multiproperties`, as those groups take no translucency (section 7.5.1).
+   */
+  const baseOf = (material: Mat, white: boolean): Base => {
     const [r, g, b, a] = material.color,
-      color = colorOf(r, g, b, a),
-      finish = displayProperties ? [material.metalness, material.roughness] : [],
-      key = JSON.stringify([color, material.name ?? '', ...finish]);
-    let found = materials.get(key);
-    if (!found) materials.set(key, (found = { index: materials.size, color, material }));
-    return found.index;
+      color = white ? '#FFFFFF' : colorOf(r, g, b, a),
+      { kind } = look(material),
+      key = JSON.stringify([color, material.name ?? '', displayProperties ? lookXml(material) : '']);
+    let group = bases.get(kind);
+    if (!group) bases.set(kind, (group = { id: bases.size ? id++ : 1, entries: new Map() }));
+    let found = group.entries.get(key);
+    if (!found) group.entries.set(key, (found = { index: group.entries.size, color, material }));
+    return { group: group.id, index: found.index };
   };
   const addTexture = (image: Uint8Array, mimeType: TextureData['mimeType'], attributes: string): number => {
     const at = id++,
@@ -581,9 +741,12 @@ export async function export3MF(
     return at;
   };
   /** The id of a `texture2d` resource for an image, written once however many materials share it. */
-  const textureId = (texture: TextureData): number => {
+  const textureId = (texture: TextureData, sampling = true): number => {
     const tile = { repeat: 'wrap', mirror: 'mirror', clamp: 'clamp' } as const,
-      attributes = ` tilestyleu="${tile[texture.wrapS ?? 'repeat']}" tilestylev="${tile[texture.wrapT ?? 'repeat']}" filter="${texture.magFilter === 'nearest' ? 'nearest' : 'auto'}"`;
+      // A display map names no sampling of its own: it takes the base colour texture's.
+      attributes = sampling
+        ? ` tilestyleu="${tile[texture.wrapS ?? 'repeat']}" tilestylev="${tile[texture.wrapT ?? 'repeat']}" filter="${texture.magFilter === 'nearest' ? 'nearest' : 'auto'}"`
+        : '';
     let samplings = textures.get(texture.image);
     if (!samplings) textures.set(texture.image, (samplings = new Map()));
     let at = samplings.get(attributes);
@@ -593,11 +756,11 @@ export async function export3MF(
   /** A colour group; with `material`, its display properties, one entry for each colour. */
   const colorGroup = (colors: readonly string[], material?: Mat): number => {
     let display = '';
-    if (displayProperties && material && finished(material)) {
-      const at = id++;
-      groups.push(
-        `<m:pbmetallicdisplayproperties id="${at}">${metallic(material).repeat(colors.length)}</m:pbmetallicdisplayproperties>`,
-      );
+    const kind = material && look(material).kind;
+    if (displayProperties && material && (kind === 'specular' || (kind === 'metallic' && finished(material)))) {
+      const at = id++,
+        element = kind === 'specular' ? 'm:pbspeculardisplayproperties' : 'm:pbmetallicdisplayproperties';
+      groups.push(`<${element} id="${at}">${lookXml(material).repeat(colors.length)}</${element}>`);
       display = ` displaypropertiesid="${at}"`;
     }
     const at = id++;
@@ -606,11 +769,57 @@ export async function export3MF(
     );
     return at;
   };
+  /** A `multiproperties` that multiplies its layers; `rows` are each corner entry's index in every layer. */
+  const multiplied = (pids: readonly number[], rows: readonly string[]): number => {
+    const at = id++;
+    groups.push(
+      `<m:multiproperties id="${at}" pids="${pids.join(' ')}" blendmethods="${pids
+        .slice(1)
+        .fill(0)
+        .map(() => 'multiply')
+        .join(' ')}">${rows.map((row) => `<m:multi pindices="${row}"/>`).join('')}</m:multiproperties>`,
+    );
+    return at;
+  };
+  /** The corners of a translucent part with colours: its white translucent base, multiplied by them. */
+  const translucentColors = (palette: readonly string[], base: Base): number =>
+    multiplied(
+      [base.group, colorGroup(palette)],
+      palette.map((_, k) => `${base.index} ${k}`),
+    );
+  /** The resource id of a map in `maps` or `glosses`, added once; no tile style: it takes the base texture's. */
+  const mapId = (map: { image: Uint8Array; id?: number }): number =>
+    (map.id ??= addTexture(map.image, 'image/png', ''));
+  /** The display properties of a textured material's group, or none. */
+  const textureDisplay = (material: Mat): string => {
+    const found = look(material);
+    if (!displayProperties || found.kind === 'translucent') return '';
+    if (found.kind === 'metallic') {
+      const map = mapOf(material);
+      if (map === undefined) return '';
+      const sampled = mapId(maps.get(map?.image ?? null)!),
+        at = id++;
+      groups.push(
+        `<m:pbmetallictexturedisplayproperties id="${at}" name="${label(material)}" metallictextureid="${sampled}" roughnesstextureid="${sampled}" metallicfactor="${num(material.metalness)}" roughnessfactor="${num(material.roughness)}"/>`,
+      );
+      return ` displaypropertiesid="${at}"`;
+    }
+    const rough = roughnessMap(material),
+      [r, g, b] = found.color,
+      colour = found.map ? textureId(found.map, false) : mapId(maps.get(null)!),
+      gloss = mapId(rough ? glosses.get(rough.image)!.get(material.roughness)! : maps.get(null)!),
+      at = id++;
+    groups.push(
+      `<m:pbspeculartexturedisplayproperties id="${at}" name="${label(material)}" speculartextureid="${colour}" glossinesstextureid="${gloss}" specularfactor="${colorOf(r, g, b, 1)}" glossinessfactor="${num(rough ? 1 : 1 - material.roughness)}"/>`,
+    );
+    return ` displaypropertiesid="${at}"`;
+  };
   /**
    * The property group a textured shape's corners index, from their `u v tint` entries. White tints leave the texture
-   * group alone; any other is a colour group under the texture, multiplied with it in a `multiproperties`.
+   * group alone; any other is a colour group under the texture, multiplied with it in a `multiproperties`, as is the
+   * base of a translucent material.
    */
-  const textureGroup = (palette: readonly string[], material: Mat): number => {
+  const textureGroup = (palette: readonly string[], material: Mat, base: Base): number => {
     const coordinates = new Map<string, number>(),
       tints = new Map<string, number>(),
       indexIn = (known: Map<string, number>, key: string): number => {
@@ -620,21 +829,10 @@ export async function export3MF(
       },
       rows = palette.map((entry) => {
         const [u, v, tint] = entry.split(' ');
-        return `<m:multi pindices="${indexIn(tints, tint)} ${indexIn(coordinates, `${u} ${v}`)}"/>`;
+        return `${indexIn(tints, tint)} ${indexIn(coordinates, `${u} ${v}`)}`;
       }),
       image = textureId(material.baseColorTexture!),
-      map = displayProperties ? mapOf(material) : undefined;
-    let display = '';
-    if (map !== undefined) {
-      const sampled = maps.get(map?.image ?? null)!;
-      // No tile style or filter: the extension takes them from the base colour texture.
-      sampled.id ??= addTexture(sampled.image, 'image/png', '');
-      const at = id++;
-      groups.push(
-        `<m:pbmetallictexturedisplayproperties id="${at}" name="${label(material)}" metallictextureid="${sampled.id}" roughnesstextureid="${sampled.id}" metallicfactor="${num(material.metalness)}" roughnessfactor="${num(material.roughness)}"/>`,
-      );
-      display = ` displaypropertiesid="${at}"`;
-    }
+      display = textureDisplay(material);
     const at = id++;
     groups.push(
       `<m:texture2dgroup id="${at}" texid="${image}"${display}>${[...coordinates.keys()]
@@ -644,14 +842,18 @@ export async function export3MF(
         })
         .join('')}</m:texture2dgroup>`,
     );
+    const translucent = look(material).kind === 'translucent',
+      white = tints.size === 1 && tints.has('#FFFFFF');
     // With white alone, each entry is its own coordinate, so the corners' indices serve the texture group as they are.
-    if (tints.size === 1 && tints.has('#FFFFFF')) return at;
-    const colors = colorGroup([...tints.keys()]),
-      layered = id++;
-    groups.push(
-      `<m:multiproperties id="${layered}" pids="${colors} ${at}" blendmethods="multiply">${rows.join('')}</m:multiproperties>`,
+    if (white && !translucent) return at;
+    const colors = white ? undefined : colorGroup([...tints.keys()]);
+    return multiplied(
+      [...(translucent ? [base.group] : []), ...(colors === undefined ? [] : [colors]), at],
+      rows.map((row) => {
+        const [tint, coordinate] = row.split(' ');
+        return `${translucent ? `${base.index} ` : ''}${white ? '' : `${tint} `}${coordinate}`;
+      }),
     );
-    return layered;
   };
 
   /** One primitive of a node, ready to weld: where it lies, what its corners carry and its base material. */
@@ -661,7 +863,7 @@ export async function export3MF(
     positions: ArrayLike<number>;
     colors?: (vertex: number) => string;
     textured: boolean;
-    pindex: number;
+    base: Base;
   }
   type Welded = { part: Part; shape: Shape }[];
   /**
@@ -679,8 +881,8 @@ export async function export3MF(
     }
     return out.filter(({ shape }) => shape.triangles.length);
   };
-  /** Adds a node's shells to lists that may hold others; `pindex` is the base material of the object they join. */
-  const append = (welded: Welded, vertices: string[], faces: string[], pindex: number): void => {
+  /** Adds a node's shells to lists that may hold others; `own` is the base material of the object they join. */
+  const append = (welded: Welded, vertices: string[], faces: string[], own: Base): void => {
     const bases = new Map<Weld, number>();
     for (const { part, shape } of welded) {
       const { weld, triangles, corners, palette } = shape;
@@ -693,8 +895,14 @@ export async function export3MF(
         }
       }
       let group = 0;
-      if (palette) group = part.textured ? textureGroup(palette, part.material) : colorGroup(palette, part.material);
-      const plain = part.pindex === pindex ? '' : ` pid="1" p1="${part.pindex}"`;
+      if (palette)
+        group = part.textured
+          ? textureGroup(palette, part.material, part.base)
+          : look(part.material).kind === 'translucent'
+            ? translucentColors(palette, part.base)
+            : colorGroup(palette, part.material);
+      const { base } = part,
+        plain = base.group === own.group && base.index === own.index ? '' : ` pid="${base.group}" p1="${base.index}"`;
       for (let t = 0; t < triangles.length; t += 3) {
         const colour = corners
           ? ` pid="${group}" p1="${corners[t]}" p2="${corners[t + 1]}" p3="${corners[t + 2]}"`
@@ -706,10 +914,10 @@ export async function export3MF(
     }
   };
   const named = (name: string | undefined): string => (name ? ` name="${escaped(name)}"` : '');
-  const object = (vertices: string[], faces: string[], pindex: number, name: string | undefined): number => {
+  const object = (vertices: string[], faces: string[], base: Base, name: string | undefined): number => {
     const at = id++;
     objects.push(
-      `<object id="${at}" type="model" pid="1" pindex="${pindex}"${named(name)}>` +
+      `<object id="${at}" type="model" pid="${base.group}" pindex="${base.index}"${named(name)}>` +
         `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles></mesh></object>`,
     );
     return at;
@@ -737,31 +945,33 @@ export async function export3MF(
       parts = drawn.map((item): Part => {
         const { geometry } = item,
           material = item.material ?? fallback,
-          pindex = materialIndex(material),
           coordinates = textureCoordinates(geometry, material),
           tint = coordinates && tintOf(geometry, material),
           colors = coordinates
             ? (vertex: number) => `${coordinates(vertex)} ${tint!(vertex)}`
             : vertexColors(geometry, material),
-          map = coordinates && displayProperties ? mapOf(material) : undefined;
+          base = baseOf(material, !!colors && look(material).kind === 'translucent'),
+          found = look(material),
+          map = coordinates && displayProperties ? mapOf(material) : undefined,
+          sampled = found.kind === 'specular' ? [found.map, roughnessMap(material)] : [];
         // What a shared object's properties depend on.
         keys.push(
-          `${numbered(geometry)} ${pindex} ${coordinates ? `${textureId(material.baseColorTexture!)} ${JSON.stringify(material.baseColorTextureTransform ?? null)} ${map ? numbered(map.image) : map}` : ''}`,
+          `${numbered(geometry)} ${base.group} ${base.index} ${coordinates ? `${textureId(material.baseColorTexture!)} ${JSON.stringify(material.baseColorTextureTransform ?? null)} ${map ? numbered(map.image) : map} ${sampled.map((t) => t && numbered(t.image))}` : ''}`,
         );
         const positions = together
           ? moved(geometry.positions, upright(matrix, zUp))
           : mirrored
             ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
             : geometry.positions;
-        return { geometry, material, positions, colors, textured: !!coordinates, pindex };
+        return { geometry, material, positions, colors, textured: !!coordinates, base };
       });
     if (together) {
       const welded = weldParts(parts, mirrored);
       if (!welded.length) return;
-      if (merged.pindex < 0)
-        Object.assign(merged, { pindex: welded[0].part.pindex, name: title === undefined ? name : String(title) });
+      if (!merged.base)
+        Object.assign(merged, { base: welded[0].part.base, name: title === undefined ? name : String(title) });
       check(welded, name);
-      append(welded, merged.vertices, merged.faces, merged.pindex);
+      append(welded, merged.vertices, merged.faces, merged.base!);
       return;
     }
     const key = `${mirrored} ${keys.join('|')}`;
@@ -771,10 +981,10 @@ export async function export3MF(
       if (!welded.length) return;
       const vertices: string[] = [],
         faces: string[] = [],
-        { pindex } = welded[0].part;
+        { base } = welded[0].part;
       check(welded, name);
-      append(welded, vertices, faces, pindex);
-      shared.set(key, (at = object(vertices, faces, pindex, name)));
+      append(welded, vertices, faces, base);
+      shared.set(key, (at = object(vertices, faces, base, name)));
     }
     const placement = `objectid="${at}" transform="${itemTransform(upright(world, zUp), scale)}"`;
     if (assembly === 'components' && nodes.size > 1) components.push(`<component ${placement}/>`);
@@ -785,7 +995,7 @@ export async function export3MF(
     placed(drawn);
   }
   if (merged.faces.length)
-    build.push(`<item objectid="${object(merged.vertices, merged.faces, merged.pindex, merged.name)}"/>`);
+    build.push(`<item objectid="${object(merged.vertices, merged.faces, merged.base!, merged.name)}"/>`);
   if (components.length) {
     const at = id++;
     // An object of components takes no property of its own (core specification section 4.2).
@@ -795,22 +1005,32 @@ export async function export3MF(
     build.push(`<item objectid="${at}"/>`);
   }
   if (!build.length) throw new RangeError('3MF requires at least one mesh with triangles');
-  const bases = [...materials.values()],
-    shiny = displayProperties && bases.some(({ material }) => finished(material)) ? id++ : 0,
-    baseDisplay = shiny
-      ? `<m:pbmetallicdisplayproperties id="${shiny}">${bases.map(({ material }) => metallic(material)).join('')}</m:pbmetallicdisplayproperties>`
-      : '',
-    base = bases
-      .map(
-        ({ color, material }) =>
-          `<base name="${material.name ? escaped(material.name) : color}" displaycolor="${color}"/>`,
-      )
-      .join(''),
-    model =
+  // Each base material group after the display properties it names.
+  const baseXml = [...bases]
+    .map(([kind, { id: group, entries }]) => {
+      const list = [...entries.values()],
+        shown =
+          displayProperties && (kind !== 'metallic' || list.some(({ material }) => finished(material))) ? id++ : 0,
+        element = `${kind === 'translucent' ? 'm:translucent' : kind === 'specular' ? 'm:pbspecular' : 'm:pbmetallic'}displayproperties`;
+      return (
+        (shown
+          ? `<${element} id="${shown}">${list.map(({ material }) => lookXml(material)).join('')}</${element}>`
+          : '') +
+        `<basematerials id="${group}"${shown ? ` displaypropertiesid="${shown}"` : ''}>${list
+          .map(
+            ({ color, material }) =>
+              `<base name="${material.name ? escaped(material.name) : color}" displaycolor="${color}"/>`,
+          )
+          .join('')}</basematerials>`
+      );
+    })
+    .join('');
+  const model =
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
       `<model unit="${unit}" xml:lang="en-US" xmlns="${CORE}" xmlns:m="${MATERIAL}"${described.namespaces}>` +
       described.xml +
-      `<resources>${baseDisplay}<basematerials id="1"${shiny ? ` displaypropertiesid="${shiny}"` : ''}>${base}</basematerials>${textureXml.join('')}${groups.join('')}${objects.join('')}</resources>` +
+      // Textures first: display properties of base materials never sample one, those of texture groups do.
+      `<resources>${baseXml}${textureXml.join('')}${groups.join('')}${objects.join('')}</resources>` +
       `<build>${build.join('')}</build></model>\n`,
     encoder = new TextEncoder(),
     relationships = (entries: readonly (readonly [string, string])[]): Uint8Array =>

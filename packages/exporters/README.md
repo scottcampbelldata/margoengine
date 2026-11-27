@@ -1392,6 +1392,37 @@ const file = await export3MF(
 console.log(`${file.length} bytes`);
 ```
 
+Each material's look becomes the materials extension's display properties, from glTF values (a GLB's are read the same way):
+
+| Material | Written as |
+| --- | --- |
+| `transmission` of at least 0.5 over its dielectric share, with `ior` of 1 or more | `translucent`: attenuation per metre from `KHR_materials_volume` (`-ln(colour) / distance`, black as 2^-16), a refractive index for red, green and blue from `ior` and `KHR_materials_dispersion`, and the roughness |
+| A dielectric (`metalness` 0) with `KHR_materials_specular`, or an `ior` other than 1.5 | `pbspecular`: the reflectance at normal incidence and 1 - roughness as glossiness; with a base colour texture, `specularColorTexture` and the roughness map become the specular and glossiness maps |
+| Any other | `pbmetallic`: metalness and roughness, written where they differ from the extension's own 0 and 1, with the metallic-roughness map |
+
+A share of transmission between 0 and 1 is rounded with a warning, as 3MF translucency has no share; `specularTexture` (strength) is left out with a warning. Colours and textures over a translucent material are written as a `multiproperties` over a white base, since colour and texture groups take no translucency (section 7.5.1).
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import type { ExtendedMaterialData } from 'margoengine/exporters/materials';
+
+// Amber resin: white light keeps this colour after 20 mm.
+const amber: ExtendedMaterialData = {
+  name: 'Amber',
+  roughness: 0.05,
+  transmission: 1,
+  ior: 1.54,
+  extensions: { KHR_materials_volume: { attenuationColor: [1, 0.6, 0.1], attenuationDistance: 0.02 } },
+};
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  normals: new Float32Array(12),
+  indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3],
+};
+const file = await export3MF({ nodes: [{ geometry, material: amber }] });
+console.log(`${file.length} bytes`);
+```
+
 | Option | Default | What it does |
 | --- | --- | --- |
 | `unit` | `'millimeter'` | `micron`, `millimeter`, `centimeter`, `inch`, `foot` or `meter`. Scene lengths are metres, as in glTF, and are converted, so a 1 m cube is 1000 long in `'millimeter'` |
@@ -1399,7 +1430,7 @@ console.log(`${file.length} bytes`);
 | `title` | none | The file's Title metadata, and the assembly's name |
 | `metadata` | none | `designer`, `description`, `copyright`, `licenseTerms`, `rating`, `creationDate`, `modificationDate` and `application`, the names the core specification defines, and `custom: [{ namespace, name, value, preserve }]` for your own |
 | `thumbnail` | none | PNG or JPEG bytes, written as the package thumbnail. A CMYK JPEG is refused |
-| `displayProperties` | `true` | Writes metalness, roughness and the metallic-roughness map as physically based display properties |
+| `displayProperties` | `true` | Writes how each material looks: metallic, specular or translucent display properties (below) |
 | `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `'components'` writes one object made of components that share meshes. `false` writes a build item for each node |
 | `compress` | `true` | Deflates the package's parts. `false` stores them |
 | `onMeshCheck` | none | Called for each mesh written with `{ name, openEdges, nonManifoldEdges, flippedEdges, insideOut }` |

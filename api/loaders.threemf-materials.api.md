@@ -14,11 +14,14 @@ export interface ThreeMFMaterialGroup extends LoadedGroup {
     texture?: number;
     layers?: ThreeMFLayer[];
     metallic?: ThreeMFMetallic;
+    specular?: ThreeMFSpecular;
+    translucent?: ThreeMFTranslucent;
 }
 
 export interface ThreeMFMaterials extends ThreeMFResult {
     groups: ThreeMFMaterialGroup[];
     textures: ThreeMFTexture[];
+    metresPerUnit?: number;
 }
 
 export interface ThreeMFMetallic {
@@ -31,6 +34,16 @@ export interface ThreeMFMetallic {
     layer?: number;
 }
 
+export interface ThreeMFSpecular {
+    name: string;
+    specularColor: [number, number, number];
+    glossiness: number;
+    specularTexture?: number;
+    glossinessTexture?: number;
+    diffuseFactor?: [number, number, number, number];
+    layer?: number;
+}
+
 export interface ThreeMFTexture {
     path: string;
     contentType: string;
@@ -38,6 +51,14 @@ export interface ThreeMFTexture {
     tileStyleU: string;
     tileStyleV: string;
     filter: string;
+}
+
+export interface ThreeMFTranslucent {
+    name: string;
+    attenuation: [number, number, number];
+    refractiveIndex: [number, number, number];
+    roughness: number;
+    layer?: number;
 }
 
 export function parse3MFMaterials(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFMaterials>;

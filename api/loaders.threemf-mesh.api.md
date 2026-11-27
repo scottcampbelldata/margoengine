@@ -60,11 +60,14 @@ interface ThreeMFMaterialGroup extends LoadedGroup {
     texture?: number;
     layers?: ThreeMFLayer[];
     metallic?: ThreeMFMetallic;
+    specular?: ThreeMFSpecular;
+    translucent?: ThreeMFTranslucent;
 }
 
 interface ThreeMFMaterials extends ThreeMFResult {
     groups: ThreeMFMaterialGroup[];
     textures: ThreeMFTexture[];
+    metresPerUnit?: number;
 }
 
 interface ThreeMFMetallic {
@@ -83,6 +86,16 @@ interface ThreeMFResult extends LoadedGeometry {
     metadata: Record<string, string>;
 }
 
+interface ThreeMFSpecular {
+    name: string;
+    specularColor: [number, number, number];
+    glossiness: number;
+    specularTexture?: number;
+    glossinessTexture?: number;
+    diffuseFactor?: [number, number, number, number];
+    layer?: number;
+}
+
 interface ThreeMFTexture {
     path: string;
     contentType: string;
@@ -90,5 +103,13 @@ interface ThreeMFTexture {
     tileStyleU: string;
     tileStyleV: string;
     filter: string;
+}
+
+interface ThreeMFTranslucent {
+    name: string;
+    attenuation: [number, number, number];
+    refractiveIndex: [number, number, number];
+    roughness: number;
+    layer?: number;
 }
 ```

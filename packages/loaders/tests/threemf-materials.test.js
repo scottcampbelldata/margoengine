@@ -470,14 +470,117 @@ test("display properties after their group, and on one base as the Consortium's 
   );
 });
 
-test('specular and translucent display properties are passed over', async () => {
-  for (const other of ['pbspeculardisplayproperties', 'translucentdisplayproperties']) {
-    const xml = model(
-      `<m:${other} id="20"/><basematerials id="4" displaypropertiesid="20">${THREE}</basematerials>`,
-      '<triangle v1="0" v2="1" v3="2" pid="4" p1="0"/>',
+const SPECULARS =
+  '<m:pbspeculardisplayproperties id="20"><m:pbspecular name="Gold" specularcolor="#FFD060" glossiness="0.75"/><m:pbspecular name="Plain"/></m:pbspeculardisplayproperties>';
+const GLASS =
+  '<m:translucentdisplayproperties id="22"><m:translucent name="Resin" attenuation="0.5 2 4" refractiveindex="1.48 1.5 1.53" roughness="0.1"/><m:translucent name="Water" attenuation="0 0 0"/></m:translucentdisplayproperties>';
+const TWO = '<base name="a" displaycolor="#FF0000"/><base name="b" displaycolor="#00FF00"/>';
+const both = '<triangle v1="0" v2="1" v3="2" pid="4" p1="0"/><triangle v1="0" v2="2" v3="3" pid="4" p1="1"/>';
+
+test('pbspecular values follow the property index, with the default specular colour and glossiness', async () => {
+  const xml = model(`${SPECULARS}<basematerials id="4" displaypropertiesid="20">${TWO}</basematerials>`, both),
+    result = await parse3MFMaterials(pack(xml));
+  assert.deepEqual(
+    result.groups.map((group) => group.specular),
+    [
+      { name: 'Gold', specularColor: [1, 0xd0 / 255, 0x60 / 255], glossiness: 0.75 },
+      { name: 'Plain', specularColor: [56 / 255, 56 / 255, 56 / 255], glossiness: 0 },
+    ],
+  );
+  assert.ok(result.groups.every((group) => !group.metallic && !group.translucent));
+});
+
+test('translucent values follow the property index, on base materials and composites', async () => {
+  const expected = [
+    { name: 'Resin', attenuation: [0.5, 2, 4], refractiveIndex: [1.48, 1.5, 1.53], roughness: 0.1 },
+    { name: 'Water', attenuation: [0, 0, 0], refractiveIndex: [1, 1, 1], roughness: 0 },
+  ];
+  for (const [resources, pid] of [
+    [`${GLASS}<basematerials id="4" displaypropertiesid="22">${TWO}</basematerials>`, 4],
+    [
+      `${GLASS}<basematerials id="3">${TWO}</basematerials><m:compositematerials id="4" matid="3" matindices="0 1" displaypropertiesid="22">${'<m:composite values="1 1"/>'.repeat(2)}</m:compositematerials>`,
+      4,
+    ],
+  ]) {
+    const result = await parse3MFMaterials(pack(model(resources, both.replaceAll('pid="4"', `pid="${pid}"`))));
+    assert.deepEqual(
+      result.groups.map((group) => group.translucent),
+      expected,
     );
-    assert.equal((await parse3MFMaterials(pack(xml))).groups[0].metallic, undefined);
+    assert.ok(result.groups.every((group) => !group.metallic && !group.specular));
   }
+});
+
+test("metresPerUnit tells a mesh's unit, whatever the attenuation's metres", async () => {
+  const xml = model(`<basematerials id="4">${TWO}</basematerials>`, both);
+  assert.equal((await parse3MFMaterials(pack(xml))).metresPerUnit, 1);
+  assert.equal((await parse3MFMaterials(pack(xml), { units: 'file' })).metresPerUnit, 0.001);
+});
+
+const SPECULAR_MAPS = (extra) =>
+  `<m:pbspeculartexturedisplayproperties id="21" name="Lacquer" speculartextureid="30" glossinesstextureid="31" ${extra}/>`;
+
+test('specular texture properties name their maps, factors and diffuse factor', async () => {
+  for (const [extra, expected] of [
+    ['', { specularColor: [1, 1, 1], glossiness: 1 }],
+    [
+      'specularfactor="#80FF40" glossinessfactor="0.5" diffusefactor="#40C080"',
+      {
+        specularColor: [0x80 / 255, 1, 0x40 / 255],
+        glossiness: 0.5,
+        diffuseFactor: [0x40 / 255, 0xc0 / 255, 0x80 / 255, 1],
+      },
+    ],
+  ]) {
+    const result = await parse3MFMaterials(
+      pack(model(MAPS + SPECULAR_MAPS(extra) + TEXTURE + shownCoords, CORNER), PARTS),
+    );
+    assert.deepEqual(result.groups[0].specular, {
+      name: 'Lacquer',
+      ...expected,
+      specularTexture: 0,
+      glossinessTexture: 1,
+    });
+    assert.equal(result.groups[0].metallic, undefined);
+  }
+});
+
+test('a stack takes one kind of display properties, from its lowest layer that has any', async () => {
+  const resources = `${GLASS}${MAPS}${SPECULAR_MAPS('')}${TEXTURE}${shownCoords}<basematerials id="4" displaypropertiesid="22">${TWO}</basematerials><m:colorgroup id="6"><m:color color="#FFFFFF"/></m:colorgroup>`;
+  const stack = async (pids, row) => {
+    const layers = `<m:multiproperties id="7" pids="${pids}"><m:multi pindices="${row}"/></m:multiproperties>`,
+      xml = model(resources + layers, '<triangle v1="0" v2="1" v3="2" pid="7" p1="0"/>');
+    return (await parse3MFMaterials(pack(xml, PARTS))).groups[0];
+  };
+  const under = await stack('4 2', '0 0');
+  assert.deepEqual([under.translucent.name, under.translucent.layer, under.specular], ['Resin', 0, undefined]);
+  const over = await stack('6 2', '0 0');
+  assert.deepEqual([over.specular.name, over.specular.layer, over.translucent], ['Lacquer', 1, undefined]);
+});
+
+test('broken specular and translucent display properties are named errors', async () => {
+  const base = `<basematerials id="4" displaypropertiesid="20">${TWO}</basematerials>`,
+    specular = (attributes) =>
+      `<m:pbspeculardisplayproperties id="20"><m:pbspecular name="x" ${attributes}/></m:pbspeculardisplayproperties>`,
+    translucent = (attributes) =>
+      `<m:translucentdisplayproperties id="20"><m:translucent name="x" ${attributes}/></m:translucentdisplayproperties>`;
+  for (const [display, code] of [
+    [specular('glossiness="1.5"'), 'range'],
+    [specular('specularcolor="gold"'), 'syntax'],
+    [translucent(''), 'syntax'],
+    [translucent('attenuation="1 1"'), 'syntax'],
+    [translucent('attenuation="1 -1 1"'), 'range'],
+    [translucent('attenuation="1 1 1" refractiveindex="1.5 0 1.5"'), 'range'],
+    [translucent('attenuation="1 1 1" refractiveindex="1.5"'), 'syntax'],
+    [translucent('attenuation="1 1 1" roughness="2"'), 'range'],
+  ])
+    await refuses(parse3MFMaterials(pack(model(display + base, both))), code);
+  const textured = (display) => parse3MFMaterials(pack(model(display + TEXTURE + shownCoords, CORNER), PARTS));
+  await refuses(textured(SPECULAR_MAPS('')), 'syntax');
+  await refuses(textured(MAPS + SPECULAR_MAPS('glossinessfactor="-1"')), 'range');
+  await refuses(textured(MAPS + SPECULAR_MAPS('diffusefactor="red"')), 'syntax');
+  // A translucent resource may not describe a texture group (section 7.5.1).
+  await refuses(textured(translucent('attenuation="1 1 1"').replace('id="20"', 'id="21"')), 'syntax');
 });
 
 test('broken display properties are named errors', async () => {

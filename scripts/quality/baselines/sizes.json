@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21012669,
+  "total": 21015295,
   "history": [
     {
       "date": "2026-10-24",
@@ -14712,6 +14712,12 @@
       "commit": "HEAD",
       "reason": "navmesh/weighted-any-angle new at 4265 B: any-angle paths over weighted ground with a proven lower bound, its own entry sharing only the point and filter checks of the navmesh search chunk, so the exact search and the rest of navmesh carry none of it; no other entry grows for it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-c5",
+      "reason": "3MF specular and translucent display properties: exporters/threemf 28528 to 30266 B (writes both kinds, a base material group for each, multiproperties over a translucent base, glossiness maps) and loaders/threemf-mesh 3224 to 4060 B (draws them: specular colour at index 0, transmission and volume with the mean chord as thickness). loaders/threemf-materials 13482 to 13808 B and threemf-lattice 17633 to 17948 B stay within budget. The code is in the one reader, writer and mesh builder of the format; a second entry would parse or write the file twice.",
+      "grew": 2
     }
   ],
   "items": {
@@ -15105,7 +15111,7 @@
     "@margoengine/exporters/sparse": 25614,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 29384,
+    "@margoengine/exporters/threemf": 31174,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,
@@ -15351,7 +15357,7 @@
     "@margoengine/loaders/textures": 702,
     "@margoengine/loaders/threemf-lattice": 18162,
     "@margoengine/loaders/threemf-materials": 13887,
-    "@margoengine/loaders/threemf-mesh": 3480,
+    "@margoengine/loaders/threemf-mesh": 4316,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,
     "@margoengine/loaders/vdb": 6406,

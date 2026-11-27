@@ -1,7 +1,14 @@
-// create3MFMesh: draws parse3MFMaterials output with @margoengine/materials, multiproperties layer stacks and metallic
-// display properties included.
+// create3MFMesh: draws parse3MFMaterials output with @margoengine/materials, multiproperties layer stacks and the
+// metallic, specular and translucent display properties included.
 import type { EngineKernel } from '@margoengine/core';
-import { Material, Texture, createMesh, type MaterialMesh, type TextureOptions } from '@margoengine/materials';
+import {
+  Material,
+  Texture,
+  createMesh,
+  type MaterialMesh,
+  type MaterialOptions,
+  type TextureOptions,
+} from '@margoengine/materials';
 import { layered, type MaterialLayer } from '@margoengine/materials/layered';
 import { SRGBToLinear } from '@margoengine/math/color';
 import { computeVertexNormals } from './normals.js';
@@ -9,8 +16,8 @@ import type {
   ThreeMFLayer,
   ThreeMFMaterialGroup,
   ThreeMFMaterials,
-  ThreeMFMetallic,
   ThreeMFTexture,
+  ThreeMFTranslucent,
 } from './threemf-materials.js';
 import { LoaderError } from './types.js';
 import { throwIfAborted } from './util.js';
@@ -25,8 +32,8 @@ export interface ThreeMFMeshOptions {
    */
   normals?: 'smooth' | 'flat';
   /**
-   * Every material's roughness, 0 to 1, in place of the file's value and map. Default: the group's `metallic`, else
-   * 0.6.
+   * Every material's roughness, 0 to 1, in place of the file's value and map. Default: that of the group's `metallic` or
+   * `translucent`, 1 - the glossiness of its `specular`, else 0.6.
    */
   roughness?: number;
   /** Every material's metalness, 0 to 1, in place of the file's value and map. Default: the group's `metallic`, else 0. */
@@ -85,31 +92,36 @@ function smoothIndices(positions: Float32Array): Uint32Array {
   return out;
 }
 
+/** One channel of a glTF-layout map: the texture and channel it samples, and the byte a sampled texel becomes. */
+interface Channel {
+  texture: number;
+  from: number;
+  value: (texel: number) => number;
+}
+
 /**
- * The metalness and roughness maps of one group as the single glTF-layout map a material reads (roughness in green,
- * metalness in blue). The extension samples each from its own image's red channel, or roughness from red and metalness
- * from green when both name one resource (section 7.4). A number given in the options leaves its channel white, and a
- * factor above 1 is applied to the texels, which stay at most 1. Images of two sizes meet at the larger one.
+ * The roughness and metalness maps of one group as the single glTF-layout map a material reads (roughness in green,
+ * metalness in blue); a channel left out stays white, so the material's number stands alone. Both samplers of the
+ * extension are read texel by texel with `addressing`, the colour texture's; images of two sizes meet at the larger one.
  */
 async function finishMap(
   loaded: ThreeMFMaterials,
-  metallic: ThreeMFMetallic,
+  channels: { roughness?: Channel; metalness?: Channel },
   addressing: ThreeMFTexture,
-  gains: { roughness: number | undefined; metalness: number | undefined },
   signal?: AbortSignal,
 ): Promise<Texture> {
   const { decodeImage } = await import('@margoengine/decoders/image'),
-    shared = metallic.metalnessTexture === metallic.roughnessTexture,
-    read = async (k: number | undefined) => {
-      const source = loaded.textures[k!];
-      if (!source) throw new LoaderError(F, 'range', `a group names texture ${k}, outside textures`);
-      throwIfAborted(signal, F);
-      return decodeImage(source.data);
-    },
-    rough = await read(metallic.roughnessTexture),
-    metal = shared ? rough : await read(metallic.metalnessTexture),
-    width = Math.max(rough.width, metal.width),
-    height = Math.max(rough.height, metal.height),
+    images = new Map<number, Awaited<ReturnType<typeof decodeImage>>>(),
+    used = [channels.roughness, channels.metalness].filter((channel) => channel !== undefined);
+  for (const { texture } of used) {
+    if (images.has(texture)) continue;
+    const source = loaded.textures[texture];
+    if (!source) throw new LoaderError(F, 'range', `a group names texture ${texture}, outside textures`);
+    throwIfAborted(signal, F);
+    images.set(texture, await decodeImage(source.data));
+  }
+  const width = Math.max(...[...images.values()].map((image) => image.width)),
+    height = Math.max(...[...images.values()].map((image) => image.height)),
     data = new Uint8Array(width * height * 4).fill(255),
     { tileStyleU, tileStyleV, filter } = addressing,
     nearest = filter === 'nearest';
@@ -122,7 +134,8 @@ async function finishMap(
     }
     return Math.min(size - 1, Math.max(0, i));
   };
-  const fill = (image: typeof rough, from: number, to: number, gain: number) => {
+  const fill = ({ texture, from, value }: Channel, to: number) => {
+    const image = images.get(texture)!;
     // Rows are stored bottom first: raw texels put row 0 at v = 0, where an image's last row is.
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) {
@@ -137,14 +150,14 @@ async function finishMap(
             image.data[
               (wrapped(j, image.height, tileStyleV) * image.width + wrapped(i, image.width, tileStyleU)) * 4 + from
             ],
-          value =
+          sampled =
             (texel(x0, y0) * (1 - fx) + texel(x0 + 1, y0) * fx) * (1 - fy) +
             (texel(x0, y0 + 1) * (1 - fx) + texel(x0 + 1, y0 + 1) * fx) * fy;
-        data[(y * width + x) * 4 + to] = Math.min(255, Math.round(value * gain));
+        data[(y * width + x) * 4 + to] = Math.round(value(sampled));
       }
   };
-  if (gains.roughness !== undefined) fill(rough, 0, 1, gains.roughness);
-  if (gains.metalness !== undefined) fill(metal, shared ? 1 : 0, 2, gains.metalness);
+  if (channels.roughness) fill(channels.roughness, 1);
+  if (channels.metalness) fill(channels.metalness, 2);
   const sampling = nearest ? 'nearest' : 'linear';
   return new Texture(
     { data, width, height },
@@ -158,6 +171,97 @@ async function finishMap(
     },
   );
 }
+
+/**
+ * The maps a group's display properties sample into the glTF layout: metallic ones from red, or roughness from red and
+ * metalness from green when both name one resource (section 7.4), and 1 - glossiness from the alpha of the specular
+ * map, or the red of its own (section 7.3). A number given in the options leaves its channel out. A metallic factor up
+ * to 1 stays the material's number; one above 1 is applied to the texels, which stay at most 1.
+ */
+function channelsOf(
+  { metallic, specular }: ThreeMFMaterialGroup,
+  options: ThreeMFMeshOptions,
+): { roughness?: Channel; metalness?: Channel } {
+  const scaled = (factor: number) => (texel: number) => Math.min(255, texel * factor),
+    out: { roughness?: Channel; metalness?: Channel } = {};
+  if (metallic?.roughnessTexture !== undefined) {
+    const { roughnessTexture, metalnessTexture } = metallic;
+    if (options.roughness === undefined)
+      out.roughness = { texture: roughnessTexture, from: 0, value: scaled(Math.max(1, metallic.roughness)) };
+    if (options.metalness === undefined)
+      out.metalness = {
+        texture: metalnessTexture!,
+        from: metalnessTexture === roughnessTexture ? 1 : 0,
+        value: scaled(Math.max(1, metallic.metalness)),
+      };
+  }
+  if (specular?.glossinessTexture !== undefined && options.roughness === undefined) {
+    const { glossinessTexture, specularTexture, glossiness } = specular,
+      gloss = scaled(glossiness);
+    out.roughness = {
+      texture: glossinessTexture,
+      from: glossinessTexture === specularTexture ? 3 : 0,
+      value: (texel) => 255 - gloss(texel),
+    };
+  }
+  return out;
+}
+
+/**
+ * The mean path through each translucent object, in mesh units: 4 V / S over its triangles, the mean chord of a convex
+ * solid (Cauchy; Santalo, "Integral Geometry and Geometric Probability", 1976). An open mesh has no volume to speak of.
+ */
+function meanPaths({ positions, indices, groups }: ThreeMFMaterials): Map<string | undefined, number> {
+  const sums = new Map<string | undefined, { volume: number; area: number; origin: number[] }>();
+  for (const { objectId, translucent } of groups)
+    if (translucent) sums.set(objectId, { volume: 0, area: 0, origin: [] });
+  for (const group of groups) {
+    const sum = sums.get(group.objectId);
+    if (!sum) continue;
+    for (let i = group.start; i < group.start + group.count; i += 3) {
+      // About the object's first vertex, so that a part far from the origin keeps its precision.
+      if (!sum.origin.length) sum.origin = [...positions.subarray(indices![i] * 3, indices![i] * 3 + 3)];
+      const [a, b, c] = [0, 1, 2].map((k) => sum.origin.map((o, axis) => positions[indices![i + k] * 3 + axis] - o)),
+        cross = (u: number[], v: number[]) => [
+          u[1] * v[2] - u[2] * v[1],
+          u[2] * v[0] - u[0] * v[2],
+          u[0] * v[1] - u[1] * v[0],
+        ],
+        edge = (to: number[]) => to.map((x, axis) => x - a[axis]);
+      sum.volume += cross(b, c).reduce((total, x, axis) => total + x * a[axis], 0) / 6;
+      sum.area += Math.hypot(...cross(edge(b), edge(c))) / 2;
+    }
+  }
+  return new Map(
+    [...sums].map(([id, { volume, area }]) => [id, area > 0 ? (4 * Math.abs(volume)) / area : 0] as const),
+  );
+}
+
+/**
+ * A translucent group as transmission and volume: Beer-Lambert's `exp(-a t)` is the material's colour to the power of
+ * `t / distance`, with the strongest channel setting the distance. The material takes green's refractive index, at
+ * least 1, and the spread from red to blue as `KHR_materials_dispersion` defines it.
+ */
+function volumeOf(translucent: ThreeMFTranslucent, metresPerUnit: number, thickness: number): MaterialOptions {
+  const [red, green, blue] = translucent.refractiveIndex,
+    ior = Math.max(1, green),
+    perUnit = translucent.attenuation.map((a) => a * metresPerUnit),
+    most = Math.max(...perUnit),
+    dispersion = ior > 1 ? (20 * (blue - red)) / (ior - 1) : 0;
+  return {
+    transmission: 1,
+    ior,
+    // Naming it would add the dispersion lobe to a material that has none.
+    ...(dispersion > 0 ? { dispersion } : {}),
+    thickness,
+    attenuationColor: perUnit.map((a) => (most ? Math.exp(-a / most) : 1)),
+    attenuationDistance: most ? 1 / most : Infinity,
+  };
+}
+
+/** `basecolorfactor` or `diffusefactor` of a group's display properties, over its colour texture. */
+const colourFactor = ({ metallic, specular }: ThreeMFMaterialGroup): number[] | undefined =>
+  metallic?.baseColorFactor ?? specular?.diffuseFactor;
 
 /**
  * Turns one group's stack into the colour each vertex starts with and the `layered()` layers over it. The colour
@@ -227,8 +331,8 @@ function stack(
     for (const v of vertices) uvs[slot].set([values[v * 2], 1 - values[v * 2 + 1]], v * 2);
     const map = textures.get(layer.texture!)!,
       texCoord = slot as 0 | 1,
-      // The display properties' `basecolorfactor` scales the colour of the layer they come from.
-      factor = group.metallic?.layer === k ? group.metallic.baseColorFactor : undefined,
+      // The display properties' colour factor scales the colour of the layer they come from.
+      factor = (group.metallic ?? group.specular)?.layer === k ? colourFactor(group) : undefined,
       tint = factor ? { color: [0, 1, 2].map((i) => SRGBToLinear(factor[i])) as [number, number, number] } : {};
     sets.set(k, texCoord);
     // The bottom layer starts the stack opaque; a mix layer above covers by its alpha; multiply scales by it.
@@ -248,9 +352,13 @@ function stack(
  * Draws a `parse3MFMaterials` result as one materials mesh with a material per group: colour groups, composites and
  * per-corner colours as vertex colours, a texture group's image as the colour map, and a `multiproperties` stack as its
  * layers (`layered()`), blended as the 3MF Materials and Properties Extension 1.2.1 specifies (mix and multiply, in
- * linear light). A group's `metallic` sets its material's metalness and roughness, with their maps. Colour images decode
- * with `createImageBitmap`; metalness and roughness maps need the optional `@margoengine/decoders` peer, which reads
- * their texels exactly.
+ * linear light). A group's `metallic` sets its material's metalness and roughness, with their maps. Its `specular` is
+ * drawn as an index of refraction of 0 with that specular colour (`KHR_materials_ior`), and roughness 1 - glossiness.
+ * Its `translucent` is drawn as transmission through a volume: the thickness is the object's mean chord, 4 V / S, and the
+ * attenuation is converted with `metresPerUnit`; draw it with `@margoengine/materials/transmission` to refract the scene
+ * behind it, without which the background shows through tinted. `unlit` draws neither. Colour images decode with
+ * `createImageBitmap`; roughness, metalness and glossiness maps need the optional `@margoengine/decoders` peer, which
+ * reads their texels exactly.
  *
  * @param engine The engine to draw in.
  * @param loaded What `parse3MFMaterials` returned.
@@ -291,7 +399,8 @@ export async function create3MFMesh(
   const textures = new Map<number, Texture>(),
     /** Repacked metalness and roughness maps, shared by the groups that sample them alike. */
     finishes = new Map<string, Texture>(),
-    materials: Material[] = [];
+    materials: Material[] = [],
+    paths = meanPaths(loaded);
   const release = () => {
     for (const material of materials) material.dispose();
     for (const texture of [...textures.values(), ...finishes.values()]) texture.dispose();
@@ -309,29 +418,44 @@ export async function create3MFMesh(
     for (const group of groups) {
       if (!group.count) continue;
       const vertices = indices.subarray(group.start, group.start + group.count),
-        { metallic } = group,
-        roughness = options.roughness ?? (metallic ? Math.min(1, metallic.roughness) : 0.6),
-        metalness = options.metalness ?? (metallic ? Math.min(1, metallic.metalness) : 0);
+        { metallic, specular, translucent } = group,
+        display = metallic ?? specular,
+        // A glossiness map holds the whole roughness, as 1 - factor x texel is no factor over a map.
+        given = specular
+          ? specular.glossinessTexture === undefined
+            ? 1 - specular.glossiness
+            : 1
+          : (metallic ?? translucent)?.roughness,
+        roughness = options.roughness ?? Math.min(1, given ?? 0.6),
+        metalness = options.metalness ?? (metallic ? Math.min(1, metallic.metalness) : 0),
+        channels = channelsOf(group, options);
       let features: MaterialLayer[] = [],
         slots = new Map<number, 0 | 1>(),
         map: Texture | undefined,
-        finish: Texture | undefined;
-      if (
-        metallic?.roughnessTexture !== undefined &&
-        (options.roughness === undefined || options.metalness === undefined)
-      ) {
-        const colour = group.layers ? group.layers[metallic.layer!]?.texture : group.texture,
+        finish: Texture | undefined,
+        specularMap: Texture | undefined;
+      const specularTexture = options.unlit ? undefined : specular?.specularTexture;
+      if (channels.roughness || channels.metalness || specularTexture !== undefined) {
+        const colour = group.layers ? group.layers[display!.layer!]?.texture : group.texture,
           addressing = loaded.textures[colour!];
         if (!addressing)
-          throw new LoaderError(F, 'range', 'a group with a metalness or roughness map needs its colour texture');
-        // A number from the options keeps the map out of its channel.
-        const gains = {
-            roughness: options.roughness === undefined ? Math.max(1, metallic.roughness) : undefined,
-            metalness: options.metalness === undefined ? Math.max(1, metallic.metalness) : undefined,
-          },
-          key = JSON.stringify([metallic.metalnessTexture, metallic.roughnessTexture, colour, gains]);
-        finish = finishes.get(key);
-        if (!finish) finishes.set(key, (finish = await finishMap(loaded, metallic, addressing, gains, signal)));
+          throw new LoaderError(F, 'range', 'a group with display property maps needs its colour texture');
+        if (channels.roughness || channels.metalness) {
+          const key = JSON.stringify([display, colour, !!channels.roughness, !!channels.metalness]);
+          finish = finishes.get(key);
+          if (!finish) finishes.set(key, (finish = await finishMap(loaded, channels, addressing, signal)));
+        }
+        if (specularTexture !== undefined) {
+          const source = loaded.textures[specularTexture];
+          if (!source) throw new LoaderError(F, 'range', `a group names texture ${specularTexture}, outside textures`);
+          const key = JSON.stringify([specularTexture, colour]),
+            { tileStyleU, tileStyleV, filter } = addressing;
+          specularMap = finishes.get(key);
+          if (!specularMap) {
+            specularMap = await decode({ ...source, tileStyleU, tileStyleV, filter }, signal);
+            finishes.set(key, specularMap);
+          }
+        }
         throwIfAborted(signal, F);
       }
       if (group.layers?.length)
@@ -339,7 +463,7 @@ export async function create3MFMesh(
       else {
         const { colors: rgb, uvs: uv } = loaded,
           alpha = loaded.attributes?.opacity,
-          factor = metallic?.baseColorFactor;
+          factor = colourFactor(group);
         for (const v of vertices) {
           for (let c = 0; c < 3; c++)
             colors[v * 4 + c] =
@@ -356,24 +480,39 @@ export async function create3MFMesh(
         else {
           if (features.length >= 8)
             throw new LoaderError(F, 'unsupported', 'a stack of 8 texture layers has no room for its metallic map');
-          const texCoord = slots.get(metallic!.layer!) ?? 0;
+          const texCoord = slots.get(display!.layer!) ?? 0;
           features.push({ blend: 'multiply', metalRoughnessMap: finish, texCoord, roughness, metalness });
         }
       }
-      const transparent = [...vertices].some((v) => colors[v * 4 + 3] < 1);
+      // A translucent surface is see-through by its transmission, not by its colour's alpha.
+      if (translucent && !options.unlit) for (const v of vertices) colors[v * 4 + 3] = 1;
+      const transparent = [...vertices].some((v) => colors[v * 4 + 3] < 1),
+        physical: MaterialOptions = options.unlit
+          ? {}
+          : specular
+            ? {
+                ior: 0,
+                specularColor: specular.specularColor.map(SRGBToLinear),
+                ...(specularMap ? { specularColorMap: specularMap } : {}),
+              }
+            : translucent
+              ? volumeOf(translucent, loaded.metresPerUnit ?? 1, paths.get(group.objectId)!)
+              : {};
       geometryGroups.push({ start: group.start, count: group.count, materialIndex: materials.length });
-      materials.push(
-        new Material({
-          ...(map ? { map } : {}),
-          ...(finish && !features.length ? { metalRoughnessMap: finish } : {}),
-          ...(options.unlit ? { shading: 'basic' as const } : {}),
-          roughness,
-          metalness,
-          doubleSided: options.doubleSided ?? true,
-          transparent,
-          features: features.length ? [layered({ layers: features })] : [],
-        }),
-      );
+      const material = new Material({
+        ...physical,
+        ...(map ? { map } : {}),
+        ...(finish && !features.length ? { metalRoughnessMap: finish } : {}),
+        ...(options.unlit ? { shading: 'basic' as const } : {}),
+        roughness,
+        metalness,
+        doubleSided: options.doubleSided ?? true,
+        transparent,
+        features: features.length ? [layered({ layers: features })] : [],
+      });
+      materials.push(material);
+      if (specularMap && slots.get(specular!.layer!))
+        material.setUVTransform({ texCoord: slots.get(specular!.layer!) }, 'specularColorMap');
     }
     if (!materials.length) throw new LoaderError(F, 'unsupported', 'the result has no nonempty groups to draw');
     const normals =

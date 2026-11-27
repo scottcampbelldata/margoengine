@@ -1014,7 +1014,7 @@ for (const { positions, indices, groups, matrices } of model.instances) {
 
 ## 3MF textures and colour groups
 
-`parse3MFMaterials` from `@margoengine/loaders/threemf-materials` reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup` coordinates, `compositematerials`, `multiproperties` and the metallic display properties. The plain `parse3MF` stays as small as it was.
+`parse3MFMaterials` from `@margoengine/loaders/threemf-materials` reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup` coordinates, `compositematerials`, `multiproperties` and the display properties (metallic, specular and translucent). The plain `parse3MF` stays as small as it was.
 
 ```ts
 import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
@@ -1029,19 +1029,22 @@ console.log(image.width, uvs?.length);
 - **Groups.** A group's `texture` indexes `textures`; a triangle without one falls in a separate group. Each texture carries its image bytes, `contentType`, `tileStyleU`, `tileStyleV` and `filter`.
 - **Composites.** `compositematerials` mix their base colours by weight into one colour.
 - **Layers.** A group whose triangles use a `multiproperties` carries its whole stack in `layers`, bottom first: each layer's `kind` (`'color'` or `'texture'`), a texture layer's `texture`, its `blend` (`'mix'` or `'multiply'`, from `blendmethods`) and the name of its per-vertex values in `attributes` (`layerColor<k>`: sRGB red, green, blue and linear alpha; `layerUV<k>`: u and v). A pindex a row leaves out is 0. `multiproperties` that break the spec's rules (a second colour group, a material group not first or twice, a nested `multiproperties`) are `syntax` errors. For older readers `texture` still names the first texture layer and `colors` the colour layers mixed together.
-- **Metalness and roughness.** A group's `metallic` holds the display properties of its triangles (their first corner's, as the spec says): `name`, `metalness` and `roughness` from `pbmetallic` on base materials, colour groups and composites, or from `pbmetallictexturedisplayproperties` on a texture group, where the two numbers are factors and `metalnessTexture` and `roughnessTexture` index the maps in `textures` (red channel; roughness in red and metalness in green when both name one resource), with `baseColorFactor` when it is not white. A stack takes the lowest layer that has any, named by `metallic.layer`. Triangles that differ in it fall in separate groups. Specular and translucent display properties are not read.
+- **Metalness and roughness.** A group's `metallic` holds the display properties of its triangles (their first corner's, as the spec says): `name`, `metalness` and `roughness` from `pbmetallic` on base materials, colour groups and composites, or from `pbmetallictexturedisplayproperties` on a texture group, where the two numbers are factors and `metalnessTexture` and `roughnessTexture` index the maps in `textures` (red channel; roughness in red and metalness in green when both name one resource), with `baseColorFactor` when it is not white. A stack takes the lowest layer that has any, named by `metallic.layer`. Triangles that differ in it fall in separate groups.
+- **Specular colour and glossiness.** A group's `specular` holds `specularColor` (sRGB reflectance at normal incidence, default `#383838`) and `glossiness` from `pbspecular`, or from `pbspeculartexturedisplayproperties`, where they are factors over `specularTexture` (sRGB) and `glossinessTexture` (its alpha when it is the same resource, else its red), with `diffuseFactor` when it is not white. The diffuse colour is the group's own colour or texture.
+- **Translucency.** A group's `translucent` holds `attenuation` for red, green and blue per metre (Beer-Lambert), `refractiveIndex` (default 1, 1, 1) and `roughness`. `metresPerUnit` on the result gives the mesh's unit.
+- **One kind per group.** A group has at most one of `metallic`, `specular` and `translucent`; in a stack it is that of the lowest layer that has any, named by its `layer`.
 
 ```ts
 import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
 
 const bytes = await (await fetch('/prints/gears.3mf')).arrayBuffer();
-for (const { name, metallic } of (await parse3MFMaterials(bytes)).groups)
-  console.log(name, metallic?.metalness, metallic?.roughness);
+for (const { name, metallic, specular, translucent } of (await parse3MFMaterials(bytes)).groups)
+  console.log(name, metallic?.metalness, specular?.glossiness, translucent?.attenuation);
 ```
 
 ### Drawing it: `create3MFMesh`
 
-`create3MFMesh` from `@margoengine/loaders/threemf-mesh` draws that result as one `@margoengine/materials` mesh (an optional peer) with a material per group: vertex colours, the texture as the colour map, and a layer stack through `layered()`. Each material takes its group's `metallic` metalness and roughness, maps included (repacked into one glTF-layout map from the texels the optional `@margoengine/decoders` peer reads exactly). The layers blend as the 3MF Materials and Properties Extension 1.2.1 (chapter 5) specifies, in linear light: mix is `new.rgb * new.a + below.rgb * (1 - new.a)`, multiply `new.rgb * below.rgb`, and the bottom layer is opaque.
+`create3MFMesh` from `@margoengine/loaders/threemf-mesh` draws that result as one `@margoengine/materials` mesh (an optional peer) with a material per group: vertex colours, the texture as the colour map, and a layer stack through `layered()`. Each material takes its group's `metallic` metalness and roughness, maps included (repacked into one glTF-layout map from the texels the optional `@margoengine/decoders` peer reads exactly). A `specular` group is drawn with an index of refraction of 0 (`KHR_materials_ior`) and that specular colour, with roughness 1 - glossiness. A `translucent` group is transmissive: its thickness is the object's mean chord, 4 V / S (Cauchy's formula; Santalo, *Integral Geometry and Geometric Probability*, 1976), its attenuation is converted from per metre, and green's refractive index and the red to blue spread give the index and dispersion. Add `@margoengine/materials/transmission` to refract the scene behind it; without it the background shows through tinted. The layers blend as the 3MF Materials and Properties Extension 1.2.1 (chapter 5) specifies, in linear light: mix is `new.rgb * new.a + below.rgb * (1 - new.a)`, multiply `new.rgb * below.rgb`, and the bottom layer is opaque.
 
 ```ts
 import { Engine } from '@margoengine/core';
@@ -1058,13 +1061,13 @@ model.dispose(); // or `using model = ...`
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `normals` | `'smooth'` | `'smooth'` shares a normal where corners meet at one position; `'flat'` gives each triangle its face normal |
-| `roughness`, `metalness` | the file's, else 0.6, 0 | Every material's surface numbers; a number given here replaces the file's value and its map |
+| `roughness`, `metalness` | the file's, else 0.6, 0 | Every material's surface numbers; a number given here replaces the file's value and its map (a `specular` group's roughness is 1 - glossiness) |
 | `doubleSided` | true | Draw both faces |
-| `unlit` | false | Draw the colours without light (`shading: 'basic'`) |
+| `unlit` | false | Draw the colours without light (`shading: 'basic'`), so no specular or translucent look |
 | `renderOrder` | 0 | Draw order of the mesh |
 | `signal` | none | Stops the image decoding (`LoaderError` code `aborted`) |
 
-The colour layers below the first texture layer blend per corner into the vertex colour; every layer from the first texture up is a material layer, a texture mixing by its alpha (the bottom one covers) and a colour layer by its colour's alpha. Limits: a stack's texture layers share UV0 and UV1, so a stack with more than two different coordinate sets, or a colour above a texture layer that changes across the group, is an `unsupported` error; a mix layer does not raise opacity a multiply layer lowered; tile style `none` draws as `clamp`; display properties (`pbmetallicdisplayproperties` and the like) are not read.
+The colour layers below the first texture layer blend per corner into the vertex colour; every layer from the first texture up is a material layer, a texture mixing by its alpha (the bottom one covers) and a colour layer by its colour's alpha. Limits: a stack's texture layers share UV0 and UV1, so a stack with more than two different coordinate sets, or a colour above a texture layer that changes across the group, is an `unsupported` error; a mix layer does not raise opacity a multiply layer lowered; tile style `none` draws as `clamp`; a translucent object's thickness is one number, its mean chord, and is 0 for an open mesh; in a stack under a translucent layer the layers above tint the light that passes.
 
 ## VTK XML
 

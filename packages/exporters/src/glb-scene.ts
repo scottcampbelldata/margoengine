@@ -2,6 +2,7 @@
 // can hold, and the nodes, skins and clips keep the file's own objects, so a skin's joints are the nodes the clips drive.
 import { readAccessor, splitGLB, type AccessorValues, type GLBParts } from './glb.js';
 import type { JSONObject } from './glb-pack.js';
+import type { ExtendedMaterialData, MaterialTextureInfo } from './materials.js';
 import type {
   AnimationChannelData,
   AnimationData,
@@ -80,6 +81,38 @@ export function sceneOfParts(parts: GLBParts): { scene: ExportScene; skipped: GL
         texCoord: info.texCoord ?? 0,
       };
     };
+  /** The material extensions the data scene's writers read, with their textures as `exportMaterialGLB` takes them. */
+  const physical = (m: JSONObject, index: number): Partial<ExtendedMaterialData> => {
+    const {
+        KHR_materials_transmission: transmission,
+        KHR_materials_ior: ior,
+        KHR_materials_specular: specular,
+        KHR_materials_volume: volume,
+        KHR_materials_dispersion: dispersion,
+      } = m.extensions ?? {},
+      out: Record<string, Record<string, unknown>> = {};
+    if (specular) {
+      const { specularTexture, specularColorTexture, ...factors } = specular;
+      out.KHR_materials_specular = factors;
+      for (const [field, info] of Object.entries({ specularTexture, specularColorTexture })) {
+        const read = texture(info as JSONObject | undefined, index);
+        if (!read) continue;
+        const { index: _, ...rest } = info as JSONObject;
+        out.KHR_materials_specular[field] = { ...rest, texture: read } satisfies MaterialTextureInfo;
+      }
+    }
+    // A thickness texture indexes the file's textures, which the data scene does not keep.
+    if (volume) {
+      const { thicknessTexture: _, ...factors } = volume;
+      out.KHR_materials_volume = factors;
+    }
+    if (dispersion) out.KHR_materials_dispersion = dispersion;
+    return {
+      ...(transmission ? { transmission: transmission.transmissionFactor ?? 0 } : {}),
+      ...(ior ? { ior: ior.ior ?? 1.5 } : {}),
+      ...(Object.keys(out).length ? { extensions: out } : {}),
+    };
+  };
   const materials = new Map<number, MaterialData>(),
     fallback: MaterialData = { color: [1, 1, 1, 1], roughness: 1, metalness: 1 },
     materialOf = (index: number | undefined): MaterialData => {
@@ -99,6 +132,7 @@ export function sceneOfParts(parts: GLBParts): { scene: ExportScene; skipped: GL
         ...(m.alphaMode === 'MASK' ? { alphaCutoff: m.alphaCutoff ?? 0.5 } : {}),
         normalScale: m.normalTexture?.scale ?? 1,
         occlusionStrength: m.occlusionTexture?.strength ?? 1,
+        ...physical(m, index),
       };
       const slots = [
         ['baseColorTexture', pbr.baseColorTexture],
