@@ -37,7 +37,7 @@ pub fn ceil_div(a: u64, b: u64) -> u64 {
 }
 
 /// ceil(a / 2^s) for a signed numerator, as B.5 needs when a band offset passes the origin.
-fn ceil_shift(a: i64, s: u32) -> i64 {
+pub fn ceil_shift(a: i64, s: u32) -> i64 {
     if s == 0 {
         return a;
     }
