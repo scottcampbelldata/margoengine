@@ -945,6 +945,23 @@ console.log(sun.elevation.degrees, sun.equationOfTime);
   `@margoengine/tonemap`, read every frame: `Tonemap.attach(engine, {exposure: 1})`, then
   `tonemap.options.exposure = 0.5`. The sky's own `exposure` option brightens only the sky backdrop.
 
+## Exact first frames on the WebGL2 layer
+
+`sky.ready` is a promise that settles once every frame lights the scene with the sky's ambient as it will from then on.
+With the `lighting` feature on the WebGL2 compatibility layer the sky fetches its ambient projection's route
+(`import()`) when it attaches; until it arrives the WebGPU projection runs on the layer's CPU tier, which sums the
+ambient in its own order. On WebGPU, and without the `lighting` feature, it is already settled. Await it before a frame
+that must be exact, such as a film frame or a pixel comparison:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const sky = Sky.attach(engine, {lighting: {}, environment: true});
+await sky.ready;
+engine.render();
+```
+
 ## Stylized night
 
 Set `night` to replace the default night gradient with a moonlit sky: a zenith-to-horizon gradient, twinkling

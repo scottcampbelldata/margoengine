@@ -19,6 +19,7 @@ engine.stop();
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 device.lost.then(i=>errors.push('lost: '+i.message));
 const sky=Sky.attach(engine,{...sunlitSky({elevation:degrees(50),azimuth:degrees(160)}),model:'bruneton'});
+await sky.ready; // KB-COMPAT-READY1: on the layer the ambient projection's route arrives by import()
 // A one-metre box of grey 0.5 (linear), metallic 0, roughness 1, as a glTF binary.
 function glb(){
  const P=[],N=[],I=[];

@@ -498,6 +498,8 @@ export interface SkyFeatures {
       bindings(): GPUBindGroupEntry[];
       /** Terrain's lit shader with the sky's ambient in place of its flat term (bindings in `group`); unchanged before the first ambient frame. */
       terrain(source: string, group: number): string;
+      /** Settles once the ambient projection takes its route (the WebGL2 layer's, loaded by import()); never rejects. */
+      readonly ready: Promise<void>;
     };
   };
 }
@@ -819,6 +821,23 @@ export class Sky implements EnginePlugin {
       out[c] = Math.max(sum * rows[39], rows[36 + c]);
     }
     return out;
+  }
+  /**
+   * Settles once every frame lights the scene with the sky's ambient as it will from then on. With the `lighting`
+   * feature on the WebGL2 compatibility layer the sky loads its ambient projection's route (a dynamic import) when it
+   * attaches; until it has loaded the WebGPU projection runs on the layer's CPU tier, which sums the ambient in its own
+   * order. Resolved at once on WebGPU and without the `lighting` feature. Read it after attaching, and await it before a
+   * frame that must be exact: a film frame, a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const sky = Sky.attach(engine, { lighting: {} }, { lighting }); // lighting from '@margoengine/sky/lighting'
+   * await sky.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.lit?.ready ?? Promise.resolve();
   }
   /** Native PBR hook for optional surface renderers; undefined until this sky's ambient resources are ready. */
   pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined {

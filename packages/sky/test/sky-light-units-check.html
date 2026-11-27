@@ -19,6 +19,7 @@ const options=sunlitSky({elevation:degrees(elevation),azimuth:degrees(160),inten
 if(light==='both')options.lighting.ambient={day:[0,0,0],night:[0,0,0]};
 else engine.lighting.ambient.set([0,0,0]);
 const sky=Sky.attach(engine,{...options,model});
+await sky.ready; // KB-COMPAT-READY1: on the layer the ambient projection's route arrives by import()
 engine.createMesh().setGeometry(box(8,0.1,8)).setMaterial(new PbrMaterial({color:[albedo,albedo,albedo],roughness:1,metallic:0}));
 async function frame(){
  const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});

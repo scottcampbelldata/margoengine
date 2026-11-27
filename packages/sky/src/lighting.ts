@@ -1,6 +1,6 @@
 import { finiteVector } from '@margoengine/math/validate';
 import { compute, group } from '../../shared/gpu.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import type { SkyFeatures } from './base.js';
 import { MargoError } from '@margoengine/math/errors';
 import { environment, environmentLayer } from './environment.js';
@@ -131,7 +131,18 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       descriptor: GPUComputePassDescriptor = {},
       sizes = [8, 4, 4, 4, 2, 2, 1, 1, 1, 1];
     let source = '',
-      shader = '';
+      shader = '',
+      // On the WebGL2 layer the projection moves off the CPU tier once its route has loaded. The route starts loading
+      // here, not on the first ambient frame, so `Sky.ready` can tell a caller when the ambient stops changing.
+      projectRoute: string | undefined,
+      applyRoute: (() => void) | undefined;
+    const loading = loadCompatRoute(d, () => import('./compat.js'));
+    loading?.then((loaded) => {
+      projectRoute = loaded.projectRoute;
+      applyRoute?.();
+    });
+    // After the handler above: by then a built projection runs on the route, and a later build takes it at once.
+    const ready = routeSettled(loading);
     // Built on the first ambient frame, so a sky that only drives the light allocates nothing for it.
     const build = () => {
       const buffer = d.createBuffer({
@@ -161,12 +172,12 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
           group(d, down, [level(2), level(3)]),
           group(d, reduce, [level(1), { buffer }]),
         ];
-      // On the WebGL2 layer the projection moves off the CPU tier once its route has loaded.
-      loadCompatRoute(d, () => import('./compat.js'))?.then(({ projectRoute }) => {
-        const route = compute(d, projectRoute);
+      applyRoute = () => {
+        const route = compute(d, projectRoute!);
         pipelines[4] = route;
         groups[4] = group(d, route, [level(1), { buffer }]);
-      });
+      };
+      if (projectRoute) applyRoute();
       return {
         buffer,
         top,
@@ -193,6 +204,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
     const hooks = new Map<number, { readonly declarations: string; readonly ambient: string }>(),
       terrains = new Map<string, string>();
     return {
+      ready,
       pbr(group) {
         if (!gpu) return undefined;
         let value = hooks.get(group);

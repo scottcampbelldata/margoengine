@@ -73,6 +73,7 @@ class Sky implements EnginePlugin {
     irradiance(normal?: readonly [number, number, number], { signal }?: {
         signal?: AbortSignal;
     }): Promise<[number, number, number] | undefined>;
+    get ready(): Promise<void>;
     pbr(group: number): {
         readonly declarations: string;
         readonly ambient: string;
@@ -168,6 +169,7 @@ interface SkyFeatures {
             } | undefined;
             bindings(): GPUBindGroupEntry[];
             terrain(source: string, group: number): string;
+            readonly ready: Promise<void>;
         };
     };
 }
