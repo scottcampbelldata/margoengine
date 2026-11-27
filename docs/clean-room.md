@@ -17806,3 +17806,25 @@ written from:
 Compared with plain linear blend skinning (N. Magnenat-Thalmann, R. Laperriere and D. Thalmann, *Joint-dependent
 local deformations for hand animation and object grasping*, Graphics Interface 1988), whose collapse at a twisted joint
 the tests measure. No other engine's source was read.
+
+### SEA-12 finite quay wake
+
+Craig and Sulem, *Numerical Simulation of Gravity Waves* (1993), express the gravity-wave variables as
+surface elevation and a trace of the fluid potential. At the mean free surface their linear equations
+are `height_t = G potential` and `potential_t = -g height`. The finite solver uses the symmetric normal
+flux operator `G` on a fixed wet volume. Johansen and Colella, *A Cartesian Grid Embedded Boundary Method
+for Poisson's Equation on Irregular Domains* (1998), motivate a shared flux over each open face. This
+implementation uses a two-point cell-centred conductance. The exact rectangular depth recurrence and
+thin-aperture series flux are independent discrete tests. The spread at wet faces retains only connected
+weights from the subcell stencil.
+
+Using the implicit midpoint update turns the top distance into `halfLayer + g dt² / 4`. The symmetric
+volume matrix uses equal and opposite face fluxes. The volume kick changes surface potential energy by
+`rho g A delta (height + delta/2)`. The held surface pressure does work `-p A deltaHeight`. Perimeter
+damping removes elevation energy and records that change separately. The bulk and normal velocity at the
+endpoint follow from twice the harmonic midpoint extension minus the old one. Porter and Evans,
+*Complementary Approximations to Wave Scattering by Vertical Barriers* (1995), Table 1, is the continuum
+reference for the half-depth plate. No companion code or measured elevation entered these equations.
+[Craig and Sulem](https://doi.org/10.1006/jcph.1993.1164) ·
+[Johansen and Colella](https://crd.lbl.gov/assets/pubs_presos/AMCS/ANAG/A135.pdf) ·
+[Porter and Evans](https://doi.org/10.1017/S0022112095002849)

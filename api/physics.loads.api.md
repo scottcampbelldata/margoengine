@@ -17,6 +17,49 @@ export interface EquivalentEllipsoid {
     volume: number;
 }
 
+export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
+    readonly id: string;
+    readonly heightField: FieldDescriptor;
+    constructor(id?: string, sources?: {
+        readonly surface?: FieldDescriptor;
+        readonly submerged?: SubmergedWakeSource;
+    });
+    describe(): SolverDescription;
+    init(host: SolverHost, params: FiniteQuayWakeParams): void;
+    step(context: StepContext, dt: number): void;
+    get grid(): {
+        readonly cells: readonly [number, number];
+        readonly cellSize: number;
+        readonly origin: readonly [number, number];
+    };
+    heights(): Float64Array;
+    wet(x: number, z: number): boolean;
+    work(): {
+        joules: number;
+        displacedVolume: number;
+        iterations: number;
+        absorbedJoules: number;
+        absorbedVolume: number;
+    };
+    energy(): number;
+    sample(x: number, z: number, out?: WakeSample): WakeSample;
+    velocityAt(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
+    exportPorts(tick: number): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface FiniteQuayWakeParams extends QuayPotentialGrid {
+    readonly origin?: readonly [number, number];
+    readonly density?: number;
+    readonly initial?: (x: number, z: number) => readonly [number, number];
+    readonly sponge?: {
+        readonly cells: number;
+        readonly rate: number;
+    };
+}
+
 export interface FloodBlockageBody {
     readonly centre: Vec3;
     readonly velocity: Vec3;
@@ -357,6 +400,25 @@ export interface QuayPoint {
     height: number;
     wash: number;
     over: boolean;
+}
+
+export class QuayPotential {
+    readonly surfaceCells: number;
+    readonly volumeCells: number;
+    constructor(grid: QuayPotentialGrid);
+    project(surface: Float64Array, out: Float64Array, source?: Float64Array, surfaceLength?: number, bulk?: Float64Array): number;
+    wetCell(index: number): boolean;
+    reaches(x: number, z: number, toX: number, toZ: number, offset: number): boolean;
+    faceFlux(axis: 'x' | 'z' | 'down', index: number, bulk?: Float64Array<ArrayBufferLike>): number;
+}
+
+export interface QuayPotentialGrid {
+    readonly cells: readonly [number, number];
+    readonly cellSize: number;
+    readonly depths: readonly number[];
+    readonly wet?: ArrayLike<number>;
+    readonly openX?: ArrayLike<number>;
+    readonly openZ?: ArrayLike<number>;
 }
 
 export class QuayWakeBoundary implements Solver<undefined> {

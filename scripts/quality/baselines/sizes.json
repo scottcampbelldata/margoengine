@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20873705,
+  "total": 20878494,
   "history": [
     {
       "date": "2026-10-24",
@@ -14502,6 +14502,11 @@
       "commit": "9eabd11265",
       "reason": "@margoengine/physics/soft: cloth tethers and skinned cloth (setTethers, setSkinConstraints, setSkinnedPositions, skinVertices; long range attachments and motion constraints in the soft kernel): entry 156,167 to 161,433 B gzip budget (measured 156,731 + 3%), base 48,852 to 51,881 (measured 50,369 + 3%): the tether paths (Dijkstra) and the skin rows are written from TypeScript beside the cloth they tie; the kernel blueprint stays within its budget. A split entry would load the same soft kernel for any skinned or tethered cloth.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "ea9ddf315a",
+      "reason": "SEA-12 finite-quay potential, closed-face flux and work receiver take the optional physics/loads entry from 52117 to 56771 B gzip and its ceiling from 53686 to 58475 B. The finite receiver already consumes the hull loads source port and shares the loads entry with the smaller straight-wall path. A split would require a second public package import for finite quay users. Core and Stage are unchanged."
     }
   ],
   "items": {
@@ -15359,7 +15364,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 53686,
+    "@margoengine/physics/loads": 58475,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,

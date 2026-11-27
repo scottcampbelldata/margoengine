@@ -1,0 +1,239 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { FiniteQuayWake, QuayPotential } from '../../dist/loads.js';
+import { SUBMERGED_WAKE_LAYOUT, WAKE_SOURCE_LAYOUT } from '../../dist/sea.js';
+import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
+
+const close = (actual, expected, tolerance = 1e-10) =>
+  assert.ok(Math.abs(actual - expected) < tolerance, `${actual} differs from ${expected}`);
+
+test('the layered free surface reproduces a finite-depth mode and converges toward continuous dispersion', () => {
+  const length = 3.2,
+    depth = 1.2,
+    waveNumber = (2 * Math.PI) / length,
+    exact = waveNumber * Math.tanh(waveNumber * depth);
+  const errors = [];
+  for (const nx of [16, 32, 64]) {
+    const cellSize = length / nx;
+    const layers = (3 * nx) / 8;
+    const layerThickness = depth / layers;
+    const grid = new QuayPotential({
+      cells: [nx, 1],
+      cellSize,
+      depths: Array.from({ length: layers + 1 }, (_, i) => i * layerThickness),
+    });
+    const trace = Float64Array.from({ length: nx }, (_, i) => Math.cos(waveNumber * (i + 0.5) * cellSize));
+    const rate = new Float64Array(nx);
+    grid.project(trace, rate);
+    // The cell-centred Neumann cosine mode has horizontal eigenvalue 4 sin²(k dx/2)/dx².
+    // The three-term recurrence in depth with the reflected bed then gives an exact discrete normal derivative.
+    const horizontal = (2 * Math.sin((waveNumber * cellSize) / 2)) / cellSize;
+    const discreteK = Math.acosh(1 + 0.5 * (layerThickness * horizontal) ** 2) / layerThickness;
+    const discrete = (2 / layerThickness) * Math.tanh(discreteK * depth) * Math.tanh((discreteK * layerThickness) / 2);
+    for (let i = 0; i < nx; i++) close(rate[i], discrete * trace[i]);
+    close(
+      rate.reduce((sum, value) => sum + value, 0),
+      0,
+    );
+    errors.push(Math.abs(discrete - exact));
+  }
+  assert.ok(errors[1] < 0.26 * errors[0] && errors[2] < 0.26 * errors[1]);
+});
+
+test('only the open lower face transmits the potential under an impermeable apron', () => {
+  const grid = new QuayPotential({ cells: [2, 1], cellSize: 1, depths: [0, 0.5, 1], openX: [0, 0, 1, 0] });
+  const out = new Float64Array(2);
+  grid.project(Float64Array.of(1, 0), out);
+  // Five conductances in series: top half-cell, down, across the aperture, up, top half-cell.
+  const exact = 1 / (0.25 + 0.5 + 2 + 0.5 + 0.25);
+  close(out[0], exact);
+  close(out[1], -exact);
+  assert.equal(grid.faceFlux('x', 0), 0);
+  assert.equal(grid.reaches(0.9, 0.5, 1, 0, 0), false);
+  assert.equal(grid.reaches(0.9, 0.5, 1, 0, 2), true);
+  close(grid.faceFlux('x', 2), -exact);
+  const projected = new Float64Array(2);
+  grid.project(Float64Array.of(0, 0), projected, Float64Array.of(0, 0, 0.03, 0));
+  close(projected[0] + projected[1], 0.03);
+  assert.ok(projected[0] > projected[1] && projected[1] > 0);
+});
+
+test('a finite sealed face diverts flux around both tips and the surface operator stays reciprocal', () => {
+  const cells = [4, 3];
+  const layer = cells[0] * cells[1];
+  const openX = new Float64Array(layer * 2).fill(1);
+  const face = 1 + cells[0];
+  openX[face] = openX[face + layer] = 0;
+  const grid = new QuayPotential({ cells, cellSize: 1, depths: [0, 0.5, 2], openX });
+  const left = Float64Array.from({ length: layer }, (_, i) => (i % cells[0] < 2 ? 1 : 0));
+  const opposite = Float64Array.from({ length: layer }, (_, i) => Math.sin(0.6 * i));
+  const leftRate = new Float64Array(layer),
+    oppositeRate = new Float64Array(layer);
+  grid.project(left, leftRate);
+  assert.equal(grid.faceFlux('x', face), 0);
+  assert.equal(grid.faceFlux('x', face + layer), 0);
+  assert.ok(grid.faceFlux('x', 1) < -0.2 && grid.faceFlux('x', 1 + 2 * cells[0]) < -0.2);
+  close(grid.faceFlux('x', 1), grid.faceFlux('x', 1 + 2 * cells[0]));
+  grid.project(opposite, oppositeRate);
+  const dot = (a, b) => a.reduce((sum, value, i) => sum + value * b[i], 0);
+  close(dot(left, oppositeRate), dot(opposite, leftRate));
+  assert.ok(dot(left, leftRate) > 0 && dot(opposite, oppositeRate) > 0);
+});
+
+test('a trapped wet pocket and a source inside solid material receive actionable errors', () => {
+  const cells = [2, 1];
+  const depths = [0, 0.5, 1];
+  assert.throws(() => new QuayPotential({ cells, cellSize: 1, depths, wet: [1, 0, 0, 1] }), {
+    message: /Connect every wet pocket to the free surface or exclude it/,
+  });
+  const grid = new QuayPotential({ cells, cellSize: 1, depths, wet: [1, 0, 1, 0] });
+  const out = Float64Array.of(4, 2);
+  assert.throws(() => grid.project(Float64Array.of(0, 0), out, Float64Array.of(0, 0, 0, 1)), {
+    message: /put each finite volume source inside a wet cell/,
+  });
+  assert.deepEqual(out, Float64Array.of(4, 2));
+});
+
+test('a live finite quay advances the discrete dispersion mode with conserved energy and exact replay', () => {
+  const cells = [20, 5],
+    cellSize = 0.2,
+    depth = 1.2,
+    layers = 6,
+    gravity = 9.81;
+  const waveNumber = Math.PI / (cells[0] * cellSize);
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -gravity, 0], memory: worldMemory(false) });
+  const wake = new FiniteQuayWake();
+  world.add(wake, {
+    cells,
+    cellSize,
+    depths: Array.from({ length: layers + 1 }, (_, i) => (i * depth) / layers),
+    initial: (x) => [0.04 * Math.cos(waveNumber * x), 0],
+  });
+  const start = world.takeSnapshot(),
+    energy = wake.energy();
+  world.advance(75);
+  const horizontal = (2 * Math.sin((waveNumber * cellSize) / 2)) / cellSize,
+    dy = depth / layers;
+  const vertical = Math.acosh(1 + 0.5 * (dy * horizontal) ** 2) / dy;
+  const normal = (2 / dy) * Math.tanh(vertical * depth) * Math.tanh((vertical * dy) / 2);
+  const angle = 2 * Math.atan(Math.sqrt(gravity * normal) / 120);
+  for (let i = 0; i < cells[0]; i++) {
+    const x = (i + 0.5) * cellSize;
+    close(wake.heights()[i], 0.04 * Math.cos(waveNumber * x) * Math.cos(75 * angle));
+  }
+  close(wake.energy(), energy, 1e-9);
+  const hash = world.hash();
+  world.restoreSnapshot(start.bytes);
+  world.advance(75);
+  assert.equal(world.hash(), hash);
+});
+
+test('wet-side height reconstruction keeps both sides of a thin wall independent', () => {
+  const cells = [6, 4];
+  const plane = cells[0] * cells[1];
+  const openX = new Float64Array(plane * 2).fill(1);
+  for (let j = 0; j < cells[1]; j++) openX[2 + j * cells[0]] = 0;
+  const world = new PhysicsWorld();
+  const wake = new FiniteQuayWake();
+  world.add(wake, {
+    cells,
+    cellSize: 1,
+    depths: [0, 0.5, 1],
+    openX,
+    initial: (x) => [x < 3 ? 0.4 : -0.2, 0],
+  });
+  const left = wake.sample(2.975, 1.5),
+    right = wake.sample(3.025, 1.5);
+  close(left.height, 0.4);
+  close(right.height, -0.2);
+  close(left.slope[0], 0);
+  close(right.slope[0], 0);
+});
+
+test('a finite quay sponge accounts for the energy and signed volume it absorbs', () => {
+  const world = new PhysicsWorld();
+  const wake = new FiniteQuayWake();
+  const cellSize = 0.2;
+  world.add(wake, {
+    cells: [12, 8],
+    cellSize,
+    depths: [0, 0.1, 0.25, 0.8],
+    sponge: { cells: 2, rate: 3 },
+    initial: (x, z) => [0.04 * Math.exp(-10 * ((x - 0.15) ** 2 + (z - 0.3) ** 2)), 0],
+  });
+  const volume = () => wake.heights().reduce((sum, height) => sum + height, 0) * cellSize ** 2;
+  const initialEnergy = wake.energy(),
+    initialVolume = volume();
+  world.advance(81);
+  const { absorbedJoules, absorbedVolume, joules } = wake.work();
+  assert.ok(absorbedJoules > 0.05 && absorbedVolume > 0.0001);
+  close(joules, 0);
+  close(wake.energy() + absorbedJoules, initialEnergy, 1e-9);
+  close(volume() + absorbedVolume, initialVolume);
+});
+
+test('finite geometry accepts both hull source layouts and accounts for pressure work and conserved volume', () => {
+  const field = (name, quantity) => ({ name, quantity, kind: 'surfaceSampleSet', centring: 'particle', unit: 'SI' });
+  const surface = field('hull.surface', 'seaSource'),
+    submerged = field('hull.submerged', 'submergedSeaSource');
+  const cells = [12, 8],
+    plane = cells[0] * cells[1],
+    cellSize = 0.25;
+  const openX = new Float64Array(plane * 3).fill(1);
+  const obstacle = 7 + 3 * cells[0];
+  openX[obstacle] = openX[obstacle + plane] = 0;
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(false) });
+  const wake = new FiniteQuayWake('finiteQuayWake', {
+    surface,
+    submerged: { field: submerged, depths: [0, 0.26, 0.8] },
+  });
+  let host, surfaceRegion, submergedRegion;
+  const driver = {
+    describe: () => ({
+      id: 'hull',
+      rate: 0,
+      stableRate: () => 0,
+      fields: [
+        { field: surface, access: 'write' },
+        { field: submerged, access: 'write' },
+      ],
+    }),
+    init(allocated) {
+      host = allocated;
+      surfaceRegion = host.allocate('surface', 5 * 8, 'f64', WAKE_SOURCE_LAYOUT);
+      submergedRegion = host.allocate('submerged', 2 * 5 * 8, 'f64', SUBMERGED_WAKE_LAYOUT);
+    },
+    step({ tick }) {
+      const a = regionWords(host.memory, surfaceRegion),
+        b = regionWords(host.memory, submergedRegion);
+      a.fill(0);
+      b.fill(0);
+      if (tick < 20) {
+        a.set([0.875, 0.875, 0.27, 300, 0.001]);
+        b.set([1.125, 0.875, 0.3, 0, 0.0013, 0.625, 0.875, 0.27, 1, -0.0013]);
+      }
+    },
+    exportPorts: (tick) => [
+      { field: surface.name, region: surfaceRegion, tick, cell: host.cell },
+      { field: submerged.name, region: submergedRegion, tick, cell: host.cell },
+    ],
+    importPorts() {},
+    stateRegions: () => [surfaceRegion, submergedRegion],
+    extraState: () => [],
+  };
+  world.add(driver, undefined).add(wake, { cells, cellSize, depths: [0, 0.15, 0.45, 1.2], openX });
+  const zero = world.takeSnapshot();
+  world.advance(46);
+  const receipt = wake.work(),
+    hash = world.hash(),
+    velocity = wake.velocityAt(1.625, -0.2, 0.875);
+  assert.ok(Math.abs(velocity[0]) > 1e-5 && Math.abs(receipt.joules) > 0.1);
+  close(receipt.displacedVolume, 0.02, 2e-11);
+  close(wake.heights().reduce((sum, h) => sum + h, 0) * cellSize ** 2, 0.02, 2e-11);
+  close(wake.energy(), receipt.joules, 1e-8);
+  world.restoreSnapshot(zero.bytes);
+  world.advance(46);
+  assert.equal(world.hash(), hash);
+  assert.deepEqual(wake.velocityAt(1.625, -0.2, 0.875), velocity);
+  assert.deepEqual(wake.work(), receipt);
+});

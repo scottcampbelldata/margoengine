@@ -6665,3 +6665,11 @@ A closed, flared displacement mesh was supplied directly from code and round-tri
 The advancing, initially heeled hull rises, rights itself and drives the live wake. With matching geometry and
 mass properties, both versions give bit-identical rigid motion, wake samples and frame-zero replay.
 [Coupling test](../../packages/physics/tests/coupling/seakeeping.test.js)
+
+### SEA-12 finite quay potential and work
+
+The layered finite-volume wake excludes solid cells and uses a shared flux on each open face. An exact
+discrete depth mode converges at second order on the flat tank. A partially closed face transmits flow
+through its deep aperture, and a finite face leaves both horizontal tip paths open. The live world test
+accounts for prescribed pressure and displaced volume, accounts for perimeter absorption separately,
+and replays from its initial snapshot. [Coupling test](../../packages/physics/tests/coupling/loads-finite-quay.test.js)

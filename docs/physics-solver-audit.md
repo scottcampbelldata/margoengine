@@ -1377,8 +1377,25 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   1.424 and 1.435 m at those anchors, and the Kelvin cusp wavelength is about 0.95 m. At 0.15 m spacing the
   full finite return needs at least 1.728 million projected cells before adding a sponge. The public
   source grid cap is 1.049 million and the straight image cannot preserve the return's water topology.
-  The missing SEA-04 boundary receiver must accept the same-tick hull sources and publish height, velocity
+  The boundary receiver for this shot must accept the same-tick hull sources and publish height, velocity
   at depth and its own discrete work receipt. The renderer, hull and spray need that same accepted state.
+
+  The loads-local `FiniteQuayWake` now accepts both hull source layouts and carries the wave around fixed
+  faces with open tips and depth-dependent wet cells. The finite-volume tests in `coupling/loads-finite-quay.test.js`
+  verify zero flux through a blocked face, transmission through its open lower layer, reciprocal surface work,
+  one-sided wet sampling, accounted sponge loss and exact replay. The midpoint advance uses the same accepted
+  3D potential for the surface and depth velocities. In the independent Porter–Evans half-depth barrier case,
+  the live packet transmits 69.06% at 0.50 m spacing and 78.22% at 0.25 m. The continuum energy fraction
+  integrated over that incident spectrum is 86.08%. The coarse-to-fine complex carrier coefficient error
+  falls from 0.229 to 0.109. The vertical column preconditioner lowers the fine barrier solve's maximum
+  iteration count from 276 to 67 with the same scattering coefficients within 2×10⁻¹¹. The real First Wake
+  prefix on a 300 × 160 grid with nine layers starts emitting at vessel tick 100. At tick 110 its water
+  carries 2.482 J, with 4.23×10⁻⁸ J absorbed and work residual below 2.8×10⁻¹⁴ J. The 1.2 m grid does not
+  resolve the shot's wakes, and the active step still uses 1,200 combined iterations. A 0.075 m single-level
+  full-frontage case needs about 84.1 million wet-volume slots and 8.13 GiB in this implementation before
+  input masks and checkpoints. These checks isolate the finite-domain model, spatial error and scale cost.
+  Measured finite-edge validation, a scaled receiver for the original footage and the full render remain open.
+  [Porter and Evans, 1995](https://doi.org/10.1017/S0022112095002849)
 
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original

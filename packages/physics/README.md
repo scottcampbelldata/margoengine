@@ -5217,6 +5217,38 @@ and the live heave and angular samples come from the posed hull's waterplane. Th
 the hull has a single convex waterplane. It approximates the swept geometry over each step around the reference
 draft and omits a yaw source. The wave exchange uses transpose work pairing as in [Peskin (2002), §5](https://math.nyu.edu/~peskin/papers/acta_numerica.pdf).
 
+#### Propagate a wake around a finite quay
+
+`FiniteQuayWake` uses a layered water volume with fixed solids. Each horizontal face can be partly or fully
+open. Close the faces alongside a quay, leave the ends open, and use open layers below a suspended apron.
+Arrays are ordered by X, then Z, then depth. In a staggered group add a `HullSolver` before the finite wake
+and give the receiver its `wakeSourceField` and `submergedWakeSource` as `surface` and `submerged`. Leave
+the periodic wake out of this connection. The receiver publishes height and provides wet-side surface and
+depth-velocity queries from its accepted potential. `work()` reports source work, displaced volume and
+any energy or signed volume taken by the optional perimeter sponge.
+
+```ts
+import {FiniteQuayWake} from 'margoengine/physics/loads';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const cells = [16, 8] as const;
+const plane = cells[0] * cells[1];
+const openX = new Float64Array(2 * plane).fill(1);
+for (let z = 2; z < 6; z++) openX[7 + z * cells[0]] = 0;
+const wake = new FiniteQuayWake();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}});
+world.add(wake, {
+  cells, cellSize: 0.25, depths: [0, 0.25, 0.8], openX,
+  initial: (x, z) => [0.04 * Math.exp(-((x - 1) ** 2 + (z - 1) ** 2) / 0.3), 0],
+});
+world.advance(120);
+console.log(wake.sample(2.25, 1).height, wake.velocityAt(1.875, -0.5, 1));
+```
+
+The model is linear, with a conservative pressure and volume work ledger. It resolves waves under a fixed
+apron where the geometry and layered grid leave a wet opening. Use a domain and grid refinement check for
+wave scattering. See the [finite quay limits](../../docs/limits.md#finite-quay-wake-and-under-apron-flow-sea-12).
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.
