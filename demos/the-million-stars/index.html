@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore one million real 2MASS point sources and brush their near-infrared colors to see where they sit on the sky.">
+  <meta name="theme-color" content="#0a101a">
+  <title>The Million Stars | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-IacUMMC9.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C-I2ecEE.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span>/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Million Stars</h1>
+      <p>Explore the Milky Way in near-infrared. Brush the histogram to see where different infrared colors appear.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive 2MASS sky survey">
+      <figure>
+        <canvas id="sky" tabindex="0" aria-label="Milky Way point cloud. Drag or use arrow keys to steer around the sky."></canvas>
+        <p id="loading" role="status">Opening the 2MASS sky survey…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="coordinate" aria-hidden="true">
+          <span>Galactic longitude / latitude</span>
+          <output id="coordinates">000.0° / +0.0°</output>
+        </div>
+        <figcaption><span>Drag to steer</span><span>Directions on a sky sphere</span></figcaption>
+      </figure>
+      <aside aria-label="Survey controls and readings">
+        <fieldset id="controls" disabled>
+          <legend class="sr-only">Select infrared color and steer the view</legend>
+          <section class="histogram-panel" aria-labelledby="histogram-title">
+            <div class="panel-head"><h2 id="histogram-title">Infrared color</h2><button id="clear" type="button">Clear brush</button></div>
+            <p id="brush-help">Drag over the bars to highlight a J − K<sub>s</sub> range.</p>
+            <div id="histogram" role="group" aria-label="Histogram of infrared color" aria-describedby="brush-help"></div>
+            <div class="axis" aria-hidden="true"><span>−0.4</span><span>0.5</span><span>1.4</span><span>2.3 mag</span></div>
+            <div class="selection-read"><span>Brush range</span><output id="range">All colors</output></div>
+          </section>
+          <div class="navigation">
+            <div class="zoom-label"><label for="field">Field of view</label><output id="field-value" for="field">82°</output></div>
+            <input id="field" type="range" min="32" max="103" step="1" value="82">
+            <div class="presets"><button id="center" type="button">Galactic center</button><button id="anticenter" type="button">Anticenter</button></div>
+          </div>
+        </fieldset>
+        <dl>
+          <div><dt>Sources loaded</dt><dd><output id="count">0</output></dd></div>
+          <div><dt>In brush</dt><dd><output id="selected">—</output></dd></div>
+        </dl>
+        <progress id="progress" max="1000000" value="0" aria-label="2MASS catalogue download"></progress>
+        <p id="stream-status" role="status">2MASS Point Source Catalog</p>
+        <button id="retry" type="button" hidden>Resume catalogue download</button>
+      </aside>
+    </section>
+    <footer>
+      <span>False color from J − K<sub>s</sub> · Equal radius means direction only</span>
+      <a href="https://irsa.ipac.caltech.edu/data/2MASS/docs/releases/allsky/">2MASS at NASA/IPAC</a>
+      <a href="./source/README.md">Data and method</a>
+    </footer>
+  </main>
+</body>
+</html>

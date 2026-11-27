@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f1e9d9">
+  <meta name="description" content="Run a gravity-fed marble sorter and steer the rolling glass into either tray.">
+  <title>The Marble Sorter · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-VYiKtjVm.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-B1HMrWRV.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Marble Sorter</h1>
+      <p>Send a glass marble down the brass rails. Move the junction before it reaches the fork to choose its tray.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive marble sorter">
+      <canvas id="scene" aria-label="A brass gravity rail with a mechanical switch and two marble trays"></canvas>
+      <p id="loading" role="status">Preparing the sorter…</p>
+      <button type="button" id="view" aria-pressed="false" disabled>Junction view</button>
+    </section>
+    <section class="controls" aria-label="Sorter controls">
+      <div class="actions">
+        <button id="release" type="button" disabled>Release marble</button>
+        <button id="reset" type="button" disabled>Reset</button>
+      </div>
+      <div class="directions" role="group" aria-label="Switch direction">
+        <button type="button" id="left" data-side="left" aria-pressed="true" disabled>
+          <span class="token" aria-hidden="true"></span><span>Left tray</span><output id="left-count" aria-label="Marbles in the left tray">0</output>
+        </button>
+        <button type="button" id="right" data-side="right" aria-pressed="false" disabled>
+          <span class="token" aria-hidden="true"></span><span>Right tray</span><output id="right-count" aria-label="Marbles in the right tray">0</output>
+        </button>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><p id="status" role="status">Junction set to the left tray.</p></footer>
+  </main>
+</body>
+</html>

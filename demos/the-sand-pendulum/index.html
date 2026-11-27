@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171f21">
+  <meta name="description" content="Release a brass sand pendulum and draw a pattern from two swinging motions.">
+  <title>The Sand Pendulum · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-nfUOqGG6.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BLKpk3vr.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Sand Pendulum</h1>
+      <p>Release the pendulum and let it draw in falling sand. Change the ratio to give one swing a different rhythm.</p>
+    </header>
+    <section class="instrument" aria-label="Sand pendulum drawing">
+      <figure>
+        <canvas id="scene" aria-label="A brass sand pendulum over a slate drawing tray on a walnut instrument stand"></canvas>
+        <p id="loading" role="status">Preparing the pendulum…</p>
+        <button type="button" id="view" aria-pressed="false" disabled>Tray view</button>
+      </figure>
+      <aside aria-label="Pendulum controls">
+        <div class="choices">
+          <h2>Swing frequency ratio</h2>
+          <div role="group" aria-label="Swing frequency ratio">
+            <button type="button" data-pattern="0" aria-pressed="false" disabled>5 : 4</button>
+            <button type="button" data-pattern="1" aria-pressed="true" disabled>3 : 2</button>
+            <button type="button" data-pattern="2" aria-pressed="false" disabled>2 : 1</button>
+          </div>
+        </div>
+        <button id="release" type="button" disabled>Release pendulum</button>
+        <dl>
+          <div><dt>Across the tray</dt><dd><output id="fast">1.10</output><small>s</small></dd></div>
+          <div><dt>Along the tray</dt><dd><output id="slow">1.65</output><small>s</small></dd></div>
+        </dl>
+        <div class="progress">
+          <label for="progress">Drawing time</label><output id="elapsed" for="progress">0.0 s</output>
+          <progress id="progress" value="0" max="9"></progress>
+        </div>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>

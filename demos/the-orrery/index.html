@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1c1719">
+  <meta name="description" content="Run two years through an interactive brass orrery and compare the orbits of Mercury, Venus, Earth and Mars.">
+  <link rel="icon" href="data:,">
+  <title>The Orrery · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-D5uAl41L.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-22YYeQv0.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Orrery</h1>
+    <p>Run two years through a brass model of the inner solar system. Mercury completes eight laps while Mars completes one.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="A brass orrery with four painted planets orbiting a gold Sun above a dark circular instrument dial"></canvas>
+      <p id="loading" role="status">Starting the orrery…</p>
+      <button type="button" id="plan" aria-pressed="false" disabled>Overhead view</button>
+    </figure>
+    <section class="controls" aria-label="Orrery controls">
+      <div class="time"><label for="days">Model date</label><output id="date" for="days">—</output></div>
+      <input id="days" type="range" min="0" max="730" step="1" value="93" disabled>
+      <div class="ticks" aria-hidden="true"><span>2026</span><span>2027</span><span>2028</span></div>
+      <button type="button" id="play" aria-pressed="false" disabled>Play time<span aria-hidden="true">▷</span></button>
+      <table>
+        <caption>Length of one orbit</caption>
+        <tbody>
+          <tr><th scope="row"><i class="mercury" aria-hidden="true"></i>Mercury</th><td>88 days</td></tr>
+          <tr><th scope="row"><i class="venus" aria-hidden="true"></i>Venus</th><td>225 days</td></tr>
+          <tr><th scope="row"><i class="earth" aria-hidden="true"></i>Earth</th><td>365 days</td></tr>
+          <tr><th scope="row"><i class="mars" aria-hidden="true"></i>Mars</th><td>687 days</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </article>
+  <footer><p>Orbital distances share one scale. The Sun and planets are enlarged.</p><a href="./source/README.md">Model and sources</a></footer>
+</main>
+</body>
+</html>

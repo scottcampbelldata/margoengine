@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#222523">
+  <meta name="description" content="Slide the ground glass in a cutaway pinhole camera and watch the inverted harbor grow dimmer.">
+  <title>The Camera Obscura · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CGcyxCJD.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BievQof1.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Camera Obscura</h1>
+      <p>A pinhole turns a moonlit harbor upside down. Slide the ground glass back to make the image bigger and dimmer.</p>
+    </header>
+    <section class="stage" aria-label="Cutaway pinhole camera and original harbor scene">
+      <canvas id="scene" aria-label="A lit harbor beside an open pinhole camera showing its inverted image"></canvas>
+      <p id="loading" role="status">Preparing the camera…</p>
+      <button type="button" id="view" aria-pressed="false" disabled>View the plate</button>
+    </section>
+    <section class="panel" aria-label="Pinhole camera controls">
+      <div class="field">
+        <label for="distance">Pinhole to plate</label><output id="distance-output" for="distance">300 mm</output>
+        <input id="distance" type="range" min="160" max="440" step="5" value="300" disabled>
+        <div class="marks" aria-hidden="true"><span>160 mm</span><span>440 mm</span></div>
+      </div>
+      <div class="meter">
+        <label for="exposure">Relative center exposure</label><output id="exposure" for="distance">28%</output>
+        <p>100% is the closest plate position.</p>
+      </div>
+      <button type="button" id="rays" aria-pressed="false" disabled>Show ray paths</button>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Ideal pinhole · ground-glass plate</span></footer>
+  </main>
+</body>
+</html>

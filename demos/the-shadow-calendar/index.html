@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#181d1f">
+  <meta name="description" content="Follow a working bronze sundial through the day and across seasons. Built with Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Shadow Calendar · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-B4doibRS.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-RTFIALU9.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Shadow Calendar</h1>
+    <p>Turn the hours on a working sundial. Change the season to see the same hour cast a different shadow.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="Bronze sundial set in a limestone courtyard, with a live sun shadow and engraved hour lines"></canvas>
+      <p id="loading" role="status">Setting the sundial…</p>
+      <div class="view-controls">
+        <span>43.5° N · True north</span>
+        <button type="button" id="overhead" aria-pressed="false" disabled>Overhead view</button>
+      </div>
+    </figure>
+    <section class="controls" aria-label="Sundial controls">
+      <div class="time">
+        <label for="clock">Solar time</label>
+        <output id="clock-value" for="clock">10:20</output>
+      </div>
+      <input id="clock" type="range" min="480" max="960" value="620" step="5" disabled>
+      <div class="ticks" aria-hidden="true"><span>08:00</span><span>12:00</span><span>16:00</span></div>
+      <fieldset>
+        <legend>Season</legend>
+        <div class="seasons">
+          <button type="button" data-season="0" aria-pressed="false" disabled><strong>Mar 20</strong><span>Equinox</span></button>
+          <button type="button" data-season="1" aria-pressed="true" disabled><strong>Jun 21</strong><span>Solstice</span></button>
+          <button type="button" data-season="2" aria-pressed="false" disabled><strong>Dec 21</strong><span>Solstice</span></button>
+        </div>
+      </fieldset>
+      <dl>
+        <div><dt>Sun height</dt><dd id="elevation">—</dd></div>
+        <div><dt>Tip projection</dt><dd id="reach">—</dd></div>
+      </dl>
+      <button type="button" id="sweep" aria-pressed="false" disabled>Play the day</button>
+    </section>
+  </article>
+  <footer>
+    <p>The dial shows local solar time. At 12:00, the sun crosses the meridian.</p>
+    <a href="./source/solar.js">View the solar model</a>
+  </footer>
+</main>
+</body>
+</html>

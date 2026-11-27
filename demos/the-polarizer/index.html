@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#131c25">
+  <meta name="description" content="Turn the analyzer and watch two polarizers take light from full transmission to extinction.">
+  <title>The Polarizer · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CKzlHNQ3.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-M8xK49gX.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Polarizer</h1>
+      <p>Turn either filter. When their axes cross at 90°, light at the detector falls to zero.</p>
+    </header>
+    <section class="stage" aria-label="Polarization instrument">
+      <canvas id="optics" aria-label="Two circular polarizers and the illuminated detector in front of them"></canvas>
+      <p id="loading" role="status">Preparing the optics…</p>
+      <button type="button" class="view" id="view" aria-pressed="false" disabled>Optics close-up</button>
+    </section>
+    <section class="panel" aria-label="Polarizer controls">
+      <div class="rotation">
+        <div class="field">
+          <div class="axis-selector">
+            <label for="angle">Angle</label>
+            <select id="filter" aria-label="Filter to rotate" disabled>
+              <option value="analyzer" selected>Blue analyzer</option>
+              <option value="polarizer">Brass polarizer</option>
+            </select>
+          </div>
+          <output id="angle-output" for="angle">25°</output>
+          <input id="angle" type="range" min="0" max="180" step="1" value="25" aria-valuetext="25 degrees" disabled>
+          <div class="marks" aria-hidden="true"><span>0°</span><span>90°</span><span>180°</span></div>
+        </div>
+        <div class="presets" role="group" aria-label="Presets for the angle between filters">
+          <button type="button" data-angle="0" aria-pressed="false" disabled>Parallel</button>
+          <button type="button" data-angle="45" aria-pressed="false" disabled>45°</button>
+          <button type="button" data-angle="90" aria-pressed="false" disabled>Crossed</button>
+        </div>
+      </div>
+      <div class="meter">
+        <div class="meter-label"><label for="transmission">Relative transmission</label><output id="result" for="angle">82%</output></div>
+        <meter id="transmission" min="0" max="1" value=".8214">82%</meter>
+        <p><span id="relative">25° between filters.</span> 100% is the aligned output.</p>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Malus’s law&nbsp; I / I₀ = cos² θ</span></footer>
+  </main>
+</body>
+</html>

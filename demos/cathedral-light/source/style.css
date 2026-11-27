@@ -1,0 +1,54 @@
+:root {
+  color-scheme:dark;
+  --paper:#1a1c21;
+  --ink:#f0e8db;
+  --muted:#c2b9ae;
+  --line:#655d57;
+  --accent:#ddaa77;
+  font-family:"Segoe UI",system-ui,sans-serif;
+}
+* {box-sizing:border-box}
+body {margin:0;background:var(--paper);color:var(--ink)}
+main {width:min(1340px,calc(100% - 2 * clamp(15px,4.3vw,72px)));margin:auto;padding:25px 0 31px}
+a {color:inherit;text-underline-offset:.32em}
+.brand {display:inline-block;font-size:.76rem;font-weight:710;letter-spacing:.065em;text-decoration:none}
+.brand span {color:var(--muted);border-left:1px solid var(--line);margin-left:.61rem;padding-left:.68rem;font-weight:460}
+header {display:grid;grid-template-columns:minmax(0,1fr) minmax(13rem,20rem);gap:26px;align-items:end;margin:30px 0 20px}
+h1 {margin:0;font:400 clamp(2.8rem,7.38vw,6.85rem)/.87 Georgia,serif;letter-spacing:-.072em}
+header p {color:var(--muted);font-size:clamp(.94rem,1.35vw,1.10rem);line-height:1.48;margin:0}
+.stage {position:relative;height:clamp(342px,56vh,675px);border:1px solid var(--line);background:#302c2a;isolation:isolate}
+canvas {display:block;width:100%;height:100%}
+.notice {position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#24232a;margin:0;padding:20px;color:var(--ink)}
+.notice[hidden],a[hidden]{display:none}
+#error p {max-width:44ch;line-height:1.5}
+#error a {color:var(--accent)}
+.panel {display:grid;grid-template-columns:1.23fr auto .83fr;align-items:center;gap:clamp(11px,2.65vw,41px);
+  padding:12px 0 16px;border-bottom:1px solid var(--line)}
+.field{display:grid;grid-template-columns:1fr auto;column-gap:9px;align-items:center}
+label,dt{color:var(--muted);font-size:.87rem;font-weight:640}
+input {width:100%;min-height:44px;margin:0;accent-color:var(--accent);grid-column:1/-1;cursor:grab}
+input:active{cursor:grabbing}
+output {font:660 clamp(1.02rem,1.75vw,1.20rem)/1.16 "Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.presets {display:flex;gap:5px}
+button {min-height:44px;border:1px solid #7a6659;border-radius:3px;padding:.37rem .64rem;background:#292624;
+  color:var(--ink);font:620 .84rem/1.2 "Segoe UI",system-ui,sans-serif;cursor:pointer}
+button:hover:not(:disabled) {background:#46392d;border-color:var(--accent)}
+button[aria-pressed="true"] {background:#524033;color:#f6dec8}
+button:disabled,input:disabled{opacity:.49;cursor:default}
+a:focus-visible,input:focus-visible,button:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+.readings {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;margin:0}
+.readings div{border-left:1px solid var(--line);padding-left:9px}
+dd{margin:5px 0 0}
+footer {display:flex;justify-content:space-between;gap:10px;padding-top:13px;color:var(--muted);font-size:.78rem}
+@media(max-width:720px){
+  main{padding-top:18px}
+  header{display:block;margin:21px 0 15px}
+  h1 {font-size:clamp(2.72rem,10.9vw,4.52rem)}
+  header p{margin-top:10px;max-width:41ch}
+  .stage{height:clamp(320px,44svh,461px)}
+  .panel{grid-template-columns:auto minmax(0,1fr);gap:10px 10px;padding-top:11px}
+  .field{grid-column:1/-1}
+  .presets{gap:4px}
+  button{padding:.34rem .45rem}
+}
+@media(max-width:355px){.panel{grid-template-columns:1fr}.presets{justify-self:start}.readings div{padding:4px 0;border-left:0}}

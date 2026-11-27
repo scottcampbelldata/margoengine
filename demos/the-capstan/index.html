@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171c29">
+  <meta name="description" content="Wind a rope around a capstan and see how friction lets you hold a heavier load.">
+  <title>The Capstan · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BZaYuXfZ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CP4LxMEA.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Capstan</h1>
+      <p>Wrap the rope around the drum. Watch how quickly the effort to hold a 150 N load falls.</p>
+    </header>
+    <section class="exhibit" aria-label="Capstan friction demonstration">
+      <figure>
+        <canvas id="scene" aria-label="A braided rope wound around a brass capstan with force gauges on both tails"></canvas>
+        <button id="view" type="button" aria-pressed="false" disabled>Plan view</button>
+        <p id="loading" role="status">Preparing the capstan…</p>
+      </figure>
+      <aside aria-label="Wrapping controls and tension readings">
+        <div class="control">
+          <div><label for="wrap">Wraps around the drum</label><output id="wrap-value" for="wrap">0.75</output></div>
+          <input id="wrap" type="range" min="0.25" max="2.25" value="0.75" step="0.05" disabled>
+        </div>
+        <div class="control">
+          <div><label for="friction">Friction coefficient</label><output id="friction-value" for="friction">0.30</output></div>
+          <input id="friction" type="range" min="0" max="0.55" value="0.30" step="0.01" disabled>
+        </div>
+        <dl>
+          <div><dt>Load tension</dt><dd>150<small>N</small></dd></div>
+          <div><dt>Minimum holding tension</dt><dd><output id="holding">—</output><small>N</small></dd></div>
+          <div><dt>Load / holding tension</dt><dd><output id="ratio">—</output><small>×</small></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>
+
+

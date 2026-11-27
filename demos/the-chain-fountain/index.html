@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#20252a">
+  <meta name="description" content="Run a chain fountain and see how contacts in its feed tray push the falling chain upward.">
+  <title>The Chain Fountain · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-AC6sauvk.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DdHamivX.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Chain Fountain</h1>
+      <p>The chain falls into the catch tray, but first it rises above its own supply. Change how strongly the supply tray pushes the links into motion.</p>
+    </header>
+    <section class="exhibit" aria-label="A moving metallic bead chain in a fountain">
+      <figure>
+        <canvas id="scene" aria-label="A metallic bead chain streams out of the elevated supply cup, arches above it, and falls into the catch tray"></canvas>
+        <button id="view" type="button" aria-pressed="false" disabled>Feed close-up</button>
+        <p id="loading" role="status">Preparing the chain fountain…</p>
+        <figcaption>¼-speed motion</figcaption>
+      </figure>
+      <aside aria-label="Chain settings and steady fountain measurements">
+        <div class="control">
+          <div><label for="pickup">Pickup contribution</label><output id="pickup-value" for="pickup">12%</output></div>
+          <input id="pickup" type="range" min="2" max="24" value="12" step="1" disabled>
+        </div>
+        <div class="control">
+          <div><label for="drop">Drop to catch tray</label><output id="drop-value" for="drop">1.7 m</output></div>
+          <input id="drop" type="range" min="1" max="2.4" value="1.7" step=".1" disabled>
+        </div>
+        <dl>
+          <div><dt>Rise above supply</dt><dd><output id="rise">—</output><small>cm</small></dd></div>
+          <div><dt>Chain speed</dt><dd><output id="speed">—</output><small>m/s</small></dd></div>
+        </dl>
+        <button id="pause" type="button" disabled>Pause chain</button>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>
+
+
+

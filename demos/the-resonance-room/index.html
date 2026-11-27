@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#191817">
+  <meta name="description" content="Tune a listening room and see where bass builds up or cancels. An interactive acoustic exhibit built with Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Resonance Room · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CbvZLD8-.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B0KILE4h.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Resonance Room</h1>
+    <p>Sweep a bass tone through a listening room. The pressure map shows where the sound builds and where it cancels.</p>
+  </header>
+  <div class="instrument">
+    <figure class="view">
+      <canvas id="scene" aria-label="Cutaway of a listening room with a blue and coral acoustic pressure map"></canvas>
+      <p id="loading" role="status">Opening the listening room…</p>
+      <div class="stage-bar">
+        <span id="slice-caption">Ear-height pressure</span>
+        <div role="group" aria-label="Pressure slice">
+          <button type="button" data-slice="plan" aria-pressed="true" disabled>Horizontal</button>
+          <button type="button" data-slice="section" aria-pressed="false" disabled>Vertical</button>
+        </div>
+      </div>
+      <figcaption>
+        <span class="phase-negative">Negative</span>
+        <i aria-hidden="true"></i><span>Pressure phase</span><i aria-hidden="true"></i>
+        <span class="phase-positive">Positive</span>
+      </figcaption>
+    </figure>
+    <div class="controls">
+      <div class="frequency"><label for="pitch">Drive frequency</label><output id="frequency" for="pitch">45.2 <span>Hz</span></output></div>
+      <input id="pitch" type="range" value="45.2" min="24" max="90" step=".1" disabled>
+      <div class="range-ticks" aria-hidden="true"><span>24</span><span>45</span><span>68</span><span>90 Hz</span></div>
+      <div class="notes-grid" aria-label="Compare room resonances">
+        <button type="button" data-preset="0" aria-pressed="false" disabled><strong>27.7 Hz</strong><span>Length</span></button>
+        <button type="button" data-preset="1" aria-pressed="true" disabled><strong>45.2 Hz</strong><span>Length + width</span></button>
+        <button type="button" data-preset="2" aria-pressed="false" disabled><strong>61.3 Hz</strong><span>Height</span></button>
+        <button type="button" data-preset="3" aria-pressed="false" disabled><strong>70.9 Hz</strong><span>Width + height</span></button>
+      </div>
+      <dl>
+        <div><dt>Strongest mode</dt><dd id="mode">—</dd></div>
+        <div><dt>At the listening seat</dt><dd id="level">—</dd></div>
+      </dl>
+      <button id="listen" type="button" aria-pressed="false" disabled><span aria-hidden="true">♪</span> Hear test tone</button>
+      <p id="audio-status" role="status" hidden></p>
+    </div>
+  </div>
+  <footer>
+    <p>Idealized 4.8 × 6.2 × 2.8 m room. Pressure is shown relative to the strongest sampled point.</p>
+    <a href="./source/acoustics.js">View the acoustic model</a>
+  </footer>
+</main>
+</body>
+</html>

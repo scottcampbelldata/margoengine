@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eee9de">
+  <meta name="description" content="Change the outlet height of a primed siphon and see what drives the water through the glass.">
+  <title>The Siphon | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-E50JDQ0c.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CxmiyqTK.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Siphon</h1>
+      <p>Once the tube is full, water can climb over the glass arch. Lower the outlet and watch the height difference drive the flow.</p>
+    </header>
+    <div class="rig">
+      <figure aria-label="Siphon exhibit">
+        <canvas id="scene" aria-label="A 3D glass siphon with a raised reservoir, swinging brass outlet and catch basin"></canvas>
+        <p id="loading" role="status">Opening the siphon…</p>
+        <div id="diagram" hidden aria-hidden="true"><span></span>Source waterline</div>
+        <div class="state" id="flow-state" role="status"><i></i><span>Primed · flowing</span></div>
+      </figure>
+      <section class="instruments" aria-label="Siphon controls and measurements">
+        <div class="height">
+          <div class="label"><label for="outlet">Outlet drop</label><output id="outlet-value" for="outlet">11.0 cm</output></div>
+          <input id="outlet" type="range" min="0" max="18" step=".5" value="11" disabled aria-describedby="offset-description">
+          <div class="limits"><span>Level with water</span><span>18 cm below</span></div>
+          <span id="offset-description" class="sr-only">Vertical distance from the supply waterline down to the outlet.</span>
+        </div>
+        <dl>
+          <div class="primary"><dt>Flow rate</dt><dd><output id="flow">—</output><small>L/min</small></dd></div>
+          <div class="secondary"><dt>Outlet speed</dt><dd><output id="speed">—</output><small>m/s</small></dd></div>
+          <div class="secondary"><dt>Crown pressure</dt><dd><output id="pressure">—</output><small>kPa gauge</small></dd></div>
+        </dl>
+        <button id="guide" type="button" aria-pressed="false" disabled><i aria-hidden="true"></i>Show waterline</button>
+      </section>
+    </div>
+    <footer><span>13 mm bore · Constant source level · Primed tube</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

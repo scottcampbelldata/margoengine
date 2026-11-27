@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eae8db">
+  <meta name="description" content="Change the speed of a brass Pelton wheel and watch how its split water jet transfers momentum.">
+  <title>The Pelton Wheel | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-HY1eF5Vf.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-COZ3aHN_.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Pelton Wheel</h1>
+      <p>A jet strikes a thin ridge and splits across two brass cups. Change the wheel speed to see how much of the water’s power reaches the shaft.</p>
+    </header>
+    <section class="rig" aria-label="Working Pelton wheel cutaway">
+      <figure>
+        <canvas id="scene" aria-label="Brass Pelton wheel turning within a porcelain splash guard with a blue water jet splitting at the top bucket"></canvas>
+        <p id="loading" role="status">Preparing the wheel…</p>
+        <div class="tag" id="jet" aria-hidden="true"><i></i>Incoming jet</div>
+        <div class="tag" id="split" aria-hidden="true"><i></i>Split jet</div>
+      </figure>
+      <aside aria-label="Wheel control and power readings">
+        <div class="control">
+          <div class="row"><label for="speed">Wheel speed</label><output for="speed" id="speed-value">363 rpm</output></div>
+          <input id="speed" type="range" min="0" max="700" step="1" value="363" disabled aria-describedby="speed-note">
+          <div class="limits"><span>0 rpm</span><span>700 rpm</span></div>
+          <p id="speed-note">Peak power at 363 rpm</p>
+        </div>
+        <dl>
+          <div class="reading power"><dt>Shaft power</dt><dd><output id="power">—</output><small>W</small></dd></div>
+          <div class="reading"><dt>Efficiency</dt><dd><output id="efficiency">—</output><small>%</small></dd></div>
+          <div class="reading"><dt>Shaft torque</dt><dd><output id="torque">—</output><small>N·m</small></dd></div>
+        </dl>
+        <button id="pause" type="button" disabled>Pause motion</button>
+      </aside>
+    </section>
+    <footer><span>8.6 m net head · Slowed playback</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

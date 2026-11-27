@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e6ecea">
+  <meta name="description" content="Turn an Archimedes screw and see the water pockets carry water from a lower pool to a raised basin.">
+  <title>The Archimedes Screw | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-fOIilCOo.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-Dj5s2LFI.css">
+</head>
+<body data-state="loading" data-running="false">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header><h1>The Archimedes Screw</h1><p>Turn the copper screw and watch pockets of water travel uphill. Each turn carries the pockets one pitch farther along the trough.</p></header>
+    <section class="exhibit" aria-label="Working Archimedes screw">
+      <figure>
+        <canvas id="scene" aria-label="An inclined copper screw with a cutaway trough, rotating drive collar, and visible water pockets rising between a lower basin and a raised basin"></canvas>
+        <p id="loading" role="status">Preparing the screw…</p>
+        <div id="intake" class="scene-label" aria-hidden="true"><i></i>Lower basin</div>
+        <div id="outlet" class="scene-label" aria-hidden="true"><i></i>Raised basin</div>
+      </figure>
+      <aside aria-label="Screw controls and measurements">
+        <div class="control">
+          <div class="row"><label for="drive">Drive speed</label><output id="speed" for="drive">22 rpm</output></div>
+          <input id="drive" type="range" min="0" max="55" step="1" value="22" disabled>
+          <div class="limits"><span>Stopped</span><span>55 rpm</span></div>
+        </div>
+        <dl>
+          <div class="quantity major"><dt>Ideal discharge</dt><dd><output id="flow">—</output><small>L/min</small></dd></div>
+          <div class="quantity"><dt>Water per turn</dt><dd><output id="volume">—</output><small>L</small></dd></div>
+          <div class="quantity"><dt>Axial travel per turn</dt><dd><output id="pitch">—</output><small>cm</small></dd></div>
+        </dl>
+        <button id="pause" type="button" disabled>Pause rotor</button>
+      </aside>
+    </section>
+    <footer><span>26° shaft incline · One-start screw · Ideal filled pockets</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

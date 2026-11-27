@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#252624">
+  <meta name="description" content="Tune a tremor, watch the suspended mass and read the trace on a mechanical seismograph rendered in Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Seismograph · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DK5uAIDS.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DdLzIxyN.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Seismograph</h1>
+    <p>Shake the whole instrument. The ink pen records how far the suspended mass moves relative to the frame.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="A mechanical seismograph with a blue shaking table, a brass suspended mass and a red pen writing on ruled paper"></canvas>
+      <p id="loading" role="status">Starting the seismograph…</p>
+    </figure>
+    <section class="controls" aria-label="Tremor controls">
+      <div class="dial"><label for="frequency">Tremor frequency</label><output id="hz" for="frequency">1.25 Hz</output></div>
+      <input id="frequency" type="range" min=".35" max="3.20" step=".05" value="1.25" disabled>
+      <div class="ticks" aria-hidden="true"><span>0.35</span><span class="natural">1.20</span><span>3.20 Hz</span></div>
+      <button type="button" id="run" disabled>Pause recording</button>
+      <dl>
+        <div><dt>Ground amplitude</dt><dd>21 mm</dd></div>
+        <div><dt>Settled pen amplitude</dt><dd id="stroke">—</dd></div>
+        <div><dt>Instrument frequency</dt><dd>1.20 Hz</dd></div>
+      </dl>
+      <p id="note">Tune near 1.20 Hz to see resonance widen the trace.</p>
+    </section>
+  </article>
+  <footer><p>One-axis model with a synthetic tremor. The paper shows the last 3.6 seconds.</p><a href="./source/README.md">Model and sources</a></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#231b19">
+  <meta name="description" content="Heat a desert road and trace the light that makes dry asphalt look like water.">
+  <title>The Desert Mirage · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DO_U5GeR.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BfDM0AFf.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Desert Mirage</h1><p>Heat the road and watch a strip of sky appear on dry asphalt.</p></header>
+    <section class="stage" aria-label="Interactive desert highway">
+      <canvas id="scene" aria-label="A low view along a desert highway with a ray-traced mirage"></canvas>
+      <button class="view" id="section" aria-pressed="false" type="button" disabled>Show ray section</button>
+      <p id="caption" hidden>640 m across · Height enlarged</p>
+      <p id="loading" role="status">Opening the desert road…</p>
+    </section>
+    <section class="panel" aria-label="Road mirage controls">
+      <div class="field">
+        <label for="temperature">Air at the road surface</label><output id="temperature-value" for="temperature">62 °C</output>
+        <input id="temperature" type="range" min="26" max="74" step="1" value="62" disabled>
+      </div>
+      <button id="compare" type="button" disabled>Cool the road</button>
+      <dl class="readings">
+        <div><dt id="ray-label">Ray at −0.32°</dt><dd><output id="ray" aria-labelledby="ray-label">—</output></dd></div>
+        <div><dt id="index-label">Index change</dt><dd><output id="index" aria-labelledby="index-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Eye height 50 cm · Ambient air 26 °C</span></footer>
+  </main>
+</body>
+</html>

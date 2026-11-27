@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#121311">
+  <meta name="description" content="An interactive study of gold, platinum, and round-brilliant gemstone facets, rendered live by Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Jewelry Counter · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-8ukCIWJz.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="modulepreload" crossorigin href="./assets/errors-DkwPZuAq.js">
+  <link rel="modulepreload" crossorigin href="./assets/color-CMZXT1qw-BP0tYt0G.js">
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-1b8ejkZX-KONmyKcE.js">
+  <link rel="modulepreload" crossorigin href="./assets/built-material-D1frGyvL-BK5s3J_z.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-B7zDm8X4.css">
+</head>
+<body>
+  <main class="counter">
+    <header class="intro">
+      <a href="../" class="home">Margo Engine</a>
+      <h1>The Jewelry Counter</h1>
+      <p>Move the studio light over a round brilliant and sixteen bead-set shoulder stones.</p>
+    </header>
+    <section id="showpiece" class="showpiece" aria-label="Interactive ring viewer">
+      <canvas id="ring-view" tabindex="0" aria-label="Ring. Drag to orbit or use the arrow keys."></canvas>
+      <p id="loading" role="status">Setting the counter…</p>
+      <div id="optics-key" hidden><strong>Inside the stone</strong><span>Move the light to trace three wavelengths through the facets.</span></div>
+      <div class="view-tools">
+        <button type="button" id="reset">Reset view</button>
+        <button type="button" id="macro" aria-pressed="false">Macro</button>
+        <button type="button" id="optics" aria-pressed="false">Optics</button>
+      </div>
+    </section>
+    <aside class="controls" aria-label="Ring and lighting controls">
+      <div class="sheet">
+        <h2>Finish</h2>
+        <div class="finish" role="group" aria-label="Metal finish">
+          <button aria-pressed="true" data-finish="gold" type="button"><span class="swatch gold"></span> Yellow gold</button>
+          <button aria-pressed="false" data-finish="platinum" type="button"><span class="swatch platinum"></span> Platinum</button>
+          <button aria-pressed="false" data-finish="rose" type="button"><span class="swatch rose"></span> Rose gold</button>
+        </div>
+      </div>
+      <div class="sheet">
+        <h2>Studio light</h2>
+        <label for="light">Angle <output id="angle" for="light">42°</output></label>
+        <input id="light" type="range" min="-140" max="140" value="42">
+      </div>
+      <div class="details"><span>Stone</span><strong>Round brilliant</strong><span>Band</span><strong>18 mm inner diameter</strong></div>
+      <a class='home source-link' href='./source/scene.js'>View scene source</a>
+    </aside>
+  </main>
+</body>
+</html>
+

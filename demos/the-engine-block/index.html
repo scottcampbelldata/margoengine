@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Section, inspect and export an exact four-cylinder CAD casting in Margo Engine.">
+  <meta name="theme-color" content="#eeefe9">
+  <title>The Engine Block · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-B9x6ro4M.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-8FRkr5mf.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header class="intro">
+      <div><h1>The Engine Block</h1><p>Move a cut through an inline-four casting and see where its metal ends and its internal passages begin.</p></div>
+      <p class="part">Inline-four cylinder casting <span>Longitudinal section</span></p>
+    </header>
+    <section class="workbench" aria-label="Interactive engine casting">
+      <figure id="viewport">
+        <canvas id="block" aria-label="An inline-four engine block with a movable section and selectable cylinder bores"></canvas>
+        <figcaption><span id="view-led" aria-hidden="true"></span><span id="view-state">Complete casting</span></figcaption>
+        <p id="status" role="status">Preparing the casting…</p>
+      </figure>
+      <aside aria-label="Model controls">
+        <section class="section-controls">
+          <div class="row"><label for="section">Section position</label><output id="depth" for="section">Open</output></div>
+          <input id="section" type="range" min="-127" max="127" step="1" value="127" disabled>
+          <div class="range-key" aria-hidden="true"><span>Back</span><span>Centreline</span><span>Front</span></div>
+          <div class="presets">
+            <button type="button" id="centre" disabled>Centre cut</button>
+            <button type="button" id="whole" aria-pressed="true" disabled>Whole casting</button>
+          </div>
+        </section>
+        <section class="measurements" aria-labelledby="dimensions">
+          <h2 id="dimensions">Measurements</h2>
+          <dl>
+            <div><dt>Bore diameter</dt><dd id="diameter">—</dd></div>
+            <div><dt>Bore pitch</dt><dd id="pitch">—</dd></div>
+            <div><dt>Nominal shell</dt><dd id="shell">—</dd></div>
+            <div><dt>Bore opening in cut</dt><dd id="chord">—</dd></div>
+          </dl>
+          <div class="bore-choices" role="group" aria-label="Inspect bore">
+            <span>Bore</span>
+            <button type="button" data-bore="1" aria-pressed="false" disabled>1</button>
+            <button type="button" data-bore="2" aria-pressed="false" disabled>2</button>
+            <button type="button" data-bore="3" aria-pressed="false" disabled>3</button>
+            <button type="button" data-bore="4" aria-pressed="false" disabled>4</button>
+          </div>
+        </section>
+        <section class="file-actions" aria-labelledby="cad">
+          <h2 id="cad">CAD file</h2>
+          <div class="file-buttons">
+            <button type="button" id="download" disabled>Download STEP</button>
+            <button type="button" id="verify" disabled>Verify readback</button>
+          </div>
+          <p id="file-status" aria-live="polite">AP214 · One solid · Metres</p>
+        </section>
+      </aside>
+    </section>
+    <footer>
+      <p>Use the view cube to turn the casting or return home. Use the bore buttons to place a measurement in the scene.</p>
+      <details>
+        <summary>How the casting is made</summary>
+        <p>The kernel rounds a solid casting blank, hollows it from the bottom and joins four cylinder bosses before machining the through-bores. Rail, rib, bolt and jacket features are part of the exported solid. The section is a live inspection view. The bore opening is the analytic chord where the plane intersects a bore.</p>
+        <ul>
+          <li><a href="https://patents.google.com/patent/JP2003161131A/en">Inline-four cylinder block geometry</a></li>
+          <li><a href="https://emc.cat.com/n/api/pubdirect?media_string_id=LEKQ9085">Caterpillar engine construction reference</a></li>
+          <li><a href="https://www.nist.gov/services-resources/software/step-file-analyzer-and-viewer">NIST STEP format and inspection reference</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

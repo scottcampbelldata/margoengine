@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e7e9df">
+  <meta name="description" content="Load a clear disc between crossed polarizers and see the stress emerge in spectral color.">
+  <title>The Birefringence Viewer · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-h5SqQ5l8.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-PQptTfcG.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Birefringence Viewer</h1>
+      <p>Squeeze the clear disc. Crossed polarizers make the stress visible as colored bands.</p>
+    </header>
+    <section class="stage" aria-label="Interactive polariscope compression press">
+      <canvas id="scene" aria-label="A clear circular specimen held in a precision press with colored stress fringes"></canvas>
+      <p id="loading" role="status">Preparing the polariscope…</p>
+      <button type="button" id="view" aria-pressed="false" disabled>Disc close-up</button>
+    </section>
+    <section class="panel" aria-label="Stress and polarization controls">
+      <div class="field">
+        <label for="load">Compression force</label><output id="load-output" for="load">780 N</output>
+        <input id="load" type="range" min="0" max="1500" step="10" value="780" disabled>
+        <div class="marks" aria-hidden="true"><span>0 N</span><span>1,500 N</span></div>
+      </div>
+      <div class="field">
+        <label for="angle">Rotate both filters</label><output id="angle-output" for="angle">35°</output>
+        <input id="angle" type="range" min="0" max="90" step="1" value="35" disabled>
+        <div class="marks" aria-hidden="true"><span>0°</span><span>90°</span></div>
+      </div>
+      <button type="button" id="parallel" aria-pressed="false" disabled>Use parallel filters</button>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>White-light photoelasticity</span></footer>
+  </main>
+</body>
+</html>

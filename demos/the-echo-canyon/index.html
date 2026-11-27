@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#211c20">
+  <meta name="description" content="Send a sound across a sandstone canyon and compare the delay from each reflected path.">
+  <title>The Echo Canyon · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CdR9HLQN.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bi4B0N2c.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Echo Canyon</h1><p>Move the receiver, then send a pulse. The direct sound arrives first. Each canyon wall sends back its own echo.</p></header>
+    <section class="exhibit" aria-label="First-order sound reflections in a sandstone canyon">
+      <figure>
+        <canvas id="scene" aria-label="An aerial canyon with a river and a colored path for each sound arrival"></canvas>
+        <p id="loading" role="status">Preparing the canyon…</p>
+        <button id="view" type="button" aria-pressed="false" disabled>Overhead</button>
+        <figcaption>¼-speed pulses</figcaption>
+      </figure>
+      <aside aria-label="Receiver position and relative delays">
+        <div class="control">
+          <div><label for="receiver">Receiver position</label><output id="position" for="receiver">−12 m</output></div>
+          <input id="receiver" type="range" min="-32" max="32" value="-12" step="1" disabled>
+        </div>
+        <dl>
+          <div><dt class="west">West-wall echo</dt><dd><output id="west-delay">—</output><small>ms later</small></dd></div>
+          <div><dt class="east">East-wall echo</dt><dd><output id="east-delay">—</output><small>ms later</small></dd></div>
+        </dl>
+        <button id="send" type="button" disabled>Send pulse</button>
+        <p id="arrivals" role="status">Ready</p>
+        <label class="audio"><input id="sound" type="checkbox" disabled> Play arrival sounds</label>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>
+
+

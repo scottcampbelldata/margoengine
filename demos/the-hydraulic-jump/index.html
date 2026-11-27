@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ede7da">
+  <meta name="description" content="Speed up water in a laboratory flume and watch shallow flow rise into a deep hydraulic jump.">
+  <title>The Hydraulic Jump | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CrQI7nOF.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-DnUrV72h.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Hydraulic Jump</h1>
+      <p>Fast, shallow water collides with slower water and rolls back on itself. Turn up the approach speed to see how far the surface rises.</p>
+    </header>
+    <section class="rig" aria-label="Working hydraulic jump flume">
+      <figure>
+        <canvas id="scene" aria-label="Clear-sided flume with shallow fast water entering from the left, a foaming roller in the middle, and deeper slow water on the right"></canvas>
+        <p id="loading" role="status">Preparing the flume…</p>
+        <div class="marker" id="approach" aria-hidden="true">Fast inflow</div>
+        <div class="marker" id="roller" aria-hidden="true">Roller</div>
+        <div class="marker" id="tailwater" aria-hidden="true">Tailwater</div>
+      </figure>
+      <aside aria-label="Approach speed and water readings">
+        <div class="control">
+          <div class="row"><label for="speed">Approach speed</label><output for="speed" id="speed-value">3.15 m/s</output></div>
+          <input id="speed" type="range" min="2.4" max="3.9" step=".01" value="3.15" disabled>
+          <div class="limits"><span>2.40 m/s</span><span>3.90 m/s</span></div>
+        </div>
+        <dl class="depth">
+          <div><dt>Inflow depth</dt><dd><output id="depth1">2.8</output><small>cm</small></dd></div>
+          <div><dt>Tailwater depth</dt><dd><output id="depth2">—</output><small>cm</small></dd></div>
+        </dl>
+        <dl class="flow">
+          <div><dt>Froude number</dt><dd><output id="froude">—</output></dd></div>
+          <div><dt>Energy dissipated</dt><dd><output id="energy">—</output><small>%</small></dd></div>
+        </dl>
+        <button id="pause" type="button" disabled>Pause water</button>
+      </aside>
+    </section>
+    <footer><span>Horizontal flume · Matched tailwater depth</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

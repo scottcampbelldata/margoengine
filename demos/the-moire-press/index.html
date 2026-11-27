@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ece4d9">
+  <meta name="description" content="Turn one precision screen over another and watch their fine lines form broad moving bands.">
+  <title>The Moiré Press · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-D9nWqc0P.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CZhRZBtc.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Moiré Press</h1>
+      <p>Turn the top screen. The fine slits stay the same size, but the bands between them draw closer together.</p>
+    </header>
+    <section class="stage" aria-label="Interactive moiré press">
+      <canvas id="glass" aria-label="Two fine metal screens over a frosted plate with visible moiré bands"></canvas>
+      <p id="loading" role="status">Preparing the press…</p>
+      <button type="button" id="lift" aria-pressed="false" disabled>Lift top screen</button>
+    </section>
+    <section class="panel" aria-label="Screen rotation">
+      <div class="rotation">
+        <div class="field">
+          <label for="angle">Top screen angle</label><output id="angle-output" for="angle">4°</output>
+          <input id="angle" type="range" min="0" max="15" step=".1" value="4" disabled>
+          <div class="marks" aria-hidden="true"><span>0°</span><span>7.5°</span><span>15°</span></div>
+        </div>
+        <div class="presets" role="group" aria-label="Screen angle presets">
+          <button type="button" data-angle="0" aria-pressed="false" disabled>Align</button>
+          <button type="button" data-angle="4" aria-pressed="true" disabled>4°</button>
+          <button type="button" data-angle="12" aria-pressed="false" disabled>12°</button>
+        </div>
+      </div>
+      <div class="readout">
+        <label for="spacing">Band spacing</label><output id="spacing" for="angle">150 mm</output>
+        <p id="description" aria-live="polite">Measured perpendicular to the bands.</p>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Screen pitch · 10.5 mm</span></footer>
+  </main>
+</body>
+</html>

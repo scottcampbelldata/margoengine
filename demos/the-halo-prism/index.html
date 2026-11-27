@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e5ebf0">
+  <meta name="description" content="Trace two refractions through a hexagonal ice prism and find the sharp inner edge of the 22 degree halo.">
+  <title>The Halo Prism · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DiQcGH8n.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-eODyySb_.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Halo Prism</h1><p>Tilt the incoming light to find the sharp inner edge of a 22° halo.</p></header>
+    <section class="stage" aria-label="Interactive alpine halo observatory">
+      <canvas id="scene" aria-label="A hexagonal ice prism bends a ray next to a wide-angle solar halo display"></canvas>
+      <div class="views" role="group" aria-label="Observatory views">
+        <button id="trace" type="button" aria-pressed="false" disabled>Trace prism</button>
+        <button id="view" type="button" aria-pressed="false" disabled>Inspect halo</button>
+      </div>
+      <p id="loading" role="status">Preparing the observatory…</p>
+    </section>
+    <section class="panel" aria-label="Ice prism ray controls">
+      <div class="field">
+        <label for="incidence">Incidence angle</label><output for="incidence" id="incidence-value">65.0°</output>
+        <input id="incidence" type="range" min="28" max="72" value="65" step=".1" disabled>
+      </div>
+      <button id="minimum" type="button" disabled>Find the minimum</button>
+      <dl class="readings">
+        <div><dt id="ray-label">Ray deviation</dt><dd><output id="ray" aria-labelledby="ray-label">—</output></dd></div>
+        <div><dt id="rim-label">Red inner edge</dt><dd><output id="rim" aria-labelledby="rim-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Ice prism · 60° between refracting faces</span></footer>
+  </main>
+</body>
+</html>

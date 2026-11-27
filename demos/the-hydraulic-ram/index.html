@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e8ece1">
+  <meta name="description" content="Watch a hydraulic ram pump use a falling stream to lift part of its water above the source.">
+  <title>The Hydraulic Ram | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BSIXjGEF.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BhtaroJ1.css">
+</head>
+<body data-state="loading" data-phase="acceleration">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header><h1>The Hydraulic Ram</h1><p>Falling water closes the waste valve. The pressure surge sends a pulse into the air chamber, where trapped air keeps water moving uphill between pulses.</p></header>
+    <section class="rig" aria-label="Working hydraulic ram">
+      <figure>
+        <canvas id="scene" aria-label="Hydraulic ram cutaway with two moving valves, transparent air chamber, and traced water flow through the waste spout and rising delivery pipe"></canvas>
+        <p id="loading" role="status">Preparing the ram…</p>
+        <div class="tag" id="waste" aria-hidden="true"><i></i>Waste valve</div>
+        <div class="tag" id="air" aria-hidden="true"><i></i>Trapped air</div>
+        <div class="tag" id="delivery" aria-hidden="true"><i></i>Delivery</div>
+      </figure>
+      <aside aria-label="Delivery lift and pump readings">
+        <div class="control">
+          <div class="row"><label for="lift">Delivery lift</label><output for="lift" id="lift-value">3.8 m</output></div>
+          <input id="lift" type="range" min="2.6" max="5.8" step=".2" value="3.8" disabled>
+          <div class="limits"><span>2.6 m</span><span>5.8 m</span></div>
+        </div>
+        <dl>
+          <div class="primary"><dt>Water delivered</dt><dd><output id="average">—</output><small>L/min</small></dd><p>Settled cycle average</p></div>
+          <div><dt>Air chamber pressure</dt><dd><output id="pressure">—</output><small>kPa gauge</small></dd></div>
+        </dl>
+        <ol aria-label="Ram cycle"><li>Accelerate</li><li>Pump</li><li>Recover</li></ol>
+        <p id="phase-message" role="status">Waste valve open</p>
+        <button id="pause" type="button" disabled>Pause cycle</button>
+      </aside>
+    </section>
+    <footer><span>1.6 m drive head · Slowed playback · Lumped hydraulic model</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,59 @@
+:root { color-scheme:dark; --page:#252034; --panel:#30293f; --line:#665d7b; --ink:#f3ecdf; --muted:#d1c9de; --accent:#f4cc82; --contact:#f48452; --guide:#76dff0; }
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+body { margin:0; color:var(--ink); background:var(--page); font:1rem/1.5 system-ui,sans-serif; }
+main { width:min(100% - clamp(1.5rem,8.6vw,9rem),83rem); margin:auto; padding:clamp(1.3rem,3.7vh,2.5rem) 0 1.3rem; }
+.brand { color:inherit; font-size:.81rem; font-weight:760; letter-spacing:.07em; text-decoration:none; }
+.brand span { padding-left:.8rem; margin-left:.8rem; border-left:1px solid var(--line); color:var(--muted); font-weight:500; }
+header { display:flex; justify-content:space-between; align-items:end; gap:1.2rem 2.4rem; margin:clamp(1rem,3.4vh,2.7rem) 0 clamp(1rem,2.7vh,2rem); }
+h1 { margin:0; font:400 clamp(3.05rem,6.94vw,7.36rem)/.90 Georgia,serif; letter-spacing:-.064em; }
+header p { max-width:30ch; margin:0 0 .18rem; color:var(--muted); }
+.exhibit { border:1px solid var(--line); display:grid; grid-template-columns:minmax(0,1fr) minmax(16.3rem,25%); }
+figure { height:clamp(23rem,62vh,41rem); margin:0; overflow:hidden; position:relative; background:#615766; }
+canvas { width:100%; height:100%; display:block; }
+#loading { position:absolute; inset:0; margin:0; display:grid; place-items:center; padding:1.2rem; background:#615766; color:#fff; }
+.view { position:absolute; top:.82rem; right:.82rem; }
+figcaption { position:absolute; pointer-events:none; inset:auto .75rem .75rem; display:flex; justify-content:center; gap:.65rem; font-size:.75rem; }
+figcaption span { display:flex; align-items:center; gap:.36rem; color:#f0e9f2; background:#2e263de8; border:1px solid #9e92b3ad; padding:.22rem .48rem; }
+figcaption i { width:.47rem; height:.47rem; border-radius:50%; }
+.hit { background:var(--contact); } .track { background:var(--guide); }
+body[data-guides=false] figcaption { visibility:hidden; }
+.controls { background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; justify-content:center; gap:.8rem; padding:clamp(1rem,2.05vw,1.72rem); }
+.dial { display:flex; flex-direction:column; gap:.28rem; }
+label,dt { color:var(--muted); font-size:.87rem; }
+output { color:var(--accent); font:400 clamp(2.9rem,4.4vw,4.8rem)/.92 Georgia,serif; letter-spacing:-.052em; white-space:nowrap; }
+input[type=range] { width:100%; height:2.75rem; margin:-.22rem 0 -.54rem; accent-color:var(--accent); cursor:ew-resize; }
+.ticks { display:flex; justify-content:space-between; color:var(--muted); font:.72rem/1.2 ui-monospace,monospace; }
+button { min-height:2.75rem; padding:.54rem .72rem; background:#463c58; border:1px solid #8a789d; color:var(--ink); font:600 .83rem/1.3 system-ui,sans-serif; cursor:pointer; }
+button:hover { background:#544568; border-color:#b3a3c4; }
+button:disabled { cursor:default; }
+#play { margin:.24rem 0 .05rem; display:flex; justify-content:space-between; align-items:center; }
+#play span { font-size:1.07rem; }
+#guides { margin-top:.26rem; }
+#guides[aria-pressed=true] { color:#b5edf5; background:#314957; border-color:#7d9cab; }
+button:focus-visible,a:focus-visible,input:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+dl { display:grid; gap:.60rem; margin:.24rem 0 0; }
+dl div { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
+dd { margin:0; font:650 .86rem/1.3 ui-monospace,monospace; white-space:nowrap; }
+#contacts { color:var(--contact); }
+footer { display:flex; justify-content:space-between; gap:.6rem 1.4rem; padding:.75rem 0; font-size:.82rem; color:var(--muted); }
+footer p { margin:0; }
+footer a { color:inherit; text-underline-offset:.22em; white-space:nowrap; }
+@media(max-width:54rem) {
+  header { align-items:start; flex-direction:column; gap:.73rem; }
+  header p { max-width:46ch; }
+  .exhibit { grid-template-columns:minmax(0,1fr); }
+  figure { height:clamp(18rem,46vh,27rem); }
+  .controls { border-left:0; border-top:1px solid var(--line); gap:.68rem; padding:.91rem 1rem 1rem; }
+  .dial { flex-direction:row; justify-content:space-between; align-items:baseline; }
+  output { font-size:2.7rem; }
+}
+@media(max-width:29rem) {
+  main { width:calc(100% - 1.5rem); }
+  h1 { font-size:clamp(2.66rem,12.2vw,3.22rem); }
+  header p { font-size:.94rem; }
+  figure { height:clamp(17.6rem,42vh,24rem); }
+  .view { inset:.29rem .61rem auto auto; }
+  figcaption { bottom:.55rem; }
+  footer { flex-direction:column; }
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#152929">
+  <meta name="description" content="Move two magnets and see a board of compass needles trace their combined magnetic field.">
+  <title>The Magnetic Field Mapper · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-Dhgf9AgG.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CqDUG2Iu.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Magnetic Field Mapper</h1>
+      <p>Move the magnets closer or reverse one pole. Every compass follows the field where it sits.</p>
+    </header>
+    <section class="exhibit" aria-label="The magnetic field around two movable spheres">
+      <figure>
+        <canvas id="scene" aria-label="Two red and blue spheres above rows of directional compass needles"></canvas>
+        <button id="view" type="button" aria-pressed="false" disabled>Plan view</button>
+        <p id="loading" role="status">Preparing the compasses…</p>
+      </figure>
+      <aside aria-label="Magnet positions and readings">
+        <div class="control">
+          <div><label for="separation">Magnet separation</label><output id="separation-value" for="separation">170 mm</output></div>
+          <input id="separation" type="range" min="120" max="260" value="170" step="2" disabled>
+        </div>
+        <button id="flip" type="button" aria-pressed="false" disabled>Reverse right magnet</button>
+        <dl>
+          <div><dt>Pole arrangement</dt><dd><output id="alignment">Same direction</output></dd></div>
+          <div><dt>Horizontal field at center</dt><dd><output id="field">—</output><small>µT</small></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>
+

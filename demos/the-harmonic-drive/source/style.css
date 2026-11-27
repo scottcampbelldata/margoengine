@@ -1,0 +1,58 @@
+:root {
+  font-family: system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-synthesis: none;
+  background: #0c1721;
+  color: #e3ebeb;
+  --copper: #efb784;
+  --blue: #a3d8dd;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { width: min(100% - 8vw,85rem); margin: auto; padding: 2rem 0 3rem; }
+nav a { color: inherit; font-weight: 700; font-size: .83rem; text-decoration: none; }
+nav span { padding-left: 1rem; margin-left: .8rem; border-left: 1px solid #4f6573; color: #b4c6cc; font-weight: 500; }
+header { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin: 2.15rem 0 1.6rem; }
+h1 { margin: 0; max-width: 12ch; font-weight: 775; font-size: clamp(3rem,6.5vw,6rem); line-height: .88; letter-spacing: -.075em; }
+header p { margin: 0 .25rem .12rem 0; flex: 0 0 min(26rem,43%); font-size: clamp(.99rem,1.34vw,1.19rem); color: #c4d4d8; line-height: 1.53; }
+.assembly { display: grid; grid-template-columns: minmax(0,1fr) minmax(19rem,25%); border: 1px solid #506473; background: #142736; }
+figure { position: relative; margin: 0; min-width: 0; height: clamp(22rem,58vh,39rem); background: #45515b; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; }
+#loading { position: absolute; inset: 0; display: grid; margin: 0; place-content: center; background: #45515b; }
+#loading[hidden] { display: none; }
+button { min-height: 44px; padding: .3rem .65rem; background: #233c4c; color: #eef4f5; border: 1px solid #708492; font: 650 .83rem system-ui,sans-serif; cursor: pointer; }
+button:hover:enabled,button[aria-pressed=true] { background: #324d5f; }
+button:disabled { opacity: .6; cursor: default; }
+button:focus-visible,input:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+#view { position: absolute; top: .68rem; left: .68rem; }
+aside { display: flex; flex-direction: column; justify-content: center; padding: 1.55rem clamp(1rem,2vw,1.95rem); border-left: 1px solid #506473; }
+.heading,.scale { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
+.heading { font-size: .92rem; }
+#input { color: var(--blue); font-variant-numeric: tabular-nums; font-size: .84rem; }
+input[type=range] { width: 100%; margin: 0; height: 42px; accent-color: var(--blue); cursor: pointer; }
+.scale { color: #b4c6cc; font-size: .74rem; }
+.actions { display: grid; grid-template-columns: 1.35fr 1fr; gap: .42rem; margin: 1.1rem 0 1.45rem; }
+.result { display: grid; gap: .36rem; padding: 1.05rem 0 .86rem; border-top: 1px solid #607682; color: #cedade; font-size: .83rem; }
+#output { color: var(--copper); font-weight: 560; line-height: .94; font-size: clamp(2.7rem,4.5vw,4.3rem); letter-spacing: -.065em; font-variant-numeric: tabular-nums; }
+.facts { display: grid; grid-template-columns: 1fr auto; row-gap: .37rem; align-items: baseline; font-size: .79rem; border-top: 1px solid #4a6470; padding-top: .67rem; }
+.facts span:nth-child(2n) { text-align: right; font-weight: 620; }
+.witness { color: #b4c6cc; font-size: .76rem; line-height: 1.48; margin: .85rem 0 0; }
+footer { display: grid; grid-template-columns: 1fr minmax(0,.76fr); gap: 1rem; padding-top: .85rem; color: #bfd0d5; font-size: .83rem; line-height: 1.55; }
+footer p { margin: 0; }
+summary { text-align: right; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
+details p { margin-top: .75rem; }
+details ul { padding: 0 0 0 1rem; }
+details a { color: inherit; }
+@media(max-width: 700px) {
+  main { width: calc(100% - 24px); padding-top: 1.15rem; }
+  header { display: block; margin: 1.28rem 0 .9rem; }
+  h1 { max-width: none; font-size: clamp(2.35rem,9.5vw,4.4rem); }
+  header p { font-size: .9rem; line-height: 1.43; margin-top: .65rem; }
+  .assembly { grid-template-columns: 1fr; }
+  figure { height: clamp(17rem,87vw,28rem); }
+  aside { border-top: 1px solid #506473; border-left: 0; padding: .92rem .95rem 1rem; }
+  .actions { margin: .8rem 0 .86rem; }
+  .result { grid-template-columns: 1fr auto; align-items: baseline; padding: .77rem 0; }
+  #output { font-size: 2.42rem; }
+  footer { grid-template-columns: 1fr; gap: .46rem; }
+  summary { text-align: left; }
+}

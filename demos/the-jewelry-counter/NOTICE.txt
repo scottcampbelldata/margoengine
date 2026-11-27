@@ -1,0 +1,4 @@
+Margo Engine
+Copyright 2026 Scott Campbell
+
+This product includes Margo Engine (https://margoengine.com) by Scott Campbell.

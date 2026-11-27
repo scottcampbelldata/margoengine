@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f0e9dd">
+  <meta name="description" content="Release a miniature crane’s linked pendulum into stacked blocks and compare how much of the tower falls.">
+  <title>The Wrecking Ball | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-La4ktwRw.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BHc9x3b_.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span>/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Wrecking Ball</h1>
+      <p>Release the ball and see how a swing travels through thirty separately stacked blocks.</p>
+    </header>
+    <section class="exhibit" aria-label="Miniature crane and block tower">
+      <figure>
+        <canvas id="scene" aria-label="Red steel crane, swinging black iron ball with visible chain links, and alternating courses of wood blocks on a museum plinth"></canvas>
+        <p id="loading" role="status">Preparing the crane and tower…</p>
+        <p id="error" role="alert" hidden></p>
+        <figcaption><span>Rigid-body model</span><span>Deck marks every 10 cm</span></figcaption>
+      </figure>
+      <aside aria-label="Crane controls and readings">
+        <fieldset id="controls" disabled>
+          <legend class="sr-only">Crane controls</legend>
+          <button id="release" type="button" class="primary">Release ball <span aria-hidden="true">↘</span></button>
+          <fieldset id="angle-group">
+            <legend>Pullback angle</legend>
+            <div class="angles">
+              <label><input type="radio" name="angle" value="34"><span>34°</span></label>
+              <label><input type="radio" name="angle" value="47"><span>47°</span></label>
+              <label><input type="radio" name="angle" value="58" checked><span>58°</span></label>
+            </div>
+          </fieldset>
+          <button id="reset" class="secondary" type="button">Rebuild tower <span aria-hidden="true">↺</span></button>
+        </fieldset>
+        <dl>
+          <div><dt>First impact speed</dt><dd><output id="speed">—</output><small>m/s</small></dd></div>
+          <div><dt>Blocks fallen</dt><dd><output id="fallen">0</output><small>/ 30</small></dd></div>
+        </dl>
+        <p id="trial" role="status">The ball is latched.</p>
+      </aside>
+    </section>
+    <footer>
+      <span>Exhibit sources</span>
+      <a href="https://collection.sciencemuseumgroup.org.uk/objects/co2015/demainbrays-wharf-jib-crane-model">Science Museum Group</a>
+      <a href="https://openstax.org/books/university-physics-volume-1/pages/8-3-conservation-of-energy">Pendulum energy</a>
+      <a href="./source/README.md">Model and source</a>
+    </footer>
+  </main>
+</body>
+</html>

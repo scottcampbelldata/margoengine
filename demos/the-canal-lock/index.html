@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#222d2b">
+  <meta name="description" content="Take a narrowboat through a working cutaway canal lock and watch the water carry it to the next reach.">
+  <title>The Canal Lock | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-C-eOfDW0.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CHdv7Y8d.css">
+</head>
+<body data-state="loading" data-phase="waiting" data-port="lower">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header><h1>The Canal Lock</h1><p>Take a narrowboat from one reach to the next. The gates seal, water moves through the culvert, and the boat rises with the chamber.</p></header>
+    <section class="exhibit" aria-label="Working canal lock">
+      <figure>
+        <canvas id="scene" aria-label="Architectural cutaway of a canal lock with a narrowboat, two miter gates, and a lockkeeper’s cottage"></canvas>
+        <p id="loading" role="status">Opening the canal lock…</p>
+        <div class="pool" id="low-label">Lower reach</div>
+        <div class="pool" id="high-label">Upper reach</div>
+      </figure>
+      <div class="operation">
+        <div class="actions">
+          <button id="travel" type="button" disabled>Lift the boat</button>
+          <button id="reset" type="button" disabled>Reset</button>
+        </div>
+        <ol id="route" aria-label="Lockage sequence">
+          <li>Enter</li><li>Seal</li><li>Equalize</li><li>Open</li><li>Exit</li>
+        </ol>
+        <dl>
+          <div><dt>Chamber level</dt><dd><output id="level">0.92</output><small>m</small></dd></div>
+          <div><dt>Water transferred</dt><dd><output id="volume">0</output><small>m³</small></dd></div>
+          <div><dt>Valve flow</dt><dd><output id="flow">0.0</output><small>m³/s</small></dd></div>
+        </dl>
+      </div>
+      <p id="phase-message" role="status">Lower gates open. The boat is waiting to enter.</p>
+    </section>
+    <footer><span>1.80 m lift · Accelerated model</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

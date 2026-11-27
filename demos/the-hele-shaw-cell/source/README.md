@@ -1,0 +1,18 @@
+# The Hele–Shaw Cell
+
+Choose a disk from 48 to 158 mm in 2 mm increments. The colored traces show how the same fluid takes new paths around each disk. The throughput falls as the disk grows. The display also reports peak gap-averaged speed and the loss in throughput relative to the empty cell. **Pause dye** holds a frame. Under reduced-motion settings, **Step dye** advances the packets.
+
+## Model
+
+The 420 × 240 mm chamber has a uniform 1 mm gap. A single Newtonian liquid has viscosity 0.080 Pa·s. The left and right manifolds maintain a 420 Pa pressure difference. The parallel gaps give the depth-averaged Darcy velocity **u = −b²∇p/(12μ)**, where **b** is the gap and **μ** the dynamic viscosity. Incompressibility **∇·u = 0** gives **∇²p = 0** in the fluid. The top and bottom edges in plan and the disk are impermeable. The largest calculated gap Reynolds number is below 0.04 for density near 1,150 kg/m³, within the viscous regime for this illustration.
+
+The solver uses an 84 × 48 finite-volume grid with 5 mm cells. A face shared by fluid cells carries a single pressure-driven flux of equal and opposite sign for the two cells. Solid faces carry zero flux. The disk boundary follows the cell mask to grid resolution. Inlet and outlet faces apply the prescribed pressure at a half-cell distance. Conjugate gradients solve the resulting balance. The steady streamfunction is reconstructed by accumulating the signed horizontal face flux across each column. Lines of constant streamfunction pass through the corresponding inlet dye ports. The pulses advance at the calculated horizontal speed, interpolated along those lines and shown at 55× time. The drawn paths may be offset up to the clearance needed to keep them outside the smooth drawn disk. Colored ribbons show passive traces of the same liquid. Dye diffusion, through-gap spreading, near-wall corrections and the transient from exchanging a disk are outside the model.
+
+## References and provenance
+
+- [Henry Selby Hele-Shaw, *The Flow of Water*, 1898](https://doi.org/10.1038/058034a0). The original experimental visualization of liquid passing an obstacle between close plates.
+- [George Gabriel Stokes, *Mathematical Proof of the Identity of the Stream Lines obtained by means of a Viscous Film with those of a Perfect Fluid moving in Two Dimensions*, 1898](https://www.cambridge.org/core/books/abs/mathematical-and-physical-papers/1898-mathematical-proof-of-the-identity-of-the-stream-lines-obtained-by-means-of-a-viscous-film-with-those-of-a-perfect-fluid-moving-in-two-dimensions/6C7393963EFB235B0B359E017A991C0E). The depth reduction and correspondence with two-dimensional potential flow.
+- [Michael J. Shelley, Fei-Ran Tian and Krzysztof Wlodarski, *Hele–Shaw flow and pattern formation in a time-dependent gap*, 1997](https://math.nyu.edu/~shelley/papers/STW1997.pdf). Depth-averaged Darcy mobility and the continuity equation. This exhibit keeps the gap constant.
+- [GUNT, *HM 152 Flow visualisation on a Hele-Shaw cell*](https://www.gunt.de/en/products/fluid-mechanics/flow-around-bodies/streamlines-and-flow-fields/potential-flow/070.15200/hm152/glct-1%3Apa-148%3Aca-785%3Apr-588). Manufacturer's reference for plate fittings, contrast inlet, and practical bench arrangement. Artwork, meshes and reflections are original.
+
+The normal showcase build supplies the pinned public Margo Engine packages. Serve its output over HTTP. Add `?backend=webgl2` to exercise the Margo WebGL2 renderer. Both paths use the same scene and model.

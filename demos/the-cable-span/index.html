@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171e21">
+  <meta name="description" content="Move a proof cart across a suspended footbridge. Watch its twin cables and timber deck find a new equilibrium.">
+  <title>The Cable Span | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-i1CMZSMx.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CNt8SbZq.css">
+</head>
+<body data-state="loading" data-view="perspective">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Cable Span</h1>
+      <p>Roll a proof cart across the gorge. Watch its weight pull the timber deck down and redistribute tension between the two towers.</p>
+    </header>
+    <section class="exhibit" aria-label="Suspension bridge load test">
+      <figure>
+        <canvas id="scene" aria-label="Interactive 3D model of a timber suspension bridge over a slate gorge"></canvas>
+        <p id="loading" role="status">Preparing the bridge…</p>
+        <div class="scene-plaque"><i></i>Gorge footbridge <span>24 m between towers</span></div>
+        <p id="trace-key" hidden><b></b>Unloaded cable</p>
+      </figure>
+      <aside aria-label="Load controls and measurements">
+        <div class="control">
+          <div class="label">
+            <label for="position">Cart position</label>
+            <output id="cart-readout" for="position">6.00 m</output>
+          </div>
+          <input id="position" type="range" min="0" max="24" value="6" step=".25" disabled>
+          <div class="endpoints"><span>West tower</span><span>East tower</span></div>
+        </div>
+        <dl class="measures">
+          <div><dt>Drop beneath cart</dt><dd><output id="drop">54</output><small>cm</small></dd></div>
+          <div><dt>Peak cable tension</dt><dd><output id="tension">17.5</output><small>kN</small></dd></div>
+          <div class="reactions">
+            <dt>Vertical load at saddles</dt>
+            <dd>
+              <div><span>West</span><output id="west">17.4</output><small>kN</small></div>
+              <div><span>East</span><output id="east">12.5</output><small>kN</small></div>
+            </dd>
+          </div>
+        </dl>
+        <div class="actions">
+          <button id="reference" type="button" aria-pressed="false" disabled><span aria-hidden="true"></span>Unloaded cable</button>
+          <button id="view" type="button" aria-pressed="false" disabled>Side view</button>
+        </div>
+      </aside>
+    </section>
+    <footer><span>9.8 kN proof load · Quasistatic model · Tension shown per cable</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

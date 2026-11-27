@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9ebe0">
+  <meta name="description" content="Follow colored dye through a thin glass cell and widen a cylinder to divert the flow.">
+  <title>The Hele–Shaw Cell | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-B6yB4uJV.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-COmhOuuY.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Hele–Shaw Cell</h1>
+      <p>Dye threads reveal how liquid slips around a disk between two glass plates. Widen the disk to see the flow squeeze through the remaining space.</p>
+    </header>
+    <section class="rig" aria-label="Working Hele–Shaw flow bench">
+      <figure>
+        <canvas id="scene" aria-label="A glass laboratory cell with rose and teal dye traces splitting around a brass and ceramic disk"></canvas>
+        <p id="loading" role="status">Preparing the glass cell…</p>
+        <div class="tag" id="inlet" aria-hidden="true">Dye inlet</div>
+        <div class="tag" id="disk" aria-hidden="true">Disk</div>
+        <div class="tag" id="outlet" aria-hidden="true">Outlet</div>
+      </figure>
+      <aside aria-label="Obstacle diameter and flow readings">
+        <div class="control">
+          <div class="row"><label for="diameter">Disk diameter</label><output for="diameter" id="diameter-value">96 mm</output></div>
+          <input id="diameter" type="range" min="48" max="158" step="2" value="96" disabled>
+          <div class="limits"><span>48 mm</span><span>158 mm</span></div>
+        </div>
+        <dl>
+          <div class="main-reading"><dt>Throughput</dt><dd><output id="flow">—</output><small>mL/min</small></dd></div>
+          <div><dt>Peak speed</dt><dd><output id="peak">—</output><small>mm/s</small></dd></div>
+          <div><dt>Flow reduced by</dt><dd><output id="reduction">—</output><small>%</small></dd></div>
+        </dl>
+        <button id="pause" type="button" disabled>Pause dye</button>
+      </aside>
+    </section>
+    <footer><span>1 mm plate gap · 420 Pa pressure drop · Accelerated dye playback</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

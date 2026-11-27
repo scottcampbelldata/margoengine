@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f1ede2">
+  <meta name="description" content="Load two paper spans side by side and see how a crease changes the way a bridge bends.">
+  <title>The Paper Bridge · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-bGKa9E29.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BBO1DFYF.css">
+</head>
+<body data-state="loading">
+  <main class="exhibit">
+    <nav class="mast" aria-label="Gallery">
+      <a href="../">Margo Engine<span> / </span>Web Demos</a>
+      <a href="#method">About the model</a>
+    </nav>
+    <header class="intro">
+      <h1>The Paper Bridge</h1>
+      <p>Two identical sheets. Change the folds, then load both spans to see how much each one bends.</p>
+    </header>
+    <figure class="bench">
+      <div class="view">
+        <canvas id="scene" aria-label="A materials test bench comparing a flat card span and a folded span under equal loads"></canvas>
+        <p id="loading" role="status">Opening the test bench…</p>
+        <span class="specimen-tag" id="flat-pin" aria-hidden="true"><b>A</b> Flat reference</span>
+        <span class="specimen-tag" id="fold-pin" aria-hidden="true"><b>B</b> Folded sheet</span>
+        <div id="stress-key" hidden><span>Compression</span><span>Tension</span></div>
+        <button type="button" id="inspect" class="inspect" aria-pressed="false" disabled>Inspect the folds</button>
+      </div>
+      <figcaption class="result">
+        <div class="readout">
+          <div class="swatch" aria-hidden="true">A</div>
+          <dl><dt>Flat deflection</dt><dd><output id="flat-bend" aria-live="off">—</output><small> mm</small></dd></dl>
+        </div>
+        <div class="readout">
+          <div class="swatch fold-swatch" aria-hidden="true">B</div>
+          <dl><dt>Folded deflection</dt><dd><output id="fold-bend" aria-live="off">—</output><small> mm</small></dd></dl>
+        </div>
+        <div class="readout ratio">
+          <dl><dt>Relative stiffness</dt><dd><output id="ratio" aria-live="off">—</output><small> ×</small></dd></dl>
+        </div>
+      </figcaption>
+    </figure>
+    <section class="controls" aria-label="Test bench controls">
+      <label class="slider-control" for="load">
+        <span class="control-heading"><span>Load on each span</span><output id="load-value" for="load">18 g</output></span>
+        <input type="range" id="load" min="0" max="30" value="18" step="1" disabled>
+        <span class="slider-range" aria-hidden="true"><span>0 g</span><span>30 g</span></span>
+      </label>
+      <label class="slider-control" for="fold">
+        <span class="control-heading"><span>Fold depth</span><output id="fold-value" for="fold">8 mm</output></span>
+        <input type="range" id="fold" min="0" max="9" value="8" step=".5" disabled>
+        <span class="slider-range" aria-hidden="true"><span>Flat</span><span>9 mm</span></span>
+      </label>
+      <div class="actions">
+        <button type="button" id="cycle" disabled>Run load cycle</button>
+        <button type="button" id="stress" aria-pressed="false" disabled>Show stress</button>
+      </div>
+    </section>
+    <section class="method" id="method" aria-label="About the test">
+      <div>
+        <h2>What the folds change</h2>
+        <p>Folds move paper farther from the middle of the section. The thicker profile bends less under the same load, even though it uses the same amount of card.</p>
+      </div>
+      <dl class="stress-data">
+        <div><dt>A · Peak bending stress</dt><dd><output id="flat-stress">—</output><small> MPa</small></dd></div>
+        <div><dt>B · Peak bending stress</dt><dd><output id="fold-stress">—</output><small> MPa</small></dd></div>
+      </dl>
+      <p class="limits">The model predicts elastic bending for 0.50 mm card across a 180 mm span. It does not predict buckling, permanent creases, or the load at failure. <a href="./source/README.md">Read the method and sources</a>.</p>
+    </section>
+  </main>
+</body>
+</html>

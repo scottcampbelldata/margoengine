@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e5ebec">
+  <meta name="description" content="Slide a knife edge into a focused beam to reveal otherwise invisible temperature gradients above a heater.">
+  <title>The Schlieren Bench · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BdwZyPCY.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BBik2EG5.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Schlieren Bench</h1><p>Slide a knife edge into the beam to reveal the currents above a heater.</p></header>
+    <section class="stage" aria-label="Interactive schlieren optical bench">
+      <canvas id="scene" aria-label="Two concave mirrors send light through a heated test region to a knife edge and a monitor"></canvas>
+      <button type="button" id="view" aria-pressed="false" disabled>Inspect the plume</button>
+      <p id="loading" role="status">Aligning the optical bench…</p>
+    </section>
+    <section class="panel" aria-label="Knife edge controls">
+      <div class="field">
+        <label for="cutoff">Knife-edge cutoff</label><output id="cutoff-value" for="cutoff">50%</output>
+        <input id="cutoff" type="range" min="0" max="100" step="1" value="50" disabled>
+      </div>
+      <button id="bypass" type="button" aria-pressed="false" disabled>Withdraw blade</button>
+      <dl class="readings">
+        <div><dt id="clear-label">Clear-field transmission</dt><dd><output id="clear" aria-labelledby="clear-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Projected refractive-index gradient</span></footer>
+  </main>
+</body>
+</html>

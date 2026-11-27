@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e6e8">
+  <meta name="description" content="Translate a mirror by nanometers and watch a Michelson interferometer count the distance in light fringes.">
+  <title>The Michelson Interferometer · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-O5NJDbOO.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index--TJg1Ryj.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Michelson Interferometer</h1><p>Move one mirror by nanometers and watch the interference fringes slide.</p></header>
+    <section class="stage" aria-label="Interactive Michelson interferometer">
+      <canvas id="scene" aria-label="A laser and a cube splitter feed perpendicular mirror arms and a circular fringe detector"></canvas>
+      <button id="view" type="button" aria-pressed="false" disabled>Inspect fringes</button>
+      <p id="loading" role="status">Aligning the interferometer…</p>
+    </section>
+    <section class="panel" aria-label="Mirror position and optical measurements">
+      <div class="field">
+        <label for="position">Mirror travel</label><output for="position" id="position-value">79.1 nm</output>
+        <input id="position" type="range" min="0" max="1265.6" step=".1" value="79.1" disabled>
+      </div>
+      <div class="actions" aria-label="Reference positions">
+        <button type="button" id="zero" disabled>Zero</button>
+        <button type="button" id="half" disabled>+½ fringe</button>
+      </div>
+      <dl class="readings">
+        <div><dt id="path-label">Round-trip change</dt><dd><output id="path" aria-labelledby="path-label">—</output></dd></div>
+        <div><dt id="count-label">Fringes passed</dt><dd><output id="count" aria-labelledby="count-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>632.8 nm · One fringe per 316.4 nm of travel</span></footer>
+  </main>
+</body>
+</html>

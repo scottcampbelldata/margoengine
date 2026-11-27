@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e7ebe0">
+  <meta name="description" content="Change river discharge and watch the modeled saltwater intrusion retreat beneath the fresh layer of a coastal estuary.">
+  <title>The Salt Wedge | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-RkMyp0Nf.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BLD2sfzV.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Salt Wedge</h1>
+      <p>Denser seawater lies beneath the river at the coast. Increase river discharge and watch the tip of the salt wedge retreat toward the sea.</p>
+    </header>
+    <section class="rig" aria-label="Estuary cross-section">
+      <figure>
+        <canvas id="scene" aria-label="A coastal estuary cutaway with green freshwater moving over a blue saline wedge, backed by a marsh and lighthouse"></canvas>
+        <p id="loading" role="status">Preparing the estuary…</p>
+        <div class="tag" id="fresh" aria-hidden="true">Freshwater</div>
+        <div class="tag" id="salt" aria-hidden="true">Saltwater</div>
+        <div class="tag" id="toe" aria-hidden="true">Wedge tip</div>
+      </figure>
+      <aside aria-label="River discharge and wedge readings">
+        <div class="control">
+          <div class="row"><label for="discharge">River discharge</label><output id="flow-value" for="discharge">104 m³/s</output></div>
+          <input id="discharge" type="range" min="80" max="146" step="2" value="104" disabled>
+          <div class="limits"><span>80 m³/s</span><span>146 m³/s</span></div>
+        </div>
+        <dl>
+          <div class="first"><dt>Salt wedge reach</dt><dd><output id="reach">—</output><small>m</small></dd><p>Inland from the mouth</p></div>
+          <div><dt>Salt depth at mouth</dt><dd><output id="depth">—</output><small>m</small></dd></div>
+          <div><dt>Density difference</dt><dd>21<small>kg/m³</small></dd></div>
+        </dl>
+        <button id="pause" type="button" disabled>Pause tracers</button>
+      </aside>
+    </section>
+    <footer><span>Steady two-layer model · Vertical scale exaggerated · Tracers sped up</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Scrub through dusk in a city built and lit in Margo Engine.">
+  <meta name="theme-color" content="#121824">
+  <title>The Night City · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-wTBfMbhn.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BHlubrpt.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Night City</h1>
+      <p>Follow the last sunlight across a city as its street lamps and windows come on block by block.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive dusk-to-night skyline">
+      <figure aria-label="Port Meridian at dusk">
+        <canvas id="city" aria-label="A dense city skyline, street grid, and glass towers through twilight"></canvas>
+        <p id="status" role="status">Building the skyline…</p>
+        <div class="view-switch" aria-label="Camera views">
+          <button type="button" data-view="skyline" aria-pressed="true" disabled>Skyline</button>
+          <button type="button" data-view="avenue" aria-pressed="false" disabled>Avenue</button>
+        </div>
+      </figure>
+      <aside aria-label="Daylight controls">
+        <div class="time"><label for="time">Local solar time</label><output id="clock" for="time">18:16</output></div>
+        <input id="time" type="range" min="1050" max="1260" value="1096" step="1" disabled>
+        <div class="scale" aria-hidden="true"><span>17:30</span><span>21:00</span></div>
+        <button id="play" type="button" disabled>Play evening</button>
+        <dl>
+          <div><dt>Sun elevation</dt><dd id="sun">—</dd></div>
+          <div><dt>Lit windows</dt><dd id="windows">—</dd></div>
+          <div><dt>Street lamps on</dt><dd id="lamps">—</dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer>
+      <p>Port Meridian is a fictional city. Its solar time follows a late-summer day at 34.6° north.</p>
+      <details>
+        <summary>Model and sources</summary>
+        <p>The skyline, blocks, and façades are built in code. A scheduled lighting wave activates street lamps and occupied rooms. Margo’s screen-space reflections use surfaces and lights visible in the current view.</p>
+        <ul>
+          <li><a href="https://www.discoverhongkong.com/eng/attractions/the-best-vantage-points-for-viewing-the-iconic-skyline.html">Hong Kong Tourism Board skyline study</a></li>
+          <li><a href="https://doi.org/10.1145/383259.383292">Parish and Müller on procedural cities</a></li>
+          <li><a href="https://aa.usno.navy.mil/faq/RST_defs">U.S. Naval Observatory twilight definitions</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171e2b">
+  <meta name="description" content="Launch a ring of dye through a dark water tank and see how circulation changes its rise.">
+  <title>The Vortex Ring | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CrLRO8Ak.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BeL6x4rV.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Vortex Ring</h1>
+      <p>Dye makes a rising vortex visible. Give the ring more circulation and watch it cover more distance in the same time.</p>
+    </header>
+    <section class="rig" aria-label="Working vortex ring tank">
+      <figure>
+        <canvas id="scene" aria-label="Cyan dye rolling into a ring inside a transparent dark water tank, with a gold gauge marking the modeled ring center"></canvas>
+        <p id="loading" role="status">Preparing the tank…</p>
+        <div class="marker" id="scale" aria-hidden="true"><i></i>Model center</div>
+      </figure>
+      <aside aria-label="Circulation and vortex readings">
+        <div class="control">
+          <div class="row"><label for="circulation">Launch circulation</label><output for="circulation" id="strength">25 cm²/s</output></div>
+          <input id="circulation" type="range" min="18" max="33" step="1" value="25" disabled>
+          <div class="limits"><span>18 cm²/s</span><span>33 cm²/s</span></div>
+        </div>
+        <dl>
+          <div class="first"><dt>Center speed</dt><dd><output id="speed">—</output><small>cm/s</small></dd></div>
+          <div><dt>Rise from launch</dt><dd><output id="rise">—</output><small>cm</small></dd></div>
+          <div><dt>Core radius</dt><dd><output id="core">—</output><small>mm</small></dd></div>
+        </dl>
+        <p class="time"><span>Model age</span><output id="clock">3.5 s</output></p>
+        <div class="actions"><button id="replay" type="button" disabled>Launch again</button><button id="pause" type="button" disabled>Pause</button></div>
+      </aside>
+    </section>
+    <footer><span>Gold marks the model center · Cyan shows dye · Slowed playback</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>
