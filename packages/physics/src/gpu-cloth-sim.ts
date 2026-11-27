@@ -8,6 +8,7 @@
 // (Macklin, Müller, Chentanez and Kim 2014) and a flat plate's quadratic drag (Hoerner 1965). Sources: docs/clean-room.md,
 // "GPU cloth".
 import type { Quat, Vec3 } from '@margoengine/math';
+import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from './body.js';
 import type { DebugLines } from './debug.js';
@@ -85,8 +86,12 @@ export type GPUClothColliderDesc = GPUClothShape & {
 export interface GPUClothOptions {
   /** Gravity in m/s^2 (default the `physics` world's, else [0, -9.81, 0]), times the description's gravity scale. */
   gravity?: Vec3;
-  /** The wind in m/s: a velocity, or a function of the cloth's time in seconds (default still air). */
-  wind?: Vec3 | ((time: number) => Vec3);
+  /**
+   * The wind in m/s: a velocity, a function of the cloth's time in seconds, or a `FlowField` of `@margoengine/math/fields`
+   * (the framework's shared wind, ATMO-01), sampled once a frame at the cloth's centre at the cloth's time, its density the
+   * air's unless `airDensity` is given (default still air).
+   */
+  wind?: Vec3 | ((time: number) => Vec3) | FlowField;
   /** How much the wind varies over the cloth and in time, 0 to 1 (default 0.25): gusts that make a flag flap. */
   turbulence?: number;
   /** Air density, kg/m^3 (default 1.2). 0 turns the air off. */
@@ -228,24 +233,39 @@ const num = (v: unknown, fallback: number, name: string, min: number, max = Infi
   return n;
 };
 
-/** Checks and fills in every setting for this frame; `time` is the cloth's time, for a wind function. */
+const flowSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+
+/**
+ * Checks and fills in every setting for this frame; `time` is the cloth's time, for a wind function, and `centre` where a
+ * flow-field wind is sampled.
+ */
 export function resolveClothParams(
   options: GPUClothOptions,
   topology: ClothTopology,
   worldGravity: Vec3 | undefined,
   time: number,
+  centre: Vec3 = [0, 0, 0],
 ): ResolvedClothParams {
   if (!options || typeof options !== 'object') throw clothError('GPUCloth options must be an object.');
   const g = options.gravity === undefined ? (worldGravity ?? [0, -9.81, 0]) : vec(options.gravity, 'gravity');
   const s = topology.gravityScale;
-  const wind = typeof options.wind === 'function' ? vec(options.wind(time), 'wind(time)') : vec(options.wind ?? [0, 0, 0], 'wind');
+  const source = options.wind;
+  let density = options.airDensity;
+  let wind: Vec3;
+  if (typeof source === 'function') wind = vec(source(time), 'wind(time)');
+  else if (source && typeof source === 'object' && typeof (source as FlowField).sample === 'function') {
+    const flow = source as FlowField;
+    const at = flow.sample(centre[0], centre[1], centre[2], time, flowSample);
+    wind = vec(at.velocity, 'wind.sample(...).velocity');
+    if (density === undefined) density = num(at.density, 0, 'wind.sample(...).density', 0, 2000);
+  } else wind = vec(source ?? [0, 0, 0], 'wind');
   const substeps = num(options.substeps, 30, 'substeps', 1, MAX_GPU_CLOTH_SUBSTEPS);
   if (!Number.isInteger(substeps)) throw clothError(`GPUCloth substeps is ${substeps}; pass a whole number from 1 to 64.`);
   return {
     gravity: [g[0] * s, g[1] * s, g[2] * s],
     wind,
     turbulence: num(options.turbulence, 0.25, 'turbulence', 0, 1),
-    dragK: 0.5 * num(options.airDensity, 1.2, 'airDensity', 0, 2000) * num(options.drag, 1.17, 'drag', 0, 10),
+    dragK: 0.5 * num(density, 1.2, 'airDensity', 0, 2000) * num(options.drag, 1.17, 'drag', 0, 10),
     compliance: [
       num(options.stretchCompliance, 0, 'stretchCompliance', 0),
       num(options.shearCompliance, 0, 'shearCompliance', 0),

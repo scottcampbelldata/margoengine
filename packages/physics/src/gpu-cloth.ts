@@ -242,6 +242,18 @@ export class GPUCloth implements EnginePlugin {
       throw clothError(`GPUCloth.${action} takes a particle index from 0 to ${this.count - 1}, not ${String(i)}.`);
     return i;
   }
+  /** The mean of the particles where the cloth last had them: where a flow-field wind is sampled. */
+  private centre(): Vec3 {
+    let x = 0,
+      y = 0,
+      z = 0;
+    for (let i = 0; i < this.count; i++) {
+      x += this.mirror[i * 4]!;
+      y += this.mirror[i * 4 + 1]!;
+      z += this.mirror[i * 4 + 2]!;
+    }
+    return [x / this.count, y / this.count, z / this.count];
+  }
   /** Where the cloth last had particle `i`: the CPU state, or on the WebGPU route the last read back (the rest shape before one). */
   private known(i: number): Vec3 {
     return [this.mirror[i * 4]!, this.mirror[i * 4 + 1]!, this.mirror[i * 4 + 2]!];
@@ -389,7 +401,7 @@ export class GPUCloth implements EnginePlugin {
     if (!Number.isInteger(steps) || steps < 1 || steps > 1000)
       throw clothError(`GPUCloth.step takes a whole number of steps from 1 to 1000, not ${String(steps)}.`);
     for (let done = 0; done < steps; ) {
-      const params = resolveClothParams(this.options, this.topology, this.world?.gravity, this.time);
+      const params = resolveClothParams(this.options, this.topology, this.world?.gravity, this.time, this.centre());
       const n = Math.min(steps - done, Math.max(1, Math.floor(GPU_CLOTH_FRAME_SUBSTEPS / params.substeps)));
       const frame = this.plan(n, params);
       const rt = this.runtime;
@@ -501,7 +513,7 @@ export class GPUCloth implements EnginePlugin {
     this.live('debugRender');
     if (this.runtime && !this.compat && !this.reading)
       this.reading = this.readBack().finally(() => (this.reading = null));
-    const params = resolveClothParams(this.options, this.topology, this.world?.gravity, this.time);
+    const params = resolveClothParams(this.options, this.topology, this.world?.gravity, this.time, this.centre());
     const N = this.count;
     return clothDebugLines(
       this.mirror.subarray(0, N * 4),
@@ -541,7 +553,7 @@ export class GPUCloth implements EnginePlugin {
   /** @internal Each frame, after the physics step: reads the pins' and colliders' poses and plans the frame's steps. */
   onPreUpdate(delta: number): void {
     if (this.disposed) return;
-    const params = resolveClothParams(this.options, this.topology, this.world?.gravity, this.time);
+    const params = resolveClothParams(this.options, this.topology, this.world?.gravity, this.time, this.centre());
     if (params.paused || !(delta > 0)) return;
     this.pending += Math.min(delta, FRAME_DELTA_CAP);
     const most = Math.max(1, Math.floor(GPU_CLOTH_FRAME_SUBSTEPS / params.substeps));

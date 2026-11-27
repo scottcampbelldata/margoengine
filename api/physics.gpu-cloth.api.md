@@ -6,6 +6,7 @@
 import { EngineKernel, Geometry, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { Quat } from "@margoengine/math";
+import { FlowField } from "@margoengine/math/fields";
 
 export class ClothCollider {
     readonly shape: GPUClothShape['shape'];
@@ -87,7 +88,7 @@ export interface GPUClothDebugOptions {
 
 export interface GPUClothOptions {
     gravity?: Vec3;
-    wind?: Vec3 | ((time: number) => Vec3);
+    wind?: Vec3 | ((time: number) => Vec3) | FlowField;
     turbulence?: number;
     airDensity?: number;
     drag?: number;

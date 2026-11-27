@@ -332,3 +332,42 @@ test('the CPU route counts its work exactly: substeps, particle updates, edge so
   });
   coded(() => new GPUCloth(SoftBodyDesc.cloth([0, 1, 0], [0.1, 0, 0], [0, 0, 0.1], 3, 3), { colliders: {} }));
 });
+
+test('the shared wind: a FlowField is sampled at the cloth\'s centre each frame, its density the air\'s (ATMO-01 to SOFT-01)', async () => {
+  // A uniform field moves the cloth exactly as the same velocity does.
+  const field = (velocity, density, seen) => ({
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample(x, y, z, t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) {
+      seen?.push([x, y, z, t]);
+      out.velocity = [...velocity];
+      out.density = density;
+      out.temperature = 288;
+      return out;
+    },
+  });
+  const desc = () => SoftBodyDesc.cloth([0, 2, 0], [0.1, 0, 0], [0, -0.1, 0], 6, 5).setPinnedParticles([0, 4]);
+  const seen = [];
+  const a = new GPUCloth(desc(), { wind: field([6, 0, 1], 1.2, seen) });
+  const b = new GPUCloth(desc(), { wind: [6, 0, 1] });
+  for (let k = 0; k < 30; k++) {
+    a.step();
+    b.step();
+  }
+  assert.equal(await a.hash(), await b.hash(), 'a uniform field and its velocity give the same bits');
+  // Sampled once a frame, at the cloth's mean point as it last was, at the cloth's time.
+  assert.equal(seen.filter(([, , , t]) => t > 0).length >= 29, true);
+  const [x, y, z, t] = seen.at(-1);
+  assert.ok(Number.isFinite(x + y + z) && Math.abs(y - 1.8) < 0.5 && Math.abs(t - 29 / 60) < 1e-9, `sampled at ${x}, ${y}, ${z}, ${t}`);
+  // The field's density sets the drag: a falling sheet's terminal speed in air of 0.6 kg/m^3.
+  const sheet = new GPUCloth(SoftBodyDesc.cloth([0, 10, 0], [0.1, 0, 0], [0, 0, 0.1], 5, 5), {
+    turbulence: 0,
+    wind: field([0, 0, 0], 0.6),
+  });
+  sheet.step(180);
+  const vt = Math.sqrt((0.12 * G) / (0.5 * 0.6 * 1.17));
+  const { state } = await sheet.snapshot();
+  const v = -state[(25 + 12) * 4 + 1];
+  assert.ok(Math.abs(v - vt) / vt < 1e-5, `falls at ${v}, terminal ${vt}`);
+  coded(() => new GPUCloth(desc(), { wind: field([NaN, 0, 0], 1.2) }));
+});
