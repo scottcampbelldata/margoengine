@@ -2,7 +2,8 @@
 // displacement vectors, coordinate groups and the displacement meshes that use them.
 import { LoaderError } from './types.js';
 import { read3MF, type ThreeMFModel, type ThreeMFOptions, type ThreeMFResult } from './threemf.js';
-import { floats, type BinaryInput, type Growable } from './util.js';
+import { tessellate, type HeightGroup, type HeightMap } from './threemf-tessellate.js';
+import { floats, limits, throwIfAborted, type BinaryInput, type Growable } from './util.js';
 
 const F = '3MF';
 
@@ -52,6 +53,16 @@ export interface ThreeMFDisplacementMesh {
   instances: Float64Array[];
 }
 
+/** Options of {@link parse3MFDisplacement}. */
+export interface ThreeMFDisplacementOptions extends ThreeMFOptions {
+  /** Subdivide and move the displaced triangles. Default true; false gives the base triangles. */
+  tessellate?: boolean;
+  /** Samples along one texel of a displacement map. Default 1. */
+  samplesPerTexel?: number;
+  /** The most segments one base edge is split into, rounded down to a power of two: 1 to 65536. Default 256. */
+  maxSegments?: number;
+}
+
 /** The result of {@link parse3MFDisplacement}. */
 export interface ThreeMFDisplacementResult extends ThreeMFResult {
   maps: ThreeMFDisplacementMap[];
@@ -98,18 +109,50 @@ interface Part {
   mesh?: { groups: number[]; corners: number[]; did?: string };
 }
 
+/** The groups of one model part with their maps decoded by `@margoengine/decoders`, loaded only for a displaced mesh. */
+async function heightGroups(groups: readonly ThreeMFDisplacementGroup[], maps: readonly ThreeMFDisplacementMap[]) {
+  const { decodePNG } = await import('@margoengine/decoders/png'),
+    pictures = new Map<Uint8Array, { width: number; height: number; data: Uint16Array }>();
+  return groups.map(({ mapId, modelPath, height, offset, coordinates, vectors }): HeightGroup => {
+    const map = maps.find((m) => m.id === mapId && m.modelPath === modelPath)!;
+    let picture = pictures.get(map.data);
+    if (!picture) {
+      try {
+        pictures.set(map.data, (picture = decodePNG(map.data, { bitDepth: 16 })));
+      } catch (error) {
+        bad(`${map.path.slice(0, 128)}: ${(error as Error).message}`);
+      }
+    }
+    const heights: HeightMap = {
+      ...picture!,
+      channel: 'RGBA'.indexOf(map.channel),
+      tileU: map.tileU,
+      tileV: map.tileV,
+      nearest: map.filter === 'nearest',
+    };
+    return { height, offset, coordinates, vectors, map: heights };
+  });
+}
+
 /**
- * Parses a 3MF package with the displacement extension. The base triangles come as {@link ThreeMFResult} gives them, in
- * groups marked `displaced`; the maps, coordinate groups and each triangle's use of them are returned beside them. The
- * surface is not tessellated or moved.
+ * Parses a 3MF package with the displacement extension. Each displacement mesh is subdivided until a segment spans at
+ * most one texel of its map (`samplesPerTexel`) and moved by it, as chapters 2 to 5 of the extension define, then
+ * placed by the build: the result's triangles are the displaced surface, in groups marked `displaced`. The maps, the
+ * coordinate groups and the base triangles are returned beside them. Self-intersections of a displaced surface are not
+ * resolved.
  *
- * @throws LoaderError for a reference to a resource the package does not define, an index outside its group, a missing
- * map part, and what `parse3MF` throws.
+ * @throws LoaderError for a reference to a resource the package does not define, an index outside its group, a map
+ * part that is missing or no PNG, a surface over `maxTriangles`, and what `parse3MF` throws.
  */
 export async function parse3MFDisplacement(
   input: BinaryInput,
-  options: ThreeMFOptions = {},
+  options: ThreeMFDisplacementOptions = {},
 ): Promise<ThreeMFDisplacementResult> {
+  const { samplesPerTexel = 1, maxSegments = 256 } = options;
+  if (!(Number.isFinite(samplesPerTexel) && samplesPerTexel > 0))
+    throw new LoaderError(F, 'range', 'samplesPerTexel must be a positive number');
+  if (!(Number.isInteger(maxSegments) && maxSegments >= 1 && maxSegments <= 65_536))
+    throw new LoaderError(F, 'range', 'maxSegments must be an integer from 1 to 65536');
   const parts = new Map<ThreeMFModel, Part>(),
     listed = new Map<ThreeMFModel, Map<string, ThreeMFDisplacementMesh>>(),
     maps: ThreeMFDisplacementMap[] = [],
@@ -127,6 +170,7 @@ export async function parse3MFDisplacement(
     return id;
   };
   const read = await read3MF(input, options, {
+    welded: true,
     field: {
       open(model, name, a) {
         const p = part(model);
@@ -244,6 +288,20 @@ export async function parse3MFDisplacement(
             };
           own.set(objectId, mesh);
           meshes.push(mesh);
+        }
+        if (options.tessellate === false || !p.meshes.size) continue;
+        const heights = await heightGroups(groups.slice(first), maps);
+        for (const [objectId, found] of p.meshes) {
+          throwIfAborted(options.signal, F);
+          const object = model.objects.get(objectId)!;
+          object.mesh = tessellate(
+            model,
+            object,
+            object.mesh!,
+            found.groups.map((g) => heights[g]),
+            found.corners,
+            { samplesPerTexel, maxSegments, maxTriangles: limits(options, F).maxTriangles },
+          );
         }
       }
     },

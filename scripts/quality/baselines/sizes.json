@@ -15091,6 +15091,12 @@
       "commit": "lane-d-jpeg2000-image",
       "reason": "decodeImage reads JPEG 2000: decoders/image 1,041,675 to 1,115,573 B gzip measured with its lazy assets (the route loads jpeg2000.js, its worker and jpeg2000.wasm only for such a file). Leaving the format out would make the one any-image call refuse a format the package decodes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e",
+      "reason": "parse3MFDisplacement tessellates and moves displacement meshes (the 3MF Displacement Extension: sampling, tile styles, per-edge subdivision, joins of section 5.2): loaders/threemf-displacement 13,066 to 15,806 B gzip; the PNG reader stays the optional decoders peer behind import(). A separate entry would only move the same code behind a second import that every caller of this entry needs by default.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15735,7 +15741,7 @@
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
     "@margoengine/loaders/threemf-boolean": 12864,
-    "@margoengine/loaders/threemf-displacement": 13325,
+    "@margoengine/loaders/threemf-displacement": 16281,
     "@margoengine/loaders/threemf-lattice": 19099,
     "@margoengine/loaders/threemf-materials": 15403,
     "@margoengine/loaders/threemf-mesh": 4316,

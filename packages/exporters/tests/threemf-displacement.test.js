@@ -233,7 +233,9 @@ test("the specification's example reads, its unnamed corners taking d1, and brok
   assert.equal(group.height, 1.5);
   assert.equal(group.offset, 0);
   assert.equal(read.maps[0].path, '/3D/Textures/label_mono.png');
-  assert.equal(read.indices.length, 18);
+  // Four of the six triangles are displaced and subdivided; `tessellate: false` keeps the base triangles.
+  assert.ok(read.indices.length > 18);
+  assert.equal((await parse3MFDisplacement(await packaged(example), { tessellate: false })).indices.length, 18);
   const broken = [
     [example.replace('dispid="10"', 'dispid="11"'), /not defined before/],
     [example.replace('n="4"', 'n="5"'), /vector index/],

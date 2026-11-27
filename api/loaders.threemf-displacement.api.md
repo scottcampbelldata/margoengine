@@ -34,13 +34,19 @@ export interface ThreeMFDisplacementMesh {
     instances: Float64Array[];
 }
 
+export interface ThreeMFDisplacementOptions extends ThreeMFOptions {
+    tessellate?: boolean;
+    samplesPerTexel?: number;
+    maxSegments?: number;
+}
+
 export interface ThreeMFDisplacementResult extends ThreeMFResult {
     maps: ThreeMFDisplacementMap[];
     displacementGroups: ThreeMFDisplacementGroup[];
     meshes: ThreeMFDisplacementMesh[];
 }
 
-export function parse3MFDisplacement(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFDisplacementResult>;
+export function parse3MFDisplacement(input: BinaryInput, options?: ThreeMFDisplacementOptions): Promise<ThreeMFDisplacementResult>;
 
 // Not exported from this entry, but used by the exports above:
 

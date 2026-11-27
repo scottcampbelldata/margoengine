@@ -1016,7 +1016,9 @@ for (const { positions, indices, groups, matrices } of model.instances) {
 
 ## 3MF volumes and displacement
 
-`parse3MFVolumetric` returns the meshes as `parse3MF` does, with `images` (PNG sheets), `functions` (image samplers and node graphs), `volumes` and the built `objects` that have volume data or a level set, each with its placements and a level set's bounding mesh. References, graph order and types are checked. `parse3MFDisplacement` returns `maps`, `displacementGroups` (coordinates, factors and unit vectors) and `meshes` (base triangles, each corner's coordinate and the placements). Neither evaluates a function, meshes a level set or moves a surface.
+`parse3MFVolumetric` returns the meshes as `parse3MF` does, with `images` (PNG sheets), `functions` (image samplers and node graphs), `volumes` and the built `objects` that have volume data or a level set, each with its placements and a level set's bounding mesh. References, graph order and types are checked. `parse3MFVolumetric` does not evaluate a function or mesh a level set.
+
+`parse3MFDisplacement` returns the displaced surface as its triangles, with `maps`, `displacementGroups` (coordinates, factors and unit vectors) and `meshes` (base triangles, each corner's coordinate and the placements) beside it. Each base edge is split until a segment spans at most one texel of its map (`samplesPerTexel`, default 1) and its interpolated vectors turn at most 15 degrees, never into more than `maxSegments` pieces (default 256, rounded down to a power of two). Points move by `(texture * height + offset) * f` along the normalized mix of the corner vectors, with the extension's filters and tile styles. Both sides of an edge split alike, so no crack opens; sides that move apart are joined directly when they use the same vectors and through the base edge when not. Colours follow the base triangles. `tessellate: false` gives the base triangles, as `parse3MF` does. Reading the map needs the optional `@margoengine/decoders` peer. Self-intersections of a displaced surface are not resolved. The subdivision follows the per-edge factors of Fisher, Fatahalian, Boulos, Akeley, Mark and Hanrahan, [DiagSplit: parallel, crack-free, adaptive tessellation for micropolygon rendering](https://graphics.stanford.edu/~mdfisher/Data/DiagSplit.pdf) (2009), as the edge-split patterns of Boubekeur and Schlick, [Generic adaptive mesh refinement](https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch05.html) (GPU Gems 3, 2007).
 
 ```ts
 import { export3MF } from 'margoengine/exporters/threemf';
@@ -1051,6 +1053,9 @@ const geometry = {
 const file = await export3MF({ nodes: [{ geometry }] }, { objectInfo: () => ({ displacement: { image, height: 0.001 } }) });
 const { displacementGroups, meshes } = await parse3MFDisplacement(file);
 console.log(displacementGroups[0].height, meshes[0].triangleGroups.length);
+// A coarser surface for a preview.
+const preview = await parse3MFDisplacement(file, { samplesPerTexel: 0.5, maxSegments: 32 });
+console.log(preview.indices.length / 3);
 ```
 
 ## 3MF boolean shapes

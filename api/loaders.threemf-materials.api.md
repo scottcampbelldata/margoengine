@@ -128,6 +128,7 @@ interface MeshData {
     triangles: Growable<Uint32Array>;
     pid: Growable<Uint32Array>;
     p: Growable<Uint32Array>;
+    flat?: (Color | undefined)[];
 }
 
 interface Model {
@@ -187,6 +188,7 @@ interface ThreeMFExtension {
     };
     levelSets?: boolean;
     booleans?: boolean;
+    welded?: boolean;
     open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
     close?(model: ThreeMFModel, name: string): void;
     ready?(read: (path: string) => Promise<Uint8Array>, context: ThreeMFReadContext): Promise<void>;

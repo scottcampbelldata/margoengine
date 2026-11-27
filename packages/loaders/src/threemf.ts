@@ -53,6 +53,8 @@ interface MeshData {
   triangles: Growable<Uint32Array>;
   pid: Growable<Uint32Array>;
   p: Growable<Uint32Array>;
+  /** For each triangle of an evaluated mesh, the colour its group takes: that of the triangle it came from. */
+  flat?: (Color | undefined)[];
 }
 interface BooleanReference {
   objectId: string;
@@ -97,6 +99,10 @@ const PRODUCTION = 'http://schemas.microsoft.com/3dmanufacturing/production/2015
 
 /** A parsed model part, as an extension of the 3MF reader sees it. */
 export type ThreeMFModel = Model;
+/** An object of a model part, as an extension of the 3MF reader sees it. */
+export type ThreeMFObject = ObjectData;
+/** An object's triangles, as an extension of the 3MF reader sees them. */
+export type ThreeMFMesh = MeshData;
 
 /** Package-part access for optional 3MF extensions that reference additional model streams. */
 export interface ThreeMFReadContext {
@@ -123,6 +129,8 @@ export interface ThreeMFExtension {
   levelSets?: boolean;
   /** The extension reads boolean shape objects, which the core reader otherwise refuses. */
   booleans?: boolean;
+  /** The extension writes nothing per corner, so meshes stay indexed as `parse3MF` gives them. */
+  welded?: boolean;
   /** An element the reader does not know, with its attributes. */
   open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
   /** The end of any element. */
@@ -621,12 +629,13 @@ export async function read3MF(
       const c = resolveColors(model, o, mesh, t);
       triangleColors.push(c);
       if (c[0]) colored = true;
-      const key = (c[0] ? c[0].join(',') : '') + suffix(t);
+      const own = mesh.flat ? mesh.flat[t] : c[0],
+        key = (own ? own.join(',') : '') + suffix(t);
       let bucket = buckets.get(key);
-      if (!bucket) buckets.set(key, (bucket = { color: c[0], triangles: [] }));
+      if (!bucket) buckets.set(key, (bucket = { color: own, triangles: [] }));
       bucket.triangles.push(t);
     }
-    const unweld = (!!colors && colored) || !!extension;
+    const unweld = (!!colors && colored) || (!!extension && !extension.welded);
     const base = positions.length / 3;
     if (base + (unweld ? triangleCount * 3 : vertexCount) > limit.maxVertices)
       throw new LoaderError(F, 'limit', `vertex count after instancing exceeds the limit of ${limit.maxVertices}`);
