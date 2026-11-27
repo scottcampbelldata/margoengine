@@ -5480,6 +5480,14 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   `Mesh & FacadeMesh` (the internal class and the public interface), so `setParent` accepts either. `examples/kitty-hawk`
   lost its cast. Regression: tests/public-engine-types.test.js (KB-GLTF-MESHTYPE1).
 
+### Open 2026-11-27: the dune coast's grass blades show black fragments (KB-SCENES-GRASSBLACK1, owner not yet found)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>`: in
+  `landing-rail-view.png` and `camp-buildings.png` (RTX A6000, WebGPU) near and middle tufts carry black dashes and
+  dots along the blades and at their edges.
+- **Cause:** not diagnosed; the same frame shows them on main before KB-SCENES-SHEDBOX1. Candidates: the grass shading
+  of thin blades, GTAO on them (`occlusion: 0` would tell) or their shadows.
+
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 
 - **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>` and compare the seven
