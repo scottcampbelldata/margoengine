@@ -19174,6 +19174,16 @@
       "raw": 50232,
       "gzip": 22012,
       "brotli": 19191
+    },
+    "packages/physics/dist/loads-kernel.wasm": {
+      "raw": 2884,
+      "gzip": 1193,
+      "brotli": 1052
+    },
+    "packages/physics/dist/loads-kernel-shared.wasm": {
+      "raw": 2884,
+      "gzip": 1194,
+      "brotli": 1065
     }
   },
   "splits": {
