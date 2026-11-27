@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21158664,
+  "total": 21235568,
   "history": [
     {
       "date": "2026-10-24",
@@ -15013,6 +15013,12 @@
       "commit": "lane-e-3mf-objects",
       "reason": "3MF object types and part numbers: exporters/threemf 30266 to 31398 B (objectInfo and itemPartNumber, a mesh for each type and part number under an object of components, the checks of the values and of the format's rules for other and support). The writer is the one function of the format; a second entry would write the file twice. loaders/threemf-materials 13808 to 13872 B, threemf-mesh 4060 to 4070 B and threemf-lattice 17948 to 18009 B (the reader's part numbers and types) stay within budget.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "22d3e015",
+      "reason": "New optional entry decoders/jpeg2000, 74,664 B gzip with its inline Wasm asset (jpeg2000.wasm alone 51,121 B gzip): one clean-room JPEG 2000 Part 1 decoder; splitting it would add fetch and assembly work",
+      "grew": 1
     }
   ],
   "items": {
@@ -15306,6 +15312,7 @@
     "@margoengine/decoders/geotiff": 1690,
     "@margoengine/decoders/image": 1068811,
     "@margoengine/decoders/jpeg": 5234,
+    "@margoengine/decoders/jpeg2000": 76904,
     "@margoengine/decoders/jxl": 902154,
     "@margoengine/decoders/ktx": 3637,
     "@margoengine/decoders/ktx2-gpu": 14795,

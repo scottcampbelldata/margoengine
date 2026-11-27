@@ -11199,3 +11199,7 @@ against this decoder. The MQ state table (Table C.2), the context tables (Tables
 reconstruction midpoint, the component transform constants and the sYCC conversion were written from the standard and
 are checked only by the crate's own tests, which include a test-side MQ encoder. No conformance claim and no speed
 claim is made until that corpus passes.
+
+Size (Vite library min+gzip, with its lazy asset references): `/jpeg2000` 74,664 B, ceiling 76,904 B;
+`jpeg2000.worker.js` 1,446 B gzip; `jpeg2000.wasm` 129,635 B raw, 51,121 B gzip. Nothing loads unless a file needs the
+decoder. Core plus stage is unchanged.

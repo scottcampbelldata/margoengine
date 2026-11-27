@@ -1,10 +1,10 @@
 {
-  "commit": "3f58e4125e",
+  "commit": "22d3e015ab",
   "dirty": false,
   "browser": "msedge 158.0.4370.45 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-D59uTbNu.js",
+      "file": "assets/dist-8kd4roRv.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
@@ -13,7 +13,7 @@
         "_node-matrix-R9BipGnp-ERCK1iAW.js",
         "_errors-DkwPZuAq.js",
         "_mat4-BTlwq2yz.js",
-        "_model-DH60urDe-CaZtAgtE.js",
+        "_model-CgHUlnHa-DTc_gKD7.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -48,7 +48,7 @@
       "src": "../../../packages/decoders/dist/draco/draco_wasm_wrapper.js"
     },
     "../../../packages/decoders/dist/index.js": {
-      "file": "assets/dist-BiOVjC1X.js",
+      "file": "assets/dist-BYTTKoCM.js",
       "name": "dist",
       "src": "../../../packages/decoders/dist/index.js",
       "isDynamicEntry": true,
@@ -86,13 +86,13 @@
       "isDynamicEntry": true
     },
     "../../../packages/gltf/dist/compression-CyUGU4DR.js": {
-      "file": "assets/compression-CyUGU4DR-CHa5JHN7.js",
+      "file": "assets/compression-CyUGU4DR-kn_aiYY4.js",
       "name": "compression-CyUGU4DR",
       "src": "../../../packages/gltf/dist/compression-CyUGU4DR.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
-        "_asset-0FOEpFiE-CrqfHcEJ.js"
+        "_asset-0FOEpFiE-CE1xE94T.js"
       ]
     },
     "../../../packages/gltf/dist/dds.js": {
@@ -129,14 +129,14 @@
       ]
     },
     "../../../packages/gltf/dist/pbr.js": {
-      "file": "assets/pbr-CjclJh6v.js",
+      "file": "assets/pbr-C064HpeB.js",
       "name": "pbr",
       "src": "../../../packages/gltf/dist/pbr.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-DH60urDe-CaZtAgtE.js",
-        "_asset-0FOEpFiE-CrqfHcEJ.js",
+        "_model-CgHUlnHa-DTc_gKD7.js",
+        "_asset-0FOEpFiE-CE1xE94T.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -171,7 +171,7 @@
       ]
     },
     "../../../packages/gltf/dist/strokes.js": {
-      "file": "assets/strokes-CEKyOZ0U.js",
+      "file": "assets/strokes-DB-wfOcL.js",
       "name": "strokes",
       "src": "../../../packages/gltf/dist/strokes.js",
       "isDynamicEntry": true,
@@ -179,7 +179,7 @@
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_preload-helper-CRzLMJPS.js",
         "_scene-scope-CZDEkd24-DwPzBn8G.js",
-        "_asset-0FOEpFiE-CrqfHcEJ.js"
+        "_asset-0FOEpFiE-CE1xE94T.js"
       ],
       "dynamicImports": [
         "../../../packages/lines/dist/index.js",
@@ -306,8 +306,8 @@
         "_errors-D0VAEAiW-CZKkhVCh.js"
       ]
     },
-    "_asset-0FOEpFiE-CrqfHcEJ.js": {
-      "file": "assets/asset-0FOEpFiE-CrqfHcEJ.js",
+    "_asset-0FOEpFiE-CE1xE94T.js": {
+      "file": "assets/asset-0FOEpFiE-CE1xE94T.js",
       "name": "asset-0FOEpFiE",
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
@@ -408,9 +408,9 @@
         "_errors-D4ZctVpl.js"
       ]
     },
-    "_model-DH60urDe-CaZtAgtE.js": {
-      "file": "assets/model-DH60urDe-CaZtAgtE.js",
-      "name": "model-DH60urDe",
+    "_model-CgHUlnHa-DTc_gKD7.js": {
+      "file": "assets/model-CgHUlnHa-DTc_gKD7.js",
+      "name": "model-CgHUlnHa",
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_version-CrCGs6gQ.js",
@@ -421,7 +421,7 @@
         "_mat4-BTlwq2yz.js",
         "_accessor-DuqjpuxI-lo3KREZ8.js",
         "_scene-scope-CZDEkd24-DwPzBn8G.js",
-        "_asset-0FOEpFiE-CrqfHcEJ.js",
+        "_asset-0FOEpFiE-CE1xE94T.js",
         "_shader-Dh2DyWHw-C8Al8TJa.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-BT_nk8cK.js"
@@ -479,7 +479,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-njXmN0Iz.js",
+      "file": "assets/index-B1CF2ui-.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -545,13 +545,13 @@
       "brotli": 1913
     },
     {
-      "path": "assets/index-njXmN0Iz.js",
+      "path": "assets/index-B1CF2ui-.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27452,
+      "transferred": 27451,
       "raw": 65815,
-      "gzip": 27070,
-      "brotli": 23918
+      "gzip": 27069,
+      "brotli": 23912
     },
     {
       "path": "assets/node-matrix-R9BipGnp-ERCK1iAW.js",
@@ -595,8 +595,8 @@
       "encoding": "identity",
       "transferred": 1054,
       "raw": 804,
-      "gzip": 434,
-      "brotli": 280
+      "gzip": 433,
+      "brotli": 278
     },
     {
       "path": "model.glb",
@@ -610,14 +610,14 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 46930,
+    "transferred": 46929,
     "raw": 97334,
-    "gzip": 40945,
-    "brotli": 36188
+    "gzip": 40943,
+    "brotli": 36180
   },
   "notFetched": [
     {
-      "path": "assets/asset-0FOEpFiE-CrqfHcEJ.js",
+      "path": "assets/asset-0FOEpFiE-CE1xE94T.js",
       "raw": 31545
     },
     {
@@ -641,7 +641,7 @@
       "raw": 1076
     },
     {
-      "path": "assets/compression-CyUGU4DR-CHa5JHN7.js",
+      "path": "assets/compression-CyUGU4DR-kn_aiYY4.js",
       "raw": 4395
     },
     {
@@ -661,8 +661,12 @@
       "raw": 17774
     },
     {
-      "path": "assets/dist-BiOVjC1X.js",
-      "raw": 8699
+      "path": "assets/dist-8kd4roRv.js",
+      "raw": 80949
+    },
+    {
+      "path": "assets/dist-BYTTKoCM.js",
+      "raw": 8772
     },
     {
       "path": "assets/dist-CQOJmRZ9.js",
@@ -675,10 +679,6 @@
     {
       "path": "assets/dist-D3JX9MPD.js",
       "raw": 27732
-    },
-    {
-      "path": "assets/dist-D59uTbNu.js",
-      "raw": 80949
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
@@ -733,15 +733,15 @@
       "raw": 7513
     },
     {
-      "path": "assets/model-DH60urDe-CaZtAgtE.js",
-      "raw": 162357
+      "path": "assets/model-CgHUlnHa-DTc_gKD7.js",
+      "raw": 162715
     },
     {
       "path": "assets/optimize-BesG8gNH.js",
       "raw": 3727
     },
     {
-      "path": "assets/pbr-CjclJh6v.js",
+      "path": "assets/pbr-C064HpeB.js",
       "raw": 1058
     },
     {
@@ -773,8 +773,8 @@
       "raw": 2094
     },
     {
-      "path": "assets/strokes-CEKyOZ0U.js",
-      "raw": 3588
+      "path": "assets/strokes-DB-wfOcL.js",
+      "raw": 4668
     },
     {
       "path": "assets/texture-BT_nk8cK.js",
