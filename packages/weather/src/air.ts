@@ -589,6 +589,29 @@ function slabReflection(tau: number, w: number, g: number): number {
   return (g2 * (1 - e)) / (k + g1 + (k - g1) * e);
 }
 
+// The two-stream `slab` of the smoke, ash and spray of a state at 670, 550 and 440 nm, their optical depths, albedos
+// and asymmetries mixed by optical depth. Undefined with no smoke, ash or spray.
+function mixedSlab(
+  state: { readonly smoke?: number; readonly ash?: number; readonly spray?: number },
+  slab: (tau: number, w: number, g: number) => number,
+): [number, number, number] | undefined {
+  const smoke = smokeOpticalDepth(state.smoke ?? 0),
+    ash = ashExtinction(state.ash ?? 0) * ASH_LAYER_DEPTH,
+    spray = sprayExtinction(state.spray ?? 0) * SPRAY_LAYER_DEPTH;
+  if (smoke + ash + spray === 0) return undefined;
+  return [670, 550, 440].map((nm, i) => {
+    const s = smoke * (nm / 550) ** -SMOKE_ANGSTROM,
+      tau = s + ash + spray,
+      scatter = s * SMOKE_ALBEDO[i]! + ash * ASH_ALBEDO[i]! + spray * SPRAY_ALBEDO[i]!,
+      g =
+        (s * SMOKE_ALBEDO[i]! * SMOKE_ASYMMETRY +
+          ash * ASH_ALBEDO[i]! * ASH_ASYMMETRY +
+          spray * SPRAY_ALBEDO[i]! * SPRAY_ASYMMETRY) /
+        scatter;
+    return slab(tau, scatter / tau, g);
+  }) as [number, number, number];
+}
+
 /**
  * The share of the diffuse light falling on the smoke, ash and spray of a state from below that they send back down,
  * red, green and blue (670, 550 and 440 nm): the two-stream reflectance of the layers (`slabReflection`, the optical
@@ -600,21 +623,7 @@ export function hazeReflectance(state: {
   readonly ash?: number;
   readonly spray?: number;
 }): [number, number, number] {
-  const smoke = smokeOpticalDepth(state.smoke ?? 0),
-    ash = ashExtinction(state.ash ?? 0) * ASH_LAYER_DEPTH,
-    spray = sprayExtinction(state.spray ?? 0) * SPRAY_LAYER_DEPTH;
-  if (smoke + ash + spray === 0) return [0, 0, 0];
-  return [670, 550, 440].map((nm, i) => {
-    const s = smoke * (nm / 550) ** -SMOKE_ANGSTROM,
-      tau = s + ash + spray,
-      scatter = s * SMOKE_ALBEDO[i]! + ash * ASH_ALBEDO[i]! + spray * SPRAY_ALBEDO[i]!,
-      g =
-        (s * SMOKE_ALBEDO[i]! * SMOKE_ASYMMETRY +
-          ash * ASH_ALBEDO[i]! * ASH_ASYMMETRY +
-          spray * SPRAY_ALBEDO[i]! * SPRAY_ASYMMETRY) /
-        scatter;
-    return slabReflection(tau, scatter / tau, g);
-  }) as [number, number, number];
+  return mixedSlab(state, slabReflection) ?? [0, 0, 0];
 }
 
 /** The linear colour of a flame's light (the `GLOW_COLOR` a fire's glow lights its smoke columns with in `@margoengine/vfx/lit`). */
@@ -666,19 +675,7 @@ export function hazeLight(
   elevation: number,
 ): [number, number, number] {
   const t = sunTransmittance(state, elevation),
-    smoke = smokeOpticalDepth(state.smoke ?? 0),
-    ash = ashExtinction(state.ash ?? 0) * ASH_LAYER_DEPTH,
-    spray = sprayExtinction(state.spray ?? 0) * SPRAY_LAYER_DEPTH;
-  if (smoke + ash + spray === 0) return [1, 1, 1];
-  return [670, 550, 440].map((nm, i) => {
-    const s = smoke * (nm / 550) ** -SMOKE_ANGSTROM,
-      tau = s + ash + spray,
-      scatter = s * SMOKE_ALBEDO[i]! + ash * ASH_ALBEDO[i]! + spray * SPRAY_ALBEDO[i]!,
-      g =
-        (s * SMOKE_ALBEDO[i]! * SMOKE_ASYMMETRY +
-          ash * ASH_ALBEDO[i]! * ASH_ASYMMETRY +
-          spray * SPRAY_ALBEDO[i]! * SPRAY_ASYMMETRY) /
-        scatter;
-    return t[i]! + (1 - t[i]!) * slabTransmission(tau, scatter / tau, g);
-  }) as [number, number, number];
+    slab = mixedSlab(state, slabTransmission);
+  if (!slab) return [1, 1, 1];
+  return [t[0] + (1 - t[0]) * slab[0], t[1] + (1 - t[1]) * slab[1], t[2] + (1 - t[2]) * slab[2]];
 }
