@@ -41,6 +41,7 @@ class DOF implements EnginePlugin {
     get enabled(): boolean;
     set enabled(value: boolean);
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     private get paused();
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

@@ -35,10 +35,26 @@ export function compatibilityLevel(device) {
 /**
  * On the WebGL2 layer, starts loading a package's compatibility route (`load`, a dynamic import, so WebGPU pages never
  * download it) and resolves what it resolves; on native WebGPU returns undefined and loads nothing. Until it resolves
- * the package keeps its WebGPU route, which the layer also runs (more slowly), so no frame is drawn differently.
+ * the package keeps its WebGPU route, which the layer also runs (more slowly), and its
+ * frames may differ until then: a package exposes `ready` (see routeSettled) for callers that need exact frames.
  */
 export function loadCompatRoute(device, load) {
   return compatTier(device) === 'webgl2' ? load() : undefined;
+}
+
+/**
+ * The promise behind a package's `ready`: settles (never rejects) once `route`, a loadCompatRoute result, has settled,
+ * after every handler the package attached to it before this call; resolved at once without a route. A package whose
+ * frames differ until its route arrives exposes it, so a caller that needs exact frames can wait (KB-COMPAT-READY1;
+ * scripts/quality/compat-routes.js holds every package that loads a route to it).
+ */
+export function routeSettled(route) {
+  return route
+    ? route.then(
+        () => undefined,
+        () => undefined,
+      )
+    : Promise.resolve();
 }
 
 /**

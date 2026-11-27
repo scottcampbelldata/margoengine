@@ -12,6 +12,8 @@ export function compatibilityLevel(
   device: { adapterInfo?: { vendor?: string }; features?: { has(name: string): boolean } } | undefined,
 ): boolean;
 export function loadCompatRoute<T>(device: GPUDevice | undefined, load: () => Promise<T>): Promise<T> | undefined;
+/** Settles (never rejects) once `route` has settled, after the handlers attached before it; resolved at once without one. */
+export function routeSettled(route: Promise<unknown> | undefined): Promise<void>;
 
 /** One stage's (or both stages' together) texture units on the WebGL2 layer, against its GL limit. */
 export interface CompatStageUnits {

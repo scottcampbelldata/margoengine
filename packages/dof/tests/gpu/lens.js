@@ -15,8 +15,11 @@ addEventListener('error', (e) => errors.push(e.message));
 addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
 
 const canvas = document.querySelector('canvas');
-let engine, dof, focus;
+let engine, dof, focus, last;
+// Every case waits for the DOF it attached to be ready: on the layer its first frames are sharp (KB-COMPAT-READY1).
+const attach = (...args) => (last = DOF.attach(...args));
 const settle = async (n = 12) => {
+  await last?.ready;
   for (let i = 0; i < n; i++) {
     engine.render();
     await engine.gpu.queue.onSubmittedWorkDone();
@@ -26,6 +29,7 @@ const settle = async (n = 12) => {
 // exact: one sample (exactSize), so the depth DOF reads is not a multisample resolve.
 const start = async (boxes, exact = false) => {
   engine?.dispose?.();
+  last = undefined;
   engine = await Engine.create(canvas, { backend: 'webgpu', ...(exact && { exactSize: true }) });
   // The backdrop the bokeh bars were measured on: linear 0.018, 0.023, 0.035, what DOF's capture held of core's clear
   // colour before KB-CLEAR-DEFAULT1. A blur's faint edge counts as bright only over it, so the check names it rather
@@ -52,7 +56,7 @@ window.check = {
       [0, 0, 4, 1],
       [2, 0, -5, 1],
     ]);
-    dof = DOF.attach(engine, { focalDistance: 5, focalLength: 0.05, aperture: 1.4 });
+    dof = attach(engine, { focalDistance: 5, focalLength: 0.05, aperture: 1.4 });
     focus = Autofocus.attach(engine, dof, { smoothing: 0 });
     await settle();
     const middle = dof.options.focalDistance;
@@ -67,7 +71,7 @@ window.check = {
   // A small box in the near field, whose bokeh spreads over the background.
   async blades(blades) {
     await start([[0, 0, 7, 0.1]]);
-    DOF.attach(engine, {
+    attach(engine, {
       focalDistance: 20,
       focalLength: 0.1,
       aperture: 0.5,
@@ -83,7 +87,7 @@ window.check = {
       data = new Uint8ClampedArray(size * size * 4);
     for (let y = 0; y < size; y++)
       for (let x = 0; x < (half ? size / 2 : size); x++) data.fill(255, (y * size + x) * 4, (y * size + x) * 4 + 4);
-    DOF.attach(engine, {
+    attach(engine, {
       focalDistance: 20,
       focalLength: 0.1,
       aperture: 0.5,
@@ -99,14 +103,14 @@ window.check = {
       [-1.2, 0.4, 6, 0.3],
       [1.5, -0.5, -20, 3],
     ]);
-    const dof = DOF.attach(engine, { focalDistance: 10, focalLength: 0.1, aperture: 0.7, maxRadius: 16, temporal });
+    const dof = attach(engine, { focalDistance: 10, focalLength: 0.1, aperture: 0.7, maxRadius: 16, temporal });
     if (taa) TAA.attach(engine, { depth: () => dof.depthTexture });
     await settle(frames);
   },
   // A near box at [x, y], through a lens with cat's eye and anamorphic squeeze (and blades, for the shape lookup).
   async optics(x, y, catEye, anamorphic, blades, size = 0.1) {
     await start([[x, y, 7, size]]);
-    DOF.attach(engine, {
+    attach(engine, {
       focalDistance: 20,
       focalLength: 0.1,
       aperture: 0.5,
@@ -118,7 +122,7 @@ window.check = {
   // The near box with DOF off: the scene the gathers start from.
   async sharp() {
     await start([[0, 0, 7, 0.1]]);
-    DOF.attach(engine, { focalDistance: 20, focalLength: 0.1, aperture: 0.5, maxRadius: 16, enabled: false });
+    attach(engine, { focalDistance: 20, focalLength: 0.1, aperture: 0.5, maxRadius: 16, enabled: false });
     await settle(4);
   },
   // KB1843: a grey card over the left half of the frame, its right edge on the middle column, on the empty background:
@@ -131,7 +135,7 @@ window.check = {
       .setGeometry(box(40, 40, 0.01))
       .setMaterial(card)
       .setPosition([-20, 0, near ? 6 : -10]);
-    DOF.attach(engine, {
+    attach(engine, {
       focalDistance: near ? 30 : 2,
       focalLength: near ? 0.2 : 0.1,
       aperture: 1,
@@ -157,7 +161,7 @@ window.check = {
       .setMaterial(lit)
       .setPosition([-22.3, -0.79, -30])
       .setRotation([0, 0.069, 0]);
-    DOF.attach(engine, { focalDistance: 30, focalLength: 0.1, aperture: 0.5, maxRadius: 32, enabled });
+    attach(engine, { focalDistance: 30, focalLength: 0.1, aperture: 0.5, maxRadius: 32, enabled });
     await settle(4);
   },
   // More frames of the current case.
@@ -171,7 +175,7 @@ window.check = {
       ],
       exact,
     );
-    DOF.attach(engine, {
+    attach(engine, {
       focalDistance,
       focalLength: 0.1,
       aperture: 0.05,

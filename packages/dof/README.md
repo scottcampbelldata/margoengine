@@ -230,6 +230,22 @@ GPU submission/completion and two later animation callbacks. npm publication
 is separate: use this repository's workspace or packed local archives until the
 package is published.
 
+## Exact first frames on the WebGL2 layer
+
+`dof.ready` is a promise that settles once every frame draws the blur as it will from then on. On the WebGL2
+compatibility layer `DOF` fetches its compatibility route (`import()`) when it attaches, and until it arrives DOF used
+alone shows the captured scene sharp. On WebGPU it is already settled. Await it before a frame that must be exact, such
+as a film frame or a pixel comparison:
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const dof = DOF.attach(engine, {focalDistance:5});
+await dof.ready;
+engine.render();
+```
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

@@ -8,10 +8,8 @@ test('temporal DOF on the full compatibility device uses independent pixel and t
   h.engine.gpu.adapterInfo = { vendor: 'margo-webgl2' };
   const dof = DOF.attach(h.engine, { focalDistance: 5, temporal: true });
   try {
-    for (let i = 0; i < 50 && h.counts.compute === 0; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 1));
-      h.frame();
-    }
+    await dof.ready;
+    h.frame();
     assert.ok(h.counts.compute > 0);
     const halves = h.pipelines.filter((p) => p.compute?.module.code.includes('var halfScene:'));
     const active = halves.at(-1).compute.module.code;

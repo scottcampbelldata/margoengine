@@ -27,7 +27,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
-import { loadCompatRoute, requireCompatTier } from '../../shared/compat.js';
+import { loadCompatRoute, requireCompatTier, routeSettled } from '../../shared/compat.js';
 import type { DOFLens } from './lens.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -104,6 +104,7 @@ export class DOF implements EnginePlugin {
   private tilesPipeline?: GPUComputePipeline;
   private tilesGroup?: GPUBindGroup;
   private waiting = false;
+  private routeReady: Promise<void> = Promise.resolve();
   private presentPipeline?: GPURenderPipeline;
   private scene?: GPUTexture;
   private depth?: GPUTexture;
@@ -265,6 +266,24 @@ export class DOF implements EnginePlugin {
         throw error;
       },
     );
+    // After the handlers above: by then the route (or, if it failed, the WebGPU route) draws every frame.
+    this.routeReady = routeSettled(route);
+  }
+  /**
+   * Settles once every frame draws the blur as it will from then on. On the WebGL2 compatibility layer DOF loads its
+   * route (a dynamic import) when it attaches, and DOF used alone shows the captured scene sharp until it has loaded.
+   * Resolved at once on WebGPU. Read it after attaching, and await it before a frame that must be exact: a film frame,
+   * a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const dof = DOF.attach(engine, { focalDistance: 5 });
+   * await dof.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
   }
   /** True while DOF, used alone, waits for its WebGL2 route (it presents the captured scene unblurred then). */
   private get paused(): boolean {

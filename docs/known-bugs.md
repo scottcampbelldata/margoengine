@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: packages that load a WebGL2 route by import() draw their first frames differently until it arrives (KB-COMPAT-READY1, culling, dof, sky, splats, vfx, compute, voxel-pathtracer, scatter)
+
+- **Repro:** the class KB-SCATTER-ATTRCOMPAT1 found in shadows. On the WebGL2 layer each of these packages fetches its
+  compatibility route with `loadCompatRoute` when it attaches; until it arrives it waits or runs its WebGPU route on
+  the layer's CPU tier. `packages/dof/tests/dof.test.js` ("DOF alone on the WebGL2 layer shows the sharp scene"): the
+  first frames of a page show the scene sharp, later ones blurred, and nothing told a caller when frames stop changing.
+- **Cause:** `packages/shared/compat.js` said "no frame is drawn differently" while the route loads; that held only
+  where a check measured it. A check or film frame drawn on a loaded machine before the route differs from one after.
+- **Fix, per package:** a `ready` promise (`routeSettled` in `packages/shared/compat.js`), documented in the README
+  and awaited by the package's own checks. Done: dof. Left: culling, sky lighting, splats, vfx, compute,
+  voxel-pathtracer, scatter's `Scatter`, then a quality step that fails on a route without `ready`.
+
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
 - **Repro:** Playwright WebKit 27.2 on Windows 11:

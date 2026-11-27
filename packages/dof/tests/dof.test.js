@@ -179,11 +179,12 @@ test('DOF alone on the WebGL2 layer shows the sharp scene, as outputTexture too,
   assert.equal(h.context.depth, h.originalDepth);
   h.frame();
   assert.equal(dof.outputTexture, sharp, 'steady while waiting');
-  for (let i = 0; i < 50 && h.counts.compute === 0; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 1));
-    h.frame();
-  }
-  assert.ok(h.counts.compute > 0, 'the route blurs once loaded');
+  // KB-COMPAT-READY1: those sharp frames differ from later ones, so ready waits for the route and the next frame blurs.
+  const pending = Symbol('pending');
+  assert.equal(await Promise.race([dof.ready, Promise.resolve(pending)]), pending, 'ready waits for the route');
+  await dof.ready;
+  h.frame();
+  assert.ok(h.counts.compute > 0, 'the first frame after ready blurs on the route');
   assert.ok(sharp.destroyed);
   assert.notEqual(dof.outputTexture, dof.depthTexture);
   assert.equal(dof.outputTexture.usage & GPUTextureUsage.STORAGE_BINDING, GPUTextureUsage.STORAGE_BINDING);
@@ -490,4 +491,12 @@ test('DOFLens catEye and anamorphic: validated, baked into every gather, and com
       assert.ok(bokeh.includes('*2.000000*eye(-nearTap/radius,pixel)/lensArea(pixel);'));
       assert.equal(bokeh.includes('shape(atan2(nearTap.y,nearTap.x*2.000000))'), blades !== undefined);
     }
+});
+
+test('DOF.ready is settled at once on WebGPU (KB-COMPAT-READY1)', async () => {
+  const h = gpuHarness(),
+    dof = DOF.attach(h.engine, { focalDistance: 5 }),
+    pending = Symbol('pending');
+  assert.notEqual(await Promise.race([dof.ready, Promise.resolve(pending)]), pending);
+  dof.dispose();
 });
