@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10191f">
+  <title>Breakable objects · Margo Engine</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #10191f; color: #e7eeed; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; min-height: 100svh; align-items: start; }
+    #view { position: sticky; top: 0; height: 100svh; min-height: 540px; overflow: hidden; background: radial-gradient(ellipse at 50% 35%, #23333d, #10191f 75%); }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    canvas:focus-visible { outline: 2px solid #9be1cf; outline-offset: -4px; }
+    .brand, .hint, .legend { position: absolute; z-index: 1; pointer-events: none; }
+    .brand { top: 24px; left: 28px; color: #aabfc4; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+    .hint { left: 28px; bottom: 28px; max-width: 360px; line-height: 1.6; font-size: 13px; color: #c2cfce; }
+    .hint strong { display: block; color: #f2f5f1; font-weight: 500; }
+    .legend { right: 24px; bottom: 28px; display: grid; gap: 6px; color: #c2cfce; font-size: 11px; }
+    .legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--dot); }
+    aside { min-height: 100svh; padding: 36px 24px 28px; background: #152128; border-left: 1px solid #2d3d43; }
+    .eyebrow { margin: 0 0 14px; color: #9be1cf; text-transform: uppercase; letter-spacing: .14em; font-size: 10px; font-weight: 650; }
+    h1 { margin: 0 0 14px; font-size: 28px; line-height: 1.18; letter-spacing: -.03em; font-weight: 500; }
+    .intro { color: #aabbbc; font-size: 13px; line-height: 1.65; margin: 0 0 22px; }
+    .readout { padding: 14px 0; border-top: 1px solid #324047; border-bottom: 1px solid #324047; }
+    #status { display: flex; gap: 9px; align-items: baseline; margin: 0; font-size: 13px; line-height: 1.5; }
+    #status::before { content: ''; flex: 0 0 6px; height: 6px; border-radius: 50%; background: #9be1cf; }
+    dl { display: grid; grid-template-columns: 1fr auto; margin: 14px 0 0; gap: 8px; font-size: 12px; }
+    dt { color: #90a4a8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
+    .controls { display: grid; gap: 12px; padding-top: 20px; }
+    button, input, select { font: inherit; }
+    select { width: 100%; padding: 9px; border: 1px solid #405057; border-radius: 5px; background: #1b2b32; color: #e7eeed; font-size: 12px; }
+    button { padding: 11px 14px; text-align: left; border: 1px solid #405057; border-radius: 5px; color: #e7eeed; background: #1b2b32; font-size: 12px; cursor: pointer; min-height: 40px; }
+    button:hover { background: #263b43; border-color: #7a9b9c; }
+    button:disabled { opacity: .45; cursor: wait; }
+    button.primary { color: #102a26; background: #a0dcca; border-color: #a0dcca; font-weight: 500; }
+    button.primary:hover { background: #b8ebdc; }
+    .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { color: #b8c8c8; font-size: 12px; line-height: 1.5; }
+    .checkbox { display: flex; gap: 9px; align-items: center; margin: 4px 0; }
+    input[type="checkbox"] { accent-color: #9be1cf; width: 15px; height: 15px; }
+    input[type="range"] { accent-color: #9be1cf; width: 100%; margin: 6px 0 2px; }
+    .range-label { display: flex; justify-content: space-between; }
+    .note { margin-top: 20px; font-size: 11px; line-height: 1.65; color: #8da4a8; }
+    code { font-family: ui-monospace, monospace; color: #b4cecb; font-size: 11px; }
+    @media (max-width: 780px) {
+      main { grid-template-columns: 1fr; }
+      #view { position: relative; height: 62svh; min-height: 420px; }
+      aside { border-left: 0; border-top: 1px solid #2d3d43; padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section id="view" aria-label="Interactive breakable objects scene">
+      <div class="brand">Margo Engine / @margoengine/physics/breakable</div>
+      <canvas id="viewport" tabindex="0" aria-label="Stone pillar, brick wall, and glass pane ready to fracture"></canvas>
+      <div class="hint">
+        <strong>Click or press Space to fire a cannonball.</strong>
+        Drag to orbit. Grounded anchors stay standing while severed overhangs detach and fall.
+      </div>
+      <div class="legend">
+        <span style="--dot:#59d9f2">Cell seams</span>
+        <span style="--dot:#33eb59">Healthy bond</span>
+        <span style="--dot:#f53829">Damaged bond</span>
+        <span style="--dot:#40a6ff">Anchor pin</span>
+        <span style="--dot:#ff8c26">Active debris</span>
+      </div>
+    </section>
+    <aside aria-label="Breakable physics controls">
+      <p class="eyebrow">Pillar #9 · BREAK-01</p>
+      <h1>Breakable objects</h1>
+      <p class="intro">3D convex Voronoi fracture with structural connection graphs, support anchors, cumulative impulse damage, and debris budgets over Margo's own physics kernel.</p>
+      <div class="readout">
+        <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+        <dl>
+          <dt>Broken structures</dt><dd id="broken-count">0 / 3</dd>
+          <dt>Active debris</dt><dd id="debris-count">0</dd>
+          <dt>Last fracture impulse</dt><dd id="last-impulse">—</dd>
+          <dt>Backend</dt><dd id="backend">—</dd>
+        </dl>
+      </div>
+      <div class="controls">
+        <label for="mode">Fracture mode</label>
+        <select id="mode" disabled>
+          <option value="prefractured">Pre-fractured Voronoi</option>
+          <option value="impact">Impact-clustered (runtime)</option>
+        </select>
+
+        <label class="range-label" for="strength">
+          <span>Bond strength</span>
+          <output id="strength-value" for="strength">1.00×</output>
+        </label>
+        <input id="strength" type="range" min="0.25" max="2.5" value="1" step="0.05" disabled>
+
+        <label class="checkbox">
+          <input id="debug-view" type="checkbox" checked disabled>
+          Show debug view (cells, bonds, anchors, debris)
+        </label>
+
+        <div class="button-row">
+          <button id="shoot" class="primary" type="button" disabled>Fire ball (Space)</button>
+          <button id="blast" type="button" disabled>Blast (B)</button>
+        </div>
+        <button id="reset" type="button" disabled>Reset structures (R)</button>
+      </div>
+      <p class="note">
+        <strong>Left:</strong> Stone pillar (bottom anchored, uniform Voronoi).<br>
+        <strong>Center:</strong> Brick wall (bottom anchored, staggered brick Voronoi).<br>
+        <strong>Right:</strong> Framed glass pane (perimeter anchored, radial Voronoi).
+      </p>
+      <p class="note"><code>@margoengine/physics/breakable</code> · <code>@margoengine/lines</code></p>
+    </aside>
+  </main>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./physics-breakable.ts'));
+  </script>
+</body>
+</html>

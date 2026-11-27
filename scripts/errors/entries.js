@@ -3317,4 +3317,22 @@ export const entries = [
       'A prop or option of a React component or hook of @margoengine/react has the wrong type (TypeError) or a value outside its range (RangeError): a non-finite number, a negative count or duration, a size or distance order that is reversed, an unknown clip or profile name, two exclusive effects in one EffectComposer, or a transform that cannot be inverted.',
     fix: 'Pass what the message asks for: finite numbers inside the stated range, a minimum that does not exceed its maximum, names that exist in the model or profile list, and one anti-aliasing and one ambient occlusion effect per EffectComposer. A value that comes from state should be checked where it is computed.',
   },
+  {
+    id: 'physics-breakable',
+    title: '@margoengine/physics/breakable: Voronoi fracture, bond graph and debris options',
+    kind: 'family',
+    messages: [
+      'BreakableWorld requires a live Physics instance; see https://margoengine.com/errors#physics-breakable',
+      'Physics world is already disposed; create a new Physics before BreakableWorld; see https://margoengine.com/errors#physics-breakable',
+      'BreakableWorld is disposed; create a new BreakableWorld; see https://margoengine.com/errors#physics-breakable',
+      'BreakableBody was removed or its BreakableWorld was disposed; see https://margoengine.com/errors#physics-breakable',
+      'cellCount must be an integer from 2 to 256 (got 1); see https://margoengine.com/errors#physics-breakable',
+      'bondStrength must be a positive finite number (got 0); see https://margoengine.com/errors#physics-breakable',
+      'Breakable geometry has no volume to break: The convex hull points all lie in one plane; pass points that span a volume.; see https://margoengine.com/errors#physics-breakable',
+      'The breakable world has other pieces than the snapshot: restore it before a break or a removal, or take a new snapshot; see https://margoengine.com/errors#physics-breakable',
+    ],
+    cause:
+      'BreakableWorld, BreakableBody or a Voronoi fracture helper got an input it cannot use (code unsupported: a non-finite or non-positive size, strength, density, impulse or radius, a cellCount outside 2..256, a geometry with no volume, an unknown option value), was used after dispose() or remove() (code disposed), or was given a snapshot of other pieces than the live ones (code state).',
+    fix: 'Pass a live Physics world, positive finite sizes, strengths, densities, impulses and radii, cellCount in 2..256 and a geometry whose points span a volume (a closed convex mesh; split a concave one with convexDecomposition first). Stop calling a BreakableBody or BreakableWorld after removing or disposing it, and restore a snapshot only while the same pieces are live: take it after the last break.',
+  },
 ];

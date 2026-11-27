@@ -2479,6 +2479,10 @@
       "types": "./dist/physics/pbf.d.ts",
       "import": "./dist/physics/pbf.js"
     },
+    "./physics/breakable": {
+      "types": "./dist/physics/breakable.d.ts",
+      "import": "./dist/physics/breakable.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

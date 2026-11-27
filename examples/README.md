@@ -41,6 +41,7 @@ backend can run it.
 | [khronos-gallery.html](khronos-gallery.html) | Khronos glTF sample assets |
 | [gallery/](gallery/index.html) | The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md)) |
 | [kinematics-constraints.html](kinematics-constraints.html) | Arm clearance check with the kinematics package |
+| [physics-breakable.html](physics-breakable.html) | Breakable stone pillar, brick wall, and glass pane with Voronoi fracture, support anchors, cumulative damage, and debug overlay |
 | [hud-preview.html](hud-preview.html) | A HUD scene and an item-preview scene over a main scene |
 | [minimap.html](minimap.html) | A second camera view as a minimap |
 | [robot-expressive.html](robot-expressive.html) | The same character study as a standalone page |

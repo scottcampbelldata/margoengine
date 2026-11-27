@@ -113,6 +113,7 @@ await build({
         underwater: resolve(root, 'src/underwater/index.ts'),
         orbit: resolve(root, 'src/orbit/index.ts'),
         rod: resolve(root, 'src/rod/index.ts'),
+        breakable: resolve(root, 'src/breakable/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,
