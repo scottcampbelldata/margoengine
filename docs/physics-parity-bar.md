@@ -60,6 +60,27 @@ for Part 2 only. For each of the 14:
   for later; a known limit that a rival does not have is a gap to build, not a note in `docs/limits.md`.
 - A row is not set DONE or VERIFIED while any point is open. Open points are listed under the item until they close.
 
+**And the eight points (Scott, 2026-11-27: "Restart them and use the 8 points").** Each of the 14 also meets the
+eight-point standard first set in `docs/physics-work-queue.md` on 2026-11-26 ("The standard: the best solver we can
+build", 069f20095) and used by `docs/physics-solver-audit.md`:
+
+1. **The strongest model.** The most accurate published model that runs at interactive and film scale, from a wide
+   search of current literature. Where fidelity and cost trade off, a fast tier and a high-fidelity tier behind one
+   API, each validated, chosen by an option with a documented default.
+2. **Validated against the real world.** Several published measurements or exact solutions across the regimes used,
+   each with its source and a derived bound, including cases not used for calibration.
+3. **Broader than any rival.** Every capability of the best engines and specialised libraries for the phenomenon, and
+   better where possible. A capability another tool has and this item lacks is a gap to build.
+4. **Fully coupled.** Two-way coupling with every neighbour the catalog names, through fields, with a coupling test
+   for each, and conserved quantities accounted across the coupling.
+5. **Robust at the extremes.** No NaN, no energy gain and no blow-up across the documented range (high speeds, large
+   mass ratios, tiny and huge scales, long runs). Input outside the range is refused with a coded error naming the fix.
+6. **Scales.** Hot loops in Rust and Wasm with SIMD, or the GPU, threads where the work splits, large worlds through
+   cells and floating origin, with work counts recorded.
+7. **Directable for film.** Seeds, placed events, targets and look parameters that steer the result without breaking
+   the physics, and output the renderer draws directly.
+8. **Honest.** `docs/limits.md` states what it does not do; nothing is called finished while a known piece is missing.
+
 ### P1. DYN-01 3D rigid bodies and contact
 
 - **Body types:** dynamic, static (fixed), kinematic by position and by velocity (Babylon "animated"); switch type at
