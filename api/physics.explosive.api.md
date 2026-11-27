@@ -102,6 +102,7 @@ export interface ExplosionCounts {
     readonly fragmentSteps: number;
     readonly gunSteps: number;
     readonly hits: number;
+    readonly threadSteps: readonly number[];
 }
 
 export interface ExplosionParams {
@@ -128,7 +129,11 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     static load(options?: ExplosionSolverOptions & {
         id?: string;
         signal?: AbortSignal;
+        threads?: number;
     }): Promise<ExplosionSolver>;
+    get threads(): number;
+    endThreads(): void;
+    [Symbol.dispose](): void;
     get kernel(): boolean;
     describe(): SolverDescription;
     init(host: SolverHost, params: ExplosionParams): void;

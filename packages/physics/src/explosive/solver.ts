@@ -188,6 +188,8 @@ export interface ExplosionCounts {
   readonly gunSteps: number;
   /** Fragments and shots that have struck a body (ray casts that hit). */
   readonly hits: number;
+  /** Fragment steps by thread, the workers first and the main thread last (the kernel's partitions; one entry without threads). */
+  readonly threadSteps: readonly number[];
 }
 
 /** What an {@link ExplosionSolver} is made with. */
@@ -226,6 +228,46 @@ type Native = {
     counts: number,
   ): void;
 };
+
+/** f64 words of a thread job (see explosive/thread.ts). */
+const JOB_WORDS = 19;
+const CONTROL_GENERATION = 0,
+  CONTROL_DONE = 1,
+  CONTROL_READY = 2,
+  CONTROL_ERROR = 3;
+
+/** Waits until control word `at` reaches `value`: blocking where the thread may (Node, a worker), spinning in a page. */
+function waitFor(control: Int32Array, at: number, value: number): void {
+  for (let seen = Atomics.load(control, at); seen < value; seen = Atomics.load(control, at)) {
+    try {
+      Atomics.wait(control, at, seen, 50);
+    } catch {
+      // A page's main thread may not block: it spins on the load.
+    }
+  }
+}
+
+/** A worker thread of the explosive kernel. */
+interface Worker {
+  post(message: object): void;
+  end(): void;
+}
+
+/** Starts a worker on `explosive/thread.ts`: a module worker in a page, a worker_threads one in Node (unreferenced). */
+async function startWorker(): Promise<Worker> {
+  const url = new URL(/* @vite-ignore */ './explosive-thread.js', import.meta.url);
+  if (typeof globalThis.Worker === 'function') {
+    const worker = new globalThis.Worker(url, { type: 'module' });
+    return { post: (message) => worker.postMessage(message), end: () => worker.terminate() };
+  }
+  const name = 'node:worker_threads';
+  const { Worker: NodeWorker } = (await import(/* @vite-ignore */ name)) as {
+    Worker: new (url: URL) => { postMessage(message: object): void; terminate(): Promise<number>; unref(): void };
+  };
+  const worker = new NodeWorker(url);
+  worker.unref();
+  return { post: (message) => worker.postMessage(message), end: () => void worker.terminate() };
+}
 
 async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
   signal?.throwIfAborted();
@@ -337,6 +379,12 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
   private countsRegion: Region | null = null;
   private fragmentCount = 0;
   private native: Native | null = null;
+  private workers: Worker[] = [];
+  /** The threads the regions were laid out for at `init` (the workers then running, plus the main thread). */
+  private threadCount = 1;
+  private control: Region | null = null;
+  private job: Region | null = null;
+  private threadSteps: number[] = [0];
   private readonly terrain: BedShape | null;
   private ground = 0;
   private steps = 0;
@@ -393,9 +441,18 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
 
   /** Loads the explosive kernel and makes a solver that flies its fragments in it. */
   static async load(
-    options: ExplosionSolverOptions & { id?: string; signal?: AbortSignal } = {},
+    options: ExplosionSolverOptions & { id?: string; signal?: AbortSignal; threads?: number } = {},
   ): Promise<ExplosionSolver> {
-    const { signal, id, ...rest } = options;
+    const { signal, id, threads = 1, ...rest } = options;
+    if (!(Number.isInteger(threads) && threads >= 1 && threads <= 64))
+      throw invalidExplosive(
+        `Threads must be a whole number from 1 to 64; got ${threads}. Pass 1 for the main thread alone.`,
+      );
+    if (threads > 1 && !canShareMemory())
+      throw new MargoError(
+        'unsupported',
+        'Explosive kernel threads need shared memory (a cross-origin isolated page, or Node); load with threads: 1. See https://margoengine.com/errors#explosives',
+      );
     const [plain, shared] = await Promise.all([
       compile(new URL(/* @vite-ignore */ './explosive-kernel.wasm?no-inline', import.meta.url), signal),
       canShareMemory()
@@ -403,7 +460,26 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         : undefined,
     ]);
     signal?.throwIfAborted();
-    return new ExplosionSolver(id ?? 'explosion', rest, { plain, shared });
+    const solver = new ExplosionSolver(id ?? 'explosion', rest, { plain, shared });
+    for (let t = 1; t < threads; t++) solver.workers.push(await startWorker());
+    return solver;
+  }
+
+  /** Threads the fragments fly on: the main thread and the workers `load({threads})` started. */
+  get threads(): number {
+    return this.workers.length + 1;
+  }
+
+  /** Stops the worker threads; later steps fly every fragment on the main thread. */
+  endThreads(): void {
+    for (const worker of this.workers) worker.end();
+    this.workers = [];
+    this.threadCount = 1;
+  }
+
+  /** Ends the worker threads (`using solver = await ExplosionSolver.load({threads: 4})`). */
+  [Symbol.dispose](): void {
+    this.endThreads();
   }
 
   /** Whether the fragments fly in the explosive kernel. */
@@ -664,7 +740,9 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     const count = Math.max(1, fragments.length) * 8;
     this.dragRegion = host.allocate('fragment-drag', count, 'f64', EXPLOSION_LAYOUT);
     this.launchRegion = host.allocate('fragment-launch', count, 'f64', EXPLOSION_LAYOUT);
-    this.countsRegion = host.allocate('flight-counts', 16, 'f64', EXPLOSION_LAYOUT);
+    this.threadCount = this.workers.length + 1;
+    this.threadSteps = new Array<number>(this.threadCount).fill(0);
+    this.countsRegion = host.allocate('flight-counts', 16 * this.threadCount, 'f64', EXPLOSION_LAYOUT);
     this.words(this.dragRegion).set(drags);
     // A case fragment leaves when its charge detonates; a shot when its gun's shot reaches the muzzle (set at the firing).
     this.words(this.launchRegion).set(owners.map((owner) => (owner >= 0 ? this.placed[owner]!.time : Infinity)));
@@ -681,6 +759,26 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         throw new MargoError('failed', 'Unexpected explosive kernel ABI. Rebuild both native assets.');
       native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
       this.native = native;
+      if (this.threadCount > 1) {
+        if (!isShared(host.memory))
+          throw new MargoError(
+            'unsupported',
+            'Explosive kernel threads fly over the world memory: make the world with worldMemory(true). See https://margoengine.com/errors#explosives',
+          );
+        this.control = host.allocate('explosive-control', 16, 'i32', EXPLOSION_LAYOUT);
+        this.job = host.allocate('explosive-job', JOB_WORDS * 8, 'f64', EXPLOSION_LAYOUT);
+        this.workers.forEach((worker, index) => {
+          const own = host.allocate(`explosive-stack-${index}`, STACK_BYTES, 'u8', EXPLOSION_LAYOUT);
+          worker.post({
+            module,
+            memory: host.memory,
+            stack: Math.floor((own.byteOffset + own.byteLength) / 16) * 16,
+            control: this.control!.byteOffset,
+            job: this.job!.byteOffset,
+            index,
+          });
+        });
+      }
     }
     const table = this.explosions();
     this.placed.forEach((c, i) =>
@@ -872,11 +970,8 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     let flying: number;
     if (this.native) {
       const t = this.terrain;
-      this.native.fly(
-        this.fragmentRegion!.byteOffset,
-        this.dragRegion!.byteOffset,
-        this.launchRegion!.byteOffset,
-        this.fragmentCount,
+      const n = this.threadCount;
+      const args = [
         dt,
         end,
         g[0],
@@ -890,11 +985,41 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         t?.depth ?? 0,
         t?.centre[0] ?? 0,
         t?.centre[1] ?? 0,
-        this.countsRegion!.byteOffset,
+      ];
+      const counts = this.countsRegion!.byteOffset;
+      if (n > 1) this.dispatch(args, counts);
+      // The main thread flies the last partition: fragments from floor((n - 1) count / n) to the end.
+      const first = Math.floor(((n - 1) * this.fragmentCount) / n);
+      this.native.fly(
+        this.fragmentRegion!.byteOffset + first * 64,
+        this.dragRegion!.byteOffset + first * 8,
+        this.launchRegion!.byteOffset + first * 8,
+        this.fragmentCount - first,
+        ...(args as [
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+        ]),
+        counts + (n - 1) * 16,
       );
-      const counts = this.words(this.countsRegion!);
-      flying = counts[0]!;
-      this.steps += counts[1]!;
+      if (n > 1) this.join();
+      const words = this.words(this.countsRegion!);
+      flying = 0;
+      for (let k = 0; k < n; k++) {
+        flying += words[2 * k]!;
+        this.steps += words[2 * k + 1]!;
+        this.threadSteps[k]! += words[2 * k + 1]!;
+      }
     } else {
       const [now, steps] = flyFragments(
         this.fragmentWords(),
@@ -909,6 +1034,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       );
       flying = now;
       this.steps += steps;
+      this.threadSteps[0]! += steps;
     }
     if (before) flying -= this.hits(before, end, bodies, impulses);
     this.flyingNow = flying;
@@ -1004,6 +1130,34 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     }
   }
 
+  /** Hands the workers this step's job: their partitions of the fragments, by a new generation. */
+  private dispatch(args: number[], counts: number): void {
+    const memory = this.live().memory;
+    new Float64Array(memory.buffer, this.job!.byteOffset, JOB_WORDS).set([
+      ...args,
+      this.fragmentRegion!.byteOffset,
+      this.dragRegion!.byteOffset,
+      this.launchRegion!.byteOffset,
+      this.fragmentCount,
+      this.threadCount,
+      counts,
+    ]);
+    const control = new Int32Array(memory.buffer, this.control!.byteOffset, 4);
+    // Every worker must have started before the first job (they start while the world is built).
+    waitFor(control, CONTROL_READY, this.threadCount - 1);
+    Atomics.store(control, CONTROL_DONE, 0);
+    Atomics.add(control, CONTROL_GENERATION, 1);
+    Atomics.notify(control, CONTROL_GENERATION);
+  }
+
+  /** Waits for every worker's partition; a worker that failed stops the step. */
+  private join(): void {
+    const control = new Int32Array(this.live().memory.buffer, this.control!.byteOffset, 4);
+    waitFor(control, CONTROL_DONE, this.threadCount - 1);
+    if (Atomics.load(control, CONTROL_ERROR) !== 0)
+      throw new MargoError('failed', 'An explosive kernel thread failed; end the threads and step on one.');
+  }
+
   /** Fire the guns whose time has come and push their carriers back by the recoil this step holds. */
   private stepGuns(start: number, end: number, bodies: Float32Array | null, impulses: Float64Array | null): void {
     const words = this.gunWords();
@@ -1086,7 +1240,13 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
 
   /** The work the last steps did (the fragment steps are counted since the solver was made). */
   get counts(): ExplosionCounts {
-    return { flying: this.flyingNow, fragmentSteps: this.steps, gunSteps: this.gunSteps, hits: this.hitCount };
+    return {
+      flying: this.flyingNow,
+      fragmentSteps: this.steps,
+      gunSteps: this.gunSteps,
+      hits: this.hitCount,
+      threadSteps: [...this.threadSteps],
+    };
   }
 
   /** Charge `index` as the `explosions` field publishes it. @throws MargoError (`unsupported`) for an index out of range. */
