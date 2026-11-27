@@ -5,7 +5,7 @@
 // plus signs were checked against the paper's own Figures 4 to 6). Valid for Z 2 to 7, A_E / A_0 0.30 to 1.05 and P / D 0.5
 // to 1.4. `bSeriesCurves` fits MMG's quadratic K_T(J) and K_Q(J), as the standard method takes them (Yasukawa and Yoshimura
 // 2015), to the polynomials between bollard pull and zero thrust, by least squares.
-import { pow } from '@margoengine/math/pinned';
+import { ln, pow } from '@margoengine/math/pinned';
 import { shipError } from './errors.js';
 import type { PropellerCurves } from './propeller.js';
 
@@ -154,7 +154,8 @@ export function wageningenB(prop: BSeriesPropeller, J: number): { kt: number; kq
   let kt = poly(KT_TERMS, J, P, A, Z),
     kq = poly(KQ_TERMS, J, P, A, Z);
   if (reynolds > 2e6) {
-    const L = Math.log10(reynolds) - 0.301,
+    // log10 R_n by the pinned natural logarithm, so every machine gets the same bits.
+    const L = ln(reynolds) * 0.4342944819032518 - 0.301,
       L2 = L * L,
       J2 = J * J,
       P2 = P * P,
