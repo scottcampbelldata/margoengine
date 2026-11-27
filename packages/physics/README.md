@@ -4139,7 +4139,7 @@ Each ship is `{row, model}` and takes these settings:
 - `hull`: the hull's form for `holtropMennen` (`{length, beam, draughtFore, draughtAft, volume, lcb, midship, waterplane, ...}`). Given, the straight run's resistance at each speed is Holtrop and Mennen's, rising with the waves the hull makes, in place of the model's constant R'_0; `revolutionsFor` balances it.
 - `autopilot`: `{bandwidth, damping}`, the heading loop's natural frequency in units of U / L (default 1) and its damping ratio (default 0.8).
 
-The solver also takes `depth` (a number or a function of (x, z), for squat), `walls` (quays and banks, `{from, to}`) and `density`.
+The solver also takes `depth` (a number or a function of (x, z): for squat, and for shallow water), `walls` (quays and banks, `{from, to}`) and `density`. Where the water is under ten draughts deep, each ship runs on its model corrected for the depth (`shallowWater(model, depth)`): every hull derivative and the sway and yaw added masses by Ankudinov et al. (1990), the surge added mass by Li and Wu (1990), held at h / T 1.2 below that; the model is made again when the draught over depth moves by a hundredth. A ship then turns wider as the water shoals, as ships do.
 
 Steer with `control(i)`:
 - `revolutions`, rev/s, negative astern; `revolutionsFor(i, speed)` gives the self-propulsion revolutions;

@@ -37,6 +37,7 @@ import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } 
 import { type HeadingGains, headingGains, type ShipTrack, steerTrack, type TrackState, wrap } from './autopilot.js';
 import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mmg.js';
 import { type HoltropHull, holtropMennen } from './resistance.js';
+import { shallowWater } from './shallow.js';
 import { raceVelocity, thrusterThrust } from './propeller.js';
 import {
   cavityRadius,
@@ -220,6 +221,9 @@ export interface ShipStatus {
 }
 
 interface Runtime {
+  /** The model the ship runs on now: its own, or corrected for the depth under it (`shallowWater`), and T/h it was made at. */
+  model: ManoeuvringModel;
+  shallowKey: number;
   /** The autopilot's gains and the speed they were placed at. */
   gains: HeadingGains | null;
   gainSpeed: number;
@@ -359,6 +363,8 @@ export class ShipSolver implements Solver<ShipParams> {
           `An autopilot's bandwidth (in U / L) and damping ratio are finite and above 0 (got ${pilot.bandwidth}, ${pilot.damping}); pass them, or leave them for 0.5 and 0.8.`,
         );
       return {
+        model: ship.model,
+        shallowKey: 0,
         gains: null,
         gainSpeed: 0,
         cavity: new VortexCavity(ship.gas ?? 1),
@@ -550,8 +556,18 @@ export class ShipSolver implements Solver<ShipParams> {
         u = dot(vm, f),
         v = dot(vm, s),
         // Yaw rate about MMG's z, which points down.
-        r = -dot(spin, up),
-        M = ship.model,
+        r = -dot(spin, up);
+      // In shallow water the hull's derivatives and added masses are the depth's (Kijima et al. 1990; Li and Wu 1990),
+      // made again when the draught over depth moves by a hundredth.
+      const depth = this.depthAt(mid[0], mid[2]),
+        key = Number.isFinite(depth) ? Math.round((100 * ship.model.draught) / depth) : 0;
+      if (key !== rt.shallowKey) {
+        rt.shallowKey = key;
+        rt.model = key === 0 ? ship.model : shallowWater(ship.model, (100 * ship.model.draught) / key);
+        mmg.setModel(rt.model);
+        rt.gains = null;
+      }
+      const M = rt.model,
         L = M.length;
       // The rudder turns toward its order: the autopilot's when it holds a heading or a track.
       mmg.revolutions = control.revolutions;

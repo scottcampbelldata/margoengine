@@ -17106,3 +17106,18 @@ The conversion (C / 2)^(2/3) to a share of the momentum bound follows from Bever
 the loads entry's arrangement (`src/loads/errors.ts`). Proof: `packages/physics/tests/ship.test.js`, "a tunnel thruster
 keeps its momentum bound" and "the ship solver refuses what it cannot be made from".
 
+### Ship manoeuvring in shallow water (SEA-09, `shallowWater`, 2026-11-26)
+
+`packages/physics/src/ship/shallow.ts` and its use in `src/ship/solver.ts`, written from:
+
+- M. Vantorre, "Manoeuvring coefficients for a container carrier in shallow water: an evaluation of semi-empirical
+  formulae", for the 23rd ITTC Manoeuvring Committee, https://www.vliz.be/imisdocs/publications/ocrd/220165.pdf (all
+  pages, read): it reprints Ankudinov, Miller, Jakobsen and Daggett (MARSIM & ICSM 1990, eqs. 4 to 8, used here), Li and Wu
+  (MARSIM & ICSM 1990, eq. 26, the surge added mass), Clarke et al. (1983) and Kijima, Nakiri, Tsutsui and Matsunaga
+  (MARSIM & ICSM 1990, eqs. 15 to 25), and compares them with captive tests on a container carrier at h/T 1.10 to 1.32.
+
+Kijima's factors were implemented and dropped: on Yasukawa and Yoshimura's KVLCC2 derivatives they made the ship turn
+tighter in shallow water. Mapping Ankudinov's |v|v-type factors onto MMG's cubic terms and the h / T 1.2 floor are this
+package's own. Proof: `packages/physics/tests/ship.test.js`, "in shallow water a hull's derivatives and added masses are
+Ankudinov's".
+

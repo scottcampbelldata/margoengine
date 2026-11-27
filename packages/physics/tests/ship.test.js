@@ -16,6 +16,9 @@ import {
   coreDeficit,
   empiricalModel,
   headingGains,
+  ankudinovShallow,
+  liWuAddedMass,
+  shallowWater,
   inceptionIndex,
   raceNumbers,
   resolvedRace,
@@ -888,4 +891,51 @@ test("a hull given to the ship runs on Holtrop and Mennen's resistance: self-pro
   const plain = new Manoeuvring({ ...M, centre: 0 }),
     other = plain.selfPropulsion(speed);
   assert.notEqual(Math.round(other * 1e6), Math.round(ships.control(0).revolutions * 1e6));
+});
+
+test("in shallow water a hull's derivatives and added masses are Ankudinov's, and it turns wider as the water shoals", () => {
+  const M = KVLCC2_L7,
+    T = M.draught,
+    hull = { length: M.length, beam: M.beam, draught: T, block: M.volume / (M.length * M.beam * T) };
+  // Deep water, or ten draughts and more, gives the model back.
+  assert.equal(shallowWater(M, Infinity), M);
+  assert.equal(shallowWater(M, 10 * T), M);
+  // At h / T 1.5 the factors are Ankudinov et al.'s eqs. 4 to 8 as Vantorre reprints them, worked here by hand.
+  const g = 0.5,
+    K0 = 1 + 0.0775 / g ** 2 - 0.011 / g ** 3 + 0.000068 / g ** 5,
+    K1 = -0.0643 / g + 0.0724 / g ** 2 - 0.0113 / g ** 3 + 0.0000767 / g ** 5,
+    K2 = 0.0342 / g,
+    b = (hull.block * hull.beam * (1 + hull.beam / M.length) ** 2) / T,
+    fnv = K0 + K1 * b + K2 * b * b,
+    f = ankudinovShallow(1.5, hull);
+  assert.ok(Math.abs(f.fnv - fnv) < 1e-12 && Math.abs(f.fyv - (1.5 * fnv - 0.5)) < 1e-12);
+  assert.ok(Math.abs(f.fnr - (K0 + 0.5 * K1 * b + (K2 * b * b) / 3)) < 1e-12);
+  const [ax] = liWuAddedMass(1.5, hull),
+    shallow = shallowWater(M, 1.5 * T);
+  assert.ok(
+    Math.abs(ax - (1 + (3.77 + 1.14 * (hull.beam / T) - 0.233 * (M.length / T) - 3.43 * hull.block) / 0.5 ** 1.3)) <
+      1e-12,
+  );
+  assert.ok(
+    Math.abs(shallow.sway[0] / M.sway[0] - f.fyv) < 1e-12 && Math.abs(shallow.yaw[1] / M.yaw[1] - f.fnr) < 1e-12,
+  );
+  assert.ok(Math.abs(shallow.addedMass[1] / M.addedMass[1] - f.gv) < 1e-12);
+  // Held at h / T 1.2 below it.
+  assert.deepEqual(shallowWater(M, 1.05 * T), shallowWater(M, 1.2 * T));
+  // The tanker hard over at 15.5 knots full scale (Froude): its tactical diameter grows as the keel nears the bed.
+  const speed = (15.5 * 0.514444) / Math.sqrt(320 / 7),
+    diameter = (model) => {
+      const ship = new Manoeuvring({ ...model, centre: 0 }, { u: speed }, { rudderRate: 11.9 * DEG });
+      ship.revolutions = new Manoeuvring({ ...M, centre: 0 }).selfPropulsion(speed);
+      ship.order = 35 * DEG;
+      while (ship.state.heading < Math.PI && ship.time < 2000) ship.step(0.02);
+      return ship.state.z / M.length;
+    },
+    deep = diameter(M),
+    sizes = [2, 1.5, 1.2].map((ratio) => diameter(shallowWater(M, ratio * T)));
+  assert.ok(deep < sizes[0] && sizes[0] < sizes[1] && sizes[1] < sizes[2], `${deep} ${sizes}`);
+  assert.throws(
+    () => shallowWater(M, 0),
+    (e) => e.code === 'unsupported' && /depth/.test(e.message),
+  );
 });

@@ -156,7 +156,7 @@ export interface ManoeuvringForces {
  * Rudder angles turn at `rudderRate` rad/s to the order; positive turns the ship to starboard (toward +Z from +X).
  */
 export class Manoeuvring {
-  readonly model: ManoeuvringModel;
+  model: ManoeuvringModel;
   /** The state, advanced by {@link step}. */
   readonly state: ManoeuvringState;
   /** The propeller's revolutions, rev/s (negative astern). */
@@ -170,9 +170,9 @@ export class Manoeuvring {
   /** Simulated time, s. */
   time = 0;
   private readonly density: number;
-  private readonly mass: number;
+  private mass = 0;
   private readonly propeller: Propeller;
-  private readonly matrix: [number, number, number, number, number];
+  private matrix: [number, number, number, number, number] = [0, 0, 0, 0, 0];
   /** The hull's straight-run resistance at a speed, N, in place of R'_0 (a Holtrop and Mennen estimate), or none. */
   private readonly resistanceAt: ((speed: number) => number) | undefined;
 
@@ -207,6 +207,15 @@ export class Manoeuvring {
     this.state = { x: 0, z: 0, heading: 0, u: 0, v: 0, r: 0, rudder: 0, ...state };
     this.propeller = new Propeller(model.propeller.diameter, model.propeller.curves);
     this.rudderRate = options.rudderRate ?? 1.76 * DEG;
+    this.setModel(model);
+  }
+
+  /**
+   * Takes `model` in place of the ship's model (its hull derivatives and added masses in shallow water, say), with its mass
+   * matrix worked out again; the state, propeller and rudder stay. The propeller's curves are the first model's.
+   */
+  setModel(model: ManoeuvringModel): this {
+    this.model = model;
     const rho = this.density,
       L = model.length,
       d = model.draught,
@@ -219,6 +228,7 @@ export class Manoeuvring {
     this.mass = m;
     // Eq. 4's left side: [(m + m_x), (m + m_y), x_G m, I_zG + x_G^2 m + J_z].
     this.matrix = [m + mx * mass2, m + my * mass2, xG * m, m * kz * kz + xG * xG * m + jz * inertia4, xG];
+    return this;
   }
 
   /** The forces at a state (eqs. 5 to 25). */

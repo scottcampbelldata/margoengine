@@ -108,7 +108,7 @@ export const KVLCC2_L7: ManoeuvringModel;
 export const KVLCC2_PROPELLER: PropellerCurves;
 
 export class Manoeuvring {
-    readonly model: ManoeuvringModel;
+    model: ManoeuvringModel;
     readonly state: ManoeuvringState;
     revolutions: number;
     order: number;
@@ -120,6 +120,7 @@ export class Manoeuvring {
         readonly rudderRate?: number;
         readonly resistance?: (speed: number) => number;
     });
+    setModel(model: ManoeuvringModel): this;
     forces(s: ManoeuvringState, out?: ManoeuvringForces): ManoeuvringForces;
     step(dt: number): this;
     linearize(speed: number): {
@@ -249,6 +250,8 @@ export interface ResolvedRace extends PropellerRace {
 export const SEA_WATER_DENSITY = 1025;
 
 export const SEA_WATER_VISCOSITY = 0.0000011883;
+
+export const SHALLOW_LIMIT = 1.2;
 
 export interface Ship {
     readonly row: number;
@@ -412,6 +415,21 @@ export class VortexCavity {
     get cavitating(): boolean;
 }
 
+export function ankudinovShallow(ratio: number, hull: {
+    readonly length: number;
+    readonly beam: number;
+    readonly draught: number;
+    readonly block: number;
+}): {
+    gv: number;
+    gnr: number;
+    fyv: number;
+    fyr: number;
+    fnv: number;
+    fnr: number;
+    vv: number;
+};
+
 export function atan2(y: number, x: number): number;
 
 export function cavityRadius(circulation: number, core: number, ambient: number, vapour?: number, density?: number): number;
@@ -436,6 +454,13 @@ export function inceptionIndex(circulation: number, core: number, speed: number)
 
 export function ittc1957(reynolds: number): number;
 
+export function liWuAddedMass(ratio: number, hull: {
+    readonly length: number;
+    readonly beam: number;
+    readonly draught: number;
+    readonly block: number;
+}): [number, number, number];
+
 export function raceNumbers(race: ResolvedRace): RaceNumbers;
 
 export function raceVelocity(race: PropellerRace, point: readonly [number, number, number], out?: [number, number, number]): [number, number, number];
@@ -445,6 +470,8 @@ export function resolvedRace(race: ResolvedRace, point: readonly [number, number
 export function rudderLiftSlope(aspect: number): number;
 
 export function scaleModel(model: ManoeuvringModel, factor: number): ManoeuvringModel;
+
+export function shallowWater(model: ManoeuvringModel, depth: number): ManoeuvringModel;
 
 export function squat(c: SquatCase): Squat;
 

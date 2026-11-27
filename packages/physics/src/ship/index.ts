@@ -5,5 +5,6 @@ export * from './mmg.js';
 export * from './propeller.js';
 export * from './race.js';
 export * from './resistance.js';
+export * from './shallow.js';
 export * from './squat.js';
 export * from './solver.js';
