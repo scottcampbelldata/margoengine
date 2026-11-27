@@ -6,6 +6,15 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: SceneFade also draws into offscreen target views (KB-FADE-TARGETVIEW1, post)
+
+- **Repro:** not yet run. By reading: attach `SceneFade`, capture, warm and start it, then render with a view that
+  has a `target` texture. Its pass runs for that view too.
+- **Cause:** `SceneFade.draw` (`packages/post/src/scene-fade.ts`) does not test `context.view?.target`: it blends the
+  canvas snapshot into the target with a pipeline made for the canvas format and the scene's sample count, where a
+  target takes 1 sample and may have another format.
+- **Fix needs:** skip views with a `target`, and a GPU check with such a view on both backends.
+
 ### Fixed 2026-11-27: damaged JPEG 2000 files could trap the decoder or keep it busy for minutes (KB-J2K-HOSTILE1, decoders)
 
 - **Repro:** `node --test packages/decoders/tests/jpeg2000-fuzz.test.js` against the decoder of 45ad3faad: 13 of
