@@ -6697,6 +6697,30 @@ fallout. Load with `{water: true}` and pass the grid of a `ShallowWaterSolver` t
 stress on it. Arrange the pair in a staggered coupling, and give the water the weather's `timeScale` (the world refuses
 the pair at two scales). `@margoengine/weather/synoptic` adapts the same solve for Sky.
 
+## Explosive sources (`@margoengine/physics/explosive`)
+
+The energy a high-explosive charge releases and where it goes (FIRE-05). `chargeEnergy(mass, explosive)` is the mass
+times the heat of detonation, and `tntEquivalent(energy)` its TNT equivalent at 4.184 MJ/kg. `EXPLOSIVES` holds the
+measured Gurney velocities and heats of detonation of Kennedy (1970), Table 2. `gurneyVelocity` uses the measured value,
+or 0.7 of the heat of detonation where none was measured (Kennedy eq 16). `metalSpeed(gurney, geometry, M/C, N/C)` is
+the speed a case or plate reaches by Gurney's equations: `cylinder`, `sphere`, `flatSandwich`, `openFacedSandwich` and
+`asymmetricSandwich` with a tamper. They hold for M/C from 0.2 to 10, and a ratio outside that is refused.
+
+A buried charge keeps most of its energy in the ground. `scaledDepth(depth, energy)` is depth / E^(1/3) in m J^-1/3.
+`airborneFraction(scaledDepth)` is the share that leaves as an air blast (Ford et al. 2014): 0.90 at the surface,
+under 1 % at the 4e-3 m J^-1/3 that digs the largest crater. `energyBudget(energy, depth)` splits the energy into
+`air` (what the blast solver reads) and `ground` (what the crater and ground shock draw on).
+
+```ts
+import { energyBudget, EXPLOSIVES, gurneyVelocity, metalSpeed } from '@margoengine/physics/explosive';
+
+// Fauld, 27 November 1944: 5.34 million lb of TNT equivalent about 90 m down in the gypsum (Fielder and Guest 1967).
+const fauld = energyBudget(5.34e6 * 0.45359237 * 4.184e6, 90);
+console.log(fauld.tntEquivalent.toFixed(0), fauld.scaledDepth.toExponential(2), (fauld.air / fauld.energy).toFixed(4));
+// A TNT-filled steel cylinder with twice its charge's mass of case.
+console.log(metalSpeed(gurneyVelocity(EXPLOSIVES.tnt), 'cylinder', 2).toFixed(0), 'm/s');
+```
+
 ## Natural lightning and thunder
 
 `LightningSolver` advances a single cloud-to-ground leader in the electric field above a flat plane or a sampled

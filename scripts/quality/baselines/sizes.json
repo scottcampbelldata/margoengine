@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20703197,
+  "total": 20704346,
   "history": [
     {
       "date": "2026-10-24",
@@ -14239,6 +14239,12 @@
       "commit": "d8821f23c",
       "reason": "physics/ship 14,644 ceiling to its new size: the autopilot (pole placement on the ship's own linearised model, line-of-sight track following, reference model and drift crab) and the Holtrop hull wired into the solver. One feature of the ship entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) explosive source energy",
+      "reason": "the explosive source entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -15075,6 +15081,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
+    "@margoengine/physics/explosive": 1149,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

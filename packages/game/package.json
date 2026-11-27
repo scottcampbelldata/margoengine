@@ -2255,6 +2255,10 @@
       "types": "./dist/physics/lightning.d.ts",
       "import": "./dist/physics/lightning.js"
     },
+    "./physics/explosive": {
+      "types": "./dist/physics/explosive.d.ts",
+      "import": "./dist/physics/explosive.js"
+    },
     "./physics/granular-mpm": {
       "types": "./dist/physics/granular-mpm.d.ts",
       "import": "./dist/physics/granular-mpm.js"

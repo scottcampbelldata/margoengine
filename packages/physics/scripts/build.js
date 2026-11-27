@@ -55,6 +55,7 @@ await build({
         rail: resolve(root, 'src/rail/index.ts'),
         seismic: resolve(root, 'src/seismic/index.ts'),
         lightning: resolve(root, 'src/lightning/index.ts'),
+        explosive: resolve(root, 'src/explosive/index.ts'),
         strands: resolve(root, 'src/strands/index.ts'),
         'granular-mpm': resolve(root, 'src/granular-mpm/index.ts'),
         synoptic: resolve(root, 'src/synoptic/index.ts'),
