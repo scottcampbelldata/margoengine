@@ -105,8 +105,8 @@ build", 069f20095) and used by `docs/physics-solver-audit.md`:
   rounded variants.
 - **Mass and fitting:** mass and inertia computed from density for every shape; convex decomposition of a concave mesh
   (Rapier has it); trimesh from any glTF mesh with no extra work; scaled shapes.
-- **Robustness:** open and non-manifold meshes refused or repaired with a coded error, never NaN. Today PA-87, PA-88 and
-  PA-09 are open.
+- **Robustness:** open and non-manifold meshes refused or repaired with a coded error, never NaN. PA-88 (repair) and
+  PA-09 (decomposition bounded by work, not the clock) are fixed; PA-87 is open.
 
 ### P3. DYN-03 Joints and motors
 

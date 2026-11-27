@@ -35,7 +35,18 @@ export interface ConvexDecompositionOptions {
   merge?: boolean;
   /** Seed of the search and the surface samples (default 0): the same mesh, options and seed give the same parts, bit for bit. */
   seed?: number;
-  /** Milliseconds before it stops with a `timeout` MargoError (default 60,000): it never returns a part-done result. */
+  /**
+   * Stops the search with the signal's reason when it aborts (checked between search steps), such as
+   * `AbortSignal.timeout(60_000)` for a wall-clock bound; a timeout's reason becomes a `timeout` MargoError. Default none:
+   * the work is bounded by `maxConvexHulls`, `iterations` and `planes`, so the same mesh and options finish, or not, the
+   * same way on every machine. It never returns a part-done result.
+   */
+  signal?: AbortSignal;
+  /**
+   * @deprecated Since 2026-11-27 (PA-09): a wall-clock bound made a slow machine fail where a fast one finished. Pass
+   * `signal: AbortSignal.timeout(ms)` instead. When given, milliseconds before it stops with a `timeout` MargoError; by
+   * default there is no wall-clock bound.
+   */
   timeLimit?: number;
   /**
    * Rounds every part with a border outside its hull (default 0), as Rapier's `round_convex_decomposition`: each part is the hull
@@ -51,6 +62,18 @@ export interface ConvexDecomposition {
   parts: { shape: 'convexHull'; points: Float32Array; borderRadius?: number }[];
   /** Each part's concavity, in the units of the `concavity` option (a share of the mesh's largest side). */
   concavity: number[];
+}
+
+/** Throws the abort reason of `signal`, a timeout's as a `timeout` MargoError. */
+function signalCheck(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  const reason: unknown = signal.reason;
+  if (reason instanceof Error && reason.name === 'TimeoutError')
+    throw new MargoError(
+      'timeout',
+      'Convex decomposition was stopped by its signal timing out; give it longer, or lower iterations, planes or depth.',
+    );
+  throw reason;
 }
 
 /** Surface samples per unit area of the unit-sized mesh (appendix C). */
@@ -168,7 +191,7 @@ interface Entry {
  * ```
  *
  * @throws RangeError for a mesh that is open, flat or not a whole number of triangles, or for options out of range.
- * @throws MargoError `timeout` past `timeLimit`.
+ * @throws MargoError `timeout` past `timeLimit` or when `signal` times out; the signal's reason when it aborts otherwise.
  */
 export function convexDecomposition(
   mesh: ColliderGeometry,
@@ -183,10 +206,13 @@ export function convexDecomposition(
   if (!(border >= 0) || !Number.isFinite(border))
     throw new RangeError(`borderRadius is 0 or more metres and finite (got ${border}); pass 0 for sharp parts.`);
   const maxParts = count(options.maxConvexHulls, 64, 'maxConvexHulls', 1),
-    timeLimit = options.timeLimit ?? 60000;
+    timeLimit = options.timeLimit ?? Infinity,
+    signal = options.signal;
   if (!(timeLimit > 0))
     throw new RangeError(`timeLimit must be a positive number of milliseconds (got ${options.timeLimit}).`);
-  const start = Date.now(),
+  signalCheck(signal);
+  // PA-09: no wall-clock bound unless one is asked for, so the outcome never depends on the machine's speed.
+  const start = timeLimit < Infinity ? Date.now() : 0,
     random: Random = createRandom(options.seed ?? 0),
     settings: SearchSettings = {
       planes: count(options.planes, 20, 'planes', 1),
@@ -194,7 +220,8 @@ export function convexDecomposition(
       depth: count(options.depth, 4, 'depth', 1),
       random,
       check: () => {
-        if (Date.now() - start > timeLimit)
+        signalCheck(signal);
+        if (timeLimit < Infinity && Date.now() - start > timeLimit)
           throw new MargoError(
             'timeout',
             `Convex decomposition passed its time limit of ${timeLimit} ms; raise timeLimit, or lower iterations, planes or depth.`,

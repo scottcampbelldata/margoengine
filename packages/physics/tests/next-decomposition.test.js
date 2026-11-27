@@ -153,6 +153,27 @@ test('maxConvexHulls caps the parts, timeLimit stops with a timeout, and open or
   assert.throws(() => convexDecomposition(tube(), { iterations: 0.5 }), RangeError);
 });
 
+// PA-09: the default has no wall-clock bound, so a machine whose clock runs a minute per search step still finishes,
+// with the parts a fast machine gets.
+test('a slow machine decomposes as a fast one: no wall-clock bound by default, and a signal stops it on request', () => {
+  const fast = convexDecomposition(tube(), { iterations: 20 }),
+    now = Date.now;
+  let clock = 0;
+  Date.now = () => (clock += 61_000);
+  try {
+    const slow = convexDecomposition(tube(), { iterations: 20 });
+    assert.deepEqual(slow, fast, 'the same parts, bit for bit');
+  } finally {
+    Date.now = now;
+  }
+  const stop = new Error('stopped');
+  assert.throws(() => convexDecomposition(tube(), { signal: AbortSignal.abort(stop) }), (error) => error === stop);
+  assert.throws(
+    () => convexDecomposition(tube(), { signal: AbortSignal.abort(new DOMException('late', 'TimeoutError')) }),
+    (error) => error instanceof MargoError && error.code === 'timeout',
+  );
+});
+
 test('a marble falls inside a decomposed cup on the own solver, and rests on the lid of its hull', () => {
   const parts = convexDecomposition(cup());
   const drop = (colliders) => {

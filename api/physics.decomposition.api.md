@@ -23,6 +23,7 @@ export interface ConvexDecompositionOptions {
     depth?: number;
     merge?: boolean;
     seed?: number;
+    signal?: AbortSignal;
     timeLimit?: number;
     borderRadius?: number;
 }
