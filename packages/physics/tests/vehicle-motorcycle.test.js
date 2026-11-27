@@ -91,7 +91,11 @@ test('a bike with its throttle on keeps going, and a motorcycle refuses what mak
   }
   assert.ok(rider.speed > 11, `it accelerates: ${rider.speed}`);
   assert.ok(Math.abs(rider.lean) < 0.02, 'and stays upright');
-  assert.throws(() => rider.setInput({ steer: Number.NaN }), RangeError);
+  assert.throws(() => rider.setInput({ steer: Number.NaN }), {
+    name: 'MargoError',
+    code: 'unsupported',
+    message: /steer must be a finite number from -1 to 1.*errors#vehicles/,
+  });
   physics.dispose();
   const world = new Physics(null),
     chassis = world.addBody(null, { colliders: { shape: 'box', halfExtents: [0.15, 0.3, 0.9], mass: 250 } });

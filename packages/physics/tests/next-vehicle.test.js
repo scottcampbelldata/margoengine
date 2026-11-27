@@ -146,7 +146,11 @@ test('a roll influence outside 0 to 1 is refused with the fix', () => {
   for (const rollInfluence of [-0.1, 1.5, Number.NaN, '0.1'])
     assert.throws(
       () => new Vehicle(physics, chassis, { wheels: [{ position: [0, 0, 0], radius: 0.3, rollInfluence }] }),
-      { name: 'RangeError', message: /rollInfluence must be a number from 0 to 1; use 0.1/ },
+      {
+        name: 'MargoError',
+        code: 'unsupported',
+        message: /rollInfluence must be a number from 0 to 1; use 0.1.*errors#vehicles/,
+      },
     );
   physics.dispose();
 });

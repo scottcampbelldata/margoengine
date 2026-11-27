@@ -110,7 +110,13 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
   damping and travel; wheel radius; friction slip; steering; engine force; brake; side friction; wheel transforms for
   drawing.
 - **Driving:** a working arcade default that drives at once with zero tuning.
-- **Today:** the full tyre-model upgrade (MF 6.x) is beyond parity and not required.
+- **Today:** the full tyre-model upgrade (MF 6.x) is beyond parity and not required. Met 2026-11-27: every raycast
+  option of the three.js Rapier example (`Vehicle`, checked against Rapier in `next-vehicle.test.js`), the zero-tuning
+  arcade car `Vehicle.car` (`vehicle-car.test.js`: closed-form rest, 0.4 g launch, snapshot replay), the nine-line
+  quick start and the three.js migration note in the physics README, the example page
+  `examples/test-pages/vehicle.html` (WebGPU and the WebGL2 compatibility layer), the debug view
+  `vehicle.debugRender()`, and coded errors linking margoengine.com/errors#vehicles. Open: speed against the rival's
+  demo (quiet speed phase), KB-PHYS-VEHICLEREST1 and KB-PHYS-TRACKEDERR1.
 
 ### P6. SOFT-01 Cloth
 
@@ -209,7 +215,7 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 | DYN-01 | 3D rigid body and contact | B Havok; T Rapier/Ammo/Jolt | P1 | CLAIMED, 234/254 Rapier rows | PERFECT |
 | DYN-02 | 2D rigid body | none | Base | CLAIMED | MEETS |
 | DYN-03 | Articulated bodies, joints, motors | B constraints; T rapier joints | P3 | CLAIMED, partial | PERFECT |
-| DYN-04 | Wheeled vehicles | T rapier vehicle | P5 | REOPENED | PERFECT |
+| DYN-04 | Wheeled vehicles | T rapier vehicle | P5 | CLAIMED, P5 met but speed (quiet phase) | PERFECT |
 | DYN-05 | Rail vehicle dynamics | none | Base | REOPENED | MEETS |
 | DYN-06 | Mass properties, collision geometry | B shapes; T helpers | P2 | CLAIMED, partial | PERFECT |
 | DYN-07 | Character, balance, ragdoll | B controller and ragdoll; T rapier controller | P4 | OPEN (Codex) | PERFECT |

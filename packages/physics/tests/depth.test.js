@@ -371,15 +371,15 @@ rtest('vehicle misuse throws coded errors that name the fix; removing the chassi
   const bare = physics.addBody(null, { colliders: [] });
   assert.throws(() => new Vehicle(physics, bare, { wheels }), /collider/);
   const chassis = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 0.25, 2] } });
-  assert.throws(() => new Vehicle(physics, chassis, { wheels: [] }), RangeError);
+  assert.throws(() => new Vehicle(physics, chassis, { wheels: [] }), { name: 'MargoError', code: 'unsupported' });
   assert.throws(() => new Vehicle(physics, chassis, { wheels: [{ position: [0, 0, 0], radius: 0 }] }), /radius/);
   assert.throws(() => new Vehicle(physics, chassis, { wheels: [{ ...wheels[0], axle: [0, 0, 0] }] }), /nonzero/);
   const other = create();
   assert.throws(() => new Vehicle(other, chassis, { wheels }), /physics.addBody/);
   other.dispose();
   const vehicle = new Vehicle(physics, chassis, { wheels });
-  assert.throws(() => vehicle.wheel(1), RangeError);
-  assert.throws(() => vehicle.setInput({ throttle: Number.NaN }), RangeError);
+  assert.throws(() => vehicle.wheel(1), { name: 'MargoError', code: 'unsupported' });
+  assert.throws(() => vehicle.setInput({ throttle: Number.NaN }), { name: 'MargoError', code: 'unsupported' });
   vehicle.setInput({ throttle: 3, steer: -3, brake: 2 });
   assert.equal(vehicle.engineForce, vehicle.maxEngineForce, 'input is clamped');
   assert.equal(vehicle.steering, -vehicle.maxSteeringAngle);

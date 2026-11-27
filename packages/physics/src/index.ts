@@ -69,6 +69,9 @@ export type { DrivetrainOptions, AxleOptions, DifferentialOptions, DrivenWheel }
 export type { TyreModel, TyreSample, TyreForces, MagicCurve, PacejkaOptions, BrushOptions } from './tyres.js';
 export type {
   VehicleOptions,
+  CarOptions,
+  VehicleDebugOptions,
+  VehicleDebugStyle,
   VehicleInput,
   WheelOptions,
   WheelState,

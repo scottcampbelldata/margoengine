@@ -4,6 +4,8 @@
 // inertia under its torque less the clutch's. What the gearbox gives goes to the driven wheels through the differentials: an open one splits
 // the torque in two, a locked one brings its two sides to one speed, a limited-slip one does so up to a torque it may move.
 
+import { MargoError } from '@margoengine/math/errors';
+
 /** How one differential splits torque between its two outputs. */
 export interface DifferentialOptions {
   /** `'open'` (default): half each. `'locked'`: the two sides turn together. `'limitedSlip'`: they turn together within a torque that may move. */
@@ -66,6 +68,9 @@ export interface DrivetrainOptions {
   efficiency?: number;
 }
 
+/** A drivetrain input that cannot be used: a MargoError of code `unsupported` naming the input and its fix, with the help link. */
+const invalidDrivetrain = (message: string): MargoError =>
+  new MargoError('unsupported', `${message} See https://margoengine.com/errors#vehicles`);
 const interpolate = (curve: readonly (readonly [number, number])[], x: number): number => {
   if (x <= curve[0]![0]) return curve[0]![1];
   const last = curve[curve.length - 1]!;
@@ -112,14 +117,14 @@ export class Drivetrain {
 
   constructor(options: DrivetrainOptions) {
     if (!Array.isArray(options?.axles) || options.axles.length < 1 || options.axles.length > 2)
-      throw new RangeError('A drivetrain drives one axle or two; pass {axles: [{wheels: [2, 3]}]}.');
+      throw invalidDrivetrain('A drivetrain drives one axle or two; pass {axles: [{wheels: [2, 3]}]}.');
     for (const axle of options.axles)
       if (
         !Array.isArray(axle.wheels) ||
         axle.wheels.length !== 2 ||
         axle.wheels.some((w: number) => !Number.isInteger(w) || w < 0)
       )
-        throw new RangeError('An axle names the two wheel indexes it drives; pass {wheels: [2, 3]}.');
+        throw invalidDrivetrain('An axle names the two wheel indexes it drives; pass {wheels: [2, 3]}.');
     this.curve = options.torqueCurve ?? [
       [1000, 120],
       [2500, 170],
@@ -131,7 +136,7 @@ export class Drivetrain {
       this.curve.length < 1 ||
       this.curve.some((p, i) => !(p[0] >= 0 && Number.isFinite(p[1])) || (i > 0 && !(p[0] > this.curve[i - 1]![0])))
     )
-      throw new RangeError(
+      throw invalidDrivetrain(
         'A torque curve is points [rpm, N m] with the rpm rising; pass them sorted by rpm, such as [[1000, 120], [4000, 200]].',
       );
     const peak = Math.max(...this.curve.map((p) => p[1]));
@@ -162,20 +167,20 @@ export class Drivetrain {
       [o.clutchTorque, 'clutchTorque'],
     ] as const)
       if (!(value > 0 && Number.isFinite(value)))
-        throw new RangeError(`Drivetrain ${name} must be a finite number above 0; got ${value}.`);
-    if (!(o.redlineRpm > o.idleRpm)) throw new RangeError('Drivetrain redlineRpm must be above idleRpm.');
+        throw invalidDrivetrain(`Drivetrain ${name} must be a finite number above 0; got ${value}.`);
+    if (!(o.redlineRpm > o.idleRpm)) throw invalidDrivetrain('Drivetrain redlineRpm must be above idleRpm.');
     if (!Array.isArray(o.gears) || o.gears.length < 1 || o.gears.some((g) => !(g > 0 && Number.isFinite(g))))
-      throw new RangeError(
+      throw invalidDrivetrain(
         'Drivetrain gears are ratios above 0, first gear first; pass them as [3.5, 2.1, 1.4, 1.0], for example.',
       );
     if (!(o.efficiency > 0 && o.efficiency <= 1))
-      throw new RangeError('Drivetrain efficiency must be above 0 and at most 1.');
-    if (!(o.shiftTime >= 0)) throw new RangeError('Drivetrain shiftTime must be 0 or more seconds.');
+      throw invalidDrivetrain('Drivetrain efficiency must be above 0 and at most 1.');
+    if (!(o.shiftTime >= 0)) throw invalidDrivetrain('Drivetrain shiftTime must be 0 or more seconds.');
     if (!(o.upshiftRpm > 0 && o.downshiftRpm > 0 && Number.isFinite(o.upshiftRpm) && Number.isFinite(o.downshiftRpm)))
-      throw new RangeError('Drivetrain upshiftRpm and downshiftRpm must be finite numbers above 0.');
+      throw invalidDrivetrain('Drivetrain upshiftRpm and downshiftRpm must be finite numbers above 0.');
     for (let g = 1; g < o.gears.length; g++)
       if (o.upshiftRpm * (o.gears[g]! / o.gears[g - 1]!) <= o.downshiftRpm)
-        throw new RangeError(
+        throw invalidDrivetrain(
           `Drivetrain would shift up from gear ${g} at ${o.upshiftRpm} rpm to ${Math.round(o.upshiftRpm * (o.gears[g]! / o.gears[g - 1]!))} rpm, ` +
             `at or under its downshiftRpm of ${o.downshiftRpm}, and shift back down; raise upshiftRpm's distance from downshiftRpm.`,
         );

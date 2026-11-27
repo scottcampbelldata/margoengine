@@ -1,13 +1,15 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { MargoError } from '@margoengine/math/errors';
+import { MargoError, type MargoErrorCode } from '@margoengine/math/errors';
 import { hypot, pow } from '@margoengine/math/pinned';
+import { STANDARD_GRAVITY } from '@margoengine/math/gravity';
 import type { Mesh } from '@margoengine/core';
 import type { PhysicsCollider } from './collider.js';
 import type { PhysicsBody } from './body.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
-import { checkVec, type Vec3 } from './math.js';
+import type { Vec3 } from './math.js';
 import type { Drivetrain } from './drivetrain.js';
 import type { TyreModel } from './tyres.js';
+import type { DebugLines } from './debug.js';
 
 /** One wheel of a {@link Vehicle}. Positions and directions are in the chassis body's local frame. */
 export interface WheelOptions {
@@ -171,6 +173,58 @@ export interface VehicleInput {
   clutch?: number;
 }
 
+/**
+ * Options of {@link Vehicle.car}: every field of {@link VehicleOptions} but `wheels`, which the car lays out itself, and three of
+ * its own. Each is optional.
+ */
+export interface CarOptions extends Omit<VehicleOptions, 'wheels'> {
+  /**
+   * Half sizes of the car's body in the chassis frame, along x, y and z (default the box around the chassis's box colliders, and
+   * around the spheres of its sphere, capsule, cylinder and cone colliders). Give it for a chassis of hull or mesh colliders.
+   */
+  halfExtents?: Vec3;
+  /** Settings every wheel takes over the arcade ones, for example `{radius: 0.4, frictionSlip: 2}` (default none). */
+  wheel?: Partial<Omit<WheelOptions, 'position' | 'mesh' | 'steer'>>;
+  /**
+   * Meshes drawn as the four wheels, in the order front left, front right, rear left, rear right: children of the chassis mesh,
+   * modelled centred on their hubs with their axle along x (default none).
+   */
+  wheelMeshes?: readonly (Mesh | null | undefined)[];
+}
+
+/** What {@link Vehicle.debugRender} draws. Each part is on unless switched off. */
+export interface VehicleDebugOptions {
+  /** Each wheel's suspension ray: mount to hub, and hub to the ground (or to full droop in the air). Default true. */
+  suspension?: boolean;
+  /** Each contact point with a short line along the ground normal. Default true. */
+  contacts?: boolean;
+  /**
+   * Each tyre's push on the chassis in the last step as a line from its contact point, one metre for a push of the wheel's whole load,
+   * green while the tyre grips and red as it reaches its grip limit and slides. Default true.
+   */
+  slip?: boolean;
+  /** Each wheel as a circle of its radius around its steered axle. Default true. */
+  wheels?: boolean;
+  /** Colours, each one left out keeping its default. */
+  style?: VehicleDebugStyle;
+}
+
+/**
+ * Colours of {@link VehicleDebugOptions.style}, red, green, blue and alpha from 0 to 1. Defaults: suspension [0.25, 0.8, 1, 1], airborne
+ * [0.55, 0.55, 0.6, 1], contact [1, 0.3, 0.9, 1], grip [0.3, 0.95, 0.35, 1], sliding [1, 0.2, 0.15, 1], wheel [0.92, 0.92, 0.95, 1];
+ * `normalLength` 0.25 m.
+ */
+export interface VehicleDebugStyle {
+  suspension?: readonly [number, number, number, number];
+  airborne?: readonly [number, number, number, number];
+  contact?: readonly [number, number, number, number];
+  grip?: readonly [number, number, number, number];
+  sliding?: readonly [number, number, number, number];
+  wheel?: readonly [number, number, number, number];
+  /** The line along each contact normal, metres. */
+  normalLength?: number;
+}
+
 /** The state of one wheel after the last step. */
 export interface WheelState {
   /** The wheel touches the ground. */
@@ -232,6 +286,8 @@ interface WheelSetup {
   normal: [number, number, number];
   ground: PhysicsCollider | null;
   hard: [number, number, number];
+  /** The suspension direction in the world at the last cast. */
+  down: [number, number, number];
   forwardImpulse: number;
   sideImpulse: number;
   cast: 'ray' | 'shape';
@@ -275,27 +331,55 @@ const multiply = (a: readonly number[], b: readonly number[]): Q => {
   ];
 };
 
+/**
+ * @internal A vehicle input or call that cannot be used: a MargoError (code `unsupported` unless given) whose message names
+ * the input and its fix and links the vehicles entry of the error help page.
+ */
+export function invalidVehicle(message: string, code: MargoErrorCode = 'unsupported'): MargoError {
+  return new MargoError(code, `${message} See https://margoengine.com/errors#vehicles`);
+}
+const checkVec = (value: unknown, label: string): void => {
+  const v = value as ArrayLike<number> | undefined;
+  if (
+    !(Array.isArray(v) || ArrayBuffer.isView(v)) ||
+    v.length !== 3 ||
+    !Number.isFinite(v[0]) ||
+    !Number.isFinite(v[1]) ||
+    !Number.isFinite(v[2])
+  )
+    throw invalidVehicle(`${label} must be [x, y, z], three finite numbers.`);
+};
 const unit = (value: Vec3, label: string): V => {
   checkVec(value, label);
   const length = Math.hypot(value[0], value[1], value[2]);
-  if (!length) throw new RangeError(`${label} must be nonzero; pass a direction such as [0, -1, 0].`);
+  if (!length) throw invalidVehicle(`${label} must be nonzero; pass a direction such as [0, -1, 0].`);
   return [value[0] / length, value[1] / length, value[2] / length];
 };
 const positive = (value: unknown, label: string): number => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
-    throw new RangeError(`${label} must be a positive finite number`);
+    throw invalidVehicle(`${label} must be a positive finite number`);
   return value;
 };
 const fraction = (value: unknown, label: string): number => {
   if (typeof value !== 'number' || !(value >= 0 && value <= 1))
-    throw new RangeError(`${label} must be a number from 0 to 1; use 0.1 for a car that does not tip over.`);
+    throw invalidVehicle(`${label} must be a number from 0 to 1; use 0.1 for a car that does not tip over.`);
   return value;
 };
 const clamp = (value: number | undefined, min: number, max: number, label: string): number => {
   const v = value ?? 0;
-  if (!Number.isFinite(v)) throw new RangeError(`${label} must be a finite number from ${min} to ${max}`);
+  if (!Number.isFinite(v)) throw invalidVehicle(`${label} must be a finite number from ${min} to ${max}`);
   return Math.min(max, Math.max(min, v));
 };
+
+/** A wheel's axle in the world, turned by its steering about the chassis up axis. */
+function steeredAxle(w: { direction: V; axle: V; steering: number }, rotation: readonly number[]): V {
+  const s = w.steering / 2,
+    sine = Math.sin(s);
+  return rotate(
+    rotation,
+    rotate([-w.direction[0] * sine, -w.direction[1] * sine, -w.direction[2] * sine, Math.cos(s)], w.axle),
+  );
+}
 
 function groundInverse(body: PhysicsBody, point: V, direction: V): number {
   if (body.type !== 'dynamic') return 0;
@@ -408,6 +492,7 @@ export class Vehicle implements PhysicsAttachment {
   private readonly groundMaterial?: VehicleOptions['groundMaterial'];
   private readonly groundReaction: boolean;
   private disposed = false;
+  private lastStep = 0;
   private readonly position = [0, 0, 0];
   private readonly quaternion = [0, 0, 0, 1];
 
@@ -422,17 +507,17 @@ export class Vehicle implements PhysicsAttachment {
     options: VehicleOptions,
   ) {
     if (!physics?.owns?.(chassis))
-      throw new MargoError('state', 'Chassis must belong to this physics world; add it with physics.addBody first.');
+      throw invalidVehicle('Chassis must belong to this physics world; add it with physics.addBody first.', 'state');
     if (chassis.type !== 'dynamic')
-      throw new TypeError(
+      throw invalidVehicle(
         "A vehicle chassis must be a dynamic body; add it with physics.addBody(mesh, {type: 'dynamic'}).",
       );
     if (!chassis.colliders.length)
-      throw new TypeError('A vehicle chassis needs a collider to have mass; give the chassis body a box collider.');
+      throw invalidVehicle('A vehicle chassis needs a collider to have mass; give the chassis body a box collider.');
     this.facing = options?.forward ? unit(options.forward, 'Vehicle forward') : [0, 0, 1];
     const wheels = options?.wheels;
     if (!Array.isArray(wheels) || !wheels.length)
-      throw new RangeError('A vehicle needs at least one wheel: {wheels: [{position: [0.8, 0, 1.2], radius: 0.35}]}');
+      throw invalidVehicle('A vehicle needs at least one wheel: {wheels: [{position: [0.8, 0, 1.2], radius: 0.35}]}');
     for (const wheel of wheels) {
       checkVec(wheel?.position, 'Wheel position');
       positive(wheel.radius, 'Wheel radius');
@@ -467,6 +552,7 @@ export class Vehicle implements PhysicsAttachment {
         normal: [0, 1, 0],
         ground: null,
         hard: [0, 0, 0],
+        down: [0, -1, 0],
         forwardImpulse: 0,
         sideImpulse: 0,
         cast: wheel.cast ?? options.wheelCast ?? 'ray',
@@ -486,9 +572,9 @@ export class Vehicle implements PhysicsAttachment {
       });
       const made = this.wheels[this.wheels.length - 1]!;
       if (made.cast !== 'ray' && made.cast !== 'shape')
-        throw new RangeError(`Wheel cast must be 'ray' or 'shape'; got ${String(made.cast)}.`);
+        throw invalidVehicle(`Wheel cast must be 'ray' or 'shape'; got ${String(made.cast)}.`);
       if (made.tyre && typeof made.tyre.forces !== 'function')
-        throw new TypeError(
+        throw invalidVehicle(
           'A tyre model is an object with a forces(sample) method; pass pacejkaTyre() or brushTyre().',
         );
     }
@@ -502,7 +588,7 @@ export class Vehicle implements PhysicsAttachment {
       [this.maxSteeringAngle, 'maxSteeringAngle'],
     ] as const)
       if (!Number.isFinite(value) || value < 0)
-        throw new RangeError(`Vehicle ${label} must be a finite number of at least 0`);
+        throw invalidVehicle(`Vehicle ${label} must be a finite number of at least 0`);
     this.groups = options.groups;
     this.predicate = options.predicate;
     this.groundMaterial = options.groundMaterial;
@@ -511,13 +597,13 @@ export class Vehicle implements PhysicsAttachment {
     if (this.drivetrain) {
       for (const index of this.drivenIndexes()) {
         if (!Number.isInteger(index) || index >= this.wheels.length)
-          throw new RangeError(
+          throw invalidVehicle(
             `The drivetrain names wheel ${index}, but the vehicle has ${this.wheels.length}; use wheel indexes from 0 to ${this.wheels.length - 1}.`,
           );
         if (!this.wheels[index]!.tyre)
-          throw new MargoError(
-            'state',
+          throw invalidVehicle(
             `Wheel ${index} is driven by a drivetrain and needs a tyre model: pass tyre: pacejkaTyre() to the vehicle.`,
+            'state',
           );
       }
     }
@@ -532,14 +618,124 @@ export class Vehicle implements PhysicsAttachment {
         b! >= this.wheels.length ||
         a === b
       )
-        throw new RangeError(
+        throw invalidVehicle(
           `Anti-roll bar ${i} joins two different wheels of the vehicle; pass {wheels: [0, 1], stiffness: 20000}.`,
         );
       if (!(bar.stiffness >= 0 && Number.isFinite(bar.stiffness)))
-        throw new RangeError(`Anti-roll bar ${i} stiffness must be a finite number of 0 or more.`);
+        throw invalidVehicle(`Anti-roll bar ${i} stiffness must be a finite number of 0 or more.`);
       return { a: a!, b: b!, stiffness: bar.stiffness };
     });
     physics.attach(this);
+  }
+
+  /**
+   * An arcade car that drives at once with no tuning: four wheels laid out from the chassis's own size, the front pair steering
+   * and all four driving and braking, as `new Vehicle(physics, chassis, {wheels})` with these wheels.
+   *
+   * From the half sizes of the body (`halfExtents`, or its box colliders) along its forward, left and up axes, `L`, `W` and `H`:
+   * wheel radius `r = 0.35 min(W, L)`, suspension rest length `0.85 r`, wheel centres on the body's sides (`W` either side,
+   * half of each tyre outside the body) and `0.7 L` ahead and behind its centre, mounted so that at rest each hub stands
+   * `0.2 r` above the bottom of the body (which rides `0.8 r` off the ground). The springs
+   * are set so the car rests with each spring a third of the way in (`suspensionStiffness = g / (4 sag)` per kilogram of
+   * chassis, `sag = rest / 3`), damped at 0.3 of critical on compression and 0.5 on extension, each carrying up to six times
+   * its share of the weight. Grip, engine force (the chassis mass in newtons a wheel, 0.4 g in all), brakes and steering keep
+   * the {@link Vehicle} defaults. `wheel` overrides any of these for every wheel; `forward` turns the whole layout (default +Z).
+   * @param physics The world the chassis belongs to.
+   * @param chassis A dynamic body with a collider, for example `{shape: 'box', halfExtents: [0.9, 0.3, 2], mass: 1200}`.
+   * @param options Overrides; see {@link CarOptions}.
+   * @throws MargoError (code `unsupported`, or `state` for a chassis of another world) naming the input and its fix.
+   */
+  static car(physics: Physics, chassis: PhysicsBody, options: CarOptions = {}): Vehicle {
+    if (!physics?.owns?.(chassis))
+      throw invalidVehicle('Chassis must belong to this physics world; add it with physics.addBody first.', 'state');
+    const { halfExtents, wheel = {} as NonNullable<CarOptions['wheel']>, wheelMeshes = [], ...rest } = options;
+    const forward = rest.forward ? unit(rest.forward, 'Vehicle forward') : ([0, 0, 1] as V),
+      up: V = [0, 1, 0],
+      side = cross(up, forward),
+      span = hypot(side[0], side[1], side[2]);
+    if (!(span > 1e-6))
+      throw invalidVehicle('Vehicle.car forward must not point along the chassis up axis (+y); pass [0, 0, 1] for +Z.');
+    const left: V = [side[0] / span, side[1] / span, side[2] / span];
+    let low: V = [Infinity, Infinity, Infinity],
+      high: V = [-Infinity, -Infinity, -Infinity];
+    if (halfExtents) {
+      checkVec(halfExtents, 'Vehicle.car halfExtents');
+      for (let a = 0; a < 3; a++) {
+        positive(halfExtents[a], 'Vehicle.car halfExtents');
+        low[a] = -halfExtents[a]!;
+        high[a] = halfExtents[a]!;
+      }
+    } else
+      for (const collider of chassis.colliders) {
+        const box = collider.halfExtents(),
+          radius = box ? null : collider.boundingRadius,
+          t = collider.translationWrtParent(),
+          q = collider.rotationWrtParent();
+        if (!box && radius === null) continue;
+        for (let corner = 0; corner < 8; corner++) {
+          const local: V = box
+              ? [corner & 1 ? box.x : -box.x, corner & 2 ? box.y : -box.y, corner & 4 ? box.z : -box.z]
+              : [corner & 1 ? radius! : -radius!, corner & 2 ? radius! : -radius!, corner & 4 ? radius! : -radius!],
+            p = box ? rotate([q.x, q.y, q.z, q.w], local) : local;
+          low = [Math.min(low[0], p[0] + t.x), Math.min(low[1], p[1] + t.y), Math.min(low[2], p[2] + t.z)];
+          high = [Math.max(high[0], p[0] + t.x), Math.max(high[1], p[1] + t.y), Math.max(high[2], p[2] + t.z)];
+        }
+      }
+    if (!(high[0] > low[0] && high[1] > low[1] && high[2] > low[2]))
+      throw invalidVehicle(
+        'Vehicle.car needs the size of the car: give the chassis a box collider, or pass halfExtents: [0.9, 0.3, 2].',
+      );
+    const centre: V = [(low[0] + high[0]) / 2, (low[1] + high[1]) / 2, (low[2] + high[2]) / 2],
+      half: V = [(high[0] - low[0]) / 2, (high[1] - low[1]) / 2, (high[2] - low[2]) / 2],
+      // The body's centre and half size along a unit axis of the chassis frame.
+      along = (u: V): [number, number] => [
+        dot(centre, u),
+        Math.abs(u[0]) * half[0] + Math.abs(u[1]) * half[1] + Math.abs(u[2]) * half[2],
+      ],
+      [atForward, length] = along(forward),
+      [atLeft, width] = along(left),
+      [atUp, height] = along(up),
+      radius = wheel.radius ?? 0.35 * Math.min(width, length),
+      restLength = wheel.suspensionRestLength ?? 0.85 * radius,
+      gravity = physics.gravity,
+      g = hypot(gravity[0], gravity[1], gravity[2]) || STANDARD_GRAVITY,
+      sag = restLength / 3,
+      stiffness = g / (4 * sag),
+      // Each spring carries a quarter of the car: four of them ring at sqrt(4 k), so a damper of c a kilogram is 2 zeta sqrt(4 k) / 4.
+      critical = Math.sqrt(4 * stiffness) / 2,
+      // At rest each hub stands 0.2 r above the bottom of the body, so the body rides 0.8 r off the ground.
+      mount = atUp - height + 0.2 * radius + (restLength - sag),
+      axle: V = [-left[0], -left[1], -left[2]];
+    const wheels = (
+      [
+        [1, 1],
+        [-1, 1],
+        [1, -1],
+        [-1, -1],
+      ] as const
+    ).map(([toLeft, ahead], i): WheelOptions => {
+      const x = atLeft + toLeft * width,
+        z = atForward + ahead * 0.7 * length;
+      return {
+        position: [
+          left[0] * x + forward[0] * z + up[0] * mount,
+          left[1] * x + forward[1] * z + up[1] * mount,
+          left[2] * x + forward[2] * z + up[2] * mount,
+        ],
+        radius,
+        axle,
+        suspensionRestLength: restLength,
+        suspensionStiffness: stiffness,
+        suspensionCompression: 0.3 * critical,
+        suspensionRelaxation: 0.5 * critical,
+        maxSuspensionForce: (6 * chassis.mass * g) / 4,
+        width: 0.6 * radius,
+        steer: ahead > 0,
+        ...(wheelMeshes[i] ? { mesh: wheelMeshes[i]! } : {}),
+        ...wheel,
+      };
+    });
+    return new Vehicle(physics, chassis, { ...rest, wheels });
   }
 
   /** Number of wheels. */
@@ -579,9 +775,9 @@ export class Vehicle implements PhysicsAttachment {
     this.checkWheel(index);
     const wheel = this.wheels[index]!;
     if (!wheel.tyre)
-      throw new MargoError(
-        'state',
+      throw invalidVehicle(
         'A wheel needs its own spin for ground traction. Configure a tyre model on the wheel.',
+        'state',
       );
     if (
       !(
@@ -592,9 +788,9 @@ export class Vehicle implements PhysicsAttachment {
         (traction.sideForce === undefined || Number.isFinite(Math.fround(traction.sideForce)))
       )
     )
-      throw new MargoError(
-        'state',
+      throw invalidVehicle(
         'The wheel ground traction is invalid. Provide positive load and finite force and torque.',
+        'state',
       );
     wheel.traction = { ...traction };
   }
@@ -636,7 +832,7 @@ export class Vehicle implements PhysicsAttachment {
   /** Copies the physical running state into a caller-owned buffer for a world snapshot. */
   writeMotionState(output: Float64Array): void {
     if (output.length !== this.motionStateWords)
-      throw new MargoError('state', 'Use a vehicle motion buffer of motionStateWords f64 values.');
+      throw invalidVehicle('Use a vehicle motion buffer of motionStateWords f64 values.', 'state');
     output[0] = this.engineForce;
     output[1] = this.steering;
     output[2] = this.brake;
@@ -651,7 +847,7 @@ export class Vehicle implements PhysicsAttachment {
   /** Restores an attachment buffer written by writeMotionState for this vehicle configuration. */
   readMotionState(source: Float64Array): void {
     if (source.length !== this.motionStateWords || !source.every(Number.isFinite))
-      throw new MargoError('state', 'Use a finite motion state made by a vehicle with the same wheels and drivetrain.');
+      throw invalidVehicle('Use a finite motion state made by a vehicle with the same wheels and drivetrain.', 'state');
     this.engineForce = source[0]!;
     this.steering = source[1]!;
     this.brake = source[2]!;
@@ -705,6 +901,7 @@ export class Vehicle implements PhysicsAttachment {
   /** @internal casts the wheels and applies suspension, drive, brake and grip; called by the world before each step. */
   beforeStep(dt: number): void {
     if (this.disposed || !this.chassis.valid) return;
+    this.lastStep = dt;
     const chassis = this.chassis;
     if (chassis.sleeping) {
       if (this.engineForce === 0 && this.brake === 0) return;
@@ -818,6 +1015,7 @@ export class Vehicle implements PhysicsAttachment {
           predicate,
         });
       wheel.hard = origin;
+      wheel.down = down;
       wheel.forwardImpulse = wheel.sideImpulse = 0;
       wheel.groundGrip = null;
       wheel.sinkage = 0;
@@ -841,7 +1039,7 @@ export class Vehicle implements PhysicsAttachment {
       });
       if (material) {
         if (!(Number.isFinite(material.grip) && material.grip >= 0))
-          throw new MargoError('state', 'Provide a finite nonnegative wheel-ground grip coefficient.');
+          throw invalidVehicle('Provide a finite nonnegative wheel-ground grip coefficient.', 'state');
         wheel.groundGrip = material.grip;
       }
       const minimum = Math.max(0, wheel.rest - wheel.travel),
@@ -1111,6 +1309,93 @@ export class Vehicle implements PhysicsAttachment {
     wheel.omega = omega;
   }
 
+  /**
+   * The vehicle's debug lines from its last step, in the same `{vertices, colors}` form as `physics.debugRender()` (x, y, z, two
+   * vertices a segment; r, g, b, a a vertex), to draw with `@margoengine/lines` beside the world's: each suspension ray, each
+   * contact point and its normal, each tyre's push and whether it slides, and each wheel. It reads, and never changes, the state.
+   */
+  debugRender(options: VehicleDebugOptions = {}): DebugLines {
+    this.checkWheel(0);
+    const { suspension = true, contacts = true, slip = true, wheels = true } = options,
+      style = options.style ?? {},
+      colour = (
+        name: Exclude<keyof VehicleDebugStyle, 'normalLength'>,
+        fallback: readonly number[],
+      ): readonly number[] => style[name] ?? fallback,
+      normalLength = style.normalLength ?? 0.25,
+      positions: number[] = [],
+      colors: number[] = [],
+      segment = (a: readonly number[], b: readonly number[], c: readonly number[]): void => {
+        positions.push(a[0]!, a[1]!, a[2]!, b[0]!, b[1]!, b[2]!);
+        colors.push(c[0]!, c[1]!, c[2]!, c[3]!, c[0]!, c[1]!, c[2]!, c[3]!);
+      },
+      along = (p: readonly number[], d: readonly number[], s: number): V => [
+        p[0]! + d[0]! * s,
+        p[1]! + d[1]! * s,
+        p[2]! + d[2]! * s,
+      ],
+      rotation = this.chassis.rotation,
+      dt = this.lastStep;
+    for (const w of this.wheels) {
+      const hub = along(w.hard, w.down, w.length);
+      if (suspension) {
+        segment(w.hard, hub, colour('suspension', [0.25, 0.8, 1, 1]));
+        segment(hub, w.contact ? w.point : along(hub, w.down, w.radius), colour('airborne', [0.55, 0.55, 0.6, 1]));
+      }
+      if (contacts && w.contact) {
+        const c = colour('contact', [1, 0.3, 0.9, 1]);
+        segment(w.point, along(w.point, w.normal, normalLength), c);
+      }
+      if (slip && w.contact && dt > 0 && w.force > 0) {
+        // The push the tyre gave, as a share of its load: one metre for a push as large as the load.
+        const axleWorld = steeredAxle(w, rotation),
+          rolling = cross(w.normal, axleWorld),
+          size = Math.hypot(rolling[0], rolling[1], rolling[2]);
+        if (size > 1e-6) {
+          const forward: V = [rolling[0] / size, rolling[1] / size, rolling[2] / size],
+            across = cross(forward, w.normal),
+            limit = w.tyre ? 0 : Math.min(w.slip, w.groundGrip ?? Infinity) * w.force * dt,
+            push = Math.hypot(w.forwardImpulse, w.sideImpulse),
+            // Friction circle: the share of the grip used. Tyre model: the combined slip against 0.1, about where the Magic Formula peaks.
+            used = Math.min(1, w.tyre ? Math.hypot(w.kappa, w.alpha) / 0.1 : limit > 0 ? push / limit : 1),
+            grip = colour('grip', [0.3, 0.95, 0.35, 1]),
+            sliding = colour('sliding', [1, 0.2, 0.15, 1]),
+            c = grip.map((g, i) => g + (sliding[i]! - g) * used),
+            scale = 1 / (w.force * dt);
+          segment(
+            w.point,
+            [
+              w.point[0] + (forward[0] * w.forwardImpulse + across[0] * w.sideImpulse) * scale,
+              w.point[1] + (forward[1] * w.forwardImpulse + across[1] * w.sideImpulse) * scale,
+              w.point[2] + (forward[2] * w.forwardImpulse + across[2] * w.sideImpulse) * scale,
+            ],
+            c,
+          );
+        }
+      }
+      if (wheels) {
+        // A circle of the wheel's radius about the steered axle through the hub.
+        const a = steeredAxle(w, rotation),
+          d = w.down,
+          f = cross(d, a),
+          c = colour('wheel', [0.92, 0.92, 0.95, 1]),
+          n = 24;
+        let previous = along(hub, d, w.radius);
+        for (let i = 1; i <= n; i++) {
+          const t = (2 * Math.PI * i) / n,
+            p: V = [
+              hub[0] + (d[0] * Math.cos(t) + f[0] * Math.sin(t)) * w.radius,
+              hub[1] + (d[1] * Math.cos(t) + f[1] * Math.sin(t)) * w.radius,
+              hub[2] + (d[2] * Math.cos(t) + f[2] * Math.sin(t)) * w.radius,
+            ];
+          segment(previous, p, c);
+          previous = p;
+        }
+      }
+    }
+    return { vertices: new Float32Array(positions), colors: new Float32Array(colors) };
+  }
+
   /** @internal disposes the vehicle when its chassis goes. */
   bodyRemoved(body: PhysicsBody): void {
     if (body === this.chassis) this.dispose();
@@ -1138,12 +1423,12 @@ export class Vehicle implements PhysicsAttachment {
 
   private checkWheel(index: number): void {
     if (this.disposed)
-      throw new MargoError(
-        'disposed',
+      throw invalidVehicle(
         'Vehicle is disposed; create a new one with new Vehicle(physics, chassis, options).',
+        'disposed',
       );
     if (!Number.isInteger(index) || index < 0 || index >= this.wheels.length)
-      throw new RangeError(`Wheel index must be an integer from 0 to ${this.wheels.length - 1}`);
+      throw invalidVehicle(`Wheel index must be an integer from 0 to ${this.wheels.length - 1}`);
   }
 
   /** Detaches the vehicle from the world. The chassis body stays; wheel meshes keep their last pose. */

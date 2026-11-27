@@ -16440,6 +16440,34 @@ repository from the papers.
 
 Only publications and existing Margo code were consulted.
 
+### Arcade car, vehicle debug lines and the three.js migration note (DYN-04, P5)
+
+`Vehicle.car` lays four ray-cast wheels out from the chassis's box and sets their springs and dampers from ride
+targets; `vehicle.debugRender()` draws the vehicle's last step as line segments. Sources:
+
+- Thomas D. Gillespie, *Fundamentals of Vehicle Dynamics*, SAE International, 1992,
+  [doi:10.4271/R-114](https://doi.org/10.4271/R-114), chapter 5 (ride): a corner's static deflection fixes its
+  natural frequency `f = sqrt(k / m) / 2 pi`, and passenger cars damp their suspension at about 0.2 to 0.4 of
+  critical. `Vehicle.car` sets the spring per kilogram from a chosen static sag (`k = g / (n sag)`, `n` wheels) and
+  the dampers at 0.3 (compression) and 0.5 (extension) of `2 sqrt(n k) / n`, the critical damping of the chassis
+  on `n` such springs.
+- William F. Milliken and Douglas L. Milliken, *Race Car Vehicle Dynamics*, SAE International, 1995,
+  [doi:10.4271/R-146](https://doi.org/10.4271/R-146), chapters 16 and 22 (ride and wheel rates, dampers): firmer
+  rebound than bump damping, the reason for the 0.5 extension and 0.3 compression shares.
+- Hans B. Pacejka, *Tyre and Vehicle Dynamics*, 3rd ed., Butterworth-Heinemann, 2012,
+  [doi:10.1016/C2010-0-68548-8](https://doi.org/10.1016/C2010-0-68548-8), chapter 4: the Magic Formula's force
+  peaks near a slip of 0.1, the point at which the debug lines show a tyre-model wheel as sliding.
+- The migration note's description of the three.js `physics_rapier_vehicle_controller` example and Rapier's
+  `DynamicRayCastVehicleController` comes from Rapier's public JavaScript API reference
+  ([rapier.rs/javascript3d](https://rapier.rs/javascript3d/classes/DynamicRayCastVehicleController.html), method
+  names and what each sets) and the running example page
+  ([threejs.org/examples](https://threejs.org/examples/#physics_rapier_vehicle_controller)). No source of three.js,
+  Rapier or any other engine was read.
+
+The wheel layout (radius from the body's smaller half size, rest length, track and wheelbase shares) is Margo's own
+choice for a car that looks and drives right with no tuning, and the debug lines are Margo's own drawing of state the
+vehicle already keeps.
+
 ### Vehicle road loads and lane pursuit (DYN-04)
 
 - R. Craig Coulter, [Implementation of the Pure Pursuit Path Tracking Algorithm](https://publications.ri.cmu.edu/storage/publications/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf) (1992), §§2.0–3.3, gives curvature `2 x/l²` from the lateral target offset and squared chord. RoadDriver finds the first forward intersection of the look-ahead circle and the lane segments. The bicycle steering geometry gives `tan(delta) = wheelbase × curvature`.

@@ -9,7 +9,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from './body.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
-import { Vehicle, type VehicleOptions, type WheelOptions } from './vehicle.js';
+import { Vehicle, invalidVehicle, type VehicleOptions, type WheelOptions } from './vehicle.js';
 import { pacejkaTyre } from './tyres.js';
 import { gravityMagnitude } from '@margoengine/math/gravity';
 
@@ -70,7 +70,7 @@ export class Motorcycle implements PhysicsAttachment {
     options: MotorcycleOptions,
   ) {
     if (!options?.front || !options?.rear)
-      throw new RangeError('A motorcycle has a front and a rear wheel; pass {front: {...}, rear: {...}}.');
+      throw invalidVehicle('A motorcycle has a front and a rear wheel; pass {front: {...}, rear: {...}}.');
     this.balance = options.balance ?? true;
     this.maxSteer = options.maxSteeringAngle ?? 0.45;
     this.maxLateral = options.maxLateralAcceleration ?? 7;
@@ -82,12 +82,12 @@ export class Motorcycle implements PhysicsAttachment {
       [this.gain, 'balanceGain'],
     ] as const)
       if (!(value > 0 && Number.isFinite(value)))
-        throw new RangeError(`Motorcycle ${name} must be a finite number above 0.`);
+        throw invalidVehicle(`Motorcycle ${name} must be a finite number above 0.`);
     if (!(this.damping >= 0 && Number.isFinite(this.damping)))
-      throw new RangeError('Motorcycle balanceDamping must be a finite number of 0 or more.');
+      throw invalidVehicle('Motorcycle balanceDamping must be a finite number of 0 or more.');
     this.wheelbase = Math.abs(options.front.position[2] - options.rear.position[2]);
     if (!(this.wheelbase > 0))
-      throw new RangeError(
+      throw invalidVehicle(
         "A motorcycle's wheels are apart along the chassis: front.position[2] must differ from rear.position[2].",
       );
     // The rider acts before the vehicle, so it attaches first.
@@ -134,7 +134,7 @@ export class Motorcycle implements PhysicsAttachment {
     this.vehicle.setInput({ throttle: input.throttle, brake: input.brake });
     this.steerInput = clamp(input.steer ?? 0, -1, 1);
     if (!Number.isFinite(this.steerInput))
-      throw new RangeError('Motorcycle steer must be a finite number from -1 to 1.');
+      throw invalidVehicle('Motorcycle steer must be a finite number from -1 to 1.');
     return this;
   }
 

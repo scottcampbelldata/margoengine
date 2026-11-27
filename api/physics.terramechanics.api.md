@@ -378,6 +378,12 @@ interface BodyOwner {
 
 type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
 
+interface CarOptions extends Omit<VehicleOptions, 'wheels'> {
+    halfExtents?: Vec3;
+    wheel?: Partial<Omit<WheelOptions, 'position' | 'mesh' | 'steer'>>;
+    wheelMeshes?: readonly (Mesh | null | undefined)[];
+}
+
 type Cell = readonly [number, number, number];
 
 type Centring = 'cell' | 'face' | 'vertex' | 'particle';
@@ -2349,6 +2355,7 @@ class Vehicle implements PhysicsAttachment {
     maxSteeringAngle: number;
     readonly drivetrain: Drivetrain | null;
     constructor(physics: Physics, chassis: PhysicsBody, options: VehicleOptions);
+    static car(physics: Physics, chassis: PhysicsBody, options?: CarOptions): Vehicle;
     get wheelCount(): number;
     get valid(): boolean;
     setInput(input: VehicleInput): this;
@@ -2365,10 +2372,29 @@ class Vehicle implements PhysicsAttachment {
         quaternion: number[];
     };
     beforeStep(dt: number): void;
+    debugRender(options?: VehicleDebugOptions): DebugLines;
     bodyRemoved(body: PhysicsBody): void;
     afterSync(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+interface VehicleDebugOptions {
+    suspension?: boolean;
+    contacts?: boolean;
+    slip?: boolean;
+    wheels?: boolean;
+    style?: VehicleDebugStyle;
+}
+
+interface VehicleDebugStyle {
+    suspension?: readonly [number, number, number, number];
+    airborne?: readonly [number, number, number, number];
+    contact?: readonly [number, number, number, number];
+    grip?: readonly [number, number, number, number];
+    sliding?: readonly [number, number, number, number];
+    wheel?: readonly [number, number, number, number];
+    normalLength?: number;
 }
 
 interface VehicleInput {

@@ -6,6 +6,29 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
+
+- **Repro:** `Vehicle.car(physics, chassis)` on a floor (the quick start of `packages/physics/README.md`), 300 steps:
+  the chassis does not move, yet `chassis.linearVelocity[1]` reads -0.0715 m/s every step, and each spring rests at
+  0.1826 m where `rest - sag` is 0.1785 m (compressed 4.6% less than its static sag). A body held still by any per-step impulse
+  (`applyImpulse` from `beforestep`) shows the same -0.0715 m/s.
+- **Cause:** the kernel takes 8 substeps a step and spreads gravity over them, while an impulse from `beforestep` acts
+  once at the start; a body whose position does not change ends the step at `-g dt (n - 1) / (2 n)` = -7/16 of
+  `g dt`. `Vehicle`'s damper (`vehicle.ts`, the suspension loop) reads that velocity as a compression speed and
+  carries part of the weight with it. The fix is a per-substep suspension force (or a damper on the step's mean
+  velocity) in `Vehicle`, which changes every vehicle's ride against the Rapier oracle tests in
+  `tests/next-vehicle.test.js`, so it waits for its own change.
+- **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
+  `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
+
+### Open 2026-11-27: the tracked vehicle still throws plain RangeError and TypeError (KB-PHYS-TRACKEDERR1, physics)
+
+- **Repro:** `new TrackedVehicle(physics, chassis, {tracks: []})` throws a `RangeError` with no help link, where
+  `Vehicle`, `Vehicle.car`, `Motorcycle`, the tyre models and `Drivetrain` throw a `MargoError` linking
+  margoengine.com/errors#vehicles (P5 DYN-04, 2026-11-27).
+- **Cause:** `packages/physics/src/tracked.ts` was left out of that change because the open branch
+  `codex/physics-terramechanics` edits the same file; it takes the same `invalidVehicle` helper once that lands.
+
 ### Fixed 2026-11-27: check:dev-servers called `npx vite build` a server start (KB-DEVSERVERS-BUILD1, scripts)
 
 - **Repro:** `node scripts/check-dev-servers.mjs --docs-only`: `tools/margo-convert/README.md:138` and `:227`,

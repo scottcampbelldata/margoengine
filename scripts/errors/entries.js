@@ -78,6 +78,15 @@ export const entries = [
     fix: 'Pass a live Physics world, a centre line of two or more distinct points (or start and end), 2 to 4096 segments, positive finite sizes and stiffnesses in SI units, a loads provider from segmentLoads, buffers of the documented length, and only a state this rod took. The error names the input and the change to make.',
   },
   {
+    id: 'vehicles',
+    title: '@margoengine/physics vehicles, tyres and drivetrains',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A `Vehicle`, `Vehicle.car`, `Motorcycle`, tyre model or `Drivetrain` received a chassis, wheel, option, input, buffer or call it cannot use: a chassis from another world or without a collider, no wheels, a vector that is not three finite numbers, a size, force or stiffness that is negative or not finite, a wheel index past the wheels, or a disposed vehicle.',
+    fix: 'Pass a dynamic chassis body of this world with a collider, at least one wheel with a `position` and a positive `radius`, directions that are not zero, sizes, forces and stiffnesses in SI units, driver input from -1 to 1 (brake and clutch from 0 to 1), a tyre model on every wheel a drivetrain drives, and a motion buffer of `motionStateWords` values this vehicle wrote. `Vehicle.car` needs a box collider on the chassis or `halfExtents`. The error names the input and the change to make.',
+  },
+  {
     id: 'body-driver',
     title: '@margoengine/input/body: webcam hands and body to a skeleton',
     kind: 'family',

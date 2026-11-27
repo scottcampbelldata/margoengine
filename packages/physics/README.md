@@ -299,6 +299,75 @@ world.advance(20);
 console.log(trunk.enabled, trunk.position);
 ```
 
+## A car in nine lines
+
+`Vehicle.car(physics, chassis)` lays four wheels out from the chassis's box and tunes them so the car rests, drives, steers and brakes at once: no suspension, grip or engine numbers to find first.
+
+```ts
+import {Physics, Vehicle} from '@margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [100, 0.5, 100]}});
+const chassis = physics.addBody(null, {position: [0, 1, 0], colliders: {shape: 'box', halfExtents: [0.9, 0.3, 2], mass: 1200}});
+const car = Vehicle.car(physics, chassis);
+physics.on('beforestep', () => car.setInput({throttle: 1, steer: 0.2}));
+for (let i = 0; i < 120; i++) physics.step();
+console.log(car.speed.toFixed(1), 'm/s');
+```
+
+On a page, give the chassis a mesh and the four wheels meshes of their own (children of the chassis mesh, axle along x), drive it from the keyboard, and draw `car.debugRender()` with `@margoengine/lines`: each suspension ray (blue, mount to hub; grey, hub to ground), each contact point and its normal (magenta), each tyre's push as a share of its load (green while it grips, red as it slides) and each wheel's rim.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Line, LineMaterial, Lines} from 'margoengine/lines';
+import {Physics, Vehicle} from 'margoengine/physics';
+
+await Physics.load();
+const engine = await Engine.create(document.querySelector('canvas')!);
+const physics = new Physics(engine);
+const floor = engine.createMesh().setGeometry(box(200, 1, 200)).setPosition([0, -0.5, 0]);
+physics.addBody(floor, {type: 'fixed', colliders: {shape: 'box', halfExtents: [100, 0.5, 100]}});
+const body = engine.createMesh().setGeometry(box(1.8, 0.6, 4)).setPosition([0, 1, 0]);
+const chassis = physics.addBody(body, {colliders: {shape: 'box', halfExtents: [0.9, 0.3, 2], mass: 1200}});
+const wheelMeshes = [0, 1, 2, 3].map(() => engine.createMesh().setGeometry(box(0.19, 0.63, 0.63)).setParent(body));
+const car = Vehicle.car(physics, chassis, {wheelMeshes});
+
+const keys = new Set<string>();
+addEventListener('keydown', (event) => keys.add(event.code));
+addEventListener('keyup', (event) => keys.delete(event.code));
+const axis = (plus: string, minus: string) => (keys.has(plus) ? 1 : 0) - (keys.has(minus) ? 1 : 0);
+physics.on('beforestep', () =>
+  car.setInput({throttle: axis('KeyW', 'KeyS'), steer: axis('KeyA', 'KeyD'), brake: keys.has('Space') ? 1 : 0}),
+);
+
+const material = new LineMaterial({width: 2, onTop: true}); // drawn over the car, so the rays inside it show
+const debug = Lines.attach(engine).add(new Line({mode: 'segments', positions: [0, 0, 0, 0, 0, 0], material}));
+physics.on('afterstep', () => {
+  const {vertices, colors} = car.debugRender();
+  debug.setPositions(vertices, colors);
+});
+engine.start();
+```
+
+The arcade layout, from the body's half sizes along its forward, left and up axes (`L`, `W`, `H`): wheel radius `r = 0.35 min(W, L)`, suspension rest length `0.85 r`, wheel centres on the body's sides (`W` either side, half of each tyre outside the body) and `0.7 L` ahead and behind the body's centre, the front pair steering and all four driving and braking. The springs rest a third of the way in (`suspensionStiffness = g / (4 sag)` per kilogram of chassis with `sag = rest / 3`), damped at 0.3 of critical on compression and 0.5 on extension, each carrying up to six times its share of the weight, and each hub rests `0.2 r` above the bottom of the body, so the body rides about `0.8 r` off the ground. Grip, engine force (the chassis mass in newtons a wheel, 0.4 g in all), brakes (1.2 g) and steering (0.5 rad at full lock) keep the `Vehicle` defaults. Every option of `new Vehicle` but `wheels` passes through (`maxEngineForce`, `tyre`, `drivetrain`, `antiRollBars`, `forward` and the rest), `wheel` overrides any wheel setting for all four (`{radius: 0.4, frictionSlip: 2}`), `halfExtents` gives the size of a chassis without a box collider, and `wheelMeshes` are drawn front left, front right, rear left, rear right. `car.debugRender({suspension, contacts, slip, wheels, style})` switches each part off and recolours it; it reads the last step and changes nothing. A snapshot of a world with a vehicle is `physics.takeSnapshot()` plus `car.writeMotionState(buffer)` (controls and wheel spin), restored with `restoreSnapshot` and `readMotionState`, and replays bit for bit. A vehicle, `Vehicle.car`, tyre model, drivetrain or motorcycle given input it cannot use throws a `MargoError` (code `unsupported`, or `state` for a chassis of another world, `disposed` after `dispose()`) whose message names the input and the fix and links [margoengine.com/errors#vehicles](https://margoengine.com/errors#vehicles).
+
+### Coming from the three.js Rapier vehicle example
+
+three.js's `physics_rapier_vehicle_controller` example builds a Rapier `DynamicRayCastVehicleController` on the chassis's rigid body, adds each wheel with its chassis-local position, suspension direction, axle and suspension rest length and radius, sets each wheel's suspension stiffness, friction slip and steering, then every frame sets the engine force on the driven wheels, the brake on all and the steering on the front pair, calls the controller's update with the time step, and copies each wheel's translation, suspension length, steering and rotation into the wheel meshes itself. In Margo the same car is:
+
+| three.js + Rapier example | Margo |
+| --- | --- |
+| `world.createVehicleController(chassis)`, then `addWheel(position, direction, axle, restLength, radius)` per wheel | `new Vehicle(physics, chassis, {wheels: [{position, direction, axle, suspensionRestLength, radius}]})`, or `Vehicle.car(physics, chassis)` for the four laid out and tuned |
+| `setWheelSuspensionStiffness`, `setWheelFrictionSlip`, `setWheelSideFrictionStiffness`, `setWheelMaxSuspensionTravel`, `setWheelSuspensionCompression` and `Relaxation`, `setWheelMaxSuspensionForce` per wheel | the same names as wheel options: `suspensionStiffness`, `frictionSlip`, `sideFrictionStiffness`, `maxSuspensionTravel`, `suspensionCompression`, `suspensionRelaxation`, `maxSuspensionForce`, `rollInfluence` |
+| `setWheelEngineForce`, `setWheelBrake`, `setWheelSteering` on chosen wheels each frame | `car.setInput({throttle, steer, brake})` from -1 to 1 (or `engineForce`, `brake`, `steering`), on the wheels marked `drive`, `brake` and `steer` |
+| `vehicle.updateVehicle(dt)` before `world.step()` | nothing: the vehicle steps with the world at its fixed rate |
+| `wheelChassisConnectionPointCs`, `wheelSuspensionLength`, `wheelSteering`, `wheelRotation` read back into each wheel mesh | `wheelMeshes` (or each wheel's `mesh`) are posed for you after every step; `car.wheelLocalPose(i)` gives the pose |
+| `currentVehicleSpeed()`, `wheelIsInContact(i)`, `wheelContactPoint(i)` | `car.speed`, `car.wheel(i).inContact`, `car.wheel(i).contactPoint` (and `contactNormal`, `suspensionForce`, `forwardImpulse`, `sideImpulse`, `ground`) |
+| `world.debugRender()` | `physics.debugRender()` for the colliders, plus `car.debugRender()` for the suspension rays, contacts, tyre slip and wheels |
+
+The suspension and grip numbers mean what they mean in Rapier (stiffness and damping per kilogram of chassis, friction slip as a friction coefficient), so values tuned for the three.js example carry over; `next-vehicle.test.js` drives Margo's vehicle and Rapier's side by side on the same car.
+
 ## Ropes, vehicles and compound shapes
 
 ```ts
@@ -1464,7 +1533,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 | `CharacterController` | `move(desired)` per fixed step, `grounded`, `collisions`, `platform`, `innerBody`, `onContact`, `dispose` |
 | `DynamicCharacter` | `update()` per fixed step, `setTargetVelocity`, `setFacing`, `jump`, `grounded`, `platform`, `groundNormal`, `dispose` |
 | `Rope` | `new Rope(physics, options)`: `segments`, `joints`, `segmentLength`, `points(out?)`, `remove`, `valid` |
-| `Vehicle` | `new Vehicle(physics, chassis, options)`: `engineForce`, `steering`, `brake`, `setInput`, `speed`, `wheel(i)`, `wheelLocalPose(i)`, `wheelCount`, `dispose` |
+| `Vehicle` | `new Vehicle(physics, chassis, options)` or the tuned four-wheeled `Vehicle.car(physics, chassis, options)`: `engineForce`, `steering`, `brake`, `setInput`, `speed`, `wheel(i)`, `wheelLocalPose(i)`, `wheelCount`, `debugRender`, `writeMotionState`, `readMotionState`, `dispose` |
 | `collisionGroups(memberships, filter)` | Packs interaction groups from group indices 0..15 or 16-bit masks |
 | `interactionGroups(memberships, filter, testMode)` | Interaction groups 32 bits wide with a test mode, `'and'` or `'or'`, for `collisionGroups`, `solverGroups` and query `groups` |
 | `geometryPositions(geometry, scale)` | Packed xyz positions from a core `Geometry` or raw arrays |
@@ -2646,7 +2715,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | --- | --- | --- | --- |
 | Kinematic character controller: offset, up vector, autostep, maximum slope climb angle, minimum slope slide angle, snap to ground, sliding | `createCharacterController` and `move` | full | `next-character.test.js`; `minSlopeSlideAngle` too |
 | Character controller: pushing dynamic bodies, character mass, the collisions of a move | `applyImpulsesToDynamicBodies`, `characterMass`, `controller.collisions` | full | `next-character.test.js` |
-| Dynamic ray-cast vehicle controller: suspension, engine, brake, steering, wheel friction | `Vehicle` | full | `next-vehicle.test.js` |
+| Dynamic ray-cast vehicle controller: suspension, engine, brake, steering, wheel friction; a tuned arcade car and its debug lines | `Vehicle`, `Vehicle.car`, `vehicle.debugRender` | full | `next-vehicle.test.js`, `vehicle-car.test.js` |
 | Ragdoll with cone joints, motors and balance | `@margoengine/ragdoll` | partial: powered ragdolls on the cone joint differ from the spherical one, see KB-PHYS-SWITCH-CONE1 | `packages/ragdoll/tests` |
 | Convex decomposition of a concave mesh | `convexDecomposition` from `margoengine/physics/decomposition` (CoACD) | full: build-time, never a bare mesh on `addBody` | `next-decomposition.test.js` |
 | Colliders for a glTF model, one body or one per node | `addModel` | full | `add-model.test.js` |

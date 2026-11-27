@@ -458,7 +458,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 0c11fd27f7 |
-| DYN-04 | Wheeled vehicles on roads | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18ded2be7c |
+| DYN-04 | Wheeled vehicles on roads | partial | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18ded2be7c; P5 parity (arcade car, debug lines, coded errors, migration note, example page) landed 2026-11-27 |
 | DYN-05 | Rail vehicle dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed fa79b04868 |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | native rods, fast guides and physical skin bindings | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c53e60dc12 |
 | SOFT-05 | Muscle, fat and skin soft tissue | physics/tissue with skeletal pins, sliding planes and passive layers | Open | OPEN |

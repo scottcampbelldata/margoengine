@@ -13,6 +13,8 @@
 // of the contact point's velocity to the rolling direction, the arc tangent of side speed over forward speed. Forces: longitudinal
 // positive pushes the car forward, lateral positive along `side`; the vehicle gives the lateral force its sign against the slip.
 
+import { MargoError } from '@margoengine/math/errors';
+
 /** What a tyre is asked: the slips and the load. */
 export interface TyreSample {
   /** `(omega R - v) / |v|` along the rolling direction (free rolling 0, locked wheel -1, full spin +infinity). */
@@ -61,6 +63,9 @@ export interface PacejkaOptions {
   combined?: boolean;
 }
 
+/** A tyre model input that cannot be used: a MargoError of code `unsupported` naming the input and its fix, with the help link. */
+const invalidTyre = (message: string): MargoError =>
+  new MargoError('unsupported', `${message} See https://margoengine.com/errors#vehicles`);
 const atan = Math.atan,
   sin = Math.sin;
 const magic = ({ B, C, D, E }: MagicCurve, x: number): number => {
@@ -85,13 +90,13 @@ export function pacejkaTyre(options: PacejkaOptions = {}): TyreModel {
   ] as const) {
     for (const key of ['B', 'C', 'D'] as const)
       if (!(Number.isFinite(curve[key]) && curve[key] > 0))
-        throw new RangeError(`Pacejka ${name}.${key} must be a finite number above 0; got ${curve[key]}.`);
-    if (!Number.isFinite(curve.E)) throw new RangeError(`Pacejka ${name}.E must be a finite number; got ${curve.E}.`);
+        throw invalidTyre(`Pacejka ${name}.${key} must be a finite number above 0; got ${curve[key]}.`);
+    if (!Number.isFinite(curve.E)) throw invalidTyre(`Pacejka ${name}.E must be a finite number; got ${curve.E}.`);
   }
   if (!(nominal > 0 && Number.isFinite(nominal)))
-    throw new RangeError('Pacejka nominalLoad must be a finite number above 0.');
+    throw invalidTyre('Pacejka nominalLoad must be a finite number above 0.');
   if (!(sensitivity >= 0 && Number.isFinite(sensitivity)))
-    throw new RangeError('Pacejka loadSensitivity must be a finite number of 0 or more.');
+    throw invalidTyre('Pacejka loadSensitivity must be a finite number of 0 or more.');
   return {
     forces({ slipRatio, slipAngle, load }) {
       if (!(load > 0)) return { longitudinal: 0, lateral: 0 };
@@ -143,7 +148,7 @@ export function brushTyre(options: BrushOptions = {}): TyreModel {
     [a, 'halfLength'],
   ] as const)
     if (!(value > 0 && Number.isFinite(value)))
-      throw new RangeError(`Brush ${name} must be a finite number above 0; got ${value}.`);
+      throw invalidTyre(`Brush ${name} must be a finite number above 0; got ${value}.`);
   return {
     forces({ slipRatio, slipAngle, load }) {
       if (!(load > 0)) return { longitudinal: 0, lateral: 0 };

@@ -10134,6 +10134,18 @@ The complete optional soft entry measures 110,995 B gzip, up from 108,726 B, wit
 The separately loaded kernel chunk is 75,819 B gzip, up from 74,174 B, and the native kernel is 211,555 B raw.
 Core plus stage remains 24,820 B gzip.
 
+### Arcade car and vehicle debug lines (DYN-04)
+
+`Vehicle.car` lays out exactly four wheels on a chassis whose up axis is its own +y; a six-wheeled truck or a chassis
+modelled on another up axis takes `new Vehicle` with its own wheels. Its size comes from the chassis's box colliders
+(spheres, capsules, cylinders and cones count by their bounding spheres); a chassis of hulls or meshes needs
+`halfExtents`. The springs rest where the dampers' reading of a still chassis puts them, 4.6% short of the designed
+sag at the defaults (KB-PHYS-VEHICLEREST1), so the body rides a few millimetres higher than `0.8 r`. The tyre models
+and grip keep the `Vehicle` defaults: the full MF 6.x tyre is beyond parity (docs/physics-parity-bar.md, P5).
+`debugRender()` allocates its two arrays on every call, reads the last step (the chassis pose and each wheel's cast),
+and colours a tyre-model wheel as sliding at a combined slip of 0.1, about where the default Magic Formula peaks,
+not at its own model's peak. Speed against the three.js example is measured in the quiet speed phase.
+
 ### Wheel contact and lane tracking (DYN-04)
 
 The clocked driver tracks authored open or closed lanes with measured traction. It uses one wetness word per vehicle with the documented bank convention. It brakes smoothly before an open lane ends. The current driver routes an individual car and uses the supplied route around obstacles. Road colliders reuse their rendered triangle tessellation. A calibrated soft patch uses a constant footprint and the measured pressure exponent. EARTH-05 owns wear and terrain-volume feedback. The paired road and dynamics fixtures cover the existing tyres, drivetrain, motorcycles and tracks alongside the new road controls and terrain interface. The optional road driving entry measures 12,776 B minified and 5,373 B gzip. The Physics root measures 1,339,661 B minified and 865,782 B gzip. Core and Stage gain zero bytes.
