@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21028140,
+  "total": 21031283,
   "history": [
     {
       "date": "2026-10-24",
@@ -14724,6 +14724,12 @@
       "commit": "lane-c5-copc",
       "reason": "points/copc-write, new optional entry (writeCOPC and writeCOPCTo, out-of-core COPC 1.0 writing; 12470 B with the LAS writer, header reader and LAZ coders it shares). The coders moved to a module both writers load; points/laz-write stays 9869 B and points/copc 15697 B. Apart from the reader, so a viewer loads none of it.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "a8b9ca4e4e",
+      "reason": "@margoengine/vfx/smoke 3933 B gzip (ceiling 3302 to 4189): KB-VFX-SMOKEROOF1, the ceiling option (the roof's obstacle box, the layer's node graph under it, Alpert's ceiling jet speed and their errors); without it smoke indoors veils its own fire. vfx/over-life 1833 B (ceiling 1831 to 2089): KB-VFX-NODESLIFE1, the slot load matched whatever it reads. cameras/clearance 1742 B, new entry of KB-SHOT-FAULDSIGHT1 (f08ca2a9fa), recorded late. A split would put the roof behind an import() inside a synchronous attach. Core and stage unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -14881,6 +14887,7 @@
     "@margoengine/cad/closed": 508,
     "@margoengine/cad/stage": 10590,
     "@margoengine/cameras": 4022,
+    "@margoengine/cameras/clearance": 1998,
     "@margoengine/cameras/hologram": 3467,
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/offaxis": 2078,
@@ -16266,14 +16273,14 @@
     "@margoengine/vfx/node-system": 4959,
     "@margoengine/vfx/nodes": 3349,
     "@margoengine/vfx/obstacles": 1311,
-    "@margoengine/vfx/over-life": 1831,
+    "@margoengine/vfx/over-life": 2089,
     "@margoengine/vfx/ribbons": 3539,
     "@margoengine/vfx/schedule": 1197,
     "@margoengine/vfx/settings": 9979,
     "@margoengine/vfx/shadows": 3061,
     "@margoengine/vfx/shapes": 3848,
     "@margoengine/vfx/skinned": 2314,
-    "@margoengine/vfx/smoke": 3302,
+    "@margoengine/vfx/smoke": 4189,
     "@margoengine/vfx/soft": 1493,
     "@margoengine/vfx/solid": 3969,
     "@margoengine/vfx/sort": 1280,
