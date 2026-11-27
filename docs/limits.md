@@ -10527,12 +10527,13 @@ The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and
 
 ### Prescribed hull wake work (SEA-12)
 
-`PrescribedWakeWork` accounts for a single receiving wake’s submerged volume source at 60 Hz. Grid size, depth,
-  density and pose cell match WakeSolver. Add the source before the meter and the receiving wake after it.
-  Excludes separate pressure and height forcing, downstream sponge loss and other rigid or actuator work.
+`PrescribedWakeWork` accounts for one submerged volume field and an optional zero-pressure surface-volume field
+  for a single receiving wake at 60 Hz. Grid size, depth, density and pose cell match WakeSolver. Add the sources
+  before the meter and the receiving wake after it. Separate pressure forcing and additional height sources,
+  downstream sponge loss and other rigid or actuator work remain outside this ledger.
   Set `mirrored` only on a symmetric straight-quay grid with mirrored state and forcing. The ledger uses one
   forward transform per occupied depth band and one inverse transform on an active tick. The loads entry
-  measures 49,181 B gzip with both wake work paths.
+  measures 49,458 B gzip with both wake work paths.
 
 ### Straight quay reflection and spray (SEA-12)
 

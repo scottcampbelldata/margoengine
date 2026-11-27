@@ -1313,7 +1313,10 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   and shared layouts. At 90 ticks 274.829 J transfers from a live rigid hull to water, with a 0.000171 J
   maximum residual against a 0.01717 J f32 roundoff bound. The disabled control adds 505.701 J to
   water with unchanged body energy. A pre-existing wave starts a hull at rest. Frame zero and mid-step
-  checkpoints replay exactly. Turning and heave/roll work and the original finite-quay render remain open.
+  checkpoints replay exactly. Prescribed surge and surface-volume work now use a single joint energy change.
+  The heaving and rotating mirrored case transfers 783.3405 J, closes to 6.03×10⁻¹² J, rejects unsupported
+  pressure before changing the ledger and replays exactly. Live free-motion heave and roll reactions and
+  the original finite-quay render remain open.
 
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original

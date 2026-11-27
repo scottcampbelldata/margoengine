@@ -4974,9 +4974,11 @@ supplied offshore sea spectrum still requires its own reflecting conditions.
 `PrescribedWakeWork` reads the same projected volume source as `WakeSolver`. Its work is the change in
 the wave's gravitational energy during the volume kick, including the kick's quadratic term.
 Add the volume publisher first, then the meter and receiving wake, in one 60 Hz staggered group.
-Use the receiving wake only for that projected source. Any separate pressure forces or additional
-wave sources need their own work measurements. Set `mirrored` to true when the source already includes
-its straight-quay image and the boundary and initial state are symmetric.
+Pass the same volume fields to the meter and the receiving wake. For simultaneous heave, heel or pitch,
+set `surface` to the wake’s surface source and leave that field’s pressure column zero. The meter includes
+the cross term between surface and projected depth-band displacements. Additional sources or pressure forces
+need their own work measurements. Set `mirrored` to true when all inputs include their straight-quay images
+and the boundary and initial state are symmetric.
 
 ```ts
 import {boxGeometry} from 'margoengine/geometry';

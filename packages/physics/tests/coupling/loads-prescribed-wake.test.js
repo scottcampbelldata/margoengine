@@ -105,9 +105,16 @@ function waveEnergy(world, wake, measure) {
   return measure * 0.5 * density * cellSize * cellSize * (gravity * pe + ke / (nx * nz));
 }
 
-for (const mirrored of [false, true]) {
+for (const [mirrored, surfaceMotion] of [
+  [false, false],
+  [true, false],
+  [true, true],
+]) {
   test(
-    'powered hull wave work closes against the live energy in the ' + (mirrored ? 'wet half of the quay' : 'open tank'),
+    surfaceMotion
+      ? 'combined surge, heave and rotation account for their shared wake work'
+      : 'powered hull wave work closes against the live energy in the ' +
+          (mirrored ? 'wet half of the quay' : 'open tank'),
     async (t) => {
       await loadKernel({ threads: mirrored });
       const world = new PhysicsWorld({ memory: worldMemory(mirrored), gravity: [0, -gravity, 0] });
@@ -115,16 +122,29 @@ for (const mirrored of [false, true]) {
       try {
         const body = physics.addBody(null, {
           position: [-2, 0, mirrored ? 1.7 : 0],
-          linearVelocity: [1.25, 0, 0],
-          enabledTranslations: [true, false, false],
-          enabledRotations: [false, false, false],
+          linearVelocity: [1.25, surfaceMotion ? 0.18 : 0, 0],
+          angularVelocity: [surfaceMotion ? 0.3 : 0, 0, surfaceMotion ? 0.2 : 0],
+          enabledTranslations: [true, surfaceMotion, false],
+          enabledRotations: [surfaceMotion, false, surfaceMotion],
           colliders: { shape: 'box', halfExtents: [1, 0.5, 0.5], mass },
         });
         const hull = new HullSolver('hull', { minimumRadius: 0.35, submergedAdvance: [0, 0.25, 0.5] });
-        const quay = mirrored ? new QuayWakeBoundary({ wallZ: 0, submerged: hull.submergedWakeSource }) : null;
+        const quay = mirrored
+          ? new QuayWakeBoundary({
+              wallZ: 0,
+              submerged: hull.submergedWakeSource,
+              surface: surfaceMotion ? hull.wakeSourceField : undefined,
+            })
+          : null;
         const source = quay?.submergedSource ?? hull.submergedWakeSource;
-        const meter = new PrescribedWakeWork({ grid: { cells, cellSize, depth, density, centre }, source, mirrored });
-        const wake = new WakeSolver('wake', undefined, source);
+        const surface = surfaceMotion ? (quay?.surfaceSource ?? hull.wakeSourceField) : undefined;
+        const meter = new PrescribedWakeWork({
+          grid: { cells, cellSize, depth, density, centre },
+          source,
+          surface,
+          mirrored,
+        });
+        const wake = new WakeSolver('wake', surface, source);
         const sea = new SpectralSea({
           waves: {
             frequencies: Float64Array.of(0.5),
@@ -169,7 +189,7 @@ for (const mirrored of [false, true]) {
         const roundoff = 256 * Number.EPSILON * cumulativeScale;
         assert.ok(meter.work().total > 100);
         assert.ok(maximumError <= roundoff, JSON.stringify({ maximumError, roundoff }));
-        assert.equal(body.linearVelocity[0], 1.25);
+        if (!surfaceMotion) assert.equal(body.linearVelocity[0], 1.25);
         if (mirrored) assert.ok(Math.abs(wake.sample(-0.5, 0).velocity[2]) < 1e-12);
         const last = meter.work();
         const rowPort = (quay ?? hull).exportPorts(60).find((port) => port.field === source.field.name);
@@ -189,8 +209,35 @@ for (const mirrored of [false, true]) {
           { code: 'unsupported', message: /in that order.+#hydrodynamic-loads/ },
         );
         assert.deepEqual(meter.work(), last);
+        if (surface) {
+          const surfacePort = quay.exportPorts(60).find((port) => port.field === surface.name);
+          const rows = regionWords(world.memory, surfacePort.region);
+          assert.ok(
+            rows.some((value, i) => i % 5 === 4 && Math.abs(value) > 1e-8),
+            'real heave or rotation displaces the surface',
+          );
+          const wakePort = wake.exportPorts(59)[0];
+          rows[3] = 1;
+          assert.throws(
+            () =>
+              meter.step({
+                level: 0,
+                seed: 0,
+                tick: 60,
+                cell: [0, 0, 0],
+                inputs: new Map([
+                  [rowPort.field, rowPort],
+                  [wakePort.field, wakePort],
+                  [surfacePort.field, surfacePort],
+                ]),
+              }),
+            { code: 'unsupported', message: /surface volume rows with zero pressure.+#hydrodynamic-loads/ },
+          );
+          rows[3] = 0;
+          assert.deepEqual(meter.work(), last);
+        }
         const hash = world.hash();
-        t.diagnostic(JSON.stringify({ mirrored, joules: last.total, maximumError, roundoff, hash }));
+        t.diagnostic(JSON.stringify({ mirrored, surfaceMotion, joules: last.total, maximumError, roundoff, hash }));
         world.restoreSnapshot(snapshot.bytes);
         assert.deepEqual(meter.work(), { step: 0, total: 0 });
         world.advance(60);

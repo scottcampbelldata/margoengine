@@ -8,11 +8,21 @@ import {
   SUBMERGED_WAKE_QUANTITY,
   SUBMERGED_WAKE_WORDS,
   type SubmergedWakeSource,
+  type WakeSourceGrid,
+  wakePatch,
   wakeDepths,
 } from '../sea/submerged-wake.js';
-import { WAKE_HEIGHT_FIELD, WAKE_LAYOUT, type WakeParams } from '../sea/wake.js';
+import { WAKE_HEIGHT_FIELD, WAKE_LAYOUT, WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS, type WakeParams } from '../sea/wake.js';
 import { regionWords } from '../world/memory.js';
-import type { Port, Region, Solver, SolverDescription, SolverHost, StepContext } from '../world/solver.js';
+import type {
+  FieldDescriptor,
+  Port,
+  Region,
+  Solver,
+  SolverDescription,
+  SolverHost,
+  StepContext,
+} from '../world/solver.js';
 import { invalidLoad } from './errors.js';
 
 type WakeGrid = Readonly<Required<Pick<WakeParams, 'cells' | 'cellSize' | 'centre' | 'depth' | 'density'>>>;
@@ -21,6 +31,8 @@ type WakeGrid = Readonly<Required<Pick<WakeParams, 'cells' | 'cellSize' | 'centr
 export interface PrescribedWakeWorkOptions {
   /** The same displaced-volume field the receiving WakeSolver reads. */
   readonly source: SubmergedWakeSource;
+  /** Optional simultaneous surface displacement field. Its pressure column must be zero. */
+  readonly surface?: FieldDescriptor;
   /** The complete receiving grid. Use these values for WakeSolver too. */
   readonly grid: WakeGrid;
   /** Record energy of the wet half of a symmetric image domain. Defaults to false. */
@@ -29,12 +41,13 @@ export interface PrescribedWakeWorkOptions {
 
 /**
  * Books the work of a prescribed hull's projected volume kick. The wave is advanced by the receiving
- * WakeSolver. Use the same submerged port as the wake, with no other volume or pressure forcing in that
+ * WakeSolver. Read its submerged port and optional surface displacement port, with no other forcing in that
  * wake. Order the volume publisher, this meter, then the wake in the same 60 Hz staggered group.
  * The work includes the kick's quadratic term and excludes later wave dissipation.
  */
 export class PrescribedWakeWork implements Solver<undefined> {
   private readonly options: PrescribedWakeWorkOptions;
+  private readonly stampGrid: WakeSourceGrid;
   private readonly projector: ProjectedWakeSource;
   private readonly fft: RealFft2;
   private readonly spectrum: Float64Array;
@@ -48,6 +61,7 @@ export class PrescribedWakeWork implements Solver<undefined> {
     readonly id = 'prescribedWakeWork',
   ) {
     const grid = options?.grid;
+    const surface = options?.surface;
     const source = options?.source;
     if (
       !source?.field?.name ||
@@ -56,6 +70,15 @@ export class PrescribedWakeWork implements Solver<undefined> {
       source.field.unit !== 'SI'
     )
       throw invalidLoad('Pass the same submerged SI source field that drives the receiving wake.');
+    if (
+      surface !== undefined &&
+      (!surface?.name ||
+        surface.name === source.field.name ||
+        surface.kind !== 'surfaceSampleSet' ||
+        surface.quantity !== 'seaSource' ||
+        surface.unit !== 'SI')
+    )
+      throw invalidLoad('Pass the receiving wake’s separate surface volume field in SI units.');
     if (
       !grid?.cells ||
       grid.cells.length !== 2 ||
@@ -83,6 +106,7 @@ export class PrescribedWakeWork implements Solver<undefined> {
     this.options = {
       ...options,
       source: { field: Object.freeze({ ...source.field }), depths },
+      surface: surface && Object.freeze({ ...surface }),
       grid: {
         ...grid,
         cells: [nx, nz],
@@ -91,11 +115,8 @@ export class PrescribedWakeWork implements Solver<undefined> {
     };
     const dx = grid.cellSize;
     this.fft = new RealFft2(nx, nz);
-    this.projector = new ProjectedWakeSource(
-      { nx, nz, dx, x0: x - (nx * dx) / 2, z0: z - (nz * dx) / 2 },
-      depths,
-      grid.depth,
-    );
+    this.stampGrid = { nx, nz, dx, x0: x - (nx * dx) / 2, z0: z - (nz * dx) / 2 };
+    this.projector = new ProjectedWakeSource(this.stampGrid, depths, grid.depth);
     this.spectrum = new Float64Array(2 * (nx / 2 + 1) * nz);
     this.displacement = new Float64Array(nx * nz);
   }
@@ -119,6 +140,7 @@ export class PrescribedWakeWork implements Solver<undefined> {
       stableRate: () => 0,
       fields: [
         { field: this.options.source.field, access: 'read' },
+        ...(this.options.surface ? [{ field: this.options.surface, access: 'read' as const }] : []),
         { field: WAKE_HEIGHT_FIELD, access: 'read' },
       ],
     };
@@ -138,6 +160,7 @@ export class PrescribedWakeWork implements Solver<undefined> {
   step({ inputs, tick, cell }: StepContext): void {
     const source = inputs.get(this.options.source.field.name);
     const wake = inputs.get(WAKE_HEIGHT_FIELD.name);
+    const surface = this.options.surface && inputs.get(this.options.surface.name);
     const bytesPerRow = 8 * SUBMERGED_WAKE_WORDS;
     if (
       !source ||
@@ -146,6 +169,13 @@ export class PrescribedWakeWork implements Solver<undefined> {
       source.region.layout !== SUBMERGED_WAKE_LAYOUT ||
       source.region.byteLength % bytesPerRow !== 0 ||
       source.region.byteLength / bytesPerRow > SUBMERGED_WAKE_MAX_ROWS ||
+      (this.options.surface &&
+        (!surface ||
+          surface.tick !== tick ||
+          surface.region.type !== 'f64' ||
+          surface.region.layout !== WAKE_SOURCE_LAYOUT ||
+          surface.region.byteLength % (WAKE_SOURCE_WORDS * 8) !== 0 ||
+          cell.some((coordinate, i) => coordinate !== surface.cell[i]))) ||
       !wake ||
       wake.tick !== tick - 1 ||
       wake.region.type !== 'f64' ||
@@ -160,10 +190,30 @@ export class PrescribedWakeWork implements Solver<undefined> {
     const rows = regionWords(memory, source.region) as Float64Array;
     this.spectrum.fill(0);
     this.projector.add(rows, this.fft, this.spectrum);
+    const projected = this.projector.bands > 0;
+    if (projected) this.fft.inverse(this.spectrum, this.displacement);
+    else this.displacement.fill(0);
+    let surfaceMotion = false;
+    if (surface) {
+      const volume = regionWords(memory, surface.region) as Float64Array;
+      for (let i = 0; i < volume.length; i += WAKE_SOURCE_WORDS) {
+        const pressure = volume[i + 3]!,
+          amount = volume[i + 4]!;
+        if (pressure !== 0)
+          throw invalidLoad('Pass surface volume rows with zero pressure to the prescribed wake work meter.');
+        if (amount === 0) continue;
+        const x = volume[i]!,
+          z = volume[i + 1]!,
+          radius = volume[i + 2]!;
+        if (![x, z, radius, amount].every(Number.isFinite) || radius <= 0)
+          throw invalidLoad('Write a finite surface volume and coordinates, with a finite positive footprint radius.');
+        wakePatch(this.stampGrid, x, z, radius, amount, this.displacement);
+        surfaceMotion = true;
+      }
+    }
     let increment = 0;
-    if (this.projector.bands > 0) {
+    if (projected || surfaceMotion) {
       const eta = regionWords(memory, wake.region) as Float64Array;
-      this.fft.inverse(this.spectrum, this.displacement);
       for (let i = 0; i < this.displacement.length; i++) {
         const delta = this.displacement[i]!;
         increment += delta * (eta[i]! + 0.5 * delta);
