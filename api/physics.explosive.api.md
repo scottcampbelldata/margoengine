@@ -4,6 +4,7 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
+import { BedGrid } from "@margoengine/math/fields";
 
 export const AIR_DEPTH_SCALE = 0.0012;
 
@@ -106,9 +107,15 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     readonly id: string;
     readonly explosionsField: FieldDescriptor;
     readonly fragmentsField: FieldDescriptor;
-    constructor(id?: string, options?: {
-        readonly carriers?: boolean;
-    });
+    constructor(id?: string, options?: ExplosionSolverOptions, modules?: {
+        plain: WebAssembly.Module;
+        shared?: WebAssembly.Module;
+    } | undefined);
+    static load(options?: ExplosionSolverOptions & {
+        id?: string;
+        signal?: AbortSignal;
+    }): Promise<ExplosionSolver>;
+    get kernel(): boolean;
     describe(): SolverDescription;
     init(host: SolverHost, params: ExplosionParams): void;
     step(context: StepContext, dt: number): void;
@@ -147,6 +154,11 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     fragments(): Float64Array;
 }
 
+export interface ExplosionSolverOptions {
+    readonly carriers?: boolean;
+    readonly terrain?: BedShape;
+}
+
 export interface Explosive {
     readonly name: string;
     readonly heatOfDetonation: number;
@@ -173,6 +185,15 @@ export interface Firing {
     readonly efficiency: number;
     readonly history: Float64Array;
     readonly steps: number;
+}
+
+export interface FlightBed {
+    readonly elevations: Float32Array;
+    readonly columns: number;
+    readonly rows: number;
+    readonly width: number;
+    readonly depth: number;
+    readonly centre: readonly [number, number];
 }
 
 export const GUN_SAMPLES = 128;
@@ -252,6 +273,8 @@ export const TNT_JOULES_PER_KG = 4184000;
 
 export function airborneFraction(scaled: number): number;
 
+export function bedHeight(bed: FlightBed, x: number, z: number): number;
+
 export function chargeEnergy(mass: number, explosive?: Explosive): number;
 
 export function closedVesselPressure(propellant: Propellant, loading: number): number;
@@ -259,6 +282,8 @@ export function closedVesselPressure(propellant: Propellant, loading: number): n
 export function energyBudget(energy: number, depth?: number, options?: GroundOptions, aboveGround?: boolean): EnergyBudget;
 
 export function fireGun(options: GunOptions): Firing;
+
+export function flyFragments(f: Float64Array, drag: Float64Array, launch: Float64Array, count: number, dt: number, end: number, g: readonly [number, number, number], ground: number, bed: FlightBed | null): [number, number];
 
 export function gurneyVelocity(explosive: Explosive): number;
 
@@ -271,6 +296,8 @@ export function scaledDepth(depth: number, energy: number): number;
 export function tntEquivalent(energy: number): number;
 
 // Not exported from this entry, but used by the exports above:
+
+type BedShape = Omit<BedGrid, 'cell'>;
 
 type Cell = readonly [number, number, number];
 

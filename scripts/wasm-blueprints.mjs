@@ -161,6 +161,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'explosive-kernel',
+    crate: 'packages/physics/explosive-kernel',
+    blueprint: 'packages/physics/src/explosive/explosive-kernel.wasm',
+    script: 'packages/physics/scripts/build-explosive-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'explosive-kernel-shared',
+    crate: 'packages/physics/explosive-kernel',
+    blueprint: 'packages/physics/src/explosive/explosive-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-explosive-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'lightning-kernel-shared',
     crate: 'packages/physics/lightning-kernel',
     blueprint: 'packages/physics/src/lightning/lightning-kernel-shared.wasm',

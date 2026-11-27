@@ -28,6 +28,7 @@ export {
   type ExplosionCounts,
   type ExplosionParams,
   ExplosionSolver,
+  type ExplosionSolverOptions,
   FRAGMENT_WORDS,
   GUN_SAMPLES,
   type GunMount,
@@ -41,3 +42,4 @@ export {
   type Propellant,
   PROPELLANTS,
 } from './gun.js';
+export { bedHeight, type FlightBed, flyFragments } from './flight.js';

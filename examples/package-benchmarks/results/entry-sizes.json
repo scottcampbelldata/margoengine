@@ -15178,6 +15178,10 @@
       "./pbf": {
         "raw": 13032,
         "gzip": 5577
+      },
+      "./explosive": {
+        "raw": 25349,
+        "gzip": 10014
       }
     },
     "@margoengine/physics2d": {
@@ -18718,6 +18722,16 @@
       "raw": 36533,
       "gzip": 14802,
       "brotli": 12771
+    },
+    "packages/physics/dist/explosive-kernel.wasm": {
+      "raw": 1118,
+      "gzip": 678,
+      "brotli": 633
+    },
+    "packages/physics/dist/explosive-kernel-shared.wasm": {
+      "raw": 1118,
+      "gzip": 678,
+      "brotli": 637
     },
     "packages/physics/dist/lightning-kernel.wasm": {
       "raw": 2357,

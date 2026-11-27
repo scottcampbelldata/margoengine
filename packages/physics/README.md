@@ -7517,8 +7517,27 @@ as fragments (`fragmentsField`, `FRAGMENT_WORDS` words: position, velocity, mass
 the case to charge mass ratio, with masses drawn from Mott's distribution (N(>m) = N0 exp(-sqrt(m/mu))) and scaled to the
 case mass. They leave in opposite pairs of equal mass, so the launch adds no momentum. They fly under the world's gravity
 and quadratic air drag (`dragCoefficient`, default 1, on a sphere of the fragment's mass and `density`) until they reach
-`groundHeight`. `seed` breaks the same cases another way; `counts` gives the fragments in flight and the fragment steps
-taken. A buried charge (`depth` above 0) keeps its case in the ground.
+`groundHeight`, or on the terrain bed. `seed` breaks the same cases another way; `counts` gives the fragments in flight,
+the fragment steps taken and the guns' integration steps. A buried charge (`depth` above 0) keeps its case in the ground.
+
+`await ExplosionSolver.load(options)` flies the fragments in the explosive kernel, a Rust crate compiled to Wasm with SIMD.
+It gives the same bits as the TypeScript path (`new ExplosionSolver(id, options)`, and `flyFragments`, its twin), with the
+same work counts. `terrain` (a `BedShape`) lands the fragments on the world's `bed` field, which a `TerrainBed` of that
+shape publishes, at the elevation `BedSurface.sample` gives.
+
+```ts
+import { TerrainBed } from '@margoengine/physics/earth';
+import { ExplosionSolver } from '@margoengine/physics/explosive';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const shape = { columns: 32, rows: 32, width: 400, depth: 400, centre: [0, 0] as [number, number] };
+const blast = await ExplosionSolver.load({ terrain: shape });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] })
+  .add(new TerrainBed(), { ...shape, elevations: (x: number) => 0.2 * x })
+  .add(blast, { charges: [{ position: [0, 30, 0], mass: 20, case: { mass: 40, fragments: 400, geometry: 'sphere' } }] });
+world.advance(600);
+console.log(blast.kernel, blast.counts);
+```
 
 ```ts
 import { ExplosionSolver } from '@margoengine/physics/explosive';

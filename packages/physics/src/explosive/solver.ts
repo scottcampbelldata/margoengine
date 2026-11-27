@@ -24,6 +24,8 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
+import { BED_FIELD, BED_LAYOUT, type BedShape, bedVertexCount } from '../earth/bed.js';
+import { canShareMemory, isShared, STACK_BYTES } from '../world/memory.js';
 import { rateOf } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import {
@@ -36,6 +38,7 @@ import {
   gurneyVelocity,
   metalSpeed,
 } from './charge.js';
+import { type FlightBed, flyFragments } from './flight.js';
 import { type Firing, fireGun, type GunOptions, HISTORY_WORDS } from './gun.js';
 
 /** The layout version of the explosion and fragment regions. */
@@ -52,8 +55,6 @@ const AIR_DENSITY = 1.225;
 /** A cast high explosive's density, kg/m^3 (TNT 1630), for telling a charge on the ground from one in the air. */
 const CHARGE_DENSITY = 1630;
 const WAITING = 0;
-const FLYING = 1;
-const LANDED = 2;
 
 /** A cased charge's case, which it throws as fragments when it detonates at or above the surface. */
 export interface ChargeCase {
@@ -129,6 +130,54 @@ export interface ExplosionCounts {
   readonly gunSteps: number;
 }
 
+/** What an {@link ExplosionSolver} is made with. */
+export interface ExplosionSolverOptions {
+  /** True when guns are mounted on rigid bodies: the solver reads `bodies` and adds the recoil to `bodyImpulses`. */
+  readonly carriers?: boolean;
+  /**
+   * The terrain bed's shape: the fragments land on the world's `bed` field (a `TerrainBed` of this shape, in the solver's
+   * cell) rather than on a flat `groundHeight`.
+   */
+  readonly terrain?: BedShape;
+}
+
+type Native = {
+  __stack_pointer: WebAssembly.Global;
+  fly(
+    fragments: number,
+    drag: number,
+    launch: number,
+    count: number,
+    dt: number,
+    end: number,
+    gx: number,
+    gy: number,
+    gz: number,
+    ground: number,
+    bed: number,
+    columns: number,
+    rows: number,
+    width: number,
+    depth: number,
+    cx: number,
+    cz: number,
+    counts: number,
+  ): void;
+};
+
+async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
+  signal?.throwIfAborted();
+  if (url.protocol === 'file:') {
+    const fs = 'node:fs/promises';
+    const { readFile } = await import(/* @vite-ignore */ fs);
+    return WebAssembly.compile(await readFile(url, { signal }));
+  }
+  const response = await fetch(url, { signal });
+  if (!response.ok)
+    throw new MargoError('failed', 'The explosive kernel could not load. Serve its optional Wasm assets.');
+  return WebAssembly.compile(await response.arrayBuffer());
+}
+
 /** Words of a gun's state: fired (0 or 1), fire time, the shot's muzzle time and the recoil's duration (s), then samples. */
 const GUN_HEAD = 4;
 /** Samples of a gun's backward momentum, uniform over its recoil's duration. */
@@ -197,9 +246,12 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
   private placed: Placed[] = [];
   private explosionRegion: Region | null = null;
   private fragmentRegion: Region | null = null;
-  private fragmentDrag: Float64Array = new Float64Array(0);
-  private fragmentCharge: Int32Array = new Int32Array(0);
+  private dragRegion: Region | null = null;
+  private launchRegion: Region | null = null;
+  private countsRegion: Region | null = null;
   private fragmentCount = 0;
+  private native: Native | null = null;
+  private readonly terrain: BedShape | null;
   private ground = 0;
   private steps = 0;
   private flyingNow = 0;
@@ -210,14 +262,17 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
   private readonly carriers: boolean;
 
   /**
-   * @param options.carriers - true when guns are mounted on rigid bodies: the solver then reads `bodies` and adds the recoil
-   * to `bodyImpulses`, so a world with a rigid solver is needed.
+   * A solver that flies its fragments in TypeScript; {@link ExplosionSolver.load} gives one that flies them in the
+   * explosive kernel (Rust and Wasm, the same bits).
    */
   constructor(
     readonly id = 'explosion',
-    options: { readonly carriers?: boolean } = {},
+    options: ExplosionSolverOptions = {},
+    private readonly modules?: { plain: WebAssembly.Module; shared?: WebAssembly.Module },
   ) {
     this.carriers = options.carriers === true;
+    this.terrain = options.terrain ?? null;
+    if (this.terrain) bedVertexCount(this.terrain);
     this.explosionsField = {
       name: `${id}:explosions`,
       kind: 'particleSet',
@@ -234,6 +289,26 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     };
   }
 
+  /** Loads the explosive kernel and makes a solver that flies its fragments in it. */
+  static async load(
+    options: ExplosionSolverOptions & { id?: string; signal?: AbortSignal } = {},
+  ): Promise<ExplosionSolver> {
+    const { signal, id, ...rest } = options;
+    const [plain, shared] = await Promise.all([
+      compile(new URL(/* @vite-ignore */ './explosive-kernel.wasm?no-inline', import.meta.url), signal),
+      canShareMemory()
+        ? compile(new URL(/* @vite-ignore */ './explosive-kernel-shared.wasm?no-inline', import.meta.url), signal)
+        : undefined,
+    ]);
+    signal?.throwIfAborted();
+    return new ExplosionSolver(id ?? 'explosion', rest, { plain, shared });
+  }
+
+  /** Whether the fragments fly in the explosive kernel. */
+  get kernel(): boolean {
+    return this.modules !== undefined;
+  }
+
   describe(): SolverDescription {
     return {
       id: this.id,
@@ -248,6 +323,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
               { field: BODY_IMPULSES_FIELD, access: 'accumulate' as const },
             ]
           : []),
+        ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ],
     };
   }
@@ -430,8 +506,27 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       'f64',
       EXPLOSION_LAYOUT,
     );
-    this.fragmentDrag = Float64Array.from(drags);
-    this.fragmentCharge = Int32Array.from(owners);
+    const count = Math.max(1, fragments.length) * 8;
+    this.dragRegion = host.allocate('fragment-drag', count, 'f64', EXPLOSION_LAYOUT);
+    this.launchRegion = host.allocate('fragment-launch', count, 'f64', EXPLOSION_LAYOUT);
+    this.countsRegion = host.allocate('flight-counts', 16, 'f64', EXPLOSION_LAYOUT);
+    this.words(this.dragRegion).set(drags);
+    // A case fragment leaves when its charge detonates; a shot when its gun's shot reaches the muzzle (set at the firing).
+    this.words(this.launchRegion).set(owners.map((owner) => (owner >= 0 ? this.placed[owner]!.time : Infinity)));
+    if (this.modules) {
+      const module = isShared(host.memory) ? this.modules.shared : this.modules.plain;
+      if (!module)
+        throw new MargoError(
+          'failed',
+          'The shared explosive kernel is unavailable. Create the world with plain memory.',
+        );
+      const stack = host.allocate('explosive-stack', STACK_BYTES, 'u8', EXPLOSION_LAYOUT);
+      const native = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as unknown as Native;
+      if (!(native.__stack_pointer instanceof WebAssembly.Global) || typeof native.fly !== 'function')
+        throw new MargoError('failed', 'Unexpected explosive kernel ABI. Rebuild both native assets.');
+      native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+      this.native = native;
+    }
     const table = this.explosions();
     this.placed.forEach((c, i) =>
       table.set(
@@ -469,6 +564,9 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       this.explosionRegion!.byteOffset,
       (this.placed.length + this.guns.length) * EXPLOSION_WORDS,
     );
+  }
+  private words(region: Region): Float64Array {
+    return new Float64Array(this.live().memory.buffer, region.byteOffset, region.byteLength / 8);
   }
   private gunWords(): Float64Array {
     return new Float64Array(this.live().memory.buffer, this.gunRegion!.byteOffset, this.guns.length * GUN_WORDS);
@@ -530,6 +628,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     // The shot: from the muzzle, at the carrier's velocity plus its own over the ground.
     const f = this.fragmentWords();
     const shot = this.fragmentCount - this.guns.length + k;
+    this.words(this.launchRegion!)[shot] = gun.time + firing.muzzleTime;
     f.set(
       [
         ...muzzle,
@@ -578,48 +677,68 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     const rows = this.explosions();
     for (let i = 0; i < this.placed.length + this.guns.length; i++)
       if (rows[i * EXPLOSION_WORDS + 3]! < end) rows[i * EXPLOSION_WORDS + 9] = 1;
-    const gunWords = this.gunWords();
-    const f = this.fragmentWords();
     const g = host.gravity;
-    let flying = 0;
-    for (let i = 0; i < this.fragmentCount; i++) {
-      const o = i * FRAGMENT_WORDS;
-      let state = f[o + 7]!;
-      const owner = this.fragmentCharge[i]!;
-      if (state === WAITING) {
-        const o = (SHOT_GUN - owner) * GUN_WORDS;
-        const launch =
-          owner >= 0 ? this.placed[owner]!.time : gunWords[o] === 1 ? gunWords[o + 1]! + gunWords[o + 2]! : Infinity;
-        if (launch < end) state = FLYING;
-      }
-      if (state !== FLYING) {
-        f[o + 7] = state;
-        continue;
-      }
-      // Quadratic drag alone over the step, exactly: speed s goes to s / (1 + k s dt) along the velocity; then gravity.
-      const vx = f[o + 3]!,
-        vy = f[o + 4]!,
-        vz = f[o + 5]!;
-      const s = pow(vx * vx + vy * vy + vz * vz, 0.5);
-      const keep = 1 / (1 + this.fragmentDrag[i]! * s * dt);
-      const nx = vx * keep + g[0] * dt,
-        ny = vy * keep + g[1] * dt,
-        nz = vz * keep + g[2] * dt;
-      f[o] = f[o]! + nx * dt;
-      f[o + 1] = f[o + 1]! + ny * dt;
-      f[o + 2] = f[o + 2]! + nz * dt;
-      f[o + 3] = nx;
-      f[o + 4] = ny;
-      f[o + 5] = nz;
-      this.steps++;
-      if (f[o + 1]! <= this.ground && ny < 0) {
-        f[o + 1] = this.ground;
-        f[o + 3] = f[o + 4] = f[o + 5] = 0;
-        f[o + 7] = LANDED;
-      } else {
-        f[o + 7] = FLYING;
-        flying++;
-      }
+    let bed: FlightBed | null = null;
+    let bedOffset = 0;
+    if (this.terrain) {
+      const port = context.inputs.get(BED_FIELD.name);
+      const vertices = bedVertexCount(this.terrain);
+      if (
+        !port ||
+        port.region.layout !== BED_LAYOUT ||
+        port.region.type !== 'f32' ||
+        port.region.byteLength !== vertices * 4
+      )
+        throw new MargoError(
+          'state',
+          `The fragments land on a ${this.terrain.columns} by ${this.terrain.rows} terrain bed; add a TerrainBed of that shape to the world.`,
+        );
+      const memory = port.region.memory ?? host.memory;
+      if (memory !== host.memory && this.native)
+        throw new MargoError('state', 'The terrain bed must live in the world memory for the explosive kernel.');
+      bedOffset = port.region.byteOffset;
+      bed = { ...this.terrain, elevations: new Float32Array(memory.buffer, bedOffset, vertices) };
+    }
+    let flying: number;
+    if (this.native) {
+      const t = this.terrain;
+      this.native.fly(
+        this.fragmentRegion!.byteOffset,
+        this.dragRegion!.byteOffset,
+        this.launchRegion!.byteOffset,
+        this.fragmentCount,
+        dt,
+        end,
+        g[0],
+        g[1],
+        g[2],
+        this.ground,
+        bed ? bedOffset : 0,
+        t?.columns ?? 0,
+        t?.rows ?? 0,
+        t?.width ?? 0,
+        t?.depth ?? 0,
+        t?.centre[0] ?? 0,
+        t?.centre[1] ?? 0,
+        this.countsRegion!.byteOffset,
+      );
+      const counts = this.words(this.countsRegion!);
+      flying = counts[0]!;
+      this.steps += counts[1]!;
+    } else {
+      const [now, steps] = flyFragments(
+        this.fragmentWords(),
+        this.words(this.dragRegion!),
+        this.words(this.launchRegion!),
+        this.fragmentCount,
+        dt,
+        end,
+        [g[0], g[1], g[2]],
+        this.ground,
+        bed,
+      );
+      flying = now;
+      this.steps += steps;
     }
     this.flyingNow = flying;
   }
@@ -700,6 +819,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       this.explosionRegion!,
       this.fragmentRegion!,
       this.gunRegion!,
+      this.launchRegion!,
       ...(this.impulseRegion ? [this.impulseRegion] : []),
     ];
   }

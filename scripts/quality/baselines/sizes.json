@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20879166,
+  "total": 20880739,
   "history": [
     {
       "date": "2026-10-24",
@@ -14513,6 +14513,12 @@
       "commit": "pending",
       "reason": "physics/ship 35,274 ceiling to its new size 35,946 (+672 B): KVLCC2's measured shallow-water table (captive tests at h/T 2.0, 1.5 and 1.2) and its interpolation and checks (KB-SHIP-SHALLOW1). Measured data in place of a generic formula; a separate entry would split the ship model from the depth it runs in. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "kernel",
+      "reason": "FIRE-05: explosive kernel loader, flight twin and terrain landing (+1573 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15353,7 +15359,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 8441,
+    "@margoengine/physics/explosive": 10014,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

@@ -119,7 +119,9 @@ await build({
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,
     },
-    rollupOptions: { external: packageExternal(root, ['@margoengine/core', '@margoengine/core/extension', '@margoengine/lines']) },
+    rollupOptions: {
+      external: packageExternal(root, ['@margoengine/core', '@margoengine/core/extension', '@margoengine/lines']),
+    },
   },
 });
 for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
@@ -134,6 +136,8 @@ for (const name of ['seismic-kernel.wasm', 'seismic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/seismic', name), resolve(dist, name));
 for (const name of ['lightning-kernel.wasm', 'lightning-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/lightning', name), resolve(dist, name));
+for (const name of ['explosive-kernel.wasm', 'explosive-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/explosive', name), resolve(dist, name));
 for (const name of ['synoptic-kernel.wasm', 'synoptic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/synoptic', name), resolve(dist, name));
 for (const name of ['swim-kernel.wasm', 'swim-kernel-shared.wasm'])

@@ -311,6 +311,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/explosive-kernel.wasm',
+    label: 'explosive-kernel.wasm',
+    kind: 'Rust SIMD fragment flight and landing on the terrain bed',
+    measure: 'file',
+    when: 'ExplosionSolver.load() from the optional /explosive entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/explosive-kernel-shared.wasm',
+    label: 'explosive-kernel-shared.wasm',
+    kind: 'Rust SIMD fragment flight and landing on the terrain bed, shared world memory',
+    measure: 'file',
+    when: 'ExplosionSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/lightning-kernel.wasm',
     label: 'lightning-kernel.wasm',
     kind: 'Rust SIMD electric potential relaxation',

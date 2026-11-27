@@ -126,6 +126,8 @@
 <tr><th scope="row"><code>pbf-kernel-shared.wasm</code></th><td>Rust SIMD position-based particle liquid, shared world memory</td><td class="num">18,143</td><td class="num">7,317</td><td class="num">6,413</td><td>PbfSolver.load(world.memory) from the optional /pbf entry with shared memory</td></tr>
 <tr><th scope="row"><code>dfsph-kernel.wasm</code></th><td>Rust SIMD divergence-free particle liquid</td><td class="num">36,539</td><td class="num">14,808</td><td class="num">12,779</td><td>DfsphSolver.load(world.memory) from the optional /dfsph entry with plain memory</td></tr>
 <tr><th scope="row"><code>dfsph-kernel-shared.wasm</code></th><td>Rust SIMD divergence-free particle liquid, shared world memory</td><td class="num">36,533</td><td class="num">14,802</td><td class="num">12,771</td><td>DfsphSolver.load(world.memory) from the optional /dfsph entry with shared memory</td></tr>
+<tr><th scope="row"><code>explosive-kernel.wasm</code></th><td>Rust SIMD fragment flight and landing on the terrain bed</td><td class="num">1,118</td><td class="num">678</td><td class="num">633</td><td>ExplosionSolver.load() from the optional /explosive entry</td></tr>
+<tr><th scope="row"><code>explosive-kernel-shared.wasm</code></th><td>Rust SIMD fragment flight and landing on the terrain bed, shared world memory</td><td class="num">1,118</td><td class="num">678</td><td class="num">637</td><td>ExplosionSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>lightning-kernel.wasm</code></th><td>Rust SIMD electric potential relaxation</td><td class="num">2,357</td><td class="num">1,155</td><td class="num">1,048</td><td>LightningSolver.load() from the optional /lightning entry</td></tr>
 <tr><th scope="row"><code>lightning-kernel-shared.wasm</code></th><td>Rust SIMD electric potential relaxation, shared world memory</td><td class="num">2,357</td><td class="num">1,155</td><td class="num">1,048</td><td>LightningSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>rail-kernel.wasm</code></th><td>Rust SIMD tensioned contact-wire propagation</td><td class="num">571</td><td class="num">391</td><td class="num">356</td><td>RailSolver.load(world.memory) from the optional /rail entry</td></tr>
@@ -4775,7 +4777,7 @@
   <caption class="sr-only">Simulation and games: bytes per package entry</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Entry</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Peers on</th></tr></thead>
 <tbody data-package="@margoengine/physics">
-<tr><th scope="rowgroup" rowspan="69"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,419,162</td><td class="num">918,308</td><td rowspan="69"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="70"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,419,162</td><td class="num">918,308</td><td rowspan="70"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./decomposition</code></td><td class="num">26,434</td><td class="num">10,779</td></tr>
 <tr><td><code>./soft</code></td><td class="num">285,928</td><td class="num">151,618</td></tr>
 <tr><td><code>./tissue</code></td><td class="num">7,324</td><td class="num">3,108</td></tr>
@@ -4844,6 +4846,7 @@
 <tr><td><code>./lava</code></td><td class="num">14,007</td><td class="num">5,891</td></tr>
 <tr><td><code>./dfsph</code></td><td class="num">19,974</td><td class="num">7,880</td></tr>
 <tr><td><code>./pbf</code></td><td class="num">13,032</td><td class="num">5,577</td></tr>
+<tr><td><code>./explosive</code></td><td class="num">25,349</td><td class="num">10,014</td></tr>
 </tbody>
 <tbody data-package="@margoengine/physics2d">
 <tr><th scope="rowgroup" rowspan="3"><a href="./catalog/#physics2d">@margoengine/physics2d</a></th><td><code>root</code></td><td class="num">68,021</td><td class="num">22,561</td><td rowspan="3"><code>@margoengine/core</code><br>Installs <code>@margoengine/geometry</code>, <code>@margoengine/math</code></td></tr>
