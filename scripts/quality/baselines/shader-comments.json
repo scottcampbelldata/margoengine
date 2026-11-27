@@ -1,7 +1,7 @@
 {
   "gate": "shader-comments",
   "about": "comments left inside shader strings of a package dist; each literal the build strip leaves whole counts one",
-  "total": 549,
+  "total": 230,
   "history": [
     {
       "date": "2026-11-12",
@@ -22,10 +22,9 @@
     "@margoengine/gltf": 25,
     "@margoengine/materials": 47,
     "@margoengine/post": 28,
-    "@margoengine/scatter": 13,
+    "@margoengine/scatter": 11,
     "@margoengine/sciviz": 47,
     "@margoengine/sprites": 3,
-    "@margoengine/ui": 7,
-    "@margoengine/voxel-pathtracer": 317
+    "@margoengine/ui": 7
   }
 }
