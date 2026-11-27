@@ -2870,7 +2870,7 @@ for (let i = 0; i < 500; i++) forest.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 
 for (const primitive of tree.primitives) primitive.instances = forest;
 ```
 
-Not per instance: frustum culling and sorting of transparent instances (`MeshletMesh` of
+TAA gives each instance its own motion vectors from its rows (`@margoengine/taa`). Not per instance: frustum culling and sorting of transparent instances (`MeshletMesh` of
 `@margoengine/culling/meshlets` culls instances on the GPU). `BatchedMesh`, many different geometries in one draw, is
 `BatchedMesh.attach(engine, material, options)` from `@margoengine/materials/batched`.
 
@@ -5930,6 +5930,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Custom bokeh shapes (`aperture` of `DOFLens` in `@margoengine/dof/lens`, 2026-11-08) | By method: the image is baked into the kernels when the effect attaches, as a 32 x 32 transmission mask over its inscribed circle (luminance times alpha, softened by about one cell at its edges) and 16, 32 and 64 far-gather taps spread over the shape; finer detail than a cell, about 1/16 of the bokeh's diameter, is lost; near and far bokeh show the image the same way up, where a real lens flips one of them; not with `blades`; GPU cost not measured (LIM-535). | The gather reads a fixed number of taps per pixel, so the shape is as fine as its taps and mask. | A heart or star bokeh from any image; a large disk shows the tap pattern a little more than the round one, as the taps cover only the open part. | Draw the shape larger (a lower f-number) for more detail per tap. |
 | TAA in stereo and XR (`@margoengine/taa` with `@margoengine/xr`, 2026-11-08) | By method: each eye is an engine view with its own TAA history, jitter cycle and captures at the eye's size; no multiview (one pass into a texture array), as the engine has none; the proof uses stereo views drawn as `EyeViews` draws them, not a headset; GPU cost not measured (LIM-531). | The engine draws XR eyes as separate views, and history must not cross eyes. | Each eye pays a full TAA resolve and holds its own history (two rgba16float and two r32float textures per eye). | None: per-eye cost is the price of per-eye history. |
 | TAA velocity of shapes a shader moves (NodeMaterial `positionNode`, raw `velocityEntry`, 2026-11-08) | By method: a `positionNode` move that reads the graph's uniform block runs again on last frame's block (kept per TAA view and draw) at last frame's model matrix; a move read from a storage buffer or texture that changes (skinning bones, morph weights, a height map), or from a `Fn` whose body reads a uniform, gets no motion of its own; a raw mesh moves only by the `velocityEntry` it writes, and keeps last frame's value of its own uniforms itself (`margoBefore` holds time, world matrix and view-projection); a raw mesh without the entry, or a transparent one, still gets camera motion only; GPU cost not measured (LIM-533). | A graph's storage and textures have no kept copy, and a raw shader is opaque code: only its author knows where a vertex was. | One more uniform block and a second run of the move per moved vertex in TAA's velocity pass; for raw, one more draw per opted-in mesh. | Register custom deformation as velocity primitives (`taa.add`) when it is in a storage buffer. |
+| TAA velocity of moving instances (`@margoengine/taa` with gltf/pbr `PBRInstances`, 2026-11-27, KB-TAA-INSTMOTION1) | Measured by [instance-velocity-browser.mjs](../packages/taa/test/instance-velocity-browser.mjs): of two Box.glb instances under a still node and camera, every pixel of the one that moves carries 0.6 to 1.4 times its median motion and none of the standing one moves (WebGPU: 11,013 and 10,999 pixels). Costs one GPU copy of each drawn instance buffer (96 bytes an instance) and one buffer copy a frame. Instances drawn by a culler or sorter take their motion from their unculled rows. On the WebGL2 layer 25 silhouette pixels of a moving box keep part of the camera's motion, plain meshes alike (KB-TAA-COMPATEDGE1). |
 | TAAUpscale temporal stability at silhouettes (`@margoengine/taa/upscale`, 2026-11-15) | Measured and enforced by [stability-browser.mjs](../packages/taa/test/stability-browser.mjs): a 0.1 m bright post 4 m from a camera that orbits it at 0.01 rad a frame, in front of a flat wall at 44 m, scale 0.67, 640 x 480; edge alternation (per pixel and frame, max(0, \|x[t] - 2x[t-1] + x[t-2]\| - \|x[t] - x[t-2]\|) in sRGB luma levels, over 24 frames round the post) at most 0.25, and the orbiting camera at most twice the 0.001 rad a frame one. RTX A6000: 0.195 on WebGPU and 0.201 on the WebGL2 layer (0.133 and 0.132 slow); the one-texel depth test it replaced read 0.361 on WebGPU (0.142 slow, so 2.5 times the slow figure) and 0.200 on the WebGL2 layer, whose resolve already reads each depth as the nearest of five texels. A box crossing the wall leaves 0 red pixels behind it on both. By method: history is rejected when the reprojected nearest depth lies outside the depth range of a 3x3 history footprint, taps one render pixel apart, so a pixel uncovered within one render pixel of an old edge keeps history and relies on the colour clamp there. | The bound sits about 25% above the measured figure, for other GPUs' rounding, and below the old 0.361, so the WebGPU run fails on the one-texel test. While the camera moves, the residue is the jittered accumulation: the current frame's weight follows the jitter, and widening the colour clamp raises it (0.43 at clampGamma 50). With the camera still it is gone: `settle` (default true) holds the mean of one jitter cycle, and still frames change on 0% of pixels with a largest difference of 0 (`still-browser.mjs`; 2.4% before, KB-TAA-STILL1), so the 0.16 the still camera left is 0 after about 16 frames. | Silhouettes against a far background hold still while the camera moves, as with a slow camera. | Raise `historyWeight` for a still steadier edge (0.168 at 0.97) at the cost of slower response; `TAA` with object velocity for fast thin movers. |
 | Raw mesh shared buffers (`@margoengine/shader/raw`) | Enforced by method: meshes share a buffer only when every packed byte is equal, compared on upload. | Comparing needs the bytes, so each shared buffer keeps a CPU copy of them until its meshes have left it. | One more CPU copy per distinct stream, and a first write to a shared buffer makes that mesh a new GPU buffer. | Build meshes from different data, or write to them, and they hold their own buffers. |
 | Raw meshes in other passes (`@margoengine/shader/raw`, 2026-11-06) | By method: raw meshes cast into `Shadows`, write the SSAO G-buffer through `gbufferEntry`, are frustum culled and are picked. `VirtualShadows` and `LocalShadows` reject custom casters; SSR, GTAO, SSGI and scene passes see only their depth, and TAA velocity a mesh's own motion only through `velocityEntry` (LIM-533). A pick covers a whole mesh: no instance index, and `discard` does not cut it. | These passes each take a different contract; a raw shader is opaque code, so the engine cannot derive velocity or per-instance IDs from it. Uniform arrays hold 16-byte elements and struct fields are plain types, as WGSL's uniform layout rules require of a generated layout. | SSR, GTAO, SSGI and scene passes see only the depth of a raw mesh, TAA velocity too unless the material has `velocityEntry`, and a pick covers a whole mesh. | Culling trusts the sphere of `position` or `bounds`, so a vertex shader that moves points outside it needs `bounds` or `frustumCulled: false`. |
@@ -15901,6 +15902,126 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: ambient occlusion draws a fine pattern over distant flat sand (KB-POST-GTAOFAR1, post; was KB-WATER-FARGRID-KH1's sand half)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file> --out=<folder>` with the
+  query `cam=880,30,-450&aim=600,3,300&fov=35`: the sand some hundreds of metres out carries one-pixel rows and a
+  checker. With `&occlusion=0` it is gone: the mean second difference between pixel rows over (500, 560) to (760, 700)
+  falls from 11.5 to 0.55 (RTX A6000, WebGPU).
+- **Cause (narrowed, not traced in the shader):** the scene's `GTAO` pass; its per-pixel sample pattern shows where the
+  ground is far and flat.
+- **The report's other half**, a stair-stepped water edge, does not show in the same frame on this main: the edge is an
+  irregular swash line.
+
+### Fixed 2026-11-27: timber-valley's cumulus showed as flat white blobs on the mountain slopes (KB-SKY-CLOUDBLOB1; scenes, sky docs)
+
+- **Repro:** timber-valley under cover 0.2 to 0.3, from the valley floor toward the ridges: a smooth white patch lies
+  against the slopes below the ridge line, with no shape or shading.
+- **Cause:** a cloud layer's `bottom` and `top` are metres over world y = 0 (the option's text said "above the
+  ground"). The scene left them to the cumulus type's 1,000 to 2,500 m on a floor 870 m up with ridges to about 1,900 m,
+  so the layer ran through the mountains and only its thin foot showed over the floor.
+- **Fix:** the scene passes `bottom` and `top` 2.5 and 4 km over the valley's floor (the lifting condensation level of
+  a dry August afternoon, Lawrence 2005), and the `VolumetricCloudOptions.bottom` text says what it is measured from.
+  The same views now show rounded cumulus with shaded bases over the ridges (RTX A6000, WebGPU).
+- **And:** applying a look family then deleted those heights and the cloud type, since the sky's apply writes every
+  row it is not given back to its default; `applyLookFamily` now keeps the layer's `type`, `coverage`, `bottom`, `top`
+  and `density` (`packages/scenes/test/look-family-parts.test.js`).
+- **Regression test:** `node packages/scenes/test/timber-valley-still.mjs` (the cloud base stands over the highest
+  ground).
+
+### Fixed 2026-11-27: timber-valley's animated-feature look could not reach its ground or its creek (KB-BIOMES-LOOKFAMILY1; biomes, scenes)
+
+- **Repro:** the scene's default `look: 'animatedFeature'` changed the sky and fire only, and giving the family the
+  view's water threw "Water settings windSpeed, windDirection and fetch need a Water made without options.waves".
+- **Cause:** a `BiomeView` built every water, a creek included, with the ocean's two fixed swell trains (`SEA`), and a
+  `Water` with fixed trains takes no wind, so no water look with a wind could be applied to it; a `wind` the caller gave
+  was ignored for the same reason. The ground materials already had their target (`applyLookFamily`'s `biomes`), and
+  the scene passed neither.
+- **Fix:** on a landlocked world, or with a `wind`, the view's water takes `SEA` without the swell, under that wind (2
+  m/s over 100 m by default); a world the sea reaches keeps the swell. The scene passes the family to the ground and the
+  water. No new option.
+- **Regression tests:** `packages/biomes/tests/view-sea-horizon.test.js` (the family applies to a landlocked view's
+  water; threw before) and `node packages/scenes/test/timber-valley-still.mjs` (the creek's water takes the family's
+  colour).
+
+### Fixed 2026-11-27: timber-valley's creek showed as stray slabs of water on a flat floor from views along the valley (KB-BIOMES-RIVERSTEP1, near half; scenes)
+
+- **Repro:** `@margoengine/scenes/timber-valley`, view `creek` after attaching with the camera near the world's centre:
+  no channel in the ground, and one flat slab of water lying on the floor some way off (blue over red 0.39 in the water
+  ahead of the bank).
+- **Cause:** since 9176e5cdd4 a `BiomeView` anchors its clipmap rings where the camera stood at attach. The scene's
+  views lie up to 2 km from there, so the creek (14 m wide) drew on 32 m cells that missed its channel; the water showed
+  only where a vertex happened to fall in it.
+- **Fix:** the scene passes `clipmap: { anchor: 'camera' }`, so the fine rings follow the camera
+  (`packages/scenes/src/timber-valley.ts`). The creek now reads as one channel with its banks (blue over red 2.73,
+  RTX A6000, WebGPU).
+- **Regression test:** `node packages/scenes/test/timber-valley-still.mjs` (the creek bank assertion; 0.39 before,
+  bound 1.3).
+- **Still open:** the far half, below.
+
+### Open 2026-11-27: seen from far off, a narrow creek breaks into separate patches of water (KB-BIOMES-RIVERSTEP1, far half; terrain, water, biomes)
+
+- **Repro:** the `aerial-west` view of timber-valley: past a few hundred metres the creek is a row of separate blue
+  patches, then only the riverbed paint.
+- **Cause:** a clipmap ring's cells grow with distance (16 and 32 m from about 500 m) past the channel's 14 m width. The
+  ring takes the ground at its vertices only, so the water, 0.3 m under the banks, shows where a vertex falls in the
+  channel and is covered elsewhere. A fix has to either keep the channel's low ground in the coarse rings or let the
+  water pass the coarse ground's error in the depth test; both are design work.
+
+### Fixed 2026-11-27: past a landlocked world's edge the view showed a flat blue plane (KB-BIOMES-WORLDEDGE1; biomes)
+
+- **Repro:** timber-valley from 2,200 m, looking past the edge: a flat blue band lies between the far mountains and the
+  sky. Seen first (2026-11-17) from the `fire-line` view, before the view drew any far ground.
+- **Cause:** two. Nothing drew ground past the edge (fixed earlier by `BiomeView`'s `horizon` far ground); and a view
+  with rivers always gave its water the sea's horizon, at sea level, which showed past the end of the far ground.
+- **Fix:** the water reaches to the horizon only where an edge of the world stands at or below sea level
+  (`packages/biomes/src/view.ts`).
+- **Regression test:** `packages/biomes/tests/view-sea-horizon.test.js` (a landlocked valley's water has no horizon, a
+  coast's has).
+- **Weak spot left:** the far ground takes each corner's materials from the nearest edge texel, so it draws long
+  smeared streaks running outward from the edge (KB-BIOMES-HORIZONSTREAK1).
+
+### Open 2026-11-27: the far ground past a world's edge draws long streaks (KB-BIOMES-HORIZONSTREAK1, biomes)
+
+- **Repro:** timber-valley, camera at (-1500, 1400, 0) looking at (-3200, 900, 300): bands of material and light run
+  straight outward from the world's edge to the horizon.
+- **Cause:** `BiomeView`'s horizon terrain copies each far corner's weights from the nearest edge texel
+  (`#horizonTerrain`), so one edge texel's material runs the whole 12 km.
+
+### Open 2026-11-27: volumetric clouds draw full white through a smoke pall (KB-SKY-PALLCLOUD1, sky)
+
+- **Repro:** timber-valley `weather=smoke&date=1910-08-22&hour=10`, view `aftermath`: a cumulus low on the left is the
+  brightest thing in the frame, white against the orange pall; `VolumetricClouds.dispose()` removes it.
+- **Cause (not traced past this):** the day sky takes the smoke layer through `atmosphere.sunColor` and
+  `scatteredLight`; the volumetric clouds are not dimmed or veiled by it.
+
+### Fixed 2026-11-27: TAA gave instanced primitives camera motion only (KB-TAA-INSTMOTION1, taa, gltf)
+
+- **Repro (before):** `node packages/taa/test/instance-velocity-browser.mjs`: two Box.glb instances (gltf/pbr
+  `PBRInstances`) under a still node and camera, the right one moving; no pixel of either box was reached by TAA's
+  object velocity pass, so the moving instance held the camera's motion (0) and smeared in history.
+- **Cause:** `drawMotion` (`packages/taa/src/index.ts`) returned for any primitive with `instances`: TAA had no
+  previous instance transforms.
+- **Fix:** TAA keeps a GPU copy of each drawn instance buffer's rows, taken after every velocity pass, and the velocity
+  program (`instancedVelocity`, `src/shader.ts`) moves each vertex by node x instance matrix now and then (reverse
+  reprojection per instance: Nehab et al. 2007; Yang, Liu and Salvi 2020, section 4.1). gltf/pbr's instance buffer
+  gains `COPY_SRC`. Copies of buffers no longer drawn are freed.
+- **Regression:** the same check: every moving-box pixel carries 0.6 to 1.4 times its median motion, no standing-box
+  pixel moves (WebGPU; in `test:gpu`). It fails on the parent (no box pixel reached).
+
+### Open 2026-11-27: on the WebGL2 layer some silhouette pixels of a moving mesh keep part of the camera's motion (KB-TAA-COMPATEDGE1, taa, webgl2-compat)
+
+- **Repro:** `node packages/taa/test/instance-velocity-browser.mjs --compat`: 25 of 10,812 pixels of the moving box
+  (its right edge, x 475 and 476, and a few on its lower left edge) read 0.4 to 0.5 times the box's motion while their
+  expected depth is the box's own (about 0.0159), so none of their four samples is sky. The same 25 pixels show with
+  the two boxes as plain gltf/pbr meshes moved by their nodes (a control run), so instancing is not the cause; WebGPU
+  gives every pixel its full motion.
+- **Cause (suspected, not proven):** the layer resolves TAA's 4x motion targets by the mean of the four samples
+  (`src/shader.ts`, `skySample` note); samples where the velocity pass's 'equal' depth test fails keep the camera
+  pass's motion and a reprojected depth of the same surface, so the mean halves the motion. Why 'equal' fails on those
+  edge samples on ANGLE but not on WebGPU (sample positions or @invariant in the GLSL translation) is not yet found.
+  `far-velocity-browser.mjs --compat` asserts only motion above 0, which such pixels pass.
+
 ### Fixed 2026-11-27: a voxel-pathtracer unit test failed on a loaded machine; the viewport ignored the fixed band budget (KB-VPT-BANDS-LOAD1, voxel-pathtracer)
 
 - **Repro (before):** `packages/voxel-pathtracer` unit suite (`node --test tests/*.test.js`) 15 times while 28 CPU
@@ -15935,8 +16056,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   orange-grey sky with the ridges visible (RTX A6000, WebGPU, 960 x 540).
 - **Regression test:** `packages/scenes/test/timber-valley.test.js` (the smoke day is daylight; fails on 0.6).
 - **Still open on this view:** the distant haze is much darker than the sky behind it (KB-SKY-PALLHAZE1), dark beaded
-  trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and the horizon past the world edge is a white
-  wedge (KB-BIOMES-WORLDEDGE1).
+  trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and a cloud low on the left draws white through
+  the pall (KB-SKY-PALLCLOUD1).
 
 ### Open 2026-11-27: under a smoke load the ground haze is far darker than the sky behind it (KB-SKY-PALLHAZE1, weather and sky)
 
@@ -15954,7 +16075,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 - **Repro:** `packages/scenes/test/timber-valley-still.html?view=aftermath&weather=smoke&fire=burnt&date=1910-08-22&hour=10&w=960&h=540`
   (film quality, 60 frames): wavy strings of dark soft blobs fill the upper left, near the camera. Not seen at
-  `quality=preview` with 30 frames. Cause not traced.
+  `quality=preview` with 30 frames.
+- **Looked at:** after the scene's `settle(86400)` for `fire: 'burnt'`, all 12 smoke columns still carried 2 to 66 MW,
+  so the fire had not burned out in a day and the "burned" valley still burns; the columns sit 700 m and more from
+  the camera. Which effect draws the strings is not traced.
 
 ### Fixed 2026-11-27: SnapshotRendering's stats lost a recording dropped before the next frame (KB-CULL-SNAPSTATS1, culling)
 
@@ -29589,6 +29713,9 @@ humanoid rig); the runner has nothing of its own left on the list.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
 - **Rechecked 2026-11-12 (hunt K1, origin/main 25a036b46):** `scripts/support/readme-run-known.json` holds one entry, not 101:
   `ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55` ("Unknown animator clip GetUpFromBack"), which waits with physics.
+- **Every package run 2026-11-27, one package at a time:** the READMEs of all other packages passed every example
+  (2,176 of 2,176 in 106 packages). 22 of those packages first stopped at the 20 s example watchdog or the browser
+  close limit on a machine at 99 to 100 % CPU, and passed whole on one rerun on 30c26e36a9 after the load dropped.
 - **Rechecked 2026-11-27:** `npm run check:readme-run -- --packages=xr,headless,ragdoll` ran 44 of 45 examples; the one
   failure is the one listed entry, now `ragdoll/readme-getting-up-margoengine-ragdoll-g-d62a73` (the same missing
   get-up clips), none failed off the list and 2 were skipped for hardware. The older counts below are history.

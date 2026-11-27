@@ -13817,6 +13817,9 @@ humanoid rig); the runner has nothing of its own left on the list.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
 - **Rechecked 2026-11-12 (hunt K1, origin/main 25a036b46):** `scripts/support/readme-run-known.json` holds one entry, not 101:
   `ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55` ("Unknown animator clip GetUpFromBack"), which waits with physics.
+- **Every package run 2026-11-27, one package at a time:** the READMEs of all other packages passed every example
+  (2,176 of 2,176 in 106 packages). 22 of those packages first stopped at the 20 s example watchdog or the browser
+  close limit on a machine at 99 to 100 % CPU, and passed whole on one rerun on 30c26e36a9 after the load dropped.
 - **Rechecked 2026-11-27:** `npm run check:readme-run -- --packages=xr,headless,ragdoll` ran 44 of 45 examples; the one
   failure is the one listed entry, now `ragdoll/readme-getting-up-margoengine-ragdoll-g-d62a73` (the same missing
   get-up clips), none failed off the list and 2 were skipped for hardware. The older counts below are history.
