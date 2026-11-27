@@ -1456,7 +1456,18 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   horizontal-rate error at 0.15 m from 0.009739 to 0.00009570 m⁻¹. This is under one fifth of the
   fourth-order error at 0.075 m with one quarter of its horizontal cells. The aperture test checks
   reciprocal flux, zero flow at every closed face, volume balance, sponge work and exact replay.
-  These controls isolate horizontal error. They do not establish convergence of the original shot.
+  On the 22.63 m source-to-quay mode probe, the isolated horizontal phase error falls from 0.05762
+  rad to 0.000186 rad. At 29 vertical layers the vertical error is still 0.405 rad. The separate
+  fourth-order temporal error is 0.00255 rad. Run the mode probe with `--phase-only` to reproduce
+  these isolated dispersion comparisons. The original shot still requires convergence of its depth
+  response and diffraction.
+
+  The Galerkin assembly now reuses the fine-cell labels and stores coarse edges in bounded pages.
+  This removes two dense integer buffers, about 420 MiB at 55 million fine cells, and the separate
+  full-size copies of coarse edges. `coupling/loads-quay-hierarchy-memory.test.js` checks original edge
+  order, protected zero edges, identical projected fields and replay. On the separate regional grids
+  at 0.15 m and 0.075 m, the lower opening retained nonzero flux and the 0.001 m³ load balanced
+  within 4×10⁻¹⁷ m³. This reduces setup memory. The full-trajectory solve cost remains open.
 
   The opt-in fourth-order time step in `coupling/loads-finite-quay.test.js` checks held pressure, the single
   volume kick, the finite-domain absorber and failure before publication. The free-hull regression transfers
@@ -1513,8 +1524,16 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   nonzero surface rows and 35,463,839 nonzero point rows with zero source rejections. The largest direct
   volume residual was 1.66×10⁻¹⁰ m³, and relative work residual stayed below 3.48×10⁻¹¹. The independent
   volume observer still failed at ticks 2965–2969, with a peak absolute defect of 5.33×10⁻⁸ m³ on this
-  older build. The corrected projection has separate mask and basin regressions. The full trajectory
-  still needs a corrected, spatially converged run.
+  older build.
+
+  The strict corrected baseline on `6119b80d6d` ran the same 4 m grid and prescribed trajectory from
+  frame zero through tick 4006. All 240,458,111 nonzero source rows were accepted. The direct source
+  volume residual stayed below 3.42×10⁻¹³ m³, and free-surface-plus-sponge volume closed within
+  1.35×10⁻¹² m³, including all five previously failing ticks. The relative work residual was below
+  3.47×10⁻¹¹. Both original shutter pairs were captured, all saved frame hashes verified and the
+  4005→4006 snapshot replay matched exactly. The two shutter height pairs differ from the pre-fix
+  run by at most 5.23×10⁻¹³ m. The 4 m grid establishes the mass, work and replay baseline.
+  Fine spatial convergence and the original-shot acceptance remain open.
 
   The 4 m full-history diagnostic used the same archived shutters and quay structure as the 8 m run,
   and both renderers sampled the accepted wave heights within 1.54×10⁻⁶ m. Wall peaks rose to 0.332 m

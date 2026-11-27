@@ -164,37 +164,42 @@ function live(dx, depths, temporalOrder = 2, horizontalOrder = 2) {
   };
 }
 
-const full = profiles[1].faces;
-const clip = full.slice(0, full.findIndex((value) => value >= 1.6) + 1);
-const fullLive = live(0.075, full);
-const clipLive = live(0.075, clip);
-const fourthLive = live(0.075, clip, 4);
-const lowBandK = increasingRoot(0, carrier, (k) => gravity * continuous(k), (0.9 * angularFrequency) ** 2);
-const minimumDepth = clip.at(-1);
-console.log(
-  JSON.stringify(
-    {
-      reference: { emit, velocity, receive, distance, carrier, angularFrequency, travelTime },
-      productionMode: [
-        live(0.15, profiles[0].faces),
-        live(0.075, profiles[0].faces),
-        live(0.15, profiles[1].faces, 4, 4),
-        live(0.15, profiles[1].faces, 4, 8),
-      ],
-      phase: profiles.map(({ name, faces }) => ({
-        name,
-        cases: [2, 4, 8].flatMap((order) => [0.15, 0.075, 0.05, 0.035].map((dx) => phase(dx, faces, order))),
-      })),
-      narrowBand: {
-        minimumDepth,
-        lowBandK,
-        dispersionBound: 2 * Math.exp(-2 * lowBandK * minimumDepth),
-        fullLive,
-        clipLive,
-        fourthLive,
+const phaseCases = profiles.map(({ name, faces }) => ({
+  name,
+  cases: [2, 4, 8].flatMap((order) => [0.15, 0.075, 0.05, 0.035].map((dx) => phase(dx, faces, order))),
+}));
+const reference = { emit, velocity, receive, distance, carrier, angularFrequency, travelTime };
+if (process.argv.includes('--phase-only')) {
+  console.log(JSON.stringify({ reference, phase: phaseCases }, null, 2));
+} else {
+  const full = profiles[1].faces;
+  const clip = full.slice(0, full.findIndex((value) => value >= 1.6) + 1);
+  const fullLive = live(0.075, full);
+  const clipLive = live(0.075, clip);
+  const fourthLive = live(0.075, clip, 4);
+  const lowBandK = increasingRoot(0, carrier, (k) => gravity * continuous(k), (0.9 * angularFrequency) ** 2);
+  const minimumDepth = clip.at(-1);
+  console.log(
+    JSON.stringify(
+      {
+        reference,
+        productionMode: [
+          live(0.15, profiles[0].faces),
+          live(0.075, profiles[0].faces),
+          live(0.15, profiles[1].faces, 4, 4),
+        ],
+        phase: phaseCases,
+        narrowBand: {
+          minimumDepth,
+          lowBandK,
+          dispersionBound: 2 * Math.exp(-2 * lowBandK * minimumDepth),
+          fullLive,
+          clipLive,
+          fourthLive,
+        },
       },
-    },
-    null,
-    2,
-  ),
-);
+      null,
+      2,
+    ),
+  );
+}

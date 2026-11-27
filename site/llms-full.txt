@@ -15417,18 +15417,18 @@ carry zero normal flow. Adjacent wet cells exchange a shared conductance times t
 The base and outside faces are closed. The optional perimeter sponge damps elevation and books the absorbed
 energy and signed volume. Size its width and run a domain comparison before treating it as an open sea.
 
-`horizontalOrder: 4` uses a wider horizontal stencil along open faces and stores one additional f64
-coefficient per layer. The default uses the two-point flux. The wider stencil reduces open-water phase
-error without changing the vertical approximation or resolving sharp corners beyond the given geometry.
-Its fourth-order accuracy applies to the uniform horizontal interior. Test vertical and temporal
-dispersion independently.
+`horizontalOrder: 4` and `8` use wider horizontal stencils along open faces and each stores one
+additional f64 coefficient per layer. The default uses the two-point flux. The wider stencils reduce
+open-water phase error on the fixed grid. The eighth-order option reads up to four neighbours
+per side and axis. The stated orders apply to the uniform horizontal interior.
+The vertical grid, time step and sharp-corner geometry have their own accuracy bounds.
 
 The default 60 Hz midpoint solves a Robin surface condition with preconditioned conjugate gradients.
 `temporalOrder: 4` composes three signed midpoint solves per tick for a better phase in the conservative
 wave evolution under held pressure. The source kick and forward sponge remain outside the stages. The
 option adds one f64 per surface cell in scratch and reuses the source buffers to publish the full step
 atomically. It retains pressure as the full-tick potential difference. The optional loads entry measures
-62,520 B gzip. Grids with
+62,956 B gzip. Grids with
 at least 2,048 volume cells can use a Galerkin coarse correction. The aggregates follow connected faces in
 each horizontal layer. Protected curtain faces remain distinct on both sides so their lower openings keep
 the original sum of conductances. Smaller grids use the same block-column solve directly.

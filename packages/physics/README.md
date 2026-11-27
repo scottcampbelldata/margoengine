@@ -5685,7 +5685,7 @@ for (let z = 2; z < 6; z++) openX[7 + z * cells[0]] = 0;
 const wake = new FiniteQuayWake();
 const world = new PhysicsWorld({rate: {num: 60, den: 1}});
 world.add(wake, {
-  cells, cellSize: 0.25, depths: [0, 0.25, 0.8], openX, horizontalOrder: 4, temporalOrder: 4,
+  cells, cellSize: 0.25, depths: [0, 0.25, 0.8], openX, horizontalOrder: 8, temporalOrder: 4,
   initial: (x, z) => [0.04 * Math.exp(-((x - 1) ** 2 + (z - 1) ** 2) / 0.3), 0],
 });
 world.advance(120);

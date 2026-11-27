@@ -18036,7 +18036,7 @@ The dimensionless uniform-grid symbol of the nearest-face horizontal graph is
 `s = 4 sin²(k dx / 2)`. The expansion of `4 asin²(sqrt(s)/2)` gives
 `s + s²/12 + s³/90 + s⁴/560` through degree four. This agrees with the
 centred stencil from Bengt Fornberg (1988), *Generation of Finite Difference
-Formulas on Arbitrarily Spaced Grids*, Table 1. See also Wim A. Mulder (2024), *Temporal dispersion correction
+Formulas on Arbitrarily Spaced Grids*, Table 1. See also W. A. Mulder (2024), *Temporal dispersion correction
 for wave-propagation modelling with a series approach*, the spatial symbol
 expansion. [Fornberg](https://doi.org/10.1090/S0025-5718-1988-0935077-0) ·
 [Series expansion](https://doi.org/10.1111/1365-2478.13411)
