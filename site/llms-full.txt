@@ -15855,6 +15855,17 @@ A motor joint's six motors solve one axis at a time, each capped alone, and the 
   `drawIndexedIndirect` each.
 - Core + stage 25,099 to 25,149 B gzip (+50 B) for `Batch.draws` and `Batch.multi`; the limit is now 25,150 B.
 
+## Dual-source transmission blending (2026-11-27)
+
+- One dual-source draw replaces the tint draw and the lit draw only where transmission takes the tinted blend: the
+  beauty pass on a linear target (under Tonemap or Bloom, for example) or without native glass, with no transmission
+  hook, no OIT pass, no capture and no `renderState.blend`. Native glass on display-encoded targets is unchanged.
+- A shading hook that rewrites the lit or tint entry point, or a surface reading sample coverage (alpha to coverage),
+  keeps its two draws under 'auto'; 'dual-source' then throws MargoError `unsupported`.
+- The WebGL2 layer needs `WEBGL_blend_func_extended` for the feature; without it the device does not offer it and
+  'auto' draws twice.
+- Core + stage stayed at 25,149 B gzip: the feature is requested through `EngineOptions.features`.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -36391,8 +36402,13 @@ run (milestone M5): as fragment draws, as point draws, or on the CPU, whichever 
 Packages whose WebGPU route would be slow there take a route of their own (milestone M6, see Package routes below).
 Render shaders that write storage buffers or textures are refused with MargoError code `unsupported`: WebGL2 render
 shaders cannot write them.
-The layer maps one WGSL extension, `enable f16;` (to highp float), and offers no `subgroups` or `clip-distances`
-feature: a module that enables any other is refused with code `unsupported` naming it (`'enable subgroups;'`). Its
+The layer maps two WGSL extensions, `enable f16;` (to highp float) and `enable dual_source_blending;`, and offers no
+`subgroups` or `clip-distances` feature: a module that enables any other is refused with code `unsupported` naming it
+(`'enable subgroups;'`). Dual-source blending is offered as the `dual-source-blending` feature where the context has
+`WEBGL_blend_func_extended`: `@blend_src(1)` becomes the second output of draw buffer 0 (GLSL ES 3.00
+`layout(location = 0, index = 1)` under `GL_EXT_blend_func_extended`) and the `src1`, `one-minus-src1`, `src1-alpha`
+and `one-minus-src1-alpha` factors map to the extension's enums. Without the feature, as on WebGPU, `requestDevice`
+refuses it, and a module that enables it or a pipeline that blends with a `src1` factor is a validation error. Its
 WGSL front end still checks such modules in full, the subgroup built-in functions included, so the refusal is what
 a page sees rather than a type error.
 
@@ -36407,22 +36423,6 @@ if (!webgpu) await (await import('margoengine/webgl2-compat')).install();
 const engine = await Engine.create(canvas);
 engine.render();
 ```
-
-`install()` makes `navigator.gpu` a WebGPU-shaped GPU on WebGL2, makes `canvas.getContext('webgpu')` return its canvas
-context, defines `GPUBufferUsage` and the other flag objects where the browser lacks them, and names its classes as
-the WebGPU interfaces (`GPUBuffer`, `GPUDevice` and the rest) while installed, so `instanceof GPUBuffer` holds for its
-objects, also in a browser that defines those interfaces without an adapter. Where the browser's own
-WebGPU has an adapter it retains native WebGPU (it resolves `{ installed: false, reason: 'webgpu' }` and warns with
-a linked `MargoError` code `state`, explaining the choice) unless you pass
-`{ force: true }`, which the layer's tests use to compare both paths on one machine. It rejects with MargoError code
-`unsupported` on a browser whose WebGL2 is below the full tier, naming what is missing. `uninstall()` puts everything
-back. The root entry holds only the probe below and `install()`: the device, the GLSL back end and the WGSL front end
-load inside `install()`.
-
-Installer diagnostics keep the error code, help link and every missing capability
-name concise enough to fit the existing entry size ceilings. A full-tier probe
-checks capabilities; package parity failures remain tracked in
-[known bugs](../../docs/known-bugs.md#open-full-layer-validation-transferred-to-parity-batch-273).
 
 [README continues: https://margoengine.com/llms/packages/webgl2-compat.md]
 

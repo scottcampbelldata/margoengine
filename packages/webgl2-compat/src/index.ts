@@ -50,6 +50,7 @@ export const COMPAT_EXTENSIONS = [
   'WEBGL_compressed_texture_etc',
   'WEBGL_compressed_texture_astc',
   'EXT_disjoint_timer_query_webgl2',
+  'WEBGL_blend_func_extended',
 ] as const;
 
 /** One of {@link COMPAT_EXTENSIONS}. */

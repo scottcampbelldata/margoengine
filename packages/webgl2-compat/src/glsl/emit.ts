@@ -493,6 +493,8 @@ export class StageEmitter {
   private baseInstance = false;
   /** True once a derivative-made value is pinned into `_dk` (fragment stage only). */
   private pinned = false;
+  /** True once an output carries @blend_src: the source then enables EXT_blend_func_extended. */
+  private dualSource = false;
 
   constructor(
     protected readonly module: IRModule,
@@ -507,7 +509,8 @@ export class StageEmitter {
 
   run(): GLSLStage {
     for (const e of this.module.enables)
-      if (e !== 'f16') throw unsupported(`'enable ${e};' (only f16 is mapped, to highp float)`);
+      if (e !== 'f16' && e !== 'dual_source_blending')
+        throw unsupported(`'enable ${e};' (only f16, to highp float, and dual_source_blending are mapped)`);
     const main = this.instance(this.entry.function, new Map());
     while (this.pending.length) this.emitFunction(this.pending.shift() as FnInstance);
     const io = this.mainFunction(main);
@@ -517,6 +520,8 @@ export class StageEmitter {
     );
     const source = [
       '#version 300 es',
+      // @blend_src(1) is draw buffer 0's second output, index 1 (EXT_blend_func_extended, behind WEBGL_blend_func_extended).
+      ...(this.dualSource ? ['#extension GL_EXT_blend_func_extended : require'] : []),
       ...precision,
       ...this.types,
       ...io.declarations,
@@ -2633,10 +2638,16 @@ export class StageEmitter {
         sets.push(v.interpolation === 'linear' ? `_v${loc} = ${code} * _pos.w;` : `_v${loc} = ${code};`);
         return;
       }
-      if (io.blendSrc !== undefined) throw unsupported('dual-source blending (@blend_src)');
-      declarations.push(`layout(location = ${loc}) out ${this.type(t)} _o${loc};`);
+      // @blend_src(n) at location 0: GLSL ES 3.00 index n of draw buffer 0 (EXT_blend_func_extended); index 1 is no
+      // draw buffer of its own.
+      const second = io.blendSrc === 1;
+      if (io.blendSrc !== undefined) this.dualSource = true;
+      const name = second ? `_o${loc}s` : `_o${loc}`;
+      declarations.push(
+        `layout(location = ${loc}${io.blendSrc !== undefined ? `, index = ${io.blendSrc}` : ''}) out ${this.type(t)} ${name};`,
+      );
       const kind = locationType(t);
-      outputs.push({ location: loc, ...kind });
+      if (!second) outputs.push({ location: loc, ...kind });
       // A float output goes through a select on a value known only at run time, the output itself for every rasterized
       // fragment (its w is 1 / clip w, above 0): ANGLE D3D11 on the Radeon 680M folds a last add or multiply written
       // straight to a 16-bit float or 8-bit UNORM output into the export and stores the step below at a few texels, where
@@ -2644,10 +2655,10 @@ export class StageEmitter {
       // Its other operand is the derivative pin when the stage has one (see `pin`), for an integer output too.
       sets.push(
         this.pinned
-          ? `_o${loc} = gl_FragCoord.w > 0.0 ? ${code} : ${this.pinAs(t)};`
+          ? `${name} = gl_FragCoord.w > 0.0 ? ${code} : ${this.pinAs(t)};`
           : kind.kind === 'float'
-            ? `_o${loc} = gl_FragCoord.w > 0.0 ? ${code} : ${this.type(t)}(0.0);`
-            : `_o${loc} = ${code};`,
+            ? `${name} = gl_FragCoord.w > 0.0 ? ${code} : ${this.type(t)}(0.0);`
+            : `${name} = ${code};`,
       );
     };
     const ret = fn.returnType;

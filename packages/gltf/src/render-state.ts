@@ -112,6 +112,8 @@ export function validateRenderState(state: PBRRenderState, format: GPUTextureFor
           'PBR renderState ' + key + '.' + operation + ' is invalid; set one of ' + operations.join(', '),
         );
   }
+  if (state.transmissionBlend !== undefined && !['auto', 'two-draw', 'dual-source'].includes(state.transmissionBlend))
+    throw new TypeError("PBR renderState transmissionBlend is invalid; set 'auto', 'two-draw' or 'dual-source'");
   if (state.alphaToCoverage !== undefined && typeof state.alphaToCoverage !== 'boolean')
     throw new TypeError('PBR renderState alphaToCoverage must be a boolean; set true or false');
   if (state.colorWrite !== undefined && typeof state.colorWrite !== 'boolean')

@@ -102,7 +102,7 @@ type BoundGroup = {
     readonly offsets: readonly number[];
 } | null;
 
-const COMPAT_EXTENSIONS: readonly ['EXT_color_buffer_float', 'EXT_color_buffer_half_float', 'EXT_float_blend', 'OES_texture_float_linear', 'EXT_clip_control', 'OES_draw_buffers_indexed', 'WEBGL_draw_instanced_base_vertex_base_instance', 'WEBGL_multi_draw', 'KHR_parallel_shader_compile', 'EXT_texture_filter_anisotropic', 'EXT_texture_norm16', 'EXT_depth_clamp', 'EXT_polygon_offset_clamp', 'WEBGL_compressed_texture_s3tc', 'WEBGL_compressed_texture_s3tc_srgb', 'EXT_texture_compression_bptc', 'EXT_texture_compression_rgtc', 'WEBGL_compressed_texture_etc', 'WEBGL_compressed_texture_astc', 'EXT_disjoint_timer_query_webgl2'];
+const COMPAT_EXTENSIONS: readonly ['EXT_color_buffer_float', 'EXT_color_buffer_half_float', 'EXT_float_blend', 'OES_texture_float_linear', 'EXT_clip_control', 'OES_draw_buffers_indexed', 'WEBGL_draw_instanced_base_vertex_base_instance', 'WEBGL_multi_draw', 'KHR_parallel_shader_compile', 'EXT_texture_filter_anisotropic', 'EXT_texture_norm16', 'EXT_depth_clamp', 'EXT_polygon_offset_clamp', 'WEBGL_compressed_texture_s3tc', 'WEBGL_compressed_texture_s3tc_srgb', 'EXT_texture_compression_bptc', 'EXT_texture_compression_rgtc', 'WEBGL_compressed_texture_etc', 'WEBGL_compressed_texture_astc', 'EXT_disjoint_timer_query_webgl2', 'WEBGL_blend_func_extended'];
 
 const COMPAT_LIMITS: readonly ['MAX_TEXTURE_SIZE', 'MAX_3D_TEXTURE_SIZE', 'MAX_ARRAY_TEXTURE_LAYERS', 'MAX_CUBE_MAP_TEXTURE_SIZE', 'MAX_RENDERBUFFER_SIZE', 'MAX_TEXTURE_IMAGE_UNITS', 'MAX_VERTEX_TEXTURE_IMAGE_UNITS', 'MAX_COMBINED_TEXTURE_IMAGE_UNITS', 'MAX_UNIFORM_BUFFER_BINDINGS', 'MAX_UNIFORM_BLOCK_SIZE', 'MAX_VERTEX_UNIFORM_BLOCKS', 'MAX_FRAGMENT_UNIFORM_BLOCKS', 'UNIFORM_BUFFER_OFFSET_ALIGNMENT', 'MAX_DRAW_BUFFERS', 'MAX_COLOR_ATTACHMENTS', 'MAX_SAMPLES', 'MAX_VERTEX_ATTRIBS', 'MAX_VARYING_COMPONENTS', 'MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS', 'MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS', 'MAX_ELEMENT_INDEX'];
 
@@ -705,6 +705,7 @@ interface Extensions {
     readonly lose: {
         loseContext(): void;
     } | null;
+    readonly blendFuncExtended: Readonly<Record<string, number>> | null;
     readonly compressed: readonly Readonly<Record<string, unknown>>[];
 }
 

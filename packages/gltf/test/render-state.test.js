@@ -530,3 +530,55 @@ test('points and lines ignore polygon bias while auxiliary replays ignore beauty
     assert.equal(draw.reference, 0);
   }
 });
+
+test('transmissionBlend: one dual-source draw where the device has the feature, two draws elsewhere', async (t) => {
+  const f = await fixture(t),
+    material = f.materials[0],
+    device = f.engine.gpu;
+  Object.assign(material, {
+    physical: [0, 0, 1, 0.75, 1, 1, 1, 1, 0, 0, 0, 0],
+    tint: [0.5, 0.5, 0.5],
+    volume: [0, 1, 1, 1],
+  });
+  const entries = () => {
+    const frame = f.frame(),
+      uniform = f.model.resources[0].uniform;
+    return frame.filter((draw) => same(draw.uniform, uniform));
+  };
+  // No feature: the tint draw, then the lit draw.
+  material.renderState = { transmissionBlend: 'auto' };
+  assert.deepEqual(
+    entries().map((draw) => draw.pipeline.fragment.entryPoint),
+    ['margoTint', 'fragment'],
+  );
+  material.renderState = { transmissionBlend: 'dual-source' };
+  assert.throws(
+    () => f.frame(),
+    (e) => e.code === 'unsupported' && /dual-source-blending/.test(e.message),
+  );
+  material.renderState = { transmissionBlend: 'sometimes' };
+  assert.throws(() => f.frame(), TypeError);
+  device.features = new Set(['core-features-and-limits', 'dual-source-blending']);
+  for (const renderState of [{ transmissionBlend: 'auto' }, { transmissionBlend: 'dual-source' }]) {
+    material.renderState = renderState;
+    const draws = entries();
+    assert.equal(draws.length, 1, JSON.stringify(renderState));
+    const fragment = draws[0].pipeline.fragment;
+    assert.equal(fragment.entryPoint, 'margoDual');
+    assert.deepEqual(fragment.targets[0].blend, {
+      color: { srcFactor: 'one', dstFactor: 'src1' },
+      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+    });
+    const code = fragment.module.code;
+    if (code !== undefined) {
+      assert.match(code, /^enable dual_source_blending;\n/);
+      assert.match(code, /@location\(0\) @blend_src\(1\) tint:vec4f/);
+      assert.doesNotMatch(code, /@fragment fn margoTint\(/);
+    }
+  }
+  material.renderState = { transmissionBlend: 'two-draw' };
+  assert.deepEqual(
+    entries().map((draw) => draw.pipeline.fragment.entryPoint),
+    ['margoTint', 'fragment'],
+  );
+});

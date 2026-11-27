@@ -1,3 +1,19 @@
+### Section 5 evidence: dual-source blending of transmission, WebGPU and the WebGL2 layer (2026-11-27)
+
+With the `dual-source-blending` feature (requested through `EngineOptions.features`, no core change) gltf/pbr draws a
+transmissive surface's tinted blend in one draw: entry `margoDual` returns the lit colour and the tint as
+`@blend_src(0)` and `@blend_src(1)` of location 0, blended as colour `one` + `src1` and alpha `one` +
+`one-minus-src-alpha` (`renderState.transmissionBlend`, materials `transmissionBlend`, default 'auto'). The WebGL2
+layer offers the feature where the context has `WEBGL_blend_func_extended`: `@blend_src(1)` is GLSL ES 3.00
+`layout(location = 0, index = 1)` under `GL_EXT_blend_func_extended`, and the four src1 factors map to the extension's
+enums; without the feature, a module that enables it or a src1 factor is a validation error, as on WebGPU. Evidence:
+`packages/materials/test/dual-source-browser.mjs` under Tonemap (rgba16float) reads the same centre texel with one
+draw as with two, for one pane and for two panes, one draw saved per pane, and the coded refusal of 'dual-source'
+without the feature, on WebGPU (RTX A6000, Edge 158) and on the WebGL2 layer (ANGLE D3D11, which has the extension);
+`packages/webgl2-compat/test/dual-source.test.js` and `packages/gltf/test/render-state.test.js` pin the translation,
+the feature, the validation and the pipeline. Missing: a WebGL2 context without the extension on real hardware (the
+refusal is checked on a stand-in context only).
+
 ### Section 5 evidence: multi-draw ranges of one merged geometry, WebGPU and the WebGL2 layer (2026-11-27)
 
 Core draws a redirected batch's `draws` indirect argument sets (20 bytes each, WebGPU drawIndexedIndirect layout) in

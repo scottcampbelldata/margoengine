@@ -130,6 +130,8 @@ export type DepthPacking = 'basic' | 'rgba';
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 /** Where a transparent material mixes with what is behind it on a display-encoded target (`Material.blendSpace`). */
 export type BlendSpace = 'display' | 'linear';
+/** How a transmissive material tints what is behind it (`Material.transmissionBlend`). */
+export type TransmissionBlend = 'auto' | 'two-draw' | 'dual-source';
 /** A live linear colour array (what gltf/pbr reads every frame) whose `set` takes any colour input, like the option. */
 type LiveColor = number[] & { set(value: ColorInput): number[] };
 /**
@@ -361,6 +363,14 @@ export interface MaterialOptions extends PhysicalOptions {
    * Linear costs a pass break and a full-target copy before each such mesh. Live.
    */
   blendSpace?: BlendSpace;
+  /**
+   * How a `transmission` material without a transmission pass tints what is behind it: 'auto' (default) draws once
+   * with dual-source blending (lit colour plus background times the tint) on a device created with
+   * `features: ['dual-source-blending']`, and in two draws (tint, then lit) elsewhere; 'two-draw' always draws twice;
+   * 'dual-source' draws once or throws MargoError `unsupported` where the device lacks the feature. A value other than
+   * 'auto' is explicit render state (the sorted beauty path). Live.
+   */
+  transmissionBlend?: TransmissionBlend;
   depthWrite?: boolean;
   depthTest?: boolean;
   colorWrite?: boolean;
@@ -499,6 +509,7 @@ const finiteFloat = (v: unknown, label: string, min = -Infinity): number => {
 interface Raster {
   blending: Blending;
   blendSpace: BlendSpace;
+  transmissionBlend: TransmissionBlend;
   depthWrite: boolean | undefined;
   depthTest: boolean;
   colorWrite: boolean;
@@ -520,6 +531,7 @@ interface Raster {
 const rasterDefaults: Raster = {
   blending: 'normal',
   blendSpace: 'display',
+  transmissionBlend: 'auto',
   depthWrite: undefined,
   depthTest: true,
   colorWrite: true,
@@ -549,6 +561,7 @@ const oneOf = (list: readonly string[], kind: string) => (v: unknown, label: str
 const rasterChecks: Record<keyof Raster, (v: never, label: string) => unknown> = {
   blending: oneOf(['normal', 'additive', 'multiply', 'none'], "'normal', 'additive', 'multiply' or 'none'"),
   blendSpace: oneOf(['display', 'linear'], "'display' or 'linear'"),
+  transmissionBlend: oneOf(['auto', 'two-draw', 'dual-source'], "'auto', 'two-draw' or 'dual-source'"),
   depthWrite: (v, label) => (v === undefined ? v : flag(v, label)),
   depthTest: flag,
   colorWrite: flag,
@@ -1828,6 +1841,13 @@ export class Material {
   set blendSpace(v: BlendSpace) {
     this.setRaster('blendSpace', v);
   }
+  /** How a transmissive material tints what is behind it (default 'auto': one dual-source draw where the device has the feature). */
+  get transmissionBlend(): TransmissionBlend {
+    return this.raster.transmissionBlend;
+  }
+  set transmissionBlend(v: TransmissionBlend) {
+    this.setRaster('transmissionBlend', v);
+  }
   get depthWrite(): boolean | undefined {
     return this.raster.depthWrite;
   }
@@ -2447,6 +2467,7 @@ export class Material {
     return (
       this.blending !== 'normal' ||
       this.blendSpace !== 'display' ||
+      this.transmissionBlend !== 'auto' ||
       this.depthWrite !== undefined ||
       !this.depthTest ||
       !this.colorWrite ||
@@ -3017,6 +3038,7 @@ function renderStateOf(m: Material): PBRRenderState | undefined {
   state = {
     blend: blends[m.blending],
     ...(m.blendSpace === 'linear' ? { blendSpace: 'linear' as const } : {}),
+    ...(m.transmissionBlend !== 'auto' ? { transmissionBlend: m.transmissionBlend } : {}),
     depthWrite: m.depthWrite,
     depthCompare: m.depthTest ? undefined : 'always',
     ...(m.colorWrite ? {} : { colorWrite: false }),

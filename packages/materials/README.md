@@ -749,6 +749,39 @@ on both the main reverse-Z renderer and forward-Z offscreen renderers; construct
 Native stencil faces follow raster winding, including mirrored transforms.
 The reference stays live per draw, resets to zero for draws without one, and reuses the pipeline.
 
+### Dual-source transmission blending
+
+A `transmission` material drawn without a transmission pass (a linear HDR target, such as one under `Tonemap` or
+`Bloom`, where native glass does not take it) tints what is behind it: the target is multiplied by the tint, then the
+lit surface adds. With WebGPU's `dual-source-blending` feature that is one draw: the fragment writes the lit colour and
+the tint as the two blend sources of location 0 (`@blend_src(0)` and `@blend_src(1)`), blended as colour `one` plus
+`src1` times what is behind. `transmissionBlend` picks the route, live:
+
+- `'auto'` (default): one draw where the engine was created with `features: ['dual-source-blending']` and the
+  adapter has it, two draws elsewhere.
+- `'two-draw'`: always the tint draw, then the lit draw.
+- `'dual-source'`: one draw, or MargoError `unsupported` naming the feature where the device lacks it.
+
+One draw halves the draw calls of each transmissive mesh and skips the rounding of the target between the two steps;
+where one mesh's triangles overlap, each layer's tint also filters the lit layers already drawn behind it. On the
+WebGL2 compatibility layer the feature comes from `WEBGL_blend_func_extended`, so contexts with that extension draw
+once too. A value other than `'auto'` is explicit render state, so the mesh takes the sorted beauty path. On
+`gltf/pbr` primitives the same choice is `renderState.transmissionBlend`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {LambertMaterial, Material, createMesh, loadTexture} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {Tonemap} from 'margoengine/tonemap';
+const engine = await Engine.create(document.querySelector('canvas')!, {features: ['dual-source-blending']});
+engine.use(new Tonemap());
+
+const pane = new Material({color: '#40c060', transmission: 0.9, roughness: 0.4});
+createMesh(engine, planeGeometry(1, 1), pane);
+console.log(engine.gpu.features.has('dual-source-blending') ? 'one draw' : 'two draws');
+pane.transmissionBlend = 'two-draw';
+```
+
 ## Lambert and Phong materials
 
 `shading: 'lambert'` is diffuse only: `base/pi * n.l` times each light's irradiance plus `base` times the hemisphere

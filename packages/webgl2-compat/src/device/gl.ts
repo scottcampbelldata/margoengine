@@ -31,6 +31,11 @@ export interface Extensions {
   readonly floatBlend: boolean;
   readonly floatLinear: boolean;
   readonly lose: { loseContext(): void } | null;
+  /**
+   * WEBGL_blend_func_extended: the second fragment output as a blend source (SRC1_COLOR_WEBGL and the other three
+   * factors), backing WebGPU's `dual-source-blending`.
+   */
+  readonly blendFuncExtended: Readonly<Record<string, number>> | null;
   /** The compressed-texture extensions the context has (their objects hold the format enums). */
   readonly compressed: readonly Readonly<Record<string, unknown>>[];
 }
@@ -51,6 +56,7 @@ export function extensions(gl: WebGL2RenderingContext): Extensions {
     floatBlend: !!get('EXT_float_blend'),
     floatLinear: !!get('OES_texture_float_linear'),
     lose: get('WEBGL_lose_context'),
+    blendFuncExtended: get('WEBGL_blend_func_extended'),
     compressed: Object.values(COMPRESSION_EXTENSIONS)
       .flat()
       .map((name) => gl.getExtension(name))

@@ -286,6 +286,8 @@ class Checker {
         out.invariant = true;
         return out;
       case 'blend_src':
+        if (!this.enables.has('dual_source_blending'))
+          throw this.fail("@blend_src needs 'enable dual_source_blending;' at the top of the module", a);
         out.blendSrc = this.attributeInt(a);
         return out;
     }

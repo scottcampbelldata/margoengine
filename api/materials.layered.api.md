@@ -239,6 +239,8 @@ class Material {
     set blending(v: Blending);
     get blendSpace(): BlendSpace;
     set blendSpace(v: BlendSpace);
+    get transmissionBlend(): TransmissionBlend;
+    set transmissionBlend(v: TransmissionBlend);
     get depthWrite(): boolean | undefined;
     set depthWrite(v: boolean | undefined);
     get depthTest(): boolean;
@@ -480,6 +482,7 @@ interface MaterialOptions extends PhysicalOptions {
     wireframe?: boolean;
     blending?: Blending;
     blendSpace?: BlendSpace;
+    transmissionBlend?: TransmissionBlend;
     depthWrite?: boolean;
     depthTest?: boolean;
     colorWrite?: boolean;
@@ -630,6 +633,8 @@ interface TranscodedTexture {
     dimension?: string;
     upload?(device: GPUDevice): GPUTexture;
 }
+
+type TransmissionBlend = 'auto' | 'two-draw' | 'dual-source';
 
 type Wrap = 'repeat' | 'clamp' | 'mirror';
 

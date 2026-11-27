@@ -1186,6 +1186,7 @@ interface PBRRenderState {
     colorWrite?: boolean;
     alphaToCoverage?: boolean;
     blendSpace?: 'display' | 'linear';
+    transmissionBlend?: 'auto' | 'two-draw' | 'dual-source';
 }
 
 interface PBRTransmission {

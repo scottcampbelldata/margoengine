@@ -4,6 +4,7 @@
 // (mapping, indirect arguments) or where WebGL forbids a binding (an index buffer is never also a vertex buffer in
 // WebGL, so a buffer with both usages has two GL buffers kept equal).
 import { checkWGSL, WGSLError } from '../wgsl.js';
+import { SourceMap } from '../wgsl/errors.js';
 import type { IRModule } from '../wgsl/ir.js';
 import { type FormatInfo, FORMATS, hasDepth } from './formats.js';
 import type { CompatDevice } from './device.js';
@@ -1366,6 +1367,13 @@ export class CompatShaderModule {
       error: Error | null = null;
     try {
       ir = checkWGSL(descriptor.code);
+      // WGSL 4.1.1: an enable names a feature the device was created with.
+      if (ir.enables.includes('dual_source_blending') && !device.features.has('dual-source-blending'))
+        throw new SourceMap(descriptor.code).error(
+          'type',
+          "'enable dual_source_blending;' needs the device feature 'dual-source-blending'; request it in requestDevice",
+          descriptor.code.indexOf('dual_source_blending'),
+        );
     } catch (e) {
       if (!(e instanceof WGSLError)) throw e;
       error = e;

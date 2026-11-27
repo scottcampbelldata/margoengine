@@ -17,8 +17,13 @@ run (milestone M5): as fragment draws, as point draws, or on the CPU, whichever 
 Packages whose WebGPU route would be slow there take a route of their own (milestone M6, see Package routes below).
 Render shaders that write storage buffers or textures are refused with MargoError code `unsupported`: WebGL2 render
 shaders cannot write them.
-The layer maps one WGSL extension, `enable f16;` (to highp float), and offers no `subgroups` or `clip-distances`
-feature: a module that enables any other is refused with code `unsupported` naming it (`'enable subgroups;'`). Its
+The layer maps two WGSL extensions, `enable f16;` (to highp float) and `enable dual_source_blending;`, and offers no
+`subgroups` or `clip-distances` feature: a module that enables any other is refused with code `unsupported` naming it
+(`'enable subgroups;'`). Dual-source blending is offered as the `dual-source-blending` feature where the context has
+`WEBGL_blend_func_extended`: `@blend_src(1)` becomes the second output of draw buffer 0 (GLSL ES 3.00
+`layout(location = 0, index = 1)` under `GL_EXT_blend_func_extended`) and the `src1`, `one-minus-src1`, `src1-alpha`
+and `one-minus-src1-alpha` factors map to the extension's enums. Without the feature, as on WebGPU, `requestDevice`
+refuses it, and a module that enables it or a pipeline that blends with a `src1` factor is a validation error. Its
 WGSL front end still checks such modules in full, the subgroup built-in functions included, so the refusal is what
 a page sees rather than a type error.
 

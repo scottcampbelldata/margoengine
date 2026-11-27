@@ -103,6 +103,7 @@ import {
   transmissiveShader,
   transparentPBR,
   transparentTintPBR,
+  dualTintShader,
   capturePBR,
   transmissionPBR,
   texturedTintPBR,
@@ -1247,6 +1248,16 @@ export interface PBRRenderState {
    * both are the same. The transparency hook (OIT) does not read this option.
    */
   blendSpace?: 'display' | 'linear';
+  /**
+   * How a transmissive surface (KHR_materials_transmission without a transmission pass) tints what is behind it on the
+   * beauty pass. 'two-draw' multiplies the target by the tint in one draw, then adds the lit surface in a second.
+   * 'dual-source' draws once: the fragment writes the lit colour and the tint as WebGPU's two blend sources (feature
+   * `dual-source-blending`, colour `one` + `src1`), so each layer of the surface filters the layers already drawn
+   * behind it, with no rounding of the target between the two steps. 'auto' (default) is 'dual-source' on a device
+   * created with that feature (`features: ['dual-source-blending']`) and 'two-draw' elsewhere. 'dual-source' on a
+   * device without it throws MargoError `unsupported`.
+   */
+  transmissionBlend?: 'auto' | 'two-draw' | 'dual-source';
 }
 export { validatePreparedGeometry };
 function preparedPrimitive(
@@ -5355,6 +5366,32 @@ export class PBRModel implements EnginePlugin {
     if (mask) code = exactAlphaShader(code);
     const coverage = !!state?.alphaToCoverage && !!mask && (c.descriptor.multisample?.count ?? 1) > 1;
     if (coverage) code = alphaCoverageShader(code);
+    // Transmission's tint and lit draws as one draw with two blend sources, where the device has the feature.
+    const transmissionBlend = state?.transmissionBlend ?? 'auto';
+    let dual =
+      transmissionBlend !== 'two-draw' &&
+      mode === 'beauty' &&
+      !through &&
+      !capture &&
+      !native &&
+      !compact &&
+      !!m.tint &&
+      state?.blend === undefined;
+    if (dual) {
+      const featured = !!c.device.features?.has('dual-source-blending'),
+        one = featured ? dualTintShader(code) : undefined;
+      if (transmissionBlend === 'dual-source' && !one)
+        throw margoError(
+          'unsupported',
+          featured
+            ? "renderState transmissionBlend 'dual-source' cannot join this surface's tint and lit draws (a shading hook replaced the transmission entry points); use 'auto' or 'two-draw'"
+            : "renderState transmissionBlend 'dual-source' needs a device with 'dual-source-blending'; create the engine with features: ['dual-source-blending'] where the adapter has it, or use 'auto'",
+        );
+      if (one) {
+        code = one;
+        entry = 'margoDual';
+      } else dual = false;
+    }
     let id = draws.codes.get(code);
     if (id === undefined) {
       if (draws.codes.size >= 256) draws.codes.clear();
@@ -5367,6 +5404,7 @@ export class PBRModel implements EnginePlugin {
       linearMark =
         through && !transmission && !linearHdr(c.format) && !!this.transparency!.linearLayers && linearBlends(m),
       tinted =
+        !dual &&
         !native &&
         transmit &&
         (mode === 'beauty' || mode === 'ambient' || (kind === 3 && !compact && !this.transparency!.depthWrite)) &&
@@ -5465,9 +5503,13 @@ export class PBRModel implements EnginePlugin {
                           ? (state.blend ?? undefined)
                           : blend && mode !== 'gbuffer' && !native
                             ? {
-                                color: transmit
-                                  ? { srcFactor: 'one', dstFactor: 'one' }
-                                  : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                                // One draw: lit colour plus what is behind times the tint (the second source).
+                                color: dual
+                                  ? // 'src1' (dual-source-blending) is past the GPUBlendFactor this package types against.
+                                    { srcFactor: 'one', dstFactor: 'src1' as unknown as GPUBlendFactor }
+                                  : transmit
+                                    ? { srcFactor: 'one', dstFactor: 'one' }
+                                    : { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
                                 alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
                               }
                             : undefined,

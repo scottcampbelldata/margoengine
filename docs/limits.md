@@ -11134,3 +11134,14 @@ A motor joint's six motors solve one axis at a time, each capped alone, and the 
   path is checked with a shim of the call; elsewhere, and always inside a snapshot's render bundle, the ranges draw one
   `drawIndexedIndirect` each.
 - Core + stage 25,099 to 25,149 B gzip (+50 B) for `Batch.draws` and `Batch.multi`; the limit is now 25,150 B.
+
+## Dual-source transmission blending (2026-11-27)
+
+- One dual-source draw replaces the tint draw and the lit draw only where transmission takes the tinted blend: the
+  beauty pass on a linear target (under Tonemap or Bloom, for example) or without native glass, with no transmission
+  hook, no OIT pass, no capture and no `renderState.blend`. Native glass on display-encoded targets is unchanged.
+- A shading hook that rewrites the lit or tint entry point, or a surface reading sample coverage (alpha to coverage),
+  keeps its two draws under 'auto'; 'dual-source' then throws MargoError `unsupported`.
+- The WebGL2 layer needs `WEBGL_blend_func_extended` for the feature; without it the device does not offer it and
+  'auto' draws twice.
+- Core + stage stayed at 25,149 B gzip: the feature is requested through `EngineOptions.features`.

@@ -320,6 +320,38 @@ export function transparentPBR(code: string, declarations: string): string {
   cache.set(code, out);
   return out;
 }
+const dualHead = '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {',
+  dualTintHead = /@fragment fn margoTint\(i:Out(,@builtin\(front_facing\) front:bool)?\)->@location\(0\) vec4f \{/g,
+  dualTints = new Map<string, string | null>();
+/**
+ * `code` (the beauty shader of a transmissive surface, tint variants applied) with one entry `margoDual` returning the
+ * lit colour and the transmission tint as the two blend sources of location 0 (WGSL `enable dual_source_blending;`,
+ * `@blend_src(0|1)`; WebGPU feature `dual-source-blending`). With colour factors `one` and `src1` one draw gives the
+ * lit colour plus what is behind times the tint, the two draws of the tinted path in one (Porter and Duff 1984 "over"
+ * with a coloured transmittance; McGuire and Mara 2016, "A Phenomenological Scattering Model for Order-Independent
+ * Transparency", I3D, per-channel transmission). Undefined when either entry point is not the standard one (a shading
+ * hook rewrote it, or the surface reads sample coverage): the surface then keeps its two draws.
+ */
+export function dualTintShader(code: string): string | undefined {
+  let out = dualTints.get(code);
+  if (out === undefined) {
+    if (dualTints.size >= 64) dualTints.clear();
+    const tints = [...code.matchAll(dualTintHead)];
+    out = null;
+    if (code.split(dualHead).length === 2 && tints.length === 1) {
+      const faced = tints[0][1] !== undefined;
+      out =
+        'enable dual_source_blending;\n' +
+        code
+          .replace(dualHead, 'fn margoDualLit(i:Out,front:bool)->vec4f {')
+          .replace(dualTintHead, `fn margoDualTint(i:Out${faced ? ',front:bool' : ''})->vec4f {`) +
+        '\nstruct MargoDual {@location(0) @blend_src(0) color:vec4f,@location(0) @blend_src(1) tint:vec4f}\n' +
+        `@fragment fn margoDual(i:Out,@builtin(front_facing) front:bool)->MargoDual {return MargoDual(margoDualLit(i,front),margoDualTint(i${faced ? ',front' : ''}));}\n`;
+    }
+    dualTints.set(code, out);
+  }
+  return out ?? undefined;
+}
 /** `code` (`transparentPBR`, tint variants applied) with the transmission tint draw returning `margoTransparentTint`. */
 export function transparentTintPBR(code: string): string {
   const faced = /@fragment fn margoTint\(i:Out,@builtin\(front_facing\) front:bool\)/.test(code);

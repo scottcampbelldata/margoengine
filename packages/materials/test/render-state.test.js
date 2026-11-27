@@ -190,3 +190,42 @@ test('a linear blendSpace material gives the PBR record blendSpace linear and no
     h.cleanup();
   }
 });
+
+test('Material transmissionBlend defaults to auto, validates, and reaches the PBR render state only when set', async () => {
+  const m = new Material({ transmission: 0.8 });
+  assert.equal(m.transmissionBlend, 'auto');
+  assert.equal(m.customState, false);
+  assert.throws(
+    () => new Material({ transmissionBlend: 'dual' }),
+    /transmissionBlend is invalid; set 'auto', 'two-draw' or 'dual-source'/,
+  );
+  assert.equal(new Material({ transmissionBlend: 'dual-source' }).transmissionBlend, 'dual-source');
+  const h = optionalGPU(),
+    engine = new Engine(
+      { width: 64, height: 64 },
+      await TransformStore.create(32),
+      { backend: 'webgpu', gpu: h.engine.gpu, add() {}, remove() {}, render() {}, dispose() {} },
+      { position: [0, 0, 4], target: [0, 0, 0] },
+      null,
+    );
+  try {
+    const model = createMesh(
+      engine,
+      { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1] },
+      m,
+    );
+    assert.equal(model.primitives[0].material.renderState, undefined);
+    for (const value of ['two-draw', 'dual-source']) {
+      m.transmissionBlend = value;
+      assert.equal(m.customState, true);
+      assert.equal(model.primitives[0].material.renderState.transmissionBlend, value);
+      assert.equal(m.clone().transmissionBlend, value);
+    }
+    m.transmissionBlend = 'auto';
+    assert.equal(model.primitives[0].material.renderState, undefined);
+    model.dispose();
+  } finally {
+    engine.dispose();
+    h.cleanup();
+  }
+});

@@ -45,6 +45,11 @@ const BLEND_FACTORS: Record<string, string> = {
   'src-alpha-saturated': 'SRC_ALPHA_SATURATE',
   constant: 'CONSTANT_COLOR',
   'one-minus-constant': 'ONE_MINUS_CONSTANT_COLOR',
+  // dual-source-blending, on WEBGL_blend_func_extended's enums.
+  src1: 'SRC1_COLOR_WEBGL',
+  'one-minus-src1': 'ONE_MINUS_SRC1_COLOR_WEBGL',
+  'src1-alpha': 'SRC1_ALPHA_WEBGL',
+  'one-minus-src1-alpha': 'ONE_MINUS_SRC1_ALPHA_WEBGL',
 };
 const BLEND_OPS: Record<string, string> = {
   add: 'FUNC_ADD',
@@ -521,9 +526,19 @@ export class CompatRenderPipeline {
     this.targets = [...(descriptor.fragment?.targets ?? [])].map((t) =>
       t ? { blend: t.blend, writeMask: t.writeMask ?? 0xf } : null,
     );
+    // A src1 factor needs dual-source-blending on the device (WebGPU createRenderPipeline validation).
+    const src1 = (f: string | undefined) => !!f && f.includes('src1'),
+      dualMissing =
+        this.targets.some(
+          (t) =>
+            !!t?.blend &&
+            [t.blend.color.srcFactor, t.blend.color.dstFactor, t.blend.alpha.srcFactor, t.blend.alpha.dstFactor].some(
+              src1,
+            ),
+        ) && !device.features.has('dual-source-blending');
     this.targetGL = this.targets.map((t) => {
       const b = t?.blend,
-        e = (name: string) => device.enum(name);
+        e = (name: string) => (dualMissing && name.includes('SRC1') ? 0 : device.enum(name));
       return {
         key: b
           ? `${b.color.operation ?? 'add'},${b.color.srcFactor ?? 'one'},${b.color.dstFactor ?? 'zero'},${b.alpha.operation ?? 'add'},${b.alpha.srcFactor ?? 'one'},${b.alpha.dstFactor ?? 'zero'}`
@@ -569,6 +584,11 @@ export class CompatRenderPipeline {
       fragmentModule = descriptor.fragment?.module as unknown as CompatShaderModule | undefined;
     const explicit = descriptor.layout !== 'auto' ? (descriptor.layout as unknown as CompatPipelineLayout) : null;
     this.layouts = explicit ? [...explicit.bindGroupLayouts] : [];
+    if (dualMissing) {
+      this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: a src1 blend factor needs the device feature 'dual-source-blending'`;
+      if (!this.deferLink) device.validationError(this.failure);
+      return;
+    }
     if (!prebuilt && (vertexModule.error || fragmentModule?.error)) {
       this.failure = 'createRenderPipeline: a shader module of the pipeline failed to compile';
       if (!this.deferLink) device.validationError(this.failure);
