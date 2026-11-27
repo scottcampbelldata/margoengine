@@ -15566,17 +15566,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/animation/tests/morph-gpu.test.js` "ends on any buffer contents",
   `packages/webgl2-compat/test/corpus.test.js` "a recording drops only".
 
-### Open 2026-11-27: after a GPU reset the WebGL2 layer reports the loss as its own link failure or an incomplete framebuffer (KB-COMPAT-LOSSREPORT1, webgl2-compat)
+### Fixed 2026-11-27: after a GPU reset the WebGL2 layer reported the loss as its own link failure or an incomplete framebuffer (KB-COMPAT-LOSSREPORT1, webgl2-compat)
 
-- **Repro:** as KB-COMPAT-CORPUSFBO1: after the hanging dispatch, the next CPU-tier storage texture upload throws
+- **Repro:** as KB-COMPAT-CORPUSFBO1: after the hanging dispatch, the next CPU-tier storage texture upload threw
   "The compatibility layer's own masked::texelFetch(t, p, 0) program did not link (a bug: report it)" with an empty
-  log, or reports the validation error "The render pass attachments do not form a complete WebGL2 framebuffer (status
-  0x8cdd)", before `device.lost` resolves.
-- **Cause:** Chrome learns of the reset in the synchronous query that waited for it (`getProgramParameter`,
-  `checkFramebufferStatus`) but sets `isContextLost()` and fires `webglcontextlost` in a later task (measured: link
-  failed at 5,788 ms, `isContextLost()` false right after, the event at 5,790 ms). `CompatRenderer.helper` checks
-  `isContextLost()` before reading the link status, and `makeFramebuffer` reports any incomplete status at once, so
-  both report a loss as a layer bug or a validation error. WebGPU surfaces no errors once a device is lost.
+  log, or reported the validation error "The render pass attachments do not form a complete WebGL2 framebuffer (status
+  0x8cdd)", before `device.lost` resolved.
+- **Cause:** Chrome learns of the reset in the synchronous query that waited for it but sets `isContextLost()` and
+  queues CONTEXT_LOST_WEBGL only for a later task. Measured again with raw WebGL2 (Chrome, ANGLE Direct3D 11, RTX
+  A6000): a hanging draw, then `readPixels` returned at 5,423 ms; right after it a fresh program's LINK_STATUS was false
+  with an empty log, a fresh shader's COMPILE_STATUS false, `checkFramebufferStatus` 0x8cdd, `getError` 0 four times
+  and `isContextLost()` false. One task later `getError` gave CONTEXT_LOST_WEBGL with `isContextLost()` true, and
+  `webglcontextlost` fired 1 ms after. No synchronous signal exists, so the layer's checks at the failing call
+  (`CompatDevice.report`, `CompatRenderer.helper`) could not tell the loss from a real failure.
+- **Fix:** `CompatDevice` judges every error read from GL in a later task, in one place (`reportable`): the
+  uncaptured dispatch (already a task of its own), `popErrorScope` (resolves in order, `null` on a lost device, as
+  WebGPU) and the async pipeline rejections (`settlePipeline`). On a context lost by then the device is lost
+  (`'unknown'`) and the error dropped; on a live context it is reported as raised. The helper program that does not
+  link is an `internal` error through that path, reported once, not a synchronous throw. Every other GL status read
+  was checked: pipeline links (`LinkedProgram.finish`) and compute refusals report through the same path; the
+  adapter probes (highp int, fresh clears, inverse trig) decide only workarounds for the adapter's own new context;
+  the zeroing check in `drawsClears` only skips the zeroing; the preview renderer and `webglPicking` throw `failed` on
+  a lost context by contract. Proved on two real resets: a helper link and a render pass right after the reset (one
+  with `isContextLost()` still false) threw nothing, raised no error, both scopes resolved `null` and `device.lost`
+  resolved `'unknown'`. Regression: `packages/webgl2-compat/test/lost-report.test.js` (all four fail on the parent).
 
 ### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
 
