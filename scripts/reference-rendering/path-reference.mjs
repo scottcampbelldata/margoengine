@@ -12,8 +12,11 @@ import { killChildTreeSync } from '../support/shutdown.mjs';
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 export const benchRoot =
   process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url));
-/** Only public Mitsuba APIs; bounded CPU reference execution, independent from the browser renderer. */
-export async function capturePathReference(script, folder) {
+/**
+ * Only public Mitsuba APIs; bounded CPU reference execution, independent from the browser renderer. `minutes` is the
+ * process tree's hard deadline (default 20); the scalar decomposition references take longer.
+ */
+export async function capturePathReference(script, folder, { minutes = 20 } = {}) {
   await new Promise((resolve, reject) => {
     const child = spawn(
       process.env.MARGO_MITSUBA_PYTHON ?? join(benchRoot, 'batch-168/mitsuba-venv/Scripts/python.exe'),
@@ -22,8 +25,8 @@ export async function capturePathReference(script, folder) {
     );
     const timer = setTimeout(() => {
       killChildTreeSync(child);
-      reject(Error('Mitsuba exceeded its 20-minute process-tree deadline'));
-    }, 20 * 60_000);
+      reject(Error(`Mitsuba exceeded its ${minutes}-minute process-tree deadline`));
+    }, minutes * 60_000);
     child.once('error', (error) => {
       clearTimeout(timer);
       reject(error);

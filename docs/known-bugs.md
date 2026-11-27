@@ -19003,25 +19003,29 @@ D text, the accepted budgets, the split-model row no looser than the KB3563 reco
   exact. The entry stays here until a failing run is caught; a failure gets its frames from
   `test-results/material-wireframe`.
 
-### Open: the CUDA decomposition references are not bit-reproducible, so `--capture-decomposition` refuses a rerun
+### Fixed 2026-11-27: the CUDA decomposition references were not bit-reproducible, so `--capture-decomposition` refused a rerun (KB-REF-DECOMP-CUDA1)
 
-Repro: `node scripts/reference-rendering/environment.mjs --capture-decomposition` with the committed script: the
-display pictures match the frozen ones (0 or 1 levels in all 262,144 pixels) but the raw float32 files differ, so the
-linear SHA-256 check refuses every capture (found 2026-11-24 while re-capturing for KB6016b; it was true before).
-Cause: the references render on Mitsuba's cuda_ad_rgb variant, whose parallel accumulation order is not fixed; the
-frozen record pins raw hashes as for the deterministic scalar_rgb references. Fix to build: pin the CUDA references by
-their display hash and a raw tolerance, or render them on scalar_rgb.
-
-2026-11-27 (lane A, RTX A6000): built and measured, not landed. On scalar_rgb (each 1024-sample picture the float64
-mean of 8 chunk renders of 128 samples, seeds seed x 8 + i, a zero pdf returning before its division) two full
-captures repeat every raw hash. The KB6016b gate on the split-model row passes on absolute (446,167 <= 484,953),
-square, max, edge and flat but not `foreground >= 47776`: 47,760, native and compat. Cause of the 16: not the zero-pdf
-guard and not CUDA's run-to-run order. The two CUDA captures of 2026-11-11 (same seed) give the same foreground on every
-row (47,776; no pixel differs). Against them the scalar picture loses 59 silhouette pixels and gains 43; at every lost
-one its raw value is exactly 0 where CUDA's is about 1e-4, so none of the pixel's 1,024 samples hit the surface
-(coverage, from the `factors` term, which divides by no pdf). That is a new Monte Carlo draw of pixels covered about
-once in 1,024 samples (no hit in 1,024 has a chance near 37 percent); the other rows move by -23, -10 and +14 pixels
-the same way. Held at 47,776 for a ruling on re-deriving the figure from the new references.
+Repro (before): `node scripts/reference-rendering/environment.mjs --capture-decomposition` with the committed script:
+the display pictures matched the frozen ones (0 or 1 levels in all 262,144 pixels) but the raw float32 files differed,
+so the linear SHA-256 check refused every capture (found 2026-11-24 while re-capturing for KB6016b).
+Cause: the references rendered on Mitsuba's cuda_ad_rgb variant, which adds a pixel's samples in a parallel order that
+is not fixed. Fix: `mitsuba-environment-decompose.py` renders on scalar_rgb; each 1024-sample picture is the float64
+mean, in chunk order, of 8 renders of 128 samples (seeds seed x 8 + i) run as separate processes, and the record was
+re-captured (about 45 minutes on 32 threads). On scalar_rgb a zero pdf raised ZeroDivisionError where the CUDA variant
+had masked the infinity; both divisions now return first. Proof: two full captures (folders decomposition-1795792857933
+and decomposition-1795795719852, lane A, RTX A6000) give the same raw bytes; split-model linear SHA-256
+b5509dc6b70302f01c20c29c014dada5e6025aeffc5b1736f6c912cf58dacb0f in both, and the second was accepted against the
+record. New rows, native: 2,285,984, 1,277,788, 1,044,777 and 446,167 absolute (CUDA: 2,285,851, 1,276,741, 1,045,571
+and 447,308); the split shares move by at most 0.1 point.
+The KB6016b floor on the split-model row's foreground (the non-black union of Margo's frozen picture and the
+reference) is re-derived by the same rule from the new reference: 47,776 (CUDA capture) to 47,760, native and compat,
+on the manager's ruling. Every other bound is unchanged and passes (absolute 446,167 <= 484,953). Cause of the 16:
+not the zero-pdf guard (the split-model coverage comes from the `factors` term, which divides by no pdf) and not CUDA's
+run-to-run order (the two CUDA captures of 2026-11-11, same seed, give the same foreground on every row, no pixel
+different). Against them the scalar picture loses 59 silhouette pixels and gains 43; at every lost one its raw value is
+exactly 0 where CUDA's is about 1e-4, so none of the pixel's 1,024 samples hit the surface: a new Monte Carlo draw of
+pixels covered about once in 1,024 samples. The other rows moved by -23, -10 and +14 pixels the same way.
+Regression: tests/reference-environment.test.js (the zero-pdf test, and the record's scalar_rgb variant and rows).
 
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 

@@ -107,6 +107,30 @@ test('the decomposition references write the GGX D denominator without float32 c
   assert.doesNotMatch(script, /ggx_d\(alpha, \w+\.z\)/);
 });
 
+// KB-REF-DECOMP-CUDA1: on scalar_rgb a sample whose pdf is 0 raised ZeroDivisionError in a chunk process (the CUDA
+// variant had masked the infinity with dr.select), which ended the first 1024-spp capture. Every division by a pdf in
+// the integrator must come after the `ok` test that includes pdf > 0 and an early return when it fails.
+test('the scalar decomposition integrator returns before dividing by a zero pdf (KB-REF-DECOMP-CUDA1)', () => {
+  const script = readFileSync(
+    new URL('../scripts/reference-rendering/mitsuba-environment-decompose.py', import.meta.url),
+    'utf8',
+  );
+  assert.match(script, /^VARIANT = 'scalar_rgb'$/m);
+  const sample = /def sample\(self[\s\S]*?\nmi\.register_integrator/.exec(script)[0].split(/\r?\n/);
+  let divisions = 0;
+  for (const [i, line] of sample.entries()) {
+    if (!/\/ pdf\b/.test(line)) continue;
+    divisions++;
+    const before = sample.slice(0, i);
+    const ok = before.findLastIndex((l) => /^\s*ok = .*\(pdf > 0\)/.test(l));
+    assert.ok(ok >= 0, `no ok test with pdf > 0 before: ${line.trim()}`);
+    const guard = before.slice(ok + 1).findIndex((l) => /^\s*if not ok:/.test(l));
+    assert.ok(guard >= 0, `no early return on a failed ok test before: ${line.trim()}`);
+    assert.match(before[ok + 1 + guard + 1], /^\s*return mi\.Spectrum\(0\.0\)/);
+  }
+  assert.equal(divisions, 2, 'the gltf and split-model branches each divide by their pdf once');
+});
+
 // KB3563 accepted difference: the frozen direct residual split by difference (docs/limits.md, batch 160 job 7).
 test('IBL furnace residual decomposes into noise, visibility, BSDF model, multiple scattering and edges (KB3563)', () => {
   const b = JSON.parse(readFileSync(new URL('../docs/whitepaper/results/batch-160-environment.json', import.meta.url)));
@@ -128,12 +152,13 @@ test('IBL furnace residual decomposes into noise, visibility, BSDF model, multip
     const meta = d.references[name].meta;
     assert.equal(meta.samples, 1024);
     assert.equal(meta.triangles, 1040409);
-    assert.equal(meta.variant, 'cuda_ad_rgb');
+    assert.equal(meta.variant, 'scalar_rgb');
+    assert.equal(meta.chunks, 8);
     assert.equal(meta.visibility, i === 0);
   }
   for (const [side, absolute] of [
-    ['native', [2285851, 1276741, 1045571, 447308]],
-    ['compat', [2285792, 1276742, 1045530, 447309]],
+    ['native', [2285984, 1277788, 1044777, 446167]],
+    ['compat', [2285927, 1277789, 1044734, 446166]],
   ])
     names.forEach((name, i) => {
       assert.equal(d[side][name].absolute, absolute[i]);
@@ -143,12 +168,12 @@ test('IBL furnace residual decomposes into noise, visibility, BSDF model, multip
     rows = d.native,
     share = (x) => Math.round((1000 * x) / base) / 10;
   assert.equal(share(base - rows['principled-direct-1024'].absolute), 1.8); // 128-spp reference noise
-  assert.equal(share(rows['principled-direct-1024'].absolute - rows['principled-unoccluded-1024'].absolute), 43.4); // visibility
-  assert.equal(share(rows['principled-unoccluded-1024'].absolute - rows['gltf-unoccluded-1024'].absolute), 9.9); // BSDF model
+  assert.equal(share(rows['principled-direct-1024'].absolute - rows['principled-unoccluded-1024'].absolute), 43.3); // visibility
+  assert.equal(share(rows['principled-unoccluded-1024'].absolute - rows['gltf-unoccluded-1024'].absolute), 10); // BSDF model
   assert.equal(share(rows['gltf-unoccluded-1024'].absolute - rows['split-model-unoccluded-1024'].absolute), 25.7); // multiple scattering
-  // What is left against the model's own exact integrals: silhouettes, and 0.8 % of numerics with no bias.
-  assert.equal(share(rows['split-model-unoccluded-1024'].edge), 18.5);
-  assert.equal(share(rows['split-model-unoccluded-1024'].flat), 0.8);
+  // What is left against the model's own exact integrals: silhouettes, and 0.7 % of numerics with no bias.
+  assert.equal(share(rows['split-model-unoccluded-1024'].edge), 18.4);
+  assert.equal(share(rows['split-model-unoccluded-1024'].flat), 0.7);
   assert.ok(Math.abs(rows['split-model-unoccluded-1024'].flatSigned) < rows['split-model-unoccluded-1024'].flat / 5);
   // KB6016b gates on this row: no budget looser than the KB3563 record of the separable table (2026-11-11).
   for (const [side, before] of [
@@ -158,6 +183,9 @@ test('IBL furnace residual decomposes into noise, visibility, BSDF model, multip
     const row = d[side]['split-model-unoccluded-1024'];
     for (const [key, value] of Object.entries(before))
       assert.ok(row[key] <= value, `${side} ${key} ${row[key]} > ${value}`);
-    assert.ok(row.foreground >= 47776);
+    // The reference's own count, not a tolerance: the non-black union of Margo's frozen picture and the scalar_rgb
+    // reference (47,776 with the CUDA one; a new sample draw at silhouettes covered about once in 1,024 samples, 59
+    // pixels lost and 43 gained, KB-REF-DECOMP-CUDA1). Re-derived on the manager's ruling, 2026-11-27.
+    assert.ok(row.foreground >= 47760);
   }
 });
