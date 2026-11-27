@@ -32,6 +32,7 @@ import {
   Propeller,
   ShipSolver,
   holtropMennen,
+  iceResistance,
   huuska,
   icorels,
   ittc1957,
@@ -1160,5 +1161,56 @@ test('a rigid body held by the ship solver heels in its turn as the four-degree 
   assert.throws(
     () => new Manoeuvring({ ...M, heel: { ...M.heel, metacentricHeight: 0 } }),
     (e) => e.code === 'unsupported' && /metacentric height above 0/.test(e.message),
+  );
+});
+
+test("level ice resists a ship by Riska et al.'s regression: Hu and Zhou's printed values, and MT Uikku's basin tests within their scatter", () => {
+  // MT Uikku (L 150 m, B 21.3 m, T 9.5 m, bow 39 m, parallel midbody 65 m, stem 30 degrees) in the Aalto ice basin at 1:31.56,
+  // full-scale values (Hu and Zhou 2015, Tables 3 to 7): ice thickness, speed, measured mean and standard deviation, kN, and
+  // Riska's resistance as they print it.
+  const uikku = { length: 150, beam: 21.3, draught: 9.5, stem: 30 * DEG, bow: 39, parallel: 65 };
+  for (const [h, V, mean, spread, printed] of [
+    [0.77, 0.2, 470, 120, 610],
+    [0.76, 0.5, 560, 120, 630],
+    [0.96, 0.2, 670, 220, 800],
+    [0.95, 0.5, 720, 200, 840],
+  ]) {
+    const r = iceResistance(uikku, h, V).resistance / 1000;
+    // Within 1.5 percent of the values they print, which are rounded to 10 kN.
+    assert.ok(Math.abs(r / printed - 1) < 0.015, `${r} against Riska's ${printed} kN as printed`);
+    // The regression runs 14 to 30 percent above the basin's means, within 1.2 of their standard deviations.
+    assert.ok(r > mean && r - mean <= 1.2 * spread, `${r} against ${mean} +- ${spread} kN measured`);
+  }
+  assert.equal(iceResistance(uikku, 0, 3).resistance, 0);
+  assert.throws(
+    () => iceResistance({ ...uikku, stem: 0 }, 1, 1),
+    (e) => e.code === 'unsupported' && /stem angle/.test(e.message),
+  );
+  // Under the solver: KVLCC2's model steams from open water into ice a centimetre thick and slows to where its thrust meets
+  // the open water's resistance and the ice's; with the screw slowed below the ice's breaking part it stays stopped in it.
+  const speed = (15.5 * 0.514444) / Math.sqrt(320 / 7),
+    iceHull = { stem: 30 * DEG, bow: 1.5, parallel: 3 },
+    thickness = (x) => (x > 10 ? 0.01 : 0),
+    { body, ships, world } = plane({ iceHull }, { speed, params: { ice: { thickness } } }),
+    open = plane({ iceHull }, { speed });
+  ships.control(0).revolutions = open.ships.control(0).revolutions = ships.revolutionsFor(0, speed);
+  for (let t = 1; t <= 60 * 60; t++) {
+    world.advance(t);
+    open.world.advance(t);
+  }
+  const s = ships.status(0),
+    r = iceResistance({ length: 7, beam: 1.27, draught: 0.46, ...iceHull }, 0.01, s.u).resistance;
+  assert.ok(body.position[0] > 10 && s.u < 0.9 * open.ships.status(0).u, `${s.u} against ${open.ships.status(0).u}`);
+  assert.ok(Math.abs(s.ice / r - 1) < 1e-6, `${s.ice} against ${r}`);
+  const held = plane({ iceHull }, { params: { ice: { thickness: 0.05 } } });
+  held.ships.control(0).revolutions = 2;
+  for (let t = 1; t <= 600; t++) held.world.advance(t);
+  assert.ok(
+    Math.abs(held.body.linearVelocity[0]) < 1e-6 && held.ships.status(0).ice > 0,
+    `${held.body.linearVelocity}`,
+  );
+  assert.throws(
+    () => plane({ iceHull: { stem: 2, bow: 1, parallel: 1 } }),
+    (e) => e.code === 'unsupported' && /stem angle/.test(e.message),
   );
 });

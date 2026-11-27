@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20754672,
+  "total": 20755213,
   "history": [
     {
       "date": "2026-10-24",
@@ -14299,6 +14299,12 @@
       "commit": "c80430a84a",
       "grew": 1,
       "reason": "@margoengine/physics/hydro 18,846 to 22,061 B gzip, ceiling 19244 to 22723. The optional SEA-12 paddle and wader settlement accepts drag only after wet/dry transport, publishing the opposite impulse in the same tick. Sharing this Hydro state avoids a second transport solver and readback contract. The surface field descriptors stay in a lightweight module for surge and surf."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "c80430a84",
+      "reason": "physics/ship 21,459 ceiling to its new size: level ice by Riska et al.'s 1997 regression (iceResistance) wired into the ship solver. One feature of the ship entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15172,7 +15178,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 21459,
+    "@margoengine/physics/ship": 22000,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,

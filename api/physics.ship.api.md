@@ -124,6 +124,15 @@ export interface HoltropResistance {
     thrust: number;
 }
 
+export interface IceHull {
+    readonly length: number;
+    readonly beam: number;
+    readonly draught: number;
+    readonly stem: number;
+    readonly bow: number;
+    readonly parallel: number;
+}
+
 export const KCS_MODEL: ManoeuvringModel;
 
 export const KCS_PROPELLER: PropellerCurves;
@@ -326,6 +335,11 @@ export interface Ship {
         readonly damping?: number;
     };
     readonly roll?: 'model' | 'hull';
+    readonly iceHull?: {
+        readonly stem: number;
+        readonly bow: number;
+        readonly parallel: number;
+    };
 }
 
 export interface ShipControl {
@@ -341,6 +355,9 @@ export interface ShipParams {
     readonly depth?: number | ((x: number, z: number) => number);
     readonly walls?: readonly ShipWall[];
     readonly density?: number;
+    readonly ice?: {
+        readonly thickness: number | ((x: number, z: number) => number);
+    };
     readonly capacity?: number;
     readonly level?: RateLevel;
 }
@@ -390,6 +407,7 @@ export interface ShipStatus {
     trim: number;
     thruster: number;
     suction: number;
+    ice: number;
     bankMoment: number;
     bankInRange: boolean;
     midship: Vec3;
@@ -506,6 +524,12 @@ export function headingGains(a: readonly [number, number, number, number], b: re
 export function holtropMennen(hull: HoltropHull, speed: number, options?: HoltropOptions): HoltropResistance;
 
 export function huuska(c: SquatCase, area: number, k1?: number): number;
+
+export function iceResistance(hull: IceHull, thickness: number, speed: number): {
+    resistance: number;
+    c1: number;
+    c2: number;
+};
 
 export function icorels(c: SquatCase, cs?: number): number;
 

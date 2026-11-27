@@ -17176,6 +17176,17 @@ Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in hori
 this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
 the ship solver heels in its turn".
 
+### A ship in level ice (SEA-09, `iceResistance`, `ShipParams.ice`, 2026-11-27)
+
+`packages/physics/src/ship/ice.ts` and the ice in `packages/physics/src/ship/solver.ts`, written from J. Hu and L. Zhou,
+"Experimental and numerical study on ice resistance for icebreaking vessels", Int. J. Naval Arch. Ocean Eng. 7, 626-639,
+2015, doi:10.1515/ijnaoe-2015-0044, https://koreascience.kr/article/JAKO201530360959703.pdf (pp. 630 to 637 read: eq. 11,
+Riska et al.'s 1997 regression and its Table 1 constants, and Tables 3 to 7, MT Uikku's Aalto basin tests and the
+formulas' printed values). Riska, Wilhelmson, Englund and Leiviskä's 1997 report itself was not obtained; Lindqvist's
+1989 formula was left out because its bending term's grouping could not be settled from the texts read. No ice
+resistance code was read. Holding a stopped ship up to C1 is this package's own. Proof: `packages/physics/tests/ship.test.js`,
+"level ice resists a ship", and `packages/physics/tests/coupling/ship.test.js`, "ShipSolver with PackIceSolver".
+
 ### The Wageningen B-screw series (SEA-09, `wageningenB`, `bSeriesCurves`, 2026-11-26)
 
 `packages/physics/src/ship/bseries.ts`, written from M. W. C. Oosterveld and P. van Oossanen, "Further computer-analyzed

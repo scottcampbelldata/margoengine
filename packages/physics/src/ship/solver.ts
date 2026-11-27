@@ -38,6 +38,7 @@ import { type HeadingGains, headingGains, type ShipTrack, steerTrack, type Track
 import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mmg.js';
 import { type HoltropHull, holtropMennen } from './resistance.js';
 import { type BankLoads, bankLoads } from './bank.js';
+import { iceResistance } from './ice.js';
 import { shallowWater } from './shallow.js';
 import { raceVelocity, thrusterThrust } from './propeller.js';
 import {
@@ -156,6 +157,8 @@ export interface Ship {
    * the body, whose pressures give them.
    */
   readonly roll?: 'model' | 'hull';
+  /** Its ice-going form for level ice (`ice`): stem angle, rad, and the lengths of its bow and parallel midbody, m. */
+  readonly iceHull?: { readonly stem: number; readonly bow: number; readonly parallel: number };
 }
 
 /** A quay or a bank, as a vertical wall along the segment from `from` to `to`, [x, z] m. */
@@ -173,6 +176,11 @@ export interface ShipParams {
   readonly walls?: readonly ShipWall[];
   /** The water's density, kg/m^3 (default 1025). */
   readonly density?: number;
+  /**
+   * Level ice over the water: its thickness, m, a number or a function of (x, z) (0 open water), which each ship whose
+   * `iceHull` is given breaks with Riska et al.'s (1997) resistance (`iceResistance`) (default none).
+   */
+  readonly ice?: { readonly thickness: number | ((x: number, z: number) => number) };
   /**
    * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
    * given, it must be the same.
@@ -219,6 +227,8 @@ export interface ShipStatus {
    */
   thruster: number;
   suction: number;
+  /** Level ice's resistance on it, N (0 in open water). */
+  ice: number;
   bankMoment: number;
   bankInRange: boolean;
   /** The midship on the waterline, forward and starboard unit vectors on the ground plane. */
@@ -261,6 +271,7 @@ export class ShipSolver implements Solver<ShipParams> {
   /** The world's up, against its gravity (+Y with none). */
   private vertical: Vec3 = [0, 1, 0];
   private depth: ShipParams['depth'];
+  private ice: ShipParams['ice'];
   private walls: readonly ShipWall[] = [];
   private runtime: Runtime[] = [];
   private rudders!: Region;
@@ -321,11 +332,26 @@ export class ShipSolver implements Solver<ShipParams> {
     this.vertical = gl > 0 ? [-gv[0] / gl, -gv[1] / gl, -gv[2] / gl] : [0, 1, 0];
     this.depth = depth;
     this.walls = walls;
+    const ice = params.ice;
+    if (
+      ice !== undefined &&
+      !(typeof ice?.thickness === 'function' || (ice?.thickness >= 0 && Number.isFinite(ice.thickness)))
+    )
+      throw shipError(
+        `Level ice is {thickness}: metres, 0 or more, or a function of (x, z) (got ${String(ice?.thickness)}); pass one.`,
+      );
+    this.ice = ice;
     let top = -1;
     this.runtime = ships.map((ship) => {
       if (!(Number.isInteger(ship?.row) && ship.row >= 0))
         throw shipError(`A ship's body row is a whole number, 0 or more (got ${ship?.row}); pass the body's row.`);
       top = Math.max(top, ship.row);
+      if (ship.iceHull)
+        iceResistance(
+          { length: ship.model?.length, beam: ship.model?.beam, draught: ship.model?.draught, ...ship.iceHull },
+          0,
+          0,
+        );
       if (ship.roll !== undefined && ship.roll !== 'model' && ship.roll !== 'hull')
         throw shipError(`A ship's roll is held by 'model' or 'hull' (got ${String(ship.roll)}); pass one.`);
       if (ship.model?.heel && ship.roll !== 'hull' && !(this.g > 0))
@@ -411,6 +437,7 @@ export class ShipSolver implements Solver<ShipParams> {
           trim: 0,
           thruster: 0,
           suction: 0,
+          ice: 0,
           bankMoment: 0,
           bankInRange: true,
           midship: [0, 0, 0],
@@ -653,6 +680,19 @@ export class ShipSolver implements Solver<ShipParams> {
       const banked = this.bank(mid, f, s, u, forces.thrust, status.sinkage, M, M.propeller.diameter);
       Y += banked.Y;
       N += banked.N;
+      // Level ice (Riska et al. 1997): breaking it resists the ship going ahead; stopped, it holds the ship up to its
+      // breaking part C1.
+      let iceDrag = 0;
+      if (this.ice && ship.iceHull) {
+        const t = this.ice.thickness,
+          h = typeof t === 'function' ? t(mid[0], mid[2]) : t;
+        if (h > 0) {
+          const r = iceResistance({ length: L, beam: M.beam, draught: M.draught, ...ship.iceHull }, h, u);
+          iceDrag = u > 0 ? r.resistance : Math.max(0, Math.min(X, r.c1));
+          X -= iceDrag;
+        }
+      }
+      status.ice = iceDrag;
       const mass = inverseMass > 0 ? 1 / inverseMass : 0;
       if (mass === 0) return;
       // The added masses and their coupling: hold the body so it moves as eq. 4 says (its own mass and inertia from the port).

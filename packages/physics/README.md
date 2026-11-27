@@ -4172,6 +4172,7 @@ Each ship is `{row, model}` and takes these settings:
 - `block` and `addedMass`: `addedMass: false` leaves the surge, sway and yaw added mass to a HullSolver's strips (the ship still claims their damping).
 - `hull`: the hull's form for `holtropMennen` (`{length, beam, draughtFore, draughtAft, volume, lcb, midship, waterplane, ...}`). Given, the straight run's resistance at each speed is Holtrop and Mennen's, rising with the waves the hull makes, in place of the model's constant R'_0; `revolutionsFor` balances it.
 - `autopilot`: `{bandwidth, damping}`, the heading loop's natural frequency in units of U / L (default 1) and its damping ratio (default 0.8).
+- `iceHull`: `{stem, bow, parallel}`, the stem angle (rad) and the lengths of the bow and parallel midbody (m), so the ship breaks the solver's level ice (`ice`).
 - `roll`: for a model with `heel`, what holds the ship upright: `'model'` (default) gives the body the model's restoring moment g m GM sin(phi) and roll damping, and needs the world's gravity; `'hull'` leaves them to a HullSolver floating the body.
 
 A model with `heel` rolls as it turns, by Fukui et al.'s (2016) four-degree-of-freedom MMG model: the hull's forces gain heel terms from captive tests at fixed heel, the roll moment about the centre of gravity balances the hull's and rudder's moments against the restoring moment g m GM sin(phi) and the roll damping of the decay test, and the heeled rudder's force carries cos(phi). `heel` is `{metacentricHeight, gravityDepth, gyration, addedInertia, decay, hullDepth, rudderDepth, straightening, surge, sway, yaw, roll}`: GM and the centre of gravity's depth below the water plane are needed, the rest default (k_xx 0.4 B, J_xx 0.2 I_xx, decay coefficient 0.035, the hull's side force at half the draught, the rudder's at its centroid, no heel terms; without `roll` the hull's roll moment is its side force at `hullDepth`). `KCS_MODEL` is the KCS container ship's 2.19 m model with its heel terms at GM 0.60 m full scale. A high-GM ship such as KVLCC2 barely heels; a container ship heels out 15 to 19 degrees as it starts a hard turn and turns about 8 percent tighter for it. Under the solver, sway and yaw act in MMG's horizontal body axes, so a heeled or trimmed hull's forces stay level, and `status(i).heel` and `rollRate` read the body's roll.
@@ -4191,7 +4192,7 @@ while (kcs.time < 10) {
 console.log(Math.round((-most * 180) / Math.PI)); // 19
 ```
 
-The solver also takes `depth` (a number or a function of (x, z): for squat, and for shallow water), `walls` (quays and banks, `{from, to}`) and `density`. A wall alongside, within half a ship length of the midship along it, pushes the ship by Vantorre et al.'s (2003) regression of captive tests (`bankLoads`): toward the bank and bow away at usual depths, off it in very shallow water (below h/T about 1.2), and the propeller ahead draws the stern in; `status(i).suction` and `bankMoment` read the force and moment, and `bankInRange` whether the hull is in the regression's range. Where the water is under ten draughts deep, each ship runs on its model corrected for the depth (`shallowWater(model, depth)`): every hull derivative and the sway and yaw added masses by Ankudinov et al. (1990), the surge added mass by Li and Wu (1990), held at h / T 1.2 below that; the model is made again when the draught over depth moves by a hundredth. A ship then turns wider as the water shoals, as ships do.
+The solver also takes `depth` (a number or a function of (x, z): for squat, and for shallow water), `walls` (quays and banks, `{from, to}`), `density` and `ice: {thickness}` (level ice, m, a number or a function of (x, z), 0 for open water). A ship with an `iceHull` going ahead through level ice is held back by Riska et al.'s (1997) regression of Baltic full-scale trials (`iceResistance(hull, thickness, speed)`: a breaking part C1 and a part C2 growing with speed); stopped, the ice holds it up to C1, and `status(i).ice` reads the force. Broken floes are ICE-04's: give the same body to a `PackIceSolver` as a vessel and couple `['ship', 'pack-ice', 'rigid']`, and the ship and floes push each other. A wall alongside, within half a ship length of the midship along it, pushes the ship by Vantorre et al.'s (2003) regression of captive tests (`bankLoads`): toward the bank and bow away at usual depths, off it in very shallow water (below h/T about 1.2), and the propeller ahead draws the stern in; `status(i).suction` and `bankMoment` read the force and moment, and `bankInRange` whether the hull is in the regression's range. Where the water is under ten draughts deep, each ship runs on its model corrected for the depth (`shallowWater(model, depth)`): every hull derivative and the sway and yaw added masses by Ankudinov et al. (1990), the surge added mass by Li and Wu (1990), held at h / T 1.2 below that; the model is made again when the draught over depth moves by a hundredth. A ship then turns wider as the water shoals, as ships do.
 
 Steer with `control(i)`:
 - `revolutions`, rev/s, negative astern; `revolutionsFor(i, speed)` gives the self-propulsion revolutions;
@@ -4236,6 +4237,14 @@ The parts work on their own too:
 - `wageningenB({blades, area, pitch, reynolds}, J)`: a Wageningen B-series propeller's K_T and K_Q by Oosterveld and van Oossanen's (1975) polynomials, with their Reynolds correction; `bSeriesCurves(propeller)` fits MMG's quadratic curves to them from bollard pull to zero thrust, for a model's `propeller.curves`.
 - `holtropMennen(hull, speed)`: Holtrop and Mennen's resistance with the wake fraction, thrust deduction and eta_R; `ittc1957(Re)` is the friction line.
 - `squat`, `icorels` and `huuska`, `rudderLiftSlope` (Fujii) and `thrusterThrust`.
+
+```ts
+import {iceResistance} from 'margoengine/physics/ship';
+
+// MT Uikku (150 m) at 0.5 m/s through 0.76 m of level ice: about 640 kN (the Aalto basin measured 560 kN, +-120).
+const uikku = {length: 150, beam: 21.3, draught: 9.5, stem: (30 * Math.PI) / 180, bow: 39, parallel: 65};
+console.log(Math.round(iceResistance(uikku, 0.76, 0.5).resistance / 1000)); // 639
+```
 
 ```ts
 import {Physics} from 'margoengine/physics';
