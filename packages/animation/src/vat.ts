@@ -353,8 +353,8 @@ let serial = 0;
  * Draws any number of copies of baked VAT data in one instanced call: each instance has its own matrix, clip, time
  * offset, speed and atlas region, and the CPU does no per-instance work per frame (instance data uploads only when
  * changed). Opaque; the GPU clips off-screen instances (no CPU culling). `shadows.add(crowd)` casts the posed crowd
- * into `@margoengine/shadows` and shadows it; `lighting.add(crowd)` lights it with an EnvironmentLighting (IBL).
- * No SSAO or clustered lights.
+ * into `@margoengine/shadows` and shadows it; `lighting.add(crowd)` lights it with an EnvironmentLighting (IBL);
+ * `lights.add(crowd)` lights it with `@margoengine/clustered` point, spot and area lights. No SSAO.
  */
 export class VATCrowd implements EnginePlugin {
   readonly name = 'vat:' + serial++;
