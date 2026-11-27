@@ -1259,7 +1259,12 @@ map into the sun's units, so a clear sky gives its measured share of the light o
 RTX A6000, WebGPU and the WebGL2 layer alike, with the sun 60 degrees up at turbidity 2, the sky gives 0.18 of the light
 on a level grey plate under Preetham (clear skies measure 0.1 to 0.2, Erbs, Klein and Duffie 1982) and 0.064 under
 Bruneton, whose air at that turbidity is nearly free of aerosol (Rayleigh air alone gives about 0.05, Bird and Hulstrom
-1981), and the share holds within 0.01 from intensity 1 to 3 (`test/sky-light-units-check.mjs`). The `ambient` floor is
+1981), and the share holds within 0.01 from intensity 1 to 3 (`test/sky-light-units-check.mjs`). `await sky.irradiance(normal?, { signal? })`
+(default normal straight up) reads back the light the shader took in the last frame: irradiance over pi in the engine
+light's units, linear RGB, from the nine harmonics and never below the floor, or undefined while the sky lights
+nothing. Against the sun's beam (intensity x colour x cos / pi) it predicts the plate's share within 0.003 in that test
+(0.1752 against 0.1764 and 0.0641 against 0.0615, WebGPU and the WebGL2 layer); the shot tool records it for the look
+checks' T6 limits. The `ambient` floor is
 in engine units and is not scaled; the sky's `exposure` brightens the scene's sky light as it brightens the backdrop.
 With `environment: true` the map follows the engine sun's own intensity, whatever set it.
 

@@ -541,6 +541,32 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
       return pack(Object.fromEntries(names.map((name) => [name, read[name]])), png);
     },
     /**
+     * The light the engine shaded a kept frame with, for the look checks' T6 limits (@margoengine/headless/look
+     * `lightBounds`): the sun as core holds it (direction toward the light, intensity, linear colour) and the diffuse
+     * light on level ground, irradiance over pi in the same units: the sky's own (`irradiance()` of a scene plugin that
+     * has one, @margoengine/sky) where it lights the scene, else core's `lighting.ambient` x `radiance[3]`.
+     */
+    async light(engine) {
+      const e = get(engine),
+        l = e?.scene?.lighting;
+      if (!l) return null;
+      let ambient = null;
+      for (const plugin of e.scene.plugins?.values?.() ?? [])
+        if (plugin && typeof plugin.irradiance === 'function') {
+          ambient = (await plugin.irradiance([0, 1, 0])) ?? null;
+          if (ambient) break;
+        }
+      return {
+        sun: {
+          direction: Array.from(l.direction.subarray(0, 3)),
+          intensity: l.direction[3],
+          colour: Array.from(l.radiance.subarray(0, 3)),
+        },
+        ambient: ambient ? Array.from(ambient) : Array.from(l.ambient, (c) => c * l.radiance[3]),
+        ambientSource: ambient ? 'sky' : 'lighting.ambient',
+      };
+    },
+    /**
      * Switches on the coverage record of the engine's sky (`@margoengine/sky`'s `coverage` option), a plugin with a
      * `coverageTexture`, before a frame; true when the engine has such a sky. The record changes no pixel of the frame.
      */

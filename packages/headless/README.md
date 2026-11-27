@@ -682,8 +682,8 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `motionBlur` | T8: % of edge centres of pixels moving over 8 pixels a frame whose edge is narrower than half their travel | 5 | `moving` |
 | `silhouette` | T5: % of the subject's outline with 15 L* or more against what is behind | [80, 100] | the `subject` mask |
 | `silhouetteShape` | T5: % of the subject (at 320 x 180, three L* values) in one value | [70, 100] | the `subject` mask |
-| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (`GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] | the `lit` and `shadow` masks |
-| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun, over the masks' interiors as `bounce` | [3, 100] | the `lit` and `shadow` masks |
+| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (`GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks |
+| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun, over the masks' interiors as `bounce` | [3, 100] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks |
 | `nightLuma`, `nightPeak` | T7: mean luma, and the luma of the brightest 1%, of a night frame | [24, 255], [180, 255] | the frame; run only when a shot names them |
 
 | Export | What it does |
@@ -697,6 +697,31 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `stairs`, `colourEdges`, `chromaSmear`, `penumbra`, `penumbraPlants`, `shimmerMoving`, `motionBlur`, `silhouette`, `silhouetteShape`, `bounce`, `shadowTint`, `nightLuma`, `nightPeak`, `reprojectionMotion(depth, viewProjection, nextViewProjection, width, height)`, `depthFromDistance(distance, eye, viewProjection, width, height, { water, plane, far })` (NDC depth from each pixel's distance to the eye, for `reprojectionMotion`; pixels with no distance meet the sea plane where `water` is 128 or more, or are `far` away), `detailKeptFloor(family)` (T7: 0.5, and 0.6 for `animatedFeature`, as `LOOK_FAMILY_DETAIL_KEPT`) | The clean-frame checks (below), each alone with its `bound`; `reprojectionMotion` gives the motion of every pixel of a still world seen by a moving camera. |
 | `LOOK_FAMILY_BOUNDS`, `LOOK_FAMILY_NAMES`, `familyBounds(name)` | The look families and their bounds. |
 | `luma(frame)`, `lookBound(bound)`, `LOOK_CHECKS` | BT.709 luma on 0 to 255, a bound as `[low, high]`, and each check's default bound, unit and meaning. |
+
+**T6 limits that follow the light** (KB-LOOK-TV-PALL1, 2026-11-26). A probe may carry the light its frame was shaded
+with, `light: { sun: { direction, intensity, colour }, ambient }` (the shot tool records it on every probe: the sun as
+core holds it, `direction` toward the light, and the diffuse light on level ground, irradiance over pi in the same
+units: `Sky.irradiance()` where a sky lights the scene, else `lighting.ambient` x `radiance[3]`). `lightBounds(light,
+base?)` gives its diffuse fraction d, the sky's luminance over the sky's plus the sun's beam on level ground (intensity x
+colour x cos / pi), and the T6 limits for it. A shadow loses the beam and keeps the sky it sees and the light bounced
+into it, both in proportion to the diffuse light, so up to `CLEAR_SUN_DIFFUSE` (0.3336: `erbsDiffuseFraction(0.65)`,
+Erbs, Klein and Duffie 1982, at the clearness index above which a sky is clear, Fakra et al. 2011) the limits stay 10 to
+35 percent and 3 b*; above it `bounce` is the base x d / 0.3336 (at most 100) and the `shadowTint` floor the base x
+(1 - d) / (1 - 0.3336). `checkProbe` uses them in place of the family's or default limits; a bound the shot names wins.
+Each T6 row records `detail.diffuse`. The timber-valley rail line (2026-11-26): calm, d 0.340 and 0.400 (its sun is 29.5
+degrees up under a cloud deck), limits 10.2 to 35.6 and 12.0 to 42.0 percent, read 17.6 and 28.9; blowup under its smoke
+pall, d 0.943 and 0.942, limits 28.3 to 99.0 and 28.2 to 98.8 percent and tint floors 0.25 and 0.26 b*, read 93.4 and
+91.3 percent and 0.33 and 0.68 b*: all pass. The same pall frame under a clear sun still fails both, and sunlit-looking
+20 percent shadows under the pall fail.
+
+```js
+import { lightBounds } from '@margoengine/headless/look';
+const { diffuse, bounce, shadowTint } = lightBounds({
+  sun: { direction: [0.87, 0.49, 0], intensity: 0.249, colour: [1, 0.3, 0.04] },
+  ambient: [0.33, 0.29, 0.27],
+});
+console.log(diffuse.toFixed(2), bounce.map(Math.round), shadowTint[0].toFixed(2)); // 0.95 [ 28, 99 ] 0.24
+```
 
 **Clean frames and look families.** The clean-frame checks are the look bar of the animated-feature film (T1 to T8, private roadmap section 3): no grain, banding, stairs or shimmer, shapes that read, bounce light in the shadows, colour that survives YouTube's 4:2:0 H.264 and motion that is blurred. `checkProbe(probe, bounds, { family: 'animatedFeature' })` (or `lookFamily: "animatedFeature"` in a shot file) holds every check the probe can run to the family's bound: grain 0.5 codes, penumbra 0.7, penumbraPlants 1, speckle 5 ppm, banding 0.2%, stairs 1%, still shimmer 0.1% and flicker 0.3, `shimmerMoving` 0.5%, crush 0.1%, the reference FLIP 0.04, plus the ranges above. A check whose input the probe lacks is left out under a family (a shot that names it in `lookBounds` still fails it as missing); a mask that marks no pixel counts as lacking, so a frame with no subject or no shaded ground runs no `silhouette` or `bounce`, and a shot's own `lookBounds` win by name. `natural` keeps every default. `stairs` and `colourEdges` read the frame alone. A step was once judged against the climb along its own row, which misread an antialiased edge near a pixel axis (one pixel of coverage 0.1 per row is a tenth of the climb on one side and nine tenths on the other): a 16 sample per pixel render of the storm-light shot read 15% `stairs`. They now look for a value between the plateaus around the step; on that shot msaa 1 reads 5.70% over the whole frame (5.98% on the crop in `tests/fixtures/look-real`, against 30.6% by the old test), msaa 4 at supersample 1, 1.5 and 2 read 0.10, 0.00 and 0.01%, and the 16 sample reference 0.00%. The flood draft shots (msaa 1, supersample 1) read 2.7 to 22.7%, which is real aliasing: they are not rendered at the film setting.
 

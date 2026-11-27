@@ -21,6 +21,8 @@ export interface BounceOptions {
     bound?: LookBound;
 }
 
+export const CLEAR_SUN_DIFFUSE: number;
+
 export interface CheckProbeOptions {
     pitch?: number;
     pixelsPerDegree?: number;
@@ -118,6 +120,12 @@ export const LOOK_FAMILY_DETAIL_KEPT: Readonly<Record<string, number>>;
 
 export const LOOK_FAMILY_NAMES: readonly string[];
 
+export interface LightBounds {
+    diffuse: number;
+    bounce: [number, number];
+    shadowTint: [number, number];
+}
+
 export interface LightDisc {
     x: number;
     y: number;
@@ -138,6 +146,15 @@ export type LookBound = number | readonly [number, number];
 export type LookCheckName = 'skyClip' | 'grain' | 'speckle' | 'banding' | 'flat' | 'blocks' | 'horizonSeam' | 'waterSeam' | 'lights' | 'foamEdges' | 'crush' | 'flicker' | 'shimmer' | 'nan' | 'backends' | 'reference' | 'penumbra' | 'penumbraPlants' | 'stairs' | 'colourEdges' | 'chromaSmear' | 'shimmerMoving' | 'motionBlur' | 'silhouette' | 'silhouetteShape' | 'bounce' | 'shadowTint' | 'nightLuma' | 'nightPeak';
 
 export type LookImage = HeadlessPixels;
+
+export interface LookLight {
+    sun: {
+        direction: readonly number[];
+        intensity: number;
+        colour: readonly number[];
+    };
+    ambient: readonly number[];
+}
 
 export interface LookMask {
     width: number;
@@ -161,6 +178,7 @@ export interface LookProbe {
     viewProjection?: ArrayLike<number>;
     still?: LookImage[];
     moving?: MovingFrames;
+    light?: LookLight;
 }
 
 export interface LookReport {
@@ -237,6 +255,7 @@ export interface ShotManifestProbe {
         motion: string;
     };
     lookBounds?: Record<string, LookBound>;
+    light?: LookLight;
 }
 
 export interface SilhouetteOptions {
@@ -291,6 +310,8 @@ export function difference(frame: LookImage, other: LookImage, check: 'reference
     map?: Float32Array;
 };
 
+export function erbsDiffuseFraction(kt: number): number;
+
 export function familyBounds(family: string): Record<string, LookBound>;
 
 export function flat(frame: LookImage, { mask, radius, bound }?: FlatOptions): LookResult;
@@ -306,6 +327,11 @@ export function grain(frame: LookImage, { mask, bound }?: RegionOptions): LookRe
 export function horizonLine(viewProjection: ArrayLike<number>, width: number, height: number): Float32Array;
 
 export function horizonSeam(frame: LookImage, { viewProjection, sky, bound }: HorizonSeamOptions): LookResult;
+
+export function lightBounds(light: LookLight, base?: {
+    bounce?: LookBound;
+    shadowTint?: LookBound;
+}): LightBounds;
 
 export function lights(frame: LookImage, options?: LightsOptions): LookResult & {
     discs: LightDisc[];

@@ -1241,6 +1241,8 @@ export interface LookProbe {
   still?: LookImage[];
   /** The frame after this one and each pixel's motion to it, for `shimmerMoving` and `motionBlur`. */
   moving?: MovingFrames;
+  /** The light the frame was shaded with: `bounce` and `shadowTint` take their limits from it ({@link lightBounds}). */
+  light?: LookLight;
 }
 
 /** Options of {@link checkProbe}. */
@@ -1340,8 +1342,18 @@ export function checkProbe(
     silhouetteShape(frame, { subject: masks.subject, bound: b('silhouetteShape') }),
   );
   const ground = masks.lit && masks.shadow ? (marked('lit') ?? marked('shadow')) : 'the lit and shadow masks';
-  run('bounce', ground, () => bounce(frame, { lit: masks.lit, shadow: masks.shadow, bound: b('bounce') }));
-  run('shadowTint', ground, () => shadowTint(frame, { lit: masks.lit, shadow: masks.shadow, bound: b('shadowTint') }));
+  // T6 follows the light (KB-LOOK-TV-PALL1): with the probe's light, the family's or default limits move as the lights
+  // predict (unchanged under a clear sun); a bound the shot names itself still wins.
+  const followed = (name: 'bounce' | 'shadowTint'): LookBound | undefined =>
+    bounds[name] ?? (probe.light ? lightBounds(probe.light, { [name]: fam[name] })[name] : fam[name]);
+  const noted = (row: LookResult): LookResult =>
+    probe.light ? { ...row, detail: { ...row.detail, diffuse: lightBounds(probe.light).diffuse } } : row;
+  run('bounce', ground, () =>
+    noted(bounce(frame, { lit: masks.lit, shadow: masks.shadow, bound: followed('bounce') })),
+  );
+  run('shadowTint', ground, () =>
+    noted(shadowTint(frame, { lit: masks.lit, shadow: masks.shadow, bound: followed('shadowTint') })),
+  );
   // A night shot names these (a daylight frame is not a failed night): no family runs them.
   if ('nightLuma' in bounds) rows.push(nightLuma(frame, { bound: bounds.nightLuma }));
   if ('nightPeak' in bounds) rows.push(nightPeak(frame, { bound: bounds.nightPeak }));
@@ -1617,6 +1629,8 @@ export interface ShotManifestProbe {
    * probe only (for example a lights bound for the probes that face the lamps).
    */
   lookBounds?: Record<string, LookBound>;
+  /** The light the frame was shaded with (the shot tool records it), for the T6 limits ({@link lightBounds}). */
+  light?: LookLight;
 }
 
 /** What {@link checkShot} reads. */
@@ -1690,6 +1704,7 @@ export async function checkShot({
       viewProjection: entry.viewProjection,
       still: entry.still ? await Promise.all(entry.still.map(png)) : undefined,
       moving: entry.moving ? await movingFrames(entry.moving, frame, read, png) : undefined,
+      light: entry.light,
     };
     const own = entry.lookBounds ? { ...bounds, ...entry.lookBounds } : bounds;
     checked.push({ name, frame, results: checkProbe(probe, own, { pitch, pixelsPerDegree, family }) });
@@ -2493,6 +2508,88 @@ export function shadowTint(frame: LookImage, { lit, shadow, bound }: BounceOptio
       missing: 'lit and shadowed ground pixels',
     };
   return result('shadowTint', l.b - s.b, bound, { lit: l.n, shadow: s.n });
+}
+
+/**
+ * The light a frame was shaded with, as the shot tool records it from the engine: the sun as core holds it and the
+ * diffuse light on level ground. Both are in the engine light's units, so level ground of albedo a takes
+ * a x `intensity` x `colour` x max(`direction`[1], 0) / pi from the sun and a x `ambient` from the sky.
+ */
+export interface LookLight {
+  /** The sun (or moon): `direction` toward it, unit; `intensity`; `colour`, linear RGB. */
+  sun: { direction: readonly number[]; intensity: number; colour: readonly number[] };
+  /** The diffuse light on level ground: irradiance over pi, linear RGB (the sky's harmonics, or core's ambient). */
+  ambient: readonly number[];
+}
+
+/**
+ * Erbs, Klein and Duffie's diffuse fraction of global horizontal light for an hourly clearness index `kt` ("Estimation
+ * of the diffuse radiation fraction for hourly, daily and monthly-average global radiation", Solar Energy 28(4),
+ * 293-302, 1982, https://doi.org/10.1016/0038-092X(82)90302-4).
+ */
+export function erbsDiffuseFraction(kt: number): number {
+  if (!Number.isFinite(kt) || kt < 0)
+    throw rangeError('erbsDiffuseFraction needs a clearness index of 0 or more', 'headless');
+  if (kt <= 0.22) return 1 - 0.09 * kt;
+  if (kt <= 0.8) return 0.9511 - 0.1604 * kt + 4.388 * kt ** 2 - 16.638 * kt ** 3 + 12.336 * kt ** 4;
+  return 0.165;
+}
+
+/**
+ * The diffuse fraction up to which a sun counts as clear, where T6 keeps its sunlit limits (10 to 35 percent, 3 b*):
+ * {@link erbsDiffuseFraction} at the clearness index 0.65 above which a sky is clear (0 to 0.3 overcast, 0.3 to 0.65
+ * intermediate: A. H. Fakra, H. Boyer, F. Miranville, D. Bigot, "A simple evaluation of global and diffuse luminous
+ * efficacy for all sky conditions in tropical and humid climate", Renewable Energy 36(1), 298-306, 2011,
+ * https://arxiv.org/abs/1212.5259), 0.3336.
+ */
+export const CLEAR_SUN_DIFFUSE = erbsDiffuseFraction(0.65);
+
+/** What {@link lightBounds} gives: the T6 limits for a light and the diffuse fraction they follow. */
+export interface LightBounds {
+  /** The share of level ground's light that is diffuse, 0 to 1: ambient luminance over ambient plus the sun's. */
+  diffuse: number;
+  bounce: [number, number];
+  shadowTint: [number, number];
+}
+
+const lightLuminance = (c: readonly number[]) => 0.2126729 * c[0] + 0.7151522 * c[1] + 0.072175 * c[2];
+
+/**
+ * The T6 limits that follow a frame's own light (KB-LOOK-TV-PALL1). Level ground in the open takes the sun's beam and
+ * the sky's diffuse light; a cast shadow loses the beam and keeps the sky it still sees plus the light bounced into it,
+ * both in proportion to the diffuse light. So the share a shadow holds scales with the diffuse fraction d of the lit
+ * ground's light, and the cooling it shows with the beam's share 1 - d. Up to {@link CLEAR_SUN_DIFFUSE} (a clear sun)
+ * the limits are `base` unchanged; above it `bounce` is base x d / CLEAR_SUN_DIFFUSE (the high end at most 100) and the
+ * low end of `shadowTint` base x (1 - d) / (1 - CLEAR_SUN_DIFFUSE). A smoke pall or an overcast sky, nearly all diffuse
+ * light, so asks for shadows near the lit ground and little tint, as measured under one (Garcia et al., Atmos. Meas.
+ * Tech. 19, 3151-3167, 2026, https://doi.org/10.5194/amt-19-3151-2026), and never for crushed shadows.
+ * `base` defaults to the checks' defaults (10 to 35 percent, 3 to 100 b*).
+ */
+export function lightBounds(light: LookLight, base: { bounce?: LookBound; shadowTint?: LookBound } = {}): LightBounds {
+  const sun = light?.sun,
+    vec = (v: unknown, n: number): v is number[] =>
+      Array.isArray(v) && v.length >= n && v.slice(0, n).every((x) => Number.isFinite(x));
+  if (!sun || !vec(sun.direction, 3) || !Number.isFinite(sun.intensity) || sun.intensity < 0 || !vec(sun.colour, 3))
+    throw rangeError(
+      'lightBounds needs light.sun with a direction, an intensity of 0 or more and a colour',
+      'headless',
+    );
+  if (!vec(light.ambient, 3) || light.ambient.some((c) => c < 0) || sun.colour.some((c) => c < 0))
+    throw rangeError('lightBounds needs a light.ambient and sun colour of three non-negative numbers', 'headless');
+  const length = Math.hypot(sun.direction[0], sun.direction[1], sun.direction[2]) || 1,
+    beam = (sun.intensity * lightLuminance(sun.colour) * Math.max(sun.direction[1] / length, 0)) / Math.PI,
+    sky = lightLuminance(light.ambient),
+    diffuse = sky + beam > 0 ? sky / (sky + beam) : 1,
+    [bLow, bHigh] = base.bounce === undefined ? LOOK_CHECKS.bounce.bound : lookBound(base.bounce),
+    [tLow, tHigh] = base.shadowTint === undefined ? LOOK_CHECKS.shadowTint.bound : lookBound(base.shadowTint);
+  if (diffuse <= CLEAR_SUN_DIFFUSE) return { diffuse, bounce: [bLow, bHigh], shadowTint: [tLow, tHigh] };
+  const up = diffuse / CLEAR_SUN_DIFFUSE,
+    cool = (1 - diffuse) / (1 - CLEAR_SUN_DIFFUSE);
+  return {
+    diffuse,
+    bounce: [Math.min(100, bLow * up), Math.min(100, bHigh * up)],
+    shadowTint: [tLow * cool, tHigh],
+  };
 }
 
 /** T7 at night: the mean luma of the frame, in codes (at least 24, a night that still reads on a phone). */

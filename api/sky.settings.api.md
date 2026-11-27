@@ -265,6 +265,9 @@ class Sky implements EnginePlugin {
     };
     constructor(options?: SkyOptions, features?: SkyFeatures);
     add(target: SkyLightingTarget): () => void;
+    irradiance(normal?: readonly [number, number, number], { signal }?: {
+        signal?: AbortSignal;
+    }): Promise<[number, number, number] | undefined>;
     pbr(group: number): {
         readonly declarations: string;
         readonly ambient: string;

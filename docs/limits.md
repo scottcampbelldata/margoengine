@@ -8745,6 +8745,17 @@ interior pixels (5 percent relative standard error), and report the check as mis
 a frame whose plants are all in the penumbra, or that holds plants of very different detail in and out of it, cannot
 be judged by it.
 
+## T6 limits that follow the light (headless/look `lightBounds`, KB-LOOK-TV-PALL1, 2026-11-26)
+
+`bounce` and `shadowTint` keep 10 to 35 percent and 3 to 100 b* for a probe whose light is a clear sun (diffuse fraction
+d at most `CLEAR_SUN_DIFFUSE`, 0.3336) and for a probe with no recorded `light`; above it `bounce` is the base x d /
+0.3336, at most 100, and the `shadowTint` floor the base x (1 - d) / (1 - 0.3336). By method: d is taken on level
+ground (the sun's beam at its elevation against the sky's irradiance straight up), not at each pixel's normal, and the
+model is linear in d with one anchor, so it holds a shadow's sky view and bounce in fixed proportion; local lights and
+a `HemisphereLight` are not in d. `Sky.irradiance()` reads back 160 bytes from the GPU per call. `headless/look` measures
+16,911 B min+gzip with `lightBounds` (quality budget 16,825 B raised to 17,419 B; a second entry would repeat the Lab and
+bound helpers), `@margoengine/sky/base` 11,170 B with `irradiance` (budget 11,026 B to 11,506 B).
+
 ## Horses: horses (2026-11-18)
 
 - Enforced: `withers` 1.2 to 2.1 m, `condition` 0.8 to 1.25, `speed` 0 to 25 m/s, `detail` 0, 1 or 2, `maneLength`

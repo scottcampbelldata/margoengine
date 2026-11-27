@@ -38,7 +38,7 @@ const run = async (query) => {
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
   const r = await page.evaluate(() => window.check.run(3));
   assert.deepEqual(r.errors, [], `${query}: GPU errors`);
-  return r.frames[2];
+  return Object.assign(r.frames[2], { irradiance: r.irradiance, sun: r.sun });
 };
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
@@ -51,7 +51,13 @@ try {
         both = await run(`model=${model}&elevation=60&intensity=${intensity}&light=both&albedo=${a}`),
         s = luminance(linear(sun)),
         b = luminance(linear(both)),
-        share = (b - s) / b;
+        share = (b - s) / b,
+        // Sky.irradiance() read back from the GPU predicts the plate's share: its luminance against the sun's beam on
+        // level ground (intensity x colour x cos / pi), as @margoengine/headless/look lightBounds reads a shot's light.
+        beam = (both.sun.direction[3] * luminance(both.sun.colour) * Math.max(both.sun.direction[1], 0)) / Math.PI,
+        sky = luminance(both.irradiance),
+        predicted = sky / (sky + beam);
+      assert.equal(sun.irradiance, undefined, 'a sky that lights nothing reads no irradiance');
       console.log(
         model,
         'intensity',
@@ -62,7 +68,14 @@ try {
         both.map((v) => v.toFixed(1)),
         'sky share',
         share.toFixed(4),
+        'predicted from Sky.irradiance()',
+        predicted.toFixed(4),
       );
+      process.env.MEASURE ||
+        assert.ok(
+          Math.abs(predicted - share) <= 0.01,
+          `${model}: Sky.irradiance() predicts ${predicted}, plate ${share}`,
+        );
       shares.push(share);
     }
     const [low, high] = model === 'preetham' ? [0.1, 0.2] : [0.04, 0.1];

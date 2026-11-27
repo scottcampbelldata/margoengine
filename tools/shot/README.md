@@ -68,6 +68,8 @@ Environment: `MARGO_SHOT_OUT` (the folder that holds the day folders), `MARGO_BR
 - `pixels.js`: the capture maths (sub-frames summed in linear light, the area filter down from the supersampled
   canvas, the blue-noise dither of the one 8-bit encode); `pixel-script.mjs` installs it in the page.
 - `look.mjs`: the look checks of the probes (P4, `@margoengine/headless/look`): `look.md`, `look.json`, `look.png`.
+  Each probe in manifest.json carries `light`, the light its frame was shaded with (driver.js `light()`: core's sun and
+  the sky's `irradiance()` on level ground, else `lighting.ambient` x `radiance[3]`), so T6 takes its limits from it.
 - `encode.mjs`: the master MP4 and its checks (P3); `colour.mjs` (sRGB to CIELAB, CIEDE2000, fine detail) and
   `mp4.mjs` (box order and the `colr` box) for them.
 - `queue.mjs`: the render queue (`submit`, `run`; a runner whose code changed under it exits for a fresh one,

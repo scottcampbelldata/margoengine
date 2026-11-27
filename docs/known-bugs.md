@@ -128,7 +128,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   their edges": 9-pixel shadow strips under a 5 x 5 blur read 31.6 percent before the fix against 23.6 sharp, and the
   same 23.6 after it.
 
-### Open 2026-11-26: under the blowup's smoke pall the rail-line ground's shadows hold 73 to 87 percent of the lit ground and are 1 to 2 b* cooler (KB-LOOK-TV-PALL1, weather, look bar; needs a maintainer decision)
+### Fixed 2026-11-26: under the blowup's smoke pall the rail-line ground's shadows hold 73 to 87 percent of the lit ground and are 1 to 2 b* cooler (KB-LOOK-TV-PALL1, headless/look, sky, shot tool)
 
 - **Repro:** the rail-line shot above at its default weather (blowup, 16:00), after KB-LOOK-TV-BOUNCE1: bounce 72.9
   percent early and 86.8 mid (bound 10 to 35), shadowTint 1.91 and 1.04 b* (bound 3 or more).
@@ -145,6 +145,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **After KB-TERRAIN-SKYAMBIENT1 (2026-11-26):** the ground now takes the smoky sky's own light instead of the white
   floor, and the blowup reads bounce 93.4 and 91.3 percent, shadowTint 0.33 and 0.68 b*: the diffuse light under the pall
   is brighter and warmer than the floor was, as the Izana measurements describe. Still the same decision; no bound moved.
+- **Decision (Scott, 2026-11-26, "Limits that follow the light"):** the T6 limits are derived per shot from its own
+  lights; the sunlit 10 to 35 percent and 3 b* stay the clear-sun case, never loosened beyond what the lights predict.
+- **Fix:** the T6 limits held every shot to sunlit ground because the look checks saw only frames and masks, not the
+  light. `@margoengine/sky` gains `Sky.irradiance(normal?)`, the light its shader took, read back from the GPU; the shot
+  tool records each probe's `light` (core's sun and that irradiance on level ground, or `lighting.ambient` x
+  `radiance[3]` with no sky); `@margoengine/headless/look` `lightBounds` gives the diffuse fraction d and the limits:
+  unchanged up to `CLEAR_SUN_DIFFUSE` (0.3336, Erbs, Klein and Duffie 1982 at the clear-sky clearness index 0.65, Fakra et
+  al., Renewable Energy 36(1) 298-306, 2011, https://arxiv.org/abs/1212.5259), above it `bounce` x d / 0.3336 and the
+  tint floor x (1 - d) / (1 - 0.3336). Rail line: blowup d 0.943 and 0.942, limits 28.3 to 99.0 and 28.2 to 98.8
+  percent, tint floors 0.25 and 0.26 b*, read 93.4 and 91.3 percent and 0.33 and 0.68 b* (pass); calm d 0.340 and
+  0.400, limits 10.2 to 35.6 and 12.0 to 42.0 percent, read 17.6 and 28.9 (pass). Calm's light is more diffuse than a
+  clear sky's at its sun (29.5 degrees up, under the valley's cloud deck), so its limits moved by what d predicts.
+- **Regression:** `packages/headless/tests/look-clean.test.js`, "T6 limits follow the light": a clear sun keeps exactly
+  10 to 35 and 3 b*; the pall's frame passes under the pall's light and fails under a clear sun; sunlit 20 percent
+  shadows fail under the pall. `packages/sky/test/sky-light-units-check.mjs`: `Sky.irradiance()` predicts the measured
+  plate share within 0.003 on WebGPU and the WebGL2 layer.
 
 ### Fixed 2026-11-26: terrain's ambient light was a white floor, not the sky's light or `lighting.ambient` (KB-TERRAIN-SKYAMBIENT1, terrain, sky, biomes)
 

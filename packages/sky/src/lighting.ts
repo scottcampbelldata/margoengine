@@ -5,7 +5,7 @@ import type { SkyFeatures } from './base.js';
 import { MargoError } from '@margoengine/math/errors';
 import { environment, environmentLayer } from './environment.js';
 import { project } from './project.js';
-declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
+declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
 // The sky's light as the scene receives it: a 64 x 32 environment rendered each frame, three box-filtered mips for
 // rougher reflections, and nine spherical-harmonic coefficients for diffuse light.
@@ -124,6 +124,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       throw new RangeError('Invalid sky ambient colors; give both ambient.day and ambient.night.');
   },
   create(d, code, entries, owned) {
+    // The buffer is a copy source for Sky.irradiance(), which reads its first ten rows back.
     // Rows 9 and 10 of the light buffer: the ambient floor and the light scale; the sun's light on level ground (E / pi,
     // the sky's units) and the ground's albedo, which the projection (project.ts) reads.
     const floor = new Float32Array(8),
@@ -135,7 +136,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
     const build = () => {
       const buffer = d.createBuffer({
           size: 176,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
         }),
         map = d.createTexture({
           size: [64, 32],

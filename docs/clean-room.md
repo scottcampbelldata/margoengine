@@ -11755,6 +11755,16 @@ https://doi.org/10.1080/014311697219015. The inset of 1/360 of the shorter side 
 R. D. Garcia et al., Impact of spectral aerosol radiative forcing at the Izana observatory during the August 2023
 extreme wildfires, Atmos. Meas. Tech. 19, 3151-3167 (2026), https://doi.org/10.5194/amt-19-3151-2026.
 
+
+T6 limits that follow the light (`lightBounds`, KB-LOOK-TV-PALL1, 2026-11-26), from the papers' text only: the hourly
+diffuse fraction against the clearness index, D. G. Erbs, S. A. Klein and J. A. Duffie, "Estimation of the diffuse
+radiation fraction for hourly, daily and monthly-average global radiation", Solar Energy 28(4), 293-302 (1982),
+https://doi.org/10.1016/0038-092X(82)90302-4 (`erbsDiffuseFraction`); the clear-sky class above a clearness index of
+0.65, A. H. Fakra, H. Boyer, F. Miranville and D. Bigot, "A simple evaluation of global and diffuse luminous efficacy for
+all sky conditions in tropical and humid climate", Renewable Energy 36(1), 298-306 (2011), https://arxiv.org/abs/1212.5259;
+light under a dense smoke pall, R. D. Garcia et al., Atmos. Meas. Tech. 19, 3151-3167 (2026),
+https://doi.org/10.5194/amt-19-3151-2026. `Sky.irradiance()` evaluates the sky's own nine harmonics as its shader does
+(Ramamoorthi and Hanrahan, SIGGRAPH 2001).
 ## Gunfire: vfx/gunfire (2026-11-18)
 
 Written from the papers and books below, read as text; no other engine's or project's code was read.

@@ -27,6 +27,9 @@ import {
   penumbra,
   penumbraPlants,
   reprojectionMotion,
+  CLEAR_SUN_DIFFUSE,
+  erbsDiffuseFraction,
+  lightBounds,
   shadowTint,
   shimmerMoving,
   silhouette,
@@ -454,6 +457,73 @@ test('T6 bounce and shadowTint read the ground masks inside their edges, where t
     none = bounce(blurred, { lit, shadow: thin });
   assert.equal(none.pass, false);
   assert.match(none.missing, /lit and shadowed ground/);
+});
+
+test('T6 limits follow the light: a clear sun keeps 10 to 35 percent and 3 b*, a pall moves them, wrong bounce fails', () => {
+  // KB-LOOK-TV-PALL1. Lights as the shot tool records them (sun toward the light; ambient is irradiance over pi on
+  // level ground). Clear: the calm rail-line sun (3.21 at 29.5 degrees up) over a clear sky's diffuse share; pall: the
+  // blowup's red sun (0.249, [1, 0.30, 0.04]) under the smoky sky's light, measured 2026-11-26.
+  const up = Math.sin((29.5 * Math.PI) / 180),
+    dir = [Math.cos((29.5 * Math.PI) / 180), up, 0],
+    clear = { sun: { direction: dir, intensity: 3.21, colour: [1, 0.86, 0.72] }, ambient: [0.06, 0.08, 0.12] },
+    flatClear = { sun: clear.sun, ambient: [0.1, 0.1, 0.1] },
+    pall = { sun: { direction: dir, intensity: 0.249, colour: [1, 0.3, 0.04] }, ambient: [0.3266, 0.286, 0.2735] },
+    overcast = { sun: { direction: dir, intensity: 0.4, colour: [1, 1, 1] }, ambient: [0.5, 0.52, 0.55] };
+  assert.ok(Math.abs(erbsDiffuseFraction(0.65) - 0.3336) < 5e-4 && CLEAR_SUN_DIFFUSE === erbsDiffuseFraction(0.65));
+  assert.equal(erbsDiffuseFraction(0.9), 0.165);
+  for (const light of [clear, flatClear]) {
+    const b = lightBounds(light);
+    assert.ok(b.diffuse <= CLEAR_SUN_DIFFUSE, `clear diffuse ${b.diffuse}`);
+    assert.deepEqual(b.bounce, [10, 35]);
+    assert.deepEqual(b.shadowTint, [3, 100]);
+  }
+  const p = lightBounds(pall),
+    o = lightBounds(overcast);
+  assert.ok(p.diffuse > 0.9 && o.diffuse > 0.7, `${p.diffuse} ${o.diffuse}`);
+  // Never looser than the sunlit limits at the low end: diffuse light asks for brighter shadows, never darker.
+  for (const b of [p, o]) assert.ok(b.bounce[0] > 10 && b.bounce[1] > 35 && b.bounce[1] <= 100, `${b.bounce}`);
+  assert.ok(p.shadowTint[0] < 0.5 && p.shadowTint[0] > 0, `${p.shadowTint}`);
+  // A family's own limits move the same way, and a light needs real numbers.
+  assert.deepEqual(lightBounds(clear, { bounce: [12, 30] }).bounce, [12, 30]);
+  assert.throws(
+    () => lightBounds({ sun: { direction: [0, 1], intensity: 1, colour: [1, 1, 1] }, ambient: [0, 0, 0] }),
+    RangeError,
+  );
+
+  // Ground frames: lit ground at 200, shadows on the left at the luminance share asked for, cooler by `cool` in blue.
+  const size = 128,
+    lit = mask(size, size, (x) => x >= 64),
+    shadow = mask(size, size, (x) => x < 64),
+    ground = (share, cool = 0) => {
+      const code = (v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)),
+        linear = 0.578;
+      return image(size, size, (x) => {
+        if (x >= 64) return [200, 200, 200];
+        const v = code(linear * share);
+        return [Math.max(0, v - cool), v, Math.min(255, v + cool)];
+      });
+    },
+    probe = (name, frame, light) => ({ name, frame, masks: { lit, shadow }, light }),
+    row = (rows, check) => rows.find((r) => r.check === check),
+    family = { family: 'animatedFeature' };
+  // The pall's frame as measured (shadows 92 percent of the lit ground, barely tinted) passes under its own light ...
+  const pallFrame = ground(0.92, 1),
+    underPall = checkProbe(probe('pall', pallFrame, pall), {}, family);
+  assert.ok(row(underPall, 'bounce').pass, JSON.stringify(row(underPall, 'bounce')));
+  assert.ok(row(underPall, 'shadowTint').pass, JSON.stringify(row(underPall, 'shadowTint')));
+  assert.ok(Math.abs(row(underPall, 'bounce').detail.diffuse - p.diffuse) < 1e-9);
+  // ... and fails as a clear-sun frame: flat bounce under a clear sun is still wrong (the flat-ambient failure).
+  const flat = checkProbe(probe('flat', pallFrame, clear), {}, family);
+  assert.equal(row(flat, 'bounce').pass, false);
+  assert.equal(row(flat, 'shadowTint').pass, false);
+  assert.deepEqual(row(flat, 'bounce').bound, [10, 35]);
+  // The wrong bounce for a pall: sunlit-looking 20 percent shadows under nearly all diffuse light fail.
+  const sunlit = checkProbe(probe('sunlit', ground(0.2, 8), pall), {}, family);
+  assert.equal(row(sunlit, 'bounce').pass, false, JSON.stringify(row(sunlit, 'bounce')));
+  // The same sunlit frame under a clear sun passes, as before.
+  assert.ok(row(checkProbe(probe('ok', ground(0.2, 8), clear), {}, family), 'bounce').pass);
+  // A bound the shot names wins over the light's.
+  assert.deepEqual(row(checkProbe(probe('named', pallFrame, pall), { bounce: [10, 35] }), 'bounce').bound, [10, 35]);
 });
 
 test('T7 night: a night that reads on a phone has a mean luma of 24 and lights over 180', () => {

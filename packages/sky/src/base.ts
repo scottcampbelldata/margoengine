@@ -34,7 +34,8 @@ import { displayShader } from '../../shared/display.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 export { sunlight } from './atmosphere.js';
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
+declare const GPUMapMode: { READ: number };
 declare const GPUTextureUsage: {
   STORAGE_BINDING: number;
   TEXTURE_BINDING: number;
@@ -756,6 +757,52 @@ export class Sky implements EnginePlugin {
       this.targets.set(target, release);
     }
     return release;
+  }
+  /**
+   * The sky's diffuse light on a surface facing `normal` (a unit vector, default straight up: level ground), as the
+   * scene's shader took it in the last drawn frame: irradiance over pi in the engine light's units, linear RGB, from
+   * the nine harmonics and never below the ambient floor (`lighting.ambient`). Lit by it, a surface of albedo a sends
+   * a x this toward the eye, as the sun's beam gives a x intensity x colour x cos / pi. Resolves undefined while the
+   * sky lights nothing (no `lighting.ambient` or `environment`) or before its first ambient frame.
+   * @example
+   * const level = await sky.irradiance(); // [r, g, b] on level ground, or undefined
+   */
+  async irradiance(
+    normal: readonly [number, number, number] = [0, 1, 0],
+    { signal }: { signal?: AbortSignal } = {},
+  ): Promise<[number, number, number] | undefined> {
+    if (!Array.isArray(normal) || normal.length !== 3 || normal.some((v) => !Number.isFinite(v)))
+      throw new RangeError('Sky irradiance needs a normal of three finite numbers');
+    const length = Math.hypot(...normal);
+    if (!(length > 0)) throw new RangeError('Sky irradiance needs a normal of nonzero length');
+    signal?.throwIfAborted();
+    // The ten rows skyIrradiance reads (nine harmonics, then the floor and the light scale), binding 8 of the sky's
+    // light, copied after every submitted pass so the numbers are the ones the scene was shaded with.
+    const entry = this.ambient() ? this.lit?.bindings().find((b) => b.binding === 8) : undefined,
+      source = (entry?.resource as GPUBufferBinding | undefined)?.buffer,
+      d = this.engine?.gpu;
+    if (!source || !d) return undefined;
+    const copy = d.createBuffer({ size: 160, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+      encoder = d.createCommandEncoder();
+    let rows: Float32Array;
+    try {
+      encoder.copyBufferToBuffer(source, 0, copy, 0, 160);
+      d.queue.submit([encoder.finish()]);
+      await copy.mapAsync(GPUMapMode.READ);
+      rows = new Float32Array(copy.getMappedRange().slice(0));
+    } finally {
+      copy.destroy();
+    }
+    signal?.throwIfAborted();
+    const [x, y, z] = normal.map((v) => v / length),
+      basis = [1, y, z, x, x * y, y * z, 3 * z * z - 1, x * z, x * x - y * y],
+      out: [number, number, number] = [0, 0, 0];
+    for (let c = 0; c < 3; c++) {
+      let sum = 0;
+      for (let k = 0; k < 9; k++) sum += rows[k * 4 + c] * basis[k];
+      out[c] = Math.max(sum * rows[39], rows[36 + c]);
+    }
+    return out;
   }
   /** Native PBR hook for optional surface renderers; undefined until this sky's ambient resources are ready. */
   pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined {

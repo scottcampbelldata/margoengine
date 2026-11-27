@@ -28,6 +28,8 @@ const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[na
 // only, the same commands and uploads in every trace.
 // The same six recorded again with KB-SKY-HOLES-KH1 (2026-11-26): the cloud sheet's optical depth goes as its depth to
 // the 5/3 and the element's own depth shades its sunlight; WGSL text only, the same commands in every trace.
+// afterlight and meadow recorded again with KB-LOOK-TV-PALL1 (2026-11-26): the light buffer is also a copy source, for
+// Sky.irradiance(); its usage flags only, the same commands, WGSL and uploads in every trace.
 test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);

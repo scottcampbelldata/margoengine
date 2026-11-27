@@ -18,7 +18,7 @@ device.lost.then(i=>errors.push('lost: '+i.message));
 const options=sunlitSky({elevation:degrees(elevation),azimuth:degrees(160),intensity,skyAmbient:light==='both'});
 if(light==='both')options.lighting.ambient={day:[0,0,0],night:[0,0,0]};
 else engine.lighting.ambient.set([0,0,0]);
-Sky.attach(engine,{...options,model});
+const sky=Sky.attach(engine,{...options,model});
 engine.createMesh().setGeometry(box(8,0.1,8)).setMaterial(new PbrMaterial({color:[albedo,albedo,albedo],roughness:1,metallic:0}));
 async function frame(){
  const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
@@ -29,6 +29,9 @@ async function frame(){
  for(let k=0;k<d.length;k+=4)for(let i=0;i<3;i++)m[i]+=d[k+i];
  return m.map(v=>v/(d.length/4));
 }
-window.check={async run(count=3){const frames=[];for(let i=0;i<count;i++)frames.push(await frame());await device.queue.onSubmittedWorkDone();return {errors,frames};}};
+// Sky.irradiance(): the light the shader took on level ground, read back, with the engine sun beside it (KB-LOOK-TV-PALL1).
+window.check={async run(count=3){const frames=[];for(let i=0;i<count;i++)frames.push(await frame());await device.queue.onSubmittedWorkDone();
+ const irradiance=await sky.irradiance(),L=engine.lighting;
+ return {errors,frames,irradiance,sun:{direction:Array.from(L.direction),colour:Array.from(L.radiance.subarray(0,3))}};}};
 window.ready=true;
 </script></body></html>

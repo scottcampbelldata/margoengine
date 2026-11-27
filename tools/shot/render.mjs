@@ -141,6 +141,7 @@ export const shotStep = async ({
   warmup,
   masks,
   viewProjection,
+  light,
   recordSky,
   skyCoverage,
 }) => {
@@ -226,6 +227,8 @@ export const shotStep = async ({
           if (matrix?.length !== 16) throw new Error(`no engine camera at ${engine} for the probe's view-projection`);
           result.viewProjection = Array.from(matrix);
         }
+        // The light the frame was shaded with, for the T6 limits that follow it (KB-LOOK-TV-PALL1).
+        if (light) result.light = await shot.light(engine);
         // The camera as drawn (heights above sea level, the ground added), for the stills' record.
         if (drawn) result.camera = { position: [...drawn.position], target: [...drawn.target], fov: drawn.fov };
       }
@@ -444,6 +447,7 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
               ? { ...masks, exact: ['depth'] }
               : masks,
         viewProjection: write && !skip && !pass && (probes.has(kept) || nextProbes.has(kept)),
+        light: write && !skip && !pass && probes.has(kept),
         skyCoverage: recordSky && !skip && !pass && probes.has(kept),
       });
       if (!result) continue;
@@ -451,6 +455,7 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
         throw new Error(`frame ${kept} is ${result.size.join(' x ')}, not ${shot.size.join(' x ')}`);
       const record = { index: kept, time: frame.time - shot.from, sha256: result.sha256 };
       if (result.viewProjection) record.viewProjection = result.viewProjection;
+      if (result.light) record.light = result.light;
       // The eye of the last sub-frame, the one the view-projection above is of.
       if (result.viewProjection && result.camera) record.eye = [...result.camera.position];
       if (result.camera) record.camera = result.camera;
@@ -589,6 +594,7 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
             }),
           ),
           viewProjection = record?.viewProjection,
+          light = record?.light,
           // The probe's own look bounds (shot.probeLookBounds), which replace the shot's for the checks they name.
           lookBounds = file.shot.probeLookBounds?.[name];
         return [
@@ -598,6 +604,7 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
             file: `probes/${name}.png`,
             ...(names.length ? { aovs } : {}),
             ...(viewProjection ? { viewProjection } : {}),
+            ...(light ? { light } : {}),
             ...(lookBounds ? { lookBounds } : {}),
           },
         ];
