@@ -1,0 +1,48 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "lantern-courier",
+    "kind": "long",
+    "seed": 8242,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 12,
+    "probes": {
+      "beat-1": 2,
+      "beat-2": 9,
+      "beat-3": 18,
+      "beat-4": 25,
+      "beat-5": 38,
+      "beat-6": 55,
+      "beat-7": 71,
+      "beat-8": 86
+    },
+    "page": {
+      "path": "examples/showcase-films/showcase-final-four.html",
+      "query": {
+        "capture": 1,
+        "film": "lantern-courier"
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "inside-concert-hall",
+    "kind": "long",
+    "seed": 88172,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 9,
+    "probes": {
+      "hook": 2,
+      "aisle": 10,
+      "seats": 19,
+      "piano": 28,
+      "balcony": 35,
+      "reflectors": 45,
+      "section": 57,
+      "services": 67,
+      "catwalk": 75,
+      "return": 81,
+      "credit": 87
+    },
+    "page": {
+      "path": "examples/showcase-films/inside-concert-hall.html",
+      "query": {
+        "capture": 1
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

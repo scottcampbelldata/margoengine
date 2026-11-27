@@ -1,0 +1,42 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 60,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "the-glass-bench",
+    "kind": "long",
+    "seed": 15431,
+    "size": [1920, 1080],
+    "fps": 24,
+    "seconds": 60,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 2,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 6,
+    "probes": {
+      "rim": 3,
+      "bench": 12,
+      "focus-before": 17,
+      "focus-after": 24,
+      "adjustment": 30,
+      "caustic": 40,
+      "polish": 49,
+      "title": 56
+    },
+    "page": {
+      "path": "examples/glass-bench/index.html",
+      "query": { "capture": 1 },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "glassBench.engine",
+      "apply": "glassBench.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

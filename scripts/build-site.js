@@ -11,6 +11,7 @@ import { readSizesInputs, sizesPage } from './build-sizes.js';
 import { writeSitePages } from './build-llms.mjs';
 import { buildGallery, buildVoxel, site } from './site-gallery.mjs';
 import { demoExampleFolders, demoPackageFolders, demoPages } from './support/site-routes.mjs';
+import { buildLiveExamples } from './build-examples.mjs';
 
 const out = resolve('site/dist');
 await rm(out, { recursive: true, force: true });
@@ -98,4 +99,5 @@ await cp('test-results/boulder-site', `${out}/demos/boulder`, { recursive: true 
 await cp('packages/creative/examples/earth/assets/ATTRIBUTION.md', `${out}/demos/earth/assets/ATTRIBUTION.md`);
 // Licence notices for the third-party code the demos bundle (Draco, Basis, Rapier); scripts/supply-chain.mjs.
 await cp('THIRD-PARTY-NOTICES.md', `${out}/THIRD-PARTY-NOTICES.md`);
+await buildLiveExamples(out);
 console.log(out);

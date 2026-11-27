@@ -1,0 +1,51 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 97,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "first-wake",
+    "kind": "long",
+    "seed": 12029,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 97,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 2,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 6,
+    "probes": {
+      "hook": 2,
+      "bridge": 15,
+      "crossing": 23,
+      "stern": 31,
+      "kelvin": 39,
+      "pilings": 47,
+      "channel": 71,
+      "under-hull": 57,
+      "bow": 79,
+      "settling": 86,
+      "title": 93,
+      "screw": 63.5
+    },
+    "page": {
+      "path": "examples/first-wake/index.html",
+      "query": {
+        "capture": 1
+      },
+      "css": "#transport,#status{display:none!important}",
+      "engine": "firstWake.engine",
+      "apply": "firstWake.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

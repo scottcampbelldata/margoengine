@@ -263,6 +263,9 @@ game guides use (`examples/assets/`, both CC0, named in its `NOTICE.md`), this R
 
 ## Demos
 
+Live films, with a thumbnail grid, a side list, search and the source of each one, are at
+[margoengine.com/examples](https://margoengine.com/examples/).
+
 [![Orrery: a brass clockwork orrery under a glass dome, rendered live by Margo Engine](site/images/orrery.jpg)](examples/orrery/README.md)
 
 [Orrery](examples/orrery/README.md): real planet positions for any date you pick, within arcminutes, checked against

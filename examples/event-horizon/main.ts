@@ -6,7 +6,6 @@ import type { Vec3 } from '@margoengine/core';
 import { Bloom } from '@margoengine/post/bloom';
 import { PostStack } from '@margoengine/post/stack';
 import { paceEngine } from '@margoengine/quality';
-import { ShaderClock } from '@margoengine/shader';
 import {
   BlackHole,
   type BlackHoleView,
@@ -18,7 +17,6 @@ import {
 } from '@margoengine/shader/black-hole';
 import { Tonemap } from '@margoengine/tonemap';
 import { createStage } from 'margoengine';
-import { demoStatus } from '../demo-status.ts';
 
 const params = new URLSearchParams(location.search);
 const ui = params.get('ui') !== '0';
@@ -35,11 +33,6 @@ const VIEWS: View[] = [
   { pos: [-2.1, 0.52, 6.4], target: [-0.35, 0, 0] }, // skimming the inner rim
 ];
 
-const page = demoStatus(
-  document.querySelector<HTMLElement>('#viewport')!,
-  document.querySelector<HTMLElement>('#status'),
-  document.querySelector<HTMLElement>('#error'),
-);
 const stage = await createStage('#viewport', {
   backend: 'webgpu',
   controls: false,
@@ -47,7 +40,7 @@ const stage = await createStage('#viewport', {
   label: 'Event Horizon: a spinning black hole',
   camera: { position: VIEWS[0].pos, target: VIEWS[0].target, fov: 38, near: 0.05, far: 1000 },
   onError: (value) => {
-    page.error(value);
+    document.querySelector('#error')!.textContent = String(value);
   },
 });
 paceEngine(stage.engine);
@@ -57,7 +50,6 @@ PostStack.attach(stage.engine, [
 ]);
 
 const hole = BlackHole.attach(stage.engine, { spin: 0.9, accretion: 1, jet: 0.5 });
-const shaderClock = ShaderClock.attach(stage.engine);
 
 // Light paths: a fan of rays from a far viewer on +z, in the plane through the spin axis, plus two side fans.
 let pathCount = 0;
@@ -85,8 +77,6 @@ interface HoleState {
   prefilter?: number;
   paths?: number;
   flareAge?: number;
-  diskTime?: number | null;
-  diskInflow?: number;
   peakTemperature?: number;
 }
 const VIEW_NAMES: BlackHoleView[] = ['beauty', 'redshift', 'beaming', 'temperature', 'orders'];
@@ -101,11 +91,9 @@ function apply(state: { properties?: Record<string, HoleState> }): void {
   if (h.peakTemperature !== undefined) hole.peakTemperature = h.peakTemperature;
   if (h.view !== undefined) hole.view = VIEW_NAMES[Math.min(Math.max(Math.round(h.view), 0), 4)];
   if (h.prefilter !== undefined) hole.prefilter = h.prefilter >= 0.5;
-  if (h.diskTime !== undefined) hole.diskTime = h.diskTime;
-  if (h.diskInflow !== undefined) hole.diskInflow = h.diskInflow;
   if (h.paths !== undefined) showPaths(Math.round(h.paths));
-  // The hot spot starts flareAge seconds before the engine's replayable shader clock.
-  if (h.flareAge !== undefined) hole.flare(shaderClock.time - h.flareAge);
+  // The hot spot started flareAge seconds ago on the shader clock (performance.now, which the shot tool drives).
+  if (h.flareAge !== undefined) hole.flare(performance.now() / 1000 - h.flareAge);
   telemetry();
 }
 
@@ -143,7 +131,7 @@ const toggle = (id: string, on: (pressed: boolean) => void) =>
   });
 toggle('paths', (on) => showPaths(on ? 24 : 0));
 toggle('filter', (on) => (hole.prefilter = on));
-$('#flare').addEventListener('click', () => hole.flare(shaderClock.time));
+$('#flare').addEventListener('click', () => hole.flare(performance.now() / 1000));
 $('#panel').addEventListener('submit', (e) => e.preventDefault());
 telemetry();
 
@@ -184,12 +172,8 @@ stage.use({
       if (Math.hypot(...f.pos.map((v, i) => v - cam.position[i])) < 0.01) flight = null;
     }
     controls?.update(dt);
-    if (
-      hole.raw.stats.drawCalls > 0 &&
-      hole.raw.stats.pending === 0 &&
-      viewport.dataset.ready !== 'true' &&
-      page.ready()
-    ) {
+    if (hole.raw.stats.drawCalls > 0 && hole.raw.stats.pending === 0 && viewport.dataset.ready !== 'true') {
+      viewport.dataset.ready = 'true';
       document.querySelector('#status')?.remove();
     }
   },

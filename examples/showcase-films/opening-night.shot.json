@@ -1,0 +1,47 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "opening-night",
+    "kind": "long",
+    "seed": 18473,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 12,
+    "probes": {
+      "hook": 2.5,
+      "ticket": 11,
+      "approach": 26.5,
+      "split": 44.6,
+      "entrance": 57.8,
+      "inside": 74.6,
+      "end-card": 87
+    },
+    "page": {
+      "path": "examples/showcase-films/showcase-12-15.html",
+      "query": {
+        "capture": 1,
+        "film": "opening-night"
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

@@ -17,9 +17,6 @@ repository's Vite dev server.
 shot's camera track and the hole through `eventHorizon.apply`, from property tracks on the target `hole`: `spin`,
 `accretion`, `turbulence`, `jet`, `view` (0 beauty, 1 redshift, 2 beaming, 3 temperature, 4 image order),
 `prefilter` (0 or 1), `paths` (light paths drawn) and `flareAge` (seconds since a hot spot started).
-The disk follows the engine shader clock by default. `diskTime` sets external texture time in seconds, and
-`diskInflow` specifies radial drift in M per orbital time unit. The beaming view shows moving disk emission
-through the stationary observer's Doppler pattern.
 
 Twelve are footage for the long video (kind `long`, 1920 x 1080 at 30 fps, 675 s in all): `eh-long-approach` (in
 from 140 r_s), `inclinations` (edge on up towards the pole), `spin` (0 to the 0.998 limit and back to 0.5),

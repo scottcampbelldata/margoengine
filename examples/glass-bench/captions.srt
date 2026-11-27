@@ -1,0 +1,15 @@
+1
+00:00:00,800 --> 00:00:05,600
+[The lens carrier clicks as it turns]
+
+2
+00:00:08,000 --> 00:00:12,200
+[Low room tone and soft music]
+
+3
+00:00:27,000 --> 00:00:32,000
+[The micrometer turns and clicks]
+
+4
+00:00:34,600 --> 00:00:38,800
+[A relay clicks and the lamp hums]
