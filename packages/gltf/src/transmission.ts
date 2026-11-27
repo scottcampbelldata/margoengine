@@ -76,11 +76,17 @@ fn margoTransmissionLevel(roughness:f32,ior:f32,path:f32)->f32 {
   let texels=deviation*reach*length(yRow)*size.y;
   return clamp(log2(max(texels,1.0)),0.0,f32(textureNumLevels(margoScene)-1u));
 }
+fn margoVolumeChord(i:Out,n:vec3f,v:vec3f,ior:f32)->f32 {
+  let m=mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz);
+  let r=refract(-v,faceForward(n,-v,n),1.0/ior);
+  let c0=cross(m[1],m[2]); let c1=cross(m[2],m[0]); let c2=cross(m[0],m[1]);
+  let normal=normalize(vec3f(dot(m[0],i.normal),dot(m[1],i.normal),dot(m[2],i.normal)));
+  let projected=abs(dot(vec3f(dot(c0,r),dot(c1,r),dot(c2,r)),normal));
+  return select(abs(dot(m[0],c0))/projected,1e30,projected==0.0);
+}
 fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   let ior=select(max(f.ext.y,1.0),1e30,f.ext.y==0.0);
-  // Node transforms scale the thickness (KHR_materials_volume): the mean of the model axis lengths.
-  let scale=(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3.0;
-  let path=max(margoVolume.x*s.th*margoVolumeThickness(i)*scale,0.0);
+  let path=max(margoVolume.x*s.th*margoVolumeThickness(i)*margoVolumeChord(i,s.n,v,ior),0.0);
   var behind=margoTransmissionBehind(i,s.n,v,ior,path,margoTransmissionLevel(s.roughness,ior,path));
   if(f.ext.w>0.0&&path>0.0){
     // KHR_materials_dispersion: IOR spread (IOR-1)*0.025*dispersion; red and blue each read on their own ray.

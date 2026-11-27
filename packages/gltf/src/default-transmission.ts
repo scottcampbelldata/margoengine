@@ -10,9 +10,8 @@ const declares = (doc: GLTFDocument, name: string): boolean =>
 /**
  * `decoders` with `transmission` added when the caller did not choose (undefined), the physical shader reads the file
  * (`materials` set) and a material declares KHR_materials_transmission (factor 0 included, for pointer animation).
- * A file with KHR_materials_volume keeps the tint for now: the pass reads thicknessFactor as the path length, and on
- * AttenuationTest that drew further from Cycles than the tint (direct 1,981,171 against 1,744,201) until the pass
- * measures the real path through the volume (KB4000, the manager's ruling of 2026-11-27).
+ * A file with KHR_materials_volume takes the pass too: on a display target the tint's multiply blend reads encoded light,
+ * so its Beer-Lambert was up to 20 levels off where the pass is exact (KB-VOL-TINT-DISPLAY1).
  * `transmission: false` stays false (the tinted blend; gltf/pbr attaches only a pass), so a second call on the same
  * hooks adds nothing either. The entry is imported on first need.
  */
@@ -23,8 +22,7 @@ export async function withTransmission<T extends Pick<GLTFDecoderHooks, 'materia
   if (
     decoders.transmission !== undefined ||
     !decoders.materials ||
-    !declares(doc, 'KHR_materials_transmission') ||
-    declares(doc, 'KHR_materials_volume')
+    !declares(doc, 'KHR_materials_transmission')
   )
     return decoders;
   return { ...decoders, transmission: (await import('./transmission.js')).screenTransmission };

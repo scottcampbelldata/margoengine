@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-11",
+  "date": "2026-11-27",
   "adapter": "AMD Radeon(TM) Graphics / RDNA 2",
   "driverVersion": "32.0.21042.62",
   "selection": {
@@ -12,7 +12,7 @@
   "proofs": [
     {
       "backend": "native",
-      "report": "../engine-bench/batch-160/volume/proof-native-1794404568133-73428/proof.json",
+      "report": "../engine-bench/batch-160/volume/proof-native-1795815019650-50832/proof.json",
       "reportSha256": "434eb547c7fd0caf570a3f9973a27f9bbfdd58bd2905f5d1901a100cf7090c1e",
       "sceneSha256": "cd8c7470b54a673a16a077a4b22d17f99ff6522725fd3c525aa2956511cdaac4",
       "processes": 3,
@@ -20,7 +20,7 @@
       "framesPerDevice": 6,
       "variants": 1,
       "decodedRGBAHashes": [
-        "4c7f62f5f4af413dc0d15406b168f75a6d9f8bb52a38dfb4662766ea23e64c86"
+        "aac669bea659e812a93652d9702457e4b5cfc86fa9704b41715b688d4617c650"
       ],
       "references": [
         {
@@ -39,45 +39,45 @@
       "metrics": {
         "viewer": {
           "pixels": 262144,
-          "absolute": 1471185,
-          "square": 22587619,
-          "max": 110,
-          "mae": 1.8707084655761719,
-          "rmse": 5.359257673604908,
+          "absolute": 1277305,
+          "square": 19070033,
+          "max": 108,
+          "mae": 1.6241772969563801,
+          "rmse": 4.92430715060432,
           "foreground": 150540,
-          "foregroundAbsolute": 1471185,
-          "foregroundMae": 3.257572738142686,
-          "changed": 149955
+          "foregroundAbsolute": 1277305,
+          "foregroundMae": 2.8282737699836145,
+          "changed": 149950
         },
         "full": {
           "pixels": 262144,
-          "absolute": 13795751,
-          "square": 1392961299,
+          "absolute": 13885109,
+          "square": 1404954793,
           "max": 148,
-          "mae": 17.54220453898112,
-          "rmse": 42.086124627232145,
+          "mae": 17.655829111735027,
+          "rmse": 42.26691853441191,
           "foreground": 150544,
-          "foregroundAbsolute": 13795751,
-          "foregroundMae": 30.546442678995287,
-          "changed": 146637
+          "foregroundAbsolute": 13885109,
+          "foregroundMae": 30.7442984553796,
+          "changed": 146638
         },
         "direct": {
           "pixels": 262144,
-          "absolute": 1810252,
-          "square": 65996060,
-          "max": 142,
-          "mae": 2.301854451497396,
-          "rmse": 9.160694835801184,
+          "absolute": 1972680,
+          "square": 78731166,
+          "max": 141,
+          "mae": 2.508392333984375,
+          "rmse": 10.00559116460505,
           "foreground": 150544,
-          "foregroundAbsolute": 1810252,
-          "foregroundMae": 4.008245651326744,
+          "foregroundAbsolute": 1972680,
+          "foregroundMae": 4.367892443405251,
           "changed": 64341
         }
       }
     },
     {
       "backend": "compat",
-      "report": "../engine-bench/batch-160/volume/proof-compat-1794404583699-86780/proof.json",
+      "report": "../engine-bench/batch-160/volume/proof-compat-1795815059503-69120/proof.json",
       "reportSha256": "96790fa8094f48550d7a15aad2f31673e0fddd55ac69b24242810598ddb15a1e",
       "sceneSha256": "cd8c7470b54a673a16a077a4b22d17f99ff6522725fd3c525aa2956511cdaac4",
       "processes": 3,
@@ -85,7 +85,7 @@
       "framesPerDevice": 6,
       "variants": 1,
       "decodedRGBAHashes": [
-        "293b3cc884b3095de228e60dbe1a1d350c03dc47d410aff538f105f4a843facf"
+        "74a7d90378d6bce5710446fc18a9d420aab1e5b0a49913bc51dd25500ef90a96"
       ],
       "references": [
         {
@@ -104,38 +104,38 @@
       "metrics": {
         "viewer": {
           "pixels": 262144,
-          "absolute": 1415249,
-          "square": 22196567,
-          "max": 110,
-          "mae": 1.7995821634928386,
-          "rmse": 5.312663595635184,
+          "absolute": 1222662,
+          "square": 18722216,
+          "max": 108,
+          "mae": 1.5546951293945312,
+          "rmse": 4.8791934504806775,
           "foreground": 150540,
-          "foregroundAbsolute": 1415249,
-          "foregroundMae": 3.1337163987423056,
-          "changed": 149969
+          "foregroundAbsolute": 1222662,
+          "foregroundMae": 2.7072804570213895,
+          "changed": 149964
         },
         "full": {
           "pixels": 262144,
-          "absolute": 13823799,
-          "square": 1393348555,
+          "absolute": 13913810,
+          "square": 1405384442,
           "max": 148,
-          "mae": 17.577869415283203,
-          "rmse": 42.09197438475671,
+          "mae": 17.69232432047526,
+          "rmse": 42.27338086017929,
           "foreground": 150544,
-          "foregroundAbsolute": 13823799,
-          "foregroundMae": 30.608546338611966,
-          "changed": 146700
+          "foregroundAbsolute": 13913810,
+          "foregroundMae": 30.80784798242817,
+          "changed": 146701
         },
         "direct": {
           "pixels": 262144,
-          "absolute": 1855106,
-          "square": 66426588,
-          "max": 142,
-          "mae": 2.3588892618815103,
-          "rmse": 9.190526347067006,
+          "absolute": 2018141,
+          "square": 79212801,
+          "max": 141,
+          "mae": 2.566198984781901,
+          "rmse": 10.036148919069127,
           "foreground": 150544,
-          "foregroundAbsolute": 1855106,
-          "foregroundMae": 4.107561023133879,
+          "foregroundAbsolute": 2018141,
+          "foregroundMae": 4.468551829808339,
           "changed": 64444
         }
       }

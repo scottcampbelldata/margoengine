@@ -252,7 +252,8 @@ for (const [family, primitives, absolute, square, max] of [
   // Re-recorded lower 2026-11-27 (KB4000 step 4): files with KHR_materials_transmission and no volume load with the
   // screen-transmission pass by default (1590949 -> 1407924 against the sample viewer).
   ['transmission', 22, 1407924, 54667134, 252],
-  ['volume', 23, 1471401, 22496007, 110],
+  // Re-recorded lower 2026-11-27 (KB-VOL-TINT-DISPLAY1): volume files load with the pass too (1471401 -> 1279373).
+  ['volume', 23, 1279373, 19008561, 108],
 ])
   test(`${family} preserves the full sample and exact viewer and path-transport budgets`, () => {
     const read = (suffix) =>
@@ -285,15 +286,18 @@ for (const [family, primitives, absolute, square, max] of [
     }
   });
 
-test('volume transport budgets are the measured figures (full re-recorded 2026-11-27 after 212d482e00)', () => {
+test('volume transport budgets are the measured figures (re-recorded 2026-11-27: volume files draw through the pass)', () => {
   const budget = JSON.parse(
     readFileSync(new URL('../docs/whitepaper/results/batch-160-volume-transport.json', import.meta.url)),
   );
-  // KB-REF-VOL-FULL1: the tint reads thicknessTexture (212d482e00); its parent draws 13794699 exactly.
-  assert.equal(budget.rows.full.metrics.absolute, 13834286);
-  assert.equal(budget.rows.full.compat.metrics.absolute, 13834286);
-  assert.equal(budget.rows.direct.metrics.absolute, 1807380);
-  assert.equal(budget.rows.direct.compat.metrics.absolute, 1807380);
+  // KB-VOL-TINT-DISPLAY1: the tint's multiply blend on encoded light drew 13834286 / 1744201; the pass is Beer-Lambert exact.
+  assert.equal(budget.rows.full.metrics.absolute, 13883255);
+  assert.equal(budget.rows.full.compat.metrics.absolute, 13883197);
+  assert.equal(budget.rows.direct.metrics.absolute, 1969228);
+  assert.equal(budget.rows.direct.compat.metrics.absolute, 1969232);
+  const viewer = JSON.parse(readFileSync(new URL('../docs/whitepaper/results/batch-160-volume.json', import.meta.url)));
+  assert.equal(viewer.metrics.absolute, 1279373);
+  assert.equal(viewer.compat.metrics.absolute, 1279301);
 });
 
 // Batch 160 job 5, measured on main's area-filter mip chain (65098f33fe): NVIDIA rows are the shared budget, the AMD
@@ -301,7 +305,7 @@ test('volume transport budgets are the measured figures (full re-recorded 2026-1
 // rows gate AMD proofs. Each row: native absolute, compat absolute, native square, compat square.
 for (const [family, primitives, nvidia, amd] of [
   ['specular', 24, [877623, 877629, 45728851, 45729151], [879353, 873565, 45729003, 45668835]],
-  ['ior', 23, [2411082, 2411082, 72778266, 72778266], [2409579, 2411871, 72786399, 72955815]],
+  ['ior', 23, [1901151, 1901175, 47203509, 47198583], [1899099, 1900341, 47209929, 47301195]],
 ])
   test(`${family} freezes the measured full-scene error on each adapter and PBR backend`, () => {
     const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));
@@ -342,7 +346,8 @@ for (const family of ['transmission', 'volume'])
     const read = (name) => JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/${name}`, import.meta.url)));
     const receipt = read(`batch-160-amd-${family}.json`),
       baseline = read(`batch-160-${family}.json`);
-    assert.equal(receipt.date, '2026-11-11');
+    // The volume receipt was measured again when volume files moved to the pass (KB-VOL-TINT-DISPLAY1).
+    assert.equal(receipt.date, family === 'volume' ? '2026-11-27' : '2026-11-11');
     for (const compat of [false, true]) {
       const budgets = amdReceiptBudgets(receipt, baseline, compat);
       assert.deepEqual(Object.keys(budgets), ['viewer', 'full', 'direct']);

@@ -118,7 +118,7 @@ await runSuite(
     const T = [0.1, 0.5, 0.9];
     for (const antialias of [false, true]) {
       const behind = frames[`slab-none:${antialias}`].data;
-      for (const name of ['slab-pass', 'slab-tint']) {
+      for (const name of ['slab-pass', 'slab-default', 'slab-tint']) {
         const got = frames[`${name}:${antialias}`].data;
         let worst = 0,
           at;
@@ -126,17 +126,21 @@ await runSuite(
           for (let x = 32; x < 96; x++) {
             const o = (y * 128 + x) * 4;
             const light = pbrNeutralInverse([0, 1, 2].map((c) => decode(behind[o + c] / 255)));
-            const want = pbrNeutral(light.map((v, c) => v * T[c])).map(encode);
+            // IOR 1 bends no ray: the path through the slab is thickness / cos of the view ray (fov 35, camera on +z).
+            const k = Math.tan((17.5 * Math.PI) / 180),
+              d = Math.hypot(((x + 0.5) / 64 - 1) * k, (1 - (y + 0.5) / 64) * k, 1);
+            const want = pbrNeutral(light.map((v, c) => v * T[c] ** d)).map(encode);
             for (let c = 0; c < 3; c++) {
-              const d = Math.abs(got[o + c] - want[c]);
-              if (d > worst) [worst, at] = [d, { x, y, c, got: [...got.subarray(o, o + 3)], want, behind: [...behind.subarray(o, o + 3)] }];
+              const e = Math.abs(got[o + c] - want[c]);
+              if (e > worst) [worst, at] = [e, { x, y, c, got: [...got.subarray(o, o + 3)], want, behind: [...behind.subarray(o, o + 3)] }];
             }
           }
         report[`${name}:${antialias}`] = { worst, at };
-        // The tint multiplies the encoded backdrop by the encoded transmittance, up to 20 levels off on this slab
-        // (KB-VOL-TINT-DISPLAY1 in docs/known-bugs.md): measured into the report, gated once fixed.
-        if (name === 'slab-pass')
-          assert.ok(worst <= 1, `the pass is Beer-Lambert through one slab (worst ${worst} levels, ${antialias})`);
+        // A default-loaded volume file draws through the pass (KB-VOL-TINT-DISPLAY1). The explicit tint (transmission:
+        // false) multiplies the encoded backdrop by the encoded transmittance, which no blend can make exact on a
+        // display target (docs/limits.md): measured into the report only.
+        if (name !== 'slab-tint')
+          assert.ok(worst <= 1, `${name} is Beer-Lambert through one slab (worst ${worst} levels, ${antialias})`);
       }
     }
     writeFileSync(

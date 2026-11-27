@@ -62,6 +62,8 @@ window.screenTransmission=async()=>{
   {name:'slab-none',none:true},
   {name:'slab-pass',slab:true,pass:true},
   {name:'slab-tint',slab:true,pass:false},
+  // KB-VOL-TINT-DISPLAY1: a default-loaded volume file draws through the pass (light behind in linear terms), not the tint.
+  {name:'slab-default',slab:true,load:'async'},
  ];
  for(const antialias of [false,true])for(const k of cases){
   const canvas=document.body.appendChild(document.createElement('canvas'));

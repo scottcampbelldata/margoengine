@@ -101,9 +101,6 @@ test('withTransmission adds the pass only for a physical file that declares the 
   assert.equal(await withTransmission(glass, base), base, 'no physical shader (materials: false): no pass');
   const other = { materials: shader };
   assert.equal(await withTransmission(plain, other), other, 'no KHR_materials_transmission: no pass');
-  // A volume file keeps the tint until the pass measures the real path length (KB4000 ruling, 2026-11-27).
-  const volume = {
-    materials: [{ extensions: { KHR_materials_transmission: { transmissionFactor: 1 }, KHR_materials_volume: {} } }],
-  };
-  assert.equal(await withTransmission(volume, other), other, 'KHR_materials_volume: no pass yet');
+  // A volume file takes the pass as well (KB-VOL-TINT-DISPLAY1): the slab-default case of
+  // scripts/test-screen-transmission-browser.mjs proves it through parseGLTFAsync.
 });
