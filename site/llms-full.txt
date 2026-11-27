@@ -13544,7 +13544,13 @@ Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
   - One wake oscillator per link and the same phase start for all, so the shedding is in step along a rod.
   - Drag, flow and pins act only on links of a multibody tree (kernel FLOW_X, DRAG_ACROSS, JOINT_PIN). The water's loads come from the `loads` provider (`segmentLoads` of `@margoengine/physics/loads`).
   - The drag across the drag crisis (Re 2e5 to 5e5) is a straight line in log Re, without the crisis's dip; below Re 1 it is held at the fit's Re 1 value. KC comes from the waves' `period`; a steady current is `period: Infinity`.
-- State: the loads provider's wake oscillators live outside the world's snapshot: take `rod.takeState()` with `physics.takeSnapshot()`.
+- State: the loads provider's wake oscillators live outside the world's snapshot: take `rod.takeState()` with `physics.takeSnapshot()`. In a `PhysicsWorld`, `RigidSolver` carries them (KB-PHYS-RODSEEK1).
+- By method, the air (`segmentAirLoads`, 2026-11-27): the water's loads with no surface (one a light year up) and the standard atmosphere's density and viscosity; the air's buoyancy and added mass are kept.
+- By method, direction (2026-11-27):
+  - `rod.setTarget` pulls each link with a spring on its own mass, held over a step, so its frequency is held to 0.5 / (2 pi dt) (4.77 Hz at 60 steps a second) and its damping to what the step can take; the pull is a force, so a heavy load or a stiff rod keeps the rod off the shape by load over spring.
+  - `swayFlow` is three seeded sines (weights 0.6, 0.3, 0.1; periods 1, 0.53, 0.29 of `period`), each travelling at its own heading within 30 degrees of `direction`: film direction, not a measured gust spectrum.
+- Work counts (`packages/physics/tests/rod-film.test.js`, 2026-11-27, the same on every machine): a rod of n links is one island of n bodies; the broad phase looks at 2n - 3 pairs (none solved, the joints filter them) and the solver solves n joints a step, so a 4,096-link rod does four times a 1,024-link one's work, and 64 rods of 24 links 64 times one rod's. The tree solve is linear in the links. Wall-clock time is a speed-phase item.
+- Open: a rope under tension over a bollard blows up (KB-PHYS-RODWRAP1), so wrapping and seabed chains wait on it.
 - Measured (`packages/physics/tests/rod.test.js`):
   - a cantilever in a current within 0.03 % of its springs and 0.06 % of the continuous beam at 32 links;
   - a line between pins within 0.007 % of its chain and 0.03 % of the catenary;
