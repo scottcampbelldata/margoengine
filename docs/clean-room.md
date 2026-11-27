@@ -18158,3 +18158,13 @@ looked at as running examples and documentation, for what they offer, not how th
   hashes across runs and a snapshot restore, and the GPU against the twin within 1e-4 m (measured 8.3e-7 m) on WebGPU.
 - Own derivation (2026-11-27, `pin_spring`): a pin that gives holds across at a thousand times its give's stiffness, so its
   across gap is a thousandth of its half link's stretch under the same load and its stiffness does not grow as 1 / h^2.
+
+## physics a sheared pipe's swing, models tried (2026-11-27)
+
+No code landed from this work; recorded for the known-bugs entry KB-PHYS-RODVIVSHEAR1. No paper's companion code was read.
+
+- M. J. Thorsen, S. Saevik and C. M. Larsen, "Time domain simulation of vortex-induced vibrations in stationary and
+  oscillating flows", J. Fluids Struct. 61 (2016) 1-19, https://doi.org/10.1016/j.jfluidstructs.2015.11.006 (open
+  submitted version, NTNU Open, read); M. J. Thorsen, "Time domain analysis of vortex-induced vibrations", PhD thesis, NTNU
+  2016 (open, read): the synchronization model, its C_v and synchronization curves (Figs. 7 and 4, read from the figures'
+  vector paths), the damping fit 0.31 + 0.89 y0 / D, the amplitude from zero crossings and its smoothing.
