@@ -650,8 +650,8 @@ export class Sky implements EnginePlugin {
   /**
    * A layer over the sky in its environment: `reflectionTexture` (from the frame-graph step at order 3.5 on, before
    * Water draws at 4) and the scene's sky light (`lighting`, from the next frame). A 64 x 32 `rgba16float` texture in the
-   * map's layout (u turns round +Y from -X, v runs down from the zenith) holding light, premultiplied, at the sky's
-   * exposure, and opacity. `VolumetricClouds` given this sky set it to their deck each frame they draw, and clear it
+   * map's layout (u turns round +Y from -X, v runs down from the zenith) holding light, premultiplied, at 2 to the sky's
+   * exposure times {@link Sky.pictureScale} (the units of the reflection map it lies over), and opacity. `VolumetricClouds` given this sky set it to their deck each frame they draw, and clear it
    * when they stop; undefined: the sky alone.
    */
   environmentLayer: GPUTexture | undefined = undefined;

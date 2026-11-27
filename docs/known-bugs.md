@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: the clouds' two-stream check read the deck's map in the sky's old units (KB-SKY-LAYERUNIT1, sky)
+
+- **Repro:** `node packages/sky/test/features-check.mjs cloud-bounds` on main after 2e2a10a637: "two-stream down at
+  tau 5: sum 0.18 want 0.75" on WebGPU and `MARGO_COMPAT=1`; it passed at 2e2a10a637's parent.
+- **Cause:** 2e2a10a637 (KB-SKY-SANDGREY1) draws the sky's reflection map, and the deck `VolumetricClouds` lay over it
+  (`Sky.environmentLayer`), at 2 to the exposure times `Sky.pictureScale` (0.1447 by day in the check), as intended;
+  the check still took the sun's irradiance in sky units (6.4), and the `environmentLayer` doc still said "at the
+  sky's exposure". The deck's light itself did not change: divided by the scale, down, up and sum are the parent's to
+  4 digits (tau 5: 0.624, 0.226, 0.907; tau 20: 0.420, 0.502, 0.954; tau 80: 0.189, 0.738, 0.955).
+- **Fix:** the check takes the sun's irradiance in the map's units (times `sky.pictureScale`), bounds unchanged, and
+  the `environmentLayer` doc names the unit (`packages/sky/src/base.ts`).
+- **Regression:** `packages/sky/test/cloud-bounds-check.html` (features-check cloud-bounds) on WebGPU and
+  `MARGO_COMPAT=1`.
 ### Fixed 2026-11-27: create3MFMesh made a material for every group, so a coloured scan crashed the page (KB-3MF-SCANGROUPS1, loaders)
 
 - **Repro:** `create3MFMesh` on the 3MF Consortium's `examples/material/kinect_scan.3mf` (3mf-samples 665e20dc4d,

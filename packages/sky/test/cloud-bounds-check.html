@@ -99,12 +99,14 @@ window.check={samples:sceneSamples,
   // optical depths 5, 20 and 80 (density x thickness x 0.35, as cloudDeckTransmittance takes it). From the deck's map
   // (Sky.environmentLayer) the irradiance it gives a level surface under it (down) and over it from above (up), the
   // sun's part only: the same deck with sunIntensity 0 (the sky's light alone) is taken away. The sun's irradiance on
-  // the deck is 4 pi sunIntensity times its colour, which the engine light carries (lights[0] at noon, dimLight off).
+  // the deck is 4 pi sunIntensity times its colour, which the engine light carries (lights[0] at noon, dimLight off),
+  // in the map's units: the layer is drawn at the sky's exposure times its picture scale (Sky.pictureScale, sky units
+  // into the engine's by day, KB-SKY-LAYERUNIT1), as the reflection map it lies over.
   const lum=(c)=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
   // Irradiance over pi on a level surface from the map's upper (rows 0 to 15) or lower half: sum L |cos| dOmega / pi.
   const flux=(m,lower)=>{let s=0;for(let y=0;y<16;y++){const row=lower?31-y:y,th=(y+0.5)/32*Math.PI,w=Math.cos(th)*Math.sin(th);for(let x=0;x<64;x++)s+=lum(m.subarray((row*64+x)*4))*w;}return s*(Math.PI/32)*(2*Math.PI/64)/Math.PI;};
   sky.options.lighting={};await frame();await frame();
-  const sunIrr=4*1.6*sky.lights[0].direction[3]*lum(sky.lights[0].radiance);
+  const sunIrr=4*1.6*sky.lights[0].direction[3]*lum(sky.lights[0].radiance)*sky.pictureScale;
   const thick={sky,coverage:1,bottom:1000,top:2000,groundAlbedo:0,dimLight:false,temporal:false,depth:()=>post.depthTexture};
   const sunPart=async(c,lower)=>{c.options.sunIntensity=1.6;await frame();await frame();const map=await read(sky.environmentLayer),lit=flux(map,lower);
    // The sun's direct beam the deck lets through (the engine light's part, not in the map): 1 - its opacity toward the
