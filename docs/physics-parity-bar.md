@@ -105,14 +105,30 @@ Status 2026-11-27 (Claude, laptop). Met: every checklist row above but Rapier pa
 `tests/rigid-validation.test.js` with the restitution chain fix (03202202a). Open, so the row stays CLAIMED:
 - Rapier parity: the three PARTIAL rows of `docs/physics-collision-parity.md` (2D soft builders, dihedral and wire
   elements, soft recovery settings) belong to SOFT-01, SOFT-02 and SOFT-04.
-- Point 1: one solver tier; no separate high-fidelity tier (for example a direct or block solver for whole stacks) behind
-  an option.
-- Point 2: checked against exact solutions only; no published measured experiment (restitution or friction of real
-  materials) yet.
-- Point 4: the couplings the catalog row names are not each re-proved for this item.
-- Point 6: four-wide solver batches and parallel broad and narrow phases (islands already solve on threads, 684c99009);
-  B-02 64-bit builds.
-- A touching Newton's cradle shares the strike out (docs/limits.md), as every sequential-impulse rival does.
+- Point 6: four-wide solver batches, parallel broad and narrow phases (islands already solve on threads, 684c99009) and
+  B-02 64-bit builds are not built: each is kernel work across the Rust crate, its three Wasm builds and the thread
+  scheduler, to be proven by deterministic work counts with identical output.
+- Point 2: the domino wave is matched at 0.2 m; real 48 mm dominoes run slower (KB-PHYS-DOMINOSCALE1, open, inside the
+  published band). Restitution and friction are inputs, checked by exact solutions, not against measured material pairs.
+- Point 3: a touching Newton's cradle shares the strike out (docs/limits.md), as Rapier, Havok, Jolt, PhysX and Box2D do.
+  The textbook cradle needs a pairwise collision pass before the contact solve (Guendelman, Bridson and Fedkiw,
+  "Nonconvex rigid bodies with stacking", SIGGRAPH 2003, section 6, collisions resolved one pair at a time); folded into
+  soft step it would also run on resting stacks, so it is held for its own kernel change with stacking re-proved.
+
+Closed since (2026-11-27, Claude, laptop):
+- Point 1: `fidelity: 'standard' | 'high'` (28b7c2b4f), each tier validated: both pass the exact-solution suite, a light box
+  under 1000 times its mass sinks within 10 percent of each tier's spring depth (18 mm and 1.3 mm), and the domino wave
+  agrees between tiers.
+- Point 2: the measured domino wave of Larham (2008), one friction fitted and four spacings held out within 0.1 sqrt(gH)
+  (`tests/rigid-measured.test.js`, 28b7c2b4f).
+- Point 4, each two-way neighbour of the catalog row with its conserved quantity: soft rope and box, total momentum
+  (`tests/coupling/rigid-neighbours.test.js`); a vehicle on a free deck with `groundReaction`, zero total momentum
+  (same file; the vehicle's default leaves the ground unpushed, as DYN-04 chose); a ragdoll hit by a crate, total momentum
+  (`packages/ragdoll/tests/ragdoll.test.js`); SEA-12 buoyancy and loads, the one-cell momentum ledger
+  (`tests/coupling/loads-reciprocal.test.js`); EARTH-04 and EARTH-05 terrain and soil, the mass ledger and rolling
+  reactions (`tests/coupling/terramechanics.test.js`, `granular-flow.test.js`); FLUID-01 and FLUID-02, pair and plate
+  momentum (`tests/coupling/dfsph.test.js`, `pbf.test.js`); FIRE-05 recoil (`explosive-gun.test.js`); fragments on a body
+  (`explosive-hits.test.js`); a ship through floes, equal and opposite (`ship.test.js`).
 
 ### P2. DYN-06 Mass properties and collision geometry
 
@@ -128,7 +144,9 @@ against the closed form, and a rolling ball checks the inertia at 5/7 g sin t), 
 bound (PA-09, 7f4117272), trimesh from any glTF mesh (`addModel`), scaled shapes, and coded errors linking
 errors#physics-meshes for every bad mesh (e4b589866). Open: PA-87 (Blender-tagged bodies get only box, sphere, capsule
 and cylinder fitted to the bounds, with no hull, mesh or decomposition tag and no density or material preset); the
-default density is 1 kg/m³ as in Rapier, not a real material's.
+default density is 1 kg/m³ as in Rapier, not a real material's. Closed since: PA-87 and named material densities
+(f45c74238): Blender `margo:collider` hull, mesh and decomposition with `margo:density`, and `densities` in the API, the
+default staying 1 kg/m³ and documented as Rapier's.
 
 ### P3. DYN-03 Joints and motors
 

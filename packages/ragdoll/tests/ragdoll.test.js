@@ -623,3 +623,29 @@ rtest('attach and dispose use the physics world scene, not the active one', asyn
   physics.dispose();
   engine.dispose();
 });
+
+// DYN-01 point 4: a ragdoll and the rigid world exchange momentum both ways. In zero gravity a crate thrown at a limp
+// ragdoll leaves the total linear momentum of crate and every bone where it was, while the bones take it up (with the
+// bones' linear damping, a drag on the world, set to 0).
+rtest('a crate hitting a ragdoll in zero gravity hands it momentum, and crate plus bones keep the total', async () => {
+  const { engine, physics } = await scene({ gravity: [0, 0, 0] }),
+    body = humanoid(engine);
+  const ragdoll = Ragdoll.attach(physics, { root: body.hips, active: true, linearDamping: 0 }),
+    crate = physics.addBody(null, {
+      position: [-1, 1.3, 0],
+      colliders: { shape: 'box', halfExtents: [0.15, 0.15, 0.15], mass: 20, friction: 0.4 },
+    });
+  crate.setLinearVelocity([4, 0, 0]);
+  const momentum = () => {
+    const total = crate.linearVelocity.map((v) => v * crate.mass);
+    for (const part of ragdoll.bones) part.body.linearVelocity.forEach((v, a) => (total[a] += v * part.body.mass));
+    return total;
+  };
+  const before = momentum();
+  frames(engine, ragdoll, 90);
+  const after = momentum(),
+    bones = ragdoll.bones.reduce((sum, part) => sum + part.body.linearVelocity[0] * part.body.mass, 0);
+  assert.ok(bones > 0.2 * before[0], `the bones took up the hit (${bones} of ${before[0]} kg m/s)`);
+  for (let a = 0; a < 3; a++)
+    assert.ok(Math.abs(after[a] - before[a]) <= 1e-3 * before[0], `momentum ${a}: ${after[a]} against ${before[a]}`);
+});
