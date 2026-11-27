@@ -45,7 +45,7 @@ test('the rewrite reaches every anchor of the sky, its night, clouds, fog, refle
         '*frame.lookCloud.rgb,opacity);',
         'fn cloudSkyAbove(',
         'fn lowLayer(',
-        'lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>}',
+        'lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>}',
       ])
         assert.ok(main.includes(piece), `${model}, night ${!!night}: ${piece}`);
       assert.doesNotMatch(all, /\bBETA_R\b/, 'no shader keeps the constant Rayleigh');
@@ -228,7 +228,7 @@ test('the haze layer light rides the look block and the day sky adds it', () => 
     'the day sky adds the layer light',
   );
   assert.ok(
-    main.includes('lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>}'),
+    main.includes('lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>}'),
     'the Frame struct ends with the layer light',
   );
   const written = new Float32Array(u.data, 256 + 72 * 4, 3);
@@ -262,8 +262,8 @@ test('the night share of the sky and its clouds are seen through the low layer, 
   assert.equal(main.match(/fn cloudSky\(/g).length, 1, 'one cloudSky, the layered one');
   assert.match(
     main,
-    /c\*mix\(vec3f\(1\.0\),t,frame\.sun\.w\)\+\(frame\.air3\.rgb\+fireLayer\(w\)\)\*frame\.sun\.w/,
-    'the night share only',
+    /c\*mix\(vec3f\(1\.0\),t,frame\.sun\.w\)\+frame\.air3\.rgb\*frame\.sun\.w\+fireSky\(w,t\);/,
+    "the night share only, the fires' light at every hour (KB-SKY-FIREDAY1)",
   );
   assert.match(main, /max\(w\.y\/max\(length\(w\),1e-6\),0\.052336\)/, 'slant path floored at 3 degrees, as the sun');
   sky.dispose();
@@ -276,7 +276,7 @@ test('the night share of the sky and its clouds are seen through the low layer, 
 test("the fires' spots on the layer ride the look block and add along each ray", () => {
   const air = look.air({}, new Float32Array(9)),
     block = new Float32Array(LOOK_FLOATS);
-  assert.equal(LOOK_FLOATS, 144);
+  assert.equal(LOOK_FLOATS, 208);
   look.write(block, {}, air, 5);
   assert.ok(
     block.subarray(80).every((v) => v === 0),
@@ -316,6 +316,42 @@ test("the fires' spots on the layer ride the look block and add along each ray",
     'the cosine law over the squared distance, the spots adding',
   );
   assert.ok(main.includes('if(sight>0.0&&run*flat>sight){run=sight/flat;}'), 'no farther across than the sight');
+  sky.dispose();
+  h.cleanup();
+});
+
+// KB-SKY-HAZEGLOW1: a far ridge the fog hides takes the sky's radiance toward it plus the fog's fire glow on the haze
+// (fog.fireSpots, the mean of the falloff along the path's first 2 / density), while the sky over it took the layer's
+// glow alone at one point (fireLayer): over a burning valley every hazed ridge stood 6 codes lighter than the sky
+// (timber-valley valley-aerial). The haze's spots ride floats 144 to 207 in the sky's units, and lowLayer sees the
+// layer's glow through the haze (t) with the haze's own glow in front (1 - t) by the fog's own law.
+test("the haze's fire glow is in front of the layer's, by the fog's law", () => {
+  const air = look.air({}, new Float32Array(9)),
+    block = new Float32Array(LOOK_FLOATS),
+    spot = { color: [0.4, 0.2, 0.1], x: 50, z: -1500, reach: 800 };
+  look.write(block, { fog: { density: 0.001, fireSpots: [spot] } }, air, 5, 4);
+  const f = (x) => Math.fround(x);
+  assert.deepEqual([...block.subarray(144, 152)], [f(0.1), f(0.05), f(0.025), 640000, 50, 1000, -1500, 2000]);
+  assert.ok(block.subarray(152).every((v) => v === 0), 'the spots left over end the list');
+  assert.ok(block.subarray(80, 144).every((v) => v === 0), 'no layer spots written by the fog');
+  for (const fog of [{ density: 0, fireSpots: [spot] }, { fireSpots: [] }, undefined]) {
+    look.write(block, { fog }, air, 5, 4);
+    assert.ok(block.subarray(144).every((v) => v === 0), `no haze glow: ${JSON.stringify(fog)}`);
+  }
+  // The fog's default density, 0.01: the path end 200 m.
+  look.write(block, { fog: { fireSpots: [spot] } }, air, 5);
+  assert.equal(block[151], 200);
+  const h = harness(),
+    sky = new Sky({ atmosphere: { fireSpots: [spot] }, timeScale: 0 });
+  h.engine.use(sky);
+  h.frame();
+  const main = h.codes.find((c) => c.includes('fn lowLayer(') && c.includes('fn lookSky('));
+  assert.ok(main.includes('+frame.air3.rgb*frame.sun.w+fireSky(w,t);'), 'the low layer takes the fire term with t');
+  assert.ok(main.includes('if(frame.hazeFires[0].w<=0.0){return layer;}'), "without haze spots, the layer's glow alone");
+  assert.ok(
+    main.includes('return layer*t+(vec3f(1.0)-t)*fireHazeTrack(frame.eye.xz,frame.eye.xz+ray.xz*frame.hazeFires[1].w);'),
+    "the layer's glow through the haze, the haze's in front along the fog's path",
+  );
   sky.dispose();
   h.cleanup();
 });

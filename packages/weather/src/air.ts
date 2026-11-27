@@ -626,6 +626,44 @@ export function hazeReflectance(state: {
   return mixedSlab(state, slabReflection) ?? [0, 0, 0];
 }
 
+/**
+ * How fast the diffuse light inside the haze of a state falls off with depth below the eye, red, green and blue (670, 550
+ * and 440 nm), per unit of the haze's optical depth: the two-stream diffusion exponent k = sqrt(g1^2 - g2^2), g1 = 2 -
+ * w (1 + g), g2 = w (1 - g) (hemispheric mean closure, W. E. Meador and W. R. Weaver, "Two-Stream Approximations to
+ * Radiative Transfer in Planetary Atmospheres", J. Atmos. Sci. 37, 630-643, 1980; the same k as `slabTransmission`).
+ * Deep in an optically thick layer the light is the diffusion mode, which falls as e^(-k tau) (H. C. van de Hulst,
+ * "Multiple Light Scattering", 1980), so the haze a ray sees below the horizon is darker than the haze at the eye
+ * (KB-SKY-HAZEBELOW1). The dust, smoke, ash and spray are mixed with the rest of the air's `extinction` per metre (a
+ * clean scatterer, w 1 and g 0, which takes no light away) by extinction, as {@link hazeLight} mixes its slabs. Exactly
+ * [0, 0, 0] with no load. Sky `fog.lightDecay` takes it.
+ */
+export function hazeLightDecay(
+  state: { readonly dust?: number; readonly smoke?: number; readonly ash?: number; readonly spray?: number },
+  extinction = 0,
+): [number, number, number] {
+  const dust = dustExtinction(state.dust ?? 0),
+    smoke = smokeExtinction(state.smoke ?? 0),
+    ash = ashExtinction(state.ash ?? 0),
+    spray = sprayExtinction(state.spray ?? 0);
+  if (dust + smoke + ash + spray === 0) return [0, 0, 0];
+  return [670, 550, 440].map((nm, i) => {
+    const s = smoke * (nm / 550) ** -SMOKE_ANGSTROM,
+      clean = Math.max(0, extinction - (dust + smoke + ash + spray)),
+      tau = dust + s + ash + spray + clean,
+      scatter = dust * DUST_ALBEDO[i]! + s * SMOKE_ALBEDO[i]! + ash * ASH_ALBEDO[i]! + spray * SPRAY_ALBEDO[i]! + clean,
+      g =
+        (dust * DUST_ALBEDO[i]! * DUST_ASYMMETRY +
+          s * SMOKE_ALBEDO[i]! * SMOKE_ASYMMETRY +
+          ash * ASH_ALBEDO[i]! * ASH_ASYMMETRY +
+          spray * SPRAY_ALBEDO[i]! * SPRAY_ASYMMETRY) /
+        scatter,
+      w = scatter / tau,
+      g1 = 2 - w * (1 + g),
+      g2 = w * (1 - g);
+    return Math.sqrt(Math.max(0, (g1 - g2) * (g1 + g2)));
+  }) as [number, number, number];
+}
+
 /** The linear colour of a flame's light (the `GLOW_COLOR` a fire's glow lights its smoke columns with in `@margoengine/vfx/lit`). */
 export const FIRE_LIGHT_COLOR: readonly [number, number, number] = [1, 0.42, 0.12];
 /** The noon sun's irradiance on level ground, W/m^2: the light the haze colours are referred to (share 1). */

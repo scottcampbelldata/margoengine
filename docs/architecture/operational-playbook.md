@@ -10254,8 +10254,10 @@ supersampled view); scenes test/dune-coast-still.mjs camp view on the WebGL2 lay
 180.6 without and 10.5 percent of pixels darker (before: 181.1 against 180.7, 0.4 percent); on native WebGPU
 (2026-11-21, adapter `intel` `xe-2lpg`, once KB-SCENES-DUNE-ARCHANG1 below let it run) 177.2 against 180.6 and 10.2
 percent darker. Missing: other GPUs, the cost of the extra draw (speed phase deferred), and the grass itself darkened
-(it is not in the ambient replay).
-
+(it is not in the ambient replay).
+
+
+
 Grass blade shadows (2026-11-27): `packages/scatter/test/grass-shadow.browser.mjs` reads the shadow `shadows.add(grass)`
 casts from the picture on WebGPU and the WebGL2 layer (RTX A6000): a 2 m and a 4 m blade cast 2.05 m and 4.00 m,
 narrowing 0.607 from 1 m to 3 m out against the blade's own 0.577, and 16 blades a clump shade 1,610 pixels against 91.
@@ -10341,6 +10343,52 @@ the harmonics and the reflection samples, never the ambient floor. Evidence: `pa
 (RTX A6000, WebGPU and `MARGO_COMPAT=1` agree to 1e-4): the sky's share of a level plate's light at 60 degrees is 0.184
 (Preetham, bound 0.1 to 0.2, Erbs, Klein and Duffie 1982) and 0.064 (Bruneton, bound 0.04 to 0.1, Bird and Hulstrom
 1981), within 0.01 from intensity 1 to 3. Cost: no new pass, buffer or binding; one float in an existing upload.
+
+**The sky's picture in the same units (KB-SKY-SANDGREY1 and KB-SKY-PALLHAZE1, 2026-11-27).** The light map was in the
+sun's units but the picture was not: the backdrop, fog, reflection map and the layers drawn over the sky in sky units
+(VolumetricClouds, AerialPerspective, LightShafts, TornadoCloud) stood 1.4 times too bright against the ground under the
+presets' Preetham sun of 5, about 6 times under Bruneton at 3. `Sky.pictureScale` (lightScale by day while the sky
+lights the scene, fading to 1 with the night blend; `balance: false` keeps 1) is added to the exposure float the sky's
+backdrop, environment and fog shaders already read, and the light buffer's scale becomes lightScale / pictureScale, so
+the map is scaled once; the layers take it with the exposure they read. WeatherDrive's haze colour, a share where 1 is
+the zenith sun on a white surface, is drawn as that share times `Sky.zenithSun` over pi at the sky's exposure and
+picture scale, the units the sky draws the same layer's `scatteredLight` in. No WGSL changed: two floats in existing
+uploads. Evidence: sky test/sky.test.js and weather tests/smoke.test.js (the uniforms and the colour);
+sky-light-units-check.mjs unchanged on WebGPU and `MARGO_COMPAT=1` (shares 0.18 and 0.06: the map is not scaled twice);
+real scene stills before and after in docs/known-bugs.md. Missing: a photograph-referenced ratio of a clear horizon sky
+to sunlit ground in a GPU check.
+
+**The haze below the horizon along the actual ray (KB-SKY-HAZEBELOW1, 2026-11-27).** The sky fog took the horizon's
+radiance (the ray's y clamped to 0.0001) for every ray below it, so a far ground the haze hides fully drew as one flat
+colour. A ray going down meets haze deeper in the layer, lit by e^(-k tau) of the light at the eye at vertical optical
+depth tau (the two-stream diffusion mode, Meador and Weaver 1980); in a horizontally uniform layer the vertical optical
+depth to a point is sin(down) times the ray's, whatever the height profile, so the in-scatter of a ray of optical depth
+x is the eye's haze colour times (1 - e^(-x (1 + c))) / ((1 + c) (1 - e^(-x))), c = k sin(down): one closed form in
+the fog fragment (`fogBelowLight`), its k in one new uniform vec4 (`fog.lightDecay`, default 0, where the factor is
+exactly 1). `WeatherDrive` writes k from the load's albedos and asymmetries (`hazeLightDecay`). In-scatter along the
+actual view ray follows Hillaire 2020 and Bruneton and Neyret 2008. Evidence: sky test/fog-below-check.mjs on WebGPU and
+`MARGO_COMPAT=1` (RTX A6000, ANGLE D3D11): the hazed ground's ratio to no decay matches the CPU mirror to 8.4e-4 and
+is 0.39 off without the shader term; the ridge-smoke shot's pre-dither float flat 10.06 to 6.44 percent early and 5.82
+to 2.73 mid against main. Missing: the change of the phase angle to the sun between the horizon and the actual ray, and
+shadows in the air (cloud and smoke-column shadows).
+
+**The fires' light on the smoke layer at every hour (KB-SKY-FIREDAY1, 2026-11-27).** The look's `lowLayer` added the
+fires' light on the layer (`atmosphere.fireSpots`) by the night's share alone, while the sky fog adds the same fires'
+light to the haze (`fog.fireSpots`) at every hour, so by day a fully hazed far ridge read lighter than the sky over it
+(timber-valley ridge, 23, 12 and 4 codes). `fireLayer` is now added at every hour, and `VolumetricClouds` above the layer
+take it in front through their veil (the `Clouds` uniform grows from 104 to 168 floats for the eight spots); one WGSL
+source (`fireLayerWgsl`) serves both. Evidence: sky features-check look on WebGPU and `MARGO_COMPAT=1` (a day fire spot
+raises the frame in the fire's colour; [0, 0, 0] without the fix), the ridge still 4, 1 and -1 codes against the sky.
+**The haze's fire glow on the sky's own rays (KB-SKY-HAZEGLOW1, 2026-11-27).** The fog drew a far ground as the sky's
+radiance plus the fires' glow on the haze (`fireHaze`, the mean of the falloff along the ground path to 2 / density),
+and the sky over it the layer's glow at one point (`fireLayer`), so a fully hazed ridge stood 6 codes lighter than the
+sky (timber-valley valley-aerial mid banding 0.227 percent: the ridge line, both sides flat). `fireSky` in
+`fire-spots.ts` now draws the layer's glow through the haze under it (t, the low layer's transmittance along the ray)
+and the haze's glow in front (1 - t) by the fog's own closed form (`fireTrackWgsl`, one source for both; the fog's WGSL
+text is unchanged), with the fog's spots in the look block (`LOOK_FLOATS` 144 to 208) and the `Clouds` uniform (168
+to 232 floats). Evidence: sky features-check look on WebGPU and `MARGO_COMPAT=1`, the same pixels over the sky and over
+a fully hazed plane 50 km out agreeing exactly (0.52 relative without the fix). Missing: the night's base light still
+differs at the horizon (the fog takes the night sky, the dome sees it through the layer), not yet measured.
 
 ## Overcast deck on the sky cloud sheet (KB-SKY-OVERCAST1, section 5 evidence, 2026-11-17)
 

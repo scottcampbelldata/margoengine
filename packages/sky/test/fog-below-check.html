@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky fog below the horizon</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// KB-SKY-HAZEBELOW1: a wide ground 1 km under the eye, hidden fully by thick haze in the sky's colour. Without
+// fog.lightDecay every pixel down a column takes the horizon's radiance (one flat colour); with it each pixel takes that
+// colour times fogBelowLight of its own ray. Driven by fog-below-check.mjs, which reads the HDR scene capture (Bloom's
+// sceneTexture, exposure 0) of both and compares the ratio with the CPU mirror per row.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const eye=[0,1000,0],target=[0,700,-2000],fov=50;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:eye,target,fov,near:1,far:60000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+engine.createMesh().setGeometry(box(60000,1,60000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,-25000]);
+const sky=Sky.attach(engine,{hours:10,timeScale:0,fog:{falloff:'exp',start:0,density:0.02}});
+await sky.ready;
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+window.check={async run(decay){
+ device.pushErrorScope('validation');
+ sky.options.fog.lightDecay=[0,0,0];await frame();const flat=await frame();
+ sky.options.fog.lightDecay=decay;await frame();const lit=await frame();
+ const error=await device.popErrorScope();
+ return {compat:isCompatDevice(device),error:error?.message??null,errors:errors.splice(0),width:post.sceneTexture.width,height:post.sceneTexture.height,
+  flat:Array.from(flat),lit:Array.from(lit),camera:{eye,target,fov,aspect:post.sceneTexture.width/post.sceneTexture.height}};
+}};
+window.ready=true;
+</script></body></html>

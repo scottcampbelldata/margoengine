@@ -235,7 +235,7 @@ const sky = Sky.attach(engine, {look: {zenithColor: [0.6, 0.2, 1], zenithStrengt
 | `ozone` | 0 to 20 | 0 | Ozone absorption, a multiple of Earth's layer: a deeper blue at twilight |
 | `scatteredLight` | linear RGB 0 to 4 | [0, 0, 0] | Light a low haze layer (smoke, ash, sea spray) scatters down, a share of the zenith sun on level ground: the layer shines evenly over the day sky with that light over pi, so the dome, its reflections, the light it gives the scene and the sky fog take its glow. A `WeatherDrive` writes it under a load |
 | `layerTransmittance` | linear RGB 0 to 1 | [1, 1, 1] | That layer's direct share straight up: the night's own light (stars, moon, twilight, the clouds above) is seen through it, t^(1 / sin e) along a ray e up (e floored at 3 degrees), with the layer's glow (`scatteredLight`) in front, so a starry sky goes out under a thick smoke pall. The day sky takes the layer through `sunColor` and `scatteredLight`; by day it dims and veils only `VolumetricClouds`, which stand above it. A `WeatherDrive` writes it under a load |
-| `fireSpots` | up to 8 `{color, x, z, height, reach}` | none | Fires light that layer from below: each ray meets a spot's lit `height` (default 1000 m) r metres across from (`x`, `z`) and takes `color` (a share of the zenith sun, 0 to 4) times `(R^2 / (R^2 + r^2))^1.5`, R the `reach` (default 1000 m); the spots add. Shown at night, as `scatteredLight` is. A `WeatherDrive` writes it from its fires |
+| `fireSpots` | up to 8 `{color, x, z, height, reach}` | none | Fires light that layer from below: each ray meets a spot's lit `height` (default 1000 m) r metres across from (`x`, `z`) and takes `color` (a share of the zenith sun, 0 to 4) times `(R^2 / (R^2 + r^2))^1.5`, R the `reach` (default 1000 m); the spots add. Shown at every hour, in front of what is above the layer (`VolumetricClouds` included), as the haze under it takes the same fires' light (`fog.fireSpots`), which the sky draws in front of it by the layer's opacity along each ray. A `WeatherDrive` writes it from its fires |
 | `fireSight` | 0 to 1e6 m | 0 | No ray takes the `fireSpots` layer farther across than this, the visual range through the smoke, so the sky low behind a ridge takes the light of the haze on it; 0 sets no limit. A `WeatherDrive` writes 2 / fog density |
 
 | `look` | Range | Default | What it does |
@@ -369,8 +369,10 @@ and Sébastien Hillaire, [Physically Based Sky, Atmosphere and Cloud Rendering i
 The clouds stand above the sky's low haze layer (`atmosphere.layerTransmittance` and `scatteredLight`, which a
 `WeatherDrive` writes under smoke, ash or spray): each cloud is seen through it, the layer's transmittance straight up
 to the power 1 / sin e along a ray e up (Beer-Lambert through a flat layer, e floored at 3 degrees), with the layer's
-glow in front, as the sky draws what is above the layer. Under a smoke pall a cumulus is dimmed and tinted with the sky
-behind it instead of drawing clean white. Without a layer the clouds are drawn as they are.
+glow in front, and the fires' light on it (`atmosphere.fireSpots`), as the sky draws what is above the layer. Under a
+smoke pall a cumulus is dimmed and tinted with the sky behind it instead of drawing clean white, and over a burning
+valley it takes the pall's fire glow in front rather than standing as a dark blot on it. Without a layer the clouds are
+drawn as they are.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -950,7 +952,8 @@ console.log(sun.elevation.degrees, sun.equationOfTime);
 
 - **Exposure.** Core has no exposure setting. Scene exposure is `exposure` (stops, default 0) on `Tonemap` from
   `@margoengine/tonemap`, read every frame: `Tonemap.attach(engine, {exposure: 1})`, then
-  `tonemap.options.exposure = 0.5`. The sky's own `exposure` option brightens only the sky backdrop.
+  `tonemap.options.exposure = 0.5`. The sky's own `exposure` option brightens the sky: its backdrop, fog, reflections
+  and the light its map gives the scene, never the engine sun's beam.
 
 ## Exact first frames on the WebGL2 layer
 
@@ -1101,15 +1104,34 @@ const level = fogOpticalDepth(haze, 800, 80, 80);   // a level view at the base:
 console.log(down < level);
 ```
 
+`lightDecay` (red, green and blue, per unit optical depth, default `[0, 0, 0]`) darkens the haze a ray meets below the
+horizon: it lies deeper in the layer, lit by e^(-k tau) of the light at the eye at a vertical optical depth tau under
+it (the two-stream diffusion mode of an absorbing haze, Meador and Weaver 1980). A ray down at sine d of optical depth x
+takes the fog's colour times `(1 - e^(-x (1 + c))) / ((1 + c) (1 - e^(-x)))`, c = k d: 1 for near haze, `1 / (1 + c)`
+for a far ground the haze hides fully, which no longer draws as the horizon's one colour (KB-SKY-HAZEBELOW1). A
+`WeatherDrive` writes it from its dust, smoke, ash and spray. `fogBelowLight(decay, rayY, optical)` returns the factor
+on the CPU:
+
+```ts
+import {fogBelowLight} from 'margoengine/sky';
+const smoke = [0.44, 0.49, 0.55];
+const far = fogBelowLight(smoke, -0.37, 30);   // ground 22 degrees down behind thick smoke: about 0.86, 0.85, 0.83
+const near = fogBelowLight(smoke, -0.37, 0.01); // a few metres of haze: about 1
+console.log(far[2] < far[0], near[1] > 0.99);
+```
+
 ### Fires in the haze and on the smoke over them
 
 `fog.fireSpots` adds each fire's colour to the haze round it, and `atmosphere.fireSpots` lights the smoke layer over it
-at night (both at most eight spots, from `@margoengine/sky`'s `SkyFireSpot`). A pixel's haze takes each spot's colour
+by day and by night, in front of the clouds above it as of the dome (both at most eight spots, from `@margoengine/sky`'s `SkyFireSpot`). A pixel's haze takes each spot's colour
 times the mean of `(R^2 / (R^2 + r^2))^1.5` along its line of sight seen from above, as far as 2 / `density` from the
 eye, where the haze's light comes from; the mean is the exact line integral (the analytic airlight of Sun,
 Ramamoorthi, Narasimhan and Nayar, SIGGRAPH 2005, https://doi.org/10.1145/1186822.1073309). `atmosphere.fireSight`
 holds the sky's low rays to the same reach (the visual range, Koschmieder 1924), so ridges stand dark against a glow
-that is brightest toward the fires. A `WeatherDrive` writes all three from its fire fronts.
+that is brightest toward the fires. The sky draws the haze's glow toward each of its own rays too, by the same law
+along the ray's ground path to 2 / `density`, in front of the layer's by the layer's opacity along the ray (1 -
+`layerTransmittance`^(1 / sin e)), so a far ridge the fog hides fully takes the sky's colour over it
+(KB-SKY-HAZEGLOW1). A `WeatherDrive` writes all three from its fire fronts.
 
 ```ts
 import {Sky} from 'margoengine/sky';
@@ -1327,6 +1349,32 @@ nothing. Against the sun's beam (intensity x colour x cos / pi) it predicts the 
 checks' T6 limits. The `ambient` floor is
 in engine units and is not scaled; the sky's `exposure` brightens the scene's sky light as it brightens the backdrop.
 With `environment: true` the map follows the engine sun's own intensity, whatever set it.
+
+A sky that lights the scene also draws in the engine light's units (`balance`, default true): its backdrop, fog colour,
+reflection map, and the `VolumetricClouds`, `AerialPerspective`, `LightShafts` and `TornadoCloud` drawn over it take
+`sky.pictureScale`, which is `sky.lightScale` by day and fades to 1 with the night blend, through the exposure they
+already share; the light map then takes only `lightScale / pictureScale`, so nothing is scaled twice. The sky stands to
+the ground the sun lights as it does outdoors: with the presets (Preetham, a sun of 5) the drawn sky is 0.72 of what it
+was, with Bruneton at a sun of 3 about a sixth. A sky that only draws a backdrop (no `lighting`, no `environment`), the
+night, and `balance: false` keep the sky's own units.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Sky } from '@margoengine/sky';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const sky = Sky.attach(engine, { hours: 15, lighting: { intensity: 5 } }); // balance: true by default
+engine.start();
+// After a frame: the factor the picture takes, the same as the light map's by day.
+console.log(sky.pictureScale, sky.lightScale);
+sky.options.balance = false; // the sky's own units again, about 1.4 times brighter here
+```
+
+- Change note (2026-11-27, KB-SKY-SANDGREY1, KB-SKY-PALLHAZE1): every sky that lights the scene draws its day sky,
+  fog and reflections darker by `lightScale` (0.72 with the presets), and `WeatherDrive` writes the haze colour of a
+  smoke, ash, spray or dust load in the units the sky draws its own haze in (`Sky.zenithSun` over pi at the sky's
+  exposure and picture scale), about 1.6 times brighter under a sun of 5, so a far ridge in a pall ends at the sky's
+  brightness instead of a dark cut-out. `balance: false` keeps the old sky; a hand-set `fog.color` is drawn as it is.
 
 - Change note (2026-11-17, KB-SKY-SUNUNITS1): every scene lit by `lighting.ambient` or `environment` takes less light
   from its sky. Until now the map lit in sky units: the clear sky gave level ground 1.3 to 1.5 times the sun's light (a

@@ -459,7 +459,7 @@ test('exponential height fog with a fixed colour packs its uniform every frame',
   h.engine.use(sky);
   h.frame();
   const values = () =>
-    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 304).data), (v) => +v.toFixed(4));
+    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 320).data), (v) => +v.toFixed(4));
   assert.deepEqual(values().slice(0, 12), [0.01, 0, 1, 0.065, 0.1, 0.2, 0.3, 1, 0, 0, 0, 0]);
   assert.ok(
     values()
@@ -489,6 +489,13 @@ test('exponential height fog with a fixed colour packs its uniform every frame',
       .every((v) => v === 0),
     'cleared with the spots',
   );
+  // KB-SKY-HAZEBELOW1: the haze's light decay below the eye in floats 76 to 78, every frame.
+  sky.options.fog.lightDecay = [0.3, 0.45, 0.7];
+  h.frame();
+  assert.deepEqual(values().slice(76, 80), [0.3, 0.45, 0.7, 0]);
+  delete sky.options.fog.lightDecay;
+  h.frame();
+  assert.deepEqual(values().slice(76, 80), [0, 0, 0, 0]);
   for (const bad of [[{ color: [5, 0, 0], x: 0, z: 0 }], [{ color: [0, 0, 0], x: 0, z: 0, reach: 0 }], [null]])
     assert.throws(() => new Sky({ fog: { fireSpots: bad } }), /fog\.fireSpots/);
   sky.dispose();
@@ -1177,6 +1184,8 @@ test('the sky light map is taken into the engine sun units, in proportion to lig
         hours: 12,
         timeScale: 0,
         model,
+        // The sky's own units, so the light buffer carries the whole scale (balanced, the picture takes it: below).
+        balance: false,
         lighting: { intensity, ambient: { day: [0, 0, 0], night: [0, 0, 0] } },
       });
       h.engine.use(sky);
@@ -1211,4 +1220,53 @@ test('the sky light map is taken into the engine sun units, in proportion to lig
   fallback.onPreUpdate(h.context.delta);
   assert.ok(Math.abs(fallback.lightScale - 3 / (4 * Math.PI * 0.55)) < 1e-6, String(fallback.lightScale));
   fallback.dispose();
+});
+
+// KB-SKY-SANDGREY1: the light map was taken into the engine sun's units (KB-SKY-SUNUNITS1), but the sky drew its picture,
+// fog and reflection map in its own: at a sun of 5 the Preetham sky stood 1.4 times too bright against the ground the
+// sun lights, Bruneton at 3 about 6 times. A sky that lights the scene now draws all of it at its exposure plus
+// log2(Sky.pictureScale), which is lightScale by day, and the light map takes only lightScale / pictureScale, so the map
+// is not scaled twice. The night, a backdrop-only sky and balance: false keep the sky's own units.
+test('a sky that lights the scene draws in the engine light units, the light map scaled once (KB-SKY-SANDGREY1)', () => {
+  const run = (options, hours = 12) => {
+    const h = optionalGPU();
+    h.engine.lighting = { direction: new Float32Array([0, 1, 0, 3]), radiance: new Float32Array([1, 1, 1, 0.18]) };
+    const sky = new Sky({ hours, timeScale: 0, ...options });
+    h.engine.use(sky);
+    sky.onPreUpdate(h.context.delta);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+    const light = h.context.bindings.find((e) => e.binding === 8)?.resource.buffer,
+      result = {
+        lightScale: sky.lightScale,
+        pictureScale: sky.pictureScale,
+        exposure: sky['values'][25],
+        map: light ? new Float32Array(light.data)[39] : undefined,
+      };
+    sky.dispose();
+    return result;
+  };
+  const lit = { lighting: { intensity: 5, ambient: { day: [0, 0, 0], night: [0, 0, 0] } } };
+  for (const model of ['preetham', 'bruneton']) {
+    const r = run({ ...lit, model, exposure: -0.6 });
+    assert.ok(Math.abs(r.pictureScale - r.lightScale) < 1e-9, `${model}: by day the picture takes lightScale`);
+    assert.ok(Math.abs(r.exposure - (-0.6 + Math.log2(r.lightScale))) < 1e-5, `${model}: exposure ${r.exposure}`);
+    assert.equal(r.map, 1, `${model}: the light map is not scaled twice`);
+    const off = run({ ...lit, model, balance: false });
+    assert.equal(off.pictureScale, 1, `${model}: balance false keeps the sky units`);
+    assert.equal(off.exposure, 0);
+    assert.equal(off.map, Math.fround(off.lightScale), `${model}: the map still takes lightScale`);
+  }
+  // Preetham at a sun of 5: 5 / (4 pi 0.55), the picture 0.72 of what it drew before.
+  assert.ok(Math.abs(run(lit).pictureScale - 5 / (4 * Math.PI * 0.55)) < 1e-6);
+  // The night keeps its look: the factor fades to 1 with the night blend (sun 15 degrees down at hour 1).
+  const night = run(lit, 1);
+  assert.equal(night.pictureScale, 1, 'the night is drawn as before');
+  assert.equal(night.map, Math.fround(night.lightScale));
+  // A sky that only draws a backdrop does not light the scene, so nothing ties its units to the engine's.
+  const backdrop = run({});
+  assert.equal(backdrop.pictureScale, 1);
+  assert.equal(backdrop.exposure, 0);
+  assert.throws(() => run({ ...lit, balance: 'yes' }), RangeError);
 });

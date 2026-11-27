@@ -34,6 +34,8 @@ const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[na
 // closed-form term (run only with a scaleHeight) and its uniform one vec4; the same commands in every trace.
 // night-fog, afterlight and preetham-clouds-fog recorded again with KB-SKY-PALLFALLOFF1 (2026-11-27): the fog WGSL
 // gained the fire spots' haze and its uniform sixteen zero vec4s; the same commands in every trace.
+// afterlight and meadow recorded again with KB-SKY-SANDGREY1 (2026-11-27): a sky that lights the scene draws in the
+// engine light's units (the exposure float and the light buffer's scale); uploads only, the same commands and WGSL.
 test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);

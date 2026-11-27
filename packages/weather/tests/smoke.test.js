@@ -228,6 +228,82 @@ test('a sky with a look but no atmosphere gets one for the sun; a sky with neith
   }
 });
 
+// KB-SKY-PALLHAZE1: the fog colour was the haze's share of a white surface's light drawn as it was, while the sky draws
+// the same layer's light (scatteredLight) as that share times its zenith sun over pi, at its exposure and picture scale:
+// about 2.2 times brighter under a sun of 5, so a far ridge under the pall was a dark cut-out against the sky. A sky
+// with `zenithSun` gets the haze in its own drawn units.
+test('the fog colour under a load is in the units the sky draws its haze in (KB-SKY-PALLHAZE1)', async () => {
+  // The glow held by hand, so this sky does not draw the load and the drive writes the haze's own colour.
+  const { holdFromWeather } = await import('../../shared/settings.js'),
+    atmosphere = { sunIntensity: 1.5 };
+  holdFromWeather(atmosphere, 'scatteredLight');
+  const zenithSun = 4 * Math.PI * 0.55,
+    pictureScale = 5 / zenithSun,
+    sky = {
+      name: 'sky',
+      zenithSun,
+      pictureScale,
+      options: { exposure: -0.6, fog: { density: 0.01, falloff: 'exp' }, atmosphere },
+    },
+    machine = new WeatherMachine('clear', { seed: 8 }),
+    engine = engineOf(sky),
+    drive = WeatherDrive.attach(engine, { weather: machine });
+  drive.setup(engine);
+  applyWeatherSettings(machine, { smoke: 0.5 });
+  drive.update(0.5);
+  const l5 = hazeLight({ smoke: 0.5 }, Math.PI / 2),
+    k = (zenithSun * 1.5 * 2 ** -0.6 * pictureScale) / Math.PI;
+  for (let i = 0; i < 3; i++) near(sky.options.fog.color[i], smokeColor()[i] * l5[i] * k, 1e-12);
+  // Balanced by day (pictureScale = lightScale), a share of 1 is the engine sun's 5 on a white surface, 5 / pi.
+  near(k, (5 * 1.5 * 2 ** -0.6) / Math.PI, 1e-12);
+});
+
+// KB-SKY-HAZEHORIZON1: under a smoke pall the drive wrote the fog a colour of its own, so a far ridge, all haze, ended
+// at that colour and not at the sky drawn right above it: in timber-valley's ridge-smoke shot an orange (119, 73, 10)
+// wedge cut hard against a brown sky of (98, 66, 24). A long enough path ends at the horizon sky (Koschmieder 1924).
+test('a sky that draws the load leaves the fog on its own radiance, gives back the colour after, and dust still tints', async () => {
+  const { holdFromWeather } = await import('../../shared/settings.js');
+  for (const extra of [{ options: { atmosphere: {} } }, { options: { look: {} } }, { airControls: true, options: {} }]) {
+    const sky = {
+        name: 'sky',
+        zenithSun: 4 * Math.PI * 0.55,
+        ...extra,
+        options: { fog: { density: 0.01, falloff: 'exp', color: [0.3, 0.4, 0.5] }, ...extra.options },
+      },
+      machine = new WeatherMachine('clear', { seed: 8 }),
+      engine = engineOf(sky),
+      drive = WeatherDrive.attach(engine, { weather: machine });
+    drive.setup(engine);
+    for (const load of [{ smoke: 0.5 }, { ash: 0.5 }, { spray: 0.6 }, { smoke: 0.3, ash: 0.3 }]) {
+      applyWeatherSettings(machine, load);
+      drive.update(0.5);
+      assert.equal(sky.options.fog.color, undefined, JSON.stringify(load));
+    }
+    // Dust is not in the sky's pall, so a load with dust keeps the haze's own colour.
+    applyWeatherSettings(machine, { dust: 0.5, smoke: 0.2 });
+    drive.update(0.5);
+    assert.equal(sky.options.fog.color.length, 3);
+    applyWeatherSettings(machine, { smoke: 0.5 });
+    drive.update(0.5);
+    assert.equal(sky.options.fog.color, undefined);
+    applyWeatherSettings(machine, {});
+    drive.update(0.5);
+    assert.deepEqual(sky.options.fog.color, [0.3, 0.4, 0.5]);
+  }
+  // A sky with no atmosphere, look or air controls, or one whose glow or sun colour is held, does not draw the load.
+  for (const [options, key] of [[{}, undefined], [{ atmosphere: {} }, 'scatteredLight'], [{ atmosphere: {} }, 'sunColor']]) {
+    if (key) holdFromWeather(options.atmosphere, key);
+    const sky = { name: 'sky', options: { fog: { density: 0.01, falloff: 'exp' }, ...options } },
+      machine = new WeatherMachine('clear', { seed: 8 }),
+      engine = engineOf(sky),
+      drive = WeatherDrive.attach(engine, { weather: machine });
+    drive.setup(engine);
+    applyWeatherSettings(machine, { smoke: 0.5 });
+    drive.update(0.5);
+    assert.equal(sky.options.fog.color.length, 3, String(key));
+  }
+});
+
 test('the sky fog takes the smoke colour while smoke is most of the air, and a mix of dust and smoke by their extinction share', () => {
   const sky = { name: 'sky', options: { fog: { density: 0.01, falloff: 'exp' } } },
     machine = new WeatherMachine('clear', { seed: 8 }),

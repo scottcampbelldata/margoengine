@@ -218,12 +218,81 @@ test('a low haze layer in the sky dims and veils the clouds seen through it', ()
   assert.match(code(h), /cloudVeiled\(light,opacity,dir\)\*k/);
   assert.match(code(h), /cloudVeiled\(scene,opacity,dir\)\*k/);
   assert.match(code(h), /let t=pow\(max\(clouds\.veil\.rgb,vec3f\(1e-30\)\),vec3f\(1\.0\/max\(d\.y\/max\(length\(d\),1e-6\),0\.052336\)\)\);/);
-  assert.match(code(h), /return light\*t\*clouds\.veil\.w\+opacity\*clouds\.glow\.rgb;/);
+  assert.match(code(h), /return light\*t\*clouds\.veil\.w\+opacity\*\(clouds\.glow\.rgb\+fireSky\(d,t\)\);/);
   clouds.dispose();
-  // Without a layer the clouds are as they were: no dimming, no glow.
-  const clear = new Float32Array(CLOUD_FLOATS);
+  // Without a layer the clouds are as they were: no dimming, no glow, no fires.
+  const clear = new Float32Array(CLOUD_FLOATS),
+    none = [1, 1, 1, 1, 0, 0, 0, 0, ...new Array(128).fill(0)];
   writeVeil(clear, undefined);
-  assert.deepEqual([...clear.subarray(96)], [1, 1, 1, 1, 0, 0, 0, 0]);
+  assert.deepEqual([...clear.subarray(96)], none);
   writeVeil(clear, { sun: [0, 1, 0], options: {}, zenithSun: 6.9 });
-  assert.deepEqual([...clear.subarray(96)], [1, 1, 1, 1, 0, 0, 0, 0]);
+  assert.deepEqual([...clear.subarray(96)], none);
+});
+
+// KB-SKY-FIREDAY1: the dome draws the fires' light on the smoke layer (atmosphere.fireSpots) in front of what is above it
+// at every hour, so clouds above the layer take it in front too, in the same sky units, or each cloud over a burning
+// valley is a dark blot on the firelit pall.
+test("the fires' light on the layer is in front of the clouds, as of the dome", () => {
+  const v = new Float32Array(CLOUD_FLOATS).fill(7),
+    spot = { color: [0.2, 0.1, 0.05], x: 300, z: -40, height: 1500, reach: 1200 };
+  writeVeil(v, {
+    sun: [0, 1, 0],
+    options: { atmosphere: { sunIntensity: 2, fireSpots: [spot], fireSight: 2600 } },
+    zenithSun: 5,
+  });
+  const unit = (2 * 5) / Math.PI,
+    f = (x) => Math.fround(x);
+  assert.deepEqual([...v.subarray(104, 112)], [f(0.2 * unit), f(0.1 * unit), f(0.05 * unit), 1440000, 300, 1500, -40, 2600]);
+  assert.ok(
+    v.subarray(112).every((x) => x === 0),
+    'the spots left over end the list',
+  );
+  const h = tracedGPU(),
+    sky = new Sky({ hours: 10, timeScale: 0, atmosphere: { fireSpots: [spot] } }),
+    clouds = new VolumetricClouds({ sky });
+  h.engine.use(sky);
+  h.engine.use(clouds);
+  frame(h, sky, clouds);
+  const c = code(h);
+  assert.match(c, /fires:array<vec4f,16>,hazeFires:array<vec4f,16>\}/, 'the uniform holds the spots');
+  assert.ok(c.includes('fn fireLayer(w:vec3f)->vec3f'), "the dome's fire term");
+  assert.ok(c.includes('let sight=clouds.fires[1].w;'), 'read from the clouds uniform');
+  clouds.dispose();
+});
+
+// KB-SKY-HAZEGLOW1: the fog adds its fires' glow on the haze (fog.fireSpots) to a far ground by its own law, which the
+// sky's rays did not take, so a ridge the haze hid stood lighter than the sky over it. Clouds over the layer take the
+// haze's glow in front as the dome does: the sky's fog spots ride floats 168 to 231 in sky units, the path end 2 / density.
+test("the haze's fire glow is in front of the clouds, as of the dome", () => {
+  const v = new Float32Array(CLOUD_FLOATS).fill(7),
+    spot = { color: [0.4, 0.2, 0.1], x: 50, z: -1500, reach: 800 };
+  writeVeil(v, {
+    sun: [0, 1, 0],
+    options: { exposure: 1, fog: { density: 0.002, fireSpots: [spot] } },
+    zenithSun: 5,
+    pictureScale: 0.5,
+  });
+  const f = (x) => Math.fround(x);
+  // 2^1 x 0.5 = 1: the fog's units are the sky's here; the path end 2 / 0.002 = 1000 m.
+  assert.deepEqual([...v.subarray(168, 176)], [f(0.4), f(0.2), f(0.1), 640000, 50, 1000, -1500, 1000]);
+  assert.ok(v.subarray(176).every((x) => x === 0), 'the spots left over end the list');
+  writeVeil(v, { sun: [0, 1, 0], options: { exposure: 2, fog: { density: 0.002, fireSpots: [spot] } }, zenithSun: 5 });
+  assert.equal(v[168], f(0.1), 'the fog adds after the exposure, the sky before it');
+  for (const fog of [{ density: 0, fireSpots: [spot] }, { density: 0.002 }, undefined]) {
+    writeVeil(v, { sun: [0, 1, 0], options: { fog }, zenithSun: 5 });
+    assert.ok(v.subarray(168).every((x) => x === 0), `no haze glow: ${JSON.stringify(fog)}`);
+  }
+  const h = tracedGPU(),
+    sky = new Sky({ hours: 10, timeScale: 0, atmosphere: { fireSpots: [spot] } }),
+    clouds = new VolumetricClouds({ sky });
+  h.engine.use(sky);
+  h.engine.use(clouds);
+  frame(h, sky, clouds);
+  const c = code(h);
+  assert.ok(c.includes('fn fireHazeTrack(start:vec2f,end:vec2f)->vec3f'), "the haze's law");
+  assert.ok(
+    c.includes('return layer*t+(vec3f(1.0)-t)*fireHazeTrack(clouds.eye.xz,clouds.eye.xz+ray.xz*clouds.hazeFires[1].w);'),
+    "the layer's glow through the haze, the haze's in front",
+  );
+  clouds.dispose();
 });

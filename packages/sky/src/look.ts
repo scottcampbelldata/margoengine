@@ -27,15 +27,15 @@
 import type { SkyAtmosphereOptions, SkyFeatures, SkyLookOptions, SkyOptions } from './base.js';
 import type { Vec3 } from '@margoengine/math';
 import { margoError } from '../../shared/errors.js';
-import { checkFireSpots, writeFireSpots } from './fire-spots.js';
+import { checkFireSpots, fireSkyWgsl, writeFireSpots, writeHazeFires } from './fire-spots.js';
 
 /** Earth's Rayleigh spectrum normalised to its blue (Hillaire 2020 Table 1): `rayleighColor`'s default. */
 export const EARTH_RAYLEIGH_COLOR: Vec3 = [0.005802 / 0.0331, 0.013558 / 0.0331, 1];
 /** Floats of the extra uniform block that follows the sky's 64 at byte 256. */
-export const LOOK_FLOATS = 144;
+export const LOOK_FLOATS = 208;
 // The Frame struct grows by the block; each later field is one vec4 unless noted.
 const FIELDS =
-  ',air0:vec4f,air1:vec4f,air2:vec4f,lookZenith:vec4f,lookHorizon:vec4f,lookGround:vec4f,lookGlow:vec4f,lookShape:vec4f,lookSun:vec4f,lookCloud:vec4f,lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>}';
+  ',air0:vec4f,air1:vec4f,air2:vec4f,lookZenith:vec4f,lookHorizon:vec4f,lookGround:vec4f,lookGlow:vec4f,lookShape:vec4f,lookSun:vec4f,lookCloud:vec4f,lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>}';
 const lookCode = /* wgsl */ `
 // Recolour at the same Rec. 709 luminance toward tint.rgb, by tint.w times weight.
 fn lookTint(c:vec3f,tint:vec4f,weight:f32)->vec3f {
@@ -66,24 +66,20 @@ fn nightSky(w:vec3f,footprint:f32)->vec3f {return lookSky(w,physicalNightSky(w,f
 // (stars, moon, twilight and the clouds above) comes from above the layer, so its share of the sky (frame.sun.w) is seen
 // through it, t^(1 / sin e) along a ray e up (Beer-Lambert through a flat layer, e floored at 3 degrees as the sun's is),
 // with the layer's own glow (air3, which the day sky adds under its clouds) in front. 1 and 0 leave the sky exactly as is.
+// The fires' light on the layer (fireLayer) is in front at every hour: the day sky has no share of it (its air3 holds
+// only the even glow), so drawn by the night's share alone it left a burning valley's pall unlit by day while the haze
+// below took the same fires' light (fog.fireSpots), every far ridge lighter than the sky over it (KB-SKY-FIREDAY1).
 // fires: the fires' light on the layer (atmosphere.fireSpots), two vec4 a spot: rgb and the reach R squared, then x, the
 // layer's lit height and z. The ray meets that height at r metres across from the spot, where the layer takes
 // (R^2 / (R^2 + r^2))^1.5 of it, an isotropic source's light on a plane (cos / d^2), so the pall glows over each fire
 // and falls off between and beyond them (KB-SKY-PALLFALLOFF1). An eye at or above that height takes its own point. The
 // first spot's unused w holds the sight (atmosphere.fireSight, 0 none): no ray takes the layer farther across than it.
-fn fireLayer(w:vec3f)->vec3f {
- let ray=normalize(w);let up=max(ray.y,0.052336);var light=vec3f(0.0);let sight=frame.fires[1].w;let flat=length(ray.xz);
- for(var i=0u;i<8u;i++){
-  let spot=frame.fires[2u*i];if(spot.w<=0.0){break;}let at=frame.fires[2u*i+1u].xyz;
-  var run=max(at.y-frame.eye.y,0.0)/up;if(sight>0.0&&run*flat>sight){run=sight/flat;}
-  let across=frame.eye.xz+ray.xz*run-at.xz;
-  light+=spot.rgb*pow(spot.w/(spot.w+dot(across,across)),1.5);
- }
- return light;
-}
-fn lowLayer(c:vec3f,w:vec3f)->vec3f {
+// hazeFires: the haze's spots (fog.fireSpots, in sky units, the fog's path end in the first spot's w): the layer's glow
+// is seen through the haze under it (t) and the haze's own glow is in front (1 - t) by the fog's law, so a far ridge
+// the fog hides takes the sky's colour over it (fireSky, KB-SKY-HAZEGLOW1).
+${fireSkyWgsl('frame')}fn lowLayer(c:vec3f,w:vec3f)->vec3f {
  let t=pow(max(frame.air4.rgb,vec3f(1e-30)),vec3f(1.0/max(w.y/max(length(w),1e-6),0.052336)));
- return c*mix(vec3f(1.0),t,frame.sun.w)+(frame.air3.rgb+fireLayer(w))*frame.sun.w;
+ return c*mix(vec3f(1.0),t,frame.sun.w)+frame.air3.rgb*frame.sun.w+fireSky(w,t);
 }
 fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {return lowLayer(cloudSkyAbove(color,backdrop,ray,angularFootprint),ray);}
 `;
@@ -262,7 +258,7 @@ export const look: NonNullable<SkyFeatures['look']> = {
     out[8] = a.mie ?? 1;
     return out;
   },
-  write(out: Float32Array, o: SkyOptions, air: Float32Array, zenith = 0): void {
+  write(out: Float32Array, o: SkyOptions, air: Float32Array, zenith = 0, picture = 1): void {
     const a = o.atmosphere ?? {},
       l = o.look ?? {},
       sun = a.sunColor ?? [1, 1, 1],
@@ -300,5 +296,7 @@ export const look: NonNullable<SkyFeatures['look']> = {
     // The fires' light on the layer, in the same sky units as the layer's own glow.
     writeFireSpots(out, 80, a.fireSpots, (intensity * zenith) / Math.PI);
     out[87] = a.fireSight ?? 0;
+    // The haze's spots, from the fog's units (after the sky's exposure and picture scale) into the sky's.
+    writeHazeFires(out, 144, o.fog, picture);
   },
 };

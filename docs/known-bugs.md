@@ -125,6 +125,198 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 - **Repro:** not yet run. By reading: water's liquid, underwater and caustics composites on a `TransparentCanvas` encode `vec4f(toDisplay(rgb),now.a)`, the pattern KB-POST-ALPHARIM1 measured at 36 of 255 on silhouettes.
 - **Cause:** the display curve is applied to premultiplied colour. The shared helper `displayFor` (`packages/shared/straight-display.js`) is the fix; each composite needs it and a case in a transparent-canvas test.
+### Open 2026-11-27: the aftermath shot shimmers 0.61 percent at mid, all of it the crest conifers' parallax against the sky (KB-LOOK-TV-SHIMMER3, look check)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`
+  (RTX A6000, WebGPU; supersample 2, 8 subframes): mid shimmerMoving 0.607 percent (bound 0.5), the shot's one failing
+  bar; the same before and after KB-SKY-FIREDAY1 and KB-SKY-HAZEGLOW1.
+- **Measured (sh2-occ split of the mid probe):** 49.3 percent of the off pixels are surfaces the next frame covers or
+  uncovers, 49.2 percent are within 3 px of a depth edge, 1.3 percent other, none in the sky; every one lies on the
+  ridge-line conifers' tips against the sky (`.lane` map in the lane B handoff 50). Scatter and biome causes ruled out
+  on these frames: no off pixel inside a tree mass (a hard LOD switch, `lodFade: 0` in biomes, or sway would show
+  there), and the silhouettes are already antialiased by the shot's supersampling. A warp by camera motion cannot
+  match a surface the next frame shows for the first time, as KB-LOOK-TV-SHIMMER2 found for rail-line.
+- **Next:** a ruling on the check (leave out pixels the next frame occludes or disoccludes, as optical-flow benchmarks
+  do) or on the shot. A TAA change (lane A) would need history rejected where the reprojected depth disagrees, a
+  neighbourhood clamp in YCoCg (Karis 2014; variance clipping, Salvi 2016) so thin dark tips against a bright sky
+  neither ghost nor crawl, and motion vectors for the plants' sway; none of it lowers the disocclusion share the
+  check counts. The bound stays 0.5.
+- **Accepted 2026-11-27 (manager's ruling, lane B landing):** main 0.581 to 0.607 with the sky in engine units
+  (KB-SKY-SANDGREY1, KB-SKY-PALLHAZE1). Per class, percent of the frame, main to landing: occluded 0.22 to 0.30, depth
+  edges 0.30 to 0.30, sky 0.05 to 0.00, other 0.02 to 0.01. Main's sky behind the crest read luma 158 (washed out, the
+  defect those fixes remove) over ground 28; the landing's 77 over 45 shows the tips. Bound unchanged.
+
+### Fixed 2026-11-27: a far ridge the haze hid fully took the haze's fire glow, the sky over it the smoke layer's, two laws for one light, so the ridge stood 6 codes lighter (KB-SKY-HAZEGLOW1, sky)
+
+- **Repro (before):** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-valley-aerial.json --once --seconds 1.1
+  --out <folder>` (RTX A6000, WebGPU) with KB-SKY-FIREDAY1 in: look bar mid banding 0.227 percent (bound 0.2; 0.0087
+  before FIREDAY1). The banded pixels were not 8-bit steps but one edge: at x 1176 of the 1920 x 1080 mid probe the sky
+  read (148, 118, 81) down to row 266 and the fully hazed far ridge (154, 121, 82) from row 267, both flat over 50 rows
+  (the sky's low rays beyond `fireSight` take one point a column, the far ridge the fog's saturated colour), so the
+  banding rule (two flat runs of 6 or more with a 1.5 to 12 step) counted the ridge line. Before FIREDAY1 the same edge
+  was 23 codes (131 over 154), over the rule's 12, so it was not counted.
+- **Cause:** the fog draws a far ground as the sky's radiance toward it (KB-SKY-HAZEHORIZON1) plus its fires' glow on
+  the haze (`fog.fireSpots`, `fireHaze`: the mean of the falloff along the ground path to 2 / density, in the haze's
+  colour), while the sky's rays over it took only the layer's glow (`atmosphere.fireSpots`, `fireLayer`: the falloff
+  at the one point where the ray meets the lit height, no farther across than `fireSight`, in the layer's colour). A
+  ray just over the ridge crosses the same haze as the ray to it, so the two must meet (Koschmieder 1924); they
+  differed by the two laws, the two colours (about 2.2 : 1 here) and the two reaches (`fireSight` 1142 m, the fog's
+  path 1978 m). Ruled out: 8-bit plateaus in the sky (the step is a depth edge, `steps.mjs` map), a coarse lookup.
+- **Fix:** one law for one light. The sky draws the haze's glow toward each of its own rays (`fireSky` in
+  `fire-spots.ts`): the layer's glow seen through the haze under it, t of it, and the haze's own glow in front, 1 - t,
+  by the fog's own closed form (`fireTrackWgsl`, which the fog now compiles from the same source, its WGSL text
+  unchanged) along the ray's ground path to the fog's path end, t the low layer's transmittance along the ray (as
+  `lowLayer` sees the night through it); a slab's airlight in front of what is behind it (Sun, Ramamoorthi, Narasimhan
+  and Nayar, SIGGRAPH 2005). The look block carries the fog's spots in sky units (floats 144 to 207, `LOOK_FLOATS` 144
+  to 208; `writeHazeFires` divides out the exposure and picture scale the fog adds them after) and `VolumetricClouds`
+  takes the same in front through their veil (`Clouds` floats 168 to 231, `CLOUD_FLOATS` 168 to 232). Without haze
+  spots the sky draws the layer's glow as before. After (same shot): mid banding 0.0017 percent, early 0.0009, the
+  ridge line at x 1176 154, 121, 82 on both sides; against main no failing bar of valley-aerial, ridge-smoke or
+  rail-line is worse.
+- **Regression test:** `packages/sky/test/look-check.html` with `features-check.mjs look` (`hazeGlow`: the same
+  pixels, 0.4 to 9 degrees up, over the sky and over a plane 50 km out in exp2 fog, a fire 1.5 km ahead: worst
+  relative difference 0 with the fix, 0.52 without, on WebGPU and MARGO_COMPAT=1), `packages/sky/test/look.test.js`
+  and `packages/sky/test/volumetric-clouds.test.js` ("the haze's fire glow is in front of ...").
+
+### Fixed 2026-11-27: by day a burning valley's smoke layer took none of its fires' light while the haze under it did, so every far ridge was lighter than the sky over it (KB-SKY-FIREDAY1, sky)
+
+- **Repro (before):** `node packages/scenes/test/timber-valley-still.mjs --views=ridge --out=<folder>` (RTX A6000,
+  WebGPU, 640 x 360) with KB-SKY-PALLHAZE1, KB-SKY-HAZEHORIZON1 and KB-SKY-HAZEBELOW1 in: the fully hazed far ridge
+  read (153, 120, 81) under a sky of (131, 108, 76) right above it, the ridge 23, 12 and 4 codes lighter than the sky
+  (main: 121 codes darker, the dark cut-out those fixes removed). Koschmieder (1924) wants a fully hazed far ground to
+  meet the horizon sky.
+- **Cause:** the look's `lowLayer` added the fires' light on the layer (`atmosphere.fireSpots`, `fireLayer`) by the
+  night's share (`frame.sun.w`) alone, like the layer's even glow; but the day sky holds only the even glow (`air3` in
+  `daySky`), so by day the spots were drawn nowhere in the sky, while the sky fog adds the same fires' light to the haze
+  (`fog.fireSpots`, `fireHaze`) at every hour. The excess in the haze had the spots' own colour ratio (about 2.4 : 1 :
+  0.26). Ruled out: the cloud deck (this scene's sky has no `clouds` option, and with its `VolumetricClouds` disposed
+  the sky above the ridge read the same 131, 108, 76).
+- **Fix:** `lowLayer` adds `fireLayer` at every hour (the even glow keeps its night share, as the day sky has its own),
+  and `VolumetricClouds`, which stand above the layer, take the same fires' light in front through their veil
+  (`writeVeil` writes `atmosphere.fireSpots` and `fireSight` into floats 104 to 167 of the `Clouds` uniform, in the
+  dome's sky units), so a cumulus over the pall is not a dark blot on it. Both draw one WGSL (`fireLayerWgsl` in
+  `fire-spots.ts`). After, same still: the ridge (154, 120, 80) under a sky of (150, 119, 81), 4, 1 and -1 codes.
+- **Regression test:** `packages/sky/test/look-check.html` with `features-check.mjs look` (a fire spot on the layer
+  must raise the day frame in the fire's colour; without the fix it is [0, 0, 0]), `packages/sky/test/look.test.js`,
+  `packages/sky/test/volumetric-clouds.test.js` ("the fires' light on the layer is in front of the clouds").
+
+### Fixed 2026-11-27: the sky settings table never wrote fog.scaleHeight or fog.base (KB-SKY-FOGROWS1, sky)
+
+- **Repro (before):** `applySkySettings({sky}, {'fog.scaleHeight': 400, 'fog.base': 80})` on a sky with `fog` left
+  both unset; `node packages/sky/test/features-check.mjs settings` stopped at "fog.scaleHeight = 3000 changes the
+  frame" (0 pixels), after "atmosphere.layerTransmittance" (by day it leaves the frame exact by design, KB-SKY-NIGHTPALL1)
+  and "atmosphere.fireSight" (it reaches only `atmosphere.fireSpots`, which has no row).
+- **Cause:** `applySkySettings` copied the fog part through a hand-kept list of five keys (density, start, height,
+  falloff, color); the scaleHeight and base rows added with the height falloff were never in it.
+- **Fix:** the keys come from the fog rows themselves (`FOG_KEYS`). The GPU check gives layerTransmittance a night
+  sun, base a height falloff and scaleHeight 20 m (the pillars' height), and leaves out fireSight (look.test.js proves
+  it). With that the check passed every fog row and stopped at "look.zenithStrength = 0.65 changes the frame" (max 1
+  level, 0 pixels). That row passes on main (677 pixels): KB-SKY-SANDGREY1 draws the sky in the engine light's units,
+  and under the page's sun of 1 the frame metered a displayed log-average luminance of 0.018 (main 0.30), so a tint at
+  the same luminance moved no pixel by 2 levels. The check's base (and the KB-SKY-NU-EDGE1 glow frame) now takes
+  `tonemap.exposure` 3, which meters it at 0.29; no bound changed. The whole settings check passes on WebGPU and
+  `MARGO_COMPAT=1` (121 rows move the frame; glow slope 0.91 a degree, bound 2.5).
+- **Regression test:** `packages/sky/test/settings.test.js` ("values land on the options they name"; fails with the
+  five-key list).
+
+### Fixed 2026-11-27: every ray below the horizon took the horizon's haze, so a fully hazed far ground was one flat colour (KB-SKY-HAZEBELOW1, sky and weather)
+
+- **Repro (before):** timber-valley `ridge-smoke` shot (`--once --seconds 1.1`, RTX A6000, WebGPU) with
+  KB-SKY-HAZEHORIZON1 in: the far ground past `BiomeView`'s 4 km world edge, all haze, read nearly one code, (124, 82,
+  32), down the whole lower left, and the look check's early flat rose to 12.9 percent (bound 5).
+  `packages/sky/test/fog-below-check.html` shows it alone: a ground 1 km under the eye hidden fully by haze is the same
+  colour down the middle column to 0 parts in 10^3.
+- **Cause:** the sky fog takes the sky's radiance toward each ray with the ray's y clamped to 0.0001
+  (`packages/sky/src/fog.ts`), so every ray below the horizon reads the horizon in its own azimuth. A long path's
+  in-scatter is the haze's own light along the actual ray (S. Hillaire, "A Scalable and Production Ready Sky and
+  Atmosphere Rendering Technique", EGSR 2020, https://doi.org/10.1111/cgf.14050: the aerial-perspective volume
+  integrates in-scatter along each camera ray; E. Bruneton and F. Neyret, "Precomputed Atmospheric Scattering", EGSR
+  2008, https://doi.org/10.1111/j.1467-8659.2008.01245.x: the in-scatter to a ground point is S(x, v) - T(x, x0) S(x0,
+  v) for the ray's own v below the horizon; A. J. Preetham, P. Shirley and B. Smits, SIGGRAPH 1999,
+  https://doi.org/10.1145/311535.311545: aerial perspective L0 Fex + Lin along the view ray). A ray going down meets
+  haze deeper in the layer, lit by less of the light from above: in an absorbing haze the diffuse light falls as e^(-k
+  tau) with the vertical optical depth tau (the two-stream diffusion mode, W. E. Meador and W. R. Weaver, J. Atmos.
+  Sci. 37, 630-643, 1980; H. C. van de Hulst, "Multiple Light Scattering", 1980), so the far ground seen steeper is
+  darker, and redder in smoke, whose blue is absorbed faster.
+- **Fix:** sky `fog.lightDecay` (k per channel, default [0, 0, 0]): a ray at sine of elevation -d and optical depth x
+  takes the fog's colour times (1 - e^(-x (1 + c))) / ((1 + c) (1 - e^(-x))), c = k d, the exact in-scatter of a layer
+  the same in every horizontal direction, whatever its height profile, since the vertical optical depth to a point is d
+  times the ray's (CPU mirror `fogBelowLight`). Rays at or above the horizon are unchanged. `WeatherDrive` writes k
+  from its dust, smoke, ash and spray (`hazeLightDecay`: their albedos and asymmetries mixed by extinction with the
+  clean rest of the air) while they colour the fog, and gives back what the fog had when they leave. Not covered: the
+  change of the phase angle to the sun between the horizon and the actual ray, and shadows in the air (cloud and smoke
+  column shadows).
+- **Regression test:** `packages/sky/test/fog-below-check.mjs` (WebGPU and MARGO_COMPAT=1: the hazed ground's ratio
+  against no decay is the CPU mirror's to 8.4e-4; without the shader term it is off by 0.39),
+  `packages/weather/tests/haze-below.test.js`, `packages/sky/test/fog-height-falloff.test.js` (`fogBelowLight`).
+
+### Fixed 2026-11-27: under a smoke pall a fully hazed ridge ended at a colour of its own, not at the sky above it (KB-SKY-HAZEHORIZON1, weather)
+
+- **Repro (before):** timber-valley `ridge-smoke` shot (`tools/shot/shots/timber-valley-ridge-smoke.json`, `--once
+  --seconds 1.1`, RTX A6000, WebGPU) with KB-SKY-PALLHAZE1 in: the far ridge on the left, all haze, read one flat
+  (119, 73, 10) against the sky right above it at (98, 66, 24), a hard 8.7-code edge between two flat areas. The look
+  check counted it as banding: early 0.81 percent (bound 0.2), up from 0. The output's 8-bit encode was not the cause:
+  the gradients beside it step one code at a time under the shot tool's blue-noise dither. The "ridge" is the far
+  ground `BiomeView` draws past the world's 4 km edge (in neither the shot page's geometry nor its depth mask).
+- **Cause:** while smoke, ash or spray was most of the air, `WeatherDrive.tintFog` wrote `sky.fog.color`, the haze's
+  diffusion colour times the light on it. A set colour replaces the fog's default, the sky's own radiance toward each
+  ray, and the sky draws the same load its own way (its glow `scatteredLight` and dimmed `sunColor`, KB-AIR-SKYLIGHT1).
+  So the two models of one airlight disagreed, and a path long enough ended at the drive's colour, not at the horizon
+  sky behind it, which it must (Koschmieder 1924; the aerial perspective of A. J. Preetham, P. Shirley and B. Smits,
+  "A Practical Analytic Model for Daylight", SIGGRAPH 1999, https://doi.org/10.1145/311535.311545, where the inscatter
+  of a long path tends to the sky's radiance in that direction).
+- **Fix:** when the sky draws the whole load (an atmosphere the drive writes, or a sky with a look or air controls,
+  whose glow and sun colour are not held) and no dust is in it, `tintFog` takes the set colour off for the load's
+  time, so the fog takes the sky's radiance toward each ray; the colour it had comes back after. Dust, which the sky
+  does not draw, and a sky that does not draw the load keep the haze's own colour. The fires' haze spots still add on
+  top (`packages/weather/src/drive.ts`, `drawsLoad`).
+- **After:** the same shot reads early banding 0 percent, mid banding 0.037 percent (0.151 with KB-SKY-PALLHAZE1 alone),
+  mid flat 6.20 percent (7.09 before the sky work, 7.21 with it). Rail-line and valley-aerial improve on every bar but
+  rail-line's `shadowTint`, -5.3878 to -5.3955 b* early and -2.5917 to -2.6043 mid (bound 0.09 up).
+- **Early flat, settled by KB-SKY-HAZEBELOW1.** With this fix alone it read 12.9 percent in 8 bits (11.3 before the sky work, 8.55 with
+  KB-SKY-PALLHAZE1 alone). On the shot tool's float frame before its dither (the same 65 x 65 windows of identical
+  pixels, frame 9) it is 10.06 percent before and 11.66 percent after, mid (frame 30) 5.82 and 4.88: the change itself
+  makes the far ground flatter, not the 8-bit encode. The far ground is all haze in both: before, its colour fell on two
+  codes, (96, 58, 4) and (95, 57, 4); after, nearly all of it on one, (124, 82, 32). Why a fully hazed far ground is
+  one colour at all was the haze's light not varying with the ray below the horizon, fixed as KB-SKY-HAZEBELOW1. With
+  all of the sky work (and KB-SKY-FIREDAY1) the shot reads early flat 7.29 percent (main 11.27), mid flat 3.85 (7.09),
+  banding 0 at both. The early flat left over the bound of 5 is the smoke column, flat on main too (vfx, open).
+- **Rail-line `shadowTint` (accepted, 2026-11-27):** -5.3878 to -5.3955 b* early, -2.5917 to -2.6043 mid (bound 0.09
+  up). The shadowed ground is unchanged (b* 22.3985 against 22.3974); the term moves because far lit ground hazes
+  toward the horizon sky's b* (far lit 44.1 to 40.4, the sky just above the horizon 25.2 and 26.7), the direction
+  Koschmieder's law requires. The check's bound is unchanged.
+- **Regression test:** `packages/weather/tests/smoke.test.js` ("a sky that draws the load leaves the fog on its own
+  radiance, gives back the colour after, and dust still tints"; fails with the colour written).
+
+### Fixed 2026-11-27: a sky that lights the scene drew its picture in its own units, too bright against the ground (KB-SKY-SANDGREY1, sky)
+
+- **Repro (before):** any `Sky` with `lighting` (the `PresetScene` presets: Preetham, a sun of 5): the sky's light map
+  was in the sun's units since KB-SKY-SUNUNITS1, but its backdrop, fog, reflection map and the clouds, air and shafts
+  drawn over it were not, 1 / lightScale = 1.38 times too bright against the ground (Bruneton at a sun of 3 about 6
+  times). On the scenes (640 x 360 or 960 x 540, RTX A6000, WebGPU, top 15 percent against bottom 25 percent of the
+  frame): dune coast `killdevil-from-flat` sky (238, 239, 235), the far dunes in the fog (219, 218, 213), sand (189,
+  179, 154); timber-valley ridge sky (238, 205, 167) over ground (108, 73, 30), 2.6 times its luminance; Fauld fr001
+  overcast sky (232, 223, 205).
+- **Cause:** the 2026-11-16 fix (51d1897352 and 3838e08512, `sunlitSky` and the default exposure balance) was reverted
+  the same evening (53d30d4f55, c6e31496ae, 3050f3bcc6); KB-SKY-SUNUNITS1 then scaled the light map alone, so the
+  picture kept the sky's units. Putting the old exposure balance back as it was would scale the light map twice.
+- **Fix:** `Sky.pictureScale` (lightScale by day while the sky lights the scene, fading to 1 with the night blend) is
+  added to the exposure float that the backdrop, environment and fog shaders read, and the light buffer's scale is
+  lightScale / pictureScale; VolumetricClouds, AerialPerspective, LightShafts and TornadoCloud take it with the exposure.
+  `SkyOptions.balance: false` keeps the old units; a sky that only draws a backdrop and the night are unchanged. After,
+  same views: dune coast sky (232, 232, 229) with its cloud structure showing, the far dunes (195, 194, 189), the sand
+  unchanged (189, 179, 154); timber-valley ridge sky (130, 108, 81) over ground (128, 89, 43); Fauld fr001 sky (214,
+  205, 188), an overcast grey instead of cream. The sky's share of the light on level ground is unchanged (0.18
+  Preetham, 0.06 Bruneton, `sky-light-units-check.mjs`, WebGPU and the WebGL2 layer), so the map is scaled once.
+- **Regression test:** `packages/sky/test/sky.test.js` ("a sky that lights the scene draws in the engine light units,
+  the light map scaled once"; fails without `pictureScale`).
+- **Weak spot:** the sand under the overcast preset was already sand-coloured near the camera and does not change: what
+  moves is the sky and the distant fog over it. Shot look bars (`tools/shot/cli.mjs <shot> --once --seconds 1.1`,
+  before / after): rail-line `lights` 4 discs / 1 and 0 (now passing), speckle 188 and 136 / 119 and 74 ppm;
+  valley-aerial shimmerMoving 0.51 / 0.42 and 0.37 percent (now passing), speckle 17.4 / 12.1 ppm; ridge-smoke early
+  `flat` 11.3 / 8.55 percent. Ridge-smoke early `banding` 0 / 0.81 percent (bound 0.2) and mid `flat` 7.09 / 7.21
+  percent with this fix alone; with KB-SKY-HAZEHORIZON1, KB-SKY-HAZEBELOW1 and KB-SKY-FIREDAY1 banding 0 at both and mid
+  flat 3.85.
 
 ### Open 2026-11-27: the shot tool's 8-bit encode leaves a colour on an exact code without dither (KB-SHOT-DITHERMOD1, tools/shot; held: needs its own plan)
 
@@ -143,6 +335,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the look checks count depends on where its colour falls between two codes.
 - **Held:** a triangular dither changes what every look bar sees, and the flat check would need a redesign that keeps it
   exactly as strict; that needs its own plan (manager, 2026-11-27).
+- **Seen 2026-11-27 (lane B, KB-SKY-HAZEGLOW1):** ridge-smoke early flat 7.29 to 7.60 percent (main 11.27): the whole
+  rise is in the top-left sky (grid cells 150 to 3753 and 3187 to 5249 pixels), where the haze's fire glow leaves the
+  sky within one code over about 250 rows (124, 82, 32 to 33); the smoke column's cells did not change.
 
 ### Fixed 2026-11-27: a fire's burn-out worked out every spent cell's spread again each step (KB-VFX-BURNOUTWORK1, vfx)
 
@@ -383,21 +578,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   percent of the green in the haze). The same view now reads 0 percent crush and no pixel at or under code 16, under an
   orange-grey sky with the ridges visible (RTX A6000, WebGPU, 960 x 540).
 - **Regression test:** `packages/scenes/test/timber-valley.test.js` (the smoke day is daylight; fails on 0.6).
-- **Still open on this view:** the distant haze is much darker than the sky behind it (KB-SKY-PALLHAZE1), dark beaded
+- **Still open on this view:** the distant haze was much darker than the sky behind it (KB-SKY-PALLHAZE1, fixed), dark beaded
   trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and a cloud low on the left drew white through
   the pall (KB-SKY-PALLCLOUD1, fixed).
 
-### Open 2026-11-27: under a smoke load the ground haze is far darker than the sky behind it (KB-SKY-PALLHAZE1, weather and sky)
+### Fixed 2026-11-27: under a smoke load the ground haze was far darker than the sky behind it (KB-SKY-PALLHAZE1, weather and sky)
 
-- **Repro:** the aftermath view above (load 0.35): the ridge about 1 km out, 90 percent haze by the visibility, draws
-  about code (73, 43, 0) against a sky of (212, 153, 118) right behind it, so every ridge is a dark cut-out. A path
-  long enough should end at the sky's own horizon radiance (Koschmieder 1924).
-- **Cause (read in the code, not yet proven by a measurement of both radiances):** the two are in different units.
-  `WeatherDrive.tintFog` writes `sky.fog.color` as the haze's albedo times `hazeLight`, a share where 1 is about a white
-  surface's radiance, and the fog pass draws a fixed colour as it is. The sky draws the same layer's light
-  (`atmosphere.scatteredLight`) as the share times the zenith sun in sky units over pi (about 5 in the `bruneton`
-  model), without the `lightScale` that takes sky units into the engine sun's units. Fixing it moves the numbers of
-  KB-AIR-HAZELIGHT1, KB-AIR-SKYLIGHT1 and the shot look bars, so it needs its own pass.
+- **Repro (before):** timber-valley `view=aftermath&weather=smoke` (load 0.35, 640 x 360, RTX A6000, WebGPU): the ridge
+  on the right read code (70, 40, 1) against the sky right above it at (173, 126, 101); in the ridge view (fire on)
+  the hazed ridges read (114, 79, 30) under a sky of (238, 205, 167), a flat brown cut-out. A path long enough should
+  end at the sky's own horizon radiance (Koschmieder 1924).
+- **Cause (measured):** the two were in different units. `WeatherDrive.tintFog` wrote `sky.fog.color` as the haze's
+  colour times `hazeLight`, a share where 1 is the zenith sun's light on a white surface, and the fog pass drew a set
+  colour as it is (engine radiance). The sky drew the same layer's light (`atmosphere.scatteredLight`) as the share times
+  its zenith sun over pi in sky units (`look.ts`): 4 pi x 0.55 / pi = 2.2 times the fog's for Preetham, times the
+  sky's exposure, and the sky itself was a further 1.4 times too bright against the ground (KB-SKY-SANDGREY1).
+- **Fix:** `tintFog` multiplies the haze colour and the fog's fire spots by `Sky.zenithSun` x
+  `atmosphere.sunIntensity` x 2^exposure x `Sky.pictureScale` over pi (`hazeUnits`, `packages/weather/src/drive.ts`),
+  the units the sky draws its own haze in; a sky target without `zenithSun` keeps the old share. With the sky balanced
+  (KB-SKY-SANDGREY1) a share of 1 is the engine sun's light on a white surface, 5 / pi under the presets. The same
+  views now read: aftermath ridge (88, 52, 2) against the sky (86, 52, 31); ridge view ridges (141, 101, 49) under a
+  sky of (130, 108, 81), the far ridges layered into the haze in the aerial-west view.
+- **Regression test:** `packages/weather/tests/smoke.test.js` ("the fog colour under a load is in the units the sky
+  draws its haze in"; fails on the share drawn as it is).
+- **Weak spot (fixed by KB-SKY-HAZEHORIZON1):** the haze kept the smoke's own orange where the sky above it was greyer,
+  so a ridge read as an orange band rather than vanishing into the sky's colour.
 
 ### Fixed 2026-11-27: the "burnt" valley still burned, under dark beaded trails at film quality (KB-VFX-DARKTRAILS1, scenes)
 
@@ -1666,6 +1871,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (low rocks and logs at the bottom edge) is left that is not. So with the check and the camera path unchanged no
   render fix reaches the 0.5 bound at mid without stilling the flames, smoke or sway. The bound stays 0.5; this needs a
   ruling on the shot or the check.
+- **Recorded 2026-11-27 (lane B, KB-SKY-FIREDAY1 and KB-SKY-HAZEGLOW1, manager's ruling):** with the fires' light on
+  the pall by day the firelit sky lights the valley floor about 11 percent brighter (mean luma of non-sky pixels 34.4
+  to 38.4 early, 37.0 to 41.0 mid), so more pixels cross the warp's fixed 6-code difference: shimmerMoving rose from
+  4.88 to 5.06 early and 8.19 to 8.41 mid against the work-in-progress frames (sh2-occ, mid: plant interiors +0.09,
+  depth edges +0.06, occluded +0.07, sky -0.01 percent of the frame), and chromaSmear 3.68 to 3.75 and 2.83 to 2.86.
+  Against main (5.09 and 8.48; chromaSmear 3.97 and 3.07) every one is lower. No bound changed.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 

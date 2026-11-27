@@ -37,6 +37,8 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface ShaftSky {
   readonly sun: ArrayLike<number>;
   readonly options: { readonly turbidity?: number; readonly exposure?: number; readonly model?: string };
+  /** The factor the sky draws in besides its exposure (`Sky.pictureScale`: sky units into the engine's). Default 1. */
+  readonly pictureScale?: number;
   readonly sunIlluminance?: number;
   readonly sunTransmittance?: ArrayLike<number>;
 }
@@ -258,7 +260,8 @@ export class LightShafts implements EnginePlugin {
     else sunlight(s[1], 0.001, sky?.options.turbidity ?? 2, this.color);
     const illuminance =
         o.sunIlluminance ?? sky?.sunIlluminance ?? (sky && (sky.options.model ?? 'preetham') === 'preetham' ? 10 : 20),
-      scale = illuminance * 2 ** (sky?.options.exposure ?? 0) * (o.intensity ?? defaults.intensity);
+      scale =
+        illuminance * 2 ** (sky?.options.exposure ?? 0) * (sky?.pictureScale ?? 1) * (o.intensity ?? defaults.intensity);
     if (!(fade > 0 && scale > 0 && Math.max(this.color[0], this.color[1], this.color[2]) > 0)) return false;
     v.set(c.camera.position, 16);
     v.set(s, 20);

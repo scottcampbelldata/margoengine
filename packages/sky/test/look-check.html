@@ -10,6 +10,7 @@ import {Sky,fogOpticalDepth} from '/packages/sky/dist/index.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,-1],fov:80,near:0.5,far:100000}}),device=engine.gpu,errors=[];
 engine.stop();
+engine.onError=(e)=>{globalThis.__engErr=(globalThis.__engErr??'')+String(e?.message??e)+'|';};
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0}),rad=Math.PI/180;
 const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
@@ -96,6 +97,24 @@ window.check={samples:sceneSamples,
   const dayNeutral=await shot('dayNeutral',o=>{b(o);o.atmosphere={};});
   const dayLayer=await shot('dayLayer',o=>{b(o);o.atmosphere={layerTransmittance:[0.01,0.01,0.01]};});
   out.dayLayerDiff=maxDiff(dayLayer.pixels,dayNeutral.pixels);
+  // KB-SKY-FIREDAY1: the fires' light on the layer is drawn by day too (it was drawn by the night's share alone, so a fire
+  // spot left the day frame exact while the haze under it took the spot's light): the frame takes the spot's colour.
+  {const e=[...engine.camera.position],dayFire=await shot('dayFire',o=>{b(o);o.atmosphere={fireSpots:[{color:[0.2,0.1,0.04],x:e[0],z:e[2],height:e[1]+1000,reach:1000}]};});
+   const rise=[0,0,0];for(let i=0;i<dayFire.pixels.length;i+=4)for(let k=0;k<3;k++)rise[k]+=(dayFire.pixels[i+k]-dayNeutral.pixels[i+k])/(dayFire.pixels.length/4);
+   out.dayFireRise=rise;}
+  // KB-SKY-HAZEGLOW1: a far ground the fog hides fully takes the sky's radiance toward it plus the fog's fire glow on the
+  // haze, so the sky over it must take that glow too, or every hazed ridge over a burning valley stands lighter than the
+  // sky. A level view, the same pixels shot over the sky (depth 0, the fog draws nothing) and over a plane 50 km ahead
+  // (the fog's opacity 1): rows 36 to 46, rays 0.4 to 9 degrees up, under a thick layer, a fire 1.5 km ahead.
+  {aim(0);const e=[...engine.camera.position],plane=(z)=>{const t=device.createTexture({size:[128,96],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}),c=device.createCommandEncoder();
+    c.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:t.createView(),depthClearValue:z?0.5*(100000-z)/(z*(100000-0.5)):0,depthLoadOp:'clear',depthStoreOp:'store'}}).end();device.queue.submit([c.finish()]);return t;};
+   const open=plane(0),far=plane(50000),layer={layerTransmittance:[0.02,0.03,0.05],fireSpots:[{color:[0.2,0.1,0.04],x:e[0],z:e[2]-1500,height:e[1]+800,reach:1000}]},
+    fog=(depth)=>({depth:()=>depth,density:0.001,start:0,falloff:'exp2',fireSpots:[{color:[0.6,0.3,0.1],x:e[0],z:e[2]-1500,reach:1000}]});
+   const rows=async(name,set)=>{const r=await shot(name,set),px=[];out[name+'Rows']=Array.from({length:12},(_,k)=>{const y=k*8;return Array.from(r.pixels.subarray((y*128+64)*4,(y*128+64)*4+3)).map(v=>+v.toFixed(3));});for(let y=36;y<47;y++)for(let x=0;x<128;x+=8)px.push(...r.pixels.subarray((y*128+x)*4,(y*128+x)*4+3));return px;};
+   const skyPx=await rows('hazeGlowSky',o=>{b(o);o.atmosphere=layer;o.fog=fog(open);}),groundPx=await rows('hazeGlowGround',o=>{b(o);o.atmosphere=layer;o.fog=fog(far);}),
+    plainPx=await rows('hazeGlowPlain',o=>{b(o);delete o.fog;o.atmosphere={layerTransmittance:layer.layerTransmittance};});
+   let worst=0,glow=0;for(let i=0;i<skyPx.length;i++){worst=Math.max(worst,Math.abs(groundPx[i]-skyPx[i])/Math.max(1e-4,groundPx[i]));glow=Math.max(glow,groundPx[i]-plainPx[i]);}
+   out.hazeGlow={worst,glow,rows:[out.hazeGlowSkyRows,out.hazeGlowGroundRows,out.hazeGlowPlainRows]};delete sky.options.fog;open.destroy();far.destroy();aim(40);}
   sky.dispose();
   // At night (sun 30 degrees down) the night sky and the clouds above are seen through the layer (KB-SKY-NIGHTPALL1).
   const night=Sky.attach(engine,{timeScale:0,sunDirection:[Math.cos(30*rad),-Math.sin(30*rad),0]});

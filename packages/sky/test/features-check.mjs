@@ -736,6 +736,17 @@ checks.look = async (page, samples) => {
   // KB-SKY-NIGHTPALL1: the low layer leaves the day frame exact; at night it takes the sky and its clouds down by
   // t^(1 / sin e) (the high band 60 to 80 degrees up, the horizon band 0 to 8, floored at 3) and its glow shows in front.
   assert.equal(r.dayLayerDiff, 0, 'by day layerTransmittance leaves the frame exact');
+  // KB-SKY-FIREDAY1: a fire spot on the layer lights the day sky too, in the fire's colour (0 before the fix).
+  assert.ok(
+    r.dayFireRise[0] > 0.004 && r.dayFireRise[0] > r.dayFireRise[1] && r.dayFireRise[1] > r.dayFireRise[2],
+    `the fires' light on the layer by day: ${JSON.stringify(r.dayFireRise)}`,
+  );
+  // KB-SKY-HAZEGLOW1: a far ground the fog hides fully takes the sky's own colour over it, the fires' glow on the haze
+  // included (the ground stood up to tens of percent lighter than the sky before the fix).
+  assert.ok(
+    r.hazeGlow.glow > 0.01 && r.hazeGlow.worst < 0.005,
+    `the haze's fire glow in the sky as on the hazed ground: ${JSON.stringify(r.hazeGlow)}`,
+  );
   const np = r.nightPlain,
     ratio = (a, k) => lum(a[k]) / lum(np[k]);
   assert.ok(lum(np.high) > 0, 'the night sky draws');
@@ -933,6 +944,10 @@ checks.presets = async (page, samples) => {
 // partway). The time rows (timeScale, clouds.speed) hold the frame at 0 and move it as time passes. Every named look
 // draws, differs from the default sky and raises no error.
 const settingsBase = {
+  // The sky draws in the engine light's units (KB-SKY-SANDGREY1): under the page's sun of 1 the frame meters a displayed
+  // log-average luminance of 0.018, every row judged in the bottom of the 8-bit range (look.zenithStrength, a tint at
+  // the same luminance, moved no pixel by 2 levels). Three stops meter it at 0.29, as the frame was before (0.30).
+  'tonemap.exposure': 3,
   'sun.mode': 'angles',
   'sun.azimuth': 90,
   'sun.elevation': 15,
@@ -1051,6 +1066,14 @@ checks.settings = async (page, samples) => {
       'hurricane.outerEyewallStrength': { 'hurricane.outerEyewall': 15000 },
       // The decay shapes only the Rankine vortex.
       'tornado.decay': { 'tornado.profile': 'rankine' },
+      // The low layer's transmittance takes down only the night's share of the sky (KB-SKY-NIGHTPALL1): by day it
+      // leaves the frame exact, so its row shows with the sun below the horizon.
+      'atmosphere.layerTransmittance': { 'sun.elevation': -12 },
+      // The haze's base height shows only with a height falloff.
+      'fog.base': { 'fog.scaleHeight': 20 },
+      // The haze's light below the eye shows on the ground the fog covers below the horizon (KB-SKY-HAZEBELOW1): fog
+      // thick enough to cover the ground a few degrees down.
+      'fog.lightDecay': { 'fog.density': 0.05 },
     },
     // The weather's rows are null by default (follow the weather; with none given, the plain layer): a value each.
     chosen = {
@@ -1075,6 +1098,11 @@ checks.settings = async (page, samples) => {
       // clock: at 35.5 m/s (the row's mid value) that moved 7 pixels by at most 3 levels, and 2 once the cloud sheet's
       // rims thinned (KB-SKY-HOLES-KH1). The row's top, 60 m/s, turns it far enough to see.
       'tornado.mesocycloneWind': 60,
+      'fog.lightDecay': [2, 2, 2],
+      // The pillars stand about 20 m: a scale height near that thins the haze across them (the row's mid value, about
+      // 5 km, leaves the low air as it was).
+      'fog.scaleHeight': 20,
+      'fog.base': 30,
     },
     running = { timeScale: 0.5, 'clouds.speed': 40, 'volumetric.evolution': 20 };
   const cloudsOn = (on) => page.evaluate((v) => window.check.clouds(v), on);
@@ -1086,6 +1114,9 @@ checks.settings = async (page, samples) => {
     // The hurricane rows that set the storm's wind and rain (the weather it makes) or move and turn its cloud over time
     // show in no still frame: hurricane.test.js proves the wind, rain and settings, features-check hurricane the motion.
     if (HURRICANE_UNSEEN.has(s.name) || TORNADO_UNSEEN.has(s.name)) continue;
+    // fireSight limits only the fires' light on the layer (atmosphere.fireSpots, a scene's data with no row), so it
+    // shows in no frame of this page: look.test.js proves what it writes and how far each ray takes the spots.
+    if (s.name === 'atmosphere.fireSight') continue;
     const base = {
       ...settingsBase,
       ...(s.group === 'hurricane' ? hurricaneBase : {}),
@@ -1214,6 +1245,8 @@ checks.settings = async (page, samples) => {
   // the slope changes by about 1 level per degree at most (8-bit noise); the bound is 2.5, from 8 to 58 degrees.
   await apply('glow', {
     ...skySettingDefaults(),
+    // The page metered as the rows' base is (settingsBase): the sky in the engine light's units is 3 stops darker.
+    'tonemap.exposure': settingsBase['tonemap.exposure'],
     'sun.mode': 'angles',
     'sun.azimuth': 60,
     'sun.elevation': 40,

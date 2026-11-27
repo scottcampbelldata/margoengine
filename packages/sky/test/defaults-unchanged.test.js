@@ -31,6 +31,12 @@
 // closed-form term (run only with a scaleHeight) and its uniform one vec4; the same commands in every trace.
 // Recorded again with KB-SKY-PALLFALLOFF1 (2026-11-27): the fog WGSL gained the fire spots' haze (run only with
 // fog.fireSpots) and its uniform sixteen zero vec4s, so fog and fogColour changed; nothing else draws differently.
+// Recorded again with KB-SKY-SANDGREY1 (2026-11-27): a sky that lights the scene draws in the engine light's units
+// (Sky.pictureScale in the exposure float and the light buffer's last float divided by it), an intended change of the
+// five that light it (lighting, day-*); the same WGSL and commands, and every other configuration is unchanged.
+// Recorded again with KB-SKY-HAZEBELOW1 (2026-11-27): the fog WGSL gained fogBelowLight (the haze's light below the
+// eye, fog.lightDecay) and its uniform one vec4, so fog and fogColour changed; at the default [0, 0, 0] the factor is
+// exactly 1 and nothing draws differently.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

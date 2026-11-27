@@ -34,3 +34,29 @@ test('the fog option checks scaleHeight and base', () => {
   assert.throws(() => fog.validate({ depth, scaleHeight: Number.NaN }), RangeError);
   assert.throws(() => fog.validate({ depth, base: Number.POSITIVE_INFINITY }), RangeError);
 });
+
+// KB-SKY-HAZEBELOW1: a ray below the horizon takes the haze's colour times fogBelowLight of its own ray.
+test('fogBelowLight: 1 at and above the horizon and for no decay, 1 / (1 + k down) for a long ray, 1 for a short one', async () => {
+  const { fogBelowLight } = await import('../dist/index.js');
+  assert.deepEqual(fogBelowLight([0.5, 0.5, 0.5], 0.2, 20), [1, 1, 1]);
+  assert.deepEqual(fogBelowLight([0.5, 0.5, 0.5], 0, 20), [1, 1, 1]);
+  assert.deepEqual(fogBelowLight([0, 0, 0], -0.4, 20), [1, 1, 1]);
+  const far = fogBelowLight([0.3, 0.45, 0.7], -0.4, 60);
+  [0.3, 0.45, 0.7].forEach((k, i) => assert.ok(Math.abs(far[i] - 1 / (1 + 0.4 * k)) < 1e-12, `${far[i]}`));
+  // The series below an optical depth of 1e-3 meets the closed form above it.
+  const a = fogBelowLight([0.5, 0.5, 0.5], -0.5, 0.000999)[0],
+    b = fogBelowLight([0.5, 0.5, 0.5], -0.5, 0.001001)[0];
+  assert.ok(Math.abs(a - b) < 1e-6, `${a} vs ${b}`);
+  // The exact in-scatter of a ray of optical depth x in light falling as e^(-c tau) along it, over the opacity.
+  const x = 0.8,
+    c = 0.45 * 0.3,
+    want = (1 - Math.exp(-x * (1 + c))) / ((1 + c) * (1 - Math.exp(-x)));
+  assert.ok(Math.abs(fogBelowLight([0.45, 0.45, 0.45], -0.3, x)[1] - want) < 1e-12);
+});
+
+test('the fog option checks lightDecay', () => {
+  fog.validate({ depth, lightDecay: [0, 0.4, 1] });
+  assert.throws(() => fog.validate({ depth, lightDecay: [-0.1, 0, 0] }), RangeError);
+  assert.throws(() => fog.validate({ depth, lightDecay: [0, Number.NaN, 0] }));
+  assert.throws(() => fog.validate({ depth, lightDecay: [0, 0] }));
+});

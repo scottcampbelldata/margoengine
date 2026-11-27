@@ -653,6 +653,8 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface TornadoSky {
   readonly sun: ArrayLike<number>;
   readonly options: { readonly turbidity?: number; readonly exposure?: number; readonly model?: string };
+  /** The factor the sky draws in besides its exposure (`Sky.pictureScale`: sky units into the engine's). Default 1. */
+  readonly pictureScale?: number;
   readonly sunIlluminance?: number;
   readonly sunTransmittance?: ArrayLike<number>;
 }
@@ -832,7 +834,7 @@ export class TornadoCloud implements EnginePlugin {
     else sunlight(up, 0.001, sky?.options.turbidity ?? 2, this.color);
     const illuminance =
         o.sunIlluminance ?? sky?.sunIlluminance ?? (sky && (sky.options.model ?? 'preetham') === 'preetham' ? 10 : 20),
-      scale = illuminance * 2 ** (sky?.options.exposure ?? 0);
+      scale = illuminance * 2 ** (sky?.options.exposure ?? 0) * (sky?.pictureScale ?? 1);
     v[23] = scale * (o.sunShare ?? 0.35);
     for (let i = 0; i < 3; i++) v[24 + i] = this.color[i];
     v[27] = +!linearHdr(c.format);

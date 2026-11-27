@@ -17,6 +17,8 @@ import { applyView } from '../../shared/view-rect.js';
 import { sunlight } from './atmosphere.js';
 import { depthWGSL, sceneDepth } from './depth.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+import { fireSkyWgsl, writeFireSpots, writeHazeFires } from './fire-spots.js';
+import type { SkyFireSpot } from './base.js';
 import {
   cloudDeckTransmittance,
   cloudLayerFor,
@@ -66,10 +68,21 @@ export interface VolumetricCloudSky {
       readonly sunIntensity?: number;
       readonly scatteredLight?: ArrayLike<number>;
       readonly layerTransmittance?: ArrayLike<number>;
+      /** The fires' light on the layer (`atmosphere.fireSpots`), in front of the clouds as of the dome. */
+      readonly fireSpots?: readonly SkyFireSpot[];
+      /** How far across a low ray takes the layer's fire light (`atmosphere.fireSight`, 0 or absent: no limit). */
+      readonly fireSight?: number;
     };
+    /**
+     * The sky's fog (`Sky` `fog`): its fires' glow on the haze (`fireSpots`, to the path end 2 / `density`) is in front of
+     * the layer's, by the layer's opacity along the ray, as the dome draws it (KB-SKY-HAZEGLOW1).
+     */
+    readonly fog?: { readonly density?: number; readonly fireSpots?: readonly SkyFireSpot[] };
   };
   /** The zenith sun on level ground in sky units (`Sky.zenithSun`), the unit of `atmosphere.scatteredLight`. */
   readonly zenithSun?: number;
+  /** The factor the sky draws in besides its exposure (`Sky.pictureScale`: sky units into the engine's). Default 1. */
+  readonly pictureScale?: number;
   readonly reflectionTexture?: GPUTexture | undefined;
   /**
    * Engine light units per sky unit (`Sky.lightScale`): the sky's lighting takes its map, this deck's light included,
@@ -298,7 +311,7 @@ fn perlinFbm(p:vec3f,period:i32)->f32 {
 // three quarters of the layer's slant depth, of the base shape only.
 /** WGSL of the cloud uniform and its density field, shared with `@margoengine/sky/cloud-shadows`. */
 export const cloudField = /* wgsl */ `
-struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f}
+struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>}
 fn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}
 fn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}
 fn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}
@@ -476,10 +489,13 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32,glow:f32)->CloudLight {
 // it, so its premultiplied light is seen through it, the layer's transmittance straight up (veil.rgb) to the power
 // 1 / sin e along the ray d e up (Beer-Lambert through a flat layer, e floored at 3 degrees, as the sky draws what is
 // above the layer), times the sky's sunIntensity (veil.w), with the layer's glow in sky units (glow.rgb) over the
-// cloud's opacity in front (KB-SKY-PALLCLOUD1). 1 and 0 leave the cloud as it is.
-fn cloudVeiled(light:vec3f,opacity:f32,d:vec3f)->vec3f {
+// cloud's opacity in front (KB-SKY-PALLCLOUD1), and the fires' light on the layer toward the ray (fireLayer, the sky's
+// atmosphere.fireSpots) with it, as the dome draws it at every hour (KB-SKY-FIREDAY1), seen through the haze under the
+// layer with the haze's own glow in front (fireSky, the sky's fog.fireSpots, KB-SKY-HAZEGLOW1). 1 and 0 leave the cloud
+// as it is.
+${fireSkyWgsl('clouds')}fn cloudVeiled(light:vec3f,opacity:f32,d:vec3f)->vec3f {
  let t=pow(max(clouds.veil.rgb,vec3f(1e-30)),vec3f(1.0/max(d.y/max(length(d),1e-6),0.052336)));
- return light*t*clouds.veil.w+opacity*clouds.glow.rgb;
+ return light*t*clouds.veil.w+opacity*(clouds.glow.rgb+fireSky(d,t));
 }
 `;
 const shader = (depthBinding: string) => /* wgsl */ `${fullscreen}${march}${displayShader}
@@ -623,9 +639,12 @@ export function layerOf(
   return out;
 }
 /**
- * Writes the sky's low haze layer into the `Clouds` uniform (floats 96 to 103): its transmittance straight up
+ * Writes the sky's low haze layer into the `Clouds` uniform (floats 96 to 231): its transmittance straight up
  * (`atmosphere.layerTransmittance`) and the sky's `sunIntensity`, then the layer's glow (`atmosphere.scatteredLight`
- * times `sunIntensity` times the zenith sun over pi, in sky units, as `@margoengine/sky/look` writes it for the dome).
+ * times `sunIntensity` times the zenith sun over pi, in sky units, as `@margoengine/sky/look` writes it for the dome),
+ * then the fires' spots on it (`atmosphere.fireSpots` in the same units, `fireSight` in the first spot's spare float),
+ * then the haze's (`fog.fireSpots` over 2 to the exposure times `pictureScale`, the path end 2 / density in the first
+ * spot's spare float).
  * Without a sky or its `atmosphere`: 1 and 0, the clouds as they are.
  */
 export function writeVeil(v: Float32Array, sky: VolumetricCloudSky | undefined): void {
@@ -640,9 +659,13 @@ export function writeVeil(v: Float32Array, sky: VolumetricCloudSky | undefined):
   }
   v[99] = intensity;
   v[103] = 0;
+  writeFireSpots(v, 104, a?.fireSpots, unit);
+  v[111] = a?.fireSight ?? 0;
+  // The haze's spots (the sky's fog.fireSpots), from the fog's units into the sky's, as the dome writes them.
+  writeHazeFires(v, 168, sky?.options.fog, 2 ** (sky?.options.exposure ?? 0) * (sky?.pictureScale ?? 1));
 }
 /** Floats in the `Clouds` uniform ({@link cloudField}): the buffers of the clouds, their shadows and shafts hold this many. */
-export const CLOUD_FLOATS = 104;
+export const CLOUD_FLOATS = 232;
 let loadedStorm: StormField | undefined, loading: Promise<StormField> | undefined, loadError: unknown;
 /** Whether the options draw a storm: a `hurricane`, or `type: 'hurricane'`. */
 export const wantsStorm = (options: VolumetricCloudOptions): boolean =>
@@ -942,7 +965,9 @@ export class VolumetricClouds implements EnginePlugin {
     // The sun's colour through the sky's atmosphere at the middle of the layer: warm and dim low down, 0 once it has set.
     sunlight(v[21], (bottom + top) / 2000, sky?.options.turbidity ?? 2, this.color);
     v.set(this.color, 24);
-    v[27] = 2 ** (sky?.options.exposure ?? 0);
+    // The sky's exposure with its picture scale (KB-SKY-SANDGREY1): the deck is drawn and written into the sky's maps in
+    // the sky's picture units, and its reading of the sky's map takes both back out.
+    v[27] = 2 ** (sky?.options.exposure ?? 0) * (sky?.pictureScale ?? 1);
     v[34] = o.maxDistance ?? defaults.maxDistance;
     v[35] = o.steps ?? defaults.steps;
     v[39] = o.lightSteps ?? defaults.lightSteps;

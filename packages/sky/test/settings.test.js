@@ -36,7 +36,7 @@ function block(options) {
 
 test('every row is well formed and names are unique', () => {
   assert.equal(byName.size, SKY_SETTINGS.length);
-  assert.equal(SKY_SETTINGS.length, 170);
+  assert.equal(SKY_SETTINGS.length, 171);
   for (const s of SKY_SETTINGS) {
     assert.ok(typeof s.about === 'string' && s.about.length > 10, s.name);
     assert.ok(['number', 'color', 'choice', 'gradient'].includes(s.kind), s.name);
@@ -209,6 +209,13 @@ test('values land on the options they name', () => {
   applySkySettings({ sky }, values);
   values['look.glowColor'][1] = 1;
   assert.deepEqual(sky.options.look.glowColor, [1, 0, 0]);
+  // KB-SKY-FOGROWS1: every fog row reaches the fog, not five named by hand (scaleHeight and base never did).
+  applySkySettings({ sky }, { 'fog.scaleHeight': 400, 'fog.base': 80, 'fog.lightDecay': [0.4, 0.5, 0.6] });
+  assert.equal(sky.options.fog.scaleHeight, 400);
+  assert.equal(sky.options.fog.base, 80);
+  assert.deepEqual(sky.options.fog.lightDecay, [0.4, 0.5, 0.6]);
+  applySkySettings({ sky }, {});
+  for (const key of ['scaleHeight', 'base', 'lightDecay']) assert.equal(key in sky.options.fog, false, key);
   // A sky without fog ignores fog values.
   const clear = new Sky({});
   applySkySettings({ sky: clear }, { 'fog.density': 0.2 });

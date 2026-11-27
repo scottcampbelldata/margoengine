@@ -169,6 +169,16 @@ export interface SkyFogOptions {
    * https://doi.org/10.1145/1186822.1073309). A `WeatherDrive` writes it from its fire fronts. Default none.
    */
   fireSpots?: readonly SkyFireSpot[];
+  /**
+   * How fast the haze's light falls with depth below the eye, red, green and blue, per unit of the haze's optical depth
+   * (`fogBelowLight`, KB-SKY-HAZEBELOW1): a ray going down takes in-scatter from haze deeper in the layer, lit by e^(-k
+   * tau) of the light at the eye at a vertical optical depth tau under it, so a far ground that the haze hides fully is
+   * darker the steeper it is seen and is no longer one flat colour. The two-stream diffusion exponent sqrt(g1^2 - g2^2)
+   * of the haze's albedo and asymmetry (Meador and Weaver 1980); a `WeatherDrive` writes it from its dust, smoke, ash and
+   * spray (`hazeLightDecay` in `@margoengine/weather`). Rays at or above the horizon are unchanged. Default [0, 0, 0]
+   * (haze that absorbs nothing, as clean fog): every ray below the horizon takes the fog's colour as it is.
+   */
+  lightDecay?: Vec3;
 }
 /** One glow a fire puts on a haze (`fog.fireSpots`) or on the smoke layer over it (`atmosphere.fireSpots`). */
 export interface SkyFireSpot {
@@ -352,10 +362,20 @@ export interface SkyOptions {
   /** Atmospheric haze, 1-10. Default 2. The Preetham model reads values below 2 as 2 (its fit breaks down below that). */
   turbidity?: number;
   /**
-   * Exposure of the sky backdrop only, in stops, -16..16. Default 0. It does not change how bright lit meshes are:
-   * scene exposure is `exposure` on `Tonemap` from `@margoengine/tonemap`.
+   * Exposure of the sky, in stops, -16..16. Default 0: its backdrop, its fog colour, its reflection map and the light
+   * that map gives surfaces (not the engine sun's beam). Scene exposure is `exposure` on `Tonemap` from
+   * `@margoengine/tonemap`.
    */
   exposure?: number;
+  /**
+   * Draw the day sky in the engine light's units when it lights the scene (`lighting` or `environment`; default true):
+   * its backdrop, fog, reflection map, the clouds and air drawn over it take {@link Sky.lightScale}, as its light map
+   * already does, so the sky stands to the ground the engine sun lights as it does outdoors. The night is drawn as it
+   * was (the factor fades to 1 with the night blend). false keeps the sky's own units, too bright against the ground
+   * (preetham 1.4 times at a sun of 5, bruneton about 6 times at 3), so its blue swamps a tan ground under a distance
+   * fog (KB-SKY-SANDGREY1).
+   */
+  balance?: boolean;
   /** Sun/moon scene lighting (needs `lighting`). Omitted: the sky does not drive engine lighting. */
   lighting?: SkyLightingOptions;
   /**
@@ -383,7 +403,7 @@ export interface SkyOptions {
 // which makes the clear noon sky give 0.165 of the light on level ground (Erbs, Klein and Duffie 1982).
 const PREETHAM_SUN = 4 * Math.PI * 0.55;
 // Floats of the look's uniform block after the 64 at byte 256 (`LOOK_FLOATS` of @margoengine/sky/look; a test pins the two).
-const LOOK_FLOATS = 144;
+const LOOK_FLOATS = 208;
 /**
  * How much of a cloud sheet of `coverage` 0 to 1 is the overcast deck (KB-SKY-OVERCAST1): 0 up to 80 percent cover, a
  * smoothstep to 1 at full cover, as the sky draws it. Under the deck the engine sun fades out by the same share.
@@ -487,7 +507,7 @@ export interface SkyFeatures {
     extend(code: string, full: boolean): string;
     validate(options: SkyOptions): void;
     air(options: SkyOptions, out: Float32Array): Float32Array;
-    write(out: Float32Array, options: SkyOptions, air: Float32Array, zenith?: number): void;
+    write(out: Float32Array, options: SkyOptions, air: Float32Array, zenith?: number, picture?: number): void;
   };
   /** `field`: the WGSL of the cloud noise alone, `cloudOctaves` over a km position, for other passes that read the same clouds. */
   clouds?: { readonly wgsl: string; readonly field?: string; validate(clouds: SkyCloudOptions): void };
@@ -656,6 +676,14 @@ export class Sky implements EnginePlugin {
    * drawn over the sky (`VolumetricClouds`) can take the same haze glow in front of it. 0 before the first update.
    */
   zenithSun = 0;
+  /**
+   * The factor everything the sky draws takes from its own units into the engine light's, besides its `exposure`, set
+   * each update: {@link Sky.lightScale} by day while the sky lights the scene with `balance` (the default), fading to 1
+   * with the night blend; 1 with `balance: false`, for a sky that only draws a backdrop, and before the first update.
+   * Its backdrop, fog, reflection map and light map are drawn at 2^exposure times this, and a layer drawn over the sky in sky units (`VolumetricClouds`, `AerialPerspective`, light
+   * shafts) takes the same factor, so all of them meet the ground in one unit (KB-SKY-SANDGREY1).
+   */
+  pictureScale = 1;
   /**
    * The share of a light at elevation sine `up` a cloud deck passes, set by `VolumetricClouds` (its `dimLight`, on by
    * default) and cleared when they go: the sun's engine light (`lights[0]`) and the moonlight under the cloud
@@ -934,10 +962,12 @@ export class Sky implements EnginePlugin {
       (o.turbidity ?? 2) < 1 ||
       (o.turbidity ?? 2) > 10 ||
       !Number.isFinite(o.exposure ?? 0) ||
-      Math.abs(o.exposure ?? 0) > 16
+      Math.abs(o.exposure ?? 0) > 16 ||
+      (o.balance !== undefined && typeof o.balance !== 'boolean')
     )
       throw new RangeError(
-        'Invalid sky options; keep timeScale within ±24, turbidity from 1 to 10, exposure within ±16 and hours finite, and use model "preetham" or "bruneton".',
+        'Invalid sky options; keep timeScale within ±24, turbidity from 1 to 10, exposure within ±16 and hours finite, ' +
+          'balance a boolean, and use model "preetham" or "bruneton".',
       );
     if ((o.model !== undefined || f.preetham || f.bruneton) && !f[model])
       throw new TypeError(`Sky model '${model}' needs ${model} from @margoengine/sky/${model}`);
@@ -1207,8 +1237,15 @@ export class Sky implements EnginePlugin {
         : PREETHAM_SUN;
     this.zenithSun = zenith;
     this.lightScale = zenith > 0 ? (l ? (l.intensity ?? 1) : (this.engine?.lighting?.direction[3] ?? 0)) / zenith : 0;
-    if (this.lit && (l || this.options.environment))
-      this.lit.update(this.engine!.lighting, this, l, this.ambient(), night, this.lightScale);
+    // The day sky drawn in the same units (KB-SKY-SANDGREY1): the picture, fog and maps take lightScale by day through
+    // the exposure uniform, so the light map takes only what is left of it. The night keeps its own look.
+    const lights = !!this.lit && !!(l || this.options.environment);
+    this.pictureScale =
+      lights && this.options.balance !== false && this.lightScale > 0
+        ? this.lightScale + (1 - this.lightScale) * night
+        : 1;
+    if (lights)
+      this.lit!.update(this.engine!.lighting, this, l, this.ambient(), night, this.lightScale / this.pictureScale);
   }
   /** Uploads this frame's uniform and refreshes the tables; idempotent within a frame (lighting runs it earlier). */
   private prepare(c: SkyPassContext): void {
@@ -1222,7 +1259,7 @@ export class Sky implements EnginePlugin {
     this.values[19] = Math.max(0.001, c.camera.position[1] / 1000);
     this.values.set(this.sun, 20);
     this.values[24] = +(this.options.model === 'bruneton');
-    this.values[25] = this.options.exposure ?? 0;
+    this.values[25] = (this.options.exposure ?? 0) + Math.log2(this.pictureScale);
     this.values[26] = this.options.turbidity ?? 2;
     this.values[36] = this.options.clouds ? (this.options.clouds.coverage ?? 0.45) : 0;
     this.values[37] = this.cloudTime;
@@ -1264,7 +1301,7 @@ export class Sky implements EnginePlugin {
     let air = false;
     if (this.extended) {
       const look = this.features.look!;
-      look.write(this.extra, this.options, this.air, this.zenithSun);
+      look.write(this.extra, this.options, this.air, this.zenithSun, 2 ** (this.options.exposure ?? 0) * this.pictureScale);
       c.device.queue.writeBuffer(this.uniform!, 256, this.extra as Float32Array<ArrayBuffer>);
       for (let i = 0; i < 9; i++) air ||= this.air[i] !== this.computedAir[i];
       this.computedAir.set(this.air);

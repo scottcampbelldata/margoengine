@@ -21,6 +21,7 @@ import {
   sprayFromWind,
   sunTransmittance,
   hazeLight,
+  hazeLightDecay,
   hazeReflectance,
   fireHazeLight,
   fireLayerLight,
@@ -76,6 +77,8 @@ export interface SkyTarget {
       falloff?: 'exp' | 'exp2';
       color?: readonly [number, number, number];
       fireSpots?: readonly SkyFireSpotTarget[];
+      /** How fast the haze's light falls with depth below the eye (sky `fog.lightDecay`, KB-SKY-HAZEBELOW1). */
+      lightDecay?: readonly [number, number, number];
     };
     /**
      * The air the sun shines through; smoke dims and reddens its `sunColor`, ash and spray dim it grey, and the light
@@ -88,8 +91,12 @@ export interface SkyTarget {
       layerTransmittance?: readonly [number, number, number];
       fireSpots?: readonly SkyFireSpotTarget[];
       fireSight?: number;
+      /** The look's sun strength (`atmosphere.sunIntensity`), which the sky's `scatteredLight` glow takes. Default 1. */
+      sunIntensity?: number;
     };
     look?: object;
+    /** The sky's exposure in stops, which its drawn haze takes. Default 0. */
+    exposure?: number;
     /** The sky's engine lighting: its `intensity` is the noon sun's light the haze colours are referred to. Default 1. */
     lighting?: { intensity?: number };
   };
@@ -106,6 +113,14 @@ export interface SkyTarget {
   readonly airControls?: boolean;
   /** The unit vector to the sun (`Sky.sun`): its y is the sine of the elevation the smoke's sun dimming reads. Zenith when absent. */
   readonly sun?: ArrayLike<number>;
+  /**
+   * The zenith sun on level ground in the sky's units (`Sky.zenithSun`). With it the haze colour the drive writes is in
+   * the units the sky draws its own haze and pall in (KB-SKY-PALLHAZE1); without it the colour stays a share of a white
+   * surface's light.
+   */
+  readonly zenithSun?: number;
+  /** The factor the sky draws in besides its exposure (`Sky.pictureScale`). Default 1. */
+  readonly pictureScale?: number;
 }
 /**
  * A wildfire (`FireFront` from `@margoengine/vfx/fire-front`): its `smokeEmission`, grams of fine smoke a second, raises
@@ -562,6 +577,8 @@ export class WeatherDrive {
   private readonly fogs = new WeakMap<object, number>();
   private readonly sandWinds = new WeakMap<object, object>();
   private readonly fogColors = new WeakMap<object, { original: unknown; wrote: unknown }>();
+  // The lightDecay each fog had before the drive wrote one, and the one it wrote (KB-SKY-HAZEBELOW1).
+  private readonly fogDecays = new WeakMap<object, { original: unknown; wrote: unknown }>();
   private readonly sunColors = new WeakMap<object, { original: unknown; wrote: unknown }>();
   // The scatteredLight each atmosphere had before the drive wrote one, and the one it wrote (KB-AIR-SKYLIGHT1).
   private readonly skyLights = new WeakMap<object, { original: unknown; wrote: unknown }>();
@@ -992,7 +1009,7 @@ export class WeatherDrive {
   // KB-WEATHER-NIGHTHAZE1), so the haze is moonlit at night, not the afternoon's. The fires below add their own light
   // (`fire`, `fireHazeLight`, KB-WEATHER-FIREHAZE1), so the haze over a burning valley glows orange at night.
   private tintFog(
-    fog: SpotHolder & { color?: readonly [number, number, number] },
+    fog: SpotHolder & { color?: readonly [number, number, number]; lightDecay?: readonly [number, number, number] },
     state: WeatherState,
     extinction: number,
     lights: readonly number[],
@@ -1009,6 +1026,7 @@ export class WeatherDrive {
         sprayExtinction(state.spray),
       ],
       total = parts[0]! + parts[1]! + parts[2]! + parts[3]!;
+    this.decayFog(fog, total > 0 && total >= 0.5 * extinction ? hazeLightDecay(state, extinction) : undefined);
     if (total > 0 && total >= 0.5 * extinction) {
       const colors = [dustColor, smokeColor, ashColor, sprayColor],
         color: [number, number, number] = [0, 0, 0];
@@ -1019,14 +1037,27 @@ export class WeatherDrive {
           lit = lights[k]!;
         for (let i = 0; i < 3; i++) color[i] += share === 1 ? c[i]! * lit : c[i]! * share * lit;
       }
-      const light = airLight(sky, state);
+      const light = airLight(sky, state),
+        k = hazeUnits(sky);
       // The haze round each source takes its light in the haze's own colour (KB-SKY-PALLFALLOFF1).
       this.writeSpots(
         fog,
-        spots.map(({ light: on, x, z, reach }) => ({ color: tinted(color, on), x, z, reach })),
+        spots.map(({ light: on, x, z, reach }) => ({
+          color: tinted(color, on).map((c) => c * k) as [number, number, number],
+          x,
+          z,
+          reach,
+        })),
       );
-      if (light || fire) for (let i = 0; i < 3; i++) color[i] *= (light ? light[i]! : 1) + (fire ? fire[i]! : 0);
       const original = record && fog.color === record.wrote ? record.original : fog.color;
+      // A sky that draws the whole load (its pall, KB-AIR-SKYLIGHT1) is where a long path through the haze ends, so the
+      // fog takes the sky's own radiance toward each ray, as with no load (KB-SKY-HAZEHORIZON1).
+      if (parts[0] === 0 && drawsLoad(sky)) {
+        this.fogColors.set(fog, { original, wrote: undefined });
+        delete fog.color;
+        return;
+      }
+      for (let i = 0; i < 3; i++) color[i] *= ((light ? light[i]! : 1) + (fire ? fire[i]! : 0)) * k;
       this.fogColors.set(fog, { original, wrote: color });
       fog.color = color;
     } else {
@@ -1037,6 +1068,24 @@ export class WeatherDrive {
         if (record.original === undefined) delete fog.color;
         else fog.color = record.original as readonly [number, number, number];
       }
+    }
+  }
+
+  // The haze's light below the eye (`lightDecay`, KB-SKY-HAZEBELOW1), written while the load colours the fog and given
+  // back as the colour is: what the fog had comes back when the load leaves; one a person set meanwhile, or one held by a
+  // setting, is left alone.
+  private decayFog(fog: { lightDecay?: readonly [number, number, number] }, decay: [number, number, number] | undefined): void {
+    if (heldFromWeather(fog, 'lightDecay')) return;
+    const record = this.fogDecays.get(fog);
+    if (decay) {
+      const original = record && fog.lightDecay === record.wrote ? record.original : fog.lightDecay;
+      this.fogDecays.set(fog, { original, wrote: decay });
+      fog.lightDecay = decay;
+    } else if (record) {
+      this.fogDecays.delete(fog);
+      if (fog.lightDecay !== record.wrote) return;
+      if (record.original === undefined) delete fog.lightDecay;
+      else fog.lightDecay = record.original as readonly [number, number, number];
     }
   }
 
@@ -1312,6 +1361,30 @@ function airLight(sky: SkyTarget, state: WeatherState): [number, number, number]
   }
   for (let i = 0; i < 3; i++) light[i] = (1 - night) * (day ? day[i]! : 1) + night * (reference > 0 ? light[i]! : 0);
   return light;
+}
+
+// The radiance the haze's light shares are drawn in (KB-SKY-PALLHAZE1): a share of 1 is the zenith sun's light on a
+// white surface, E / pi, which in the sky's units is its zenith sun over pi (as the sky draws its `scatteredLight` glow,
+// look.ts) at the sky's exposure and picture scale, so a long path through the haze ends at the sky's own horizon
+// (Koschmieder 1924). Until 2026-11-27 the share was drawn as engine radiance as it was, about 2.2 times darker than the
+// sky behind it under a sun of 5, so every far ridge in a pall was a dark cut-out. A sky without `zenithSun` keeps 1.
+function hazeUnits(sky: SkyTarget): number {
+  const zenith = sky.zenithSun;
+  if (typeof zenith !== 'number' || !(zenith > 0)) return 1;
+  return (
+    (zenith * (sky.options.atmosphere?.sunIntensity ?? 1) * 2 ** (sky.options.exposure ?? 0) * (sky.pictureScale ?? 1)) /
+    Math.PI
+  );
+}
+
+// Whether the sky draws the smoke, ash and spray it is under (`dimSun`: an atmosphere it has, or one the drive makes for
+// a sky with a look or air controls, whose glow and sun colour the drive writes), so its radiance toward the horizon is
+// the haze's own airlight at the end of a long path (KB-SKY-HAZEHORIZON1).
+function drawsLoad(sky: SkyTarget): boolean {
+  const o = sky.options,
+    atm = o.atmosphere;
+  if (atm === undefined) return o.look !== undefined || sky.airControls === true;
+  return !heldFromWeather(atm, 'scatteredLight') && !heldFromWeather(atm, 'sunColor');
 }
 
 // The sky's own day/night blend: its nightFactor, else the same smoothstep of its sun (base.ts, (sun.y + 0.12) / 0.2).

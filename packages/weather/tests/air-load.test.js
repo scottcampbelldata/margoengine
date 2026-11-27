@@ -243,10 +243,14 @@ test('the drive raises spray over a sea and thickens it near the surf line; spra
     assert.throws(() => new WeatherDrive({ weather: machine, surf: bad }), TypeError);
 });
 
-test('the sky fog takes the ash or spray colour, each by its share of the load, and the sun dims grey', () => {
+test('the sky fog takes the ash or spray colour, each by its share of the load, and the sun dims grey', async () => {
+  // The glow held by hand: this sky does not draw the load, so the fog takes the haze's own colour (KB-SKY-HAZEHORIZON1).
+  const { holdFromWeather } = await import('../../shared/settings.js'),
+    atmosphere = {};
+  holdFromWeather(atmosphere, 'scatteredLight');
   const sky = {
       name: 'sky',
-      options: { fog: { density: 0.01, falloff: 'exp' }, atmosphere: {} },
+      options: { fog: { density: 0.01, falloff: 'exp' }, atmosphere },
       sun: new Float32Array([0, 1, 0]),
     },
     machine = new WeatherMachine('clear', { seed: 8 }),
@@ -301,7 +305,7 @@ test('the haze is lit by the light that reaches it through the layer: the fog da
     for (const load of [0.25, 0.35, 0.5, 0.65, 0.8, 1]) {
       const sky = {
           name: 'sky',
-          options: { fog: { density: 0.01, falloff: 'exp' }, atmosphere: {} },
+          options: { fog: { density: 0.01, falloff: 'exp' } },
           sun: new Float32Array([0, Math.sin(0.8), Math.cos(0.8)]),
         },
         machine = new WeatherMachine('clear', { seed: 8 }),

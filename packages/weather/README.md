@@ -1175,6 +1175,21 @@ A `WeatherDrive` does three things for it, all package calls:
 - **The fog takes the smoke colour.** While dust and smoke together are most of the air's extinction, the sky fog's colour
   is `smokeColor()` (a grey brown from the single-scattering albedo of smoke, 0.84 to 0.89) times `smokeLight`, or the
   mix of dust and smoke colours by their share of the extinction.
+- **The haze below the eye is darker.** While it colours the fog the drive also writes the fog's `lightDecay`,
+  `hazeLightDecay(state, extinction)`: how fast the light inside the haze falls with depth below the eye, the two-stream
+  diffusion exponent sqrt(g1^2 - g2^2) of the load's albedo and asymmetry (Meador and Weaver 1980), mixed by
+  extinction with the clean rest of the air. A far ground the haze hides fully then darkens with the angle it is seen
+  at, redder in smoke, instead of taking the horizon's one colour (KB-SKY-HAZEBELOW1). About 0.44, 0.49, 0.55 for smoke
+  alone; 0 with no load. What the fog had comes back when the load leaves.
+
+```js
+import { hazeLightDecay } from 'margoengine/weather';
+
+// Smoke alone: its light halves every 1.4 or so of optical depth below the eye, blue fastest.
+const [red, green, blue] = hazeLightDecay({ smoke: 0.5 });
+console.log(red < green && green < blue, green.toFixed(2));
+```
+
 - **A fire front makes smoke.** Each `FireFront` in the scene (found as `fire-front:N`, or the `fires` option) reports its
   `smokeEmission` in grams of PM2.5 a second (the fuel it burns times `smokeYield`, 15 g/kg, Akagi et al. 2011); the
   drive raises the state's `smoke` to `smokeFromEmission(grams, wind, smokeWidth)`, the box model Q / (U H W) over a

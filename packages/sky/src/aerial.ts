@@ -42,6 +42,8 @@ export interface AerialSky {
   };
   /** A sky with its own sun illuminance (`HillaireSky`) lends it, so the air and the sky agree. */
   readonly sunIlluminance?: number;
+  /** The factor the sky draws in besides its exposure (`Sky.pictureScale`: sky units into the engine's). Default 1. */
+  readonly pictureScale?: number;
   /** A sky with its own atmosphere (`HillaireSky`) lends it whole: the air then ignores turbidity. */
   readonly resolvedAtmosphere?: Readonly<Required<AtmosphereParameters>>;
 }
@@ -226,7 +228,7 @@ export class AerialPerspective implements EnginePlugin {
       o.sky?.sunIlluminance ??
       (o.sky && (o.sky.options.model ?? 'preetham') === 'preetham' ? 10 : 20);
     for (let i = 0; i < 3; i++) v[36 + i] = sun[i] / length;
-    v[39] = 2 ** (o.sky?.options.exposure ?? 0);
+    v[39] = 2 ** (o.sky?.options.exposure ?? 0) * (o.sky?.pictureScale ?? 1);
     v.set(c.camera.position, 40);
     v[43] = perUnit / 1000;
     v[44] = (o.maxDistance ?? 64000) / 1000;

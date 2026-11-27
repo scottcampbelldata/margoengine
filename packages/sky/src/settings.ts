@@ -857,6 +857,14 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
   n('fog.height', 'fog', 0, 0, 1, 0.001, '', 'Extra fog below y = 0, as a fraction: height fog.'),
   n('fog.scaleHeight', 'fog', 0, 0, 10000, 10, 'm', 'Height over which the haze thins by e above fog.base, integrated along each ray (0: the same at every height).'),
   n('fog.base', 'fog', 0, -1000, 10000, 1, 'm', 'World height where the haze has fog.density (with fog.scaleHeight).'),
+  c(
+    'fog.lightDecay',
+    'fog',
+    [0, 0, 0],
+    0,
+    2,
+    "How fast the haze's light falls with depth below the eye, per unit optical depth (0: rays below the horizon keep the fog colour).",
+  ),
   choice('fog.falloff', 'fog', ['exp2', 'exp'], "How fog thickens with distance: 'exp2' softer near the camera."),
   {
     ...c('fog.color', 'fog', [1, 1, 1], 0, 4, "Fixed fog colour; null takes the sky's colour in the view direction."),
@@ -912,7 +920,7 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
     '',
     "0 rings the whole horizon, 1 gathers the glow on the sun's side.",
   ),
-  n('exposure', 'exposure', 0, -16, 16, 0.1, 'stops', 'Brightness of the sky backdrop only.'),
+  n('exposure', 'exposure', 0, -16, 16, 0.1, 'stops', 'Brightness of the sky: its backdrop, haze and the light its map gives surfaces.'),
   n('tonemap.exposure', 'exposure', 0, -16, 16, 0.1, 'stops', 'Brightness of the whole frame (Tonemap).'),
   n(
     'tonemap.temperature',
@@ -932,6 +940,8 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
   c('grade.gain', 'grade', [1, 1, 1], 0, 4, 'Gain per channel: scales the whites (Grade).'),
 ];
 /** The rows that can change every frame (everything but `model`), for keying over a shot. */
+// The fog option's keys the table writes: one per fog row.
+const FOG_KEYS = SKY_SETTINGS.filter((s) => s.name.startsWith('fog.')).map((s) => s.name.slice(4));
 export const SKY_LIVE_SETTINGS: readonly SkySetting[] = liveSettings(SKY_SETTINGS) as SkySetting[];
 const BY_NAME = settingIndex(SKY_SETTINGS) as Map<string, SkySetting>;
 /** Every setting at its default, as a fresh object to edit (a slider panel's state). */
@@ -1228,8 +1238,10 @@ export function applySkySettings(targets: SkySettingTargets, values: SkySettingV
   if (value('clouds.coverage') === 0) delete o.clouds;
   else o.clouds = parts.clouds;
   const fog = o.fog as Record<string, unknown> | undefined;
+  // Every fog row's key, not a list kept by hand: until 2026-11-27 only five were, so the scaleHeight and base rows never
+  // reached the fog (KB-SKY-FOGROWS1).
   if (fog)
-    for (const key of ['density', 'start', 'height', 'falloff', 'color'])
+    for (const key of FOG_KEYS)
       if (key in parts.fog) fog[key] = parts.fog[key];
       else delete fog[key];
   if (value('sun.mode') === 'angles')
