@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21070433,
+  "total": 21071601,
   "history": [
     {
       "date": "2026-10-24",
@@ -14839,6 +14839,12 @@
       "commit": "kb-scenes-scour1",
       "reason": "new entry @margoengine/terrain/scour (windScour and refinedHeightfieldGeometry, 2,756 B gzip, ceiling 3,012) and scenes/dune-coast shapes its sand with it (KB-SCENES-SCOUR1): 6,914 to 7,362 B, the sheds' footprints, the choice of grass clumps that grow a shadow dune and the scour setting. Both are the scene's own placement code; a split entry would cost a second import for every attach",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "hdr-flip",
+      "reason": "Limits gap HDR-FLIP: headless/look gains hdrFlip (Andersson, Nilsson, Shirley and Akenine-Moller 2021), 16,982 to 18,045 B gzip measured (limit 17419 to 18587). It is the 8-bit FLIP run once per exposure and shares its colour and feature planes, the pooling and the error helpers; a separate entry would carry a second copy of FLIP (about 2 KB) or import look whole.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15332,7 +15338,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 17419,
+    "@margoengine/headless/look": 18587,
     "@margoengine/headless/null": 3411,
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,

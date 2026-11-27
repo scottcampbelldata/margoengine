@@ -8524,7 +8524,7 @@ WebGL2 compatibility frame and `reference` a 16-sample reference frame. The shot
 each probe its masks and the view-projection core drew it with (the last sub-frame's, when a shot averages
 sub-frames), so with a `sky` mask `horizonSeam` runs and with a `water` mask `waterSeam`; it does not write `dark`, `foam`, still,
 float, compat or reference inputs yet, so those checks are left out; a check named in `lookBounds` without its input
-fails as not run. FLIP is the paper's 8-bit (LDR) form at 67 pixels per degree by default; HDR-FLIP is not built. `blocks` looks for
+fails as not run. FLIP is the paper's 8-bit (LDR) form at 67 pixels per degree by default; `hdrFlip` (HDR-FLIP, 2026-11-27) takes float frames and costs one FLIP per exposure, max(2, ceil(stop - start)) of them (about 10 for a lamp-lit interior), and its tone curves are the ACES fit, Reinhard and any curve of Equation 1's rational form (Hable's Uncharted 2 curve is not built in: pass its coefficients). It rejects negative, NaN and infinite light, and a reference whose largest or median luminance is 0 unless both exposures are given; the checks and `checkProbe` do not run it yet (a probe's `hdr` frame has no float reference beside it). `blocks` looks for
 steps repeating at one pitch (default 8 pixels) in tiles 8 pitches across, so blocks smaller than a tile, one-code
 block steps and blocks masked by strong texture are not seen. `flat` needs a constant 65 x 65 window, `banding` flat
 runs of 6 pixels or more. `lights` counts bright discs by shape (fill 0.6 to 0.95 of the box, aspect within 1.5) from

@@ -106,6 +106,20 @@ export interface FoamEdgesOptions {
 
 export const GROUND_INSET: number;
 
+export interface HdrFlipOptions extends FlipOptions {
+    toneMapper?: ToneCurve;
+    startExposure?: number;
+    stopExposure?: number;
+    exposureMap?: boolean;
+}
+
+export interface HdrFlipResult extends FlipResult {
+    startExposure: number;
+    stopExposure: number;
+    exposures: number;
+    exposureMap?: Float32Array;
+}
+
 export interface HorizonSeamOptions {
     viewProjection: ArrayLike<number>;
     sky?: LookMask;
@@ -278,6 +292,8 @@ export interface SpeckleOptions extends RegionOptions {
     threshold?: number;
 }
 
+export type ToneCurve = 'aces' | 'reinhard' | readonly [number, number, number, number, number, number];
+
 export interface WaterSeamOptions {
     water: LookMask;
     bound?: LookBound;
@@ -328,6 +344,8 @@ export function flip(test: LookImage, reference: LookImage, { pixelsPerDegree, m
 export function foamEdges(frame: LookImage, options: FoamEdgesOptions): LookResult;
 
 export function grain(frame: LookImage, { mask, bound }?: RegionOptions): LookResult;
+
+export function hdrFlip(test: FloatFrame, reference: FloatFrame, { pixelsPerDegree, map, toneMapper, startExposure, stopExposure, exposureMap }?: HdrFlipOptions): HdrFlipResult;
 
 export function horizonLine(viewProjection: ArrayLike<number>, width: number, height: number): Float32Array;
 

@@ -10541,6 +10541,28 @@ differences, Color Research and Application 45(2) (2020), https://doi.org/10.100
 0.95 compression; edge and point features at sigma 0.5 x 0.082 degrees, power 0.5). The paper's companion code was not
 read; the feature input is the achromatic channel scaled to 0..1, which is Y over the white's.
 
+HDR-FLIP (`hdrFlip`, 2026-11-27): P. Andersson, J. Nilsson, P. Shirley and T. Akenine-Moller, Visualizing Errors in
+Rendered High Dynamic Range Images, Eurographics 2021 Short Papers, https://doi.org/10.2312/egs.20211015 (the PDF read,
+HDRFLIP-paper.pdf in the asset library, 105,227,498 B, SHA-256
+69590f0a22152a4b136e883686ae6cb1ac23b0df76f2274d183403af747297a4, downloaded with Scott's approval; text extracted
+with pdftotext). Every constant comes from the paper's text: exposure compensation 2^c I (section 2.1); tone curves as
+the rational form of Equation 1, the positive root of Equation 2 and c = log2(x_p / I) of Equation 3; target 0.85 with
+I = the reference's largest luminance for the start and its median for the stop; N = max(2, ceil(stop - start))
+exposures spread evenly over [start, stop] (the ceiling read against Figures 1 and 4: 11.9 stops gives 12 columns,
+17.5 gives N = 18), tone mapped and clamped to [0, 1]; the per-pixel maximum of LDR-FLIP over them (Equation 4) and an
+exposure map of the exposure that gave it; ACES as the default tone mapper and 67 pixels per degree. The ACES curve is
+K. Narkowicz, ACES Filmic Tone Mapping Curve (2016), with the 0.6 pre-scale `acesNarkowicz` in packages/shared/aces.js
+already uses; Reinhard is E. Reinhard, M. Stark, P. Shirley and J. Ferwerda, Photographic Tone Reproduction for Digital
+Images, ACM TOG 21(3) (2002), https://doi.org/10.1145/566654.566575, L / (1 + L). Read as ours where the paper is
+silent: luminance is CIE Y of linear Rec.709 (the same matrix as FLIP's), the median of an even count is the mean of
+the two middle values, the tone mapped values enter LDR-FLIP as linear light (the sRGB decode is skipped, which equals
+encoding then decoding without 8-bit rounding), and a black reference, negative or non-finite light are refused rather
+than guessed at. Compared before building: HDR-VDP-2 (Mantiuk et al. 2011, above; the paper reports its poor
+localisation), SMAPE, relMSE and RMAE (statistics on the HDR values, which the paper shows miss errors seen at some
+exposures), and the mPSNR of J. Munkberg, P. Clarberg, J. Hasselgren and T. Akenine-Moller, High Dynamic Range Texture
+Compression for Graphics Hardware, ACM TOG 25(3) (2006), https://doi.org/10.1145/1141911.1141944 (MSE averaged over
+exposures). The companion code (NVlabs/flip) was not read.
+
 Per-check sources: noise, J. Immerkaer, Fast Noise Variance Estimation, CVIU 64(2) (1996),
 https://doi.org/10.1006/cviu.1996.0060; isolated pixels, H. Hwang and R. A. Haddad, Adaptive median filters: new
 algorithms and results, IEEE TIP 4(4) (1995), https://doi.org/10.1109/83.370679 (order statistics of the neighbours);

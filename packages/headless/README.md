@@ -693,6 +693,7 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `lookReport(probes, { thumbWidth?, columns?, title? })` | `{ pass, json, markdown, sheet }` of `{ name, frame, results }` probes: the table failures first, and a contact sheet of thumbnails (default 270 wide, 4 across) framed green or red and labelled with what failed, each reference check's FLIP map beside its frame. |
 | `skyClip`, `grain`, `speckle`, `banding`, `flat`, `blocks`, `horizonSeam`, `waterSeam`, `lights`, `foamEdges`, `crush`, `flicker`, `shimmer`, `nan` | Each check alone, `(frame, options)` with its `bound` and the options above (`flicker` and `shimmer` take the frames), giving `{ check, value, bound, pass, unit, detail }`. `lights` adds `discs` with their centres and radii. |
 | `flip(test, reference, { pixelsPerDegree?, map? })` | FLIP (Andersson et al. 2020): the difference a viewer sees flipping between two frames, 0 to 1 per pixel, as `{ mean, p50, p95, p99, max }` and the per-pixel `map` with `map: true`. 67 pixels per degree is a 4K monitor at 0.7 m; a phone at 30 cm showing 1080 pixels across 6.5 cm is about 87. `difference(frame, other, 'reference' or 'backends')` is its check row. |
+| `hdrFlip(test, reference, { pixelsPerDegree?, map?, toneMapper?, startExposure?, stopExposure?, exposureMap? })` | HDR-FLIP (Andersson, Nilsson, Shirley and Akenine-Moller 2021) on two linear float frames (RGBA, Float32 or half floats): the largest FLIP error over a range of exposures, pooled as `flip`'s, with `startExposure`, `stopExposure`, `exposures` and, with `exposureMap: true`, the exposure that gave each pixel its error. See "HDR-FLIP" below. |
 | `horizonLine(viewProjection, width, height)`, `maskTopEdge(mask)` | The row per column of the horizon of horizontal planes (column-major view-projection, WebGPU clip space) and of a mask's top edge. NaN where there is none. |
 | `stairs`, `colourEdges`, `chromaSmear`, `penumbra`, `penumbraPlants`, `shimmerMoving`, `motionBlur`, `silhouette`, `silhouetteShape`, `bounce`, `shadowTint`, `nightLuma`, `nightPeak`, `reprojectionMotion(depth, viewProjection, nextViewProjection, width, height)`, `depthFromDistance(distance, eye, viewProjection, width, height, { water, plane, far })` (NDC depth from each pixel's distance to the eye, for `reprojectionMotion`; pixels with no distance meet the sea plane where `water` is 128 or more, or are `far` away), `detailKeptFloor(family)` (T7: 0.5, and 0.6 for `animatedFeature`, as `LOOK_FAMILY_DETAIL_KEPT`) | The clean-frame checks (below), each alone with its `bound`; `reprojectionMotion` gives the motion of every pixel of a still world seen by a moving camera. |
 | `LOOK_FAMILY_BOUNDS`, `LOOK_FAMILY_NAMES`, `familyBounds(name)` | The look families and their bounds. |
@@ -740,6 +741,34 @@ for (let y = 0; y < size; y++)
 const rows = checkProbe({ name: 'disc', frame: { width: size, height: size, data } }, {}, { family: 'animatedFeature' });
 const stairs = rows.find((row) => row.check === 'stairs')!;
 console.log(familyBounds('animatedFeature').stairs, stairs.value, stairs.pass); // [0, 1] 0 true
+```
+
+**HDR-FLIP.** `flip` compares two 8-bit frames as shown. A float frame before tone mapping can hide errors that only
+some exposure shows: noise in a dim corner is invisible at the exposure that suits a lamp. `hdrFlip(test, reference)`
+exposure compensates both float frames by 2^c, tone maps them (default `'aces'`, Narkowicz's fit as `acesNarkowicz`
+has it; `'reinhard'`; or the six coefficients of a curve (k0 x^2 + k1 x + k2) / (k3 x^2 + k4 x + k5)), clamps them to
+0..1 and keeps each pixel's largest FLIP error over max(2, ceil(stop - start)) exposures spread evenly from
+`startExposure` to `stopExposure`. By default the start maps the reference's largest luminance to 0.85 after the curve
+and the stop its median, so every test frame of one reference is judged over the same exposures. Negative, NaN or
+infinite values reject with a RangeError (run `nan` first), and so does a reference whose largest or median luminance
+is 0 unless both exposures are given. It costs one FLIP per exposure.
+
+```js
+import { hdrFlip } from '@margoengine/headless/look';
+
+// A lamp (luminance 40) over a dim wall; the test frame's wall is 20 percent too dark.
+const width = 32,
+  height = 32;
+const frame = (wall) => {
+  const data = new Float32Array(width * height * 4);
+  for (let i = 0; i < width * height; i++) {
+    const lamp = i % width > 20 && Math.floor(i / width) < 8;
+    data.set(lamp ? [40, 40, 40, 1] : [wall, wall, wall, 1], i * 4);
+  }
+  return { width, height, data };
+};
+const result = hdrFlip(frame(0.04), frame(0.05));
+console.log(result.startExposure.toFixed(2), result.stopExposure.toFixed(2), result.exposures, result.mean.toFixed(3)); // -4.24 5.41 10 0.199
 ```
 
 Default bounds are starting values for a 1080 x 1920 short; a scene kit or shot file sets its own. FLIP keeps about 30

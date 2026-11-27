@@ -6,6 +6,8 @@
 // - Perceptual difference: P. Andersson, J. Nilsson, T. Akenine-Moller, M. Oskarsson, K. Astrom, M. D. Fairchild,
 //   "FLIP: A Difference Evaluator for Alternating Images", Proc. ACM Comput. Graph. Interact. Tech. 3(2) (2020).
 //   YyCxCz from Flohr et al. (1993); HyAB from Abasi, Amani Tehran and Fairchild (2020).
+// - HDR difference: P. Andersson, J. Nilsson, P. Shirley, T. Akenine-Moller, "Visualizing Errors in Rendered High
+//   Dynamic Range Images", Eurographics 2021 Short Papers, https://doi.org/10.2312/egs.20211015.
 // - Grain: J. Immerkaer, "Fast Noise Variance Estimation", CVIU 64(2) (1996).
 // - Speckle: impulse detection by local order statistics, Hwang and Haddad, "Adaptive median filters" (1995).
 // - Banding: steps between flat runs, after Tandon et al., "CAMBI" (2021) and Tu et al., "BBAND" (2020).
@@ -1069,18 +1071,25 @@ interface FlipPlanes {
   point: Float32Array;
 }
 
-/** The colour (spatially filtered, Hunt-adjusted L*a*b*) and feature planes of one image. */
-function flipPlanes(image: LookImage, ppd: number): FlipPlanes {
-  const { width, height, data } = image,
-    n = width * height,
+/** Linear RGB, three floats per pixel, of an 8-bit sRGB frame. */
+function linearOf({ width, height, data }: LookImage): Float32Array {
+  const n = width * height,
+    out = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) out[i * 3 + c] = toLinear[data[i * 4 + c]];
+  return out;
+}
+
+/** The colour (spatially filtered, Hunt-adjusted L*a*b*) and feature planes of one linear RGB image in 0..1. */
+function flipPlanes(linear: Float32Array, width: number, height: number, ppd: number): FlipPlanes {
+  const n = width * height,
     Yy = new Float32Array(n),
     Cx = new Float32Array(n),
     Cz = new Float32Array(n),
     achromatic = new Float32Array(n);
   for (let i = 0; i < n; i++) {
-    const r = toLinear[data[i * 4]],
-      g = toLinear[data[i * 4 + 1]],
-      b = toLinear[data[i * 4 + 2]],
+    const r = linear[i * 3],
+      g = linear[i * 3 + 1],
+      b = linear[i * 3 + 2],
       x = (RGB_XYZ[0] * r + RGB_XYZ[1] * g + RGB_XYZ[2] * b) / WHITE[0],
       y = RGB_XYZ[3] * r + RGB_XYZ[4] * g + RGB_XYZ[5] * b,
       z = (RGB_XYZ[6] * r + RGB_XYZ[7] * g + RGB_XYZ[8] * b) / WHITE[2];
@@ -1165,25 +1174,45 @@ export function flip(
   checkImage(test, 'test frame');
   checkImage(reference, 'reference');
   sameSize(reference, test, 'test frame');
-  if (!(pixelsPerDegree > 0 && pixelsPerDegree < 1000)) throw rangeError('pixelsPerDegree is above 0', 'headless');
-  const t = flipPlanes(test, pixelsPerDegree),
-    r = flipPlanes(reference, pixelsPerDegree),
-    n = test.width * test.height,
+  checkPpd(pixelsPerDegree);
+  const { width, height } = test,
+    errors = flipErrors(
+      flipPlanes(linearOf(test), width, height, pixelsPerDegree),
+      flipPlanes(linearOf(reference), width, height, pixelsPerDegree),
+    );
+  return { ...pool(errors), ...(map ? { map: errors } : {}) };
+}
+
+const checkPpd = (ppd: number) => {
+  if (!(ppd > 0 && ppd < 1000)) throw rangeError('pixelsPerDegree is above 0 and below 1000', 'headless');
+};
+
+/** The LDR-FLIP error of each pixel between the planes of a test image and its reference. */
+function flipErrors(t: FlipPlanes, r: FlipPlanes): Float32Array {
+  const n = t.edge.length,
     errors = new Float32Array(n),
     cmax = colourCeiling(),
     pc = 0.4,
-    pt = 0.95,
-    histogram = new Uint32Array(1001);
-  let sum = 0,
-    max = 0;
+    pt = 0.95;
   for (let i = 0; i < n; i++) {
     const a = i * 3,
       hyab = Math.abs(t.lab[a] - r.lab[a]) + Math.hypot(t.lab[a + 1] - r.lab[a + 1], t.lab[a + 2] - r.lab[a + 2]),
       e = hyab ** 0.7,
       colour = e < pc * cmax ? (pt / (pc * cmax)) * e : pt + ((e - pc * cmax) / (cmax - pc * cmax)) * (1 - pt),
-      feature = (Math.max(Math.abs(t.edge[i] - r.edge[i]), Math.abs(t.point[i] - r.point[i])) / Math.SQRT2) ** 0.5,
-      value = Math.min(1, colour ** (1 - feature));
-    errors[i] = value;
+      feature = (Math.max(Math.abs(t.edge[i] - r.edge[i]), Math.abs(t.point[i] - r.point[i])) / Math.SQRT2) ** 0.5;
+    errors[i] = Math.min(1, colour ** (1 - feature));
+  }
+  return errors;
+}
+
+/** Mean, percentiles and maximum of per-pixel errors in 0..1. */
+function pool(errors: Float32Array): Omit<FlipResult, 'map'> {
+  const n = errors.length,
+    histogram = new Uint32Array(1001);
+  let sum = 0,
+    max = 0;
+  for (let i = 0; i < n; i++) {
+    const value = errors[i];
     sum += value;
     if (value > max) max = value;
     histogram[Math.round(value * 1000)]++;
@@ -1202,7 +1231,178 @@ export function flip(
     p95: quantile(0.95),
     p99: quantile(0.99),
     max,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------- HDR-FLIP
+
+/**
+ * A tone curve in the form of HDR-FLIP's Equation 1, y = (k0 x^2 + k1 x + k2) / (k3 x^2 + k4 x + k5), applied to each
+ * of R, G and B and clamped to 0..1: `'aces'` (the default, Narkowicz's ACES fit as `acesNarkowicz` in
+ * `packages/shared/aces.js` has it, with its 0.6 pre-scale), `'reinhard'` (Reinhard et al. 2002, x / (1 + x)) or the
+ * six coefficients of another curve that rises from 0 on [0, infinity).
+ */
+export type ToneCurve = 'aces' | 'reinhard' | readonly [number, number, number, number, number, number];
+
+/** Options of {@link hdrFlip}. */
+export interface HdrFlipOptions extends FlipOptions {
+  /** The tone curve every exposure goes through before LDR-FLIP compares it. Default `'aces'`. */
+  toneMapper?: ToneCurve;
+  /** Shortest exposure compensation, in stops. Default: the exposure that maps the reference's largest luminance to
+   * 0.85 after the tone curve. */
+  startExposure?: number;
+  /** Longest exposure compensation, in stops. Default: the exposure that maps the reference's median luminance to
+   * 0.85 after the tone curve. */
+  stopExposure?: number;
+  /** Also return, per pixel, the exposure (in stops) whose LDR pair gave the largest error. Default false. */
+  exposureMap?: boolean;
+}
+
+/** What {@link hdrFlip} gives back: the errors pooled as {@link flip}'s, and the exposures they were taken over. */
+export interface HdrFlipResult extends FlipResult {
+  startExposure: number;
+  stopExposure: number;
+  /** How many exposures were compared: max(2, ceil(stop - start)). */
+  exposures: number;
+  /** With `exposureMap: true`: the exposure in stops that gave each pixel its error, row by row. */
+  exposureMap?: Float32Array;
+}
+
+// Narkowicz's fit y = x (2.51 x + 0.03) / (x (2.43 x + 0.59) + 0.14) at x = 0.6 c, written in Equation 1's form.
+const ACES_CURVE = [2.51 * 0.36, 0.03 * 0.6, 0, 2.43 * 0.36, 0.59 * 0.6, 0.14] as const;
+const REINHARD_CURVE = [0, 1, 0, 0, 1, 1] as const;
+// HDR-FLIP section 2.1: the target LDR luminance of the start (largest reference luminance) and stop (median) exposures.
+const HDR_FLIP_TARGET = 0.85;
+
+function toneCurve(curve: ToneCurve): readonly number[] {
+  if (curve === 'aces') return ACES_CURVE;
+  if (curve === 'reinhard') return REINHARD_CURVE;
+  if (!Array.isArray(curve) || curve.length !== 6 || !curve.every((k) => Number.isFinite(k)))
+    throw typeError("toneMapper is 'aces', 'reinhard' or six finite coefficients [k0, k1, k2, k3, k4, k5]", 'headless');
+  return curve;
+}
+
+/** The exposure c (stops) at which the curve maps luminance `luminance` to `target`: Equations 2 and 3. */
+function exposureFor(k: readonly number[], target: number, luminance: number, which: string): number {
+  if (!(luminance > 0))
+    throw rangeError(
+      `The reference's ${which} luminance is 0, so no exposure maps it to ${target}: give startExposure and stopExposure`,
+      'headless',
+    );
+  const a = target * k[3] - k[0],
+    b = target * k[4] - k[1],
+    c = target * k[5] - k[2];
+  let x = Number.NaN;
+  if (Math.abs(a) < 1e-12) x = -c / b;
+  else {
+    const disc = b * b - 4 * a * c;
+    if (disc >= 0) {
+      const q = Math.sqrt(disc),
+        roots = [(-b - q) / (2 * a), (-b + q) / (2 * a)].filter((root) => root > 0);
+      if (roots.length) x = Math.min(...roots);
+    }
+  }
+  if (!(x > 0 && x < Infinity))
+    throw rangeError(
+      `The tone curve never reaches ${target} on (0, infinity), so it cannot set the exposures`,
+      'headless',
+    );
+  return Math.log2(x / luminance);
+}
+
+/** RGB, three floats per pixel, of a float frame; every value must be finite and not negative. */
+function hdrLinear(frame: FloatFrame, what: string): Float32Array {
+  const { width, height, data } = frame ?? ({} as FloatFrame);
+  if (!(data instanceof Float32Array || data instanceof Uint16Array) || !(width > 0) || !(height > 0))
+    throw typeError(`The ${what} must be {width, height, data: Float32Array or Uint16Array half floats}`, 'headless');
+  if (data.length !== width * height * 4) throw rangeError(`The ${what}'s data does not match its size`, 'headless');
+  const half = data instanceof Uint16Array,
+    n = width * height,
+    out = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++)
+    for (let c = 0; c < 3; c++) {
+      const v = half ? halfToFloat(data[i * 4 + c]) : data[i * 4 + c];
+      if (!(v >= 0 && v < Infinity))
+        throw rangeError(
+          `The ${what} has a negative, NaN or infinite value at pixel ${i}: HDR-FLIP needs light of 0 or more`,
+          'headless',
+        );
+      out[i * 3 + c] = v;
+    }
+  return out;
+}
+
+/**
+ * HDR-FLIP (Andersson, Nilsson, Shirley and Akenine-Moller 2021): the largest LDR-FLIP error a rendered HDR frame shows
+ * against its HDR reference over a range of exposures. Both float frames (linear Rec.709 RGBA, Float32 or half floats)
+ * are exposure compensated by 2^c for max(2, ceil(stop - start)) exposures c spread evenly from `startExposure` to
+ * `stopExposure`, tone mapped and clamped to 0..1, and each pair is compared with {@link flip}'s LDR-FLIP; each pixel
+ * keeps its largest error. The default range comes from the reference alone, so every test frame of one reference is
+ * judged over the same exposures.
+ */
+export function hdrFlip(
+  test: FloatFrame,
+  reference: FloatFrame,
+  {
+    pixelsPerDegree = 67,
+    map = false,
+    toneMapper = 'aces',
+    startExposure,
+    stopExposure,
+    exposureMap = false,
+  }: HdrFlipOptions = {},
+): HdrFlipResult {
+  const t = hdrLinear(test, 'test frame'),
+    r = hdrLinear(reference, 'reference');
+  sameSize(reference, test, 'test frame');
+  checkPpd(pixelsPerDegree);
+  const k = toneCurve(toneMapper),
+    { width, height } = test,
+    n = width * height;
+  if (startExposure !== undefined && !Number.isFinite(startExposure))
+    throw rangeError('startExposure is a finite number of stops', 'headless');
+  if (stopExposure !== undefined && !Number.isFinite(stopExposure))
+    throw rangeError('stopExposure is a finite number of stops', 'headless');
+  let start = startExposure,
+    stop = stopExposure;
+  if (start === undefined || stop === undefined) {
+    const luminance = new Float32Array(n);
+    for (let i = 0; i < n; i++)
+      luminance[i] = RGB_XYZ[3] * r[i * 3] + RGB_XYZ[4] * r[i * 3 + 1] + RGB_XYZ[5] * r[i * 3 + 2];
+    luminance.sort();
+    const largest = luminance[n - 1],
+      median = n % 2 ? luminance[n >> 1] : (luminance[n / 2 - 1] + luminance[n / 2]) / 2;
+    start ??= exposureFor(k, HDR_FLIP_TARGET, largest, 'largest');
+    stop ??= exposureFor(k, HDR_FLIP_TARGET, median, 'median');
+  }
+  if (start > stop) throw rangeError(`startExposure ${start} is above stopExposure ${stop}`, 'headless');
+  const first = start,
+    last = stop,
+    count = Math.max(2, Math.ceil(last - first)),
+    errors = new Float32Array(n),
+    chosen = exposureMap ? new Float32Array(n).fill(first) : undefined,
+    curve = (x: number) =>
+      Math.min(1, Math.max(0, (k[0] * x * x + k[1] * x + k[2]) / (k[3] * x * x + k[4] * x + k[5]))),
+    ldr = (hdr: Float32Array, scale: number) => Float32Array.from(hdr, (v) => curve(scale * v));
+  for (let e = 0; e < count; e++) {
+    const c = first + (e * (last - first)) / (count - 1),
+      at = flipErrors(
+        flipPlanes(ldr(t, 2 ** c), width, height, pixelsPerDegree),
+        flipPlanes(ldr(r, 2 ** c), width, height, pixelsPerDegree),
+      );
+    for (let i = 0; i < n; i++)
+      if (at[i] > errors[i]) {
+        errors[i] = at[i];
+        if (chosen) chosen[i] = c;
+      }
+  }
+  return {
+    ...pool(errors),
+    startExposure: first,
+    stopExposure: last,
+    exposures: count,
     ...(map ? { map: errors } : {}),
+    ...(chosen ? { exposureMap: chosen } : {}),
   };
 }
 
@@ -2323,7 +2523,8 @@ export function motionBlur(
   sameSize(frame, motion, 'motion');
   if (motion.data.length !== width * height * 2)
     throw rangeError('The motion holds two floats (x, y) per pixel', 'headless');
-  if (!(shutter > 0 && shutter <= 360)) throw rangeError('The shutter is more than 0 and up to 360 degrees', 'headless');
+  if (!(shutter > 0 && shutter <= 360))
+    throw rangeError('The shutter is more than 0 and up to 360 degrees', 'headless');
   const smear = shutter / 360;
   const y = luma(frame),
     inside = maskBits(frame, mask, 'motionBlur');
