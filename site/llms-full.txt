@@ -6472,6 +6472,7 @@ only: no timings.
 | Cloth in the air (`setAerodynamics`, 2026-11-27) | By method: each face is a thin plate on its own, quasi-steady (no wake, no memory of earlier steps, no shielding of one face by another, so a crumpled cloth takes the air on every face); the attached lift's slope is set by one aspect ratio for the whole body (default 1, a square), not by the wind's direction across it; the vortex lift is Polhamus's slender limit, pi, unless set; the stall is abrupt, where attached flow's normal force reaches the square plate's 1.17. Measured (`tests/soft-aerodynamics.test.js`): square-on 1.17 q A, small-angle lift and the separated plate within 1 percent of their closed forms; Helmbold's slope within 10 percent and the stall within 5 degrees of the flat plates Torres and Mueller (2004) measured at aspect ratios 0.5 to 1. A tumbling sheet's lift can carry it a little past the air's speed for a while (1 percent for a free cotton sheet in a 60 m/s gale), as a real one does. | A cloth lifts, stalls and flutters as a thin plate does, at any shape and resolution. | A sail-like cloth is better served by `SailForce` (the whole sail's circulation); faces shielded by others still take the air. | Set `aspectRatio` to the cloth's span squared over its area as the wind meets it; use `SailForce` for sails. |
 | Soft-world snapshots (`SoftBodies.takeSnapshot`, `restoreSnapshot`, 2026-11-27) | By method: the snapshot holds the soft kernel's whole linear memory (every column and its allocator, exact), so it is as large as that memory (a few megabytes for thousands of particles, growing with the largest world it held), plus a copy of each body's and the world's own state. The world's settings, hooks, listeners and drawings are the user's and are not in it. A rigid companion of a body removed since the snapshot comes back only where it can: its surface collider is made again with the settings it was made with (a new rigid body, so restore the rigid world's snapshot first, and only where its bodies are those it took), a cluster's rigid proxy when next asked for; an attachment to a rigid body that is gone is dropped; a drawing is not brought back. Measured (`tests/soft-snapshot.test.js`): a cloth in a gust with a box on it, cut partway and split after the snapshot, steps to the same hash for 60 steps after the restore; bodies made, removed and split since come back as they were and step to the same bits. | Exact replay of a soft world, for scrubbing a shot and resuming it mid-way. | Memory: a snapshot a keyframe costs the kernel's memory. | Snapshot at the keyframes a shot needs, not every step. |
 | Adaptive tearing of sheets (`SoftBodyMaterial.adaptiveTearing`, 2026-11-27) | By method: cuts are decided after the step on the faces' stretch (no fracture energy or toughness, no crack speed beyond the cap of cuts a step, default 8); a face's stretch is its own (no smoothing over neighbours), so a crack can branch where two neighbouring faces fail at once; the body is rebuilt at each step that cuts it (a new `SoftBody`; handles to the old one go stale, as after a split), costing a walk over its edges per cut; a cut drops the edges crossing it; a cell body (tetrahedra) is cut by its own crack module, not this one. Measured (`tests/soft-adaptive-tearing.test.js`): every inserted vertex lies straight across the stretch from its corner on meshes turned 0, 30 and 60 degrees to it; a shearing sheet's mass is kept to 1e-6 and its momentum to 1e-4 kg m/s through tens of cuts; nothing tears below the strain. | A tear runs where the stretch sends it, at any mesh orientation. | Rebuilding a large sheet at every cutting step costs a walk over its mesh. | Cap the cuts a step with `maxTearsPerStep`; listen with `soft.onTear` for the rebuilt body. |
+| Vertex block descent for cloth (`setSolver('vertex-block')` on a body of edges, 2026-11-27) | By method: edges are springs (a rigid edge a spring at ten times the piece's rate, so it gives a sliver; a thread past its measured strain is projected back after the passes); blocks are solved in particle order on one thread (Gauss-Seidel, no graph colouring); contacts and links with rigid bodies are still met by the exact solve and the contact pass after the blocks; 'fem' and 'projective' on a body of edges keep the edge solver. Measured (`tests/soft-cloth-vertex-block.test.js`): a strip of the default cotton hangs to Irvine's elastic-cable sag within 0.1 percent at two passes or eight; a 4 Hz edge rings with a period within 2 percent of 0.25 s; a run replays bit for bit. | A cloth's stretch from its springs' stiffness, with a resting equilibrium independent of the passes. | Rigid edges are near-rigid springs, not exact; one thread. | The default edge solver for rigid or inextensible edges; vertex blocks for a cloth of measured stiffness. |
 | Sails and flags (`SailForce`, AERO-02, 2026-11-25) | By method: a quasi-steady vortex lattice on the cloth's grid cells (the wake leaves the trailing edge straight along the mean apparent wind each step, with no memory), potential flow where attached (no viscous drag there), the flat-plate normal force past `stall` (default 20 degrees), one surface (no thickness, no mast ahead of it); a dense solve of one unknown per cell every step (a 12 by 4 sail, 48 cells). Measured in the tests: a flat sail of aspect ratio 6 within 5 percent of Helmbold's lift slope, linear in incidence, the stalled plate's 1.17 sin(a). A `SailForce` on a cloth supplies the cloth's air loads while attached, and turns the cloth's own flat-plate drag off, so the air is counted once. Each corner takes its load damped implicitly against its own speed through the air (backward Euler on the aerodynamic damping), so a sail of real weight is stable at any step; `force` is the load that went into the cloth over the step, which on a light free sail is less than the instantaneous load the lattice gives at the step's start. | A sail's own shape decides its lift each step, from a method sail designers use for attached flow. | No unsteady wake (flutter is driven by the cloth, not by shed vortices); large grids cost a dense solve. | Keep sail grids to a few hundred cells; a stiffer cloth for a racing sail. |
 | Aerodynamic loads from shape (`WindForce`, AERO-01, 2026-11-25) | By method: each collider's surface as panels (a box face 4 x 4, a sphere 320 triangles, round shapes 16 strips); a windward panel takes the flat-plate normal force C_N90 sin(a) q A and every panel skin friction C_f q A; no sheltering of one body by another, no flow separation from curved surfaces, no added mass, and lift only from inclined panels (a flat plate's sin law, not a wing's circulation). Measured in the tests: a square plate face on 1.17 (Hoerner's 1.17), at 45 degrees half drag and half lift of 1.17 sin 45; a sphere 0.78 against about 0.47 measured below the drag crisis. Other collider shapes take the box of their bounds. The load is held as a force through the step and taken implicitly in the body's velocity and spin (a finite-difference Jacobian, thirteen evaluations of the panels a body a step), so many bodies in one wind cost more than an explicit load would. | Drag, lift and moment come from the geometry and the wind at each panel, so a gust or a spin acts where it lands. | Round bodies drag too much; no shadowing. | Lower `drag` for a streamlined or round body; a wing or sail takes its own solver (AERO-02, AERO-03). |
 | Gravity fields, updrafts and vortices (`GravityField`, `Updraft`, `Vortex`, DYN-01, 2026-11-27) | By method: a force at each dynamic body's centre of mass, sampled there once a step and applied as force times the step (explicit, so a very strong field over a long step overshoots as any explicit force does); a body is inside or outside by its centre of mass only, not its shape; a vortex turns counter-clockwise seen from above only; no air is simulated, so nothing is sheltered and a body's shape does not change the push. | Game and film effects matching Babylon's helpers, with SI units. | A long body half inside a field is pushed all or nothing. | `WindForce` for drag from a body's shape; smaller `physics.fixedTimestep` for strong fields. |
@@ -15751,18 +15752,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** a body that holds a volume or a gas takes the air on its windward faces only, at a cube face's 1.05 (Hoerner
   1965), which sums to 0.525 on a sphere. Regression: `packages/physics/tests/soft-volume.test.js` ("a closed volume
   feels the air on its windward side").
-### Open 2026-11-27: packages that load a WebGL2 route by import() draw their first frames differently until it arrives (KB-COMPAT-READY1, culling, dof, sky, splats, vfx, compute, voxel-pathtracer, scatter)
-
-- **Repro:** the class KB-SCATTER-ATTRCOMPAT1 found in shadows. On the WebGL2 layer each of these packages fetches its
-  compatibility route with `loadCompatRoute` when it attaches; until it arrives it waits or runs its WebGPU route on
-  the layer's CPU tier. `packages/dof/tests/dof.test.js` ("DOF alone on the WebGL2 layer shows the sharp scene"): the
-  first frames of a page show the scene sharp, later ones blurred, and nothing told a caller when frames stop changing.
-- **Cause:** `packages/shared/compat.js` said "no frame is drawn differently" while the route loads; that held only
-  where a check measured it. A check or film frame drawn on a loaded machine before the route differs from one after.
-- **Fix, per package:** a `ready` promise (`routeSettled` in `packages/shared/compat.js`), documented in the README
-  and awaited by the package's own checks. Done: dof, vfx, splats, compute (`ComputeFrame.ready`), sky; voxel-pathtracer's
-  `ready` already waited for its route kernel. Left: culling (three files) and scatter's `Scatter`, listed as owed in
-  `scripts/quality/compat-route-proofs.json`; the quality step `compat-routes` fails on any other route without `ready`.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -15797,6 +15786,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   flow, the entry of 2026-11-15). `features-browser.mjs` now holds the layer to the exact values
   (`test/derivative-check.mjs`) and reports what native does. A shader of your own that must run right natively on this
   GPU should take the derivative in the entry point, or use its value outside the branch too.
+
+### Fixed 2026-11-27: packages that loaded a WebGL2 route by import() drew their first frames differently until it arrived (KB-COMPAT-READY1, culling, dof, sky, splats, vfx, compute, voxel-pathtracer, scatter)
+
+- **Repro:** the class KB-SCATTER-ATTRCOMPAT1 found in shadows. On the WebGL2 layer each of these packages fetches its
+  compatibility route with `loadCompatRoute` when it attaches; until it arrives it waits or runs its WebGPU route on
+  the layer's CPU tier. `packages/dof/tests/dof.test.js` ("DOF alone on the WebGL2 layer shows the sharp scene"): the
+  first frames of a page show the scene sharp, later ones blurred, and nothing told a caller when frames stop changing.
+- **Cause:** `packages/shared/compat.js` said "no frame is drawn differently" while the route loads; that held only
+  where a check measured it. A check or film frame drawn on a loaded machine before the route differs from one after.
+- **Fix, per package:** a `ready` promise (`routeSettled` in `packages/shared/compat.js`), documented in the README
+  ("Exact first frames on the WebGL2 layer") and awaited by the package's own checks: dof 99d57ea87e, vfx 699d0c511d,
+  splats e279aba67e, compute 60dc62f075 (`ComputeFrame.ready`), sky c59a9a2aa7, culling f7197f4315 (`CulledMeshes`,
+  `CulledInstances`, `DynamicInstances`) and scatter's `Scatter` (the commit closing this row); voxel-pathtracer's
+  `ready` already waited for its route kernel. The owed list of `scripts/quality/compat-route-proofs.json` is empty.
+- **Regression:** each package's ready test (`packages/dof/tests/dof.test.js`, `packages/sky/test/compat-ready.test.js`,
+  `packages/culling/test/compat-ready.test.js`, `packages/scatter/test/compat-ready.test.js` and the others named in
+  those commits); the class check is the quality step `compat-routes` (5b24bdc8eb, `tests/quality-compat-routes.test.js`),
+  which fails on any file that loads a route with neither `ready` nor a recorded proof of identical frames.
 
 ### Fixed 2026-11-27: a remote voice was silent in Chromium (KB-NETCODE-VOICESILENT1, netcode)
 
@@ -16176,8 +16183,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   but the towed pipe at 1.6 m/s swings 1.4 D in its first mode, and the 0.4 m/s and 0.6 m/s shear cases run 42 % and 128 %
   high. With the drag's damping kept beside theirs: -6 % and +14 % on the towed pipe, but +45 % on the 0.6 m/s shear and
   -35 % here. Their excitation was fitted to a different riser; no variant without new fitting matches all four cases.
-- **Open:** fitting an excitation model across the measured cases (calibrated on some, checked on the rest), or a model of
-  the wake along a sheared span.
+- **Calibrated (2026-11-27), not landed:** the same model with its C_v scaled to the two towed cases (half its height): the
+  towed pipe within -2 % and -9 % across, but the gentle shear +47 % and the strong shear -15 % in its first mode where the
+  test shows the second, and the towed pipe at 1.6 m/s flips to a first-mode swing of about 1 D at nearby scalings. A fit
+  on uniform flow does not carry to shear.
+- **Open:** a model of the wake's correlation along a sheared span (the paper's own CFD, which resolves the wake strip by
+  strip, is within 5 % on this case).
 
 ### Fixed 2026-11-27: a pinned rod blew up at coarse steps under high tension, and at fine steps when stretched (KB-PHYS-RODSTRING1, physics rod)
 
@@ -41122,23 +41133,30 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
-## Character controller quick start
+## Rigid bodies quick start
 
-A kinematic capsule that walks, climbs slopes up to 45 degrees and slides off steeper ones, steps up 0.3 m ledges, snaps
-down stairs, rides what it stands on, pushes crates and jumps. `walk(velocity)` takes a speed in m/s and adds the world's
-gravity and the jump itself, once per fixed step:
+A floor, a bouncing ball, two seconds of fixed steps, and the mass the solver computed from the ball's density (kg/m³; 1 by
+default, as in Rapier, so pass a real one):
 
 ```ts
 import { Physics } from '@margoengine/physics';
 await Physics.load();
-const physics = new Physics(null);
-physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
-const body = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0.9, 0], colliders: { shape: 'capsule', halfHeight: 0.5, radius: 0.3 } });
-const controller = physics.createCharacterController(body, { applyImpulsesToDynamicBodies: true, characterMass: 70 });
-physics.on('beforestep', () => controller.walk([1.5, 0, 0]));
+const physics = new Physics(null); // new Physics(engine) steps with the engine and moves the meshes you pass
+physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
+const ball = physics.addBody(null, { position: [0, 5, 0], colliders: { shape: 'sphere', radius: 0.5, density: 1000, restitution: 0.6 } });
 for (let i = 0; i < 120; i++) physics.step();
-console.log(controller.grounded, controller.jump(5), body.position);
+console.log(ball.position, ball.mass); // mass 523.6 kg = 1000 x 4/3 pi 0.5^3
 ```
+
+A live page with all of it at once (instanced bodies on heightfield terrain, a pointer ray, an explosion, every shape with
+its computed mass): `examples/physics-rigid.html`.
+
+### From three.js and Rapier
+
+The three.js Rapier examples (`physics_rapier_basic`, `physics_rapier_instancing`, `physics_rapier_terrain`) load
+Rapier, make a world with a gravity, describe each body and collider with `RigidBodyDesc` and `ColliderDesc`, call
+`world.step()` each frame, and copy every body's translation and rotation into its mesh (or into
+`InstancedMesh.setMatrixAt`) themselves. In Margo:
 
 [README continues: https://margoengine.com/llms/packages/physics.md]
 
@@ -42545,6 +42563,7 @@ This first scene needs no model or texture files. For a reader moving from anoth
 - `examples/gallery/index.html`: The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md))
 - `examples/kinematics-constraints.html`: Arm clearance check with the kinematics package
 - `examples/physics-breakable.html`: Breakable stone pillar, brick wall, and glass pane with Voronoi fracture, support anchors, cumulative damage, and debug overlay
+- `examples/physics-rigid.html`: 800 instanced boxes and spheres (one body per instance, two draws) falling onto heightfield terrain, a pointer ray that pushes what it hits, an explosion, and shapes with their computed mass beside the exact one
 - `examples/physics-joints.html`: A hinged door with a stop and a motor, a three-link multibody arm on position motors, and a chain of limited ball joints, with the joint frames and limits debug view
 - `examples/hud-preview.html`: A HUD scene and an item-preview scene over a main scene
 - `examples/minimap.html`: A second camera view as a minimap
