@@ -218,6 +218,8 @@ test('Flame: a length, an intensity (Byram) or a heat (Heskestad) sizes it, its 
   assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: -1 }), RangeError);
   assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, flicker: 4 }), RangeError);
   assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, tongues: 0.1 }), RangeError);
+  // KB-TAA-PARTICLEMASK2: the reactive mask is on, off or left to TAA's demand, nothing else.
+  assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, reactive: 1 }), /reactive must be true or false/);
   assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, lights: {} }), TypeError);
   // 60 frames of a flame that grows, moves, leans and widens: no buffer or texture.
   const made = h.resources.length;

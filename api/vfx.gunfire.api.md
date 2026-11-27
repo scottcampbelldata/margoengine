@@ -534,6 +534,7 @@ interface FlameOptions extends FlameRampOptions {
     lightPower?: number;
     fog?: FogLike | null;
     depth?: () => GPUTexture | undefined;
+    reactive?: boolean;
 }
 
 interface FlamePlume {

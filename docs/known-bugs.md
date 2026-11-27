@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: VFX ribbons, mesh particles and Flame wrote no TAA reactive mask (KB-TAA-PARTICLEMASK2, vfx)
+
+- **Repro:** `TAA.attach(engine)` with a fast `VFX` that has `ribbons` (`heads: false`) or `mesh`, or a `Flame`:
+  `taa.velocity.resolved` alpha (the mask TAA read) is 1 everywhere, as with no mask, so the strips, pieces and tongues
+  average into the history they have no motion vectors for. Billboards had written the mask since KB-TAA-PARTICLEMASK1.
+- **Cause:** those three draw in passes of their own, and only the billboard draw (`base.ts` `drawReactive`) drew into
+  the shared particle mask (`packages/shared/reactive-mask.js` `reactiveTarget`).
+- **Fix:** each draws its coverage into the shared mask while TAA reads masks, or as the effect's (or flame's)
+  `reactive` option says: ribbons their strips' alpha, mesh particles 1 over their pieces (depth tested against what
+  they just wrote), `Flame` its march opacity (glow left out), all with the shared `reactiveBlend` (max).
+  Regression: `packages/vfx/test/reactive-sources-check.mjs` (WebGPU and the WebGL2 layer; on the parent the ribbons,
+  mesh and flame rigs read 1 everywhere, as their `reactive: false` twins), which also covers billboards drawn by an
+  order-independent pass (`addEffect`), a path that had no mask test; `reactive` validation in
+  `packages/vfx/test/flame.test.js`.
+
 ### Fixed 2026-11-26: the gameplay-sandbox settlement test looked for scatter's material block in 128-byte uniforms (KB-GS-UNIFORM144, gameplay-sandbox)
 
 - **Repro:** `cd examples/gameplay-sandbox && node --test test/procedural.test.js`: "settlement uploads baked AO and

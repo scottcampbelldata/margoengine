@@ -1,3 +1,4 @@
+import { reactiveBlend, reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
 import { applyView } from '../../shared/view-rect.js';
 import type { VFXExtension, VFXMeshParticles, VFXState } from './base.js';
 import { frame } from './frame.js';
@@ -44,7 +45,8 @@ export function meshCorners(m: VFXMeshParticles): Float32Array {
  * angle (uniform on the sphere: z and longitude from the hash's two halves), so each piece tumbles its own way.
  * `velocity`: the mesh's +y follows the particle's velocity and the angle spins it about that line. The mesh's radius is
  * half the particle size, so the billboards' cull sphere (radius size) holds it. Lambert shading from one directional
- * light plus ambient (direction.w), opaque and depth written.
+ * light plus ambient (direction.w), opaque and depth written. `reactive` covers the mesh fully: a piece has no motion
+ * vectors, so TAA's camera reprojection would blend it with the history where it was.
  */
 const shader = (align: 'random' | 'velocity', spin = '') =>
   frame +
@@ -74,7 +76,8 @@ fn meshHash(v:u32)->u32 {var x=v;x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846
 @fragment fn fragment(i:Out)->@location(0) vec4f {
   let lit=meshLight.direction.w+(1-meshLight.direction.w)*max(dot(normalize(i.normal),meshLight.direction.xyz),0.0);
   return vec4f(i.color*meshLight.color.rgb*lit,1);
-}`;
+}
+@fragment fn reactive(i:Out)->@location(0) vec4f {return vec4f(1,0,0,1);}`;
 
 /** Checks a finite flat list of numbers. */
 const list = (v: unknown, name: string): ArrayLike<number> => {
@@ -118,6 +121,8 @@ function geometry(m: VFXMeshParticles): void {
  * The `mesh` feature: draws each particle as an instance of a small triangle mesh instead of a billboard, tumbling by
  * its spin or following its velocity, lit by one directional light. Pass it as `{mesh}` to `VFX` from
  * `@margoengine/vfx/base`; the root `VFX` has it. The mesh is read at attach; `light`, `color` and `ambient` every frame.
+ * The pieces cover the frame's shared reactive mask while TAA reads masks (the effect's `reactive` option), as they
+ * have no motion vectors.
  */
 export const mesh: VFXExtension<VFXMeshParticles> = {
   validate(m) {
@@ -162,7 +167,13 @@ export const mesh: VFXExtension<VFXMeshParticles> = {
         depthLoadOp: 'load',
         depthStoreOp: 'store',
       },
-      descriptor: GPURenderPassDescriptor = { colorAttachments: [color], depthStencilAttachment: depth };
+      descriptor: GPURenderPassDescriptor = { colorAttachments: [color], depthStencilAttachment: depth },
+      // The mask pass tests against the depth the pieces just wrote, so a piece hidden by a nearer one adds nothing.
+      maskDepth: GPURenderPassDepthStencilAttachment = { view: undefined!, depthReadOnly: true },
+      reactiveAttachments: GPURenderPassColorAttachment[] = [],
+      reactivePass: GPURenderPassDescriptor = { colorAttachments: reactiveAttachments, depthStencilAttachment: maskDepth },
+      // The owner TAA's demand is counted for: one per runtime, so a restored device starts it again.
+      owner = {};
     let module: GPUShaderModule | undefined;
     const settings = () => {
       if (options.mesh !== value)
@@ -182,16 +193,22 @@ export const mesh: VFXExtension<VFXMeshParticles> = {
         const format = c.descriptor.depthStencil!.format,
           samples = c.descriptor.multisample?.count ?? 1,
           key = c.format + ':' + format + ':' + samples;
-        let drawing = pipelines.get(key);
-        if (!drawing) {
+        // The pieces into the frame (depth written), or their coverage into the reactive mask (tested, not written).
+        const prepare = (reactive: boolean) => {
+          let drawing = pipelines.get(key + (reactive ? ':reactive' : ''));
+          if (drawing) return drawing;
           module ??= device.createShaderModule({ code: shader(align, state.spin?.code) });
           const pipeline = device.createRenderPipeline({
             layout: 'auto',
             vertex: { module, entryPoint: 'vertex' },
-            fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
+            fragment: reactive
+              ? { module, entryPoint: 'reactive', targets: [{ format: 'r8unorm', blend: reactiveBlend }] }
+              : { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
             primitive: { topology: 'triangle-list', cullMode: 'back', frontFace: 'ccw' },
             multisample: c.descriptor.multisample,
-            depthStencil: { format, depthWriteEnabled: true, depthCompare: 'greater' },
+            depthStencil: reactive
+              ? { format, depthWriteEnabled: false, depthCompare: 'greater-equal' }
+              : { format, depthWriteEnabled: true, depthCompare: 'greater' },
           });
           drawing = [
             pipeline,
@@ -202,26 +219,35 @@ export const mesh: VFXExtension<VFXMeshParticles> = {
                 { binding: 1, resource: { buffer: state.particles } },
                 { binding: 2, resource: { buffer: state.alive } },
                 { binding: 15, resource: { buffer: vertices } },
-                { binding: 16, resource: { buffer: light } },
+                // The mask's fragment reads no light, so its auto layout has no binding 16.
+                ...(reactive ? [] : [{ binding: 16, resource: { buffer: light } }]),
                 ...(state.spin ? [state.spin.entry] : []),
               ],
             }),
-          ];
-          pipelines.set(key, drawing);
-        }
+          ] as [GPURenderPipeline, GPUBindGroup];
+          pipelines.set(key + (reactive ? ':reactive' : ''), drawing);
+          return drawing;
+        };
         c.encoder.copyBufferToBuffer(state.visible, 4, indirect, 4, 4);
         color.view = c.color;
-        depth.view = c.depth;
+        depth.view = maskDepth.view = c.depth;
         const stencil = format.includes('stencil');
         depth.stencilLoadOp = stencil ? 'load' : undefined;
         depth.stencilStoreOp = stencil ? 'store' : undefined;
-        const pass = c.encoder.beginRenderPass(descriptor);
-        pass.setPipeline(drawing[0]);
-        pass.setBindGroup(0, drawing[1]);
-        applyView(pass, c);
-        pass.drawIndirect(indirect, 0);
-        pass.end();
-        state.stats.drawCalls++;
+        maskDepth.stencilReadOnly = stencil ? true : undefined;
+        const draw = (into: GPURenderPassDescriptor, [pipeline, group]: [GPURenderPipeline, GPUBindGroup]) => {
+          const pass = c.encoder.beginRenderPass(into);
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, group);
+          applyView(pass, c);
+          pass.drawIndirect(indirect, 0);
+          pass.end();
+          state.stats.drawCalls++;
+        };
+        draw(descriptor, prepare(false));
+        if (!(options.reactive ?? reactiveMaskWanted(c, owner))) return;
+        reactiveAttachments[0] = reactiveTarget(c);
+        draw(reactivePass, prepare(true));
       },
     };
   },

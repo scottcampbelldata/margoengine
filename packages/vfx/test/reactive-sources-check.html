@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX reactive mask sources check</title><style>body{margin:0}canvas{display:inline-block;width:128px;height:96px}</style></head><body>
+<script type="module">
+// KB-TAA-PARTICLEMASK2: VFX ribbons, mesh particles and the Flame volume write TAA's reactive mask themselves, and
+// billboards drawn by an order-independent pass still write theirs. Each source runs on its own engine with a plain
+// TAA.attach(engine) and nothing wired, twice: with its default (the mask on while TAA reads masks) and with
+// reactive: false. TAA keeps the mask it read in the resolved frame's alpha (taa.velocity.resolved), so this page reads
+// that texture back: the default must cover the source's pixels, reactive: false must give TAA no mask (alpha 1). Driven by
+// reactive-sources-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {VFX} from '/packages/vfx/dist/index.js';
+import {Flame} from '/packages/vfx/dist/flame.js';
+import {TAA} from '/packages/taa/dist/index.js';
+import {OIT} from '/packages/oit/dist/index.js';
+import {addEffect} from '/packages/oit/dist/vfx.js';
+const errors=[],W=128,H=96;
+const spray={capacity:2000,initialCount:0,rate:120,position:[-3,1,0],velocity:[12,0,0],spread:2,gravity:[0,0,0],color:[1,1,1,1],size:0.2,lifetime:[0.4,0.6]};
+// A cube of 12 triangles, counter-clockwise faces out.
+const cube={positions:new Float32Array([-1,-1,-1,1,-1,-1,1,1,-1,-1,1,-1,-1,-1,1,1,-1,1,1,1,1,-1,1,1]),
+ indices:[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,6,2,3,7,6,0,4,7,0,7,3,1,2,6,1,6,5]};
+const sources={
+ // Billboards handed to an order-independent pass: the pass draws their colour, the effect still writes the mask.
+ oit:(engine,off)=>{const oit=OIT.attach(engine);const v=new VFX({...spray,...off});engine.use(v);addEffect(oit,v);},
+ // Ribbons alone (heads: false), so only the strips can write the mask.
+ ribbons:(engine,off)=>engine.use(new VFX({...spray,size:0.05,ribbons:{points:12,width:0.2,heads:false},...off})),
+ mesh:(engine,off)=>engine.use(new VFX({...spray,size:0.4,mesh:cube,...off})),
+ flame:(engine,off)=>Flame.attach(engine,{position:[0,0.2,0],length:1.6,...off}),
+};
+async function rig(source,reactive){
+ const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;document.body.append(canvas);
+ const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,1,5],target:[0,1,0],near:0.1,far:100},onError:e=>errors.push(source+': '+String(e?.message??e))});
+ engine.stop();engine.scene.background='#050608';
+ engine.gpu.addEventListener('uncapturederror',e=>errors.push(source+': '+e.error.message));
+ const taa=TAA.attach(engine);
+ sources[source](engine,reactive?{}:{reactive:false});
+ return {engine,taa};
+}
+const rigs={};
+for(const s of Object.keys(sources))for(const on of [true,false])rigs[s+(on?'':'Off')]=await rig(s,on);
+// IEEE half to float.
+const half=h=>{const e=(h>>10)&31,m=h&1023,v=e?(e===31?Infinity:(1+m/1024)*2**(e-15)):m/1024*2**-14;return h&0x8000?-v:v;};
+async function maskOf({engine,taa}){
+ const texture=taa.velocity?.resolved;if(!texture)return {mean:-1,covered:-1,max:-1};
+ const device=engine.gpu,bytesPerRow=Math.ceil(texture.width*8/256)*256,
+  buffer=device.createBuffer({size:bytesPerRow*texture.height,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+  encoder=device.createCommandEncoder();
+ encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow},[texture.width,texture.height]);
+ device.queue.submit([encoder.finish()]);
+ await buffer.mapAsync(GPUMapMode.READ);
+ const data=new Uint16Array(buffer.getMappedRange().slice(0));buffer.destroy();
+ let sum=0,covered=0,max=0;
+ for(let y=0;y<texture.height;y++)for(let x=0;x<texture.width;x++){
+  const a=half(data[(y*bytesPerRow)/2+x*4+3]);sum+=a;max=Math.max(max,a);if(a>0.1)covered++;
+ }
+ return {mean:sum/(texture.width*texture.height),covered,max};
+}
+window.check={
+ async run(n){
+  for(let i=0;i<n;i++)for(const r of Object.values(rigs))r.engine.render({delta:1/60});
+  for(const r of Object.values(rigs))await r.engine.gpu.queue.onSubmittedWorkDone();
+  const out={};for(const [k,r] of Object.entries(rigs))out[k]=await maskOf(r);return out;
+ },
+ errors:()=>errors.slice(),
+};
+window.ready=true;
+</script></body></html>

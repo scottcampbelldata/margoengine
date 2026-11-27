@@ -24,7 +24,7 @@ import {
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
-import { reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
+import { reactiveBlend, reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 import { surfacePass, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
 declare const GPUBufferUsage: {
@@ -57,9 +57,6 @@ const defaultPosition: Vec3 = [0, 1, 0],
  * `texture`) may change between frames; validation runs before GPU commands and throws RangeError when a value is out
  * of range.
  */
-// The reactive mask keeps the largest coverage of the particles over a pixel.
-const maxBlend: GPUBlendComponent = { operation: 'max', srcFactor: 'one', dstFactor: 'one' };
-
 export interface VFXOptions {
   /**
    * Particle slots, an integer 1-16,776,960 (64 bytes each). Fixed at construction. Default 1,000,000 (or the quality
@@ -1456,7 +1453,7 @@ export class VFX implements EnginePlugin {
           entryPoint: reactive ? 'reactive' : hook ? 'transparent' : 'fragment',
           ...(hook?.blends ? { constants: { margoKind: 0 } } : {}),
           targets: reactive
-            ? [{ format: 'r8unorm', blend: { color: maxBlend, alpha: maxBlend } }]
+            ? [{ format: 'r8unorm', blend: reactiveBlend }]
             : hook
               ? [...hook.targets]
               : [

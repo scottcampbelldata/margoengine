@@ -13,3 +13,5 @@ export function reactiveTarget(context: {
   height: number;
   descriptor: { multisample?: { count?: number } };
 }): GPURenderPassColorAttachment;
+/** The blend of a draw into the shared particle mask: each pixel keeps the largest coverage drawn over it. */
+export const reactiveBlend: GPUBlendState;

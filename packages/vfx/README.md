@@ -194,7 +194,10 @@ reactive mask (one r8unorm texture for every effect and `Weather`), which TAA re
 `reactive` (default: on while TAA or another reader of reactive masks runs, off otherwise; `true` always, `false`
 never) may change every frame. The mask costs one more draw of the visible billboards a frame and one r8unorm texture
 of the drawing size (plus a multisampled twin with MSAA) shared by all effects; without TAA there is no extra work.
-Ribbons, mesh particles and the `Flame` volume do not write it yet.
+Effects in an order-independent pass (`addEffect` from `margoengine/oit/vfx`) still draw their own mask. Ribbons draw
+their strips' alpha, mesh particles cover their pieces fully (they write depth but have no motion vectors, so TAA's
+camera reprojection would blend them with where they were), and the `Flame` volume draws its opacity along each ray
+(its glow, smooth added light, is left out), each in one more draw a frame under the same `reactive` option.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -208,7 +211,10 @@ engine.use(new VFX({rate: 200, position: [-4, 1, 0], velocity: [24, 0, 0], color
 
 Measured on an RTX A6000 (`test/reactive-check.mjs`, 256x192, a sparse spray at 24 m/s over a dark sky): the spray keeps
 86% of its brightness without TAA (0.89 sRGB levels of lift against 1.03) with the mask, and 48% (0.49) with
-`reactive: false`; the same on the WebGL2 layer.
+`reactive: false`; the same on the WebGL2 layer. `test/reactive-sources-check.mjs` reads TAA's resolved alpha, which
+holds the mask it read, at 128x96 over a dark sky: an order-independent spray covers 206 pixels, ribbons 843, mesh
+particles 1,044 and a 1.6 m flame 752, the background stays 0, and each `reactive: false` twin gives TAA no mask; the
+same on the WebGL2 layer.
 
 ### GPU cost
 
@@ -1040,9 +1046,8 @@ console.log(fire.lights.length); // 2
   disposing the scene disposes it.
 - `fire.lights` holds the steady points, `fire.particles` the `flames`, `embers` and `steam` effects. `fire.dispose()`
   stops the flicker, removes the fire's group (or empties a `Clustered` it owned) and disposes the particles.
-- The embers and steam write TAA's reactive mask by themselves (Under TAA, above). Not yet: the mask for the `Flame`
-  volume and a light
-  source size for highlights on metal (later clustered and materials jobs). Smoke over the fire: `Smoke` (below);
+- The embers, steam and `Flame` volume write TAA's reactive mask by themselves (Under TAA, above). Not yet: a light
+  source size for highlights on metal (a later clustered and materials job). Smoke over the fire: `Smoke` (below);
   soot on the walls: `@margoengine/materials/soot`.
 
 ### A smoke column from one call
@@ -1171,8 +1176,9 @@ them off. Without `depth`, a surface standing in that light (a tree) takes the l
 pass writes the flame's depth where it is opaque, so a spark or a smoke puff behind the flames is hidden and one in front
 draws over them.
 Everything is read each frame and written into one uniform, so a flame that grows, moves, leans, changes its look or goes
-out makes no GPU object after its first frame; every flame volume on a device shares its three pipelines (glow, flame,
-depth).
+out makes no GPU object after its first frame; every flame volume on a device shares its four pipelines (glow, flame,
+depth, reactive mask). While TAA runs the flame draws its opacity into the frame's shared reactive mask, so its tongues
+do not smear into TAA's history (`reactive`, as for particles: Under TAA, above).
 The scene behind the flames shimmers through `HeatHaze` of `@margoengine/post/heat-haze`: `flame.plume` is the hot plume
 it reads (base, length, footprint as drawn, lean in the wind, the flame's clock), so `new HeatHaze({sources: [flame]})`
 in a `PostStack` bends the light through it, and `() => front.flameVolumes` does it for a `FireFront`.

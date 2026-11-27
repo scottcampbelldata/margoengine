@@ -63,6 +63,7 @@ import type { Clustered, PointLight } from '@margoengine/clustered';
 import type { LightGroup, LightGroups } from '@margoengine/clustered/groups';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView } from '../../shared/view-rect.js';
+import { reactiveBlend, reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
 import { valueNoiseWgsl } from '../../shared/noise-wgsl.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
@@ -326,6 +327,13 @@ export interface FlameOptions extends FlameRampOptions {
    * depth-tested against the scene, which draws nothing from inside it.
    */
   depth?: () => GPUTexture | undefined;
+  /**
+   * Draw the flame's coverage (its opacity along each pixel's ray) into the frame's shared reactive mask, which TAA reads
+   * with no option, so the rising, puffing tongues stay crisp instead of smearing into a history they have no motion
+   * vectors for. The glow, smooth added light, is left out. Default: on while TAA (or another reader of reactive masks)
+   * runs, off otherwise; `true` draws it every frame, `false` never. Changeable between frames.
+   */
+  reactive?: boolean;
 }
 
 const clamp01 = (v: number): number => Math.min(Math.max(v, 0), 1);
@@ -532,7 +540,7 @@ fn glowAt(e:vec3f,rd:vec3f,ta:f32,tb:f32,tg:f32)->vec3f {
   }
   return u.glow.rgb*(u.ground.w*0.07957747*air+u.ground.z*0.31830989*lit);
 }
-@fragment fn fragment(i:Out)->@location(0) vec4f {
+fn flame(i:Out)->vec4f {
   let r=rayOf(i,u.box.x,u.box.y,false);
   if(r.span.w<=0.0){discard;}
   let m=march(r.o,r.d,r.span.x,r.span.y,i.clip.xy,0.0);
@@ -545,6 +553,9 @@ fn glowAt(e:vec3f,rd:vec3f,ta:f32,tb:f32,tg:f32)->vec3f {
   ${encode ? 'c=encodeSrgb(max(c,vec3f(0.0)));' : ''}
   return vec4f(c*alpha,alpha);
 }
+@fragment fn fragment(i:Out)->@location(0) vec4f {return flame(i);}
+// The flame's coverage of TAA's reactive mask.
+@fragment fn reactiveFragment(i:Out)->@location(0) vec4f {return vec4f(clamp(flame(i).a,0.0,1.0),0,0,1);}
 // The glow, drawn before the flame over its larger box: added light, tested at the depth where the ray enters the box
 // (the camera's when it stands inside), so a ridge or a wall in front of the fire hides it.
 struct Glow {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
@@ -625,6 +636,7 @@ export class Flame implements EnginePlugin {
   private readonly groups = new Map<GPURenderPipeline, GPUBindGroup>();
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = { view: undefined!, depthReadOnly: true };
+  private readonly reactiveAttachments: GPURenderPassColorAttachment[] = [];
   private constructor(options: FlameOptions, index: number) {
     this.name = 'vfx-flame:' + nextId++;
     this.seed = (index * 7.31) % 97;
@@ -678,6 +690,8 @@ export class Flame implements EnginePlugin {
       rampIn(o.slope[1], 'slope z', -10, 10);
     }
     rampIn(o.glow ?? 1, 'glow', 0, 8);
+    if (o.reactive !== undefined && typeof o.reactive !== 'boolean')
+      throw new TypeError('Flame reactive must be true or false; pass a boolean');
     rampIn(o.haze ?? DEFAULT_HAZE, 'haze', 0, 1);
     rampIn(o.groundAlbedo ?? 0, 'groundAlbedo', 0, 1);
     rampIn(o.glowRadius ?? GLOW_RADIUS, 'glowRadius', 0.5, 10);
@@ -1079,11 +1093,18 @@ export class Flame implements EnginePlugin {
           { format: c.format, writeMask: 0 },
           { depthWriteEnabled: true, depthCompare: 'greater-equal' },
         ),
+        // The coverage into the reactive mask, tested as the flame is; the most over a pixel is kept.
+        make(
+          'vertex',
+          'reactiveFragment',
+          { format: 'r8unorm', blend: reactiveBlend },
+          { depthWriteEnabled: false, depthCompare: depth ? 'always' : 'greater-equal' },
+        ),
       ];
       shared.set(key, set);
     }
     const pipelines = depthPass ? [set[2]!] : u[EXTRA + 3]! > 0 ? [set[0]!, set[1]!] : [set[1]!];
-    for (const pipeline of [set[0]!, set[1]!, set[2]!])
+    for (const pipeline of set)
       if (!this.groups.has(pipeline))
         this.groups.set(
           pipeline,
@@ -1121,6 +1142,18 @@ export class Flame implements EnginePlugin {
       if (this.engine) this.engine.stats.drawCalls++;
     }
     pass.end();
+    if (depthPass || !(o.reactive ?? reactiveMaskWanted(c, this))) return;
+    this.reactiveAttachments[0] = reactiveTarget(c);
+    const mask = c.encoder.beginRenderPass({
+      colorAttachments: this.reactiveAttachments,
+      depthStencilAttachment: this.depthAttachment,
+    });
+    applyView(mask, c);
+    mask.setPipeline(set[3]!);
+    mask.setBindGroup(0, this.groups.get(set[3]!)!);
+    mask.draw(36);
+    mask.end();
+    if (this.engine) this.engine.stats.drawCalls++;
   }
   /** Sets the flame length, metres (see {@link FlameOptions.length}); the volume answers from the next frame. */
   setLength(length: number): this {

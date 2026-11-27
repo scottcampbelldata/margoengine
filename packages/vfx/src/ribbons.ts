@@ -1,3 +1,4 @@
+import { reactiveBlend, reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
 import { applyView } from '../../shared/view-rect.js';
 import type { VFXExtension, VFXRibbons, VFXState } from './base.js';
 import { frame } from './frame.js';
@@ -33,7 +34,8 @@ ${uniform}
  * so a young particle's ribbon is shorter. A dead slot is moved outside the clip volume. The strip's side is
  * perpendicular to the ribbon (the neighbours' difference, or the next pair's where the newest record is the particle
  * itself) and to the eye, so it shows its face; where neither gives a direction the strip has no width. Alpha falls from the particle's own (with its life
- * fade) at the head to 0 at the tail, and across the width as 1 - e^2 (e from -1 to 1).
+ * fade) at the head to 0 at the tail, and across the width as 1 - e^2 (e from -1 to 1). `reactive` writes that alpha
+ * as the strip's coverage of TAA's reactive mask.
  */
 export const ribbonShader =
   frame +
@@ -58,7 +60,8 @@ fn ribbonPoint(slot:u32,k:u32,head:vec3f)->vec3f {
   o.clip=f.camera*vec4f(p+side*inverseSqrt(max(s,1e-24))*select(0.0,e*ribbon.shape.x*0.5,s>1e-12),1);
   o.color=vec4f(color.rgb,color.a*clamp(head.w/rotation.z,0.0,1.0)*(1-f32(v/2u)/f32(ribbon.control.w-1u)));return o;
 }
-@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(i.color.rgb,i.color.a*(1-i.edge*i.edge));}`;
+@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(i.color.rgb,i.color.a*(1-i.edge*i.edge));}
+@fragment fn reactive(i:Out)->@location(0) vec4f {return vec4f(clamp(i.color.a*(1-i.edge*i.edge),0.0,1.0),0,0,1);}`;
 
 const points = (v: VFXRibbons) => v.points ?? 16;
 
@@ -66,7 +69,8 @@ const points = (v: VFXRibbons) => v.points ?? 16;
  * The `ribbons` feature: a camera-facing ribbon behind every particle through its last positions (`points`, recorded
  * every `interval` seconds), for smoke and magic trails. Pass it as `{ribbons}` to `VFX` from `@margoengine/vfx/base`;
  * the root `VFX` has it. Ribbons draw after the billboards in their own pass, alpha blended and depth tested, in slot
- * order; `heads: false` leaves the billboards out.
+ * order; `heads: false` leaves the billboards out. Like the billboards, the strips draw their coverage into the frame's
+ * shared reactive mask while TAA reads masks (the effect's `reactive` option), as they have no motion vectors.
  */
 export const ribbons: VFXExtension<VFXRibbons> = {
   validate(v, o) {
@@ -116,7 +120,11 @@ export const ribbons: VFXExtension<VFXRibbons> = {
       pipelines = new Map<string, [GPURenderPipeline, GPUBindGroup]>(),
       color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' },
       depth: GPURenderPassDepthStencilAttachment = { view: undefined!, depthReadOnly: true },
-      descriptor: GPURenderPassDescriptor = { colorAttachments: [color], depthStencilAttachment: depth };
+      descriptor: GPURenderPassDescriptor = { colorAttachments: [color], depthStencilAttachment: depth },
+      reactiveAttachments: GPURenderPassColorAttachment[] = [],
+      reactivePass: GPURenderPassDescriptor = { colorAttachments: reactiveAttachments, depthStencilAttachment: depth },
+      // The owner TAA's demand is counted for: one per runtime, so a restored device starts it again.
+      owner = {};
     let module: GPUShaderModule | undefined,
       records = 0,
       // The first frame records, so a ribbon starts at the first particle position.
@@ -164,42 +172,54 @@ export const ribbons: VFXExtension<VFXRibbons> = {
         const format = c.descriptor.depthStencil!.format,
           samples = c.descriptor.multisample?.count ?? 1,
           key = c.format + ':' + format + ':' + samples;
-        let drawing = pipelines.get(key);
-        if (!drawing) {
-          module ??= device.createShaderModule({ code: ribbonShader });
-          const pipeline = device.createRenderPipeline({
-            layout: 'auto',
-            vertex: { module, entryPoint: 'vertex' },
-            fragment: {
-              module,
-              entryPoint: 'fragment',
-              targets: [
-                {
-                  format: c.format,
-                  blend: {
-                    color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-                  },
-                },
-              ],
-            },
-            primitive: { topology: 'triangle-strip' },
-            multisample: c.descriptor.multisample,
-            depthStencil: { format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
-          });
-          drawing = [pipeline, entries(pipeline.getBindGroupLayout(0))];
-          pipelines.set(key, drawing);
-        }
+        // The strips into the frame (alpha blended), or their coverage into the reactive mask (the most over a pixel).
+        const prepare = (reactive: boolean) => {
+          let drawing = pipelines.get(key + (reactive ? ':reactive' : ''));
+          if (!drawing) {
+            module ??= device.createShaderModule({ code: ribbonShader });
+            const pipeline = device.createRenderPipeline({
+              layout: 'auto',
+              vertex: { module, entryPoint: 'vertex' },
+              fragment: {
+                module,
+                entryPoint: reactive ? 'reactive' : 'fragment',
+                targets: [
+                  reactive
+                    ? { format: 'r8unorm', blend: reactiveBlend }
+                    : {
+                        format: c.format,
+                        blend: {
+                          color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                          alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                        },
+                      },
+                ],
+              },
+              primitive: { topology: 'triangle-strip' },
+              multisample: c.descriptor.multisample,
+              depthStencil: { format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+            });
+            drawing = [pipeline, entries(pipeline.getBindGroupLayout(0))];
+            pipelines.set(key + (reactive ? ':reactive' : ''), drawing);
+          }
+          return drawing;
+        };
         color.view = c.color;
         depth.view = c.depth;
         depth.stencilReadOnly = format.includes('stencil') ? true : undefined;
-        const pass = c.encoder.beginRenderPass(descriptor);
-        pass.setPipeline(drawing[0]);
-        pass.setBindGroup(0, drawing[1]);
-        applyView(pass, c);
-        pass.draw(count * 2, capacity);
-        pass.end();
-        state.stats.drawCalls++;
+        const draw = (into: GPURenderPassDescriptor, [pipeline, group]: [GPURenderPipeline, GPUBindGroup]) => {
+          const pass = c.encoder.beginRenderPass(into);
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, group);
+          applyView(pass, c);
+          pass.draw(count * 2, capacity);
+          pass.end();
+          state.stats.drawCalls++;
+        };
+        draw(descriptor, prepare(false));
+        if (!(options.reactive ?? reactiveMaskWanted(c, owner))) return;
+        reactiveAttachments[0] = reactiveTarget(c);
+        draw(reactivePass, prepare(true));
       },
     };
   },

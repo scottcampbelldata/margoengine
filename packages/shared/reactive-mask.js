@@ -84,3 +84,6 @@ export function reactiveTarget(c) {
     storeOp: 'store',
   };
 }
+// The blend of a draw into the shared mask: each pixel keeps the largest coverage drawn over it.
+const max = { operation: 'max', srcFactor: 'one', dstFactor: 'one' };
+export const reactiveBlend = { color: max, alpha: max };
