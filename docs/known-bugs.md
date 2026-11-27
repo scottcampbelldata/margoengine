@@ -13576,7 +13576,14 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 - **Repro:** `node tools/shot/fauld-shots.mjs`; `tools/shot/fauld-sight.json` marks fr073, fr108, fr114, fr136 and fr146 `"clear": false` with 0 of the subject seen.
 - **Cause:** their target is the crater floor (or the farm site) 450 m off on a long lens, below the plateau rim: no turn or lift up to 34 m sees it. The rows describe the rim, a fence, a path or the skyline, which the generator does not aim at.
-- **Left:** aim each of these rows at what it describes (its own target in the generator), then judge a still. Their cameras are unchanged.
+- **Checked 2026-11-27:** the shot list has no per-row target to read (its columns are id, section, start_s, dur_s,
+  narration_line_ref, visual, camera, source_tag, assets, fallback, set, place, state, look, setup, transition); the
+  generator takes the subject from the set and from words of the visual. What fr073 (a smoke column over a row of
+  poplars), fr108 (figures on the rim), fr114 (a sentry at a fence, a warning board) and fr146 (a walker, a path into
+  the wood) describe is in neither scene as a model; the rim (fr108) and the ridge and wooded hollow (fr136) are ground
+  the crater scene has.
+- **Left:** the film lanes say what each row looks at (a target in the shot list, which the generator then reads, with
+  a test) and the missing models are built in their scene; then judge a still. Their cameras are unchanged.
 - **Also seen:** the lorry of fr031 and the memorial stone of fr139 have no model, so those frames show their places without them.
 
 ### Fixed 2026-11-26: margoengine/viz cost 264 B gzip more than @margoengine/points for PointsPlugin (package build, splats, KB-INL1b)
