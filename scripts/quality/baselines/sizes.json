@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21100015,
+  "total": 21137285,
   "history": [
     {
       "date": "2026-10-24",
@@ -14911,6 +14911,66 @@
       "commit": "13b785b78",
       "reason": "ONNX old-opset review (limits row 61): compute/onnx 13789 -> 14480 for the batched Scan-8 path; splitting it would duplicate the graph executor bridge",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "3f58e4125e",
+      "reason": "VATCrowd is an SSAO source (three.js parity row 138): animation/vat 8,324 to 8,990 B gzip measured, instanced-skin 9,637 to 10,298, instanced-morph 10,988 to 11,642 (the G-buffer pipeline and the composed occlusion fragment, which SkinnedCrowd and MorphedCrowd inherit), so SSAO darkens a crowd's ambient light; ssao.add(crowd) calls the crowd inside SSAO's open pass, so a split entry would export the crowd's pose buffers and composed shader and need a second import before add() works",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "7c20bdf2e4",
+      "reason": "KB-BIOMES-HORIZONSTREAK1 and ce267ebcf3: biomes/view 15,973 to 16,686 B gzip measured (edge means on prefix sums and the weight blend, so the far ground no longer runs edge texels out as streaks); BiomeView builds its horizon at construction, so a split would add a request to every view and save nothing",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "ca83af7847",
+      "reason": "Shadows honour clipping planes (three.js parity row 20), with the PCSS radius of d603e0c8d1: clustered 17,172 to 18,221 B gzip measured, clustered/shadows 14,356 to 15,631, clustered/shadow-atlas 16,959 to 18,235 (the shared section and clip-distance caster code, its bindings and the per-frame redraw of clipped casters); the planes are live per material and the caster pipeline is chosen while the frame draws, so a lazy split would cast whole meshes until it loaded",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "a00d0284d4",
+      "reason": "BatchedMesh GPU item sort and shared geometry (gap row 177, +2,804 B), its CPU pose for raycasts (KB-BVH-SYNCPOSE-BATCHED1, +632 B), attribute() mesh data (+185 B) and smaller material features: materials/batched 40,022 to 43,951 B gzip measured; sort is on by default and shares the placement pass and index buffer, and a raycast reads the pose synchronously, so a split would draw transparent batches unsorted until it loaded or make apps import two more entries",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "54c08c373e",
+      "reason": "New entry materials/curve-flow (gap row 44), added without a ceiling: 15,540 B gzip measured, nearly all the Texture class (materials/texture alone is 12,075) and the material plugin machinery (materials/plugins alone is 4,923), chunks an app using materials already loads; the plugin needs both at construction, so there is nothing to split",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "d4dd976602",
+      "reason": "KB-SCATTER-AOFRINGE1 (about +1,340 B), KB-POST-GTAOFAR1 (about +280 B) and KB-SCENES-GRASSBLACK1: post 45,726 to 48,299 B gzip measured (the root also carries the SSR cone, traced fallback and silhouette fixes since its last ceiling), post/ssao 9,908 to 11,686, post/gtao 13,463 to 15,289 (the under-blade depth and ambient passes and the centre plane depth in the blur); the passes start on the first frame with a covered blade, so a lazy split would show pale blade outlines until it loaded",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "7d96ac7993",
+      "reason": "timber-valley creek, far ground, cloud and look fixes (ce267ebcf3) and the burnt fire that goes out (KB-VFX-DARKTRAILS1): scenes/look-family 749 to 844 B gzip measured, scenes/timber-valley 5,838 to 6,150; these are the scene's own settings, read when it is built, so a split would add a request and save nothing",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "ca83af7847",
+      "reason": "Clipped casters through the shared caster code (+72 B) and per-row handedness in instanced picks (KB-PICK-MIRRORROWS1, about +46 B): selection/hit-details 16,163 to 16,213 B gzip measured, selection/area 16,394 to 16,446; both sit in the pick pass itself, so there is nothing to split",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "b11fa4b723",
+      "reason": "Raw meshes cast LocalShadows point and spot shadows (879f5e93f1, +278 B) and raw uniform structs nest structs and arrays (+256 B), both three.js parity row 15, with the TAA edge fix's shared code (+55 B): shader/raw 15,939 to 16,570 B gzip measured; uniform layout and casters are needed when a raw mesh is built, so a lazy split would make construction async",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "30c26e36a9",
+      "reason": "KB-TAA-INSTMOTION1 (about +610 to +720 B) and KB-TAA-COMPATEDGE1 (about +170 B): taa 16,969 to 17,765 B gzip measured, taa/upscale-velocity 21,723 to 22,662 (per-instance motion vectors for PBRInstances and whole object motion on silhouette pixels of the WebGL2 layer); both are in the velocity pass every moving frame draws, so a split would ghost until it loaded",
+      "grew": 2
     }
   ],
   "items": {
@@ -14920,8 +14980,8 @@
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 4772,
     "@margoengine/animation/geometry-cache": 5658,
-    "@margoengine/animation/instanced-morph": 11318,
-    "@margoengine/animation/instanced-skin": 9927,
+    "@margoengine/animation/instanced-morph": 11992,
+    "@margoengine/animation/instanced-skin": 10607,
     "@margoengine/animation/interactivity": 25889,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/mixer": 5048,
@@ -14931,7 +14991,7 @@
     "@margoengine/animation/pointer": 7420,
     "@margoengine/animation/sampling": 2727,
     "@margoengine/animation/skeleton-utils": 8508,
-    "@margoengine/animation/vat": 8580,
+    "@margoengine/animation/vat": 9260,
     "@margoengine/animator": 20936,
     "@margoengine/animator/blend-trees": 1841,
     "@margoengine/animator/ccd": 6289,
@@ -15023,7 +15083,7 @@
     "@margoengine/biomes/toolkit": 3176,
     "@margoengine/biomes/treeline": 4663,
     "@margoengine/biomes/valley": 5060,
-    "@margoengine/biomes/view": 16453,
+    "@margoengine/biomes/view": 17187,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4905,
@@ -15088,7 +15148,7 @@
     "@margoengine/cinematic/noise": 1612,
     "@margoengine/cinematic/ortho": 3133,
     "@margoengine/cinematic/physical-lens": 842,
-    "@margoengine/clustered": 17688,
+    "@margoengine/clustered": 18768,
     "@margoengine/clustered/area": 14762,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 4349,
@@ -15104,8 +15164,8 @@
     "@margoengine/clustered/line": 1265,
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
-    "@margoengine/clustered/shadow-atlas": 17464,
-    "@margoengine/clustered/shadows": 14787,
+    "@margoengine/clustered/shadow-atlas": 18783,
+    "@margoengine/clustered/shadows": 16100,
     "@margoengine/clustered/shapes": 12255,
     "@margoengine/clustered/stochastic": 2472,
     "@margoengine/clustered/units": 1089,
@@ -15589,8 +15649,9 @@
     "@margoengine/materials": 70734,
     "@margoengine/materials/alpha-hash": 1615,
     "@margoengine/materials/atlas": 2014,
-    "@margoengine/materials/batched": 41223,
+    "@margoengine/materials/batched": 45270,
     "@margoengine/materials/batched-lod": 3846,
+    "@margoengine/materials/curve-flow": 16007,
     "@margoengine/materials/eye": 4661,
     "@margoengine/materials/fake-shadows": 39249,
     "@margoengine/materials/fur": 4113,
@@ -15847,7 +15908,7 @@
     "@margoengine/points/potree": 17694,
     "@margoengine/points/style": 13401,
     "@margoengine/points/surfels": 15751,
-    "@margoengine/post": 47098,
+    "@margoengine/post": 49748,
     "@margoengine/post/accumulate": 7389,
     "@margoengine/post/afterimage": 7157,
     "@margoengine/post/anamorphic": 7857,
@@ -15864,7 +15925,7 @@
     "@margoengine/post/filter-graph": 13850,
     "@margoengine/post/fxaa": 4890,
     "@margoengine/post/glitch": 7455,
-    "@margoengine/post/gtao": 13867,
+    "@margoengine/post/gtao": 15748,
     "@margoengine/post/halftone": 7290,
     "@margoengine/post/heat-haze": 13265,
     "@margoengine/post/image": 14395,
@@ -15887,7 +15948,7 @@
     "@margoengine/post/selective-bloom": 11634,
     "@margoengine/post/settings": 5273,
     "@margoengine/post/smaa": 6435,
-    "@margoengine/post/ssao": 10206,
+    "@margoengine/post/ssao": 12037,
     "@margoengine/post/ssgi": 14577,
     "@margoengine/post/ssr": 15052,
     "@margoengine/post/sss": 8144,
@@ -16073,9 +16134,9 @@
     "@margoengine/scenes/fauld-crater": 8214,
     "@margoengine/scenes/fauld-tunnels": 13903,
     "@margoengine/scenes/library": 4468,
-    "@margoengine/scenes/look-family": 809,
+    "@margoengine/scenes/look-family": 1100,
     "@margoengine/scenes/shot-settings": 1718,
-    "@margoengine/scenes/timber-valley": 5843,
+    "@margoengine/scenes/timber-valley": 6406,
     "@margoengine/sciviz": 69059,
     "@margoengine/sciviz dist/workers/readers.js": 60265,
     "@margoengine/sciviz/a11y": 6737,
@@ -16162,9 +16223,9 @@
     "@margoengine/sciviz/xdmf": 19832,
     "@margoengine/selection": 23571,
     "@margoengine/selection/actions": 2943,
-    "@margoengine/selection/area": 16394,
+    "@margoengine/selection/area": 16940,
     "@margoengine/selection/highlight": 14153,
-    "@margoengine/selection/hit-details": 16163,
+    "@margoengine/selection/hit-details": 16700,
     "@margoengine/selection/spatial": 2313,
     "@margoengine/selection/xray": 13398,
     "@margoengine/shader": 21398,
@@ -16182,7 +16243,7 @@
     "@margoengine/shader/lighting": 10704,
     "@margoengine/shader/noise": 5538,
     "@margoengine/shader/pass": 13203,
-    "@margoengine/shader/raw": 16417,
+    "@margoengine/shader/raw": 17068,
     "@margoengine/shader/readback": 9692,
     "@margoengine/shader/serialization": 22025,
     "@margoengine/shader/shadertoy": 53319,
@@ -16310,10 +16371,10 @@
     "@margoengine/studio/ground": 10534,
     "@margoengine/studio/pathtrace": 1874,
     "@margoengine/studio/pathtrace-materials": 2034,
-    "@margoengine/taa": 17479,
+    "@margoengine/taa": 18298,
     "@margoengine/taa/sharpen": 971,
     "@margoengine/taa/upscale": 9394,
-    "@margoengine/taa/upscale-velocity": 22375,
+    "@margoengine/taa/upscale-velocity": 23342,
     "@margoengine/terrain": 17938,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 7313,
