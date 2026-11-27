@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: a rope under tension over a bollard blows up, so wrapping cannot be checked against the capstan law (KB-PHYS-RODWRAP1, physics kernel)
+
+- **Repro:** a `Rod` of 48 links (radius 5 mm, nylon) draped half a turn over a fixed cylinder of radius 0.2 m, a free
+  10 kg body pinned to each end (`attachStart`, `attachEnd`), gravity on. It blows up within two seconds, with friction
+  0.3 or 0. A steel rope, 32 substeps and 16 links each delay or move the failure; only 1 kg weights on 16 links hold.
+  The same rope draped with free ends rests on a cylinder, a capsule or a box, and a weight on a hanging rope hangs still
+  (KB-PHYS-PINFREE1).
+- **Cause, as measured so far:** the contacts act on each link through its own mass, a few grams, while the rope's tension
+  of about 100 N runs through the multibody's implicit tree solve, which comes after the contact passes. Each substep the
+  tree pulls the links into the cylinder and the contacts push them out against the link's mass alone, so the contact
+  impulses meet a mass far smaller than what pulls, and the exchange gains energy.
+- **Plan:** solve a link's contacts against its articulated effective mass (the tree's response at the contact point,
+  as the pins now see the free body's), or carry the contact into the tree's implicit solve as the pins are. Then the
+  capstan law T2 = T1 e^(mu theta) is SOFT-02's wrapping check (Sueda, Kaufman and Pai 2008).
+
 ### Fixed 2026-11-27: a weight on a rope's end was thrown off, or blew the world up (KB-PHYS-PINFREE1, physics kernel)
 
 - **Repro:** `packages/physics/tests/rod.test.js`, "a weight on a rope's end hangs still": a rope pinned at the top with a
