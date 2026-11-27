@@ -14,7 +14,11 @@ Taubman, "High performance scalable image compression with EBCOT" (IEEE Transact
 read. Tier-2 (B.9 to B.12): tag trees decoded node by node from the root, the packet header bit reader with its
 0xFF stuffing, Table B.4's pass counts, Lblock and per-segment lengths, SOP and EPH, packed headers, and the five
 progressions with POC changes; the position-driven orders sort each precinct by where B.12's loops first reach it
-(the tile corner for a precinct its resolution starts inside). Part 2 extensions (marker range 0xFF70 to 0xFF7F, MCT above 1, arbitrary kernels) and the HT block coder of
+(the tile corner for a precinct its resolution starts inside). Tier-1 (Annex C and D): the MQ decoder's INITDEC,
+BYTEIN and DECODE with Table C.2's 47 states, the bypass's raw bits, and the significance propagation, refinement
+and cleanup passes with Table D.1's zero coding, D.3's sign and D.4's refinement contexts, run-length coding, and
+every Table A.19 style (bypass, reset, termination on each pass, vertically causal contexts, segmentation
+symbols). The unit tests hold it against a test encoder written from C.2 and D.3. Part 2 extensions (marker range 0xFF70 to 0xFF7F, MCT above 1, arbitrary kernels) and the HT block coder of
 Part 15 are refused as unsupported, not skipped.
 
 ### Soft volumes from a mesh (P8, SOFT-04 and SOFT-06, 2026-11-27)

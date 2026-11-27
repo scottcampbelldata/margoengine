@@ -4,6 +4,8 @@
 //! https://doi.org/10.1109/83.847830). No other decoder's source was read.
 pub mod codestream;
 pub mod geometry;
+pub mod mq;
+pub mod t1;
 pub mod tier2;
 pub mod tile;
 
