@@ -714,7 +714,32 @@ interface PluginLine {
   count: number;
   mode: 'segments' | 'strip' | 'loop';
   attachedMesh: Mesh | null;
-  material: { color: Float32Array; opacity: number; width: number; worldUnits: boolean; vertexColors?: boolean };
+  material: PluginLineStyle & {
+    color: Float32Array;
+    opacity: number;
+    width: number;
+    worldUnits: boolean;
+    vertexColors?: boolean;
+    colorMode?: string;
+  };
+}
+/** The public style fields of a line material or batch that go in the primitive's extras. */
+interface PluginLineStyle {
+  join?: string;
+  cap?: string;
+  miterLimit?: number;
+  dashed?: boolean;
+  dashCap?: string;
+  dashSize?: number;
+  gapSize?: number;
+  dashOffset?: number;
+  onTop?: boolean;
+  antialias?: boolean;
+  depthWrite?: boolean;
+  depthBias?: number;
+  behind?: boolean;
+  alphaToCoverage?: boolean;
+  fog?: boolean;
 }
 /** The public fields of a `@margoengine/points` PointCloud that the exporters read. */
 interface PluginCloud {
@@ -766,6 +791,8 @@ interface PluginBatch {
   opacity: number;
   width: number;
   worldUnits: boolean;
+  onTop?: boolean;
+  antialias?: boolean;
 }
 const isPluginBatch = (v: unknown): v is PluginBatch =>
   isObject(v) &&
@@ -868,6 +895,11 @@ function linePart(line: PluginLine): Part | null {
     m = line.material,
     colors =
       (m.vertexColors ?? true) && line.colors && line.colors.length >= n * 4 ? line.colors.slice(0, n * 4) : null;
+  // glTF multiplies COLOR_0 by the base colour (glTF 2.0 section 3.9.2). A line that draws the point's colour alone
+  // ('set') or the clamped sum of both ('add') writes what it draws over a white base colour.
+  const baked = colors !== null && (m.colorMode === 'set' || m.colorMode === 'add');
+  if (baked && m.colorMode === 'add')
+    for (let i = 0; i < colors.length; i++) if (i % 4 < 3) colors[i] = Math.min(1, colors[i] + m.color[i % 4]);
   if (colors) data.colors = colors;
   const units = m.worldUnits ? 'world' : 'pixels',
     translucent = colors !== null && colors.some((v, i) => i % 4 === 3 && v < 1),
@@ -876,10 +908,50 @@ function linePart(line: PluginLine): Part | null {
   if (widths) geometry.widths = widths;
   return {
     geometry,
-    material: pluginMaterial(m.color, m.opacity, true, translucent, { value: m.width, units, kind: 'lines' }),
-    extras: { lineWidth: m.width, lineWidthUnits: units },
+    material: pluginMaterial(baked ? white : m.color, m.opacity, true, translucent, {
+      value: m.width,
+      units,
+      kind: 'lines',
+    }),
+    extras: { lineWidth: m.width, lineWidthUnits: units, ...lineStyle(m) },
   };
 }
+
+/** A `Line`'s defaults for the style fields written as `line` + the field's name. */
+const LINE_DEFAULTS = {
+  join: 'round',
+  cap: 'round',
+  miterLimit: 4,
+  onTop: false,
+  antialias: true,
+  depthWrite: false,
+  depthBias: 0,
+  behind: false,
+  alphaToCoverage: false,
+  fog: true,
+};
+
+/**
+ * What of a line's style differs from a `Line`'s defaults, as primitive extras (glTF 2.0 section 3.12; glTF holds no
+ * join, cap, dash or draw order of a line): `lineJoin`, `lineCap`, `lineMiterLimit`, `lineDash` (dash and gap in world
+ * units) with `lineDashOffset` and `lineDashCap`, `lineOnTop`, `lineAntialias`, `lineDepthWrite`, `lineDepthBias`,
+ * `lineBehind`, `lineAlphaToCoverage` and `lineFog`. gltf/strokes reads them back.
+ */
+function lineStyle(style: PluginLineStyle): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, usual] of Object.entries(LINE_DEFAULTS)) {
+    const value = style[name as keyof typeof LINE_DEFAULTS];
+    if (value !== undefined && value !== usual) out[`line${name[0].toUpperCase()}${name.slice(1)}`] = value;
+  }
+  if (style.dashed) {
+    out.lineDash = [style.dashSize ?? 1, style.gapSize ?? 1];
+    if (style.dashOffset) out.lineDashOffset = style.dashOffset;
+    if (style.dashCap !== undefined && style.dashCap !== 'butt') out.lineDashCap = style.dashCap;
+  }
+  return out;
+}
+
+const white = new Float32Array([1, 1, 1]);
 
 /** A batch's segments as a line list, its colours linear RGBA and left out when all are white. */
 function batchPart(batch: PluginBatch): Part | null {
@@ -910,7 +982,12 @@ function batchPart(batch: PluginBatch): Part | null {
       units,
       kind: 'lines',
     }),
-    extras: { lineWidth: batch.width, lineWidthUnits: units },
+    // A batch's segments have square ends.
+    extras: {
+      lineWidth: batch.width,
+      lineWidthUnits: units,
+      ...lineStyle({ cap: 'square', onTop: batch.onTop, antialias: batch.antialias }),
+    },
   };
 }
 

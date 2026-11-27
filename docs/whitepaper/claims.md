@@ -6744,3 +6744,10 @@ checked with another tool's reader. No speed or rival comparison claim. [Limits]
 each again and requires the compressed points and the chunk table to be the original bytes, and round-trips every format
 through the reader with extra bytes and variable chunks. No speed or rival comparison claim.
 [Limits](../limits.md)
+
+## Plugin line style round trip (exporters and gltf/strokes, 2026-11-27)
+
+Claim: a `Line`'s join, cap, miter limit, dashes, `onTop`, `antialias`, depth, coverage and fog settings, and a
+`LineBatch`'s square ends, `onTop` and `antialias`, survive `exportGLB` and `parseGLTFAsync`, and a second `exportModel`;
+lines in `colorMode` `'set'` or `'add'` export the colours they draw. Other viewers ignore the `extras` keys. Proof:
+`packages/exporters/tests/plugin-lines-points.test.js`.

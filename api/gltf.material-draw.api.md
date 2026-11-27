@@ -720,6 +720,7 @@ interface GLTFStrokeItem {
     readonly vertices: Float32Array;
     readonly indices: Uint32Array;
     readonly widths?: Float32Array;
+    readonly extras?: unknown;
     readonly material: {
         readonly base: readonly number[];
         readonly alphaMode?: unknown;

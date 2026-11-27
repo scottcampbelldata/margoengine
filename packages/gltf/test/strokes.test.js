@@ -215,3 +215,42 @@ test('a width that is not a positive number with known units is not read', async
   assert.deepEqual(line({ lineWidth: 0 }, 0), { kind: 'lines', size: 3, units: 'pixels', bentley: true });
   assert.equal(strokeWidth(doc, { mode: 4, extras: { lineWidth: 2 } }), undefined, 'triangles have no width');
 });
+
+test('a malformed line style extra keeps the Line default; the good ones beside it are drawn', async () => {
+  const instance = await engine(),
+    positions = new Float32Array([0, 0, 0, 1, 0, 0]),
+    doc = {
+      asset: { version: '2.0' },
+      buffers: [{ byteLength: 24 }],
+      bufferViews: [{ buffer: 0, byteLength: 24 }],
+      accessors: [{ bufferView: 0, componentType: 5126, count: 2, type: 'VEC3', min: [0, 0, 0], max: [1, 0, 0] }],
+      meshes: [
+        {
+          primitives: [
+            {
+              attributes: { POSITION: 0 },
+              mode: 1,
+              extras: {
+                lineWidth: 5,
+                lineJoin: 'sharp',
+                lineCap: 'butt',
+                lineMiterLimit: 0.5,
+                lineDepthBias: 2,
+                lineOnTop: 'yes',
+                lineDash: [0, 1],
+              },
+            },
+          ],
+        },
+      ],
+      nodes: [{ mesh: 0 }],
+      scenes: [{ nodes: [0] }],
+    },
+    model = await parseGLTFAsync(instance, doc, [positions]),
+    [{ material }] = instance.plugins.get('gltf-lines').lines;
+  assert.deepEqual(
+    [material.cap, material.join, material.miterLimit, material.depthBias, material.onTop, material.dashed],
+    ['butt', 'round', 4, 0, false, false],
+  );
+  model.dispose();
+});

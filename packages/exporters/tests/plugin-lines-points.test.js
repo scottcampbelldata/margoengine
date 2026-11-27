@@ -309,7 +309,8 @@ test('LineBatches batches are written as line lists with colours and widths; deb
   assert.equal(attached.attributes.COLOR_0, undefined);
   const part = all.find((p) => p.extras?.lineWidth === 0.02);
   assert.equal(part.mode, 1);
-  assert.deepEqual(part.extras, { lineWidth: 0.02, lineWidthUnits: 'world' });
+  // A batch's segments have square ends.
+  assert.deepEqual(part.extras, { lineWidth: 0.02, lineWidthUnits: 'world', lineCap: 'square' });
   assert.deepEqual(Array.from(asset.accessor(part.indices)), [0, 1, 2, 3]);
   assert.deepEqual(Array.from(asset.accessor(part.attributes.POSITION)), [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]);
   // The stored bytes are sRGB of the linear input; decoded they are within a byte step of it.
@@ -392,4 +393,97 @@ test('styleExtensions writes pixel widths and diameters as the BENTLEY line and 
   const asset = new GLTFAsset(json, [readGLB(glb).bin]);
   assert.ok(asset.accessor(points.indices).length > 0);
   assert.throws(() => exportGLB(engine, { styleExtensions: 1 }), /styleExtensions must be boolean/);
+});
+
+// Limits gaps row 15: dashes, joins, caps, onTop and antialias were left out, so a dashed overlay line came back solid.
+test('line joins, caps, dashes, onTop and antialias travel in extras and gltf/pbr draws them back', async () => {
+  const { engine, lines } = await scene(),
+    batches = LineBatches.attach(engine),
+    styled = {
+      join: 'miter',
+      cap: 'butt',
+      miterLimit: 2,
+      dashed: true,
+      dashSize: 0.25,
+      gapSize: 0.125,
+      dashOffset: 0.5,
+      dashCap: 'round',
+      onTop: true,
+      antialias: false,
+      depthWrite: true,
+      depthBias: 0.001,
+      behind: true,
+      alphaToCoverage: true,
+      fog: false,
+    };
+  // Their widths name them in the read-back scene.
+  lines.add(new Line({ positions: [0, 0, 0, 1, 0, 0, 1, 1, 0], width: 7, ...styled }));
+  batches.add(new LineBatch({ positions: [0, 0, 0, 1, 0, 0], width: 9, onTop: true, antialias: false }));
+  const glb = exportGLB(engine),
+    report = await validate(glb),
+    extrasOf = (file, width) => primitivesOf(readGLB(file).json).find((p) => p.extras?.lineWidth === width).extras;
+  assert.equal(report.errors, 0, JSON.stringify(report.messages));
+  assert.deepEqual(extrasOf(glb, 7), {
+    lineWidth: 7,
+    lineWidthUnits: 'pixels',
+    lineJoin: 'miter',
+    lineCap: 'butt',
+    lineMiterLimit: 2,
+    lineDash: [0.25, 0.125],
+    lineDashOffset: 0.5,
+    lineDashCap: 'round',
+    lineOnTop: true,
+    lineAntialias: false,
+    lineDepthWrite: true,
+    lineDepthBias: 0.001,
+    lineBehind: true,
+    lineAlphaToCoverage: true,
+    lineFog: false,
+  });
+  assert.deepEqual(extrasOf(glb, 9), {
+    lineWidth: 9,
+    lineWidthUnits: 'pixels',
+    lineCap: 'square',
+    lineOnTop: true,
+    lineAntialias: false,
+  });
+  // A line in the default style writes its width alone, as before.
+  assert.deepEqual(Object.keys(extrasOf(glb, 3)), ['lineWidth', 'lineWidthUnits']);
+
+  const gpu = mockGPU(),
+    { canvas, restore } = installWebGPU(gpu),
+    other = await Engine.create(canvas, { backend: 'webgpu' });
+  restore();
+  const model = await parseGLTFAsync(other, glb),
+    drawn = [...other.plugins.get('gltf-lines').lines],
+    read = (width) => drawn.find((line) => Math.abs(line.material.width - width) < 1e-6).material;
+  assert.deepEqual(Object.fromEntries(Object.keys(styled).map((key) => [key, read(7)[key]])), styled);
+  assert.deepEqual([read(9).cap, read(9).onTop, read(9).antialias, read(9).dashed], ['square', true, false, false]);
+  assert.deepEqual([read(3).join, read(3).cap, read(3).onTop, read(3).antialias], ['round', 'round', false, true]);
+  // A second export of the model holds the same extras.
+  const again = await exportModel(model, { binary: true });
+  for (const width of [3, 7, 9]) assert.deepEqual(extrasOf(again, width), extrasOf(glb, width));
+  model.dispose();
+});
+
+// A line in colorMode 'set' or 'add' was written as base colour times COLOR_0, a colour it never draws.
+test("a line's colorMode 'set' or 'add' writes the colours it draws", async () => {
+  const { engine, lines } = await scene(),
+    options = { positions: [0, 0, 0, 1, 0, 0], color: [0.5, 0.25, 0], colors: [0.25, 0.5, 1, 1, 0.75, 1, 0.5, 0.5] };
+  lines.add(new Line({ ...options, width: 11, colorMode: 'set', opacity: 0.5 }));
+  lines.add(new Line({ ...options, width: 12, colorMode: 'add' }));
+  lines.add(new Line({ ...options, width: 13 }));
+  const { json, bin } = readGLB(exportGLB(engine)),
+    asset = new GLTFAsset(json, [bin]),
+    drawn = (width) => {
+      const p = primitivesOf(json).find((q) => q.extras?.lineWidth === width),
+        base = json.materials[p.material].pbrMetallicRoughness.baseColorFactor;
+      return [base, Array.from(asset.accessor(p.attributes.COLOR_0))];
+    };
+  assert.deepEqual(drawn(11)[0], [1, 1, 1, 0.5]);
+  near(drawn(11)[1], [0.25, 0.5, 1, 1, 0.75, 1, 0.5, 0.5], 'set');
+  assert.deepEqual(drawn(12)[0], [1, 1, 1, 1]);
+  near(drawn(12)[1], [0.75, 0.75, 1, 1, 1, 1, 0.5, 0.5], 'add');
+  assert.deepEqual(drawn(13)[0], [0.5, 0.25, 0, 1]);
+  near(drawn(13)[1], options.colors, 'multiply');
 });

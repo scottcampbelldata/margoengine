@@ -5189,3 +5189,7 @@ Build packages, then `node --test packages/exporters/tests/plugin-lines-points.t
 ## Grass blade shadows (scatter/grass)
 Build packages, then `npm run test:browser:grass-shadow --workspace @margoengine/scatter` (WebGPU and the WebGL2 layer;
 each runs `Shadows` and `VirtualShadows`).
+
+## Plugin line style round trip (exporters and gltf/strokes, 2026-11-27)
+
+Build packages, then `node --test packages/exporters/tests/plugin-lines-points.test.js`.

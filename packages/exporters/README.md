@@ -142,6 +142,9 @@ unless `onlyVisible: false`.
 | a cloud | its finite points as POINTS, unlit unless `shading: 'sphere'`, sRGB colours decoded to linear | `Points` |
 | line width, point diameter | primitive `extras`: `lineWidth` and `lineWidthUnits`, `pointSize` and `pointSizeUnits` (`'pixels'` or `'world'`) | world units as `widths`; pixels keep `lineWidth` (0.01) |
 | a `Stroke`'s `widths`, a cloud's `sizes` | `_WIDTH`, a float per vertex multiplying the width | per-vertex `widths` |
+| join, cap, miter limit | primitive `extras` `lineJoin`, `lineCap`, `lineMiterLimit` | not written |
+| dashes (world units) | `lineDash` as `[dash, gap]`, with `lineDashOffset` and `lineDashCap` | not written |
+| draw state | `lineOnTop`, `lineAntialias`, `lineDepthWrite`, `lineDepthBias`, `lineBehind`, `lineAlphaToCoverage`, `lineFog` | not written |
 
 glTF gives a point or line no size and recommends 1 px (glTF 2.0 section 3.9.7), and no Khronos extension holds one,
 so another viewer draws them 1 px wide; Godot 4.7.2 keeps the POINTS and LINES surfaces unshaded with `point_size` 1.
@@ -154,7 +157,10 @@ plugins that draw them, so a second export holds each once.
 rounded and at least 1. World-unit widths and per-point multipliers have no form there. They are not Khronos
 extensions, and the Khronos validator warns where one sits beside `KHR_materials_unlit`, so they are off by default.
 
-Dashes, joins, caps, point shapes, textures and a batch's `onTop` are not written. A `DebugLines` queue is one frame's
+The style keys are written only where a line differs from a `Line`'s defaults; a batch writes `lineCap: 'square'`, the
+ends it draws, with its `onTop` and `antialias`. A line in `colorMode` `'set'` or `'add'` writes the colours it draws
+into `COLOR_0` over a white base colour. Clipping planes, a stroke's `progress`, point shapes and point textures are not
+written. A `DebugLines` queue is one frame's
 debug drawing and is never written. A splat cloud of `@margoengine/splats` is left out by every scene writer, which
 calls `onWarning` with it as `item`; write its data with `exportGaussianGLB` (`@margoengine/exporters/splats`).
 STL, 3MF and Roblox call `onWarning` once for a
@@ -170,12 +176,14 @@ import {exportGLB} from 'margoengine/exporters';
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
 const lines = Lines.attach(engine);
 lines.add(new Line({positions: [0, 0, 0, 1, 0, 0, 1, 1, 0], width: 4, color: '#ff6600'}));
+// Its dashes travel too: extras {lineWidth: 3, ..., lineDash: [0.2, 0.1], lineOnTop: true}.
+lines.add(new Line({positions: [0, 1, 0, 1, 1, 0], width: 3, dashed: true, dashSize: 0.2, gapSize: 0.1, onTop: true}));
 const batches = LineBatches.attach(engine);
 batches.add(new LineBatch({positions: [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1], width: 2}));
 const points = new PointsPlugin();
 engine.use(points);
 points.add(new PointCloud({positions: [0, 0, 0, 0, 1, 0, 0, 0, 1], material: {size: 6}}));
-// Two LINES primitives with extras {lineWidth: 4 or 2, lineWidthUnits: 'pixels'}, one POINTS with {pointSize: 6, ...}.
+// Three LINES primitives with extras {lineWidth: 4, 3 or 2, ...}, one POINTS with {pointSize: 6, ...}.
 const glb = exportGLB(engine);
 ```
 

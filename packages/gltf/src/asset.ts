@@ -216,6 +216,8 @@ export interface GLTFStrokeItem {
   readonly indices: Uint32Array;
   /** Per-vertex `_WIDTH` multipliers, when the primitive has them. */
   readonly widths?: Float32Array;
+  /** The primitive's extras, which hold a line's style (join, cap, dashes, draw state). */
+  readonly extras?: unknown;
   readonly material: { readonly base: readonly number[]; readonly alphaMode?: unknown; readonly extensions?: object };
   /** The node mesh the drawing follows: its world matrix and visibility. */
   readonly node: import('@margoengine/core').Mesh;

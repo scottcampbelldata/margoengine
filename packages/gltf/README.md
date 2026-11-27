@@ -988,7 +988,10 @@ Limits are in [docs/limits.md](../../docs/limits.md): the clouds do not follow l
 
 glTF gives a point or a line no size, and most viewers draw them 1 px wide. A POINTS or LINES primitive that asks for a width is drawn that wide by plain `loadGLTF`, `loadGLTFInWorker` or `parseGLTFAsync`, with `@margoengine/lines` and `@margoengine/points` (optional peer dependencies, loaded only for such a file). Two forms are read:
 
-- the primitive `extras` that `@margoengine/exporters` writes: `lineWidth` with `lineWidthUnits` and `pointSize` (a diameter) with `pointSizeUnits`, each `'pixels'` (CSS pixels, the default) or `'world'`, and a per-vertex `_WIDTH` multiplier;
+- the primitive `extras` that `@margoengine/exporters` writes: `lineWidth` with `lineWidthUnits` and `pointSize` (a diameter) with `pointSizeUnits`, each `'pixels'` (CSS pixels, the default) or `'world'`, and a per-vertex `_WIDTH` multiplier; a line's style keys beside
+  them (`lineJoin`, `lineCap`, `lineMiterLimit`, `lineDash` as `[dash, gap]` in world units with `lineDashOffset` and
+  `lineDashCap`, `lineOnTop`, `lineAntialias`, `lineDepthWrite`, `lineDepthBias`, `lineBehind`,
+  `lineAlphaToCoverage`, `lineFog`) are drawn too, and a missing or malformed one keeps the `Line` default;
 - the Bentley vendor material extensions CesiumJS reads: `BENTLEY_materials_line_style.width` and `BENTLEY_materials_point_style.diameter`, in CSS pixels, a point drawn as a disc.
 
 When a primitive has both, as `exportGLB` with `styleExtensions: true` writes them, the extras win: they hold the exact width, where the Bentley style is rounded to whole pixels.

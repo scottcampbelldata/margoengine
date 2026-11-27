@@ -90,6 +90,45 @@ function chain(indices: Uint32Array): { order: ArrayLike<number>; mode: 'segment
   return { order, mode: 'strip' };
 }
 
+const isCap = (v: unknown) => v === 'butt' || v === 'round' || v === 'square';
+const isFlag = (v: unknown) => typeof v === 'boolean';
+const isLength = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+/** Which values each `line` + name extra may hold. */
+const LINE_STYLE = {
+  join: (v: unknown) => v === 'miter' || v === 'round' || v === 'bevel',
+  cap: isCap,
+  miterLimit: (v: unknown) => isLength(v) && v >= 1,
+  onTop: isFlag,
+  antialias: isFlag,
+  depthWrite: isFlag,
+  depthBias: (v: unknown) => isLength(v) && v < 1,
+  behind: isFlag,
+  alphaToCoverage: isFlag,
+  fog: isFlag,
+};
+
+/**
+ * The `Line` options a primitive's style extras hold, as @margoengine/exporters writes them where a line differs from the
+ * defaults. A value that is not this convention's keeps the default, as extras are application-specific.
+ */
+function lineStyle(value: unknown): Record<string, unknown> {
+  const extras = Object(value) as Record<string, unknown>,
+    style: Record<string, unknown> = {},
+    dash = extras.lineDash;
+  for (const [name, holds] of Object.entries(LINE_STYLE)) {
+    const value = extras[`line${name[0].toUpperCase()}${name.slice(1)}`];
+    if (holds(value)) style[name] = value;
+  }
+  if (Array.isArray(dash) && dash.length === 2 && isLength(dash[0]) && dash[0] > 0 && isLength(dash[1])) {
+    const { lineDashOffset: offset, lineDashCap: cap } = extras;
+    Object.assign(style, { dashed: true, dashSize: dash[0], gapSize: dash[1] });
+    if (Number.isFinite(offset)) style.dashOffset = offset;
+    if (isCap(cap)) style.dashCap = cap;
+  }
+  return style;
+}
+
 /** Per-vertex `_WIDTH` multipliers in `order`, or undefined when there are none or all are 1. */
 function multipliers(widths: Float32Array | undefined, order: ArrayLike<number>): Float32Array | undefined {
   if (!widths) return undefined;
@@ -162,6 +201,7 @@ function draw(
         opacity,
         width: width.size,
         worldUnits: width.units === 'world',
+        ...lineStyle(item.extras),
       },
       line = widths ? new stroke!.Stroke({ ...options, widths }) : new lines!.Line(options);
     return [{ owner, item: owner.add(line) }];

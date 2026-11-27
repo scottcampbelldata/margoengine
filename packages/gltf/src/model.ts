@@ -2756,6 +2756,7 @@ export class PBRModel implements EnginePlugin {
           source = p.definition.material === undefined ? undefined : doc.materials?.[p.definition.material];
         return {
           width,
+          extras: p.definition.extras,
           vertices: p.vertices,
           indices: p.indices,
           ...(widths ? { widths } : {}),
