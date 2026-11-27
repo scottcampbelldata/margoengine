@@ -65,7 +65,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parsePLY` | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; `edge` elements (`vertex1`, `vertex2`) as `lineIndices`; files without faces become point clouds; unknown elements and properties skipped |
 | `parseSTL` | See [STL](#stl) |
 | `parse3MF` (async) | Own ZIP reader (stored and deflate through `DecompressionStream('deflate-raw')`, CRC-32 checked); objects, meshes, components, build items, 3x4 transforms; `basematerials` and materials-extension `colorgroup` colors; production-extension `p:path` parts; unit conversion to meters |
-| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), and MLINE (each element along the vertices' miters, with its breaks; the style's caps, fill and element colours are not read), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting and `%%` control codes resolved); [block attributes](#dxf-block-attributes) in `texts`; 3DSOLID, BODY and REGION ACIS data decoded to SAT text. `HATCH` with [`readDXFHatch`](#dxf-hatches). Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
+| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), and MLINE (each element along the vertices' miters, with its breaks; the style's caps, fill and element colours are not read), in each entity's object coordinate system; [LEADER and MULTILEADER](#dxf-leaders) with their arrows, text and block content; POINT, TEXT and MTEXT (formatting and `%%` control codes resolved); [block attributes](#dxf-block-attributes) in `texts`; 3DSOLID, BODY and REGION ACIS data decoded to SAT text. `HATCH` with [`readDXFHatch`](#dxf-hatches). Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
 | `parsePCD` | `DATA ascii`, `binary`, `binary_compressed` (own LZF decompressor); x y z, normal_x/y/z, packed `rgb`/`rgba`, `intensity`, any other field skipped |
 | `parseOFF` | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals) |
 | `parseXYZ` | xyz, xyz+rgb, xyz+normal, xyz+normal+rgb, xyz+intensity, PTS (xyz+intensity+rgb), chemistry XYZ |
@@ -632,6 +632,35 @@ for (const { tag, text, position } of drawing.texts) console.log(tag, text, posi
 - A multiline attribute reads the MTEXT after its group code 101.
 - `TEXT`, `MTEXT` and attributes resolve the `%%d`, `%%p`, `%%c`, `%%%` and `%%nnn` control codes and drop the
   `%%u`, `%%o` and `%%k` toggles.
+
+## DXF leaders
+
+`parseDXF` draws `LEADER` and `MULTILEADER` with no option. Leader lines go to `lines` as segments (splines sampled
+`splineSegments` times a span), closed filled arrowheads to `mesh`, and a `MULTILEADER`'s text to `texts`. Its block
+content, attribute values included, and custom arrowhead blocks are drawn from the drawing's `BLOCKS`.
+
+- The arrow size is the entity's own (`MULTILEADER`), or `DIMASZ` x `DIMSCALE` from the leader's style overrides,
+  then its `DIMSTYLE`, then the header (`LEADER`). As in AutoCAD, a first segment shorter than twice that size has no
+  arrow.
+- A `LEADER` that carries text above its line (`DIMTAD`) runs on under the text.
+- Breaks are cut out of straight leader lines and doglegs. A leader type of "none" draws only the content.
+- Not drawn: tolerance content (counted in `skipped`), the text frame and background, leader colours, linetypes and
+  weights set apart from the entity's, and MTEXT column layout.
+
+```ts
+import { parseDXF } from '@margoengine/loaders';
+
+// A leader from (0, 0) over (4, 3) to (10, 3), with arrows of size 1.
+const groups = [
+  0, 'SECTION', 2, 'HEADER', 9, '$DIMASZ', 40, 1, 0, 'ENDSEC', 0, 'SECTION', 2, 'ENTITIES',
+  0, 'LEADER', 71, 1, 72, 0, 73, 3, 76, 3, 10, 0, 20, 0, 10, 4, 20, 3, 10, 10, 20, 3,
+  0, 'ENDSEC', 0, 'EOF',
+];
+const file = new TextEncoder().encode(groups.join('\n'));
+const drawing = parseDXF(file);
+console.log(drawing.lines.positions.length / 6); // 2 segments
+console.log(drawing.mesh.positions.length / 9); // 1 triangle, the arrow
+```
 
 ## DXF hatches
 

@@ -3,8 +3,9 @@
 // (rows and columns included) and DIMENSION, and the model-space entities a viewer draws. Faces (3DFACE, SOLID, TRACE,
 // polyface and polygon-mesh POLYLINEs, MESH) become one triangle list; curves (LINE, polylines with bulges, ARC,
 // CIRCLE, ELLIPSE, SPLINE) become line segments; ACIS solids (3DSOLID, BODY, REGION) are handed back as SAT text.
-// HATCH is drawn by the optional reader of ./dxf-hatch.ts.
+// LEADER and MULTILEADER are read by ./dxf-leaders.ts. HATCH is drawn by the optional reader of ./dxf-hatch.ts.
 import { NurbsCurve } from '@margoengine/geometry/nurbs';
+import { dimensionOverrides, readLeader, readMultiLeader, type DXFArrow, type DXFPoint } from './dxf-leaders.js';
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { checkCount, latin1, limits, toBytes, type BinaryInput } from './util.js';
 
@@ -74,7 +75,7 @@ export interface DXFLayer {
   visible: boolean;
 }
 
-/** A TEXT, MTEXT or block attribute: the string (formatting and control codes resolved) and where it stands. */
+/** A TEXT, MTEXT, MULTILEADER text or block attribute: the string (formatting and control codes resolved) and where it stands. */
 export interface DXFText {
   text: string;
   /** Insertion point, in the output's units. */
@@ -118,7 +119,7 @@ export interface DXFResult {
   lines: DXFLines;
   /** POINT entities, xyz each. */
   points: Float32Array;
-  /** TEXT and MTEXT, and the visible attributes of block references. */
+  /** TEXT and MTEXT, the text of MULTILEADERs, and the visible attributes of block references. */
   texts: DXFText[];
   layers: DXFLayer[];
   solids: DXFSolid[];
@@ -401,6 +402,26 @@ function ocs(n: [number, number, number]): M4 {
   return Float64Array.of(x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, 0, 0, 0, 1);
 }
 
+/** An arrowhead's axes: `u` out through the tip, `v` across it in the leader's plane, `w` out of that plane. */
+function arrowAxes({ tip, from, normal }: DXFArrow): { u: DXFPoint; v: DXFPoint; w: DXFPoint } {
+  const m = identity(),
+    u = direction(m, tip[0] - from[0], tip[1] - from[1], tip[2] - from[2]),
+    across = (n: DXFPoint): DXFPoint => [
+      n[1] * u[2] - n[2] * u[1],
+      n[2] * u[0] - n[0] * u[2],
+      n[0] * u[1] - n[1] * u[0],
+    ];
+  let side = across(normal);
+  // A leader that runs along its own normal lies in no single plane: any direction across it serves.
+  if (Math.hypot(...side) <= 1e-9 * Math.hypot(...normal)) side = across(Math.abs(u[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]);
+  const v = direction(m, ...side);
+  return {
+    u,
+    v,
+    w: [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
+  };
+}
+
 /**
  * Reads a DXF drawing (ASCII or binary) into faces, line segments, points, texts and ACIS solids, in
  * meters by default. Throws a {@link LoaderError}: `'syntax'` or `'truncated'` for a malformed file, `'limit'` past a
@@ -448,7 +469,11 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
   const header = new Map<string, Map<number, Value>>(),
     layers = new Map<string, DXFLayer & { aci: number }>(),
     blocks = new Map<string, { base: [number, number, number]; entities: Entity[] }>(),
+    /** Block names by the handle of their BLOCK_RECORD, and DIMSTYLE entries by upper-case name. */
+    records = new Map<string, string>(),
+    dimensionStyles = new Map<string, Entity>(),
     model: Entity[] = [];
+  const handle = (v: Value | undefined) => str(v).trim().toUpperCase();
   /** Entities from pair `i` (a code 0) up to the end of the section or `stop`. */
   const entitiesFrom = (i: number, stop: (type: string) => boolean): { list: Entity[]; next: number } => {
     const list: Entity[] = [];
@@ -493,10 +518,12 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
       const { list, next } = entitiesFrom(i, (type) => type === 'ENDSEC');
       i = next;
       if (name === 'TABLES') {
-        for (const e of list)
-          if (e.type === 'LAYER') {
-            const get = (code: number) => e.values[e.codes.indexOf(code)],
-              layerName = unicode(str(get(2)).trim()),
+        for (const e of list) {
+          const get = (code: number) => e.values[e.codes.indexOf(code)];
+          if (e.type === 'BLOCK_RECORD') records.set(handle(get(5)), unicode(str(get(2)).trim()));
+          else if (e.type === 'DIMSTYLE') dimensionStyles.set(unicode(str(get(2)).trim()).toUpperCase(), e);
+          else if (e.type === 'LAYER') {
+            const layerName = unicode(str(get(2)).trim()),
               aci = num(get(62), 7),
               flags = num(get(70)),
               rgb = e.codes.includes(420) ? num(get(420)) : undefined;
@@ -510,6 +537,7 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
               visible: aci >= 0 && !(flags & 1),
             });
           }
+        }
       } else if (name === 'BLOCKS') {
         let current: { name: string; base: [number, number, number]; entities: Entity[] } | undefined;
         for (const e of list) {
@@ -628,6 +656,15 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
         out.push(curve.evaluate(t0 + ((t1 - t0) * k) / splineSegments));
     }
     return out.length ? out : control;
+  };
+
+  const metric = num(header.get('$MEASUREMENT')?.get(70)) === 1;
+  /** The header variable behind each DIMSTYLE code a leader reads: DIMSCALE, DIMASZ, DIMTAD, DIMGAP. */
+  const HEADER_DIMENSIONS: Record<number, [string, number, number]> = {
+    40: ['$DIMSCALE', 40, 1],
+    41: ['$DIMASZ', 40, metric ? 2.5 : 0.18],
+    77: ['$DIMTAD', 70, 0],
+    147: ['$DIMGAP', 40, 0],
   };
 
   interface Context {
@@ -951,6 +988,110 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
             for (let t = 0; t < toggles.length; t += 2)
               polyline(lineOut(), [at(toggles[t]), t + 1 < toggles.length ? at(toggles[t + 1]) : end], false);
           });
+        }
+        return;
+      }
+      case 'LEADER':
+      case 'MULTILEADER':
+      case 'MLEADER': {
+        const leader = e.type === 'LEADER',
+          // A dimension variable comes from the entity's overrides, else its DIMSTYLE, else the header.
+          overrides = dimensionOverrides(e.codes, e.values),
+          style = leader ? dimensionStyles.get(unicode(str(first(3)).trim()).toUpperCase()) : undefined,
+          dimension = (code: number) => {
+            const k = style ? style.codes.indexOf(code) : -1,
+              stated = overrides.get(code) ?? (k < 0 ? undefined : style!.values[k]);
+            if (stated !== undefined || !(code in HEADER_DIMENSIONS)) return stated;
+            const [variable, group, fallback] = HEADER_DIMENSIONS[code];
+            return header.get(variable)?.get(group) ?? fallback;
+          },
+          curve = {
+            segments: splineSegments,
+            most: maxSegments - segments,
+            tooMany: (): never => {
+              throw new LoaderError(F, 'limit', `line segment count exceeds the limit of ${maxSegments}`);
+            },
+          },
+          multi = leader ? undefined : readMultiLeader(e.codes, e.values, dimension, curve),
+          plan = leader ? readLeader(e.codes, e.values, dimension, curve) : multi;
+        if (!plan) {
+          skip(`${e.type} (no context data)`);
+          return;
+        }
+        /** Draws a block's entities as part of this entity: an arrowhead or the content. */
+        const place = (name: string, entities: Entity[], matrix: M4) => {
+          if (context.depth >= maxDepth)
+            throw new LoaderError(F, 'limit', `block references nest deeper than maxDepth ${maxDepth} (at "${name}")`);
+          inserts++;
+          if (inserts > maxInserts)
+            throw new LoaderError(F, 'limit', `block references exceed maxInserts ${maxInserts}`);
+          for (const child of entities) emit(child, { matrix, layer: layerName, color, depth: context.depth + 1 });
+        };
+        for (const path of plan.paths) polyline(lineOut(), path.map(world), false);
+        // A leader's own arrow block (DIMLDRBLK): a handle in its style or overrides, a name in the header.
+        const own = dimension(341),
+          named = own === undefined && !style ? str(header.get('$DIMLDRBLK')?.get(1)).trim() : '';
+        for (const arrow of plan.arrows) {
+          const stated = leader ? own : arrow.handle,
+            name = stated === undefined ? unicode(named) : records.get(handle(stated)),
+            symbol = name ? blocks.get(name) : undefined,
+            { u, v, w } = arrowAxes(arrow),
+            { tip, size } = arrow;
+          if (symbol) {
+            // The arrow block is drawn pointing along +X with its tip at the insertion point, one arrow size long.
+            const [x, y, z] = [u, v, w].map((axis) => axis.map((c) => c * size)),
+              placed = Float64Array.of(...x, 0, ...y, 0, ...z, 0, ...tip, 1),
+              base = translate(-symbol.base[0], -symbol.base[1], -symbol.base[2]);
+            place(name!, symbol.entities, mul(mul(m, placed), base));
+            continue;
+          }
+          // The closed filled arrow: as long as the arrow size and a third as wide.
+          const corner = (side: number) => world([0, 1, 2].map((a) => tip[a] - u[a] * size + (v[a] * side * size) / 6));
+          triangle(faces(), world(tip), corner(1), corner(-1));
+        }
+        if (!multi) return;
+        if (multi.tolerance) skip(`${e.type} (tolerance content)`);
+        if (multi.text) {
+          const { raw, position, height, direction: along, normal } = multi.text;
+          texts.push({
+            text: controlCodes(plainMText(raw)),
+            position: world(position),
+            height: height * Math.hypot(m[4], m[5], m[6]),
+            direction: direction(m, ...along),
+            normal: direction(m, ...normal),
+            layer: layerName,
+            color,
+          });
+        }
+        if (multi.block) {
+          const { position, normal, rotation, scale: size, attributes } = multi.block,
+            name = records.get(handle(multi.block.handle)),
+            content = name === undefined ? undefined : blocks.get(name);
+          if (!content) {
+            skip(`${e.type} (missing block)`);
+            return;
+          }
+          const placed = mul(mul(translate(...position), ocs(normal)), rotateZ(rotation)),
+            base = translate(-content.base[0], -content.base[1], -content.base[2]),
+            matrix = mul(m, mul(placed, mul(scaling(...size), base))),
+            // Each attribute value takes the place and look of its definition in the block.
+            filled = attributes.flatMap(([id, value]): Entity[] => {
+              const definition = content.entities.find(
+                (d) => d.type === 'ATTDEF' && handle(d.values[d.codes.indexOf(5)]) === handle(id),
+              );
+              if (!definition) return [];
+              const embedded = definition.codes.indexOf(101),
+                end = embedded < 0 ? definition.codes.length : embedded,
+                codes = definition.codes.slice(0, end),
+                values = definition.values.slice(0, end),
+                k = codes.indexOf(1);
+              if (k < 0) {
+                codes.push(1);
+                values.push(value);
+              } else values[k] = value;
+              return [{ type: 'ATTRIB', codes, values }];
+            });
+          place(name!, [...content.entities, ...filled], matrix);
         }
         return;
       }

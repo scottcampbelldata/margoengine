@@ -17812,6 +17812,31 @@ The `ATTRIB` and `ATTDEF` reading and the `%%` control codes of `packages/loader
 The `101 Embedded Object` marker of a multiline attribute is not named on that page and is not yet proven on a real
 file. No other project's source was read.
 
+## DXF leaders (2026-11-27)
+
+`packages/loaders/src/dxf-leaders.ts` and the `LEADER` and `MULTILEADER` reading of `dxf.ts` are written from:
+
+- Autodesk, *DXF Reference* (https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-DXF/files/): "LEADER (DXF)"
+  (GUID-396B2369-F89F-47D7-8223-8B7FB794F9F3), "DIMSTYLE (DXF)" (GUID-F2FAD36F-0CE3-4943-9DAD-A9BCD2AE81DA),
+  "Dimension Style Overrides (DXF)" (GUID-6A4C31C0-4988-499C-B5A4-15582E433B0F), "HEADER Section Group Codes (DXF)"
+  (GUID-A85E8E67-27CD-4C59-BE61-4DC9FADBE74A), and from the 2018 edition "MLEADER (DXF)" with its common, context
+  data, leader node and leader line code pages (GUID-72D20B8C-0F5E-4993-BEB7-0FCF94F32BE0).
+- Autodesk help, "DIMASZ (System Variable)" (0.18 imperial, 2.5 metric), "DIMSCALE (System Variable)" and "About
+  Customizing Arrowheads" (GUID-5D1F8D41-86EC-481F-ACA0-B169F0B91D00: a block, scaled by the arrow size, inserted
+  unrotated at the right-hand end, from which its tip-at-origin, pointing +X form is read).
+- Siemens Support, "Arrowhead missing from Datum Feature Symbol in dxf viewed in Autocad" (PL8005546), quoting
+  Autodesk: no arrowhead on a first segment shorter than twice its size.
+- Alan Thomas, *Demystifying DXF: LEADER and MULTILEADER implementation notes*, 2018, CC BY-SA 4.0 (prose only,
+  https://atlight.github.io/formats/dxf-leader.html): the `CONTEXT_DATA{`, `LEADER{` and `LEADER_LINE{` markers, when
+  a dogleg is drawn and where lines end without it, breaks, and the hook line under text.
+- ezdxf documentation, "MULTILEADER Internals" and the MultiLeader entity page (prose and tag listings, no source):
+  the leader and content type values, and block rotation in radians.
+- Carl de Boor, *A Practical Guide to Splines*, Springer 1978, chapter IV (complete cubic spline interpolation), for
+  spline leaders.
+
+The arrow's width, a third of its length, is the usual drafting proportion. No other project's source was read, and
+none of this is yet proven on a real file.
+
 ## DXF multilines (2026-11-27)
 
 The `MLINE` reading of `packages/loaders/src/dxf.ts` is written from Autodesk, *DXF Reference*, "MLINE (DXF)" (the
