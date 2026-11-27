@@ -37,6 +37,7 @@ import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } 
 import { type HeadingGains, headingGains, type ShipTrack, steerTrack, type TrackState, wrap } from './autopilot.js';
 import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mmg.js';
 import { type HoltropHull, holtropMennen } from './resistance.js';
+import { type BankLoads, bankLoads } from './bank.js';
 import { shallowWater } from './shallow.js';
 import { raceVelocity, thrusterThrust } from './propeller.js';
 import {
@@ -202,9 +203,15 @@ export interface ShipStatus {
   /** Sinkage at the midship, m, and trim by the stern, rad, from its squat. */
   sinkage: number;
   trim: number;
-  /** The thruster's push, N, and the walls' suction, N (toward the wall). */
+  /**
+   * The thruster's push, N, and the banks' sway force, N (positive to starboard; toward a bank at usual depths, away from
+   * it in very shallow water), their yaw moment, N m (positive turning the bow to starboard), and whether the hull is in the
+   * bank regression's range.
+   */
   thruster: number;
   suction: number;
+  bankMoment: number;
+  bankInRange: boolean;
   /** The midship on the waterline, forward and starboard unit vectors on the ground plane. */
   midship: Vec3;
   forward: Vec3;
@@ -382,6 +389,8 @@ export class ShipSolver implements Solver<ShipParams> {
           trim: 0,
           thruster: 0,
           suction: 0,
+          bankMoment: 0,
+          bankInRange: true,
           midship: [0, 0, 0],
           forward: [1, 0, 0],
           starboard: [0, 0, 1],
@@ -609,8 +618,10 @@ export class ShipSolver implements Solver<ShipParams> {
         }
       }
       // Suction toward a wall alongside: the return flow pressed through the gap.
-      const suction = this.suction(mid, f, s, Math.sqrt(u * u + v * v), M);
-      Y += suction.force;
+      // The banks alongside (Vantorre et al. 2003), with last step's sinkage.
+      const banked = this.bank(mid, f, s, u, forces.thrust, status.sinkage, M, M.propeller.diameter);
+      Y += banked.Y;
+      N += banked.N;
       const mass = inverseMass > 0 ? 1 / inverseMass : 0;
       if (mass === 0) return;
       // The added masses and their coupling: hold the body so it moves as eq. 4 says (its own mass and inertia from the port).
@@ -728,7 +739,9 @@ export class ShipSolver implements Solver<ShipParams> {
       status.sinkage = sinkage;
       status.trim = trim;
       status.thruster = push;
-      status.suction = suction.force;
+      status.suction = banked.Y;
+      status.bankMoment = banked.N;
+      status.bankInRange = banked.inRange;
       status.midship = mid;
       status.forward = f;
       status.starboard = s;
@@ -744,14 +757,24 @@ export class ShipSolver implements Solver<ShipParams> {
   }
 
   /**
-   * The lateral pull toward the nearest wall alongside (positive to starboard): the hull's section C_M B T, half of whose
-   * return flow is pressed through the gap of width g and depth h, speeds the gap's water to U (1 + 0.5 A_S / (g h)); the
-   * pressure drop 1/2 rho (U_gap^2 - U^2) acts on the parallel middle body, taken as 0.6 L by T.
+   * The banks' sway force and yaw moment (Vantorre et al. 2003, `bankLoads`): the nearest wall alongside on each side,
+   * within half a ship length of the midship along it, gives y_B = (B / 2) (1 / y_s - 1 / y_p); the depth less the last
+   * step's sinkage is the effective depth.
    */
-  private suction(mid: Vec3, f: Vec3, s: Vec3, speed: number, M: ManoeuvringModel): { force: number } {
-    if (this.walls.length === 0 || speed <= 0) return { force: 0 };
-    let best = Number.POSITIVE_INFINITY,
-      side = 0;
+  private bank(
+    mid: Vec3,
+    f: Vec3,
+    s: Vec3,
+    u: number,
+    thrust: number,
+    sinkage: number,
+    M: ManoeuvringModel,
+    diameter: number,
+  ): BankLoads {
+    const none: BankLoads = { Y: 0, N: 0, inRange: true };
+    if (this.walls.length === 0) return none;
+    let starboard = Number.POSITIVE_INFINITY,
+      port = Number.POSITIVE_INFINITY;
     for (const wall of this.walls) {
       const [ax, az] = wall.from,
         [bx, bz] = wall.to,
@@ -761,20 +784,32 @@ export class ShipSolver implements Solver<ShipParams> {
         t = length2 > 0 ? Math.max(0, Math.min(1, ((mid[0] - ax) * ex + (mid[2] - az) * ez) / length2)) : 0,
         px = ax + t * ex - mid[0],
         pz = az + t * ez - mid[2],
-        distance = Math.sqrt(px * px + pz * pz),
-        // Only a wall alongside: within half a ship length of the midship along the ship.
-        along = Math.abs(px * f[0] + pz * f[2]);
-      if (along > M.length / 2 || !(distance < best)) continue;
-      best = distance;
-      side = px * s[0] + pz * s[2] >= 0 ? 1 : -1;
+        along = Math.abs(px * f[0] + pz * f[2]),
+        across = px * s[0] + pz * s[2];
+      // Only a wall alongside: within half a ship length of the midship along the ship, and clear of its side.
+      if (along > M.length / 2 || !(Math.abs(across) > M.beam / 2)) continue;
+      if (across > 0) starboard = Math.min(starboard, across);
+      else port = Math.min(port, -across);
     }
-    const gap = best - M.beam / 2;
-    if (!Number.isFinite(best) || !(gap > 0) || gap > 2 * M.beam) return { force: 0 };
-    const h = Math.min(this.depthAt(mid[0], mid[2]), 4 * M.draught),
-      section = 0.98 * M.beam * M.draught,
-      ugap = speed * (1 + (0.5 * section) / (gap * h)),
-      drop = 0.5 * this.density * (ugap * ugap - speed * speed);
-    return { force: side * drop * 0.6 * M.length * M.draught };
+    if (!Number.isFinite(starboard) && !Number.isFinite(port)) return none;
+    const yB = (M.beam / 2) * (1 / starboard - 1 / port),
+      depth = this.depthAt(mid[0], mid[2]) - Math.max(0, sinkage);
+    if (!(depth > M.draught)) return none;
+    return bankLoads(
+      {
+        length: M.length,
+        beam: M.beam,
+        draught: M.draught,
+        block: M.volume / (M.length * M.beam * M.draught),
+        diameter,
+      },
+      yB,
+      depth,
+      u,
+      thrust,
+      this.density,
+      this.g,
+    );
   }
 
   /** The races' and configured tunnel jets' water velocity at (x, y, z), into a flow sample. */

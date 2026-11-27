@@ -17,6 +17,7 @@ import {
   empiricalModel,
   headingGains,
   ankudinovShallow,
+  bankLoads,
   liWuAddedMass,
   shallowWater,
   inceptionIndex,
@@ -937,5 +938,43 @@ test("in shallow water a hull's derivatives and added masses are Ankudinov's, an
   assert.throws(
     () => shallowWater(M, 0),
     (e) => e.code === 'unsupported' && /depth/.test(e.message),
+  );
+});
+
+test("a bank alongside draws a ship in and turns its bow away, and pushes it off in very shallow water: Vantorre's regression", () => {
+  // Vantorre et al. (MARSIM 2003), model C: the bulk carrier of their tests, 3.672 m, inside the regression's range (their
+  // container carrier D has B/T 3.06, a shade past the 3.0 they give).
+  const D = { length: 3.672, beam: 0.504, draught: 0.191, block: 0.828, diameter: 0.12 },
+    u = 0.069 * Math.sqrt(9.81 * D.length),
+    at = (ratio, yB = 0.3, thrust = 0) => bankLoads(D, yB, ratio * D.draught, u, thrust, 1000, 9.81);
+  assert.ok(at(1.5).inRange);
+  // At usual depths the bank attracts the ship (toward a starboard bank: +Y) and turns its bow away (-N).
+  for (const ratio of [1.2, 1.35, 1.5, 2, 2.5]) assert.ok(at(ratio).Y > 0 && at(ratio).N < 0, `h/T ${ratio}`);
+  // In very shallow water the attraction turns into repulsion, at the critical h/T the paper gives, 1.1 to 1.3.
+  assert.ok(at(1.1).Y < 0);
+  let lo = 1.1,
+    hi = 1.5;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (at(mid).Y < 0) lo = mid;
+    else hi = mid;
+  }
+  assert.ok(lo > 1.1 && lo < 1.3, `the force turns at h/T ${lo}`);
+  // A bank to port mirrors one to starboard; a ship on a canal's centreline feels none.
+  const s = at(1.5, 0.3),
+    p = at(1.5, -0.3);
+  assert.ok(Math.abs(s.Y + p.Y) < 1e-12 && Math.abs(s.N + p.N) < 1e-12);
+  assert.deepEqual(at(1.5, 0), { Y: 0, N: 0, inRange: true });
+  // The propeller ahead adds its own part, which grows with its thrust; going astern the hull's part is left out.
+  assert.notEqual(at(1.5, 0.3, 20).Y, s.Y);
+  assert.equal(bankLoads(D, 0.3, 1.5 * D.draught, -u, 0, 1000, 9.81).Y, 0);
+  // KVLCC2's L/B 5.5 is outside the regression's 6 to 7.3, and says so.
+  assert.equal(
+    bankLoads({ length: 320, beam: 58, draught: 20.8, block: 0.81, diameter: 9.86 }, 0.3, 40, 7, 0).inRange,
+    false,
+  );
+  assert.throws(
+    () => bankLoads(D, 0.3, 0.1, u, 0),
+    (e) => e.code === 'unsupported' && /deeper than its draught/.test(e.message),
   );
 });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20707880,
+  "total": 20708854,
   "history": [
     {
       "date": "2026-10-24",
@@ -14257,6 +14257,12 @@
       "commit": "7b1f858e9",
       "reason": "physics/ship 16,589 ceiling to its new size: shallow-water manoeuvring (Ankudinov et al. 1990 derivatives and added masses, Li and Wu 1990 surge added mass) applied per ship from the depth under it. One feature of the ship entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "9bc70c24f",
+      "reason": "physics/ship 17,596 ceiling to its new size: bank effects by Vantorre et al.'s 2003 regression (three coefficient tables) in place of the uncalibrated quay pull. One feature of the ship entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15130,7 +15136,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 17596,
+    "@margoengine/physics/ship": 18570,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,

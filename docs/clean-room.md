@@ -17121,3 +17121,19 @@ tighter in shallow water. Mapping Ankudinov's |v|v-type factors onto MMG's cubic
 package's own. Proof: `packages/physics/tests/ship.test.js`, "in shallow water a hull's derivatives and added masses are
 Ankudinov's".
 
+### Bank effects on ships (SEA-09, `bankLoads`, 2026-11-26)
+
+`packages/physics/src/ship/bank.ts` and the walls' use in `src/ship/solver.ts`, written from:
+
+- M. Vantorre, G. Delefortrie, K. Eloot and E. Laforce, "Experimental investigation of ship-bank interaction forces",
+  MARSIM 2003, Kanazawa, https://www.vliz.be/imisdocs/publications/ocrd/141422.pdf (all 9 pages, read): eqs. 4 and 8 to
+  18, the coefficient tables and the range on page 9, and its note that y_B^2 reads y_B |y_B|.
+- E. Lataire and M. Vantorre, "Ship-bank interaction induced by irregular bank geometries", 27th Symposium on Naval
+  Hydrodynamics 2008, https://www.vliz.be/imisdocs/publications/ocrd/140585.pdf (pages 4 to 12, read): its weighted
+  distances and influence width, whose coefficients are not published, so the 2003 regression is used.
+
+The sign convention was not stated on the pages read. It was set by evaluating the regression for the paper's bulk
+carrier: attraction at usual depths turning to repulsion between h/T 1.1 and 1.2, and the bow turned away, as the paper's
+text says. Leaving out the hull's part astern, and the propeller-with-speed part without gravity, are this package's
+own. Proof: `packages/physics/tests/ship.test.js`, "a bank alongside draws a ship in and turns its bow away".
+

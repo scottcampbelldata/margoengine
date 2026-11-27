@@ -5,6 +5,20 @@
 ```ts
 import { FlowField, SeaSource, SeaSurface } from "@margoengine/math/fields";
 
+export interface BankHull {
+    readonly length: number;
+    readonly beam: number;
+    readonly draught: number;
+    readonly block: number;
+    readonly diameter: number;
+}
+
+export interface BankLoads {
+    Y: number;
+    N: number;
+    inRange: boolean;
+}
+
 export const ESTABLISHMENT_LENGTH = 3.25;
 
 export interface EmpiricalHull {
@@ -342,6 +356,8 @@ export interface ShipStatus {
     trim: number;
     thruster: number;
     suction: number;
+    bankMoment: number;
+    bankInRange: boolean;
     midship: Vec3;
     forward: Vec3;
     starboard: Vec3;
@@ -431,6 +447,10 @@ export function ankudinovShallow(ratio: number, hull: {
 };
 
 export function atan2(y: number, x: number): number;
+
+export function bankInRange(hull: BankHull, depth: number): boolean;
+
+export function bankLoads(hull: BankHull, yB: number, depth: number, u: number, thrust: number, density?: number, gravity?: number): BankLoads;
 
 export function cavityRadius(circulation: number, core: number, ambient: number, vapour?: number, density?: number): number;
 
