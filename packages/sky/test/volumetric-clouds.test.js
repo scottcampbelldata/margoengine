@@ -7,6 +7,8 @@ import {
   PLANET_RADIUS,
   cloudDeckTransmittance,
   cloudField,
+  CLOUD_FLOATS,
+  writeVeil,
   layerOf,
 } from '@margoengine/sky/volumetric-clouds';
 import { Sky } from '@margoengine/sky';
@@ -156,7 +158,7 @@ test('the coverage map drifts on without a jump where the shapes wrap', () => {
     queue = h.engine.gpu.queue,
     write = queue.writeBuffer.bind(queue);
   queue.writeBuffer = (buffer, offset, data) => {
-    if (data.length === 96) uniforms.push(Float32Array.from(data));
+    if (data.length === CLOUD_FLOATS) uniforms.push(Float32Array.from(data));
     return write(buffer, offset, data);
   };
   h.engine.use(clouds);
@@ -181,4 +183,47 @@ test('the coverage map drifts on without a jump where the shapes wrap', () => {
   }
   assert.match(code(h), /vec3f\(\(p\.xz\+c\.flags\.zw\)\*c\.shape\.x\*0\.17,0\.37\)/);
   clouds.dispose();
+});
+
+// KB-SKY-PALLCLOUD1: under a smoke pall the day dome is dimmed and veiled by the layer (sunColor, scatteredLight), and
+// the clouds drew over it clean, the brightest thing in a smoke-day frame. They stand above the layer, so they are now
+// seen through it (layerTransmittance along the ray) with its glow in front, as the sky draws what is above the layer.
+test('a low haze layer in the sky dims and veils the clouds seen through it', () => {
+  const h = tracedGPU();
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
+  const sky = new Sky({
+      hours: 10,
+      timeScale: 0,
+      lighting: {},
+      atmosphere: { layerTransmittance: [0.3, 0.2, 0.1], sunIntensity: 2, scatteredLight: [0.4, 0.25, 0.1] },
+    }),
+    clouds = new VolumetricClouds({ sky }),
+    uniforms = [],
+    queue = h.engine.gpu.queue,
+    write = queue.writeBuffer.bind(queue);
+  queue.writeBuffer = (buffer, offset, data) => {
+    if (data.length === CLOUD_FLOATS) uniforms.push(Float32Array.from(data));
+    return write(buffer, offset, data);
+  };
+  h.engine.use(sky);
+  h.engine.use(clouds);
+  frame(h, sky, clouds);
+  const v = uniforms.at(-1),
+    unit = (2 * sky.zenithSun) / Math.PI;
+  assert.ok(sky.zenithSun > 0, `the sky's zenith sun ${sky.zenithSun}`);
+  for (const [i, c] of [0.3, 0.2, 0.1, 2].entries()) assert.equal(v[96 + i], Math.fround(c));
+  for (const [i, c] of [0.4, 0.25, 0.1].entries()) assert.ok(Math.abs(v[100 + i] - c * unit) < 1e-5 * unit);
+  // The picture and both deck maps take the cloud's light through the layer.
+  assert.match(code(h), /var color=cloudVeiled\(m\.light,m\.opacity,d\)\*clouds\.sunColor\.w;/);
+  assert.match(code(h), /cloudVeiled\(light,opacity,dir\)\*k/);
+  assert.match(code(h), /cloudVeiled\(scene,opacity,dir\)\*k/);
+  assert.match(code(h), /let t=pow\(max\(clouds\.veil\.rgb,vec3f\(1e-30\)\),vec3f\(1\.0\/max\(d\.y\/max\(length\(d\),1e-6\),0\.052336\)\)\);/);
+  assert.match(code(h), /return light\*t\*clouds\.veil\.w\+opacity\*clouds\.glow\.rgb;/);
+  clouds.dispose();
+  // Without a layer the clouds are as they were: no dimming, no glow.
+  const clear = new Float32Array(CLOUD_FLOATS);
+  writeVeil(clear, undefined);
+  assert.deepEqual([...clear.subarray(96)], [1, 1, 1, 1, 0, 0, 0, 0]);
+  writeVeil(clear, { sun: [0, 1, 0], options: {}, zenithSun: 6.9 });
+  assert.deepEqual([...clear.subarray(96)], [1, 1, 1, 1, 0, 0, 0, 0]);
 });

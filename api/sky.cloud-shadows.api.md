@@ -205,7 +205,13 @@ interface VolumetricCloudSky {
         readonly lighting?: {
             readonly intensity?: number;
         };
+        readonly atmosphere?: {
+            readonly sunIntensity?: number;
+            readonly scatteredLight?: ArrayLike<number>;
+            readonly layerTransmittance?: ArrayLike<number>;
+        };
     };
+    readonly zenithSun?: number;
     readonly reflectionTexture?: GPUTexture | undefined;
     readonly lightScale?: number;
     readonly lights?: readonly {

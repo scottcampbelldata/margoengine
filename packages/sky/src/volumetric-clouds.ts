@@ -56,7 +56,20 @@ export interface VolumetricCloudSky {
     readonly exposure?: number;
     /** The sky's light (`Sky` `lighting`): its `intensity` scales the engine sun the deck's light is matched to. */
     readonly lighting?: { readonly intensity?: number };
+    /**
+     * The sky's air (`Sky` `atmosphere`): the clouds stand above its low haze layer (smoke, ash, spray), so they are seen
+     * through it, `layerTransmittance` to the power 1 / sin e along a ray e up, with the layer's glow
+     * (`scatteredLight`) in front, as the sky draws what is above the layer (KB-SKY-PALLCLOUD1); `sunIntensity` scales
+     * their light as it does the dome's.
+     */
+    readonly atmosphere?: {
+      readonly sunIntensity?: number;
+      readonly scatteredLight?: ArrayLike<number>;
+      readonly layerTransmittance?: ArrayLike<number>;
+    };
   };
+  /** The zenith sun on level ground in sky units (`Sky.zenithSun`), the unit of `atmosphere.scatteredLight`. */
+  readonly zenithSun?: number;
   readonly reflectionTexture?: GPUTexture | undefined;
   /**
    * Engine light units per sky unit (`Sky.lightScale`): the sky's lighting takes its map, this deck's light included,
@@ -285,7 +298,7 @@ fn perlinFbm(p:vec3f,period:i32)->f32 {
 // three quarters of the layer's slant depth, of the base shape only.
 /** WGSL of the cloud uniform and its density field, shared with `@margoengine/sky/cloud-shadows`. */
 export const cloudField = /* wgsl */ `
-struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>}
+struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f}
 fn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}
 fn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}
 fn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}
@@ -459,6 +472,15 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32,glow:f32)->CloudLight {
  }
  return CloudLight(light,scene,opacity);
 }
+// The low haze layer under the deck (the sky's atmosphere.layerTransmittance and scatteredLight): the deck stands above
+// it, so its premultiplied light is seen through it, the layer's transmittance straight up (veil.rgb) to the power
+// 1 / sin e along the ray d e up (Beer-Lambert through a flat layer, e floored at 3 degrees, as the sky draws what is
+// above the layer), times the sky's sunIntensity (veil.w), with the layer's glow in sky units (glow.rgb) over the
+// cloud's opacity in front (KB-SKY-PALLCLOUD1). 1 and 0 leave the cloud as it is.
+fn cloudVeiled(light:vec3f,opacity:f32,d:vec3f)->vec3f {
+ let t=pow(max(clouds.veil.rgb,vec3f(1e-30)),vec3f(1.0/max(d.y/max(length(d),1e-6),0.052336)));
+ return light*t*clouds.veil.w+opacity*clouds.glow.rgb;
+}
 `;
 const shader = (depthBinding: string) => /* wgsl */ `${fullscreen}${march}${displayShader}
 ${depthBinding}
@@ -470,7 +492,7 @@ ${depthBinding}
  if(end<=span.x){discard;}
  let m=cloudMarch(d,span.x,end,u32(clouds.shape.w),fract(cloudHash3(vec3u(vec2u(i.position.xy),7u)).x+clouds.flags.y),0.95);
  if(m.opacity<=0.0){discard;}
- var color=m.light*clouds.sunColor.w;
+ var color=cloudVeiled(m.light,m.opacity,d)*clouds.sunColor.w;
  if(clouds.flags.x>0.5){color=toDisplay(color/m.opacity)*m.opacity;}
  return vec4f(color,m.opacity);
 }
@@ -495,8 +517,10 @@ const deckShader = /* wgsl */ `${march}
   if(span.y>span.x){let m=cloudMarch(d,span.x,span.y,32u,(f32(r)+0.5)*0.25,0.8);light+=m.light;scene+=m.scene;opacity+=m.opacity;}
  }
  let k=0.25*clouds.sunColor.w;
- textureStore(deck,vec2i(id.xy),vec4f(light*k,opacity*0.25));
- textureStore(deckLight,vec2i(id.xy),vec4f(scene*k,opacity*0.25));
+ let mid=(vec2f(id.xy)+0.5)/vec2f(64,32);let mp=(mid.x-0.5)*6.2831853;let mt=mid.y*3.14159265;
+ let dir=vec3f(sin(mt)*cos(mp),cos(mt),sin(mt)*sin(mp));
+ textureStore(deck,vec2i(id.xy),vec4f(cloudVeiled(light,opacity,dir)*k,opacity*0.25));
+ textureStore(deckLight,vec2i(id.xy),vec4f(cloudVeiled(scene,opacity,dir)*k,opacity*0.25));
 }
 `;
 // The sky light the clouds receive, from the sky's 64 x 32 reflection map: the cosine-weighted mean radiance of the upper
@@ -598,8 +622,27 @@ export function layerOf(
   out.density = options.density ?? w?.density ?? defaults.density;
   return out;
 }
+/**
+ * Writes the sky's low haze layer into the `Clouds` uniform (floats 96 to 103): its transmittance straight up
+ * (`atmosphere.layerTransmittance`) and the sky's `sunIntensity`, then the layer's glow (`atmosphere.scatteredLight`
+ * times `sunIntensity` times the zenith sun over pi, in sky units, as `@margoengine/sky/look` writes it for the dome).
+ * Without a sky or its `atmosphere`: 1 and 0, the clouds as they are.
+ */
+export function writeVeil(v: Float32Array, sky: VolumetricCloudSky | undefined): void {
+  const a = sky?.options.atmosphere,
+    through = a?.layerTransmittance,
+    glow = a?.scatteredLight,
+    intensity = a?.sunIntensity ?? 1,
+    unit = (intensity * (sky?.zenithSun ?? 0)) / Math.PI;
+  for (let i = 0; i < 3; i++) {
+    v[96 + i] = through ? through[i]! : 1;
+    v[100 + i] = glow ? glow[i]! * unit : 0;
+  }
+  v[99] = intensity;
+  v[103] = 0;
+}
 /** Floats in the `Clouds` uniform ({@link cloudField}): the buffers of the clouds, their shadows and shafts hold this many. */
-export const CLOUD_FLOATS = 96;
+export const CLOUD_FLOATS = 104;
 let loadedStorm: StormField | undefined, loading: Promise<StormField> | undefined, loadError: unknown;
 /** Whether the options draw a storm: a `hurricane`, or `type: 'hurricane'`. */
 export const wantsStorm = (options: VolumetricCloudOptions): boolean =>
@@ -935,6 +978,7 @@ export class VolumetricClouds implements EnginePlugin {
     v[62] = dim || !(scale > 0) ? 0 : 1 / (4 * Math.PI * 0.15) / scale;
     // The ground's albedo times the share of the light the deck passes to it (cloudDeckTransmittance at the sun's height).
     v[63] = (o.groundAlbedo ?? defaults.groundAlbedo) * cloudDeckTransmittance(layer, Math.max(v[21], 0.1));
+    writeVeil(v, sky);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     return v[30] > 0;
   }

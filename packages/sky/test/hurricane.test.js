@@ -246,7 +246,7 @@ test('the clouds draw the storm: the hurricane layer, its fields in the uniform,
   // Without a storm the fields are 0 and the storm is off (storm[3].y).
   const plain = new Float32Array(CLOUD_FLOATS).fill(7);
   writeLayer(plain, {}, [0, 0, 0]);
-  assert.ok(plain.subarray(64).every((x) => x === 0));
+  assert.ok(plain.subarray(64, 96).every((x) => x === 0));
   // The storm's options are checked when its code has loaded: `ready` rejects, and a draw would throw the same.
   await assert.rejects(new VolumetricClouds({ hurricane: { bands: 12 } }).ready, RangeError);
   assert.throws(() => new VolumetricClouds({ hurricane: 3 }), TypeError);

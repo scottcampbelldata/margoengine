@@ -234,7 +234,7 @@ const sky = Sky.attach(engine, {look: {zenithColor: [0.6, 0.2, 1], zenithStrengt
 | `mieAnisotropy` | -0.95 to 0.95 | 0.8 | Cornette-Shanks asymmetry: higher is a tighter glow round the sun |
 | `ozone` | 0 to 20 | 0 | Ozone absorption, a multiple of Earth's layer: a deeper blue at twilight |
 | `scatteredLight` | linear RGB 0 to 4 | [0, 0, 0] | Light a low haze layer (smoke, ash, sea spray) scatters down, a share of the zenith sun on level ground: the layer shines evenly over the day sky with that light over pi, so the dome, its reflections, the light it gives the scene and the sky fog take its glow. A `WeatherDrive` writes it under a load |
-| `layerTransmittance` | linear RGB 0 to 1 | [1, 1, 1] | That layer's direct share straight up: the night's own light (stars, moon, twilight, the clouds above) is seen through it, t^(1 / sin e) along a ray e up (e floored at 3 degrees), with the layer's glow (`scatteredLight`) in front, so a starry sky goes out under a thick smoke pall. The day sky takes the layer through `sunColor` and `scatteredLight`, so by day it changes nothing. A `WeatherDrive` writes it under a load |
+| `layerTransmittance` | linear RGB 0 to 1 | [1, 1, 1] | That layer's direct share straight up: the night's own light (stars, moon, twilight, the clouds above) is seen through it, t^(1 / sin e) along a ray e up (e floored at 3 degrees), with the layer's glow (`scatteredLight`) in front, so a starry sky goes out under a thick smoke pall. The day sky takes the layer through `sunColor` and `scatteredLight`; by day it dims and veils only `VolumetricClouds`, which stand above it. A `WeatherDrive` writes it under a load |
 | `fireSpots` | up to 8 `{color, x, z, height, reach}` | none | Fires light that layer from below: each ray meets a spot's lit `height` (default 1000 m) r metres across from (`x`, `z`) and takes `color` (a share of the zenith sun, 0 to 4) times `(R^2 / (R^2 + r^2))^1.5`, R the `reach` (default 1000 m); the spots add. Shown at night, as `scatteredLight` is. A `WeatherDrive` writes it from its fires |
 | `fireSight` | 0 to 1e6 m | 0 | No ray takes the `fireSpots` layer farther across than this, the visual range through the smoke, so the sky low behind a ridge takes the light of the haze on it; 0 sets no limit. A `WeatherDrive` writes 2 / fog density |
 
@@ -366,6 +366,11 @@ selects another depth source. When there is no sampleable depth, clouds draw ove
 The separation of atmospheric integration from scene surfaces follows Andrew Schneider and Nathan Vos,
 [The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn](https://www.advances.realtimerendering.com/s2015/index.html) (2015),
 and Sébastien Hillaire, [Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite](https://blog.selfshadow.com/publications/s2016-shading-course/) (2016).
+The clouds stand above the sky's low haze layer (`atmosphere.layerTransmittance` and `scatteredLight`, which a
+`WeatherDrive` writes under smoke, ash or spray): each cloud is seen through it, the layer's transmittance straight up
+to the power 1 / sin e along a ray e up (Beer-Lambert through a flat layer, e floored at 3 degrees), with the layer's
+glow in front, as the sky draws what is above the layer. Under a smoke pall a cumulus is dimmed and tinted with the sky
+behind it instead of drawing clean white. Without a layer the clouds are drawn as they are.
 
 ```ts
 import {Engine} from 'margoengine/core';

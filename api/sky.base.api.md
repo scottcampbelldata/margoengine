@@ -42,6 +42,7 @@ export class Sky implements EnginePlugin {
     environmentLayer: GPUTexture | undefined;
     environmentLightLayer: GPUTexture | undefined;
     lightScale: number;
+    zenithSun: number;
     deck: ((up: number) => number) | undefined;
     get airControls(): boolean;
     readonly sun: Float32Array<ArrayBuffer>;

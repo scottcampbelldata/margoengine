@@ -80,7 +80,7 @@ test('a deck passes its share: overcast stratus 40 to 50 percent, a storm 5 perc
 });
 
 // The plugin side: the weather option, the step cap and temporal 'auto' in the uniform, and the sky's deck hook.
-import { VolumetricClouds, layerOf } from '@margoengine/sky/volumetric-clouds';
+import { VolumetricClouds, layerOf, CLOUD_FLOATS } from '@margoengine/sky/volumetric-clouds';
 import { Sky } from '@margoengine/sky';
 import { tracedGPU } from '../../../tests/support/gpu-trace.js';
 
@@ -92,7 +92,7 @@ function harness(options) {
     uniforms = [];
   const write = h.engine.gpu.queue.writeBuffer.bind(h.engine.gpu.queue);
   h.engine.gpu.queue.writeBuffer = (b, offset, v, ...rest) => {
-    if (v instanceof Float32Array && v.length === 96) uniforms.push(v.slice());
+    if (v instanceof Float32Array && v.length === CLOUD_FLOATS) uniforms.push(v.slice());
     return write(b, offset, v, ...rest);
   };
   h.engine.use(sky);

@@ -651,6 +651,12 @@ export class Sky implements EnginePlugin {
    */
   lightScale = 0;
   /**
+   * The zenith sun on level ground in the sky's own units this frame, set each update (4 pi x 0.55 for Preetham; 20
+   * times the zenith transmittance down to the eye for Bruneton): the unit of `atmosphere.scatteredLight`, so a layer
+   * drawn over the sky (`VolumetricClouds`) can take the same haze glow in front of it. 0 before the first update.
+   */
+  zenithSun = 0;
+  /**
    * The share of a light at elevation sine `up` a cloud deck passes, set by `VolumetricClouds` (its `dimLight`, on by
    * default) and cleared when they go: the sun's engine light (`lights[0]`) and the moonlight under the cloud
    * ({@link Sky.moonUnderClouds}, in place of `lighting.moon.cloudCover`) are scaled by it, so a scene under the deck is
@@ -686,8 +692,6 @@ export class Sky implements EnginePlugin {
   private readonly values = new Float32Array(64);
   // The look and air block written after the 64 values at byte 256 while `extended`, and the air its tables were made with.
   private readonly extra = new Float32Array(LOOK_FLOATS);
-  // The zenith sun on level ground in sky units this frame (onPreUpdate): the unit of `atmosphere.scatteredLight`.
-  private zenithSun = 0;
   private readonly air = new Float32Array(9);
   private readonly computedAir = new Float32Array(9).fill(NaN);
   private extended: boolean;
