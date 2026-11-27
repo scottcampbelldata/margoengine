@@ -11337,3 +11337,13 @@ Intel and AMD under Direct3D 11, and a corpus record of the guide's program.
   tile shapes are proved with files the test writes) and a TIFF with 12-bit or lossless JPEG from a third-party writer
   (the strips are libjpeg-turbo's, the TIFF container is the test's).
 - Arithmetic, hierarchical and DNL-height files are refused with code `unsupported`.
+
+## Ambient replay under blended coverage (section 5 supplement, 2026-11-27)
+
+- SSAO and GTAO subtract `ambient * (1 - visibility)`, so the replayed ambient light of a pixel must never exceed what
+  the picture holds. Anything blended over a captured surface without owning its depth draws an ambient veil
+  (`packages/shared/ambient-veil.js`): its coverage, black, over the replay target. `Scatter`'s covered rings do.
+- Evidence: `packages/scatter/test/grass-ao.browser.mjs` checks the bound `shut >= open * visibility` per pixel
+  (12,231 pixels broke it before, 0 after, RTX A6000, WebGPU and the WebGL2 layer);
+  `packages/post/test/ssao-silhouette-browser.mjs` checks one-pixel slits (KB-SSAO-LONEPIXEL1).
+- Missing: veils for blended meshes and particles; SSGI and SSR composites under blended coverage are not measured.

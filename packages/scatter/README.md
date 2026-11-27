@@ -878,8 +878,11 @@ every `Scatter` option, with `blades` shading on by default.
   depth with the chance of its coverage and overlapping blades leave it bare with the chance over leaves its colour
   bare (stochastic transparency, Enderton, Sintorn, Shirley and Luebke, I3D 2010), and the pattern stays on the blade
   as the camera moves. Ambient occlusion (`@margoengine/post` GTAO, which reads only depth), depth of field, fog and
-  meshes drawn later see the grass while its colour keeps the blended coverage (KB-SCENES-DUNE-GTAO1); see
-  `docs/limits.md`.
+  meshes drawn later see the grass while its colour keeps the blended coverage (KB-SCENES-DUNE-GTAO1). `SSAO` and
+  `GTAO` darken only ambient light: the covered blades take their share of each pixel out of the ground's ambient light
+  as they take it out of its colour (the product of one less each coverage, the revealage of McGuire and Bavoil,
+  "Weighted Blended Order-Independent Transparency", JCGT 2013), so a blade never leaves a black pixel behind
+  (KB-SCENES-GRASSBLACK1). Nothing to call: attaching both is enough. See `docs/limits.md`.
   Dune grass (1.6 cm leaves) to 230 m at 480 x 270 without MSAA: 4,902 lone pixels per million before, 0 after on
   WebGPU and 7.8 on the WebGL2 layer, mean luma within 0.31 codes of the same view drawn at 4 x 4 the pixels. Shadows
   keep a pixel floor with a hashed keep (Persson 2012; Cook, Halstead, Planck and Ryu, SIGGRAPH 2007), as does a

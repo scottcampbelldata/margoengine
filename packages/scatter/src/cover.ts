@@ -95,6 +95,12 @@ export function coverCode(code: string, lit: boolean, at = 0, depth = false): st
   );
 }
 
+/** Over with a black source: a strip only takes its coverage out of what is drawn (an ambient replay's light). */
+export const coverVeil: GPUBlendState = {
+  color: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+};
+
 /** Porter and Duff's over: one strip of a covered ring over what is drawn. */
 export const coverBlend: GPUBlendState = {
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },

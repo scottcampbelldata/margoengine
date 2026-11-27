@@ -52,7 +52,8 @@ import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
-import { coverBlend, coverCode, splitDeclaration } from './cover.js';
+import { coverBlend, coverCode, coverVeil, splitDeclaration } from './cover.js';
+import { addAmbientVeil } from '../../shared/ambient-veil.js';
 import { captureStage, type ScatterCapture } from './capture.js';
 export { coverCode, coverDeclaration, splitDeclaration } from './cover.js';
 import { OrderedCull, candidateShader } from './order.js';
@@ -608,6 +609,16 @@ export class Scatter implements EnginePlugin {
   private captureUniforms: GPUBuffer[] = [];
   private readonly captureValues = new Float32Array(32);
   private readonly pbrGroups = new Map<GPURenderPipeline, GPUBindGroup>();
+  /** The last colour pass, whose covered parts an ambient replay of the same frame, view and depth veils. */
+  private readonly veiled = {
+    encoder: undefined as GPUCommandEncoder | undefined,
+    depth: undefined as GPUTextureView | undefined,
+    view: undefined as object | undefined,
+    key: '',
+    culled: false,
+  };
+  private readonly ambientVeil = { veil: (c: ScatterPassContext, format: GPUTextureFormat) => this.veil(c, format) };
+  private leaveVeils?: () => void;
   private readonly presentation = overlayDepthPass();
   private readonly attachment = this.presentation.colorAttachments[0];
   private readonly depthAttachment = this.presentation.depthStencilAttachment;
@@ -867,6 +878,7 @@ export class Scatter implements EnginePlugin {
       Math.ceil(this.count / 64) > d.limits.maxComputeWorkgroupsPerDimension
     )
       throw new RangeError('Scatter exceeds GPU limits; reduce the instance count or the number of exclusions.');
+    this.leaveVeils = addAmbientVeil(d, this.ambientVeil);
     this.uniform = d.createBuffer({
       size: this.values.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1331,7 +1343,8 @@ export class Scatter implements EnginePlugin {
    * 'cover' blended by each vertex's coverage and writing no depth (undefined when the stage cannot carry it; see
    * `coverCode`), or the two halves of a split ring, 'body' (opaque) and 'tip' (covered), marked `splitDeclaration`.
    * `depth` makes a covered part's coverage-depth stage instead: the same pose, writing depth and no colour where the
-   * coverage passes the pose's threshold (`coverCode` with `depth`), drawn after every blended part.
+   * coverage passes the pose's threshold (`coverCode` with `depth`), drawn after every blended part. `veil` makes the
+   * covered part an ambient veil of that target format: the same stage and coverage, its colour black, writing no depth.
    */
   private colourPipeline(
     c: ScatterPassContext,
@@ -1341,10 +1354,11 @@ export class Scatter implements EnginePlugin {
     own: boolean,
     part: 'opaque' | 'cover' | 'body' | 'tip',
     depth = false,
+    veil?: GPUTextureFormat,
   ): { pipeline: GPURenderPipeline; groups: GPUBindGroup[]; lighting?: GPUBindGroup } | undefined {
     const cover = part === 'cover' || part === 'tip',
       blend = cover && !depth,
-      id = key + (part === 'opaque' ? '' : ':' + part) + (depth ? ':depth' : '');
+      id = key + (part === 'opaque' ? '' : ':' + part) + (depth ? ':depth' : '') + (veil ? ':veil:' + veil : '');
     let pipeline = this.pipelines.get(id);
     if (!pipeline) {
       const code = this.stageCode(c, lit, part, depth);
@@ -1356,7 +1370,13 @@ export class Scatter implements EnginePlugin {
         fragment: {
           module,
           entryPoint: 'fragment',
-          targets: [{ format: c.format, ...(blend ? { blend: coverBlend } : {}), ...(depth ? { writeMask: 0 } : {}) }],
+          targets: [
+            {
+              format: veil ?? c.format,
+              ...(blend ? { blend: veil ? coverVeil : coverBlend } : {}),
+              ...(depth ? { writeMask: 0 } : {}),
+            },
+          ],
           ...(own ? { constants: { C: 1 } } : {}),
         },
         ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
@@ -1602,7 +1622,46 @@ export class Scatter implements EnginePlugin {
       else pass.drawIndexedIndirect(this.colourCommands(), i * 20);
     }
     pass.end();
+    const veiled = this.veiled;
+    veiled.encoder = c.encoder;
+    veiled.depth = c.depth;
+    veiled.view = c.view;
+    veiled.key = key;
+    veiled.culled = culled;
     this.drawn(c);
+  }
+  /**
+   * Draws this view's covered parts over an ambient replay's target (`c.color`, of `format`) as veils: where a blade
+   * covers a share of a pixel, that share of the light behind it leaves the target (packages/shared/ambient-veil.js).
+   * Opaque parts need none: they own their pixels' depth, so the replay holds nothing there.
+   */
+  private veil(c: ScatterPassContext, format: GPUTextureFormat): void {
+    const veiled = this.veiled;
+    if (c.encoder !== veiled.encoder || c.depth !== veiled.depth || c.view !== veiled.view) return;
+    const lit = !!this.options.material;
+    let pass: GPURenderPassEncoder | undefined;
+    for (let i = 0; i < 3; i++) {
+      const part = this.drawsRing(i) ? this.coverRing(i) : 'opaque';
+      if (part === 'opaque') continue;
+      const stage = part === 'split' ? 'tip' : 'cover',
+        use = this.colourPipeline(c, veiled.key, lit, veiled.culled, false, stage, false, format);
+      if (!use) continue;
+      if (!pass) {
+        this.attachment.view = c.color;
+        this.depthAttachment.view = c.depth;
+        pass = c.encoder.beginRenderPass(this.presentation);
+        applyView(pass, c);
+      }
+      pass.setPipeline(use.pipeline);
+      if (lit) pass.setBindGroup(0, use.lighting!);
+      if (this.maps) pass.setBindGroup(2, this.mapGroup(c.device, use.pipeline, 2, 3));
+      pass.setBindGroup(lit ? 1 : 0, use.groups[i]);
+      pass.setVertexBuffer(0, this.vertices[i]);
+      pass.setIndexBuffer(this.indices[i], 'uint32');
+      if (this.route) pass.drawIndexed(this.geometries[i].indices.length, this.ringCapacity());
+      else pass.drawIndexedIndirect(this.colourCommands(), i * 20);
+    }
+    pass?.end();
   }
   /**
    * Lets a capture hook (`@margoengine/post` SSR, SceneTargets, LightBounce: `targets.add(scatter)`) draw the plants'
@@ -1949,6 +2008,8 @@ export class Scatter implements EnginePlugin {
     this.pbrUniform = this.materialUniform = undefined;
     for (const t of this.maps?.textures ?? []) t.destroy();
     this.maps = undefined;
+    this.leaveVeils?.();
+    this.leaveVeils = this.veiled.encoder = this.veiled.depth = this.veiled.view = undefined;
     this.pbrShader = '';
     this.pbrBindings.length = 0;
     this.pbrGroups.clear();

@@ -15,6 +15,7 @@ import { preset } from '../../shared/preset.js';
 import { margoError } from '../../shared/errors.js';
 import { orthographic } from '../../shared/projection.js';
 import { fullscreen, render, group as bind } from '../../shared/gpu.js';
+import { drawAmbientVeils } from '../../shared/ambient-veil.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { extractShader, ssaoShader, blurShader, compositeShader } from './shaders.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -644,6 +645,8 @@ export class SSAO implements EnginePlugin {
     c.color = ambient;
     try {
       c.draw({ pipeline: this.ambientPipeline, clear: false, bindings: c.bindings });
+      // Blades and other strips blended over those surfaces leave only part of that light in a pixel.
+      drawAmbientVeils(c, 'rgba16float');
     } finally {
       c.color = color;
     }

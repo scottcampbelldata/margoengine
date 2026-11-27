@@ -5515,13 +5515,44 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   `Mesh & FacadeMesh` (the internal class and the public interface), so `setParent` accepts either. `examples/kitty-hawk`
   lost its cast. Regression: tests/public-engine-types.test.js (KB-GLTF-MESHTYPE1).
 
-### Open 2026-11-27: the dune coast's grass blades show black fragments (KB-SCENES-GRASSBLACK1, owner not yet found)
+### Fixed 2026-11-27: the dune coast's grass blades showed black fragments (KB-SCENES-GRASSBLACK1, post and scatter)
 
-- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>`: in
-  `landing-rail-view.png` and `camp-buildings.png` (RTX A6000, WebGPU) near and middle tufts carry black dashes and
-  dots along the blades and at their edges.
-- **Cause:** not diagnosed; the same frame shows them on main before KB-SCENES-SHEDBOX1. Candidates: the grass shading
-  of thin blades, GTAO on them (`occlusion: 0` would tell) or their shadows.
+- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=camp-buildings`: near and
+  middle tufts carried black dashes and dots along the blades (6,400 near-black pixels below the horizon against the
+  `occlusion: 0` frame, RTX A6000, WebGPU).
+- **Cause:** two, both in the occlusion composite, `scene - ambient * (1 - visibility)`. (1) The ambient replay holds
+  the light of the surface that owns a pixel's depth. Covered grass (KB-SCATTER-SUBPIXEL1) blends over the sand without
+  owning the depth, so the replay held the sand's whole ambient light under a blade that left only part of the sand in
+  the pixel, and the composite took more light than the pixel held, down to black. (2) KB-SSAO-LONEPIXEL1 below: the
+  sand pixels in one-pixel gaps between blades read as shut in.
+- **Fix:** `packages/shared/ambient-veil.js`: `SSAO` and `GTAO` draw each registered veil over the replay target after
+  core's replay, and `Scatter` registers one that draws its covered parts again with the same pose and coverage, black
+  and blended, so the light there is multiplied by one less each blade's alpha (the revealage of McGuire and Bavoil,
+  "Weighted Blended Order-Independent Transparency", JCGT 2013, https://jcgt.org/published/0002/02/09/, over Porter and
+  Duff's over, SIGGRAPH 1984). Screen-space occlusion at the edges of binary-coverage depth is also McGuire and Mara,
+  "Phenomenological Transparency", IEEE TVCG 2017
+  (https://research.nvidia.com/sites/default/files/pubs/2017-03_Phenomenological-Transparency/McGuire2017Transparency.pdf).
+  The blades' own colour is not darkened: replaying their ambient light too was tried and left 274 near-black pixels,
+  their one-pixel normals being noise.
+- **After:** 6 near-black pixels of 6,400 in the same still; the camp occlusion check reads mean 196.3 against 199.0
+  open, 10.4 percent of pixels darker.
+- **Regression:** `packages/scatter/test/grass-ao.browser.mjs` (no pixel under its colour without occlusion times its
+  visibility: 12,231 pixels before, 0 after, WebGPU and the WebGL2 layer).
+
+### Fixed 2026-11-27: SSAO and GTAO read a one-pixel gap between two nearer surfaces as shut in (KB-SSAO-LONEPIXEL1, post)
+
+- **Repro (before):** a wall seen through slits one pixel wide between slats 1.5 units in front of it, past the
+  occlusion radius: GTAO visibility 0.457 mean, 0.251 least in the slit pixels; SSAO 0.694 and 0.595.
+- **Cause:** the extract pass builds a normal from the neighbour with the smaller depth step. A pixel whose two
+  horizontal neighbours are both nearer (a slit, or in reverse a one-pixel wire) has no surface neighbour on that axis,
+  so the normal faced along the view's side.
+- **Fix:** `packages/post/src/shaders.ts`: where both neighbours of an axis lie on the same side of the pixel in depth,
+  each over four pixel widths away (a plane's depth is monotonic along a screen line), the axis step is the pixel's own
+  at constant depth. Neighbour choice as before otherwise (J. Turanszki, "Improved normal reconstruction from depth",
+  2019; five taps an axis, as in https://atyuwen.github.io/posts/normal-reconstruction, would also settle wider gaps at
+  four more depth reads a pixel and was not needed here).
+- **After:** GTAO 0.999 mean, 0.995 least; SSAO 0.823 and 0.797 (its range check still counts the slats a little).
+- **Regression:** `packages/post/test/ssao-silhouette-browser.mjs`, WebGPU and the WebGL2 layer.
 
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 

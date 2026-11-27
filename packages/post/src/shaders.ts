@@ -19,7 +19,11 @@ fn viewPosition(p:vec2i,d:f32)->vec3f {
 // Turanszki, "Improved normal reconstruction from depth", 2019,
 // https://wickedengine.net/2019/09/improved-normal-reconstruction-from-depth/). The normal is degenerate if an axis has
 // no surface neighbour (a one-pixel tip of a silhouette), or dx and dy are (near) parallel or zero: |n|^2 scales with
-// the pixel footprint^4, so a fixed threshold made close surfaces camera-facing.
+// the pixel footprint^4, so a fixed threshold made close surfaces camera-facing. A pixel alone along an axis, both
+// neighbours on the same side of it in depth and each over four pixel widths away (a slit between two blades, or a
+// one-pixel wire), has no surface step there: a plane's depth is monotonic along a screen line. Either neighbour gave a
+// normal along the view's side, which GTAO read as shut in, a black dot (KB-SSAO-LONEPIXEL1). The step along that axis
+// is then the pixel's own at constant depth.
 export const extractShader =
   frame +
   `
@@ -38,7 +42,10 @@ export const extractShader =
   let okR=p.x<limit.x&&dr!=0;let okL=p.x>0&&dl!=0;let okD=p.y<limit.y&&db!=0;let okU=p.y>0&&dt!=0;
   let forwardX=okR&&(!okL||abs(r.z-c.z)<abs(c.z-l.z));
   let forwardY=okD&&(!okU||abs(b.z-c.z)<abs(c.z-t.z));
-  let dx=select(c-l,r-c,forwardX);let dy=select(c-t,b-c,forwardY);
+  let flatX=viewPosition(p+vec2i(1,0),d)-c;let flatY=viewPosition(p+vec2i(0,1),d)-c;
+  let loneX=okR&&okL&&(r.z-c.z)*(l.z-c.z)>0.0&&min(abs(r.z-c.z),abs(l.z-c.z))>4.0*length(flatX);
+  let loneY=okD&&okU&&(b.z-c.z)*(t.z-c.z)>0.0&&min(abs(b.z-c.z),abs(t.z-c.z))>4.0*length(flatY);
+  let dx=select(select(c-l,r-c,forwardX),flatX,loneX);let dy=select(select(c-t,b-c,forwardY),flatY,loneY);
   let n=cross(dy,dx);let normal=select(vec3f(0,0,1),normalize(n),(okR||okL)&&(okD||okU)&&dot(n,n)>0.000001*dot(dx,dx)*dot(dy,dy));
   textureStore(output,p,vec4f(normal,-c.z));textureStore(viewDepth,p,vec4f(-c.z));
 }
