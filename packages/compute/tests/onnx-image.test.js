@@ -1,0 +1,133 @@
+// ai.onnx ImageDecoder (opset 20) against images written here from their format specifications, so every expected pixel
+// is known: PNG (ISO/IEC 15948), BMP (Windows DIB), TIFF 6.0, Netpbm and lossless JPEG (ITU-T T.81 Annex H).
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { crc32, deflateSync } from 'node:zlib';
+import { loadOnnx, OnnxTensor } from '../dist/onnx.js';
+import { tiff } from '../../decoders/tests/support/texture-encoders.js';
+import { encodeLossless } from '../../decoders/tests/support/jpeg-lossless-encoder.js';
+import * as p from './onnx-fixtures.js';
+
+async function decode(bytes, format, version = 20, attrs = []) {
+  const info = (name) => p.field(1, name);
+  if (format) attrs = [p.attr('pixel_format', format), ...attrs];
+  using model = await loadOnnx(
+    p.model(p.graph([p.node('ImageDecoder', ['x'], ['y'], attrs)], [info('x')], [info('y')]), version),
+  );
+  const persistentBytes = model.work.liveBytes;
+  const result = await model.run({ x: new OnnxTensor('uint8', bytes, [bytes.length]) });
+  assert.equal(model.work.liveBytes, persistentBytes);
+  assert.equal(result.y.dtype, 'uint8');
+  return result.y;
+}
+
+// A 2 x 2 picture: red, green / blue, a mixed colour.
+const rgb = [255, 0, 0, 0, 255, 0, 0, 0, 255, 10, 200, 90];
+const bgr = [0, 0, 255, 0, 255, 0, 255, 0, 0, 90, 200, 10];
+// BT.601 luma of those four colours, rounded: .299 R + .587 G + .114 B.
+const grey = [76, 150, 29, 131];
+
+const word = (n) => [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+function png() {
+  const chunk = (type, data) => {
+    const body = [...new TextEncoder().encode(type), ...data];
+    return [...word(data.length), ...body, ...word(crc32(Uint8Array.from(body)))];
+  };
+  const rows = [0, ...rgb.slice(0, 6), 0, ...rgb.slice(6)];
+  return Uint8Array.from([
+    ...[137, 80, 78, 71, 13, 10, 26, 10],
+    ...chunk('IHDR', [...word(2), ...word(2), 8, 2, 0, 0, 0]),
+    ...chunk('IDAT', [...deflateSync(Uint8Array.from(rows))]),
+    ...chunk('IEND', []),
+  ]);
+}
+function bmp() {
+  const bytes = new Uint8Array(54 + 16),
+    view = new DataView(bytes.buffer);
+  bytes.set([66, 77]);
+  view.setUint32(2, bytes.length, true);
+  view.setUint32(10, 54, true);
+  view.setUint32(14, 40, true);
+  view.setInt32(18, 2, true);
+  view.setInt32(22, -2, true);
+  view.setUint16(26, 1, true);
+  view.setUint16(28, 24, true);
+  bytes.set(bgr.slice(0, 6), 54);
+  bytes.set(bgr.slice(6), 62);
+  return bytes;
+}
+const channel = (c) => [0, 1, 2, 3].map((i) => rgb[i * 3 + c]);
+const files = {
+  png: png(),
+  bmp: bmp(),
+  tiff: tiff({ width: 2, height: 2, spp: 3, bits: 8, photometric: 2, samples: rgb }),
+  'float tiff': tiff({
+    ...{ width: 2, height: 2, spp: 3, bits: 32, float: true, photometric: 2 },
+    samples: rgb.map((v) => v / 255),
+  }),
+  ppm: Uint8Array.from([...new TextEncoder().encode('P6 2 2 255\n'), ...rgb]),
+  jpeg: encodeLossless({
+    width: 2,
+    height: 2,
+    precision: 8,
+    components: [0, 1, 2].map((c) => ({ samples: channel(c) })),
+  }),
+};
+
+for (const [name, bytes] of Object.entries(files))
+  test(`ImageDecoder reads ${name} as RGB, BGR and Grayscale`, async () => {
+    for (const [format, expected] of [
+      [undefined, rgb],
+      ['RGB', rgb],
+      ['BGR', bgr],
+      ['Grayscale', grey],
+    ]) {
+      const image = await decode(bytes, format);
+      assert.deepEqual(image.shape, [2, 2, expected.length / 4]);
+      assert.deepEqual([...image.data], expected, `${name} ${format}`);
+    }
+  });
+
+test('ImageDecoder reads WebP: the same pixels as the decoders reader, alpha dropped', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { parseWebP } = await import('@margoengine/decoders/webp');
+  const bytes = new Uint8Array(
+    await readFile(new URL('../../decoders/tests/fixtures/webp/lossy.webp', import.meta.url)),
+  );
+  const expected = parseWebP(bytes);
+  const image = await decode(bytes, 'RGB');
+  assert.deepEqual(image.shape, [83, 97, 3]);
+  assert.deepEqual(Buffer.from(image.data), Buffer.from(expected.data.filter((_, i) => i % 4 !== 3)));
+});
+
+test('ImageDecoder gives an empty matrix for a stream it cannot decode', async () => {
+  const damaged = [
+    new Uint8Array(0),
+    new TextEncoder().encode('not an image'),
+    ...Object.values(files).map((bytes) => bytes.slice(0, 20)),
+    new TextEncoder().encode('RIFF....WEBPVP8L'),
+  ];
+  for (const bytes of damaged) {
+    const image = await decode(bytes);
+    assert.deepEqual(image.shape, [0, 0, 3]);
+    assert.equal(image.data.length, 0);
+  }
+  assert.deepEqual((await decode(damaged[1], 'Grayscale')).shape, [0, 0, 1]);
+});
+
+test('ImageDecoder refuses unread formats, bad attributes, types and old opsets', async () => {
+  const unsupported = (bytes, pattern) =>
+    assert.rejects(
+      decode(Uint8Array.from(bytes)),
+      (error) => error.code === 'unsupported' && pattern.test(error.message),
+    );
+  await unsupported([0xff, 0x4f, 0xff, 0x51, 0, 0], /JPEG 2000/);
+  await unsupported([0, 0, 0, 12, 0x6a, 0x50, 0x20, 0x20, 13, 10, 0x87, 10], /JPEG 2000/);
+  await unsupported([0x49, 0x49, 43, 0, 8, 0, 0, 0], /BigTIFF/);
+  await assert.rejects(decode(files.png, 'rgb'), /pixel_format/);
+  await assert.rejects(decode(files.png, 'RGB', 20, [p.attr('extra', 1)]), /pixel_format/);
+  await assert.rejects(decode(files.png, 'RGB', 19), /ImageDecoder/);
+  const info = (name) => p.field(1, name);
+  using model = await loadOnnx(p.model(p.graph([p.node('ImageDecoder', ['x'], ['y'])], [info('x')], [info('y')]), 20));
+  await assert.rejects(model.run({ x: new OnnxTensor('float32', new Float32Array(4), [4]) }), /uint8/);
+});

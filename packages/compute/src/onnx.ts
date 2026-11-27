@@ -464,6 +464,7 @@ export class OnnxModel implements Disposable {
               'SequenceMap',
               'StringNormalizer',
               'RegexFullMatch',
+              'ImageDecoder',
             ].includes(node.op))
         ) &&
         !this.#k.supported(node.kernelIndex, version)
@@ -935,6 +936,22 @@ export class OnnxModel implements Disposable {
         const matches = fullMatcher(pattern.value);
         const output = Uint8Array.from(x.data as readonly string[], (s) => Number(matches(s)));
         return [this.#upload(new OnnxTensor('bool', output, x.shape), state.owned)];
+      }
+      case 'ImageDecoder': {
+        if ((opsets[''] ?? 1) < 20 || values.length !== 1 || node.outputs.length !== 1)
+          invalid('ImageDecoder needs opset >=20 and one input/output');
+        const format = attrs.find((a) => a.name === 'pixel_format') ?? { kind: 3, value: 'RGB' };
+        if (
+          attrs.some((a) => a.name !== 'pixel_format') ||
+          format.kind !== 3 ||
+          !['RGB', 'BGR', 'Grayscale'].includes(format.value as string)
+        )
+          invalid('ImageDecoder takes one attribute, pixel_format: RGB, BGR or Grayscale');
+        const x = this.#read(this.#tensor(values[0]));
+        if (x.dtype !== 'uint8') invalid('ImageDecoder needs a uint8 tensor');
+        const { decodeImagePixels } = await import('./onnx-image.js');
+        const image = await decodeImagePixels(x.data as Uint8Array, format.value as string);
+        return [this.#upload(new OnnxTensor('uint8', image.data, image.shape), state.owned)];
       }
       case 'SequenceMap': {
         if ((opsets[''] ?? 1) < 17) invalid('SequenceMap requires opset >=17');

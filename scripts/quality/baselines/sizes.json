@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21097038,
+  "total": 21099303,
   "history": [
     {
       "date": "2026-10-24",
@@ -14899,6 +14899,12 @@
       "commit": "1aaefefa32",
       "reason": "attribute() in node materials (three.js parity row 46): shader/black-hole 25,814 to 26,087 gzip, the StorageBuffer ranged update and frame-safe dispose it bundles",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "07e10e69d",
+      "reason": "ONNX ImageDecoder (limits row 61): compute/onnx 12934 -> 13789 measured with the lazy image chunk; new entry decoders/pnm 1115",
+      "grew": 2
     }
   ],
   "items": {
@@ -15109,7 +15115,7 @@
     "@margoengine/compute/linalg": 5745,
     "@margoengine/compute/nn": 19137,
     "@margoengine/compute/nn-extra": 21385,
-    "@margoengine/compute/onnx": 13309,
+    "@margoengine/compute/onnx": 14203,
     "@margoengine/compute/quant": 4183,
     "@margoengine/compute/random": 8328,
     "@margoengine/compute/shape": 3736,
@@ -15205,6 +15211,7 @@
     "@margoengine/decoders/meshopt-simd": 19627,
     "@margoengine/decoders/pcx": 1460,
     "@margoengine/decoders/png": 4572,
+    "@margoengine/decoders/pnm": 1371,
     "@margoengine/decoders/pvr": 3259,
     "@margoengine/decoders/snappy": 1506,
     "@margoengine/decoders/texture": 914,

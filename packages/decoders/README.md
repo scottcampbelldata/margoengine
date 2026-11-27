@@ -451,6 +451,23 @@ console.log(skin.width, skin.height);
 `tests/pcx.test.js` builds every layout and checks pixels exactly. `npm run test:real-files -w @margoengine/loaders` reads
 three real files and compares every pixel with Pillow 13.0.0.
 
+## PNM: PBM, PGM and PPM (`@margoengine/decoders/pnm`)
+
+`parsePNM(bytes, {maxPixels?})` returns `{width, height, data}`, RGBA8 rows top first, from a Netpbm bitmap, grey map
+or pixel map, plain (magic P1 to P3) or raw (P4 to P6), with comments and a maximum sample value of 1 to 65535. Samples
+scale onto 0 to 255, rounded, with no transfer curve applied; a set bitmap bit is black. A file holding several raw
+images gives the first. PAM (P7) and PFM are not read. `maxPixels` defaults to 2^26. Written from the Netpbm
+[pbm](https://netpbm.sourceforge.net/doc/pbm.html), [pgm](https://netpbm.sourceforge.net/doc/pgm.html) and
+[ppm](https://netpbm.sourceforge.net/doc/ppm.html) format specifications.
+
+```ts
+import {parsePNM} from 'margoengine/decoders/pnm';
+
+const file = new TextEncoder().encode('P2 3 1 15 0 7 15');
+const {width, height, data} = parsePNM(file);
+console.log(width, height, data[0], data[4], data[8]); // 3 1 0 119 255
+```
+
 ## KTX2 cube maps and arrays (`@margoengine/decoders/ktx2-layers`)
 
 `KTX2LayerDecoder` reads every level, face and layer of a KTX2 file, so skyboxes, reflection probes and terrain layer

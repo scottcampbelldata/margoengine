@@ -692,6 +692,30 @@ RegexFullMatch (RE2 syntax, matched without backtracking), TfIdfVectorizer, Defo
 operators (Attention, RotaryEmbedding, TensorScatter, CausalConvWithState, LinearAttention) run too.
 [Limits](../../docs/limits.md#batch-180-job-5-temporal-analysis) lists what is not built.
 
+ImageDecoder (opset 20) turns a PNG, JPEG, WebP, BMP, TIFF or PNM file in a `uint8` tensor into
+`[height, width, channels]` bytes, `RGB` (the default), `BGR` or `Grayscale`, with alpha dropped. It reads the files
+through the optional peer `@margoengine/decoders`: install it beside compute for models that use this operator. A
+stream that cannot be decoded gives the empty matrix `[0, 0, channels]`. JPEG 2000 and BigTIFF reject with a
+`MargoError` `unsupported`.
+
+```ts
+import {loadOnnx, OnnxTensor} from 'margoengine/compute/onnx';
+
+// Normally loadOnnx(new URL('model.onnx', import.meta.url)). These 135 bytes hold one ImageDecoder node, BGR.
+const model135 = Uint8Array.from(
+  atob(
+    'CAo6fQozCgRmaWxlEgVpbWFnZSIMSW1hZ2VEZWNvZGVyKhYKDHBpeGVsX2Zvcm1hdKABAyIDQkdSEhJjbGVhbi1yb29tLWZpeHR1cmVaEwoEZmlsZRILCgkIAhIFCgMSAW5iHQoFaW1hZ2USFAoSCAISDgoDEgFoCgMSAXcKAggDQgQKABAU',
+  ),
+  (c) => c.charCodeAt(0),
+);
+// A 2 x 1 image as a PPM file: one red pixel and one blue one.
+const file = Uint8Array.from([...new TextEncoder().encode('P6 2 1 255 '), 255, 0, 0, 0, 0, 255]);
+using decoder = await loadOnnx(model135);
+const decoded = await decoder.run({ file: new OnnxTensor('uint8', file, [file.length]) });
+const image = decoded.image as OnnxTensor;
+console.log(image.shape, image.data); // [1, 2, 3] and [0, 0, 255, 255, 0, 0]
+```
+
 ## Errors, waiting and profiling
 
 Operations queue GPU work and return at once. Anything that waits (`read`, `item`, `done`, `profile`, `filter`) takes

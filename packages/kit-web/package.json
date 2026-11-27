@@ -527,6 +527,10 @@
       "types": "./dist/decoders/snappy.d.ts",
       "import": "./dist/decoders/snappy.js"
     },
+    "./decoders/pnm": {
+      "types": "./dist/decoders/pnm.d.ts",
+      "import": "./dist/decoders/pnm.js"
+    },
     "./decoders/avif": {
       "types": "./dist/decoders/avif.d.ts",
       "import": "./dist/decoders/avif.js"

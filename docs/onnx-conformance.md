@@ -61,3 +61,19 @@ step on values that land near a tie.
 | TensorScatter | 24 | linear and circular writes, every element type |
 | CausalConvWithState | 27 | the opset 29 `dilation` is not built |
 | LinearAttention | 27 | the four update rules; the recurrence runs in float32; the opset 29 `v_num_heads` and `states` are not built |
+
+## ImageDecoder (built 2026-11-27)
+
+Opset 20, from https://onnx.ai/onnx/operators/onnx__ImageDecoder.html . The stream's signature picks the reader of
+`@margoengine/decoders`. Proof: `packages/compute/tests/onnx-image.test.js` writes PNG, BMP, TIFF, PPM and lossless
+JPEG files with known pixels and compares RGB, BGR and Grayscale exactly; the WebP case compares with the decoders
+reader, which has its own proof.
+
+| Point of the specification | Margo |
+| --- | --- |
+| BMP, JPEG, TIFF, PNG, WebP, PNM | read (classic TIFF only; PBM, PGM, PPM) |
+| JPEG 2000 | not built: rejects with code `unsupported` |
+| Lossless JPEG (optional) | read |
+| A stream that cannot be decoded | empty matrix `[0, 0, channels]` |
+| Grayscale weights | none given; Rec. ITU-R BT.601 luma, https://www.itu.int/rec/R-REC-BT.601 |
+| Fancy chroma upsampling | linear filter at the stated positions; the alternating rounding is not reproduced |

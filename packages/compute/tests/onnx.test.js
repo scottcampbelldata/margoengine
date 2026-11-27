@@ -207,14 +207,7 @@ test('ONNX unbuilt operators fail at load with a coded operator and opset diagno
   const groups = [
     ['ai.onnx.ml', 3, ['TreeEnsemble']],
     ['ai.onnx.ml', 5, ['UnknownML']],
-    [
-      '',
-      28,
-      [
-        'ImageDecoder',
-        'NotARealOperator',
-      ],
-    ],
+    ['', 28, ['NotARealOperator']],
   ];
   for (const [domain, version, operators] of groups)
     for (const op of operators) {

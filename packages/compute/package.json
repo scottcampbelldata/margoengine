@@ -114,10 +114,14 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/decoders": {
       "optional": true
     }
   },
