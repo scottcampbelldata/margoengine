@@ -11,7 +11,10 @@ tile-components, resolutions, sub-bands, precincts and code-block sizes), from R
 Fundamentals, Standards and Practice* (Kluwer, 2002), <https://doi.org/10.1007/978-1-4615-0799-4>; and David
 Taubman, "High performance scalable image compression with EBCOT" (IEEE Transactions on Image Processing 9(7),
 2000), <https://doi.org/10.1109/83.847830>. No decoder's source (OpenJPEG, Kakadu, Grok, jpx.js or any other) was
-read. Part 2 extensions (marker range 0xFF70 to 0xFF7F, MCT above 1, arbitrary kernels) and the HT block coder of
+read. Tier-2 (B.9 to B.12): tag trees decoded node by node from the root, the packet header bit reader with its
+0xFF stuffing, Table B.4's pass counts, Lblock and per-segment lengths, SOP and EPH, packed headers, and the five
+progressions with POC changes; the position-driven orders sort each precinct by where B.12's loops first reach it
+(the tile corner for a precinct its resolution starts inside). Part 2 extensions (marker range 0xFF70 to 0xFF7F, MCT above 1, arbitrary kernels) and the HT block coder of
 Part 15 are refused as unsupported, not skipped.
 
 ### Soft volumes from a mesh (P8, SOFT-04 and SOFT-06, 2026-11-27)
