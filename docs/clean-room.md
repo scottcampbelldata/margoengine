@@ -14900,6 +14900,54 @@ cells share it, the CPU twin in the same order with the cell index in f32, split
 most 0.05 s, the predator push strength (1 + 2 u^2), the containment and obstacle pushes, the banking and flap-phase
 animation, and the built-in bird and fish meshes.
 
+### GPU particle liquid (FLUID-02 and FLUID-03, parity bar P13, `GPULiquid` in `@margoengine/water/liquid`, 2026-11-27)
+
+Written from the papers below, read as text. No engine source was read, three.js's `webgpu_compute_particles_fluid`
+included: the README's three.js note describes that example from its public description (an MLS-MPM liquid in
+compute shaders), and no companion code of any paper was opened.
+
+- Yuanming Hu, Yu Fang, Ziheng Ge, Ziyin Qu, Yixin Zhu, Andre Pradhana and Chenfanfu Jiang,
+  [A Moving Least Squares Material Point Method with Displacement Discontinuity and Two-Way Rigid Body Coupling](https://doi.org/10.1145/3197517.3201293)
+  (ACM TOG 37(4), SIGGRAPH 2018): MLS-MPM, the particle's stress folded into its affine momentum with
+  D_p^-1 = diag(4 / h^2) for quadratic B-splines, so a step is one scatter, a grid update and one gather.
+- Chenfanfu Jiang, Craig Schroeder, Andrew Selle, Joseph Teran and Alexey Stomakhin,
+  [The Affine Particle-in-Cell Method](https://doi.org/10.1145/2766996) (ACM TOG 34(4), SIGGRAPH 2015): the affine
+  matrix C = sum w v (D^-1 d)^T carried by each particle, which keeps linear and angular momentum through the transfers.
+- Michael Steffen, Robert M. Kirby and Martin Berzins,
+  [Analysis and reduction of quadrature errors in the material point method](https://doi.org/10.1002/nme.2360)
+  (IJNME 76, 2008): the quadratic B-spline weights 0.5 (1.5 - f)^2, 0.75 - (f - 1)^2, 0.5 (f - 0.5)^2 and their
+  partition of unity and linear completeness, which the momentum checks rely on.
+- J. J. Monaghan, [Simulating Free Surface Flows with SPH](https://doi.org/10.1006/jcph.1994.1034) (J. Comput. Phys.
+  110, 1994), and Markus Becker and Matthias Teschner,
+  [Weakly compressible SPH for free surface flows](https://doi.org/10.2312/SCA/SCA07/209-217) (SCA 2007): the Tait
+  equation p = B ((rho / rho0)^7 - 1) with B = rho0 c^2 / 7, no tension below rest density, and the trade between the
+  speed of sound and compression (hydrostatic r(d) = (1 + 6 g d / c^2)^(1/6), the closed form the limits compare with).
+- Alexey Stomakhin, Craig Schroeder, Lawrence Chai, Joseph Teran and Andrew Selle,
+  [A Material Point Method for Snow Simulation](https://doi.org/10.1145/2461912.2461948) (ACM TOG 32(4), 2013): rigid
+  colliders as level sets applied on the grid, the relative velocity's normal part removed when it points into the body
+  and the tangential part reduced by Coulomb friction.
+- Nadir Akinci, Markus Ihmsen, Gizem Akinci, Barbara Solenthaler and Matthias Teschner,
+  [Versatile Rigid-Fluid Coupling for Incompressible SPH](https://doi.org/10.1145/2185520.2185558) (ACM TOG 31(4),
+  2012), and P. W. Randles and L. D. Libersky,
+  [Smoothed Particle Hydrodynamics: Some recent improvements and applications](https://doi.org/10.1016/S0045-7825(96)01090-0)
+  (CMAME 139, 1996): a boundary that counts in the density as liquid at rest, and mirror (ghost) particles across a
+  wall. Here the container's walls lie on grid nodes and the grid's mass is mirrored across them, and a collider's
+  inside counts as liquid at rest by the B-spline's share of each node behind its surface.
+- Ming Gao, Xinlei Wang, Kui Wu, Andre Pradhana, Eftychios Sifakis, Cem Yuksel and Chenfanfu Jiang,
+  [GPU Optimization of Material Point Methods](https://doi.org/10.1145/3272127.3275044) (ACM TOG 37(6), 2018):
+  particle-to-grid scatter with atomics on the GPU.
+- Mark Jarzynski and Marc Olano, [Hash Functions for GPU Rendering](https://jcgt.org/published/0009/03/02/) (JCGT 9(3),
+  2020): the PCG hash of the start lattice's jitter.
+- The surface is `ParticleLiquid`'s, from van der Laan, Green and Sainz (I3D 2009) and Truong and Yuksel (I3D 2018),
+  cited in `docs/water-liquid.md`.
+
+Margo's own: the fixed-point integer sums (2^16 for mass and momentum, 2^10 for the collider impulses) that make the GPU
+step the same on every run, the grid density with the walls mirrored and the colliders covered, the walls placed on
+nodes by giving each axis a whole number of cells, the per-node speed limit of one cell a substep, the pointer as a
+stirring stick that blends node velocities towards its own, counting both the grid's and the particles' collider pushes
+as the body's impulse, the substep from a Courant number of 0.4 on the speed of sound, and the CPU twin in the same
+order.
+
 ### Bubbles (`BubbleSolver`, `@margoengine/physics/bubbles`, 2026-11-26, FW-4)
 
 Written from papers and a thesis read as text (no code, no companion repositories):

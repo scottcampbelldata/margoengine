@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20844412,
+  "total": 20857727,
   "history": [
     {
       "date": "2026-10-24",
@@ -14454,6 +14454,12 @@
       "commit": "eddfc4209f",
       "reason": "@margoengine/vfx/ribbons 2622 to 3283 B gzip (ceiling 2854 to 3539), vfx/mesh 3240 to 3965 (3449 to 4221), vfx/flame 12010 to 12693 (12357 to 13074), measured at f8f8a1a10e~1 and f8f8a1a10e: KB-TAA-PARTICLEMASK2 draws each one's coverage into TAA's shared reactive mask (shared/reactive-mask.js, the mask pipeline and pass), so ribbons, mesh pieces and the Flame volume stop smearing under TAA. Nothing in the added code is unused; a split behind import() would leave the first masked frames smeared and add an async path to every draw. @margoengine/water 37313 at 1a14411a31~1 to 38843 at 1a14411a31 and 38848 now (ceiling 37677 to 40014): Water.sample and sampleHeight, the CPU twin of the Gerstner surface for synchronous height queries (SEA-02, SEA-04); 1a14411a31 recorded 37677, below its own measurement. It is a method of the root Water, so a split would move it away from the object it answers for. The baseline total is the sum of its items again (it was 3029 B off). Core and stage unchanged.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "2c6bc437e",
+      "reason": "water/liquid 18041 to 31356 B ceiling (built 30442 B gzip): GPULiquid (FLUID-02/03, parity bar P13), the MLS-MPM liquid in five compute passes, its collider forces, pointer, snapshots, debug view and the CPU twin the WebGL2 layer steps it with. It sits beside ParticleLiquid, which draws it, so one entry is the real-time liquid; the package is sideEffects: false, so a bundle that imports only ParticleLiquid drops it. A split entry would add a second import and its wrapper re-exports for the same code.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16103,7 +16109,7 @@
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
-    "@margoengine/water/liquid": 18041,
+    "@margoengine/water/liquid": 31356,
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,

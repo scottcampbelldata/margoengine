@@ -4,7 +4,90 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+
+export class GPULiquid implements EnginePlugin {
+    readonly name: string;
+    readonly options: GPULiquidOptions;
+    readonly count: number;
+    readonly stats: LiquidStats;
+    surface?: ParticleLiquid;
+    forces: LiquidForce[];
+    constructor(options?: GPULiquidOptions);
+    static attach(engine: EngineKernel, options?: GPULiquidAttachOptions): GPULiquid;
+    get spacing(): number;
+    get particleMass(): number;
+    setPointer(pointer: LiquidPointer | null): void;
+    setColliders(colliders: readonly LiquidCollider[]): void;
+    setDebug(debug: LiquidDebugOptions): void;
+    getDebug(): Required<LiquidDebugOptions>;
+    reset(seed?: number): void;
+    step(dt: number): void;
+    snapshot(signal?: AbortSignal): Promise<LiquidSnapshot>;
+    restore(snapshot: LiquidSnapshot): void;
+    readForces(signal?: AbortSignal): Promise<LiquidForce[]>;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onPreUpdate(delta: number): void;
+    particleBuffer(device: GPUDevice): GPUBuffer;
+    debugLines(): Float32Array;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface GPULiquidAttachOptions extends GPULiquidOptions {
+    surface?: false | Omit<ParticleLiquidOptions, 'particles'>;
+}
+
+export interface GPULiquidOptions {
+    count?: number;
+    box?: LiquidBox;
+    fill?: LiquidBox;
+    resolution?: number;
+    gravity?: LiquidVec3;
+    density?: number;
+    speedOfSound?: number;
+    viscosity?: number;
+    maxSubsteps?: number;
+    seed?: number;
+    paused?: boolean;
+    pointer?: LiquidPointer | null;
+    colliders?: readonly LiquidCollider[];
+    debug?: LiquidDebugOptions;
+}
+
+export const LIQUID_PARTICLE_FLOATS = 20;
+
+export interface LiquidBox {
+    min: LiquidVec3;
+    max: LiquidVec3;
+}
+
+export interface LiquidCollider {
+    shape: 'sphere' | 'box';
+    position: LiquidVec3;
+    radius?: number;
+    halfExtents?: LiquidVec3;
+    rotation?: readonly [number, number, number, number];
+    velocity?: LiquidVec3;
+    angularVelocity?: LiquidVec3;
+    friction?: number;
+}
+
+export interface LiquidDebugOptions {
+    enabled?: boolean;
+    particles?: 'speed' | 'density' | 'off';
+    speedScale?: number;
+    grid?: boolean;
+    container?: boolean;
+    colliders?: boolean;
+}
+
+export interface LiquidForce {
+    force: [number, number, number];
+    torque: [number, number, number];
+}
 
 export interface LiquidFrameStats {
     passes: number;
@@ -14,6 +97,48 @@ export interface LiquidFrameStats {
     groups: number;
     whitewater: number;
 }
+
+export interface LiquidPointer {
+    position: LiquidVec3;
+    velocity?: LiquidVec3;
+    radius?: number;
+    strength?: number;
+}
+
+export interface LiquidSnapshot {
+    count: number;
+    steps: number;
+    particles: Float32Array;
+}
+
+export interface LiquidState {
+    particles: Float32Array;
+    impulses: Float64Array;
+    grid: Float64Array;
+}
+
+export interface LiquidStats {
+    count: number;
+    backend: 'webgpu' | 'webgl2-compat';
+    dims: readonly [number, number, number];
+    nodes: number;
+    cellSize: number;
+    restDensity: number;
+    steps: number;
+    frameSubsteps: number;
+    substep: number;
+    realTime: boolean;
+    dispatches: number;
+    debugDraws: number;
+}
+
+export type LiquidVec3 = readonly [number, number, number];
+
+export const MAX_GPU_LIQUID_NODES = 4194304;
+
+export const MAX_GPU_LIQUID_PARTICLES = 1048576;
+
+export const MAX_LIQUID_COLLIDERS = 8;
 
 export const MAX_LIQUID_PARTICLES = 4194304;
 
@@ -85,6 +210,49 @@ export interface ParticleSource {
     velocityOffset?: number;
 }
 
+export interface ResolvedCollider {
+    kind: 0 | 1;
+    position: LiquidVec3;
+    half: LiquidVec3;
+    rotation: readonly [number, number, number, number];
+    velocity: LiquidVec3;
+    angularVelocity: LiquidVec3;
+    friction: number;
+}
+
+export interface ResolvedLiquidParams {
+    count: number;
+    boxMin: LiquidVec3;
+    boxMax: LiquidVec3;
+    fillMin: LiquidVec3;
+    fillMax: LiquidVec3;
+    lattice: LiquidVec3;
+    cell: LiquidVec3;
+    cellSize: number;
+    cells: readonly [number, number, number];
+    dims: readonly [number, number, number];
+    nodes: number;
+    origin: LiquidVec3;
+    restDensity: number;
+    gravity: LiquidVec3;
+    density: number;
+    particleMass: number;
+    speedOfSound: number;
+    viscosity: number;
+    maxSubstep: number;
+    maxSubsteps: number;
+    seed: number;
+    paused: boolean;
+    pointer: {
+        position: LiquidVec3;
+        velocity: LiquidVec3;
+        radius: number;
+        strength: number;
+    } | null;
+    colliders: ResolvedCollider[];
+    debug: Required<LiquidDebugOptions>;
+}
+
 export interface WhitewaterOptions {
     enabled?: boolean;
     maxParticles?: number;
@@ -108,4 +276,19 @@ export interface WhitewaterOptions {
     opacity?: number;
     seed?: number;
 }
+
+export function colliderDistance(c: ResolvedCollider, x: LiquidVec3, normal: number[]): number;
+
+export function createLiquidState(params: ResolvedLiquidParams): LiquidState;
+
+export function liquidStateHash(particles: Float32Array): string;
+
+export function liquidSubsteps(p: ResolvedLiquidParams, dt: number, cap?: number): {
+    n: number;
+    h: number;
+};
+
+export function resolveLiquidParams(options?: GPULiquidOptions, fixedCount?: number): ResolvedLiquidParams;
+
+export function stepLiquidCPU(state: LiquidState, params: ResolvedLiquidParams, dt: number, cap?: number): number;
 ```

@@ -900,3 +900,6 @@ export class ParticleLiquid implements EnginePlugin {
     s.draws += 1;
   }
 }
+
+// The GPU particle liquid that moves particles and draws them with ParticleLiquid (MLS-MPM; liquid-mpm.ts).
+export * from './liquid-mpm.js';

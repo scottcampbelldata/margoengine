@@ -203,8 +203,18 @@ for Part 2 only. For each of the 14:
   rates, with tens of thousands of particles or more; container walls; pushed by the pointer and by rigid bodies;
   drawn as a fluid surface.
 - **Drawing:** the surface pass also draws other particle systems as fluid (Babylon `FluidRenderer`).
-- **Today:** FLUID-02 is landed and REOPENED, FLUID-03 is REOPENED, and the GPU path must be proven against the three.js
-  demo.
+- **Today:** the GPU path landed 2026-11-27: `GPULiquid` in `@margoengine/water/liquid` steps 65,536 MLS-MPM particles
+  by default (the check; up to 1,048,576) in five compute passes a substep with no readback, held by the container's
+  walls, stirred by the pointer, pushed by up to 8 sphere and box colliders that read back the liquid's force on them,
+  and drawn as a liquid surface by `ParticleLiquid` from its particle buffer; `ParticleLiquid` draws any other particle
+  system the same way. Deterministic with snapshot and restore; a quick start, a three.js note, `examples/gpu-liquid.html`
+  and a debug view (particles by speed or density, the grid, the container, colliders); on the WebGL2 layer its CPU twin
+  steps it (`packages/water/test/gpu-liquid-check.mjs` passes on both). The CPU solvers `physics/pbf`, `physics/dfsph`
+  and `physics/flip` stay the accurate route. Not DONE; open against the wider rival set (three.js and its ecosystem,
+  Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): emitters and drains that add and remove
+  particles at run time; surface tension and wall adhesion; more than one liquid (per-particle colour or kind, mixing);
+  capsule, plane and triangle-mesh colliders and a one-call two-way link to `physics` rigid bodies (today the caller
+  integrates a body from `forces`); and speed against the rivals' demos, measured in the speed phase.
 
 ### P14. LIFE-04 Flocking
 
@@ -309,8 +319,8 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 | ID | Solver | Rivals | Must have | Status today | Verdict |
 |---|---|---|---|---|---|
 | FLUID-01 | SPH, accurate | none (B FluidRenderer draws only) | Base | OPEN | DON'T BUILD (P13 covers liquids) |
-| FLUID-02 | Position based fluids | T MLS-MPM compute fluid | P13 | REOPENED | PERFECT |
-| FLUID-03 | FLIP/APIC liquids | T MLS-MPM compute fluid | P13 | REOPENED | PERFECT |
+| FLUID-02 | Position based fluids | T MLS-MPM compute fluid | P13 | GPU path landed 2026-11-27 (water/liquid GPULiquid); points open (see P13) | PERFECT |
+| FLUID-03 | FLIP/APIC liquids | T MLS-MPM compute fluid | P13 | GPU path landed 2026-11-27 (water/liquid GPULiquid); points open (see P13) | PERFECT |
 | FLUID-04 | Smoke and gas | none (both have smoke particles only) | Base; smoke particles are the VFX package | OPEN | DON'T BUILD |
 | FLUID-05 | Compressible flow, blast | none | Base | OPEN | DON'T BUILD |
 | FLUID-06 | Viscoplastic fluids | none | Base | REOPENED | MEETS |

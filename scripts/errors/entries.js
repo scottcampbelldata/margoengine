@@ -3015,6 +3015,15 @@ export const entries = [
     fix: 'Pass the value the message names within the range the README lists for it: positions as [x, y, z], radii and speeds above 0, an obstacle radius, a mesh facing +Z of 1 to 16,384 triangles (a glTF mesh geometry passes as it is), a dt of at most 1 s (call step again for more), and to restore only a snapshot this flock took.',
   },
   {
+    id: 'gpu-liquid',
+    title: '@margoengine/water/liquid: the GPU particle liquid',
+    kind: 'family',
+    messages: [],
+    cause:
+      'GPULiquid or a helper of its CPU twin was given something it cannot use: a count outside 1 to 1,048,576, a box or fill whose max is not above its min on every axis (or a fill outside the box), a resolution outside 8 to 256 or one that leaves a side of the box fewer than 4 cells across or the grid over 4,194,304 nodes, a gravity, speed of sound, viscosity (above cell² / (8 * substep)), maxSubsteps or seed out of range, a pointer or collider that is not as documented (a shape other than sphere or box, more than 8, a rotation that is not a unit quaternion, a radius or half size not above 0), a debug mode other than speed, density or off, a step dt outside 0 to 1 s, a snapshot of another liquid or with values not finite or outside the box, or a device that cannot bind the particle or grid buffer. The message names the value.',
+    fix: 'Pass the value the message names within the range the water README lists for it ("GPU liquid"): positions as [x, y, z], boxes as { min, max }, a higher resolution for a thin box, a lower count or resolution for a small device, and to restore only a snapshot this liquid took.',
+  },
+  {
     id: 'points',
     title: '@margoengine/points: octree cloud options',
     kind: 'family',

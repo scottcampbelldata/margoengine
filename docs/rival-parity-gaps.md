@@ -68,7 +68,7 @@ From the three.js examples gallery, example by example (names only).
 | --- | --- | --- | --- | --- |
 | Solid Particle System (many meshes as one mesh, per-particle transform and colour, pickable) | Babylon | DONE | M | 86b898ed7 |
 | Particle sub-emitters (spawn on birth, death, collision) | Babylon, PlayCanvas | DONE (death and collision EXISTS in `packages/vfx/src/events.ts`; birth added) | S to M | 0480e7a40 |
-| Particle fluid solver (`ParticleLiquid` only draws particles today) | three.js, Babylon fluid rendering | PLANNED: FLUID-01 and FLUID-02 in [physics-solvers.md](physics-solvers.md) | L |  |
+| Particle fluid solver (`ParticleLiquid` only draws particles today) | three.js, Babylon fluid rendering | BUILDING: `GPULiquid` in `@margoengine/water/liquid` (MLS-MPM on the GPU, drawn by `ParticleLiquid`) landed 2026-11-27; the open P13 points are listed in [physics-parity-bar.md](physics-parity-bar.md) P13 | L |  |
 | Soft-body defects KB-SOFT-LIGHT1 and KB-SOFT-ITER1, plus a cloth render bridge | three.js, Babylon | DONE (KB-SOFT-LIGHT1, KB-SOFT-ITER1, cloth render bridge `@margoengine/gltf/soft-mesh`) | M | 0a4570d8e, d640a7242, 606261f00 |
 | Breakable / fracturing bodies | three.js `physics_ammo_break` | PLANNED: BREAK-01 in [physics-solvers.md](physics-solvers.md) | M |  |
 | Swappable physics plugin (one API over different engines) | Babylon physics v2 plugins | PLANNED: "Other engines as solvers", [physics-framework.md](physics-framework.md) section 5 | M |  |

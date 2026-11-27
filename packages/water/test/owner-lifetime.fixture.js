@@ -39,7 +39,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Underwater } = await load('../dist/underwater.js');
   const { Rivers } = await load('../dist/rivers.js');
   const { Flood } = await load('../dist/flood.js');
-  const { ParticleLiquid } = await load('../dist/liquid.js');
+  const { ParticleLiquid, GPULiquid } = await load('../dist/liquid.js');
   const { ShipWakes } = await load('../dist/ships.js');
   const { BergFoam, Iceberg } = await load('../dist/ice.js');
   const { ShotSplash } = await load('../dist/splash.js');
@@ -75,6 +75,8 @@ export async function fixtures(load = (entry) => import(entry)) {
     PostStack.attach(engine, [new Caustics({ surface, size: 16 }), new Underwater({ surface })]));
   on('PostStack of FFTOcean effects', FFTOcean, (engine, surface) =>
     PostStack.attach(engine, [new Caustics({ surface, size: 16 }), new Underwater({ surface })]));
+  // The GPU liquid and the surface it attached come off together.
+  own('GPULiquid.attach', (engine) => GPULiquid.attach(engine, { count: 512, resolution: 8 }));
   own('PostStack of ParticleLiquid', (engine) => PostStack.attach(engine,
     [new ParticleLiquid({ particles: { positions: new Float32Array([0, 0, 0, 0.1, 0, 0, 0, 0.1, 0]) }, radius: 0.05 })]));
   const post = new Set([Caustics, Underwater]);

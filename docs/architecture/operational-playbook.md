@@ -11001,6 +11001,18 @@ includes a published surge timing comparison, a real offset rigid impulse and a 
 Artificial pressure uses the solver substep squared relative to 60 Hz. The kernel preserves rest for
 free-water pairs outside the active density constraints, checked separately from the surge data.
 
+### GPU particle liquid (FLUID-02 and FLUID-03, parity bar P13)
+
+`GPULiquid` in `@margoengine/water/liquid` is the real-time liquid: MLS-MPM in five WebGPU compute passes a substep, at
+most four storage buffers a stage (particles, grid, collider sums, plus the uniform), no readback in the step. GPU
+maths: every particle-to-grid and collider sum is an integer `atomicAdd` of a fixed-point term (2^16, impulses 2^10), so
+the result does not depend on the order of the adds and a run repeats bit for bit on one GPU and driver; the grid
+update writes the node's f32 velocity bits over its integer sums in place. The WebGL2 backend has no compute, so the CPU
+twin runs the same passes and uploads the particles for the same surface draw. Evidence: the CPU twin's closed-form
+and conservation tests and the GPU-against-twin check on WebGPU and `--compat`
+(`packages/water/test/gpu-liquid-check.mjs`, Intel Arc 140V). Missing: a speed comparison with the three.js compute
+fluid (speed phase) and a run on a second GPU vendor.
+
 ### Rail wheelsets and catenary (DYN-05)
 
 The optional rail solver owns layout-1 f64 car and cable regions. It consumes ATMO-09 wetness directly through the field registry. The numeric state includes springs, axle speeds, controls and wire deflections. The Rust SIMD cable kernel works in the same arena and has no active static data in either memory mode. Its two lanes carry lateral and vertical waves. Focused proofs cover static axle loads, rolling distance, cant, a rail joint, wet-braking slip, coupler reactions, wire lift, contact loss, deterministic scrub and rendered asset motion on both backends.

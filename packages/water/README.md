@@ -899,6 +899,113 @@ console.log(await liquid.readNarrowBand()); // { voxels, layer1, layer2, particl
 `bandVoxel` sets the voxel size, the paper's 2h (default 4 * radius, two particle spacings); it grows by 1.25 until the
 grid fits the band's atlas. Default `narrowBand` false. The code loads on first use; `ready()` resolves when it has.
 
+## GPU liquid
+
+`GPULiquid` in `@margoengine/water/liquid` is a real-time particle liquid that moves its own particles: tens of thousands
+to a million of them on WebGPU, held by a container's walls, stirred by the pointer, pushed by rigid bodies (which it
+pushes back), and drawn as a liquid surface by the `ParticleLiquid` above straight from its particle buffer. It steps
+by MLS-MPM, the moving least squares material point method (Hu et al. 2018) with APIC transfers (Jiang et al. 2015)
+and a Tait equation of state, in five compute passes a substep with no readback.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { GPULiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [0, 0.8, 2.2], target: [0, 0.3, 0] } });
+const liquid = GPULiquid.attach(engine); // 65,536 particles: a dam break in a 1 m tank, drawn as a liquid surface
+engine.render({ delta: 1 / 60 });
+```
+
+Which liquid to use: `GPULiquid` is the one for interactive scenes, games and demos (WebGPU, real time, weakly
+compressible). The CPU solvers in `@margoengine/physics` are for accuracy and for coupling into a physics `World`:
+`physics/pbf` (position based fluids), `physics/dfsph` (divergence-free SPH) and `physics/flip` (FLIP and APIC on a
+pressure-projected grid, held to the sea). Any of them, and any particle system of your own, draws as liquid with
+`ParticleLiquid`.
+
+Stir it, drop things in and read what the liquid does to them:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { projectPoint, screenToWorld } from '@margoengine/math/project';
+import { GPULiquid } from '@margoengine/water/liquid';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { camera: { position: [0, 0.8, 2.2], target: [0, 0.3, 0] } });
+const liquid = GPULiquid.attach(engine, {
+  count: 32768,
+  fill: { min: [-0.5, 0, -0.5], max: [0.5, 0.35, 0.5] }, // a resting layer over the whole floor
+  colliders: [{ shape: 'box', position: [0, 0.6, 0], halfExtents: [0.08, 0.08, 0.08], velocity: [0, -2, 0] }],
+});
+canvas.addEventListener('pointermove', (e) => {
+  // The pointer on the plane through the tank's middle, at its depth on screen.
+  const depth = projectPoint({ x: 0, y: 0.3, z: 0 }, engine.camera, { x: 0, y: 0, z: 0 })?.z ?? 0.5;
+  const at = screenToWorld(e.offsetX, e.offsetY, depth, engine.camera, canvas.clientWidth, canvas.clientHeight, { x: 0, y: 0, z: 0 });
+  liquid.setPointer(at ? { position: [at.x, at.y, at.z], radius: 0.12 } : null); // velocity from its motion
+});
+engine.render({ delta: 1 / 60 });
+console.log(liquid.forces[0]); // { force: [x, y, z] N, torque: [x, y, z] N m } on the box, one frame behind
+```
+
+Options (all but `count`, `box`, `fill`, `resolution`, `seed` and `surface` can change live, the pointer, colliders and
+debug view through `setPointer`, `setColliders` and `setDebug`):
+
+- `count` 65,536 particles (1 to 1,048,576). `box` the container, default 1 m wide, deep and tall from
+  [-0.5, 0, -0.5]; its six walls hold the liquid with free slip. `fill` where the particles start, a box inside the
+  container filled on a jittered lattice from the floor up (`seed`, default 0, jitters it); default the left 40% of the
+  container, 60% of its height, its full depth. The packing there is the rest density.
+- `resolution` grid cells along the container's longest side (8 to 256), default two particle spacings a cell (about
+  eight particles a cell). Each side gets a whole number of cells, so every wall lies on a grid node; a side needs at
+  least four cells.
+- `gravity` [0, -9.81, 0] m/s², `density` 1000 kg/m³ (it sets the particle mass and so `forces`), `viscosity`
+  0.0005 m²/s (kinematic; up to cell² / (8 * substep)).
+- `speedOfSound` default 2 * sqrt(|g| * box height) m/s: higher is stiffer (less compression) and takes more substeps,
+  each 0.4 * cell / speedOfSound long. `maxSubsteps` 32 a frame; a frame that needs more runs in slow motion
+  (`stats.realTime` false). A frame advances at most 1/30 s.
+- `pointer` (or `setPointer`): `{ position, velocity?, radius?, strength? }`, a stirring stick. Grid nodes within
+  `radius` (default 0.1 times the longest side) take on its `velocity` at `strength` per second (default 40); without a
+  velocity it is the pointer's own motion between frames. `null` for none.
+- `colliders` (or `setColliders`), up to 8: `{ shape: 'sphere' | 'box', position, radius? (0.1), halfExtents?
+  ([0.1, 0.1, 0.1]), rotation? (quaternion [x, y, z, w]), velocity?, angularVelocity?, friction? (0.2) }`. The liquid
+  flows round them and is pushed by their motion; `forces[i]` is the force and torque the liquid put on collider i over
+  the last stepped frame (read back by itself, one frame behind on WebGPU), and `readForces()` reads it now. Feed them
+  from your own rigid bodies each frame for two-way coupling.
+- `paused` false; `step(dt)` advances now in equal substeps (0 to 1 s), also while paused.
+- `surface` (attach only): `ParticleLiquid` options for the surface, or `false` for none; default radius the particle
+  spacing. `liquid.surface` is that `ParticleLiquid`, its options live. The particle buffer is also yours:
+  `liquid.particleBuffer(engine.gpu)` holds five vec4 a particle (position and density over rest density, velocity, the
+  three rows of the APIC matrix), to draw or read with your own shaders.
+- `debug` (or `setDebug`): `{ enabled, particles: 'speed' | 'density' | 'off', speedScale?, grid, container,
+  colliders }`. On, it colours every particle by its speed (blue still to red at `speedScale`, default the speed of a
+  fall through the container) or by its density over rest density (0.8 blue to 1.2 red), and hides the surface while it
+  does; it draws the container's edges, the grid on its floor and back wall, and the colliders and pointer as lines.
+
+`snapshot()` reads the particles back and `restore(snapshot)` puts them back (checked whole first); the same options and
+steps give the same state bit for bit on one GPU and driver, because every sum is a fixed-point integer `atomicAdd`.
+`reset(seed?)` starts again. `stats` holds the grid, rest density, substeps and dispatches of the last frame. On the
+WebGL2 compatibility layer the same passes run on the CPU (`stats.backend` is `'webgl2-compat'`) and the same surface
+draws them; keep `count` to a few thousand there. `stepLiquidCPU`, `createLiquidState` and `resolveLiquidParams` are
+that CPU twin, for tests and offline use. Measured compression, the force accuracy on bodies and the limits:
+[limits](../../docs/limits.md#gpu-particle-liquid-gpuliquid). Example page: `examples/gpu-liquid.html`.
+
+### Coming from three.js
+
+three.js ships the MLS-MPM liquid as an example, `webgpu_compute_particles_fluid`, not as a library: the solver lives
+in the example's own code, as storage buffers and compute passes written in TSL that the page dispatches every frame,
+with the pointer and the drawing wired up by the page. To use it you copy that code into your project and keep it. In
+Margo the solver is the engine's:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { GPULiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [0, 0.8, 2.2], target: [0, 0.3, 0] } });
+// three.js: copy the example's buffers and compute passes, and call them each frame. Margo: one attach.
+const liquid = GPULiquid.attach(engine, { count: 131072, debug: { enabled: true, particles: 'speed' } });
+engine.render({ delta: 1 / 60 });
+```
+
+What maps to what: the container is the `box` you pass, in metres; the pointer is `setPointer`; rigid bodies are
+`colliders` and report their `forces`; `debug.particles: 'speed'` shows the particles as coloured spheres, and with the
+debug view off they draw as a refracting liquid surface (`ParticleLiquid`); `snapshot()` and `restore()` repeat a run
+exactly; on a browser without WebGPU the WebGL2 layer runs it on the CPU instead of failing.
+
 ## Floods, dam breaks and walls
 
 `@margoengine/water/flood` floods a `Water`'s terrain: dam breaks, bores, hydraulic jumps, run-up and water spreading

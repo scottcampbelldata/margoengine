@@ -1,0 +1,182 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>GPU liquid check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body>
+<script type="module">
+import { Engine } from '/packages/core/dist/index.js';
+import {
+  GPULiquid,
+  createLiquidState,
+  liquidStateHash,
+  resolveLiquidParams,
+  stepLiquidCPU,
+  LIQUID_PARTICLE_FLOATS as F,
+} from '/packages/water/dist/liquid.js';
+import { isCompatDevice } from '/packages/webgl2-compat/dist/device.js';
+
+const W = 320, H = 240;
+window.check = async () => {
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  document.body.append(c);
+  const engine = await Engine.create(c, {
+    backend: 'webgpu',
+    camera: { position: [0, 0.6, 2.2], target: [0, 0.35, 0], near: 0.05, far: 50 },
+  });
+  engine.stop();
+  engine.scene.background = '#0a101a';
+  const errors = [];
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+
+  const compat = isCompatDevice(engine.gpu);
+  // 65,536 particles on WebGPU (docs/physics-parity-bar.md P13: tens of thousands at interactive rates); the CPU twin
+  // steps 1,024 on the WebGL2 layer.
+  const count = compat ? 1024 : 65536;
+  const options = {
+    count,
+    seed: 3,
+    // A resting layer 0.4 m deep over the whole floor, with a held sphere in it from the first step.
+    fill: { min: [-0.5, 0, -0.5], max: [0.5, 0.4, 0.5] },
+    colliders: [{ shape: 'sphere', position: [0.25, 0.2, 0], radius: 0.1 }],
+  };
+  const liquid = GPULiquid.attach(engine, options);
+  const hash = async () => liquidStateHash((await liquid.snapshot()).particles);
+
+  // Determinism: the same 30 frames from the start give the same hash; a snapshot restored repeats the rest exactly.
+  for (let k = 0; k < 30; k++) liquid.step(1 / 60);
+  const runA = await hash();
+  liquid.reset();
+  for (let k = 0; k < 15; k++) liquid.step(1 / 60);
+  const mid = await liquid.snapshot();
+  for (let k = 0; k < 15; k++) liquid.step(1 / 60);
+  const runB = await hash();
+  liquid.restore(mid);
+  for (let k = 0; k < 15; k++) liquid.step(1 / 60);
+  const runC = await hash();
+
+  // One frame of the GPU step against its CPU twin from the same start, particles and collider forces.
+  liquid.reset();
+  liquid.step(1 / 60);
+  const gpu = (await liquid.snapshot()).particles;
+  const gpuForces = await liquid.readForces();
+  const params = resolveLiquidParams(liquid.options, count);
+  const twin = createLiquidState(params);
+  const substeps = stepLiquidCPU(twin, params, 1 / 60);
+  let worstPos = 0, worstVel = 0;
+  for (let i = 0; i < count; i++)
+    for (let a = 0; a < 3; a++) {
+      worstPos = Math.max(worstPos, Math.abs(gpu[i * F + a] - twin.particles[i * F + a]));
+      worstVel = Math.max(worstVel, Math.abs(gpu[i * F + 4 + a] - twin.particles[i * F + 4 + a]));
+    }
+  const twinForceY = (twin.impulses[1] / 1024) * liquid.particleMass * 60;
+
+  // Two seconds of frames: the liquid stays finite and inside the container.
+  // The held sphere's force averaged over the last two of three seconds, against Archimedes' rho g V.
+  liquid.reset();
+  let lift = 0;
+  for (let k = 0; k < 180; k++) {
+    liquid.step(1 / 60);
+    if (k >= 60) lift += (await liquid.readForces())[0].force[1] / 120;
+  }
+  const archimedes = 1000 * 9.81 * (4 / 3) * Math.PI * 0.1 ** 3;
+  const late = (await liquid.snapshot()).particles;
+  let outside = 0, nonFinite = 0;
+  const { boxMin, boxMax } = params;
+  for (let i = 0; i < count; i++)
+    for (let a = 0; a < 3; a++) {
+      const x = late[i * F + a];
+      if (!Number.isFinite(x) || !Number.isFinite(late[i * F + 4 + a])) nonFinite++;
+      else if (x < boxMin[a] || x > boxMax[a]) outside++;
+    }
+  const lateForces = await liquid.readForces();
+
+  // The pointer: liquid near it takes on its velocity.
+  const near = (data) => {
+    let v = 0, n = 0;
+    for (let i = 0; i < count; i++) {
+      const dx = data[i * F] + 0.3, dy = data[i * F + 1] - 0.15, dz = data[i * F + 2];
+      if (dx * dx + dy * dy + dz * dz < 0.01) { v += data[i * F + 6]; n++; }
+    }
+    return n ? v / n : 0;
+  };
+  liquid.setPointer({ position: [-0.3, 0.15, 0], velocity: [0, 0, 2], radius: 0.15, strength: 60 });
+  for (let k = 0; k < 6; k++) liquid.step(1 / 60);
+  const pointerVz = near((await liquid.snapshot()).particles);
+  liquid.setPointer(null);
+
+  const shot = new OffscreenCanvas(W, H);
+  const ctx = shot.getContext('2d', { willReadFrequently: true });
+  const grab = async (delta = 1 / 60) => {
+    engine.render({ delta });
+    if (compat) await engine.gpu.queue.onSubmittedWorkDone();
+    ctx.drawImage(c, 0, 0);
+    return ctx.getImageData(0, 0, W, H).data;
+  };
+  const nonBg = (px) => {
+    let n = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i] > 28 || px[i + 1] > 32 || px[i + 2] > 44) n++;
+    return n;
+  };
+  const diffCount = (a, b) => {
+    let n = 0;
+    for (let i = 0; i < a.length; i += 4)
+      if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 18) n++;
+    return n;
+  };
+
+  liquid.reset();
+  const stepsBefore = liquid.stats.steps;
+  const frame1 = await grab(1 / 60);
+  for (let k = 0; k < 8; k++) engine.render({ delta: 1 / 60 });
+  const frame2 = await grab(1 / 60);
+  const frameSteps = liquid.stats.steps - stepsBefore;
+  const frameSubsteps = liquid.stats.frameSubsteps;
+  liquid.options.paused = true;
+  const pausedA = await grab(1 / 60);
+  const pausedB = await grab(1 / 60);
+  liquid.setDebug({ enabled: true, particles: 'speed', grid: false, container: false, colliders: false });
+  const frameSpeed = await grab(0);
+  liquid.setDebug({ particles: 'density' });
+  const frameDensity = await grab(0);
+  liquid.setDebug({ particles: 'off', grid: true, container: true, colliders: true });
+  const frameLines = await grab(0);
+  const debugDraws = liquid.stats.debugDraws;
+  liquid.setDebug({ enabled: false });
+  const frameSurface = await grab(0);
+  const surfaceBack = liquid.surface.options.enabled !== false;
+
+  const stats = { ...liquid.stats };
+  liquid.dispose();
+  const frameAfterDispose = await grab(1 / 60);
+  engine.dispose();
+
+  return {
+    compat,
+    count,
+    errors,
+    stats,
+    hashes: [runA, runB, runC],
+    substeps,
+    worstPos,
+    worstVel,
+    gpuForceY: gpuForces[0]?.force[1],
+    twinForceY,
+    lateForceY: lateForces[0]?.force[1],
+    lift,
+    archimedes,
+    outside,
+    nonFinite,
+    pointerVz,
+    frameSteps,
+    frameSubsteps,
+    litFrame1: nonBg(frame1),
+    movedPixels: diffCount(frame1, frame2),
+    pausedDiff: diffCount(pausedA, pausedB),
+    speedDiff: diffCount(frameSurface, frameSpeed),
+    densityDiff: diffCount(frameSpeed, frameDensity),
+    linesDiff: diffCount(frameSurface, frameLines),
+    debugDraws,
+    surfaceBack,
+    afterDisposeLit: nonBg(frameAfterDispose),
+  };
+};
+window.ready = true;
+</script></body></html>
