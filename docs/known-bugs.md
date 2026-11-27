@@ -2256,14 +2256,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   statement word for word.
 - **Fix:** `overLife` anchors on the load whatever it reads. Regression: packages/vfx/test/nodes.test.js.
 
-### Open 2026-11-27: a smoke column over a fire at night reads blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx)
+### Fixed 2026-11-27: a smoke column over a fire at night read blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx, weather)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=aerial-west --query=hour=22 --out=<folder>`: the
-  columns are lit orange only near their source point and read as dark blue-black shapes against the orange pall above.
-- **Cause:** a column's puffs take the glow of one point at its base (falling as 1 / d^2 over the km the column climbs)
-  and the engine's moonlit ambient; the firelit haze round them, and the rest of the burning front, give them no light.
-- **Owed in vfx:** the puffs' ambient from the air they sit in (the drive's firelit haze light) or the front as a line
-  of sources, with a test and a real frame.
+  columns were lit orange only near their source point and read as dark blue-black shapes against the orange pall above.
+- **Cause:** a column's puffs took the glow of one point at its base (falling as 1 / d^2 over the km the column climbs)
+  and the engine's moonlit ambient; the firelit pall round them, and the rest of the burning front, gave them no light.
+- **Fix:** `VFXLit.air` (vfx): the light of the air round the particles as shares of the noon sun, which adds
+  `air * noon / pi` to the ambient (light of that share from every side shows a ball E / pi). `SmokeOptions.air` and
+  `FireFront.air` carry it to the columns, and `WeatherDrive` writes on each front its fires' light on the pall over it
+  (the spots of `fireLayerLight` at the front's heat-weighted centre plus the even `fireHazeLight`). Real frame
+  (aerial-west at 22:00, 640 x 360, RTX A6000): the column's mean 8-bit colour 2.4, 3.1, 7.6 before, 58.0, 32.1, 7.6
+  after, against the pall's 82.7, 53.5, 21.1: a warm column a little darker than the lit pall, not a blue-black hole.
+- **Also:** `timber-valley-still.mjs` added `--query` to its own fixed comparisons, so `--query=hour=22` made the day
+  still a night one and the run stopped on "the night sky is dark and blue" (day and night read 53.6 / 101.2 alike).
+  Only the views asked for take `--query` now.
+- **Regression:** `packages/vfx/test/lit.test.js` (the air term in any scene units), `packages/vfx/test/smoke.test.js`
+  (a column and a front carry it), `packages/weather/tests/air-load.test.js` (the drive writes the pall's light).
 
 ### Fixed 2026-11-26: the smoke haze over a burning valley took no light from the fire (KB-WEATHER-FIREHAZE1, weather and vfx)
 

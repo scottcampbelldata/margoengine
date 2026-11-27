@@ -1106,6 +1106,11 @@ console.log(Object.keys(SMOKE_LOOKS).join(', ')); // campfire, houseFire, wildfi
   1,000 W/m^2 would). `noon` is that sun's engine intensity, the sky's `lighting.intensity` (default pi; 5 in a scene at
   sun 5, `SUN_ILLUMINANCE` in one lit in lux), so a fire is the same share of the noon light in any units
   (KB-VFX-GLOWUNITS1); a `FireFront`'s `noon` writes it on all its columns and `WeatherDrive` sets that from its sky.
+  `air` (red, green and blue shares of the noon sun's light, default none, read every frame) is the light of the air
+  round the column, such as a pall lit by the fires below: light of that share from every side adds `air * noon / pi`
+  to the puffs' ambient (`VFXLit.air`), so a column inside a firelit pall takes its light and is not lit by its base
+  alone (KB-VFX-COLUMNAMBIENT1). A `FireFront`'s `air` writes it on all its columns, and `WeatherDrive` sets that to
+  its fires' light on the pall over the front.
   So the column over a fire is orange underneath and fades to grey as it climbs, at night with no other light;
   `glow: 0` turns it off. A new puff is opaque within `SMOKE_FADE_IN` (1 s) whatever its lifetime
   (`smokeAlphaCurve`; it was a fifth of the life, 12 s of a minute).

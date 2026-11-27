@@ -209,6 +209,7 @@ export interface VFXLit {
         color?: readonly [number, number, number];
     };
     noon?: number;
+    air?: readonly [number, number, number];
 }
 
 export interface VFXMeshParticles {

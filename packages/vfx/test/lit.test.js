@@ -156,3 +156,38 @@ test('the glow is the same share of the noon light in a scene at sun 5 and in on
   assert.throws(() => new VFX({ lit: { noon: 0 } }), /lit noon/);
   effect.dispose();
 });
+
+// KB-VFX-COLUMNAMBIENT1: a column over a burning front at night took the glow of one point at its base and the moonlit
+// ambient, and read blue-black against the firelit pall round it. `air`, the pall's light as shares of the noon sun, adds
+// to the ambient as light of that share from every side: a ball shows E / pi, so `air * noon / pi`.
+test("the air's light adds air * noon / pi to the ambient, in any scene units", () => {
+  const { h, effect } = attach({ capacity: 8, initialCount: 8, lit: { ambient: [0.01, 0.02, 0.03] } });
+  const ambient = () => [...new Float32Array(uniform(h).data).slice(8, 11)];
+  h.frame();
+  const base = ambient();
+  for (const noon of [undefined, 5, 133775 * Math.exp(-0.21)]) {
+    if (noon === undefined) delete effect.options.lit.noon;
+    else effect.options.lit.noon = noon;
+    effect.options.lit.air = [0.004, 0.0016, 0.0004];
+    h.frame();
+    const got = ambient();
+    for (let i = 0; i < 3; i++) {
+      const want = base[i] + (effect.options.lit.air[i] * (noon ?? Math.PI)) / Math.PI;
+      assert.ok(Math.abs(got[i] - want) <= Math.abs(want) * 1e-6, `noon ${noon} channel ${i}: ${got[i]}, want ${want}`);
+    }
+  }
+  delete effect.options.lit.air;
+  h.frame();
+  assert.deepEqual(ambient(), base, 'no air: the ambient alone');
+  for (const bad of [
+    [-1, 0, 0],
+    [0, 0],
+    [0, NaN, 0],
+    [0, 0, 1e4],
+  ]) {
+    effect.options.lit.air = bad;
+    assert.throws(() => h.frame(), /lit air/);
+  }
+  assert.throws(() => new VFX({ lit: { air: [1, 1] } }), /lit air/);
+  effect.dispose();
+});

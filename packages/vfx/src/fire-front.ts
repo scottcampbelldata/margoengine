@@ -1086,7 +1086,29 @@ export class FireFront implements EnginePlugin {
     if (this.noonValue !== undefined) o.noon = this.noonValue;
     else if (this.options.smoke?.noon !== undefined) o.noon = this.options.smoke.noon;
     else delete o.noon;
+    if (this.airValue) (o as { air?: readonly [number, number, number] }).air = this.airValue;
+    else if (this.options.smoke?.air !== undefined) o.air = this.options.smoke.air;
+    else delete o.air;
   }
+  /**
+   * Light of the air round its smoke columns (`SmokeOptions.air`, shares of the noon sun's light, red, green and blue),
+   * written on every column now and on those made later. `WeatherDrive` sets it each frame to its fires' light on the
+   * smoke pall over this front, so the columns inside the firelit pall take its light, not only their bases' glow
+   * (KB-VFX-COLUMNAMBIENT1). Undefined: the columns' own (`smoke.air`, default none).
+   */
+  get air(): readonly [number, number, number] | undefined {
+    return this.airValue;
+  }
+  set air(value: readonly [number, number, number] | undefined) {
+    if (value !== undefined) {
+      if (!Array.isArray(value) || value.length !== 3)
+        throw new TypeError('FireFront air must be [r, g, b] or undefined');
+      for (const v of value) finiteIn(v, 'air', 0, 1000);
+    }
+    this.airValue = value && [value[0], value[1], value[2]];
+    for (const c of this.columns) this.noonOn(c);
+  }
+  private airValue?: readonly [number, number, number];
   /** True while a cell burns or an ignition waits. */
   get active(): boolean {
     return this.burning.length > 0 || this.pending.length > 0;

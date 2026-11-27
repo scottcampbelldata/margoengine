@@ -549,7 +549,12 @@ test('at night under a pall the sky takes the layer transmittance and its moonli
 // KB-VFX-GLOWUNITS1: the fire columns' glow was referred to a sun of intensity pi while the haze over them takes the
 // sky's lighting.intensity; the drive writes that noon sun on the fronts that take one.
 test("the drive writes its sky's noon sun on the fires' smoke glow", () => {
-  const sky = { name: 'sky', options: { lighting: { intensity: 5 } }, sun: new Float32Array([0, 1, 0]), airControls: true },
+  const sky = {
+      name: 'sky',
+      options: { lighting: { intensity: 5 } },
+      sun: new Float32Array([0, 1, 0]),
+      airControls: true,
+    },
     front = { options: {}, smokeEmission: 0, noon: undefined },
     plain = { options: {}, smokeEmission: 0 },
     machine = new WeatherMachine('clear', { seed: 8 }),
@@ -567,7 +572,7 @@ test("the drive writes its sky's noon sun on the fires' smoke glow", () => {
 // KB-SKY-PALLFALLOFF1: the fires' light on the pall and the haze was one even glow, so a ridge did not stand out against
 // it. A fire that says where it burns lights them by the cosine law from straight over each source, which spreads the
 // same P / 2 over the plane, and the sources add; fires that say nothing light them evenly as before.
-test("fires that say where they burn light the pall and haze as a spot over each source", async () => {
+test('fires that say where they burn light the pall and haze as a spot over each source', async () => {
   const { fireHazeLight, fireLayerLight, hazeReflectance, smokeColor, SMOKE_LAYER_DEPTH } = await import(
       '../dist/index.js'
     ),
@@ -674,4 +679,38 @@ test("fires that say where they burn light the pall and haze as a spot over each
   assert.equal(a.fireSpots, undefined);
   assert.equal(a.fireSight, undefined);
   assert.equal(fog.fireSpots, undefined);
+});
+
+// KB-VFX-COLUMNAMBIENT1: a front's smoke columns took no light from the firelit pall round them, so over a burning valley
+// at night they read blue-black against it. The drive writes the pall's light over each front on its `air`: the spots'
+// light at the front's heat-weighted centre; a fire with no segments gets the even light; one without the setter none.
+test("the drive writes the firelit pall's light on each front's smoke air", async () => {
+  const { fireLayerLight, fireHazeLight } = await import('../dist/index.js'),
+    sky = { name: 'sky', options: { lighting: { intensity: 5 } }, sun: new Float32Array([0, 1, 0]), airControls: true },
+    segs = [
+      { x: 0, y: 0, z: 0, heat: 6e8 },
+      { x: 30, y: 0, z: 0, heat: 4e8 },
+    ],
+    front = { options: {}, smokeEmission: 0, radiantPower: 2e9, air: undefined, segments: () => segs },
+    even = { options: {}, smokeEmission: 0, radiantPower: 1e9, air: undefined },
+    plain = { options: {}, smokeEmission: 0, radiantPower: 1e9 },
+    machine = new WeatherMachine('clear', { seed: 8 }),
+    engine = engineOf(sky),
+    drive = WeatherDrive.attach(engine, { weather: machine, advance: false, fires: [front, even, plain] });
+  drive.setup(engine);
+  drive.update(0);
+  assert.ok(front.air && front.air.length === 3, 'the front takes the light');
+  // The even light of the two fires that say nothing of where they burn, plus the spots at the front's centre.
+  const flat = fireHazeLight(2e9);
+  for (let i = 0; i < 3; i++) assert.ok(front.air[i] > flat[i] * 0.999, `channel ${i} at least the even light`);
+  assert.ok(front.air[0] > front.air[1] && front.air[1] > front.air[2], 'the flames orange');
+  assert.ok(front.air[0] >= fireLayerLight(1e9, 0, 30)[0], 'at least a spot 30 m off');
+  for (let i = 0; i < 3; i++)
+    assert.ok(Math.abs(even.air[i] - flat[i]) <= flat[i] * 1e-9, 'a fire with no segments takes the even light alone');
+  assert.ok(!('air' in plain), 'a fire without the setter is left alone');
+  front.radiantPower = 0;
+  even.radiantPower = 0;
+  plain.radiantPower = 0;
+  drive.update(0);
+  assert.equal(front.air, undefined, 'no fire, no light');
 });

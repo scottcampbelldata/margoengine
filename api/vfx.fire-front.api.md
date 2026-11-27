@@ -96,6 +96,8 @@ export class FireFront implements EnginePlugin {
     get radiantPower(): number;
     get noon(): number | undefined;
     set noon(value: number | undefined);
+    get air(): readonly [number, number, number] | undefined;
+    set air(value: readonly [number, number, number] | undefined);
     get active(): boolean;
     ignite(x: number, z: number, radius?: number, time?: number): this;
     advanceTime(delta: number): void;
@@ -387,6 +389,7 @@ interface SmokeOptions {
     prewarm?: boolean;
     glow?: number;
     noon?: number;
+    air?: readonly [number, number, number];
     texture?: VFXTexture;
     lights?: VFXLightSource;
     shadows?: VFXLightSource;
@@ -588,6 +591,7 @@ interface VFXLit {
         color?: readonly [number, number, number];
     };
     noon?: number;
+    air?: readonly [number, number, number];
 }
 
 interface VFXMeshParticles {

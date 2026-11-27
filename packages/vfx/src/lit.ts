@@ -95,6 +95,17 @@ function checkGlow(g: VFXLit['glow']): void {
     );
 }
 
+function checkAir(a: unknown): void {
+  if (
+    a !== undefined &&
+    (!Array.isArray(a) ||
+      a.length !== 3 ||
+      !a.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1e3))
+  )
+    throw new RangeError(
+      "VFX lit air must be [r, g, b] shares of the noon sun's light, each 0 to 1000; pass e.g. [0.002, 0.0008, 0.0002]",
+    );
+}
 function checkNoon(n: unknown): void {
   if (n !== undefined && !(typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 1e7))
     throw new RangeError("VFX lit noon must be the noon sun's engine intensity, above 0 and at most 1e7; pass e.g. 1");
@@ -123,6 +134,7 @@ export const lit: VFXExtension<VFXLit> = {
       throw new RangeError('VFX lit ambient must be linear [r, g, b], each 0 to 16');
     checkGlow(l.glow);
     checkNoon(l.noon);
+    checkAir(l.air);
   },
   billboard: (code, value) => billboard(code, value),
   create(state: VFXState, value, owned) {
@@ -159,6 +171,10 @@ export const lit: VFXExtension<VFXLit> = {
           values[8 + i] = value.ambient ? value.ambient[i] : radiance[3] * ambient[i];
           values[12 + i] = c.camera.position[i];
         }
+        // The air's own light (a lit haze round the particles): light of irradiance E from every side shows a ball
+        // E / pi, so a share s of the noon sun adds s noon / pi to the ambient (KB-VFX-COLUMNAMBIENT1).
+        checkAir(value.air);
+        if (value.air) for (let i = 0; i < 3; i++) values[8 + i] += (value.air[i]! * (value.noon ?? Math.PI)) / Math.PI;
         values[7] = value.wrap ?? 0.5;
         // The glow is read every frame; none (or no power) adds nothing.
         const g = value.glow;

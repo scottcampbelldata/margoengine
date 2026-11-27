@@ -98,6 +98,7 @@ export interface FireTarget {
     readonly smokeEmission: number;
     readonly radiantPower?: number;
     noon?: number;
+    air?: readonly [number, number, number];
     segments?(): readonly {
         readonly x: number;
         readonly y: number;

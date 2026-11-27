@@ -1181,7 +1181,9 @@ A `WeatherDrive` does three things for it, all package calls:
   about 0.6 in a 5 m/s wind) lights the haze at 0.56, 0.24, 0.07 of the noon sun. `fireLight` scales it (default 1, 0
   off); a fire that reports no `radiantPower` gives the haze no light. A front that takes a `noon` (`FireFront.noon`)
   is given the sky's `lighting.intensity` each frame, so its columns' glow is referred to the same noon sun as the haze
-  (KB-VFX-GLOWUNITS1).
+  (KB-VFX-GLOWUNITS1). A front that takes an `air` (`FireFront.air`) is given the fires' light on the pall over it, the
+  spots' light below at its heat-weighted centre plus the even light, so its smoke columns glow with the pall round
+  them instead of reading dark against it at night (KB-VFX-COLUMNAMBIENT1).
 - **The glow is brightest over the fires.** A fire that also says where it burns (`segments()`, as `FireFront` has:
   `x`, `y`, `z` and `heat` each) lights the sky and the haze as spots over its sources instead of evenly
   (KB-SKY-PALLFALLOFF1). The drive shares each fire's `radiantPower` among its segments by heat and clusters all of

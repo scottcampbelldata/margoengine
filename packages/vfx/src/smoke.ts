@@ -398,6 +398,12 @@ export interface SmokeOptions {
    * `lighting.intensity`. Read every frame. Default pi.
    */
   noon?: number;
+  /**
+   * Light of the air round the column, red, green and blue shares of the noon sun's light (`VFXLit.air`): a firelit
+   * pall lights the puffs inside it, so a column over a burning front is not lit by its base alone
+   * (KB-VFX-COLUMNAMBIENT1). Read every frame; `FireFront.air` writes it. Default none.
+   */
+  air?: readonly [number, number, number];
   /** A puff sprite (RGBA8 sRGB, alpha the coverage), multiplied by the colour. Read at attach. Default: a soft disc. */
   texture?: VFXTexture;
   /** Point and spot lights on the puffs (`Clustered` of `@margoengine/clustered`). Read at attach. Default: the sun and ambient only. */
@@ -612,6 +618,12 @@ export class Smoke implements EnginePlugin {
     } else delete this.lit.glow;
     if (o.noon === undefined) delete this.lit.noon;
     else this.lit.noon = unit(o.noon, 'noon', 0, 1e7, true);
+    if (o.air === undefined) delete this.lit.air;
+    else {
+      finiteVector(o.air, 3, 'Smoke air');
+      for (let i = 0; i < 3; i++) unit(o.air[i], 'air channel', 0, 1000);
+      this.lit.air = [o.air[0]!, o.air[1]!, o.air[2]!];
+    }
   }
   /** Puts the roof's box and the jet under it where this frame's source, radius, heat and ceiling put them. */
   private placeRoof(roof: Roof, radius: number): void {

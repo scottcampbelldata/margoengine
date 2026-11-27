@@ -123,6 +123,12 @@ export interface FireTarget {
    */
   noon?: number;
   /**
+   * Light of the air round its smoke columns (`FireFront.air`, KB-VFX-COLUMNAMBIENT1): the drive writes the fires' light
+   * on the smoke pall over this fire each frame (shares of the noon sun, red, green and blue), so its columns take the
+   * pall's light.
+   */
+  air?: readonly [number, number, number];
+  /**
    * Its burning segments (`FireFront.segments()`): world metres on the ground and convective heat, watts. A fire that
    * has them lights the sky's pall and haze as spots over where it burns (KB-SKY-PALLFALLOFF1), its radiant power
    * shared among them by their heat; one that has none lights them evenly (`fireHazeLight`).
@@ -685,7 +691,29 @@ export class WeatherDrive {
     }
     const fireLight = even > 0 ? fireHazeLight(even, o.smokeWidth) : undefined;
     if (fireLight) for (let i = 0; i < 3; i++) fireLight[i] *= scale;
-    const spots = clusterFires(burning).map((s) => ({
+    // The same light on the pall over each fire lights its own columns (KB-VFX-COLUMNAMBIENT1): the spots' light at its
+    // heat-weighted centre, plus the even light, so a column over a burning front glows with the pall round it.
+    const clusters = clusterFires(burning);
+    for (const fire of fires) {
+      if (!('air' in fire)) continue;
+      const placed = scale > 0 ? (fire.segments?.().filter(isPlaced) ?? []) : [];
+      let heat = 0,
+        cx = 0,
+        cz = 0;
+      for (const s of placed) {
+        heat += s.heat;
+        cx += s.x * s.heat;
+        cz += s.z * s.heat;
+      }
+      const air: [number, number, number] = fireLight ? [fireLight[0], fireLight[1], fireLight[2]] : [0, 0, 0];
+      if (heat > 0)
+        for (const c of clusters) {
+          const l = fireLayerLight(c.power, c.spread, Math.hypot(c.x - cx / heat, c.z - cz / heat));
+          for (let i = 0; i < 3; i++) air[i]! += l[i]! * scale;
+        }
+      fire.air = air[0] > 0 || air[1] > 0 || air[2] > 0 ? air : undefined;
+    }
+    const spots = clusters.map((s) => ({
       light: fireLayerLight(s.power, s.spread).map((v) => v * scale),
       x: s.x,
       z: s.z,
@@ -1082,7 +1110,13 @@ export class WeatherDrive {
     const back = hazeReflectance(state);
     this.writeSpots(
       atm,
-      (loaded ? spots : []).map(({ light, x, z, height, reach }) => ({ color: tinted(back, light), x, z, height, reach })),
+      (loaded ? spots : []).map(({ light, x, z, height, reach }) => ({
+        color: tinted(back, light),
+        x,
+        z,
+        height,
+        reach,
+      })),
     );
     // A low ray sees the lit layer as far across as the haze's light comes from (the sky fog's 2 / density).
     this.writeSight(atm, loaded && spots.length && extinction > 0 ? Math.min(1e6, 2 / extinction) : undefined);

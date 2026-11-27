@@ -586,3 +586,51 @@ test('ceiling jet speed: 0.96 (Q/H)^(1/3) by the axis, 0.195 Q^(1/3) H^(1/2) / r
   ])
     assert.throws(() => ceilingJetSpeed(...bad), RangeError);
 });
+
+// KB-VFX-COLUMNAMBIENT1: the firelit pall's light reaches the puffs as `air` (VFXLit.air), on a column and through a front.
+test('KB-VFX-COLUMNAMBIENT1: a column and a front carry the light of the air round them', async () => {
+  const h = optionalGPU(),
+    smoke = Smoke.attach(h.engine, { position: [0, 0, 0], heat: 7e6, prewarm: false });
+  h.frame();
+  assert.equal(smoke.effect.options.lit.air, undefined, 'unset: none');
+  smoke.options.air = [0.004, 0.0016, 0.0004];
+  h.frame();
+  assert.deepEqual(smoke.effect.options.lit.air, [0.004, 0.0016, 0.0004]);
+  smoke.options.air = [0, -1, 0];
+  assert.throws(() => h.frame(), /Smoke air/);
+  delete smoke.options.air;
+  h.frame();
+  assert.equal(smoke.effect.options.lit.air, undefined, 'cleared');
+  smoke.dispose();
+  const { FireFront } = await import('../dist/fire-front.js'),
+    front = FireFront.attach(h.engine, {
+      size: [200, 200],
+      columns: 2,
+      flames: 0,
+      buildingFlames: 0,
+      smoke: { air: [0.001, 0.0004, 0.0001] },
+      ignitions: [{ at: [0, 0], radius: 20 }],
+    });
+  front.air = [0.004, 0.0016, 0.0004];
+  await front.ready;
+  assert.deepEqual(
+    front.smokeColumns.map((c) => c.options.air),
+    [
+      [0.004, 0.0016, 0.0004],
+      [0.004, 0.0016, 0.0004],
+    ],
+    'a front writes its air on columns it makes later',
+  );
+  front.air = undefined;
+  assert.deepEqual(
+    front.smokeColumns.map((c) => c.options.air),
+    [
+      [0.001, 0.0004, 0.0001],
+      [0.001, 0.0004, 0.0001],
+    ],
+    "unset: the front's own smoke option",
+  );
+  assert.throws(() => (front.air = [0, 0, -1]), /fire air/);
+  assert.throws(() => (front.air = [0, 0]), /FireFront air/);
+  front.dispose();
+});

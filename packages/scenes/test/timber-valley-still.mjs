@@ -41,9 +41,11 @@ if (library)
 await page.setViewportSize({ width: Math.max(w, 1440), height: Math.max(h, 1100) });
 if (out) await mkdir(out, { recursive: true });
 console.log('device', context.hardware?.compat ? 'webgl2-compat layer' : 'webgpu');
+// The views asked for take --query; the fixed comparisons below (fire against none, day against night) take only their
+// own settings, so --query=hour=22 does not turn their day still into a night one.
 const still = async (view, query = '') => {
   await page.goto(
-    `http://127.0.0.1:${port}/packages/scenes/test/timber-valley-still.html?view=${view}&w=${w}&h=${h}${query ? '&' + query : ''}${extra ? '&' + extra : ''}`,
+    `http://127.0.0.1:${port}/packages/scenes/test/timber-valley-still.html?view=${view}&w=${w}&h=${h}${query ? '&' + query : ''}`,
   );
   await page.waitForFunction(() => window.ready, null, { timeout: 300000 });
   const r = await page.evaluate(() => window.check.run());
@@ -64,7 +66,7 @@ const spread = (img) => {
 };
 try {
   for (const view of views) {
-    const { r, png, img } = await still(view);
+    const { r, png, img } = await still(view, extra);
     if (out) await writeFile(join(out, `${view}.png`), png);
     const { mean, sd } = spread(img);
     console.log(

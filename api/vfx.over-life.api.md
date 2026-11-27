@@ -116,6 +116,7 @@ interface VFXLit {
         color?: readonly [number, number, number];
     };
     noon?: number;
+    air?: readonly [number, number, number];
 }
 
 interface VFXMeshParticles {

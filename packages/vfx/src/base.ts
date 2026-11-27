@@ -394,6 +394,13 @@ export interface VFXLit {
    * any scene units. Read every frame; `WeatherDrive` writes it on its fire fronts' smoke from its sky. Default pi.
    */
   noon?: number;
+  /**
+   * Light of the air round the particles, added to the ambient: red, green and blue shares of the noon sun's light
+   * (`noon`, 1,000 W/m^2) that the haze they sit in receives, as a fire lights its smoke pall from below. Light of that
+   * share from every side adds `air * noon / pi` to the ambient, so smoke inside a firelit pall takes the pall's light.
+   * Read every frame; `WeatherDrive` writes it on its fire fronts' smoke. Each 0 to 1,000. Default none.
+   */
+  air?: readonly [number, number, number];
 }
 /**
  * Sub-emitters: a particle that is born from the emitter (`on: 'birth'`, a trail or a flash at the muzzle), dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
