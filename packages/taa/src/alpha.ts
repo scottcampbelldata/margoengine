@@ -28,12 +28,15 @@ export function premultipliedResolve(code: string): string {
   const locked = code.includes('var lockHistory'),
     reactive = code.includes('reactiveMask'),
     settles = code.includes('fn settled(');
-  const clamped = 'clamp(oldAlpha/total,loA,hiA)',
+  // Variance clipping moves history along the line to the box's centre, so colour and alpha are one point of one box:
+  // clipping colour that way and clamping alpha on its own moved the two by different shares, and a partly covered
+  // pixel's straight colour with them.
+  const colourClip = 'clipHistory(ycocg(old/total),lo,hi,m1,m2)',
+    variance = code.includes('fn clipHistory('),
+    joint = 'clipPremultiplied(vec4f(ycocg(old/total),oldAlpha/total),vec4f(lo,loA),vec4f(hi,hiA),vec4f(m1,m1A),vec4f(m2,m2A))';
+  const clamped = variance ? joint + '.w' : 'clamp(oldAlpha/total,loA,hiA)',
     history = locked ? `select(${clamped},oldAlpha/total,lock>0.0)` : clamped,
     weight = reactive ? 'temporal.settings.x*(1.0-max(react,oldReact/total))' : 'temporal.settings.x';
-  const variance = code.includes('fn clipHistory(')
-    ? '{let mean=m1A/9.0;let sigma=sqrt(max(m2A/9.0-mean*mean,0.0))*temporal.settings.w;loA=max(loA,mean-sigma);hiA=min(hiA,mean+sigma);}'
-    : '';
   // Every read of the scene's colour, premultiplied in linear light.
   let out = code
     .replaceAll('linear(textureLoad(scene,', 'premultiplied(textureLoad(scene,')
@@ -48,8 +51,7 @@ export function premultipliedResolve(code: string): string {
       'var result=current;',
       'var result=current;let currentAlpha=textureLoad(scene,p,0).a;var resultAlpha=currentAlpha;var oldAlpha=0.0;' +
         'var loA=1e30;var hiA=-1e30;var m1A=0.0;var m2A=0.0;for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){' +
-        'let a=textureLoad(scene,clamp(p+vec2i(x,y),vec2i(0),vec2i(size)-1),0).a;loA=min(loA,a);hiA=max(hiA,a);m1A+=a;m2A+=a*a;}}' +
-        variance,
+        'let a=textureLoad(scene,clamp(p+vec2i(x,y),vec2i(0),vec2i(size)-1),0).a;loA=min(loA,a);hiA=max(hiA,a);m1A+=a;m2A+=a*a;}}',
     ],
     ['total+=weight;}', 'oldAlpha+=textureLoad(history,pixel,0).a*weight;total+=weight;}'],
     ['result=mix(current,', `resultAlpha=mix(currentAlpha,${history},${weight});result=mix(current,`],
@@ -64,6 +66,18 @@ export function premultipliedResolve(code: string): string {
       `textureStore(outputDepth,p,vec4f(textureLoad(depth,p,0),${reactive ? 'react' : '0.0'},0,0));`,
     ],
   ]);
+  if (variance)
+    out = edit(out, [
+      [colourClip, joint + '.xyz'],
+      [
+        'fn clipHistory(',
+        'fn clipPremultiplied(h:vec4f,lo:vec4f,hi:vec4f,m1:vec4f,m2:vec4f)->vec4f {let mean=m1/9.0;' +
+          'let sigma=sqrt(max(m2/9.0-mean*mean,vec4f(0)))*temporal.settings.w;let a=max(lo,mean-sigma);let b=min(hi,mean+sigma);' +
+          'let centre=(a+b)*0.5;let extent=max((b-a)*0.5,vec4f(1e-6));let d=h-centre;let q=abs(d)/extent;' +
+          'let t=max(max(q.x,q.y),max(q.z,q.w));return select(h,centre+d/t,t>1.0);}\n' +
+          'fn clipHistory(',
+      ],
+    ]);
   if (reactive) out = edit(out, [['oldReact+=h.a*weight;', 'oldReact+=textureLoad(historyDepth,pixel,0).g*weight;']]);
   if (settles) out = alphaSettle(out, 'currentAlpha');
   return out;

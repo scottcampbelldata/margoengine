@@ -147,6 +147,8 @@ Technical Memo 4, 1995, <http://alvyray.com/Memos/CG/Microsoft/4_comp.pdf>; J. B
 IEEE CG&A 14(5), 1994, <https://doi.org/10.1109/38.310740>; B. Karis, "High Quality Temporal Supersampling", SIGGRAPH
 2014; M. Salvi, "An Excursion in Temporal Supersampling", GDC 2016; L. Yang, S. Liu and M. Salvi, "A Survey of Temporal
 Antialiasing Techniques", Computer Graphics Forum 39(2), 2020, <https://doi.org/10.1111/cgf.14018>.
+With `rejection: 'variance'` colour and alpha are clipped as one point of one box, so a partly covered pixel keeps its
+colour.
 
 ## Still views settle
 
