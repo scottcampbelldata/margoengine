@@ -12,6 +12,18 @@ declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: numb
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type Vec3 = readonly [number, number, number];
 
+function finiteWord(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(Math.fround(value));
+}
+
+function finiteWords(value: unknown, count: number): value is ArrayLike<number> {
+  if (typeof value !== 'object' || value === null) return false;
+  const words = value as ArrayLike<number>;
+  if (words.length !== count) return false;
+  for (let i = 0; i < count; i++) if (!finiteWord(words[i])) return false;
+  return true;
+}
+
 /** State from an accepted wall sample, such as the reflecting edge of a physics wake. */
 export interface WaterWallSample {
   /** Surface elevation in metres, in the same frame as the crest. */
@@ -32,18 +44,27 @@ export function wallOvertoppingSpawn(
   crest: Vec3,
 ): { position: Vec3; velocity: Vec3; fraction: number } | undefined {
   if (
-    !Number.isFinite(previous.height) ||
-    !Number.isFinite(current.height) ||
-    !crest.every(Number.isFinite) ||
-    !previous.velocity.every(Number.isFinite) ||
-    !current.velocity.every(Number.isFinite)
+    !finiteWord(previous?.height) ||
+    !finiteWord(current?.height) ||
+    !finiteWords(crest, 3) ||
+    !finiteWords(previous.velocity, 3) ||
+    !finiteWords(current.velocity, 3)
   )
-    throw fault('state', 'Wall spray needs finite, consecutive wave samples and a crest in world metres.');
+    throw fault(
+      'state',
+      'Give wall spray consecutive samples with a finite height and three velocity components, and a finite XYZ crest in world metres.',
+    );
   const level = crest[1];
   if (!(previous.height < level && current.height >= level)) return undefined;
   const fraction = (level - previous.height) / (current.height - previous.height);
-  const [a, b, c] = previous.velocity;
-  const [x, y, z] = current.velocity;
+  const { velocity: before } = previous;
+  const { velocity: after } = current;
+  const a = before[0],
+    b = before[1],
+    c = before[2];
+  const x = after[0],
+    y = after[1],
+    z = after[2];
   const velocity: Vec3 = [a + (x - a) * fraction, b + (y - b) * fraction, c + (z - c) * fraction];
   if (!(velocity[1] > 0)) return undefined;
   return { position: [crest[0], level, crest[2]], velocity, fraction };
@@ -90,17 +111,30 @@ export class WaterWake implements EnginePlugin {
   private removeDispose?: () => void;
   private disposed = false;
 
-  /** @throws TypeError without a Water or a wake with a grid and heights(). */
+  /** @throws MargoError `state` without a Water, a valid wake grid and heights(), or a finite wet-side boundary. */
   constructor(options: WaterWakeOptions) {
     const { surface, wake, minWetZ } = options ?? ({} as WaterWakeOptions);
     if (!surface || typeof (surface as { onDispose?: unknown }).onDispose !== 'function')
-      throw new TypeError('WaterWake needs the Water it draws on; pass options.surface.');
-    if (!wake || typeof wake.heights !== 'function' || !wake.grid)
-      throw new TypeError('WaterWake needs a wake with grid and heights(); pass a WakeSolver.');
-    const [nx, nz] = wake.grid.cells;
-    if (!(Number.isInteger(nx) && Number.isInteger(nz) && nx >= 4 && nz >= 4 && wake.grid.cellSize > 0))
-      throw new TypeError('WaterWake needs a wake grid of at least 4 x 4 cells and a cell size above 0.');
-    if (minWetZ !== undefined && !(typeof minWetZ === 'number' && Number.isFinite(Math.fround(minWetZ))))
+      throw fault('state', 'WaterWake needs the Water it draws on; pass options.surface.');
+    const grid = wake?.grid;
+    if (!grid || typeof wake.heights !== 'function')
+      throw fault('state', 'WaterWake needs a wake with grid and heights(); pass a WakeSolver.');
+    const { cells, cellSize, origin } = grid;
+    if (
+      !finiteWords(cells, 2) ||
+      !Number.isInteger(cells[0]) ||
+      cells[0] < 4 ||
+      !Number.isInteger(cells[1]) ||
+      cells[1] < 4 ||
+      !finiteWord(cellSize) ||
+      Math.fround(cellSize) <= 0 ||
+      !finiteWords(origin, 2)
+    )
+      throw fault(
+        'state',
+        'Give WaterWake a grid of at least 4 x 4 cells with a positive finite cell size and a finite XZ origin.',
+      );
+    if (minWetZ !== undefined && !finiteWord(minWetZ))
       throw fault('state', 'Set the WaterWake wet-side boundary to a finite world Z in metres.');
     this.surface = surface;
     this.wake = wake;
@@ -149,10 +183,10 @@ export class WaterWake implements EnginePlugin {
       throw fault('state', 'WaterWake and Water must use the same engine; attach both to one engine');
     const { cells, cellSize, origin } = this.wake.grid,
       source = this.wake.heights();
-    if (source.length !== this.heights.length)
+    if (source?.length !== this.heights.length)
       throw fault(
         'state',
-        `The wake's grid changed size (${source.length} heights for ${this.heights.length}); attach a new WaterWake.`,
+        `The wake returned ${source?.length ?? 'no'} heights for a grid of ${this.heights.length}; supply one height per cell or attach a new WaterWake.`,
       );
     for (let i = 0; i < source.length; i++) this.heights[i] = source[i]!;
     this.header.set([origin[0], origin[1], cellSize, this.minWetZ ?? 0, cells[0], cells[1], 0, 0]);
