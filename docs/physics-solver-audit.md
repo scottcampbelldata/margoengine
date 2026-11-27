@@ -1188,6 +1188,16 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   `coupling/loads-swim-actuators.test.js` checks two-way tail and fin recoil through the production receiver,
   live HYDRO and projected rigid drag, with independent disabled paths. The worst water-step momentum
   residual is (1.27×10^{-15}) N·s and the 40-frame total residual is (5.77×10^{-7}) N·s.
+  The guided cut-cell upgrade closes and reopens an entire cell without dividing by zero storage.
+  `coupling/moving-cylinder-blockage.test.js` accounts for volume, pressure reaction and energy through
+  a periodic seam, and reproduces its state hash. The count stays fixed at two substeps per tick at rest
+  from 99% occupancy to full coverage.
+  `loads-radiation-coupled-profile.test.js` compares the full panel fit to its numerical reference and
+  checks the independent Vugts width-confined sway–roll experiments. It verifies signed cross terms and
+  a reactive pole outside the sample band. `loads-coupled-radiation.test.js` checks all six wrench components
+  about an offset centre, pressure-independent passive memory, dry and rewet transitions, two native
+  layouts and replay. `loads-kernel.test.js` guards exact legacy behavior, the coupled numerical envelope
+  and rejection of a singular six-axis matrix before it publishes a wrench.
 
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 

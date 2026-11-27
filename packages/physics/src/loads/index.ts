@@ -8,6 +8,13 @@ export * from './flood-paddle.js';
 export * from './flood-wading.js';
 export * from './morison.js';
 export * from './quay.js';
+export {
+  coupledRadiationProfile,
+  type LoadCoupledRadiationFit,
+  type LoadCoupledRadiationProfile,
+  type LoadCoupledRadiationProfileOptions,
+  type LoadCoupledRadiationResonance,
+} from './radiation-coupled-profile.js';
 export * from './radiation-profile.js';
 export type { LoadRadiationMode, LoadRadiationResonance } from './radiation.js';
 export * from './shapes.js';

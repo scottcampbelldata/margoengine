@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const STRIDE = 32;
+const COUPLED = STRIDE + 9;
 const WRENCH = 6;
 const PAGE = 65536;
 const START = 18 * PAGE;
@@ -19,7 +20,7 @@ async function instance(shared) {
   assert.equal(wasm.exports.__data_end.value, 0);
   assert.ok(mark.every((word) => word === 0x63));
   wasm.exports.__stack_pointer.value = START;
-  return { memory, hold: wasm.exports.loads_hold };
+  return { memory, hold: wasm.exports.loads_hold, holdCoupled: wasm.exports.loads_hold_coupled };
 }
 
 // The scalar Loads algorithm before batching, retaining the original parenthesization and rounded stores.
@@ -164,4 +165,65 @@ test('the native ABI refuses invalid regions and reports the bad input row witho
   inWords[STRIDE + 3] = NaN;
   assert.equal(hold(START, 2, forces, 2, 0), 2, 'the second input is nonfinite');
   assert.deepEqual(Array.from(outWords.slice(WRENCH)), [0, 0, 0, 0, 0, 0]);
+});
+
+for (const shared of [false, true]) {
+  test(`the ${shared ? 'shared' : 'plain'} SIMD batch holds six coupled motions against a known applied wrench`, async () => {
+    const { memory, holdCoupled } = await instance(shared);
+    const count = 65;
+    const outputRows = 128;
+    const forces = START + count * COUPLED * 8 + 64;
+    const packed = new Float64Array(memory.buffer, START, count * COUPLED).fill(0);
+    const output = new Float64Array(memory.buffer, forces, outputRows * WRENCH).fill(-17);
+    const expected = output.slice();
+    const relative = 192 * Number.EPSILON;
+    const gravity = 9.81;
+    for (let i = 0; i < count; i++) {
+      const mass = 10 ** ((i % 11) - 4);
+      const row = (17 * i + 31) % outputRows;
+      const held = [0.5, 1.5 + (i % 9), -2.5, 3.5, -4.5, 5.5].map((value) => value * mass);
+      const weight = -mass * gravity;
+      const twist = [0.48, -0.52, 0.46, 0.51, 0.54, -0.63];
+      const inRotation = i % 5 === 0 ? [0, 0, 0] : [0.21 / mass, 0, 0.7 / mass].map(Math.fround);
+      const acceleration = held.map((value, axis) => (axis < 3 ? value / mass : value * inRotation[axis - 3]));
+      const added = (r, c) => mass * (twist[r] * twist[c] + (r === c ? (r + 1) * 0.2 : 0));
+      const applied = held.map(
+        (value, axis) => value + acceleration.reduce((torque, a, c) => torque + a * added(axis, c), 0),
+      );
+      applied[1] -= weight;
+      const input = packed.subarray(i * COUPLED, (i + 1) * COUPLED);
+      input.set([row, mass, ...applied]);
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          input[8 + 3 * r + c] = added(r, c);
+          input[17 + 3 * r + c] = added(r + 3, c + 3);
+          input[STRIDE + 3 * r + c] = added(r, c + 3);
+        }
+      }
+      input.set([inRotation[0], 0, 0, inRotation[1], 0, inRotation[2]], 26);
+      for (let axis = 0; axis < WRENCH; axis++) expected[row * WRENCH + axis] += held[axis] - (axis === 1 ? weight : 0);
+    }
+
+    const initial = packed.slice();
+    assert.equal(holdCoupled(START, count, forces, outputRows, gravity), 0, 'one call for every coupled row');
+    assert.deepEqual(packed, initial, 'the next step can repack the same region');
+    for (const [i, value] of output.entries()) {
+      // Three-product mobility and six-equation elimination on well-conditioned manufactured systems.
+      const bound = relative * Math.max(1, Math.abs(expected[i] + 17));
+      assert.ok(Math.abs(value - expected[i]) <= bound, `word ${i}: ${value} vs ${expected[i]} ± ${bound}`);
+    }
+    assert.ok(new Uint8Array(memory.buffer, forces - 64, 64).every((word) => word === 0x63));
+  });
+}
+
+test('a singular six-axis system reports the row without publishing a partial wrench', async () => {
+  const { memory, holdCoupled } = await instance(false);
+  const forces = START + COUPLED * 8;
+  const input = new Float64Array(memory.buffer, START, COUPLED).fill(0);
+  const output = new Float64Array(memory.buffer, forces, WRENCH).fill(12);
+  input.set([0, 8, 2, 4, 6, 8, 10, 12]);
+  input[8] = -8;
+  assert.equal(holdCoupled(START, 1, forces, 1, 0), 1);
+  assert.deepEqual(output, new Float64Array(WRENCH).fill(12));
+  assert.equal(holdCoupled(START, 1, START + 32 * 8, 1, 0), -1, 'the cross block must not overlap the output');
 });

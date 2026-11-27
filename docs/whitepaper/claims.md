@@ -393,6 +393,15 @@ first: each names its scope, its evidence file and how to reproduce it.
   Reproduce with `node --test packages/physics/tests/loads-radiation-profile.test.js`.
   [Vugts, Report 194, Table 5.1 and Fig. 6.5](https://scispace.com/pdf/the-hydrodynamic-coefficients-for-swaying-heaving-and-3a4lrtj0vo.pdf).
 
+- Coupled body radiation (SEA-12). The width-confined rectangular section reproduces six independent
+  normalized sway–roll inertia observations within 0.0060. The predicted signed damping crest is −0.129833
+  against the reciprocal measured values −0.142 and −0.184, with the difference of the reciprocal
+  experiments as its qualification bound. The separate 3D panel case has 0.7842% normalized RMS error
+  against its numerical response. Live coupled wrenches in TypeScript and both Wasm builds are
+  bit-identical in a world using both hold layouts. Reproduce with `loads-radiation-coupled-profile.test.js`
+  and `loads-coupled-radiation.test.js` under `packages/physics/tests`.
+  [Vugts, Report 194, width-confined rectangular section](https://doi.org/10.3233/ISP-1968-1516702).
+
 - Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
   properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
   2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts

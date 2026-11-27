@@ -3831,6 +3831,10 @@ solvers and supplies their staggered order. `withRigidCylinder` takes a radius f
 `withCylinder` exposes motion and reaction fields for a prescribed path. These modes use a flat, wet,
 periodic channel on the world clock.
 
+Both footprint extents must fit one grid cell. A nearly closed cell shares its conserved water state
+with a fluid neighbour for that pressure step.
+A fully covered cell publishes zero depth and receives water through the shared state when it reopens.
+
 ```ts
 import {Physics} from 'margoengine/physics';
 import {bedSurface} from 'margoengine/physics/earth';
@@ -4170,8 +4174,9 @@ The sea, current and wind can use separate origin cells. Set `cellSize` to the P
 if it differs from the default of 4096 m. World-fixed members use the LoadSolver's origin cell.
 
 Use `await LoadSolver.load({id, signal})` for the optional Rust SIMD wrench batch. It uses the containing
-world's plain or shared memory and holds all active rows in one call. The synchronous constructor uses
-the TypeScript reference. `workCounts()` reports the number of held bodies, native calls and reserved scratch bytes.
+world's plain or shared memory. It batches the ordinary 32-word rows and six-axis 41-word rows
+separately, with one call for each active layout. The synchronous constructor uses the TypeScript
+reference. `workCounts()` reports held bodies, native calls and reserved scratch bytes.
 
 `radiationProfile(mesh, {mass, density, centre})` computes coefficients at the hull's still-water draft.
 Its default reference is deep-water strip theory. Select `panels: {frequencies, depth}` for the native
@@ -4179,8 +4184,13 @@ three-dimensional reference. Use the returned `addedMass`, `addedInertia` and
 `radiationResonances: profile.resonances` on the same mesh in the loads solver.
 `frequencyResponse` reports the sampled band and the fit error in each principal motion.
 
+`coupledRadiationProfile` keeps cross-motion inertia and damping from the full 6×6 panel response.
+Choose it for hulls where heave and pitch, or sway and roll, interact. Pass the result as `coupledRadiation`
+on the matching `LoadBody` and use that body's local rigid centre of mass and water density. It supplies
+its own added inertia and memory. It models small wave motions at zero forward speed.
+
 ```ts
-import {radiationProfile} from 'margoengine/physics/loads';
+import {coupledRadiationProfile, radiationProfile} from 'margoengine/physics/loads';
 
 const mesh = {
   vertices: [-2,-0.5,-1, 2,-0.5,-1, 2,0.5,-1, -2,0.5,-1, -2,-0.5,1, 2,-0.5,1, 2,0.5,1, -2,0.5,1],
@@ -4189,6 +4199,10 @@ const mesh = {
 const profile = await radiationProfile(mesh, {mass: 4100, density: 1025, centre: [0, 0, 0]});
 const loads = {addedMass: profile.addedMass, addedInertia: profile.addedInertia, radiationResonances: profile.resonances};
 console.log(profile.draft.toFixed(2), loads.radiationResonances.length > 0); // 0.50 true
+const coupledRadiation = await coupledRadiationProfile(mesh, {mass: 4100, density: 1025, centre: [0, 0, 0],
+  panels: {depth: 4, frequencies: [0.25, 0.4, 0.6, 0.8]}});
+const coupledLoad = {shape: {mesh}, coupledRadiation};
+console.log(coupledLoad.coupledRadiation.infiniteMass.length); // 36
 ```
 
 Omit `capacity` to use the world's rigid body rows. Unsupported load inputs raise `MargoError` with

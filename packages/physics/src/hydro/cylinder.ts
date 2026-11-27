@@ -23,6 +23,7 @@ import { DRY, type ShallowGrid, shallowOpenRates, velocityOf } from './shallow.j
 
 type Point = readonly [number, number];
 type Impulse = [number, number, number, number, number, number];
+const UNMERGED_AREA_FRACTION = Math.PI / 4;
 
 function bad(message: string): MargoError {
   return new MargoError('unsupported', `${message} See https://margoengine.com/errors#hydrodynamic-loads`);
@@ -99,6 +100,110 @@ function stagedHeight(value: number): number {
       'A moving shallow-water cylinder requires wet cells; increase the channel depth or use HYDRO-01 without it.',
     );
   return value;
+}
+
+interface CutCellMerge {
+  readonly cut: number;
+  readonly neighbour: number;
+  readonly from: number;
+  readonly to: number;
+}
+
+/** Causon, Ingram and Mingham (2001, §3.4): integrate disappearing cells with a wet neighbour. */
+function smallCutCellMerge(grid: ShallowGrid, geometry: CylinderGeometry, motion: Point): CutCellMerge | undefined {
+  const { occupiedStart, occupiedEnd, openX, openZ } = geometry;
+  const { nx, nz, dx, dz } = grid;
+  // The change in overlap is bounded by a full face length in each direction.
+  // From the nearer endpoint, occupation can gain at most half the swept fraction.
+  const sweep = Math.abs(motion[0]) / dx + Math.abs(motion[1]) / dz;
+  for (let cut = 0; cut < occupiedStart.length; cut++) {
+    const old = occupiedStart[cut]!,
+      next = occupiedEnd[cut]!;
+    if (Math.max(old, next) + sweep / 2 <= UNMERGED_AREA_FRACTION) continue;
+    // The Courant limit bounds sweep by 0.5 (1 - π/4). A candidate had
+    // more than half a cell of solid at the start, so there can only be one.
+    const column = cut % nx,
+      row = Math.floor(cut / nx),
+      west = row * nx + ((column + nx - 1) % nx),
+      east = row * nx + ((column + 1) % nx),
+      south = ((row + nz - 1) % nz) * nx + column,
+      north = ((row + 1) % nz) * nx + column;
+    const faces = [
+      { cell: west, open: openX[cut]! * dz },
+      { cell: east, open: openX[east]! * dz },
+      { cell: south, open: openZ[cut]! * dx },
+      { cell: north, open: openZ[north]! * dx },
+    ];
+    let neighbour = -1,
+      aperture = 0;
+    for (const { cell, open } of faces)
+      if (open > aperture || (open > 0 && open === aperture && cell < neighbour)) {
+        aperture = open;
+        neighbour = cell;
+      }
+    if (neighbour < 0) {
+      if (old === 1 && next === 1) return undefined;
+      throw bad('The small cut cell has no open face to wet water; use a narrower obstacle or a shorter common step.');
+    }
+    return {
+      cut,
+      neighbour,
+      from: 2 - (old + occupiedStart[neighbour]!),
+      to: 2 - (next + occupiedEnd[neighbour]!),
+    };
+  }
+  return undefined;
+}
+
+/** Project intensive states without changing their joint extensive quantity. */
+function mergeState(state: Float64Array, merge: CutCellMerge, occupiedStart: Float64Array): void {
+  const { cut, neighbour, from } = merge;
+  const reference = state[neighbour]!;
+  state[cut] = state[neighbour] = reference + ((1 - occupiedStart[cut]!) / from) * (state[cut]! - reference);
+}
+
+type WaterState = readonly [Float64Array, Float64Array, Float64Array];
+
+/** Use the same beginning/end geometry in both stages and evolve the aggregate before dividing by its storage. */
+function evolveStage(
+  before: WaterState,
+  after: WaterState,
+  geometry: CylinderGeometry,
+  merge: CutCellMerge | undefined,
+  first: Rates,
+  dt: number,
+  second?: Rates,
+): void {
+  const { occupiedStart, occupiedEnd } = geometry;
+  const scale = second ? 0.5 * dt : dt;
+  for (const [axis, name] of (['depth', 'x', 'z'] as const).entries()) {
+    const start = before[axis]!,
+      state = after[axis]!,
+      a = first[name],
+      b = second?.[name];
+    for (let k = 0; k < start.length; k++) {
+      if (k === merge?.cut || k === merge?.neighbour) continue;
+      const from = 1 - occupiedStart[k]!,
+        to = 1 - occupiedEnd[k]!;
+      // A solid cell throughout the substep owns neither storage nor open-face flux.
+      if (from === 0 && to === 0) {
+        state[k] = start[k]!;
+        continue;
+      }
+      if (!(from > 0 && to > 0))
+        throw bad('The cut-cell storage cannot be represented; use a narrower footprint or resize the water grid.');
+      const rate = b ? a[k]! + b[k]! : a[k]!;
+      const value = update(start[k]!, from - to, to, scale * rate);
+      state[k] = axis === 0 ? stagedHeight(value) : value;
+    }
+    if (merge) {
+      const { cut, neighbour, from, to } = merge;
+      const r0 = a[cut]! + a[neighbour]!;
+      const rate = b ? r0 + (b[cut]! + b[neighbour]!) : r0;
+      const value = update(start[neighbour]!, from - to, to, scale * rate);
+      state[cut] = state[neighbour] = axis === 0 ? stagedHeight(value) : value;
+    }
+  }
 }
 
 function waterEnergy(
@@ -181,9 +286,9 @@ export class CylinderBlockage {
     if (!(grid.nx >= 3 && grid.nz >= 3 && grid.g > 0) || !grid.sides.every((side) => side === 'periodic'))
       throw bad('A shallow-water blockage needs positive gravity and at least 3×3 periodic cells.');
     const { low, high, area } = this.footprint;
-    if (high[0] - low[0] > grid.dx || high[1] - low[1] > grid.dz || area > (Math.PI / 4) * grid.dx * grid.dz)
+    if (high[0] - low[0] > grid.dx || high[1] - low[1] > grid.dz || !(area <= grid.dx * grid.dz))
       throw bad(
-        'The blockage footprint exceeds the cut-cell capacity; fit each extent within one cell and its area within π/4 of the cell.',
+        'The blockage footprint exceeds the cut-cell capacity; fit each extent within one cell and its area within the cell area.',
       );
 
     this.host = host;
@@ -269,7 +374,10 @@ export class CylinderBlockage {
     const dx = this.displacement(pose[0]!, centre[0], grid.nx * grid.dx);
     const dz = this.displacement(pose[1]!, centre[1], grid.nz * grid.dz);
     const wallVelocity: Point = [dx / dt, dz / dt];
-    const cutAreaLowerBound = 1 - this.footprint.area / (grid.dx * grid.dz);
+    const cellArea = grid.dx * grid.dz;
+    const mergeSmallCells = this.footprint.area > UNMERGED_AREA_FRACTION * cellArea;
+    // A pair's aggregate is at least half open because the one obstacle occupies at most one cell.
+    const cutAreaLowerBound = 1 - (mergeSmallCells ? UNMERGED_AREA_FRACTION : this.footprint.area / cellArea);
     const n = grid.nx * grid.nz;
     const h = new Float64Array(n);
     const hu = new Float64Array(n);
@@ -293,12 +401,19 @@ export class CylinderBlockage {
     let geometry: CylinderGeometry | undefined;
     while (elapsed < dt) {
       let rate = Math.abs(wallVelocity[0]) / grid.dx + Math.abs(wallVelocity[1]) / grid.dz;
+      let advection = rate,
+        waves = 0;
       for (let k = 0; k < n; k++) {
         const c = Math.sqrt(grid.g * h[k]!);
         const x = Math.abs(velocityOf(h[k]!, hu[k]!)) + Math.abs(wallVelocity[0]) + c;
         const z = Math.abs(velocityOf(h[k]!, hv[k]!)) + Math.abs(wallVelocity[1]) + c;
         rate = Math.max(rate, x / grid.dx + z / grid.dz);
+        if (mergeSmallCells) {
+          advection = Math.max(advection, (x - c) / grid.dx + (z - c) / grid.dz);
+          waves = Math.max(waves, c);
+        }
       }
+      if (mergeSmallCells) rate = Math.max(rate, advection + waves * (1 / grid.dx + 1 / grid.dz));
       const sub = Math.min(dt - elapsed, (courant * cutAreaLowerBound) / rate);
       if (!(sub > 0 && Number.isFinite(sub) && elapsed + sub > elapsed))
         throw bad(
@@ -307,25 +422,16 @@ export class CylinderBlockage {
       const start: Point = [pose[0]! + elapsed * wallVelocity[0], pose[1]! + elapsed * wallVelocity[1]];
       const end: Point = [start[0] + sub * wallVelocity[0], start[1] + sub * wallVelocity[1]];
       geometry = blockageGeometry(grid, this.footprint, start, end);
-      const { occupiedStart, occupiedEnd } = geometry;
+      const merge = mergeSmallCells
+        ? smallCutCellMerge(grid, geometry, [end[0] - start[0], end[1] - start[1]])
+        : undefined;
+      const before = [h, hu, hv] as const;
+      const staged = [h1, hu1, hv1] as const;
+      if (merge) for (const component of before) mergeState(component, merge, geometry.occupiedStart);
       const r0 = rates(grid, geometry, h, hu, hv, wallVelocity, cy!);
-      for (let k = 0; k < n; k++) {
-        const from = 1 - occupiedStart[k]!;
-        const to = 1 - occupiedEnd[k]!;
-        const storageChange = from - to;
-        h1[k] = stagedHeight(update(h[k]!, storageChange, to, sub * r0.depth[k]!));
-        hu1[k] = update(hu[k]!, storageChange, to, sub * r0.x[k]!);
-        hv1[k] = update(hv[k]!, storageChange, to, sub * r0.z[k]!);
-      }
+      evolveStage(before, staged, geometry, merge, r0, sub);
       const r1 = rates(grid, geometry, h1, hu1, hv1, wallVelocity, cy!);
-      for (let k = 0; k < n; k++) {
-        const from = 1 - occupiedStart[k]!;
-        const to = 1 - occupiedEnd[k]!;
-        const storageChange = from - to;
-        h[k] = stagedHeight(update(h[k]!, storageChange, to, 0.5 * sub * (r0.depth[k]! + r1.depth[k]!)));
-        hu[k] = update(hu[k]!, storageChange, to, 0.5 * sub * (r0.x[k]! + r1.x[k]!));
-        hv[k] = update(hv[k]!, storageChange, to, 0.5 * sub * (r0.z[k]! + r1.z[k]!));
-      }
+      evolveStage(before, before, geometry, merge, r0, sub, r1);
       for (let k = 0; k < impulse.length; k++) impulse[k]! += 0.5 * sub * density * (r0.force[k]! + r1.force[k]!);
       elapsed += sub;
       substeps++;
@@ -367,8 +473,12 @@ export class CylinderBlockage {
     return [this.pose, this.occupied, this.receipt];
   }
 
+  occupiedFractions(): Float64Array {
+    return this.words(this.occupied);
+  }
+
   volume(state: Float64Array, cellArea: number): number {
-    const occupied = this.words(this.occupied);
+    const occupied = this.occupiedFractions();
     let total = 0;
     for (let k = 0; k < occupied.length; k++) total += (1 - occupied[k]!) * state[3 * k]!;
     return total * cellArea;

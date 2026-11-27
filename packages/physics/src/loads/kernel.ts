@@ -8,6 +8,9 @@ import type { SolverHost } from '../world/solver.js';
  */
 export const LOADS_KERNEL_WORDS = 32;
 
+/** The regular row followed by the 3×3 linear/angular cross-inertia block. */
+export const LOADS_KERNEL_COUPLED_WORDS = LOADS_KERNEL_WORDS + 9;
+
 export interface LoadsBuilds {
   readonly plain: WebAssembly.Module;
   readonly shared?: WebAssembly.Module;
@@ -16,6 +19,8 @@ export interface LoadsBuilds {
 export interface LoadsKernel {
   /** Adds held wrenches into the selected output rows. Success is 0, invalid arguments -1, bad row index + 1. */
   loads_hold(scratch: number, count: number, forceRegion: number, forceRows: number, gravity: number): number;
+  /** The same receipt and return codes for six-axis coupled radiation rows. */
+  loads_hold_coupled(scratch: number, count: number, forceRegion: number, forceRows: number, gravity: number): number;
 }
 
 export async function loadLoadsBuilds(signal?: AbortSignal): Promise<LoadsBuilds> {
@@ -71,7 +76,11 @@ export function bindLoadsKernel(host: SolverHost, builds: LoadsBuilds): LoadsKer
     );
   const stack = host.allocate('loads-kernel-stack', STACK_BYTES + 8, 'u8', 1);
   const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
-  if (!(exports.__stack_pointer instanceof WebAssembly.Global) || typeof exports.loads_hold !== 'function')
+  if (
+    !(exports.__stack_pointer instanceof WebAssembly.Global) ||
+    typeof exports.loads_hold !== 'function' ||
+    typeof exports.loads_hold_coupled !== 'function'
+  )
     throw new MargoError('failed', 'The loads kernel ABI is invalid; rebuild the optional Wasm assets.');
   exports.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
   return exports as unknown as LoadsKernel;

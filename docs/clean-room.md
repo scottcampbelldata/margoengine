@@ -13057,6 +13057,12 @@ back into the next accepted obstruction step. The pressure wall uses Causon, Ing
 Sections 3.2–3.2.1. [Causon et al. (2001), *A Cartesian cut cell method for shallow water flows with moving boundaries*](https://doi.org/10.1016/S0309-1708(01)00010-0) ·
 [Sanders, Schubert and Gallegos (2008), *Integral formulation of shallow-water equations with anisotropic porosity*](https://doi.org/10.1016/j.jhydrol.2008.08.009)
 
+In Causon et al. §3.4, equations 34–38 sum the conserved quantities of a disappearing cell and a fluid
+neighbour. For one obstacle bounded by the area of a grid cell, a two-cell aggregate always has at least
+one cell's worth of water storage. Both Runge–Kutta stages integrate mass and discharge with the same
+pair and swept geometry before dividing by the aggregate's new open area. The common internal
+face term cancels, and the wall pressure still contributes one paired impulse to water and rigid.
+
 The same shallow-water impulse model loads clipped paddle blades at their actual lever arms and wading
 profiles at their centres of pressure. The rigid shaft receives torque from the immersed blade, and a
 driven motor returns momentum to the water. The test uses actual revolute and shallow-water solvers.
@@ -13085,6 +13091,25 @@ holdout from Vugts Report 194 Table 5.1 and Fig. 6.5 has a 0.30 m draft and a no
 of 0.57–0.60. The geometry-only profile computes 0.299987 m and 0.597699. The measured damping is held out
 of the reference solve and of the fit. [J. H. Vugts (1968), *The hydrodynamic coefficients for swaying, heaving and rolling cylinders in a free surface*](https://doi.org/10.3233/ISP-1968-1516702) ·
 [T. Pérez and T. I. Fossen (2008), *Time- vs. Frequency-domain Identification of Parametric Radiation Force Models*](https://doi.org/10.4173/mic.2008.1.1)
+
+The full panel profile fits the complex impedance `B(ω) + iω(A(ω) − A∞)` in all six body motions, using
+signed rank-one directions and positive residues. The same direction projects rigid velocity into each
+mode and distributes its force and torque about the rigid centre of mass. The outer products preserve
+reciprocity and let the backward-Euler hold account for stored energy and dissipation. Poles outside the
+sampled range represent reactive tails without adding artificial reference observations. The finite-depth
+panel fixture reports 0.7842% normalized RMS and 5.4741% maximum reference-fit error and −194.278 kg·m
+sway–roll cross inertia at infinite frequency. Those errors are against the panel solve. The separate
+width-confined Vugts B/T=2 rectangular tank holdout compares six signed sway–roll inertia ordinates. The
+maximum absolute discrepancy is 0.0060. The predicted damping crest is −0.129833 at normalized
+frequency 0.865. The two reciprocal experiments give −0.142 and −0.184. Their difference supplies the
+observed comparison bound. The tank fixture qualifies the width-confined strip response. The live
+rigid fixture verifies simultaneous forces and torques and passive memory through dry and rewet intervals.
+[Vugts (1968), Report 194, §§5.1, 5.7 and the rectangular-section sway–roll plots](https://doi.org/10.3233/ISP-1968-1516702)
+
+Full frequency-dependent matrix coupling is used by the specialist solvers as well. The loads profile
+reuses Margo's clean-room panel solve and offers a principal-motion reference for lower cost.
+[OrcaFlex vessel added mass and damping](https://www.orcina.com/webhelp/OrcaFlex/Content/html/Vesseltypes%2CStiffness%2Caddedmassanddamping.htm) ·
+[HydroDyn modeling considerations](https://openfast.readthedocs.io/en/dev/source/user/hydrodyn/modeling_considerations.html)
 
 ### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
 

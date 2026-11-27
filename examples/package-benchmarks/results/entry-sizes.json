@@ -15056,8 +15056,8 @@
         "gzip": 17356
       },
       "./hydro": {
-        "raw": 35498,
-        "gzip": 13617
+        "raw": 36968,
+        "gzip": 14291
       },
       "./foam": {
         "raw": 17324,
@@ -15076,8 +15076,8 @@
         "gzip": 14217
       },
       "./loads": {
-        "raw": 94286,
-        "gzip": 35538
+        "raw": 105853,
+        "gzip": 39422
       },
       "./surge": {
         "raw": 9465,
@@ -19328,14 +19328,14 @@
       "brotli": 424250
     },
     "packages/physics/dist/loads-kernel.wasm": {
-      "raw": 2884,
-      "gzip": 1193,
-      "brotli": 1052
+      "raw": 7668,
+      "gzip": 2756,
+      "brotli": 2355
     },
     "packages/physics/dist/loads-kernel-shared.wasm": {
-      "raw": 2884,
-      "gzip": 1194,
-      "brotli": 1065
+      "raw": 7668,
+      "gzip": 2756,
+      "brotli": 2323
     }
   },
   "splits": {

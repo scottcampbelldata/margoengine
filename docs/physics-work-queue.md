@@ -85,6 +85,19 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **SEA-12** needs consistent live port frames after `PhysicsWorld.shiftOrigin`. Shift both retained field
+  mirrors with the solver cells after range-checking all of them. Preserve the mirrors’ ticks, rates and region
+  bytes. A mixed-tick swimmer and water bridge currently reads a 1.5 m separation as −4,094.5 m on the
+  first tick after a one-cell rebase. Reproduce with a same-rate staggered group and compare original, shifted
+  and restored runs while retaining both field mirrors. Expose a live local cell to the solver host so a
+  retained water flow can report its current cell before its own step.
+- **SEA-12** needs `RigidSolver` to publish the transformed centre of mass on its initial `bodies` receipt
+  and provide effective per-axis mobility for constrained rigid bodies. An off-centre collider or body mass
+  update currently publishes the body origin as its centre until a rigid step refreshes the pose. The scalar
+  linear inverse mass and reported world inverse inertia also omit the enabled-axes flags. Test the initial
+  receipt on a rotated body with an eccentric centre and compare the effective mobility to one known impulse
+  per axis. Retain the existing body layout for current consumers.
+
 - **FLUID-01:** Connect SEA-04 and general HYDRO-01 cells to the optional DFSPH layout-1 parcel requests and
   receipts. The real HYDRO-01 wet-cell test settles signed depth and both horizontal momentum components in
   the same tick through the signed inflow and added forcing. Vertical momentum stays in a separate ledger.

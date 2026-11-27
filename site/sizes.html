@@ -97,8 +97,8 @@
 <tr><th scope="row"><code>pack-ice-kernel-shared.wasm</code></th><td>Rust SIMD pack-ice contacts and floe fracture, shared world memory</td><td class="num">5,716</td><td class="num">2,534</td><td class="num">2,332</td><td>PackIceSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity</td><td class="num">30,756</td><td class="num">11,743</td><td class="num">10,158</td><td>ThinFilmSolver.load() from the optional /thin-film entry</td></tr>
 <tr><th scope="row"><code>hull-panel-kernel.wasm</code></th><td>Rust three-dimensional hull radiation and diffraction</td><td class="num">50,232</td><td class="num">22,012</td><td class="num">19,191</td><td>bakeHullPanels() from the optional /seakeeping entry</td></tr>
-<tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">2,884</td><td class="num">1,193</td><td class="num">1,052</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
-<tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">2,884</td><td class="num">1,194</td><td class="num">1,065</td><td>LoadSolver.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">7,668</td><td class="num">2,756</td><td class="num">2,355</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
+<tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,668</td><td class="num">2,756</td><td class="num">2,323</td><td>LoadSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">30,756</td><td class="num">11,743</td><td class="num">10,152</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>crush-shell-kernel.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending</td><td class="num">19,230</td><td class="num">8,975</td><td class="num">7,824</td><td>CrushShellSolver.load() from the optional /crush entry</td></tr>
 <tr><th scope="row"><code>crush-shell-kernel-shared.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending, shared world memory</td><td class="num">19,230</td><td class="num">8,975</td><td class="num">7,824</td><td>the shell loader on a host supporting shared world memory</td></tr>
@@ -4812,12 +4812,12 @@
 <tr><td><code>./schooling</code></td><td class="num">12,254</td><td class="num">4,846</td></tr>
 <tr><td><code>./vegetation</code></td><td class="num">22,639</td><td class="num">8,980</td></tr>
 <tr><td><code>./tracers</code></td><td class="num">46,754</td><td class="num">17,356</td></tr>
-<tr><td><code>./hydro</code></td><td class="num">35,498</td><td class="num">13,617</td></tr>
+<tr><td><code>./hydro</code></td><td class="num">36,968</td><td class="num">14,291</td></tr>
 <tr><td><code>./foam</code></td><td class="num">17,324</td><td class="num">7,418</td></tr>
 <tr><td><code>./surf</code></td><td class="num">18,959</td><td class="num">7,428</td></tr>
 <tr><td><code>./rogue</code></td><td class="num">18,460</td><td class="num">7,386</td></tr>
 <tr><td><code>./ship</code></td><td class="num">32,845</td><td class="num">14,217</td></tr>
-<tr><td><code>./loads</code></td><td class="num">94,286</td><td class="num">35,538</td></tr>
+<tr><td><code>./loads</code></td><td class="num">105,853</td><td class="num">39,422</td></tr>
 <tr><td><code>./surge</code></td><td class="num">9,465</td><td class="num">4,504</td></tr>
 <tr><td><code>./ice</code></td><td class="num">6,791</td><td class="num">3,227</td></tr>
 <tr><td><code>./glacier</code></td><td class="num">7,631</td><td class="num">3,484</td></tr>

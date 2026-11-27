@@ -5,6 +5,7 @@
 use core::arch::wasm32::{f64x2, f64x2_extract_lane, f64x2_mul, memory_size, unreachable};
 
 const INPUT_WORDS: usize = 32;
+const COUPLED_WORDS: usize = INPUT_WORDS + 9;
 const OUTPUT_WORDS: usize = 6;
 
 #[panic_handler]
@@ -116,6 +117,78 @@ fn hold(input: &[f64; INPUT_WORDS], gravity: f64) -> [f64; OUTPUT_WORDS] {
     ]
 }
 
+/// Forms (I + A M_dry^-1) in wrench space. The last nine input words are
+/// the translation-to-rotation block of the symmetric added inertia A.
+fn hold_coupled(input: &[f64; COUPLED_WORDS], gravity: f64) -> [f64; OUTPUT_WORDS] {
+    let [xx, xy, xz, yy, yz, zz] = [
+        input[26], input[27], input[28], input[29], input[30], input[31],
+    ];
+    let angular_mobility = [[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]];
+    let mass = input[1];
+    let inverse_mass = 1.0 / mass;
+    let weight = -mass * gravity;
+    let mut system = [[0.0; 7]; 6];
+    for (row, equation) in system.iter_mut().enumerate() {
+        let (linear, angular) = if row < 3 {
+            (block_row(input, 8, row), block_row(input, INPUT_WORDS, row))
+        } else {
+            let at = INPUT_WORDS + row - 3;
+            (
+                [input[at], input[at + 3], input[at + 6]],
+                block_row(input, 17, row - 3),
+            )
+        };
+        for col in 0..3 {
+            let linear_diagonal = if row == col { 1.0 } else { 0.0 };
+            let angular_diagonal = if row == col + 3 { 1.0 } else { 0.0 };
+            equation[col] = linear_diagonal + linear[col] * inverse_mass;
+            equation[col + 3] = angular_element(angular_diagonal, angular, angular_mobility[col]);
+        }
+        equation[6] = input[2 + row] + if row == 1 { weight } else { 0.0 };
+    }
+    let mut held = solve_coupled(system);
+    held[1] -= weight;
+    held
+}
+
+#[inline]
+fn block_row(input: &[f64; COUPLED_WORDS], offset: usize, row: usize) -> [f64; 3] {
+    let start = offset + 3 * row;
+    [input[start], input[start + 1], input[start + 2]]
+}
+
+fn solve_coupled(mut system: [[f64; 7]; 6]) -> [f64; 6] {
+    for k in 0..6 {
+        let mut pivot = k;
+        for row in k + 1..6 {
+            if system[row][k].abs() > system[pivot][k].abs() {
+                pivot = row;
+            }
+        }
+        let diagonal = system[pivot][k];
+        if diagonal == 0.0 || !diagonal.is_finite() {
+            return [f64::NAN; 6];
+        }
+        system.swap(pivot, k);
+        let top = system[k];
+        for row in system.iter_mut().skip(k + 1) {
+            let multiplier = row[k] / diagonal;
+            for column in k + 1..7 {
+                row[column] -= multiplier * top[column];
+            }
+        }
+    }
+    let mut solution = [0.0; 6];
+    for k in (0..6).rev() {
+        let mut rhs = system[k][6];
+        for j in k + 1..6 {
+            rhs -= system[k][j] * solution[j];
+        }
+        solution[k] = rhs / system[k][k];
+    }
+    solution
+}
+
 fn region_end(address: u32, rows: u32, words: usize, arena_bytes: u64) -> Option<u64> {
     let address = u64::from(address);
     let byte_len = u64::from(rows) * words as u64 * 8;
@@ -134,6 +207,37 @@ pub unsafe extern "C" fn loads_hold(
     force_rows: u32,
     gravity: f64,
 ) -> i32 {
+    hold_rows(scratch, count, force_region, force_rows, gravity, hold)
+}
+
+/// Adds held wrenches with all six motions coupled. The input has the legacy
+/// 32 words followed by the nine cross-inertia words in row-major order.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn loads_hold_coupled(
+    scratch: u32,
+    count: u32,
+    force_region: u32,
+    force_rows: u32,
+    gravity: f64,
+) -> i32 {
+    hold_rows(
+        scratch,
+        count,
+        force_region,
+        force_rows,
+        gravity,
+        hold_coupled,
+    )
+}
+
+fn hold_rows<const WORDS: usize>(
+    scratch: u32,
+    count: u32,
+    force_region: u32,
+    force_rows: u32,
+    gravity: f64,
+    solve: impl Fn(&[f64; WORDS], f64) -> [f64; OUTPUT_WORDS],
+) -> i32 {
     if !(gravity.is_finite() && gravity >= 0.0) || count > force_rows {
         return -1;
     }
@@ -141,7 +245,7 @@ pub unsafe extern "C" fn loads_hold(
         return 0;
     }
     let arena_bytes = memory_size::<0>() as u64 * 65_536;
-    let Some(input_end) = region_end(scratch, count, INPUT_WORDS, arena_bytes) else {
+    let Some(input_end) = region_end(scratch, count, WORDS, arena_bytes) else {
         return -1;
     };
     let Some(output_end) = region_end(force_region, force_rows, OUTPUT_WORDS, arena_bytes) else {
@@ -151,7 +255,7 @@ pub unsafe extern "C" fn loads_hold(
         return -1;
     }
 
-    let input_ptr = scratch as *const [f64; INPUT_WORDS];
+    let input_ptr = scratch as *const [f64; WORDS];
     let output_ptr = force_region as *mut [f64; OUTPUT_WORDS];
     for index in 0..count {
         // The rectangular regions were checked above, and the selected row is validated before writing it.
@@ -164,7 +268,7 @@ pub unsafe extern "C" fn loads_hold(
         {
             return index as i32 + 1;
         }
-        let wrench = hold(input, gravity);
+        let wrench = solve(input, gravity);
         let output = unsafe { &mut *output_ptr.add(row as usize) };
         let next = [
             output[0] + wrench[0],

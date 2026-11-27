@@ -38,10 +38,25 @@ import {
   compactSpinTorque,
   compactWindLoad,
 } from './compact-drag.js';
-import { bindLoadsKernel, LOADS_KERNEL_WORDS, loadLoadsBuilds, type LoadsBuilds, type LoadsKernel } from './kernel.js';
+import {
+  addCoupledRadiation,
+  holdCoupledRadiation,
+  prepareCoupledRadiation,
+  type PreparedCoupledRadiation,
+  validateCoupledCentre,
+} from './coupled-radiation.js';
+import {
+  bindLoadsKernel,
+  LOADS_KERNEL_COUPLED_WORDS,
+  LOADS_KERNEL_WORDS,
+  loadLoadsBuilds,
+  type LoadsBuilds,
+  type LoadsKernel,
+} from './kernel.js';
 import { cylinderCoefficients, tangentialDrag, wakeStep } from './morison.js';
 import { memberOrbit } from './oscillatory.js';
 import { type LocatedWater, localFlow, localSea } from './origin.js';
+import { prepareCoupledRadiationProfile, type LoadCoupledRadiationProfile } from './radiation-coupled-profile.js';
 import {
   type LoadRadiationMode,
   type LoadRadiationResonance,
@@ -87,6 +102,8 @@ export interface LoadBody {
   readonly radiation?: readonly LoadRadiationMode[];
   /** Passive resonant radiation kernels in the principal motions at the rigid centre of mass. Default empty. */
   readonly radiationResonances?: readonly LoadRadiationResonance[];
+  /** Optional six-motion radiation at the rigid COM, replacing the principal-axis added inertia and radiation options. */
+  readonly coupledRadiation?: LoadCoupledRadiationProfile;
   /** 'surface' integrates incident pressure on a box or closed mesh. Default 'compact' uses a local plane and point acceleration. */
   readonly pressureModel?: 'compact' | 'surface';
   /** The wind's drag coefficient on its emerged area. The default follows Reynolds number and shape. */
@@ -143,6 +160,7 @@ interface BodyRuntime {
   readonly addedInertia: Vec3;
   readonly radiation: readonly RadiationMode[];
   readonly resonances: readonly RadiationResonance[];
+  readonly coupledRadiation: PreparedCoupledRadiation | undefined;
   readonly dragGeometry: CompactDragGeometry;
   readonly sphere: boolean;
   /** A box's exact half extents, also used for its vertical support. */
@@ -157,6 +175,7 @@ interface BodyLoads {
   torque: Vec3;
   added: Float64Array;
   rotational?: Float64Array;
+  coupled?: Float64Array;
 }
 
 /** A member's load from the last step, world axes: force, N, at its middle, and its wake's lift coefficient. */
@@ -194,6 +213,7 @@ export class LoadSolver implements Solver<LoadParams> {
   private forces!: Region;
   private wakes!: Region;
   private history: Region | undefined;
+  private hasCoupledRadiation = false;
   private builds: LoadsBuilds | undefined;
   private native: { kernel: LoadsKernel; scratch: Region } | undefined;
   private heldBodies = 0;
@@ -264,14 +284,34 @@ export class LoadSolver implements Solver<LoadParams> {
     this.level = level as RateLevel;
     const rows: number[] = [];
     let radiationWords = 1;
+    const dt = 1 / rateOf(this.level);
     this.bodies = bodies.map((spec) => {
       if (!(Number.isInteger(spec?.row) && spec.row >= 0))
         throw invalidLoad(`A body's row is a whole number, 0 or more (got ${spec?.row}); pass the body's row.`);
       rows.push(spec.row);
+      let coupled: PreparedCoupledRadiation | undefined;
+      if (spec.coupledRadiation !== undefined) {
+        if (
+          spec.addedMass !== undefined ||
+          spec.addedInertia !== undefined ||
+          spec.radiation !== undefined ||
+          spec.radiationResonances !== undefined
+        )
+          throw invalidLoad(
+            'Coupled radiation already includes water inertia and memory; supply only coupledRadiation.',
+          );
+        const profile = prepareCoupledRadiationProfile(spec.coupledRadiation);
+        if (profile.density !== sea.density)
+          throw invalidLoad(
+            'Coupled radiation density differs from the water; generate the profile using sea.density.',
+          );
+        coupled = prepareCoupledRadiation(profile, dt, radiationWords);
+        radiationWords += coupled.words;
+      }
       if (spec.radiation !== undefined && !Array.isArray(spec.radiation))
         throw invalidLoad('Invalid radiation modes; supply an array of axis, strength and decayTime records.');
       const modes = (spec.radiation ?? []).map((mode) => {
-        const prepared = prepareRadiation(mode, 1 / rateOf(this.level), radiationWords);
+        const prepared = prepareRadiation(mode, dt, radiationWords);
         radiationWords += 2;
         return prepared;
       });
@@ -280,12 +320,13 @@ export class LoadSolver implements Solver<LoadParams> {
           'Invalid radiation resonances; supply an array of axis, frequency, decayRate and strength records.',
         );
       const resonances = (spec.radiationResonances ?? []).map((mode) => {
-        const prepared = prepareRadiationResonance(mode, 1 / rateOf(this.level), radiationWords);
+        const prepared = prepareRadiationResonance(mode, dt, radiationWords);
         radiationWords += 3;
         return prepared;
       });
-      return this.prepare(spec, modes, resonances);
+      return this.prepare(spec, modes, resonances, coupled);
     });
+    this.hasCoupledRadiation = this.bodies.some((body) => body.coupledRadiation !== undefined);
     for (const m of members) {
       if (
         !(
@@ -331,12 +372,8 @@ export class LoadSolver implements Solver<LoadParams> {
     if (radiationWords > 1) this.history = host.allocate('radiation', radiationWords * 8, 'f64', LOADS_LAYOUT);
     if (this.builds) {
       const kernel = bindLoadsKernel(host, this.builds);
-      const scratch = host.allocate(
-        'held-wrench-scratch',
-        Math.max(1, capacity) * LOADS_KERNEL_WORDS * 8,
-        'f64',
-        LOADS_LAYOUT,
-      );
+      const stride = this.hasCoupledRadiation ? LOADS_KERNEL_COUPLED_WORDS : LOADS_KERNEL_WORDS;
+      const scratch = host.allocate('held-wrench-scratch', Math.max(1, capacity) * stride * 8, 'f64', LOADS_LAYOUT);
       this.native = { kernel, scratch };
     }
     // The wake oscillators start at the free van der Pol cycle's amplitude, q = 2.
@@ -349,6 +386,7 @@ export class LoadSolver implements Solver<LoadParams> {
     spec: LoadBody,
     radiation: readonly RadiationMode[],
     resonances: readonly RadiationResonance[],
+    coupledRadiation: PreparedCoupledRadiation | undefined,
   ): BodyRuntime {
     const shape = spec.shape;
     if (!shape || typeof shape !== 'object')
@@ -412,7 +450,9 @@ export class LoadSolver implements Solver<LoadParams> {
     if (!validDrag(spec.spinDrag ?? 1) || !validDrag(spec.windage ?? 1))
       throw invalidLoad('Invalid wind or spin drag; supply finite nonnegative windage and spinDrag values.');
     const sphere = Math.max(...axes) < 1.05 * Math.min(...axes),
-      addedMass = (spec.addedMass ? [...spec.addedMass] : ellipsoidAddedMass(axes)) as Vec3;
+      addedMass = (
+        coupledRadiation ? [0, 0, 0] : spec.addedMass ? [...spec.addedMass] : ellipsoidAddedMass(axes)
+      ) as Vec3;
     if (addedMass.length !== 3 || !addedMass.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient)))
       throw invalidLoad('Invalid hydrodynamic added mass; supply three finite nonnegative coefficients.');
     if (spec.addedInertia !== undefined && spec.addedInertia !== 'ellipsoid' && !Array.isArray(spec.addedInertia))
@@ -435,6 +475,7 @@ export class LoadSolver implements Solver<LoadParams> {
       addedInertia,
       radiation,
       resonances,
+      coupledRadiation,
       dragGeometry,
       sphere,
       box,
@@ -515,6 +556,7 @@ export class LoadSolver implements Solver<LoadParams> {
       inverseMass = bodies[at + 16]!,
       mass = inverseMass > 0 ? 1 / inverseMass : 0;
     if (mass === 0) return;
+    if (b.coupledRadiation) validateCoupledCentre(b.coupledRadiation, q, origin, cm);
     const centre = add(origin, rotate(q, b.centre)),
       axesWorld = b.frame.map((d) => rotate(q, d)) as [Vec3, Vec3, Vec3],
       [ax, ay, az] = b.axes,
@@ -667,6 +709,7 @@ export class LoadSolver implements Solver<LoadParams> {
       if (inertia > 0) addInertiaAxis((acc.rotational ??= new Float64Array(9)), axesWorld[axis]!, inertia);
     }
     if (history) {
+      if (b.coupledRadiation) addCoupledRadiation(acc, b.coupledRadiation, q, v, w, wet, dt, history);
       const exposed = Math.sqrt(wet);
       for (const mode of b.radiation) {
         const angular = mode.axis >= 3;
@@ -722,13 +765,24 @@ export class LoadSolver implements Solver<LoadParams> {
       const m = r.mass,
         W: Vec3 = [0, -m * this.g, 0],
         F = add(r.force, W),
-        a = r.added,
+        at = row * FORCE_WORDS;
+      if (r.coupled && bodies) {
+        const held = holdCoupledRadiation(r.coupled, r.added, r.rotational, 1 / m, bodies, row * BODY_WORDS + 17, [
+          ...F,
+          ...r.torque,
+        ]);
+        for (let k = 0; k < 3; k++) {
+          out[at + k]! += held[k]! - W[k]!;
+          out[at + 3 + k]! += held[k + 3]!;
+        }
+        continue;
+      }
+      const a = r.added,
         M = [m + a[0]!, a[1]!, a[2]!, a[3]!, m + a[4]!, a[5]!, a[6]!, a[7]!, m + a[8]!],
         inverse = invert3(M),
         held: Vec3 = [0, 0, 0];
       for (let k = 0; k < 3; k++)
         held[k] = m * (inverse[3 * k]! * F[0] + inverse[3 * k + 1]! * F[1] + inverse[3 * k + 2]! * F[2]);
-      const at = row * FORCE_WORDS;
       const torque =
         r.rotational && bodies ? holdTorque(r.torque, r.rotational, bodies, row * BODY_WORDS + 17) : r.torque;
       for (let k = 0; k < 3; k++) {
@@ -741,31 +795,47 @@ export class LoadSolver implements Solver<LoadParams> {
 
   private holdNative(bodies: Float32Array, { kernel, scratch }: { kernel: LoadsKernel; scratch: Region }): void {
     const words = regionWords(this.host.memory, scratch) as Float64Array;
-    let at = 0;
+    // Keep ordinary 32-word rows at the front and coupled rows at the end of one arena region.
+    let regular = 0;
+    let coupled = words.length;
     for (const [row, load] of this.rows) {
+      const matrix = load.coupled;
+      const at = matrix ? coupled - LOADS_KERNEL_COUPLED_WORDS : regular;
+      if (matrix) coupled = at;
+      else regular += LOADS_KERNEL_WORDS;
       words[at] = row;
       words[at + 1] = load.mass;
       words.set(load.force, at + 2);
       words.set(load.torque, at + 5);
-      words.set(load.added, at + 8);
-      if (load.rotational) words.set(load.rotational, at + 17);
-      else words.fill(0, at + 17, at + 26);
+      if (matrix) {
+        for (let i = 0; i < 3; i++)
+          for (let j = 0; j < 3; j++) {
+            const axis = 3 * i + j;
+            words[at + 8 + axis] = matrix[6 * i + j]! + load.added[axis]!;
+            const angular = matrix[6 * (i + 3) + j + 3]!;
+            words[at + 17 + axis] = load.rotational ? angular + load.rotational[axis]! : angular;
+            words[at + LOADS_KERNEL_WORDS + axis] = matrix[6 * i + j + 3]!;
+          }
+      } else {
+        words.set(load.added, at + 8);
+        if (load.rotational) words.set(load.rotational, at + 17);
+        else words.fill(0, at + 17, at + 26);
+      }
       const inertia = row * BODY_WORDS + 17;
       for (let axis = 0; axis < 6; axis++) words[at + 26 + axis] = bodies[inertia + axis]!;
-      at += LOADS_KERNEL_WORDS;
     }
-    const result = kernel.loads_hold(
-      scratch.byteOffset,
-      this.heldBodies,
-      this.forces.byteOffset,
-      this.forces.byteLength / (FORCE_WORDS * 8),
-      this.g,
-    );
-    if (result !== 0)
-      throw invalidLoad(
-        `Cannot hold hydrodynamic loads at batch row ${result}; supply finite forces and positive body masses.`,
-      );
-    this.batchCalls = 1;
+    const forceRows = this.forces.byteLength / (FORCE_WORDS * 8);
+    const run = (hold: LoadsKernel['loads_hold'], from: number, count: number): void => {
+      if (count === 0) return;
+      const result = hold(scratch.byteOffset + from * 8, count, this.forces.byteOffset, forceRows, this.g);
+      if (result !== 0)
+        throw invalidLoad(
+          `Cannot hold hydrodynamic loads at batch row ${result}; supply finite wrenches and physical inertia.`,
+        );
+      this.batchCalls++;
+    };
+    run(kernel.loads_hold, 0, regular / LOADS_KERNEL_WORDS);
+    run(kernel.loads_hold_coupled, coupled, (words.length - coupled) / LOADS_KERNEL_COUPLED_WORDS);
     this.rows.clear();
   }
 

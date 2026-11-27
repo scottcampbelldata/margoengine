@@ -862,6 +862,8 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     const s = this.words(),
       p = regionWords(this.host.memory, this.published) as Float32Array;
     p.set(s);
+    const occupied = this.cylinder?.occupiedFractions();
+    if (occupied) for (let k = 0; k < occupied.length; k++) if (occupied[k] === 1) p.fill(0, 3 * k, 3 * k + 3);
   }
 
   /** The waves' forcing contributors summed into `surfaceWaterForcing` this tick, or none. */
@@ -915,7 +917,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       j = Math.min(nz - 1, Math.max(0, Math.floor((z - this.z0) / this.grid.dz))),
       k = i + nx * j,
       s = this.words(),
-      h = s[3 * k]!;
+      h = this.cylinder?.occupiedFractions()[k] === 1 ? 0 : s[3 * k]!;
     out.depth = h;
     out.surface = this.grid.bed[k]! + h;
     out.velocity[0] = velocityOf(h, s[3 * k + 1]!);

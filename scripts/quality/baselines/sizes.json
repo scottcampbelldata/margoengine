@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20681041,
+  "total": 20685735,
   "history": [
     {
       "date": "2026-10-24",
@@ -14185,6 +14185,12 @@
       "commit": "ce06986663",
       "grew": 2,
       "reason": "@margoengine/physics/loads grew from 20816 to 35538 B gzip and from a 21441 to a 36605 B ceiling. @margoengine/physics/hydro grew from 7829 to 13617 B gzip and from a 7885 to a 14026 B ceiling. SEA-12 adds draft-dependent radiation, moving cut-cell pressure, projected hull and compact-body drag, paddle, wading and swimmer coupling. Those are optional Physics entry points and share the body and water solvers. The moving obstruction and native panel calculation load on demand. Splitting off ports would still require both solvers at every coupling."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c8af3a4312",
+      "grew": 2,
+      "reason": "@margoengine/physics/loads grew from 35538 to 39422 B gzip and from a 36605 to a 40605 B ceiling. @margoengine/physics/hydro grew from 13617 to 14291 B gzip and from a 14026 to a 14720 B ceiling. SEA-12 adds passive six-axis radiation and conservative merging for fully closing moving cut cells. The optional entries reuse the existing body and water ports. Native panels and obstruction stages load on demand. A split would still ship the load or water path that consumes them."
     }
   ],
   "items": {
@@ -15028,7 +15034,7 @@
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,
     "@margoengine/physics/groundwater": 4158,
-    "@margoengine/physics/hydro": 14026,
+    "@margoengine/physics/hydro": 14720,
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
     "@margoengine/physics/landscape": 4538,
@@ -15036,7 +15042,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 36605,
+    "@margoengine/physics/loads": 40605,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 8785,

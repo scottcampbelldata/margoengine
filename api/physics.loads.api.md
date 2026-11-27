@@ -141,8 +141,42 @@ export interface LoadBody {
     readonly addedInertia?: 'ellipsoid' | readonly [number, number, number];
     readonly radiation?: readonly LoadRadiationMode[];
     readonly radiationResonances?: readonly LoadRadiationResonance[];
+    readonly coupledRadiation?: LoadCoupledRadiationProfile;
     readonly pressureModel?: 'compact' | 'surface';
     readonly windage?: number;
+}
+
+export interface LoadCoupledRadiationFit {
+    readonly range: readonly [number, number];
+    readonly normalizedRmsError: number;
+    readonly normalizedMaxError: number;
+    readonly sourceNegativeDamping: number;
+}
+
+export interface LoadCoupledRadiationProfile {
+    readonly centre: Vec3;
+    readonly density: number;
+    readonly waterline: number;
+    readonly draft: number;
+    readonly immersion: number;
+    readonly infiniteMass: readonly number[];
+    readonly resonances: readonly LoadCoupledRadiationResonance[];
+}
+
+export interface LoadCoupledRadiationProfileOptions {
+    readonly mass: number;
+    readonly centre?: Vec3;
+    readonly density?: number;
+    readonly panels: Pick<HullPanelOptions, 'frequencies' | 'depth' | 'gravity'> | HullPanelResponse;
+    readonly poles?: number;
+    readonly signal?: AbortSignal;
+}
+
+export interface LoadCoupledRadiationResonance {
+    readonly direction: readonly [number, number, number, number, number, number];
+    readonly frequency: number;
+    readonly decayRate: number;
+    readonly strength: number;
 }
 
 export interface LoadMember {
@@ -417,6 +451,10 @@ export interface WoodyDebrisImpactInput {
 
 export function accumulateFilteredWoodyContact(bodies: Float32Array, impulses: Float64Array, contact: WoodyDebrisContact): WoodyDebrisImpact | undefined;
 
+export function coupledRadiationProfile(mesh: HullMesh, options: LoadCoupledRadiationProfileOptions): Promise<LoadCoupledRadiationProfile & {
+    readonly fit: LoadCoupledRadiationFit;
+}>;
+
 export function cylinderAddedMass(kc: number, steady?: number): number;
 
 export function cylinderCoefficients(kc: number, roughness?: number, current?: number, orbital?: number, re?: number): {
@@ -554,6 +592,25 @@ interface HullPanelOptions {
     readonly frequencies: ArrayLike<number>;
     readonly headings?: number;
     readonly signal?: AbortSignal;
+}
+
+interface HullPanelResponse {
+    readonly waterline: number;
+    readonly centre: Vec3;
+    readonly depth: number;
+    readonly gravity: number;
+    readonly density: number;
+    readonly headings: number;
+    readonly panelCount: number;
+    readonly frequencies: readonly number[];
+    readonly samples: readonly HullPanelSample[];
+    readonly infiniteMass: readonly number[];
+}
+
+interface HullPanelSample {
+    readonly addedMass: readonly number[];
+    readonly damping: readonly number[];
+    readonly diffraction: readonly number[];
 }
 
 interface Port {

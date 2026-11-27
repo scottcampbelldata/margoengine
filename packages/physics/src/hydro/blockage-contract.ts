@@ -18,7 +18,7 @@ export interface ShallowMovingFootprint extends ShallowBlockageBody {
   /**
    * Perimeter vertices in order, in fixed world X/Z axes relative to the rigid centre (metres).
    * Either winding is accepted. The origin must lie strictly inside the footprint.
-   * Each extent must fit its grid spacing and the area at most π/4 of the cell.
+   * Each extent must fit its grid spacing. Small fluid volumes merge with an open neighbour.
    */
   readonly footprint: ReadonlyArray<readonly [number, number]>;
 }

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bedSurface } from '../../dist/earth.js';
-import { DRY, SHALLOW_BLOCKAGE_LAYOUT, SHALLOW_BLOCKAGE_MOTION_WORDS, ShallowWaterSolver } from '../../dist/hydro.js';
+import {
+  DRY,
+  SHALLOW_BLOCKAGE_LAYOUT,
+  SHALLOW_BLOCKAGE_MOTION_WORDS,
+  ShallowWaterSolver,
+  SURFACE_WATER_FIELD,
+} from '../../dist/hydro.js';
 import { Physics } from '../../dist/index.js';
 import { BODY_IMPULSES_FIELD, IMPULSE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../../dist/world.js';
 import {
@@ -76,23 +82,29 @@ test('the shallow-water moving piston obeys the bore, rarefaction and dry vacuum
   assert.equal(cylinderPistonDepth(HEIGHT, -3 * c, G), 0);
 });
 
-function waterLedger(water, x, z, shape) {
-  const centre = [positiveModulo(x + WIDTH / 2, WIDTH), positiveModulo(z + DEPTH / 2, DEPTH)];
+function waterLedger(water, x, z, shape, grid = GRID, depth = HEIGHT) {
+  const { nx, nz, dx, dz } = grid;
+  const width = nx * dx;
+  const span = nz * dz;
+  const area = dx * dz;
+  const centre = [positiveModulo(x + width / 2, width), positiveModulo(z + span / 2, span)];
   const cells = shape
-    ? blockageGeometry(GRID, shape, centre, centre).occupiedStart
-    : cylinderGeometry(GRID, cylinderFootprint(RADIUS), RADIUS, centre, centre).occupiedStart;
+    ? blockageGeometry(grid, shape, centre, centre).occupiedStart
+    : cylinderGeometry(grid, cylinderFootprint(RADIUS), RADIUS, centre, centre).occupiedStart;
   const totals = [0, 0];
   let maxHead = 0;
   let energy = 0;
-  for (let j = 0; j < GRID.nz; j++) {
-    for (let i = 0; i < GRID.nx; i++) {
-      const sample = water.sample((i + 0.5) * GRID.dx - WIDTH / 2, (j + 0.5) * GRID.dz - DEPTH / 2);
-      const mass = DENSITY * AREA * (1 - cells[i + GRID.nx * j]) * sample.depth;
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const sample = water.sample((i + 0.5) * dx - width / 2, (j + 0.5) * dz - span / 2);
+      const openArea = area * (1 - cells[i + nx * j]);
+      if (openArea === 0) continue;
+      const mass = DENSITY * openArea * sample.depth;
       const [u, v] = sample.velocity;
       totals[0] += mass * u;
       totals[1] += mass * v;
-      const eta = sample.depth - HEIGHT;
-      energy += 0.5 * mass * (u * u + v * v) + 0.5 * DENSITY * AREA * (1 - cells[i + GRID.nx * j]) * G * eta * eta;
+      const eta = sample.depth - depth;
+      energy += 0.5 * mass * (u * u + v * v) + 0.5 * DENSITY * openArea * G * eta * eta;
       maxHead = Math.max(maxHead, Math.abs(eta));
     }
   }
@@ -292,8 +304,9 @@ test('the same-tick cylinder reaction drives the real rigid impulse port', async
 });
 
 async function guidedCylinder(physics, mass, footprint, setup = {}) {
-  const { velocity = [0.41, 0, 0.28], depth = HEIGHT } = setup;
-  const centre = [WIDTH / 2 - 0.05, DEPTH / 2 - 0.1];
+  const { velocity = [0.41, 0, 0.28], depth = HEIGHT, grid = GRID } = setup;
+  const { nx, nz, dx, dz } = grid;
+  const centre = setup.centre ?? [(nx * dx) / 2 - 0.05, (nz * dz) / 2 - 0.1];
   const body = physics.addBody(null, {
     position: [centre[0], 0.4, centre[1]],
     linearVelocity: velocity,
@@ -303,7 +316,15 @@ async function guidedCylinder(physics, mass, footprint, setup = {}) {
     angularDamping: 0,
     linearDamping: 0,
     colliders: footprint
-      ? { shape: 'box', halfExtents: [0.185, 0.7, 0.145], mass }
+      ? {
+          shape: 'box',
+          halfExtents: [
+            Math.max(...footprint.map(([x]) => Math.abs(x))),
+            0.7,
+            Math.max(...footprint.map(([, z]) => Math.abs(z))),
+          ],
+          mass,
+        }
       : { shape: 'sphere', radius: RADIUS, mass },
   });
   const binding = { bodyRow: body.row, centre };
@@ -316,8 +337,8 @@ async function guidedCylinder(physics, mass, footprint, setup = {}) {
     ? ShallowWaterSolver.withRigidFootprint({ ...binding, footprint })
     : ShallowWaterSolver.withRigidCylinder({ ...binding, radius: RADIUS }));
   const bed = bedSurface(
-    { columns: GRID.nx, rows: GRID.nz, width: WIDTH, depth: DEPTH, centre: [0, 0] },
-    new Float64Array((GRID.nx + 1) * (GRID.nz + 1)),
+    { columns: nx, rows: nz, width: nx * dx, depth: nz * dz, centre: [0, 0] },
+    new Float64Array((nx + 1) * (nz + 1)),
   );
   const world = new PhysicsWorld({ rate: RATE, gravity: [0, -G, 0] })
     .add(new RigidSolver(), { physics })
@@ -514,10 +535,10 @@ test('unsupported footprint geometry is refused before cut-cell stepping', async
     bodyRow: 0,
     centre: [0, 0],
     footprint: [
-      [-0.25, -0.2],
-      [0.25, -0.2],
-      [0.25, 0.2],
-      [-0.25, 0.2],
+      [-0.26, -0.2],
+      [0.26, -0.2],
+      [0.26, 0.2],
+      [-0.26, 0.2],
     ],
   });
   const bed = bedSurface(
@@ -573,4 +594,102 @@ test('a nearly capacity-filling guided footprint holds exact rest down to the we
     world.advance(frames);
     assert.equal(world.hash(), hash);
   }
+});
+
+test('a nearly closed cell at rest uses a fraction-independent number of cut-cell stages', async () => {
+  await Physics.load();
+  const grid = { nx: 4, nz: 4, dx: 1, dz: 1 };
+  const depth = 0.75;
+  const centre = [1.5, 1.5];
+  const substeps = Math.ceil((2 * Math.sqrt(G * depth)) / (0.4 * (1 - Math.PI / 4) * RATE.num));
+  for (const half of [Math.sqrt(0.99) / 2, 0.5 - 2 ** -26, 0.5]) {
+    using physics = new Physics(null, { gravity: [0, -G, 0], fixedTimestep: 1 / RATE.num });
+    const footprint = [
+      [-half, -half],
+      [half, -half],
+      [half, half],
+      [-half, half],
+    ];
+    const { body, water, world } = await guidedCylinder(physics, 4096, footprint, {
+      velocity: [0, 0, 0],
+      grid,
+      depth,
+      centre,
+    });
+    const volume = water.volume();
+    near(volume, depth * (16 - 4 * half * half), 8 * Number.EPSILON * volume);
+    for (let tick = 1; tick <= 4; tick++) {
+      world.advance(tick);
+      assert.equal(water.volume(), volume);
+      assert.deepEqual(body.linearVelocity, [0, 0, 0]);
+      assert.equal(water.sample(1.5, 0.5).depth, depth);
+      assert.equal(water.sample(...centre).depth, half === 0.5 ? 0 : depth);
+    }
+    assert.deepEqual(water.work, { steps: 4, substeps: 4 * substeps });
+  }
+});
+
+test('a guided footprint closes and reopens a whole cell, then crosses a seam with a reciprocal pressure ledger', async () => {
+  await Physics.load();
+  using physics = new Physics(null, { gravity: [0, -G, 0], fixedTimestep: 1 / RATE.num });
+  const grid = { nx: 4, nz: 4, dx: 1, dz: 1 };
+  const footprint = [
+    [-0.5, -0.5],
+    [0.5, -0.5],
+    [0.5, 0.5],
+    [-0.5, 0.5],
+  ];
+  const shape = prepareFootprint(footprint);
+  const depth = 0.75;
+  const mass = 4096;
+  const speed = 1.875;
+  const { body, water, world, predictor } = await guidedCylinder(physics, mass, footprint, {
+    centre: [1.46875, 1.5],
+    velocity: [speed, 0, 0],
+    grid,
+    depth,
+  });
+  const volume = depth * (16 - 1);
+  const totalImpulse = [0, 0];
+  const initialEnergy = 0.5 * mass * speed * speed;
+  let previousEnergy = initialEnergy;
+  let closed;
+  assert.equal(water.volume(), volume);
+  assert.equal(water.sample(1.5, 1.5).depth, depth);
+  for (let tick = 1; tick <= 36; tick++) {
+    world.advance(tick);
+    const [{ region }] = predictor.exportPorts(tick);
+    const [, endX, endZ] = regionWords(world.memory, region);
+    const { totals, energy } = waterLedger(water, endX, endZ, shape, grid, depth);
+    const ports = water.exportPorts(tick);
+    const reaction = ports.find(({ field }) => field === water.blockageFields.reaction.name);
+    const [ticket, row, jx, , jz] = regionWords(world.memory, reaction.region);
+    assert.equal(ticket, tick);
+    assert.equal(row, body.row);
+    totalImpulse[0] += jx;
+    totalImpulse[1] += jz;
+    const [vx, , vz] = body.linearVelocity;
+    for (const [axis, momentum] of [mass * (vx - speed), mass * vz].entries()) {
+      near(totals[axis] + totalImpulse[axis], 0, 512 * Number.EPSILON * DENSITY * volume);
+      near(momentum, totalImpulse[axis], 64 * 2 ** -24 * mass);
+    }
+    near(water.volume(), volume, 128 * Number.EPSILON * volume);
+    const totalEnergy = energy + 0.5 * mass * (vx * vx + vz * vz);
+    assert.ok(totalEnergy < previousEnergy);
+    previousEnergy = totalEnergy;
+    if (tick === 1) {
+      assert.equal(endX, 1.5);
+      assert.ok(jx < 0);
+      assert.deepEqual(water.sample(1.5, 1.5), { depth: 0, surface: 0, velocity: [0, 0] });
+      const surface = ports.find(({ field }) => field === SURFACE_WATER_FIELD.name);
+      assert.deepEqual([...regionWords(world.memory, surface.region).subarray(45, 48)], [0, 0, 0]);
+      closed = world.takeSnapshot();
+    }
+    if (tick === 2) assert.ok(water.sample(1.5, 1.5).depth > DRY);
+  }
+  assert.ok(body.position[0] > 2);
+  const hash = world.hash();
+  world.restoreSnapshot(closed.bytes);
+  world.advance(36);
+  assert.equal(world.hash(), hash);
 });
