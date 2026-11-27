@@ -205,6 +205,7 @@ interface ProjectedFloodDragOptions {
     readonly id?: string;
     readonly rigidId?: string;
     readonly rate?: RateLevel;
+    readonly readMobility?: boolean;
     readonly signal?: AbortSignal;
 }
 

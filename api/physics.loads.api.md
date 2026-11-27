@@ -21,6 +21,7 @@ export interface FloodBlockageBody {
     readonly velocity: Vec3;
     readonly angularVelocity: Vec3;
     readonly inverseMass: number;
+    readonly effectiveInverseMass?: Vec3;
     readonly inverseInertia: Symmetric3;
 }
 
@@ -67,7 +68,9 @@ export interface FloodBodyDragParams extends FloodDragGridParams {
 
 export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
     readonly id: string;
-    constructor(id?: string);
+    constructor(id?: string, options?: {
+        readonly readMobility?: boolean;
+    });
     describe(): SolverDescription;
     init(host: SolverHost, params: FloodBodyDragParams): void;
     step({ inputs, tick, cell }: StepContext, dt: number): void;
@@ -272,11 +275,11 @@ export type LoadShape = {
 };
 
 export class LoadSolver implements Solver<LoadParams> {
-    static load({ id, signal }?: {
+    static load({ id, signal, readMobility }?: LoadSolverOptions & {
         readonly id?: string;
         readonly signal?: AbortSignal;
     }): Promise<LoadSolver>;
-    constructor(id?: string);
+    constructor(id?: string, { readMobility }?: LoadSolverOptions);
     workCounts(): {
         readonly heldBodies: number;
         readonly batchCalls: number;
@@ -290,6 +293,10 @@ export class LoadSolver implements Solver<LoadParams> {
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+}
+
+export interface LoadSolverOptions {
+    readonly readMobility?: boolean;
 }
 
 export type LoadWater = Pick<SeaSurface, 'elevation' | 'water' | 'density'>;

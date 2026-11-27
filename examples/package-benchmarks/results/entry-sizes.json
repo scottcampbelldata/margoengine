@@ -15064,8 +15064,8 @@
         "gzip": 17389
       },
       "./hydro": {
-        "raw": 61789,
-        "gzip": 22073
+        "raw": 62589,
+        "gzip": 22361
       },
       "./foam": {
         "raw": 17324,
@@ -15084,12 +15084,12 @@
         "gzip": 14217
       },
       "./loads": {
-        "raw": 114719,
-        "gzip": 42849
+        "raw": 116251,
+        "gzip": 43446
       },
       "./surge": {
         "raw": 9446,
-        "gzip": 4481
+        "gzip": 4478
       },
       "./ice": {
         "raw": 6791,
@@ -18575,14 +18575,14 @@
       "brotli": 19191
     },
     "packages/physics/dist/loads-kernel.wasm": {
-      "raw": 7668,
-      "gzip": 2756,
-      "brotli": 2355
+      "raw": 7761,
+      "gzip": 2926,
+      "brotli": 2525
     },
     "packages/physics/dist/loads-kernel-shared.wasm": {
-      "raw": 7668,
-      "gzip": 2756,
-      "brotli": 2323
+      "raw": 7761,
+      "gzip": 2926,
+      "brotli": 2524
     },
     "packages/physics/dist/thin-film-kernel-shared.wasm": {
       "raw": 30756,
