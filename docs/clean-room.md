@@ -18069,6 +18069,13 @@ The surface impulse and absorber lie outside the conservative composition. The r
 pressure uses the accepted potential difference across the whole tick.
 [Yoshida](https://doi.org/10.1016/0375-9601%2890%2990092-3)
 
+Use the transpose of linear depth interpolation to distribute a point source between the wet layer
+centres. The two weights sum to one, including at the mean surface. If the nearest depth neighbour
+is solid, retain the full contribution in its connected wet layer. The finite harmonic extension pairs
+the surface flux with the same weighted depth values. The mode test uses the
+uniform-layer normal mode and its Neumann bed as an independent reference.
+[Bao et al. (2017), §2](https://arxiv.org/abs/1701.07169)
+
 The reference hull waterplane cuts the indexed triangle mesh into exact spans between adjacent
 longitudinal knots. On each subdivided trapezoid use four-point Gauss–Legendre nodes in each
 direction on `[0,1]`. The change of coordinates includes the local trapezoid breadth. The affine

@@ -2,7 +2,7 @@
 // meshes, a quay wall's pressures and wash, the solver that holds rigid bodies with them, and the loads on a moving
 // slender structure's segments (a rod's links) that the structure solves with its own stiffness.
 export * from './debris-contact.js';
-export { FiniteQuayWake, type FiniteQuayWakeParams } from './finite-quay-wake.js';
+export { finiteQuayPointSource, FiniteQuayWake, type FiniteQuayWakeParams } from './finite-quay-wake.js';
 export * from './flood-blockage.js';
 export { FloodBodyDragSolver, type FloodBodyDragBody, type FloodBodyDragParams } from './flood-body-drag.js';
 export * from './flood-paddle.js';

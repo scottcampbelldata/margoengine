@@ -23,6 +23,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     constructor(id?: string, sources?: {
         readonly surface?: FieldDescriptor;
         readonly submerged?: SubmergedWakeSource;
+        readonly points?: FieldDescriptor;
     });
     describe(): SolverDescription;
     init(host: SolverHost, params: FiniteQuayWakeParams): void;
@@ -690,6 +691,8 @@ export function equivalentEllipsoid(mesh: {
     readonly vertices: ArrayLike<number>;
     readonly indices: ArrayLike<number>;
 }): EquivalentEllipsoid;
+
+export function finiteQuayPointSource(name: string): FieldDescriptor;
 
 export function floodBlockageExchange(input: FloodBlockageInput): FloodBlockageExchange;
 

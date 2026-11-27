@@ -5678,6 +5678,47 @@ apron where the geometry and layered grid leave a wet opening. Set `horizontalOr
 phase error of short waves in open, uniform layers. The default is 2. Both orders follow the same wet faces.
 Use a domain, layer and grid refinement check for wave scattering. See the [finite quay limits](../../docs/limits.md#finite-quay-wake-and-under-apron-flow-sea-12).
 
+#### Send a submerged wake source at its own depth
+
+With a finite receiver, a publisher can report the depth of each signed volume in metres below still
+water. Call `finiteQuayPointSource` to describe its port and pass it as `points` on `FiniteQuayWake`.
+Supply five f64 values per row in layout 1 in this order: X, Z, projection radius, point depth and signed
+volume in cubic metres. Run the publisher before the receiver in the same staggered group. Depth
+weights split the source between wet neighbours, using the free surface as the upper neighbour and
+the last wet cell at the bed. This input replaces the band source. Surface displacement and applied
+pressure can still enter through the independent `surface` field.
+
+```ts
+import {finiteQuayPointSource, FiniteQuayWake} from 'margoengine/physics/loads';
+import {PhysicsWorld, regionWords, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
+
+const points = finiteQuayPointSource('demo.pointVolumes');
+const wake = new FiniteQuayWake('wake', {points});
+let host: SolverHost;
+let region: Region;
+const source: Solver<undefined> = {
+  describe: () => ({ id: 'points', rate: 0, stableRate: () => 0, fields: [{field: points, access: 'write'}] }),
+  init(owner) {
+    host = owner;
+    region = host.allocate('volumes', 5 * 8, 'f64', 1);
+  },
+  step({tick}) {
+    const row = regionWords(host.memory, region) as Float64Array;
+    row.set([0.875, 0.875, 0.10, 0.31, tick === 0 ? 0.002 : 0]);
+  },
+  exportPorts(tick) { return [{field: points.name, region, tick, cell: host.cell}]; },
+  importPorts() {},
+  stateRegions: () => [region],
+  extraState: () => [],
+};
+const world = new PhysicsWorld({rate: {num: 60, den: 1}});
+world.add(source, undefined).add(wake, {
+  cells: [16, 8], cellSize: 0.25, depths: [0, 0.2, 0.45, 1.2],
+}).couple(['points', 'wake'], 'staggered');
+world.advance(4);
+console.log(wake.work().displacedVolume); // about 0.002 m³
+```
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.

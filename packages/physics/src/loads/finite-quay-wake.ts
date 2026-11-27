@@ -24,6 +24,20 @@ import { QuayPotential, type QuayPotentialGrid } from './quay-potential.js';
 // Yoshida (1990), equations 4.4–4.6: [a, 1 − 2a, a], where a = 1/(2 − ∛2).
 const fourthOrderStages = [1.3512071919596575, -1.7024143839193153, 1.3512071919596575] as const;
 const midpointStages = [1] as const;
+const pointWakeQuantity = 'submergedPointSeaSource';
+
+/** Open a layout-1 f64 source port with rows [x, z, radius, depth below still water, signed volume]. */
+export function finiteQuayPointSource(name: string): FieldDescriptor {
+  if (typeof name !== 'string' || !name.trim())
+    throw invalidLoad('Give the finite hull point source a unique nonempty field name.');
+  return Object.freeze({
+    name,
+    kind: 'surfaceSampleSet',
+    quantity: pointWakeQuantity,
+    unit: 'SI',
+    centring: 'particle',
+  });
+}
 
 /** Finite wave tank with solid cells and partially open faces. All lengths are in metres. */
 export interface FiniteQuayWakeParams extends QuayPotentialGrid {
@@ -46,6 +60,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
   readonly heightField: FieldDescriptor;
   private readonly sourceField?: FieldDescriptor;
   private readonly submerged?: SubmergedWakeSource;
+  private readonly points?: FieldDescriptor;
   private host!: SolverHost;
   private operator!: QuayPotential;
   private regions!: [Region, Region, Region, Region, Region];
@@ -66,7 +81,11 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
 
   constructor(
     readonly id = 'finiteQuayWake',
-    sources: { readonly surface?: FieldDescriptor; readonly submerged?: SubmergedWakeSource } = {},
+    sources: {
+      readonly surface?: FieldDescriptor;
+      readonly submerged?: SubmergedWakeSource;
+      readonly points?: FieldDescriptor;
+    } = {},
   ) {
     if (sources.surface && (sources.surface.quantity !== 'seaSource' || sources.surface.unit !== 'SI'))
       throw invalidLoad('Supply the layout-1 surface wake source in SI units.');
@@ -75,7 +94,13 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       (sources.submerged.field.quantity !== SUBMERGED_WAKE_QUANTITY || sources.submerged.field.unit !== 'SI')
     )
       throw invalidLoad('Supply the layout-1 submerged wake source and its depth bands in SI units.');
+    if (
+      sources.points &&
+      (sources.submerged || sources.points.quantity !== pointWakeQuantity || sources.points.unit !== 'SI')
+    )
+      throw invalidLoad('Pass finiteQuayPointSource in SI units as the only submerged input.');
     this.sourceField = sources.surface;
+    this.points = sources.points;
     this.submerged = sources.submerged && {
       field: sources.submerged.field,
       depths: wakeDepths(sources.submerged.depths),
@@ -90,6 +115,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
   }
 
   describe(): SolverDescription {
+    const submerged = this.points ?? this.submerged?.field;
     return {
       id: this.id,
       rate: 0,
@@ -97,7 +123,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       fields: [
         { field: this.heightField, access: 'write' },
         ...(this.sourceField ? [{ field: this.sourceField, access: 'read' as const }] : []),
-        ...(this.submerged ? [{ field: this.submerged.field, access: 'read' as const }] : []),
+        ...(submerged ? [{ field: submerged, access: 'read' as const }] : []),
       ],
     };
   }
@@ -219,7 +245,8 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     kick.fill(0);
     pressure.fill(0);
     const surface = this.sourceField && context.inputs.get(this.sourceField.name);
-    const submerged = this.submerged && context.inputs.get(this.submerged.field.name);
+    const submergedField = this.points ?? this.submerged?.field;
+    const submerged = submergedField && context.inputs.get(submergedField.name);
     if (surface) this.stamp(surface, context, false);
     let iterations = 0;
     if (submerged) {
@@ -322,7 +349,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
         'Connect the finite quay and hull sources in the same cell with matching layout-1 f64 records.',
       );
     const rows = regionWords(port.region.memory ?? this.host.memory, region) as Float64Array;
-    return this.stampRows(rows, below);
+    return below && this.points ? this.stampPoints(rows) : this.stampRows(rows, below);
   }
 
   private stampRows(rows: Float64Array, below: boolean): boolean {
@@ -356,6 +383,54 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       }
     }
     return active;
+  }
+
+  private stampPoints(rows: Float64Array): boolean {
+    const plane = this.operator.surfaceCells;
+    let active = false;
+    for (let at = 0; at < rows.length; at += SUBMERGED_WAKE_WORDS) {
+      const x = rows[at]!,
+        z = rows[at + 1]!,
+        radius = rows[at + 2]!,
+        depth = rows[at + 3]!,
+        volume = rows[at + 4]!;
+      if (volume === 0) continue;
+      if (
+        !Number.isFinite(volume) ||
+        !(radius > 0 && Number.isFinite(radius)) ||
+        !(depth >= 0 && depth <= this.depths.at(-1)!)
+      ) {
+        throw invalidLoad(
+          'Use signed finite volumes, positive radii and point depths between still water and the bed.',
+        );
+      }
+      const i = this.cellIndex(x, z);
+      const layer = this.layerAt(depth);
+      if (i < 0 || !this.operator.wetCell(i + layer * plane))
+        throw invalidLoad('Place each point volume inside a wet cell of the finite quay.');
+      const centre = this.depthCentre(layer);
+      const adjacent = depth < centre ? layer - 1 : layer + 1;
+      let fraction = 0;
+      if (adjacent === -1) {
+        fraction = 1 - depth / centre;
+        if (fraction > 0) this.scatter(x, z, radius, 0, fraction * volume, 0);
+      } else if (adjacent + 1 < this.depths.length && this.operator.wetCell(i + adjacent * plane)) {
+        fraction = (depth - centre) / (this.depthCentre(adjacent) - centre);
+        if (fraction > 0) {
+          this.scatter(x, z, radius, adjacent, fraction * volume);
+          active = true;
+        }
+      }
+      if (fraction < 1) {
+        this.scatter(x, z, radius, layer, (1 - fraction) * volume);
+        active = true;
+      }
+    }
+    return active;
+  }
+
+  private depthCentre(layer: number): number {
+    return (this.depths[layer]! + this.depths[layer + 1]!) / 2;
   }
 
   /** Check that the guided surge will be the only actuator on this wake. Add the finite wake first. */
@@ -559,7 +634,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       return 0;
     const layer = this.layerAt(depth);
     if (!this.operator.wetCell(i + layer * plane)) return 0;
-    const centre = (this.depths[layer]! + this.depths[layer + 1]!) / 2;
+    const centre = this.depthCentre(layer);
     const readLayer = (target: number) =>
       this.surfaceAt(head.subarray((target + 1) * plane, (target + 2) * plane), x, z, target);
     const local = readLayer(layer);
@@ -569,7 +644,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       const surface = this.surfaceAt(head.subarray(0, plane), x, z);
       dynamic = surface + ((local - surface) * depth) / centre;
     } else if (adjacent + 1 < this.depths.length && this.operator.wetCell(i + adjacent * plane)) {
-      const other = (this.depths[adjacent]! + this.depths[adjacent + 1]!) / 2;
+      const other = this.depthCentre(adjacent);
       dynamic += ((readLayer(adjacent) - local) * (depth - centre)) / (other - centre);
     }
     return this.rho * (dynamic - this.g * y);

@@ -1457,6 +1457,11 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   unchanged. `coupling/seakeeping.test.js` checks the same steady buoyancy, righting and wake state from
   code-built and GLB hulls with both the legacy wake and the baked finite receiver.
 
+  `coupling/loads-quay-point-depth.test.js` checks individual depth source rows against the volume pairing
+  of a uniform-layer normal mode, including a point between the free surface and first layer. A second case
+  verifies the closed upper neighbour, signed volume, work and the coded error below the bed. Both memory
+  modes replay exactly. This replaces uniform-depth band smearing for compatible finite-domain publishers.
+
   The 4 m full-history diagnostic used the same archived shutters and quay structure as the 8 m run,
   and both renderers sampled the accepted wave heights within 1.54×10⁻⁶ m. Wall peaks rose to 0.332 m
   and 0.311 m at the 67 and 71 s shutters from 0.200 m and 0.149 m at 8 m. Both stayed below the wall crest
