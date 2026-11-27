@@ -10654,6 +10654,12 @@ gives a consumer the retained pressure and velocities. At an enabled aperture th
 even when the surface is solid above it. The triangle-pressure loop and projected volume work remain
 separate until a fully matched mechanical coupling is supplied on this domain.
 
+Water's optional wake entry draws the rigid wet mask and the finite-domain heights from the same source.
+The mask is fixed per attachment and occupies one u32 per cell on the GPU. The surface reconstruction
+uses connected bilinear weights and the same wet-side derivative as the finite pressure receiver.
+Dry fragments clip in the draw. WaveQuery intersections use the underlying displaced triangles. The
+optional Water wake entry measures 3,264 B gzip.
+
 ### Ship motion on the wake grid
 
 `HullSolver` with the wake option publishes two five-word f64 records per reference waterplane station. The stamp uses one longitudinal midpoint and two transverse Gauss samples for a centreline-symmetric waterplane. Volume comes from small heave, pitch and roll about the reference draft. A wholly dry or submerged hull emits no waterplane flux. The model uses a signed surface-volume source. Its finite-depth wave propagation is handled by `WakeSolver`, and the hull's reaction still comes from its seakeeping solver. The projection has no three-dimensional radiation calibration or matched energy exchange with the wake grid.

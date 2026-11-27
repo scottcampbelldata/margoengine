@@ -1,6 +1,6 @@
 // A scaled straight quay with an incoming finite-depth packet. The low sill is a controlled renderer fixture.
 import { box, EngineKernel, PbrMaterial } from '/packages/core/dist/index.js';
-import { QuayWakeBoundary } from '/packages/physics/dist/loads.js';
+import { FiniteQuayWake, QuayWakeBoundary } from '/packages/physics/dist/loads.js';
 import { SpectralSea, WakeSolver } from '/packages/physics/dist/sea.js';
 import { PhysicsWorld } from '/packages/physics/dist/world.js';
 import { PostStack } from '/packages/post/dist/stack.js';
@@ -160,6 +160,102 @@ export async function createQuayOvertoppingScene(canvas) {
       spray.dispose();
       effect.dispose();
       water.dispose();
+      engine.dispose();
+      return validation?.message ?? null;
+    },
+  };
+}
+
+// A finite face separates two wet cells. The diagonal at the corner has a shorter open route on
+// one side of the X-first tie, and the dry block has no opaque mesh to conceal a shader leak.
+export async function createFiniteWakeMaskScene(canvas) {
+  const engine = await EngineKernel.create(canvas, {
+    backend: 'webgpu',
+    camera: { position: [0, 9, 0.21], target: [0, 0, 0], fov: 57, near: 0.08, far: 26 },
+  });
+  engine.gpu.pushErrorScope('validation');
+  engine.scene.background = '#b12b64';
+  const cells = [6, 6];
+  const plane = 36;
+  const wet = new Uint8Array(plane * 2).fill(1);
+  for (const offset of [0, plane]) {
+    wet[offset + 1 + 6] = 0;
+    wet[offset + 1 + 2 * 6] = 0;
+  }
+  const openX = new Float64Array(plane * 2).fill(1);
+  const openZ = new Float64Array(plane * 2).fill(1);
+  openX[2 + 3 * 6] = 0;
+  openZ[3 + 2 * 6] = 0.25;
+  const wake = new FiniteQuayWake();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wake, {
+    cells,
+    cellSize: 1,
+    origin: [-3, -3],
+    depths: [0, 0.5, 2],
+    wet,
+    openX,
+    openZ,
+    initial: (x, z) => [x === -0.5 && z === -0.5 ? 0.92 : x > 1 ? 0.45 : 0.2, 0],
+  });
+  const water = Water.attach(engine, { size: [8, 8], segments: 64, sea: { waveComponents: () => 0 } });
+  const effect = WaterWake.attach(engine, { surface: water, wake });
+  const render = async () => {
+    engine.render({ delta: 0 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+  };
+  await render();
+
+  const compare = async () => {
+    const { vertices } = await WaveQuery.capture(water);
+    let maxHeightError = 0;
+    let maxNormalError = 0;
+    const corner = {};
+    for (let i = 0; i < vertices.length; i += 12) {
+      const x = vertices[i + 3],
+        z = vertices[i + 7];
+      const {
+        height,
+        slope: [sx, sz],
+      } = wake.sample(x, z);
+      const norm = Math.hypot(sx, 1, sz);
+      maxHeightError = Math.max(maxHeightError, Math.abs(vertices[i + 1] - height));
+      maxNormalError = Math.max(
+        maxNormalError,
+        Math.hypot(vertices[i + 4] + sx / norm, vertices[i + 5] - 1 / norm, vertices[i + 6] + sz / norm),
+      );
+      if (x === 0 && z === 0) corner.tie = vertices[i + 1];
+      if (x === 0.125 && z === 0.25) corner.closed = vertices[i + 1];
+      if (x === 0.25 && z === 0.125) corner.open = vertices[i + 1];
+      if (x === 0.125 && z === 0.75) corner.oneSidedX = vertices[i + 4];
+    }
+    return { maxHeightError, maxNormalError, corner, vertices: vertices.length / 12 };
+  };
+  const initial = await compare();
+  world.advance(1);
+  await render();
+  const stepped = await compare();
+  const toPixel = ([x, z]) => {
+    const m = engine.camera.matrix;
+    const w = m[3] * x + m[11] * z + m[15];
+    return [
+      Math.floor((((m[0] * x + m[8] * z + m[12]) / w) * 0.5 + 0.5) * canvas.width),
+      Math.floor((0.5 - ((m[1] * x + m[9] * z + m[13]) / w) * 0.5) * canvas.height),
+    ];
+  };
+  const probes = { dry: toPixel([-1.5, -1.5]), wet: toPixel([-1.5, 0.65]), beyond: toPixel([3.5, 0.65]) };
+  return {
+    receipt: { initial, stepped, probes },
+    async drawWithoutMask() {
+      effect.dispose();
+      WaterWake.attach(engine, { surface: water, wake: { grid: wake.grid, heights: () => wake.heights() } });
+      await render();
+    },
+    async drawBackground() {
+      water.dispose();
+      await render();
+    },
+    async dispose() {
+      const validation = await engine.gpu.popErrorScope();
       engine.dispose();
       return validation?.message ?? null;
     },

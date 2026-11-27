@@ -121,6 +121,50 @@ try {
   assert.equal(await page.evaluate(() => window.quayOvertopping.dispose()), null);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ backend, ...wall, imagePixels, droplets }));
+
+  const finite = await page.evaluate(async () => {
+    const { createFiniteWakeMaskScene } = await import('/packages/water/test/quay-overtopping-scene.js');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:480px;height:288px';
+    document.body.replaceChildren(canvas);
+    window.finiteWake = await createFiniteWakeMaskScene(canvas);
+    return window.finiteWake.receipt;
+  });
+  for (const phase of [finite.initial, finite.stepped]) {
+    assert.equal(phase.vertices, 65 ** 2);
+    assert.ok(phase.maxHeightError < 2e-6 && phase.maxNormalError < 3e-6, JSON.stringify(phase));
+  }
+  const { tie, closed, open, oneSidedX } = finite.initial.corner;
+  assert.ok(Math.abs(tie - 0.2) < 2e-6 && Math.abs(closed - 0.2) < 2e-6);
+  assert.ok(Math.abs(open - 0.28) < 2e-6, 'the diagonal is reachable when the open Z face is hit first');
+  assert.ok(oneSidedX < -0.1, 'the wall uses a one-sided rising wake normal');
+  assert.ok(Math.abs(finite.stepped.corner.open - open) > 1e-6, 'drawn heights update while the mask stays fixed');
+  const masked = await capture('finite-mask');
+  await page.evaluate(() => window.finiteWake.drawWithoutMask());
+  const withoutMask = await capture('finite-unmasked');
+  await page.evaluate(() => window.finiteWake.drawBackground());
+  const clear = await capture('finite-clear');
+  const differenceAt = (a, b, [x, z]) => {
+    let difference = 0;
+    for (let dz = -3; dz <= 3; dz++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        const at = ((z + dz) * a.width + x + dx) * 4;
+        for (let n = 0; n < 3; n++) difference += Math.abs(a.data[at + n] - b.data[at + n]);
+      }
+    }
+    return difference / 147;
+  };
+  const pixelProof = {
+    dry: differenceAt(masked, clear, finite.probes.dry),
+    originalDry: differenceAt(withoutMask, clear, finite.probes.dry),
+    wet: differenceAt(masked, clear, finite.probes.wet),
+    beyond: differenceAt(masked, clear, finite.probes.beyond),
+  };
+  assert.ok(pixelProof.dry < 1 && pixelProof.originalDry > 12, JSON.stringify(pixelProof));
+  assert.ok(pixelProof.wet > 12 && pixelProof.beyond > 12, JSON.stringify(pixelProof));
+  assert.equal(await page.evaluate(() => window.finiteWake.dispose()), null);
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ backend, ...finite, pixelProof }));
 } finally {
   await closeAll({ browser });
 }

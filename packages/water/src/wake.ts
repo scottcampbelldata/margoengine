@@ -78,6 +78,30 @@ export interface WaterWakeSource {
     readonly origin: readonly [number, number];
   };
   heights(): ArrayLike<number>;
+  /**
+   * Fixed finite geometry, one byte per cell. Bit 1 means wet, bit 2 an open face toward +X and bit 4 an open face
+   * toward +Z. WaterWake copies the mask at attachment. Attach a new wake if the grid or its geometry changes.
+   */
+  surfaceMask?(): Uint8Array;
+}
+
+function fixedMask(wake: WaterWakeSource, nx: number, nz: number): Uint8Array | undefined {
+  if (wake.surfaceMask === undefined) return undefined;
+  const mask = typeof wake.surfaceMask === 'function' ? wake.surfaceMask() : undefined;
+  const invalid = () =>
+    fault('state', 'Supply a WaterWake surfaceMask() with one byte per cell and open faces joining wet grid cells.');
+  if (!(mask instanceof Uint8Array) || mask.length !== nx * nz) throw invalid();
+  for (let i = 0; i < mask.length; i++) {
+    const bits = mask[i]!;
+    if (
+      bits > 7 ||
+      (bits !== 0 && !(bits & 1)) ||
+      (bits & 2 && (i % nx === nx - 1 || !(mask[i + 1]! & 1))) ||
+      (bits & 4 && (i + nx >= mask.length || !(mask[i + nx]! & 1)))
+    )
+      throw invalid();
+  }
+  return new Uint8Array(mask);
 }
 
 /** Options of {@link WaterWake}. */
@@ -101,9 +125,11 @@ export class WaterWake implements EnginePlugin {
   private readonly surface: Water;
   private readonly wake: WaterWakeSource;
   private readonly minWetZ?: number;
+  private readonly mask?: Uint8Array;
   private engine?: Engine;
   private grid?: GPUBuffer;
   private field?: GPUBuffer;
+  private maskBuffer?: GPUBuffer;
   private heights = new Float32Array(0);
   private readonly header = new Float32Array(8);
   private resources: GPUBindingResource[] = [];
@@ -139,6 +165,7 @@ export class WaterWake implements EnginePlugin {
     this.surface = surface;
     this.wake = wake;
     this.minWetZ = minWetZ;
+    this.mask = fixedMask(wake, cells[0], cells[1]);
   }
 
   /** Attaches a wake to `engine` and to its Water. */
@@ -164,10 +191,19 @@ export class WaterWake implements EnginePlugin {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
     this.resources = [{ buffer: this.grid }, { buffer: this.field }];
+    if (this.mask) {
+      this.maskBuffer = device.createBuffer({
+        size: this.mask.length * Uint32Array.BYTES_PER_ELEMENT,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      device.queue.writeBuffer(this.maskBuffer, 0, Uint32Array.from(this.mask));
+      this.resources.push({ buffer: this.maskBuffer });
+    }
+    const key = this.mask ? 'wake-finite' : 'wake';
     this.remove = addSurfaceEffect(this.surface, {
-      key: this.minWetZ === undefined ? 'wake' : 'wake-wet-side',
+      key: this.minWetZ === undefined ? key : key + '-wet-side',
       vertex: true,
-      count: 2,
+      count: this.resources.length,
       shader: (code, binding) => this.shader(code, binding),
       prepare: (c) => {
         this.upload(c);
@@ -198,28 +234,89 @@ export class WaterWake implements EnginePlugin {
     const prefix = `
 @group(0) @binding(${binding}) var<uniform> wakeGrid:array<vec4f,2>;
 @group(0) @binding(${binding + 1}) var<storage,read> wakeField:array<f32>;
-// The wake's height at cell (i, j), 0 off its grid; read bilinearly between cell centres, and 0 within a cell and a half
-// of the grid's edge, as WakeSolver.sample reads it.
+`;
+    const open = `
+// Read between cell centres, stopping within one and a half cells of the edge like WakeSolver.sample.
 fn wakeAt(p:vec2i)->f32 {let n=vec2i(i32(wakeGrid[1].x),i32(wakeGrid[1].y));if(any(p<vec2i(0))||any(p>=n)){return 0.0;}return wakeField[u32(p.y*n.x+p.x)];}
 fn wakeHeight(xz:vec2f)->f32 {let c=wakeGrid[0].z;let n=vec2f(wakeGrid[1].x,wakeGrid[1].y);let p=(xz-wakeGrid[0].xy)/c-0.5;
  if(any(p<vec2f(1.0))||any(p>=n-vec2f(2.0))){return 0.0;}
  let a=vec2i(floor(p));let t=p-floor(p);
  return mix(mix(wakeAt(a),wakeAt(a+vec2i(1,0)),t.x),mix(wakeAt(a+vec2i(0,1)),wakeAt(a+vec2i(1,1)),t.x),t.y);}
 `;
-    const water =
-      prefix +
-      code.replace(
-        'return Surface(p,normalize(cross(binormal,tangent)),crest);',
-        `
+    const masked = `
+@group(0) @binding(${binding + 2}) var<storage,read> wakeMask:array<u32>;
+fn wakeGridPoint(xz:vec2f)->vec2f {return (xz-wakeGrid[0].xy)/wakeGrid[0].z;}
+fn wakeInside(p:vec2i)->bool {return all(p>=vec2i(0))&&all(p<vec2i(wakeGrid[1].xy));}
+fn wakeIndex(p:vec2i)->u32 {return u32(p.y*i32(wakeGrid[1].x)+p.x);}
+fn wakeFlags(p:vec2i)->u32 {if(!wakeInside(p)){return 0u;}return wakeMask[wakeIndex(p)];}
+fn wakeWet(p:vec2i)->bool {return (wakeFlags(p)&1u)!=0u;}
+fn wakeAcrossX(p:vec2i,step:i32)->bool {return (wakeFlags(p+vec2i(min(step,0),0))&2u)!=0u;}
+fn wakeAcrossZ(p:vec2i,step:i32)->bool {return (wakeFlags(p+vec2i(0,min(step,0)))&4u)!=0u;}
+
+// Every interpolation or slope probe is at most one cell away in each axis. Follow the physical ray,
+// taking X first on a corner tie, as QuayPotential.reaches does.
+fn wakeReach(point:vec2f,to:vec2i)->bool {
+ let start=vec2i(floor(point));let step=to-start;
+ if(!wakeWet(start)||!wakeWet(to)){return false;}
+ if(step.x==0){return step.y==0||wakeAcrossZ(start,step.y);}
+ if(step.y==0){return wakeAcrossX(start,step.x);}
+ let travel=vec2f(to)+vec2f(0.5)-point;
+ let boundary=vec2f(start+max(step,vec2i(0)));
+ let hits=(boundary-point)/travel;
+ if(hits.x<=hits.y){return wakeAcrossX(start,step.x)&&wakeAcrossZ(start+vec2i(step.x,0),step.y);}
+ return wakeAcrossZ(start,step.y)&&wakeAcrossX(start+vec2i(0,step.y),step.x);
+}
+fn wakeHeight(point:vec2f)->f32 {
+ let centered=point-vec2f(0.5);
+ let corner=vec2i(floor(centered));let fraction=fract(centered);
+ var sum=0.0;var height=0.0;
+ for(var x=0;x<2;x++){for(var z=0;z<2;z++){
+  let to=corner+vec2i(x,z);
+  if(wakeReach(point,to)){
+   let weight=select(1.0-fraction.x,fraction.x,x==1)*select(1.0-fraction.y,fraction.y,z==1);
+   sum+=weight;height+=weight*wakeField[wakeIndex(to)];
+  }
+ }}
+ if(sum==0.0){return 0.0;}return height/sum;
+}
+fn wakeSlope(point:vec2f,axis:vec2f,height:f32)->f32 {
+ let lower=wakeReach(point,vec2i(floor(point-axis)));
+ let upper=wakeReach(point,vec2i(floor(point+axis)));
+ var before=height;var after=height;var count=0.0;
+ if(lower){before=wakeHeight(point-axis);count+=1.0;}
+ if(upper){after=wakeHeight(point+axis);count+=1.0;}
+ return (after-before)/(wakeGrid[0].z*max(1.0,count));
+}
+fn wakeDry(xz:vec2f)->bool {
+ let cell=vec2i(floor(wakeGridPoint(xz)));
+ return wakeInside(cell)&&!wakeWet(cell);
+}
+`;
+    const displacement = this.mask
+      ? `
+ let point=wakeGridPoint(xz);
+ if(wakeWet(vec2i(floor(point)))){
+  let height=wakeHeight(point);
+  p.y+=height;tangent.y+=wakeSlope(point,vec2f(1,0),height);
+  binormal.y+=wakeSlope(point,vec2f(0,1),height);
+ }`
+      : `
  let wh=wakeHeight(xz);let wc=wakeGrid[0].z;
  p.y+=wh;tangent.y+=(wakeHeight(xz+vec2f(wc,0))-wakeHeight(xz-vec2f(wc,0)))/(2.0*wc);
- binormal.y+=(wakeHeight(xz+vec2f(0,wc))-wakeHeight(xz-vec2f(0,wc)))/(2.0*wc);
- return Surface(p,normalize(cross(binormal,tangent)),crest);`,
+ binormal.y+=(wakeHeight(xz+vec2f(0,wc))-wakeHeight(xz-vec2f(0,wc)))/(2.0*wc);`;
+    const surface =
+      prefix +
+      (this.mask ? masked : open) +
+      code.replace(
+        'return Surface(p,normalize(cross(binormal,tangent)),crest);',
+        displacement + '\n return Surface(p,normalize(cross(binormal,tangent)),crest);',
       );
-    // Keep the full surface and its derivatives at the face. Discard only the image-domain fragments.
-    return this.minWetZ === undefined
-      ? water
-      : water.replace('if(dry){discard;}', 'if(dry||i.world.z<wakeGrid[0].w){discard;}');
+    // An infinite mirror still supplies its full derivatives at the clip plane.
+    const clipped = this.minWetZ === undefined ? '' : '||i.world.z<wakeGrid[0].w';
+    if (!this.mask) return surface.replace('if(dry){discard;}', `if(dry${clipped}){discard;}`);
+    // Clip after the shared shader's derivatives. Keep its dry marker available to other surface effects.
+    const view = 'let v=normalize(frame.eye.xyz-i.world);';
+    return surface.replace(view, `if(wakeDry(i.xz)${clipped}){discard;}\n ${view}`);
   }
 
   /** Stops drawing the wake and releases its buffers. */
@@ -230,7 +327,8 @@ fn wakeHeight(xz:vec2f)->f32 {let c=wakeGrid[0].z;let n=vec2f(wakeGrid[1].x,wake
     this.removeDispose?.();
     this.grid?.destroy();
     this.field?.destroy();
-    this.grid = this.field = undefined;
+    this.maskBuffer?.destroy();
+    this.grid = this.field = this.maskBuffer = undefined;
     this.resources = [];
     this.engine?.sceneOf(this)?.removePlugin(this.name);
   }

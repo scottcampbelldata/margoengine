@@ -65,3 +65,20 @@ test('a WaterWake for a real grid has its own plugin name, and needs a WebGPU en
   b.dispose();
   assert.throws(() => b.setup({ gpu: {} }), /disposed; attach a new one/);
 });
+
+test('WaterWake validates fixed mask bytes and the two open-face directions', () => {
+  const coded = { name: 'MargoError', code: 'state', message: /one byte per cell.+open faces joining wet/ };
+  const source = wake([4, 4]);
+  for (const mask of [
+    new Float32Array(16),
+    new Uint8Array(15),
+    Uint8Array.of(8, ...new Uint8Array(15)),
+    Uint8Array.of(2, 1, ...new Uint8Array(14)),
+    Uint8Array.of(3, ...new Uint8Array(15)),
+    Uint8Array.of(0, 0, 0, 3, 1, ...new Uint8Array(11)),
+    Uint8Array.of(...new Uint8Array(12), 5, 0, 0, 0),
+  ])
+    assert.throws(() => new WaterWake({ surface: water, wake: { ...source, surfaceMask: () => mask } }), coded);
+  const valid = Uint8Array.of(7, 1, 0, 0, 1, ...new Uint8Array(11));
+  new WaterWake({ surface: water, wake: { ...source, surfaceMask: () => valid } }).dispose();
+});

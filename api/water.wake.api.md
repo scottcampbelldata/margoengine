@@ -29,6 +29,7 @@ export interface WaterWakeSource {
         readonly origin: readonly [number, number];
     };
     heights(): ArrayLike<number>;
+    surfaceMask?(): Uint8Array;
 }
 
 export interface WaterWallSample {

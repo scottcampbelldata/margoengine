@@ -151,6 +151,15 @@ The water GPU fixture compares sampled heights to the CPU law over a grid on ope
 The hull and foam terms are independent of the phase change. See the
 [clean-room record](../clean-room.md#kelvin-wake-crest-phase-2026-11-23).
 
+### Section 5 evidence: finite-quay draw and wet queries (SEA-12)
+
+`WaterWake` accepts the finite receiver's fixed wet-cell and open-face bits. The vertex shader follows the
+same connected bilinear stencil and one-sided slopes as the CPU receiver. Fragment clipping keeps the
+shared water-body marker and leaves the scene's ordinary sea beyond the finite grid. The existing quay
+browser chain compares the live solver at 4,225 drawn vertices on each backend. Height and normal residuals
+stay below 1.11×10⁻⁷, and the dry patch matches the no-water background exactly. The geometric WaveQuery
+samples the displaced vertices. Per-fragment clipping is a render effect.
+
 ### Section 5 evidence: open-ocean horizon depth (2026-11-23)
 
 Water keeps its original homogeneous depth on the displaced grid. A separate flat quad fills the remaining ocean

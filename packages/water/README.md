@@ -480,7 +480,7 @@ central difference one cell either side). So with the wake also among the sea's 
 `sea.sample` rides the wake the camera sees, and WaveQuery reads it too. `test/wake-agreement.browser.mjs` captures the
 drawn surface at 1,362 vertices, 494 of them on the wake, and checks height and normal against `sea.sample` inside the
 bound in `docs/limits.md` ("Drawn wake"), on WebGPU and the WebGL2 layer: on an Apple M6 the largest difference is 0.04
-percent of the bound. `dispose()` (or the Water's) stops drawing it and frees its two buffers.
+percent of the bound. `dispose()` (or the Water's) stops drawing it and frees its buffers.
 
 ```ts
 import {Water} from 'margoengine/water';
@@ -509,6 +509,34 @@ engine.render({delta: 0}); // the wake drawn where the physics has it
 For a straight quay with water on its +Z side, give `WaterWake` its physical `minWetZ`. Its full mirrored grid still
 supplies the height and slopes at the wall, while the rendered surface stops at the wet face. The CPU physics and
 WaveQuery still see the full grid. Sample the physical half when using that grid for a wall effect.
+
+
+A finite quay wake from `@margoengine/physics/loads` provides `surfaceMask()`, so the attachment uses the same wet cells
+and open faces as the physics sampler. Heights blend only through reachable wet neighbours. Normals use centred
+differences in open water and one-sided differences at blocked faces. Dry cells inside the finite grid are clipped
+from the water draw. Beyond the grid, Water draws its ordinary surface. WaveQuery reads the same mesh displacements
+and normals. Its triangle queries use mesh geometry, while the dry-cell clip is applied to rendered pixels.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { FiniteQuayWake } from '@margoengine/physics/loads';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { Water } from '@margoengine/water';
+import { WaterWake } from '@margoengine/water/wake';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const wake = new FiniteQuayWake();
+const wet = new Uint8Array(64).fill(1);
+wet[3 + 8 * 3] = 0;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wake, {
+  cells: [8, 8], cellSize: 1, origin: [-4, -4], depths: [0, 3], wet,
+  initial: (x) => [0.02 * Math.cos(x), 0],
+});
+const water = Water.attach(engine, { size: [10, 10], sea: { waveComponents: () => 0 } });
+WaterWake.attach(engine, { surface: water, wake });
+world.advance(1);
+engine.render({ delta: 0 });
+```
 
 `wallOvertoppingSpawn(previous, current, crest)` takes consecutive accepted wall samples and interpolates the
 world-space launch velocity at a rising crest crossing. The returned position and velocity can feed a VFX burst.

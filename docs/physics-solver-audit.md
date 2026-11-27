@@ -1416,6 +1416,20 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   case at 0.075 m reduces its harmonic solve from 1,316 to 66 iterations. The regression checks the exact fine
   potential and open-face flux on two odd grids and confirms a fully sealed side stays exactly at zero.
 
+  On the actual First Wake 1.2 m prefix the same Galerkin change cuts the active combined iterations
+  from 1,200 to 115. At tick 110 the water energy agrees between solvers within 8.4×10⁻¹⁴ J.
+  The renderer now reads `FiniteQuayWake.surfaceMask()` directly. The chained Water quay test checks
+  4,225 positions and normals on WebGPU and WebGL2 within 1.11×10⁻⁷, including a closed corner ray and
+  an open corner ray. The dry in-grid patch matches the no-water reference exactly.
+
+  The finite receiver was compared with the 26 measured Briggs M4 submerged-lee probes using an incident
+  packet at the published period and height and an identical open-water normalization. At the fixed 14 s
+  sample, RMS errors in relative wave height for 30°, 60° and 90° are 0.039, 0.030 and 0.056 at 0.50 m.
+  The 0.25 m grid gives 0.015, 0.027 and 0.067. The gain is on the 30° transect. The full 26-point error
+  stays about 0.043. The original paddle history is unavailable. The packet window affects the results,
+  and the full finite field still needs a converged measured comparison.
+  [Briggs, Thompson and Vincent, 1995](https://doi.org/10.1061/%28ASCE%290733-950X%281995%29121%3A1%2823%29)
+
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.
