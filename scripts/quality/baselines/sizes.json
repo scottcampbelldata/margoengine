@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20832503,
+  "total": 20836872,
   "history": [
     {
       "date": "2026-10-24",
@@ -14437,6 +14437,12 @@
       "commit": "cd4508a015",
       "reason": "DXF hatches: new optional entry loaders/dxf-hatch, 0 to 2720 B gzip (ceiling 2976 B). In parseDXF it would have cost every DXF reader those bytes; core plus stage unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "cbe4dc9be4",
+      "reason": "@margoengine/weather/drive: 7,481 B (at the 7737 B ceiling's measurement, cb04a8f5cf) to 7,744 B gzip, ceiling 7737 to 8000 B: 8baf3f7935 (KB-SKY-NIGHTPALL1) adds the night sky seen through a smoke pall, its moon, twilight and fire light and the two-stream reflectance (7,781 B, 7,744 after the shared mixing cbe4dc9be4). A split would only move the same night light behind another import. @margoengine/webgl2-compat: 125,619 B at e2177dc6e5 to 128,114 B gzip, ceiling 127852 to 131958 B (all lazy chunks counted). Fixes and limits that cannot be dropped: texture units past 16 on ANGLE Direct3D 11 (7545434ce1 +313, af7a2e9a65 +634), loops and lone cases ANGLE compiled wrong (d4b49e227d +328), subgroup built-ins in the WGSL checker (af98405e0b +601), workgroup limits (ed3163e5af +379), loss reports (7e10f55b18 +95) and warm draws and map errors (+145). A split would add a boundary without removing a byte the layer loads. Core and stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16106,7 +16112,7 @@
     "@margoengine/weather/boundary-layer": 2596,
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
-    "@margoengine/weather/drive": 7737,
+    "@margoengine/weather/drive": 8000,
     "@margoengine/weather/eruption": 10430,
     "@margoengine/weather/gltf": 5981,
     "@margoengine/weather/hail": 5699,
@@ -16123,7 +16129,7 @@
     "@margoengine/weather/surface-energy": 3616,
     "@margoengine/weather/synoptic": 1196,
     "@margoengine/weather/turbulence": 1965,
-    "@margoengine/webgl2-compat": 127852,
+    "@margoengine/webgl2-compat": 131958,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 97864,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 34020,
     "@margoengine/webgl2-compat/adapter": 1214,
