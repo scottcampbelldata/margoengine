@@ -603,7 +603,7 @@ as it packs: the same triangles in the order the vertex cache and early depth te
 left in the file's order. It needs `@margoengine/geometry`, takes load time, and keeps a load on the main thread. A
 file built with `margo-convert` is already in this order, so leave it off there.
 
-The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model, and its `textures` option streams KTX2 mip levels ("Texture mip streaming" below). `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced; `maxDownloadBytes` counts the root JSON/GLB file together with its fetched and data-URI resources.
+The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; it streams Draco and meshopt files too ("Compressed files and levels of detail" below), and its `textures` option streams KTX2 mip levels ("Texture mip streaming" below). `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced; `maxDownloadBytes` counts the root JSON/GLB file together with its fetched and data-URI resources.
 
 In a multi-view frame, a model draws only the nodes in the view's layers, and each view keeps its own camera uniforms
 even when one command encoder records several views or probe faces. Buffers released mid-draw (a callback that
@@ -1172,6 +1172,39 @@ for (const packet of metadata.packets) console.log(packet.fields.title, packet.f
 
 Properties resolve by namespace URI, so `dc11:creator` reads as an author when `dc11` names Dublin Core, and `dc:creator` does not when a packet points `dc` elsewhere. A prefix a packet leaves out of `@context` keeps its usual meaning, because a real exporter writes `xmp:CreatorTool` that way. A bad packet list or `packet` reference throws a `TypeError` here and never at load. Limits are in [docs/limits.md](../../docs/limits.md).
 
+#### Compressed files and levels of detail (`/progressive`)
+
+`loadGLTFProgressive` streams a Draco or meshopt file like any other. A Draco primitive's compressed bytes are asked for
+in view order and decode one at a time on the decoder's workers, each drawn as it is decoded. A meshopt view decodes
+where the file is read (the progressive worker), and a fallback buffer is never fetched. Your own decoders work as in
+`loadGLTF`: `draco` (or `decoders.draco`) is called on the main thread, and `decoders.meshopt`, being synchronous,
+moves the whole stream to the main thread.
+
+An object with `MSFT_lod` levels streams its coarsest level first, along with everything that has no levels, then the
+level the current view calls for (by `MSFT_screencoverage`), then the rest. Until all of an object's levels are here,
+the finest one that has arrived is the one that shows. To let `@margoengine/lod` pick levels while the file streams,
+call `LOD.fromModel` as soon as the model is ready: it takes the object over and never switches to a level that has
+not arrived.
+
+```js
+import { createStage } from 'margoengine';
+import { loadGLTFProgressive } from 'margoengine/gltf/progressive';
+import { LOD, LODSystem } from 'margoengine/lod';
+
+const stage = await createStage('#app');
+const lods = new LODSystem();
+stage.engine.use(lods);
+const load = loadGLTFProgressive(stage.engine, '/model.glb', {
+  onProgress: ({ primitivesLoaded, primitives }) => console.log(`${primitivesLoaded}/${primitives}`),
+});
+const model = await load.ready;
+LOD.fromModel(lods, model);
+await load.complete;
+```
+
+A file with Gaussian splats, point or line primitives or `MSFT_texture_dds` textures, a KTX2 file without `textures`,
+a `ktx2` decoder or a custom `fetch` loads whole, as `loadGLTF` does: `ready` and `complete` are then one promise.
+
 #### Texture mip streaming (`textures` of `/progressive`)
 
 KTX 2.0 keeps the smallest mip first, so a texture can start from a small read of the head of its file. With `textures` set, `loadGLTFProgressive` opens each KTX2 image from those smallest levels and loads finer ones only as the texture's size on screen calls for them, inside a memory budget. Levels nothing needs leave when the budget runs out. It reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream`, loaded only with this option.
@@ -1196,7 +1229,7 @@ console.log(model.primitives.length, textures?.usedBytes, textures?.textures);
 
 `load.textures` is a promise of the live stream: `usedBytes`, `budgetBytes` (settable), `textures` (each one's size, finest level held, level count and size on screen) and `update()`. It runs by itself about five times a second for as long as the model lives; disposing the model frees it.
 
-A texture's size on screen is the square root of its primitive's surface area over its UV area, which is the length one whole texture covers, times the pixels one world unit covers at the nearest point of the primitive's bounding sphere, on the nearest camera that sees it. Tiling, atlases and `KHR_texture_transform` scale need no special case. An image inside a GLB or a `.bin` streams too, by Range reads at its offset, and those bytes stay out of the buffers; on a server without Range the file comes once and the texture streams from memory. A file `loadGLTFProgressive` takes whole (Draco, meshopt, or a `fetch` option) still streams its KTX2 images. `complete` means every primitive is loaded and every texture is drawing from at least its coarsest levels.
+A texture's size on screen is the square root of its primitive's surface area over its UV area, which is the length one whole texture covers, times the pixels one world unit covers at the nearest point of the primitive's bounding sphere, on the nearest camera that sees it. Tiling, atlases and `KHR_texture_transform` scale need no special case. An image inside a GLB or a `.bin` streams too, by Range reads at its offset, and those bytes stay out of the buffers; on a server without Range the file comes once and the texture streams from memory. A file `loadGLTFProgressive` takes whole (points, lines, splats, DDS textures, or a `fetch` option) still streams its KTX2 images. `complete` means every primitive is loaded and every texture is drawing from at least its coarsest levels.
 
 PNG, JPEG, WebP and AVIF files hold no mips, so they load whole, and a KTX2 file stored with one level has nothing to stream. `model.uploadImage` refuses a streamed image, and a replica on another device refuses a streamed model. Off WebGPU the option has no effect. See `docs/limits.md`.
 

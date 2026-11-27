@@ -8,8 +8,6 @@ import { COMPONENT_BYTES } from '../../shared/accessor.js';
 // arrive. Geometry first, then images, then the remaining bytes, so the final buffers equal a plain download.
 import {
   GLTFAsset,
-  asyncCompression,
-  asyncGeometry,
   assetLimit,
   checkDocument,
   decodeImage,
@@ -21,12 +19,14 @@ import {
   rejectLFSPointer,
   unusedBasisuFallbacks,
 } from './asset.js';
+import { hasSplats } from './splat-state.js';
+import { decoded } from './draco-state.js';
 import { decodeExtras, packPrimitive, primitiveDefs, usesLaterUV } from './pack.js';
 import { PART_VERTICES } from './parts.js';
 import type { PrimitivePart } from './model.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
-import type { GLTFDocument, GLTFStreamSource } from './asset.js';
+import type { GLTFDecoderHooks, GLTFDocument, GLTFDracoDecodeOptions, GLTFStreamSource } from './asset.js';
 import { MAX_IMAGE_PIXELS } from './image-limit.js';
 
 /** An error as it crosses to the main thread; `code` keeps a MargoError's code. */
@@ -51,7 +51,15 @@ export type StreamMessage =
       source?: GLTFStreamSource;
     }
   | { type: 'bytes'; loaded: number; total: number }
-  | { type: 'done'; buffers: Uint8Array[]; accessors: [number, Float32Array][] }
+  | {
+      type: 'done';
+      buffers: Uint8Array[];
+      accessors: [number, Float32Array][];
+      /** Decoded indices of each Draco primitive, by key. */
+      draco?: [number, Float32Array][];
+    }
+  /** From the worker script: a Draco stream for the main thread's decoder, answered by `{ draco: id, result }`. */
+  | { type: 'draco'; id: number; data: Uint8Array; options: GLTFDracoDecodeOptions }
   | { type: 'error'; error: StreamError };
 
 interface Source {
@@ -64,6 +72,15 @@ interface Source {
   size?: number;
 }
 type Range = [source: number, lo: number, hi: number];
+/** The decoders a stream uses: Draco (the main thread's, for a worker) and a caller's own meshopt decoder. */
+export type StreamDecoders = Pick<GLTFDecoderHooks, 'draco' | 'meshopt'>;
+// The bytes of its glTF buffer a bufferView reads: a meshopt view reads its compressed stream, whole.
+function stored(doc: GLTFDocument, id: number): { buffer: number; offset: number; length: number; packed: boolean } {
+  const view = entry(doc.bufferViews, id, 'bufferView'),
+    packed = view.extensions?.EXT_meshopt_compression ?? view.extensions?.KHR_meshopt_compression,
+    at = (packed ?? view) as { buffer: number; byteOffset?: number; byteLength: number };
+  return { buffer: at.buffer, offset: at.byteOffset ?? 0, length: at.byteLength, packed: !!packed };
+}
 // Requests cover whole 256 KB blocks (about one round trip of data on a 50 Mbit/s link), so an assembly of many small
 // parts costs file/256 KB requests at most rather than one per part.
 const BATCH = 1 << 20,
@@ -125,10 +142,12 @@ export class GLTFStream {
   private loaded = 0;
   private reported = 0;
   private base: URL;
+  /** Draco primitives decode one after another here, while the requests go on. */
+  private decoding: Promise<void> = Promise.resolve();
   /**
    * `limit`: maxDownloadBytes, already validated by the caller; `maxNodes`: the load's maxNodes; `textures`: KTX2 images
    * stream on the main thread, so this reports where each one is and fetches none of it; `partVertices`: the load's
-   * maxPartVertices, already validated.
+   * maxPartVertices, already validated; `decoders`: what decodes Draco and, when given, meshopt.
    */
   constructor(
     private readonly url: URL,
@@ -139,6 +158,7 @@ export class GLTFStream {
     private readonly allowedURLs?: readonly string[],
     private readonly textures = false,
     private readonly partVertices = PART_VERTICES,
+    private readonly decoders: StreamDecoders = {},
   ) {
     this.base = url;
     signal.addEventListener('abort', () => this.notify(), { once: true });
@@ -160,17 +180,24 @@ export class GLTFStream {
     try {
       const doc = await this.head();
       checkDocument(doc); // before the main thread (or the fallback test) reads it
-      if (
-        (this.textures ? asyncGeometry(doc) : asyncCompression(doc)) ||
-        doc.bufferViews?.some(
-          (view) => view?.extensions?.EXT_meshopt_compression || view?.extensions?.KHR_meshopt_compression,
-        )
-      ) {
+      // What only a whole-file load reads: splats, points and lines, DDS textures, KTX2 images without texture
+      // streaming, and Draco with no decoder here.
+      const ktx2 = () =>
+          doc.textures?.some((texture) => texture?.extensions?.KHR_texture_basisu) ||
+          doc.images?.some((image) => image?.mimeType === 'image/ktx2'),
+        needsDraco = () =>
+          doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression));
+      const whole =
+        hasSplats(doc) ||
+        doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => (p?.mode ?? 4) < 4)) ||
+        doc.textures?.some((texture) => texture?.extensions?.MSFT_texture_dds);
+      if (whole || (!this.textures && ktx2()) || (!this.decoders.draco && needsDraco())) {
         this.post({ type: 'fallback' });
         return;
       }
       this.post({ type: 'doc', doc });
       this.buffers(doc);
+      await this.asset!.prepareMeshopt();
       while (!this.order) await this.next();
       await this.geometry(doc);
       await this.images(doc);
@@ -187,7 +214,23 @@ export class GLTFStream {
         }
       while (this.inflight || this.sources.some((s) => !covered(s.got, 0, s.data?.length ?? 0))) await this.next();
       this.bytes(true);
-      this.post({ type: 'done', buffers: this.asset!.buffers as Uint8Array[], accessors: decodeExtras(this.asset!) });
+      const accessors = new Map(decodeExtras(this.asset!)),
+        draco: [number, Float32Array][] = [];
+      // What Draco decoded: the main thread's asset holds it as a plain load's does.
+      primitiveDefs(doc).forEach((p, key) => {
+        const indices = decoded.get(this.asset!)?.get(p);
+        if (!indices) return;
+        draco.push([key, indices]);
+        const ext = p.extensions!.KHR_draco_mesh_compression as { attributes: object };
+        for (const id of [...Object.keys(ext.attributes).map((name) => p.attributes![name]), p.indices])
+          if (id !== undefined) accessors.set(id, this.asset!.accessor(id));
+      });
+      this.post({
+        type: 'done',
+        buffers: this.asset!.buffers as Uint8Array[],
+        accessors: [...accessors],
+        ...(draco.length ? { draco } : {}),
+      });
     } catch (e) {
       if (!this.signal.aborted) this.post({ type: 'error', error: error(e) });
     }
@@ -372,6 +415,12 @@ export class GLTFStream {
       }
     }
     const views = (doc.buffers ?? []).map((def, i) => {
+      // A meshopt fallback buffer is for loaders without meshopt: nothing of it is fetched (as loadGLTF).
+      const extensions = def?.extensions as Record<string, { fallback?: boolean } | undefined> | undefined;
+      if ((extensions?.EXT_meshopt_compression ?? extensions?.KHR_meshopt_compression)?.fallback === true) {
+        this.map.push({ source: -1, offset: 0 });
+        return new Uint8Array();
+      }
       if (def?.uri === undefined) {
         if (i === 0 && glb && binLength) {
           checkBinChunk(binDeclared, def.byteLength);
@@ -400,14 +449,24 @@ export class GLTFStream {
       return this.sources[k].data!;
     });
     // Same validation (and the same errors) as a plain load: required extensions, buffer sizes, the byte budget.
-    this.asset = new GLTFAsset(doc, views, undefined, {}, this.limit, this.maxNodes);
+    const { meshopt } = this.decoders;
+    this.asset = new GLTFAsset(doc, views, undefined, meshopt ? { meshopt } : {}, this.limit, this.maxNodes);
     this.asset.partVertices = this.partVertices;
     this.needs = primitiveDefs(doc).map((p) => {
       const out: Range[] = [],
-        a = p?.attributes ?? {};
+        a = p?.attributes ?? {},
+        draco = p?.extensions?.KHR_draco_mesh_compression as
+          | { bufferView: number; attributes?: Record<string, unknown> }
+          | undefined;
       try {
-        const later = usesLaterUV(doc, p) ? [a.TEXCOORD_2, a.TEXCOORD_3] : [];
-        for (const id of [a.POSITION, a.NORMAL, a.TANGENT, a.TEXCOORD_0, a.TEXCOORD_1, ...later, a.COLOR_0, p.indices])
+        const later = usesLaterUV(doc, p) ? ['TEXCOORD_2', 'TEXCOORD_3'] : [];
+        const read = ['POSITION', 'NORMAL', 'TANGENT', 'TEXCOORD_0', 'TEXCOORD_1', ...later, 'COLOR_0'];
+        // Draco's stream replaces the accessors it names and the indices; the rest are read as stored.
+        if (draco) this.whole(doc, draco.bufferView, out);
+        for (const id of [
+          ...read.filter((name) => !(draco?.attributes && name in draco.attributes)).map((name) => a[name]),
+          draco ? undefined : p.indices,
+        ])
           if (id !== undefined) this.ranges(doc, id, out);
       } catch {
         for (const [i, b] of this.map.entries())
@@ -423,6 +482,7 @@ export class GLTFStream {
       width = components[a.type],
       count = a.count;
     const span = (view: number, offset: number, length: number) => {
+      if (stored(doc, view).packed) return this.whole(doc, view, out);
       const v = entry(doc.bufferViews, view, 'bufferView'),
         b = this.map[v.buffer],
         lo = (v.byteOffset ?? 0) + offset,
@@ -449,6 +509,16 @@ export class GLTFStream {
       );
       span(a.sparse.values.bufferView, a.sparse.values.byteOffset ?? 0, n * size * width);
     }
+  }
+  // Every byte a bufferView reads, clipped to its buffer like `ranges`.
+  private whole(doc: GLTFDocument, view: number, out: Range[]): void {
+    const { buffer, offset, length } = stored(doc, view),
+      b = this.map[buffer],
+      end = offset + length;
+    if (!b || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(end) || !(length > 0))
+      throw new TypeError('range; pass a { start, end } byte range');
+    const hi = Math.min(end, this.asset!.buffers[buffer].length);
+    if (b.source >= 0 && offset < hi) out.push([b.source, b.offset + offset, b.offset + hi]);
   }
   private request(k: number, lo: number, hi: number): void {
     const s = this.sources[k],
@@ -499,16 +569,11 @@ export class GLTFStream {
       for (const key of order)
         if (this.ready(key)) {
           this.posted.add(key);
-          try {
-            // One message per part as it is filled: the worker holds the source accessors and one part at a time.
-            packPrimitive(this.asset!, defs[key], ({ vertices, indices, uvs, part }) =>
-              this.post({ type: 'geometry', key, vertices, indices, uvs, ...(part ? { part } : {}) }),
-            );
-          } catch (e) {
-            this.post({ type: 'geometry', key, error: error(e) });
-          }
+          if (defs[key]?.extensions?.KHR_draco_mesh_compression)
+            this.decoding = this.decoding.then(() => this.decompress(key, defs[key]));
+          else this.pack(key, defs[key]);
         }
-      if (this.order!.every((k) => this.posted.has(k))) return;
+      if (this.order!.every((k) => this.posted.has(k))) return this.decoding;
       // Ask for the next keys' missing blocks, about BATCH bytes at a time, merging adjacent blocks into one request.
       let budget = BATCH;
       const wanted: Range[] = [];
@@ -541,6 +606,28 @@ export class GLTFStream {
       if (!wanted.length) await this.next();
     }
   }
+  private pack(key: number, primitive: GLTFPrimitive): void {
+    try {
+      // One message per part as it is filled: the worker holds the source accessors and one part at a time.
+      packPrimitive(this.asset!, primitive, ({ vertices, indices, uvs, part }) =>
+        this.post({ type: 'geometry', key, vertices, indices, uvs, ...(part ? { part } : {}) }),
+      );
+    } catch (e) {
+      this.post({ type: 'geometry', key, error: error(e) });
+    }
+  }
+  private async decompress(key: number, primitive: GLTFPrimitive): Promise<void> {
+    try {
+      const { decompressPrimitive } = await import('./compression.js');
+      this.signal.throwIfAborted();
+      await decompressPrimitive(this.asset!, primitive, async () => this.decoders.draco!, this.signal);
+      this.signal.throwIfAborted();
+    } catch (e) {
+      if (!this.signal.aborted) this.post({ type: 'geometry', key, error: error(e) });
+      return;
+    }
+    this.pack(key, primitive);
+  }
   // Where KTX2 image `def` is. A view in a ranged file is left unfetched (counted as received) for the stream to read.
   private async textureSource(
     doc: GLTFDocument,
@@ -554,22 +641,24 @@ export class GLTFStream {
       if (def.uri.startsWith('data:')) return { bytes: embedded(def.uri, this.limit) };
       return { url: assetURL(def.uri, this.base, this.allowedURLs, 'glTF').href };
     }
-    this.asset!.view(def.bufferView);
-    const v = entry(doc.bufferViews, def.bufferView, 'bufferView'),
+    const v = stored(doc, def.bufferView),
       b = this.map[v.buffer];
+    // Bounds first. A meshopt view is read decoded, once its compressed bytes are here.
+    if (!v.packed) this.asset!.view(def.bufferView);
     if (b?.source >= 0) {
       const s = this.sources[b.source],
-        lo = b.offset + (v.byteOffset ?? 0),
-        hi = lo + v.byteLength;
+        lo = b.offset + v.offset,
+        hi = lo + v.length;
       while (s.ranged === undefined) {
         if (!s.probing) this.request(b.source, lo, Math.min(hi, lo + 1));
         await this.next();
       }
-      if (s.ranged) {
+      if (s.ranged && !v.packed) {
         add(s.asked, lo, hi);
         add(s.got, lo, hi);
-        return { url: s.url.href, offset: lo, length: v.byteLength };
+        return { url: s.url.href, offset: lo, length: v.length };
       }
+      if (s.ranged) for (const [a, c] of gaps(s.asked, lo, Math.min(hi, s.data!.length))) this.request(b.source, a, c);
       while (!covered(s.got, lo, Math.min(hi, s.data!.length))) await this.next();
     }
     return { bytes: this.asset!.view(def.bufferView).slice() };
@@ -619,13 +708,13 @@ export class GLTFStream {
       let data: Uint8Array;
       if (def.bufferView !== undefined) {
         // Bounds first (a named error): a view outside its buffer would otherwise wait for bytes that never arrive.
-        this.asset!.view(def.bufferView);
-        const v = entry(doc.bufferViews, def.bufferView, 'bufferView'),
+        const v = stored(doc, def.bufferView),
           b = this.map[v.buffer];
+        if (!v.packed) this.asset!.view(def.bufferView);
         if (b?.source >= 0) {
           const s = this.sources[b.source],
-            lo = b.offset + (v.byteOffset ?? 0),
-            hi = lo + v.byteLength;
+            lo = b.offset + v.offset,
+            hi = Math.min(lo + v.length, s.data!.length);
           if (s.ranged) {
             const missing = gaps(s.asked, lo, hi);
             for (const [a, c] of missing) this.request(b.source, a, c);

@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DracoDecoder } from '../../decoders/dist/index.js';
 import { loadGLTF } from '../dist/pbr.js';
+import { meshoptDecodeGltfBuffer } from '../../decoders/dist/meshopt.js';
+import { LOD, LODSystem } from '../../lod/dist/index.js';
 import { loadGLTFProgressive } from '../dist/progressive.js';
 import { instancing } from '../dist/pbr-instancing.js';
 import { uniformBytes } from '../../../tests/support/optional-gpu.js';
@@ -98,6 +100,22 @@ const files = {
   // JSON past the first 64 KiB range, so a stream must ask for the rest.
   '/padded.gltf': Buffer.from(JSON.stringify({ ...JSON.parse(external.json), extras: { pad: 'x'.repeat(70_000) } })),
 };
+
+// Real compressed files: Draco (Box and Avocado with external .bin files, the orrery's 126 meshes in a GLB) and meshopt
+// (a robot GLB, and Khronos' MeshoptCubeTest in KHR_meshopt_compression with a fallback .bin).
+for (const [name, path] of [
+  ['Box.gltf', 'packages/decoders/tests/fixtures/Box.gltf'],
+  ['Box.bin', 'packages/decoders/tests/fixtures/Box.bin'],
+  ['orrery.glb', 'examples/orrery/orrery.glb'],
+  ['robot-meshopt.glb', 'examples/assets/boulder-robot.glb'],
+  ...[
+    'MeshoptCubeTest.gltf',
+    'MeshoptCubeTest.bin',
+    'MeshoptCubeTestFallback.bin',
+    ...[0, 1, 2, 3, 4].flatMap((i) => [`row${i}.png`, `col${i}.png`]),
+  ].map((f) => [f, `examples/assets/khronos/MeshoptCubeTest/${f}`]),
+])
+  files[`/${name}`] = await readFile(new URL(`../../../${path}`, import.meta.url));
 
 // Static server; paths under /plain/ ignore Range (a server without range support). Records every request.
 const log = [];
@@ -274,13 +292,25 @@ async function withGlobals(worker, run) {
     location: globalThis.location,
   };
   globalThis.createImageBitmap = bitmapStub;
+  const decode = DracoDecoder.prototype.decode;
   if (worker) {
     globalThis.Worker = InProcessWorker;
     globalThis.location = { href: base + '/' };
+    // The stand-in Worker runs only this package's script, so the Draco decoder runs on this thread, as in plain Node.
+    DracoDecoder.prototype.decode = function (...args) {
+      const stand = globalThis.Worker;
+      delete globalThis.Worker;
+      try {
+        return decode.apply(this, args);
+      } finally {
+        globalThis.Worker = stand;
+      }
+    };
   }
   try {
     return await run();
   } finally {
+    DracoDecoder.prototype.decode = decode;
     for (const [k, v] of Object.entries(saved))
       if (v === undefined) delete globalThis[k];
       else globalThis[k] = v;
@@ -392,6 +422,10 @@ for (const [name, path, decoders, more = {}] of [
   ['3 x 66k-vertex grids (one without normals; several range requests)', '/grids.glb'],
   ['grids drawn 12 times each through EXT_mesh_gpu_instancing', '/parts.glb', { instancing }],
   ['.gltf with an external .bin', '/external.gltf'],
+  ['Draco Box (external .bin)', '/Box.gltf'],
+  ['Draco orrery (126 meshes)', '/orrery.glb'],
+  ['meshopt robot (compressed views)', '/robot-meshopt.glb'],
+  ['KHR_meshopt_compression cube test (fallback .bin never fetched)', '/MeshoptCubeTest.gltf'],
 ])
   for (const mode of ['main thread', 'worker'])
     for (const plain of [false, true])
@@ -459,6 +493,13 @@ for (const [name, path, decoders, more = {}] of [
             );
             if (path === '/grids.glb') assert.ok(requests.length > 3, `${requests.length} requests`);
           }
+          assert.ok(!log.some((r) => r.path.includes('Fallback')), 'a meshopt fallback buffer is never fetched');
+          // Compressed data stays readable on the loaded model, as after a plain load.
+          for (const p of model.primitives.slice(0, 4))
+            assert.deepEqual(
+              model.asset.accessor(p.definition.attributes.POSITION),
+              expected.asset.accessor(p.definition.attributes.POSITION),
+            );
           model.dispose();
           expected.dispose();
         }));
@@ -503,16 +544,186 @@ test('abort and dispose stop the load; errors keep their type', () =>
     await assert.rejects(loadGLTFProgressive(engine, base + '/missing.glb').ready, /HTTP 404/);
   }));
 
-test('Draco, meshopt or KTX2 decoders fall back to loadGLTF', () =>
+test('a KTX2 decoder or a custom fetch falls back to loadGLTF; Draco and meshopt decoders stream', () =>
   withGlobals(false, async () => {
-    const { engine } = await gpuEngine(),
-      load = loadGLTFProgressive(engine, base + '/helmet.glb', { decoders: { meshopt: { decodeGltfBuffer() {} } } });
-    assert.equal(load.ready, load.complete);
-    const model = await load.complete;
-    assert.equal(
-      model.primitives[0].vertices.length,
-      model.asset.doc.accessors[model.primitives[0].definition.attributes.POSITION].count * 20,
+    const { engine } = await gpuEngine();
+    for (const options of [{ decoders: { ktx2: { transcode() {} } } }, { fetch: (...args) => fetch(...args) }]) {
+      const load = loadGLTFProgressive(engine, base + '/helmet.glb', options);
+      assert.equal(load.ready, load.complete);
+      (await load.complete).dispose();
+    }
+    // Your own decoders are the ones called, after the placeholders are up.
+    const own = new DracoDecoder(),
+      calls = { draco: 0, meshopt: 0 };
+    const draco = loadGLTFProgressive(engine, base + '/Box.gltf', {
+      draco: { decode: (data, options) => (calls.draco++, own.decode(data, options)) },
+    });
+    assert.notEqual(draco.ready, draco.complete);
+    const box = await draco.ready;
+    assert.equal(calls.draco, 0);
+    assert.equal(box.primitives[0].vertices.length, 480);
+    await draco.complete;
+    assert.equal(calls.draco, 1);
+    box.dispose();
+    own.dispose();
+    const packed = loadGLTFProgressive(engine, base + '/robot-meshopt.glb', {
+      decoders: {
+        meshopt: {
+          decodeGltfBuffer: (target, count, stride, source, mode, filter) => {
+            calls.meshopt++;
+            target.set(meshoptDecodeGltfBuffer(source, count, stride, mode, filter));
+          },
+        },
+      },
+    });
+    (await packed.complete).dispose();
+    assert.ok(calls.meshopt > 0);
+  }));
+
+for (const [name, edit] of [
+  ['a line primitive', (doc) => (doc.meshes[0].primitives[0].mode = 1)],
+  ['an MSFT_texture_dds texture', (doc) => (doc.textures = [{ extensions: { MSFT_texture_dds: { source: 0 } } }])],
+])
+  test(`${name} is read by a whole-file load, never as a stand-in box`, () =>
+    withGlobals(false, async () => {
+      files['/whole.glb'] = editedGLB(edit);
+      const { engine } = await gpuEngine(),
+        load = loadGLTFProgressive(engine, base + '/whole.glb');
+      try {
+        const model = await load.ready;
+        assert.ok([...model.primitives, ...model.pointsAndLines].every((p) => p.vertices.length !== 480));
+        assert.equal(await load.complete, model);
+        model.dispose();
+      } finally {
+        delete files['/whole.glb'];
+      }
+    }));
+
+for (const useWorker of [false, true])
+  test(`a Draco decoder that fails rejects the load with its error (${useWorker ? 'worker' : 'main'})`, () =>
+    withGlobals(useWorker, async () => {
+      const { engine } = await gpuEngine(),
+        load = loadGLTFProgressive(engine, base + '/Box.gltf', {
+          draco: { decode: async () => Promise.reject(new RangeError('broken stream')) },
+        });
+      const model = await load.ready;
+      await assert.rejects(load.complete, /broken stream/);
+      assert.equal(model.disposed, true);
+    }));
+
+// One object with two MSFT_lod levels, each a grid mesh of its own: nodes 0 (finest), 1 and 2 (coarsest).
+files['/lod.glb'] = (() => {
+  // Each over 1 MiB, so a stream asks for one level at a time, in its priority order.
+  const glb = bigGLB({ segments: 200, meshes: 3 }),
+    v = new DataView(glb.buffer, glb.byteOffset),
+    length = v.getUint32(12, true),
+    doc = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + length))),
+    bin = glb.subarray(28 + length);
+  doc.extensionsUsed = [...(doc.extensionsUsed ?? []), 'MSFT_lod'];
+  doc.nodes = [0, 1, 2].map((mesh) => ({ mesh }));
+  doc.nodes[0].extensions = { MSFT_lod: { ids: [1, 2] } };
+  doc.nodes[0].extras = { MSFT_screencoverage: [0.5, 0.1] };
+  doc.scenes = [{ nodes: [0] }];
+  doc.scene = 0;
+  const json = new TextEncoder().encode(JSON.stringify(doc).padEnd(Math.ceil(JSON.stringify(doc).length / 4) * 4)),
+    out = new Uint8Array(28 + json.length + bin.length),
+    o = new DataView(out.buffer);
+  o.setUint32(0, 0x46546c67, true);
+  o.setUint32(4, 2, true);
+  o.setUint32(8, out.length, true);
+  o.setUint32(12, json.length, true);
+  o.setUint32(16, 0x4e4f534a, true);
+  out.set(json, 20);
+  o.setUint32(20 + json.length, bin.length, true);
+  o.setUint32(24 + json.length, 0x004e4942, true);
+  out.set(bin, 28 + json.length);
+  return out;
+})();
+const levelsShown = (model) => model.lods[0].levels.flatMap((node, i) => (node.visible ? [i] : []));
+/** Looks at the whole model from `distance` times its size. */
+function lookFrom(engine, model, distance) {
+  const b = model.bounds,
+    centre = [0, 1, 2].map((k) => (b[k] + b[k + 3]) / 2),
+    size = Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]);
+  engine.camera.target = centre;
+  engine.camera.position = [centre[0], centre[1], centre[2] + distance * size];
+  engine.camera.update(128 / 96, true);
+}
+/** Loads /lod.glb one upload step a pump, recording after each geometry step which levels have arrived and show. */
+async function lodLoad(distance, { onReady, onStep } = {}) {
+  const { engine } = await gpuEngine(),
+    steps = [];
+  let model;
+  const load = loadGLTFProgressive(engine, base + '/lod.glb', {
+    maxJobs: 1,
+    onProgress: (p) => {
+      if (p.stage !== 'geometry') return;
+      onStep?.();
+      steps.push({
+        loaded: model.primitives.flatMap((q) => (q.vertices.length === 480 ? [] : [q.nodeIndex])).sort(),
+        shown: levelsShown(model),
+      });
+    },
+  });
+  model = await load.ready;
+  lookFrom(engine, model, distance);
+  onReady?.(engine, model);
+  await load.complete;
+  return { engine, model, steps };
+}
+
+for (const useWorker of [false, true])
+  test(`MSFT_lod streams the coarsest level first, then the one the view calls for (${useWorker ? 'worker' : 'main'})`, () =>
+    withGlobals(useWorker, async () => {
+      const near = await lodLoad(0.7);
+      assert.deepEqual(
+        near.steps.map((s) => [s.loaded, s.shown]),
+        [
+          [[2], [2]],
+          [[0, 2], [0]],
+          [[0, 1, 2], [0]],
+        ],
+      );
+      // At the end, as a plain load: level 0 shows and no level answers requests any more.
+      assert.deepEqual(
+        near.model.lods[0].levels.map((n) => [n.visible, n.request]),
+        [
+          [true, undefined],
+          [false, undefined],
+          [false, undefined],
+        ],
+      );
+      near.model.dispose();
+      const far = await lodLoad(40);
+      assert.deepEqual(
+        far.steps.map((s) => s.loaded),
+        [[2], [1, 2], [0, 1, 2]],
+        'far away: coarsest first, then finer by level',
+      );
+      far.model.dispose();
+    }));
+
+test('LOD.fromModel at ready takes the levels over and never shows one that has not arrived', () =>
+  withGlobals(false, async () => {
+    const system = new LODSystem();
+    let lodModel;
+    const { model, steps } = await lodLoad(0.7, {
+      onReady: (engine, loading) => {
+        lodModel = loading;
+        engine.use(system);
+        LOD.fromModel(system, loading);
+        // Before anything arrives the coarsest level's box stands in.
+        system.update();
+        assert.deepEqual(levelsShown(lodModel), [2]);
+      },
+      onStep: () => system.update(),
+    });
+    assert.deepEqual(
+      steps.map((s) => s.shown),
+      [[2], [0], [0]],
     );
+    system.update();
+    assert.deepEqual(levelsShown(model), [0]);
     model.dispose();
   }));
 

@@ -44,6 +44,7 @@
     "test:gpu:parts": "cd ../.. && node packages/gltf/scripts/test-parts-browser.mjs && node packages/gltf/scripts/test-parts-browser.mjs --compat",
     "test:gpu:skinned-parts": "cd ../.. && node packages/gltf/scripts/test-skinned-parts-browser.mjs && node packages/gltf/scripts/test-skinned-parts-browser.mjs --compat",
     "test:gpu:mask-alpha": "cd ../.. && node packages/gltf/scripts/test-mask-alpha-browser.mjs && node packages/gltf/scripts/test-mask-alpha-browser.mjs --compat",
+    "test:gpu:progressive": "cd ../.. && node packages/gltf/scripts/test-progressive-browser.mjs && node packages/gltf/scripts/test-progressive-browser.mjs --compat",
     "test:gpu:base-textures": "cd ../.. && node packages/gltf/scripts/test-base-textures-browser.mjs && node packages/gltf/scripts/test-base-textures-browser.mjs --compat",
     "test:browser:audio": "cd ../.. && node packages/gltf/scripts/test-audio-browser.mjs",
     "test:gpu:pixel-images": "cd ../.. && node packages/gltf/scripts/test-node-images.mjs && node packages/gltf/scripts/test-pixel-images.mjs && node packages/gltf/scripts/test-pixel-images.mjs --compat",

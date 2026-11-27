@@ -71,6 +71,40 @@ export interface GLTFImageOptions {
     ): Promise<GLTFCompressedImage | TranscodedKTX2Result>;
   };
 }
+/** A caller's Draco hook, with the metadata it may omit (vertex count, attribute widths, indices) filled in. */
+export function adaptDraco(hook: NonNullable<GLTFDecoderHooks['draco']>): NonNullable<GLTFDecoderHooks['draco']> {
+  return {
+    decode: async (data: Uint8Array, options: GLTFDracoDecodeOptions) => {
+      const result = await hook.decode(data, options),
+        vertexCount = result.vertexCount ?? (result.positions?.length as number) / 3;
+      const attributes =
+        result.attributes &&
+        Object.fromEntries(
+          Object.entries(result.attributes).map(([name, value]) => {
+            const attribute = value as { array: ArrayLike<number>; itemSize?: number; componentType?: number };
+            return [
+              name,
+              {
+                ...attribute,
+                itemSize: attribute.itemSize ?? attribute.array.length / vertexCount,
+                componentType: attribute.componentType ?? options.componentTypes[name],
+              },
+            ];
+          }),
+        );
+      return {
+        ...result,
+        vertexCount,
+        attributes,
+        indices:
+          result.indices ??
+          (Number.isSafeInteger(vertexCount) && vertexCount >= 3 && vertexCount <= PRIMITIVE_VERTICES
+            ? Uint32Array.from({ length: vertexCount }, (_, i) => i)
+            : undefined),
+      };
+    },
+  };
+}
 /** Async codecs stay on the owning thread; meshopt is synchronous and can be packed in a parser worker. */
 export const asyncGeometry = (doc: GLTFDocument): boolean =>
   !!doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression)) ||
@@ -694,42 +728,7 @@ export class GLTFAsset {
     // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
     if (!hasDraco(this)) return signal?.throwIfAborted();
     const { decompressPrimitives } = await import('./compression.js');
-    const hook = this.hooks.draco;
-    // The retained structural hook permits omitted derived metadata; the built-in decoder's strict contract remains unchanged.
-    const draco = hook
-      ? {
-          decode: async (data: Uint8Array, options: GLTFDracoDecodeOptions) => {
-            const result = await hook.decode(data, options),
-              vertexCount = result.vertexCount ?? (result.positions?.length as number) / 3;
-            const attributes =
-              result.attributes &&
-              Object.fromEntries(
-                Object.entries(result.attributes).map(([name, value]) => {
-                  const attribute = value as { array: ArrayLike<number>; itemSize?: number; componentType?: number };
-                  return [
-                    name,
-                    {
-                      ...attribute,
-                      itemSize: attribute.itemSize ?? attribute.array.length / vertexCount,
-                      componentType: attribute.componentType ?? options.componentTypes[name],
-                    },
-                  ];
-                }),
-              );
-            return {
-              ...result,
-              vertexCount,
-              attributes,
-              indices:
-                result.indices ??
-                (Number.isSafeInteger(vertexCount) && vertexCount >= 3 && vertexCount <= PRIMITIVE_VERTICES
-                  ? Uint32Array.from({ length: vertexCount }, (_, i) => i)
-                  : undefined),
-            };
-          },
-        }
-      : undefined;
-    await decompressPrimitives(this, { signal, draco });
+    await decompressPrimitives(this, { signal, draco: this.hooks.draco && adaptDraco(this.hooks.draco) });
   }
   /**
    * The accessor's values as floats (normalized integers scaled, sparse values applied), cached. A NaN or infinity

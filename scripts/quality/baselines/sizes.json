@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21084730,
+  "total": 21085684,
   "history": [
     {
       "date": "2026-10-24",
@@ -14875,6 +14875,12 @@
       "commit": "nrrd-orientation",
       "reason": "NRRD parity: the volume layer takes a transform (rotated, flipped or sheared scans draw in place, with the mirrored cull side); sciviz root to 67,047 B gzip measured, 331 B over its ceiling. The option lives in VolumeLayer, which Figure.volume() builds, so a split entry could not add it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "e750b057",
+      "reason": "gltf progressive worker +672 B (18,196 to 18,868 gzip): it streams Draco files (each primitive's decode asked of the main thread) and meshopt files in place of falling back to a whole load; a split would add a second worker file and request for every progressive load",
+      "grew": 1
     }
   ],
   "items": {
@@ -15331,7 +15337,7 @@
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7698,
     "@margoengine/gltf dist/workers/gltf.js": 41508,
-    "@margoengine/gltf dist/workers/progressive.js": 18481,
+    "@margoengine/gltf dist/workers/progressive.js": 19435,
     "@margoengine/gltf/asset": 6177,
     "@margoengine/gltf/audio": 4958,
     "@margoengine/gltf/auto": 19030,
@@ -16294,11 +16300,11 @@
     "@margoengine/terrain/planet-recipes": 3472,
     "@margoengine/terrain/query": 4196,
     "@margoengine/terrain/relief-lighting": 3564,
-    "@margoengine/terrain/scour": 3012,
     "@margoengine/terrain/rock-settings": 2718,
     "@margoengine/terrain/rock-surface": 5056,
     "@margoengine/terrain/rocks": 6844,
     "@margoengine/terrain/rvt": 7126,
+    "@margoengine/terrain/scour": 3012,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/settings": 2711,
     "@margoengine/terrain/stream": 16154,

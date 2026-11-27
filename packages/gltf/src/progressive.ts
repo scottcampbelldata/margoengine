@@ -9,13 +9,19 @@ import { captureScene } from '../../shared/scene-scope.js';
 import { worldRadius } from '../../shared/sphere.js';
 import {
   GLTFAsset,
+  adaptDraco,
   assetLimit,
   downloadLimit,
   overBudget,
   type GLTFDocument,
   type GLTFImage,
   type GLTFDecoderHooks,
+  type GLTFDracoDecodeOptions,
 } from './asset.js';
+import { withDecoders } from './decoder-default.js';
+import { withMaterials } from './default-materials.js';
+import { decoded } from './draco-state.js';
+import { levelOrder } from './progressive-lod.js';
 import { PBRModel, loadGLTF, type GLTFLoadOptions, type PBRMaterial, type PBRPrimitive } from './pbr.js';
 import type { PrimitivePart } from './model.js';
 import { partLimit } from './parts.js';
@@ -129,8 +135,11 @@ function box(
  * Load a .glb/.gltf so it is interactive at once: `ready` resolves with the model drawn as one box per primitive (fit the
  * camera to `model.bounds`), then real geometry streams in, most visible and largest on screen first (HTTP range requests
  * where the server supports them, else the whole file parsed as it arrives), then textures. Network and decoding run in a
- * worker (dist/workers/progressive.js; on this thread where Worker is unavailable); GPU uploads run here within
- * `frameBudget` ms per animation frame. Draco, meshopt or KTX2 `decoders` fall back to `loadGLTF` (ready = complete).
+ * worker (dist/workers/progressive.js; on this thread where Worker is unavailable, or for your own `decoders.meshopt`);
+ * GPU uploads run here within `frameBudget` ms per animation frame. Draco primitives decode one by one as their bytes
+ * arrive and meshopt views as they are read. An `MSFT_lod` object streams its coarsest level first and shows the finest
+ * level that has arrived; `LOD.fromModel` called at `ready` takes over and picks only levels that have arrived. A custom
+ * `fetch` or a `ktx2` decoder falls back to `loadGLTF` (ready = complete).
  */
 export function loadGLTFProgressive(
   instance: EngineKernel,
@@ -182,7 +191,7 @@ export function loadGLTFProgressive(
     stream?.attach(loaded);
     return loaded;
   };
-  if (options.fetch || options.draco || options.ktx2 || decoders.draco || decoders.meshopt || decoders.ktx2) {
+  if (options.fetch || options.ktx2 || decoders.ktx2) {
     const model = plain().then((m) => {
       emit('complete');
       return m;
@@ -241,10 +250,34 @@ export function loadGLTFProgressive(
     run();
   };
 
+  // Draco: your decoder, else one this load owns, made for the first compressed primitive and disposed at the end.
+  let dracoReady: Promise<NonNullable<GLTFDecoderHooks['draco']>> | undefined, owned: { dispose(): void } | undefined;
+  const draco = {
+    decode: async (data: Uint8Array, wanted: GLTFDracoDecodeOptions) => {
+      dracoReady ??= (async () => {
+        const custom = options.draco ?? decoders.draco;
+        if (custom) return adaptDraco(custom);
+        const { DracoDecoder } = await withDecoders({ decoders }).decoders.decoderModule!();
+        controller.signal.throwIfAborted();
+        return (owned = new DracoDecoder()) as unknown as NonNullable<GLTFDecoderHooks['draco']>;
+      })();
+      return (await dracoReady).decode(data, { ...wanted, signal: controller.signal });
+    },
+  };
+  const release = () =>
+    void dracoReady?.then(
+      () => owned?.dispose(),
+      () => {},
+    );
+  // MSFT_lod: which level of each object shows while it loads, and which primitives come first.
+  let levels: ReturnType<typeof levelOrder> | undefined;
+
   const fail = (error: unknown) => {
     if (finished) return;
     finished = true;
     worker?.terminate();
+    release();
+    levels?.release();
     controller.abort(error);
     for (const b of pending) b.destroy();
     pending.clear();
@@ -287,6 +320,8 @@ export function loadGLTFProgressive(
       const size = radius / Math.max(Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]) - radius, 1e-9);
       score[key] = Math.max(score[key], visible + size / (1 + size));
     });
+    // Level tiers outrank view order: everything's coarsest level, then the levels this view calls for, then the rest.
+    levels!.rank(score);
     return byKey
       .map((_, k) => k)
       .filter((k) => byKey[k].length && !received.has(k))
@@ -440,18 +475,27 @@ export function loadGLTFProgressive(
         }
       }
       // A split primitive counts as loaded with its last part.
-      if (!part || part.index === part.count - 1) progress.primitivesLoaded++;
+      if (!part || part.index === part.count - 1) {
+        progress.primitivesLoaded++;
+        levels!.arrived(key);
+      }
       uploading--;
       emit('geometry');
       settle();
       return true;
     };
   };
-  const finish = (buffers: Uint8Array[], accessors: [number, Float32Array][]) => () => {
-    buffers.forEach((b, i) => {
+  const finish = (m: Extract<StreamMessage, { type: 'done' }>) => () => {
+    m.buffers.forEach((b, i) => {
       (asset.buffers as Uint8Array[])[i] = b;
     });
-    for (const [id, data] of accessors) asset['cache'].set(id, data);
+    for (const [id, data] of m.accessors) asset['cache'].set(id, data);
+    if (m.draco) {
+      const defs = primitiveDefs(doc);
+      decoded.set(asset, new Map(m.draco.map(([key, indices]) => [defs[key] as object, indices])));
+    }
+    // Every level is whole: level 0 shows, as a plain load has it, unless an LOD system took the object over.
+    levels!.release();
     // EXT_mesh_gpu_instancing reads its accessors, so it applies now (one PBRInstances per node, as PBRModel's constructor).
     if (decoders.instancing) {
       hooks.instancing = decoders.instancing;
@@ -476,6 +520,7 @@ export function loadGLTFProgressive(
     (asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral })[deferStaticBatches]?.commit?.();
     finished = true;
     worker?.terminate();
+    release();
     emit('complete');
     resolveComplete(model!);
     return true;
@@ -515,7 +560,7 @@ export function loadGLTFProgressive(
       if (scheduled) pump();
     }
   };
-  const build = (d: GLTFDocument) => {
+  const build = (d: GLTFDocument, materials?: GLTFDecoderHooks['materials']) => {
     doc = d;
     const defs = primitiveDefs(doc),
       keyOf = new Map(defs.map((p, k) => [p, k]));
@@ -526,11 +571,18 @@ export function loadGLTFProgressive(
       if (p && typeof p === 'object') packed.set(p, [b]);
     });
     if (decoders.instancing) hooks.instancing = { read: () => undefined };
-    if (decoders.materials) hooks.materials = decoders.materials;
-    // Placeholder buffers at their declared sizes: checked against the budget before they are allocated.
-    const sizes = (doc.buffers ?? []).map((b) =>
-      Number.isSafeInteger(b?.byteLength) && b.byteLength > 0 ? b.byteLength : 0,
-    );
+    if (materials) hooks.materials = materials;
+    if (decoders.meshopt) hooks.meshopt = decoders.meshopt;
+    // Placeholder buffers at their declared sizes: checked against the budget before they are allocated. A meshopt
+    // fallback buffer is never read, so it gets none.
+    const sizes = (doc.buffers ?? []).map((b) => {
+      const extensions = b?.extensions as Record<string, { fallback?: boolean } | undefined> | undefined;
+      return (extensions?.EXT_meshopt_compression ?? extensions?.KHR_meshopt_compression)?.fallback !== true &&
+        Number.isSafeInteger(b?.byteLength) &&
+        b.byteLength > 0
+        ? b.byteLength
+        : 0;
+    });
     if (sizes.reduce((sum, n) => sum + n, 0) > limit) throw overBudget('glTF buffers exceed byte budget', limit);
     asset = new GLTFAsset(
       doc,
@@ -541,6 +593,8 @@ export function loadGLTFProgressive(
       options.maxNodes,
     );
     asset.partVertices = partVertices;
+    // Later reads of meshopt views (the model's own, an exporter's) need the decoder on this thread too.
+    opening.push(asset.prepareMeshopt().catch(fail));
     (asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral })[deferStaticBatches] = {};
     images = Array.from(doc.images ?? [], () => undefined);
     settled = images.map(() => false);
@@ -582,6 +636,7 @@ export function loadGLTFProgressive(
       bare.add(p);
     }
     engine.use(model);
+    levels = levelOrder(model, engine);
     model.onDispose(() => abort(new DOMException('Model disposed while loading', 'AbortError')));
     void textures?.then((stream) => stream.attach(model!), fail);
     // The first order goes out on the next frame, after the app has had `ready` and placed its camera.
@@ -589,7 +644,13 @@ export function loadGLTFProgressive(
     resolveReady(model);
     schedule();
   };
+  // Messages that arrive while the document's own readers load (its material shaders) wait, in order.
+  let held: StreamMessage[] | undefined;
   const message = (m: StreamMessage) => {
+    if (held) {
+      held.push(m);
+      return;
+    }
     if (finished) {
       if (m.type === 'image' && m.image && 'close' in m.image) m.image.close();
       return;
@@ -609,8 +670,20 @@ export function loadGLTFProgressive(
           resolveReady(loaded);
           resolveComplete(loaded);
         }, fail);
-      } else if (m.type === 'doc') scope.run(() => build(m.doc));
-      else if (m.type === 'geometry') {
+      } else if (m.type === 'doc') {
+        held = [];
+        // As loadGLTF: a file with physical or specular-glossiness materials draws them with no option passed.
+        void withMaterials(m.doc, decoders)
+          .then((found) => {
+            if (!finished) scope.run(() => build(m.doc, found.materials));
+          })
+          .catch(fail)
+          .then(() => {
+            const waiting = held!;
+            held = undefined;
+            waiting.forEach(message);
+          });
+      } else if (m.type === 'geometry') {
         if (m.error) throw revive(m.error);
         received.add(m.key);
         jobs.push(geometry(m.key, m.vertices!, m.indices!, m.uvs, m.part));
@@ -647,14 +720,27 @@ export function loadGLTFProgressive(
         progress.bytesLoaded = m.loaded;
         progress.bytesTotal = m.total;
         if (model) emit();
+      } else if (m.type === 'draco') {
+        const { id } = m,
+          to = worker;
+        draco.decode(m.data, m.options).then(
+          (result) => {
+            try {
+              to?.postMessage({ draco: id, result });
+            } catch (error) {
+              fail(error);
+            }
+          },
+          (e: { name?: string; message?: string; code?: string }) =>
+            to?.postMessage({ draco: id, error: { name: e?.name, message: e?.message, code: e?.code } }),
+        );
       } else if (m.type === 'done') {
-        const { buffers, accessors } = m;
         // Streams still opening hold their primitives back until their smallest levels are on the GPU.
         void Promise.all(opening).then(() => {
           if (finished) return;
           last = () => {
             texturesReady(true);
-            jobs.push(finish(buffers, accessors));
+            jobs.push(finish(m));
           };
           settle();
         });
@@ -668,7 +754,8 @@ export function loadGLTFProgressive(
     limit = downloadLimit(options.maxDownloadBytes);
     partVertices = partLimit(options.maxPartVertices);
     const href = new URL(url, globalThis.location?.href).href;
-    if (canUseWorker()) {
+    // Your own meshopt decoder cannot cross to a worker, so its stream runs on this thread.
+    if (canUseWorker() && !decoders.meshopt) {
       worker = new Worker(workerURL(), { name: 'margoengine-progressive' });
       // Replies come only from this package's worker; anything that is not an object fails the load instead of throwing here.
       worker.onmessage = ({ data }) =>
@@ -705,6 +792,7 @@ export function loadGLTFProgressive(
             options.allowedURLs,
             !!textures,
             partVertices,
+            { draco, ...(decoders.meshopt ? { meshopt: decoders.meshopt } : {}) },
           )).run();
       }, fail);
   } catch (error) {
