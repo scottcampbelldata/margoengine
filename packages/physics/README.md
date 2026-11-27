@@ -718,6 +718,42 @@ console.log(crate.linearVelocity);
 wind.remove();
 ```
 
+### Gravity fields, updrafts and vortices
+
+Babylon's `PhysicsHelper` fields, as attachments that push every step until removed. Each takes `center`, `radius`,
+`falloff` (`'linear'` by default, `'inverse-square'` or `'none'`, from the centre or the axis out to the radius) and a
+query `filter`, holds no state of its own (a snapshot and restore replays it bit for bit), and has `enabled` (default
+true) and `remove()` (`using` calls it). A body is pushed at its centre of mass, so it is thrown, not spun, and wakes.
+
+| Field | Pushes | Its own options (default) |
+| --- | --- | --- |
+| `new GravityField(physics, options)` | every dynamic body within `radius` of `center` toward it, at `acceleration` m/s² whatever its mass | `acceleration` |
+| `new Updraft(physics, options)` | every dynamic body in the upright cylinder of `radius` and `height` on `center` up with `strength` newtons | `height`, `strength`, `mode` (`'perpendicular'`: straight up; `'center'`: away from the centre of the base) |
+| `new Vortex(physics, options)` | every dynamic body in that cylinder around the axis with `strength` newtons, counter-clockwise seen from above | `height`, `strength`, `centripetal` (0.3, the pull to the axis as a share of `strength`), `lift` (0.1, the push up) |
+
+```ts
+import {GravityField, Physics, Updraft, Vortex} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [20, 0.5, 20]}});
+const crate = physics.addBody(null, {position: [0.5, 0.3, 0], colliders: {shape: 'box', halfExtents: [0.3, 0.3, 0.3], mass: 2}});
+const lift = new Updraft(physics, {center: [0, 0, 0], radius: 2, height: 6, strength: 40});
+new Vortex(physics, {center: [0, 0, 0], radius: 3, height: 6, strength: 15});
+new GravityField(physics, {center: [0, 8, 0], radius: 5, acceleration: 4, falloff: 'inverse-square'});
+for (let i = 0; i < 120; i++) physics.step();
+lift.enabled = false;
+console.log(crate.position);
+```
+
+Coming from Babylon: `helper.gravitationalField(origin, radius, strength, falloff)` is `new GravityField(physics,
+{center, radius, acceleration})` (an acceleration, so a crate and a pebble fall in alike); `helper.updraft(origin,
+radius, strength, height, mode)` and `helper.vortex(origin, radius, strength, height)` are `Updraft` and `Vortex` with
+`strength` in newtons; the event's `enable()` and `disable()` are `enabled = true` and `false`, and its `dispose()` is
+`remove()`. `applyRadialExplosionImpulse` is `explosion` above; a radial explosion force over one step is `explosion`
+with `impulse` set to the force times `physics.fixedTimestep`. Bad input is a `MargoError` linked to
+[its help entry](https://margoengine.com/errors#physics-fields).
+
 ## Universal joint and wheel joint
 
 `addUniversalJoint(physics, bodyA, bodyB, {anchorA, anchorB, frameA, frameB, limitsX, limitsY, motorX, motorY})` joins two bodies at a point so that they turn about the X and Y axes of frame A and cannot twist about Z (a cardan joint): a generic joint with the sliding axes and the twist locked, so `joint.setAxisLimits` and `joint.setAxisMotor` change the limits and drives later. `addWheelJoint(physics, chassis, wheel, {anchor, wheelAnchor, frequency = 4, damping = 0.7, travel, maxTorque, steerable})` hangs a wheel from a chassis on a suspension along Y of the chassis frame (a spring of that natural frequency per kilogram between the travel limits) with the axle along X, and returns `{joint, knuckle, drive(speed), coast(), steer(angle)}`: `drive` spins the wheel toward a speed under the torque cap, and a `steerable` wheel hangs from a knuckle body that `steer` turns about the suspension axis. Swing-twist is the `cone` joint and a D6 is the `generic` joint; both exist already.

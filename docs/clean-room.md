@@ -17700,3 +17700,15 @@ vertex, segment direction and miter codes and the meaning of the group 41 elemen
 https://help.autodesk.com/view/OARX/2024/ENU/?guid=GUID-590E8AE3-C6D9-4641-8485-D7B3693E432C. Break distances are
 read as measured from the element's start, our reading of that page, not yet proven on a real file. No other
 project's source was read.
+
+## Rigid-body fields: gravity field, updraft and vortex (DYN-01, 2026-11-27)
+
+`GravityField`, `Updraft` and `Vortex` in `packages/physics/src/fields.ts` are Margo's own, written from the behaviour
+described in the Babylon.js documentation page "Physics Helpers" (doc.babylonjs.com, the features deep dive on
+physics, read 2026-11-26 for the parity bar): a gravitational field that pulls bodies toward an origin within a
+radius, an updraft that pushes bodies up inside a cylinder (straight up, or away from the centre of its base), and a
+vortex that turns bodies about a cylinder's axis while pulling them in and lifting them. The force laws are Newton's
+(a field acceleration toward a point, a force along a direction) with the falloffs Margo's `explosion` already used;
+the step is explicit Euler on the impulse F dt (E. Hairer, S. P. Norsett and G. Wanner, *Solving Ordinary
+Differential Equations I*, Springer 1993, section I.7). No Babylon, Havok, Ammo, three.js or other engine source was
+read; the API names follow the documentation only so that code ports.

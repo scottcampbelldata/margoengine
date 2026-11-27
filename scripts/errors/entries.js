@@ -83,8 +83,17 @@ export const entries = [
     kind: 'family',
     messages: [],
     cause:
-      'A `Vehicle`, `Vehicle.car`, `Motorcycle`, tyre model or `Drivetrain` received a chassis, wheel, option, input, buffer or call it cannot use: a chassis from another world or without a collider, no wheels, a vector that is not three finite numbers, a size, force or stiffness that is negative or not finite, a wheel index past the wheels, or a disposed vehicle.',
+      'A `Vehicle`, `Vehicle.car`, `Motorcycle`, `TrackedVehicle`, tyre model or `Drivetrain` received a chassis, wheel, option, input, buffer or call it cannot use: a chassis from another world or without a collider, no wheels, a vector that is not three finite numbers, a size, force or stiffness that is negative or not finite, a wheel index past the wheels, or a disposed vehicle.',
     fix: 'Pass a dynamic chassis body of this world with a collider, at least one wheel with a `position` and a positive `radius`, directions that are not zero, sizes, forces and stiffnesses in SI units, driver input from -1 to 1 (brake and clutch from 0 to 1), a tyre model on every wheel a drivetrain drives, and a motion buffer of `motionStateWords` values this vehicle wrote. `Vehicle.car` needs a box collider on the chassis or `halfExtents`. The error names the input and the change to make.',
+  },
+  {
+    id: 'physics-fields',
+    title: '@margoengine/physics fields: explosions, wind, gravity fields, updrafts and vortices',
+    kind: 'family',
+    messages: [],
+    cause:
+      'An `explosion`, `WindForce`, `GravityField`, `Updraft` or `Vortex` got an input it cannot use (code unsupported): a centre or velocity that is not three finite numbers, an impulse, radius, height, strength or acceleration that is not a finite number above 0, a share (centripetal, lift), drag or friction below 0, a falloff other than linear, inverse-square or none, an updraft mode other than perpendicular or center, an air density that is not above 0, or a flow field whose cell is not [0, 0, 0].',
+    fix: "Pass what the message names: [x, y, z] of finite numbers, sizes in SI units above 0 (newtons, newton seconds, metres, m/s²), shares of 0 or more, and one of the named falloffs or modes. A wind force's flow field must be in the physics world's frame.",
   },
   {
     id: 'body-driver',

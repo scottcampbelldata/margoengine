@@ -2,15 +2,16 @@
 // is sampled per body, at the body's centre, so it costs a query and a loop over the bodies it reaches. Both run inside a
 // step, so they use no host Math: lengths by the pinned hypot and the standard atmosphere by the pinned exp and pow, the same
 // bits on every engine (tests/step-path.test.js holds this file to it).
-import { standardDensity } from '@margoengine/math/atmosphere';
-import { hypot } from '@margoengine/math/pinned';
-import type { FlowField, FlowSample } from '@margoengine/math/fields';
-import { colliderSurface, type Surface } from './aero.js';
-import type { PhysicsBody } from './body.js';
-import { type AirHold, type AirLoad, airHoldOf } from './air-hold.js';
-import { implicitWrench, type Wrench } from './held.js';
-import { checkVec, rotateVec, type Vec3 } from './math.js';
-import type { Physics, PhysicsAttachment, QueryFilter } from './physics.js';
+import { standardDensity } from "@margoengine/math/atmosphere";
+import { hypot } from "@margoengine/math/pinned";
+import type { FlowField, FlowSample } from "@margoengine/math/fields";
+import { colliderSurface, type Surface } from "./aero.js";
+import type { PhysicsBody } from "./body.js";
+import { type AirHold, type AirLoad, airHoldOf } from "./air-hold.js";
+import { implicitWrench, type Wrench } from "./held.js";
+import { MargoError } from "@margoengine/math/errors";
+import { rotateVec, type Vec3 } from "./math.js";
+import type { Physics, PhysicsAttachment, QueryFilter } from "./physics.js";
 
 /** Options of {@link explosion}. */
 export interface ExplosionOptions {
@@ -19,7 +20,7 @@ export interface ExplosionOptions {
   /** Reach in metres: nothing further than this is touched. */
   radius: number;
   /** How the push falls off with distance: `'linear'` to nothing at the radius (default), `'inverse-square'` (a body at the radius gets a quarter of the impulse at half of it) or `'none'`. */
-  falloff?: 'linear' | 'inverse-square' | 'none';
+  falloff?: "linear" | "inverse-square" | "none";
   /** Added to the push as a share of its size, upward along y, so debris flies up (default 0). */
   lift?: number;
   /** Only the bodies these queries let through. */
@@ -29,33 +30,55 @@ export interface ExplosionOptions {
 /**
  * An explosion: every dynamic body within `radius` of `center` gets an impulse away from the centre, scaled by the falloff and
  * applied at its centre of mass (it is thrown, not spun). Returns the bodies that were pushed.
- * @throws RangeError for an impulse or radius that is not a positive finite number.
+ * @throws MargoError (code `unsupported`, linking margoengine.com/errors#physics-fields) for an impulse or radius that is
+ * not a positive finite number, an unknown falloff or a centre that is not three finite numbers.
  */
-export function explosion(physics: Physics, center: Vec3, options: ExplosionOptions): PhysicsBody[] {
-  checkVec(center, 'Explosion centre');
-  const { impulse, radius, falloff = 'linear', lift = 0, filter } = options;
+export function explosion(
+  physics: Physics,
+  center: Vec3,
+  options: ExplosionOptions,
+): PhysicsBody[] {
+  fieldVec(center, "Explosion centre");
+  const { impulse, radius, falloff = "linear", lift = 0, filter } = options;
   if (!(impulse > 0 && Number.isFinite(impulse)))
-    throw new RangeError('Explosion impulse is a positive number of newton seconds; pass options.impulse above 0.');
+    throw fieldInput(
+      "Explosion impulse is a positive number of newton seconds; pass options.impulse above 0.",
+    );
   if (!(radius > 0 && Number.isFinite(radius)))
-    throw new RangeError('Explosion radius is a positive number of metres; pass options.radius above 0.');
-  if (!['linear', 'inverse-square', 'none'].includes(falloff))
-    throw new RangeError("Explosion falloff is 'linear', 'inverse-square' or 'none'; pass one of them.");
+    throw fieldInput(
+      "Explosion radius is a positive number of metres; pass options.radius above 0.",
+    );
+  if (!["linear", "inverse-square", "none"].includes(falloff))
+    throw fieldInput(
+      "Explosion falloff is 'linear', 'inverse-square' or 'none'; pass one of them.",
+    );
   const pushed: PhysicsBody[] = [];
   for (const body of physics.intersectAabb(
     [center[0] - radius, center[1] - radius, center[2] - radius],
     [center[0] + radius, center[1] + radius, center[2] + radius],
     filter,
   )) {
-    if (body.type !== 'dynamic') continue;
+    if (body.type !== "dynamic") continue;
     const [x, y, z] = body.position,
       d: Vec3 = [x - center[0], y - center[1], z - center[2]],
       distance = hypot(d[0], d[1], d[2]);
     if (distance > radius) continue;
     const share =
-      falloff === 'none' ? 1 : falloff === 'linear' ? 1 - distance / radius : inverseSquare(distance / radius);
-    const unit: Vec3 = distance > 1e-9 ? [d[0] / distance, d[1] / distance, d[2] / distance] : [0, 1, 0],
+      falloff === "none"
+        ? 1
+        : falloff === "linear"
+          ? 1 - distance / radius
+          : inverseSquare(distance / radius);
+    const unit: Vec3 =
+        distance > 1e-9
+          ? [d[0] / distance, d[1] / distance, d[2] / distance]
+          : [0, 1, 0],
       size = impulse * share;
-    body.applyImpulse([unit[0] * size, unit[1] * size + lift * size, unit[2] * size]);
+    body.applyImpulse([
+      unit[0] * size,
+      unit[1] * size + lift * size,
+      unit[2] * size,
+    ]);
     pushed.push(body);
   }
   return pushed;
@@ -97,25 +120,36 @@ export interface WindOptions {
 export class WindForce implements PhysicsAttachment, AirLoad {
   private released = false;
   private readonly hold: AirHold;
-  private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+  private readonly sample: FlowSample = {
+    velocity: [0, 0, 0],
+    density: 0,
+    temperature: 0,
+  };
   constructor(
     private readonly physics: Physics,
     private readonly options: WindOptions,
   ) {
     const { density, drag = 1.17, friction = 0.004, velocity } = options;
     if (density !== undefined && !(density > 0 && Number.isFinite(density)))
-      throw new RangeError('Air density is a positive number of kg/m3; pass options.density above 0.');
+      throw fieldInput(
+        "Air density is a positive number of kg/m3; pass options.density above 0.",
+      );
     if (!(drag >= 0 && Number.isFinite(drag)))
-      throw new RangeError('Drag coefficient is 0 or more; pass options.drag of 0 or above.');
+      throw fieldInput(
+        "Drag coefficient is 0 or more; pass options.drag of 0 or above.",
+      );
     if (!(friction >= 0 && Number.isFinite(friction)))
-      throw new RangeError('Friction coefficient is 0 or more; pass options.friction of 0 or above.');
+      throw fieldInput(
+        "Friction coefficient is 0 or more; pass options.friction of 0 or above.",
+      );
     if (isFlow(velocity)) {
       const c = velocity.cell;
       if (!c || c[0] !== 0 || c[1] !== 0 || c[2] !== 0)
-        throw new RangeError(
+        throw fieldInput(
           "A wind force samples its flow field in the physics world's frame; pass a field whose cell is [0, 0, 0].",
         );
-    } else if (typeof velocity !== 'function') checkVec(velocity, 'Wind velocity');
+    } else if (typeof velocity !== "function")
+      fieldVec(velocity, "Wind velocity");
     this.hold = airHoldOf(physics);
     this.hold.loads.add(this);
     physics.attach(this);
@@ -141,7 +175,7 @@ export class WindForce implements PhysicsAttachment, AirLoad {
       time = this.hold.now(),
       flow = isFlow(velocity) ? velocity : undefined;
     for (const body of this.physics.intersectAabb(min, max, filter)) {
-      if (body.type !== 'dynamic') continue;
+      if (body.type !== "dynamic") continue;
       const p = body.position;
       let air: Vec3, density: number;
       if (flow) {
@@ -149,13 +183,16 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         air = s.velocity;
         density = this.options.density ?? s.density;
         if (!(density > 0 && Number.isFinite(density)))
-          throw new RangeError(
+          throw fieldInput(
             `The wind's flow field gave a density of ${density} at (${p[0]}, ${p[1]}, ${p[2]}); a flow field's density is kg/m3 above 0.`,
           );
       } else {
         air =
-          typeof velocity === 'function'
-            ? (velocity as (point: Vec3, time: number) => Vec3)([p[0], p[1], p[2]], time)
+          typeof velocity === "function"
+            ? (velocity as (point: Vec3, time: number) => Vec3)(
+                [p[0], p[1], p[2]],
+                time,
+              )
             : (velocity as Vec3);
         density = this.options.density ?? standardDensity(p[1]);
       }
@@ -174,8 +211,16 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         winds = new Float64Array(3 * count),
         rhos = new Float64Array(count);
       for (let i = 0; i < count; i++) {
-        const local = rotateVec(q, [centres[3 * i]!, centres[3 * i + 1]!, centres[3 * i + 2]!]),
-          n = rotateVec(q, [normals[3 * i]!, normals[3 * i + 1]!, normals[3 * i + 2]!]),
+        const local = rotateVec(q, [
+            centres[3 * i]!,
+            centres[3 * i + 1]!,
+            centres[3 * i + 2]!,
+          ]),
+          n = rotateVec(q, [
+            normals[3 * i]!,
+            normals[3 * i + 1]!,
+            normals[3 * i + 2]!,
+          ]),
           px = pos[0] + local[0],
           py = pos[1] + local[1],
           pz = pos[2] + local[2];
@@ -192,8 +237,11 @@ export class WindForce implements PhysicsAttachment, AirLoad {
           ay = s.velocity[1];
           az = s.velocity[2];
           rho = this.options.density ?? s.density;
-        } else if (typeof velocity === 'function') {
-          const at = (velocity as (point: Vec3, time: number) => Vec3)([px, py, pz], time);
+        } else if (typeof velocity === "function") {
+          const at = (velocity as (point: Vec3, time: number) => Vec3)(
+            [px, py, pz],
+            time,
+          );
           ax = at[0];
           ay = at[1];
           az = at[2];
@@ -253,7 +301,12 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         const [f] = wrench([0, 0, 0], [0, 0, 0]);
         if (!(hypot(f[0], f[1], f[2]) >= 0.1 * body.mass)) continue;
       }
-      const [force, torque] = implicitWrench(body, wrench, dt, this.physics.gravity);
+      const [force, torque] = implicitWrench(
+        body,
+        wrench,
+        dt,
+        this.physics.gravity,
+      );
       this.hold.hold(body, force, torque);
     }
   }
@@ -264,7 +317,10 @@ export class WindForce implements PhysicsAttachment, AirLoad {
   }
 
   /** Each body's surface as panels in its frame, made again when its colliders change. */
-  private readonly surfaces = new Map<PhysicsBody, { key: string; surface: Surface }>();
+  private readonly surfaces = new Map<
+    PhysicsBody,
+    { key: string; surface: Surface }
+  >();
 
   private surfaceOf(body: PhysicsBody): Surface | undefined {
     const colliders = body.colliders.filter((c) => !c.isSensor()),
@@ -272,9 +328,9 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         .map((c) => {
           const t = c.translationWrtParent(),
             r = c.rotationWrtParent();
-          return `${c.handle}:${c.shape}:${c.shape === 'box' ? JSON.stringify(c.halfExtents()) : ''}:${c.shape === 'sphere' || c.shape === 'capsule' || c.shape === 'cylinder' || c.shape === 'cone' ? `${c.radius()},${c.halfHeight()}` : ''}:${t.x},${t.y},${t.z}:${r.x},${r.y},${r.z},${r.w}`;
+          return `${c.handle}:${c.shape}:${c.shape === "box" ? JSON.stringify(c.halfExtents()) : ""}:${c.shape === "sphere" || c.shape === "capsule" || c.shape === "cylinder" || c.shape === "cone" ? `${c.radius()},${c.halfHeight()}` : ""}:${t.x},${t.y},${t.z}:${r.x},${r.y},${r.z},${r.w}`;
         })
-        .join('|');
+        .join("|");
     if (!colliders.length) return undefined;
     const cached = this.surfaces.get(body);
     if (cached?.key === key) return cached.surface;
@@ -286,15 +342,25 @@ export class WindForce implements PhysicsAttachment, AirLoad {
           centres = new Float64Array(s.centres.length),
           normals = new Float64Array(s.normals.length);
         for (let i = 0; i < s.areas.length; i++) {
-          const p = rotateVec(q, [s.centres[3 * i]!, s.centres[3 * i + 1]!, s.centres[3 * i + 2]!]),
-            n = rotateVec(q, [s.normals[3 * i]!, s.normals[3 * i + 1]!, s.normals[3 * i + 2]!]);
+          const p = rotateVec(q, [
+              s.centres[3 * i]!,
+              s.centres[3 * i + 1]!,
+              s.centres[3 * i + 2]!,
+            ]),
+            n = rotateVec(q, [
+              s.normals[3 * i]!,
+              s.normals[3 * i + 1]!,
+              s.normals[3 * i + 2]!,
+            ]);
           centres.set([p[0] + t.x, p[1] + t.y, p[2] + t.z], 3 * i);
           normals.set(n, 3 * i);
         }
         return { centres, normals, areas: s.areas };
       }),
       join = (pick: (p: Surface) => Float64Array) => {
-        const out = new Float64Array(parts.reduce((n, p) => n + pick(p).length, 0));
+        const out = new Float64Array(
+          parts.reduce((n, p) => n + pick(p).length, 0),
+        );
         let at = 0;
         for (const p of parts) {
           out.set(pick(p), at);
@@ -302,7 +368,11 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         }
         return out;
       },
-      surface = { centres: join((p) => p.centres), normals: join((p) => p.normals), areas: join((p) => p.areas) };
+      surface = {
+        centres: join((p) => p.centres),
+        normals: join((p) => p.normals),
+        areas: join((p) => p.areas),
+      };
     this.surfaces.set(body, { key, surface });
     return surface;
   }
@@ -331,12 +401,286 @@ export const WindField = WindForce;
 /** @deprecated Use {@link WindForce}. */
 export type WindField = WindForce;
 
-function isFlow(velocity: WindOptions['velocity']): velocity is FlowField {
-  return typeof velocity === 'object' && velocity !== null && typeof (velocity as FlowField).sample === 'function';
+function isFlow(velocity: WindOptions["velocity"]): velocity is FlowField {
+  return (
+    typeof velocity === "object" &&
+    velocity !== null &&
+    typeof (velocity as FlowField).sample === "function"
+  );
 }
 
 /** The inverse-square falloff at a share `s` of the radius: 1 / (1 + 2 s)^2. */
 function inverseSquare(s: number): number {
   const d = 1 + 2 * s;
   return 1 / (d * d);
+}
+
+const HELP = " See https://margoengine.com/errors#physics-fields";
+/** A field input that cannot be used: code `unsupported`, the message naming it and its fix, with the fields' help link. */
+function fieldInput(message: string): MargoError {
+  return new MargoError("unsupported", message + HELP);
+}
+function fieldVec(value: unknown, label: string): asserts value is Vec3 {
+  const v = value as ArrayLike<number> | undefined;
+  if (
+    !(Array.isArray(v) || ArrayBuffer.isView(v)) ||
+    v.length !== 3 ||
+    !Number.isFinite(v[0]) ||
+    !Number.isFinite(v[1]) ||
+    !Number.isFinite(v[2])
+  )
+    throw fieldInput(`${label} must be [x, y, z], three finite numbers.`);
+}
+function fieldPositive(value: unknown, label: string): number {
+  if (!(typeof value === "number" && value > 0 && Number.isFinite(value)))
+    throw fieldInput(`${label} must be a finite number above 0.`);
+  return value;
+}
+function fieldShare(value: number, label: string): number {
+  if (!(value >= 0 && Number.isFinite(value)))
+    throw fieldInput(
+      `${label} is a share of strength, 0 or more; pass a finite number of 0 or above.`,
+    );
+  return value;
+}
+type Out = [number, number, number];
+type Falloff = "linear" | "inverse-square" | "none";
+function fieldFalloff(falloff: unknown, label: string): Falloff {
+  if (
+    falloff !== "linear" &&
+    falloff !== "inverse-square" &&
+    falloff !== "none"
+  )
+    throw fieldInput(
+      `${label} falloff is 'linear', 'inverse-square' or 'none'; pass one of them.`,
+    );
+  return falloff;
+}
+/** The share of a field's strength at `s` of its reach (0 at the centre or axis, 1 at the edge). */
+function falloffShare(falloff: Falloff, s: number): number {
+  return falloff === "none"
+    ? 1
+    : falloff === "linear"
+      ? 1 - s
+      : inverseSquare(s);
+}
+
+/** What every continuous field takes: where it is and which bodies feel it. */
+export interface FieldOptions {
+  /** The centre of a gravity field, or the centre of the base of an updraft's or vortex's upright cylinder. */
+  center: Vec3;
+  /** Reach in metres: a sphere's radius for a gravity field, the cylinder's for an updraft or vortex. */
+  radius: number;
+  /**
+   * How the strength falls off from the centre (a sphere) or the axis (a cylinder) out to the radius, as an explosion's:
+   * `'linear'` (default), `'inverse-square'` or `'none'`.
+   */
+  falloff?: "linear" | "inverse-square" | "none";
+  /** Only the bodies these queries let through (default all). */
+  filter?: QueryFilter;
+}
+/** Options of {@link GravityField}. */
+export interface GravityFieldOptions extends FieldOptions {
+  /** Acceleration toward the centre in m/s², scaled by the falloff: every mass falls alike, as under gravity. */
+  acceleration: number;
+}
+/** Options of {@link Updraft}. */
+export interface UpdraftOptions extends FieldOptions {
+  /** Height of the cylinder above `center`, metres. */
+  height: number;
+  /** Force in newtons on a body on the axis, scaled by the falloff: a light body rises faster than a heavy one. */
+  strength: number;
+  /** `'perpendicular'` pushes straight up the axis (default); `'center'` pushes away from the centre of the base, a fountain. */
+  mode?: "perpendicular" | "center";
+}
+/** Options of {@link Vortex}. */
+export interface VortexOptions extends FieldOptions {
+  /** Height of the cylinder above `center`, metres. */
+  height: number;
+  /** Force in newtons around the axis, counter-clockwise seen from above (+y), scaled by the falloff. */
+  strength: number;
+  /** The pull toward the axis as a share of `strength` (default 0.3), which keeps bodies circling instead of flung out. */
+  centripetal?: number;
+  /** The push up the axis as a share of `strength` (default 0.1), which lifts the debris as it circles. */
+  lift?: number;
+}
+
+/**
+ * The shared step of the continuous fields: each fixed step, every dynamic body whose centre of mass is inside the field
+ * gets the field's force for that step, as an impulse of force times the step at its centre of mass (it is pushed, not
+ * spun, and wakes). A field holds no state of its own, so a snapshot and restore of the world replays it bit for bit.
+ */
+abstract class ForceField implements PhysicsAttachment {
+  /** False to stop pushing for now, true to start again (default true). */
+  enabled = true;
+  private released = false;
+  protected readonly center: Vec3;
+  protected readonly radius: number;
+  protected readonly falloff: Falloff;
+  private readonly filter?: QueryFilter;
+  constructor(
+    protected readonly physics: Physics,
+    options: FieldOptions,
+    label: string,
+  ) {
+    fieldVec(options?.center, `${label} center`);
+    this.center = [options.center[0], options.center[1], options.center[2]];
+    this.radius = fieldPositive(options.radius, `${label} radius`);
+    this.falloff = fieldFalloff(options.falloff ?? "linear", label);
+    this.filter = options.filter;
+  }
+  /** How far the field reaches above its centre, for the box of bodies it looks at. */
+  protected abstract readonly top: number;
+  /** Writes the force on a body whose centre of mass is at `p` into `out`, or returns false when it is outside the field. */
+  protected abstract forceAt(p: Vec3, mass: number, out: Out): boolean;
+  /** @internal */
+  beforeStep(dt: number): void {
+    if (this.released || !this.enabled) return;
+    const [x, y, z] = this.center,
+      r = this.radius,
+      out: Out = [0, 0, 0];
+    for (const body of this.physics.intersectAabb(
+      [x - r, y - r, z - r],
+      [x + r, y + this.top, z + r],
+      this.filter,
+    )) {
+      if (
+        body.type !== "dynamic" ||
+        !this.forceAt(body.worldCenterOfMass, body.mass, out)
+      )
+        continue;
+      body.applyImpulse([out[0] * dt, out[1] * dt, out[2] * dt]);
+    }
+  }
+  /** Takes the field out of the world; it pushes nothing after this. `using` calls it. */
+  remove(): void {
+    if (this.released) return;
+    this.released = true;
+    this.physics.detach(this);
+  }
+  /** @internal */
+  dispose(): void {
+    this.released = true;
+  }
+  [Symbol.dispose](): void {
+    this.remove();
+  }
+}
+
+/**
+ * A gravity field (Babylon's `gravitationalField`): every dynamic body within `radius` of `center` is pulled toward it at
+ * `acceleration` m/s², scaled by the falloff with distance, every step until removed. With `physics.gravity = [0, 0, 0]`
+ * it is a small planet of your own.
+ * @throws MargoError (code `unsupported`, linking margoengine.com/errors#physics-fields) for a centre, radius, acceleration
+ * or falloff it cannot use.
+ */
+export class GravityField extends ForceField {
+  protected readonly top: number;
+  private readonly acceleration: number;
+  constructor(physics: Physics, options: GravityFieldOptions) {
+    super(physics, options, "Gravity field");
+    this.top = this.radius;
+    this.acceleration = fieldPositive(
+      options.acceleration,
+      "Gravity field acceleration",
+    );
+    physics.attach(this);
+  }
+  protected forceAt(p: Vec3, mass: number, out: Out): boolean {
+    const dx = this.center[0] - p[0],
+      dy = this.center[1] - p[1],
+      dz = this.center[2] - p[2],
+      d = hypot(dx, dy, dz);
+    if (d > this.radius || !(d > 1e-9)) return false;
+    const size =
+      (mass * this.acceleration * falloffShare(this.falloff, d / this.radius)) /
+      d;
+    out[0] = dx * size;
+    out[1] = dy * size;
+    out[2] = dz * size;
+    return true;
+  }
+}
+
+/**
+ * An updraft (Babylon's `updraft`): every dynamic body inside the upright cylinder of `radius` and `height` standing on
+ * `center` is pushed up with `strength` newtons, scaled by the falloff with distance from the axis, every step until
+ * removed. `mode: 'center'` pushes away from the centre of the base instead, so bodies spread as they rise.
+ * @throws MargoError (code `unsupported`, linking margoengine.com/errors#physics-fields) for an input it cannot use.
+ */
+export class Updraft extends ForceField {
+  protected readonly top: number;
+  private readonly strength: number;
+  private readonly mode: "perpendicular" | "center";
+  constructor(physics: Physics, options: UpdraftOptions) {
+    super(physics, options, "Updraft");
+    this.top = fieldPositive(options.height, "Updraft height");
+    this.strength = fieldPositive(options.strength, "Updraft strength");
+    const mode = options.mode ?? "perpendicular";
+    if (mode !== "perpendicular" && mode !== "center")
+      throw fieldInput(
+        "Updraft mode is 'perpendicular' or 'center'; pass one of them.",
+      );
+    this.mode = mode;
+    physics.attach(this);
+  }
+  protected forceAt(p: Vec3, _mass: number, out: Out): boolean {
+    const dx = p[0] - this.center[0],
+      dy = p[1] - this.center[1],
+      dz = p[2] - this.center[2],
+      d = hypot(dx, 0, dz);
+    if (d > this.radius || dy < 0 || dy > this.top) return false;
+    const size = this.strength * falloffShare(this.falloff, d / this.radius),
+      length = this.mode === "center" ? hypot(dx, dy, dz) : 0;
+    if (length > 1e-9) {
+      out[0] = (dx / length) * size;
+      out[1] = (dy / length) * size;
+      out[2] = (dz / length) * size;
+    } else {
+      out[0] = 0;
+      out[1] = size;
+      out[2] = 0;
+    }
+    return true;
+  }
+}
+
+/**
+ * A vortex (Babylon's `vortex`): every dynamic body inside the upright cylinder of `radius` and `height` standing on
+ * `center` is pushed around the axis with `strength` newtons, counter-clockwise seen from above, pulled toward the axis by
+ * `centripetal` times that and lifted by `lift` times that, all scaled by the falloff with distance from the axis, every
+ * step until removed: a whirlwind or a whirlpool.
+ * @throws MargoError (code `unsupported`, linking margoengine.com/errors#physics-fields) for an input it cannot use.
+ */
+export class Vortex extends ForceField {
+  protected readonly top: number;
+  private readonly strength: number;
+  private readonly centripetal: number;
+  private readonly lift: number;
+  constructor(physics: Physics, options: VortexOptions) {
+    super(physics, options, "Vortex");
+    this.top = fieldPositive(options.height, "Vortex height");
+    this.strength = fieldPositive(options.strength, "Vortex strength");
+    this.centripetal = fieldShare(
+      options.centripetal ?? 0.3,
+      "Vortex centripetal",
+    );
+    this.lift = fieldShare(options.lift ?? 0.1, "Vortex lift");
+    physics.attach(this);
+  }
+  protected forceAt(p: Vec3, _mass: number, out: Out): boolean {
+    const dx = p[0] - this.center[0],
+      dy = p[1] - this.center[1],
+      dz = p[2] - this.center[2],
+      d = hypot(dx, 0, dz);
+    if (d > this.radius || dy < 0 || dy > this.top || !(d > 1e-9)) return false;
+    const size = this.strength * falloffShare(this.falloff, d / this.radius),
+      ux = dx / d,
+      uz = dz / d;
+    // Counter-clockwise about +y seen from above: up x outward = (uz, 0, -ux); the pull is along -outward.
+    out[0] = (uz - this.centripetal * ux) * size;
+    out[1] = this.lift * size;
+    out[2] = (-ux - this.centripetal * uz) * size;
+    return true;
+  }
 }

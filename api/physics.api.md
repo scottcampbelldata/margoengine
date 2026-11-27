@@ -514,8 +514,15 @@ export interface DynamicCharacterOptions {
 export interface ExplosionOptions {
     impulse: number;
     radius: number;
-    falloff?: 'linear' | 'inverse-square' | 'none';
+    falloff?: "linear" | "inverse-square" | "none";
     lift?: number;
+    filter?: QueryFilter;
+}
+
+export interface FieldOptions {
+    center: Vec3;
+    radius: number;
+    falloff?: "linear" | "inverse-square" | "none";
     filter?: QueryFilter;
 }
 
@@ -527,6 +534,16 @@ export interface GearOptions extends MechanismOptions {
     axisA?: Vec3;
     axisB?: Vec3;
     ratio?: number;
+}
+
+export class GravityField extends ForceField {
+    protected readonly top: number;
+    constructor(physics: Physics, options: GravityFieldOptions);
+    protected forceAt(p: Vec3, mass: number, out: Out): boolean;
+}
+
+export interface GravityFieldOptions extends FieldOptions {
+    acceleration: number;
 }
 
 export interface HalfEdgeTopology {
@@ -2107,6 +2124,18 @@ export interface UniversalJointOptions {
     motorY?: Parameters<PhysicsJoint['setAxisMotor']>[1];
 }
 
+export class Updraft extends ForceField {
+    protected readonly top: number;
+    constructor(physics: Physics, options: UpdraftOptions);
+    protected forceAt(p: Vec3, _mass: number, out: Out): boolean;
+}
+
+export interface UpdraftOptions extends FieldOptions {
+    height: number;
+    strength: number;
+    mode?: "perpendicular" | "center";
+}
+
 export type Vec3 = readonly [number, number, number];
 
 export class Vehicle implements PhysicsAttachment {
@@ -2185,6 +2214,19 @@ export interface VehicleOptions {
     groundMaterial?: (contact: WheelGroundContact) => WheelGroundMaterial | undefined;
     groundReaction?: boolean;
     forward?: Vec3;
+}
+
+export class Vortex extends ForceField {
+    protected readonly top: number;
+    constructor(physics: Physics, options: VortexOptions);
+    protected forceAt(p: Vec3, _mass: number, out: Out): boolean;
+}
+
+export interface VortexOptions extends FieldOptions {
+    height: number;
+    strength: number;
+    centripetal?: number;
+    lift?: number;
 }
 
 export type VoxelFill = 'surface' | 'filled';
@@ -2412,7 +2454,24 @@ interface DofCouplingOptions extends MechanismOptions {
 
 type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 
+type Falloff = "linear" | "inverse-square" | "none";
+
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
+
+abstract class ForceField implements PhysicsAttachment {
+    protected readonly physics: Physics;
+    enabled: boolean;
+    protected readonly center: Vec3;
+    protected readonly radius: number;
+    protected readonly falloff: Falloff;
+    constructor(physics: Physics, options: FieldOptions, label: string);
+    protected abstract readonly top: number;
+    protected abstract forceAt(p: Vec3, mass: number, out: Out): boolean;
+    beforeStep(dt: number): void;
+    remove(): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
 
 interface JointBase {
     anchorA?: Vec3;
@@ -2524,6 +2583,8 @@ interface MultibodyOwner {
     addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint;
     removeMultibody(multibody: Multibody): void;
 }
+
+type Out = [number, number, number];
 
 interface PathOptions extends MechanismOptions {
     points: readonly Vec3[];

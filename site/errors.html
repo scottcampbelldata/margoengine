@@ -108,8 +108,13 @@
     </section>
     <section id="vehicles">
       <h2><a href="#vehicles">@margoengine/physics vehicles, tyres and drivetrains</a></h2>
-      <p><strong>Cause.</strong> A <code>Vehicle</code>, <code>Vehicle.car</code>, <code>Motorcycle</code>, tyre model or <code>Drivetrain</code> received a chassis, wheel, option, input, buffer or call it cannot use: a chassis from another world or without a collider, no wheels, a vector that is not three finite numbers, a size, force or stiffness that is negative or not finite, a wheel index past the wheels, or a disposed vehicle.</p>
+      <p><strong>Cause.</strong> A <code>Vehicle</code>, <code>Vehicle.car</code>, <code>Motorcycle</code>, <code>TrackedVehicle</code>, tyre model or <code>Drivetrain</code> received a chassis, wheel, option, input, buffer or call it cannot use: a chassis from another world or without a collider, no wheels, a vector that is not three finite numbers, a size, force or stiffness that is negative or not finite, a wheel index past the wheels, or a disposed vehicle.</p>
       <p><strong>Fix.</strong> Pass a dynamic chassis body of this world with a collider, at least one wheel with a <code>position</code> and a positive <code>radius</code>, directions that are not zero, sizes, forces and stiffnesses in SI units, driver input from -1 to 1 (brake and clutch from 0 to 1), a tyre model on every wheel a drivetrain drives, and a motion buffer of <code>motionStateWords</code> values this vehicle wrote. <code>Vehicle.car</code> needs a box collider on the chassis or <code>halfExtents</code>. The error names the input and the change to make.</p>
+    </section>
+    <section id="physics-fields">
+      <h2><a href="#physics-fields">@margoengine/physics fields: explosions, wind, gravity fields, updrafts and vortices</a></h2>
+      <p><strong>Cause.</strong> An <code>explosion</code>, <code>WindForce</code>, <code>GravityField</code>, <code>Updraft</code> or <code>Vortex</code> got an input it cannot use (code unsupported): a centre or velocity that is not three finite numbers, an impulse, radius, height, strength or acceleration that is not a finite number above 0, a share (centripetal, lift), drag or friction below 0, a falloff other than linear, inverse-square or none, an updraft mode other than perpendicular or center, an air density that is not above 0, or a flow field whose cell is not [0, 0, 0].</p>
+      <p><strong>Fix.</strong> Pass what the message names: [x, y, z] of finite numbers, sizes in SI units above 0 (newtons, newton seconds, metres, m/s²), shares of 0 or more, and one of the named falloffs or modes. A wind force's flow field must be in the physics world's frame.</p>
     </section>
     <section id="body-driver">
       <h2><a href="#body-driver">@margoengine/input/body: webcam hands and body to a skeleton</a></h2>
