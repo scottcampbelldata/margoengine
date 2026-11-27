@@ -6,6 +6,29 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: the points pixel size check was in no GPU chain (KB-POINTS-GPUPLAN1)
+
+- **Repro.** `node --test tests/modern-extension-suite.test.js tests/parallel-check.test.js` on a829b78da's parents:
+  `packages/points/tests/pixel-density-browser.mjs: browser test file(s) that nothing check:gpu-packages runs
+  reaches`.
+- **Cause.** KB-POINTS-CSSPX1 added the check without naming it in the package's `test:gpu` chain, so it never ran in
+  CI and the GPU plan refused to build.
+- **Fix.** `packages/points/package.json` `test:gpu` runs it after the scale check.
+- **Regression test:** `tests/modern-extension-suite.test.js` ("the plan runs every GPU check file, and each one left
+  out says why").
+
+### Open 2026-11-27: build:packages fails on main, core plus glTF is over 30 KiB (KB-BUILD-COREGLTF30K)
+
+- **Repro.** `npm run build:packages` on 829b78dab4: every package builds, then `sizeRecords` in
+  `scripts/build-modern.js` stops with `Core + glTF exceed 30 KiB gzip` (core 22,525 B + gltf 8,323 B = 30,848 B,
+  128 B over). Local CI passed this step at 3b3db1b109 and failed it at 25d5368704.
+- **Cause.** The two core features of 2026-11-27, snapshot rendering (4ea24d04d1, +110 B) and multi-draw (c04ed9040d,
+  +46 B), raised the core-only and core + stage limits but left this third limit, which had 28 B to spare. The glTF
+  figure here bundles the `@margoengine/math` helpers the root imports, so it reads higher than its entry size record
+  (7,442 B).
+- **Needs a maintainer decision:** raise this limit as the other two were raised, or take 128 B out of core or the glTF
+  root.
+
 ### Fixed 2026-11-27: checks downloaded files nobody asked for (KB-CHECK-FETCH1; scripts, decoders, loaders, biomes)
 
 - **Repro.** `node packages/decoders/scripts/test-real-textures.mjs <folder>` on a folder holding only the 34 KTX2
