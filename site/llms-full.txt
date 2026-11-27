@@ -15202,6 +15202,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: `npm run quality` is red on main at 9013114839 in physics entries (SEA-12, K2-09; solver-owned, not touched here)
+
+- **Repro:** `npm run quality` on 9013114839: sizes (the baseline holds the "feat(physics2d) vehicle" history row
+  twice, and `@margoengine/physics2d/vehicle` is new at 2380 B), tests (10 physics and audio entries no test
+  imports: `physics/tissue`, `rail`, `seismic`, `lightning`, `strands`, `outdoor-sound`, `drainage-fog`, `vortices`,
+  `aeolian`, `audio/outdoor`), api (102 items, `tsdoc physics` such as `TissueSolverParams`) and readme-types (the
+  physics README example 132: `TerrainBedParams` needs `centre`, `SwimSolver.id` is private).
+- **Owner:** the physics solver rows whose commits added them (SEA-12 at 113a391fde and 1a6c425709, K2-09 at
+  2f22453d8b and the rest of the physics queue); found by gap lane B's gate for KB-LOOK-TV-BOUNCE1, which changes none
+  of them.
+
 ### Fixed 2026-11-26: `bounce` and `shadowTint` averaged the ground masks' edge pixels, where the frame mixes lit and shadowed ground (KB-LOOK-TV-BOUNCE1, headless)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-rail-line.json --once --seconds 1.1 --out <dir>`
