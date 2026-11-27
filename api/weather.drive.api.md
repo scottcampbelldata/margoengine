@@ -97,6 +97,7 @@ export interface FireTarget {
     readonly options: object;
     readonly smokeEmission: number;
     readonly radiantPower?: number;
+    noon?: number;
 }
 
 export interface FogVolumeTarget {

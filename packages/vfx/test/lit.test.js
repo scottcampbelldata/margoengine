@@ -128,3 +128,31 @@ test('lights and shadows take bind group 1 of the billboard draw, and group 2 un
   assert.deepEqual(passBound[2][1].entries, [...lights.entries, ...shadows.entries]);
   effect.dispose();
 });
+
+// KB-VFX-GLOWUNITS1: the glow was referred to a sun of intensity pi whatever the scene's sun, so in a scene at sun 5 it
+// was pi / 5 of the haze's share and in a scene lit in lux it was invisible. `noon` refers it to the scene's noon sun.
+test('the glow is the same share of the noon light in a scene at sun 5 and in one lit in lux', () => {
+  const { h, effect } = attach({ capacity: 8, initialCount: 8, lit: {} });
+  const power = () => new Float32Array(uniform(h).data)[23];
+  effect.options.lit.glow = { position: [0, 0, 0], power: 5e6 };
+  h.frame();
+  assert.equal(power(), 5e6, 'unset: a sun of intensity pi, as before');
+  // The shader lights a ball with base * colour * power / (4 pi 1,000 d^2) * wrap; the noon sun at the zenith with
+  // white radiance lights it with base * noon / pi * wrap. Their ratio is the glow's share of the noon light.
+  const share = (noon) => {
+    effect.options.lit.noon = noon;
+    h.frame();
+    return power() / (4 * Math.PI * 1000) / (noon / Math.PI);
+  };
+  const want = 5e6 / (4 * Math.PI * 1000);
+  for (const noon of [5, 133775 * Math.exp(-0.21), 1, Math.PI]) {
+    const got = share(noon);
+    assert.ok(Math.abs(got - want) <= want * 1e-6, `noon ${noon}: share ${got}, want ${want}`);
+  }
+  for (const bad of [0, -1, NaN, 1e8]) {
+    effect.options.lit.noon = bad;
+    assert.throws(() => h.frame(), /lit noon/);
+  }
+  assert.throws(() => new VFX({ lit: { noon: 0 } }), /lit noon/);
+  effect.dispose();
+});

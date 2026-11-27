@@ -545,3 +545,21 @@ test('at night under a pall the sky takes the layer transmittance and its moonli
   // The reflectance is the two-stream slab's: none without a load, and R + T = 1 for a slab that absorbs nothing.
   assert.deepEqual(hazeReflectance({}), [0, 0, 0]);
 });
+
+// KB-VFX-GLOWUNITS1: the fire columns' glow was referred to a sun of intensity pi while the haze over them takes the
+// sky's lighting.intensity; the drive writes that noon sun on the fronts that take one.
+test("the drive writes its sky's noon sun on the fires' smoke glow", () => {
+  const sky = { name: 'sky', options: { lighting: { intensity: 5 } }, sun: new Float32Array([0, 1, 0]), airControls: true },
+    front = { options: {}, smokeEmission: 0, noon: undefined },
+    plain = { options: {}, smokeEmission: 0 },
+    machine = new WeatherMachine('clear', { seed: 8 }),
+    engine = engineOf(sky),
+    drive = WeatherDrive.attach(engine, { weather: machine, advance: false, fires: [front, plain] });
+  drive.setup(engine);
+  drive.update(0);
+  assert.equal(front.noon, 5);
+  assert.ok(!('noon' in plain), 'a fire without the setter is left alone');
+  delete sky.options.lighting;
+  drive.update(0);
+  assert.equal(front.noon, 1, "the sky's default intensity");
+});

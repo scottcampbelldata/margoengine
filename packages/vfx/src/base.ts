@@ -378,8 +378,8 @@ export interface VFXLit {
   /**
    * A fire's glow on the particles, read every frame: a point source radiating `power` watts at `position`, softened
    * over `radius` metres (default 1), of `color` (default `GLOW_COLOR`, a flame's orange). Its irradiance
-   * P / (4 pi (d^2 + r^2)) lights a particle as the sun at intensity pi lights it with 1,000 W/m^2, so smoke over a fire
-   * is lit orange from below, by night with no other light. Default none.
+   * P / (4 pi (d^2 + r^2)) lights a particle as the scene's noon sun (`noon`) lights it with 1,000 W/m^2, so smoke over
+   * a fire is lit orange from below, by night with no other light. Default none.
    */
   glow?: {
     position: readonly [number, number, number];
@@ -387,6 +387,13 @@ export interface VFXLit {
     radius?: number;
     color?: readonly [number, number, number];
   };
+  /**
+   * The engine sun intensity of the scene's noon sun, the light of 1,000 W/m^2 the glow is referred to: the sky's
+   * `lighting.intensity` (1 by default, `SUN_ILLUMINANCE` in a scene lit in lux, 5 in timber valley). A glow of E W/m^2
+   * lights a particle as a sun of intensity `noon * E / 1,000` would, so a fire is the same share of the noon light in
+   * any scene units. Read every frame; `WeatherDrive` writes it on its fire fronts' smoke from its sky. Default pi.
+   */
+  noon?: number;
 }
 /**
  * Sub-emitters: a particle that is born from the emitter (`on: 'birth'`, a trail or a flash at the muzzle), dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),

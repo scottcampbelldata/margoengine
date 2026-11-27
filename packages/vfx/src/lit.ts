@@ -49,7 +49,8 @@ fn lit(i:Out,c:vec4f)->vec4f {
   var light=base*litFrame.ambient.rgb+${lit.shadows ? `shadowLit(${sun},p,n)` : sun};
   ${lit.lights ? 'light+=clusterLighting(i.clip.xy,p,n,litFrame.eye.xyz,base,1.0,0.0,vec3f(0.04),1.0);' : ''}
   // A fire's glow: a point source of radiant power P (W) at glow.xyz, softened over glow.w metres; its irradiance
-  // P / (4 pi (d^2 + r^2)) lights the ball as a sun of 1,000 W/m^2 (intensity pi) would, with the same wrap.
+  // P / (4 pi (d^2 + r^2)) lights the ball as the noon sun of 1,000 W/m^2 would, with the same wrap: the power is
+  // written times noon / pi, so the pi of the sun's Lambert term cancels and E / 1,000 is the share of that sun.
   let toGlow=litFrame.glow.xyz-p;let d2=dot(toGlow,toGlow);
   let e=litFrame.glowColor.w/(12566.37*(d2+litFrame.glow.w*litFrame.glow.w));
   light+=base*litFrame.glowColor.rgb*(e*max(0.0,dot(n,toGlow*inverseSqrt(max(d2,1e-6)))+wrap)/(1.0+wrap));
@@ -94,6 +95,11 @@ function checkGlow(g: VFXLit['glow']): void {
     );
 }
 
+function checkNoon(n: unknown): void {
+  if (n !== undefined && !(typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 1e7))
+    throw new RangeError("VFX lit noon must be the noon sun's engine intensity, above 0 and at most 1e7; pass e.g. 1");
+}
+
 /**
  * The `lit` feature: billboards lit by the engine's sun (with wrap lighting), its ambient light, `Clustered` point and
  * spot lights and `Shadows` sun shadows, shaded as balls so smoke and dust take light from the side it comes from.
@@ -116,6 +122,7 @@ export const lit: VFXExtension<VFXLit> = {
     )
       throw new RangeError('VFX lit ambient must be linear [r, g, b], each 0 to 16');
     checkGlow(l.glow);
+    checkNoon(l.noon);
   },
   billboard: (code, value) => billboard(code, value),
   create(state: VFXState, value, owned) {
@@ -156,6 +163,7 @@ export const lit: VFXExtension<VFXLit> = {
         // The glow is read every frame; none (or no power) adds nothing.
         const g = value.glow;
         checkGlow(g);
+        checkNoon(value.noon);
         values.fill(0, 16, 24);
         if (g && g.power > 0) {
           const color = g.color ?? GLOW_COLOR;
@@ -164,7 +172,8 @@ export const lit: VFXExtension<VFXLit> = {
             values[20 + i] = color[i]!;
           }
           values[19] = g.radius ?? 1;
-          values[23] = g.power;
+          // Referred to the scene's noon sun (KB-VFX-GLOWUNITS1): pi keeps a sun of intensity pi as the reference.
+          values[23] = (g.power * (value.noon ?? Math.PI)) / Math.PI;
         }
         c.device.queue.writeBuffer(buffer, 0, values as Float32Array<ArrayBuffer>);
       },

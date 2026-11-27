@@ -253,6 +253,11 @@ export interface SmokeOptions {
    * to 10. Read every frame. Default 1.
    */
   glow?: number;
+  /**
+   * The engine sun intensity of the scene's noon sun, which the glow is referred to (`VFXLit.noon`): the sky's
+   * `lighting.intensity`. Read every frame. Default pi.
+   */
+  noon?: number;
   /** A puff sprite (RGBA8 sRGB, alpha the coverage), multiplied by the colour. Read at attach. Default: a soft disc. */
   texture?: VFXTexture;
   /** Point and spot lights on the puffs (`Clustered` of `@margoengine/clustered`). Read at attach. Default: the sun and ambient only. */
@@ -426,6 +431,8 @@ export class Smoke implements EnginePlugin {
       g.power = ((glow * RADIANT_FRACTION) / 0.7) * this.heat();
       g.radius = Math.max(radius, 0.01);
     } else delete this.lit.glow;
+    if (o.noon === undefined) delete this.lit.noon;
+    else this.lit.noon = unit(o.noon, 'noon', 0, 1e7, true);
   }
   /** The wind the column follows this frame: its own, else what the fire or the weather wrote on the puffs. */
   private wind(): number {

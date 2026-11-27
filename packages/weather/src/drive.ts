@@ -97,6 +97,11 @@ export interface FireTarget {
   readonly smokeEmission: number;
   /** The flames' radiant power now, watts (`FireFront.radiantPower`): it lights the smoke haze from below. None gives no light. */
   readonly radiantPower?: number;
+  /**
+   * The noon sun its smoke's glow is referred to (`FireFront.noon`, KB-VFX-GLOWUNITS1): the drive writes its sky's
+   * `lighting.intensity` here each frame, so the columns over a fire take the same share of the noon light as the haze.
+   */
+  noon?: number;
 }
 /** A cloud layer (`VolumetricClouds` from `@margoengine/sky/volumetric-clouds`). */
 export interface CloudLayerTarget {
@@ -624,6 +629,12 @@ export class WeatherDrive {
       for (const fire of fires) grams += fire.smokeEmission;
       const raised = smokeFromEmission(grams, state.wind, o.smokeWidth);
       if (raised > state.smoke) state = { ...state, smoke: raised };
+    }
+    // The columns' glow takes the noon sun the haze is referred to (KB-VFX-GLOWUNITS1), for a front that has the setter.
+    const litSky = o.sky ?? (found?.get(FOUND.sky) as SkyTarget | undefined);
+    if (litSky) {
+      const noon = litSky.options.lighting?.intensity ?? 1;
+      if (noon > 0) for (const fire of fires) if ('noon' in fire && fire.noon !== noon) fire.noon = noon;
     }
     // The flames' light on the haze over them (KB-WEATHER-FIREHAZE1), from the fronts that report their radiant power.
     let radiant = 0;

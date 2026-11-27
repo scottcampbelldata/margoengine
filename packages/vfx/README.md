@@ -1102,9 +1102,12 @@ console.log(Object.keys(SMOKE_LOOKS).join(', ')); // campfire, houseFire, wildfi
   and prewarm it again next frame, for a column moved to a new fire) and `dispose`; `smoke.effect` is the `VFX`.
 - Glow from below: the puffs are lit by a point at the source radiating `RADIANT_FRACTION` (0.3, Drysdale 2011;
   McGrattan, Baum and Hamins 2000) of the release, `glow` times 0.3 / 0.7 of `heat`, softened over the source radius
-  (`VFXLit.glow` of `@margoengine/vfx/lit`: irradiance P / (4 pi (d^2 + r^2)) lights a puff as a 1,000 W/m^2 sun of
-  intensity pi would). So the column over a fire is orange underneath and fades to grey as it climbs, at night with no
-  other light; `glow: 0` turns it off. A new puff is opaque within `SMOKE_FADE_IN` (1 s) whatever its lifetime
+  (`VFXLit.glow` of `@margoengine/vfx/lit`: irradiance P / (4 pi (d^2 + r^2)) lights a puff as the scene's noon sun of
+  1,000 W/m^2 would). `noon` is that sun's engine intensity, the sky's `lighting.intensity` (default pi; 5 in a scene at
+  sun 5, `SUN_ILLUMINANCE` in one lit in lux), so a fire is the same share of the noon light in any units
+  (KB-VFX-GLOWUNITS1); a `FireFront`'s `noon` writes it on all its columns and `WeatherDrive` sets that from its sky.
+  So the column over a fire is orange underneath and fades to grey as it climbs, at night with no other light;
+  `glow: 0` turns it off. A new puff is opaque within `SMOKE_FADE_IN` (1 s) whatever its lifetime
   (`smokeAlphaCurve`; it was a fifth of the life, 12 s of a minute).
 
   ```ts
@@ -1112,8 +1115,9 @@ console.log(Object.keys(SMOKE_LOOKS).join(', ')); // campfire, houseFire, wildfi
   import {Engine} from 'margoengine/core';
 
   const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
-  const smoke = Smoke.attach(engine, {position: [0, 8, 0], heat: 20e6, radius: 6, glow: 1.5});
+  const smoke = Smoke.attach(engine, {position: [0, 8, 0], heat: 20e6, radius: 6, glow: 1.5, noon: 5});
   console.log(smoke.effect.options.lit?.glow?.power); // 12857142.857142856
+  console.log(smoke.effect.options.lit?.noon); // 5
   ```
 - Settings: `SMOKE_SETTINGS` in `@margoengine/vfx/settings` (`applySmokeSettings`, `smokeSettingValues`,
   `SMOKE_LOOKS` campfire, houseFire, wildfire and oil); the wind rows are null by default and follow the weather.

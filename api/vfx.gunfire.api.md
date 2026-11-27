@@ -618,6 +618,7 @@ interface SmokeOptions {
     turbulence?: number;
     prewarm?: boolean;
     glow?: number;
+    noon?: number;
     texture?: VFXTexture;
     lights?: VFXLightSource;
     shadows?: VFXLightSource;
@@ -819,6 +820,7 @@ interface VFXLit {
         radius?: number;
         color?: readonly [number, number, number];
     };
+    noon?: number;
 }
 
 interface VFXMeshParticles {

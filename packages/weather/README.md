@@ -1178,7 +1178,9 @@ A `WeatherDrive` does three things for it, all package calls:
   sun's 1,000 W/m^2 in the flames' orange (`FIRE_LIGHT_COLOR`). So a valley burning under its smoke pall glows orange at
   night instead of going black, and the moon's light adds to it (KB-WEATHER-FIREHAZE1). A 45 GW blowup (a smoke of
   about 0.6 in a 5 m/s wind) lights the haze at 0.56, 0.24, 0.07 of the noon sun. `fireLight` scales it (default 1, 0
-  off); a fire that reports no `radiantPower` gives the haze no light.
+  off); a fire that reports no `radiantPower` gives the haze no light. A front that takes a `noon` (`FireFront.noon`)
+  is given the sky's `lighting.intensity` each frame, so its columns' glow is referred to the same noon sun as the haze
+  (KB-VFX-GLOWUNITS1).
 
 ```js
 import { WeatherMachine, fireHazeLight } from 'margoengine/weather';

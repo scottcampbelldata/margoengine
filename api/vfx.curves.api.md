@@ -170,6 +170,7 @@ interface VFXLit {
         radius?: number;
         color?: readonly [number, number, number];
     };
+    noon?: number;
 }
 
 interface VFXMeshParticles {

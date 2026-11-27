@@ -1067,6 +1067,26 @@ export class FireFront implements EnginePlugin {
     for (const s of this.segs.values()) convective += s.heat;
     return (RADIANT_SHARE / 0.7) * convective;
   }
+  /**
+   * The engine sun intensity of the scene's noon sun its smoke columns' glow is referred to (`SmokeOptions.noon`,
+   * KB-VFX-GLOWUNITS1), written on every column now and on those made later. `WeatherDrive` sets it from its sky's
+   * `lighting.intensity` each frame. Undefined: the columns' own (`smoke.noon`, default pi).
+   */
+  get noon(): number | undefined {
+    return this.noonValue;
+  }
+  set noon(value: number | undefined) {
+    if (value !== undefined) finiteIn(value, 'noon', 1e-9, 1e7);
+    this.noonValue = value;
+    for (const c of this.columns) this.noonOn(c);
+  }
+  private noonValue?: number;
+  private noonOn(c: Smoke): void {
+    const o = c.options as SmokeOptions;
+    if (this.noonValue !== undefined) o.noon = this.noonValue;
+    else if (this.options.smoke?.noon !== undefined) o.noon = this.options.smoke.noon;
+    else delete o.noon;
+  }
   /** True while a cell burns or an ignition waits. */
   get active(): boolean {
     return this.burning.length > 0 || this.pending.length > 0;
@@ -1677,6 +1697,7 @@ export class FireFront implements EnginePlugin {
           heat: 0,
         }),
       );
+    for (const c of this.columns) this.noonOn(c);
     if (this.smokeLook) for (const c of this.columns) this.smokeLook(c);
     this.dirty = true;
     this.publish();

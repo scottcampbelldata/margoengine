@@ -349,6 +349,52 @@ test('a fire front stands its columns on the flames: source as wide as the burni
   own.dispose();
 });
 
+test('KB-VFX-GLOWUNITS1: a column and a front carry the noon sun their glow is referred to', async () => {
+  const h = optionalGPU(),
+    smoke = Smoke.attach(h.engine, { position: [0, 0, 0], heat: 7e6, prewarm: false });
+  h.frame();
+  assert.equal(smoke.effect.options.lit.noon, undefined, 'unset: the lit default');
+  smoke.options.noon = 5;
+  h.frame();
+  assert.equal(smoke.effect.options.lit.noon, 5);
+  smoke.options.noon = 0;
+  assert.throws(() => h.frame(), /Smoke noon/);
+  delete smoke.options.noon;
+  h.frame();
+  assert.equal(smoke.effect.options.lit.noon, undefined, 'cleared');
+  smoke.dispose();
+  const { FireFront } = await import('../dist/fire-front.js'),
+    front = FireFront.attach(h.engine, {
+      size: [200, 200],
+      columns: 2,
+      flames: 0,
+      buildingFlames: 0,
+      smoke: { noon: 2 },
+      ignitions: [{ at: [0, 0], radius: 20 }],
+    });
+  front.noon = 5;
+  await front.ready;
+  assert.deepEqual(
+    front.smokeColumns.map((c) => c.options.noon),
+    [5, 5],
+    'a front writes its noon on columns it makes later',
+  );
+  front.noon = 108000;
+  assert.deepEqual(
+    front.smokeColumns.map((c) => c.options.noon),
+    [108000, 108000],
+    'and on those it has',
+  );
+  front.noon = undefined;
+  assert.deepEqual(
+    front.smokeColumns.map((c) => c.options.noon),
+    [2, 2],
+    "unset: the front's own smoke option",
+  );
+  assert.throws(() => (front.noon = 0), /fire noon/);
+  front.dispose();
+});
+
 test("KB-VFX-FRONTSMOKE-LOOK1: a smoke look reaches a fire front's columns, made before or after, and keeps their per-column heat and radius", async () => {
   const [{ FireFront }, { applySmokeSettings, SMOKE_LOOKS }] = await Promise.all([
       import('../dist/fire-front.js'),
