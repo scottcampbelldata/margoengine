@@ -13054,8 +13054,15 @@ each) on a grid of at most 4,194,304 nodes (16 B each), 8 to 256 cells along the
   little, raise `viscosity` to settle sooner). The top layer reads under rest density and carries no pressure, so a free
   surface sinks into the liquid by about a cell. A stiffer liquid needs a higher `speedOfSound` and proportionally more
   substeps.
-- One liquid, one density and one viscosity; no two-phase air, no spray or foam of its own (the surface's `whitewater`
-  can draw them from the particles' velocities).
+- Up to 4 liquids, each with its own density, viscosity and colour, all at one speed of sound and on one grid; no
+  two-phase air, no spray or foam of its own (the surface's `whitewater` can draw them from the particles' velocities).
+  The liquids do not dissolve into each other: a particle keeps its liquid's density and viscosity, and `mixing` blends
+  only colours (each relaxes towards the weighted mean colour round it, which is not exactly conserving: the mean colour
+  drifts by the fixed-point rounding, under 4.2e-4 a step). Between two liquids there is no interfacial tension of its own
+  beyond `surfaceTension`, which acts on the liquids' shared free surface. Each liquid's start box rounds to whole
+  lattice columns, so their particles start a few percent apart in volume and the rest density is the volume-weighted
+  mean. Two liquids of 1000 and 3000 kg/m³ press on a floor with their summed weight to the fixed-point rounding
+  (`gpu-liquid.test.js`).
 - Surface tension is the continuum surface force on the grid, so it acts over the cells the surface's density falls
   across (about one), not on a sharp surface: a feature under a few cells across (a thin jet, a small drop) is rounded
   by the grid's curvature, not its own. Measured: without gravity a 0.2 m cube at sigma = 10 N/m pulls into a ball and
