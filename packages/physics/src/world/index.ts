@@ -81,11 +81,14 @@ export {
   BODIES_FIELD,
   BODY_FORCES_FIELD,
   BODY_IMPULSES_FIELD,
+  BODY_MOBILITY_FIELD,
+  BODY_MOBILITY_WORDS,
   BODY_WORDS,
   FORCE_WORDS,
   IMPULSE_WORDS,
   RigidSolver,
   rateLevelOf,
+  type RigidSolverOptions,
   type RigidSolverParams,
 } from './solvers/rigid.js';
 export { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from './deck.js';

@@ -115,6 +115,7 @@ export function solveFloodProfile(
   bodyCell: Cell,
   input: {
     readonly water: Float32Array | Float64Array;
+    readonly waterCell: Cell;
     readonly dt: number;
     readonly forcing?: Float64Array;
     readonly bottom?: Float64Array;
@@ -122,12 +123,12 @@ export function solveFloodProfile(
   },
 ) {
   const { centre, halfHeight, area, projection, dragCoefficient } = profile;
-  const { water, dt, forcing, bottom, periodic } = input;
+  const { water, waterCell, dt, forcing, bottom, periodic } = input;
   if (rigid[at + 23] !== 1 || dragCoefficient === 0) return undefined;
   const rotation = normalizeQuaternion(rigid.subarray(at + 3, at + 7));
   const inverse = conjugateQuaternion(rotation);
   const offset = rotateByQuaternion(centre, rotation);
-  const bodyCentre = grid.point(rigid.subarray(at + 7, at + 10), bodyCell);
+  const bodyCentre = grid.point(rigid.subarray(at + 7, at + 10), bodyCell, waterCell);
   const profileCentre: Vec3 = [bodyCentre[0] + offset[0], bodyCentre[1] + offset[1], bodyCentre[2] + offset[2]];
   const height = projected(halfHeight, rotateByQuaternion([0, 1, 0], inverse), projection);
   if (!(height > 0 && Number.isFinite(height)))
@@ -195,7 +196,6 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
   private host!: SolverHost;
   private grid!: FloodDragGrid;
   private rate: RateLevel = 0;
-  private bedCell: Cell = ORIGIN;
   private bodies: readonly FloodDragProfile[] = [];
   private waterForcing!: Region;
   private bodyImpulse!: Region;
@@ -243,12 +243,9 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
     this.grid = grid;
     this.rate = rate;
     this.bodies = bodies;
-    this.bedCell = [...params.bed.cell];
   }
 
   step({ inputs, tick, cell }: StepContext, dt: number): void {
-    if (!cell.every((value, axis) => value === this.bedCell[axis]))
-      throw invalidLoad('Place the flood drag solver in the same origin cell as its shallow-water grid.');
     const { grid, host, forcingWork, impulseWork } = this;
     const bodyPort = inputs.get(BODIES_FIELD.name);
     const region = bodyPort?.region;
@@ -262,13 +259,16 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
     )
       throw invalidLoad('Match the live rigid port and rate. Run flood drag before the rigid solver.');
     const rigid = regionWords(host.memory, region) as Float32Array;
-    const water = grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
+    const { water, cell: waterCell } = grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
+    if (!cell.every((value, axis) => value === waterCell[axis]))
+      throw invalidLoad('Place the flood drag solver in the same origin cell as its shallow-water grid.');
     forcingWork.fill(0);
     impulseWork.fill(0);
     for (const profile of this.bodies) {
       const { row } = profile;
       const result = solveFloodProfile(grid, profile, rigid, row * BODY_WORDS, bodyPort.cell, {
         water,
+        waterCell,
         dt,
         forcing: forcingWork,
       });
@@ -284,9 +284,10 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
   importPorts(): void {}
 
   exportPorts(tick: number): readonly Port[] {
+    const cell = this.host.cell;
     return [
-      { field: SURFACE_WATER_FORCING_FIELD.name, region: this.waterForcing, cell: this.bedCell, tick },
-      { field: BODY_IMPULSES_FIELD.name, region: this.bodyImpulse, cell: this.bedCell, tick },
+      { field: SURFACE_WATER_FORCING_FIELD.name, region: this.waterForcing, cell, tick },
+      { field: BODY_IMPULSES_FIELD.name, region: this.bodyImpulse, cell, tick },
     ];
   }
 

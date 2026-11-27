@@ -124,7 +124,7 @@ export class FloodWadingSolver implements Solver<FloodWadingParams> {
   }
 
   private exchange(
-    { inputs, tick }: StepContext,
+    { cell, inputs, tick }: StepContext,
     dt: number,
     settledWater?: Float64Array,
     bottom?: Float64Array,
@@ -146,14 +146,20 @@ export class FloodWadingSolver implements Solver<FloodWadingParams> {
     const host = this.host!;
     const grid = this.grid!;
     const poses = new Float64Array((region.memory ?? host.memory).buffer, region.byteOffset, region.byteLength / 8);
-    const water = settledWater ?? grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
+    const flood = settledWater
+      ? { water: settledWater, cell }
+      : grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
     forces.fill(0);
     forcing.fill(0);
     for (const [i, body] of this.bodies.entries()) {
       if (!body) continue;
       const at = i * POSE_WORDS;
-      const centre = grid.point([poses[at]!, poses[at + 1]! + body.centreOffset, poses[at + 2]!], port!.cell);
-      const sample = grid.sample(water, forcing, centre, body.halfHeight, dt, bottom, periodic);
+      const centre = grid.point(
+        [poses[at]!, poses[at + 1]! + body.centreOffset, poses[at + 2]!],
+        port!.cell,
+        flood.cell,
+      );
+      const sample = grid.sample(flood.water, forcing, centre, body.halfHeight, dt, bottom, periodic);
       if (!sample) continue;
       const vx = sample.vx - poses[at + 3]!;
       const vz = sample.vz - poses[at + 5]!;

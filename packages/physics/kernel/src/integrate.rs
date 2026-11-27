@@ -657,7 +657,9 @@ impl World {
             self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
             if kind == DYNAMIC {
                 let frame = rotation.mul(self.q(INERTIA_FRAME_X, at));
-                let turn = apply_inverse_inertia(self.v(INVERSE_INERTIA_X, at), frame, self.v(ANGULAR_IMPULSE_X, at));
+                let angular_locks = (self.flags(at) & LOCK_ANGULAR) / LOCK_ANGULAR_X;
+                let impulse = lock(self.v(ANGULAR_IMPULSE_X, at), angular_locks);
+                let turn = apply_inverse_inertia(self.v(INVERSE_INERTIA_X, at), frame, impulse);
                 let linear = self.v(LINEAR_X, at).add(self.v(IMPULSE_X, at).scale(self.s(INVERSE_MASS, at)));
                 self.set_v(LINEAR_X, at, linear);
                 self.set_v(ANGULAR_X, at, self.v(ANGULAR_X, at).add(turn));
@@ -696,7 +698,9 @@ impl World {
             }
 
             let frame = self.q(ROTATION_X, at).mul(self.q(INERTIA_FRAME_X, at));
-            let turn = apply_inverse_inertia(self.v(INVERSE_INERTIA_X, at), frame, self.v(TORQUE_X, at));
+            let angular_locks = (flags & LOCK_ANGULAR) / LOCK_ANGULAR_X;
+            let torque = lock(self.v(TORQUE_X, at), angular_locks);
+            let turn = apply_inverse_inertia(self.v(INVERSE_INERTIA_X, at), frame, torque);
             let mut angular = self.v(ANGULAR_X, at).add(turn.scale(h));
             let inertia = self.v(INERTIA_X, at);
             if flags & (LOCK_ANGULAR | NO_GYROSCOPIC) == 0 && (inertia.x != inertia.y || inertia.y != inertia.z) {

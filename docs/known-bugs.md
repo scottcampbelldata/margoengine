@@ -28,6 +28,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   70351f3224 (KB6016d). Rolling those back together fails to build against today's shared light terms.
 - **Owed:** prove the rest are those intended fixes, then `visual:update` the three views with the reasons.
 
+### Fixed 2026-11-26: moving the world origin displaced a retained water reading (KB-LOADS-ORIGINMIRROR)
+
+- **Repro:** Move the world origin back one 4,096 m cell between ticks in a staggered coupling. The reader steps first.
+  Its 1.5 m distance to the writer's retained point becomes −4,094.5 m.
+- **Cause and fix:** The solver cells moved while the current and previous field samples stayed in the old frame.
+  Both retained cells now move atomically with the solver cells. Hydro's retained flow and its Loads consumers use
+  the live cell, including before the first Hydro step after a shift.
+- **Regression:** `packages/physics/tests/world.test.js` checks both mirrors and atomic rejection of a retained-cell
+  overflow. `packages/physics/tests/coupling/loads-swim-actuators.test.js` checks paired water and body impulses
+  against the unshifted swimmer and verifies exact replay.
+
+### Fixed 2026-11-26: film seek from frame zero lost the accumulator layout (KB-LOADS-FRAMEZERO)
+
+- **Repro:** Snapshot a world with buoyancy and a pending 5 N·s rigid impulse before it advances. The first step
+  used to allocate the force and impulse sums, after which restoring the initial checkpoint failed.
+- **Cause and fix:** The registry now reserves a sum when the first contributor publishes its shape. Summation
+  and draining still occur in the owner step.
+- **Regression:** `packages/physics/tests/world-frame-zero-accumulator.test.js` checks the rigid body receives the
+  impulse once and replays both accumulators. `packages/water/test/flood-rigid-drag.browser.mjs` seeks to frame zero
+  and replays independent buoyancy and accepted flood momentum on WebGPU and WebGL2.
+
+### Fixed 2026-11-26: torque about a locked axis turned a rigid body (KB-LOADS-AXISMOBILITY)
+
+- **Repro:** Tilt a box with unequal principal inertia and lock rotation about world X. Give it an angular impulse
+  or held torque about world X. The free Y or Z axes move.
+- **Cause and fix:** Integration projected the velocity after applying the inverse inertia. It now projects
+  the angular input as well, matching the effective mobility used by contact constraints. The separate
+  `bodyMobility` port publishes this response without changing the existing `bodies` layout.
+- **Regression:** `packages/physics/tests/world-rigid-solver.test.js` compares published response with all six impulse
+  directions and held torque using a rotated rigid body and a frame-zero restore.
+
 ### Fixed 2026-11-26: a supersampled edge pixel half plants and half lit ground was in both masks (KB-LOOK-MASKTIE1, shot tool)
 
 - **Repro:** rail-line shot `--once --seconds 1.1` (supersample 2): `probes/mid.plants.png` and `mid.lit.png` both read

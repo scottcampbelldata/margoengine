@@ -13,11 +13,22 @@
 // - `sum` adds the contributors' regions into the field's sum region by contributor id, then by element, so the sum is the
 //   same bits whatever order the solvers ran in and however many threads ran them, and clears them;
 // - a small f64 region per field records the tick, rate level and origin cell of the current and previous values.
-// Mirrors and contribution regions are made at a field's first publish; the world publishes every solver's ports once
+// Mirrors, contribution regions and the sum are made at their first publish; the world publishes every solver's ports
 // after `init`, so all of them exist before the first snapshot.
 import { MargoError } from '@margoengine/math/errors';
 import { type Arena, BYTES, regionWords } from './memory.js';
-import type { Cell, Centring, FieldDescriptor, FieldKind, FieldUse, Port, RateLevel, Region } from './solver.js';
+import {
+  type Cell,
+  type Centring,
+  checkCell,
+  type FieldDescriptor,
+  type FieldKind,
+  type FieldUse,
+  type Port,
+  type RateLevel,
+  type Region,
+  shiftedCell,
+} from './solver.js';
 
 /**
  * The SI unit of each quantity the framework's shared fields use. A field of one of these quantities must be in its unit;
@@ -194,6 +205,25 @@ export class FieldRegistry {
     }
   }
 
+  /**
+   * Moves both retained publications of every field into the rebased coordinate system. All cells are checked before
+   * writing any metadata. The payload mirrors and their publication times keep their original bytes.
+   */
+  shiftOrigin(delta: Cell): void {
+    checkCell(delta);
+    const moved: { meta: Float64Array; xyz: number; cell: Cell }[] = [];
+    for (const entry of this.fields.values()) {
+      const meta = this.words(entry.meta) as Float64Array;
+      for (const offset of [0, 6]) {
+        if (meta[offset] !== 1) continue;
+        const xyz = offset + 3;
+        const cell = shiftedCell([meta[xyz]!, meta[xyz + 1]!, meta[xyz + 2]!], delta);
+        moved.push({ meta, xyz, cell });
+      }
+    }
+    for (const { meta, xyz, cell } of moved) meta.set(cell, xyz);
+  }
+
   /** The field named `name`, or undefined. */
   field(name: string): RegisteredField | undefined {
     const entry = this.fields.get(name);
@@ -216,7 +246,8 @@ export class FieldRegistry {
    * An owner's port is copied into the field's next mirror and becomes the current value, the one it replaces the previous;
    * a contributor's port is added, element by element as f64, into its contribution for the next `sum`.
    * @throws RangeError when `solver` neither owns nor contributes to the field, when a port changes its element type,
-   * length or layout version from the field's first, or when an owner's port ends before the current one.
+   * length or layout version from the field's first, when contributors to a field have different element counts,
+   * or when an owner's port ends before the current one.
    */
   publish(solver: string, port: Port, level: RateLevel): void {
     const { cell } = port;
@@ -258,9 +289,19 @@ export class FieldRegistry {
       return;
     }
     const length = port.region.byteLength / BYTES[port.region.type];
+    const byteLength = length * BYTES.f64;
     let mine = entry.from.get(solver);
     if (!mine) {
-      mine = this.arena.allocate(`${port.field}/from/${solver}`, length * 8, 'f64', SUM_LAYOUT);
+      const sum = entry.sum;
+      if (entry.from.size > 0 && sum!.byteLength !== byteLength)
+        throw new RangeError(
+          `Contributor "${solver}" adds ${length} words to field "${port.field}", which receives ${sum!.byteLength / BYTES.f64}; every contribution to a field must cover the same elements.`,
+        );
+      mine = this.arena.allocate(`${port.field}/from/${solver}`, byteLength, 'f64', SUM_LAYOUT);
+      // Reserve the sum at initial publication, without consuming any pending contribution. A field with no remaining
+      // contributors can use a new shape; an active sum stays at the same address and layout.
+      if (sum?.byteLength !== byteLength)
+        entry.sum = this.arena.allocate(`${port.field}/sum`, byteLength, 'f64', SUM_LAYOUT);
       entry.from.set(solver, mine);
     }
     const into = this.words(mine),
@@ -276,27 +317,20 @@ export class FieldRegistry {
    * Sums the contributions to field `name` into its sum region, contributor by contributor in id order and each element in
    * index order, so the result is the same bits whatever order the contributors ran in, and clears them. Returns the sum as a
    * port valid at `tick` in origin cell `cell` (the owner's), or undefined when nobody has contributed to the field yet.
-   * @throws RangeError when two contributors' lengths differ.
    */
   sum(name: string, tick: number, cell: Cell = [0, 0, 0]): Port | undefined {
     const entry = this.fields.get(name);
     if (!entry || entry.from.size === 0) return undefined;
-    const ids = [...entry.from.keys()].sort(byText),
-      length = entry.from.get(ids[0]!)!.byteLength;
-    for (const id of ids)
-      if (entry.from.get(id)!.byteLength !== length)
-        throw new RangeError(
-          `Contributors "${ids[0]}" and "${id}" add different lengths to field "${name}"; every contribution to a field covers the same elements.`,
-        );
-    entry.sum ??= this.arena.allocate(`${name}/sum`, length, 'f64', SUM_LAYOUT);
-    const out = this.words(entry.sum);
+    const ids = [...entry.from.keys()].sort(byText);
+    const sum = entry.sum!;
+    const out = this.words(sum);
     out.fill(0);
     for (const id of ids) {
       const from = this.words(entry.from.get(id)!);
       for (let i = 0; i < from.length; i++) out[i]! += from[i]!;
       from.fill(0);
     }
-    return { field: name, region: entry.sum, tick, cell: [cell[0], cell[1], cell[2]] };
+    return { field: name, region: sum, tick, cell: [cell[0], cell[1], cell[2]] };
   }
 
   /** The regions of field `name` (meta, mirrors, sum, contributions by contributor id), or none for an unknown field. */

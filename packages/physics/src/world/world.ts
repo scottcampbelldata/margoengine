@@ -35,11 +35,13 @@ import {
 } from './snapshot.js';
 import {
   type Cell,
+  checkCell,
   isRateLevel,
   type Port,
   rateOf,
   type RateLevel,
   type Region,
+  shiftedCell,
   type Solver,
   type SolverDescription,
   type SolverHost,
@@ -80,11 +82,6 @@ const WORLD_ID = '';
 // Layout versions of the world's own regions.
 const CLOCK_LAYOUT = 1;
 const SOLVER_LAYOUT = 1;
-
-function checkCell(cell: Cell): void {
-  if (!cell || cell.length !== 3 || !cell.every((k) => Number.isInteger(k) && Math.abs(k) < 2147483648))
-    throw new RangeError('A cell is three whole numbers within +-2^31; pass [i, j, k].');
-}
 
 /** One solver in the world, and what the world keeps of it outside its regions. */
 interface Entry {
@@ -244,6 +241,7 @@ export class PhysicsWorld {
       summed: [],
       reads: description.fields.filter((u) => u.access === 'read').map((u) => u.field.name),
     };
+    this.words(entry.record).set(cell, 1);
     try {
       solver.init(this.host(entry), params);
       this.checkTimeScales(entry, params);
@@ -254,7 +252,7 @@ export class PhysicsWorld {
           'state',
           `Solver "${id}" steps at level ${level}, and the world is ${ran % (1 << (TOP - level))} base ticks into one of its steps; add it on a multiple of 1/${60 * (1 << level)} s, as at a 1/60 s boundary.`,
         );
-      this.words(entry.record).set([level, cell[0], cell[1], cell[2]]);
+      this.words(entry.record)[0] = level;
       this.entries = [...this.entries, entry].sort((a, b) => (a.id < b.id ? -1 : 1));
       this.reorder();
       this.publish(entry, ran / (1 << (TOP - level)) - 1);
@@ -387,7 +385,11 @@ export class PhysicsWorld {
 
   /** The origin cell solver `id` steps in. @throws RangeError for an unknown solver. */
   cellOf(id: string): Cell {
-    const w = this.words(this.entry(id).record);
+    return this.cellOfEntry(this.entry(id));
+  }
+
+  private cellOfEntry(entry: Entry): Cell {
+    const w = this.words(entry.record);
     return [w[1]!, w[2]!, w[3]!];
   }
 
@@ -399,18 +401,14 @@ export class PhysicsWorld {
   }
 
   /**
-   * Moves the origin by `delta` cells (as it follows a camera or a ship): every solver's cell shifts by the whole numbers, so
-   * no simulated state changes. All or nothing.
-   * @throws RangeError when a cell would leave +-2^31.
+   * Moves the origin by `delta` cells (as it follows a camera or a ship). Solver cells and both retained publications move
+   * by the same whole numbers. All or nothing.
+   * @throws RangeError when a solver or retained publication's cell would leave +-2^31.
    */
   shiftOrigin(delta: Cell): this {
     checkCell(delta);
-    const moved = this.entries.map((e) => {
-      const c = this.cellOf(e.id),
-        m: Cell = [c[0] - delta[0], c[1] - delta[1], c[2] - delta[2]];
-      checkCell(m);
-      return m;
-    });
+    const moved = this.entries.map((e) => shiftedCell(this.cellOfEntry(e), delta));
+    this.fields.shiftOrigin(delta);
     this.entries.forEach((e, i) => this.words(e.record).set(moved[i]!, 1));
     return this;
   }
@@ -721,10 +719,14 @@ export class PhysicsWorld {
   }
 
   private host(e: Entry): SolverHost {
-    const arena = this.arena,
+    const world = this,
+      arena = this.arena,
       id = e.id;
     return {
       memory: arena.memory,
+      get cell() {
+        return world.cellOfEntry(e);
+      },
       gravity: this.gravity,
       allocate: (name, byteLength, type, layout) => arena.allocate(name, byteLength, type, layout),
       resize: (region, byteLength) => arena.resize(region, byteLength),

@@ -117,6 +117,19 @@ export interface Region {
  */
 export type Cell = readonly [number, number, number];
 
+/** @internal Validate a world origin cell before writing the i32 record or field metadata. */
+export function checkCell(cell: Cell): void {
+  if (!cell || cell.length !== 3 || !cell.every((k) => Number.isInteger(k) && Math.abs(k) < 2147483648))
+    throw new RangeError('A cell is three whole numbers within +-2^31; pass [i, j, k].');
+}
+
+/** @internal The exact cell coordinates after moving the world's reference origin by delta. */
+export function shiftedCell(cell: Cell, delta: Cell): Cell {
+  const moved: Cell = [cell[0] - delta[0], cell[1] - delta[1], cell[2] - delta[2]];
+  checkCell(moved);
+  return moved;
+}
+
 /** A port: one field's data at a tick, published by its owner or gathered for an accumulator, as a region. */
 export interface Port {
   readonly field: string;
@@ -154,6 +167,8 @@ export interface SolverDescription {
 export interface SolverHost {
   /** The world's shared memory, which every solver module imports. */
   readonly memory: WebAssembly.Memory;
+  /** A fresh copy of the solver's current origin cell, also during init and after restoring or shifting the world. */
+  readonly cell: Cell;
   /** The world's gravity, m/s squared, the one value every solver uses (PA-08). */
   readonly gravity: readonly [number, number, number];
   /**

@@ -52,7 +52,6 @@ export class ProjectedFloodDragWater {
   private host!: SolverHost;
   private grid!: FloodDragGrid;
   private periodic!: PeriodicDragAxes;
-  private bedCell!: Cell;
   private receiptState!: Region;
   private waterWork!: Float64Array<ArrayBuffer>;
   private receiptWork!: Float64Array<ArrayBuffer>;
@@ -86,7 +85,8 @@ export class ProjectedFloodDragWater {
     this.grid = new FloodDragGrid(params);
     this.periodic = periodic;
     this.host = host;
-    this.bedCell = [...params.bed.cell];
+    if (!sameCell(host.cell, params.bed.cell))
+      throw invalidLoad('Register Hydro in the same origin cell as the bed used for projected drag.');
     const size =
       bodyRowsOf(
         host,
@@ -105,14 +105,11 @@ export class ProjectedFloodDragWater {
       port.tick !== tick ||
       level !== this.rate ||
       !sameCell(port.cell, cell) ||
-      !sameCell(cell, this.bedCell) ||
       port.region.type !== 'f32' ||
       port.region.layout !== LAYOUT ||
       port.region.byteLength !== this.profiles.length * BODY_WORDS * 4
     )
-      throw invalidLoad(
-        'Run the projected drag request before water at the same rate and in the fixed bed origin cell.',
-      );
+      throw invalidLoad('Run the projected drag request before water at the same rate and in the same origin cell.');
     return regionWords(this.host.memory, port.region) as Float32Array;
   }
 
@@ -121,9 +118,11 @@ export class ProjectedFloodDragWater {
     waterWork.set(water);
     receiptWork.fill(0);
     const densityArea = grid.density * grid.cellArea;
+    const cell = this.host.cell;
     for (const [record, profile] of profiles.entries()) {
-      const result = solveFloodProfile(grid, profile, request, record * BODY_WORDS, this.bedCell, {
+      const result = solveFloodProfile(grid, profile, request, record * BODY_WORDS, cell, {
         water: waterWork,
+        waterCell: cell,
         dt,
         bottom,
         periodic: this.periodic,

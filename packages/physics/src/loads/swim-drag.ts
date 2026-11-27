@@ -129,7 +129,7 @@ export class SwimDragToWater implements Solver<SwimDragToWaterParams> {
       port.tick !== tick
     )
       throw invalidLoad(this.source.repair);
-    const water = grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
+    const { water, cell } = grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
     const packets = regionWords(region.memory ?? host.memory, region) as Float64Array;
     const out = regionWords(host.memory, forcing) as Float64Array;
     out.fill(0);
@@ -137,7 +137,7 @@ export class SwimDragToWater implements Solver<SwimDragToWaterParams> {
       const x = packets[at + 3]!,
         z = packets[at + 5]!;
       if (x === 0 && z === 0) continue;
-      const point = grid.point(packets.subarray(at, at + 3), port.cell);
+      const point = grid.point(packets.subarray(at, at + 3), port.cell, cell);
       const radius = packets[at + 6]!;
       const sample = grid.sample(water, out, point, radius, dt);
       if (!sample) throw invalidLoad('Keep nonzero swimmer reactions inside the coupled wet shallow-water grid.');

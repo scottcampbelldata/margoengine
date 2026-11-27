@@ -2716,6 +2716,15 @@ Known kernel gaps:
 
 ### 1.7 Physics kernel
 
+Rigid axis locks project the angular impulse and held torque before applying the rotated inverse inertia and
+then project the resulting velocity. This uses the same available degrees of freedom as the contact solve.
+The `bodyMobility` port publishes the corresponding response at frame zero and at coupling ticks. The
+rotated-body impulse regression checks every input axis and the surviving off-diagonal angular response.
+The field registry reserves accumulator sums at first publication and rebases both retained field mirrors
+with solver cells. The focused CPU and Flood browser regressions cover restored frame-zero loads and
+equal and opposite accepted water impulses on both renderers.
+[David Baraff, Linear-Time Dynamics Using Lagrange Multipliers (1996), §§2–3](https://www.cs.cmu.edu/~baraff/papers/sig96.pdf)
+
 `SchoolSolver` (LIFE-04) imports the world's WebAssembly.Memory. Its plain and shared Rust builds put
 read-only linker data in slot 4. The host supplies each instance a separate stack and gives the existing
 neighbour grid only its bounded world-allocated scratch. The blueprint build checks both variants

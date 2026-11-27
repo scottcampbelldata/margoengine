@@ -198,7 +198,6 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private projectedDrag?: ProjectedFloodDragWater;
   private floodLoads?: FloodActuatorWater;
   private host!: SolverHost;
-  private cell: Cell = ORIGIN;
   private bedShape!: BedShape;
   private ground!: Bed;
   /** Each cell's raise by the buildings on it, m. */
@@ -688,7 +687,6 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
           );
       }
     }
-    this.cell = context.cell;
     this.cellBeds(this.ground.elevations);
     if (this.cylinder) {
       if (this.forcing || this.potential)
@@ -945,10 +943,11 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   }
 
   exportPorts(tick: number): readonly Port[] {
-    const water = { field: SURFACE_WATER_FIELD.name, region: this.published, tick, cell: this.cell };
-    if (this.cylinder) return [water, this.cylinder.reaction(tick, this.cell)];
-    if (this.floodLoads) return [water, ...this.floodLoads.exportPorts(tick, this.cell)];
-    return this.projectedDrag ? [water, this.projectedDrag.receipt(tick, this.cell)] : [water];
+    const cell = this.host.cell;
+    const water = { field: SURFACE_WATER_FIELD.name, region: this.published, tick, cell };
+    if (this.cylinder) return [water, this.cylinder.reaction(tick, cell)];
+    if (this.floodLoads) return [water, ...this.floodLoads.exportPorts(tick, cell)];
+    return this.projectedDrag ? [water, this.projectedDrag.receipt(tick, cell)] : [water];
   }
 
   stateRegions(): readonly Region[] {
@@ -1013,9 +1012,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
    * carries the water's `timeScale`, and a solver at another scale is refused it.
    */
   get flow(): FlowField & { readonly timeScale: number } {
+    const water = this;
     return {
       medium: 'water',
-      cell: this.cell,
+      get cell() {
+        return water.host?.cell ?? ORIGIN;
+      },
       timeScale: this.scale,
       sample: (x, y, z, _t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) => {
         const w = this.sample(x, z);

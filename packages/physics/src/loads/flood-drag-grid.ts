@@ -103,7 +103,7 @@ export class FloodDragGrid {
       throw invalidLoad('Choose a shallow-water grid and density whose cell measures fit finite SI values.');
   }
 
-  read(host: SolverHost, port: Port | undefined, previousTick: number): Float32Array {
+  read(host: SolverHost, port: Port | undefined, previousTick: number): { water: Float32Array; cell: Cell } {
     const region = port?.region;
     if (
       !region ||
@@ -114,22 +114,19 @@ export class FloodDragGrid {
       throw invalidLoad('Use the matching live ShallowWaterSolver surface-water field.');
     if (port?.tick !== previousTick)
       throw invalidLoad('Match the flood and drag rate levels and stagger the drag exchange before shallow water.');
-    if (!port.cell.every((cell, axis) => cell === this.bed.cell[axis]))
-      throw invalidLoad('Use the same origin cell for the shallow-water solver and its supplied bed.');
-    return new Float32Array((region.memory ?? host.memory).buffer, region.byteOffset, this.count * 3);
+    return {
+      water: new Float32Array((region.memory ?? host.memory).buffer, region.byteOffset, this.count * 3),
+      cell: port.cell,
+    };
   }
 
-  /** Convert a point between the position port and the bed's origin. No view over the bed is saved. */
-  point(point: ArrayLike<number>, from: Cell, to: Cell = this.bed.cell): [number, number, number] {
+  /** Convert a point between a position port and the live origin of the water grid. */
+  point(point: ArrayLike<number>, from: Cell, to: Cell): [number, number, number] {
     return [
       point[0]! + (from[0] - to[0]) * this.cellSize,
       point[1]! + (from[1] - to[1]) * this.cellSize,
       point[2]! + (from[2] - to[2]) * this.cellSize,
     ];
-  }
-
-  fromBed(point: ArrayLike<number>, to: Cell): [number, number, number] {
-    return this.point(point, this.bed.cell, to);
   }
 
   sample(

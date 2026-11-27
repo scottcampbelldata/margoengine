@@ -46,7 +46,6 @@ export class FloodActuatorWater {
   private readonly wading?: FloodWadingSolver;
   private readonly actuators: readonly (FloodPaddleSolver | FloodWadingSolver)[];
   private work = new Float64Array(0);
-  private bed?: Bed;
 
   constructor(
     water: ShallowWaterSolver,
@@ -81,7 +80,8 @@ export class FloodActuatorWater {
       if (profile && (profile.bed !== bed || (profile.density ?? WATER_DENSITY) !== density))
         throw invalidLoad('Give Hydro and the flood-loads profiles the same bed and density.');
     }
-    this.bed = bed;
+    if (!host.cell.every((part, axis) => part === bed.cell[axis]))
+      throw invalidLoad('Register Hydro and the flood-loads profiles in the shared bed origin cell.');
     this.work = new Float64Array(bed.columns * bed.rows * 3);
     if (paddle) this.paddle!.init(host, paddle);
     if (wading) this.wading!.init(host, wading);
@@ -94,8 +94,6 @@ export class FloodActuatorWater {
     bottom: Float64Array,
     periodic: PeriodicDragAxes,
   ): void {
-    if (!this.bed || !context.cell.every((part, axis) => part === this.bed!.cell[axis]))
-      throw invalidLoad('Place Hydro and the flood-loads profiles in the shared fixed bed origin.');
     this.work.set(water);
     for (const actuator of this.actuators) actuator.settleFlood(context, dt, this.work, bottom, periodic);
     if (!this.work.every(Number.isFinite))

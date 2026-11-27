@@ -2,13 +2,15 @@
 // by the world. Each step is today's `physics.step()`, so the public API, its events and attachments, and the replay goldens
 // are what they were.
 //
-// Fields. The solver owns `bodies` and `bodyImpulses`:
+// Fields. The solver owns `bodies`, `bodyMobility`, `bodyImpulses` and `bodyForces`:
 // - `bodies` (a body set, one record of `BODY_WORDS` f32 per kernel body row): the origin's position, the rotation, the
 //   centre of mass, the linear and angular velocity, the inverse mass and the inverse inertia in world axes (its six distinct
 //   entries), whether the row is a moving body, and the substeps its last step took (the world's substeps times 2^k for its
 //   island's level, `substepLevel`): a held force (`bodyForces`) moves a body by (v + F dt (s + 1) / (2 s m)) dt over a step of
 //   s symplectic-Euler substeps, so a solver that holds a load from the body's pose takes it where that pose is energy-neutral
 //   (a hull's load at (s - 1) / (2 s) of the step). A reader reads it at the coupling tick.
+// - `bodyMobility`: the response to an impulse in world axes. Translation has three diagonal entries; rotation has six
+//   symmetric entries. Locked axes have zero response and zero coupling to free axes.
 // - `bodyImpulses` (a body set, `IMPULSE_WORDS` words per row): what other solvers push the bodies with, as a linear impulse
 //   (N s) and an angular impulse about the body's centre of mass (N m s), world axes. A load at a point p is the pair
 //   (J, (p - c) x J), c the centre of mass in `bodies`: pairs add, so the world sums the contributions by contributor and then
@@ -29,7 +31,10 @@ import type { Physics, PhysicsAttachment } from '../../physics.js';
 /** Bits of the kernel's `flags` column (kernel/src/layout.rs): a live row, and the kind bits, 2 for a dynamic body. */
 const ALIVE = 1,
   KIND = 6,
-  DYNAMIC = 2;
+  DYNAMIC = 2,
+  LOCK_LINEAR_X = 1 << 3,
+  LOCK_ANGULAR_X = 1 << 6,
+  DISABLED = 1 << 11;
 import {
   type FieldDescriptor,
   type Port,
@@ -45,6 +50,8 @@ import {
 
 /** f32 words of a body's record in the `bodies` port. */
 export const BODY_WORDS = 25;
+/** f32 words per body in `bodyMobility`: linear X, Y, Z, then angular XX, XY, XZ, YY, YZ, ZZ. */
+export const BODY_MOBILITY_WORDS = 9;
 /** f64 words of a body's record in the `bodyImpulses` port: linear impulse then angular impulse about the centre of mass. */
 export const IMPULSE_WORDS = 6;
 /** f64 words of a body's record in the `bodyForces` port: force then torque about the centre of mass. */
@@ -58,6 +65,14 @@ export const BODIES_FIELD: FieldDescriptor = {
   kind: 'bodySet',
   quantity: 'bodyState',
   unit: 'm, rad, m/s, rad/s, 1/kg, 1/(kg m^2)',
+  centring: 'particle',
+};
+/** The per-axis effective inverse mass and world inverse inertia of each rigid body, including axis locks. */
+export const BODY_MOBILITY_FIELD: FieldDescriptor = {
+  name: 'bodyMobility',
+  kind: 'bodySet',
+  quantity: 'bodyMobility',
+  unit: '1/kg, 1/(kg m^2)',
   centring: 'particle',
 };
 /** The `bodyImpulses` field: linear and angular impulses other solvers push the bodies with, summed by contributor. */
@@ -82,8 +97,13 @@ export const BODY_FORCES_FIELD: FieldDescriptor = {
 export interface RigidSolverParams {
   /** The world to step. Its `fixedTimestep` must be a framework rate: 1/60, 1/120, ... 1/7680 s. */
   readonly physics: Physics;
-  /** Body rows the two ports hold (default the kernel's body capacity at `init`). A world with more bodies refuses to publish. */
+  /** Body rows the ports hold (default the kernel's body capacity at `init`). A world with more bodies refuses to publish. */
   readonly capacity?: number;
+}
+
+export interface RigidSolverOptions {
+  /** Publish effective mobility (default true). Disable to restore a checkpoint captured before the field was added. */
+  readonly publishMobility?: boolean;
 }
 
 /** FNV-1a of a kernel's column table (names and element types, in layout order): the layout version of its state regions. */
@@ -138,6 +158,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
   private host: SolverHost | null = null;
   private level: RateLevel = 0;
   private bodies: Region | null = null;
+  private mobility: Region | null = null;
   /**
    * The Physics's step count, one f64, kept as extra state so a snapshot, a restore and the hash carry it: anything clocked
    * by `stepCount * fixedTimestep` (a wind, a sail's gusts, `Physics.advance`) reads the restored time after a seek.
@@ -159,8 +180,14 @@ export class RigidSolver implements Solver<RigidSolverParams> {
   /** The forces and torques `importPorts` added for this tick's step, taken off after it (`FORCE_WORDS` a body row). */
   private held = new Float64Array(0);
   private holding = false;
+  private readonly publishMobility: boolean;
 
-  constructor(readonly id = 'rigid') {}
+  constructor(
+    readonly id = 'rigid',
+    options: RigidSolverOptions = {},
+  ) {
+    this.publishMobility = options.publishMobility ?? true;
+  }
 
   describe(): SolverDescription {
     const level = this.physics ? this.level : 0;
@@ -168,6 +195,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       id: this.id,
       fields: [
         { field: BODIES_FIELD, access: 'write' },
+        ...(this.publishMobility ? [{ field: BODY_MOBILITY_FIELD, access: 'write' as const }] : []),
         { field: BODY_IMPULSES_FIELD, access: 'write' },
         { field: BODY_FORCES_FIELD, access: 'write' },
       ],
@@ -192,6 +220,8 @@ export class RigidSolver implements Solver<RigidSolverParams> {
     const capacity = host.bodyRows(wanted);
     this.capacity = capacity;
     this.bodies = host.allocate('bodies', capacity * BODY_WORDS * 4, 'f32', BODIES_LAYOUT);
+    if (this.publishMobility)
+      this.mobility = host.allocate('bodyMobility', capacity * BODY_MOBILITY_WORDS * 4, 'f32', 1);
     this.clock = host.allocate('stepCount', 8, 'f64', 1);
     this.writeClock(physics.stepCount);
     this.holders = physics.statefulAttachments();
@@ -316,11 +346,16 @@ export class RigidSolver implements Solver<RigidSolverParams> {
         `The world has ${rows} body rows and the RigidSolver's ports hold ${this.capacity}; make the solver with a capacity of ${rows} or more.`,
       );
     const out = new Float32Array(this.host!.memory.buffer, this.bodies!.byteOffset, this.capacity * BODY_WORDS),
+      mobility =
+        this.mobility &&
+        new Float32Array(this.host!.memory.buffer, this.mobility.byteOffset, this.capacity * BODY_MOBILITY_WORDS),
       c = kernel.columns;
     out.fill(0);
+    mobility?.fill(0);
     for (let row = 0; row < rows; row++) {
       const at = row * BODY_WORDS,
-        moving = (c.flags![row]! & (ALIVE | KIND)) === (ALIVE | DYNAMIC) ? 1 : 0;
+        flags = c.flags![row]!,
+        moving = (flags & (ALIVE | KIND)) === (ALIVE | DYNAMIC) ? 1 : 0;
       out[at] = c.positionX[row]!;
       out[at + 1] = c.positionY[row]!;
       out[at + 2] = c.positionZ[row]!;
@@ -339,11 +374,27 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       out[at + 15] = c.angularZ[row]!;
       out[at + 16] = moving ? c.inverseMass[row]! : 0;
       if (moving) worldInverseInertia(c, row, out, at + 17);
+      if (moving && mobility && !(flags & DISABLED)) {
+        const response = row * BODY_MOBILITY_WORDS,
+          x = (flags & LOCK_ANGULAR_X) === 0,
+          y = (flags & (LOCK_ANGULAR_X << 1)) === 0,
+          z = (flags & (LOCK_ANGULAR_X << 2)) === 0;
+        for (let axis = 0; axis < 3; axis++)
+          if (!(flags & (LOCK_LINEAR_X << axis))) mobility[response + axis] = out[at + 16]!;
+        if (x) mobility[response + 3] = out[at + 17]!;
+        if (x && y) mobility[response + 4] = out[at + 18]!;
+        if (x && z) mobility[response + 5] = out[at + 19]!;
+        if (y) mobility[response + 6] = out[at + 20]!;
+        if (y && z) mobility[response + 7] = out[at + 21]!;
+        if (z) mobility[response + 8] = out[at + 22]!;
+      }
       out[at + 23] = moving;
       out[at + 24] = moving ? kernel.substeps * (1 << c.substepLevel![row]!) : 0;
     }
     // The world sets the cell of every port to the solver's own.
-    return [{ field: BODIES_FIELD.name, region: this.bodies!, tick, cell: [0, 0, 0] }];
+    const ports: Port[] = [{ field: BODIES_FIELD.name, region: this.bodies!, tick, cell: [0, 0, 0] }];
+    if (this.mobility) ports.push({ field: BODY_MOBILITY_FIELD.name, region: this.mobility, tick, cell: [0, 0, 0] });
+    return ports;
   }
 
   importPorts(_tick: number): void {

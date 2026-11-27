@@ -7,11 +7,14 @@ import { Physics } from '../dist/index.js';
 import {
   BODIES_FIELD,
   BODY_IMPULSES_FIELD,
+  BODY_MOBILITY_FIELD,
+  BODY_MOBILITY_WORDS,
   BODY_WORDS,
   IMPULSE_WORDS,
   PhysicsWorld,
   RigidSolver,
   rateLevelOf,
+  regionWords,
   worldMemory,
 } from '../dist/world.js';
 
@@ -190,6 +193,85 @@ test('impulses other solvers add land as linear and angular impulse pairs, as an
   assert.ok(Math.abs(pushed.box.angularVelocity[2]) > 0.1, 'the push at a point turned the box');
   pushed.physics.dispose();
   direct.physics.dispose();
+});
+
+test('the frame-zero mobility predicts the six impulse responses of a rotated, axis-locked rigid body', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: 1 / 60, substeps: 1 });
+  try {
+    const fixed = physics.addBody(null, { type: 'fixed', position: [0, -10, 0] });
+    const disabled = physics.addBody(null, { position: [0, -10, 0], colliders: { shape: 'sphere', radius: 1 } });
+    disabled.enabled = false;
+    const body = physics.addBody(null, {
+      position: [5, 2, 3],
+      rotation: [0.25, 0.25, 0.25, Math.sqrt(13) / 4],
+      massProperties: { mass: 10, centerOfMass: [0.375, 0, 0], principalInertia: [1, 3, 5] },
+      colliders: { shape: 'box', halfExtents: [0.25, 0.5, 0.75] },
+      enabledTranslations: [true, false, true],
+      enabledRotations: [false, true, true],
+    });
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }, [7, 0, 0]);
+    const bodies = world.fields.port(BODIES_FIELD.name);
+    const mobility = world.fields.port(BODY_MOBILITY_FIELD.name);
+    assert.equal(bodies.region.layout, 2);
+    assert.equal(bodies.region.byteLength, world.bodyRows * 25 * 4);
+    assert.deepEqual(mobility.cell, bodies.cell);
+    assert.equal(mobility.tick, -1);
+    const words = regionWords(world.memory, mobility.region);
+    const at = body.row * BODY_MOBILITY_WORDS;
+    const [mx, my, mz, xx, xy, xz, yy, yz, zz] = words.slice(at, at + BODY_MOBILITY_WORDS);
+    const inverse = [
+      [xx, xy, xz],
+      [xy, yy, yz],
+      [xz, yz, zz],
+    ];
+    const raw = regionWords(world.memory, bodies.region);
+    assert.ok(Math.abs(raw[body.row * BODY_WORDS + 18]) > 0.05, 'the dry inertia couples the locked X and free Y axes');
+    assert.ok(Math.abs(yz) > 0.05, 'free angular axes remain coupled');
+    assert.deepEqual([mx, my, mz], body.effectiveInverseMass.map(Math.fround));
+    assert.deepEqual(inverse.flat(), body.effectiveWorldInverseInertia.map(Math.fround));
+    for (const immobile of [fixed, disabled]) {
+      const start = immobile.row * BODY_MOBILITY_WORDS;
+      assert.ok(words.subarray(start, start + BODY_MOBILITY_WORDS).every((entry) => entry === 0));
+    }
+
+    const zero = world.takeSnapshot();
+    for (const kind of ['linear', 'angular', 'held angular']) {
+      for (let axis = 0; axis < 3; axis++) {
+        world.restoreSnapshot(zero.bytes);
+        const push = [0, 0, 0];
+        push[axis] = 1;
+        if (kind === 'linear') body.applyImpulse(push);
+        else if (kind === 'angular') body.applyTorqueImpulse(push);
+        else body.addTorque(push.map((x) => x / physics.fixedTimestep));
+        world.advance(1);
+        const got = kind === 'linear' ? body.linearVelocity : body.angularVelocity;
+        const expected = kind === 'linear' ? [mx * push[0], my * push[1], mz * push[2]] : inverse[axis];
+        // At a zero entry the lock acts exactly. Nonzero columns cross the f32 kernel's quaternion rotation and solve.
+        const bound = 8 * 2 ** -23 * Math.max(...expected.map(Math.abs));
+        for (let k = 0; k < 3; k++) {
+          const error = Math.abs(got[k] - expected[k]);
+          assert.ok(error <= (expected[k] === 0 ? 0 : bound), `${kind} ${axis} → ${k}: ${got[k]} vs ${expected[k]}`);
+        }
+      }
+    }
+  } finally {
+    physics.dispose();
+  }
+});
+
+test('older rigid checkpoint layouts remain selectable without a mobility port', () => {
+  const { physics } = scene();
+  try {
+    const world = new PhysicsWorld().add(new RigidSolver('rigid', { publishMobility: false }), { physics });
+    assert.equal(world.fields.port(BODY_MOBILITY_FIELD.name), undefined);
+    assert.ok(world.fields.port(BODIES_FIELD.name));
+    const zero = world.takeSnapshot();
+    world.advance(2);
+    world.restoreSnapshot(zero.bytes);
+    assert.equal(world.hash(), zero.hash);
+  } finally {
+    physics.dispose();
+  }
 });
 
 test('a fixed step that is no framework rate is refused, naming the nearest levels', () => {

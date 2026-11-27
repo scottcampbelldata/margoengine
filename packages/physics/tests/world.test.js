@@ -258,6 +258,105 @@ test('origin cells move without touching simulated state', () => {
   assert.throws(() => world.setCell('a', [0.5, 0, 0]), RangeError);
 });
 
+test('a staggered reader sees both retained publications in the rebased origin immediately', () => {
+  const position = field('position');
+  let startCell, writerHost, readerHost, point, seen;
+  const writer = {
+    describe: () => ({
+      id: 'writer',
+      rate: 0,
+      stableRate: () => 0,
+      fields: [{ field: position, access: 'write' }],
+    }),
+    init(host) {
+      writerHost = host;
+      startCell = host.cell;
+      point = host.allocate('point', 8, 'f64', 1);
+    },
+    step({ tick }) {
+      regionWords(writerHost.memory, point)[0] = (tick + 1) * 0.75;
+    },
+    exportPorts: (tick) => [{ field: position.name, region: point, tick, cell: writerHost.cell }],
+    importPorts() {},
+    stateRegions: () => [point],
+    extraState: () => [],
+  };
+  const reader = {
+    describe: () => ({
+      id: 'reader',
+      rate: 0,
+      stableRate: () => 0,
+      fields: [{ field: position, access: 'read' }],
+    }),
+    init(host) {
+      readerHost = host;
+    },
+    step({ cell, inputs }) {
+      const port = inputs.get(position.name);
+      const x = regionWords(readerHost.memory, port.region)[0];
+      seen = world.relocate([x, 0, 0], port.cell, cell)[0];
+    },
+    importPorts() {},
+    exportPorts: () => [],
+    stateRegions: () => [],
+    extraState: () => [],
+  };
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, cellSize: 4096 })
+    .add(writer, {}, [1, 0, 0])
+    .add(reader, {}, [1, 0, 0])
+    .couple(['reader', 'writer'], 'staggered');
+  assert.deepEqual(startCell, [1, 0, 0]);
+  world.advance(2);
+  const snapshot = world.takeSnapshot();
+  const retained = () => {
+    const { current, previous } = world.fields.field(position.name);
+    return [current, previous].map(({ port: { tick, cell, region }, level }) => ({
+      tick,
+      level,
+      cell,
+      region,
+      bytes: new Uint8Array(world.memory.buffer, region.byteOffset, region.byteLength).slice(),
+    }));
+  };
+  const before = retained();
+  assert.deepEqual(
+    before.map(({ tick }) => tick),
+    [1, 0],
+  );
+  const used = world.arena.used;
+  world.advance(3);
+  assert.equal(seen, 1.5);
+  world.restoreSnapshot(snapshot.bytes);
+  world.shiftOrigin([-1, 0, 0]);
+  assert.equal(world.tick, 256);
+  assert.equal(world.arena.used, used);
+  assert.deepEqual(
+    retained(),
+    before.map((value) => ({ ...value, cell: [2, 0, 0] })),
+  );
+  assert.deepEqual(readerHost.port(position.name).cell, [2, 0, 0]);
+  assert.deepEqual(readerHost.cell, [2, 0, 0]);
+  assert.deepEqual(startCell, [1, 0, 0], 'caller-held cells remain snapshots');
+  world.advance(3);
+  assert.equal(seen, 1.5);
+  const shifted = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  assert.deepEqual(readerHost.cell, [1, 0, 0]);
+  world.shiftOrigin([-1, 0, 0]).advance(3);
+  assert.equal(world.hash(), shifted);
+});
+
+test('an out-of-range retained publication refuses the whole origin shift', () => {
+  const writer = spring('writer', 0);
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(writer, {}, [2147483647, 0, 0]);
+  world.setCell('writer', [0, 0, 0]).advance(1);
+  assert.deepEqual(world.fields.field('writer-x').previous.port.cell, [2147483647, 0, 0]);
+  const hash = world.hash();
+  assert.throws(() => world.shiftOrigin([-1, 0, 0]), /pass \[i, j, k\]/);
+  assert.equal(world.hash(), hash);
+  assert.deepEqual(world.cellOf('writer'), [0, 0, 0]);
+});
+
 test('refusals: ids, a field nobody writes, a solver added mid-step', () => {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
   world.add(spring('reader', 0, { reads: 'nobody' }), {});

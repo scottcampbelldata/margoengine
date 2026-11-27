@@ -129,7 +129,7 @@ export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
   }
 
   private exchange(
-    { inputs, tick }: StepContext,
+    { cell, inputs, tick }: StepContext,
     dt: number,
     finalWater?: Float64Array,
     bottom?: Float64Array,
@@ -152,7 +152,9 @@ export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
     const host = this.host!;
     const grid = this.grid!;
     const bodies = new Float32Array((region.memory ?? host.memory).buffer, region.byteOffset, region.byteLength / 4);
-    const water = finalWater ?? grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
+    const flood = finalWater
+      ? { water: finalWater, cell }
+      : grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
     output.fill(0);
     forcing.fill(0);
     reactions.fill(0);
@@ -165,10 +167,10 @@ export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
       const length = hypot(worldNormal[0], 0, worldNormal[2]);
       if (!(length > 0)) continue;
       const direction: Vector = [worldNormal[0] / length, 0, worldNormal[2] / length];
-      const local = grid.point(centre, port!.cell);
-      const sample = grid.sample(water, forcing, local, blade.halfHeight, dt, bottom, periodic);
+      const local = grid.point(centre, port!.cell, flood.cell);
+      const sample = grid.sample(flood.water, forcing, local, blade.halfHeight, dt, bottom, periodic);
       if (!sample) continue;
-      const point = grid.fromBed(sample.point, port!.cell);
+      const point = grid.point(sample.point, flood.cell, port!.cell);
       const body = atContact(bodies, output, blade.row, point, direction);
       const slip = dot([sample.vx, 0, sample.vz], direction) - dot(body.velocity, direction);
       const coefficient = 0.5 * grid.density * sample.wet * blade.area * blade.dragCoefficient;

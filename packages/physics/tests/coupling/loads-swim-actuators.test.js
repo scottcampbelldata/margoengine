@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bedSurface } from '../../dist/earth.js';
-import { ShallowWaterSolver } from '../../dist/hydro.js';
+import { ShallowWaterSolver, SURFACE_WATER_FIELD } from '../../dist/hydro.js';
 import { Physics } from '../../dist/index.js';
 import { SWIM_PASSIVE_REACTION_FIELD, SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SwimSolver } from '../../dist/life.js';
 import { FloodBodyDragSolver, LoadSolver, SwimDragToWater } from '../../dist/loads.js';
@@ -33,7 +33,7 @@ function waterMomentum(water) {
   return WATER_MASS * point.velocity[1];
 }
 
-async function run({ actuatorReturn = true, probeReturn = true, shared = false } = {}) {
+async function run({ actuatorReturn = true, probeReturn = true, shared = false, originShift = false } = {}) {
   await Physics.load({ threads: shared });
   const world = new PhysicsWorld({ rate: RATE, memory: worldMemory(shared) });
   const bed = bedSurface(
@@ -41,6 +41,7 @@ async function run({ actuatorReturn = true, probeReturn = true, shared = false }
     new Float64Array(4).fill(-DEPTH),
   );
   const water = new ShallowWaterSolver();
+  const flow = water.flow;
   world.add(water, {
     bed,
     depth: DEPTH,
@@ -49,9 +50,8 @@ async function run({ actuatorReturn = true, probeReturn = true, shared = false }
     sides: { minX: 'periodic', maxX: 'periodic', minZ: 'periodic', maxZ: 'periodic' },
   });
   const sea = {
-    water: water.flow,
+    water: flow,
     density: RHO,
-    cell: water.flow.cell,
     elevation: (x, z) => water.sample(x, z).surface,
   };
   using physics = new Physics(null, { fixedTimestep: DT, arena: world.arena });
@@ -129,10 +129,24 @@ async function run({ actuatorReturn = true, probeReturn = true, shared = false }
   };
   for (let frame = 1; frame <= 16; frame++) advance(frame);
   const snapshot = world.takeSnapshot();
+  if (originShift) {
+    assert.deepEqual(flow.cell, [0, 0, 0]);
+    world.shiftOrigin([1, 0, 0]);
+    const waterField = world.fields.field(SURFACE_WATER_FIELD.name);
+    assert.equal(waterField.current.port.tick, 15);
+    assert.equal(waterField.previous.port.tick, 14);
+    assert.deepEqual(waterField.current.port.cell, [-1, 0, 0]);
+    assert.deepEqual(waterField.previous.port.cell, [-1, 0, 0]);
+    assert.deepEqual(flow.cell, [-1, 0, 0], 'a retained flow sees the new origin before Hydro steps');
+  }
   for (let frame = 17; frame <= FINAL_FRAME; frame++) advance(frame);
   const hash = world.hash();
   const sample = final();
   world.restoreSnapshot(snapshot.bytes);
+  if (originShift) {
+    assert.deepEqual(flow.cell, [0, 0, 0], 'the retained flow follows snapshot restore before a step');
+    world.shiftOrigin([1, 0, 0]);
+  }
   world.advance(FINAL_FRAME);
   assert.equal(world.hash(), hash);
   return { ...sample, stepError, tailImpulse, finImpulse, hash };
@@ -141,9 +155,12 @@ async function run({ actuatorReturn = true, probeReturn = true, shared = false }
 test('SEA-12 production receivers exchange the swimmer tail and fin impulses through live HYDRO', async (context) => {
   const both = await run();
   const shared = await run({ shared: true });
+  const moved = await run({ originShift: true });
   const noActuator = await run({ actuatorReturn: false });
   const noProbe = await run({ probeReturn: false });
   assert.deepEqual(shared, both);
+  assert.notEqual(moved.hash, both.hash, 'the snapshots record different cells');
+  assert.deepEqual({ ...moved, hash: both.hash }, both, 'both frames give the same forces and water momentum');
   const initial = SWIM_MASS * SWIM_START + PROBE_MASS * PROBE_START;
   const end = both.swimmer + both.probe + both.water;
   assert.ok(Math.abs(end - initial) < 128 * 2 ** -24 * PROBE_MASS);
