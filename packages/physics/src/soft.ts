@@ -24,6 +24,7 @@ import {
   type Skin,
   tetDeterminant,
 } from './soft-volume.js';
+import { adaptiveTear } from './soft-adaptive-tear.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
 import {
   bindTensileSeam,
@@ -440,6 +441,14 @@ export class SoftBodyMaterial {
    */
   tearStrain = 0;
   /**
+   * Whether a body of triangles with no cells (a cloth, a trimesh) tears through its faces (default false: along its edges).
+   * With it a face stretched past `tearStrain` is cut across its greatest stretch from a crack tip or a corner, a vertex
+   * inserted where the cut meets the face's far side, and the crack opens behind its tip (Pfaff et al. 2014), so a tear runs
+   * where the load sends it, not where the mesh has edges. The body is rebuilt at each cut: listen with `soft.onTear` for the
+   * body that replaces it. `maxTearsPerStep` caps the cuts a step (default 8 here).
+   */
+  adaptiveTearing = false;
+  /**
    * The spring that pulls every particle toward its place in the best-fit rotated rest shape, for a body with shape matching
    * on (default rigid, 0 Hz).
    */
@@ -499,6 +508,7 @@ export class SoftBodyMaterial {
     copy.tensile = this.tensile && { warp: { ...this.tensile.warp }, weft: { ...this.tensile.weft } };
     copy.arealDensity = this.arealDensity;
     copy.tearStrain = this.tearStrain;
+    copy.adaptiveTearing = this.adaptiveTearing;
     copy.shapeMatchingSoftness = { ...this.shapeMatchingSoftness };
     copy.volumeSoftness = { ...this.volumeSoftness };
     copy.edgePlasticYield = this.edgePlasticYield;
@@ -2248,6 +2258,8 @@ export class SoftBody {
   /** @internal */ force: Vec3 = [0, 0, 0];
   /** @internal */ pointForces = new Map<number, Vec3>();
   /** @internal */ tornSeen = new Set<number>();
+  /** @internal The sides a face-cutting tear ran along that are still joined at both ends (slits a later cut opens). */
+  crackSides = new Set<string>();
   /** @internal */ triangleList = new Uint32Array(0);
   /** @internal The fixed body that holds this body's surface collider, once it has one. */
   surface: PhysicsBody | null = null;
@@ -4433,8 +4445,10 @@ export class SoftBodies implements PhysicsAttachment {
       c.tear[row] = 0;
       const m = body.material,
         flow = { compression: 0, stretch: 1, both: 2 }[m.edgePlasticFlow];
-      fem.e_strain![row] = bend ? 0 : tearStrain * resistance;
-      fem.e_force![row] = bend ? 0 : m.tearForce * resistance;
+      // A sheet that tears through its faces is not torn at its edges (adaptive-tear.ts decides where it parts).
+      const adaptive = m.adaptiveTearing && body.triangleList.length > 0 && body.cellRange.count === 0;
+      fem.e_strain![row] = bend || adaptive ? 0 : tearStrain * resistance;
+      fem.e_force![row] = bend || adaptive ? 0 : m.tearForce * resistance;
       fem.e_smooth![row] = m.tearSmoothing;
       fem.e_yield![row] = bend ? 0 : m.edgePlasticYield;
       fem.e_creep![row] = m.edgePlasticCreep;
@@ -5017,6 +5031,7 @@ export class SoftBodies implements PhysicsAttachment {
       this.report(c);
     }
     if (this.tensileFractures.size > 0) this.openTensileFractures();
+    this.tearFaces();
     const live = this.columns();
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, live);
     for (const mesh of this.bound) this.moveBound(mesh, live);
@@ -6045,6 +6060,36 @@ export class SoftBodies implements PhysicsAttachment {
       }
       if (fresh.length && body.tetherStretch !== null) this.tethersDirty = true;
       if (fresh.length || freshCells.length) this.announce(body, fresh, freshCells, this.splitAfterTear(body));
+    }
+  }
+
+  /** Cuts the faces of the sheets that tear through their faces and are stretched past their tear strain (adaptive-tear.ts). */
+  private tearFaces(): void {
+    for (const body of [...this.bodies]) {
+      const m = body.material;
+      if (!m.adaptiveTearing || !(m.tearStrain > 0) || body.removed || body.asleep) continue;
+      if (body.triangleList.length === 0 || body.cellRange.count > 0) continue;
+      let made: { split: SoftSplit; cuts: number } | null = null;
+      const limit = m.maxTearsPerStep > 0 ? m.maxTearsPerStep : 8,
+        split = this.transferCutAttachments(body, () => {
+          made = adaptiveTear(this, body, (positions) => new SoftBodyDesc(positions), limit);
+          return made?.split ?? null;
+        });
+      if (!split) continue;
+      // A cut that parts the sheet: the pieces become bodies of their own where the world splits torn bodies.
+      const piece = split.pieces[0]!,
+        parted = this.splitOnTear === 'all' ? this.splitAfterTear(piece) : null;
+      this.announce(
+        body,
+        [],
+        [],
+        parted
+          ? {
+              pieces: parted.pieces,
+              destinations: (p) => split.destinations(p).flatMap((d) => parted.destinations(d.particle)),
+            }
+          : split,
+      );
     }
   }
 

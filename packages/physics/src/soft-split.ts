@@ -282,7 +282,7 @@ function carrySkin(body: SoftBody, piece: SoftBody, desc: SoftBodyDesc, oldCells
 }
 
 /** What a piece copies from the body it was split from. */
-function carry(
+export function carry(
   desc: SoftBodyDesc,
   body: SoftBody,
   c: ReturnType<SoftBodies['columns']>,
@@ -554,7 +554,7 @@ export function crossesBlade(
 }
 
 /** A piece of a skinned body keeps its particles' limits. */
-function skinLimitsDesc(desc: SoftBodyDesc, body: SoftBody, members: readonly number[]): void {
+export function skinLimitsDesc(desc: SoftBodyDesc, body: SoftBody, members: readonly number[]): void {
   if (!body.skinMax) return;
   const max = body.skinMax,
     back = body.skinBack;
@@ -563,7 +563,7 @@ function skinLimitsDesc(desc: SoftBodyDesc, body: SoftBody, members: readonly nu
 }
 
 /** ...and where the skin holds them, its normals there and which of them the skin pinned. */
-function carrySkinLimits(body: SoftBody, piece: SoftBody, members: readonly number[]): void {
+export function carrySkinLimits(body: SoftBody, piece: SoftBody, members: readonly number[]): void {
   if (!body.skinMax || !piece.skinMax) return;
   members.forEach((p, k) => {
     for (let a = 0; a < 3; a++) {

@@ -921,6 +921,31 @@ console.log(physics.alpha, drawn.length);
 - **Surface collider.** `soft.createSurfaceCollider(body, {friction})` gives a body made from triangles (`trimesh`, `cloth`, `clothTube`) a deformable triangle-mesh collider that follows its particles each step with each vertex's speed, so every rigid shape, convex hulls and meshes included, rests on cloth and is dragged by its friction; particles meet every shape directly through the kernel's swept particle probe. It is removed with the body.
 - **Drawing.** `drawSoftBody(engine, body, {material, images, uvs})` from `margoengine/gltf/soft-mesh` draws a cloth or any body with triangles as a PBR mesh that follows it every frame, normals and tangents recomputed and texture coordinates from `body.grid` (`{nu, nv, wrap}` for a body built by `cloth`, `clothAnisotropic` or `clothTube`, null otherwise); see the gltf README.
 - **World.** `soft.create`, `soft.remove`, `soft.list()`, `soft.onTear(listener)`, `soft.hash()` (equal across two runs that did the same), `soft.substeps` (default 8) and `soft.iterations` (default 2), `soft.dispose()`.
+- **Adaptive tearing.** A body of triangles (a cloth, a trimesh) whose material has `adaptiveTearing = true` and a `tearStrain` tears through its faces instead of at its edges: after each step a face stretched past the tear strain is cut across its greatest stretch, from a crack tip, a corner on the boundary or any corner, to the far side, where a vertex is inserted and the face beyond is split, so the mesh stays whole (Pfaff et al. 2014). The crack opens behind its tip: a vertex the crack's sides divide is copied, one for each side, its mass shared by area. So a tear runs where the stretch sends it, not where the mesh has edges, and a woven sheet, whose threads hold and whose weave shears, tears along its threads as fabric does. The body is rebuilt at each step that cuts it (`soft.onTear` hands you the new body in `pieces`); mass is kept exactly, and momentum by every cut. `maxTearsPerStep` caps the cuts a step (default 8 here); with `soft.splitOnTear = 'all'` a sheet the cuts part becomes separate bodies.
+
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, 0, 0] });
+const soft = await SoftBodies.attach(physics);
+const desc = SoftBodyDesc.cloth([-0.5, -0.5, 0], [0.05, 0, 0], [0, 0.05, 0], 21, 21).setAirDrag(false);
+const material = desc.material.clone();
+material.tearStrain = 0.02;
+material.adaptiveTearing = true;
+let sheet = soft.create(desc.setMaterial(material));
+soft.onTear((event) => {
+  sheet = event.pieces.at(-1) ?? sheet; // the sheet as rebuilt by the cut
+});
+// Thrown into shear: it tears where it stretches most.
+for (let p = 0; p < sheet.numParticles(); p++) {
+  const [x, y] = sheet.particlePosition(p);
+  sheet.setParticleVelocity(p, [3 * y, 3 * x, 0]);
+}
+for (let i = 0; i < 30; i++) physics.step();
+console.log(sheet.numParticles() > 441); // true: the cuts inserted and copied vertices
+```
 - **Snapshots.** `soft.takeSnapshot()` copies the whole soft world (every body with its particles, edges, cells, clusters, tears, pins, targets, skin, tethers and settings, the attachments to rigid bodies, and the soft kernel's memory) and `soft.restoreSnapshot(snapshot)` puts it back, so stepping on gives the same bits as the first time: a cloth can be scrubbed back and a shot resumed mid-way. It restores across bodies made, removed, torn or split since: the snapshot's bodies are the bodies again (the same `SoftBody` objects, a removed one valid again) and a body made since is removed. A surface collider removed since is made again with its settings; a drawing of a body removed since is not, so draw it again. The world's settings (`wind`, `water`, `substeps`, `iterations`, `splitOnTear`, hooks and listeners) are yours and stay as they are. Take the rigid world's beside it; `physics.takeSnapshot()` also carries the world's clock (`stepCount` and the accumulator), so a wind that reads the time blows as it did.
 
 ```js

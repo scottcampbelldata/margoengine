@@ -2435,6 +2435,7 @@ class SoftBody {
     force: Vec3;
     pointForces: Map<number, Vec3>;
     tornSeen: Set<number>;
+    crackSides: Set<string>;
     triangleList: Uint32Array<ArrayBuffer>;
     surface: PhysicsBody | null;
     surfaceSettings: Omit<ColliderSettings, 'offset' | 'rotation'> | null;
@@ -2696,6 +2697,7 @@ class SoftBodyMaterial {
     arealDensity: number | null;
     bendSoftness: SoftSoftness;
     tearStrain: number;
+    adaptiveTearing: boolean;
     shapeMatchingSoftness: SoftSoftness;
     volumeSoftness: SoftSoftness;
     edgePlasticYield: number;

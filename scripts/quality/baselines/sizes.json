@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20908076,
+  "total": 20912229,
   "history": [
     {
       "date": "2026-10-24",
@@ -14595,6 +14595,12 @@
       "commit": "reopen",
       "reason": "FIRE-05 reopen fixes (+636 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "8706614d6",
+      "reason": "@margoengine/physics/soft base 51,881 to 56,034 B gzip budget (measured 54,401 + 3%): adaptive tearing of sheets (soft-adaptive-tear.ts: each face's principal stretch, the cut across it with an inserted vertex and the conforming split of the face beyond, the unzip of vertices the crack divides, and the rebuild of the body), with the cloth aerodynamics and soft-world snapshots landed before it. It runs where the step reports tears, beside the edge and cell tearing it replaces for sheets; a separate entry would load the same soft kernel for any tearing cloth.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15476,7 +15482,7 @@
     "@margoengine/physics/ship": 36294,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 161433,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 51881,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 56034,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 107182,
     "@margoengine/physics/strands": 6171,
     "@margoengine/physics/surf": 7669,

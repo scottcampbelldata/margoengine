@@ -12344,6 +12344,15 @@ Written clean room; no engine's source was read. A soft world runs in its own Wa
 - G. Fiedler, "Deterministic Lockstep", Gaffer On Games, 2014. https://gafferongames.com/post/deterministic_lockstep/
 - T. Cannon, GGPO rollback networking SDK, documentation (save, load and advance of the whole game state). https://www.ggpo.net/
 
+### Adaptive tearing of sheets (`@margoengine/physics/soft`, 2026-11-27)
+
+Written clean room from the papers below; no engine's source and no companion code was read. After each step every face of an adaptive sheet has its deformation gradient taken against the rest triangle its three edges' rest lengths give, and its greatest principal stretch from the right Cauchy-Green tensor. Faces past the tear strain are cut, most stretched first, a capped number a step: from a crack tip, then a boundary corner, then any corner, along the line in the face's plane perpendicular to the greatest stretch, to the opposite side, where a vertex is inserted (its rest distances by Stewart's theorem) and both faces on that side are split so the mesh stays conforming; a cut within a fifth of a side of a corner runs along the side instead (no slivers). Edges crossing the cut are dropped. Then every vertex whose ring of faces the crack's sides divide is copied, one copy for each part, mass shared by the parts' areas, so the crack opens behind its tip and stays joined at it.
+
+- T. Pfaff, R. Narain, J. M. de Joya and J. F. O'Brien, "Adaptive Tearing and Cracking of Thin Sheets", ACM Transactions on Graphics 33(4), SIGGRAPH 2014. https://doi.org/10.1145/2601097.2601132
+- J. F. O'Brien and J. K. Hodgins, "Graphical Modeling and Animation of Brittle Fracture", SIGGRAPH 1999 (the crack across an element perpendicular to its greatest principal stress).
+- N. Molino, Z. Bao and R. Fedkiw, "A Virtual Node Algorithm for Changing Mesh Topology During Simulation", SIGGRAPH 2004 (copies of a vertex for each side of a crack).
+- M. Stewart, *Some General Theorems of Considerable Use in the Higher Parts of Mathematics*, 1746 (a cevian's length from the sides).
+
 ### Shape matching (`@margoengine/physics/soft`, 2026-11-24)
 
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.
