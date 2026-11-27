@@ -1317,7 +1317,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,348 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,350 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -5686,7 +5686,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Black hole ray budget (`@margoengine/shader/black-hole`) | Enforced by design: each ray gets at most `steps` (default 260) fourth-order Runge-Kutta steps through Kerr spacetime. The null condition stays under 1e-5 on escaping rays (packages/shader/test/black-hole.test.js) and drifts more on retrograde captured rays inside 4 M. | A fixed budget keeps the full-screen pass bounded. | Rays that graze the photon orbit and neither escape nor fall in within the budget end dark, a hair inside the photon ring. | Raise `hole.steps` for stills. |
 | Negated scaled components in a division on the Radeon 680M (D3D12) | Measured 2026-11-14 with packages/shader/test/negated-division-check.mjs (driver 32.0.21030.2001, Edge 157): `(-(v * 2.0).z) / (v * 2.0).x` and the same inside atan2 lose their sign; the RTX A6000 and every WebGL2 path are exact. | Below Margo: the driver's D3D12 shader compiler (docs/known-bugs.md). | Margo's own shaders avoid the pattern; a user shader that divides a negated component of a constant-scaled vector gets the wrong sign on that GPU. | Negate outside the call (`-atan2(v.z, v.x)`), negate before scaling, or divide by a length. |
 | A derivative used only inside a per-pixel branch, WebGL2 layer on ANGLE Direct3D 11 (RTX A6000) | Fixed 2026-11-15 in the layer: every derivative and implicit-derivative sample of a fragment feeds the outputs through a select that never takes it, so the Direct3D 11 compile can no longer move it into the branch (docs/known-bugs.md). | One add per derivative or implicit sample on the layer; webgl2-compat/glsl +294 B gzip. | None for output: the layer returns WebGPU's differences (features.html derivativeBranch). | None needed; the black hole still keeps its derivatives in uniform control flow, which is right on every backend. |
-| Texture units and large uniform blocks in one stage, WebGL2 layer on ANGLE Direct3D 11 (RTX A6000) | Fixed 2026-11-25 in the layer (KB-BOUNCE-COMPATUNITS1): ANGLE gives a uniform block of 50 or more rows a shader resource after the textures, and past 16 the GPU process crashed at the first draw ([d3d11-srv-crash-repro.mjs](../packages/webgl2-compat/test/d3d11-srv-crash-repro.mjs)). A stage whose texture units and uniform blocks pass its texture unit limit declares its blocks inside a struct of the same layout, kept as a constant buffer. | Stages within the limit are unchanged; a stage past it reads its blocks as constant buffers on Direct3D 11 (on Vulkan and GL they already are). | None: the scene of [compat-units-gpu-check.js](../scripts/compat-units-gpu-check.js) draws on ANGLE Direct3D 11, Vulkan and native WebGPU. | Texture units themselves still stop at the GL limit (16 here). Since 2026-11-26 the layer counts them per stage before linking (`device.textureUnits(descriptor)`) and refuses a pipeline past a limit with code `unsupported` (errors#texture-units, naming the stage and each binding); gltf materials past it pack their five base maps first, four units fewer. |
+| Texture units and large uniform blocks in one stage, WebGL2 layer on ANGLE Direct3D 11 (RTX A6000) | Fixed 2026-11-25 in the layer (KB-BOUNCE-COMPATUNITS1): ANGLE gives a uniform block of 50 or more rows a shader resource after the textures, and past 16 the GPU process crashed at the first draw ([d3d11-srv-crash-repro.mjs](../packages/webgl2-compat/test/d3d11-srv-crash-repro.mjs)). A stage whose texture units and uniform blocks pass its texture unit limit declares its blocks inside a struct of the same layout, kept as a constant buffer. | Stages within the limit are unchanged; a stage past it reads its blocks as constant buffers on Direct3D 11 (on Vulkan and GL they already are). | None: the scene of [compat-units-gpu-check.js](../scripts/compat-units-gpu-check.js) draws on ANGLE Direct3D 11, Vulkan and native WebGPU. | Texture units themselves still stop at the GL limit (16 here). Since 2026-11-26 the layer counts them per stage before linking (`device.textureUnits(descriptor)`) and refuses a pipeline past a limit with code `unsupported` (errors#texture-units, naming the stage and each binding); gltf materials past it pack their five base maps first, four units fewer. The WGSL corpus records khronos-gallery's material unpacked (as built on WebGPU, 16 sampled textures plus a storage data texture: 19 layer units); its checks count that recording as refused, and the packed material draws on the layer (KB-COMPAT-CORPUSRED1). |
 | Exact repeat of 4x captures, WebGL2 layer on ANGLE Direct3D 11 with NVIDIA (RTX A6000) | Measured, open (docs/known-bugs.md, "ANGLE D3D11 returns two versions of the same MSAA-resolved HDR texture"): identical WebGL2 command streams resolve to two images one float16 step (or one 8-bit level) apart in a few channels. Exact on the same GPU under ANGLE Vulkan, and on an Intel Arc 140V under ANGLE Direct3D 11 (rechecked 2026-11-25). | Below Margo: the NVIDIA Direct3D driver path; the layer's resolve is one `blitFramebuffer` with no vendor branch. | Two captures of an unchanged 4x scene can differ by one step in a few channels on that machine; 1x is exact. | Exact captures on that machine: launch the browser with `--use-angle=vulkan`, or render at 1x. |
 | One directional light in core | Enforced by design: core's lighting is one direction and one radiance, plus a colourless scalar ambient. Its BRDF is glTF 2.0 Appendix B's: GGX, height-correlated Smith G2 (Heitz 2014; since 2026-11-11, before that separable), Schlick, Lambert, single scattering only (rough metals lose the energy of multiple bounces between microfacets). Clustered lights, the materials package and the other PBR shaders use the same G2 since KB6016; environment's image-based split-sum table still integrates the separable G (KB6016b, docs/known-bugs.md). | Every light model beyond one sun is an optional package, so apps that need one sun pay for one sun. | No API for a second sun in core; core's own ambient does not light metals. | `@margoengine/clustered`: up to 1,024 point and spot lights (`RangeError: Expected at most 1,024 lights` past that). `@margoengine/clustered/shadows`: shadows for up to 16 of them ([local-shadows-gpu.json](../examples/package-benchmarks/results/local-shadows-gpu.json)). `@margoengine/clustered/area` (8,946 B gzip): up to 64 rectangle area lights (`RangeError: Expected at most 64 area lights`), unshadowed, no texture bindings ([area-lights-gpu.json](../examples/package-benchmarks/results/area-lights-gpu.json)). More directional lights: `@margoengine/clustered/directional` (1,563 B gzip), up to 16 (`RangeError: Expected an array of at most 16 directional lights`), unshadowed. IES profiles: `@margoengine/clustered/ies` (3,697 B gzip), at most 16 distinct profiles, type C files only. Projector spots: `@margoengine/clustered/projector` (2,618 B gzip), at most 16 images of up to 4,096 texels a side. Physical units: `@margoengine/clustered/units` (833 B gzip). All three light entries use storage buffers, no texture bindings ([light-features-gpu.json](../examples/package-benchmarks/results/light-features-gpu.json)). Configurable ambient: `@margoengine/environment` `HemisphereLight` and `AmbientLight`, one per engine. Image-based lighting: `@margoengine/environment`. |
 | 16 sampled textures and 16 samplers per shader stage | Enforced by WebGPU's guaranteed minimum; Margo's device asks for no more. gltf/pbr's physical material with directional shadows, IBL and local shadows uses exactly 16 (asserted in [instancing.test.js](../packages/gltf/test/pbr-instancing.test.js)). | Every adapter, phones included, supports 16. Requiring more would make the same app fail on some devices. | A `RangeError` naming the combination, e.g. `gltf/pbr: physical material + shadows + environment:lighting + clustered + clustered:shadows + shader patch needs 17 sampled textures per shader stage; this device allows 16`. | Drop one lighting feature for that material, or use the standard material (8 of 16 with everything attached). `VolumetricFog`, SSAO, clustered lights, area lights and light probes (`@margoengine/environment/probes`: one storage buffer; with an environment fallback they take EnvironmentLighting's place and its bindings) add no textures. Texture arrays are planned after 1.0. |
@@ -13547,6 +13547,14 @@ The optional physics/celestial entry ships independently of the physics and sky 
 
 ## Physics solver settings and speed caps (own solver)
 
+Breakable objects (`@margoengine/physics/breakable`, BREAK-01, 2026-11-27):
+- Enforced: 2 to 256 cells; sizes, strengths, densities, impulses and radii positive and finite; restitution 0 to 1; a geometry whose points span a volume. Bad input throws `MargoError` (`unsupported`) with the `#physics-breakable` help link.
+- By method, the shape: a mesh breaks as its convex hull, so a concave mesh fills in; split it with `convexDecomposition` first. Cut faces are flat (Voronoi planes), with planar UVs.
+- By method, the cells: a cell whose inscribed ball about its centroid is under 1/1000 of its own diagonal is a sliver and is dropped, so its volume (and mass) is lost. Only a site outside the body or two sites almost on top of each other make one; sites inside a box never do (`tests/breakable.test.js`, every pattern and seed at 1e-9 of the volume). Sites of the built-in patterns come from the body's bounds, so a non-box shape loses the cells of sites that fall outside it (fewer, larger pieces) and a little volume at those slivers (under 1 % in the octahedron test).
+- By method, the damage: a bond holds an impulse budget (N s), not a stress or a fracture energy. A contact's damage is the rise of the pair's normal impulse over its last step, so a carried load wears nothing, but a body placed already touching another takes its first step's weight impulse (m g dt) once. That step impulse depends on the time step. Damage falls off linearly to `impactRadius`; an area weight holds a bond to 0.35 to 2.5 times `bondStrength`. A fixed structure's pieces take 0.75 of a direct `applyImpact` impulse (0.35 of a contact's) shared out by distance, as the contact itself pushed only the fixed body.
+- State: bond damage, runtime splits, debris timers and the contacts' last impulses live outside the world's snapshot: take `breakable.takeSnapshot()` with `physics.takeSnapshot()`. A snapshot holds for the pieces live when taken; a restore across a break is refused (`state`), as the world's own snapshot needs the same bodies.
+- Size: the entry is 18,787 B gzip (the clipper, mass properties, bond graph, debris policy and debug view in one entry).
+
 Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
 - Enforced: 2 to 4,096 links; radius, density and moduli positive and finite; damping 0 or more; `loads` a provider with `apply`. `segmentLoads`: roughness, drag, added mass and viscosity finite and 0 or more, period above 0 (Infinity a steady current), a Strouhal number above 0.
 - By method, the links:
@@ -15458,6 +15466,43 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   them is still judged at 180. The rail-line probes read 0.55 and 0.60 percent. Regression:
   `packages/headless/tests/look-clean.test.js` (an 8 sub-frame 180 degree bar passes, one sub-frame and a 90 degree
   bar judged at 180 fail, the probe's own angle applies).
+### Open 2026-11-26: the WebGL2 layer accepts a compute pipeline past maxComputeInvocationsPerWorkgroup at creation (KB-COMPAT-WGSIZE1, webgl2-compat)
+
+- **Repro:** on the layer's device (maxComputeInvocationsPerWorkgroup 256), `createComputePipeline` with
+  `@compute @workgroup_size(512) fn main() {}` returns a pipeline with no validation error; the first dispatch's
+  build throws the planner's RangeError ("has more than 256 invocations") out of the submit.
+- **Cause:** `CompatComputePipeline` (src/device/compute.ts) checks binding counts at creation but not the workgroup
+  size; only the planner (src/compute/analyze.ts `workgroupSizeOf`) checks it, at build. WebGPU makes it a validation
+  error at creation. Packages tune to the device's limit, so none reaches it in use; found with KB-COMPAT-CORPUSRED1.
+
+### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
+
+- **Repro:** at 3d585ad959, after `npm run build -w @margoengine/webgl2-compat`, run
+  `node --test packages/webgl2-compat/test/{compute,corpus,interpret,wgsl-corpus-check}.test.js`: six fail, five with
+  `Unknown function 'subgroupAdd'` (code `wgsl-type`) and one with modules moved from scatter and compute to shared
+  and sciviz; `npm run test:browser -w @margoengine/webgl2-compat` fails on 18 `enable clip_distances;` translations
+  and khronos-gallery's material.
+- **Cause:** four, all brought out by the re-recording. (1) The WGSL checker typed none of the subgroup and quad
+  built-in functions, so compute's 23 subgroup kernels (built only when the device has `subgroups`) died with an
+  uncoded type error before the layer's coded refusal. (2) `writeCorpus` re-derived a module's owner from labels a
+  later recording merged in, so writing the read corpus again moved modules. (3) The corpus checks expected a
+  translation for modules behind `enable subgroups;` and `enable clip_distances;`, extensions the layer does not
+  offer (materials uses clip distances only on `clip-distances`), and for 12 compute kernels sized 512 and 1024 on
+  adapters granting more than WebGPU's default 256 invocations. (4) `glsl-corpus-browser.mjs` linked
+  khronos-gallery's material (module 7ba63815075dd8da, recorded on WebGPU with its base maps apart: 19 layer units)
+  where the device refuses it before linking; on the layer gltf/pbr asks the device first and packs the base maps.
+- **Fix:** the checker types the WGSL subgroup functions (subgroupAdd to quadSwapDiagonal) behind
+  `enable subgroups;`, compute and fragment stages only, with subgroupBroadcast's and quadBroadcast's const lane
+  range, and asks for the enable on a call or a subgroup built-in value without it. `writeCorpus` keeps a settled
+  owner. One corpus rule, in `test/support/corpus-refusals.mjs`, asserted in compute.test.js, glsl-corpus-browser.mjs
+  and corpus-draw-browser.mjs: an unmapped enable is refused with the coded error naming it, counted per name against
+  the recorded counts (compute 23 `subgroups`, GLSL 18 `clip_distances`), the 12 kernels past 256 invocations are
+  refused by the planner and counted, and a pipeline past the texture units is refused as the device refuses it
+  (`unitsRefusal`, the device's own wording) and must belong to a recorded module with its cause. Nothing left the
+  corpus and no check loosened. Regression: `test/wgsl-front-end.test.js` "subgroup built-in functions",
+  `test/corpus.test.js` "re-recording keeps an owner", `test/compute.test.js` corpus tier test. khronos-gallery's
+  full material on the layer: `scripts/compat-units-gpu-check.js --compat` (all 13 maps, image light, both shadow
+  kinds, clustered light, bounce) passes.
 
 ### Fixed 2026-11-26: paddle and wading loads settle with the final wet cells (KB-LOADS-ACTUATORDRY)
 
@@ -34688,6 +34733,10 @@ run (milestone M5): as fragment draws, as point draws, or on the CPU, whichever 
 Packages whose WebGPU route would be slow there take a route of their own (milestone M6, see Package routes below).
 Render shaders that write storage buffers or textures are refused with MargoError code `unsupported`: WebGL2 render
 shaders cannot write them.
+The layer maps one WGSL extension, `enable f16;` (to highp float), and offers no `subgroups` or `clip-distances`
+feature: a module that enables any other is refused with code `unsupported` naming it (`'enable subgroups;'`). Its
+WGSL front end still checks such modules in full, the subgroup built-in functions included, so the refusal is what
+a page sees rather than a type error.
 
 Load it only where WebGPU is missing, with a dynamic import, so browsers with WebGPU never download it:
 
@@ -34716,15 +34765,6 @@ Installer diagnostics keep the error code, help link and every missing capabilit
 name concise enough to fit the existing entry size ceilings. A full-tier probe
 checks capabilities; package parity failures remain tracked in
 [known bugs](../../docs/known-bugs.md#open-full-layer-validation-transferred-to-parity-batch-273).
-
-The WGSL front end resolves adjacent minus signs in expression context, while keeping statement decrements:
-
-```ts
-import {checkWGSL} from '@margoengine/webgl2-compat/wgsl';
-const module = checkWGSL('const value = 1--2; fn f(){var i=2; i--;}');
-const value = module.globals.find(item => item.name === 'value');
-console.log(value?.kind === 'const' ? value.value : undefined); // 3
-```
 
 [README continues: https://margoengine.com/llms/packages/webgl2-compat.md]
 
@@ -41664,6 +41704,7 @@ This first scene needs no model or texture files. For a reader moving from anoth
 - `examples/khronos-gallery.html`: Khronos glTF sample assets
 - `examples/gallery/index.html`: The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md))
 - `examples/kinematics-constraints.html`: Arm clearance check with the kinematics package
+- `examples/physics-breakable.html`: Breakable stone pillar, brick wall, and glass pane with Voronoi fracture, support anchors, cumulative damage, and debug overlay
 - `examples/hud-preview.html`: A HUD scene and an item-preview scene over a main scene
 - `examples/minimap.html`: A second camera view as a minimap
 - `examples/robot-expressive.html`: The same character study as a standalone page
