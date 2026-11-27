@@ -397,20 +397,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Next:** bisect `packages/physics/src` on main for the commit where the test turned red, then fix it in the package that
   owns it with this test as the regression.
 
-### Open 2026-11-27: a towed flexible pipe's in-line vortex-induced vibration is an order short of the measurement (KB-PHYS-RODVIVIL1, physics loads)
+### Open 2026-11-27: a flexible pipe in strongly sheared flow swings 40 % short of the measurement across it (KB-PHYS-RODVIVSHEAR1, physics loads)
 
-- **Repro:** `packages/physics/tests/rod-viv.test.js`, the towing-tank pipe of Fu et al. (2025): the rod's in-line RMS is
-  0.028 D at 0.40 m/s and 0.010 D at 1.60 m/s, where the test measured 0.0885 D and 0.175 D. The mode is right at 1.60 m/s
-  (fifth) and the cross-flow amplitude within 31 %.
-- **Cause:** the in-line excitation at twice the shedding frequency comes from the lift turned by the cross-flow swing, the
-  drag's modulation by it, and the in-line wake oscillator of Srinil and Zanganeh (2012, C_D0 0.2, Lambda 12, calibrated on
-  rigid cylinders). Against the in-line drag damping, rho C_D D U per metre (50 N s/m^2 at 1.60 m/s), those give about
-  0.02 D at most; at 1.60 m/s without the in-line wake the rod gives 0.0087 D, with it 0.0101 D, and at a fluctuating drag
-  of 0.6, three times the published one, still 0.033 D. Measured, the fluid feeds the in-line motion (in-line lock-in at twice the cross-flow frequency), which the
-  strip model's wake does not reproduce at its published coefficients. Raising them to fit this one test would be a fit
-  to one pipe; a calibration needs a second data set (the Chaplin et al. 2005 riser data, awaited) to validate against.
-- **Open:** the in-line wake's coupling at a flexible cylinder's high modes, calibrated on one riser data set and checked
-  on another.
+- **Repro:** `packages/physics/tests/rod-viv.test.js`, Fu et al. (2025)'s linearly sheared pipe at 1.0 m/s (their Fig. 12):
+  the rod swings 0.235 D RMS across in the measured second mode where the test measured 0.407 D (-42 %), and 0.085 D in
+  line in the second mode where it measured 0.104 D in the third (-18 %). The bow is within 22 % (the paper's CFD +24 %), and
+  the same pipe at 0.6 m/s is within the paper's CFD on every quantity.
+- **Cause, so far:** not the Reynolds scaling (without it, 0.229 D), not the discretisation, and only in part the damping:
+  the rod's damping is stiffness-proportional, so the pipe's 2.58 % at its first mode is 5.7 % at its second; matched at the
+  second it swings 0.246 D. Strip wake models feed a mode only where the local shedding frequency meets it, so a strongly
+  sheared flow feeds less span than the measurement shows; the paper's CFD resolves the wake along the span and is within
+  5 %.
+- **Open:** the wakes' correlation along the span in sheared flow (a coupling between neighbouring wake oscillators, as in
+  diffusive wake models), checked on this case and on the paper's bidirectionally sheared cases.
+
+### Open 2026-11-27: a rod whose tension dwarfs its bending stiffness blows up at some steps (KB-PHYS-RODSTRING1, physics rod)
+
+- **Repro:** a `Rod` of 48 links, 7.9 m, 1.77 kg/m, bending stiffness 1 N m^2, pinned at both ends and brought to 48 kN over
+  half a second, then plucked (no water, no material damping): at 60 steps a second it swings to hundreds of metres within
+  a second, at 600 it rings steadily (damping ratio 4e-6), and at 2,400 the kernel stops it (a body past 1e15). The same rod
+  with 1,470 N m^2 at 3 kN is steady at 60, 600 and 1,200.
+- **Cause, so far:** at the coarse step, a link turned across its line meets the tension as a stiffness T / l (290 kN/m on a
+  0.29 kg link, about 1,000 rad/s), which a 60 Hz step holds only if the multibody's implicit solve holds it, and it holds
+  the links' own springs, not the tension's. That does not explain the failure at the finest step, which is not yet found.
+- **Open:** find the fine-step failure; then hold the tension's stiffness across the links in the tree's implicit solve.
 
 ### Fixed 2026-11-27: KVLCC2 was too course-stable in shallow water (KB-SHIP-SHALLOW1, physics ship)
 

@@ -7,15 +7,17 @@
 // then feels the whole drag and stays stable, where an explicit drag force on it does neither.
 //
 // Each segment's wake oscillator is driven by the segment's own acceleration across the flow (Facchinetti, de Langre and
-// Biolley 2004, eq. 2, A = 12), so a cable free across a flow locks onto its own frequency. A second wake oscillator at twice
-// the shedding frequency gives the fluctuating drag along the flow, driven by the segment's acceleration along it (Srinil
-// and Zanganeh 2012, eq. 6, Lambda = 12, C_D0 = 0.2). The drag on the flow relative to the moving segment already raises
-// the mean drag as it swings across; Vandiver's fit of the measured growth, C_D (1 + 1.043 (2 y_rms / D)^0.65) (Vandiver
-// 1983), y_rms the swing's root mean square over the last five shedding periods, can be added on top (`amplify`), which
-// counts that kinematic part twice: on a towed pipe it bowed the pipe 50 % past the measurement, where without it the bow is
-// within 19 % (packages/physics/tests/rod-viv.test.js).
+// Biolley 2004, eq. 2, A = 12), so a cable free across a flow locks onto its own frequency. The drag along the flow
+// fluctuates at twice that frequency as each vortex sheds: by default it follows the cross-flow wake, q^2 less its mean, so
+// it keeps the lift's phase and a symmetric swing drives only symmetric in-line modes; or by a wake of its own at twice the
+// frequency, driven by the acceleration along (`inLineWake: 'own'`; Srinil and Zanganeh 2012, eq. 6, Lambda = 12). The forces
+// take the water's own speed across the segment, the motion turning only their direction (Srinil and Zanganeh, eqs. 3 to
+// 5), and grow with the Reynolds number as a free cylinder's swing does (Govardhan and Williamson 2006). The amplitudes are
+// calibrated on one measured towed pipe and checked on its other speeds and on sheared flows (tests/rod-viv.test.js). The
+// drag on the flow relative to the moving segment raises the mean drag as it swings, which is how the bow grows with the
+// swing; Vandiver's fit of that growth (Vandiver 1983, `amplify`) can replace it.
 import type { FlowCell, FlowField, FlowSample } from '@margoengine/math/fields';
-import { atan2, cos, hypot, pow, sin } from '@margoengine/math/pinned';
+import { atan2, cos, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { invalidLoad } from './errors.js';
 import { cylinderCoefficients, reynoldsDrag, tangentialDrag, wakeStep } from './morison.js';
 import { SEA_WATER_VISCOSITY, type LoadWater } from './solver.js';
@@ -90,14 +92,25 @@ export interface SegmentLoadOptions {
   /** An added mass coefficient in place of DNV's (default none). */
   readonly addedMass?: number;
   /**
-   * Vortex shedding; `false` for none. `strouhal` (default 0.2) sets the shedding frequency; `lift` (default 0.3) is a held
-   * cylinder's lift amplitude across the flow; `drag` (default 0.2) its fluctuating drag amplitude along the flow at twice
-   * the frequency (0 for none); `amplify` (default false) adds Vandiver's growth of the mean drag with the segment's swing
-   * across the flow, a measured fit that includes the growth the drag on the relative flow already gives.
+   * Vortex shedding; `false` for none. `strouhal` (default 0.2) sets the shedding frequency; `lift` (default 0.56) and `drag`
+   * (default 0.53, 0 for none) are the wake's lift amplitude across the flow and fluctuating drag amplitude along it at Re
+   * 5e4, calibrated on a towed pipe; `reynolds` (default true) scales both with the Reynolds number by Govardhan and
+   * Williamson's fit; `inLineWake` (default 'lift') ties the fluctuating drag to the lift's wake, or `'own'` gives it a wake
+   * of its own; `coupling` and `inLineCoupling` (default 12) are the wakes' couplings to the motion; `amplify` (default false)
+   * puts Vandiver's growth of the mean drag with the swing in place of the growth the drag on the relative flow gives.
    */
   readonly vortex?:
     | false
-    | { readonly strouhal?: number; readonly lift?: number; readonly drag?: number; readonly amplify?: boolean };
+    | {
+        readonly strouhal?: number;
+        readonly lift?: number;
+        readonly drag?: number;
+        readonly amplify?: boolean;
+        readonly coupling?: number;
+        readonly inLineCoupling?: number;
+        readonly reynolds?: boolean;
+        readonly inLineWake?: 'own' | 'lift';
+      };
   /** The water's kinematic viscosity, m^2/s (default 1.19e-6). */
   readonly viscosity?: number;
 }
@@ -105,15 +118,39 @@ export interface SegmentLoadOptions {
 /** Facchinetti et al. 2004's coupling of the wake to the cylinder's acceleration, A (eq. 2). */
 const COUPLING = 12;
 
+/**
+ * The wake's lift and fluctuating drag amplitudes at {@link REFERENCE_RE}, calibrated on one measured case and checked on
+ * others (packages/physics/tests/rod-viv.test.js): set so the towed pipe of Fu et al. (2025) vibrates as measured at 1.6 m/s,
+ * 0.460 D RMS across in its third mode and 0.175 D in line in its fifth; their 0.4 m/s case and their linearly sheared flows
+ * check them. A held rigid cylinder's are 0.3 and 0.2 (Facchinetti et al. 2004; Srinil and Zanganeh 2012); on a free
+ * cylinder the wake locks to its motion and does more.
+ */
+const LIFT = 0.56,
+  FLUCTUATING_DRAG = 0.53;
+
+/** The Reynolds number at which `lift` and `drag` are the wake's amplitudes, where the towed pipe they were set on sat. */
+const REFERENCE_RE = 5e4;
+
+/**
+ * The shedding's strength at Reynolds number `re` against its strength at {@link REFERENCE_RE}: Govardhan and Williamson
+ * (2006)'s growth of a free cylinder's peak amplitude with Re, log10(0.41 Re^0.36), as a ratio (0 below Re 12, where the
+ * fit has none).
+ */
+export function sheddingScale(re: number): number {
+  const at = (r: number) => Math.max(0, (ln(0.41) + 0.36 * ln(r)) / ln(10));
+  return re > 0 ? at(re) / at(REFERENCE_RE) : 0;
+}
+
 // A segment's state words: the wake across (q, q'), the wake along (p, p'), its velocity before the step (3), and the mean and
 // mean square deviation of its displacement across the flow (the square -1 until it is first wet).
-const WORDS = 9;
+const WORDS = 11;
 
 class Provider implements SegmentLoads {
   private wakes = new Float64Array(0);
   private inLine = new Float64Array(0);
   private before = new Float64Array(0);
   private swing = new Float64Array(0);
+  private squares = new Float64Array(0);
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly u: Vec3 = [0, 0, 0];
   private readonly a: Vec3 = [0, 0, 0];
@@ -128,7 +165,8 @@ class Provider implements SegmentLoads {
     this.wakes = new Float64Array(2 * n);
     this.inLine = new Float64Array(2 * n);
     this.before = new Float64Array(3 * n);
-    this.swing = new Float64Array(2 * n);
+    this.swing = new Float64Array(3 * n);
+    this.squares = new Float64Array(n);
     // The wake oscillators start at the free van der Pol cycle's amplitude, q = 2, as LoadSolver's members do.
     for (let i = 0; i < n; i++) this.rest(i);
   }
@@ -137,8 +175,10 @@ class Provider implements SegmentLoads {
   private rest(i: number): void {
     this.wakes[2 * i] = this.inLine[2 * i] = 2;
     this.wakes[2 * i + 1] = this.inLine[2 * i + 1] = 0;
-    this.swing[2 * i] = 0;
-    this.swing[2 * i + 1] = -1;
+    this.swing[3 * i] = 0;
+    this.swing[3 * i + 1] = -1;
+    this.swing[3 * i + 2] = 1;
+    this.squares[i] = 2;
   }
 
   prepare(segments: number): void {
@@ -246,8 +286,13 @@ class Provider implements SegmentLoads {
       }
       // Vortex lift across the flow and the segment: the wake q at 2 pi St U / D, driven by the segment's acceleration
       // across the flow, the lift 1/2 rho U^2 D (C_L0 / 2) q on the wetted length; and the fluctuating drag along the flow:
-      // the wake p at twice that, driven by the acceleration along, the drag 1/2 rho U^2 D (C_D0 / 2) p.
-      if (vortex && speedN > 1e-9) {
+      // the wake p at twice that, driven by the acceleration along, the drag 1/2 rho U^2 D (C_D0 / 2) p. U is the water's own
+      // speed across the segment (Srinil and Zanganeh 2012, eq. 5), the segment's motion turning the forces' direction only
+      // (their eqs. 3 and 4): on the relative speed, the wake locked to the motion would give the fluctuating forces a mean,
+      // -rho D U (C / 2) <v p>, which took back from the mean drag what the in-line motion adds to it.
+      const uAlongE = u[0] * e[0] + u[1] * e[1] + u[2] * e[2],
+        stream = hypot(u[0] - uAlongE * e[0], u[1] - uAlongE * e[1], u[2] - uAlongE * e[2]);
+      if (vortex && speedN > 1e-9 && stream > 1e-9) {
         const lift: Vec3 = [
             (e[1] * vrN[2] - e[2] * vrN[1]) / speedN,
             (e[2] * vrN[0] - e[0] * vrN[2]) / speedN,
@@ -260,18 +305,22 @@ class Provider implements SegmentLoads {
             s.velocity[2] - this.before[k + 2]!,
           ],
           across = (change[0] * lift[0] + change[1] * lift[1] + change[2] * lift[2]) / dt,
-          omega = (2 * Math.PI * (vortex.strouhal ?? 0.2) * speedN) / D,
-          pressure = 0.5 * rho * D * wet * speedN * speedN;
-        const q = wakeStep(this.wakes, i, omega, (COUPLING / D) * across, dt),
-          f = pressure * ((vortex.lift ?? 0.3) / 2) * q;
+          omega = (2 * Math.PI * (vortex.strouhal ?? 0.2) * stream) / D,
+          strength = vortex.reynolds === false ? 1 : sheddingScale((stream * D) / nu),
+          pressure = 0.5 * rho * D * wet * stream * stream * strength;
+        const q = wakeStep(this.wakes, i, omega, ((vortex.coupling ?? COUPLING) / D) * across, dt),
+          f = pressure * ((vortex.lift ?? LIFT) / 2) * q;
         force[0] += lift[0] * f;
         force[1] += lift[1] * f;
         force[2] += lift[2] * f;
-        const fluctuating = vortex.drag ?? 0.2;
+        const fluctuating = vortex.drag ?? FLUCTUATING_DRAG;
         if (fluctuating > 0) {
           const flow: Vec3 = [vrN[0] / speedN, vrN[1] / speedN, vrN[2] / speedN],
             alongFlow = (change[0] * flow[0] + change[1] * flow[1] + change[2] * flow[2]) / dt,
-            p = wakeStep(this.inLine, i, omega, (COUPLING / D) * alongFlow, dt, 2),
+            p =
+              vortex.inLineWake !== 'own'
+                ? this.squareSwing(i, q, omega, dt)
+                : wakeStep(this.inLine, i, omega, ((vortex.inLineCoupling ?? COUPLING) / D) * alongFlow, dt, 2),
             fd = pressure * (fluctuating / 2) * p;
           force[0] += flow[0] * fd;
           force[1] += flow[1] * fd;
@@ -309,10 +358,14 @@ class Provider implements SegmentLoads {
     if (!(size > 1e-9)) return 1;
     const lift: Vec3 = [across[0] / size, across[1] / size, across[2] / size],
       y = s.position[0] * lift[0] + s.position[1] * lift[1] + s.position[2] * lift[2],
-      k = 2 * i;
+      k = 3 * i,
+      // The growth the drag on the relative flow already gives the mean drag: the relative speed across the segment over the
+      // water's own, as the in-line drag is that speed times the speed along the flow.
+      kinematic = speedN / size;
     if (this.swing[k + 1]! < 0) {
       this.swing[k] = y;
       this.swing[k + 1] = 0;
+      this.swing[k + 2] = kinematic;
       return 1;
     }
     const period = s.diameter / ((vortex.strouhal ?? 0.2) * speedN),
@@ -320,8 +373,18 @@ class Provider implements SegmentLoads {
       deviation = y - this.swing[k]!;
     this.swing[k]! += alpha * deviation;
     this.swing[k + 1]! += alpha * (deviation * deviation - this.swing[k + 1]!);
-    const rms = Math.sqrt(this.swing[k + 1]!);
-    return rms > 0 ? 1 + 1.043 * pow((2 * rms) / s.diameter, 0.65) : 1;
+    this.swing[k + 2]! += alpha * (kinematic - this.swing[k + 2]!);
+    const rms = Math.sqrt(this.swing[k + 1]!),
+      measured = rms > 0 ? 1 + 1.043 * pow((2 * rms) / s.diameter, 0.65) : 1;
+    // Vandiver's fit is of the whole measured growth; what the relative flow already gives is taken from it, so it counts once.
+    return Math.max(1, measured - (this.swing[k + 2]! - 1));
+  }
+
+  /** q^2 less its mean over the last five shedding periods: the drag's fluctuation at twice the lift's frequency. */
+  private squareSwing(i: number, q: number, omega: number, dt: number): number {
+    const alpha = Math.min(1, (dt * omega) / (2 * Math.PI * 5));
+    this.squares[i]! += alpha * (q * q - this.squares[i]!);
+    return q * q - this.squares[i]!;
   }
 
   takeState(): Float64Array {
@@ -331,6 +394,7 @@ class Provider implements SegmentLoads {
     state.set(this.inLine, 2 * n);
     state.set(this.before, 4 * n);
     state.set(this.swing, 7 * n);
+    state.set(this.squares, 10 * n);
     return state;
   }
 
@@ -345,7 +409,8 @@ class Provider implements SegmentLoads {
     this.wakes = state.slice(0, 2 * n);
     this.inLine = state.slice(2 * n, 4 * n);
     this.before = state.slice(4 * n, 7 * n);
-    this.swing = state.slice(7 * n);
+    this.swing = state.slice(7 * n, 10 * n);
+    this.squares = state.slice(10 * n);
   }
 }
 
@@ -374,7 +439,7 @@ export function segmentLoads(sea: LoadWater, options: SegmentLoadOptions = {}): 
       `Segment loads' period is above 0 s, or Infinity for a steady current (got ${options.period}); pass one.`,
     );
   if (options.vortex !== undefined && options.vortex !== false) {
-    const { strouhal = 0.2, lift = 0.3, drag = 0.2 } = options.vortex;
+    const { strouhal = 0.2, lift = LIFT, drag = FLUCTUATING_DRAG } = options.vortex;
     if (
       !(
         strouhal > 0 &&

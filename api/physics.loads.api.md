@@ -514,6 +514,10 @@ export interface SegmentLoadOptions {
         readonly lift?: number;
         readonly drag?: number;
         readonly amplify?: boolean;
+        readonly coupling?: number;
+        readonly inLineCoupling?: number;
+        readonly reynolds?: boolean;
+        readonly inLineWake?: 'own' | 'lift';
     };
     readonly viscosity?: number;
 }
@@ -715,6 +719,8 @@ export function segmentAirLoads(air: FlowField, options?: SegmentAirLoadOptions)
 export function segmentLoads(sea: LoadWater, options?: SegmentLoadOptions): SegmentLoads;
 
 export function sheddingFrequency(speed: number, diameter: number, strouhal?: number): number;
+
+export function sheddingScale(re: number): number;
 
 export function sphereDrag(re: number): number;
 
