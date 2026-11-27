@@ -312,7 +312,6 @@ export class SSAO implements EnginePlugin {
         compute: { module: this.device!.createShaderModule({ code }), entryPoint: 'main' },
       });
     this.extract = create(extractShader);
-    this.extractUnder = create(extractUnderShader);
     this.occlusion = create(this.occlusionShader());
     this.blur = create(blurShader);
     this.noise = this.device.createTexture({
@@ -859,6 +858,12 @@ export class SSAO implements EnginePlugin {
         layout: p.getBindGroupLayout(0),
         entries: resources.map((resource, binding) => ({ binding, resource })),
       });
+    // Made with the first covered frame's resources, like the passes above, so SSAO with no covered blades compiles
+    // nothing for them (its GPU calls stay those of the scene without blades).
+    this.extractUnder ??= device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: module(extractUnderShader), entryPoint: 'main' },
+    });
     const centreView = only(centre),
       noise = this.noise!.createView(),
       clear = { r: 0, g: 0, b: 0, a: 0 };
