@@ -94,6 +94,40 @@ const isCap = (v: unknown) => v === 'butt' || v === 'round' || v === 'square';
 const isFlag = (v: unknown) => typeof v === 'boolean';
 const isLength = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
+/** Which values each `point` + name extra may hold. */
+const POINT_STYLE = {
+  shape: (v: unknown) => v === 'square' || v === 'round',
+  minPixelSize: isLength,
+  maxPixelSize: isLength,
+  edl: isFlag,
+  adaptiveSize: isLength,
+  alphaTest: (v: unknown) => isLength(v) && v <= 1,
+  blending: (v: unknown) => v === 'normal' || v === 'additive',
+  depthTest: isFlag,
+  depthWrite: isFlag,
+  fog: isFlag,
+};
+
+/** The values of `extras` named `prefix` + a field of `table` that the field may hold. */
+function readStyle(prefix: string, table: Record<string, (v: unknown) => boolean>, extras: Record<string, unknown>) {
+  const style: Record<string, unknown> = {};
+  for (const [name, holds] of Object.entries(table)) {
+    const value = extras[`${prefix}${name[0].toUpperCase()}${name.slice(1)}`];
+    if (holds(value)) style[name] = value;
+  }
+  return style;
+}
+
+/** The `PointsMaterial` options a primitive's style extras hold; pixel clamps that cross keep the defaults. */
+function pointStyle(value: unknown): Record<string, unknown> {
+  const style = readStyle('point', POINT_STYLE, Object(value) as Record<string, unknown>);
+  if (Number(style.minPixelSize ?? 1) > Number(style.maxPixelSize ?? 256)) {
+    delete style.minPixelSize;
+    delete style.maxPixelSize;
+  }
+  return style;
+}
+
 /** Which values each `line` + name extra may hold. */
 const LINE_STYLE = {
   join: (v: unknown) => v === 'miter' || v === 'round' || v === 'bevel',
@@ -114,12 +148,8 @@ const LINE_STYLE = {
  */
 function lineStyle(value: unknown): Record<string, unknown> {
   const extras = Object(value) as Record<string, unknown>,
-    style: Record<string, unknown> = {},
+    style = readStyle('line', LINE_STYLE, extras),
     dash = extras.lineDash;
-  for (const [name, holds] of Object.entries(LINE_STYLE)) {
-    const value = extras[`line${name[0].toUpperCase()}${name.slice(1)}`];
-    if (holds(value)) style[name] = value;
-  }
   if (Array.isArray(dash) && dash.length === 2 && isLength(dash[0]) && dash[0] > 0 && isLength(dash[1])) {
     const { lineDashOffset: offset, lineDashCap: cap } = extras;
     Object.assign(style, { dashed: true, dashSize: dash[0], gapSize: dash[1] });
@@ -227,6 +257,7 @@ function draw(
       shape: width.bentley ? 'round' : undefined,
       shading: lit ? 'sphere' : 'flat',
       transparent: alpha,
+      ...pointStyle(item.extras),
     },
   });
   cloud.attach(node);

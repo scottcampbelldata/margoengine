@@ -487,3 +487,55 @@ test("a line's colorMode 'set' or 'add' writes the colours it draws", async () =
   assert.deepEqual(drawn(13)[0], [0.5, 0.25, 0, 1]);
   near(drawn(13)[1], options.colors, 'multiply');
 });
+
+// Limits gaps row 15, the point cloud half: only a cloud's size and units travelled, so a round, clamped, depth-tinted
+// cloud came back as default squares.
+test('point cloud style travels in extras and gltf/pbr draws it back', async () => {
+  const { engine, points } = await scene(),
+    styled = {
+      shape: 'round',
+      minPixelSize: 2,
+      maxPixelSize: 32,
+      edl: true,
+      adaptiveSize: 3,
+      alphaTest: 0.25,
+      blending: 'additive',
+      depthTest: false,
+      depthWrite: false,
+      fog: false,
+    };
+  // Its size names it in the read-back scene.
+  points.add(new PointCloud({ positions: [0, 0, 0, 1, 0, 0], material: { size: 9, ...styled } }));
+  const glb = exportGLB(engine),
+    report = await validate(glb),
+    extrasOf = (file, size) => primitivesOf(readGLB(file).json).find((p) => p.extras?.pointSize === size).extras;
+  assert.equal(report.errors, 0, JSON.stringify(report.messages));
+  assert.deepEqual(extrasOf(glb, 9), {
+    pointSize: 9,
+    pointSizeUnits: 'pixels',
+    pointShape: 'round',
+    pointMinPixelSize: 2,
+    pointMaxPixelSize: 32,
+    pointEdl: true,
+    pointAdaptiveSize: 3,
+    pointAlphaTest: 0.25,
+    pointBlending: 'additive',
+    pointDepthTest: false,
+    pointDepthWrite: false,
+    pointFog: false,
+  });
+  assert.deepEqual(extrasOf(glb, 6), { pointSize: 6, pointSizeUnits: 'pixels' }, 'the default style writes its size');
+
+  const gpu = mockGPU(),
+    { canvas, restore } = installWebGPU(gpu),
+    other = await Engine.create(canvas, { backend: 'webgpu' });
+  restore();
+  const model = await parseGLTFAsync(other, glb),
+    drawn = [...other.plugins.get('gltf-points').pointClouds],
+    read = (size) => drawn.find((cloud) => cloud.material.size === size).material;
+  assert.deepEqual(Object.fromEntries(Object.keys(styled).map((key) => [key, read(9)[key]])), styled);
+  assert.deepEqual([read(6).shape, read(6).maxPixelSize, read(6).edl], ['square', 256, false]);
+  const again = await exportModel(model, { binary: true });
+  assert.deepEqual(extrasOf(again, 9), extrasOf(glb, 9));
+  model.dispose();
+});

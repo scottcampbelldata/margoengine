@@ -254,3 +254,40 @@ test('a malformed line style extra keeps the Line default; the good ones beside 
   );
   model.dispose();
 });
+
+test('crossed or malformed point style extras keep the PointsMaterial defaults', async () => {
+  const instance = await engine(),
+    doc = {
+      asset: { version: '2.0' },
+      buffers: [{ byteLength: 12 }],
+      bufferViews: [{ buffer: 0, byteLength: 12 }],
+      accessors: [{ bufferView: 0, componentType: 5126, count: 1, type: 'VEC3', min: [0, 0, 0], max: [0, 0, 0] }],
+      meshes: [
+        {
+          primitives: [
+            {
+              attributes: { POSITION: 0 },
+              mode: 0,
+              extras: {
+                pointSize: 5,
+                pointShape: 'star',
+                pointMinPixelSize: 300,
+                pointAlphaTest: 2,
+                pointEdl: 1,
+                pointFog: false,
+              },
+            },
+          ],
+        },
+      ],
+      nodes: [{ mesh: 0 }],
+      scenes: [{ nodes: [0] }],
+    },
+    model = await parseGLTFAsync(instance, doc, [new Float32Array(3)]),
+    [{ material }] = instance.plugins.get('gltf-points').pointClouds;
+  assert.deepEqual(
+    [material.shape, material.minPixelSize, material.maxPixelSize, material.alphaTest, material.edl, material.fog],
+    ['square', 1, 256, 0, false, false],
+  );
+  model.dispose();
+});

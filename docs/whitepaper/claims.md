@@ -6749,7 +6749,8 @@ through the reader with extra bytes and variable chunks. No speed or rival compa
 
 Claim: a `Line`'s join, cap, miter limit, dashes, `onTop`, `antialias`, depth, coverage and fog settings, and a
 `LineBatch`'s square ends, `onTop` and `antialias`, survive `exportGLB` and `parseGLTFAsync`, and a second `exportModel`;
-lines in `colorMode` `'set'` or `'add'` export the colours they draw. Other viewers ignore the `extras` keys. Proof:
+lines in `colorMode` `'set'` or `'add'` export the colours they draw; so do a point cloud's shape, pixel clamps,
+eye-dome lighting, adaptive size, alpha test, blending, depth and fog settings. Other viewers ignore the `extras` keys. Proof:
 `packages/exporters/tests/plugin-lines-points.test.js`.
 
 ### Terrain complex craters, rays and secondary chains (2026-11-27)

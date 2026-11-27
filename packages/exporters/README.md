@@ -144,7 +144,8 @@ unless `onlyVisible: false`.
 | a `Stroke`'s `widths`, a cloud's `sizes` | `_WIDTH`, a float per vertex multiplying the width | per-vertex `widths` |
 | join, cap, miter limit | primitive `extras` `lineJoin`, `lineCap`, `lineMiterLimit` | not written |
 | dashes (world units) | `lineDash` as `[dash, gap]`, with `lineDashOffset` and `lineDashCap` | not written |
-| draw state | `lineOnTop`, `lineAntialias`, `lineDepthWrite`, `lineDepthBias`, `lineBehind`, `lineAlphaToCoverage`, `lineFog` | not written |
+| point style | `pointShape`, `pointMinPixelSize`, `pointMaxPixelSize`, `pointEdl`, `pointAdaptiveSize`, `pointAlphaTest`, `pointBlending`, `pointDepthTest`, `pointDepthWrite`, `pointFog` | not written |
+| line draw state | `lineOnTop`, `lineAntialias`, `lineDepthWrite`, `lineDepthBias`, `lineBehind`, `lineAlphaToCoverage`, `lineFog` | not written |
 
 glTF gives a point or line no size and recommends 1 px (glTF 2.0 section 3.9.7), and no Khronos extension holds one,
 so another viewer draws them 1 px wide; Godot 4.7.2 keeps the POINTS and LINES surfaces unshaded with `point_size` 1.
@@ -157,9 +158,9 @@ plugins that draw them, so a second export holds each once.
 rounded and at least 1. World-unit widths and per-point multipliers have no form there. They are not Khronos
 extensions, and the Khronos validator warns where one sits beside `KHR_materials_unlit`, so they are off by default.
 
-The style keys are written only where a line differs from a `Line`'s defaults; a batch writes `lineCap: 'square'`, the
+The style keys are written only where a line or cloud differs from the `Line` or `PointsMaterial` defaults; a batch writes `lineCap: 'square'`, the
 ends it draws, with its `onTop` and `antialias`. A line in `colorMode` `'set'` or `'add'` writes the colours it draws
-into `COLOR_0` over a white base colour. Clipping planes, a stroke's `progress`, point shapes and point textures are not
+into `COLOR_0` over a white base colour. Clipping planes, a stroke's `progress` and point textures are not
 written. A `DebugLines` queue is one frame's
 debug drawing and is never written. A splat cloud of `@margoengine/splats` is left out by every scene writer, which
 calls `onWarning` with it as `item`; write its data with `exportGaussianGLB` (`@margoengine/exporters/splats`).

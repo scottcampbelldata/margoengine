@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21157095,
+  "total": 21157498,
   "history": [
     {
       "date": "2026-10-24",
@@ -15001,6 +15001,12 @@
       "commit": "planet-complex-craters",
       "reason": "terrain: complex craters, rays and secondary chains in craterField (planet-recipes 3226 to 5848 B, budget 6104 B) and a brightness input on PlanetTerrain (planet 7512 to 7636 B, budget 7892 B). The rays are an option of the same field and cut the same ground in age order; a separate entry would need a second field type and its own merging of ejecta. Core plus stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "point-style-export",
+      "reason": "gltf/strokes 1,983 to 2,451 B gzip measured: it reads the line and point style extras back (4e6ae63863 and the point cloud half of Limits row 15); the entry is already the lazy reader that only a file with wide points or lines loads, so a further split would add a request to those files for a few hundred bytes",
+      "grew": 1
     }
   ],
   "items": {
@@ -15483,7 +15489,7 @@
     "@margoengine/gltf/soft-mesh": 73133,
     "@margoengine/gltf/spec-gloss": 12038,
     "@margoengine/gltf/splats": 2356,
-    "@margoengine/gltf/strokes": 2304,
+    "@margoengine/gltf/strokes": 2707,
     "@margoengine/gltf/texture-coordinates": 824,
     "@margoengine/gltf/textured": 9754,
     "@margoengine/gltf/transmission": 5116,

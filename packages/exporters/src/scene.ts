@@ -761,7 +761,7 @@ interface PluginCloud {
     sizeUnits: 'pixels' | 'world';
     shading: string;
     vertexColors: boolean;
-  };
+  } & Partial<Record<keyof typeof POINT_DEFAULTS, unknown>>;
 }
 const isPluginLine = (v: unknown): v is PluginLine =>
   isObject(v) &&
@@ -931,6 +931,30 @@ const LINE_DEFAULTS = {
   fog: true,
 };
 
+/** A `PointsMaterial`'s defaults for the style fields written as `point` + the field's name. */
+const POINT_DEFAULTS = {
+  shape: 'square',
+  minPixelSize: 1,
+  maxPixelSize: 256,
+  edl: false,
+  adaptiveSize: 0,
+  alphaTest: 0,
+  blending: 'normal',
+  depthTest: true,
+  depthWrite: null,
+  fog: true,
+};
+
+/** The fields of `style` that differ from `defaults`, each named `prefix` + the field's name. */
+function styleExtras(prefix: string, defaults: object, style: object): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, usual] of Object.entries(defaults)) {
+    const value = (style as Record<string, unknown>)[name];
+    if (value !== undefined && value !== usual) out[`${prefix}${name[0].toUpperCase()}${name.slice(1)}`] = value;
+  }
+  return out;
+}
+
 /**
  * What of a line's style differs from a `Line`'s defaults, as primitive extras (glTF 2.0 section 3.12; glTF holds no
  * join, cap, dash or draw order of a line): `lineJoin`, `lineCap`, `lineMiterLimit`, `lineDash` (dash and gap in world
@@ -938,11 +962,7 @@ const LINE_DEFAULTS = {
  * `lineBehind`, `lineAlphaToCoverage` and `lineFog`. gltf/strokes reads them back.
  */
 function lineStyle(style: PluginLineStyle): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [name, usual] of Object.entries(LINE_DEFAULTS)) {
-    const value = style[name as keyof typeof LINE_DEFAULTS];
-    if (value !== undefined && value !== usual) out[`line${name[0].toUpperCase()}${name.slice(1)}`] = value;
-  }
+  const out = styleExtras('line', LINE_DEFAULTS, style);
   if (style.dashed) {
     out.lineDash = [style.dashSize ?? 1, style.gapSize ?? 1];
     if (style.dashOffset) out.lineDashOffset = style.dashOffset;
@@ -1035,7 +1055,8 @@ function cloudPart(cloud: PluginCloud): Part | null {
       units: m.sizeUnits,
       kind: 'points',
     }),
-    extras: { pointSize: m.size, pointSizeUnits: m.sizeUnits },
+    // And the rest of its style, which glTF holds no field for (section 3.12): gltf/strokes reads it back.
+    extras: { pointSize: m.size, pointSizeUnits: m.sizeUnits, ...styleExtras('point', POINT_DEFAULTS, m) },
   };
 }
 

@@ -1016,7 +1016,9 @@ glTF gives a point or a line no size, and most viewers draw them 1 px wide. A PO
 - the primitive `extras` that `@margoengine/exporters` writes: `lineWidth` with `lineWidthUnits` and `pointSize` (a diameter) with `pointSizeUnits`, each `'pixels'` (CSS pixels, the default) or `'world'`, and a per-vertex `_WIDTH` multiplier; a line's style keys beside
   them (`lineJoin`, `lineCap`, `lineMiterLimit`, `lineDash` as `[dash, gap]` in world units with `lineDashOffset` and
   `lineDashCap`, `lineOnTop`, `lineAntialias`, `lineDepthWrite`, `lineDepthBias`, `lineBehind`,
-  `lineAlphaToCoverage`, `lineFog`) are drawn too, and a missing or malformed one keeps the `Line` default;
+  `lineAlphaToCoverage`, `lineFog`) and a cloud's (`pointShape`, `pointMinPixelSize`, `pointMaxPixelSize`, `pointEdl`,
+  `pointAdaptiveSize`, `pointAlphaTest`, `pointBlending`, `pointDepthTest`, `pointDepthWrite`, `pointFog`) are drawn
+  too, and a missing or malformed one keeps the `Line` or `PointsMaterial` default;
 - the Bentley vendor material extensions CesiumJS reads: `BENTLEY_materials_line_style.width` and `BENTLEY_materials_point_style.diameter`, in CSS pixels, a point drawn as a disc.
 
 When a primitive has both, as `exportGLB` with `styleExtensions: true` writes them, the extras win: they hold the exact width, where the Bentley style is rounded to whole pixels.
