@@ -1501,6 +1501,15 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   `coupling/loads-quay-wet-traversal.test.js` records exact dense versus indexed output and replay for
   the same masked aperture. Its projection visits 581,952 active entries versus 1,496,448 dense entries.
 
+  The full point-source diagnostic completed the prescribed original trajectory from frame zero on the
+  4 m grid using the pre-correction solver. It saved both shutter pairs at vessel ticks 3765–3766 and
+  4005–4006, replaying tick 4006 bit for bit from tick 4005. The finite receiver accepted 204,994,272
+  nonzero surface rows and 35,463,839 nonzero point rows with zero source rejections. The largest direct
+  volume residual was 1.66×10⁻¹⁰ m³, and relative work residual stayed below 3.48×10⁻¹¹. The independent
+  volume observer still failed at ticks 2965–2969, with a peak absolute defect of 5.33×10⁻⁸ m³ on this
+  older build. The corrected projection has separate mask and basin regressions. The full trajectory
+  still needs a corrected, spatially converged run.
+
   The 4 m full-history diagnostic used the same archived shutters and quay structure as the 8 m run,
   and both renderers sampled the accepted wave heights within 1.54×10⁻⁶ m. Wall peaks rose to 0.332 m
   and 0.311 m at the 67 and 71 s shutters from 0.200 m and 0.149 m at 8 m. Both stayed below the wall crest
