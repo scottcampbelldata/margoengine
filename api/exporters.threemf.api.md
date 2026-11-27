@@ -127,11 +127,29 @@ export interface ThreeMFObjectInfo {
     modelResolution?: ThreeMFModelResolution;
     alternatives?: readonly ThreeMFAlternative[];
     lattice?: ThreeMFLattice;
+    slices?: ThreeMFSlices;
 }
 
 export type ThreeMFObjectType = (typeof TYPES)[number];
 
 export type ThreeMFRatios = readonly number[];
+
+export interface ThreeMFSliceLayer {
+    top: number;
+    contours?: readonly (ArrayLike<number> | ThreeMFSliceOutline)[];
+}
+
+export interface ThreeMFSliceOutline {
+    points: ArrayLike<number>;
+    color?: string | readonly string[];
+}
+
+export interface ThreeMFSlices {
+    layers: readonly ThreeMFSliceLayer[];
+    bottom?: number;
+    meshResolution?: 'fullres' | 'lowres';
+    separatePart?: boolean;
+}
 
 export type ThreeMFUnit = keyof typeof UNITS;
 

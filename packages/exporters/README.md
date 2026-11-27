@@ -1455,7 +1455,7 @@ console.log(`${file.length} bytes`);
 | `thumbnail` | none | PNG or JPEG bytes, written as the package thumbnail. A CMYK JPEG is refused |
 | `displayProperties` | `true` | Writes how each material looks: metallic, specular or translucent display properties (below) |
 | `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `'components'` writes one object made of components that share meshes. `false` writes a build item for each node |
-| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber, composite, modelResolution, alternatives, lattice }` (below) |
+| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber, composite, modelResolution, alternatives, lattice, slices }` (below) |
 | `itemPartNumber` | none | The `partnumber` of the one build item of a scene written as one object. With `assembly: false`, give each node's through `objectInfo` |
 | `production` | `false` | Writes the production extension: UUIDs, and with `separateParts` a model part for each object (below) |
 | `compress` | `true` | Deflates the package's parts. `false` stores them |
@@ -1588,6 +1588,35 @@ const file = await export3MF(
         radius: 0.001,
         ballMode: 'all',
         ballRadius: 0.0022,
+      },
+    }),
+  },
+);
+console.log(`${file.length} bytes`);
+```
+
+### Sliced layers
+
+A slicer's layers can travel beside the mesh as the [3MF Slice Extension](https://github.com/3MFConsortium/spec_slice)'s slice stack. `objectInfo`'s `slices` gives a node's `layers`, each a rising `top` and its `contours` (`x y` pairs, or `{ points, color }`), with `bottom` (default 0), `meshResolution` (`'lowres'` when the mesh is too coarse to make the layers from, which makes the file require the extension) and `separatePart` (the layers go into a part under `/2D/`). Lengths are scene units in the object's frame with Z up: for a Y-up scene a point `(x, y, z)` of the geometry is `(x, -z)` at height `y`. A solid's contours close by themselves and fill by the positive rule, so run outer contours counter-clockwise and holes clockwise; a `support` object's are open paths. The extension keeps layers level, so a sliced node may turn about the up axis, move and scale across the bed, but not tilt or change its height, and needs an object of its own. Margo writes the layers you give; it does not slice the mesh.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0, -0.04, 0, 0.001, 0]),
+  indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3],
+};
+// Two 0.2 mm layers of a triangle.
+const outline = [0, 0, 0.03, 0, 0, 0.03];
+const file = await export3MF(
+  { nodes: [{ name: 'Wedge', geometry }] },
+  {
+    objectInfo: () => ({
+      slices: {
+        layers: [
+          { top: 0.0002, contours: [outline] },
+          { top: 0.0004, contours: [outline] },
+        ],
       },
     }),
   },

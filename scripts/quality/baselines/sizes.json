@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21256658,
+  "total": 21257975,
   "history": [
     {
       "date": "2026-10-24",
@@ -15037,6 +15037,12 @@
       "commit": "lane-e-3mf",
       "reason": "3MF beam lattices: exporters/threemf 33562 to 35386 B (the lattice element, balls, sets, per-end colours, clipping and representation meshes and the extension's rules checked; the writer is the one function of the format), and the collector's empty-triangle option for the writers that bundle it.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf",
+      "reason": "3MF slice stacks: exporters/threemf 35386 to 36665 B (layers, contours, colours, a part under /2D/ and the level-transform rule; the writer is the one function of the format) and the 3MF readers' skip of slice stacks.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15435,7 +15441,7 @@
     "@margoengine/exporters/sparse": 26469,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 36448,
+    "@margoengine/exporters/threemf": 37765,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,

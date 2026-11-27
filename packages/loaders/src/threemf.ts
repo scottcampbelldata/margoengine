@@ -183,7 +183,9 @@ function parseModel(
     metadataText = '',
     // 3MF Core 1.4 section 4.1: <metadata> inside an object's or item's <metadatagroup> describes that element, not
     // the model, so only top-level entries reach the model metadata.
-    metadataGroups = 0;
+    metadataGroups = 0,
+    /** Inside a slice stack, whose vertices are the layers' 2D points and no mesh's. */
+    sliceStacks = 0;
   let vertexCount = 0,
     triangleCount = 0,
     sawModel = false;
@@ -193,6 +195,8 @@ function parseModel(
       open(name, a) {
         for (const key in a) if (key.startsWith('xmlns:')) prefixes.set(key.slice(6), a[key]);
         if (extension?.element?.(model, name, a)) return;
+        if (name === 'slicestack') sliceStacks++;
+        if (sliceStacks) return;
         switch (name) {
           case 'model':
             if (sawModel) throw new LoaderError(F, 'syntax', 'nested <model>');
@@ -325,6 +329,7 @@ function parseModel(
       },
       close(name) {
         extension?.close?.(model, name);
+        if (name === 'slicestack') sliceStacks--;
         if (name === 'object') object = undefined;
         else if (name === 'basematerials' || name === 'colorgroup') colors = undefined;
         else if (name === 'metadatagroup') metadataGroups--;

@@ -77,6 +77,86 @@ export interface ThreeMFObjectInfo {
    * or `solidsupport` type. Default none.
    */
   lattice?: ThreeMFLattice;
+  /**
+   * The node's printed layers (slice extension), beside its mesh. It needs a build item or component of the node's own
+   * (`assembly` `false` or `'components'`, or a single node) that neither tilts it nor scales its height. Default none.
+   */
+  slices?: ThreeMFSlices;
+}
+
+/** One closed contour of a layer, or in a `support` object one open path, with colours. */
+export interface ThreeMFSliceOutline {
+  /** `x y` for each point. */
+  points: ArrayLike<number>;
+  /** One sRGB colour, `'#RRGGBB'` or `'#RRGGBBAA'`, or one for each point. Default the node's material. */
+  color?: string | readonly string[];
+}
+
+/** One printed layer. */
+export interface ThreeMFSliceLayer {
+  /** The height of the layer's top, above the one before. */
+  top: number;
+  /**
+   * Its contours, each `x y x y ...` or a {@link ThreeMFSliceOutline}. A solid's contours close by themselves and fill
+   * by the positive rule, so an outer contour runs counter-clockwise and a hole clockwise. Default none: a gap.
+   */
+  contours?: readonly (ArrayLike<number> | ThreeMFSliceOutline)[];
+}
+
+/**
+ * The layers of an object. Lengths are in scene units, in the object's frame with Z up: for a Y-up scene a point
+ * `(x, y, z)` of the geometry is `(x, -z)` at height `y`.
+ */
+export interface ThreeMFSlices {
+  layers: readonly ThreeMFSliceLayer[];
+  /** The height the first layer starts at. Default 0. */
+  bottom?: number;
+  /**
+   * `'lowres'` says the mesh is too coarse to make these layers from, and the file then requires the extension.
+   * Default `'fullres'`.
+   */
+  meshResolution?: 'fullres' | 'lowres';
+  /** Writes the layers into a model part of their own under `/2D/`. Default `false`. */
+  separatePart?: boolean;
+}
+
+/** Layers checked against the extension's rules, each contour a point list without a repeated end. */
+function checkSlices({ layers, bottom = 0, meshResolution = 'fullres', separatePart }: ThreeMFSlices, open: boolean) {
+  const fail = (message: string): never => {
+    throw new RangeError(`3MF slices ${message}`);
+  };
+  if (!Array.isArray(layers) || !layers.length) fail('need at least one layer');
+  if (!Number.isFinite(bottom)) fail('bottom must be a number');
+  if (meshResolution !== 'fullres' && meshResolution !== 'lowres') fail("meshResolution must be 'fullres' or 'lowres'");
+  let below = bottom;
+  const checked = (layers as readonly ThreeMFSliceLayer[]).map(({ top, contours = [] }) => {
+    if (!(Number.isFinite(top) && top > below)) fail('layer tops must rise from the bottom, each above the one before');
+    below = top;
+    const outlines = contours.map((contour) => {
+      const { points, color } = 'points' in contour ? contour : { points: contour, color: undefined };
+      let count = (points?.length ?? 0) / 2;
+      if (!Number.isInteger(count) || !Array.from(points).every(Number.isFinite))
+        fail('contours need two finite numbers for each point');
+      const same = (a: number, b: number): boolean =>
+        Math.fround(points[a * 2]) === Math.fround(points[b * 2]) &&
+        Math.fround(points[a * 2 + 1]) === Math.fround(points[b * 2 + 1]);
+      // A solid's contour closes itself, so a repeated first point at its end is not a segment of its own.
+      if (!open && count > 1 && same(0, count - 1)) count--;
+      if (count < (open ? 2 : 3)) fail(open ? 'paths need two points' : 'contours need three points');
+      for (let i = open ? 1 : 0; i < count; i++)
+        if (same(i, (i + count - 1) % count)) fail('contours must not repeat a point next to itself');
+      const colors = color === undefined || typeof color === 'string' ? color : Array.from(color);
+      if (
+        colors !== undefined &&
+        ((typeof colors !== 'string' && colors.length < count) ||
+          [colors].flat().some((c) => typeof c !== 'string' || !MIX_COLOR.test(c)))
+      )
+        fail("colours are '#RRGGBB' or '#RRGGBBAA', one or one for each point");
+      return { points, count, color: colors };
+    });
+    return { top, outlines };
+  });
+  return { layers: checked, bottom, meshResolution, separatePart: !!separatePart, open };
 }
 
 const CAPS = ['sphere', 'hemisphere', 'butt'] as const;
@@ -483,8 +563,15 @@ function resourcesOf(resources: readonly string[], from: string): string[] {
   return resources.filter((xml) => wanted.has(idOf(xml)));
 }
 
-/** What `objectInfo` says of a node, with its lattice checked. */
-type Described = ThreeMFObjectInfo & { type: ThreeMFObjectType; checked?: ReturnType<typeof checkLattice> };
+/** What `objectInfo` says of a node, with its lattice and layers checked. */
+type Described = ThreeMFObjectInfo & {
+  type: ThreeMFObjectType;
+  checked?: ReturnType<typeof checkLattice>;
+  layered?: ReturnType<typeof checkSlices>;
+};
+
+/** Turns a Y-up object's frame to the file's Z up: `(x, y, z)` to `(x, -z, y)`. */
+const TURN = [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1];
 
 /** A base material: its group's resource id and its index there. */
 interface Base {
@@ -696,7 +783,8 @@ const FLIP = [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const PRODUCTION = 'http://schemas.microsoft.com/3dmanufacturing/production/2015/06',
   ALTERNATIVES = 'http://schemas.microsoft.com/3dmanufacturing/production/alternatives/2021/04';
 const BEAMS = 'http://schemas.microsoft.com/3dmanufacturing/beamlattice/2017/02',
-  BALLS = 'http://schemas.microsoft.com/3dmanufacturing/beamlattice/balls/2020/07';
+  BALLS = 'http://schemas.microsoft.com/3dmanufacturing/beamlattice/balls/2020/07',
+  SLICE = 'http://schemas.microsoft.com/3dmanufacturing/slice/2015/07';
 const CORE = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02',
   MATERIAL = 'http://schemas.microsoft.com/3dmanufacturing/material/2015/02',
   RELATIONSHIP = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/',
@@ -1028,6 +1116,9 @@ export async function export3MF(
     pathed = new Set<string>(),
     /** The beam lattice namespaces the file uses. */
     lattices = new Set<'b' | 'b2'>(),
+    /** The mesh resolutions of the sliced objects, and the model parts that hold layers alone. */
+    sliced = new Set<'fullres' | 'lowres'>(),
+    layerParts: { part: string; resources: string[] }[] = [],
     /** A composite material group for each list of constituents, with the mixtures its triangles use. */
     mixtures = new Map<string, { base: number; id: number; rows: Map<string, number> }>(),
     seen = new Map<object, number>(),
@@ -1357,14 +1448,14 @@ export async function export3MF(
     base: Base,
     name: string | undefined,
     { type = 'model', partNumber, modelResolution }: ThreeMFObjectInfo,
-    { alternatives = '', lattice = '', rooted = false } = {},
+    { alternatives = '', lattice = '', slices = '', rooted = false } = {},
   ): number => {
     const at = id++,
-      resolution = modelResolution === undefined ? '' : ` pa:modelresolution="${modelResolution}"`,
+      resolution = (modelResolution === undefined ? '' : ` pa:modelresolution="${modelResolution}"`) + slices,
       // Only the root part may name another (production extension 3.2), and an unreferenced object stays in it, as do
       // a lattice and the meshes it names, which must share a part.
       part =
-        separateParts && type !== 'other' && !alternatives && !lattice && !rooted
+        separateParts && type !== 'other' && !alternatives && !lattice && !slices && !rooted
           ? `3D/Objects/object${at}.model`
           : undefined;
     if (part) objectParts.set(at, part);
@@ -1407,8 +1498,12 @@ export async function export3MF(
         alternatives: given.alternatives?.length ? given.alternatives : undefined,
         lattice: given.lattice,
         checked: given.lattice && checkLattice(given.lattice),
+        slices: given.slices,
+        layered: given.slices && checkSlices(given.slices, type === 'support'),
       };
     if (!TYPES.includes(type)) throw new RangeError(`3MF object type must be one of ${TYPES.join(', ')}`);
+    if (info.slices && together)
+      throw new RangeError("3MF writes slices for a node's own object; use assembly: false or 'components'");
     if (info.lattice) {
       if (type !== 'model' && type !== 'solidsupport')
         throw new RangeError('3MF puts a beam lattice only in a model or solidsupport object');
@@ -1481,6 +1576,75 @@ export async function export3MF(
     );
     return { geometry, material, positions, colors, textured: !!coordinates, base };
   };
+  /** A node's own positions in its object's frame: mirrored nodes reflect them, and sliced ones stand them up. */
+  const framed = (positions: ArrayLike<number>, mirrored: boolean, turned: boolean): ArrayLike<number> => {
+    const reflected = mirrored ? moved(positions, FLIP) : positions;
+    return turned ? moved(reflected, TURN) : reflected;
+  };
+  /**
+   * Writes an object's layers, into a part of their own when asked, and gives its slice stack's id. `mirrored`
+   * reflects them in X and runs each contour the other way, so it still fills.
+   */
+  const sliceStack = (slices: ReturnType<typeof checkSlices>, mirrored: boolean): number => {
+    const { layers, bottom, separatePart, open } = slices,
+      colors = new Map<string, number>(),
+      colorIndex = (color: string): number => {
+        const key = color.toUpperCase();
+        let at = colors.get(key);
+        if (at === undefined) colors.set(key, (at = colors.size));
+        return at;
+      },
+      height = (value: number): string => num(value * scale),
+      group = layers.some(({ outlines }) => outlines.some(({ color }) => color !== undefined)) ? id++ : 0;
+    const body = layers.map(({ top, outlines }) => {
+      const vertices: string[] = [],
+        known = new Map<string, number>();
+      const polygons = outlines.map(({ points, count, color }) => {
+        const order = Array.from({ length: count }, (_, i) => i);
+        if (mirrored) order.reverse();
+        const at = order.map((i) => {
+          const x = Math.fround(points[i * 2] * scale * (mirrored ? -1 : 1)),
+            y = Math.fround(points[i * 2 + 1] * scale);
+          if (!Number.isFinite(x + y))
+            throw new RangeError(
+              '3MF position exceeds Float32 range in this unit; pick a larger unit or lower the scale',
+            );
+          const key = `${x} ${y}`;
+          let found = known.get(key);
+          if (found === undefined) {
+            known.set(key, (found = vertices.length));
+            vertices.push(`<s:vertex x="${num(x)}" y="${num(y)}"/>`);
+          }
+          return found;
+        });
+        const property = (corner: number): number =>
+          colorIndex(typeof color === 'string' ? color : color![order[corner]]);
+        const segments = Array.from({ length: open ? count - 1 : count }, (_, i) => {
+          const next = (i + 1) % count;
+          return `<s:segment v2="${at[next]}"${color === undefined ? '' : ` pid="${group}" p1="${property(i)}" p2="${property(next)}"`}/>`;
+        });
+        return `<s:polygon startv="${at[0]}">${segments.join('')}</s:polygon>`;
+      });
+      return `<s:slice ztop="${height(top)}">${polygons.length ? `<s:vertices>${vertices.join('')}</s:vertices>${polygons.join('')}` : ''}</s:slice>`;
+    });
+    const palette = group
+        ? [
+            `<m:colorgroup id="${group}">${[...colors.keys()].map((c) => `<m:color color="${c}"/>`).join('')}</m:colorgroup>`,
+          ]
+        : [],
+      stack = (own: number, content: string): string =>
+        `<s:slicestack id="${own}" zbottom="${height(bottom)}">${content}</s:slicestack>`,
+      at = id++;
+    if (!separatePart) groups.push(...palette, stack(at, body.join('')));
+    else {
+      const inner = id++,
+        part = `2D/slices${at}.model`;
+      layerParts.push({ part, resources: [...palette, stack(inner, body.join(''))] });
+      groups.push(stack(at, `<s:sliceref slicestackid="${inner}" slicepath="/${part}"/>`));
+    }
+    sliced.add(slices.meshResolution);
+    return at;
+  };
   /** Writes a mesh given in a node's frame as an object of its own, which no build item places. */
   const meshObject = (
     node: ExportNode,
@@ -1488,11 +1652,12 @@ export async function export3MF(
     info: ThreeMFObjectInfo,
     name: string | undefined,
     rooted: boolean,
+    turned: boolean,
   ): number => {
     const drawn = drawables(collect({ nodes: [node] }, options, undefined, 'shape')),
       parts = drawn.map((item) => {
         const own = moved(item.geometry.positions, item.world);
-        return partOf(item, mirrored ? moved(own, FLIP) : own, info, []);
+        return partOf(item, framed(own, mirrored, turned), info, []);
       }),
       // The mesh's own reflection reverses its triangles once more.
       reversed = mirrored !== (!!drawn.length && determinant3(drawn[0].world) < 0),
@@ -1519,8 +1684,9 @@ export async function export3MF(
   ): string => {
     const { positions, beams, balls, sets, clipping, representation, ballMode, ballRadius, cap } = lattice,
       // A mesh named by a lattice is a model with no lattice of its own.
+      turned = !!info.layered && zUp,
       referred = (node: ExportNode): number =>
-        meshObject(node, mirrored, { type: 'model', composite: info.composite }, node.name ?? name, true),
+        meshObject(node, mirrored, { type: 'model', composite: info.composite }, node.name ?? name, true, turned),
       clip = clipping && referred(clipping.mesh),
       shown = representation && referred(representation),
       first = vertices.length,
@@ -1533,8 +1699,9 @@ export async function export3MF(
         if (at === undefined) colors.set(key, (at = colors.size));
         return at;
       };
+    const placedAt = framed(positions, mirrored, turned);
     for (let i = 0; i < positions.length; i += 3) {
-      const [x, y, z] = [0, 1, 2].map((k) => Math.fround(positions[i + k] * scale * (mirrored && !k ? -1 : 1)));
+      const [x, y, z] = [0, 1, 2].map((k) => Math.fround(placedAt[i + k] * scale));
       if (!Number.isFinite(x + y + z))
         throw new RangeError('3MF position exceeds Float32 range in this unit; pick a larger unit or lower the scale');
       vertices.push(`<vertex x="${num(x)}" y="${num(y)}" z="${num(z)}"/>`);
@@ -1592,6 +1759,7 @@ export async function export3MF(
           { type: info.type, partNumber: info.partNumber, composite: info.composite },
           own,
           false,
+          !!info.layered && zUp,
         );
       if (objectParts.has(at)) pathed.add('pa');
       return `<pa:alternative objectid="${at}"${pathOf(at, 'path')}${unique('alternative', own, 'UUID')} modelresolution="${resolution}"/>`;
@@ -1614,9 +1782,22 @@ export async function export3MF(
       keys: string[] = [];
     if (!info.lattice && drawn.some(({ geometry }) => !geometry.indices.length))
       throw new RangeError('Indices must hold complete triangles; only a node with a lattice may have none');
+    // A sliced object's frame has the file's Z up, so its build transform keeps layers level (slice extension 1).
+    const turned = !!info.layered && zUp,
+      placement = upright(world, zUp);
+    if (turned)
+      for (let row = 0; row < 3; row++)
+        [placement[4 + row], placement[8 + row]] = [-placement[8 + row], placement[4 + row]];
+    if (
+      info.layered &&
+      [placement[2], placement[6], placement[8], placement[9], placement[10] - 1].some((v) => v !== 0)
+    )
+      throw new RangeError(
+        '3MF layers stay level: a sliced node may turn about the up axis, move and scale across the bed, not tilt or change its height',
+      );
     const parts = drawn.map((item): Part => {
       const { positions } = item.geometry,
-        placedAt = together ? moved(positions, upright(matrix, zUp)) : mirrored ? moved(positions, FLIP) : positions;
+        placedAt = together ? moved(positions, upright(matrix, zUp)) : framed(positions, mirrored, turned);
       return partOf(item, placedAt, info, keys);
     });
     if (together) {
@@ -1634,7 +1815,8 @@ export async function export3MF(
     }
     const others = info.alternatives && numbered(info.alternatives),
       beamed = info.lattice && numbered(info.lattice),
-      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others, beamed])} ${keys.join('|')}`;
+      layered = info.slices && numbered(info.slices),
+      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others, beamed, layered])} ${keys.join('|')}`;
     let at = shared.get(key);
     if (at === undefined) {
       const welded = weldParts(parts, mirrored);
@@ -1647,11 +1829,14 @@ export async function export3MF(
       append(welded, vertices, faces, base);
       // Resources are defined before they are referred to, so the meshes this object names come first.
       const alternatives = alternativesOf(info, mirrored, name),
-        lattice = info.checked && latticeOf(info.checked, mirrored, vertices, info, name);
-      shared.set(key, (at = object(vertices, faces, base, name, info, { alternatives, lattice })));
+        lattice = info.checked && latticeOf(info.checked, mirrored, vertices, info, name),
+        slices =
+          info.layered &&
+          ` s:slicestackid="${sliceStack(info.layered, mirrored)}"${info.layered.meshResolution === 'lowres' ? ' s:meshresolution="lowres"' : ''}`;
+      shared.set(key, (at = object(vertices, faces, base, name, info, { alternatives, lattice, slices })));
     }
     if (info.type === 'other') return;
-    const transform = ` transform="${itemTransform(upright(world, zUp), scale)}"`;
+    const transform = ` transform="${itemTransform(placement, scale)}"`;
     printed.push({ type: info.type, alone: ownItems });
     if (!ownItems && assembly === 'components') components.push(component(at, name, transform));
     else item(at, info.itemPartNumber ?? itemNumber, name, transform);
@@ -1724,10 +1909,12 @@ export async function export3MF(
       (production ? ` xmlns:p="${PRODUCTION}"` : '') +
       (alternatives ? ` xmlns:pa="${ALTERNATIVES}"` : '') +
       (lattices.size ? ` xmlns:b="${BEAMS}"` : '') +
-      (lattices.has('b2') ? ` xmlns:b2="${BALLS}"` : ''),
+      (lattices.has('b2') ? ` xmlns:b2="${BALLS}"` : '') +
+      (sliced.size ? ` xmlns:s="${SLICE}"` : ''),
     // A package whose model parts refer to others must require the production extension (its chapter 1), and one with
     // beam lattices theirs (beam lattice extension chapter 1).
-    extensions = [...(apart.length ? ['p', ...pathed] : []), ...lattices],
+    // A file whose mesh is too coarse without its layers requires the slice extension (its chapter 2).
+    extensions = [...(apart.length ? ['p', ...pathed] : []), ...lattices, ...(sliced.has('lowres') ? ['s'] : [])],
     required = extensions.length ? ` requiredextensions="${extensions.join(' ')}"` : '',
     modelOf = (head: string, body: string, own: readonly string[], items: string): string =>
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -1753,7 +1940,7 @@ export async function export3MF(
       files.filter((_, i) => own.has(textureXml[i])).map(({ name }) => [name, `${RELATIONSHIP}3dtexture`] as const),
     rootRelations = [
       ...sampled(new Set(rootResources)),
-      ...apart.map(({ part }) => [part, `${RELATIONSHIP}3dmodel`] as const),
+      ...[...apart, ...layerParts].map(({ part }) => [part, `${RELATIONSHIP}3dmodel`] as const),
     ],
     parts = apart.flatMap(({ part, xml, needs }) => {
       const textured = sampled(new Set(needs)),
@@ -1790,6 +1977,10 @@ export async function export3MF(
       { name: '3D/3dmodel.model', data: encoder.encode(model) },
       ...(rootRelations.length ? [{ name: '3D/_rels/3dmodel.model.rels', data: relationships(rootRelations) }] : []),
       ...parts,
+      ...layerParts.map(({ part, resources: own }) => ({
+        name: part,
+        data: encoder.encode(modelOf(namespaces, '', own, '<build/>')),
+      })),
       ...files,
       ...pictures,
     ],
