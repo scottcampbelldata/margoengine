@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20859456,
+  "total": 20859724,
   "history": [
     {
       "date": "2026-10-24",
@@ -14472,6 +14472,12 @@
       "commit": "ground-split",
       "reason": "FIRE-05: the ground share split into ground shock, crater work and heat (+633 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "8baf3f7935",
+      "reason": "@margoengine/sky/look 2644 to 2808 B gzip (ceiling 2796 to 3064): KB-SKY-NIGHTPALL1 makes the night sky and its clouds seen through the smoke layer (layerTransmittance, lowLayer: t^(1/sin e) per ray plus the layer's glow), so a starry dome goes out under a thick pall. The WGSL comments are already stripped at build, so nothing is waste; the bytes are the one new shader function and its uniform rows. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15768,7 +15774,7 @@
     "@margoengine/sky/hurricane": 2851,
     "@margoengine/sky/lighting": 5135,
     "@margoengine/sky/lightning-bolt": 5591,
-    "@margoengine/sky/look": 2796,
+    "@margoengine/sky/look": 3064,
     "@margoengine/sky/milky-way": 6589,
     "@margoengine/sky/moon": 3810,
     "@margoengine/sky/moonlight": 1950,
