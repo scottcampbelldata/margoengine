@@ -11,6 +11,7 @@ export class ComputeFrame implements EnginePlugin {
     static attach(engine: EngineKernel, options?: ComputeFrameOptions): ComputeFrame;
     constructor(options?: ComputeFrameOptions);
     get gpu(): ComputeContext;
+    get ready(): Promise<void>;
     get jobs(): readonly FrameJob[];
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
@@ -84,6 +85,7 @@ class ComputeContext {
     kernelRoute: KernelRoute | undefined;
     readonly routeReady: Promise<void>;
     constructor(device: GPUDevice, ownsDevice: boolean, fastMath?: boolean);
+    get ready(): Promise<void>;
     get disposed(): boolean;
     get backend(): 'webgpu' | 'cpu';
     get f16(): boolean;

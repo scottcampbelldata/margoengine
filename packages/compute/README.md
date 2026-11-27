@@ -508,6 +508,22 @@ frame.dispose();
 console.assert(engine.sceneOf(frame) === undefined && data.disposed);
 ```
 
+On the WebGL2 compatibility layer a context loads its sort route (`import()`) when it is made. `createCompute`
+resolves after it, but a `ComputeFrame` makes its context when it attaches, and a sort built on `frame.gpu` before the
+route has loaded keeps the radix passes, which the layer runs on its CPU tier. `frame.ready` (and `gpu.ready`) settles
+once the route is in place; it is already settled on WebGPU. Await it before building kernels on a frame's context:
+
+```ts
+import {Engine} from '@margoengine/core';
+import {ComputeFrame} from '@margoengine/compute/frame';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const frame = ComputeFrame.attach(engine);
+await frame.ready;
+const order = frame.gpu.sort(frame.gpu.zeros(1024));
+order.dispose();
+frame.dispose();
+```
+
 ## Subgroups
 
 `@margoengine/compute/subgroups` runs a context's reductions, flat scans and radix sorts on WebGPU subgroups.

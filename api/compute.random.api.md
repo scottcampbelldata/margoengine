@@ -90,6 +90,7 @@ class ComputeContext {
     kernelRoute: KernelRoute | undefined;
     readonly routeReady: Promise<void>;
     constructor(device: GPUDevice, ownsDevice: boolean, fastMath?: boolean);
+    get ready(): Promise<void>;
     get disposed(): boolean;
     get backend(): 'webgpu' | 'cpu';
     get f16(): boolean;

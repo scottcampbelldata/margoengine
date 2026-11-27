@@ -6,6 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCompute } from '@margoengine/compute';
+import { ComputeFrame } from '@margoengine/compute/frame';
 import { runComputeOnCPU } from '../../webgl2-compat/dist/compute.js';
 
 globalThis.GPUBufferUsage ??= {
@@ -134,4 +135,27 @@ test('a wait rejects when queued work raised an internal error (the layer drops 
   device.internal = { message: 'A compute dispatch on the CPU tier stopped at its work budget' };
   const y = x.add(1).eval();
   await assert.rejects(y.read(), /GPU internal error: A compute dispatch on the CPU tier stopped at its work budget/);
+});
+
+// KB-COMPAT-READY1: a ComputeFrame makes its context when it attaches, with no createCompute to wait for the route, so a
+// sort built on frame.gpu in the same task took the radix passes on the layer's CPU tier. frame.ready waits for it.
+test('ComputeFrame.ready waits for the WebGL2 route, and a sort built after it takes the route', async () => {
+  for (const vendor of ['margo-webgl2', 'nvidia']) {
+    const device = standIn(vendor),
+      frame = new ComputeFrame(),
+      pending = Symbol('pending');
+    frame.setup({ gpu: device });
+    const state = await Promise.race([frame.ready, Promise.resolve(pending)]);
+    if (vendor === 'nvidia') {
+      assert.notEqual(state, pending, 'settled at once on WebGPU');
+      assert.equal(frame.gpu.sortRoute, undefined);
+      continue;
+    }
+    assert.equal(state, pending, 'ready waits for the route');
+    assert.equal(frame.gpu.sortRoute, undefined, 'the route has not loaded yet');
+    await frame.ready;
+    assert.equal(typeof frame.gpu.sortRoute, 'string', 'the route is in place once ready settles');
+    frame.gpu.sort(frame.gpu.zeros(1000));
+    assert.ok(device.codes.includes(frame.gpu.sortRoute), 'the sort takes the route');
+  }
 });

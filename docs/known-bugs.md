@@ -15,7 +15,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `packages/shared/compat.js` said "no frame is drawn differently" while the route loads; that held only
   where a check measured it. A check or film frame drawn on a loaded machine before the route differs from one after.
 - **Fix, per package:** a `ready` promise (`routeSettled` in `packages/shared/compat.js`), documented in the README
-  and awaited by the package's own checks. Done: dof, vfx, splats. Left: culling, sky lighting, compute,
+  and awaited by the package's own checks. Done: dof, vfx, splats, compute (`ComputeFrame.ready`). Left: culling, sky lighting,
   voxel-pathtracer, scatter's `Scatter`, then a quality step that fails on a route without `ready`.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)

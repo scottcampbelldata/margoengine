@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import { GpuArray, checkShape } from './array.js';
 import { DTYPES, bytesOf, dtypeOf, type DType } from './dtype.js';
 import { Expr, Operand, fuse, where, type AxisOptions, type OperandLike } from './expr.js';
@@ -210,6 +210,7 @@ export class ComputeContext {
   readonly #staging = new Set<GPUBuffer>();
   #errors: { kind: string; error: Promise<GPUError | null> }[] = [];
   #disposed = false;
+  #ready: Promise<void>;
   // While profiling: the timestamps of each timed submit, read once the submits' error scopes have resolved.
   #timings: { staging: GPUBuffer; queries: GPUQuerySet; labels: string[] }[] | undefined;
 
@@ -232,11 +233,22 @@ export class ComputeContext {
     this.lost = device.lost;
     this.fastMath = fastMath;
     // On the WebGL2 layer: the sort route, loaded by import() there only; createCompute waits for it.
-    this.routeReady = (loadCompatRoute(device, () => import('./compat.js')) ?? Promise.resolve(undefined)).then(
-      (route) => {
-        this.sortRoute = route?.sortShader;
-      },
-    );
+    const route = loadCompatRoute(device, () => import('./compat.js'));
+    this.routeReady = (route ?? Promise.resolve(undefined)).then((loaded) => {
+      this.sortRoute = loaded?.sortShader;
+    });
+    this.#ready = route ? routeSettled(this.routeReady) : Promise.resolve();
+  }
+
+  /**
+   * Settles once the context's kernels take the routes they will from then on. On the WebGL2 compatibility layer a
+   * context loads its sort route (a dynamic import) when it is made, and a sort built before it has loaded keeps the
+   * radix passes, which the layer runs on its CPU tier. `createCompute` resolves only after it, so its contexts are
+   * ready; a `ComputeFrame`'s context is made when the frame attaches: await this (or `frame.ready`) before building
+   * kernels on it (KB-COMPAT-READY1). Resolved at once on WebGPU; never rejects.
+   */
+  get ready(): Promise<void> {
+    return this.#ready;
   }
 
   /** True after `dispose()`. */

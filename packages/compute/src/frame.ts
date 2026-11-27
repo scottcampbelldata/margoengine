@@ -70,6 +70,22 @@ export class ComputeFrame implements EnginePlugin {
     return this.#gpu;
   }
 
+  /**
+   * Settles once the frame's compute context takes its routes: see {@link ComputeContext.ready}. On the WebGL2
+   * compatibility layer await it after attaching and before building a sort on `frame.gpu`; resolved at once on WebGPU
+   * (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const frame = ComputeFrame.attach(engine);
+   * await frame.ready;
+   * const sorted = frame.gpu.sort(frame.gpu.zeros(1024));
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.gpu.ready;
+  }
+
   /** The jobs, in run order. */
   get jobs(): readonly FrameJob[] {
     return this.#jobs;
