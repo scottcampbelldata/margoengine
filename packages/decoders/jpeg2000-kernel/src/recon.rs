@@ -20,10 +20,10 @@ pub fn step(precision: u32, band: Band, exponent: u8, mantissa: u16) -> f32 {
 /// known plane).
 #[inline]
 fn unshift(mag: u32, low: u8, roi: u8) -> (u32, u32) {
-    if roi > 0 && mag >> roi != 0 {
-        (mag >> roi, (low as u32).saturating_sub(roi as u32))
-    } else {
-        (mag, low as u32)
+    // RGN may name up to 255 planes; past the 32 a magnitude holds, every one is background.
+    match mag.checked_shr(roi as u32) {
+        Some(region) if roi > 0 && region != 0 => (region, (low as u32).saturating_sub(roi as u32)),
+        _ => (mag, low as u32),
     }
 }
 
@@ -59,9 +59,10 @@ pub fn irreversible(d: &Decoded, roi: u8, delta: f32, out: &mut [f32], stride: u
 /// The inverse reversible component transform (Equation G-7).
 pub fn inverse_rct(y0: &mut [i32], y1: &mut [i32], y2: &mut [i32]) {
     for ((a, b), c) in y0.iter_mut().zip(y1.iter_mut()).zip(y2.iter_mut()) {
-        let g = *a - ((*b + *c) >> 2);
-        let r = *c + g;
-        let bl = *b + g;
+        // Wrapping: damaged data reaches the ends of the range, where the picture is noise whatever is done.
+        let g = a.wrapping_sub(b.wrapping_add(*c) >> 2);
+        let r = c.wrapping_add(g);
+        let bl = b.wrapping_add(g);
         (*a, *b, *c) = (r, g, bl);
     }
 }
@@ -85,12 +86,29 @@ pub fn level_shift(v: f64, precision: u32, signed: bool) -> i32 {
     } else {
         (0, (1i64 << precision) - 1, 1i64 << (precision - 1))
     };
-    (v + shift).clamp(lo, hi) as i32
+    v.saturating_add(shift).clamp(lo, hi) as i32
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Damaged data fills 31 bit-planes: each of these once panicked with an overflow, a trap in Wasm.
+    #[test]
+    fn the_ends_of_the_range_do_not_panic() {
+        let (mut a, mut b, mut c) = ([i32::MIN, i32::MAX], [i32::MAX, i32::MIN], [i32::MAX, i32::MIN]);
+        inverse_rct(&mut a, &mut b, &mut c);
+        for v in [f64::MAX, f64::MIN, f64::INFINITY, f64::NAN] {
+            for signed in [false, true] {
+                let out = level_shift(v, 8, signed);
+                assert!((-128..=255).contains(&out), "{v} {signed} {out}");
+            }
+        }
+        // A region-of-interest shift past the width of a magnitude leaves every coefficient as background.
+        for roi in [31, 32, 255] {
+            assert_eq!(unshift(5, 1, roi), (5, 1));
+        }
+    }
 
     fn decoded(mag: &[u32], neg: &[bool], low: &[u8]) -> Decoded {
         Decoded { width: mag.len(), height: 1, magnitude: mag.to_vec(), negative: neg.to_vec(), low: low.to_vec() }

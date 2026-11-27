@@ -63,7 +63,8 @@ fn boxes(data: &[u8], range: Range<usize>) -> Result<Vec<([u8; 4], Range<usize>)
         if len < head {
             return Err(Error::Invalid);
         }
-        let end = at as u64 + len;
+        // An extended length may name up to 2^64 - 1 bytes.
+        let end = (at as u64).saturating_add(len);
         if end > range.end as u64 {
             // A cut final box keeps what is there (a cut codestream still decodes).
             out.push((kind, at + head as usize..range.end));
@@ -183,6 +184,13 @@ struct Channel {
     signed: bool,
 }
 
+/// Where a channel's samples come from: a component, directly or through a palette column.
+#[derive(Clone, Copy)]
+struct Source {
+    component: usize,
+    column: Option<usize>,
+}
+
 /// A plane resampled (nearest sample) to `w` by `h`, the size of the largest plane.
 fn resample(p: &Plane, w: u32, h: u32) -> Vec<i32> {
     if p.width == w && p.height == h {
@@ -212,32 +220,40 @@ pub struct Rgba {
 pub fn rgba(img: &Image, jp2: Option<&Jp2>, depth: u32) -> Result<Rgba> {
     let w = img.components.iter().map(|p| p.width).max().ok_or(Error::Invalid)?;
     let h = img.components.iter().map(|p| p.height).max().ok_or(Error::Invalid)?;
-    let comp = |i: usize| -> Result<Channel> {
-        let p = img.components.get(i).ok_or(Error::Invalid)?;
-        Ok(Channel { data: resample(p, w, h), precision: p.precision, signed: p.signed })
-    };
-    // Channels, after the palette.
-    let mut chans: Vec<Channel> = Vec::new();
-    match jp2.and_then(|j| j.palette.as_ref().map(|p| (j, p))) {
+    if w == 0 || h == 0 {
+        // Subsampling can leave every component without a sample.
+        return Err(Error::Invalid);
+    }
+    // Channels, after the palette. Only the few the picture reads are built: a file may declare thousands, each the
+    // size of the picture.
+    let mut sources: Vec<Source> = Vec::new();
+    let palette = jp2.and_then(|j| j.palette.as_ref().map(|p| (j, p)));
+    match palette {
         Some((j, pal)) => {
             for &(c, kind, column) in &j.mapping {
-                let src = comp(c as usize)?;
-                if kind == 0 {
-                    chans.push(src);
-                } else {
-                    let (bits, signed) = *pal.depths.get(column as usize).ok_or(Error::Invalid)?;
-                    let last = pal.entries.len() as i64 - 1;
-                    let data = src.data.iter().map(|&v| pal.entries[(v as i64).clamp(0, last) as usize][column as usize]).collect();
-                    chans.push(Channel { data, precision: bits, signed });
+                let component = c as usize;
+                if component >= img.components.len() || (kind != 0 && column as usize >= pal.depths.len()) {
+                    return Err(Error::Invalid);
                 }
+                sources.push(Source { component, column: (kind != 0).then_some(column as usize) });
             }
         }
-        None => {
-            for i in 0..img.components.len() {
-                chans.push(comp(i)?);
-            }
-        }
+        None => sources.extend((0..img.components.len()).map(|component| Source { component, column: None })),
     }
+    let build = |channel: usize| -> Result<Channel> {
+        let source = sources.get(channel).ok_or(Error::Invalid)?;
+        let p = img.components.get(source.component).ok_or(Error::Invalid)?;
+        let data = resample(p, w, h);
+        Ok(match (source.column, palette) {
+            (Some(column), Some((_, pal))) => {
+                let (bits, signed) = *pal.depths.get(column).ok_or(Error::Invalid)?;
+                let last = pal.entries.len() as i64 - 1;
+                let data = data.iter().map(|&v| pal.entries[(v as i64).clamp(0, last) as usize][column]).collect();
+                Channel { data, precision: bits, signed }
+            }
+            _ => Channel { data, precision: p.precision, signed: p.signed },
+        })
+    };
     // Colour channels and opacity, by channel definitions or by count.
     let colour: Vec<usize>;
     let mut alpha: Option<(usize, bool)> = None;
@@ -246,7 +262,7 @@ pub fn rgba(img: &Image, jp2: Option<&Jp2>, depth: u32) -> Result<Rgba> {
             let mut slots: Vec<(u16, usize)> = Vec::new();
             for &(cn, typ, asoc) in &j.channels {
                 let cn = cn as usize;
-                if cn >= chans.len() {
+                if cn >= sources.len() {
                     return Err(Error::Invalid);
                 }
                 match typ {
@@ -259,7 +275,7 @@ pub fn rgba(img: &Image, jp2: Option<&Jp2>, depth: u32) -> Result<Rgba> {
             colour = slots.into_iter().map(|(_, c)| c).collect();
         }
         None => {
-            let n = chans.len();
+            let n = sources.len();
             let colours = match jp2.map(|j| j.colour) {
                 Some(Colour::Grey) => 1,
                 Some(Colour::Srgb | Colour::Sycc) => 3,
@@ -282,13 +298,20 @@ pub fn rgba(img: &Image, jp2: Option<&Jp2>, depth: u32) -> Result<Rgba> {
         (v / range).clamp(0.0, 1.0)
     };
     let sycc = jp2.map(|j| j.colour) == Some(Colour::Sycc) && colour.len() >= 3;
+    // The colour channels read (one for grey, three for colour), then the opacity channel.
+    let read = if colour.len() >= 3 { 3 } else { 1 };
+    let colours: Vec<Channel> = colour[..read].iter().map(|&c| build(c)).collect::<Result<_>>()?;
+    let opacity = match alpha {
+        Some((channel, premultiplied)) => Some((build(channel)?, premultiplied)),
+        None => None,
+    };
     let n = (w * h) as usize;
     let mut data = vec![0u16; n * 4];
     for i in 0..n {
         let mut rgb = [0f64; 3];
         if colour.len() >= 3 {
             for k in 0..3 {
-                let c = &chans[colour[k]];
+                let c = &colours[k];
                 rgb[k] = scale(c, c.data[i] as f64);
             }
             if sycc {
@@ -297,16 +320,16 @@ pub fn rgba(img: &Image, jp2: Option<&Jp2>, depth: u32) -> Result<Rgba> {
                 rgb = [y + 1.402 * cr, y - 0.344_136 * cb - 0.714_136 * cr, y + 1.772 * cb];
             }
         } else {
-            let c = &chans[colour[0]];
+            let c = &colours[0];
             let g = scale(c, c.data[i] as f64);
             rgb = [g; 3];
         }
-        let a = match alpha {
-            Some((ch, _)) => scale(&chans[ch], chans[ch].data[i] as f64),
+        let a = match &opacity {
+            Some((c, _)) => scale(c, c.data[i] as f64),
             None => 1.0,
         };
         // Premultiplied opacity is divided out, so every output is straight RGBA.
-        if let Some((_, true)) = alpha {
+        if let Some((_, true)) = opacity {
             if a > 0.0 {
                 for v in rgb.iter_mut() {
                     *v /= a;

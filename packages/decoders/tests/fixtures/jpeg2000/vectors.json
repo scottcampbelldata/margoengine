@@ -1,0 +1,85 @@
+{
+  "encoder": "Pillow 13.0.0, OpenJPEG 2.5.4",
+  "vectors": [
+    {
+      "file": "grey.j2k",
+      "pixels": "grey.png",
+      "lossless": true
+    },
+    {
+      "file": "grey-alpha.jp2",
+      "pixels": "grey-alpha.png",
+      "lossless": true
+    },
+    {
+      "file": "rgb.jp2",
+      "pixels": "rgb.png",
+      "lossless": true
+    },
+    {
+      "file": "rgb-no-mct.j2k",
+      "pixels": "rgb-no-mct.png",
+      "lossless": true
+    },
+    {
+      "file": "rgba.jp2",
+      "pixels": "rgba.png",
+      "lossless": true
+    },
+    {
+      "file": "tiles.j2k",
+      "pixels": "tiles.png",
+      "lossless": true
+    },
+    {
+      "file": "offsets.j2k",
+      "pixels": "offsets.png",
+      "lossless": true
+    },
+    {
+      "file": "blocks.j2k",
+      "pixels": "blocks.png",
+      "lossless": true
+    },
+    {
+      "file": "precincts.j2k",
+      "pixels": "precincts.png",
+      "lossless": true
+    },
+    {
+      "file": "rlcp-layers.jp2",
+      "pixels": "rlcp-layers.png",
+      "lossless": true
+    },
+    {
+      "file": "pcrl.j2k",
+      "pixels": "pcrl.png",
+      "lossless": true
+    },
+    {
+      "file": "cprl.j2k",
+      "pixels": "cprl.png",
+      "lossless": true
+    },
+    {
+      "file": "plt.j2k",
+      "pixels": "plt.png",
+      "lossless": true
+    },
+    {
+      "file": "one-level.j2k",
+      "pixels": "one-level.png",
+      "lossless": true
+    },
+    {
+      "file": "lossy-grey.j2k",
+      "pixels": "lossy-grey.png",
+      "lossless": false
+    },
+    {
+      "file": "lossy-rgb.jp2",
+      "pixels": "lossy-rgb.png",
+      "lossless": false
+    }
+  ]
+}

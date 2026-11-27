@@ -58,8 +58,9 @@ impl Size {
     pub fn tiles_down(&self) -> u32 {
         (self.image.y1 - self.tile_y0).div_ceil(self.tile_height)
     }
+    /// The product is taken in 64 bits: a hostile SIZ passes 32, the width of this count in Wasm.
     pub fn tile_count(&self) -> usize {
-        self.tiles_across() as usize * self.tiles_down() as usize
+        usize::try_from(self.tiles_across() as u64 * self.tiles_down() as u64).unwrap_or(usize::MAX)
     }
     /// Tile t's rectangle on the reference grid (Equation B-7).
     pub fn tile(&self, t: usize) -> Rect {
@@ -191,28 +192,44 @@ pub struct Change {
     pub order: Order,
 }
 
+/// Values for the components a header names, sorted by component: a table of every component in every tile header
+/// would take gigabytes at 65,535 tiles of 16,384 components.
+#[derive(Clone, Debug)]
+pub struct Sparse<T>(Vec<(u16, T)>);
+
+impl<T> Default for Sparse<T> {
+    fn default() -> Sparse<T> {
+        Sparse(Vec::new())
+    }
+}
+
+impl<T> Sparse<T> {
+    fn at(&self, component: u16) -> std::result::Result<usize, usize> {
+        self.0.binary_search_by_key(&component, |e| e.0)
+    }
+    /// A later marker for a component replaces an earlier one.
+    pub fn insert(&mut self, component: u16, value: T) {
+        match self.at(component) {
+            Ok(i) => self.0[i].1 = value,
+            Err(i) => self.0.insert(i, (component, value)),
+        }
+    }
+    pub fn get(&self, component: u16) -> Option<&T> {
+        self.at(component).ok().map(|i| &self.0[i].1)
+    }
+}
+
 /// The parameters one header (main or tile) sets.
 #[derive(Clone, Debug, Default)]
 pub struct Header {
     pub global: Option<Global>,
     pub style: Option<Style>,
-    pub component_style: Vec<Option<Style>>,
+    pub component_style: Sparse<Style>,
     pub quant: Option<Quant>,
-    pub component_quant: Vec<Option<Quant>>,
+    pub component_quant: Sparse<Quant>,
     /// The ROI maxshift (RGN, A.6.3) per component.
-    pub roi: Vec<Option<u8>>,
+    pub roi: Sparse<u8>,
     pub changes: Vec<Change>,
-}
-
-impl Header {
-    fn new(components: usize) -> Header {
-        Header {
-            component_style: vec![None; components],
-            component_quant: vec![None; components],
-            roi: vec![None; components],
-            ..Header::default()
-        }
-    }
 }
 
 /// One tile-part: its index within the tile and the byte range of its packet data.
@@ -396,7 +413,7 @@ fn parse_coc(body: &[u8], header: &mut Header, components: usize) -> Result<()> 
     if r.left() != 0 {
         return Err(Error::Invalid);
     }
-    header.component_style[c] = Some(style);
+    header.component_style.insert(c as u16, style);
     Ok(())
 }
 
@@ -471,7 +488,7 @@ fn header_segment(marker: u16, body: &[u8], header: &mut Header, components: usi
         QCC => {
             let mut r = Reader { data: body, at: 0 };
             let c = component_index(&mut r, components)?;
-            header.component_quant[c] = Some(parse_quant(&mut r)?);
+            header.component_quant.insert(c as u16, parse_quant(&mut r)?);
         }
         RGN => {
             let mut r = Reader { data: body, at: 0 };
@@ -480,7 +497,7 @@ fn header_segment(marker: u16, body: &[u8], header: &mut Header, components: usi
             if r.u8()? != 0 {
                 return Err(Error::Unsupported);
             }
-            header.roi[c] = Some(r.u8()?);
+            header.roi.insert(c as u16, r.u8()?);
             if r.left() != 0 {
                 return Err(Error::Invalid);
             }
@@ -510,7 +527,7 @@ pub fn parse(data: &[u8]) -> Result<Codestream<'_>> {
     }
     let size = parse_size(segment(&mut r)?)?;
     let components = size.components.len();
-    let mut main = Header::new(components);
+    let mut main = Header::default();
     // PPM bodies by Zppm.
     let mut ppm: Vec<(u8, Vec<u8>)> = Vec::new();
     loop {
@@ -541,7 +558,8 @@ pub fn parse(data: &[u8]) -> Result<Codestream<'_>> {
     if main.global.is_none() || main.style.is_none() || main.quant.is_none() {
         return Err(Error::Invalid);
     }
-    let mut tiles: Vec<Tile> = (0..size.tile_count()).map(|_| Tile { header: Header::new(components), ..Tile::default() }).collect();
+    // A header holds only the components its markers name, so 65,535 tiles of 16,384 components stay small.
+    let mut tiles: Vec<Tile> = (0..size.tile_count()).map(|_| Tile::default()).collect();
     let mut order: Vec<usize> = Vec::new();
     let mut truncated = false;
     // The data ends before EOC; Psot 0 runs to there.
@@ -673,26 +691,27 @@ impl Codestream<'_> {
     /// Component c's coding style in tile t: tile COC, then tile COD, then main COC, then main COD (A.6.1).
     pub fn style(&self, t: usize, c: usize) -> &Style {
         let tile = &self.tiles[t].header;
-        tile.component_style[c]
-            .as_ref()
+        tile.component_style
+            .get(c as u16)
             .or(tile.style.as_ref())
-            .or(self.main.component_style[c].as_ref())
+            .or(self.main.component_style.get(c as u16))
             .or(self.main.style.as_ref())
             .expect("parse requires a main COD")
     }
     /// Component c's quantization in tile t: tile QCC, then tile QCD, then main QCC, then main QCD (A.6.4).
     pub fn quant(&self, t: usize, c: usize) -> &Quant {
         let tile = &self.tiles[t].header;
-        tile.component_quant[c]
-            .as_ref()
+        tile.component_quant
+            .get(c as u16)
             .or(tile.quant.as_ref())
-            .or(self.main.component_quant[c].as_ref())
+            .or(self.main.component_quant.get(c as u16))
             .or(self.main.quant.as_ref())
             .expect("parse requires a main QCD")
     }
     /// Component c's ROI maxshift in tile t (tile RGN over main RGN), 0 without one.
     pub fn roi(&self, t: usize, c: usize) -> u8 {
-        self.tiles[t].header.roi[c].or(self.main.roi[c]).unwrap_or(0)
+        let c = c as u16;
+        self.tiles[t].header.roi.get(c).or(self.main.roi.get(c)).copied().unwrap_or(0)
     }
     /// The progression changes of tile t: the tile's POC segments, else the main header's.
     pub fn changes(&self, t: usize) -> &[Change] {
@@ -867,7 +886,7 @@ pub(crate) mod tests {
 
     #[test]
     fn poc_entries() {
-        let mut h = Header::new(3);
+        let mut h = Header::default();
         parse_poc(&[0, 0, 0, 2, 1, 3, 2, 1, 1, 0, 3, 6, 0, 4], &mut h, 3).unwrap();
         assert_eq!(h.changes.len(), 2);
         assert_eq!(h.changes[0], Change { rs: 0, cs: 0, le: 2, re: 1, ce: 3, order: Order::RPCL });

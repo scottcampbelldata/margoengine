@@ -45,13 +45,13 @@ pub fn synth53(x: &mut [i32], i0: u32) {
     for k in (first_even..n).step_by(2) {
         let a = x[reflect(k as isize - 1, n)];
         let b = x[reflect(k as isize + 1, n)];
-        x[k] -= (a + b + 2) >> 2;
+        x[k] = x[k].wrapping_sub(a.wrapping_add(b).wrapping_add(2) >> 2);
     }
     // Equation F-6: X(2n+1) = Y(2n+1) + floor((X(2n) + X(2n+2)) / 2).
     for k in (first_odd..n).step_by(2) {
         let a = x[reflect(k as isize - 1, n)];
         let b = x[reflect(k as isize + 1, n)];
-        x[k] += (a + b) >> 1;
+        x[k] = x[k].wrapping_add(a.wrapping_add(b) >> 1);
     }
 }
 
@@ -147,6 +147,14 @@ pub fn level<T: Sample>(res: &Rect, ll: (&Rect, &[T]), hl: (&Rect, &[T]), lh: (&
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn the_reversible_filter_wraps_at_the_ends_of_the_range() {
+        for i0 in [0, 1] {
+            let mut x = [i32::MAX, i32::MAX, i32::MIN, i32::MIN, i32::MAX, i32::MIN, i32::MAX];
+            synth53(&mut x, i0);
+        }
+    }
 
     /// 1D_SD of the 5-3 filter (F.4.8.1), for tests.
     pub fn analyse53(x: &mut [i32], i0: u32) {

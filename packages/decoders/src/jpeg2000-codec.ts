@@ -53,7 +53,7 @@ function failure(code: number): Error {
   if (code === 4)
     return rangeError(
       'JPEG 2000 is over a limit: more pixels than maxPixels (raise it for trusted data or pass a larger reduce), ' +
-        'too many code-blocks, or a code-block over 31 bit-planes',
+        'too many tiles, precincts, code-blocks or packet visits, or a code-block over 31 bit-planes',
       'limits',
     );
   return fault('failed', 'JPEG 2000 is malformed, or reduce exceeds its decomposition levels; re-encode the image');

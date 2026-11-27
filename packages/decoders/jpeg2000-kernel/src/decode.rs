@@ -4,7 +4,7 @@ use crate::codestream::{self, Codestream, Quantization};
 use crate::geometry::{self, Rect, ceil_div, ceil_shift};
 use crate::tier2::{self, Streams};
 use crate::tile::{self, TileComponent};
-use crate::{Error, Result, dwt, recon, t1};
+use crate::{Error, Result, Work, dwt, recon, t1};
 
 /// What to decode.
 #[derive(Clone, Copy, Debug)]
@@ -55,6 +55,9 @@ fn component_rect(image: &Rect, dx: u32, dy: u32, reduce: u32) -> Rect {
     Rect { x0: f(r.x0), y0: f(r.y0), x1: f(r.x1), y1: f(r.y1) }
 }
 
+/// The most tile-components (tiles times components) a stream may name; each is built even when it holds no sample.
+const MAX_TILE_COMPONENTS: u64 = 1 << 20;
+
 /// Decodes a raw codestream (starting at SOC).
 pub fn decode(data: &[u8], opts: &Options) -> Result<Image> {
     // A component has at most 32 decomposition levels (A.6.1), so more can never be dropped.
@@ -63,6 +66,10 @@ pub fn decode(data: &[u8], opts: &Options) -> Result<Image> {
     }
     let cs = codestream::parse(data)?;
     let size = &cs.size;
+    if size.tile_count() as u64 * size.components.len() as u64 > MAX_TILE_COMPONENTS {
+        return Err(Error::Limit);
+    }
+    let mut work = Work::new(data.len());
     let mut planes = Vec::with_capacity(size.components.len());
     let mut total = 0u64;
     let (mut widest, mut tallest) = (0u64, 0u64);
@@ -85,7 +92,7 @@ pub fn decode(data: &[u8], opts: &Options) -> Result<Image> {
     }
     let mut truncated = cs.truncated;
     for t in 0..size.tile_count() {
-        let (samples, cut) = decode_tile(&cs, t, opts)?;
+        let (samples, cut) = decode_tile(&cs, t, opts, &mut work)?;
         truncated |= cut;
         for (c, (tc_rect, values)) in samples.into_iter().enumerate() {
             let (rect, plane) = &mut planes[c];
@@ -108,7 +115,7 @@ enum Samples {
 }
 
 /// Decodes tile t into each component's region at the reduced resolution and its samples, shifted and clamped.
-fn decode_tile(cs: &Codestream, t: usize, opts: &Options) -> Result<(Vec<(Rect, Vec<i32>)>, bool)> {
+fn decode_tile(cs: &Codestream, t: usize, opts: &Options, work: &mut Work) -> Result<(Vec<(Rect, Vec<i32>)>, bool)> {
     let mut comps = tile::build(cs, t)?;
     for tc in &comps {
         if opts.reduce > tc.style.levels as u32 {
@@ -121,7 +128,9 @@ fn decode_tile(cs: &Codestream, t: usize, opts: &Options) -> Result<(Vec<(Rect, 
     let mut streams = Streams { body: &body, at: 0, packed: tile.packed.as_deref().map(|p| (p, 0)) };
     let layers = if opts.layers == 0 { u32::MAX } else { opts.layers };
     let mut truncated = false;
-    for pk in tier2::sequence(cs, t, &comps)? {
+    // A packet header takes at least one byte, so no more packets than those bytes, and the one that finds them spent.
+    let most = streams.packed.map_or(body.len(), |(p, _)| p.len()) + 1;
+    for pk in tier2::sequence(cs, t, &comps, most, work)? {
         let tc = &mut comps[pk.c as usize];
         let keep = (pk.l as u32) < layers && (pk.r as u32) + opts.reduce <= tc.style.levels as u32;
         let at_end = match streams.packed {
@@ -133,7 +142,7 @@ fn decode_tile(cs: &Codestream, t: usize, opts: &Options) -> Result<(Vec<(Rect, 
             truncated = true;
             break;
         }
-        match tier2::read_packet(&mut streams, tc, pk.r as usize, pk.p as usize, pk.l, global.sop, global.eph, keep) {
+        match tier2::read_packet(&mut streams, tc, pk.r as usize, pk.p as usize, pk.l, global.sop, global.eph, keep, work) {
             Ok(()) => {}
             Err(Error::Truncated) => {
                 truncated = true;

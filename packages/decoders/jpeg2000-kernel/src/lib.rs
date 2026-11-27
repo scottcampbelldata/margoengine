@@ -15,6 +15,22 @@ pub mod tile;
 #[cfg(any(target_arch = "wasm32", test))]
 mod wasm;
 
+/// The work one decode may still do: visits of precincts, code-blocks and packet orderings. Headers can ask for far
+/// more of it than their bytes carry (65,535 layers over millions of code-blocks), so it is bounded by a fixed share
+/// plus one in proportion to the input.
+#[derive(Debug)]
+pub struct Work(u64);
+
+impl Work {
+    pub fn new(input: usize) -> Work {
+        Work((1 << 28) + 64 * input as u64)
+    }
+    pub fn spend(&mut self, units: u64) -> Result<()> {
+        self.0 = self.0.checked_sub(units).ok_or(Error::Limit)?;
+        Ok(())
+    }
+}
+
 /// Why a stream cannot be decoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {

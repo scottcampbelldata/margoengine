@@ -173,8 +173,10 @@ pub struct TileComponent {
     pub resolutions: Vec<Resolution>,
 }
 
-/// The most code-blocks one tile may hold, to keep a hostile header from claiming unbounded memory.
-const MAX_BLOCKS: u64 = 1 << 24;
+/// The most code-blocks one tile may hold, a band of a precinct counting as PRECINCT_COST of them (its vectors and two
+/// tag trees), to keep a hostile header from claiming more memory than Wasm can hold.
+pub const MAX_BLOCKS: u64 = 1 << 22;
+const PRECINCT_COST: u64 = 4;
 
 impl TileComponent {
     pub fn build(cs: &Codestream, t: usize, c: usize, budget: &mut u64) -> Result<TileComponent> {
@@ -195,9 +197,11 @@ impl TileComponent {
             let (xcb, ycb) =
                 geometry::block_exponents(style.block_width as u32, style.block_height as u32, ppx, ppy, r);
             let count = across as u64 * down as u64;
-            if count > MAX_BLOCKS {
-                return Err(Error::Limit);
-            }
+            // Spent before anything is built: every band of every precinct costs memory even without a code-block.
+            *budget = count
+                .checked_mul(bands.len() as u64 * PRECINCT_COST)
+                .and_then(|cost| budget.checked_sub(cost))
+                .ok_or(Error::Limit)?;
             let mut precincts = Vec::with_capacity(count as usize);
             for index in 0..across * down {
                 let mut pbands = Vec::with_capacity(bands.len());
@@ -248,6 +252,22 @@ pub fn build(cs: &Codestream, t: usize) -> Result<Vec<TileComponent>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A precinct for every sample of a 4096 x 4096 tile: more structures than Wasm memory should be asked for.
+    #[test]
+    fn precincts_count_against_the_tile_budget() {
+        use crate::codestream::tests::{Writer, cod, siz};
+        let mut w = Writer(Vec::new());
+        w.marker(0xff4f)
+            .segment(0xff51, &siz(4096, 4096, 4096, 4096, &[(8, false, 1, 1)]))
+            .segment(0xff52, &cod(0, 1, 0, 0, true, Some(&[0])))
+            .segment(0xff5c, &[0x20, 8 << 3])
+            .segment(0xff90, &[0, 0, 0, 0, 0, 14, 0, 1])
+            .marker(0xff93)
+            .marker(0xffd9);
+        let cs = crate::codestream::parse(&w.0).unwrap();
+        assert_eq!(build(&cs, 0).unwrap_err(), Error::Limit);
+    }
 
     /// Encodes values into a tag tree's bit stream the way B.10.2 describes, for tests.
     pub fn encode_tag_tree(width: u32, height: u32, values: &[u32], queries: &[(u32, u32, u32)]) -> Vec<u32> {

@@ -2,7 +2,7 @@
 //! packet's header: inclusion, zero bit-planes, new coding passes and their lengths.
 use crate::codestream::{Change, Codestream, Order};
 use crate::tile::{Block, TileComponent, segment_passes};
-use crate::{Error, Result};
+use crate::{Error, Result, Work};
 
 /// One packet: component, resolution, precinct and layer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,8 +38,9 @@ fn anchor(tc: &TileComponent, tile: (u32, u32), r: usize, p: u32) -> (u64, u64) 
 }
 
 /// The packets of tile t in codestream order: each progression of the tile's (or main header's) POC in turn, then the
-/// COD progression for any packet none of them reached.
-pub fn sequence(cs: &Codestream, t: usize, comps: &[TileComponent]) -> Result<Vec<Packet>> {
+/// COD progression for any packet none of them reached. At most `most` packets are ordered: the caller's data holds no
+/// more. Each precinct visited is spent from `work`, so progression changes cannot repeat them without end.
+pub fn sequence(cs: &Codestream, t: usize, comps: &[TileComponent], most: usize, work: &mut Work) -> Result<Vec<Packet>> {
     let global = cs.global(t);
     let layers = global.layers;
     let tile = cs.size.tile(t);
@@ -53,7 +54,7 @@ pub fn sequence(cs: &Codestream, t: usize, comps: &[TileComponent]) -> Result<Ve
     let mut out = Vec::new();
     let emit = |c: usize, r: usize, p: usize, upto: u16, next: &mut Vec<Vec<Vec<u16>>>, out: &mut Vec<Packet>| -> Result<()> {
         let n = &mut next[c][r][p];
-        while *n < upto {
+        while *n < upto && out.len() < most {
             if out.len() >= MAX_PACKETS {
                 return Err(Error::Limit);
             }
@@ -66,6 +67,10 @@ pub fn sequence(cs: &Codestream, t: usize, comps: &[TileComponent]) -> Result<Ve
     let mut changes: Vec<Change> = cs.changes(t).to_vec();
     changes.push(whole);
     for ch in changes {
+        if out.len() >= most {
+            break;
+        }
+        work.spend(1)?;
         let le = ch.le.min(layers);
         let (rs, re) = (ch.rs as usize, (ch.re as usize).min(max_r));
         let (c0, c1) = (ch.cs as usize, (ch.ce as usize).min(comps.len()));
@@ -80,10 +85,15 @@ pub fn sequence(cs: &Codestream, t: usize, comps: &[TileComponent]) -> Result<Ve
                         if r < rs {
                             continue;
                         }
+                        if out.len() >= most {
+                            return Ok(out);
+                        }
                         for c in c0..c1 {
+                            work.spend(1)?;
                             if !has(c, r) {
                                 continue;
                             }
+                            work.spend(comps[c].resolutions[r].precincts.len() as u64)?;
                             for p in 0..comps[c].resolutions[r].precincts.len() {
                                 // Only the layer the precinct waits for: earlier ones are already in the stream.
                                 if next[c][r][p] == l as u16 {
@@ -99,9 +109,12 @@ pub fn sequence(cs: &Codestream, t: usize, comps: &[TileComponent]) -> Result<Ve
                 let mut list: Vec<([u64; 4], usize, usize, usize)> = Vec::new();
                 for c in c0..c1 {
                     for r in rs..re {
+                        work.spend(1)?;
                         if !has(c, r) {
                             continue;
                         }
+                        // Each precinct is listed and sorted.
+                        work.spend(8 * comps[c].resolutions[r].precincts.len() as u64)?;
                         for p in 0..comps[c].resolutions[r].precincts.len() {
                             let (x, y) = anchor(&comps[c], corner, r, p as u32);
                             let key = match ch.order {
@@ -223,7 +236,8 @@ pub struct Streams<'a> {
 
 /// Reads one packet into its precinct's code-blocks. `keep` is false for a layer past the one the caller decodes: its
 /// header is read, its bytes skipped. Returns Err(Truncated) when the stream ends inside the packet.
-pub fn read_packet(streams: &mut Streams, tc: &mut TileComponent, r: usize, p: usize, layer: u16, sop: bool, eph: bool, keep: bool) -> Result<()> {
+#[allow(clippy::too_many_arguments)]
+pub fn read_packet(streams: &mut Streams, tc: &mut TileComponent, r: usize, p: usize, layer: u16, sop: bool, eph: bool, keep: bool, work: &mut Work) -> Result<()> {
     let style = tc.style.block_style;
     // An SOP marker segment may lead the packet, in the body (A.8.1).
     if sop && streams.body.get(streams.at..streams.at + 2) == Some(&[0xff, 0x91]) {
@@ -242,6 +256,8 @@ pub fn read_packet(streams: &mut Streams, tc: &mut TileComponent, r: usize, p: u
     let mut adds: Vec<(usize, usize, Vec<(u32, u32)>)> = Vec::new();
     if bits.bit()? == 1 {
         for (bi, pb) in precinct.bands.iter_mut().enumerate() {
+            // A packet of a few bits may still ask every code-block of its precinct whether it is in.
+            work.spend(pb.blocks.len() as u64)?;
             for y in 0..pb.down {
                 for x in 0..pb.across {
                     let i = (y * pb.across + x) as usize;
@@ -346,6 +362,11 @@ mod tests {
     use crate::codestream::{self, COD, EOC, QCD, SIZ, SOC, SOD, SOT};
     use crate::tile;
 
+    /// Every packet of tile 0 in order.
+    fn all(cs: &codestream::Codestream, tcs: &[TileComponent]) -> Vec<Packet> {
+        sequence(cs, 0, tcs, usize::MAX, &mut Work::new(0)).unwrap()
+    }
+
     /// Packet header bits with the 0xFF stuffing rule, for tests.
     struct BitWriter {
         out: Vec<u8>,
@@ -412,7 +433,7 @@ mod tests {
             let tcs = tile::build(&cs, 0).unwrap();
             assert_eq!(tcs[0].resolutions[0].precincts.len(), 1);
             assert_eq!(tcs[0].resolutions[1].precincts.len(), 2);
-            sequence(&cs, 0, &tcs).unwrap().iter().map(|p| (p.l, p.r, p.c, p.p)).collect::<Vec<_>>()
+            all(&cs, &tcs).iter().map(|p| (p.l, p.r, p.c, p.p)).collect::<Vec<_>>()
         };
         let lrcp = check(0);
         assert_eq!(lrcp.len(), 2 * 2 * 3);
@@ -459,7 +480,7 @@ mod tests {
         let data = stream(16, 8, 0, 1, 2, None, &comps, &[(codestream::POC, poc)]);
         let cs = codestream::parse(&data).unwrap();
         let tcs = tile::build(&cs, 0).unwrap();
-        let seq: Vec<_> = sequence(&cs, 0, &tcs).unwrap().iter().map(|p| (p.l, p.r, p.c)).collect();
+        let seq: Vec<_> = all(&cs, &tcs).iter().map(|p| (p.l, p.r, p.c)).collect();
         assert_eq!(seq[0], (0, 0, 1));
         assert_eq!(&seq[1..4], &[(0, 0, 0), (0, 1, 0), (0, 1, 1)]);
         assert_eq!(seq.len(), 8);
@@ -521,8 +542,8 @@ mod tests {
         packet.extend(w.finish());
         packet.extend_from_slice(&[8; 4]);
         let mut streams = Streams { body: &packet, at: 0, packed: None };
-        read_packet(&mut streams, &mut tcs[0], 0, 0, 0, false, false, true).unwrap();
-        read_packet(&mut streams, &mut tcs[0], 0, 0, 1, false, false, true).unwrap();
+        read_packet(&mut streams, &mut tcs[0], 0, 0, 0, false, false, true, &mut Work::new(0)).unwrap();
+        read_packet(&mut streams, &mut tcs[0], 0, 0, 1, false, false, true, &mut Work::new(0)).unwrap();
         assert_eq!(streams.at, packet.len());
         let blk = &tcs[0].resolutions[0].precincts[0].bands[0].blocks[0];
         assert_eq!((blk.zero_planes, blk.passes, blk.lblock), (2, 5, 4));
@@ -538,15 +559,15 @@ mod tests {
         // SOP, an empty header byte, EPH.
         let body = [0xff, 0x91, 0, 4, 0, 0, 0x00, 0xff, 0x92];
         let mut streams = Streams { body: &body, at: 0, packed: None };
-        read_packet(&mut streams, &mut tcs[0], 0, 0, 0, true, true, true).unwrap();
+        read_packet(&mut streams, &mut tcs[0], 0, 0, 0, true, true, true, &mut Work::new(0)).unwrap();
         assert_eq!(streams.at, body.len());
         // Packed headers: the header comes from the packed stream, the body from the tile data.
         let packed = [0x00];
         let mut streams = Streams { body: &[], at: 0, packed: Some((&packed, 0)) };
-        read_packet(&mut streams, &mut tcs[0], 0, 0, 0, false, false, true).unwrap();
+        read_packet(&mut streams, &mut tcs[0], 0, 0, 0, false, false, true, &mut Work::new(0)).unwrap();
         assert_eq!(streams.packed.unwrap().1, 1);
         // A stream that ends inside the header is reported.
         let mut streams = Streams { body: &[], at: 0, packed: None };
-        assert_eq!(read_packet(&mut streams, &mut tcs[0], 0, 0, 0, false, false, true).unwrap_err(), Error::Truncated);
+        assert_eq!(read_packet(&mut streams, &mut tcs[0], 0, 0, 0, false, false, true, &mut Work::new(0)).unwrap_err(), Error::Truncated);
     }
 }
