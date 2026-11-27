@@ -127,31 +127,47 @@ test("a segment's wake oscillator is driven by its own motion, and its state goe
   assert.ok(Math.abs(top - 2) < 0.05, `the free wake's amplitude ${top}`);
 });
 
-test("a held segment's drag fluctuates at twice the shedding frequency by its in-line wake, which a drag of 0 turns off", () => {
-  // The in-line wake p (Srinil and Zanganeh 2012, eq. 6): p'' + 2 eps w_f (p^2 - 1) p' + 4 w_f^2 p = Lambda / D x'', held
-  // still a van der Pol cycle of amplitude about 2 at 2 w_f, the drag along the flow 1/2 rho U^2 D L (C_D0 / 2) p. With
-  // U 0.3 m/s, D 0.1 m and L 1 m: shedding at St U / D = 0.6 Hz, the drag at 1.2 Hz, amplitude 1/2 rho U^2 D L C_D0 =
-  // 0.9 N at C_D0 0.2. The cycle's amplitude at eps 0.6 is 2 to 0.5 % measured and its frequency 2 w_f to 0.6 %; held to 3 %.
-  const run = (options) => {
-    const loads = segmentLoads(water([0, 0, 0.3]), { period: Infinity, ...options }),
+test("a held segment's drag fluctuates at twice the shedding frequency with its lift's wake, or with a wake of its own", () => {
+  // Held still in a flow of 0.3 m/s, D 0.1 m, L 1 m: the lift's wake settles to the free van der Pol cycle q = 2 cos(w_f t),
+  // and the drag along fluctuates as q^2 less its mean, 2 cos(2 w_f t), at 1.2 Hz with amplitude 1/2 rho U^2 D L C_D0 s,
+  // s the shedding's strength at Re 25,200 against Re 5e4 by Govardhan and Williamson's fit, log10(0.41 Re^0.36) as a ratio.
+  // Measured within 0.7 % and 0.3 %, held to 3 %. With a wake of its own (Srinil and Zanganeh 2012, eq. 6) the drag
+  // fluctuates the same way at its own C_D0; with a drag of 0, not at all.
+  const re = (0.3 * 0.1) / SEA_WATER_VISCOSITY,
+    strength = (Math.log10(0.41) + 0.36 * Math.log10(re)) / (Math.log10(0.41) + 0.36 * Math.log10(5e4)),
+    pressure = 0.5 * 1000 * 0.3 * 0.3 * 0.1;
+  const run = (vortex) => {
+    const loads = segmentLoads(water([0, 0, 0.3]), { period: Infinity, vortex }),
       out = [blank()],
       along = [];
     for (let i = 0; i < 3600; i++) {
       loads.apply([segment([0, -2, 0], [1, 0, 0])], context, out);
       along.push(out[0].force[2]);
     }
-    return along.slice(1800);
+    const tail = along.slice(1800),
+      ups = [];
+    for (let i = 1; i < tail.length; i++)
+      if (tail[i - 1] < 0 && tail[i] >= 0) ups.push(i - tail[i] / (tail[i] - tail[i - 1]));
+    return {
+      amplitude: (Math.max(...tail) - Math.min(...tail)) / 2,
+      f: ((ups.length - 1) * 60) / (ups[ups.length - 1] - ups[0]),
+      tail,
+    };
   };
-  const tail = run({}),
-    amplitude = (Math.max(...tail) - Math.min(...tail)) / 2,
-    ups = [];
-  for (let i = 1; i < tail.length; i++)
-    if (tail[i - 1] < 0 && tail[i] >= 0) ups.push(i - tail[i] / (tail[i] - tail[i - 1]));
-  const f = ((ups.length - 1) * 60) / (ups[ups.length - 1] - ups[0]);
-  assert.ok(Math.abs(amplitude / 0.9 - 1) < 0.03, `the drag along fluctuates by ${amplitude} N`);
-  assert.ok(Math.abs(f / 1.2 - 1) < 0.03, `at ${f} Hz`);
+  for (const [vortex, drag] of [
+    [{}, 0.53],
+    [{ inLineWake: 'own', drag: 0.2 }, 0.2],
+  ]) {
+    const { amplitude, f } = run(vortex),
+      exact = pressure * drag * strength;
+    assert.ok(
+      Math.abs(amplitude / exact - 1) < 0.03,
+      `the drag along fluctuates by ${amplitude} N, ${exact} N expected`,
+    );
+    assert.ok(Math.abs(f / 1.2 - 1) < 0.03, `at ${f} Hz`);
+  }
   assert.ok(
-    run({ vortex: { drag: 0 } }).every((v) => v === 0),
+    run({ drag: 0 }).tail.every((v) => v === 0),
     'with no fluctuating drag the held segment feels none along',
   );
   // The shared step at the second harmonic: held still, the in-line wake keeps the free cycle's amplitude near 2.
