@@ -15420,7 +15420,7 @@ The default 60 Hz midpoint solves a Robin surface condition with preconditioned 
 wave evolution under held pressure. The source kick and forward sponge remain outside the stages. The
 option adds one f64 per surface cell in scratch and reuses the source buffers to publish the full step
 atomically. It retains pressure as the full-tick potential difference. The optional loads entry measures
-61,970 B gzip. Grids with
+62,006 B gzip. Grids with
 at least 2,048 volume cells can use a Galerkin coarse correction. The aggregates follow connected faces in
 each horizontal layer. Protected curtain faces remain distinct on both sides so their lower openings keep
 the original sum of conductances. Smaller grids use the same block-column solve directly.
@@ -15454,7 +15454,9 @@ The optional seakeeping entry measures 42,604 B gzip.
 
 The finite point-depth port stores signed cubic metres per row at a discrete depth coordinate. It
 linearly distributes the volume between the nearest wet depth samples, including the free surface.
-The last depth cell and closed neighbours take the whole local share. Inspect the still-water
+The shared horizontal scatter uses four bilinear candidates per pass for radii up to one cell.
+For a fractional interior position this replaces 16 candidate visits. The wet-side weights and
+work ledger match the cosine stencil at that support exactly. The last depth cell and closed neighbours take the whole local share. Inspect the still-water
 layer schedule and receiver spacing to resolve short vertical wavelengths. The band-based periodic
 receiver and matched guided-hull operators use their existing source ports.
 

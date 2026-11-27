@@ -529,10 +529,12 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       fu = u - ci,
       fv = v - cj;
     const r = Math.max(1, radius / dx);
-    const i0 = Math.max(0, Math.floor(u - r)),
-      i1 = Math.min(nx - 1, Math.ceil(u + r));
-    const j0 = Math.max(0, Math.floor(v - r)),
-      j1 = Math.min(nz - 1, Math.ceil(v + r));
+    // At radius one the cosine is zero at every integer offset except the origin.
+    const bilinear = r === 1;
+    const i0 = Math.max(0, bilinear ? ci : Math.floor(u - r)),
+      i1 = Math.min(nx - 1, bilinear ? ci + 1 : Math.ceil(u + r));
+    const j0 = Math.max(0, bilinear ? cj : Math.floor(v - r)),
+      j1 = Math.min(nz - 1, bilinear ? cj + 1 : Math.ceil(v + r));
     const offset = nx * nz * layer,
       inverseArea = 1 / (dx * dx);
     const tap = (di: number, dj: number) => {
@@ -547,9 +549,10 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
           if (!this.operator.wetCell(index)) continue;
           const a = i - ci,
             b = j - cj;
-          const weight =
-            (1 - fv) * ((1 - fu) * tap(a, b) + fu * tap(a - 1, b)) +
-            fv * ((1 - fu) * tap(a, b - 1) + fu * tap(a - 1, b - 1));
+          const weight = bilinear
+            ? (a === 0 ? 1 - fu : fu) * (b === 0 ? 1 - fv : fv)
+            : (1 - fv) * ((1 - fu) * tap(a, b) + fu * tap(a - 1, b)) +
+              fv * ((1 - fu) * tap(a, b - 1) + fu * tap(a - 1, b - 1));
           if (weight === 0 || !this.operator.reaches(sourceX, sourceZ, i, j, offset)) continue;
           if (pass === 0) sum += weight;
           else if (pressure === undefined) this.bulkKick[index]! += (weight * volume) / sum;

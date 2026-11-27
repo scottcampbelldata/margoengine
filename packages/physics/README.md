@@ -5682,7 +5682,8 @@ Use a domain, layer and grid refinement check for wave scattering. See the [fini
 
 With a finite receiver, a publisher can report the depth of each signed volume in metres below still
 water. Call `finiteQuayPointSource` to describe its port and pass it as `points` on `FiniteQuayWake`.
-Supply five f64 values per row in layout 1 in this order: X, Z, projection radius, point depth and signed
+A radius at or below one cell uses the connected bilinear footprint. Refine the grid to resolve a
+narrower source. Supply five f64 values per row in layout 1 in this order: X, Z, projection radius, point depth and signed
 volume in cubic metres. Run the publisher before the receiver in the same staggered group. Depth
 weights split the source between wet neighbours, using the free surface as the upper neighbour and
 the last wet cell at the bed. This input replaces the band source. Surface displacement and applied
