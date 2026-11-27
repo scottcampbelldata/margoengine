@@ -162,7 +162,8 @@ test('every deferred speed entry ends by its event loop with code 0', { timeout:
       /^(bench|scripts|examples|packages)\//.test(file) &&
       /\bdeferSpeedEntry\(import\.meta\.url, /.test(readFileSync(join(root, file), 'utf8')),
   );
-  assert.ok(entries.length >= 61, `only ${entries.length} speed entries found`);
+  // 61 until 895391feac removed the oit, points, splats and tiles rival-bench entries with their harnesses.
+  assert.ok(entries.length >= 57, `only ${entries.length} speed entries found`);
   const run = (file, i) =>
     new Promise((done) => {
       const child = spawn(process.execPath, [join(root, file), `--run=${i}`], { cwd: root, env, windowsHide: true });
