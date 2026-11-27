@@ -1239,7 +1239,9 @@ console.log(Math.round(flameLuminousFlux(1e6, 1760))); // about 150,000 lm from 
   (flame-check `graded`); at peak 1 it never reaches that bloom and grades dim orange.
 - `Fire.attach(engine, {position, flameLength: 10, width: 12, lights})` makes the fire's flames such a `Flame`
   (`fire.flame`, along `axis`), lit through the fire's `lights`; its embers scale by the square root of the length over
-  the hearth's 0.25 m. A `Smoke` column (`fire.smoke`) stands on the
+  the hearth's 0.25 m and are as bright as the flame's hottest part, never brighter: their brightest channel is
+  `fire.flame.peakRadiance` (the flame's `peak` times its `radiance`) times `power`, so they stay orange under any
+  exposure or white balance that keeps the flame orange. A `Smoke` column (`fire.smoke`) stands on the
   flame tips with the fire's convective heat: Heskestad's length turned back into a heat release, 70% convected
   (Heskestad 1983; Drysdale 2011 ch. 4), as wide as the flames and lit by the fire's `lights`. `smoke: {...}` gives it
   options of its own (a `ceiling` indoors), `smoke: false` none. It is on by default with `flameLength` and off for

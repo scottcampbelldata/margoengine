@@ -767,6 +767,14 @@ export class Flame implements EnginePlugin {
     return this;
   }
   /**
+   * The brightest the flame shows in any channel, linear: its `peak` times its `radiance` as the look is now (the
+   * camera shoulder holds every flame channel under it). A `Fire`'s embers take it as their own brightest radiance.
+   */
+  get peakRadiance(): number {
+    const look = this.lookOf();
+    return look.peak * look.radiance;
+  }
+  /**
    * The hot plume over the flame as of its last frame, for `HeatHaze` of `@margoengine/post/heat-haze` (the shimmer of
    * the scene behind the fire): the base, the length now, the footprint as drawn (`flames.size` included), the yaw, the
    * lean in the wind (world metres across per metre up) and the flame's clock, so a seeked flame shimmers as a played
@@ -1057,9 +1065,7 @@ export class Flame implements EnginePlugin {
     if (!set) {
       const module = device.createShaderModule({ code: shader(samples, !!fog, encode, !!depth) }),
         // The depth pass's own: over a scene depth it must not sample it (it writes the depth).
-        written = depth
-          ? device.createShaderModule({ code: shader(samples, !!fog, encode, true, false) })
-          : module,
+        written = depth ? device.createShaderModule({ code: shader(samples, !!fog, encode, true, false) }) : module,
         // Premultiplied over (Porter and Duff 1984): the flame covers what is behind it by its opacity; the glow (alpha 0) adds.
         blend: GPUBlendState = {
           color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },

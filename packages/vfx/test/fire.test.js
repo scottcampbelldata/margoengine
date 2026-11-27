@@ -308,3 +308,24 @@ test("a lit fire's column takes no second light from its glow; an unlit one keep
   assert.equal(own.smoke.options.ceiling, 4, 'the column takes its roof');
   for (const fire of [lit, unlit, own]) fire.dispose();
 });
+
+// Regression (KB-VFX-EMBERWHITE1): beside a flame volume the hearth's embers kept their radiance of 5, five times the
+// flame's peak of 1, so under the Fauld tunnel's exposure and 3,200 K balance every channel clipped and the sparks drew
+// white beside orange flames. Their brightest channel now equals the flame's peak radiance, times the fire's power.
+test("a flame volume's embers are no brighter in any channel than the flame's peak, at any power", async (t) => {
+  const { e, groups } = await scene(t),
+    { hearth } = snowNight(),
+    brightest = (fx) =>
+      fx.options.intensity *
+      Math.max(...fx.options.curves.color.flatMap((k) => k.color.map((v, i) => v * fx.options.color[i])));
+  for (const power of [1, 0.5, 3]) {
+    const fire = Fire.attach(e, { position: [0, 0, 0], flameLength: 2, lights: groups, power });
+    assert.ok(Math.abs(brightest(fire.particles.embers) - fire.flame.peakRadiance * power) < 1e-9, `power ${power}`);
+    assert.ok(brightest(fire.particles.embers) < hearth.embers.intensity * power, 'dimmer than the hearth kit says');
+    fire.dispose();
+  }
+  // A hearth fire (particle flames, no volume) keeps its kit's embers.
+  const small = Fire.attach(e, { position: [0, 0, 0], lights: groups, power: 2 });
+  assert.equal(small.particles.embers.options.intensity, 2 * hearth.embers.intensity);
+  small.dispose();
+});

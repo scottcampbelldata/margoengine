@@ -2214,13 +2214,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   longer overlap; walls hide the part that runs into them instead of turning it along the tunnel.
 - **Owed in vfx:** a layer that fills a gallery (two walls turn the jet along it) with puffs that widen as they thin.
 
-### Open 2026-11-27: a fire's sparks draw white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
+### Fixed 2026-11-27: a fire's sparks drew white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr091.json --stills --out <folder>`: the embers beside the
-  flames are white streaks while the flames are orange.
-- **Cause:** not yet traced; the likely one is that the hearth kit's ember radiance, set for a scene at its own
-  exposure, is far over the pre-exposed frame's white, so every channel clips.
-- **Owed in vfx:** embers whose radiance follows the flame's peak, with a test and a real frame.
+  flames were white streaks while the flames were orange.
+- **Cause:** a `Fire` with `flameLength` kept the hearth kit's embers at intensity 5 (birth colour 1, 0.6, 0.2), set for
+  the hearth close-up's own exposure. Its `Flame` volume holds every channel under its `peak` (1) through a camera
+  shoulder; the sparks were five times that in red and three times in green, so under the tunnel's exposure and
+  3,200 K balance every channel clipped and they read white.
+- **Fix:** beside a flame volume the embers' brightest channel over their life is the flame's peak radiance
+  (`Flame.peakRadiance`, its `peak` times its `radiance`, new) times the fire's `power`; a hearth fire with particle
+  flames keeps its kit's embers. Real frame (fr091 mid still, RTX A6000): spark pixels with red over 120 in the spark
+  field 963 before, 401 after; of them near white (green and blue over 170) 126 before, 0 after; mean blue 130 to 91.
+- **Regression:** `packages/vfx/test/fire.test.js`, "a flame volume's embers are no brighter in any channel than the
+  flame's peak, at any power" (fails on the parent: the embers stood at 5 times the peak).
 
 ### Fixed 2026-11-27: smoke indoors climbed through the roof and veiled its own fire (KB-VFX-SMOKEROOF1, vfx and scenes)
 

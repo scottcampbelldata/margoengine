@@ -69,6 +69,7 @@ class Flame implements EnginePlugin {
     readonly lights: readonly PointLight[];
     private constructor();
     setFlameLook(values: Readonly<Record<string, unknown>>): this;
+    get peakRadiance(): number;
     get plume(): FlamePlume;
     get flameLength(): number;
     get time(): number;

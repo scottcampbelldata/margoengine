@@ -104,6 +104,12 @@ function flameRadiance(fire: KitParticles): number {
     keys = fire.curves.color.length ? fire.curves.color.map((k) => k.color) : [[1, 1, 1]];
   return fire.intensity * Math.max(...keys.map((k) => luminance(k.map((v, i) => v * tint[i]))));
 }
+/** Particles' brightest channel over their life at intensity 1: the tint times each colour key. */
+function brightestChannel(data: KitParticles): number {
+  const tint = data.color.slice(0, 3),
+    keys = data.curves.color.length ? data.curves.color.map((k) => k.color) : [[1, 1, 1]];
+  return Math.max(...keys.flatMap((k) => k.map((v, i) => v * tint[i]!)));
+}
 
 /** Soft-particle fade distance, metres, while the hearth data has none of its own (the Cabin Hearth's value). */
 const SOFTNESS = 0.08;
@@ -228,7 +234,12 @@ export class Fire implements EnginePlugin {
         ...(options.lights ? { lights: options.lights } : {}),
       });
     const flames = flameLength === undefined ? part(hearth.fire, options.position, power) : undefined,
-      embers = options.embers === false ? undefined : part(hearth.embers, [x, y + hearth.emberHeight, z], power),
+      // Beside a flame volume the sparks are as bright as its hottest part, never brighter (KB-VFX-EMBERWHITE1): the
+      // hearth's ember radiance, set for its own close exposure, is 5 times the flame's peak and clipped white in every
+      // channel under the frame's exposure and a tungsten balance while the flame, held under its peak, stayed orange.
+      emberBrightest = hearth.embers.intensity * brightestChannel(hearth.embers),
+      emberScale = this.flame ? (emberBrightest > 0 ? (this.flame.peakRadiance * power) / emberBrightest : 0) : power,
+      embers = options.embers === false ? undefined : part(hearth.embers, [x, y + hearth.emberHeight, z], emberScale),
       steam = options.steam ? part(hearth.steam, options.steam, 1) : undefined;
     this.particles = Object.freeze({ flames, embers, steam });
     const smoke = options.smoke ?? flameLength !== undefined;
