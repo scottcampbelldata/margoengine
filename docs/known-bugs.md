@@ -474,8 +474,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   but the towed pipe at 1.6 m/s swings 1.4 D in its first mode, and the 0.4 m/s and 0.6 m/s shear cases run 42 % and 128 %
   high. With the drag's damping kept beside theirs: -6 % and +14 % on the towed pipe, but +45 % on the 0.6 m/s shear and
   -35 % here. Their excitation was fitted to a different riser; no variant without new fitting matches all four cases.
-- **Open:** fitting an excitation model across the measured cases (calibrated on some, checked on the rest), or a model of
-  the wake along a sheared span.
+- **Calibrated (2026-11-27), not landed:** the same model with its C_v scaled to the two towed cases (half its height): the
+  towed pipe within -2 % and -9 % across, but the gentle shear +47 % and the strong shear -15 % in its first mode where the
+  test shows the second, and the towed pipe at 1.6 m/s flips to a first-mode swing of about 1 D at nearby scalings. A fit
+  on uniform flow does not carry to shear.
+- **Open:** a model of the wake's correlation along a sheared span (the paper's own CFD, which resolves the wake strip by
+  strip, is within 5 % on this case).
 
 ### Fixed 2026-11-27: a pinned rod blew up at coarse steps under high tension, and at fine steps when stretched (KB-PHYS-RODSTRING1, physics rod)
 
