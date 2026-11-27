@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20836872,
+  "total": 20844412,
   "history": [
     {
       "date": "2026-10-24",
@@ -14448,6 +14448,12 @@
       "date": "2026-11-27",
       "commit": "1e6935bbdd",
       "reason": "SEA-12 free heave, roll and pitch work move @margoengine/physics/loads from 49458 to 52122 B gzip and its ceiling from 50657 to 53686 B. The optional exchange shares source projection and body ports with the existing wake coupling. Splitting it would require coupled callers to import the same geometry and projection separately. @margoengine/physics/seakeeping moves from 39443 to 39460 B, below its 40620 B ceiling, to integrate wet hull sections consistently. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "eddfc4209f",
+      "reason": "@margoengine/vfx/ribbons 2622 to 3283 B gzip (ceiling 2854 to 3539), vfx/mesh 3240 to 3965 (3449 to 4221), vfx/flame 12010 to 12693 (12357 to 13074), measured at f8f8a1a10e~1 and f8f8a1a10e: KB-TAA-PARTICLEMASK2 draws each one's coverage into TAA's shared reactive mask (shared/reactive-mask.js, the mask pipeline and pass), so ribbons, mesh pieces and the Flame volume stop smearing under TAA. Nothing in the added code is unused; a split behind import() would leave the first masked frames smeared and add an async path to every draw. @margoengine/water 37313 at 1a14411a31~1 to 38843 at 1a14411a31 and 38848 now (ceiling 37677 to 40014): Water.sample and sampleHeight, the CPU twin of the Gerstner surface for synchronous height queries (SEA-02, SEA-04); 1a14411a31 recorded 37677, below its own measurement. It is a method of the root Water, so a split would move it away from the object it answers for. The baseline total is the sum of its items again (it was 3029 B off). Core and stage unchanged.",
+      "grew": 4
     }
   ],
   "items": {
@@ -15971,18 +15977,18 @@
     "@margoengine/vfx/fields": 2079,
     "@margoengine/vfx/fire": 2208,
     "@margoengine/vfx/fire-front": 9841,
-    "@margoengine/vfx/flame": 12357,
+    "@margoengine/vfx/flame": 13074,
     "@margoengine/vfx/flipbook": 1167,
     "@margoengine/vfx/flocking": 17160,
     "@margoengine/vfx/gunfire": 12137,
     "@margoengine/vfx/json": 2860,
     "@margoengine/vfx/lit": 2369,
-    "@margoengine/vfx/mesh": 3449,
+    "@margoengine/vfx/mesh": 4221,
     "@margoengine/vfx/node-system": 4959,
     "@margoengine/vfx/nodes": 3349,
     "@margoengine/vfx/obstacles": 1311,
     "@margoengine/vfx/over-life": 1831,
-    "@margoengine/vfx/ribbons": 2854,
+    "@margoengine/vfx/ribbons": 3539,
     "@margoengine/vfx/schedule": 1197,
     "@margoengine/vfx/settings": 9979,
     "@margoengine/vfx/shadows": 3061,
@@ -16088,7 +16094,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 37677,
+    "@margoengine/water": 40014,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,
