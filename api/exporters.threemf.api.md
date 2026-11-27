@@ -32,6 +32,15 @@ export interface ThreeMFAlternative {
     resolution?: ThreeMFModelResolution;
 }
 
+export interface ThreeMFBeamGroup {
+    name?: string;
+    identifier?: string;
+    beams?: readonly number[];
+    balls?: readonly number[];
+}
+
+export type ThreeMFCapMode = (typeof CAPS)[number];
+
 export interface ThreeMFComposite {
     materials: readonly ThreeMFConstituent[];
     ratios: ThreeMFRatios | ((position: [number, number, number]) => ThreeMFRatios);
@@ -53,6 +62,39 @@ export interface ThreeMFElement {
     element: 'build' | 'item' | 'object' | 'component' | 'alternative';
     name?: string;
     index: number;
+}
+
+export interface ThreeMFLattice {
+    positions: ArrayLike<number>;
+    beams: readonly ThreeMFLatticeBeam[];
+    radius: number;
+    minLength?: number;
+    cap?: ThreeMFCapMode;
+    balls?: readonly ThreeMFLatticeBall[];
+    ballMode?: (typeof BALL_MODES)[number];
+    ballRadius?: number;
+    sets?: readonly ThreeMFBeamGroup[];
+    clipping?: {
+        mode: 'inside' | 'outside';
+        mesh: ExportNode;
+    };
+    representation?: ExportNode;
+}
+
+export interface ThreeMFLatticeBall {
+    vertex: number;
+    radius?: number;
+    color?: string;
+}
+
+export interface ThreeMFLatticeBeam {
+    v1: number;
+    v2: number;
+    r1?: number;
+    r2?: number;
+    cap1?: ThreeMFCapMode;
+    cap2?: ThreeMFCapMode;
+    color?: string | readonly [string, string];
 }
 
 export interface ThreeMFMeshReport {
@@ -84,6 +126,7 @@ export interface ThreeMFObjectInfo {
     composite?: ThreeMFComposite;
     modelResolution?: ThreeMFModelResolution;
     alternatives?: readonly ThreeMFAlternative[];
+    lattice?: ThreeMFLattice;
 }
 
 export type ThreeMFObjectType = (typeof TYPES)[number];
@@ -109,6 +152,10 @@ interface AnimationData {
     channels: readonly AnimationChannelData[];
     extras?: Extras;
 }
+
+const BALL_MODES: readonly ['none', 'mixed', 'all'];
+
+const CAPS: readonly ['sphere', 'hemisphere', 'butt'];
 
 interface CameraData {
     type: 'perspective' | 'orthographic';

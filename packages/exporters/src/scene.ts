@@ -658,8 +658,8 @@ function unit(value: unknown, label: string, fallback: number): number {
 }
 
 /** A validated triangle list into `count` vertices. */
-function triangleIndices(source: unknown, count: number, label: string): Uint32Array {
-  if (!isObject(source) || typeof source.length !== 'number' || source.length === 0 || source.length % 3)
+function triangleIndices(source: unknown, count: number, label: string, empty = false): Uint32Array {
+  if (!isObject(source) || typeof source.length !== 'number' || (source.length === 0 && !empty) || source.length % 3)
     throw new RangeError(`${label} must hold complete triangles`);
   const indices = new Uint32Array(source.length);
   for (let i = 0; i < indices.length; i++) {
@@ -1101,7 +1101,12 @@ function bakeMatrix(geo: Geo, m: Float64Array): Geo {
 }
 
 /** Validates and normalizes geometry data. Normals and tangents become unit length, tangent w becomes +1 or -1. */
-export function normalizeGeometry(data: Geometry | GeometryData, topology?: 'points' | 'lines'): Geo {
+export function normalizeGeometry(
+  data: Geometry | GeometryData,
+  topology?: 'points' | 'lines',
+  /** Takes an empty `indices` list: vertices with no triangle, which a 3MF beam lattice may be. */
+  empty?: boolean,
+): Geo {
   if (isCoreGeometry(data)) {
     const count = data.vertices.length / 6,
       positions = new Float32Array(count * 3),
@@ -1111,7 +1116,7 @@ export function normalizeGeometry(data: Geometry | GeometryData, topology?: 'poi
         positions[i * 3 + a] = data.vertices[i * 6 + a];
         normals[i * 3 + a] = data.vertices[i * 6 + 3 + a];
       }
-    return normalizeGeometry({ positions, normals, indices: data.indices });
+    return normalizeGeometry({ positions, normals, indices: data.indices }, undefined, empty);
   }
   if (!isObject(data)) fail('Expected Geometry or geometry data');
   const length = data.positions?.length;
@@ -1125,7 +1130,7 @@ export function normalizeGeometry(data: Geometry | GeometryData, topology?: 'poi
   else if (data.indices === undefined) {
     if (count % 3) throw new RangeError('Non-indexed geometry needs complete triangles');
     indices = Uint32Array.from({ length: count }, (_, i) => i);
-  } else indices = triangleIndices(data.indices, count, 'Indices');
+  } else indices = triangleIndices(data.indices, count, 'Indices', empty);
   // Area-weighted fallback normals for zero-length inputs.
   let fallback: Float64Array | null = null;
   for (let i = 0; i < count; i++) {
@@ -1618,6 +1623,8 @@ export function collect(
   plan?: (bytes: number) => void,
   loaded: LoadedModels = 'refuse',
   writes: readonly ('points' | 'lines')[] = [],
+  /** Takes meshes with an empty `indices` list. */
+  empty = false,
 ): Node[] {
   if (!isObject(options)) fail('Options must be an object');
   const onlyVisible = options.onlyVisible ?? true;
@@ -1642,7 +1649,7 @@ export function collect(
     if (!geo) {
       const data = (isCoreGeometry(value) && options.geometryData?.get(value)) || value;
       plan?.(attributeBytes(data));
-      geo = normalizeGeometry(data);
+      geo = normalizeGeometry(data, undefined, empty);
       geometries.set(value, geo);
     }
     return geo;

@@ -1455,7 +1455,7 @@ console.log(`${file.length} bytes`);
 | `thumbnail` | none | PNG or JPEG bytes, written as the package thumbnail. A CMYK JPEG is refused |
 | `displayProperties` | `true` | Writes how each material looks: metallic, specular or translucent display properties (below) |
 | `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `'components'` writes one object made of components that share meshes. `false` writes a build item for each node |
-| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber, composite, modelResolution, alternatives }` (below) |
+| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber, composite, modelResolution, alternatives, lattice }` (below) |
 | `itemPartNumber` | none | The `partnumber` of the one build item of a scene written as one object. With `assembly: false`, give each node's through `objectInfo` |
 | `production` | `false` | Writes the production extension: UUIDs, and with `separateParts` a model part for each object (below) |
 | `compress` | `true` | Deflates the package's parts. `false` stores them |
@@ -1564,6 +1564,32 @@ const file = await export3MF(
   {
     production: { separateParts: true },
     objectInfo: () => ({ alternatives: [{ node: { geometry: solid(0.039) }, resolution: 'lowres' }] }),
+  },
+);
+console.log(`${file.length} bytes`);
+```
+
+### Beam lattices
+
+Lattices and trusses are far smaller as beams than as triangles. `objectInfo`'s `lattice` writes a node's mesh object with the [3MF Beam Lattice Extension](https://github.com/3MFConsortium/spec_beamlattice): `positions` (the beam ends, `x y z`, in the geometry's own coordinates, so the node's transform moves and scales them), `beams` (`v1`, `v2`, and optionally `r1`, `r2`, `cap1`, `cap2` of `'sphere'`, `'hemisphere'` or `'butt'`, and `color`, one or one for each end), a default `radius`, `minLength` (default 1e-7), `cap` (default `'sphere'`), `balls` with `ballMode` (`'mixed'` or `'all'`) and `ballRadius`, named `sets`, a `clipping` mesh (`'inside'` or `'outside'`) and a `representation` mesh for previews. The file lists the extension in `requiredextensions`, as the specification asks, so a reader without it refuses the file. A node of a lattice alone gives its geometry `indices: []`. A lattice needs a `model` or `solidsupport` object of the node's own (`assembly: false` or `'components'`, or one node), and stays in the root model part with the meshes it names. `parse3MFLattice` (`@margoengine/loaders/threemf-lattice`) reads it all back.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+// A tripod of 1 mm struts, thicker at the foot, with a ball at each end.
+const file = await export3MF(
+  { nodes: [{ name: 'Tripod', geometry: { positions: new Float32Array(3), indices: [] } }] },
+  {
+    upAxis: 'z',
+    objectInfo: () => ({
+      lattice: {
+        positions: [0, 0, 0.03, -0.02, -0.01, 0, 0.02, -0.01, 0, 0, 0.02, 0],
+        beams: [1, 2, 3].map((foot) => ({ v1: 0, v2: foot, r1: 0.001, r2: 0.002 })),
+        radius: 0.001,
+        ballMode: 'all',
+        ballRadius: 0.0022,
+      },
+    }),
   },
 );
 console.log(`${file.length} bytes`);

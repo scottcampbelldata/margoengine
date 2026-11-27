@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21254779,
+  "total": 21256658,
   "history": [
     {
       "date": "2026-10-24",
@@ -15031,6 +15031,12 @@
       "commit": "lane-e-3mf",
       "reason": "3MF production extension: exporters/threemf 32055 to 33562 B (UUIDs, a model part for each object with the resources it needs, alternative representations; the writer is the one function of the format, so a second entry would write the file twice), loaders/threemf-materials 13872 to 14449 B and threemf-lattice 18009 to 18542 B (the shared reader: namespaced paths and UUIDs, alternatives and the one-level rule).",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf",
+      "reason": "3MF beam lattices: exporters/threemf 33562 to 35386 B (the lattice element, balls, sets, per-end colours, clipping and representation meshes and the extension's rules checked; the writer is the one function of the format), and the collector's empty-triangle option for the writers that bundle it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15429,7 +15435,7 @@
     "@margoengine/exporters/sparse": 26469,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 34569,
+    "@margoengine/exporters/threemf": 36448,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,

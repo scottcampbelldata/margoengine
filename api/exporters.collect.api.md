@@ -211,7 +211,8 @@ export interface TextureData {
 
 export function cameraDefinition(camera: CameraData): GLTFCameraDefinition;
 
-export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void, loaded?: LoadedModels, writes?: readonly ('points' | 'lines')[]): Node[];
+export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void, loaded?: LoadedModels, writes?: readonly ('points' | 'lines')[],
+empty?: boolean): Node[];
 
 export function drawables(nodes: Node[], lines?: boolean): Drawable[];
 

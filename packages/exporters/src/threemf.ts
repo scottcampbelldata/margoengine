@@ -71,6 +71,84 @@ export interface ThreeMFObjectInfo {
    * component of the node's own (`assembly` `false` or `'components'`, or a single node). Default none.
    */
   alternatives?: readonly ThreeMFAlternative[];
+  /**
+   * A beam lattice in the node's mesh object (beam lattice extension), which then needs no triangles. It needs a
+   * build item or component of the node's own (`assembly` `false` or `'components'`, or a single node) and a `model`
+   * or `solidsupport` type. Default none.
+   */
+  lattice?: ThreeMFLattice;
+}
+
+const CAPS = ['sphere', 'hemisphere', 'butt'] as const;
+const BALL_MODES = ['none', 'mixed', 'all'] as const;
+
+/** How a beam's end closes. */
+export type ThreeMFCapMode = (typeof CAPS)[number];
+
+/** One beam: a cone frustum between two lattice points. */
+export interface ThreeMFLatticeBeam {
+  /** The index of its first point in `positions`. */
+  v1: number;
+  /** The index of its second point. */
+  v2: number;
+  /** Radius at the first point. Default the lattice's `radius`. */
+  r1?: number;
+  /** Radius at the second point. Default `r1`. */
+  r2?: number;
+  /** Default the lattice's `cap`. */
+  cap1?: ThreeMFCapMode;
+  /** Default the lattice's `cap`. */
+  cap2?: ThreeMFCapMode;
+  /** One sRGB colour, `'#RRGGBB'` or `'#RRGGBBAA'`, or one for each end. Default the node's material. */
+  color?: string | readonly [string, string];
+}
+
+/** A sphere at a lattice point that ends a beam. */
+export interface ThreeMFLatticeBall {
+  /** The index of its centre in `positions`. */
+  vertex: number;
+  /** Default the lattice's `ballRadius`. */
+  radius?: number;
+  /** An sRGB colour. Default the node's material. */
+  color?: string;
+}
+
+/** A named group of beams and balls, by their indices. It changes no geometry. */
+export interface ThreeMFBeamGroup {
+  name?: string;
+  /** An identifier no other set of the lattice has. */
+  identifier?: string;
+  beams?: readonly number[];
+  balls?: readonly number[];
+}
+
+/**
+ * A beam lattice. Its points and radii are in the node's geometry coordinates, so the node's transform moves and
+ * scales it as it does the mesh.
+ */
+export interface ThreeMFLattice {
+  /** The beam ends, `x y z` for each. */
+  positions: ArrayLike<number>;
+  beams: readonly ThreeMFLatticeBeam[];
+  /** The default beam radius. */
+  radius: number;
+  /** Consumers ignore beams shorter than this. Default 1e-7 scene units. */
+  minLength?: number;
+  /** The default end of a beam. Default `'sphere'`. */
+  cap?: ThreeMFCapMode;
+  balls?: readonly ThreeMFLatticeBall[];
+  /**
+   * `'none'` writes no ball, `'mixed'` the `balls` listed, `'all'` one at every beam end, `balls` overriding those
+   * they name. Default `'mixed'` with `balls`, else `'none'`.
+   */
+  ballMode?: (typeof BALL_MODES)[number];
+  /** The default ball radius, needed unless `ballMode` is `'none'`. */
+  ballRadius?: number;
+  sets?: readonly ThreeMFBeamGroup[];
+  /** Keeps only the lattice inside, or outside, a closed mesh, given in the node's frame. */
+  clipping?: { mode: 'inside' | 'outside'; mesh: ExportNode };
+  /** A mesh of the lattice's intended shape, for previews only, in the node's frame. */
+  representation?: ExportNode;
 }
 
 /** The intended use of a representation. An `obfuscated` one hides detail and must enclose the `fullres` shape. */
@@ -306,6 +384,85 @@ function randomUUID(): string {
     .replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-');
 }
 
+const positive = (value: number): boolean => typeof value === 'number' && value > 0 && Number.isFinite(value);
+
+/** A lattice checked against the extension's rules, with its defaults filled in. */
+function checkLattice(lattice: ThreeMFLattice) {
+  const {
+      positions,
+      beams,
+      radius,
+      minLength = 1e-7,
+      cap = 'sphere',
+      balls = [],
+      ballMode = balls.length ? 'mixed' : 'none',
+      ballRadius,
+      sets = [],
+      clipping,
+      representation,
+    } = lattice,
+    points = Math.floor((positions?.length ?? 0) / 3),
+    point = (index: number): boolean => Number.isInteger(index) && index >= 0 && index < points,
+    fail = (message: string): never => {
+      throw new RangeError(`3MF lattice ${message}`);
+    };
+  if (!points || positions.length % 3 || !Array.from(positions).every(Number.isFinite))
+    fail('positions need three finite numbers for each point');
+  if (!Array.isArray(beams) || !beams.length) fail('needs at least one beam');
+  if (!positive(radius) || !positive(minLength)) fail('radius and minLength must be positive');
+  if (!CAPS.includes(cap)) fail(`cap must be one of ${CAPS.join(', ')}`);
+  if (!BALL_MODES.includes(ballMode)) fail(`ballMode must be one of ${BALL_MODES.join(', ')}`);
+  if (ballRadius !== undefined && !positive(ballRadius)) fail('ballRadius must be positive');
+  if (ballMode !== 'none' && ballRadius === undefined) fail('ballMode needs a ballRadius');
+  if (ballMode === 'none' && balls.length) fail("lists balls but its ballMode is 'none'");
+  const colour = (color: unknown): void => {
+      if (typeof color !== 'string' || !MIX_COLOR.test(color)) fail("colours are '#RRGGBB' or '#RRGGBBAA'");
+    },
+    ends = new Set<number>();
+  for (const { v1, v2, r1, r2, cap1, cap2, color } of beams as readonly ThreeMFLatticeBeam[]) {
+    if (!point(v1) || !point(v2)) fail('beams must join points of positions');
+    if ([0, 1, 2].every((k) => Math.fround(positions[v1 * 3 + k]) === Math.fround(positions[v2 * 3 + k])))
+      fail('beams must join two distinct points');
+    if ((r1 !== undefined && !positive(r1)) || (r2 !== undefined && !positive(r2))) fail('radii must be positive');
+    if ([cap1, cap2].some((c) => c !== undefined && !CAPS.includes(c))) fail(`cap must be one of ${CAPS.join(', ')}`);
+    if (color !== undefined) for (const c of typeof color === 'string' ? [color] : [color[0], color[1]]) colour(c);
+    ends.add(v1).add(v2);
+  }
+  const centres = new Set<number>();
+  for (const { vertex, radius: own, color } of balls) {
+    if (!ends.has(vertex) || centres.has(vertex)) fail('balls must each sit on a beam end of their own');
+    centres.add(vertex);
+    if (own !== undefined && !positive(own)) fail('ball radii must be positive');
+    if (color !== undefined) colour(color);
+  }
+  const identifiers = new Set<string>();
+  for (const set of sets) {
+    if (set.identifier !== undefined) {
+      if (identifiers.has(set.identifier)) fail(`set identifier "${set.identifier}" is given twice`);
+      identifiers.add(set.identifier);
+    }
+    const within = (list: readonly number[] = [], length: number): boolean =>
+      list.every((i) => Number.isInteger(i) && i >= 0 && i < length);
+    if (!within(set.beams, beams.length) || !within(set.balls, balls.length))
+      fail('sets must name beams and balls of the lattice');
+  }
+  if (clipping && clipping.mode !== 'inside' && clipping.mode !== 'outside')
+    fail("clipping mode must be 'inside' or 'outside'");
+  return {
+    positions,
+    beams,
+    radius,
+    minLength,
+    cap,
+    balls,
+    ballMode,
+    ballRadius,
+    sets,
+    clipping,
+    representation,
+  };
+}
+
 /** The attributes that name another property resource, in the XML this writer makes (names are escaped). */
 const REFERENCE = / (?:pid|pids|texid|matid|displaypropertiesid|[a-z]+textureid)="([\d ]+)"/g;
 const idOf = (xml: string): string => / id="(\d+)"/.exec(xml)![1];
@@ -325,6 +482,9 @@ function resourcesOf(resources: readonly string[], from: string): string[] {
       }
   return resources.filter((xml) => wanted.has(idOf(xml)));
 }
+
+/** What `objectInfo` says of a node, with its lattice checked. */
+type Described = ThreeMFObjectInfo & { type: ThreeMFObjectType; checked?: ReturnType<typeof checkLattice> };
 
 /** A base material: its group's resource id and its index there. */
 interface Base {
@@ -535,6 +695,8 @@ function upright(world: ArrayLike<number>, zUp: boolean): number[] {
 const FLIP = [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const PRODUCTION = 'http://schemas.microsoft.com/3dmanufacturing/production/2015/06',
   ALTERNATIVES = 'http://schemas.microsoft.com/3dmanufacturing/production/alternatives/2021/04';
+const BEAMS = 'http://schemas.microsoft.com/3dmanufacturing/beamlattice/2017/02',
+  BALLS = 'http://schemas.microsoft.com/3dmanufacturing/beamlattice/balls/2020/07';
 const CORE = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02',
   MATERIAL = 'http://schemas.microsoft.com/3dmanufacturing/material/2015/02',
   RELATIONSHIP = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/',
@@ -832,7 +994,7 @@ export async function export3MF(
     fallback = normalizeMaterial({}),
     onWarning = options.onWarning ?? ((warning: ExportWarning) => console.warn(warning.message)),
     items = drawables(
-      collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options, undefined, 'shape'),
+      collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options, undefined, 'shape', [], true),
     ),
     /** A node's primitives, which share its world matrix, are one mesh. */
     nodes = new Map<Float64Array, Drawable[]>(),
@@ -864,6 +1026,8 @@ export async function export3MF(
     shared = new Map<string, number>(),
     /** The extensions whose references name another model part, beyond the production one. */
     pathed = new Set<string>(),
+    /** The beam lattice namespaces the file uses. */
+    lattices = new Set<'b' | 'b2'>(),
     /** A composite material group for each list of constituents, with the mixtures its triangles use. */
     mixtures = new Map<string, { base: number; id: number; rows: Map<string, number> }>(),
     seen = new Map<object, number>(),
@@ -1193,19 +1357,23 @@ export async function export3MF(
     base: Base,
     name: string | undefined,
     { type = 'model', partNumber, modelResolution }: ThreeMFObjectInfo,
-    alternatives = '',
+    { alternatives = '', lattice = '', rooted = false } = {},
   ): number => {
     const at = id++,
       resolution = modelResolution === undefined ? '' : ` pa:modelresolution="${modelResolution}"`,
-      // Only the root part may name another (production extension 3.2), and an unreferenced object stays in it.
-      part = separateParts && type !== 'other' && !alternatives ? `3D/Objects/object${at}.model` : undefined;
+      // Only the root part may name another (production extension 3.2), and an unreferenced object stays in it, as do
+      // a lattice and the meshes it names, which must share a part.
+      part =
+        separateParts && type !== 'other' && !alternatives && !lattice && !rooted
+          ? `3D/Objects/object${at}.model`
+          : undefined;
     if (part) objectParts.set(at, part);
     objects.push({
       id: at,
       part,
       xml:
         `<object id="${at}" type="${type}"${resolution} pid="${base.group}" pindex="${base.index}"${named(name)}${numberedPart(partNumber)}${unique('object', name)}>` +
-        `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles></mesh>${alternatives}</object>`,
+        `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles>${lattice}</mesh>${alternatives}</object>`,
     });
     return at;
   };
@@ -1227,7 +1395,7 @@ export async function export3MF(
     );
   };
   /** What `objectInfo` says of a node, checked. */
-  const infoOf = (source: Mesh | ExportNode): ThreeMFObjectInfo & { type: ThreeMFObjectType } => {
+  const infoOf = (source: Mesh | ExportNode): Described => {
     const given = objectInfo?.(source) ?? {},
       type = given.type ?? 'model',
       info = {
@@ -1237,8 +1405,16 @@ export async function export3MF(
         composite: given.composite && checkComposite(given.composite),
         modelResolution: given.modelResolution,
         alternatives: given.alternatives?.length ? given.alternatives : undefined,
+        lattice: given.lattice,
+        checked: given.lattice && checkLattice(given.lattice),
       };
     if (!TYPES.includes(type)) throw new RangeError(`3MF object type must be one of ${TYPES.join(', ')}`);
+    if (info.lattice) {
+      if (type !== 'model' && type !== 'solidsupport')
+        throw new RangeError('3MF puts a beam lattice only in a model or solidsupport object');
+      if (together)
+        throw new RangeError("3MF writes a beam lattice in a node's own object; use assembly: false or 'components'");
+    }
     const resolutions = [info.modelResolution, ...(info.alternatives ?? []).map(({ resolution }) => resolution)];
     if (resolutions.some((r) => r !== undefined && !RESOLUTIONS.includes(r)))
       throw new RangeError(`3MF model resolution must be one of ${RESOLUTIONS.join(', ')}`);
@@ -1305,26 +1481,118 @@ export async function export3MF(
     );
     return { geometry, material, positions, colors, textured: !!coordinates, base };
   };
+  /** Writes a mesh given in a node's frame as an object of its own, which no build item places. */
+  const meshObject = (
+    node: ExportNode,
+    mirrored: boolean,
+    info: ThreeMFObjectInfo,
+    name: string | undefined,
+    rooted: boolean,
+  ): number => {
+    const drawn = drawables(collect({ nodes: [node] }, options, undefined, 'shape')),
+      parts = drawn.map((item) => {
+        const own = moved(item.geometry.positions, item.world);
+        return partOf(item, mirrored ? moved(own, FLIP) : own, info, []);
+      }),
+      // The mesh's own reflection reverses its triangles once more.
+      reversed = mirrored !== (!!drawn.length && determinant3(drawn[0].world) < 0),
+      welded = weldParts(parts, reversed);
+    if (!welded.length)
+      throw new RangeError('3MF alternative, clipping and representation nodes need a mesh with triangles');
+    const vertices: string[] = [],
+      faces: string[] = [],
+      { base } = welded[0].part;
+    check(welded, name);
+    append(welded, vertices, faces, base);
+    return object(vertices, faces, base, name, info, { rooted });
+  };
+  /**
+   * Adds a lattice's points to its object's vertices and gives its element. The meshes it names are written first, in
+   * the same model part.
+   */
+  const latticeOf = (
+    lattice: ReturnType<typeof checkLattice>,
+    mirrored: boolean,
+    vertices: string[],
+    info: ReturnType<typeof infoOf>,
+    name: string | undefined,
+  ): string => {
+    const { positions, beams, balls, sets, clipping, representation, ballMode, ballRadius, cap } = lattice,
+      // A mesh named by a lattice is a model with no lattice of its own.
+      referred = (node: ExportNode): number =>
+        meshObject(node, mirrored, { type: 'model', composite: info.composite }, node.name ?? name, true),
+      clip = clipping && referred(clipping.mesh),
+      shown = representation && referred(representation),
+      first = vertices.length,
+      length = (value: number | undefined, attribute: string): string =>
+        value === undefined ? '' : ` ${attribute}="${num(value * scale)}"`,
+      colors = new Map<string, number>(),
+      colorIndex = (color: string): number => {
+        const key = color.toUpperCase();
+        let at = colors.get(key);
+        if (at === undefined) colors.set(key, (at = colors.size));
+        return at;
+      };
+    for (let i = 0; i < positions.length; i += 3) {
+      const [x, y, z] = [0, 1, 2].map((k) => Math.fround(positions[i + k] * scale * (mirrored && !k ? -1 : 1)));
+      if (!Number.isFinite(x + y + z))
+        throw new RangeError('3MF position exceeds Float32 range in this unit; pick a larger unit or lower the scale');
+      vertices.push(`<vertex x="${num(x)}" y="${num(y)}" z="${num(z)}"/>`);
+    }
+    // The colour group takes its id once its colours are known, and is written before the object that names it.
+    const group = beams.some((b) => b.color !== undefined) || balls.some((b) => b.color !== undefined) ? id++ : 0;
+    const beamXml = beams.map(({ v1, v2, r1, r2, cap1, cap2, color }) => {
+      let property = '';
+      if (color !== undefined) {
+        const [a, b] = typeof color === 'string' ? [color, color] : color;
+        property = ` pid="${group}" p1="${colorIndex(a)}" p2="${colorIndex(b)}"`;
+      }
+      return (
+        `<b:beam v1="${first + v1}" v2="${first + v2}"` +
+        // A second radius is not allowed without a first.
+        length(r1 ?? (r2 === undefined ? undefined : lattice.radius), 'r1') +
+        `${length(r2, 'r2')}${property}${cap1 ? ` cap1="${cap1}"` : ''}${cap2 ? ` cap2="${cap2}"` : ''}/>`
+      );
+    });
+    const ballXml = balls.map(
+      ({ vertex, radius, color }) =>
+        `<b2:ball vindex="${first + vertex}"${length(radius, 'r')}${color === undefined ? '' : ` pid="${group}" p="${colorIndex(color)}"`}/>`,
+    );
+    if (group)
+      groups.push(
+        `<m:colorgroup id="${group}">${[...colors.keys()].map((color) => `<m:color color="${color}"/>`).join('')}</m:colorgroup>`,
+      );
+    const refs = (list: readonly number[] = [], element: string): string =>
+        list.map((index) => `<${element} index="${index}"/>`).join(''),
+      setXml = sets.map(
+        (set) =>
+          `<b:beamset${set.name === undefined ? '' : ` name="${escaped(set.name)}"`}${set.identifier === undefined ? '' : ` identifier="${escaped(set.identifier)}"`}>${refs(set.beams, 'b:ref')}${refs(set.balls, 'b2:ballref')}</b:beamset>`,
+      );
+    lattices.add('b');
+    if (ballMode !== 'none') lattices.add('b2');
+    return (
+      `<b:beamlattice radius="${num(lattice.radius * scale)}" minlength="${num(lattice.minLength * scale)}" cap="${cap}"` +
+      (clip === undefined ? '' : ` clippingmode="${clipping!.mode}" clippingmesh="${clip}"`) +
+      (shown === undefined ? '' : ` representationmesh="${shown}"`) +
+      (ballMode === 'none' ? '' : ` b2:ballmode="${ballMode}" b2:ballradius="${num(ballRadius! * scale)}"`) +
+      `><b:beams>${beamXml.join('')}</b:beams>` +
+      (setXml.length ? `<b:beamsets>${setXml.join('')}</b:beamsets>` : '') +
+      (ballXml.length ? `<b2:balls>${ballXml.join('')}</b2:balls>` : '') +
+      '</b:beamlattice>'
+    );
+  };
   /** Writes a node's alternative objects, and gives the element that lists them for its own object. */
   const alternativesOf = (info: ReturnType<typeof infoOf>, mirrored: boolean, name: string | undefined): string => {
     if (!info.alternatives) return '';
     const listed = info.alternatives.map(({ node, resolution = 'fullres' }) => {
-      const drawn = drawables(collect({ nodes: [node] }, options, undefined, 'shape')),
-        parts = drawn.map((item) => {
-          const own = moved(item.geometry.positions, item.world);
-          return partOf(item, mirrored ? moved(own, FLIP) : own, info, []);
-        }),
-        // The alternative's own reflection reverses its triangles once more.
-        reversed = mirrored !== (!!drawn.length && determinant3(drawn[0].world) < 0),
-        welded = weldParts(parts, reversed);
-      if (!welded.length) throw new RangeError('3MF alternatives each need a mesh with triangles');
-      const vertices: string[] = [],
-        faces: string[] = [],
-        { base } = welded[0].part,
-        own = node.name ?? name;
-      check(welded, own);
-      append(welded, vertices, faces, base);
-      const at = object(vertices, faces, base, own, { type: info.type, partNumber: info.partNumber });
+      const own = node.name ?? name,
+        at = meshObject(
+          node,
+          mirrored,
+          { type: info.type, partNumber: info.partNumber, composite: info.composite },
+          own,
+          false,
+        );
       if (objectParts.has(at)) pathed.add('pa');
       return `<pa:alternative objectid="${at}"${pathOf(at, 'path')}${unique('alternative', own, 'UUID')} modelresolution="${resolution}"/>`;
     });
@@ -1343,12 +1611,14 @@ export async function export3MF(
         '3MF holds solids to print, and a node scaled to 0 on an axis has no volume; give it a nonzero scale or leave it out',
       );
     const info = infoOf(drawn[0].source!),
-      keys: string[] = [],
-      parts = drawn.map((item) => {
-        const { positions } = item.geometry,
-          placedAt = together ? moved(positions, upright(matrix, zUp)) : mirrored ? moved(positions, FLIP) : positions;
-        return partOf(item, placedAt, info, keys);
-      });
+      keys: string[] = [];
+    if (!info.lattice && drawn.some(({ geometry }) => !geometry.indices.length))
+      throw new RangeError('Indices must hold complete triangles; only a node with a lattice may have none');
+    const parts = drawn.map((item): Part => {
+      const { positions } = item.geometry,
+        placedAt = together ? moved(positions, upright(matrix, zUp)) : mirrored ? moved(positions, FLIP) : positions;
+      return partOf(item, placedAt, info, keys);
+    });
     if (together) {
       const welded = weldParts(parts, mirrored);
       if (!welded.length) return;
@@ -1363,19 +1633,22 @@ export async function export3MF(
       return;
     }
     const others = info.alternatives && numbered(info.alternatives),
-      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others])} ${keys.join('|')}`;
+      beamed = info.lattice && numbered(info.lattice),
+      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others, beamed])} ${keys.join('|')}`;
     let at = shared.get(key);
     if (at === undefined) {
       const welded = weldParts(parts, mirrored);
-      if (!welded.length) return;
+      // A lattice object may have no triangles.
+      if (!welded.length && !(info.lattice && parts.length)) return;
       const vertices: string[] = [],
         faces: string[] = [],
-        { base } = welded[0].part;
-      check(welded, name);
+        { base } = welded[0]?.part ?? parts[0];
+      if (welded.length) check(welded, name);
       append(welded, vertices, faces, base);
-      // Resources are defined before they are referred to, so the alternatives come first.
-      const alternatives = alternativesOf(info, mirrored, name);
-      shared.set(key, (at = object(vertices, faces, base, name, info, alternatives)));
+      // Resources are defined before they are referred to, so the meshes this object names come first.
+      const alternatives = alternativesOf(info, mirrored, name),
+        lattice = info.checked && latticeOf(info.checked, mirrored, vertices, info, name);
+      shared.set(key, (at = object(vertices, faces, base, name, info, { alternatives, lattice })));
     }
     if (info.type === 'other') return;
     const transform = ` transform="${itemTransform(upright(world, zUp), scale)}"`;
@@ -1449,9 +1722,13 @@ export async function export3MF(
     namespaces =
       ` xmlns="${CORE}" xmlns:m="${MATERIAL}"` +
       (production ? ` xmlns:p="${PRODUCTION}"` : '') +
-      (alternatives ? ` xmlns:pa="${ALTERNATIVES}"` : ''),
-    // A package whose model parts refer to others must require the extension (production extension chapter 1).
-    required = apart.length ? ` requiredextensions="p${pathed.has('pa') ? ' pa' : ''}"` : '',
+      (alternatives ? ` xmlns:pa="${ALTERNATIVES}"` : '') +
+      (lattices.size ? ` xmlns:b="${BEAMS}"` : '') +
+      (lattices.has('b2') ? ` xmlns:b2="${BALLS}"` : ''),
+    // A package whose model parts refer to others must require the production extension (its chapter 1), and one with
+    // beam lattices theirs (beam lattice extension chapter 1).
+    extensions = [...(apart.length ? ['p', ...pathed] : []), ...lattices],
+    required = extensions.length ? ` requiredextensions="${extensions.join(' ')}"` : '',
     modelOf = (head: string, body: string, own: readonly string[], items: string): string =>
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
       `<model unit="${unit}" xml:lang="en-US"${head}>${body}<resources>${own.join('')}</resources>${items}</model>\n`,
