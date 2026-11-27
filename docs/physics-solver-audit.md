@@ -1665,6 +1665,11 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   state that Water draws. The sealed chambers and timber displacement mesh are separate from the visible grate.
   The [asset source](../examples/assets/source/sea12/README.md) records the construction and modeled mass.
 
+**Paused on Scott’s direction.** The corrected 4 m First Wake replay covers all 4,006 ticks. On the
+unchanged fine domain the full-volume preflight reached its twelve-minute limit during the first
+projection. The finite-curtain outgoing-wave check landed in `c38c7d9589`. The full fine replay and
+independent KCS stern-flow acceptance remain open.
+
 **Commit and test receipts on public main**
 
 | Audit item | Commit and test |
