@@ -161,6 +161,8 @@ export const KVLCC2_L7: ManoeuvringModel;
 
 export const KVLCC2_PROPELLER: PropellerCurves;
 
+export const KVLCC2_SHALLOW: ShallowTable;
+
 export const MACON_BLADE: readonly (readonly [number, number, number])[];
 
 export class Manoeuvring {
@@ -261,6 +263,7 @@ export interface ManoeuvringModel {
         readonly position?: number;
     };
     readonly heel?: ManoeuvringHeel;
+    readonly shallow?: ShallowTable;
 }
 
 export interface ManoeuvringState {
@@ -537,6 +540,19 @@ export interface SailingStatus {
     drive: number;
     side: number;
     resistance: number;
+}
+
+export type ShallowRows = readonly (readonly number[])[];
+
+export interface ShallowTable {
+    readonly hull: ShallowRows;
+    readonly surge?: ShallowRows;
+    readonly resistance?: ShallowRows;
+    readonly interaction?: ShallowRows;
+    readonly straightening?: ShallowRows;
+    readonly wakeRatio?: ShallowRows;
+    readonly thrustDeduction?: ShallowRows;
+    readonly wake?: ShallowRows;
 }
 
 export interface Ship {

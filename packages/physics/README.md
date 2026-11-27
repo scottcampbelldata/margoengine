@@ -4554,6 +4554,27 @@ while (kcs.time < 10) {
 console.log(Math.round((-most * 180) / Math.PI)); // 17
 ```
 
+In water under ten draughts deep, `shallowWater(model, depth)` gives the model the ship runs on there (the solver does this itself from `depth`), held at h/T 1.2 below that. A model with its own `shallow` table, from captive tests at several depths, uses it. KVLCC2's table is `KVLCC2_SHALLOW`, and `KVLCC2_L7` carries it. A table holds the hull's Y'v, N'v and N'r, its surge derivatives and resistance, and its hull, propeller and rudder interaction constants, each as `[h/T, ...values]` rows interpolated in (T/h)^2. A model without a table takes Ankudinov et al.'s (1990) factors on its hull derivatives. KVLCC2 at 7 kn then overshoots a 20/5 zigzag 3.8 degrees at h/T 1.2, as KRISO measured. Measured against data not fitted, it is within 20 percent of KRISO's and FHR's other zigzags and turns at h/T 1.2. At h/T 1.5 its 20/5 overshoot is 45 percent under KRISO's (docs/limits.md).
+
+```ts
+import {KVLCC2_L7, Manoeuvring, shallowWater} from 'margoengine/physics/ship';
+
+// KVLCC2's model at 7 kn full scale in water 1.2 draughts deep: a 20/5 zigzag's first overshoot.
+const speed = (7 * 0.514444) / Math.sqrt(320 / 7);
+const ship = new Manoeuvring(shallowWater(KVLCC2_L7, 1.2 * KVLCC2_L7.draught), {u: speed}, {
+  rudderRate: ((2.32 * Math.PI) / 180) * Math.sqrt(320 / 7),
+});
+ship.revolutions = ship.selfPropulsion(speed);
+ship.order = (20 * Math.PI) / 180;
+let overshoot = null;
+while (overshoot === null) {
+  ship.step(0.05);
+  if (ship.order > 0 && ship.state.heading > (5 * Math.PI) / 180) ship.order = -ship.order;
+  if (ship.order < 0 && ship.state.r < 0) overshoot = (ship.state.heading * 180) / Math.PI - 5;
+}
+console.log(overshoot.toFixed(1)); // 3.8
+```
+
 The solver also takes `depth` (a number or a function of (x, z): for squat, and for shallow water), `walls` (quays and banks, `{from, to}`), `density` and `ice: {thickness}` (level ice, m, a number or a function of (x, z), 0 for open water). With `waves`, regular `{amplitude, period, direction}` or irregular `{significantHeight, period, direction, spread}` (the direction the waves travel, rad on the ground plane; a Bretschneider spectrum in the significant height and mean period, spread as cos^spread), each ship meets their mean drift loads as Yasukawa (2006) adds them to the MMG forces: the surge force by the ITTC's SNNM added resistance (Liu and Papanikolaou; `addedResistance`), the sway force and yaw moment by the short-wave reflection on the waterline facing the waves times Fujii and Takahashi's draft factor (`driftLoads`, `irregularDriftLoads`). In head seas it slows, and in a turn it drifts down the waves; `status(i).forces.XW`, `YW` and `NW` read them. The wave-frequency heave, roll and pitch are a HullSolver's on the same sea. A ship with an `iceHull` going ahead through level ice is held back by Riska et al.'s (1997) regression of Baltic full-scale trials (`iceResistance(hull, thickness, speed)`: a breaking part C1 and a part C2 growing with speed); stopped, the ice holds it up to C1, and `status(i).ice` reads the force. Broken floes are ICE-04's: give the same body to a `PackIceSolver` as a vessel and couple `['ship', 'pack-ice', 'rigid']`, and the ship and floes push each other. A wall alongside, within half a ship length of the midship along it, pushes the ship by Vantorre et al.'s (2003) regression of captive tests (`bankLoads`): toward the bank and bow away at usual depths, off it in very shallow water (below h/T about 1.2), and the propeller ahead draws the stern in; `status(i).suction` and `bankMoment` read the force and moment, and `bankInRange` whether the hull is in the regression's range. Where the water is under ten draughts deep, each ship runs on its model corrected for the depth (`shallowWater(model, depth)`): every hull derivative and the sway and yaw added masses by Ankudinov et al. (1990), the surge added mass by Li and Wu (1990), held at h / T 1.2 below that; the model is made again when the draught over depth moves by a hundredth. A ship then turns wider as the water shoals, as ships do.
 
 Steer with `control(i)`:

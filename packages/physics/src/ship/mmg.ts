@@ -19,6 +19,7 @@
 import { cos, exp, sin } from '@margoengine/math/pinned';
 import { atan2, Propeller, type PropellerCurves, KVLCC2_PROPELLER } from './propeller.js';
 import { shipError } from './errors.js';
+import { KVLCC2_SHALLOW, type ShallowTable } from './shallow.js';
 import {
   type DriftLoads,
   driftLoads,
@@ -82,6 +83,11 @@ export interface ManoeuvringModel {
   };
   /** Heel: the ship rolls as it turns (Fukui et al. 2016). Without it the ship stays upright (MMG's three degrees of freedom). */
   readonly heel?: ManoeuvringHeel;
+  /**
+   * The hull's shallow-water corrections from captive tests, which `shallowWater` uses in place of Ankudinov et al.'s factors
+   * (default none: Ankudinov's).
+   */
+  readonly shallow?: ShallowTable;
 }
 
 /**
@@ -155,6 +161,7 @@ export const KVLCC2_L7: ManoeuvringModel = Object.freeze({
     wakeRatio: 1.09,
     kappa: 0.5,
   },
+  shallow: KVLCC2_SHALLOW,
 });
 
 /** A model scaled by `factor` in length (Froude scaling: the non-dimensional coefficients stay; the heel's lengths scale too). */

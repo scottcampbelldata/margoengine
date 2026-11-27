@@ -27,6 +27,7 @@ import {
   resolvedRace,
   KCS_MODEL,
   KVLCC2_L7,
+  KVLCC2_SHALLOW,
   KVLCC2_PROPELLER,
   Manoeuvring,
   Propeller,
@@ -912,8 +913,9 @@ test("a hull given to the ship runs on Holtrop and Mennen's resistance: self-pro
   assert.notEqual(Math.round(other * 1e6), Math.round(ships.control(0).revolutions * 1e6));
 });
 
-test("in shallow water a hull's derivatives and added masses are Ankudinov's, and it turns wider as the water shoals", () => {
-  const M = KVLCC2_L7,
+test("in shallow water a hull's derivatives and added masses are Ankudinov's or its own table's, and it turns wider as the water shoals", () => {
+  // KVLCC2 without its measured table: Ankudinov's factors.
+  const { shallow: table, ...M } = KVLCC2_L7,
     T = M.draught,
     hull = { length: M.length, beam: M.beam, draught: T, block: M.volume / (M.length * M.beam * T) };
   // Deep water, or ten draughts and more, gives the model back.
@@ -951,8 +953,27 @@ test("in shallow water a hull's derivatives and added masses are Ankudinov's, an
       return ship.state.z / M.length;
     },
     deep = diameter(M),
-    sizes = [2, 1.5, 1.2].map((ratio) => diameter(shallowWater(M, ratio * T)));
+    sizes = [2, 1.5, 1.2].map((ratio) => diameter(shallowWater(M, ratio * T))),
+    measured = [2, 1.5, 1.2].map((ratio) => diameter(shallowWater(KVLCC2_L7, ratio * T)));
   assert.ok(deep < sizes[0] && sizes[0] < sizes[1] && sizes[1] < sizes[2], `${deep} ${sizes}`);
+  // On its table KVLCC2 turns wider from h/T 2 to 1.2, but a little tighter at h/T 2 than in deep water: its captive tests'
+  // N'v grows faster than Y'v and N'r at moderate depth, so its course stability falls there (as Esso Osaka's, Kijima et al.
+  // 1984 and Yoshimura 1986).
+  assert.ok(
+    measured[0] < deep && measured[0] < measured[1] && measured[1] < measured[2] && deep < measured[2],
+    `${deep} ${measured}`,
+  );
+  // With its table: at a row's depth the table's own ratio, between rows interpolated in (T/h)^2, and a's added to deep.
+  assert.equal(table, KVLCC2_SHALLOW);
+  const at15 = shallowWater(KVLCC2_L7, 1.5 * T),
+    at13 = shallowWater(KVLCC2_L7, 1.3 * T),
+    w = (1 / 1.3 ** 2 - 1 / 1.5 ** 2) / (1 / 1.2 ** 2 - 1 / 1.5 ** 2);
+  assert.ok(Math.abs(at15.sway[0] / M.sway[0] - 1.89) < 1e-12 && Math.abs(at15.yaw[1] / M.yaw[1] - 1.22) < 1e-12);
+  assert.ok(Math.abs(at15.rudder.forceIncrease - (M.rudder.forceIncrease + 0.22)) < 1e-12);
+  assert.ok(Math.abs(at13.yaw[0] / M.yaw[0] - (2.61 + w * (4.99 - 2.61))) < 1e-12);
+  // Its other terms and the added masses stay Ankudinov's and Li and Wu's.
+  assert.deepEqual(at15.addedMass, shallow.addedMass);
+  assert.equal(at15.sway[2], shallow.sway[2]);
   assert.throws(
     () => shallowWater(M, 0),
     (e) => e.code === 'unsupported' && /depth/.test(e.message),
@@ -1792,36 +1813,75 @@ test("banks and shallows against measurement: Vantorre et al.'s container ship b
       `h/T ${hT}, y_B ${yB}: Y' ${y} against ${Y}`,
     );
   }
-  // KVLCC2 in shallow water at 7 kn (Yun et al. 2015, KRISO; Eloot et al. 2015, FHR): the first overshoot of a 20/5
-  // zigzag falls from 8.0 degrees at h/T 1.5 to 3.8 and 4.7 at 1.2, and the turn to 40 degrees of heading runs further:
-  // 1.61, 1.69 and 2.00 L at h/T 2.0, 1.5 and 1.2. The model follows the trend but is too course-stable in shallow water
-  // (KB-SHIP-SHALLOW1): overshoots 2.1 and 3.3 degrees, turns 2.1 to 3.3 L.
+  // KVLCC2 in shallow water at 7 kn, on its measured shallow-water table (KVLCC2_SHALLOW). One value is fitted: N'r at h/T
+  // 1.2, to KRISO's first 20/5 overshoot there, 3.8 degrees (Yun et al. 2015). The rest is data not fitted:
+  // - h/T 1.2: KRISO's 20/10, 5.5; FHR's 20/5, 4.73 and 8.19 (Eloot et al. 2015); the 35 degree turn's 40 degree reach,
+  //   2.00 L (KRISO), and advance, 2.92 L (Sherif et al. 2027's table of free-running tests).
+  // - h/T 1.5: KRISO's 20/10, 9.3, and reach, 1.69 L; its 20/5, 8.0, the model gives 45 percent under (docs/limits.md).
+  // - h/T 2.0: KRISO's reach, 1.61 L.
+  // Ankudinov's factors alone (KB-SHIP-SHALLOW1) gave 2.1 and 3.3 degrees at h/T 1.2 and 1.5, and reaches of 3.3 and 2.3 L.
   const k = 320 / 7,
     v0 = (7 * 0.514444) / Math.sqrt(k),
     rate = 2.32 * DEG * Math.sqrt(k),
+    near = (value, measured, band) => Math.abs(value / measured - 1) < band,
     at = (hT) => {
       const model = shallowWater(KVLCC2_L7, hT * KVLCC2_L7.draught),
-        z = new Manoeuvring(model, { u: v0 }, { rudderRate: rate });
-      z.revolutions = z.selfPropulsion(v0);
-      z.order = 20 * DEG;
-      let flipped = false,
-        overshoot = null;
-      while (z.time < 2000 && overshoot === null) {
-        z.step(0.05);
-        if (!flipped && z.state.heading > 5 * DEG) (z.order = -20 * DEG), (flipped = true);
-        if (flipped && z.state.r < 0) overshoot = z.state.heading / DEG - 5;
-      }
-      const t = new Manoeuvring(model, { u: v0 }, { rudderRate: rate });
+        zigzag = (angle, turn) => {
+          const z = new Manoeuvring(model, { u: v0 }, { rudderRate: rate });
+          z.revolutions = z.selfPropulsion(v0);
+          z.order = angle * DEG;
+          const overshoots = [];
+          let side = 1;
+          while (z.time < 3000 && !(overshoots.length === 2 && overshoots[1] !== null)) {
+            z.step(0.05);
+            const heading = z.state.heading / DEG;
+            if (side * heading > turn) (side = -side), (z.order = side * angle * DEG), overshoots.push(null);
+            if (overshoots.at(-1) === null && side * z.state.r > 0)
+              overshoots[overshoots.length - 1] = Math.abs(heading) - turn;
+          }
+          return overshoots;
+        },
+        t = new Manoeuvring(model, { u: v0 }, { rudderRate: rate });
       t.revolutions = t.selfPropulsion(v0);
       t.order = 35 * DEG;
-      while (t.state.heading < 40 * DEG) t.step(0.05);
-      return { overshoot, reach: t.state.x / 7 };
+      let reach = null;
+      while (t.state.heading < 90 * DEG) {
+        t.step(0.05);
+        if (reach === null && t.state.heading > 40 * DEG) reach = t.state.x / 7;
+      }
+      return { z5: zigzag(20, 5), z10: zigzag(20, 10), reach, advance: t.state.x / 7 };
     },
     h12 = at(1.2),
     h15 = at(1.5),
-    h20 = at(2);
+    h20 = at(2),
+    all = JSON.stringify([h12, h15, h20]);
+  assert.ok(near(h12.z5[0], 3.8, 0.05), `fitted: ${all}`);
   assert.ok(
-    h12.overshoot < h15.overshoot && h12.reach > h15.reach && h15.reach > h20.reach,
-    JSON.stringify([h12, h15, h20]),
+    near(h12.z10[0], 5.5, 0.1) &&
+      near(h12.z5[0], 4.73, 0.25) &&
+      near(h12.z5[1], 8.19, 0.2) &&
+      near(h12.reach, 2.0, 0.12) &&
+      near(h12.advance, 2.92, 0.08),
+    `h/T 1.2: ${all}`,
   );
+  assert.ok(
+    near(h15.z10[0], 9.3, 0.3) &&
+      near(h15.z5[0], 8.0, 0.5) &&
+      near(h15.reach, 1.69, 0.12) &&
+      near(h20.reach, 1.61, 0.12),
+    `h/T 1.5 and 2.0: ${all}`,
+  );
+  // A table is checked: its rows are [h/T, ...values], h/T above 1, deepest first.
+  for (const hull of [
+    [[0.9, 1, 1, 1]],
+    [
+      [1.2, 1, 1, 1],
+      [1.5, 1, 1, 1],
+    ],
+    [[1.5, 1, 1]],
+  ])
+    assert.throws(
+      () => shallowWater({ ...KVLCC2_L7, shallow: { hull } }, 0.6),
+      (e) => e.code === 'unsupported' && /shallow-water table/.test(e.message),
+    );
 });

@@ -412,24 +412,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Open:** the in-line wake's coupling at a flexible cylinder's high modes, calibrated on one riser data set and checked
   on another.
 
-### Open 2026-11-27: KVLCC2 is too course-stable in shallow water (KB-SHIP-SHALLOW1, physics ship)
+### Fixed 2026-11-27: KVLCC2 was too course-stable in shallow water (KB-SHIP-SHALLOW1, physics ship)
 
-- **Repro:** `shallowWater(KVLCC2_L7, depth)` at 7 kn full scale (`packages/physics/tests/ship.test.js`, "banks and shallows
-  against measurement").
-  - At h/T 1.2 the first overshoot of a 20/5 zigzag is 2.1 degrees, where KRISO measured 3.8 (Yun et al. 2015) and FHR
-    4.7 (Eloot et al. 2015).
-  - At h/T 1.5 it is 3.3, where KRISO measured 8.0.
-  - In a 35 degree turn the model reaches 40 degrees of heading 3.3 L along at h/T 1.2 and 2.3 L at 1.5, where KRISO
-    measured 2.0 and 1.7.
-  - The trend with depth is right; the size is not.
-- **Cause, not yet found.** Ankudinov et al.'s 1990 factors on Yasukawa and Yoshimura's deep-water derivatives make the
-  hull too stable as it shoals. Eloot et al. report the same of other mathematical models at 20 percent under-keel
-  clearance. Even at h/T 2.0 and in deep water the model turns slower at 7 kn than KRISO's h/T 2.0 test. The deep-water
-  derivatives at this low speed, and the shallow-water rudder and propeller interaction constants (kept from deep water),
-  are the next suspects.
-- **Ruled out:** Kijima et al.'s 1990 factors, which turn KVLCC2 tighter in shallow water against every measurement.
-- **What to use:** the trend (wider turns and smaller overshoots as the water shoals) for direction, not KVLCC2's numbers
-  in shallow water.
+- **Cause:** Ankudinov et al.'s 1990 factors on KVLCC2 raise Y'v and N'r faster than captive tests measure, and N'v
+  slower. The hull-propeller-rudder interaction constants also stayed as in deep water. Captive tests show N'r growing much
+  more slowly than N'v at h/T 1.5: 1.22 against 2.61 times deep on KVLCC2 (Nguyen et al. 2020), 1.19 against 2.33 on
+  Esso Osaka (Kijima et al. 1984). Ankudinov gives 1.55 against 2.10.
+- **Fix:** a hull can carry its own measured table (`ManoeuvringModel.shallow`), which `shallowWater` uses in place of
+  Ankudinov's factors (`packages/physics/src/ship/shallow.ts`). KVLCC2's table, `KVLCC2_SHALLOW`, holds:
+  - its linear hull derivatives;
+  - surge derivatives and resistance;
+  - a_H, x'_H, gamma_R, 1 - t_P, w_P and epsilon,
+  each from captive tests at h/T 2.0, 1.5 and 1.2 (docs/clean-room.md).
+- **Calibration:** one value, N'r at h/T 1.2, where the captive tests disagree twofold. It is fitted to KRISO's 20/5
+  overshoot there.
+- **Checked against data not fitted:**
+  - At h/T 1.2: KRISO's 20/10, FHR's two 20/5 overshoots, and the turn's reach and advance, all within 20 percent.
+  - At h/T 1.5: the reach within 10 percent, and the 20/10 28 percent under.
+  - At h/T 2.0: the reach within 11 percent.
+  The 20/5 at h/T 1.5 stays 45 percent under KRISO's 8.0, an accepted difference recorded with its cause in
+  docs/limits.md.
+- **Test:** "banks and shallows against measurement" and "in shallow water a hull's derivatives and added masses are
+  Ankudinov's or its own table's" in `packages/physics/tests/ship.test.js`.
+- **History:** filed at 2.1 and 3.3 degrees of 20/5 overshoot at h/T 1.2 and 1.5, where KRISO measured 3.8 and 8.0.
 
 ### Fixed 2026-11-27: KCS heeled out too far as it started a turn and too little in the steady turn (KB-SHIP-HEEL1, physics ship)
 

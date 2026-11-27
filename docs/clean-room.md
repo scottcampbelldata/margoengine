@@ -17419,6 +17419,46 @@ Validated on data not fitted:
 - The advance and tactical diameter.
 - The 20/20 and 10/10 zigzags' first overshoots.
 
+### A ship in shallow water from captive tests (SEA-09, `KVLCC2_SHALLOW`, `ManoeuvringModel.shallow`, 2026-11-27)
+
+`packages/physics/src/ship/shallow.ts` (the table, its interpolation in (T/h)^2 and its checks), written from:
+- V. M. Nguyen, T. T. D. Nguyen and H. K. Yoon, "A study on sensitivity analysis of the hydrodynamic derivatives on the
+  maneuverability prediction of KVLCC2 in shallow water by model test", J. Navig. Port Res. 44(2), 98-109, 2020,
+  doi:10.5394/KINPR.2020.44.2.98 (Table 3: KVLCC2's hull derivatives at h/T 8.0, 1.5 and 1.2; their ratios to deep water are
+  used, as the 1.4 m model's absolute values differ from Yasukawa and Yoshimura's).
+- K. Kijima, M. Murakami, T. Katsuno and Y. Nakiri, "A study on ship manoeuvring characteristics in shallow water" (title in
+  Japanese), Trans. West-Japan Soc. Naval Arch. 69, 111-122, 1984, https://www.jstage.jst.go.jp/article/wjsna/69/0/69_111/_pdf
+  (Table 3: Esso Osaka's hull derivatives at h/d 2.0 to 1.2).
+- Y. Furukawa, H. Ibaragi, Y. Nakiri and K. Kijima, "Shallow water effects on longitudinal components of hydrodynamic
+  derivatives", 4th MASHCON, 295-303, 2016, doi:10.18451/978-3-939230-38-0_33 (Table 2: Ship A, KVLCC2's L/B, B/T and C_B,
+  its R'_0 and surge derivatives at h/T 6.0 to 1.2).
+- M. Hirano, J. Takanashi, S. Moriya and Y. Nakamura, "An experimental study on maneuvering hydrodynamic forces in shallow
+  water", Trans. West-Japan Soc. Naval Arch. 69, 101-110, 1984, https://www.jstage.jst.go.jp/article/wjsna/69/0/69_101/_pdf
+  (Figs. 5 and 6: Esso Osaka's a_H and x'_H at h/d 1.5 and 1.2, read off the figures to about 0.02).
+- Y. Yoshimura, "Mathematical model for the manoeuvring ship motion in shallow water", J. Kansai Soc. Naval Arch. Japan 200,
+  41-51, 1986, https://www.jstage.jst.go.jp/article/kansaiks/200/0/200_41/_pdf (Figs. 5, 9 and 10: 1 - t_P and gamma_R of
+  Esso Osaka and epsilon of a pure car carrier against depth, read off the figures).
+- O. M. Amin and K. Hasegawa, "Generalized mathematical model for ship manoeuvrability considering shallow water effect",
+  Conf. Proc. JASNAOE 10, 531-534, 2010, as I. M. Sherif, P. Xin and X. Zhou reprint its formulas (Brodogradnja 78(1),
+  2027, Appendix C): w_P0 at each depth and gamma_R at h/T 2.0, evaluated for KVLCC2.
+- Free-running data the test holds, none of it used to build the table but KRISO's 20/5 at h/T 1.2: K. Yun, D. J. Yeo and
+  B. Park, "A study on the manoeuvrability of KVLCC2 in shallow water by free running model test", J. Soc. Naval Arch. Korea
+  52(6), 494-500, 2015, doi:10.3744/SNAK.2015.52.6.494 (Tables 5 to 7); K. Eloot, G. Delefortrie, M. Vantorre and
+  F. Quadvlieg, "Validation of ship manoeuvring in shallow water through free-running tests", OMAE2015-41912 (Table 4);
+  Sherif et al. 2027, Table 4.
+- Read for the diagnosis: D. Y. Kim, S. H. Kim, J. S. Han, S. J. Kim and K. J. Paik, Brodogradnja 68(4), 2017,
+  doi:10.21278/brod68401 (Ankudinov's factors give KVLCC2 overshoots far under KRISO's); G. Delefortrie, K. Eloot, E. Lataire,
+  W. Van Hoydonck and M. Vantorre, 4th MASHCON, 273-286, 2016 (a fully measured model is also too course-stable at h/T 1.2).
+No simulation code was read. Applying one tanker's measured interaction constants to another of the same form, reading
+X'_vr's ratio as that of X'_vr + m'_y, and interpolating in (T/h)^2 are this package's own.
+
+Calibration. One value is fitted: N'r at h/T 1.2, 2.4 times deep, where the captive tests disagree twofold (Esso Osaka 1.99,
+KVLCC2's 1.4 m model 4.10), to KRISO's first 20/5 overshoot at h/T 1.2, 3.8 degrees. Validated on data not fitted:
+- h/T 1.2: KRISO's 20/10; FHR's two 20/5 overshoots; the 35 degree turn's 40 degree reach and its advance.
+- h/T 1.5: the reach and the 20/10.
+- h/T 2.0: the reach.
+Proof: `packages/physics/tests/ship.test.js`, "banks and shallows against measurement".
+
 ### Measured checks for the ships (SEA-09, `B4_70_FOUR_QUADRANT`, `fourQuadrantCoefficients`, 2026-11-27)
 
 - R. F. Roddy, D. E. Hess and W. E. Faller, "A tool to predict the four-quadrant performance of the Wageningen B-screw
