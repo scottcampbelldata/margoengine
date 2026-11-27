@@ -1125,6 +1125,12 @@ class Physics implements EnginePlugin, BodyOwner {
         den: number;
     }): number;
     step(): void;
+    get threadCount(): number;
+    useThreads(count: number, options?: {
+        signal?: AbortSignal;
+    }): Promise<this>;
+    endThreads(): this;
+    stepAsync(): Promise<void>;
     detectCollisions(): void;
     get quarantined(): readonly PhysicsBody[];
     sync(alpha?: number): void;

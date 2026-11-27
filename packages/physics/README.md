@@ -1501,6 +1501,8 @@ console.log(world.threadCount); // 4
 world.endThreads();
 ```
 
+A `Physics` on a shared memory does the same through the engine's world: `await physics.useThreads(4)` starts the workers, `await physics.stepAsync()` runs one fixed step like `step()` (the same bits, events, breaks and attachments) with its islands solved across them, `physics.threadCount` reads the count and `physics.endThreads()` stops them. Make it as `new Physics(null, {arena: new Arena(worldMemory(true))})` after `await Physics.load({threads: true})`.
+
 Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 8 substeps (`world.substeps`) of 2 solver passes (`world.iterations`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
 
 Each step finds pairs: `world.pairCount`, and `world.pairs()` for the collider rows, the lower first. A pair means two fat boxes overlap, where a fat box holds everything the step can reach plus 0.04 m, so a pair is near, not yet touching. Colliders of one body or of two fixed bodies are no pair. A step can grow the world, so read views after it, and call `world.touch(body)` after writing a fixed or sleeping body's pose by hand.

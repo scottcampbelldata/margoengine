@@ -95,3 +95,28 @@ test('threads need a shared memory and a count from 1 to 64, and a shared memory
   plain.dispose();
   shared.dispose();
 });
+
+test('Physics.useThreads and stepAsync match Physics.step bit for bit with events and stepCount', {
+  timeout: 120_000,
+}, async () => {
+  const serial = scene();
+  const threaded = scene(new Arena(worldMemory(true)));
+  await threaded.useThreads(4);
+  assert.equal(threaded.threadCount, 4);
+  let serialContacts = 0,
+    threadedContacts = 0;
+  serial.on('contactstart', () => serialContacts++);
+  threaded.on('contactstart', () => threadedContacts++);
+  for (let i = 0; i < 60; i++) {
+    serial.step();
+    await threaded.stepAsync();
+    assert.equal(threaded.kernel.hash, serial.kernel.hash, `step ${i}`);
+  }
+  assert.equal(threaded.stepCount, serial.stepCount);
+  assert.ok(serialContacts > 0, 'contact events fired');
+  assert.equal(threadedContacts, serialContacts);
+  threaded.endThreads();
+  assert.equal(threaded.threadCount, 1);
+  serial.dispose();
+  threaded.dispose();
+});
