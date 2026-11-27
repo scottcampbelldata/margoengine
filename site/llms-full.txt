@@ -1340,7 +1340,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,366 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,370 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -13052,8 +13052,21 @@ each) on a grid of at most 4,194,304 nodes (16 B each), 8 to 256 cells along the
   little, raise `viscosity` to settle sooner). The top layer reads under rest density and carries no pressure, so a free
   surface sinks into the liquid by about a cell. A stiffer liquid needs a higher `speedOfSound` and proportionally more
   substeps.
-- One liquid, one density and one viscosity; no surface tension, no adhesion, no two-phase air, no spray or foam of its
-  own (the surface's `whitewater` can draw them from the particles' velocities).
+- One liquid, one density and one viscosity; no two-phase air, no spray or foam of its own (the surface's `whitewater`
+  can draw them from the particles' velocities).
+- Surface tension is the continuum surface force on the grid, so it acts over the cells the surface's density falls
+  across (about one), not on a sharp surface: a feature under a few cells across (a thin jet, a small drop) is rounded
+  by the grid's curvature, not its own. Measured: without gravity a 0.2 m cube at sigma = 10 N/m pulls into a ball and
+  holds 150.8 Pa inside against Laplace's 2 sigma / R = 161.2 Pa (WebGPU, 32,768 particles, cell 0.0125 m, averaged
+  over 2 to 3 s; the check's bound is 2 sigma / (R + h) to 2 sigma / (R - h)), and 146 to 177 Pa on the CPU twin at a
+  0.025 m cell; the spurious currents round that drop stay near 0.004 m/s. It is explicit, so it is refused above
+  density * cell³ / (2 pi substep²) (Brackbill et al.'s capillary step limit). Nodes under a quarter of rest density
+  (the far edge of the particles' spread) take its push as nodes at a quarter, which keeps them from being flung and
+  slightly softens the force there.
+- Adhesion is a pull towards the walls and colliders with a set acceleration within one cell (fading out at two), not a
+  contact angle: the angle a drop makes with a wall follows from adhesion, gravity and surface tension together and is
+  not set directly. A film thinner than a cell hangs from the ceiling exactly when adhesion is above gravity
+  (`gpu-liquid.test.js`); liquid on a side wall is pulled sideways only, so it still runs down the wall.
 - Colliders are up to 8 spheres, boxes, capsules, planes and triangle meshes, moved by the caller or by a linked body
   (`link`). A mesh is a distance field of at most 64³ samples (`bakeLiquidMesh`, all mesh fields together at most
   2,097,152 samples), so detail finer than its sample spacing is rounded off (a baked cube's edges by up to one spacing)
@@ -15730,6 +15743,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/soft-volume.test.js` ("an impulse moves a soft volume at J / M") holds
   momentum to 1e-3 of the impulse, the measured loss, and `docs/limits.md` states it.
 
+### Fixed 2026-11-27: tests picked a build's compat-*.js chunk by listing order (KB-COMPAT-CHUNKPICK1, scatter, shadows tests)
+
+- **Repro:** a package build holds two `compat-*.js` chunks once two of its entries import `packages/shared/compat.js` (vfx,
+  culling and sky builds do); their content hashes decide which one `readdirSync` names first. Scatter's `order` and
+  `audit-132` tests and the shadows allocation probe imported the first one, and scatter's attributes check held every
+  `packages/shadows/dist/compat-*.js`, so a build that split the shared chunk out would give them the wrong module or
+  hold the package's own static import.
+- **Fix:** `tests/support/compat-chunk.js` gains `compatChunkFile`; the four pick the chunk by its export (`compatChunk`,
+  `compatChunkFile`). webgl2-compat's isolation and routes tests already kept only the chunk imported by `import()`.
+  Regression: `tests/compat-chunk.test.js`, the pick under a listing that names the shared chunk first, and a scan that
+  fails on any test that picks a `compat-*.js` by name alone or globs over all of them.
+
 ### Fixed 2026-11-27: a soft body on flat ground kept a face contact its corners already held (KB-SOFT-FACEROWS1, physics soft)
 
 - **Repro:** `SoftBodyDesc.volume(sphereGeometry(0.4, 16, 12))` dropped from 1.5 m on a box floor: 240 steps took about
@@ -15829,6 +15854,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the page and closed by `dispose()`; a context passed in stays the caller's.
 - **Regression:** `packages/netcode/tests/browser/media.mjs` (the untouched listener, strict autoplay policy) and
   `packages/netcode/tests/media.test.js` "KB-NETCODE-VOICEGESTURE1".
+
+### Open 2026-11-27: a cloth pressing on the body it is lashed to loses linear momentum (KB-SOFT-LASHCONTACT1, physics soft)
+
+- **Repro:** no gravity; a 4 by 7 sail of `FABRICS.sailcloth` (1 m by 6 m, from [0, 1, 0]) with a `SailForce` in a 10 m/s
+  wind, its seven luff particles tied by `attachParticle` to a free 200 kg box hull at [0, 0.5, 3] (half extents
+  [0.5, 0.25, 3.5]), 60 steps: the hull's and the sail's linear momentum is [27.22, -13.96, -0.85] N s where the summed
+  impulse of the sail's load is [27.58, -13.79, -1.07] (1.3 percent). The same with the hull at [0, -1, 3], clear of the
+  sail, matches to 2e-4 N s (`packages/physics/tests/sail.test.js` "a sail lashed along its luff to a free hull drives the
+  hull", PA-29). Passing the hull's collider `collisionGroups: 0` changes nothing.
+- **Cause:** the sail's particles lie 0.08 m above the hull's top face, inside their contact radius (the circumradius of
+  the widest triangle, 0.24 m on these 0.33 m cells), so the soft kernel's particle and face contacts with the hull run in
+  the same solve as the lashings to that hull; the impulses those contacts give the particles are not all handed back to
+  the hull. Which row drops them (the face contact's share by inverse mass, or the contact solved against the hull's
+  velocity before the lashings move it) is not yet traced. Owner: SOFT-01 soft kernel (`packages/physics/soft-kernel`).
+- **Kept honest by:** the PA-29 test keeps its hull clear of the sail; nothing else is loosened.
 
 ### Open 2026-11-27: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
 
@@ -16270,7 +16310,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   draped rope rest, and two plain bugs of that code were found (a fixed root's stale contact list; sliding friction past
   the stop); but the contact set flips between rounds under tension, and the variants either never slide on a slope or
   do not rest. A fix that keeps the contact passes needs the contacts and the tension in one solve.
-- **What to use instead:** a rope over bollards, pulleys or fairleads is `WrappedRope` (`@margoengine/physics/rod`), whose
+- **What to use instead:** a rope over bollards, pulleys or fairleads is `WrappedRope` (`@margoengine/physics/wrapped-rope`), whose
   wraps carry the capstan law exactly (`packages/physics/tests/wrapped-rope.test.js`). The capsule-chain `Rod` stays the
   rope for free spans, contact with moving bodies and bending.
 
