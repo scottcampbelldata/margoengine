@@ -71,6 +71,7 @@ export interface FiniteQuayWakeParams extends QuayPotentialGrid {
         readonly rate: number;
     };
     readonly pressureAtDepth?: boolean;
+    readonly temporalOrder?: 2 | 4;
 }
 
 export interface FloodBlockageBody {

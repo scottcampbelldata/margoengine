@@ -139,6 +139,153 @@ test('the finite quay advances the exact discrete mode and returns its depth pre
   assert.equal(world.hash(), hash);
 });
 
+test('fourth-order quay stages reduce temporal phase error and retain the pressure across the tick', () => {
+  const cells = [20, 5],
+    cellSize = 0.2,
+    depth = 1.2,
+    layers = 6,
+    gravity = 9.81,
+    rate = 60,
+    steps = 48,
+    amplitude = 0.04;
+  const waveNumber = (5 * Math.PI) / (cells[0] * cellSize);
+  const world = new PhysicsWorld({
+    rate: { num: rate, den: 1 },
+    gravity: [0, -gravity, 0],
+    memory: worldMemory(false),
+  });
+  const wake = new FiniteQuayWake();
+  const params = {
+    cells,
+    cellSize,
+    depths: Array.from({ length: layers + 1 }, (_, i) => (i * depth) / layers),
+    initial: (x) => [amplitude * Math.cos(waveNumber * x), 0],
+    pressureAtDepth: true,
+  };
+  assert.throws(() => world.add(new FiniteQuayWake('badOrder'), { ...params, temporalOrder: 3 }), {
+    message: /Set the finite quay temporalOrder to 2 or 4/,
+  });
+  world.add(wake, { ...params, temporalOrder: 4 });
+  const start = world.takeSnapshot();
+  const energy = wake.energy();
+  world.advance(steps);
+  const dy = depth / layers;
+  const horizontal = (2 * Math.sin((waveNumber * cellSize) / 2)) / cellSize;
+  const vertical = Math.acosh(1 + 0.5 * (dy * horizontal) ** 2) / dy;
+  const normal = (2 / dy) * Math.tanh(vertical * depth) * Math.tanh((vertical * dy) / 2);
+  const frequency = Math.sqrt(gravity * normal);
+  const exactAngle = frequency / rate;
+  const a = 1 / (2 - Math.cbrt(2)); // Yoshida's symmetric composition of Cayley rotations.
+  const angle = 4 * Math.atan((a * exactAngle) / 2) + 2 * Math.atan(((1 - 2 * a) * exactAngle) / 2);
+  assert.ok(Math.abs(angle - exactAngle) < 0.1 * Math.abs(2 * Math.atan(exactAngle / 2) - exactAngle));
+  const distance = 1.5 * dy;
+  const headRatio =
+    Math.cosh(vertical * (depth - distance)) / (Math.cosh(vertical * depth) * Math.cosh((vertical * dy) / 2));
+  const head = (gravity / exactAngle) * (Math.sin(steps * angle) - Math.sin((steps - 1) * angle));
+  const heights = wake.heights();
+  for (let i = 0; i < cells[0]; i++) {
+    const x = (i + 0.5) * cellSize;
+    const mode = amplitude * Math.cos(waveNumber * x);
+    close(heights[i], mode * Math.cos(steps * angle));
+    close(wake.pressure(x, -distance, 0.5), wake.density * (gravity * distance + headRatio * mode * head), 1e-8);
+  }
+  close(wake.energy(), energy, 1e-9);
+  const hash = world.hash();
+  world.restoreSnapshot(start.bytes);
+  world.advance(steps);
+  assert.equal(world.hash(), hash);
+});
+
+test('an interrupted later wave stage leaves the published potential, pressure and work intact', (t) => {
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+  const wake = new FiniteQuayWake();
+  world.add(wake, {
+    cells: [9, 7],
+    cellSize: 0.2,
+    depths: [0, 0.2, 0.5],
+    initial: (x, z) => [0.02 * Math.sin(x + z), 0.005 * Math.cos(x - z)],
+    temporalOrder: 4,
+    pressureAtDepth: true,
+    sponge: { cells: 2, rate: 2 },
+  });
+  const state = () => wake.stateRegions().map((region) => regionWords(world.memory, region).slice());
+  const before = state();
+  const project = QuayPotential.prototype.project;
+  let stages = 0;
+  t.mock.method(QuayPotential.prototype, 'project', function (...args) {
+    if (++stages === 2) assert.fail('test interruption in the second midpoint solve');
+    return project.apply(this, args);
+  });
+  assert.throws(() => world.advance(1), /test interruption in the second midpoint solve/);
+  assert.deepEqual(state(), before);
+});
+
+test('fourth-order quay takes one volume kick, pairs held pressure with displacement and damps only forward', () => {
+  const field = { name: 'load', quantity: 'seaSource', kind: 'surfaceSampleSet', centring: 'particle', unit: 'SI' };
+  const cellSize = 0.25,
+    area = cellSize * cellSize,
+    width = 12,
+    gravity = 9.81,
+    pressure = 250,
+    volume = 0.002,
+    index = 5 + 4 * width;
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -gravity, 0], memory: worldMemory(false) });
+  const wake = new FiniteQuayWake('wake', { surface: field });
+  let host, region;
+  const driver = {
+    describe: () => ({ id: 'source', rate: 0, stableRate: () => 0, fields: [{ field, access: 'write' }] }),
+    init(allocated) {
+      host = allocated;
+      region = host.allocate('load', 5 * 8, 'f64', WAKE_SOURCE_LAYOUT);
+    },
+    step({ tick }) {
+      const words = regionWords(host.memory, region);
+      words.fill(0);
+      if (tick === 0) words.set([1.375, 1.125, 0.125, pressure, volume]);
+    },
+    exportPorts: (tick) => [{ field: field.name, region, tick, cell: host.cell }],
+    importPorts() {},
+    stateRegions: () => [region],
+    extraState: () => [],
+  };
+  world.add(driver, undefined).add(wake, {
+    cells: [width, 8],
+    cellSize,
+    depths: [0, 0.15, 0.41, 0.6],
+    temporalOrder: 4,
+    pressureAtDepth: true,
+    sponge: { cells: 2, rate: 8 },
+    initial: (x, z) => [0.04 * Math.exp(-10 * ((x - 0.15) ** 2 + (z - 0.3) ** 2)), 0],
+  });
+  const start = world.takeSnapshot();
+  const surfaceVolume = () => wake.heights().reduce((sum, value) => sum + value, 0) * area;
+  const startEnergy = wake.energy(),
+    startVolume = surfaceVolume(),
+    height = wake.heights()[index];
+  world.advance(1);
+  const rise = volume / area;
+  const kickWork = wake.density * gravity * volume * (height + rise / 2);
+  // The load lies exactly on an interior cell centre. Both the kick and pressure have that single-cell support.
+  const pressureWork = -pressure * area * (wake.heights()[index] - height - rise);
+  assert.ok(Math.abs(pressureWork) > 0.001 && wake.work().absorbedJoules > 0.01);
+  close(wake.work().joules, kickWork + pressureWork, 1e-9);
+  let absorbed = wake.work().absorbedJoules;
+  for (let frame = 2; frame <= 16; frame++) {
+    world.advance(frame);
+    assert.ok(wake.work().absorbedJoules > absorbed);
+    absorbed = wake.work().absorbedJoules;
+  }
+  const receipt = wake.work();
+  close(receipt.displacedVolume, volume);
+  close(wake.energy() + receipt.absorbedJoules, startEnergy + receipt.joules, 1e-9);
+  close(surfaceVolume() + receipt.absorbedVolume, startVolume + volume);
+  const hash = world.hash();
+  world.restoreSnapshot(start.bytes);
+  world.advance(16);
+  assert.equal(world.hash(), hash);
+  assert.deepEqual(wake.work(), receipt);
+});
+
 test('wet-side height reconstruction keeps both sides of a thin wall independent', () => {
   const cells = [6, 4];
   const plane = cells[0] * cells[1];

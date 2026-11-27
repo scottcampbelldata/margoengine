@@ -134,7 +134,7 @@ function kinetic(body) {
   );
 }
 
-function setup(shared, paired, unit, finite = false) {
+function setup(shared, paired, unit, finite = false, temporalOrder) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -g, 0], memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, substeps: 1, gravity: [0, -g, 0] });
   const body = physics.addBody(null, {
@@ -199,6 +199,7 @@ function setup(shared, paired, unit, finite = false) {
       openZ,
       density,
       initial,
+      temporalOrder,
       sponge: { cells: 3, rate: 2 },
     });
     if (paired) world.add(exchange, undefined);
@@ -209,8 +210,14 @@ function setup(shared, paired, unit, finite = false) {
   return { world, physics, body, hull, wake, exchange, cellSize };
 }
 
-function exerciseWaveWork(shared, paired, finite) {
-  const { world, physics, body, hull, wake, exchange, cellSize } = setup(shared, paired, undefined, finite);
+function exerciseWaveWork(shared, paired, finite, temporalOrder) {
+  const { world, physics, body, hull, wake, exchange, cellSize } = setup(
+    shared,
+    paired,
+    undefined,
+    finite,
+    temporalOrder,
+  );
   using _physics = physics;
   const accountedWave = finite
     ? () => readFiniteWave(world, wake, cellSize) + wake.work().absorbedJoules
@@ -302,10 +309,10 @@ function exerciseWaveWork(shared, paired, finite) {
   };
 }
 
-function checkWaveWork(t, finite) {
-  const coupled = exerciseWaveWork(false, true, finite);
-  assert.deepEqual(exerciseWaveWork(true, true, finite), coupled);
-  const uncoupled = exerciseWaveWork(false, false, finite);
+function checkWaveWork(t, finite, temporalOrder) {
+  const coupled = exerciseWaveWork(false, true, finite, temporalOrder);
+  assert.deepEqual(exerciseWaveWork(true, true, finite, temporalOrder), coupled);
+  const uncoupled = exerciseWaveWork(false, false, finite, temporalOrder);
   assert.ok(coupled.wave > 20 && coupled.crossResponse > 1e-4 && Math.abs(coupled.yaw) > 1e-3);
   assert.ok(coupled.maxClosure < coupled.roundoff, JSON.stringify(coupled));
   assert.ok(uncoupled.maxClosure > 10 && uncoupled.wakeWork === 0, JSON.stringify(uncoupled));
@@ -318,6 +325,9 @@ test('free native anisotropic rotation and the live hull exchange physical work 
 
 test('finite curtain exchanges free hull heave, roll, pitch and surge work across an open lower layer', (t) =>
   checkWaveWork(t, true));
+
+test('fourth-order finite curtain preserves free hull work and exact replay on both memory layouts', (t) =>
+  checkWaveWork(t, true, 4));
 
 test('locked or disabled gyroscopic rotation is rejected before any active publication changes', () => {
   const { world, physics, body, exchange } = setup(false, true);

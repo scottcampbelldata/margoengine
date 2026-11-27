@@ -18008,6 +18008,16 @@ as before. The fourth-order claim applies to the open uniform horizontal interio
 connection and work check at the aperture.
 [Lele](https://doi.org/10.1016/0021-9991%2892%2990348-8)
 
+Haruo Yoshida, *Construction of higher order symplectic integrators* (1990), Eqs. 4.4–4.6,
+composes a symmetric second-order flow into fourth order with two forward stages and one signed
+backward stage. The midpoint rotation of a linear gravity mode has angle `2 atan(ω Δt/2)`.
+The three coefficients sum to one and their cubes sum to zero, cancelling the cubic angle error.
+Each stage preserves the quadratic invariant with the held pressure added as a constant shift of
+elevation. The pressure work is therefore the sum of `-p A Δη` over the signed motion of the stages.
+The surface impulse and absorber lie outside the conservative composition. The reported depth
+pressure uses the accepted potential difference across the whole tick.
+[Yoshida](https://doi.org/10.1016/0375-9601%2890%2990092-3)
+
 ## physics rod vortex-induced vibration calibrated and checked against towed and sheared pipes (2026-11-27)
 
 Files: `packages/physics/src/loads/segments.ts`, `packages/physics/tests/rod-viv.test.js`, `packages/physics/tests/rod.test.js`,

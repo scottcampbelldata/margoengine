@@ -5501,6 +5501,12 @@ and depth velocities from the same potential. Give the finite wake its initial s
 coupled world. The ordinary hull return uses triangle pressure integration. The wave work ledger tracks
 the applied sources and sponge, and the hull's mechanical response has a separate balance.
 
+`temporalOrder` defaults to `2`, one midpoint stage per tick. Set it to `4` for lower time dispersion
+using three symmetric midpoint stages with pressure held over the tick. Sources displace water once per
+tick and the optional sponge still uses a pair of forward half steps. Fourth order applies to the
+conservative wave evolution. Face and layer resolution still control spatial dispersion. The three stages
+follow [Haruo Yoshida, *Construction of higher order symplectic integrators* (1990)](https://doi.org/10.1016/0375-9601(90)90092-3).
+
 ```ts
 import {FiniteQuayWake} from 'margoengine/physics/loads';
 import {PhysicsWorld} from 'margoengine/physics/world';
@@ -5512,7 +5518,7 @@ for (let z = 2; z < 6; z++) openX[7 + z * cells[0]] = 0;
 const wake = new FiniteQuayWake();
 const world = new PhysicsWorld({rate: {num: 60, den: 1}});
 world.add(wake, {
-  cells, cellSize: 0.25, depths: [0, 0.25, 0.8], openX, horizontalOrder: 4,
+  cells, cellSize: 0.25, depths: [0, 0.25, 0.8], openX, horizontalOrder: 4, temporalOrder: 4,
   initial: (x, z) => [0.04 * Math.exp(-((x - 1) ** 2 + (z - 1) ** 2) / 0.3), 0],
 });
 world.advance(120);

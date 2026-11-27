@@ -21,6 +21,10 @@ import type {
 import { invalidLoad } from './errors.js';
 import { QuayPotential, type QuayPotentialGrid } from './quay-potential.js';
 
+// Yoshida (1990), equations 4.4–4.6: [a, 1 − 2a, a], where a = 1/(2 − ∛2).
+const fourthOrderStages = [1.3512071919596575, -1.7024143839193153, 1.3512071919596575] as const;
+const midpointStages = [1] as const;
+
 /** Finite wave tank with solid cells and partially open faces. All lengths are in metres. */
 export interface FiniteQuayWakeParams extends QuayPotentialGrid {
   /** Minimum X and Z corners of the cell-centred grid in the world's cell. */
@@ -33,6 +37,8 @@ export interface FiniteQuayWakeParams extends QuayPotentialGrid {
   readonly sponge?: { readonly cells: number; readonly rate: number };
   /** Retain the time-centred Bernoulli pressure throughout the water volume. Default false. */
   readonly pressureAtDepth?: boolean;
+  /** Order of the conservative wave step with pressure held over a tick. Default 2 (one midpoint stage). */
+  readonly temporalOrder?: 2 | 4;
 }
 
 /** A bounded 3D linear potential wake. Sources, wave work and the wet surface use the same finite geometry. */
@@ -56,6 +62,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
   private nextBulk!: Float64Array;
   private forcingPressure!: Float64Array;
   private sponge?: Float64Array;
+  private stagedRise?: Float64Array;
 
   constructor(
     readonly id = 'finiteQuayWake',
@@ -97,7 +104,18 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
 
   init(host: SolverHost, params: FiniteQuayWakeParams): void {
     if (!params) throw invalidLoad('Pass the finite quay grid and depth faces.');
-    const { cells, cellSize, depths, origin = [0, 0], density = 1025, initial, sponge, pressureAtDepth } = params;
+    const {
+      cells,
+      cellSize,
+      depths,
+      origin = [0, 0],
+      density = 1025,
+      initial,
+      sponge,
+      pressureAtDepth,
+      temporalOrder = 2,
+    } = params;
+    if (temporalOrder !== 2 && temporalOrder !== 4) throw invalidLoad('Set the finite quay temporalOrder to 2 or 4.');
     const [gx, gy, gz] = host.gravity;
     if (
       gx !== 0 ||
@@ -131,6 +149,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     this.g = -gy;
     this.host = host;
     const { surfaceCells, volumeCells } = operator;
+    this.stagedRise = temporalOrder === 4 ? new Float64Array(surfaceCells) : undefined;
     const allocate = (label: string, count: number) =>
       host.allocate(`${this.id}:${label}`, count * 8, 'f64', WAKE_LAYOUT);
     this.regions = [
@@ -216,7 +235,6 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     let absorbed = 0;
     let absorbedVolume = 0;
     const half = dt / 2;
-    const robin = g * half * half;
     for (let i = 0; i < height.length; i++) {
       const original = height[i]!,
         eta = this.heightBeforeKick(original, i, half),
@@ -224,33 +242,64 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       absorbed += 0.5 * (original * original - eta * eta);
       absorbedVolume += original - eta;
       nextHeight[i] = eta + change;
-      mid[i] = trace[i]! - half * (g * nextHeight[i]! + pressure[i]! / density);
       sourceWork += density * g * change * (eta + change / 2) * area;
       volume += change * area;
     }
-    iterations += operator.project(mid, rise, undefined, robin, nextBulk);
     const oldRise = this.words(3),
       oldBulk = this.words(2);
     const head = this.headWords();
-    // Harmonic extension and upward flux are linear in the surface trace. Reflect the solved
-    // midpoint around the old state to publish the endpoint without another elliptic solve.
+    const staged = this.stagedRise;
+    const endTrace = staged ? kick : trace,
+      endBulk = staged ? bulkKick : oldBulk,
+      endRise = staged ?? oldRise;
+    if (staged) {
+      // These source buffers are available after the volume kick. Leave live fields untouched until all stages solve.
+      endTrace.set(trace);
+      endBulk.set(oldBulk);
+      endRise.set(oldRise);
+    }
+    // Pressure is held over the outer tick. Its work uses the signed motion from each stage.
+    // Volume and damping stay outside the composition: its middle stage runs backwards.
+    for (const fraction of staged ? fourthOrderStages : midpointStages) {
+      const duration = dt * fraction;
+      const halfStage = duration / 2;
+      const robin = g * halfStage * halfStage;
+      for (let i = 0; i < height.length; i++)
+        mid[i] = endTrace[i]! - halfStage * (g * nextHeight[i]! + pressure[i]! / density);
+      iterations += operator.project(mid, rise, undefined, robin, nextBulk);
+      if (!staged && head) {
+        head.set(trace);
+        head.set(oldBulk, height.length);
+      }
+      // Harmonic extension and upward flux are linear. Reflect the midpoint to recover each endpoint.
+      for (let i = 0; i < height.length; i++) {
+        const motion = duration * rise[i]!;
+        nextHeight[i]! += motion;
+        endTrace[i] = 2 * (mid[i]! - robin * rise[i]!) - endTrace[i]!;
+        sourceWork -= pressure[i]! * motion * area;
+        endRise[i] = 2 * rise[i]! - endRise[i]!;
+      }
+      for (let i = 0; i < oldBulk.length; i++) endBulk[i] = 2 * nextBulk[i]! - endBulk[i]!;
+    }
+    if (staged && head) {
+      head.set(trace);
+      head.set(oldBulk, height.length);
+    }
     for (let i = 0; i < height.length; i++) {
-      const motion = dt * rise[i]!;
-      const eta = nextHeight[i]! + motion;
+      const eta = nextHeight[i]!;
       const damped = sponge?.[i] ? eta * exp(-sponge[i]! * half) : eta;
       absorbed += 0.5 * (eta * eta - damped * damped);
       absorbedVolume += eta - damped;
       nextHeight[i] = damped;
-      const next = 2 * (mid[i]! - robin * rise[i]!) - trace[i]!;
-      if (head) head[i] = (trace[i]! - next) / dt;
-      trace[i] = next;
-      sourceWork -= pressure[i]! * motion * area;
-      oldRise[i] = 2 * rise[i]! - oldRise[i]!;
+      if (head) head[i] = (head[i]! - endTrace[i]!) / dt;
     }
-    for (let i = 0; i < oldBulk.length; i++) {
-      const next = 2 * nextBulk[i]! - oldBulk[i]!;
-      if (head) head[i + height.length] = (oldBulk[i]! - next) / dt;
-      oldBulk[i] = next;
+    if (head) {
+      for (let i = 0; i < oldBulk.length; i++) head[i + height.length] = (head[i + height.length]! - endBulk[i]!) / dt;
+    }
+    if (staged) {
+      trace.set(endTrace);
+      oldBulk.set(endBulk);
+      oldRise.set(endRise);
     }
     height.set(nextHeight);
     ledger[0]! += sourceWork;

@@ -1441,12 +1441,29 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   The same test checks the reciprocal flux and conservation through a partial lower opening, zero
   cross-wall flux at a closed face and exact replay with the absorber active.
 
-  The finite receiver was compared with the 26 measured Briggs M4 submerged-lee probes using an incident
+  The opt-in fourth-order time step in `coupling/loads-finite-quay.test.js` checks held pressure, the single
+  volume kick, the finite-domain absorber and failure before publication. The free-hull regression transfers
+  1,144.557 J with a maximum closure error of 0.000308 J and exact replay. The original 22.63 m wave ray in
+  the [mode probe](../packages/physics/scripts/measure-finite-quay-dispersion.mjs) isolates temporal lag.
+  With 0.15 m horizontal cells and 29 layers, the wider horizontal stencil and the fourth-order time step give
+  0.058 rad horizontal, 0.406 rad vertical and 0.0026 rad temporal shift. The 42-layer choice reduces the
+  vertical term to 0.190 rad on that ray. These are discrete mode checks. The original wake and its near-wall
+  diffraction still require a resolved full-history capture.
+
+  The 4 m full-history diagnostic used the same archived shutters and quay structure as the 8 m run,
+  and both renderers sampled the accepted wave heights within 1.54×10⁻⁶ m. Wall peaks rose to 0.332 m
+  and 0.311 m at the 67 and 71 s shutters from 0.200 m and 0.149 m at 8 m. Both stayed below the wall crest
+  and produced no spray. The changes across grids show the shot's wall response has yet to converge.
+
+  The finite receiver was compared with the 26 measured Briggs M4 lee-side wave gauges using an incident
   packet at the published period and height and an identical open-water normalization. At the fixed 14 s
   sample, RMS errors in relative wave height for 30°, 60° and 90° are 0.039, 0.030 and 0.056 at 0.50 m.
   The 0.25 m grid gives 0.015, 0.027 and 0.067. The gain is on the 30° transect. The full 26-point error
-  stays about 0.043. The original paddle history is unavailable. The packet window affects the results,
-  and the full finite field still needs a converged measured comparison.
+  stays about 0.043. With the optional fourth-order horizontal stencil the two total errors at the same
+  sample are 0.0379 and 0.0447. The 90° values dominate the remaining error. Table 5 of the paper reports
+  0.052 for its regular-wave prediction, also with the largest discrepancy along 90°. The original paddle
+  history is unavailable. The packet window affects the results, and refinement does not yet converge
+  against the full 26-gauge record.
   [Briggs, Thompson and Vincent, 1995](https://doi.org/10.1061/%28ASCE%290733-950X%281995%29121%3A1%2823%29)
   [Opt-in coarse and fine comparison](../packages/physics/scripts/measure-finite-quay-briggs.mjs)
 

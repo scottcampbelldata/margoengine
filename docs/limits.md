@@ -10669,9 +10669,14 @@ energy and signed volume. Size its width and run a domain comparison before trea
 coefficient per layer. The default uses the two-point flux. The wider stencil reduces open-water phase
 error without changing the vertical approximation or resolving sharp corners beyond the given geometry.
 Its fourth-order accuracy applies to the uniform horizontal interior. Test vertical and temporal
-dispersion independently. The optional loads entry measures 61,406 B gzip.
+dispersion independently.
 
-The 60 Hz midpoint solves a Robin surface condition with preconditioned conjugate gradients. Grids with
+The default 60 Hz midpoint solves a Robin surface condition with preconditioned conjugate gradients.
+`temporalOrder: 4` composes three signed midpoint solves per tick for a better phase in the conservative
+wave evolution under held pressure. The source kick and forward sponge remain outside the stages. The
+option adds one f64 per surface cell in scratch and reuses the source buffers to publish the full step
+atomically. It retains pressure as the full-tick potential difference. The optional loads entry measures
+61,614 B gzip. Grids with
 at least 2,048 volume cells can use a Galerkin coarse correction. The aggregates follow connected faces in
 each horizontal layer. Protected curtain faces remain distinct on both sides so their lower openings keep
 the original sum of conductances. Smaller grids use the same block-column solve directly.
