@@ -1,0 +1,1 @@
+var e=e=>Math.round((e>0?Math.min(1,e):0)*255),t=(t,n,r)=>`#${[t,n,r].map(t=>e(t).toString(16).padStart(2,`0`)).join(``)}`;export{t as n,e as t};

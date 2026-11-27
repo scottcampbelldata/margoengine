@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Last Tram | Margo Engine</title>
+  <link rel="stylesheet" href="./player.css">
+</head>
+<body>
+  <div id="viewport"></div>
+  <p id="status" role="status">Preparing the film…</p>
+  <section id="controls" aria-label="Film playback" hidden>
+    <button id="play" type="button">Pause</button>
+    <input id="seek" type="range" aria-label="Film time" min="0" max="90" value="0" step="0.01">
+    <output id="clock" for="seek">0:00 / 1:30</output>
+  </section>
+  <script type="module">
+    import { openFilm } from './film.js';
+    import { buildDepot } from './last-tram.js';
+    await openFilm({ title: 'Last Tram', build: buildDepot, night: true, far: 180 });
+  </script>
+</body>
+</html>

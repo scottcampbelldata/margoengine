@@ -1,0 +1,1 @@
+export{t as extendedMaterials}from"./extended-C_t3TMDR.js";

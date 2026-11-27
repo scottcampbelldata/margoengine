@@ -1,0 +1,1 @@
+import{a as e,i as t,n,o as r,s as i,t as a}from"./dist-mjUC1sVg.js";import{r as o}from"./version-DZ3BcJze.js";export{o as CORE_VERSION,t as Camera,n as Engine,a as EngineKernel,r as Geometry,e as PbrMaterial,i as box};

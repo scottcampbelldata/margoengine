@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Village That Builds Itself | Margo Engine</title>
+  <link rel="stylesheet" href="../../showcase-films/player.css">
+</head>
+<body>
+  <div id="viewport"></div>
+  <p id="status" role="status">Preparing the film.</p>
+  <section id="controls" aria-label="Film playback" hidden>
+    <button id="play" type="button">Pause</button>
+    <input id="seek" type="range" aria-label="Film time" min="0" max="90" value="0" step="0.01">
+    <output id="clock" for="seek">0:00 / 1:30</output>
+  </section>
+  <script type="module">
+    import { openFilm } from '../../showcase-films/film.js';
+    import { buildVillage } from '../../showcase-films/the-village-that-builds-itself.js';
+    await openFilm({ title: 'The Village That Builds Itself', build: buildVillage, far: 110, look: { direction: [-0.64, 0.54, 0.48, 2.5], radiance: [1, 0.87, 0.73, 0.38], environment: 0.82, exposure: 0.24, shadows: { distance: 50 } } });
+  </script>
+</body>
+</html>

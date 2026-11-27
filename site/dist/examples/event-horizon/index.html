@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="A spinning black hole with a glowing accretion disk, bent light, Doppler beaming and a relativistic jet, rendered live in WebGPU with Margo Engine.">
+  <title>Event Horizon · Margo Engine</title>
+  <!-- Margo engine made for Margie -->
+  <style>*{box-sizing:border-box}html,body{height:100%}body{color:#e6e9ee;background:#000;margin:0;font:15px/1.4 system-ui,sans-serif;overflow:hidden}#viewport{position:fixed;inset:0}canvas{touch-action:none;display:block}h1{margin:0;font-size:16px;font-weight:500;position:fixed;top:18px;left:22px}h1 a{color:inherit}#panel{background:#05070ad9;border:1px solid #3a414b;border-radius:6px;width:min(300px,100% - 44px);padding:12px 14px;position:fixed;top:56px;left:22px}label{grid-template-columns:5.5em 1fr 3em;align-items:center;gap:8px;margin:6px 0;display:grid}input[type=range]{width:100%;min-height:32px}.row{flex-wrap:wrap;gap:6px;margin-top:8px;display:flex}button{min-height:40px;color:inherit;font:inherit;cursor:pointer;background:#0b0f14;border:1px solid #4a5360;border-radius:4px;padding:6px 10px}button[aria-pressed=true]{color:#ffd9a0;border-color:#f2b35d}#telemetry{color:#9fb0c0;margin:8px 0 0;font:13px/1.4 ui-monospace,monospace}:focus-visible{outline-offset:2px;outline:3px solid #ffd98a}#status{text-align:center;margin:0;padding:0 24px;position:fixed;top:44%;left:0;right:0}#error{color:#ffd9b5;margin:0;position:fixed;bottom:24px;left:22px;right:22px}#error:empty{display:none}</style>
+  <script type="module" crossorigin src="../assets/event-horizon/index-XNQa-kQD.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-P2Xu9kJm.js">
+  <link rel="modulepreload" crossorigin href="../assets/preload-helper-CRzLMJPS.js">
+</head>
+<body>
+  <main id="viewport" aria-label="A spinning black hole and its accretion disk; drag to orbit, scroll to zoom"></main>
+  <h1>Event Horizon, <a href="../../">Margo Engine</a></h1>
+  <form id="panel" aria-label="Black hole controls">
+    <label>Spin <input id="spin" type="range" min="0" max="0.998" step="0.001" value="0.9"><output id="spin-out">0.90</output></label>
+    <label>Accretion <input id="accretion" type="range" min="0" max="3" step="0.01" value="1"><output id="accretion-out">1.00</output></label>
+    <label>Jet <input id="jet" type="range" min="0" max="1" step="0.01" value="0.5"><output id="jet-out">0.50</output></label>
+    <div class="row" role="group" aria-label="View">
+      <button type="button" data-view="beauty" aria-pressed="true">Light</button>
+      <button type="button" data-view="redshift" aria-pressed="false">Redshift</button>
+      <button type="button" data-view="beaming" aria-pressed="false">Beaming</button>
+      <button type="button" data-view="temperature" aria-pressed="false">Temperature</button>
+      <button type="button" data-view="orders" aria-pressed="false">Image order</button>
+    </div>
+    <div class="row" role="group" aria-label="Camera">
+      <button type="button" data-cam="0">Inclined</button>
+      <button type="button" data-cam="1">Edge on</button>
+      <button type="button" data-cam="2">Pole</button>
+      <button type="button" data-cam="3">Rim</button>
+    </div>
+    <div class="row">
+      <button type="button" id="paths" aria-pressed="false">Light paths</button>
+      <button type="button" id="filter" aria-pressed="true">Filtering</button>
+      <button type="button" id="flare">Flare</button>
+    </div>
+    <p id="telemetry" aria-live="polite"></p>
+  </form>
+  <p id="status" role="status" data-webgpu-status>Bending light. The first load can take a few seconds.</p>
+  <p id="error" role="alert"></p>
+</body>
+</html>

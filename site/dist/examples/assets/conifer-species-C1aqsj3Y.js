@@ -1,0 +1,1 @@
+export{c as CONIFER_AGES,r as CONIFER_SPECIES,d as CONIFER_SPECIES_IDS,o as coniferAgeAt,l as coniferCrownRatio,i as coniferCrownWidth,f as coniferDiameter,s as coniferForm,n as coniferHeight,u as coniferHeightAt,t as coniferHeightGrowth,a as parseConiferKey}from"./conifer-species-C_-mQ5rg.js";

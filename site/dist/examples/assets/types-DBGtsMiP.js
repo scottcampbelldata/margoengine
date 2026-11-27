@@ -1,0 +1,1 @@
+var e=class extends Error{constructor(e,t,n,r){super(`${e}: ${n}; see https://margoengine.com/errors#loader-${t}`,r),this.name=`LoaderError`,this.format=e,this.code=t,r?.status!==void 0&&(this.status=r.status),r?.retryAfter!==void 0&&(this.retryAfter=r.retryAfter)}};export{e as t};

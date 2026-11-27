@@ -1,0 +1,300 @@
+{
+  "films": [
+    {
+      "id": "below-the-swell",
+      "title": "Below the Swell",
+      "group": "Water and sky",
+      "description": "A diver at a subsea cable, then the view rises along the survey ship and its wake.",
+      "entry": "examples/underwater-cable/index.html",
+      "sources": [
+        "examples/underwater-cable/index.html",
+        "examples/underwater-cable/main.js",
+        "examples/underwater-cable/materials.js",
+        "examples/underwater-cable/set.js",
+        "examples/underwater-cable/diver.js",
+        "examples/underwater-cable/timeline.js",
+        "examples/underwater-cable/showcase.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "first-wake",
+      "title": "First Wake",
+      "group": "Water and sky",
+      "description": "A survey ship leaves Berth 04 at dawn, and the camera follows the wake behind the stern.",
+      "entry": "examples/first-wake/index.html",
+      "sources": [
+        "examples/first-wake/index.html",
+        "examples/first-wake/main.js",
+        "examples/first-wake/harbor.js",
+        "examples/first-wake/timeline.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "event-horizon",
+      "title": "Event Horizon",
+      "group": "Water and sky",
+      "description": "A spinning black hole with an accretion disk, bent light and a jet. Drag to look around.",
+      "entry": "examples/event-horizon/index.html",
+      "sources": [
+        "examples/event-horizon/index.html",
+        "examples/event-horizon/main.ts"
+      ]
+    },
+    {
+      "id": "city-to-street",
+      "title": "City to Street",
+      "group": "City and night",
+      "description": "The camera moves from the Chicago park survey down to street level on Balbo Drive.",
+      "entry": "examples/showcase-films/city-to-street.html",
+      "sources": [
+        "examples/showcase-films/city-to-street.html",
+        "examples/showcase-films/city-to-street.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/balbo-drive.js",
+        "examples/showcase-films/environment-films.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "last-tram",
+      "title": "Last Tram",
+      "group": "City and night",
+      "description": "A three section tram arrives at North Yard in the rain, and the doors open.",
+      "entry": "examples/showcase-films/last-tram.html",
+      "sources": [
+        "examples/showcase-films/last-tram.html",
+        "examples/showcase-films/last-tram.js",
+        "examples/showcase-films/film.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "lantern-courier",
+      "title": "Lantern Courier",
+      "group": "City and night",
+      "description": "A pixel courier carries a lantern up to a workshop, and the workshop light comes on.",
+      "entry": "examples/live/entries/lantern-courier.html",
+      "sources": [
+        "examples/live/entries/lantern-courier.html",
+        "examples/showcase-films/lantern-courier.js",
+        "examples/showcase-films/film.js"
+      ]
+    },
+    {
+      "id": "opening-night",
+      "title": "Opening Night",
+      "group": "City and night",
+      "description": "A crowd walks into a lit hall on opening night.",
+      "entry": "examples/live/entries/opening-night.html",
+      "sources": [
+        "examples/live/entries/opening-night.html",
+        "examples/showcase-films/opening-night.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/environment-films.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "the-projectionist",
+      "title": "The Projectionist",
+      "group": "City and night",
+      "description": "A projection booth runs a countdown, then the lamp comes up on the reel.",
+      "entry": "examples/live/entries/the-projectionist.html",
+      "sources": [
+        "examples/live/entries/the-projectionist.html",
+        "examples/showcase-films/the-projectionist.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/environment-films.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "the-voxel-night-shop",
+      "title": "The Voxel Night Shop",
+      "group": "City and night",
+      "description": "A small repair shop after dark, path traced, including the glazed side window.",
+      "entry": "examples/live/entries/the-voxel-night-shop.html",
+      "sources": [
+        "examples/live/entries/the-voxel-night-shop.html",
+        "examples/showcase-films/the-voxel-night-shop.js",
+        "examples/showcase-films/film.js"
+      ]
+    },
+    {
+      "id": "above-the-treeline",
+      "title": "Above the Treeline",
+      "group": "Landscape",
+      "description": "One rising move from bunchgrass to the forest thinning over a mountain valley.",
+      "entry": "examples/showcase-films/above-the-treeline.html",
+      "sources": [
+        "examples/showcase-films/above-the-treeline.html",
+        "examples/showcase-films/above-the-treeline.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/subalpine-fir.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "horse-at-the-ridge",
+      "title": "Horse at the Ridge",
+      "group": "Landscape",
+      "description": "A bay horse walks a dirt trail along a ridge.",
+      "entry": "examples/live/entries/horse-at-the-ridge.html",
+      "sources": [
+        "examples/live/entries/horse-at-the-ridge.html",
+        "examples/showcase-films/horse-at-the-ridge.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/environment-films.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "the-observatory-dome",
+      "title": "The Observatory Dome",
+      "group": "Landscape",
+      "description": "The dome opens and the telescope slews across the night sky.",
+      "entry": "examples/showcase-films/the-observatory-dome.html",
+      "sources": [
+        "examples/showcase-films/the-observatory-dome.html",
+        "examples/showcase-films/the-observatory-dome.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/environment-films.js"
+      ]
+    },
+    {
+      "id": "the-solar-field",
+      "title": "The Solar Field",
+      "group": "Landscape",
+      "description": "Tracker rows tilt through the afternoon over Antelope Valley.",
+      "entry": "examples/showcase-films/the-solar-field.html",
+      "sources": [
+        "examples/showcase-films/the-solar-field.html",
+        "examples/showcase-films/the-solar-field.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/solar-landscape.js",
+        "examples/showcase-films/environment-films.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "the-village-that-builds-itself",
+      "title": "The Village That Builds Itself",
+      "group": "Landscape",
+      "description": "Road tiles and houses fill a lot by matching open edges.",
+      "entry": "examples/live/entries/the-village-that-builds-itself.html",
+      "sources": [
+        "examples/live/entries/the-village-that-builds-itself.html",
+        "examples/showcase-films/the-village-that-builds-itself.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/environment-films.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "inside-turbofan",
+      "title": "Inside a Turbofan",
+      "group": "Machines",
+      "description": "The camera follows the air through a cutaway engine, then the modules separate.",
+      "entry": "examples/showcase-films/inside-turbofan.html",
+      "sources": [
+        "examples/showcase-films/inside-turbofan.html",
+        "examples/showcase-films/inside-turbofan.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/turbofan-assembly.js",
+        "examples/showcase-films/turbofan-flow.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "the-robot-cell",
+      "title": "The Robot Cell",
+      "group": "Machines",
+      "description": "An arm carries a housing through a gauge and seats it.",
+      "entry": "examples/showcase-films/robot-cell.html",
+      "sources": [
+        "examples/showcase-films/robot-cell.html",
+        "examples/showcase-films/robot-cell.js",
+        "examples/showcase-films/film.js"
+      ]
+    },
+    {
+      "id": "the-kiln-shift",
+      "title": "The Kiln Shift",
+      "group": "Machines",
+      "description": "A firing door opens on glowing brick and ceramic vessels.",
+      "entry": "examples/showcase-films/the-kiln-shift.html",
+      "sources": [
+        "examples/showcase-films/the-kiln-shift.html",
+        "examples/showcase-films/the-kiln-shift.js",
+        "examples/showcase-films/film.js"
+      ]
+    },
+    {
+      "id": "the-glass-bench",
+      "title": "The Glass Bench",
+      "group": "Rooms",
+      "description": "An optical test station: glass, a micrometer and a calibration grid.",
+      "entry": "examples/glass-bench/index.html",
+      "sources": [
+        "examples/glass-bench/index.html",
+        "examples/glass-bench/main.js",
+        "examples/glass-bench/bench.js",
+        "examples/glass-bench/timeline.js"
+      ]
+    },
+    {
+      "id": "inside-concert-hall",
+      "title": "Inside the Concert Hall",
+      "group": "Rooms",
+      "description": "The camera moves from the seats into the roof framing of Cedar Hall.",
+      "entry": "examples/showcase-films/inside-concert-hall.html",
+      "sources": [
+        "examples/showcase-films/inside-concert-hall.html",
+        "examples/showcase-films/inside-concert-hall.js",
+        "examples/showcase-films/film.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "inside-a-meteorite",
+      "title": "Inside a Meteorite",
+      "group": "Rooms",
+      "description": "A Martian meteorite as a surface scan, a slice and two isosurfaces.",
+      "entry": "examples/live/entries/inside-a-meteorite.html",
+      "sources": [
+        "examples/live/entries/inside-a-meteorite.html",
+        "examples/showcase-films/inside-a-meteorite.js",
+        "examples/showcase-films/film.js",
+        "examples/live/asset-base.js"
+      ]
+    },
+    {
+      "id": "the-paper-aviary",
+      "title": "The Paper Aviary",
+      "group": "Rooms",
+      "description": "Folded paper birds, hatched and lit in a bright room.",
+      "entry": "examples/live/entries/the-paper-aviary.html",
+      "sources": [
+        "examples/live/entries/the-paper-aviary.html",
+        "examples/showcase-films/the-paper-aviary.js",
+        "examples/showcase-films/film.js"
+      ]
+    },
+    {
+      "id": "the-scanned-workshop",
+      "title": "The Scanned Workshop",
+      "group": "Rooms",
+      "description": "A daylight potting bench with two scanned plants.",
+      "entry": "examples/showcase-films/the-scanned-workshop.html",
+      "sources": [
+        "examples/showcase-films/the-scanned-workshop.html",
+        "examples/showcase-films/the-scanned-workshop.js",
+        "examples/showcase-films/film.js",
+        "examples/showcase-films/environment-films.js",
+        "examples/live/asset-base.js"
+      ]
+    }
+  ]
+}

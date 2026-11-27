@@ -1,0 +1,1 @@
+var e=(2-2**-24)*2**127;function t(t,n,r){if(!t||t.length!==n)throw TypeError(`${r} must contain ${n} finite numbers`);for(let i=0;i<n;i++){let a=t[i];if(typeof a!=`number`||!(a>-e&&a<e))throw TypeError(`${r} must contain ${n} finite Float32 numbers`)}}export{t};
