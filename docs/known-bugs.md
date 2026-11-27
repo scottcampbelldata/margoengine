@@ -2842,6 +2842,9 @@ test.
   Direct3D 11 load time on the layer against the shot tool's 180 s wait.
 - **Same on main:** main's tools/shot fails the same way. The film hook added for PA-03 does not change it.
 - **Windows run (RTX A6000, Chrome, 2026-11-27, main cd4508a015):** `MARGO_COMPAT=1 node tools/shot/test/sky-coverage-check.mjs` passes all three shots, orrery included, so the loss is specific to ANGLE Metal. A rerun on the M6 Mac with the new loss texts is the only way forward; no cause is claimed.
+- **Again on main feca833059 (RTX A6000, 2026-11-27, packages rebuilt):** the same command passes all three shots. The
+  device loss has reproduced only on the M6 Mac (ANGLE on Metal); this row stays open until a Mac session reruns it.
+  The Direct3D 11 load time above is a separate failure, seen on the Arc 140V laptop.
 
 ### Fixed 2026-11-26: GitHub CI's lint failed every pull request, and quality checked less there (KB-CI-MERGEBASE1, .github/workflows/ci.yml)
 
