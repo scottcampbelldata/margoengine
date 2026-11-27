@@ -99,6 +99,33 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause (not traced past this):** the day sky takes the smoke layer through `atmosphere.sunColor` and
   `scatteredLight`; the volumetric clouds are not dimmed or veiled by it.
 
+### Fixed 2026-11-27: TAA gave instanced primitives camera motion only (KB-TAA-INSTMOTION1, taa, gltf)
+
+- **Repro (before):** `node packages/taa/test/instance-velocity-browser.mjs`: two Box.glb instances (gltf/pbr
+  `PBRInstances`) under a still node and camera, the right one moving; no pixel of either box was reached by TAA's
+  object velocity pass, so the moving instance held the camera's motion (0) and smeared in history.
+- **Cause:** `drawMotion` (`packages/taa/src/index.ts`) returned for any primitive with `instances`: TAA had no
+  previous instance transforms.
+- **Fix:** TAA keeps a GPU copy of each drawn instance buffer's rows, taken after every velocity pass, and the velocity
+  program (`instancedVelocity`, `src/shader.ts`) moves each vertex by node x instance matrix now and then (reverse
+  reprojection per instance: Nehab et al. 2007; Yang, Liu and Salvi 2020, section 4.1). gltf/pbr's instance buffer
+  gains `COPY_SRC`. Copies of buffers no longer drawn are freed.
+- **Regression:** the same check: every moving-box pixel carries 0.6 to 1.4 times its median motion, no standing-box
+  pixel moves (WebGPU; in `test:gpu`). It fails on the parent (no box pixel reached).
+
+### Open 2026-11-27: on the WebGL2 layer some silhouette pixels of a moving mesh keep part of the camera's motion (KB-TAA-COMPATEDGE1, taa, webgl2-compat)
+
+- **Repro:** `node packages/taa/test/instance-velocity-browser.mjs --compat`: 25 of 10,812 pixels of the moving box
+  (its right edge, x 475 and 476, and a few on its lower left edge) read 0.4 to 0.5 times the box's motion while their
+  expected depth is the box's own (about 0.0159), so none of their four samples is sky. The same 25 pixels show with
+  the two boxes as plain gltf/pbr meshes moved by their nodes (a control run), so instancing is not the cause; WebGPU
+  gives every pixel its full motion.
+- **Cause (suspected, not proven):** the layer resolves TAA's 4x motion targets by the mean of the four samples
+  (`src/shader.ts`, `skySample` note); samples where the velocity pass's 'equal' depth test fails keep the camera
+  pass's motion and a reprojected depth of the same surface, so the mean halves the motion. Why 'equal' fails on those
+  edge samples on ANGLE but not on WebGPU (sample positions or @invariant in the GLSL translation) is not yet found.
+  `far-velocity-browser.mjs --compat` asserts only motion above 0, which such pixels pass.
+
 ### Fixed 2026-11-27: a voxel-pathtracer unit test failed on a loaded machine; the viewport ignored the fixed band budget (KB-VPT-BANDS-LOAD1, voxel-pathtracer)
 
 - **Repro (before):** `packages/voxel-pathtracer` unit suite (`node --test tests/*.test.js`) 15 times while 28 CPU

@@ -35,7 +35,7 @@ import { hiddenInTree } from '../../shared/visibility.js';
 import { reactiveMasks } from '../../shared/reactive-mask.js';
 import { requireCompatTier } from '../../shared/compat.js';
 export { halton, jitterProjection } from './jitter.js';
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; VERTEX: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
   TEXTURE_BINDING: number;
@@ -139,7 +139,11 @@ export interface VelocityPrimitive extends CasterCutout {
   cutoff?: number;
   /** UV set of `alphaTexture`, 0 or 1. */
   texCoord?: number;
-  /** Instanced (gltf\/pbrInstances) primitives get no object motion: camera reprojection covers static instances. */
+  /**
+   * Instanced primitives (gltf\/pbr `PBRInstances`, also behind materials `createInstancedMesh`): each instance moves by
+   * its own matrix now and last frame (TAA keeps last frame's rows on the GPU). A value without `upload` (another
+   * instancing kind) keeps camera reprojection only.
+   */
   instances?: unknown;
 }
 /** TAA's motion vectors and resolved frame ({@link TAA.velocity}), for effects such as `MotionBlur` (@margoengine/post). */
@@ -188,6 +192,33 @@ export interface VelocitySource {
   /** True once the source is disposed; TAA then forgets it. */
   readonly disposed?: boolean;
 }
+/** What TAA reads of a primitive's `instances` (gltf/pbr PBRInstances). */
+interface InstanceRows {
+  upload(device: GPUDevice): GPUBuffer;
+  readonly count: number;
+}
+/** An instance buffer's rows this frame and a GPU copy of last frame's; `frame` is the frame the copy holds. */
+interface InstanceHistory {
+  current: GPUBuffer;
+  previous: GPUBuffer;
+  frame: number;
+  count: number;
+}
+type MotionDraw = { r: Draw; p: VelocityPrimitive; rows?: InstanceHistory };
+// gltf/pbr's instance rows (96 bytes: matrix columns, tint, UV scale and offset) at the colour pass's locations 5 to
+// 10, and last frame's matrix columns at 11 to 14.
+const instanceBuffers: GPUVertexBufferLayout[] = [
+  {
+    arrayStride: 96,
+    stepMode: 'instance',
+    attributes: [5, 6, 7, 8, 9, 10].map((shaderLocation, i) => ({ shaderLocation, offset: i * 16, format: 'float32x4' })),
+  },
+  {
+    arrayStride: 96,
+    stepMode: 'instance',
+    attributes: [11, 12, 13, 14].map((shaderLocation, i) => ({ shaderLocation, offset: i * 16, format: 'float32x4' })),
+  },
+];
 interface Draw {
   uniform: GPUBuffer;
   /** What `uniform` holds: model, previous model, settings, alpha (and alpha UV rows). */
@@ -288,6 +319,7 @@ export class TAA implements EnginePlugin {
   private motionDepth?: GPUTextureView;
   private objectPipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
+  private instanceHistories = new Map<InstanceRows, InstanceHistory>();
   /** The object velocity draws' shared camera block, and its rows. */
   private objectCamera?: GPUBuffer;
   private readonly cameraRows = new Float32Array(40);
@@ -849,7 +881,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     const rect = viewRect(c);
     block.set(rect ? [rect[2] / c.width, rect[3] / c.height, rect[0] / c.width, rect[1] / c.height] : [1, 1, 0, 0], 36);
     c.device.queue.writeBuffer(this.objectCamera, 0, block as Float32Array<ArrayBuffer>);
-    const pending: { r: Draw; p: VelocityPrimitive }[] = [],
+    const pending: MotionDraw[] = [],
       submitted = new Map<Mesh, Set<object>>(),
       draw = (primitive: VelocityPrimitive) => {
         const key = primitive.primitive ?? primitive.index;
@@ -1022,9 +1054,11 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     }
     return this.whiteView;
   }
-  private drawMotion(c: Context, p: VelocityPrimitive, out: { r: Draw; p: VelocityPrimitive }[]): void {
-    // Per-instance previous transforms are unavailable; retain camera reprojection for these casters.
-    if (p.instances) return;
+  private drawMotion(c: Context, p: VelocityPrimitive, out: MotionDraw[]): void {
+    const rows = p.instances as InstanceRows | undefined;
+    // An instancing kind without its rows on the GPU keeps camera reprojection.
+    if (rows && typeof rows.upload !== 'function') return;
+    if (rows && !rows.count) return;
     p.node.check();
     if (p.node.engine !== this.engine || ![24, 80].includes(p.stride))
       throw new TypeError('Invalid TAA velocity primitive; use a mesh of this engine with stride 24 or 80');
@@ -1046,6 +1080,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       // A move that reads the graph's uniforms runs again on last frame's.
       before =
         displacement?.move?.some((line) => line.includes('ndu.')) && displacement.program ? displacement : undefined;
+    if (rows && p.stride !== 80) throw new TypeError('Invalid TAA instanced primitive; use a PBR primitive with stride 80');
     if ((opacity || animation || displacement || clip) && p.stride !== 80)
       throw new TypeError(
         'Invalid TAA opacity map, UV animation, displacement or clip; use it on a primitive with stride 80.',
@@ -1053,6 +1088,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     const pbr = p.stride === 80,
       solid = pbr && p.vertexAlpha === false,
       key =
+        (rows ? 'i:' : '') +
         p.stride +
         ':' +
         !!transform +
@@ -1083,6 +1119,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           graph,
           before && { move: before.move!, binding: before.program!.next },
           !!animation,
+          !!rows,
         ),
       });
       pipeline = c.device.createRenderPipeline({
@@ -1102,6 +1139,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
                   ]
                 : [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
             },
+            // This frame's instance rows (the colour pass's layout), then last frame's matrix columns.
+            ...(rows ? instanceBuffers : []),
           ],
         },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rg16float' }, { format: 'r32float' }] },
@@ -1264,14 +1303,39 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     }
     r.previous.set(p.node.matrix);
     r.frame = this.frame;
-    out.push({ r, p });
+    out.push({ r, p, ...(rows ? { rows: this.instanceRows(c, rows) } : {}) });
+  }
+  /**
+   * The instance rows of `rows` this frame and last frame. Last frame's are a GPU copy TAA takes after each motion
+   * pass (flushMotion); rows with no copy from the frame before (first frame, a skipped frame, a new buffer) start
+   * from this frame's, so they add no instance motion.
+   */
+  private instanceRows(c: Context, rows: InstanceRows): InstanceHistory {
+    const current = rows.upload(c.device);
+    let h = this.instanceHistories.get(rows);
+    if (!h || h.current !== current) {
+      h?.previous.destroy();
+      h = {
+        current,
+        previous: c.device.createBuffer({ size: current.size, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST }),
+        frame: -2,
+        count: 0,
+      };
+      this.instanceHistories.set(rows, h);
+    }
+    if (h.frame !== this.frame - 1 && h.frame !== this.frame) {
+      c.encoder.copyBufferToBuffer(current, 0, h.previous, 0, current.size);
+      h.frame = this.frame - 1;
+    }
+    h.count = rows.count;
+    return h;
   }
   /**
    * Draws the frame's object velocities in one render pass, then takes every PBR snapshot (this frame's vertices, read
    * as the previous ones next frame) in one compute pass: each draw reads its own snapshot buffer, so taking them all
    * after all draws is the same as after each.
    */
-  private flushMotion(c: Context, draws: { r: Draw; p: VelocityPrimitive }[], drawers: TAAVelocityPass[]): void {
+  private flushMotion(c: Context, draws: MotionDraw[], drawers: TAAVelocityPass[]): void {
     if (!draws.length && !drawers.length) return;
     const pass = c.encoder.beginRenderPass({
       colorAttachments: (this.motionViews.length ? this.motionViews : [this.velocityView!, this.expectedView!]).map(
@@ -1284,13 +1348,17 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       },
     });
     applyView(pass, c);
-    for (const { r, p } of draws) {
+    for (const { r, p, rows } of draws) {
       pass.setPipeline(r.pipeline);
       pass.setBindGroup(0, r.group);
       if (r.displaced) pass.setBindGroup(1, r.displaced);
       pass.setVertexBuffer(0, p.vertex, r.vertexOffset || undefined);
+      if (rows) {
+        pass.setVertexBuffer(1, rows.current);
+        pass.setVertexBuffer(2, rows.previous);
+      }
       pass.setIndexBuffer(p.index, 'uint32');
-      pass.drawIndexed(p.count);
+      pass.drawIndexed(p.count, rows?.count);
     }
     if (drawers.length) {
       const frame: TAAVelocityFrame = {
@@ -1304,6 +1372,18 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       for (const drawer of drawers) drawer.drawVelocity(pass, frame);
     }
     pass.end();
+    // This frame's instance rows become next frame's previous ones, once per instance buffer.
+    for (const { rows } of draws)
+      if (rows && rows.frame !== this.frame) {
+        c.encoder.copyBufferToBuffer(rows.current, 0, rows.previous, 0, rows.current.size);
+        rows.frame = this.frame;
+      }
+    // Instance buffers no primitive drew last frame or this one (removed, disposed or replaced) free their copy.
+    for (const [key, h] of this.instanceHistories)
+      if (h.frame < this.frame - 1) {
+        h.previous.destroy();
+        this.instanceHistories.delete(key);
+      }
     if (!draws.some(({ r }) => r.snapshot)) return;
     const copy = c.encoder.beginComputePass();
     copy.setPipeline(this.snapshotPipeline!);
@@ -1411,6 +1491,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.histories = [];
     this.historyDepths = [];
     this.draws.clear();
+    for (const h of this.instanceHistories.values()) h.previous.destroy();
+    this.instanceHistories.clear();
     this.objectPipelines.clear();
     this.scene = this.depth = this.velocityTarget = this.expected = undefined;
     this.uniform = undefined;

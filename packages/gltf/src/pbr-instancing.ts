@@ -7,7 +7,7 @@ import { instanceLayout, instanceMatrix } from '../../shared/instances.js';
 import { instancedShader } from './instanced-shader.js';
 import type { TextureTransform } from './pbr.js';
 import type { GLTFAsset } from './asset.js';
-declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number; STORAGE: number };
+declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number; STORAGE: number; COPY_SRC: number };
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0];
 /**
  * Per-instance data for gltf/pbr primitives (a matrix, a tint and a UV transform per instance):
@@ -209,8 +209,9 @@ export class PBRInstances {
       this.gpu?.destroy();
       this.gpu = device.createBuffer({
         size: this.data.byteLength,
-        // Storage: a GPU culler reads the rows (@margoengine/culling/models).
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+        // Storage: a GPU culler reads the rows (@margoengine/culling/models). Copy source: TAA keeps last frame's rows
+        // for instance motion vectors (@margoengine/taa).
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
       });
       this.device = device;
       this.low = 0;

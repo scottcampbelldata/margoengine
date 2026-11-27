@@ -1615,8 +1615,8 @@ read one set, and one material may take several sets (one storage buffer each, o
 The values are read in the colour pass and, for a `vertex` point, in shadows (cascaded, virtual, local and
 clustered), contact shadows and GPU picking of plain meshes, so what they move casts and picks where it draws. A
 device restore uploads them again. `@margoengine/culling` `CulledModels` and `FrontToBack` leave such instances in
-their own rows (drawn unculled and unsorted), since reordered rows would swap their values. Not covered: TAA gives
-instances camera motion only, GPU picking of instanced meshes tests the unmoved instances, mesh `bounds`, CPU
+their own rows (drawn unculled and unsorted), since reordered rows would swap their values. TAA gives each instance
+its own motion from its rows (`@margoengine/taa`, "Instances that move"). Not covered: GPU picking of instanced meshes tests the unmoved instances, mesh `bounds`, CPU
 raycasts, occluder depth, path tracing and exporters do not see what a shader moves or the values, and core meshes
 (`createStage` boxes, core `PbrMaterial`) do not take material plugins. Errors are `TypeError`, `RangeError` or
 `MargoError` `'disposed'` / `'unsupported'` with https://margoengine.com/errors#instance-attributes. Saving: pass

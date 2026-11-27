@@ -216,6 +216,35 @@ createMesh(engine, planeGeometry(2, 2), new NodeMaterial({positionNode: position
 engine.onFrame((_, delta) => { phase.value += delta * 4; }); // its motion reaches TAA by itself
 ```
 
+## Instances that move
+
+An instanced primitive (gltf/pbr `PBRInstances`, which materials `createInstancedMesh` uses) gets the motion of each
+instance, not only the camera's: TAA keeps last frame's instance rows in a GPU copy it takes after each velocity pass,
+and moves every vertex by node x instance matrix now and then, the reverse reprojection of Nehab et al. ("Accelerating
+real-time shading with reverse reprojection caching", Graphics Hardware 2007) per instance, as Yang, Liu and Salvi's
+survey of temporal antialiasing describes for object motion ("A Survey of Temporal Antialiasing Techniques", Computer
+Graphics Forum 39(2), 2020, section 4.1; Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014 course). Rows
+written with `setMatrixAt` or `setMatrices` reach it by themselves. An instance buffer seen for the first time, or after
+a frame TAA did not draw, starts from its own rows (no instance motion that frame). Each drawn instance buffer costs one
+copy of its rows on the GPU (96 bytes an instance), freed once no primitive draws it for a frame.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Material, createInstancedMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+import {TAA} from 'margoengine/taa';
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+TAA.attach(engine);
+const boxes = createInstancedMesh(engine, boxGeometry(1, 1, 1), new Material({color: '#4080c0'}), 2);
+boxes.instances.setMatrixAt(0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -1.5, 0, 0, 1]);
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  // Instance 1 slides; its pixels carry its own motion into TAA's velocity.
+  boxes.instances.setMatrixAt(1, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1.5 + Math.sin(time), 0, 0, 1]);
+});
+```
+
 ## Stereo and XR
 
 TAA runs per eye with no extra entry. `@margoengine/xr` with an engine from `createXREngine` draws each eye as a view of

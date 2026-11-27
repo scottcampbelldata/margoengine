@@ -922,7 +922,7 @@ for (let i = 0; i < 500; i++) forest.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 
 for (const primitive of tree.primitives) primitive.instances = forest;
 ```
 
-Not per instance: frustum culling and sorting of transparent instances (`MeshletMesh` of
+TAA gives each instance its own motion vectors from its rows (`@margoengine/taa`). Not per instance: frustum culling and sorting of transparent instances (`MeshletMesh` of
 `@margoengine/culling/meshlets` culls instances on the GPU). `BatchedMesh`, many different geometries in one draw, is
 `BatchedMesh.attach(engine, material, options)` from `@margoengine/materials/batched`.
 

@@ -34,6 +34,31 @@ export const multisampledCameraVelocity = /* @__PURE__ */ cameraVelocity.replace
   'if(d==0){o.depth=0;}',
   `if(d==0){o.depth=${skySample};}`,
 );
+/**
+ * An object velocity program for a gltf/pbr instanced primitive (PBRInstances): slot 1 holds this frame's instance rows
+ * (locations 5 to 10, the colour pass's layout), slot 2 last frame's (11 to 14, the matrix columns). Each vertex moves by
+ * node x instance matrix now and then, as reverse reprojection does for whole objects (Nehab et al. 2007; Yang, Liu
+ * and Salvi 2020, section 4.1). The current position keeps the colour pass's expression, (node x instance) x vertex,
+ * so the 'equal' depth test meets it (@invariant). The instance's UV scale and offset and its tint's alpha cut as the
+ * colour pass does.
+ */
+export function instancedVelocity(code: string): string {
+  const edits: [string, string][] = [
+    [
+      '@vertex fn vertex(i:Input,',
+      'struct MargoInstance {@location(5) m0:vec4f,@location(6) m1:vec4f,@location(7) m2:vec4f,@location(8) m3:vec4f,@location(9) tint:vec4f,@location(10) uvt:vec4f,@location(11) p0:vec4f,@location(12) p1:vec4f,@location(13) p2:vec4f,@location(14) p3:vec4f}\n@vertex fn vertex(i:Input,k:MargoInstance,',
+    ],
+    ['let world=f.model*p;', 'let world=(f.model*mat4x4f(k.m0,k.m1,k.m2,k.m3))*p;'],
+    ['o.previous=camera.previous*f.previousModel*old;', 'o.previous=camera.previous*(f.previousModel*mat4x4f(k.p0,k.p1,k.p2,k.p3))*old;'],
+    ['o.uv=i.uv;o.alpha=i.color.a;', 'o.uv=i.uv;o.uv=o.uv*k.uvt.xyxy+k.uvt.zwzw;o.alpha=i.color.a*k.tint.a;'],
+  ];
+  for (const [from, to] of edits) {
+    if (!code.includes(from))
+      throw new MargoError('state', 'TAA instanced velocity patch target missing; use matching @margoengine/taa sources');
+    code = code.replace(from, to);
+  }
+  return code;
+}
 export function objectVelocity(
   pbr: boolean,
   transformed = false,
@@ -44,6 +69,7 @@ export function objectVelocity(
   graph?: (code: string, group: number) => string,
   before?: { move: readonly string[]; binding: number },
   animated = false,
+  instanced = false,
 ): string {
   // A moving cut-out (MToon UV animation) reads its alpha map at the animated UV, bound at 9 to 11.
   let code = `${opacity ? opacityCode(0, 5) : ''}${animated ? animationCode(0, 9) : ''}
@@ -64,6 +90,7 @@ ${motion}
   // which otherwise appears as false velocity even when the surface has only projection jitter.
   let current=(i.current.xy/i.current.w*vec2f(0.5,-0.5)+0.5)*camera.viewport.xy+camera.viewport.zw;
   return motion(current,i.previous);}`;
+  if (instanced) code = instancedVelocity(code);
   if (solid) code = solidVertexDepth(code);
   // The previous frame's vertex moves by the same amount: a map or scale changing moves a surface without any velocity.
   if (graph)
