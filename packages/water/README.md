@@ -506,6 +506,24 @@ water.setTime(10);
 engine.render({delta: 0}); // the wake drawn where the physics has it
 ```
 
+For a straight quay with water on its +Z side, give `WaterWake` its physical `minWetZ`. Its full mirrored grid still
+supplies the height and slopes at the wall, while the rendered surface stops at the wet face. The CPU physics and
+WaveQuery still see the full grid. Sample the physical half when using that grid for a wall effect.
+
+`wallOvertoppingSpawn(previous, current, crest)` takes consecutive accepted wall samples and interpolates the
+world-space launch velocity at a rising crest crossing. The returned position and velocity can feed a VFX burst.
+The low-sill renderer proof separates incident-only waves, reflected elevation, and the visual droplets. The spray
+population is a rendering choice. Breaking, flip-through jets and overland transport require other models. The
+wave-tank experiments describe those jets and their spray breakup. [Watanabe and Ingram (2016), Size distributions of sprays produced by violent wave impacts on vertical sea walls](https://doi.org/10.1098/rspa.2016.0423).
+
+```ts
+import {wallOvertoppingSpawn, type WaterWallSample} from '@margoengine/water/wake';
+
+function acceptedRise(before: WaterWallSample, after: WaterWallSample, crest: readonly [number, number, number]) {
+  return wallOvertoppingSpawn(before, after, crest);
+}
+```
+
 ### Sliders for every control: settings
 
 `@margoengine/water/settings` lists every live Water control as one table for panels and tools, and names eleven looks made

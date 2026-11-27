@@ -94,7 +94,33 @@ try {
   assert.ok(subjects.hull > 60 && subjects.debris > 60, 'both bodies remain visible on the departure frame');
   const error = await page.evaluate(() => window.loadsQuay.dispose());
   assert.equal(error, null);
+
+  const wall = await page.evaluate(async () => {
+    const { createQuayOvertoppingScene } = await import('/packages/water/test/quay-overtopping-scene.js');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:480px;height:288px';
+    document.body.replaceChildren(canvas);
+    window.quayOvertopping = await createQuayOvertoppingScene(canvas);
+    return window.quayOvertopping.receipt;
+  });
+  assert.equal(wall.hash, wall.replay);
+  assert.equal(wall.incident.spawn, undefined);
+  assert.ok(wall.incident.peak < 0.08 && wall.incident.maxNormal > 0.1);
+  assert.ok(wall.reflected.peak > 0.13 && wall.reflected.maxNormal < 1e-12);
+  assert.ok(wall.reflected.spawn.velocity[1] > 0.45);
+  assert.deepEqual(wall.reflected.spawn.position, [0, 0.11, 0]);
+  assert.ok(wall.nodes > 30 && wall.maxDifference > 0.04 && wall.maxError < 2e-6);
+  const reflectionOnly = await capture('wall-reflection');
+  await page.evaluate(() => window.quayOvertopping.drawReflection(true));
+  const imagePixels = changedPixels(reflectionOnly, await capture('wall-image-domain'));
+  assert.ok(imagePixels > 500, 'the solver image domain stays off the rendered quay');
+  await page.evaluate(() => window.quayOvertopping.drawReflection(false));
+  await page.evaluate(() => window.quayOvertopping.showSpray());
+  const droplets = changedPixels(reflectionOnly, await capture('wall-overtopping'));
+  assert.ok(droplets > 3, 'the physical rising crest adds a visible spray response');
+  assert.equal(await page.evaluate(() => window.quayOvertopping.dispose()), null);
   assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ backend, ...wall, imagePixels, droplets }));
 } finally {
   await closeAll({ browser });
 }

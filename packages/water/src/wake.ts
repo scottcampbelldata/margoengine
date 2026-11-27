@@ -10,6 +10,44 @@ import { addSurfaceEffect } from './surface-effects.js';
 import { fault } from '../../shared/errors.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type Vec3 = readonly [number, number, number];
+
+/** State from an accepted wall sample, such as the reflecting edge of a physics wake. */
+export interface WaterWallSample {
+  /** Surface elevation in metres, in the same frame as the crest. */
+  readonly height: number;
+  /** Surface velocity in world axes, m/s. */
+  readonly velocity: Vec3;
+}
+
+/**
+ * The launch point and velocity of a visual spray burst when a rising physical surface crosses a wall's crest.
+ * Supply consecutive accepted wall samples and the fixed crest position at that sample. The velocity is interpolated
+ * at the crossing and can go directly to a VFX burst. A smooth subcrest rise has no airborne emitter. This draws a
+ * resolved overtopping crossing; droplet population and nonlinear wave impact are outside the linear wake model.
+ */
+export function wallOvertoppingSpawn(
+  previous: WaterWallSample,
+  current: WaterWallSample,
+  crest: Vec3,
+): { position: Vec3; velocity: Vec3; fraction: number } | undefined {
+  if (
+    !Number.isFinite(previous.height) ||
+    !Number.isFinite(current.height) ||
+    !crest.every(Number.isFinite) ||
+    !previous.velocity.every(Number.isFinite) ||
+    !current.velocity.every(Number.isFinite)
+  )
+    throw fault('state', 'Wall spray needs finite, consecutive wave samples and a crest in world metres.');
+  const level = crest[1];
+  if (!(previous.height < level && current.height >= level)) return undefined;
+  const fraction = (level - previous.height) / (current.height - previous.height);
+  const [a, b, c] = previous.velocity;
+  const [x, y, z] = current.velocity;
+  const velocity: Vec3 = [a + (x - a) * fraction, b + (y - b) * fraction, c + (z - c) * fraction];
+  if (!(velocity[1] > 0)) return undefined;
+  return { position: [crest[0], level, crest[2]], velocity, fraction };
+}
 
 /** A wake Water draws: its grid and its heights (x fastest, then z). `WakeSolver` of `@margoengine/physics/sea` is one. */
 export interface WaterWakeSource {
@@ -27,6 +65,8 @@ export interface WaterWakeOptions {
   surface: Water;
   /** The wake. */
   wake: WaterWakeSource;
+  /** Render only at or above this world Z, for a straight quay with water on its +Z side. Wave queries retain the full grid. */
+  minWetZ?: number;
 }
 
 let sequence = 0;
@@ -39,6 +79,7 @@ export class WaterWake implements EnginePlugin {
   readonly name = `water:wake-${sequence++}`;
   private readonly surface: Water;
   private readonly wake: WaterWakeSource;
+  private readonly minWetZ?: number;
   private engine?: Engine;
   private grid?: GPUBuffer;
   private field?: GPUBuffer;
@@ -51,7 +92,7 @@ export class WaterWake implements EnginePlugin {
 
   /** @throws TypeError without a Water or a wake with a grid and heights(). */
   constructor(options: WaterWakeOptions) {
-    const { surface, wake } = options ?? ({} as WaterWakeOptions);
+    const { surface, wake, minWetZ } = options ?? ({} as WaterWakeOptions);
     if (!surface || typeof (surface as { onDispose?: unknown }).onDispose !== 'function')
       throw new TypeError('WaterWake needs the Water it draws on; pass options.surface.');
     if (!wake || typeof wake.heights !== 'function' || !wake.grid)
@@ -59,8 +100,11 @@ export class WaterWake implements EnginePlugin {
     const [nx, nz] = wake.grid.cells;
     if (!(Number.isInteger(nx) && Number.isInteger(nz) && nx >= 4 && nz >= 4 && wake.grid.cellSize > 0))
       throw new TypeError('WaterWake needs a wake grid of at least 4 x 4 cells and a cell size above 0.');
+    if (minWetZ !== undefined && !(typeof minWetZ === 'number' && Number.isFinite(Math.fround(minWetZ))))
+      throw fault('state', 'Set the WaterWake wet-side boundary to a finite world Z in metres.');
     this.surface = surface;
     this.wake = wake;
+    this.minWetZ = minWetZ;
   }
 
   /** Attaches a wake to `engine` and to its Water. */
@@ -87,7 +131,7 @@ export class WaterWake implements EnginePlugin {
     });
     this.resources = [{ buffer: this.grid }, { buffer: this.field }];
     this.remove = addSurfaceEffect(this.surface, {
-      key: 'wake',
+      key: this.minWetZ === undefined ? 'wake' : 'wake-wet-side',
       vertex: true,
       count: 2,
       shader: (code, binding) => this.shader(code, binding),
@@ -111,7 +155,7 @@ export class WaterWake implements EnginePlugin {
         `The wake's grid changed size (${source.length} heights for ${this.heights.length}); attach a new WaterWake.`,
       );
     for (let i = 0; i < source.length; i++) this.heights[i] = source[i]!;
-    this.header.set([origin[0], origin[1], cellSize, 0, cells[0], cells[1], 0, 0]);
+    this.header.set([origin[0], origin[1], cellSize, this.minWetZ ?? 0, cells[0], cells[1], 0, 0]);
     c.device.queue.writeBuffer(this.grid!, 0, this.header);
     c.device.queue.writeBuffer(this.field!, 0, this.heights as Float32Array<ArrayBuffer>);
   }
@@ -128,7 +172,7 @@ fn wakeHeight(xz:vec2f)->f32 {let c=wakeGrid[0].z;let n=vec2f(wakeGrid[1].x,wake
  let a=vec2i(floor(p));let t=p-floor(p);
  return mix(mix(wakeAt(a),wakeAt(a+vec2i(1,0)),t.x),mix(wakeAt(a+vec2i(0,1)),wakeAt(a+vec2i(1,1)),t.x),t.y);}
 `;
-    return (
+    const water =
       prefix +
       code.replace(
         'return Surface(p,normalize(cross(binormal,tangent)),crest);',
@@ -137,8 +181,11 @@ fn wakeHeight(xz:vec2f)->f32 {let c=wakeGrid[0].z;let n=vec2f(wakeGrid[1].x,wake
  p.y+=wh;tangent.y+=(wakeHeight(xz+vec2f(wc,0))-wakeHeight(xz-vec2f(wc,0)))/(2.0*wc);
  binormal.y+=(wakeHeight(xz+vec2f(0,wc))-wakeHeight(xz-vec2f(0,wc)))/(2.0*wc);
  return Surface(p,normalize(cross(binormal,tangent)),crest);`,
-      )
-    );
+      );
+    // Keep the full surface and its derivatives at the face. Discard only the image-domain fragments.
+    return this.minWetZ === undefined
+      ? water
+      : water.replace('if(dry){discard;}', 'if(dry||i.world.z<wakeGrid[0].w){discard;}');
   }
 
   /** Stops drawing the wake and releases its buffers. */
