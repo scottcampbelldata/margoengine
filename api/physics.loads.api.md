@@ -325,6 +325,7 @@ export class PrescribedWakeWork implements Solver<undefined> {
 
 export interface PrescribedWakeWorkOptions {
     readonly source: SubmergedWakeSource;
+    readonly surface?: FieldDescriptor;
     readonly grid: WakeGrid;
     readonly mirrored?: boolean;
 }
