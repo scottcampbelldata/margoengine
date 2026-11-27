@@ -43,18 +43,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** a body that holds a volume or a gas takes the air on its windward faces only, at a cube face's 1.05 (Hoerner
   1965), which sums to 0.525 on a sphere. Regression: `packages/physics/tests/soft-volume.test.js` ("a closed volume
   feels the air on its windward side").
-### Open 2026-11-27: packages that load a WebGL2 route by import() draw their first frames differently until it arrives (KB-COMPAT-READY1, culling, dof, sky, splats, vfx, compute, voxel-pathtracer, scatter)
-
-- **Repro:** the class KB-SCATTER-ATTRCOMPAT1 found in shadows. On the WebGL2 layer each of these packages fetches its
-  compatibility route with `loadCompatRoute` when it attaches; until it arrives it waits or runs its WebGPU route on
-  the layer's CPU tier. `packages/dof/tests/dof.test.js` ("DOF alone on the WebGL2 layer shows the sharp scene"): the
-  first frames of a page show the scene sharp, later ones blurred, and nothing told a caller when frames stop changing.
-- **Cause:** `packages/shared/compat.js` said "no frame is drawn differently" while the route loads; that held only
-  where a check measured it. A check or film frame drawn on a loaded machine before the route differs from one after.
-- **Fix, per package:** a `ready` promise (`routeSettled` in `packages/shared/compat.js`), documented in the README
-  and awaited by the package's own checks. Done: dof, vfx, splats, compute (`ComputeFrame.ready`), sky; voxel-pathtracer's
-  `ready` already waited for its route kernel. Left: culling (three files) and scatter's `Scatter`, listed as owed in
-  `scripts/quality/compat-route-proofs.json`; the quality step `compat-routes` fails on any other route without `ready`.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -89,6 +77,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   flow, the entry of 2026-11-15). `features-browser.mjs` now holds the layer to the exact values
   (`test/derivative-check.mjs`) and reports what native does. A shader of your own that must run right natively on this
   GPU should take the derivative in the entry point, or use its value outside the branch too.
+
+### Fixed 2026-11-27: packages that loaded a WebGL2 route by import() drew their first frames differently until it arrived (KB-COMPAT-READY1, culling, dof, sky, splats, vfx, compute, voxel-pathtracer, scatter)
+
+- **Repro:** the class KB-SCATTER-ATTRCOMPAT1 found in shadows. On the WebGL2 layer each of these packages fetches its
+  compatibility route with `loadCompatRoute` when it attaches; until it arrives it waits or runs its WebGPU route on
+  the layer's CPU tier. `packages/dof/tests/dof.test.js` ("DOF alone on the WebGL2 layer shows the sharp scene"): the
+  first frames of a page show the scene sharp, later ones blurred, and nothing told a caller when frames stop changing.
+- **Cause:** `packages/shared/compat.js` said "no frame is drawn differently" while the route loads; that held only
+  where a check measured it. A check or film frame drawn on a loaded machine before the route differs from one after.
+- **Fix, per package:** a `ready` promise (`routeSettled` in `packages/shared/compat.js`), documented in the README
+  ("Exact first frames on the WebGL2 layer") and awaited by the package's own checks: dof 99d57ea87e, vfx 699d0c511d,
+  splats e279aba67e, compute 60dc62f075 (`ComputeFrame.ready`), sky c59a9a2aa7, culling f7197f4315 (`CulledMeshes`,
+  `CulledInstances`, `DynamicInstances`) and scatter's `Scatter` (the commit closing this row); voxel-pathtracer's
+  `ready` already waited for its route kernel. The owed list of `scripts/quality/compat-route-proofs.json` is empty.
+- **Regression:** each package's ready test (`packages/dof/tests/dof.test.js`, `packages/sky/test/compat-ready.test.js`,
+  `packages/culling/test/compat-ready.test.js`, `packages/scatter/test/compat-ready.test.js` and the others named in
+  those commits); the class check is the quality step `compat-routes` (5b24bdc8eb, `tests/quality-compat-routes.test.js`),
+  which fails on any file that loads a route with neither `ready` nor a recorded proof of identical frames.
 
 ### Fixed 2026-11-27: a remote voice was silent in Chromium (KB-NETCODE-VOICESILENT1, netcode)
 

@@ -86,7 +86,7 @@ await postBrowser(
       return shot();
     };
     const build = (values) =>
-      t((values) => {
+      t(async (values) => {
         const w = window.t;
         w.field?.dispose();
         w.field = w.Scatter.attach(w.engine, w.box(0.08, 0.6, 0.08), {
@@ -97,6 +97,7 @@ await postBrowser(
           seed: 3,
         });
         if (values) w.settings.applyScatterSettings(w.field, values);
+        await w.field.ready;
       }, values);
     const result = {};
     await build();
@@ -147,7 +148,7 @@ await postBrowser(
     // The lit field: a material, with a sun behind the blades.
     const lit = (options, values) =>
       t(
-        ([options, values]) => {
+        async ([options, values]) => {
           const w = window.t;
           w.field?.dispose();
           w.field = w.Scatter.attach(w.engine, w.box(0.08, 0.6, 0.08), {
@@ -160,6 +161,7 @@ await postBrowser(
             ...options,
           });
           if (values) w.settings.applyScatterSettings(w.field, values);
+          await w.field.ready;
         },
         [options, values],
       );

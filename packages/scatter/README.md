@@ -1078,6 +1078,22 @@ engine.onFrame((_, delta) => {
 });
 ```
 
+## Exact first frames on the WebGL2 layer
+
+`scatter.ready` is a promise that settles once every frame draws the instances as it will from then on. On the WebGL2
+compatibility layer a plain `Scatter` (no texture maps, no states) fetches its compatibility route (`import()`) when it
+attaches, and until it arrives frames run the WebGPU kernels on the layer. On WebGPU, and for every other Scatter, it is
+already settled. Await it before a frame that must be exact, such as a film frame or a pixel comparison:
+
+```ts
+import {Scatter} from 'margoengine/scatter';
+import {Engine, box} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const grass = Scatter.attach(engine, box(0.1, 0.4, 0.1), {count: 10_000, area: [20, 20]});
+await grass.ready;
+engine.render();
+```
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

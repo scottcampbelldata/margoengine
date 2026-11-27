@@ -52,6 +52,7 @@ try {
         remove?.();
         field?.dispose();
         field = Scatter.attach(engine, box(0.06, 0.8, 0.06), { count: 6000, area: [10, 10], seed: 5, wind });
+        await field.ready;
         remove = shadows.add(field);
         await waitForPipelines(async () => {
           engine.render({ delta: 0 });

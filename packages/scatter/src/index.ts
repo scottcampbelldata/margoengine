@@ -51,7 +51,7 @@ import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import { coverBlend, coverCode, splitDeclaration } from './cover.js';
 import { captureStage, type ScatterCapture } from './capture.js';
 export { coverCode, coverDeclaration, splitDeclaration } from './cover.js';
@@ -640,6 +640,7 @@ export class Scatter implements EnginePlugin {
   private readonly listOffsets = new Uint32Array(this.cullValues.buffer, 256, 4);
   /** On the WebGL2 layer, once loaded: the kernels as point draws on the GPU and draws without a read-back (./compat.js). */
   private route?: import('./compat.js').ScatterRoute;
+  private routeReady: Promise<void> = Promise.resolve();
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;
   /** `blades.translucency`, read from the material uniform once the lit shader has the stage (0: the shader as it was). */
@@ -934,32 +935,53 @@ export class Scatter implements EnginePlugin {
     const uniform = this.uniform;
     // A textured Scatter draws through the layer's generic tiers, as ScatterTiles does (the route's shadow stage has no uvs),
     // and so does one with states (the route's stages bind no pose entries).
-    if (this.constructor === Scatter && !this.uvs && !this.options.states)
-      loadCompatRoute(d, () => import('./compat.js'))?.then(({ ScatterRoute }) => {
-        if (this.uniform !== uniform) return;
-        this.route = new ScatterRoute({
-          device: d,
-          cull: this.cullCode(),
-          count: this.count,
-          capacity: this.ringCapacity(),
-          uniform,
-          rings: this.instances,
-          commands: this.commands!,
-          exclusions: this.exclusionBuffer!,
-          vertices: this.vertices,
-          indices: this.indices,
-          indexCounts: this.geometries.map((g) => g.indices.length),
-          values: this.values,
-          shadowCode,
-          shadowListCode,
-          shadowDepth,
-        });
-        this.pipelines.clear();
-        this.renderGroups.clear();
-        this.pbrGroups.clear();
-        // The capture stages are counted too now, and their ring groups bind each ring's count.
-        this.forgetCapture();
+    const route =
+      this.constructor === Scatter && !this.uvs && !this.options.states
+        ? loadCompatRoute(d, () => import('./compat.js'))
+        : undefined;
+    route?.then(({ ScatterRoute }) => {
+      if (this.uniform !== uniform) return;
+      this.route = new ScatterRoute({
+        device: d,
+        cull: this.cullCode(),
+        count: this.count,
+        capacity: this.ringCapacity(),
+        uniform,
+        rings: this.instances,
+        commands: this.commands!,
+        exclusions: this.exclusionBuffer!,
+        vertices: this.vertices,
+        indices: this.indices,
+        indexCounts: this.geometries.map((g) => g.indices.length),
+        values: this.values,
+        shadowCode,
+        shadowListCode,
+        shadowDepth,
       });
+      this.pipelines.clear();
+      this.renderGroups.clear();
+      this.pbrGroups.clear();
+      // The capture stages are counted too now, and their ring groups bind each ring's count.
+      this.forgetCapture();
+    });
+    // After the handler above: by then the route draws every frame.
+    this.routeReady = routeSettled(route);
+  }
+  /**
+   * Settles once every frame draws the instances as it will from then on. On the WebGL2 compatibility layer a plain
+   * Scatter (no texture maps, no states) loads its route (a dynamic import) when it attaches, and frames before it has
+   * loaded run the WebGPU kernels on the layer. Resolved at once on WebGPU and for every other Scatter. Read it after
+   * attaching, and await it before a frame that must be exact: a film frame, a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const grass = Scatter.attach(engine, box(0.1, 0.4, 0.1), { count: 10_000, area: [20, 20] });
+   * await grass.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
   }
   /**
    * Sets the cull reach for the wind now in `options.wind`: a bent instance reaches twice as far, so the reach doubles

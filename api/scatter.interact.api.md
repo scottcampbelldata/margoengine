@@ -82,6 +82,7 @@ class Scatter implements EnginePlugin {
     constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input?: ScatterOptions);
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): Scatter;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     protected applyReach(): void;
     protected applySway(): void;
     protected reachChanged(): void;

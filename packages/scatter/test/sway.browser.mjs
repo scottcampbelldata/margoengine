@@ -39,6 +39,7 @@ try {
       const d = engine.gpu;
       // A drawn Scatter: its frame values carry the sway, and its pose source is what every pass compiles.
       const field = Scatter.attach(engine, box(0.2, 2, 0.2), { count: 4, area: [4, 4], wind: [1, 0, 1, 20] });
+      await field.ready;
       engine.render({ delta: 0.5 });
       await d.queue.onSubmittedWorkDone();
       const parts = field.velocityParts();

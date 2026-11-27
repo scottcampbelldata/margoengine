@@ -1,7 +1,5 @@
 {
   "about": "scripts/quality/compat-routes.js (KB-COMPAT-READY1). proofs: a file that loads a WebGL2 route without a ready promise, with the test that proves its frames are identical before and after the route arrives. owed: files still without either; the list only shrinks.",
   "proofs": {},
-  "owed": [
-    "packages/scatter/src/index.ts"
-  ]
+  "owed": []
 }
