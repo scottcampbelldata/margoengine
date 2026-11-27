@@ -95,6 +95,10 @@ export interface Hull {
     readonly surgeAddedMass?: boolean;
     readonly panels?: HullPanelResponse;
     readonly shortWaveResistance?: boolean;
+    readonly wakeWaterplane?: {
+        readonly plane: WakeWaterplane;
+        readonly radius: number;
+    };
     readonly compartments?: readonly Compartment[];
     readonly openings?: readonly Opening[];
 }
@@ -320,6 +324,16 @@ export interface SlamStation {
 
 export type Vec3 = readonly [number, number, number];
 
+export interface WakeWaterplane {
+    readonly waterline: number;
+    readonly nodes: Float64Array;
+}
+
+export interface WakeWaterplaneOptions {
+    readonly maxPanelSize: number;
+    readonly maxRows?: number;
+}
+
 export interface WettedDrag {
     readonly coefficient: number;
     velocity(x: number, y: number, z: number, out: [number, number, number]): void;
@@ -334,6 +348,8 @@ export interface WettedLoads {
 export function addedMassInfinite(sections: readonly Section[], centre: readonly [number, number, number], density: number): Float64Array;
 
 export function bakeHullPanels(mesh: HullMesh, options: HullPanelOptions): Promise<HullPanelResponse>;
+
+export function bakeWakeWaterplane(mesh: HullMesh, waterline: number, options: WakeWaterplaneOptions): WakeWaterplane;
 
 export function deckOf(mesh: {
     readonly vertices: ArrayLike<number>;

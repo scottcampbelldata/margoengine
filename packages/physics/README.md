@@ -5439,6 +5439,43 @@ world.advance(18);
 console.log(meter.work().total > 0); // true
 ```
 
+#### Bake a reference waterplane
+
+`bakeWakeWaterplane(mesh, waterline, {maxPanelSize, maxRows})` cuts the closed indexed mesh at the
+reference waterline in hull coordinates. It returns `[x, z, area]` triples for the wet area. The
+positive quadrature weights integrate area and both first moments exactly. For heave, roll and pitch,
+multiply each area by the negative vertical velocity of its transformed point and by the time step
+to obtain its signed displaced volume. `maxPanelSize` bounds the panel's horizontal spans in metres.
+The optional `maxRows` checks the node count before allocation. The receiver's projection radius is a
+separate choice. [NIST Digital Library of Mathematical Functions §3.5(v)](https://dlmf.nist.gov/3.5.v)
+
+Give the hull `wakeWaterplane: {plane, radius}` and initialize its `HullSolver` with the wake option.
+Bake at its equilibrium draft using its reference mass and density. The solver copies the nodes into
+its fixed wake configuration and publishes the posed heave, roll and pitch flux. Either advancing
+mode can still publish its own rows. Choose `radius` for the receiver's grid. For the regular
+`WakeSolver`, allow at least one cell's radius so the cosine patch has support at every subcell
+position. `FiniteQuayWake` handles subcell deposition with its wet-cell projection.
+
+This is a linearized source at the equilibrium waterplane. The node positions follow rigid motion
+and the weights stay fixed. The body can use live pressure integration on its wetted hull. Large
+heel, appreciable immersion changes and flooding change the cross-section itself and require a
+live source integration or a new settled reference. For example, a constant-width box whose side
+walls still enclose the surface at 30 degrees has a live cross-section 15.5% larger than its upright
+reference due to the secant of the heel angle.
+
+```ts
+import {boxGeometry} from '@margoengine/geometry';
+import {bakeWakeWaterplane} from '@margoengine/physics/seakeeping';
+
+const box = boxGeometry(4, 2, 2);
+const plane = bakeWakeWaterplane({vertices: box.positions, indices: box.indices}, 0, {
+  maxPanelSize: 0.5, maxRows: 512,
+});
+let area = 0;
+for (let i = 2; i < plane.nodes.length; i += 3) area += plane.nodes[i]!;
+console.log(Math.abs(area - 8) < 1e-12); // true
+```
+
 #### Exchange energy with a free-surging hull
 
 `SurgeWakeCoupling` exchanges signed volume and a reciprocal longitudinal impulse with the finite-depth wake.

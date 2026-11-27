@@ -93,6 +93,7 @@ import { SHELL_PRESSURE_LAYOUT, SHELL_PRESSURE_WORDS, shellPressureField } from 
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
 import { submergedWakeNodes, type SubmergedWakeNode } from './submerged-wake.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
+import type { WakeWaterplane } from './wake-waterplane.js';
 import {
   interceptedBreadth,
   type ReflectingWaterline,
@@ -125,6 +126,13 @@ export interface Hull {
   readonly panels?: HullPanelResponse;
   /** Add mean axial wave-reflection loads on the hull's waterline. Default false. */
   readonly shortWaveResistance?: boolean;
+  /** Baked reference waterplane for heave, roll and pitch sources. A wake-enabled HullSolver copies its nodes. */
+  readonly wakeWaterplane?: {
+    /** Bake the hull mesh at its equilibrium waterline for the configured mass and density. */
+    readonly plane: WakeWaterplane;
+    /** Positive projection radius in metres, independent of the panel spacing. */
+    readonly radius: number;
+  };
   /**
    * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
    * its water at the start and its cargo. The body's mass includes the cargo, not the floodwater.
@@ -351,13 +359,16 @@ export class HullSolver implements Solver<HullParams> {
     Hull,
     {
       waterline: number;
+      mass: number;
+      density: number;
       sections: readonly Section[];
       submerged?: readonly SubmergedWakeNode[];
     }
   >();
   private readonly wakeRadius: number | null;
   private readonly wakeAdvance: boolean;
-  private wakeRowsPerHull = 0;
+  private wakeOffsets: number[] = [];
+  private wakeWaterplanes: Hull['wakeWaterplane'][] = [];
 
   /** Pass the crush damage or girder seam field to enable structural compartment openings. */
   constructor(
@@ -619,19 +630,46 @@ export class HullSolver implements Solver<HullParams> {
     this.wakeSources = null;
     this.submergedWakeSources = null;
     this.wakePlanes.clear();
+    this.wakeWaterplanes = hulls.map(({ wakeWaterplane }) => {
+      if (wakeWaterplane === undefined) return undefined;
+      const { plane, radius } = wakeWaterplane ?? {};
+      if (this.wakeRadius === null)
+        throw new MargoError('state', 'Enable the HullSolver wake option before assigning a baked waterplane.');
+      if (!(radius > 0 && Number.isFinite(radius)))
+        throw new MargoError('state', 'Set the baked waterplane projection radius to positive finite metres.');
+      const nodes = plane?.nodes;
+      if (
+        !(nodes instanceof Float64Array) ||
+        nodes.length === 0 ||
+        nodes.length % 3 !== 0 ||
+        !Number.isFinite(plane.waterline) ||
+        nodes.some((value, i) => !Number.isFinite(value) || (i % 3 === 2 && !(value > 0)))
+      )
+        throw new MargoError(
+          'state',
+          'Bake a nonempty reference waterplane with finite XZ coordinates and positive areas.',
+        );
+      return { plane: { waterline: plane.waterline, nodes: nodes.slice() }, radius };
+    });
     this.reflectingWaterlines.clear();
     if (this.wakeRadius !== null || hulls.some((hull) => hull.shortWaveResistance)) this.loads.surfacePiercing = false;
     else delete this.loads.surfacePiercing;
     if (this.wakeRadius !== null) {
       if (level !== 0)
         throw new MargoError('state', 'Hull wake sources use the world base rate. Set the hull and wake to level 0.');
-      this.wakeRowsPerHull = 2 * this.stations + (this.wakeAdvance ? this.stations + 1 : 0);
-      this.wakeSources = host.allocate(
-        'wakeSources',
-        hulls.length * this.wakeRowsPerHull * WAKE_SOURCE_WORDS * 8,
-        'f64',
-        WAKE_SOURCE_LAYOUT,
-      );
+      let rows = 0;
+      this.wakeOffsets = this.wakeWaterplanes.map((baked) => {
+        const start = rows;
+        rows += (baked ? baked.plane.nodes.length / 3 : 2 * this.stations) + (this.wakeAdvance ? this.stations + 1 : 0);
+        return start;
+      });
+      const bytes = rows * WAKE_SOURCE_WORDS * Float64Array.BYTES_PER_ELEMENT;
+      if (bytes > 0xffffffff)
+        throw new MargoError(
+          'state',
+          'Reduce the number of hulls or bake fewer waterplane rows to fit in the wake field.',
+        );
+      this.wakeSources = host.allocate('wakeSources', bytes, 'f64', WAKE_SOURCE_LAYOUT);
     }
     if (this.submergedWakeSource) {
       this.submergedWakeRowsPerHull = 4 * (this.stations + 1) * (this.submergedWakeSource.depths.length - 1);
@@ -1136,12 +1174,22 @@ export class HullSolver implements Solver<HullParams> {
     rows: Float64Array,
     submergedRows?: Float64Array,
   ): void {
+    const baked = this.wakeWaterplanes[index];
     let plane = this.wakePlanes.get(hull);
-    if (!plane) {
-      const waterline = stillWaterline(hull.mesh, mass, this.sea!.density ?? SEA_WATER);
-      const sections = hullSections(hull.mesh, waterline, this.stations);
+    const density = baked || !plane ? (this.sea!.density ?? SEA_WATER) : plane.density;
+    if (!plane || (baked && (plane.mass !== mass || plane.density !== density))) {
+      const waterline = stillWaterline(hull.mesh, mass, density);
+      if (baked && Math.abs(baked.plane.waterline - waterline) > 2e-6 * Math.max(1, Math.abs(waterline)))
+        throw new MargoError(
+          'state',
+          'Rebake the wake waterplane for the hull’s current reference mass and sea density.',
+        );
+      const sections =
+        !baked || this.wakeAdvance || this.submergedWakeSource ? hullSections(hull.mesh, waterline, this.stations) : [];
       plane = {
         waterline,
+        mass,
+        density,
         sections,
         submerged: this.submergedWakeSource
           ? submergedWakeNodes(hull.mesh, waterline, sections, this.submergedWakeSource.depths, this.wakeRadius!)
@@ -1149,22 +1197,42 @@ export class HullSolver implements Solver<HullParams> {
       };
       this.wakePlanes.set(hull, plane);
     }
-    let at = index * this.wakeRowsPerHull * WAKE_SOURCE_WORDS;
-    const gauss = 1 / (2 * Math.sqrt(3));
-    for (const { x, width, breadth } of plane.sections) {
-      const radius = Math.max(this.wakeRadius!, 0.5 * hypot(width, 0.5 * breadth));
-      const area = 0.5 * width * breadth;
-      // Two Gauss points integrate the transverse first flux moment of a rectangular waterplane strip.
-      for (const side of [-1, 1]) {
-        const point = rotate(pose.rotation, [x, plane.waterline, side * gauss * breadth]);
-        const px = pose.position[0] + point[0];
-        const pz = pose.position[2] + point[2];
-        const vertical = heave + spin[2]! * (px - centre[0]) - spin[0]! * (pz - centre[2]);
-        rows[at] = px;
-        rows[at + 1] = pz;
-        rows[at + 2] = radius;
-        rows[at + 4] = -area * vertical * dt;
-        at += WAKE_SOURCE_WORDS;
+    let at = this.wakeOffsets[index]! * WAKE_SOURCE_WORDS;
+    if (baked) {
+      const { nodes, waterline } = baked.plane;
+      const origin = rotate(pose.rotation, [0, waterline, 0]);
+      const forward = rotate(pose.rotation, [1, 0, 0]);
+      const right = rotate(pose.rotation, [0, 0, 1]);
+      const x0 = pose.position[0] + origin[0];
+      const z0 = pose.position[2] + origin[2];
+      const vertical = heave + spin[2]! * (x0 - centre[0]) - spin[0]! * (z0 - centre[2]);
+      const along = spin[2]! * forward[0] - spin[0]! * forward[2];
+      const across = spin[2]! * right[0] - spin[0]! * right[2];
+      for (let i = 0; i < nodes.length; i += 3, at += WAKE_SOURCE_WORDS) {
+        const x = nodes[i]!;
+        const z = nodes[i + 1]!;
+        rows[at] = x0 + x * forward[0] + z * right[0];
+        rows[at + 1] = z0 + x * forward[2] + z * right[2];
+        rows[at + 2] = baked.radius;
+        rows[at + 4] = -nodes[i + 2]! * (vertical + x * along + z * across) * dt;
+      }
+    } else {
+      const gauss = 1 / (2 * Math.sqrt(3));
+      for (const { x, width, breadth } of plane.sections) {
+        const radius = Math.max(this.wakeRadius!, 0.5 * hypot(width, 0.5 * breadth));
+        const area = 0.5 * width * breadth;
+        // Two Gauss points integrate the transverse first flux moment of a rectangular waterplane strip.
+        for (const side of [-1, 1]) {
+          const point = rotate(pose.rotation, [x, plane.waterline, side * gauss * breadth]);
+          const px = pose.position[0] + point[0];
+          const pz = pose.position[2] + point[2];
+          const vertical = heave + spin[2]! * (px - centre[0]) - spin[0]! * (pz - centre[2]);
+          rows[at] = px;
+          rows[at + 1] = pz;
+          rows[at + 2] = radius;
+          rows[at + 4] = -area * vertical * dt;
+          at += WAKE_SOURCE_WORDS;
+        }
       }
     }
     if (submergedRows && throughWater !== 0) {

@@ -18052,6 +18052,14 @@ The surface impulse and absorber lie outside the conservative composition. The r
 pressure uses the accepted potential difference across the whole tick.
 [Yoshida](https://doi.org/10.1016/0375-9601%2890%2990092-3)
 
+The reference hull waterplane cuts the indexed triangle mesh into exact spans between adjacent
+longitudinal knots. On each subdivided trapezoid use four-point Gauss–Legendre nodes in each
+direction on `[0,1]`. The change of coordinates includes the local trapezoid breadth. The affine
+vertical velocity is `heave + ωz (x − cmx) − ωx (z − cmz)`. Its area integral and the centroid
+terms are exact for the polygon at the reference draft. Shorter panels converge the signed wave
+coefficients independently of the receiver's mollifier. The tests use a closed-form rectangle
+Fourier integral and a disconnected waterplane. [NIST DLMF §3.5(v)](https://dlmf.nist.gov/3.5.v)
+
 ## physics rod vortex-induced vibration calibrated and checked against towed and sheared pipes (2026-11-27)
 
 Files: `packages/physics/src/loads/segments.ts`, `packages/physics/tests/rod-viv.test.js`, `packages/physics/tests/rod.test.js`,

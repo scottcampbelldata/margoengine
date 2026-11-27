@@ -10703,6 +10703,13 @@ publishing the rigid impulse and volume. On an active tick either coupling uses 
 to construct its advancing basis and one to apply the scaled source. The three surface unit profiles
 do not require volume solves. The waterplane and guided degrees of freedom above also apply near the fixed quay.
 
+`Hull.wakeWaterplane` is an optional fixed-reference source for prescribed surface motion. The quadrature
+uses three f64 values per node for local X, Z and area. The copied bake is paired with one five-f64 wake
+row per node. The existing advancing source keeps its own resolution. Use a radius supported by the chosen
+wake receiver and choose the spacing from the physical wavelengths. Changing the equilibrium mass or
+density can require a new bake. Large heel and changes of immersion need a live waterplane.
+The optional seakeeping entry measures 41,106 B gzip.
+
 Water's optional wake entry draws the rigid wet mask and the finite-domain heights from the same source.
 The mask is fixed per attachment and occupies one u32 per cell on the GPU. The surface reconstruction
 uses connected bilinear weights and the same wet-side derivative as the finite pressure receiver.

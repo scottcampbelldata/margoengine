@@ -6,7 +6,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { hostMath } from '../../../../scripts/check-pinned-math.mjs';
 import { Physics } from '../../dist/index.js';
+import { FiniteQuayWake } from '../../dist/loads.js';
 import {
+  bakeWakeWaterplane,
   GRAVITY,
   hullMemory,
   SEA_VISCOSITY,
@@ -20,6 +22,7 @@ import {
   lateralSection,
   lewisForm,
   SEA_WATER,
+  stillWaterline,
   volumeBelow,
   wettedLoads,
 } from '../../dist/seakeeping.js';
@@ -2723,7 +2726,7 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
     indices: readAccessor(glb, primitive.indices).values,
   };
 
-  function run(mesh) {
+  function run(mesh, finite) {
     const density = 1025,
       depth = 3,
       world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(false) });
@@ -2734,8 +2737,15 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
       colliders: { shape: 'convexHull', points: mesh.vertices, mass: 2400 },
     });
     const hull = new HullSolver('hull', { minimumRadius: 0.25, submergedAdvance: [0, 0.25, 0.55] });
-    const wake = new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
-    const sea = new SpectralSea({
+    const cells = [48, 32],
+      cellSize = 0.25;
+    const wake = finite
+      ? new FiniteQuayWake('wake', { surface: hull.wakeSourceField, submerged: hull.submergedWakeSource })
+      : new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
+    const wakeWaterplane = finite
+      ? { plane: bakeWakeWaterplane(mesh, stillWaterline(mesh, body.mass, density), { maxPanelSize: 0.5 }), radius: 0.15 }
+      : undefined;
+    const sea = finite ? wake.seaSurface() : new SpectralSea({
       waves: {
         frequencies: Float64Array.of(0.5),
         directions: Float64Array.of(0),
@@ -2748,7 +2758,7 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
     world
       .add(new RigidSolver(), { physics })
       .add(hull, {
-        hulls: [{ row: body.row, mesh }],
+        hulls: [{ row: body.row, mesh, wakeWaterplane }],
         sea,
         radiation: false,
         addedMass: false,
@@ -2759,7 +2769,12 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
         greenWater: false,
         slamming: false,
       })
-      .add(wake, { cells: [48, 32], cellSize: 0.25, depth, sponge: 0, density })
+      .add(
+        wake,
+        finite
+          ? { cells, cellSize, origin: [-6, -4], depths: [0, 0.25, 0.55, 1.5, depth], density, pressureAtDepth: true }
+          : { cells, cellSize, depth, sponge: 0, density },
+      )
       .couple(['hull', 'wake', 'rigid'], 'staggered');
 
     const zero = world.takeSnapshot();
@@ -2782,7 +2797,8 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
     };
   }
 
-  assert.deepEqual(run(importedHull), run(codeHull));
+  assert.deepEqual(run(importedHull, false), run(codeHull, false));
+  assert.deepEqual(run(importedHull, true), run(codeHull, true));
 });
 
 test('submerged HullSolver wake preserves an eccentric waterplane, fixed work and a real frame-zero replay', async () => {

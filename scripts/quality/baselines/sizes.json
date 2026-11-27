@@ -14551,6 +14551,11 @@
     },
     {
       "date": "2026-11-27",
+      "commit": "sea-12-reference-waterplane",
+      "reason": "SEA-12 precise indexed reference waterplane and per-hull optional source rows move physics/seakeeping from 39456 to 41106 B gzip and its ceiling from 40620 to 42340 B. The bake and live publisher share mesh and wake layout validation in the same optional entry. A split would require callers to manage two independent wake imports. Core and Stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
       "commit": "finite-quay-horizontal-order",
       "reason": "SEA-12 optional fourth-order horizontal potential flux changes physics/loads from 61164 to 61406 B gzip and its cap from 61338 to 63248 B. Both orders share the same boundary geometry, potential, source work and sampler, so a separate entry would duplicate that public setup. Core and Stage are unchanged."
     },
@@ -15512,7 +15517,7 @@
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 7880,
-    "@margoengine/physics/seakeeping": 40620,
+    "@margoengine/physics/seakeeping": 42340,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,
