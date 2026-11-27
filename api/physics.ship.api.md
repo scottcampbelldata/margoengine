@@ -154,6 +154,8 @@ export const KVLCC2_L7: ManoeuvringModel;
 
 export const KVLCC2_PROPELLER: PropellerCurves;
 
+export const MACON_BLADE: readonly (readonly [number, number, number])[];
+
 export class Manoeuvring {
     model: ManoeuvringModel;
     readonly state: ManoeuvringState;
@@ -262,6 +264,13 @@ export interface ManoeuvringState {
     rudder: number;
     heel?: number;
     rollRate?: number;
+}
+
+export interface Oar {
+    readonly pin: readonly [number, number, number];
+    readonly side: 1 | -1;
+    readonly outboard: number;
+    readonly area?: number;
 }
 
 export interface PlaningBoat {
@@ -412,6 +421,56 @@ export interface ResolvedRace extends PropellerRace {
         readonly force: readonly [number, number, number];
     };
     readonly density?: number;
+}
+
+export interface RowingBoat {
+    readonly row: number;
+    readonly oars: readonly Oar[];
+    readonly crew: number;
+    readonly travel?: number;
+    readonly drag: number | ((speed: number) => number);
+    readonly forward?: readonly [number, number, number];
+    readonly up?: readonly [number, number, number];
+}
+
+export interface RowingControl {
+    rate: number;
+    drive: number;
+    catchAngle: number;
+    finishAngle: number;
+    turn: number;
+}
+
+export interface RowingParams {
+    readonly boats: readonly RowingBoat[];
+    readonly density?: number;
+    readonly capacity?: number;
+    readonly level?: RateLevel;
+}
+
+export class RowingSolver implements Solver<RowingParams> {
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: RowingParams): void;
+    control(index: number): RowingControl;
+    status(index: number): RowingStatus;
+    step(context: StepContext, _dt: number): void;
+    importPorts(_tick: number): void;
+    exportPorts(tick: number): readonly Port[];
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface RowingStatus {
+    phase: number;
+    driving: boolean;
+    angle: number;
+    speed: number;
+    hull: number;
+    propulsion: number;
+    propulsivePower: number;
+    rowingPower: number;
+    crewOffset: number;
 }
 
 export const SEA_WATER_DENSITY = 1025;
@@ -643,6 +702,11 @@ export function bankLoads(hull: BankHull, yB: number, depth: number, u: number, 
 export function besselI1(x: number): number;
 
 export function besselK1(x: number): number;
+
+export function bladeCoefficients(alpha: number): {
+    lift: number;
+    drag: number;
+};
 
 export function cavityRadius(circulation: number, core: number, ambient: number, vapour?: number, density?: number): number;
 

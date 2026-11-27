@@ -4262,6 +4262,30 @@ The parts work on their own too:
 
 Planing boats run on rigid bodies under a `PlaningSolver`: each boat's prismatic bottom (`{row, beam, deadrise, length, transom, forward, up, propeller, thrustAngle}`) is cut into strips across the keel, each a wedge entering the water by Zarnick's (1978) momentum theory: the rate of change of its added mass's momentum, its cross-flow drag and its buoyancy, the added masses moved to the left of the heave and pitch equations, falling to nothing at the transom by Garme's function. The body rises, trims and runs at its own attitude, and porpoises where a real boat does. Set `control(i).thrust`, read `status(i)` (trim, immersion, speed, normal force, friction, wetted lengths, resistance, airborne). Couple it before the rigid solver and give it the rigid solver's `level` (its fixedTimestep's: a 1 m model wants 1/480 s); the world needs gravity. Surge, heave and pitch only.
 
+Rowing boats run under a `RowingSolver`: each oar (`{pin, side, outboard, area}`, its pin in the body's frame, 1 starboard or -1 port, the pin-to-blade-centre length and the blade's area, default the Macon blade's 0.108 m^2) sweeps from its catch to its finish angle in the drive with a half-cosine sweep and back in the recovery, and its blade takes the lift and drag Caplan and Gardner measured on a Macon blade (`bladeCoefficients(alpha)`), from when it starts to move aft through the water to when it would move forward again. The crew (`crew`, kg, part of the body's mass) moves fore and aft by `travel` (default 0.6 m) each stroke, and the hull's `drag` (k for k v^2, or a function of the speed) acts at the hull's own speed. Set `control(i)`: `rate` (strokes a minute), `drive` (s), `catchAngle` and `finishAngle` (rad, 0 square to the hull, negative toward the bow) and `turn` (-1 to 1, shortening one side's sweep to turn); `status(i)` reads the phase, the oars' angle, the speed and the hull's, the blades' push and the rowers' power.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {RowingSolver} from 'margoengine/physics/ship';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+// A men's single scull at 35 strokes a minute from a standing start (pitch and roll held: nothing floats it here).
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 240, gravity: [0, 0, 0]});
+const shell = physics.addBody(null, {enabledRotations: [false, true, false], colliders: {shape: 'box', halfExtents: [4, 0.2, 0.2], mass: 103}});
+const rowing = new RowingSolver();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(rowing, {boats: [{row: shell.row, crew: 85.8, drag: 3.19, oars: [
+    {pin: [0, 0.2, 0.8], side: 1, outboard: 1.8, area: 0.08},
+    {pin: [0, 0.2, -0.8], side: -1, outboard: 1.8, area: 0.08},
+  ]}], level: 2})
+  .couple(['rowing', 'rigid'], 'staggered');
+Object.assign(rowing.control(0), {rate: 35, drive: 0.85, catchAngle: (-62 * Math.PI) / 180, finishAngle: (43.5 * Math.PI) / 180});
+world.advance(60 * 30);
+console.log(shell.position[0] > 100); // true: well under way
+```
+
 ```ts
 import {savitsky} from 'margoengine/physics/ship';
 

@@ -32,6 +32,8 @@ import {
   Propeller,
   ShipSolver,
   holtropMennen,
+  bladeCoefficients,
+  RowingSolver,
   savitsky,
   PlaningSolver,
   addedResistance,
@@ -1423,4 +1425,95 @@ test('a planing boat on a rigid body runs at the trim and wetted length Fridsma 
     assert.ok(r.swing < 2, `${aft} ${cv}: swings ${r.swing} degrees`);
   }
   assert.ok(run(0.7, 3.99).swing > 2);
+});
+
+test("oars: Caplan and Gardner's Macon blade, Coppel et al.'s eight, and a single scull against Holt et al.'s racing measurements", () => {
+  // The blade's coefficients through the measured points (Coppel et al. 2009, Table 1).
+  for (const [a, lift, drag] of [
+    [20, 0.7, 0.22],
+    [90, 0.04, 1.85],
+    [135, -1.19, 1.25],
+  ]) {
+    const c = bladeCoefficients(a * DEG);
+    assert.ok(Math.abs(c.lift - lift) < 1e-9 && Math.abs(c.drag - drag) < 1e-9, `${a}: ${c.lift} ${c.drag}`);
+  }
+  assert.ok(bladeCoefficients(0).drag === 0);
+  const row = (boat, stroke, speed, mass, halfLength) => {
+    const physics = new Physics(null, { fixedTimestep: 1 / 240, gravity: [0, 0, 0] }),
+      // Pitch and roll held: the hull's buoyancy that holds them is not in this world.
+      body = physics.addBody(null, {
+        linearVelocity: [speed, 0, 0],
+        enabledRotations: [false, true, false],
+        colliders: { shape: 'box', halfExtents: [halfLength, 0.2, 0.2], mass },
+      }),
+      rowing = new RowingSolver(),
+      world = new PhysicsWorld({ rate: { num: 240, den: 1 } })
+        .add(new RigidSolver(), { physics })
+        .add(rowing, { boats: [{ row: body.row, ...boat }], level: 2 })
+        .couple(['rowing', 'rigid'], 'staggered');
+    Object.assign(rowing.control(0), stroke);
+    let sum = 0,
+      power = 0,
+      useful = 0,
+      n = 0,
+      lo = Infinity,
+      hi = -Infinity;
+    for (let t = 1; t <= 240 * 30; t++) {
+      world.advance(t);
+      const s = rowing.status(0);
+      if (t > 240 * 20) {
+        sum += s.hull;
+        power += s.rowingPower;
+        useful += s.propulsivePower;
+        n++;
+        lo = Math.min(lo, s.hull);
+        hi = Math.max(hi, s.hull);
+      }
+    }
+    return { speed: sum / n, power: power / n, efficiency: useful / power, range: hi - lo, body };
+  };
+  // Coppel et al.'s heavyweight eight: crew 740 kg, boat and cox 146 kg, 30 strokes a minute, drive 0.92 s, catch -55 and
+  // finish 35 degrees, outboard 2.365 m, Macon blades, Wellicome's drag with Hoerner's air: their model ran at 5.25 m/s.
+  const oars = [];
+  for (let i = 0; i < 8; i++)
+    oars.push({
+      pin: [4.2 - 2.8 * Math.floor(i / 2), 0.2, (i % 2 ? 1 : -1) * 0.84],
+      side: i % 2 ? 1 : -1,
+      outboard: 2.365,
+    });
+  const eight = row(
+    { oars, crew: 740, drag: (v) => 13.05 * v * v - 11.22 * v + 24.93 + 8 * 0.348 * v * v },
+    { rate: 30, drive: 0.92, catchAngle: -55 * DEG, finishAngle: 35 * DEG },
+    5,
+    886,
+    8.5,
+  );
+  // 7 percent below theirs: the blade goes in only once it moves aft through the water (docs/limits.md).
+  assert.ok(Math.abs(eight.speed / 5.25 - 1) < 0.08, `eight ${eight.speed} m/s against 5.25`);
+  assert.ok(Math.abs(eight.body.position[2]) < 1e-6, 'a balanced rig runs straight');
+  // A men's single at 35.1 strokes a minute, catch -62 and finish 43.5 degrees (Holt et al. 2020, 2021: 4.60 +- 0.10 m/s,
+  // a 2.27 m/s swing within the stroke), Kleshnev's drag 3.19 N s^2/m^2, a sculler of 85.8 kg in 17 kg of boat and oars;
+  // the blades 0.08 m^2 at 1.80 m and a 0.85 s drive are assumptions. Kleshnev measured singles' blades 78.5 +- 3.1 percent
+  // efficient.
+  const single = row(
+    {
+      oars: [
+        { pin: [0, 0.2, 0.8], side: 1, outboard: 1.8, area: 0.08 },
+        { pin: [0, 0.2, -0.8], side: -1, outboard: 1.8, area: 0.08 },
+      ],
+      crew: 85.8,
+      drag: 3.19,
+    },
+    { rate: 35.1, drive: 0.85, catchAngle: -62 * DEG, finishAngle: 43.5 * DEG },
+    4.5,
+    103,
+    4,
+  );
+  assert.ok(Math.abs(single.speed / 4.6 - 1) < 0.05, `single ${single.speed} m/s against 4.60`);
+  assert.ok(Math.abs(single.range / 2.27 - 1) < 0.1, `swing ${single.range} against 2.27`);
+  assert.ok(single.efficiency > 0.785 - 2 * 0.031 && single.efficiency < 0.785 + 2 * 0.031, `${single.efficiency}`);
+  assert.throws(
+    () => row({ oars: [{ pin: [0, 0, 1], side: 2, outboard: 2 }], crew: 80, drag: 3 }, {}, 0, 100, 4),
+    (e) => e.code === 'unsupported' && /side: 1/.test(e.message),
+  );
 });

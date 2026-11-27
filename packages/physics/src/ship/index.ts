@@ -11,6 +11,7 @@ export * from './planing-solver.js';
 export * from './propeller.js';
 export * from './race.js';
 export * from './resistance.js';
+export * from './rowing.js';
 export * from './shallow.js';
 export * from './squat.js';
 export * from './waves.js';

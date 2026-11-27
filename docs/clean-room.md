@@ -17176,6 +17176,20 @@ Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in hori
 this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
 the ship solver heels in its turn".
 
+### Oars (SEA-09, `RowingSolver`, `bladeCoefficients`, `MACON_BLADE`, 2026-11-27)
+
+`packages/physics/src/ship/rowing.ts`, written from A. Coppel, T. Gardner, N. Caplan and D. Hargreaves, "Oar blade force
+coefficients and a mathematical model of rowing", ISBS 2009, https://ojs.ub.uni-konstanz.de/cpa/article/view/3132 (all 4
+pages read: Table 1, Caplan and Gardner's 2007 measured Macon coefficients, the cubic spline, the boat equation and the
+eight's inputs and speed), A. L. Coppel, PhD thesis, University of Birmingham, 2010, https://etheses.bham.ac.uk/id/eprint/793/
+(Chapter 5 read: eqs. 5.3 to 5.5, Table 5.1, the stroke's angles), E. J. Grift, M. J. Tummers and J. Westerweel, J. Fluid
+Mech. 918, A29, 2021 (pp. 2 to 7 and 19 to 22: the quasi-steady model's limits), and the measurements the test holds: A. C.
+Holt et al., Front. Sports Act. Living 2, 589013, 2020 (Table 1) and PLoS One 16(8), e0249122, 2021 (Table 1), and V.
+Kleshnev, "Propulsive efficiency of rowing", ISBS 1999 (Table 2). Caplan and Gardner's 2007 papers themselves were not
+obtained. No rowing code was read. The natural cubic spline, putting the blade in only while it moves aft, and holding
+the blades' forces at the pins' height are this package's own. Proof: `packages/physics/tests/ship.test.js`, "oars", and
+`packages/physics/tests/coupling/rowing.test.js`.
+
 ### Planing hulls (SEA-09, `savitsky`, `planingLoads`, `PlaningSolver`, 2026-11-27)
 
 `packages/physics/src/ship/planing.ts` and `packages/physics/src/ship/planing-solver.ts`, written from:
