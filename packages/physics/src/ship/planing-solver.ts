@@ -104,6 +104,7 @@ export class PlaningSolver implements Solver<PlaningParams> {
   private statuses: PlaningStatus[] = [];
   private forces!: Region;
   private cell: [number, number, number] = [0, 0, 0];
+  private work = { boats: 0, strips: 0 };
   private readonly strips = {
     ma: new Float64Array(STRIPS),
     vn: new Float64Array(STRIPS),
@@ -214,11 +215,13 @@ export class PlaningSolver implements Solver<PlaningParams> {
     this.cell = [context.cell[0], context.cell[1], context.cell[2]];
     const out = regionWords(this.host.memory, this.forces) as Float64Array;
     out.fill(0);
+    this.work = { boats: 0, strips: 0 };
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     if (!port) return;
     const memory = port.region.memory ?? this.host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4);
     this.boats.forEach((boat, index) => {
+      this.work.boats++;
       const at = boat.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) return;
       this.boat(boat, index, bodies, at, out);
@@ -282,6 +285,7 @@ export class PlaningSolver implements Solver<PlaningParams> {
       const sinking = -dot(pointVelocity, vertical) / cosTrim;
       ma[i] = rate[i] = area[i] = halfBeam[i] = 0;
       if (!(d > 0)) continue;
+      this.work.strips++;
       keel = (i + 1) * dx;
       const wet = d >= chineDepth,
         b = wet ? half : ((Math.PI / 2) * d) / tanBeta;
@@ -376,6 +380,11 @@ export class PlaningSolver implements Solver<PlaningParams> {
     status.normal = lift + dot(buoyant, up);
     status.friction = friction;
     status.resistance = -dot(add(scale(up, lift), add(buoyant, scale(fwd, -friction))), course);
+  }
+
+  /** The work of the last step: boats stepped and wetted strips summed (deterministic counts). */
+  workCounts(): Readonly<{ boats: number; strips: number }> {
+    return this.work;
   }
 
   importPorts(_tick: number): void {}

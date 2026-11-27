@@ -1607,3 +1607,46 @@ test("a sailing yacht by the Delft series and the ORC's sails: Sysser 44's wette
     assert.ok(Math.abs(-s.heel - vpp.heel) < 2.5 * DEG, `${twa}: heel ${s.heel / DEG} against ${vpp.heel / DEG}`);
   }
 });
+
+test("the ships' work counts are deterministic and grow with the fleet, and the telegraph holds a speed order through ice", () => {
+  // Two ships against one: each step evaluates each ship's MMG forces once and tests each wall once per ship.
+  const fleet = (count) => {
+    const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+      rows = [];
+    for (let i = 0; i < count; i++)
+      rows.push(
+        physics.addBody(null, {
+          position: [0, 0, 20 * i],
+          linearVelocity: [1, 0, 0],
+          colliders: { shape: 'box', halfExtents: [3.5, 0.46, 0.635], mass: 1025 * KVLCC2_L7.volume },
+        }).row,
+      );
+    const ships = new ShipSolver(),
+      world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+        .add(new RigidSolver(), { physics })
+        .add(ships, {
+          ships: rows.map((row) => ({ row, model: { ...KVLCC2_L7, centre: 0 } })),
+          walls: [{ from: [-50, -10], to: [50, -10] }],
+        })
+        .couple(['ship', 'rigid'], 'staggered');
+    for (const [i] of rows.entries()) ships.control(i).revolutions = 8;
+    world.advance(10);
+    return ships.workCounts();
+  };
+  const one = fleet(1),
+    two = fleet(2);
+  assert.deepEqual(one, { ships: 1, forceEvaluations: 1, driftTables: 0, wallTests: 1, shallowModels: 0 });
+  assert.deepEqual(two, { ships: 2, forceEvaluations: 2, driftTables: 0, wallTests: 2, shallowModels: 0 });
+  // The telegraph: ordered 1.0 m/s, the model steams at it in open water and holds it as it enters ice a centimetre thick.
+  const iceHull = { stem: 30 * DEG, bow: 1.5, parallel: 3 },
+    { ships, world } = plane({ iceHull }, { speed: 0.6, params: { ice: { thickness: (x) => (x > 80 ? 0.01 : 0) } } });
+  ships.control(0).speed = 1;
+  let open = 0;
+  for (let t = 1; t <= 60 * 200; t++) {
+    world.advance(t);
+    if (t === 60 * 70) open = ships.status(0).u;
+  }
+  const s = ships.status(0);
+  assert.ok(Math.abs(open - 1) < 0.02, `open water ${open} m/s`);
+  assert.ok(s.ice > 0 && Math.abs(s.u - 1) < 0.02, `in ice ${s.u} m/s`);
+});

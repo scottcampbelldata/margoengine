@@ -39,11 +39,16 @@ const make = (rate = { num: 24, den: 1 }) => {
       .add(sailing, { yachts: [{ row: body.row, hull, rig }], wind: [0, 0, -6] })
       .couple(['sailing', 'rigid'], 'staggered');
   sailing.control(0).heading = 0;
-  return world;
+  return Object.assign(world, { sailing });
 };
 
 test('SailingSolver: the same sail at 24, 30 and 60 frames a second', () => frameRateIndependent(make));
 test('SailingSolver: a seek equals a continuous run', () => seekEqualsContinuous(() => make()));
+test('SailingSolver: its work is one yacht and one sail plan a step', () => {
+  const world = make({ num: 60, den: 1 });
+  world.advance(5);
+  assert.deepEqual(world.sailing.workCounts(), { yachts: 1, sails: 1 });
+});
 test("SailingSolver with AERO-02's SailForce: a cloth sail on the mast drives the hull, and the hull's speed eases the sail", async () => {
   const run = async (water) => {
     const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),

@@ -407,8 +407,8 @@ export function yachtSails(
     // The centres of effort: the main's at 0.39 P above its boom, the jib's at 0.39 I, weighted by their forces.
     zm = boom + 0.39 * P * r,
     zj = freeboard + 0.39 * I * r,
-    wm = Math.hypot(clm, cdm) * main,
-    wj = Math.hypot(clj, cdj) * bkj * jib,
+    wm = hypot(clm, cdm) * main,
+    wj = hypot(clj, cdj) * bkj * jib,
     centre = (zm * wm + zj * wj) / (wm + wj);
   return {
     drive: q * (cl * sin(eff) - cd * cos(eff)),
@@ -461,7 +461,7 @@ export function velocityPrediction(
       const wx = tws * cos(twa) + V,
         wy = tws * sin(Math.abs(twa)),
         awa = atan2(wy, wx),
-        aws = Math.hypot(wx, wy);
+        aws = hypot(wx, wy);
       let heel = 0,
         sails = yachtSails(rig, awa, aws, heel, flat, reef, fluids);
       for (let i = 0; i < 40; i++) {
@@ -627,6 +627,7 @@ export class SailingSolver implements Solver<SailingParams> {
   private statuses: SailingStatus[] = [];
   private forces!: Region;
   private cell: [number, number, number] = [0, 0, 0];
+  private work = { yachts: 0, sails: 0 };
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0 } as unknown as FlowSample;
 
   constructor(id = 'sailing') {
@@ -731,6 +732,7 @@ export class SailingSolver implements Solver<SailingParams> {
     this.cell = [context.cell[0], context.cell[1], context.cell[2]];
     const out = regionWords(this.host.memory, this.forces) as Float64Array;
     out.fill(0);
+    this.work = { yachts: 0, sails: 0 };
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     if (!port) return;
     const memory = port.region.memory ?? this.host.memory,
@@ -766,9 +768,10 @@ export class SailingSolver implements Solver<SailingParams> {
         vk = vadd(velocity, vcross(spin, vsub(clr, centre))),
         u = vdot(vk, f),
         v = vdot(vk, s),
-        speed = Math.hypot(u, v),
+        speed = hypot(u, v),
         leeway = u > 1e-6 ? atan2(v, u) : 0,
         w = yacht.row * FORCE_WORDS;
+      this.work.yachts++;
       status.speed = vdot(velocity, f);
       status.heel = heel;
       status.heading = heading;
@@ -793,13 +796,14 @@ export class SailingSolver implements Solver<SailingParams> {
           ax = -vdot(air, f),
           ay = -vdot(air, s),
           awa = atan2(Math.abs(ay), ax),
-          aws = Math.hypot(ax, ay),
+          aws = hypot(ax, ay),
           sails = yachtSails(rig, awa, aws, heel, c.flat, c.reef, this.fluids),
           // The heeling force pushes to leeward: away from the side the wind comes from.
           leeward = ay > 0 ? -1 : 1,
           force = vadd(vscale(f, sails.drive), vscale(s, leeward * sails.heel * cos(heel))),
           point = vadd(centre, vscale(up, vdot(vsub(vadd(water, vscale(up, sails.centre)), centre), up)));
         apply(out, w, centre, point, force);
+        this.work.sails++;
         drive = sails.drive;
         status.apparentAngle = awa;
         status.apparentSpeed = aws;
@@ -831,6 +835,11 @@ export class SailingSolver implements Solver<SailingParams> {
         for (let k = 0; k < 3; k++) out[w + 3 + k]! -= moment * vertical[k]!;
       }
     });
+  }
+
+  /** The work of the last step: yachts stepped and sail plans evaluated (deterministic counts). */
+  workCounts(): Readonly<{ yachts: number; sails: number }> {
+    return this.work;
   }
 
   importPorts(_tick: number): void {}

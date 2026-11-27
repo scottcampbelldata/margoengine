@@ -210,6 +210,22 @@ export interface ShipControl {
   thruster: number;
   heading: number | null;
   track: ShipTrack | null;
+  /**
+   * A speed order, m/s through the water (negative astern), or null: the engine-room telegraph sets the revolutions that
+   * hold that speed against the calm water's resistance and the waves' and ice's added resistance, in place of
+   * `revolutions`.
+   */
+  speed: number | null;
+}
+
+/** The work a {@link ShipSolver} did in its last step: deterministic counts, the same on every machine. */
+export interface ShipWork {
+  /** Ships stepped, MMG force evaluations, irregular-sea drift tables built, walls tested for banks, shallow-water models made. */
+  ships: number;
+  forceEvaluations: number;
+  driftTables: number;
+  wallTests: number;
+  shallowModels: number;
 }
 
 /** What a ship is doing, from the last step. */
@@ -282,6 +298,7 @@ export class ShipSolver implements Solver<ShipParams> {
   private depth: ShipParams['depth'];
   private ice: ShipParams['ice'];
   private walls: readonly ShipWall[] = [];
+  private work: ShipWork = { ships: 0, forceEvaluations: 0, driftTables: 0, wallTests: 0, shallowModels: 0 };
   private runtime: Runtime[] = [];
   private rudders!: Region;
   private forces!: Region;
@@ -434,7 +451,7 @@ export class ShipSolver implements Solver<ShipParams> {
         cavity: new VortexCavity(ship.gas ?? 1),
         ship,
         mmg,
-        control: { revolutions: 0, rudder: 0, thruster: 0, heading: null, track: null },
+        control: { revolutions: 0, rudder: 0, thruster: 0, heading: null, track: null, speed: null },
         status: {
           speed: 0,
           u: 0,
@@ -602,6 +619,7 @@ export class ShipSolver implements Solver<ShipParams> {
     out.fill(0);
     const jets = this.thrusterJets && (regionWords(this.host.memory, this.thrusterJets) as Float64Array);
     jets?.fill(0);
+    this.work = { ships: 0, forceEvaluations: 0, driftTables: 0, wallTests: 0, shallowModels: 0 };
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     if (!port) return;
     const memory = port.region.memory ?? this.host.memory,
@@ -610,6 +628,9 @@ export class ShipSolver implements Solver<ShipParams> {
       const { ship, mmg, control, status } = rt,
         at = ship.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) return;
+      const evaluations = mmg.evaluations,
+        tables = mmg.driftTables;
+      this.work.ships++;
       const q: [number, number, number, number] = [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!],
         origin: Vec3 = [bodies[at]!, bodies[at + 1]!, bodies[at + 2]!],
         centre: Vec3 = [bodies[at + 7]!, bodies[at + 8]!, bodies[at + 9]!],
@@ -642,13 +663,23 @@ export class ShipSolver implements Solver<ShipParams> {
       if (key !== rt.shallowKey) {
         rt.shallowKey = key;
         rt.model = key === 0 ? ship.model : shallowWater(ship.model, (100 * ship.model.draught) / key);
+        this.work.shallowModels++;
         mmg.setModel(rt.model);
         rt.gains = null;
       }
       const M = rt.model,
         L = M.length;
-      // The rudder turns toward its order: the autopilot's when it holds a heading or a track.
-      mmg.revolutions = control.revolutions;
+      // The telegraph: a speed order sets the revolutions that hold that speed against the calm-water resistance and the
+      // added resistance of the last step (the waves' and the ice's), trimmed by the speed's error while the ship gathers or
+      // loses way; at the speed the trim is nothing and the balance is the model's own.
+      if (control.speed !== null && control.speed !== undefined && Number.isFinite(control.speed)) {
+        const target = control.speed,
+          added = Math.max(0, status.ice - status.forces.XW),
+          base = target === 0 ? 0 : Math.sign(target) * mmg.selfPropulsion(Math.abs(target), added),
+          scale = Math.max(Math.abs(target), 0.05 * Math.sqrt(9.81 * L)),
+          error = (target - u) / scale;
+        mmg.revolutions = target === 0 ? 0 : base * Math.max(0.2, Math.min(2, 1 + 2 * error * Math.sign(target)));
+      } else mmg.revolutions = control.revolutions;
       const heading = atan2(f[2], f[0]),
         ordered = this.autopilot(rt, index, heading, mid, u, v, r, dt),
         order = Math.max(-mmg.rudderLimit, Math.min(mmg.rudderLimit, ordered ?? control.rudder)),
@@ -849,9 +880,16 @@ export class ShipSolver implements Solver<ShipParams> {
       status.bankMoment = banked.N;
       status.bankInRange = banked.inRange;
       status.midship = mid;
+      this.work.forceEvaluations += mmg.evaluations - evaluations;
+      this.work.driftTables += mmg.driftTables - tables;
       status.forward = f;
       status.starboard = s;
     });
+  }
+
+  /** The work of the last step: ships, MMG force evaluations, drift tables, wall tests and shallow-water models. */
+  workCounts(): Readonly<ShipWork> {
+    return this.work;
   }
 
   /** The water's depth at (x, z), m (Infinity for deep water). */
@@ -882,6 +920,7 @@ export class ShipSolver implements Solver<ShipParams> {
     let starboard = Number.POSITIVE_INFINITY,
       port = Number.POSITIVE_INFINITY;
     for (const wall of this.walls) {
+      this.work.wallTests++;
       const [ax, az] = wall.from,
         [bx, bz] = wall.to,
         ex = bx - ax,

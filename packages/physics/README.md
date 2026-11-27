@@ -4250,11 +4250,12 @@ Steer with `control(i)`:
 - `rudder`, the order in radians, positive to starboard;
 - `thruster`, from -1 to 1;
 - `heading`, radians on the ground plane from +X toward +Z (the way the ship turns to starboard), or null: the autopilot holds it;
+- `speed`, m/s through the water, or null: the telegraph sets the revolutions that hold that speed against the calm water's resistance and the last step's added resistance from waves and ice, trimmed by the speed's error while the ship gathers way, in place of `revolutions`;
 - `track`, `{waypoints: [[x, z], ...], lookahead, acceptance, loop}`, or null: the autopilot follows the waypoints by line of sight (Breivik and Fossen 2008), with a lookahead of 5 ship lengths and waypoints passed within 1 ship length along the track by default.
 
 The autopilot places the poles of the ship's own manoeuvring model, linearised in sway and yaw at its speed (`Manoeuvring.linearize`), with an integral of the heading error, so a course-unstable hull such as KVLCC2 holds its heading and a steady wind leaves no offset. It eases into a new heading through a second-order reference at its own frequency, places its gains again when the speed changes by a tenth, and on a track crabs into a steady drift low-passed over 10 L / U. `status(i)` then gives its `heading`, `headingOrdered` and `track` (`leg`, `course`, `crossTrack`, positive to starboard of the leg, and `done`).
 
-`status(i)` reads speed, drift, yaw rate, rudder angle, the forces, the squat, the thruster's push and the quay's pull. Every refusal of the ship entry is a coded `MargoError` (`unsupported`) whose message names the fix and links to margoengine.com/errors#ships.
+`status(i)` reads speed, drift, yaw rate, rudder angle, the forces, the squat, the thruster's push and the quay's pull. `workCounts()` reads the last step's work: ships stepped, MMG force evaluations, irregular-sea drift tables built, walls tested and shallow-water models made, deterministic counts that grow with the fleet; the `PlaningSolver`, `RowingSolver` and `SailingSolver` count their boats and wetted strips, blades in the water, and yachts and sail plans. Every refusal of the ship entry is a coded `MargoError` (`unsupported`) whose message names the fix and links to margoengine.com/errors#ships.
 
 What it gives the rest of the engine:
 - `sea(base)`: the sea drawn down along each hull by its squat (ICORELS and Hooft's form of Tuck's law, Huuska's factor in a channel). Pass it to the `HullSolver` as its sea, so the hull sinks and trims by its own hydrostatics and the drawdown shows. `drawdown(x, z)` reads it.

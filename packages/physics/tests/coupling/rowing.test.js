@@ -56,4 +56,6 @@ test('RowingSolver: the blades drive the boat, and the boat moving faster throug
   // In the first half second of the drive the slow boat is pushed on and the fast one less so.
   assert.ok(pushSlow > 0 && pushSlow > pushFast, `${pushSlow} ${pushFast}`);
   assert.ok(slow.body.linearVelocity[0] > 2);
+  // Its work: one boat, its two blades in the water while it drives.
+  assert.deepEqual(slow.rowing.workCounts(), { boats: 1, blades: slow.rowing.status(0).driving ? 2 : 0 });
 });

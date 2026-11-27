@@ -150,6 +150,7 @@ export class RowingSolver implements Solver<RowingParams> {
   private statuses: RowingStatus[] = [];
   private forces!: Region;
   private phases!: Region;
+  private work = { boats: 0, blades: 0 };
   private cell: [number, number, number] = [0, 0, 0];
 
   constructor(id = 'rowing') {
@@ -251,6 +252,7 @@ export class RowingSolver implements Solver<RowingParams> {
       phases = regionWords(this.host.memory, this.phases) as Float64Array,
       dt = 1 / rateOf(context.level);
     out.fill(0);
+    this.work = { boats: 0, blades: 0 };
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     if (!port) return;
     const memory = port.region.memory ?? this.host.memory,
@@ -292,6 +294,7 @@ export class RowingSolver implements Solver<RowingParams> {
         k = boat.drag,
         drag = typeof k === 'function' ? k(Math.abs(hull)) : k * hull * hull,
         w = boat.row * FORCE_WORDS;
+      this.work.boats++;
       status.phase = phase;
       status.driving = driving;
       status.speed = speed;
@@ -323,6 +326,7 @@ export class RowingSolver implements Solver<RowingParams> {
           // The blade goes in as it starts to move aft through the water and comes out when it would move forward again (the
           // rower's catch and release), so it never drags the boat back.
           if (!(V > 1e-9) || dot(v, fwd) > 0) continue;
+          this.work.blades++;
           const vh = scale(v, 1 / V),
             cosAlpha = Math.max(-1, Math.min(1, dot(dir, vh))),
             alpha = atan2(Math.sqrt(1 - cosAlpha * cosAlpha), cosAlpha),
@@ -348,6 +352,11 @@ export class RowingSolver implements Solver<RowingParams> {
       status.rowingPower = rowingPower;
       if (rate > 0) phases[index] = phases[index]! + dt / cycle;
     });
+  }
+
+  /** The work of the last step: boats stepped and blades in the water (deterministic counts). */
+  workCounts(): Readonly<{ boats: number; blades: number }> {
+    return this.work;
   }
 
   importPorts(_tick: number): void {}

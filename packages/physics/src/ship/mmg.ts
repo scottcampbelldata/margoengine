@@ -242,6 +242,9 @@ export class Manoeuvring {
   rudderLimit = 35 * DEG;
   /** Simulated time, s. */
   time = 0;
+  /** Work done so far: force evaluations and irregular-sea drift tables built (deterministic counts). */
+  evaluations = 0;
+  driftTables = 0;
   private readonly density: number;
   private readonly gravity: number;
   private mass = 0;
@@ -346,6 +349,7 @@ export class Manoeuvring {
 
   /** The forces at a state (eqs. 5 to 25). */
   forces(s: ManoeuvringState, out?: ManoeuvringForces): ManoeuvringForces {
+    this.evaluations++;
     const o = out ?? {
         X: 0,
         Y: 0,
@@ -545,6 +549,7 @@ export class Manoeuvring {
         loads[3 * i + 2] = one.N;
       }
       t = this.driftTable = { speed, key, loads };
+      this.driftTables++;
     }
     let rel = (waves.direction - heading) / (2 * Math.PI);
     rel = (rel - Math.floor(rel)) * steps;
@@ -662,10 +667,10 @@ export class Manoeuvring {
   }
 
   /**
-   * The propeller revolutions, rev/s, at which the ship runs straight at `speed` m/s (thrust balancing R'_0): what the MMG
-   * method holds in its turning and zig-zag tests.
+   * The propeller revolutions, rev/s, at which the ship runs straight at `speed` m/s (thrust balancing R'_0 and `extra` N
+   * more, an added resistance such as the waves' or the ice's): what the MMG method holds in its turning and zig-zag tests.
    */
-  selfPropulsion(speed: number): number {
+  selfPropulsion(speed: number, extra = 0): number {
     if (!(speed > 0 && Number.isFinite(speed)))
       throw shipError(`A speed is finite m/s above 0 (got ${speed}); pass one.`);
     const M = this.model,
@@ -673,6 +678,7 @@ export class Manoeuvring {
         ? this.resistanceAt(speed)
         : 0.5 * this.density * M.length * M.draught * speed * speed * M.resistance,
       inflow = speed * (1 - M.propeller.wake),
+      need = resistance + Math.max(0, Number.isFinite(extra) ? extra : 0),
       save = this.revolutions;
     let lo = 1e-6,
       hi = 1e3;
@@ -680,7 +686,7 @@ export class Manoeuvring {
       const mid = Math.sqrt(lo * hi);
       this.revolutions = mid;
       const t = this.propeller.load(mid, inflow, this.density).thrust * (1 - M.propeller.thrustDeduction);
-      if (t > resistance) hi = mid;
+      if (t > need) hi = mid;
       else lo = mid;
     }
     this.revolutions = save;

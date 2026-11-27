@@ -52,6 +52,11 @@ test('PlaningSolver: the bottom lifts and trims the body, and the body’s attit
     `${s.normal}`,
   );
   assert.ok(Math.abs(world.body.linearVelocity[1]) < 0.05);
+  // Its work: one boat, and only the strips in the water summed.
+  const work = world.planing.workCounts();
+  assert.ok(
+    work.boats === 1 && work.strips > 0 && work.strips < 40 && work.strips === Math.ceil(s.keel / (L / 40) - 1e-9),
+  );
   // More thrust, more speed, less trim: the body's attitude changes the bottom's forces.
   sunk.planing.control(0).thrust = 0.2 * mass * 9.81;
   for (let f = 1; f <= 60 * 5; f++) sunk.advance(f);

@@ -164,6 +164,8 @@ export class Manoeuvring {
     rudderRate: number;
     rudderLimit: number;
     time: number;
+    evaluations: number;
+    driftTables: number;
     waves: RegularWaves | IrregularWaves | undefined;
     constructor(model: ManoeuvringModel, state?: Partial<ManoeuvringState>, options?: {
         readonly density?: number;
@@ -180,7 +182,7 @@ export class Manoeuvring {
         a: [number, number, number, number];
         b: [number, number];
     };
-    selfPropulsion(speed: number): number;
+    selfPropulsion(speed: number, extra?: number): number;
 }
 
 export interface ManoeuvringForces {
@@ -334,6 +336,10 @@ export class PlaningSolver implements Solver<PlaningParams> {
     control(index: number): PlaningControl;
     status(index: number): PlaningStatus;
     step(context: StepContext, _dt: number): void;
+    workCounts(): Readonly<{
+        boats: number;
+        strips: number;
+    }>;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -455,6 +461,10 @@ export class RowingSolver implements Solver<RowingParams> {
     control(index: number): RowingControl;
     status(index: number): RowingStatus;
     step(context: StepContext, _dt: number): void;
+    workCounts(): Readonly<{
+        boats: number;
+        blades: number;
+    }>;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -499,6 +509,10 @@ export class SailingSolver implements Solver<SailingParams> {
     control(index: number): SailingControl;
     status(index: number): SailingStatus;
     step(context: StepContext, _dt: number): void;
+    workCounts(): Readonly<{
+        yachts: number;
+        sails: number;
+    }>;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -563,6 +577,7 @@ export interface ShipControl {
     thruster: number;
     heading: number | null;
     track: ShipTrack | null;
+    speed: number | null;
 }
 
 export interface ShipParams {
@@ -587,6 +602,7 @@ export class ShipSolver implements Solver<ShipParams> {
     status(index: number): ShipStatus;
     revolutionsFor(index: number, speed: number): number;
     step(context: StepContext, _dt: number): void;
+    workCounts(): Readonly<ShipWork>;
     sea(base: SeaSurface | SeaQuery): SeaQuery & {
         readonly cell?: readonly [number, number, number];
     };
@@ -651,6 +667,14 @@ export interface ShipTrack {
 export interface ShipWall {
     readonly from: readonly [number, number];
     readonly to: readonly [number, number];
+}
+
+export interface ShipWork {
+    ships: number;
+    forceEvaluations: number;
+    driftTables: number;
+    wallTests: number;
+    shallowModels: number;
 }
 
 export interface Squat {
