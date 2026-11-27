@@ -104,8 +104,8 @@ needs its Z mirrored to land correctly in Margo. Three tools do it for you:
 ## Install only what you import
 
 There are three ways in: `@margoengine/core` or `@margoengine/stage` alone, a domain install profile, or
-`margoengine` for every feature. The [kits guide](guides/kits.md) has the routes that work today (publication is
-pending). The examples in this guide import from `margoengine/...`, the full install; with a profile, replace
+`margoengine` for every feature. The [kits guide](guides/kits.md) lists each route. The packages are on npm at
+0.1.0. The examples in this guide import from `margoengine/...`, the full install; with a profile, replace
 `margoengine/controls` with `@margoengine/kit-web/controls`, or import `@margoengine/controls` directly.
 
 ```sh
@@ -114,8 +114,7 @@ npm install @margoengine/stage                   # the createStage facade plus c
 npm install margoengine                          # every feature package
 ```
 
-These commands work once 1.0.0 is published to npm; the packages are not on npm yet. Until then, build them from a
-checkout and use the routes in the [kits guide](guides/kits.md).
+These commands install the published 0.1.0 packages. The [kits guide](guides/kits.md) lists what each one includes.
 
 ## API mapping
 

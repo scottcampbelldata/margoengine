@@ -10,14 +10,13 @@ components that edit that engine. The package needs WebGPU for models, shadows a
 
 ## 1. Set up a project
 
-The packages are not on npm yet, so follow the [Install](../../README.md#install) section of the main README (Route 2) to
-get the `.tgz` files, then:
+The packages are on npm at 0.1.0.
 
 ```sh
 mkdir my-react-app && cd my-react-app
 npm init -y
 npm pkg set type=module
-npm install ../margoengine/test-results/*.tgz react react-dom vite @vitejs/plugin-react typescript @types/react @types/react-dom
+npm install @margoengine/react react react-dom vite @vitejs/plugin-react typescript @types/react @types/react-dom
 ```
 
 Copy `examples/assets/flight-helmet-mobile.glb` from the repository to `public/models/` in your project. Save the

@@ -7,7 +7,7 @@ Sources: `packages/react/README.md`, `packages/react/SCENE.md`, `packages/react/
 
 ## 1. What it is
 
-`@margoengine/react` (v1.0.0, Apache-2.0, not on npm yet) is the React binding for Margo. It is a react-three-fiber
+`@margoengine/react` (Apache-2.0, on npm at 0.1.0) is the React binding for Margo. It is a react-three-fiber
 (R3F) style API with one big difference: there is no custom reconciler and no `react-reconciler` dependency.
 `<Canvas>` creates one engine, and its children are ordinary React components that edit it through hooks and effects.
 
@@ -20,7 +20,7 @@ Sources: `packages/react/README.md`, `packages/react/SCENE.md`, `packages/react/
 
 | Route | Status |
 | --- | --- |
-| `npm i margoengine react react-dom` | After 1.0.0 is published. |
+| `npm i margoengine react react-dom` | Works today, npm 0.1.0. |
 | Local tarballs (`npm run pack:packages`, then install `test-results/*.tgz` into your app) | Works today. |
 | `examples/react-viewer` (`npm run dev --workspace @margoengine/react-viewer`) | Works today, Vite. |
 | `examples/next` | Works today, Next.js 16.4.3 with React 19.3.0: `npm run build` builds it with Turbopack (Next 16's default), `npm run build:webpack` with webpack, and `npm run modern:test:browser` checks the Turbopack build in a browser on a real GPU. |
@@ -167,7 +167,6 @@ type-checked from packed tarballs), `modern:test:bundlers`. Guides: `docs/react-
 
 ## 11. Honest gaps to know about
 
-- Not on npm yet (tarballs only).
 - WebGPU only for React click events, PBR, IBL, shadows, post; WebGL2 is a basic preview (`engine.pick` needs its `/pick` entry there).
 - `Box`, `Sphere`, `Plane` take a colour or one base colour `map` (PNG or JPEG, WebGPU only, needs `@margoengine/gltf`); other maps need a glTF `Model`.
 - Lowercase JSX tags and `extend()` need `jsxImportSource: '@margoengine/react'` (2026-11-07); `extend` takes React components, not engine classes. Events bubble from the hit mesh through its parents.

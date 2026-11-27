@@ -962,7 +962,7 @@ finished starting. A page that is not ready in time leaves `failed-<page>.png` a
 300 s from the first command to the verified interactive frame, and ends every process it started at a hard limit of
 900 s. It is a step of `check:merge`, so the nightly full run has it too.
 Not measured: reading the page and copying the two files, and anything after the first interactive frame. The install
-route is a clone because 1.0.0 is not on npm yet.
+route this check runs is a clone and local tarballs. The packages are also on npm at 0.1.0.
 
 ## Rules for real-GPU numbers
 

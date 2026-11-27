@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Margo Engine whitepaper</title>
-  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,910 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,910 bytes gzip; the catalog lists 108 packages, on npm at 0.1.0, behind one install; a named source for every number.">
   <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Margo Engine whitepaper">
-  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,910 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,910 bytes gzip; the catalog lists 108 packages, on npm at 0.1.0, behind one install; a named source for every number.">
   <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="../favicon.ico" sizes="32x32">
@@ -28,15 +28,15 @@
 
 <main id="main" class="page">
 <header class="masthead">
-  <p class="eyebrow">Whitepaper · October 2026 · coming soon</p>
+  <p class="eyebrow">Whitepaper · October 2026 · on npm at 0.1.0</p>
   <h1>Margo Engine</h1>
-  <p class="deck">A WebGPU engine for the web. Core plus stage is 24,910 bytes gzipped. The catalog lists 108 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
+  <p class="deck">A WebGPU engine for the web. Core plus stage is 24,910 bytes gzipped. The catalog lists 108 packages, on npm at 0.1.0, with one install that holds them all. Every number we publish names its source.</p>
   <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 51d8786a; tests at 01836c27; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
 </header>
 
 <div class="ledger" role="list">
   <div role="listitem"><b>24,910 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; the build fails a change at 25,000</span><i>entry-sizes.json · 0e71a9024</i></div>
-  <div role="listitem"><b>108</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code> (none published to npm yet)</span><i>docs/catalog.json</i></div>
+  <div role="listitem"><b>108</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code>, on npm at 0.1.0</span><i>docs/catalog.json</i></div>
   <div role="listitem"><b>6,498</b><span>Node tests in every <code>npm run verify</code>: 6,496 pass, 2 skipped, 0 fail</span><i>results/test-count.json · 01836c27</i></div>
   <div role="listitem"><b>153 of 161</b><span>feature rows with an equivalent Margo package; 4 partial, 4 missing</span><i>docs/three-parity-matrix.md · bec8b597</i></div>
 </div>
@@ -45,7 +45,7 @@
 <section class="status" aria-labelledby="status-h">
   <h2 id="status-h">Where it stands today</h2>
   <ul>
-    <li><strong>Coming soon.</strong> The packages are not on npm yet, and the source repository stays private while we finish the launch checklist.</li>
+    <li><strong>On npm at 0.1.0.</strong> The packages are published, and the source repository is public.</li>
     <li><strong>WebGPU only, for now.</strong> About 88% of browsers in use support WebGPU: 85.8% fully and 2.02% partly (caniuse.com/webgpu, StatCounter data for September 2026). A fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load. Today the basic WebGL2 package draws core meshes, and the React Canvas takes loadFallback and fallbackContent.</li>
     <li><strong>Few browsers verified.</strong> Real-GPU results come from Edge and Chrome on Windows 11 (NVIDIA, Intel and AMD GPUs) and from Chromium on one Linux machine with an Intel GPU, where three suites have not finished (section 10). Firefox, Safari, macOS and phones are not verified yet.</li>
     <li><strong>No speed claims against other engines.</strong> The same-scene comparison tool exists, but no quiet-machine run has been made. The numbers on this page are our own internal measurements, and each names its hardware.</li>
@@ -295,7 +295,6 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 
 <h2 id="next"><span class="n">12</span>Coming soon</h2>
 <ul>
-  <li>The packages on npm, <code>npm create margo</code>, and the public repository.</li>
   <li>A WebGL2 fallback for the optional packages.</li>
   <li>Firefox, Safari and phone verification.</li>
   <li>Quiet-machine comparisons with other engines, published with their method and the places other engines win.</li>

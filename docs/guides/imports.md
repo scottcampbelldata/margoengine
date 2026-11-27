@@ -1,9 +1,7 @@
 # Which import do I need?
 
-Choose core/stage alone, a domain profile, or the full engine. The packages are not on npm yet: until 1.0.0 is
-published, the install commands on this page work only with the local tarballs from the
-[README](../../README.md#install) (Route 2), and `npm create margo` and the CDN import map do not work. Core requires no
-other engine package; stage adds only core. `npm install @margoengine/kit-web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
+Choose core/stage alone, a domain profile, or the full engine. The packages are on npm at 0.1.0. Core requires no
+other engine package; stage adds only core. `npm install @margoengine/kit-web` (or `@margoengine/game`, `@margoengine/kit-viz`, `@margoengine/kit-react`) installs just that domain's member packages.
 The [kits guide](kits.md) lists the contents and measured install sizes. A new app can use
 `npm create margo@latest my-app -- --template web`; each template installs its profile rather than the umbrella.
 
@@ -113,10 +111,10 @@ copy it into the page, or only the lines your imports reach:
 <script type="importmap">
   {
     "imports": {
-      "margoengine": "https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/index.js",
-      "@margoengine/stage": "https://cdn.jsdelivr.net/npm/@margoengine/stage@1.0.0/dist/index.js",
-      "@margoengine/core": "https://cdn.jsdelivr.net/npm/@margoengine/core@1.0.0/dist/index.js",
-      "@margoengine/core/extension": "https://cdn.jsdelivr.net/npm/@margoengine/core@1.0.0/dist/extension.js"
+      "margoengine": "https://cdn.jsdelivr.net/npm/margoengine@0.1.0/dist/index.js",
+      "@margoengine/stage": "https://cdn.jsdelivr.net/npm/@margoengine/stage@0.1.0/dist/index.js",
+      "@margoengine/core": "https://cdn.jsdelivr.net/npm/@margoengine/core@0.1.0/dist/index.js",
+      "@margoengine/core/extension": "https://cdn.jsdelivr.net/npm/@margoengine/core@0.1.0/dist/extension.js"
     }
   }
 </script>

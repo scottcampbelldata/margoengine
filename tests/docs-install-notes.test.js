@@ -38,14 +38,22 @@ test('the rule reads shell blocks and npm create, not prose about installs', () 
 
 test('the public install pages do not say the packages are unpublished', () => {
   const stale =
-    /not on npm|publication is pending|name placeholder|0\.0\.1[^\n]{0,40}placeholder|until 1\.0\.0 is published/i;
+    /not on npm|none published|publication is pending|name placeholder|0\.0\.1[^\n]{0,40}placeholder|until 1\.0\.0 is published|once 1\.0\.0 is published|stays private/i;
   const files = [
     'README.md',
     'docs/start-here.md',
     'docs/guides/kits.md',
+    'docs/from-babylon.md',
+    'docs/from-playcanvas.md',
+    'docs/guides/imports.md',
+    'docs/guides/react-first-scene.md',
+    'docs/guides/blender-game.md',
+    'docs/react-nextjs-options.md',
+    'docs/whitepaper/reproduce.md',
     'packages/margoengine/README.md',
     'packages/core/README.md',
     'site/index.html',
+    'site/whitepaper/engine.html',
   ];
   assert.deepEqual(
     files.filter((file) => stale.test(read(file))),
