@@ -105,6 +105,16 @@ export interface ExplosionCounts {
     readonly threadSteps: readonly number[];
 }
 
+export interface ExplosionDust {
+    readonly sources: number;
+    readonly links: readonly {
+        readonly charge: number;
+        readonly source: number;
+    }[];
+    readonly fraction: number;
+    readonly duration?: number;
+}
+
 export interface ExplosionParams {
     readonly charges?: readonly ChargeOptions[];
     readonly guns?: readonly GunMount[];
@@ -114,6 +124,7 @@ export interface ExplosionParams {
     readonly physics?: Physics;
     readonly breakables?: ImpactTarget;
     readonly plates?: readonly HullPlate[];
+    readonly dust?: ExplosionDust;
 }
 
 export class ExplosionSolver implements Solver<ExplosionParams> {
@@ -184,6 +195,7 @@ export interface ExplosionSolverOptions {
     readonly carriers?: boolean;
     readonly terrain?: BedShape;
     readonly hullPlates?: boolean;
+    readonly dust?: FieldDescriptor;
 }
 
 export interface Explosive {
@@ -282,17 +294,17 @@ export interface ImpactTarget {
 export const PROPELLANTS: {
     readonly cordite: {
         readonly name: 'cordite';
-        readonly force: 1015800;
-        readonly covolume: 0.0006982;
+        readonly force: 1006900;
+        readonly covolume: 0.00070719;
         readonly gamma: 1.2;
         readonly density: 1560;
-        readonly burnRate: 2.4295e-9;
+        readonly burnRate: 2.474e-9;
         readonly pressureIndex: 1;
     };
     readonly pebblePowder: {
         readonly name: 'pebble powder';
-        readonly force: 253900;
-        readonly covolume: 0.0006067;
+        readonly force: 253880;
+        readonly covolume: 0.00059677;
         readonly gamma: 1.2;
         readonly density: 1700;
     };
@@ -307,6 +319,11 @@ export interface Propellant {
     readonly burnRate?: number;
     readonly pressureIndex?: number;
 }
+
+export const SEISMIC_COUPLING: {
+    readonly competentRock: 0.01;
+    readonly dryAlluvium: 0.0005;
+};
 
 export const SONDER_CRATER_LAW: CraterLaw;
 
@@ -325,6 +342,8 @@ export function energyBudget(energy: number, depth?: number, options?: GroundOpt
 export function fireGun(options: GunOptions): Firing;
 
 export function flyFragments(f: Float64Array, drag: Float64Array, launch: Float64Array, count: number, dt: number, end: number, g: readonly [number, number, number], ground: number, bed: FlightBed | null): [number, number];
+
+export function freeAirEquivalent(budget: Pick<EnergyBudget, 'air' | 'ground'>): number;
 
 export function gurneyVelocity(explosive: Explosive): number;
 

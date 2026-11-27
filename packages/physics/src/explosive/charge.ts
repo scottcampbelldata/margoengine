@@ -13,9 +13,17 @@
 //   exp(-d/d3) / (1 + exp(-10 d/d3))^(1/10) with scaled depth d (m J^-1/3), d3 = 1.2e-3 m J^-1/3.
 // - I. Sonder, A. H. Graettinger, T. Neeley et al., "Experimental multiblast craters and ejecta", J. Geophys. Res. Solid
 //   Earth, 2022 (doi 10.1029/2022JB023952): scaled depth d / E^(1/3), and the 23 measured airborne energy fractions of
-//   their Table 3 that validate the depth law here (they were not used to set it); the crater law of their eq 11 (from
-//   Sonder, Graettinger and Valentine 2015) and their energy partition Eb = Ea + Es + Erem (eq 21), with the airborne and
-//   seismic energy together about 17 % of a blast, which sets the default seismic coupling.
+//   their Table 3 that validate the depth law here (they were not used to set it; their airborne energies are free-air
+//   equivalents by Kinney and Graham's laws, so they are compared with twice the hemispherical air share, its image in the
+//   ground); the crater law of their eq 11 (from Sonder, Graettinger and Valentine 2015).
+// - H. C. Rodean, "Explosion-produced ground motion: technical summary with respect to seismic hazards", Symposium on
+//   Engineering with Nuclear Explosives, CONF-700101, 1970, pp. 1024 to 1050 (Fig. 9 and its text): the seismic share of an
+//   explosion's energy runs from about 1 % in competent rock such as granite or salt to hundredths of 1 % in dry alluvium,
+//   the rest dissipated by heating and breaking rock.
+// - T. Waltham, "The explosion crater at Fauld", Mercian Geologist 15(2), 2001, pp. 123 to 125: the bomb store about 35 m
+//   below the surface, the crater just over 250 m across and about 30 m deep, well over a million tonnes of rock and soil
+//   thrown out; with G. Fielder and J. E. Guest (Comm. Lunar Planet. Lab. 6, 1967) for the 5.34 million lb TNT equivalent and
+//   the 250 m crater.
 // - The crater work is the least mechanical work that empties a crater of the given size (lift and a throw past the rim at
 //   the best angle, elementary ballistics), a lower bound that needs no ejecta law.
 import { invalidExplosive } from './errors.js';
@@ -143,9 +151,10 @@ export const AIR_DEPTH_SCALE = 1.2e-3;
 /**
  * The share of a buried charge's energy that escapes into the air as a blast, 0 to 1, by Ford et al. (2014): the airborne
  * impulse falls as g(d) = exp(-d/d3) / (1 + exp(-10 d/d3))^(1/10) with scaled depth d, and blast energy goes as impulse to
- * the 3/2 (energy scales as distance cubed, impulse as distance), so the share is g(d)^(3/2) of a free-air burst: 0.90 at
- * the surface, 0.7 % at 4e-3 m J^-1/3. Sonder et al.'s 23 measured blasts lie above it by a factor of 1.8 on average
- * (spread a factor of 1.6), the difference between the two studies' reference charges that Sonder et al. note.
+ * the 3/2 (energy scales as distance cubed, impulse as distance), so the share is g(d)^(3/2): 0.90 at the surface, 0.7 % at
+ * 4e-3 m J^-1/3. It is the energy of a hemispherical blast over the ground, which spreads as a free-air blast of twice the
+ * energy (its image in the ground); Sonder et al.'s 23 blasts, measured as free-air equivalents, sit within their scatter
+ * of that ({@link freeAirEquivalent}).
  */
 export function airborneFraction(scaled: number): number {
   if (!(Number.isFinite(scaled) && scaled >= 0))
@@ -154,6 +163,21 @@ export function airborneFraction(scaled: number): number {
   const g = exp(-x) / pow(1 + exp(-10 * x), 0.1);
   return pow(g, 1.5);
 }
+
+/**
+ * The free-air blast energy, J, equivalent to a charge's air share: twice the air energy for a charge at or under the ground
+ * (the hemisphere and its image), the air energy itself for one in the air. Blast laws for a free-air burst (Kinney and
+ * Graham) take this energy.
+ */
+export function freeAirEquivalent(budget: Pick<EnergyBudget, 'air' | 'ground'>): number {
+  return budget.ground > 0 ? 2 * budget.air : budget.air;
+}
+
+/**
+ * Rodean's (1970) seismic shares of an explosion's energy: about 1 % in competent rock (granite, salt), hundredths of 1 % in
+ * dry alluvium (here 0.05 %, the middle of that decade).
+ */
+export const SEISMIC_COUPLING = { competentRock: 0.01, dryAlluvium: 5e-4 } as const;
 
 /**
  * Sonder, Graettinger and Valentine's (2015) single-blast crater law: the scaled crater radius (m J^-1/3) against scaled
@@ -206,13 +230,13 @@ export interface GroundOptions {
   /** Gravity's magnitude, m/s^2 (default 9.81). */
   readonly gravity?: number;
   /**
-   * The share of the ground energy radiated as elastic (seismic) waves, 0 to 1 (default 0.15, from Sonder et al.'s 2022
-   * estimate that the airborne and seismic energy together were about 17 % of each blast in an unconsolidated host).
+   * The share of the ground energy radiated as elastic (seismic) waves, 0 to 1 (default
+   * `SEISMIC_COUPLING.dryAlluvium`, 0.05 %; `SEISMIC_COUPLING.competentRock` is 1 %; Rodean 1970).
    */
   readonly seismicCoupling?: number;
   /** The crater's radius, m, where it is known (a survey, or the cratering solver); default from `law`. */
   readonly craterRadius?: number;
-  /** The apparent crater's depth over its radius (default 0.5). */
+  /** The apparent crater's depth over its radius (default 0.24, Fauld's 30 m deep crater 250 m across; Waltham 2001). */
   readonly depthRatio?: number;
   /** The crater law for the default radius (default {@link SONDER_CRATER_LAW}). */
   readonly law?: CraterLaw;
@@ -226,7 +250,7 @@ export interface EnergyBudget {
   readonly tntEquivalent: number;
   /** Scaled depth, m J^-1/3 (0 at or above the surface). */
   readonly scaledDepth: number;
-  /** The share that leaves as an air blast (FIRE-04 reads it). */
+  /** The share that leaves as an air blast, J: a hemisphere over the ground for a charge at or under it (FIRE-04 reads it). */
   readonly air: number;
   /** The rest, held in the ground: `groundShock` + `craterWork` + `heat`. */
   readonly ground: number;
@@ -268,10 +292,16 @@ export function energyBudget(
   const ground = energy - air;
   const density = finitePositive(options.density ?? 1800, 'Ground density', 'Give it in kg/m^3.');
   const g = finitePositive(options.gravity ?? 9.81, 'Gravity', 'Give its magnitude in m/s^2.');
-  const coupling = options.seismicCoupling ?? 0.15;
+  const coupling = options.seismicCoupling ?? SEISMIC_COUPLING.dryAlluvium;
   if (!(Number.isFinite(coupling) && coupling >= 0 && coupling <= 1))
-    throw invalidExplosive(`Seismic coupling must be from 0 to 1; got ${coupling}. Pass a share such as 0.15.`);
-  const ratio = finitePositive(options.depthRatio ?? 0.5, 'Crater depth ratio', 'Pass depth over radius, such as 0.5.');
+    throw invalidExplosive(
+      `Seismic coupling must be from 0 to 1; got ${coupling}. Pass a share such as SEISMIC_COUPLING.competentRock.`,
+    );
+  const ratio = finitePositive(
+    options.depthRatio ?? 0.24,
+    'Crater depth ratio',
+    'Pass depth over radius, such as 0.24.',
+  );
   let radius = 0;
   if (!aboveGround) {
     if (options.craterRadius !== undefined) {

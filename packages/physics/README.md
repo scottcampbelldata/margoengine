@@ -7621,30 +7621,33 @@ the speed a case or plate reaches by Gurney's equations: `cylinder`, `sphere`, `
 
 A buried charge keeps most of its energy in the ground. `scaledDepth(depth, energy)` is depth / E^(1/3) in m J^-1/3.
 `airborneFraction(scaledDepth)` is the share that leaves as an air blast (Ford et al. 2014): 0.90 at the surface,
-under 1 % at the 4e-3 m J^-1/3 that digs the largest crater. `energyBudget(energy, depth, ground)` splits the energy
-into `air` (what the blast solver reads) and `ground`, and splits the ground's share three ways:
+under 1 % at the 4e-3 m J^-1/3 that digs the largest crater. That share is a hemispherical blast over the ground.
+`freeAirEquivalent(budget)` is twice it, the free-air blast it spreads as (its image in the ground), and is what
+free-air blast laws take. `energyBudget(energy, depth, ground)` splits the energy into `air` (what the blast solver
+reads) and `ground`, and splits the ground's share three ways:
 
-- `groundShock`: what radiates as seismic waves, `seismicCoupling` (default 0.15) of the ground share. Sonder et al.
-  (2022) estimated airborne plus seismic energy at about 17 % of each blast.
+- `groundShock`: what radiates as seismic waves, `seismicCoupling` of the ground share. The default is
+  `SEISMIC_COUPLING.dryAlluvium` (0.05 %); `SEISMIC_COUPLING.competentRock` is 1 % (Rodean 1970).
 - `craterWork`: the least work that empties the crater, which is lifting the bowl and throwing it past the rim. The crater
-  is a paraboloid of `craterRadius` (a survey's or the cratering solver's) and `depthRatio` (default 0.5) in host of
-  `density` (default 1800 kg/m^3). Without a radius, Sonder et al.'s crater law `scaledCraterRadius` gives one.
+  is a paraboloid of `craterRadius` (a survey's or the cratering solver's) and `depthRatio` (default 0.24, Fauld's) in
+  host of `density` (default 1800 kg/m^3). Without a radius, Sonder et al.'s crater law `scaledCraterRadius` gives one;
+  at Fauld it gives the measured 250 m.
 - `heat`: the rest, which is the cavity's hot gas, crushing and friction.
 
 ```ts
 import { energyBudget } from '@margoengine/physics/explosive';
 
-// Fauld's measured crater, about 250 m across in gypsum.
-const split = energyBudget(1.013e13, 90, { craterRadius: 125, density: 2300 });
+// Fauld: the bomb store about 35 m down in gypsum and mudstone (Waltham 2001).
+const split = energyBudget(1.013e13, 35, { density: 2300 });
 console.log(split.air, split.groundShock, split.craterWork, split.heat);
 ```
 
 ```ts
 import { energyBudget, EXPLOSIVES, gurneyVelocity, metalSpeed } from '@margoengine/physics/explosive';
 
-// Fauld, 27 November 1944: 5.34 million lb of TNT equivalent about 90 m down in the gypsum (Fielder and Guest 1967).
-const fauld = energyBudget(5.34e6 * 0.45359237 * 4.184e6, 90);
-console.log(fauld.tntEquivalent.toFixed(0), fauld.scaledDepth.toExponential(2), (fauld.air / fauld.energy).toFixed(4));
+// Fauld, 27 November 1944: 5.34 million lb of TNT equivalent (Fielder and Guest 1967), about 35 m down (Waltham 2001).
+const fauld = energyBudget(5.34e6 * 0.45359237 * 4.184e6, 35, { density: 2300 });
+console.log(fauld.tntEquivalent.toFixed(0), (2 * fauld.craterRadius).toFixed(0), 'm crater', fauld.craterMass.toExponential(2), 'kg');
 // A TNT-filled steel cylinder with twice its charge's mass of case.
 console.log(metalSpeed(gurneyVelocity(EXPLOSIVES.tnt), 'cylinder', 2).toFixed(0), 'm/s');
 ```
@@ -7660,7 +7663,10 @@ case mass. They leave in opposite pairs of equal mass, so the launch adds no mom
 and quadratic air drag (`dragCoefficient`, default 1, on a sphere of the fragment's mass and `density`) until they reach
 `groundHeight`, or on the terrain bed. A charge's `film` is art direction, not physics: `aim` and `spread` (default
 pi / 6) send its case fragments into a cone, and `speedScale` (default 1) scales their launch speed. The masses stay
-Mott's, but aimed fragments leave one by one rather than in opposite pairs, so the launch carries momentum. `seed` breaks
+Mott's, but aimed fragments leave one by one rather than in opposite pairs, so the launch carries momentum. With `dust`
+(made with `new ExplosionSolver(id, { dust: airborne.emissionField })`), each linked charge emits `fraction` of its
+crater mass into an `AirborneParticles` source (ATMO-06) at a constant rate over `duration`, by default the flight time
+of a throw past the rim at 45 degrees, sqrt(2 R / g). `seed` breaks
 the same cases another way; `counts` gives the fragments in flight,
 the fragment steps taken and the guns' integration steps. A buried charge (`depth` above 0) keeps its case in the ground.
 

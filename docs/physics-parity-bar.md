@@ -407,7 +407,7 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 | FIRE-02 | Flame and fireball | none (fire is particles in both) | Base | OPEN | DON'T BUILD |
 | FIRE-03 | Plumes and thermals | none | Base | CLAIMED (Fauld film) | MEETS |
 | FIRE-04 | Blast loading | B radial explosion helper | A radial explosion impulse on bodies in range, with falloff (also under P1 field forces) | CLAIMED (Fauld film) | MEETS |
-| FIRE-05 | Explosive source, fragments | none | Base | LANDED (Fauld film) | MEETS |
+| FIRE-05 | Explosive source, fragments | none | Base | REOPENED (Fauld film) | MEETS |
 | FIRE-06 | Heat conduction | none | Base | REOPENED | MEETS |
 | FIRE-07 | Burning structures | none | Base | OPEN | DON'T BUILD |
 

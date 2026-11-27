@@ -7,12 +7,14 @@ import {
   chargeEnergy,
   energyBudget,
   EXPLOSIVES,
+  freeAirEquivalent,
   GURNEY_FRACTION,
   gurneyVelocity,
   metalSpeed,
   SONDER_CRATER_LAW,
   scaledCraterRadius,
   scaledDepth,
+  SEISMIC_COUPLING,
   TNT_JOULES_PER_KG,
   tntEquivalent,
 } from '../dist/explosive.js';
@@ -70,7 +72,7 @@ test('a charge releases its mass times its heat of detonation, and TNT equivalen
   assert.throws(() => scaledDepth(-1, 1e6), coded);
 });
 
-test("the air share falls with scaled depth from 0.90 at the surface, and Sonder et al.'s 23 measured blasts lie in its band", () => {
+test("the air share falls with scaled depth from 0.90 at the surface, and Sonder et al.'s 23 blasts, as free-air equivalents, sit on twice it", () => {
   // At the surface g = 2^(-1/10), so the share is 2^(-3/20).
   close(airborneFraction(0), 2 ** -0.15, 1e-12, 'surface share');
   for (let d = 0; d < 8e-3; d += 2e-4) assert.ok(airborneFraction(d + 2e-4) < airborneFraction(d), `falls at ${d}`);
@@ -100,31 +102,40 @@ test("the air share falls with scaled depth from 0.90 at the surface, and Sonder
     [1.46, 3.95],
     [6.6, 3.22],
   ];
-  const logs = measured.map(([percent, d]) => Math.log(percent / 100 / airborneFraction(d * 1e-3)));
-  const mean = logs.reduce((a, b) => a + b, 0) / logs.length;
-  const spread = Math.sqrt(logs.reduce((a, b) => a + (b - mean) ** 2, 0) / (logs.length - 1));
-  // The two studies' reference charges differ (Sonder et al. section 2.2.1): the measured shares sit a factor 1.84 above
-  // the law with a spread of 1.6. Every blast lies inside the mean plus or minus 2.5 spreads, and the mean inside a factor 2.
-  assert.ok(mean > 0 && mean < Math.log(2), `mean log ratio ${mean}`);
+  // Their airborne energies are free-air equivalents (Kinney and Graham's laws); the model's air share is the hemisphere over
+  // the ground, whose free-air equivalent is twice it (the image in the ground). No constant is fitted to these blasts.
+  const logs = measured.map(([percent, d]) => {
+    const budget = { air: airborneFraction(d * 1e-3), ground: 1 };
+    return Math.log(percent / 100 / freeAirEquivalent(budget));
+  });
+  const n = logs.length;
+  const mean = logs.reduce((a, b) => a + b, 0) / n;
+  const spread = Math.sqrt(logs.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
+  // The bound is the blasts' own scatter: the mean within two standard errors of zero, each blast within 2.5 spreads.
+  assert.ok(
+    Math.abs(mean) < (2 * spread) / Math.sqrt(n),
+    `mean log ratio ${mean}, standard error ${spread / Math.sqrt(n)}`,
+  );
   for (const [i, value] of logs.entries())
-    assert.ok(Math.abs(value - mean) < 2.5 * spread, `blast ${i}: log ratio ${value}, mean ${mean}, spread ${spread}`);
+    assert.ok(Math.abs(value) < 2.5 * spread, `blast ${i}: log ratio ${value}, spread ${spread}`);
+  assert.equal(freeAirEquivalent({ air: 5, ground: 0 }), 5, 'a charge in the air is its own free-air blast');
 });
 
-test('Fauld (Fielder and Guest 1967): 5.34 million lb of TNT at a Baldwin scaled depth of 1.7 ft/lb^(1/3) keeps almost all its energy in the ground', () => {
-  const poundsTnt = 5.34e6,
-    kilograms = poundsTnt * 0.45359237,
+test('Fauld: 5.34 million lb of TNT about 35 m down digs the measured 250 m crater and throws out over a million tonnes', () => {
+  // Fielder and Guest 1967: 5.34 million lb TNT equivalent and a crater about 250 m across. Waltham 2001: the bomb store about
+  // 35 m below the surface, the crater just over 250 m across and about 30 m deep, well over a million tonnes thrown out.
+  const kilograms = 5.34e6 * 0.45359237,
     energy = kilograms * TNT_JOULES_PER_KG;
-  // Baldwin's scaled depth H / W^(1/3) = 1.7 in feet and pounds gives the charge centre's depth.
-  const depth = 1.7 * Math.cbrt(poundsTnt) * 0.3048;
-  assert.ok(depth > 85 && depth < 95, `the charge centre is ${depth} m down (the stores were 200 to 400 ft down)`);
-  const budget = energyBudget(energy, depth);
+  const budget = energyBudget(energy, 35, { density: 2300 });
   close(budget.tntEquivalent, kilograms, 1e-12, 'TNT equivalent');
-  // 4.2e-3 m J^-1/3: the depth that digs the largest crater (Goto et al. 2001; Sonder et al. 2022).
-  assert.ok(budget.scaledDepth > 4.0e-3 && budget.scaledDepth < 4.3e-3, `scaled depth ${budget.scaledDepth}`);
-  assert.ok(budget.air / energy < 0.01 && budget.air / energy > 0.002, `air share ${budget.air / energy}`);
-  close(budget.air + budget.ground, energy, 1e-12, 'every joule accounted');
-  // A surface charge sends most of its energy into the air.
-  assert.ok(energyBudget(energy, 0).air / energy > 0.85);
+  const diameter = 2 * budget.craterRadius;
+  assert.ok(Math.abs(diameter / 250 - 1) < 0.1, `crater ${diameter} m across against 250 m measured`);
+  // The default depth ratio is Fauld's own (30 m deep, 125 m radius); the mass is then a consequence of the law's radius.
+  assert.ok(budget.craterMass > 1e9 && budget.craterMass < 4e9, `crater mass ${budget.craterMass} kg`);
+  close(budget.air + budget.groundShock + budget.craterWork + budget.heat, energy, 1e-12, 'every joule accounted');
+  // A shallower than optimal charge: a crater under the largest, and more of its energy in the air.
+  assert.ok(budget.scaledDepth < SONDER_CRATER_LAW.optimalDepth);
+  assert.ok(energyBudget(energy, 0).air / energy > 0.85, 'a surface charge sends most of its energy into the air');
 });
 
 test("the crater law has Sonder et al.'s shape: r0 at the surface, its largest radius at the optimal depth, smaller past it", () => {
@@ -144,7 +155,7 @@ test('every joule of a buried charge is in the air, the ground shock, the crater
     close(b.air + b.groundShock + b.craterWork + b.heat, b.energy, 1e-12, `sum at ${depth} m`);
     close(b.groundShock + b.craterWork + b.heat, b.ground, 1e-12, `ground at ${depth} m`);
     for (const part of ['air', 'groundShock', 'craterWork', 'heat']) assert.ok(b[part] >= 0, `${part} at ${depth} m`);
-    close(b.groundShock, 0.15 * b.ground, 1e-12, 'default seismic coupling');
+    close(b.groundShock, SEISMIC_COUPLING.dryAlluvium * b.ground, 1e-12, 'default seismic coupling');
   }
   // A charge in the air: all of it is blast; the ground gets it through FIRE-04.
   const air = energyBudget(4.184e6, 0, {}, true);
@@ -155,28 +166,18 @@ test('every joule of a buried charge is in the air, the ground shock, the crater
   assert.throws(() => energyBudget(1e6, 1, { craterRadius: -1 }), coded);
 });
 
-test("Sonder et al.'s blasts: the model's seismic share lies in their measured elastic band of 10 to 17 % of each blast", () => {
-  // Sonder et al. 2022, section 3.3.3: airborne plus seismic energy was about 17 % of each blast for pads 1, 2 and 4 and
-  // about 10 % for pad 3; the airborne part of each (Table 3) is at most 7.6 %. Their charges were about 0.43 MJ.
-  for (const d of [2.3e-3, 2.9e-3, 3.95e-3, 4.33e-3, 5.05e-3]) {
-    const energy = 4.3e5;
-    const b = energyBudget(energy, d * Math.cbrt(energy));
-    const share = b.groundShock / energy;
-    assert.ok(share > 0.1 && share < 0.17, `seismic share ${share} at scaled depth ${d}`);
+test("the seismic share lies in Rodean's measured band: about 1 % in competent rock, hundredths of 1 % in dry alluvium", () => {
+  // Rodean 1970, Fig. 9: 0.01 to 1 % of an explosion's energy radiates as seismic waves, the rest heats and breaks rock.
+  for (const [host, coupling, low, high] of [
+    ['dry alluvium', SEISMIC_COUPLING.dryAlluvium, 1e-4, 1e-3],
+    ['competent rock', SEISMIC_COUPLING.competentRock, 3e-3, 3e-2],
+  ]) {
+    const b = energyBudget(4.3e5, 0.02 * Math.cbrt(4.3e5), { seismicCoupling: coupling });
+    const share = b.groundShock / b.energy;
+    assert.ok(share > low && share < high, `${host}: seismic share ${share}`);
   }
-});
-
-test('Fauld: in its measured 250 m crater the least crater work is a fifth of the energy, and the crater law overshoots it in rock', () => {
-  const kilograms = 5.34e6 * 0.45359237,
-    energy = kilograms * TNT_JOULES_PER_KG,
-    depth = 1.7 * Math.cbrt(5.34e6) * 0.3048;
-  // Fielder and Guest 1967: a crater about 250 m across, in gypsum (alabaster) with marl, about 2300 kg/m^3.
-  const measured = energyBudget(energy, depth, { craterRadius: 125, density: 2300 });
-  const share = measured.craterWork / energy;
-  assert.ok(share > 0.1 && share < 0.3, `crater work share ${share}`);
-  assert.ok(measured.heat > measured.craterWork, 'most of the ground share is heat');
-  // Sonder et al.'s law was fitted in loose ground; in Fauld's rock it gives a crater about 30 % wider than measured
-  // (docs/limits.md), which is why the budget takes a surveyed or solved radius.
-  const predicted = energyBudget(energy, depth).craterRadius * 2;
-  assert.ok(predicted > 250 && predicted < 340, `law diameter ${predicted} m against 250 m`);
+  assert.equal(
+    energyBudget(1e6, 1).groundShock,
+    energyBudget(1e6, 1, { seismicCoupling: SEISMIC_COUPLING.dryAlluvium }).groundShock,
+  );
 });

@@ -151,6 +151,24 @@ export interface ExplosionParams {
   readonly breakables?: ImpactTarget;
   /** Hull plates the hits load (the solver must be made with `hullPlates: true`); their damage field opens hull openings. */
   readonly plates?: readonly HullPlate[];
+  /** The dust the craters throw into the air (the solver must be made with `dust`; see {@link ExplosionDust}). */
+  readonly dust?: ExplosionDust;
+}
+
+/**
+ * Crater dust for an airborne solver (ATMO-06): `fraction` of each linked charge's crater mass, emitted into airborne source
+ * `source` at a constant rate over `duration` (default the flight time of a throw past the rim at 45 degrees, sqrt(2 R / g)).
+ * The share fine enough to stay aloft depends on the ground; give it from the site.
+ */
+export interface ExplosionDust {
+  /** How many sources the airborne solver has (its emission field holds one rate each). */
+  readonly sources: number;
+  /** Which charge feeds which airborne source. */
+  readonly links: readonly { readonly charge: number; readonly source: number }[];
+  /** The share of the crater mass that goes into the air as dust, 0 to 1. */
+  readonly fraction: number;
+  /** Seconds over which it leaves (default sqrt(2 R / g)). */
+  readonly duration?: number;
 }
 
 /** Anything that takes an impact at a point, as BreakableWorld.applyImpact does (BREAK-01). */
@@ -203,6 +221,11 @@ export interface ExplosionSolverOptions {
   readonly terrain?: BedShape;
   /** True when the solver publishes `damageField` for hull plates (`plates` in its params). */
   readonly hullPlates?: boolean;
+  /**
+   * An airborne solver's `emissionField` (ATMO-06, `AirborneParticles.load({emissions: true})`): the solver then writes the
+   * dust its charges' craters throw up into it (`dust` in its params).
+   */
+  readonly dust?: FieldDescriptor;
 }
 
 type Native = {
@@ -341,6 +364,7 @@ interface Placed {
   readonly craterWork: number;
   readonly heat: number;
   readonly craterRadius: number;
+  readonly craterMass: number;
   readonly scaledDepth: number;
   readonly gasMass: number;
   readonly fragments: number;
@@ -370,6 +394,9 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
   private damageRegion: Region | null = null;
   private diameter: Float64Array = new Float64Array(0);
   private hitCount = 0;
+  private dustField: FieldDescriptor | null = null;
+  private dustRegion: Region | null = null;
+  private dustLinks: { charge: number; source: number; mass: number; duration: number }[] = [];
   private host: SolverHost | null = null;
   private placed: Placed[] = [];
   private explosionRegion: Region | null = null;
@@ -405,6 +432,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     private readonly modules?: { plain: WebAssembly.Module; shared?: WebAssembly.Module },
   ) {
     this.carriers = options.carriers === true;
+    this.dustField = options.dust ?? null;
     this.terrain = options.terrain ?? null;
     if (this.terrain) bedVertexCount(this.terrain);
     this.explosionsField = {
@@ -504,6 +532,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
         { field: this.hitsField, access: 'write' as const },
         ...(this.damageField ? [{ field: this.damageField, access: 'write' as const }] : []),
+        ...(this.dustField ? [{ field: this.dustField, access: 'write' as const }] : []),
       ],
     };
   }
@@ -655,6 +684,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         craterWork: budget.craterWork,
         heat: budget.heat,
         craterRadius: budget.craterRadius,
+        craterMass: budget.craterMass,
         scaledDepth: budget.scaledDepth,
         gasMass: mass,
         fragments: count,
@@ -724,6 +754,36 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     if (this.damageField)
       this.damageRegion = host.allocate('plate-damage', Math.max(1, plates.length) * CRUSH_WORDS * 8, 'f64', 1);
     this.diameter = Float64Array.from(diameters);
+    if (params.dust !== undefined && !this.dustField)
+      throw new MargoError(
+        'unsupported',
+        'Dust goes to an airborne solver: make the solver with new ExplosionSolver(id, {dust: airborne.emissionField}). See https://margoengine.com/errors#explosives',
+      );
+    if (this.dustField) {
+      const dust = params.dust;
+      if (!dust)
+        throw invalidExplosive('A solver made with dust needs dust: {sources, links, fraction} in its params.');
+      const sources = dust.sources;
+      if (!(Number.isInteger(sources) && sources >= 1))
+        throw invalidExplosive(`Dust sources must be the airborne solver's source count, 1 or more; got ${sources}.`);
+      const fraction = dust.fraction;
+      if (!(Number.isFinite(fraction) && fraction >= 0 && fraction <= 1))
+        throw invalidExplosive(`Dust fraction must be a share of the crater mass from 0 to 1; got ${fraction}.`);
+      this.dustLinks = (dust.links ?? []).map((link, k) => {
+        if (!(Number.isInteger(link.charge) && link.charge >= 0 && link.charge < this.placed.length))
+          throw invalidExplosive(`Dust link ${k} charge must be a charge index from 0 to ${this.placed.length - 1}.`);
+        if (!(Number.isInteger(link.source) && link.source >= 0 && link.source < sources))
+          throw invalidExplosive(`Dust link ${k} source must be an airborne source index from 0 to ${sources - 1}.`);
+        const c = this.placed[link.charge]!;
+        // The ejecta leave over the flight time of a throw past the rim at 45 degrees, sqrt(2 R / g).
+        const g = hypot(host.gravity[0], host.gravity[1], host.gravity[2]) || 9.81;
+        const duration = dust.duration ?? (c.craterRadius > 0 ? Math.sqrt((2 * c.craterRadius) / g) : 1);
+        if (!(Number.isFinite(duration) && duration > 0))
+          throw invalidExplosive(`Dust duration must be a finite number of seconds above 0; got ${duration}.`);
+        return { charge: link.charge, source: link.source, mass: fraction * c.craterMass, duration };
+      });
+      this.dustRegion = host.allocate('dust-emissions', sources * 8, 'f64', 1);
+    }
     this.explosionRegion = host.allocate(
       'explosions',
       (this.placed.length + this.guns.length) * EXPLOSION_WORDS * 8,
@@ -1037,6 +1097,16 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       this.threadSteps[0]! += steps;
     }
     if (before) flying -= this.hits(before, end, bodies, impulses);
+    if (this.dustRegion) {
+      // Each linked charge's dust at a constant rate over its duration: this step's share of it, as a rate over the step.
+      const rates = this.words(this.dustRegion);
+      rates.fill(0);
+      for (const link of this.dustLinks) {
+        const t0 = this.placed[link.charge]!.time;
+        const overlap = Math.min(end, t0 + link.duration) - Math.max(start, t0);
+        if (overlap > 0) rates[link.source] = rates[link.source]! + (link.mass * overlap) / (link.duration * dt);
+      }
+    }
     this.flyingNow = flying;
   }
 
@@ -1206,6 +1276,9 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
             },
           ]
         : []),
+      ...(this.dustField && this.dustRegion
+        ? [{ field: this.dustField.name, region: this.dustRegion, tick, cell: [0, 0, 0] as [number, number, number] }]
+        : []),
       ...(this.impulseRegion
         ? [
             {
@@ -1230,6 +1303,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       this.launchRegion!,
       this.hitRegion!,
       ...(this.damageRegion ? [this.damageRegion] : []),
+      ...(this.dustRegion ? [this.dustRegion] : []),
       ...(this.impulseRegion ? [this.impulseRegion] : []),
     ];
   }

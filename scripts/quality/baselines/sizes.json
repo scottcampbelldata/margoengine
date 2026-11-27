@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20907440,
+  "total": 20908076,
   "history": [
     {
       "date": "2026-10-24",
@@ -14589,6 +14589,12 @@
       "commit": "pending",
       "reason": "physics/ship 35,946 ceiling to its new size 36,294 (+348 B): the bank model's hull part by Lataire's form fitted to Vantorre et al.'s tests, in place of the regression's hull table. One function of one model; nothing to split. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "reopen",
+      "reason": "FIRE-05 reopen fixes (+636 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15430,7 +15436,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 12562,
+    "@margoengine/physics/explosive": 13198,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,
