@@ -5662,6 +5662,25 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **After:** GTAO 0.999 mean, 0.995 least; SSAO 0.823 and 0.797 (its range check still counts the slats a little).
 - **Regression:** `packages/post/test/ssao-silhouette-browser.mjs`, WebGPU and the WebGL2 layer.
 
+### Open 2026-11-27: ambient occlusion leaves pale pixels along grass blade edges (KB-SCATTER-AOFRINGE1, scatter and post)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file>` with the shots
+  `view=camp-buildings` and `view=camp-buildings&occlusion=0`; enlarge the grass at the lower left (pixels 370 to 470
+  across, 975 to 1055 down): with occlusion on, pale one-pixel outlines run along blades over the shaded sand at their
+  feet. Counted as pixels over 8 codes of luma above their 5 x 5 median with occlusion and not without, lower 45 percent
+  of the frame: 41,520 (mean 19.6 codes; 9,408 under `weather=clear&hour=9`). RTX A6000, WebGPU.
+- **Cause:** a covered blade's depth is written where its coverage passes a hash (KB-SCENES-DUNE-GTAO1), and that pixel
+  is mostly sand wherever the coverage is low. The ambient replay holds the sand's light there (times one less the
+  coverage), but the occlusion is worked out at the blade's depth, so the sand's share is not darkened while the bare
+  pixels beside it are. The error is the sand's share times the difference of the two visibilities.
+- **Ruled out (same view, measured):** writing no covered depth at all leaves 3,307 pale pixels but also takes 90
+  percent of the darkening grass causes (mean 6.07 to 0.60 codes); no depth on the edges of blades wide enough to have
+  an opaque core leaves 36,390 (12 percent fewer) with 11 percent less darkening; a depth threshold of 0.5 or 0.75 on
+  those blades leaves 39,255 and 37,449. The pale pixels are the other face of the occlusion the hashed depth gives, so
+  no threshold removes one without the other.
+- **What a fix needs:** the occlusion of a veiled pixel worked out at the depth under the blades (the surface whose
+  light the replay holds) with the blades still counted as occluders: a second depth read in `SSAO` and `GTAO`.
+
 ### Fixed 2026-11-27: the wind left no mark on the dune coast's sand (KB-SCENES-SCOUR1, terrain and scenes)
 
 - **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file>` with a camera
