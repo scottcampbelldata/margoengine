@@ -169,6 +169,13 @@ const STAIR_CODE = {
       : style.startsWith('japan')
         ? { rise: 0.23, tread: 0.15, width: 0.75 }
         : { rise: 9.5 * IN, tread: 6.75 * IN, width: 26 * IN },
+  // The straight treads keep the dwelling or office stair's own rule.
+  winder: (s, style) =>
+    style === 'japan-2011-concrete'
+      ? { rise: 0.18, tread: 0.26, width: 0.9 }
+      : style.startsWith('japan')
+        ? { rise: 0.21, tread: 0.23, width: 0.75 }
+        : { rise: 7.75 * IN, tread: 10 * IN, width: 36 * IN },
   // Rungs 10 to 14 in apart, 16 in between the rails.
   ladder: () => ({ rise: 14 * IN, tread: 0, width: 16 * IN }),
 };
@@ -185,6 +192,13 @@ function check(b, o, label, wrong, kinds) {
       wrong.push(`${label}: ${s.kind} rise ${s.rise} tread ${s.tread} width ${s.width}`);
     // The flight stands in one room on both its floors, across no doorway, and its ends are outside it and in a room.
     const body = { x0: s.min[0], x1: s.max[0], z0: s.min[1], z1: s.max[1] };
+    // Winder treads: on the walking line and at the narrow end, IRC R311.7.5.2.1 and Order art. 23.
+    if (s.kind === 'winder') {
+      const [walk, narrow] =
+        style === 'japan-2011-concrete' ? [0.24, 0] : style.startsWith('japan') ? [0.15, 0] : [10 * IN, 6 * IN];
+      if (s.winders.walk < walk - 1e-6 || s.winders.narrow < narrow - 1e-6)
+        wrong.push(`${label}: winders ${s.winders.walk} on the walking line, ${s.winders.narrow} at the well`);
+    }
     for (const [floor, end] of [
       [s.floor, s.foot],
       [s.floor + 1, s.head],
@@ -219,6 +233,18 @@ test('every storey of every random multi-storey building is reached on foot', ()
   // Houses keep ordinary stairs: spirals and ladders are for plans too small for them.
   assert.ok(kinds['dog-leg'] > (kinds.spiral ?? 0) * 5, JSON.stringify(kinds));
   assert.ok(kinds.spiral > 0 && kinds.ladder > 0, JSON.stringify(kinds));
+});
+
+test('winder stairs reach every storey too, and come first where asked', () => {
+  const wrong = [],
+    kinds = {};
+  for (let i = 0; i < 400; i++) {
+    const o = { ...randomOptions(i), stairShape: 'winder' },
+      b = generateBuilding(o);
+    check(b, o, `winder #${i} ${o.style} ${o.width.toFixed(2)} x ${o.depth.toFixed(2)}`, wrong, kinds);
+  }
+  assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
+  assert.ok(kinds.winder > (kinds['dog-leg'] ?? 0) * 5, JSON.stringify(kinds));
 });
 
 test('the smallest and most extreme plans the options allow still have a way up', () => {
@@ -646,7 +672,11 @@ function surfaces(b, names, x, z) {
       if (Math.abs(normals[v[0] + 1]) < 0.99) continue;
       const xs = v.map((q) => p[q]),
         zs = v.map((q) => p[q + 2]);
-      if (covers(xs, zs, x, z)) out.push({ y: p[v[0] + 1], up: normals[v[0] + 1] > 0, name });
+      if (!covers(xs, zs, x, z)) continue;
+      // The face's own height there: a ramp's slopes.
+      const [nx, ny, nz] = [0, 1, 2].map((q) => normals[v[0] + q]),
+        y = p[v[0] + 1] - (nx * (x - xs[0]) + nz * (z - zs[0])) / ny;
+      out.push({ y, up: ny > 0, name });
     }
   }
   return out;
@@ -797,18 +827,32 @@ function unevenFaults(b, o, label) {
       wrong.push(`${label}: an open ledge of ${edges} cells at ${levels[k].toFixed(2)}, the first at ${first}`);
   });
   wrong.push(...coveredWindows(b, label));
+  // No floor covering is left over a sunk flight's well.
+  for (const s of steps.filter((q) => q.sunken)) {
+    const p = [(s.min[0] + s.max[0]) / 2 + 0.013, (s.min[1] + s.max[1]) / 2 + 0.013],
+      over = surfaces(b, ['mats', 'fabric'], ...p).find((f) => f.up && f.y > s.from - 0.01 && f.y < s.to + 0.1);
+    if (over) wrong.push(`${label}: ${over.name} at ${over.y.toFixed(2)} over the well to ${s.from.toFixed(2)}`);
+  }
   for (const s of steps) {
-    const name = `${label}: steps ${s.from.toFixed(2)} to ${s.to.toFixed(2)}${s.sunken ? ' sunk' : ''}`;
-    if (Math.abs(s.risers * s.rise - (s.to - s.from)) > 1e-6) wrong.push(`${name}: risers do not climb the change`);
-    if (s.rise > code.rise + 1e-6 || s.tread < code.tread - 1e-6 || s.width < code.width - 1e-6)
-      wrong.push(`${name}: rise ${s.rise} tread ${s.tread} width ${s.width}`);
+    const name = `${label}: ${s.ramp ? 'ramp' : 'steps'} ${s.from.toFixed(2)} to ${s.to.toFixed(2)}${s.sunken ? ' sunk' : ''}`;
+    if (s.ramp) {
+      // IBC 2021 1012: no steeper than 1 in 12, at most 30 in of rise a run.
+      if (s.risers || Math.abs(s.rise - (s.to - s.from)) > 1e-6) wrong.push(`${name}: it does not climb the change`);
+      if (s.rise / s.tread > 1 / 12 + 1e-9 || s.rise > 30 * IN + 1e-6 || s.width < code.width - 1e-6)
+        wrong.push(`${name}: rise ${s.rise} over ${s.tread}, width ${s.width}`);
+    } else {
+      if (Math.abs(s.risers * s.rise - (s.to - s.from)) > 1e-6) wrong.push(`${name}: risers do not climb the change`);
+      if (s.rise > code.rise + 1e-6 || s.tread < code.tread - 1e-6 || s.width < code.width - 1e-6)
+        wrong.push(`${name}: rise ${s.rise} tread ${s.tread} width ${s.width}`);
+    }
     // Every tread is there, from the foot to the head, with headroom over it and over both landings.
     const along = Math.abs(s.head[0] - s.foot[0]) > Math.abs(s.head[1] - s.foot[1]) ? 0 : 1,
       dir = Math.sign(s.head[along] - s.foot[along]),
       start = dir > 0 ? s.min[along] : s.max[along],
       mid = (s.min[1 - along] + s.max[1 - along]) / 2 + 0.013,
       point = (u) => (along ? [mid, start + dir * u] : [start + dir * u, mid]);
-    if (Math.abs(s.max[along] - s.min[along] - (s.risers - 1) * s.tread) > 1e-6) wrong.push(`${name}: run`);
+    const run = s.ramp ? s.tread : (s.risers - 1) * s.tread;
+    if (Math.abs(s.max[along] - s.min[along] - run) > 1e-6) wrong.push(`${name}: run`);
     const stand = [
       [s.foot, s.from],
       [s.head, s.to],
@@ -820,9 +864,18 @@ function unevenFaults(b, o, label) {
         wrong.push(`${name}: no tread ${k}`);
       stand.push([p, y]);
     }
-    // Headroom too where the flight passes through the join: at its first tread when sunk, else at its top.
-    const run = (s.risers - 1) * s.tread,
-      through = s.sunken ? [point(0.004), s.from + s.rise] : [point(run - 0.004), s.to];
+    // A ramp's surface climbs evenly from end to end.
+    for (let k = 1; s.ramp && k < 10; k++) {
+      const p = point((k / 10) * run),
+        y = s.from + (k / 10) * s.rise;
+      if (!surfaces(b, ['stairs'], ...p).some((f) => f.up && Math.abs(f.y - y) < 2e-3))
+        wrong.push(`${name}: no ramp at ${k}/10`);
+      stand.push([p, y]);
+    }
+    // Headroom too where the flight passes through the join: at its low end when sunk, else at its top.
+    const through = s.sunken
+      ? [point(0.004), s.from + (s.ramp ? (0.004 / run) * s.rise : s.rise)]
+      : [point(run - 0.004), s.to];
     for (const [p, y] of [...stand, through]) {
       const low = surfaces(b, ['interior', 'walls', 'roof', 'mats', 'fabric', 'furniture', 'fixtures'], ...p).find(
         (f) => f.y > y + 0.02 && f.y < y + code.head - 0.005,
@@ -863,4 +916,76 @@ test('wings whose floors differ from the main block are joined by steps, and no 
   }
   assert.deepEqual(wrong.slice(0, 25), [], `${wrong.length} failures`);
   assert.ok(steps > 100 && sunk > 5 && climbed > 80, `${steps} flights, ${sunk} sunk, ${climbed} ground joins climbed`);
+});
+
+test('a wing no steps reach gets a door even where its front is inside the main block (KB-PROC-WINGDOOR1)', () => {
+  const o = randomUneven(1071),
+    b = generateBuildingPlan(o);
+  assert.equal(b.joinSteps.length, 0);
+  assert.deepEqual(unevenFaults(b, o, '#1071'), []);
+  assert.equal(b.openings.filter((d) => d.kind === 'door').length, 2);
+});
+
+test('a sunk flight cuts the tatami as well as the floor (KB-PROC-WELLMATS1)', () => {
+  const wrong = [];
+  for (const i of [559, 590, 803]) {
+    const o = randomUneven(i),
+      b = generateBuildingPlan(o);
+    assert.ok(
+      b.joinSteps.some((s) => s.sunken),
+      `#${i} has no sunk steps`,
+    );
+    wrong.push(...unevenFaults(b, o, `#${i}`));
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('with ramps, joined floors at most 30 in apart are joined by ramps and every room is still reached', () => {
+  const wrong = [];
+  let ramps = 0;
+  for (let i = 0; i < Number(process.env.UNEVEN ?? 300); i++) {
+    const o = { ...randomUneven(i), ramps: true },
+      b = generateBuildingPlan(o),
+      w = o.wings[0],
+      label = `#${i} ${o.style} wing plinth ${w.plinth.toFixed(2)} storeys ${w.storeys.length} ramps`;
+    wrong.push(...unevenFaults(b, o, label));
+    ramps += (b.joinSteps ?? []).filter((s) => s.ramp).length;
+  }
+  assert.deepEqual(wrong.slice(0, 25), [], `${wrong.length} failures`);
+  assert.ok(ramps > 20, `${ramps} ramps built`);
+});
+
+test('ramps climb to every front door at 1 in 12 in runs of at most 30 in', () => {
+  for (const style of BUILDING_STYLES) {
+    for (const plinth of [0.1, 0.45, 1.2, 2]) {
+      const b = generateBuilding({ style, plinth, ramps: true }),
+        doors = b.openings.filter((d) => d.kind === 'door' && d.side === 0 && d.floor === 0);
+      if (!doors.length) continue;
+      const wide = doors[0].width > 2.2;
+      assert.ok(b.ramps.length > 0, `${style} ${plinth}`);
+      assert.equal(b.steps.length, 0, `${style} ${plinth} still has steps`);
+      for (const r of b.ramps) {
+        assert.ok(r.rise / r.run <= (wide ? 1 / 8 : 1 / 12) + 1e-9, `${style} ${r.rise} over ${r.run}`);
+        assert.ok(wide || r.rise <= 30 * IN + 1e-6, `${style} ${r.rise} a run`);
+        assert.ok(r.width >= 36 * IN, `${style} ${r.width} wide`);
+      }
+      // The runs add up to the floor's height at each door (a porch has one way up).
+      const ways = b.options.porch > 0 ? 1 : doors.length,
+        climbed = b.ramps.reduce((n, r) => n + r.rise, 0);
+      assert.ok(Math.abs(climbed - ways * plinth) < 1e-6, `${style} climbs ${climbed} for ${ways} x ${plinth}`);
+      // The ramp's surface is there, under the door, from the deck to the ground.
+      const [x, , z] = doors[0].centre,
+        deck = b.options.porch > 0 ? b.options.porch : 1,
+        long = b.ramps.filter((_, k) => k < b.ramps.length / ways),
+        p = [x, b.options.depth / 2 + deck + long[0].run / 2],
+        y = plinth - long[0].rise / 2;
+      if (!wide) {
+        assert.ok(Math.abs(p[1] - z) > 0.4);
+        assert.ok(
+          surfaces(b, ['porch'], ...p).some((f) => f.up && Math.abs(f.y - y) < 2e-3),
+          `${style} ${plinth} no ramp surface at ${y}`,
+        );
+      }
+    }
+  }
 });

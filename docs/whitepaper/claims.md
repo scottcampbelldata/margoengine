@@ -6807,3 +6807,12 @@ and the WebGL2 layer. Wings with their own floor levels are joined by steps or w
 test walks 300 random ones on their meshes, to every room and past no open ledge. Not claimed: compliance with a
 building code as a whole (the figures kept are each stair's own), or steps at every pair of unequal floors (a pair with
 too little headroom or no clear floor is walled off).
+
+## Winder stairs and ramps in rules buildings (`@margoengine/procedural/building-rules`, `building-plans`, 2026-11-27)
+
+Claim: winder stairs keep the winder tread depths of International Residential Code 2021 R311.7.5.2.1 and Japan's Order
+art. 23 para. 2, and ramps keep 1 in 12 with at most 30 in of rise a run (International Building Code 2021, 1012).
+Proof: `packages/procedural/test/building-reach.test.js` walks 400 random winder buildings and 300 random joined plans
+with ramps, and `packages/procedural/test/building-interiors.test.js` climbs a winder stair's walking line on its mesh
+one riser at a time. Not claimed: compliance with a building code as a whole, or a wheelchair route (door widths,
+turning space and landings at doors are not checked).

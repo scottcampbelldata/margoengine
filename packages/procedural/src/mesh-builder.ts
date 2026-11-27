@@ -106,6 +106,24 @@ export class MeshBuilder {
       this.poly(side, cross(sub(b, a), n));
     }
   }
+  /** A solid from the flat polygon `points`, which may slope, straight down to the level `base` below it. */
+  column(points: readonly V3[], base: number): void {
+    let p = dedupe(points);
+    if (p.length < 3) return;
+    let n = newell(p);
+    if (n[1] < 0) {
+      p = p.slice().reverse();
+      n = scale(n, -1);
+    }
+    const down = (q: V3): V3 => [q[0], base, q[2]];
+    this.poly(p, unit(n));
+    this.poly(p.map(down).reverse(), [0, -1, 0]);
+    for (let k = 0; k < p.length; k++) {
+      const a = p[k],
+        b = p[(k + 1) % p.length];
+      this.poly([a, down(a), down(b), b], cross(sub(b, a), [0, 1, 0]));
+    }
+  }
   /** A box of half sizes h on axes (ax, ay, az, unit and orthogonal) centred at c. */
   box(c: V3, h: V3, ax: V3 = [1, 0, 0], ay: V3 = [0, 1, 0], az: V3 = [0, 0, 1]): void {
     const corner = (sx: number, sy: number, sz: number): V3 =>

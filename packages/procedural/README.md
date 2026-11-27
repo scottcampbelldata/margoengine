@@ -987,7 +987,7 @@ whole number of bays, and each bay into wall, window or door, inside walls of re
 front wall and always clears the roof behind it. Windows sit back by the `reveal` with jambs through the wall, frames
 (sliding, double-hung or strip), sills, casings or stone lintels; doors are panelled, glazed or roller doors; a front
 `porch` gets posts, a shed roof, railings and steps, a raised door without one gets a stoop and steps (a ramp for a
-vehicle door), and a `balcony` gets a 1.1 m railing and a full height sash onto it. Roofs carry courses of tile (with
+vehicle door, and for every door with `ramps`), and a `balcony` gets a 1.1 m railing and a full height sash onto it. Roofs carry courses of tile (with
 pan and roll at `near` detail), shingle or standing seam metal, ridge and hip caps, gutters and downspouts, knee
 braces and a chimney that clears the roof by the building code. `detail` (`far`, `mid`, `near`) sets how much small
 geometry there is, so a whole town can be `mid` and the hero house `near`.
@@ -1054,6 +1054,8 @@ console.log(town.length, Object.keys(town[0].parts).length > 5); // 1 true
 | `detail` | `mid` | `far`, `mid`, `near` | small geometry |
 | `interior` | `rooms` (`cells` at `far`) | `rooms`, `cells`, `none` | what stands behind the windows |
 | `stairs` | true | | stairs between the storeys of furnished rooms, with their wells and guards |
+| `stairShape` | `auto` | `auto`, `winder` | which stair is tried first: a dog-leg or straight flight, or a winder stair |
+| `ramps` | false | | ramps at the front doors instead of steps, and between joined floors where one fits |
 | `fixtures` | true | | kitchen, bathroom and toilet rooms with their fixtures |
 | `softFurnishings` | true | | tatami, rugs, curtains, bedding and cushions in homes |
 | `origin`, `yaw`, `seed` | [0, 0, 0], 0, 1 | | placement and the seed of small differences |
@@ -1091,8 +1093,16 @@ art. 23 (concrete public buildings 0.9 or 1.2 m wide with risers of 0.18 m at mo
 and outer doors, and clear of the windows where the plan allows (else it passes one, as a stair window does). A
 partition that would run into an outer door stops 1.2 m short of it, leaving an entry.
 
+A `winder` stair has the same two flights with a half turn of equal winder treads in place of the half landing, so its
+plan is shorter and wider. Its winders are measured on the walking line and keep a least depth at the well: at least
+10 in at 12 in from the narrow side and 6 in anywhere in the United States (IRC 2021 R311.7.4 and R311.7.5.2.1), and in
+Japan, measured 30 cm from the narrow end (Order art. 23 para. 2), at least 15 cm in houses and 24 cm in concrete
+public buildings. It is built where a dog-leg does not fit, or first with `stairShape: 'winder'`; a Japanese house gets
+six winders, the others three or four. Each `stairs` entry of one gives `winders` (their `count`, and their depth at the
+walking line `walk` and at the well `narrow`).
+
 Every storey is reached. Where no room holds the stair, partitions come down to make a stair hall. A plan too small for
-that gets a `spiral` stair (IRC spiral stairways: 26 in wide, treads at least 6 3/4 in at 12 in from the narrow edge,
+a dog-leg or a winder stair gets a `spiral` stair (IRC spiral stairways: 26 in wide, treads at least 6 3/4 in at 12 in from the narrow edge,
 risers at most 9 1/2 in; in Japan art. 23, measured 30 cm from the narrow end), and one too small for a spiral a fixed
 `ladder` through hatches (US 29 CFR 1910.23: 16 in between the rails, rungs at most 14 in apart, rails 42 in above the
 floor). Each entry of `stairs` gives its `kind`, footprint, and the `foot` and `head` points where a walker steps on
@@ -1112,6 +1122,8 @@ import {generateBuilding} from 'margoengine/procedural/building-rules';
 const house = generateBuilding({style: 'western-1910-house'});
 console.log(house.rooms.length, house.furniture.some((f) => f.kind === 'range')); // 8 true
 console.log(house.stairs[0].kind, house.stairs[0].risers, house.parts.stairs !== undefined); // dog-leg 16 true
+const turned = generateBuilding({stairShape: 'winder'});
+console.log(turned.stairs[0].kind, turned.stairs[0].winders?.count); // winder 6
 ```
 
 Sources for the interiors: Blondel 1675-1683, Cours d'architecture; Merrell, Schkufza, Li, Koltun and Agrawala 2011,
@@ -1219,7 +1231,8 @@ tower already covers that part of the slope, or where the roof is too low for on
 Every storey is reached on foot. The main block's stair serves the floors it shares; a tower that climbs higher is a
 stair tower, entered from the main block, with the whole stack of its flights inside it; a wing given by hand that has
 floors the main block lacks, or stands apart from it, gets its own stair (a wing's own `stairs` option overrides
-this). Where every ground floor door is inside another block, the tower or a wing gets a door.
+this). Where every ground floor door is inside another block, the tower or a wing gets a door; a block whose front lies
+inside the others is turned about on its footprint so that the door opens to the air.
 
 A wing given by hand with its own `plinth` or `storeys` may stand at other floor levels than the main block. A change of
 one riser or less stays an open step. A larger one is walled, with a doorway and a flight of steps at the join wherever
@@ -1241,7 +1254,16 @@ import {generateBuildingPlan} from 'margoengine/procedural/building-plans';
 const split = generateBuildingPlan({style: 'western-1910-house', width: 12, depth: 8, storeys: [3.2, 3.2],
   wings: [{at: [6.5, 0], width: 5, depth: 6, plinth: 0.2, storeys: [2.9, 2.9]}]});
 console.log(split.joinSteps.map((s) => `${s.risers} risers to ${s.to.toFixed(2)} m`)); // [ '3 risers to 0.60 m' ]
+const ramped = generateBuildingPlan({style: 'western-1910-house', width: 12, depth: 8, storeys: [3.2, 3.2], ramps: true,
+  wings: [{at: [6.5, 0], width: 7, depth: 6, plinth: 0.4, storeys: [2.9, 2.9]}]});
+console.log(ramped.joinSteps.map((s) => `${s.ramp} ${s.rise.toFixed(2)} m over ${s.tread.toFixed(2)} m`)); // [ 'true 0.20 m over 2.40 m' ]
 ```
+
+With `ramps: true`, floors at most 30 in apart are joined by a ramp where one fits, a step of one riser or less too: 1
+in 12 in one run, with a handrail each side over 6 in of rise (International Building Code 2021, 1012.2, 1012.4 and
+1012.8; Japan allows 1 in 8, Order art. 26). A ramp's `joinSteps` entry has `ramp` true, `risers` 0, `rise` the climb
+and `tread` its level length. Each front door has a ramp from the ground instead of steps, in runs of at most 30 in of
+rise with a 60 in landing between them, kerbs and handrails (1012.6 and 1012.10), listed in the building's `ramps`.
 
 It returns `{parts, palette, blocks, top, openings, dormers, rooms, furniture, doorways, stairs, joinSteps,
 roofHeight(x, z), insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding`; `roofHeight` is the upper envelope of

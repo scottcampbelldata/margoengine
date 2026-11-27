@@ -10,7 +10,7 @@
 //   procedural floor plan generation", Proc. GAME-ON 2010, https://graphics.tudelft.nl/~rafa/myPapers/bidarra.GAMEON10.pdf:
 //   every room of a generated plan, on every floor, must be reachable, repaired where it is not.
 import type { Building, BuildingDoorway, BuildingStyle } from './building-rules.js';
-import { doorHeight, railing, SLAB, stairRule } from './building-interiors.js';
+import { doorHeight, RAMP, railing, SLAB, stairRule } from './building-interiors.js';
 import { MeshBuilder, type V3 } from './mesh-builder.js';
 
 /**
@@ -34,6 +34,8 @@ export interface BuildingJoinStep {
   readonly width: number;
   /** Sunk into the upper floor (two ground floors, where the lower one's ceiling is too low to climb under). */
   readonly sunken: boolean;
+  /** A ramp (with `ramps`): `risers` is 0, `rise` the whole climb and `tread` its level length. */
+  readonly ramp: boolean;
 }
 /** A block as the joins see it: where it stands, and whether its inside comes before another's (a lower rank). */
 export interface JoinBlock {
@@ -198,7 +200,7 @@ function remainder(all: Area, holes: readonly Area[]): Area[] {
 }
 
 /** Walls, doorways and steps for every two blocks whose floors do not run level where they meet. */
-export function planJoins(blocks: readonly JoinBlock[], style: BuildingStyle): Joins {
+export function planJoins(blocks: readonly JoinBlock[], style: BuildingStyle, ramps = false): Joins {
   const frames = blocks.map(frame),
     walls: { first: number; mesh: MeshBuilder }[] = [],
     steps = new MeshBuilder(),
@@ -243,29 +245,42 @@ export function planJoins(blocks: readonly JoinBlock[], style: BuildingStyle): J
         rule = stairRule(style, (F.inner.x1 - F.inner.x0) * (F.inner.z1 - F.inner.z0)),
         rails = rule.solid ? metal : steps;
       for (const v of pairs) {
-        if (v.step <= rule.maxRise) {
-          if (v.hi > v.lo) runs.forEach((f, n) => holes[n].push({ s0: f.t0, s1: f.t1, y0: v.lo, y1: v.hi }));
-          if (v.hi - v.lo >= 1.5) linked.push([i, j]);
+        // A step no taller than a riser is walked up as it is, unless a ramp takes it.
+        const small = v.step <= rule.maxRise,
+          open = () => {
+            if (v.hi > v.lo) runs.forEach((f, n) => holes[n].push({ s0: f.t0, s1: f.t1, y0: v.lo, y1: v.hi }));
+            if (v.hi - v.lo >= 1.5) linked.push([i, j]);
+          },
+          // Ramps take changes of over 1/2 in, in one run; steps the others over a riser.
+          forms = [...(ramps && v.step > 0.013 && v.step <= RAMP.rise ? [true] : []), ...(small ? [] : [false])];
+        if (!forms.length) {
+          open();
           continue;
         }
         const low = Math.min(v.a.y, v.b.y),
           high = v.lo,
           lowerIsFirst = v.a.y < v.b.y,
           [lowBlock, lowFloor, highBlock, highFloor] = lowerIsFirst ? [i, v.ka, j, v.kb] : [j, v.kb, i, v.ka],
-          risers = Math.ceil(v.step / rule.maxRise - 1e-9),
-          rise = v.step / risers,
-          run = (risers - 1) * rule.minTread,
           w = rule.width,
           landing = Math.max(0.8, w),
-          // On the lower floor, climbing to the join; or, between two ground floors, sunk into the higher one, the first
-          // tread then passing under the head of the doorway.
-          higher = lowerIsFirst ? v.b : v.a,
-          ways = [
-            ...(v.hi - high >= head ? [false] : []),
-            ...(v.ka === 0 && v.kb === 0 && v.hi - low - rise >= head && higher.top - high >= head ? [true] : []),
-          ];
+          higher = lowerIsFirst ? v.b : v.a;
         let placed = false;
-        for (const sunken of ways) {
+        // On the lower floor, climbing to the join; or, between two ground floors, sunk into the higher one, the first
+        // tread then passing under the head of the doorway.
+        const ways = forms.flatMap((ramp) => {
+          const risers = ramp ? 0 : Math.ceil(v.step / rule.maxRise - 1e-9),
+            rise = ramp ? 0 : v.step / risers,
+            run = ramp ? v.step / RAMP.slope : (risers - 1) * rule.minTread,
+            sunk = v.ka === 0 && v.kb === 0 && v.hi - low - rise >= head && higher.top - high >= head;
+          return [...(v.hi - high >= head ? [false] : []), ...(sunk ? [true] : [])].map((sunken) => ({
+            sunken,
+            ramp,
+            risers,
+            rise,
+            run,
+          }));
+        });
+        for (const { sunken, ramp, risers, rise, run } of ways) {
           for (let n = 0; n < runs.length && !placed; n++) {
             const f = runs[n],
               // Which way the flight leads from the join, along the face's outward direction.
@@ -309,6 +324,18 @@ export function planJoins(blocks: readonly JoinBlock[], style: BuildingStyle): J
                 if (sunken) box(steps, tread, low - 0.15, low + r * rise);
                 else box(steps, tread, low - 0.01, high - r * rise);
               }
+              if (ramp) {
+                // A wedge from the floor it starts on up to the floor it reaches.
+                const [yNear, yFar] = sunken ? [low, high] : [high, low],
+                  corner = (u: number, s: number, y: number): V3 => {
+                    const r = onFace(f, d * u, d * u, s, s);
+                    return [r.x0, y, r.z0];
+                  };
+                steps.column(
+                  [corner(0, s0, yNear), corner(0, s1, yNear), corner(run, s1, yFar), corner(run, s0, yFar)],
+                  sunken ? low - 0.15 : low - 0.01,
+                );
+              }
               const guarded = v.step > 0.76;
               if (sunken) {
                 // The well: its last riser under the floor's edge and a cheek each side.
@@ -341,6 +368,8 @@ export function planJoins(blocks: readonly JoinBlock[], style: BuildingStyle): J
                 [bottomAt, topAt] = sunken ? [0, run] : [run, 0],
                 sloped = (s: number, height: number) =>
                   railing(rails, at(bottomAt, s, low + rise), at(topAt, s, high), height, true, low, high - rise);
+              // A ramp that climbs more than 6 in has a handrail each side (IBC 2021 1012.8).
+              if (ramp && v.step > 0.152) for (const s of [s0 + 0.03, s1 - 0.03]) sloped(s, rule.handrail);
               // A guard where a side is open more than 30 in above the floor, a handrail from four risers.
               if (guarded)
                 for (const s of sunken ? [s0 - 0.015, s1 + 0.015] : [s0 + 0.03, s1 - 0.03])
@@ -367,16 +396,18 @@ export function planJoins(blocks: readonly JoinBlock[], style: BuildingStyle): J
                 foot: sunken ? before : after,
                 head: sunken ? after : before,
                 risers,
-                rise,
-                tread: rule.minTread,
+                rise: ramp ? v.step : rise,
+                tread: ramp ? run : rule.minTread,
                 width: w,
                 sunken,
+                ramp,
               });
               linked.push([i, j]);
             }
           }
           if (placed) break;
         }
+        if (!placed && small) open();
       }
       // Wall off everything else the two share: the faces under the higher floors and every ledge.
       // A floor below the other block's eaves was cut at the join, so its wall runs to its own ceiling, even where that

@@ -208,6 +208,8 @@ interface BuildingRuleOptions {
     readonly detail?: BuildingDetail;
     readonly interior?: BuildingInterior;
     readonly stairs?: boolean;
+    readonly stairShape?: 'auto' | 'winder';
+    readonly ramps?: boolean;
     readonly fixtures?: boolean;
     readonly softFurnishings?: boolean;
     readonly origin?: readonly [number, number, number];

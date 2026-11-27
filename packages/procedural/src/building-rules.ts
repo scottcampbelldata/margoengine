@@ -32,6 +32,7 @@
 import type { GeometryData } from '@margoengine/geometry/utils';
 import { MeshBuilder, add, clip, cross, dot, lerp, random, scale, sub, unit, type V3 } from './mesh-builder.js';
 import {
+  RAMP,
   buildInterior,
   type Hole,
   type Side,
@@ -166,6 +167,17 @@ export interface BuildingRuleOptions {
   readonly interior?: BuildingInterior;
   /** Stairs between the storeys of furnished rooms, with the wells and guards. Default true. */
   readonly stairs?: boolean;
+  /**
+   * Which stair is tried first. `auto` (default): a dog-leg or straight flight, then a winder stair, a spiral and a
+   * ladder as the plan needs them. `winder`: a winder stair (a half turn of winder treads instead of the half landing).
+   */
+  readonly stairShape?: 'auto' | 'winder';
+  /**
+   * Ramps where the rules allow them: at each front door in place of its steps (1 in 12, at most 30 in of rise a run
+   * with a 60 in landing between runs, handrails and kerbs), and in a joined plan between floors at most 30 in apart,
+   * where a run fits. Default false.
+   */
+  readonly ramps?: boolean;
   /** Kitchen, bathroom and toilet rooms with their fixtures. Default true. */
   readonly fixtures?: boolean;
   /** Tatami, rugs, curtains, bedding and cushions in homes. Default true. */
@@ -249,6 +261,8 @@ export interface Building {
   }[];
   /** Railing heights built (porches and balconies), metres above their deck. */
   readonly railings: readonly number[];
+  /** Ramps built outside the doors, one entry a run: its rise, level length and width, metres. */
+  readonly ramps: readonly { readonly rise: number; readonly run: number; readonly width: number }[];
   /** Rooms built (`interior: 'rooms'`), local metres, between the inner faces of walls and partitions. */
   readonly rooms: readonly BuildingRoom[];
   /** Furnishing and fixture blocks built, local metres. */
@@ -273,13 +287,16 @@ export interface BuildingRoom {
 export type BuildingRoomUse = 'living' | 'kitchen' | 'bathroom' | 'bedroom' | 'office' | 'toilet' | 'shop' | 'store';
 /**
  * The stair from one storey to the next: its footprint on the floor (the well open in the floor above), local metres.
- * `dog-leg` is two flights and a half landing; `straight` one flight; `spiral` steps round a post, in a plan too small
+ * `dog-leg` is two flights and a half landing; `straight` one flight; `winder` two flights joined by a half turn of
+ * winder treads; `spiral` steps round a post, in a plan too small
  * for those; `ladder` a fixed ladder through a hatch, in a plan too small for any stair.
  */
 export interface BuildingStair {
   /** The storey it starts on. */
   readonly floor: number;
-  readonly kind: 'dog-leg' | 'straight' | 'spiral' | 'ladder';
+  readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
+  /** A winder stair's turn: its treads, and their depth on the walking line and at the well. */
+  readonly winders?: { readonly count: number; readonly walk: number; readonly narrow: number };
   readonly min: readonly [number, number];
   readonly max: readonly [number, number];
   /** Where a person steps on, on this storey (local `[x, z]`, just clear of the footprint). */
@@ -316,7 +333,17 @@ type Resolved = Required<Omit<BuildingRuleOptions, 'origin'>> & {
 };
 type StyleSet = Omit<
   Resolved,
-  'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior' | 'stairs' | 'fixtures' | 'softFurnishings'
+  | 'style'
+  | 'origin'
+  | 'yaw'
+  | 'seed'
+  | 'detail'
+  | 'interior'
+  | 'stairs'
+  | 'stairShape'
+  | 'ramps'
+  | 'fixtures'
+  | 'softFurnishings'
 >;
 
 const BASE: StyleSet = {
@@ -724,6 +751,8 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
     detail: pick(o, 'detail', ['far', 'mid', 'near'], 'mid'),
     interior: pick(o, 'interior', ['rooms', 'cells', 'none'], o.detail === 'far' ? 'cells' : 'rooms'),
     stairs: bool(o, 'stairs', true),
+    stairShape: pick(o, 'stairShape', ['auto', 'winder'], 'auto'),
+    ramps: bool(o, 'ramps', false),
     fixtures: bool(o, 'fixtures', true),
     softFurnishings: bool(o, 'softFurnishings', true),
     origin: tuple(o, 'origin', 3, -1e5, 1e5, [0, 0, 0]) as [number, number, number],
@@ -1106,8 +1135,9 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
 
   // Porch, stoops, balcony, awning.
   const steps: { rise: number; tread: number; count: number }[] = [],
-    railings: number[] = [];
-  buildFrontage(parts, o, sides[0], holes, floors, eaves, near, far, steps, railings);
+    railings: number[] = [],
+    ramps: { rise: number; run: number; width: number }[] = [];
+  buildFrontage(parts, o, sides[0], holes, floors, eaves, near, far, steps, railings, ramps);
   // Chimney.
   let chimney: Building['chimney'];
   if (o.chimney && !flat) {
@@ -1154,6 +1184,7 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     chimney,
     steps,
     railings,
+    ramps,
     ...inside,
   };
   return built;
@@ -1699,6 +1730,7 @@ function buildFrontage(
   far: boolean,
   steps: { rise: number; tread: number; count: number }[],
   railings: number[],
+  ramps: { rise: number; run: number; width: number }[],
 ) {
   const W = o.width,
     D = o.depth,
@@ -1716,6 +1748,54 @@ function buildFrontage(
       parts.porch.box([x, ytop / 2, zc], [width / 2, ytop / 2, tread / 2]);
     }
     steps.push({ rise, tread, count });
+  };
+  // A door's way up from the ground: the steps, or with `ramps` a ramp in runs with level landings between.
+  const approach = (x: number, z0: number, width: number, height: number) => {
+    if (!o.ramps) return stair(x, z0, width, height);
+    if (height < 0.013) return;
+    const count = Math.ceil(height / RAMP.rise - 1e-9),
+      rise = height / count,
+      run = rise / RAMP.slope,
+      half = width / 2;
+    let z = z0,
+      top = height;
+    for (let k = 0; k < count; k++) {
+      if (k) {
+        // A 60 in landing between runs (IBC 2021 1012.6).
+        parts.porch.box([x, top / 2, z + RAMP.landing / 2], [half, top / 2, RAMP.landing / 2]);
+        for (const side of [x - half + 0.03, x + half - 0.03])
+          if (rise > 0.152) handrail([side, top, z], [side, top, z + RAMP.landing]);
+        z += RAMP.landing;
+      }
+      const low = top - rise;
+      parts.porch.column(
+        [
+          [x - half, top, z],
+          [x + half, top, z],
+          [x + half, low, z + run],
+          [x - half, low, z + run],
+        ],
+        -0.05,
+      );
+      for (const side of [x - half + 0.03, x + half - 0.03]) {
+        // A kerb along each open side (IBC 2021 1012.10) and, over 6 in of rise, a handrail (1012.8).
+        parts.porch.beam([side, top + 0.05, z], [side, low + 0.05, z + run], 0.06, 0.1);
+        if (rise > 0.152) handrail([side, top, z], [side, low, z + run]);
+      }
+      ramps.push({ rise, run, width });
+      top = low;
+      z += run;
+    }
+  };
+  // 36 in above the walking surface, on posts at most 1.2 m apart.
+  const handrail = (a: V3, b: V3) => {
+    const up = (p: V3): V3 => add(p, [0, 0.9, 0]),
+      posts = far ? 1 : Math.max(1, Math.ceil((b[2] - a[2]) / 1.2));
+    parts.porch.beam(up(a), up(b), 0.05, 0.045);
+    for (let k = 0; k <= posts; k++) {
+      const p = lerp(a, b, k / posts);
+      parts.porch.beam(p, up(p), 0.04, 0.04, [1, 0, 0]);
+    }
   };
   const railing = (a: V3, b: V3, height: number, solid: boolean) => {
     if (far || solid) {
@@ -1771,6 +1851,9 @@ function buildFrontage(
         near,
       );
     }
+    // A ramp serves a deck of any height; steps one over 0.3 m, below which it is stepped up onto.
+    if (o.ramps && deck <= 0.3)
+      approach(doors[0] ? s.start[0] + (s.dir[0] * (doors[0].a0 + doors[0].a1)) / 2 : 0, z1, 1.4, deck);
     // Railing along the front between the posts, open at the door.
     const door = doors[0];
     if (deck > 0.3) {
@@ -1778,7 +1861,7 @@ function buildFrontage(
       const gap = 0.75;
       railing([-pw + 0.17, deck, z1 - 0.12], [dx - gap, deck, z1 - 0.12], 0.9, false);
       railing([dx + gap, deck, z1 - 0.12], [pw - 0.17, deck, z1 - 0.12], 0.9, false);
-      stair(dx, z1, 1.4, deck);
+      approach(dx, z1, 1.4, deck);
     }
   } else {
     // A stoop at each raised door.
@@ -1787,6 +1870,7 @@ function buildFrontage(
       const x = s.start[0] + s.dir[0] * ((h.a0 + h.a1) / 2),
         w = h.a1 - h.a0 + 0.5;
       if (h.a1 - h.a0 > 2.2) {
+        ramps.push({ rise: deck, run: deck * 8, width: w });
         // A vehicle door gets a ramp at 1 in 8 instead of steps.
         const run = deck * 8;
         parts.porch.slab(
@@ -1802,7 +1886,7 @@ function buildFrontage(
         continue;
       }
       parts.porch.box([x, deck / 2, D / 2 + 0.5], [w / 2, deck / 2, 0.5]);
-      stair(x, D / 2 + 1, w, deck);
+      approach(x, D / 2 + 1, w, deck);
     }
   }
   // Balcony (veranda): a slab with a 1.1 m railing at the chosen floor.

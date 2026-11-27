@@ -15886,12 +15886,12 @@
         "gzip": 3866
       },
       "./building-rules": {
-        "raw": 53538,
-        "gzip": 20846
+        "raw": 56815,
+        "gzip": 22131
       },
       "./building-plans": {
-        "raw": 78522,
-        "gzip": 30418
+        "raw": 82881,
+        "gzip": 32076
       },
       "./harbour": {
         "raw": 19746,
@@ -15902,12 +15902,12 @@
         "gzip": 11615
       },
       "./building-settings": {
-        "raw": 15917,
-        "gzip": 5814
+        "raw": 16128,
+        "gzip": 5898
       },
       "./city": {
-        "raw": 86952,
-        "gzip": 34240
+        "raw": 90212,
+        "gzip": 35536
       },
       "./caves": {
         "raw": 2679,

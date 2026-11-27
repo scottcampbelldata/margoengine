@@ -375,3 +375,61 @@ test('the foundation never shares the plane of the ground floor', () => {
       assert.ok(under.length > 0, `${style} the foundation still shows a ledge under the walls`);
     }
 });
+
+/** The highest upward face of the named parts at (x, z) no higher than `most`. */
+function treadAt(b, x, z, most) {
+  let best = -Infinity;
+  for (const name of ['stairs', 'interior']) {
+    const { positions: p, indices, normals } = b.parts[name];
+    for (let t = 0; t < indices.length; t += 3) {
+      const [i, j, k] = [indices[t] * 3, indices[t + 1] * 3, indices[t + 2] * 3];
+      if (normals[i + 1] < 0.99 || p[i + 1] > most || p[i + 1] <= best) continue;
+      const side = (a, c) => (p[c] - p[a]) * (z - p[a + 2]) - (p[c + 2] - p[a + 2]) * (x - p[a]),
+        s = [side(i, j), side(j, k), side(k, i)];
+      if (s.every((v) => v >= -1e-9) || s.every((v) => v <= 1e-9)) best = p[i + 1];
+    }
+  }
+  return best;
+}
+
+test('a winder stair climbs its walking line one riser at a time from floor to floor', () => {
+  for (const style of ['japan-2011-house', 'japan-2011-concrete', 'western-1910-house', 'western-1910-brick']) {
+    const b = generateBuilding({ style, stairShape: 'winder' });
+    assert.equal(b.stairs.length, b.floors.length - 1, style);
+    for (const s of b.stairs) {
+      assert.equal(s.kind, 'winder', style);
+      // Across the stair runs from the foot to the head; along it runs from them into the footprint.
+      const gap = Math.hypot(s.head[0] - s.foot[0], s.head[1] - s.foot[1]),
+        v = [(s.head[0] - s.foot[0]) / gap, (s.head[1] - s.foot[1]) / gap],
+        centre = [(s.min[0] + s.max[0]) / 2, (s.min[1] + s.max[1]) / 2],
+        inward = [Math.abs(v[1]), Math.abs(v[0])].map((a, i) => a * Math.sign(centre[i] - s.foot[i])),
+        size = [s.max[0] - s.min[0], s.max[1] - s.min[1]],
+        length = size[0] * Math.abs(inward[0]) + size[1] * Math.abs(inward[1]),
+        breadth = size[0] * Math.abs(v[0]) + size[1] * Math.abs(v[1]),
+        inner = breadth / 2 - s.width,
+        run = length - inner - s.width,
+        // Where the entry edge's first corner is, on the foot's side.
+        origin = [0, 1].map((i) => centre[i] - (inward[i] * length) / 2 - (v[i] * breadth) / 2),
+        radius = inner + (style.startsWith('japan') ? 0.3 : 0.305),
+        at = (u, w) => [0, 1].map((i) => origin[i] + inward[i] * u + v[i] * w),
+        path = [];
+      for (let u = -0.15; u < run; u += 0.01) path.push(at(u, breadth / 2 - radius));
+      for (let a = 0.002; a < Math.PI; a += 0.005 / radius)
+        path.push(at(run + radius * Math.sin(a), breadth / 2 - radius * Math.cos(a)));
+      for (let u = run - 0.001; u > -0.15; u -= 0.01) path.push(at(u, breadth / 2 + radius));
+      const base = b.floors[s.floor];
+      let y = base,
+        steps = 0;
+      for (const [x, z] of path) {
+        const next = treadAt(b, x, z, y + s.rise + 1e-4);
+        if (next > y + 1e-4) {
+          assert.ok(Math.abs(next - y - s.rise) < 1e-4, `${style} a step of ${next - y} for ${s.rise}`);
+          y = next;
+          steps++;
+        } else assert.ok(next > y - 1e-4, `${style} a hole in the walking line at ${x}, ${z}: ${next} under ${y}`);
+      }
+      assert.equal(steps, s.risers, style);
+      assert.ok(Math.abs(y - b.floors[s.floor + 1]) < 1e-4, style);
+    }
+  }
+});

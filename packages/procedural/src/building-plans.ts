@@ -44,7 +44,7 @@ import {
   WALL_LINING,
 } from './building-interiors.js';
 import { type Joins, type BuildingJoinStep, planJoins } from './building-joins.js';
-import { WINDOW_FIT, windowFit } from './building-windows.js';
+import { WINDOW_FIT, type WindowFit, windowFit } from './building-windows.js';
 import { MeshBuilder, type V3 } from './mesh-builder.js';
 
 export type { BuildingJoinStep } from './building-joins.js';
@@ -139,6 +139,8 @@ interface BlockSpec {
   opts: BuildingRuleOptions;
   at: V3;
   turn: number;
+  /** For a block with others beside it: the fit its windows and outer doors take at a quarter turn. */
+  fit?: (turn: number) => WindowFit;
 }
 
 /**
@@ -255,27 +257,68 @@ function openDoor(specs: BlockSpec[], built: Building[], j: number) {
   );
 }
 /**
+ * A block turned by quarter turns on the same footprint, its width and depth changing places on an odd turn, with the
+ * floor its stair keeps off moved into its new terms.
+ */
+function turnedAbout(sp: BlockSpec, built: Building, quarter: number): BlockSpec {
+  const turn = (sp.turn + quarter) % 4,
+    { width, depth } = built.options,
+    avoid = (sp.opts as { [STAIR_AVOID]?: StairAvoid })[STAIR_AVOID],
+    // A local point of the old stance in the new one: a quarter turn back.
+    point = (x: number, z: number): [number, number] =>
+      [
+        [x, z],
+        [-z, x],
+        [-x, -z],
+        [z, -x],
+      ][quarter] as [number, number],
+    rect = (r: StairAvoid['rects'][number]) => {
+      const a = point(r.x0, r.z0),
+        b = point(r.x1, r.z1);
+      return { x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), z0: Math.min(a[1], b[1]), z1: Math.max(a[1], b[1]) };
+    },
+    opts = Object.assign(
+      {},
+      sp.opts,
+      quarter % 2 ? { width: depth, depth: width } : {},
+      sp.fit && { [WINDOW_FIT]: sp.fit(turn) },
+      avoid && {
+        [STAIR_AVOID]: {
+          ...avoid,
+          rects: avoid.rects.map(rect),
+          soft: avoid.soft?.map(rect),
+          hidden: avoid.hidden?.map(rect),
+          from: avoid.from && rect(avoid.from),
+        },
+      },
+    );
+  return { ...sp, turn, opts };
+}
+/**
  * Where every ground floor door of a group of connected blocks is inside another block (a tower over the only one, or a
  * wing no steps reach), one of them, the last first, gets one. Returns whether a block was rebuilt.
  */
 function openAWayIn(specs: BlockSpec[], built: Building[], blocks: readonly number[]) {
   const group = [...blocks].sort((a, b) => b - a);
   if (group.some((j) => openDoor(specs, built, j))) return false;
-  for (const j of group) {
-    const sp = specs[j],
-      yaw = (sp.turn * Math.PI) / 2;
-    for (const side of ['doors', 'every bay'] as const) {
-      const bays = side === 'doors' ? [0] : [0, 1, 2, 3, 4, 5],
-        opts = Object.assign({}, sp.opts, { doors: bays }),
-        b = generateBuilding({ ...opts, origin: sp.at, yaw }),
-        trial = built.map((q, i) => (i === j ? b : q));
-      if (openDoor(specs, trial, j)) {
-        specs[j] = { ...sp, opts };
-        built[j] = b;
-        return true;
+  // The front first as each block stands; then a block turned about on its footprint, its front away from the others.
+  for (const quarter of [0, 2, 1, 3])
+    for (const j of group) {
+      const sp = quarter ? turnedAbout(specs[j], built[j], quarter) : specs[j],
+        yaw = (sp.turn * Math.PI) / 2;
+      for (const side of ['doors', 'every bay'] as const) {
+        const bays = side === 'doors' ? [0] : [0, 1, 2, 3, 4, 5],
+          opts = Object.assign({}, sp.opts, { doors: bays }),
+          b = generateBuilding({ ...opts, origin: sp.at, yaw }),
+          trial = built.map((q, i) => (i === j ? b : q)),
+          moved = specs.map((q, i) => (i === j ? { ...sp, opts } : q));
+        if (openDoor(moved, trial, j)) {
+          specs[j] = moved[j];
+          built[j] = b;
+          return true;
+        }
       }
     }
-  }
   return false;
 }
 
@@ -289,11 +332,13 @@ function joinFloors(
   first: readonly number[],
   joined: ReadonlySet<number>,
   style: BuildingStyle,
+  ramps: boolean,
 ): Joins {
   const plan = () =>
     planJoins(
       specs.map((sp, j) => ({ building: built[j], at: sp.at, turn: sp.turn, rank: first[j] })),
       style,
+      ramps,
     );
   let joins = plan(),
     changed = true;
@@ -1027,18 +1072,19 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
       const others = placed.flatMap((list, i) => (i === j ? [] : list));
       if (!others.length) return b;
       const sp = specs[j],
-        yawB = (sp.turn * Math.PI) / 2,
-        c = Math.cos(yawB),
-        sn = Math.sin(yawB),
-        fit = windowFit(
-          others.map((s) => s.halves),
-          ([x, y, z]) => [sp.at[0] + x * c + z * sn, sp.at[1] + y, sp.at[2] - x * sn + z * c],
-          b.options.wall,
-        );
-      specs[j] = { ...sp, opts: Object.assign({}, sp.opts, { [WINDOW_FIT]: fit }) };
+        fit = (turn: number) => {
+          const c = Math.cos((turn * Math.PI) / 2),
+            sn = Math.sin((turn * Math.PI) / 2);
+          return windowFit(
+            others.map((s) => s.halves),
+            ([x, y, z]) => [sp.at[0] + x * c + z * sn, sp.at[1] + y, sp.at[2] - x * sn + z * c],
+            b.options.wall,
+          );
+        };
+      specs[j] = { ...sp, fit, opts: Object.assign({}, sp.opts, { [WINDOW_FIT]: fit(sp.turn) }) };
       return generate(specs[j]);
     });
-  const joins = joinFloors(specs, built, first, joined, o.style);
+  const joins = joinFloors(specs, built, first, joined, o.style, built[0].options.ramps);
   const blocks: Block[] = specs.map((sp, j) => {
     const yawB = (sp.turn * Math.PI) / 2,
       b = built[j],
@@ -1189,8 +1235,8 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
               eps: indoor ? 0 : i < j ? EPS : -EPS,
             })),
       );
-      // A sunk flight's well opens the floor and base it stands in.
-      if (name === 'base' || (name === 'interior' && !lining))
+      // A sunk flight's well opens the floor, its mats and rugs, and the base it stands in.
+      if (name === 'base' || name === 'mats' || name === 'fabric' || (name === 'interior' && !lining))
         for (const w of joins.wells) if (w.block === j) cutters.push({ s: boxSolid(w.min, w.max), eps: 0 });
       const cut = subtract(g, cutters);
       if (cut.indices!.length) (merged[name] ??= []).push(cut);

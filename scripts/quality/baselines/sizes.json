@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21473958,
+  "total": 21479745,
   "history": [
     {
       "date": "2026-10-24",
@@ -15139,6 +15139,12 @@
       "commit": "lane-e-3mf-corpus",
       "reason": "3MF corpus: duplicate property ids refused and the lattice-only message (threemf.ts, about 300 B in every entry that includes the reader). Also records the budgets 23a7f0798c left out: threemf-evaluate 31261 B and threemf-beams 2796 B are new, threemf-volumetric 19311 B budget against 23730 B (parse3MFEvaluated joins the readers; the stages are shared, so a split would parse a package twice). mesh-edit/modeling, boolean-exact, boolean-batch and hull: the zero-area triangle removal of 9f3d0b83f5, whose budgets were left out too.",
       "grew": 9
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "building-winders-ramps",
+      "reason": "Winder stairs and ramps in rules buildings (limits row 19), with wing doors and well coverings fixed (KB-PROC-WINGDOOR1, KB-PROC-WELLMATS1): measured gzip building-rules 20,846 to 22,131, building-plans 30,418 to 32,076, building-settings 5,814 to 5,898, city 34,240 to 35,536. The generators are synchronous and choose a stair or ramp while building, so a split entry would leave plans without one until a second import.",
+      "grew": 4
     }
   ],
   "items": {
@@ -16133,12 +16139,12 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 31331,
-    "@margoengine/procedural/building-rules": 20923,
-    "@margoengine/procedural/building-settings": 5862,
+    "@margoengine/procedural/building-plans": 33039,
+    "@margoengine/procedural/building-rules": 22795,
+    "@margoengine/procedural/building-settings": 6154,
     "@margoengine/procedural/buildings": 1758,
     "@margoengine/procedural/caves": 1677,
-    "@margoengine/procedural/city": 34688,
+    "@margoengine/procedural/city": 36603,
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,

@@ -115,6 +115,8 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
     'Behind the windows: furnished rooms, one room cell per window, or nothing.',
   ),
   c('stairs', 'detail', onOff, 'Stairs between the storeys of furnished rooms.'),
+  c('stairShape', 'detail', ['auto', 'winder'], 'Which stair is tried first: a dog-leg (auto) or a winder stair.'),
+  c('ramps', 'frontage', offOn, 'Ramps at the front doors, and between joined floors where one fits.'),
   c('fixtures', 'detail', onOff, 'Kitchen, bathroom and toilet rooms with their fixtures.'),
   c('softFurnishings', 'detail', onOff, 'Tatami, rugs, curtains, bedding and cushions in homes.'),
   n('seed', 'detail', 1, 0, 1_000_000, 1, '', 'Seed for small differences.'),
@@ -132,6 +134,7 @@ const FLAGS = [
   'cornice',
   'brackets',
   'stairs',
+  'ramps',
   'fixtures',
   'softFurnishings',
 ];

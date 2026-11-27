@@ -25,6 +25,7 @@ export interface BuildingJoinStep {
     readonly tread: number;
     readonly width: number;
     readonly sunken: boolean;
+    readonly ramp: boolean;
 }
 
 export interface BuildingPlanBlock {
@@ -180,6 +181,8 @@ interface BuildingRuleOptions {
     readonly detail?: BuildingDetail;
     readonly interior?: BuildingInterior;
     readonly stairs?: boolean;
+    readonly stairShape?: 'auto' | 'winder';
+    readonly ramps?: boolean;
     readonly fixtures?: boolean;
     readonly softFurnishings?: boolean;
     readonly origin?: readonly [number, number, number];
@@ -189,7 +192,12 @@ interface BuildingRuleOptions {
 
 interface BuildingStair {
     readonly floor: number;
-    readonly kind: 'dog-leg' | 'straight' | 'spiral' | 'ladder';
+    readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
+    readonly winders?: {
+        readonly count: number;
+        readonly walk: number;
+        readonly narrow: number;
+    };
     readonly min: readonly [number, number];
     readonly max: readonly [number, number];
     readonly foot: readonly [number, number];

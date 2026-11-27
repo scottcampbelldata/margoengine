@@ -4568,6 +4568,18 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   again. It ends with its host, closed or not (Node starts each child in a job that kills it on close). The real close
   test then passed 20 of 20 beside four CPU hogs (3.1 min, 100% CPU). Regression: tests/killer.test.js.
 
+### Fixed 2026-11-27: tatami floated over sunk flights between joined floors (KB-PROC-WELLMATS1, procedural, building plans)
+
+- **Repro:** random plans 559, 590 and 803 of the uneven-floor walk in `packages/procedural/test/building-reach.test.js`: Japanese houses whose sunk steps had floor mats 0.2 to 0.6 m over their treads.
+- **Cause:** a sunk flight's well cut the floor and base of its block but not the floor coverings.
+- **Fixed:** the well cuts the `mats` and `fabric` parts too.
+
+### Fixed 2026-11-27: a wing with its front inside the main block got no door (KB-PROC-WINGDOOR1, procedural, building plans)
+
+- **Repro:** random plan 1071 of the same walk: a two storey wing at another floor level, joined by nothing, with no outer door, so all six of its rooms were cut off.
+- **Cause:** outer doors stand only on a block's front side, and the fallback that adds one never tried another stance.
+- **Fixed:** after every block's front has been tried, one is turned about on its footprint (width and depth changing places on a quarter turn), its stair keep-outs and window fit moved with it.
+
 ### Fixed 2026-11-27: one in ten rules buildings had no stair, so storeys could not be reached (KB-PROC-NOSTAIR1, procedural, buildings)
 
 - **Repro:** `generateBuilding({style: 'western-1910-brick', width: 13, depth: 6.9})` returned an empty `stairs`; 42 of 400 random plans of the multi-storey styles did. `packages/procedural/test/building-reach.test.js` walks every storey.

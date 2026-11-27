@@ -17,6 +17,9 @@
 //   30 cm from its narrow end). Tatami of the Edo-ma size, about 0.88 by 1.76 m, laid so no four corners meet.
 // - Spiral stairs: International Residential Code 2021, spiral stairways (26 in wide, tread at least 6 3/4 in at 12 in
 //   from the narrow edge, riser at most 9 1/2 in, headroom 6 ft 6 in).
+// - Winder stairs: International Residential Code 2021 R311.7.4 (the walking line 12 in from the narrow side) and
+//   R311.7.5.2.1 (a winder tread at least 10 in on the walking line and 6 in anywhere in the clear width); Order art. 23
+//   para. 2 (measured 30 cm from the narrow end).
 // - Fixed ladders: US 29 CFR 1910.23 (rungs 10 to 14 in apart, at least 16 in wide, 7 in clear behind, side rails
 //   42 in above the landing).
 import type {
@@ -58,6 +61,7 @@ interface InteriorOptions {
   readonly storefront: boolean;
   readonly interior: BuildingInterior;
   readonly stairs: boolean;
+  readonly stairShape: 'auto' | 'winder';
   readonly fixtures: boolean;
   readonly softFurnishings: boolean;
   readonly detail: 'far' | 'mid' | 'near';
@@ -143,6 +147,8 @@ const box = (b: MeshBuilder, x0: number, x1: number, y0: number, y1: number, z0:
 // are 0.86 by 1.8 m (fusuma opening) and 32 by 80 in (0.81 by 2.03 m).
 const ROOM_WIDTH = { japan: 3.64, western: 3.66 } as const;
 export const SLAB = 0.2;
+/** A ramp's slope, the most one run of it climbs and a landing between runs: 1 in 12, 30 in and 60 in (IBC 2021 1012). */
+export const RAMP = { slope: 1 / 12, rise: 0.762, landing: 1.525 } as const;
 /** Height of a doorway through a wall: a fusuma opening, 1.8 m, or an 80 in door. */
 export const doorHeight = (style: BuildingStyle) => (style.startsWith('japan') ? 1.8 : 2.03);
 
@@ -262,6 +268,11 @@ interface StairShape {
   flights: Flight[];
   /** Plan length of the sloped run. */
   run: number;
+  /**
+   * A winder stair's half turn: how many equal winder treads, the radius of the well they turn about, and their depth
+   * on the walking line and at the well.
+   */
+  turn?: { count: number; inner: number; walk: number; narrow: number };
 }
 interface StairPlan extends StairShape {
   place: Place;
@@ -275,7 +286,6 @@ function framedShapes(rule: StairRule, floors: number[]): StairShape[] {
   const heights = storeyHeights(floors),
     w = rule.width,
     approach = approachOf(w),
-    going = (rise: number) => Math.min(0.32, Math.max(rule.minTread, 0.63 - 2 * rise)),
     kinds: StairShape['kind'][] = heights.length === 1 ? ['dog-leg', 'straight'] : ['dog-leg'];
   return kinds.map((kind) => {
     const dog = kind === 'dog-leg',
@@ -283,7 +293,7 @@ function framedShapes(rule: StairRule, floors: number[]): StairShape[] {
         const n = Math.ceil(h / ((dog ? 2 : 1) * rule.maxRise) - 1e-9);
         return { n, rise: h / ((dog ? 2 : 1) * n) };
       }),
-      run = Math.max(...counts.map((c) => (c.n - 1) * going(c.rise)));
+      run = Math.max(...counts.map((c) => (c.n - 1) * goingOf(rule, c.rise)));
     return {
       kind,
       length: dog ? run + w : run,
@@ -295,6 +305,55 @@ function framedShapes(rule: StairRule, floors: number[]): StairShape[] {
       run,
     };
   });
+}
+
+/** A straight tread's going for a rise: Blondel's step rule within the code's tread and a comfortable most. */
+const goingOf = (rule: StairRule, rise: number) => Math.min(0.32, Math.max(rule.minTread, 0.63 - 2 * rise));
+
+/**
+ * Winder stairs, for plans a dog-leg does not fit: two flights whose half landing is a half turn of equal winder treads
+ * about the end of the well. The well is wide enough for the code's narrow end (6 in in the United States), and a
+ * storey takes one riser more where that makes both flights alike. Smallest plan first.
+ */
+function winderShapes(style: BuildingStyle, rule: StairRule, floors: number[]): StairShape[] {
+  const japan = style.startsWith('japan'),
+    // Where the code measures a winder from the narrow side, its least depth there and anywhere.
+    offset = japan ? 0.3 : 0.305,
+    walkMin = style === 'japan-2011-concrete' ? 0.24 : japan ? 0.15 : 0.254,
+    narrowMin = japan ? 0 : 0.1524,
+    w = rule.width;
+  return [6, 4, 3]
+    .flatMap((count): StairShape[] => {
+      const chord = 2 * Math.sin(Math.PI / (2 * count)),
+        inner = Math.max(0.05, narrowMin / chord + 1e-6),
+        walk = (inner + offset) * chord;
+      if (walk < walkMin) return [];
+      const flights = storeyHeights(floors).map((h) => {
+        let n = Math.ceil(h / rule.maxRise - 1e-9);
+        if ((n - 1 - count) % 2) n++;
+        return { count: n, rise: h / n, straight: (n - 1 - count) / 2 };
+      });
+      const run = Math.max(...flights.map((f) => f.straight * goingOf(rule, f.rise)));
+      return [
+        {
+          kind: 'winder',
+          length: run + inner + w,
+          breadth: 2 * (w + inner),
+          before: approachOf(w),
+          after: 0,
+          rule,
+          flights: flights.map((f) => ({
+            count: f.count,
+            rise: f.rise,
+            tread: run / f.straight,
+            angle: Math.PI / count,
+          })),
+          run,
+          turn: { count, inner, walk, narrow: inner * chord },
+        },
+      ];
+    })
+    .sort((a, b) => a.length * a.breadth - b.length * b.breadth);
 }
 
 /** A spiral flight's last quarter turn is the landing at the floor above, so every flight starts and ends alike. */
@@ -484,7 +543,7 @@ function halls(columns: number, rows: number): Hall[] {
 
 /**
  * A stair that reaches every floor: a framed stair in a room, else in a stair hall made by taking partitions down, else
- * a spiral the same two ways, else a ladder. `plan(hall)` builds the floors with that hall. Undefined only when
+ * a winder stair, else a spiral the same two ways, else a ladder. `plan(hall)` builds the floors with that hall. Undefined only when
  * `keepOut` leaves no room for any.
  */
 function placeStair(
@@ -495,11 +554,16 @@ function placeStair(
   rows: number,
   plan: (hall?: Hall) => Floor[],
   keepOut: KeepOut,
+  winderFirst: boolean,
 ): { stair: StairPlan; hall?: Hall } | undefined {
   const base = plan(),
-    order = roomOrder(base);
+    order = roomOrder(base),
+    framed: [StairShape[], Clearance[]][] = [
+      [framedShapes(rule, floors), CLEAR],
+      [winderShapes(style, rule, floors), CLEAR],
+    ];
   const sets: [StairShape[], Clearance[]][] = [
-    [framedShapes(rule, floors), CLEAR],
+    ...(winderFirst ? framed.reverse() : framed),
     [spiralShapes(style, rule, floors), CLEAR],
     [ladderShapes(rule, floors), TIGHT],
   ];
@@ -565,7 +629,7 @@ function flightEnds(plan: StairPlan, k: number): [[number, number], [number, num
   if (kind === 'spiral') return [at(back, plan.breadth / 2), at(back, plan.breadth / 2)];
   const w = rule.width;
   if (kind === 'straight') return [at(back, w / 2), at(plan.length - back, w / 2)];
-  return [at(back, w / 2), at(back, 1.5 * w + WELL_GAP)];
+  return [at(back, w / 2), at(back, plan.breadth - w / 2)];
 }
 
 /** An edge against a wall of the room around the stair needs no guard. */
@@ -685,6 +749,74 @@ function buildLadder(metal: MeshBuilder, plan: StairPlan, floors: number[], layo
   });
 }
 
+/**
+ * A winder stair's half turn up from the tread at height `from`: equal treads about the end of the well out to the
+ * stair's outer rectangle, a riser board under each front edge, the handrail round the well and posts under the outer
+ * corners.
+ */
+function buildWinders(
+  wood: MeshBuilder,
+  rails: MeshBuilder,
+  plan: StairPlan,
+  base: number,
+  from: number,
+  rise: number,
+  fine: boolean,
+) {
+  const { place, rule, run, length, breadth } = plan,
+    { count, inner } = plan.turn!,
+    middle = breadth / 2,
+    outer = inner + rule.width,
+    step = Math.PI / count,
+    at = (r: number, a: number, y: number): V3 => {
+      const [x, z] = planPoint(place, run + r * Math.sin(a), middle - r * Math.cos(a));
+      return [x, y, z];
+    },
+    // How far the ray at `a` runs from the well's middle to the stair's outer rectangle.
+    edge = (a: number) => outer / Math.max(Math.sin(a), Math.abs(Math.cos(a)));
+  for (let i = 0; i < count; i++) {
+    const a = i * step,
+      b = a + step,
+      y = from + (i + 1) * rise,
+      corners = [Math.PI / 4, (3 * Math.PI) / 4].filter((c) => c > a + 1e-6 && c < b - 1e-6),
+      rim = [a, ...corners, b].map((t) => at(edge(t), t, y));
+    wood.slab([at(inner, a, y), ...rim, at(inner, b, y)], rule.solid ? rise + 0.1 : 0.035, [0, 1, 0]);
+    if (!rule.solid) {
+      // The first winder's riser is the top one of the flight below it; each later one stands just behind its front
+      // edge, so its top is under the tread.
+      const mid = y - 0.035 - (rise - 0.035) / 2,
+        behind = (r: number): V3 => {
+          const [x, , z] = at(r, a, mid),
+            [dx, dz] = planPoint({ o: [0, 0], u: place.u, v: place.v }, Math.cos(a), Math.sin(a));
+          return [x + 0.012 * dx, mid, z + 0.012 * dz];
+        };
+      if (i > 0) wood.beam(behind(inner), behind(edge(a) - 0.03), 0.02, rise - 0.035);
+      // A stringer board under the outer edge, inside the walls.
+      const low = [a, ...corners, b].map((t) => at(edge(t) - 0.025, t, y - 0.11));
+      for (let k = 0; k + 1 < low.length; k++) wood.beam(low[k], low[k + 1], 0.044, 0.15);
+    }
+    // The handrail round the well climbs evenly from the lower flight's rail to the upper one's.
+    const r = inner + 0.04,
+      high = (t: number) => from + rise * (1 + (t / Math.PI) * count) + rule.handrail;
+    rails.beam(at(r, a, high(a)), at(r, b, high(b)), 0.05, 0.045);
+    const n = fine ? Math.max(1, Math.ceil((r * step) / 0.11)) : 1;
+    for (let j = 0; j < n; j++) {
+      const t = a + ((j + 0.5) * step) / n,
+        [x, , z] = at(r, t, 0);
+      box(rails, x - 0.012, x + 0.012, y, high(t), z - 0.012, z + 0.012);
+    }
+  }
+  // Posts under the two outer corners, up to the winder that crosses each.
+  for (const [v, corner] of [
+    [0.05, Math.PI / 4],
+    [breadth - 0.05, (3 * Math.PI) / 4],
+  ] as const) {
+    const under = from + (Math.floor(corner / step) + 1) * rise - 0.035,
+      r = planRect(place, length - 0.1, length, v - 0.045, v + 0.045);
+    box(wood, r.x0, r.x1, base, under, r.z0, r.z1);
+  }
+}
+
 function buildStair(
   parts: Parts,
   plan: StairPlan,
@@ -709,8 +841,13 @@ function buildStair(
       const r = planRect(place, Math.min(u0, u1), Math.max(u0, u1), v0, v1);
       box(b, r.x0, r.x1, y0, y1, r.z0, r.z1);
     };
+  const { turn } = plan,
+    // The v where the second flight starts.
+    other = breadth - w;
   plan.flights.forEach((f, k) => {
-    const { count: m, rise, tread } = f,
+    const { rise, tread } = f,
+      // Risers of one flight: a winder stair's turn takes its own out of the storey's.
+      m = turn ? (f.count - 1 - turn.count) / 2 + 1 : f.count,
       base = floors[k],
       // Where a shorter storey's wider treads start so every flight meets the landing at `run`.
       flight = (v0: number, from: number, dir: 1 | -1, y0: number) => {
@@ -742,14 +879,19 @@ function buildStair(
     };
     // Flight A from this floor's approach to the half landing (or straight to the floor above).
     flight(0, 0, 1, base);
-    if (kind === 'dog-leg') {
-      const mid = base + m * rise;
-      slab(wood, run, length, 0, breadth, mid - (rule.solid ? 0.18 : 0.06), mid);
-      for (const v of [0.05, breadth - 0.05]) slab(wood, length - 0.1, length, v - 0.045, v + 0.045, base, mid - 0.06);
-      flight(w + WELL_GAP, run, -1, mid);
+    if (kind !== 'straight') {
+      // The second flight starts from the half landing, or from the last winder.
+      const mid = base + (turn ? m - 1 + turn.count : m) * rise;
+      if (turn) buildWinders(wood, rails, plan, base, base + (m - 1) * rise, rise, fine);
+      else {
+        slab(wood, run, length, 0, breadth, mid - (rule.solid ? 0.18 : 0.06), mid);
+        for (const v of [0.05, breadth - 0.05])
+          slab(wood, length - 0.1, length, v - 0.045, v + 0.045, base, mid - 0.06);
+      }
+      flight(other, run, -1, mid);
       for (const [v, from, to, y0] of [
         [w - 0.04, 0, run, base],
-        [w + WELL_GAP + 0.04, run, 0, mid],
+        [other + 0.04, run, 0, mid],
       ] as const)
         handrail(v, from, to, y0);
     } else handrail(w - 0.04, 0, run, base);
@@ -762,7 +904,7 @@ function buildStair(
         [p(0, 0, y), p(length, 0, y)],
         [p(0, breadth, y), p(length, breadth, y)],
       ];
-    if (kind === 'dog-leg') {
+    if (kind !== 'straight') {
       edges.push([p(length, 0, y), p(length, breadth, y)]);
       if (top) edges.push([p(0, 0, y), p(0, w, y)]);
     } else edges.push([p(0, 0, y), p(0, breadth, y)]);
@@ -1025,7 +1167,16 @@ export function buildInterior(
   let chosen: ReturnType<typeof placeStair>;
   if (o.interior === 'rooms' && o.stairs && floors.length > 1) {
     const find = (keepOut: KeepOut) =>
-      placeStair(o.style, rule, floors, columns, rowLines.length - 1, (hall) => planFloors([], hall), keepOut);
+      placeStair(
+        o.style,
+        rule,
+        floors,
+        columns,
+        rowLines.length - 1,
+        (hall) => planFloors([], hall),
+        keepOut,
+        o.stairShape === 'winder',
+      );
     chosen =
       (avoid?.soft?.length ? find({ ...avoid, rects: [...avoid.rects, ...avoid.soft] }) : undefined) ??
       find(avoid ?? { rects: [] }) ??
@@ -1086,6 +1237,7 @@ export function buildInterior(
         tread: flight.tread,
         width: plan.rule.width,
         guard: plan.rule.guard,
+        ...(plan.turn && { winders: { count: plan.turn.count, walk: plan.turn.walk, narrow: plan.turn.narrow } }),
       });
     });
   }

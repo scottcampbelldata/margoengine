@@ -208,6 +208,20 @@ try {
           wings: [{ at: [6.5, 0], width: 5, depth: 6, plinth, storeys: wing }],
         },
       ]),
+      // Winder stairs, and a ramp between joined floors.
+      [generateBuilding, { style: 'japan-2011-house', width: 5, depth: 4.5, stairShape: 'winder' }],
+      [generateBuilding, { style: 'western-1910-house', width: 5.5, depth: 5, stairShape: 'winder' }],
+      [
+        generateBuildingPlan,
+        {
+          style: 'western-1910-house',
+          width: 12,
+          depth: 8,
+          storeys: [3.2, 3.2],
+          ramps: true,
+          wings: [{ at: [6.5, 0], width: 7, depth: 6, plinth: 0.4, storeys: [2.9, 2.9] }],
+        },
+      ],
     ]) {
       const at = [cuts.length * 40, 0, -600];
       const b = make({ ...options, origin: at, detail: 'near' });
@@ -217,12 +231,28 @@ try {
         if (!b.parts[name]) continue;
         // Steps start a little under their floor; a join is cut below the lower ceiling so it shows.
         const under = name === 'interior' ? 0.2 : b.joinSteps?.length ? 0.2 : 0,
-          g = slice(b.parts[name], lo - under, lo + (b.joinSteps?.length ? 1.9 : b.blocks ? 2.4 : 4));
+          g = slice(
+            b.parts[name],
+            lo - under,
+            lo + (b.joinSteps?.length ? 1.9 : b.blocks ? 2.4 : options.stairShape ? 2.7 : 4),
+          );
         if (g.indices.length) add(g, b.palette[name]);
       }
       const r = b.blocks ? 14 : 5.5,
-        flight = b.joinSteps?.[0];
-      if (flight) {
+        flight = b.joinSteps?.[0],
+        turned = !b.blocks && b.stairs[0]?.kind === 'winder' ? b.stairs[0] : undefined;
+      if (turned) {
+        // From over the foot of the stair, looking up the flight into the turn.
+        const x = at[0] + (turned.min[0] + turned.max[0]) / 2,
+          z = at[2] + (turned.min[1] + turned.max[1]) / 2,
+          dx = x - (at[0] + turned.foot[0]),
+          dz = z - (at[2] + turned.foot[1]),
+          d = Math.hypot(dx, dz);
+        cuts.push([
+          [x - (dx / d) * 2.1, lo + 3.7, z - (dz / d) * 2.1],
+          [x + (dx / d) * 0.4, lo + 1.1, z + (dz / d) * 0.4],
+        ]);
+      } else if (flight) {
         // Close over the steps at the join.
         const x = at[0] + (flight.min[0] + flight.max[0]) / 2,
           z = at[2] + (flight.min[1] + flight.max[1]) / 2;
@@ -240,6 +270,19 @@ try {
           [at[0] + r * 0.25, lo + r, at[2] + r * 0.75],
           [at[0], lo + 1, at[2]],
         ]);
+    }
+    // Ramps up to the front doors, over a porch and over a stoop, from the front corner.
+    for (const [style, plinth] of [
+      ['western-1910-house', 0.9],
+      ['japan-2011-house', 0.5],
+    ]) {
+      const at = [cuts.length * 40, 0, -600];
+      const b = generateBuilding({ style, plinth, ramps: true, origin: at, detail: 'near' });
+      for (const [name, g] of Object.entries(b.parts)) add(g, b.palette[name]);
+      cuts.push([
+        [at[0] + 17, 7, at[2] + 19],
+        [at[0], 1, at[2] + 7],
+      ]);
     }
     const views = [
       [
