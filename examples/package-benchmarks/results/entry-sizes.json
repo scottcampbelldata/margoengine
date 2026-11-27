@@ -1506,8 +1506,8 @@
         "gzip": 28928
       },
       "./threemf": {
-        "raw": 102843,
-        "gzip": 36665
+        "raw": 125149,
+        "gzip": 44612
       },
       "./model": {
         "raw": 25194,
@@ -14380,8 +14380,8 @@
         "gzip": 4509
       },
       "./threemf-materials": {
-        "raw": 39533,
-        "gzip": 14478
+        "raw": 41131,
+        "gzip": 14973
       },
       "./threemf-mesh": {
         "raw": 9375,
@@ -14456,8 +14456,8 @@
         "gzip": 12012
       },
       "./threemf-lattice": {
-        "raw": 53793,
-        "gzip": 18564
+        "raw": 55390,
+        "gzip": 19055
       },
       "./mmcif": {
         "raw": 7204,
@@ -14474,6 +14474,22 @@
       "dist/workers/usd.js": {
         "raw": 23625,
         "gzip": 9655
+      },
+      "./threemf-boolean": {
+        "raw": 36941,
+        "gzip": 14069
+      },
+      "./threemf-displacement": {
+        "raw": 41333,
+        "gzip": 15806
+      },
+      "./threemf-secure": {
+        "raw": 21531,
+        "gzip": 8677
+      },
+      "./threemf-volumetric": {
+        "raw": 50385,
+        "gzip": 18748
       }
     },
     "@margoengine/lod": {
