@@ -29,6 +29,7 @@ await build({
           'index',
           'las',
           'laz',
+          'laz-write',
           'e57',
           'octree',
           'copc',

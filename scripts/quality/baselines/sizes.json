@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20997982,
+  "total": 21008148,
   "history": [
     {
       "date": "2026-10-24",
@@ -14700,6 +14700,12 @@
       "commit": "lane-c4",
       "reason": "3MF metallic display properties: loaders/threemf-materials 12722 to 13482 B (pbmetallic and pbmetallictexturedisplayproperties on every property group and stack, with their errors), threemf-lattice (which reads it) 16870 to 17633 B, loaders/threemf-mesh 2352 to 3224 B (draws them: repacks the two linear maps into one glTF-layout map, decoded by the lazily imported optional @margoengine/decoders peer, and gives every stack layer the material numbers). A second entry would parse the file twice or duplicate the stack sampling.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-c4",
+      "reason": "points/laz-write, new optional entry (writeLAZ and compressLAZ, LASzip-compatible LAZ for point formats 0 to 10; 9869 B with the LAS writer and header reader it shares). The decoder models moved to a module both share; points/laz stays 8668 B. Apart from the reader, so a page that only opens clouds loads none of it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15624,6 +15630,7 @@
     "@margoengine/points/las base (without LAZ decoder)": 6231,
     "@margoengine/points/las lazy LAZ decoder": 8776,
     "@margoengine/points/laz": 8872,
+    "@margoengine/points/laz-write": 10166,
     "@margoengine/points/octree": 9474,
     "@margoengine/points/pick": 5471,
     "@margoengine/points/potree": 17694,

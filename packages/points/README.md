@@ -315,7 +315,8 @@ console.log(las.crs?.epsg, las.header.pointFormat, Object.keys(las.extra));
 
 LAZ files (compressed LAS) are recognised by the header's compression bit and open as they are: the decoder below loads
 the first time a compressed file arrives, so a plain LAS file never pays for it. `options.laz` replaces it with a
-function of your own that returns the uncompressed point records (`LazDecoder`). `writeLAS` writes uncompressed LAS
+function of your own that returns the uncompressed point records (`LazDecoder`). To write LAZ, see
+[the LAZ writer](#laz-writer-margoenginepointslaz-write). `writeLAS` writes uncompressed LAS
 1.0 to 1.5 (extra bytes, WKT or EPSG, points by return always filled in) for tools and tests. An EPSG code alone is
 GeoTIFF, which LAS allows only for formats 0 to 5 before 1.5; formats 6 to 10 and LAS 1.5 take the CRS as `wkt`.
 
@@ -376,6 +377,31 @@ format: public files of formats 0 to 3, 7, 8 and 10 (`tests/fixtures/NOTICE.md`)
 (`tests/laz-usgs.test.js`), and real points LASzip compressed for formats 4, 5 and 9 and for channels that switch. The
 reference decoders are not part of the repository. Compressor 0, compressor 1 with version 2 items and chunk size 0 are
 checked only against the test encoder, a stand-in, because no tool here writes them.
+
+## LAZ writer (`margoengine/points/laz-write`)
+
+`writeLAZ(input, options?)` takes what `writeLAS` takes and returns the compressed file; `compressLAZ(bytes, options?)`
+compresses any uncompressed LAS file, versions 1.0 to 1.5, point formats 0 to 10, extra bytes included. It is lossless:
+every point record reads back byte for byte, and the header, the variable length records, the extended records and
+waveform packets are kept. Formats 0 to 5 are written as pointwise chunks and formats 6 to 10 as layered chunks, the
+two forms LASzip 3 writes, and the compressed points are LASzip's own bytes for the same records and chunks, so the
+tools that read LASzip's files read these. The entry is separate from the reader: a page that only opens clouds does not
+load it.
+
+```ts
+import { parseLAS } from 'margoengine/points/las';
+import { writeLAZ } from 'margoengine/points/laz-write';
+
+const bytes = writeLAZ({ positions: [0, 0, 0, 1, 2, 3], intensity: [10, 20], wkt: 'GEOGCS["WGS 84"]' });
+console.log(bytes.length, (await parseLAS(bytes)).count);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `chunkSize` | 50,000 | Points per chunk. A reader seeks to a chunk; smaller chunks compress less. |
+| `chunks` | none | The point count of each chunk in turn (variable chunks, as an octree's nodes have). Not with `chunkSize`. |
+
+Both run on the calling thread and return the whole file; compress a large cloud in a worker.
 
 ## E57 scans (`margoengine/points/e57`)
 
