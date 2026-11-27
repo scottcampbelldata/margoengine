@@ -134,7 +134,13 @@ export function resolveFrame({ sum, width, height, count, outWidth, outHeight, n
   return out;
 }
 
-/** An 8-bit grey mask from `width` x `height` to `outWidth` x `outHeight` by the area filter (coverage at the edges). */
+/**
+ * An 8-bit grey mask from `width` x `height` to `outWidth` x `outHeight` by the area filter (coverage at the edges).
+ * Coverage rounds to the nearest level with an exact half rounding down (127.5 to 127), so 128 and above (the look
+ * masks' inside, @margoengine/headless/look) means more than half the pixel is covered: two masks that never share a
+ * sample (plants and lit ground) never both read inside, where rounding half up put a half-and-half edge pixel in both
+ * (KB-LOOK-MASKTIE1). The 1e-7 takes up the float error of the weights, so a sum that is half in exact maths ties.
+ */
 export function resampleMask({ grey, width, height, outWidth, outHeight }) {
   if (width === outWidth && height === outHeight) return grey;
   const across = areaWeights(width, outWidth),
@@ -149,7 +155,7 @@ export function resampleMask({ grey, width, height, outWidth, outHeight }) {
             grey[(down.first[i] + a) * width + across.first[j] + b] *
             down.weights[down.offset[i] + a] *
             across.weights[across.offset[j] + b];
-      out[i * outWidth + j] = Math.round(v);
+      out[i * outWidth + j] = Math.max(0, Math.ceil(v - 0.5 - 1e-7));
     }
   return out;
 }

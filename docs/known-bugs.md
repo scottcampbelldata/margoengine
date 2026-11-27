@@ -6,6 +6,31 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: a supersampled edge pixel half plants and half lit ground was in both masks (KB-LOOK-MASKTIE1, shot tool)
+
+- **Repro:** rail-line shot `--once --seconds 1.1` (supersample 2): `probes/mid.plants.png` and `mid.lit.png` both read
+  128 on 14,504 to 15,904 pixels, `plants` and `shadow` on 1,173 to 1,259 (up to 12 percent of the shaded mask), and
+  `lit` and `shadow` on about 25, though the page's SceneTargets masks never mark one sample twice (plants is
+  1 - t.ground, the ground masks need t.ground above 0.5).
+- **Cause:** `resampleMask` (`tools/shot/pixels.js`) took a 2 x 2 footprint with two of four samples covered to
+  `Math.round(127.5)`, 128, and the look checks read 128 and above as inside, so an exact half counted as inside for
+  both masks of a complementary pair.
+- **Fix:** coverage rounds to the nearest level with an exact half rounding down (127.5 to 127, with 1e-7 for the
+  weights' float error), so 128 means more than half covered and two masks that share no sample can never both read
+  inside. The rail-line probes now read 0 pixels in every pair (lit 41.96 and 43.12 percent, shaded 0.38 and 0.44,
+  plants 33.33 and 32.04 early and mid).
+- **Regression:** `tests/shot-capture.test.js`, "masks that share no sample stay disjoint after the downsample" (fails
+  with round half up); `packages/scenes/test/timber-valley-masks-check.mjs` asserts the rail-line masks disjoint and
+  within their coverage bounds (in the scenes `test:gpu`).
+
+### Open 2026-11-26: the rail-line shot's motionBlur reads 60.5 and 46.5 percent (bound 0 to 5) (KB-LOOK-TV-MOTIONBLUR1, shot look checks)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-rail-line.json --once --seconds 1.1 --out <dir>`:
+  `look.md` reads motionBlur 60.5 percent early and 46.5 mid, the same before and after KB-LOOK-MASKTIE1.
+- **Cause:** not yet found. Candidates: the moving evidence's depth (exp(-distance / 2000)) on the plants against the
+  8-subframe, 180-degree shutter frame, or the wind's sway, which the camera's motion vectors do not hold, read as
+  missing blur. Measurement only so far.
+
 ### Fixed 2026-11-26: paddle and wading loads settle with the final wet cells (KB-LOADS-ACTUATORDRY)
 
 - **Repro:** Put a moving paddle or legged body over a 2 µm periodic water cell and draw it down to
@@ -1177,7 +1202,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/animation/src/mixer.ts` and `api/animation.mixer.api.md`.
 - **Check:** `npm run check:readme-run -- --packages=animation` runs the new example as a reader would paste it.
 
-### Open 2026-11-26: the look masks see ground through plants and trees, so bounce reads over 100 percent (KB-LOOK-MASKOCCLUDE1, scatter, biomes)
+### Fixed 2026-11-26: the look masks saw ground through plants and trees, so bounce read over 100 percent (KB-LOOK-MASKOCCLUDE1, scatter, biomes)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-rail-line.json --once --seconds 1.1 --out <dir>`
   (blowup, 16:00): T6 bounce reads 193 percent early and 184 percent mid (bar 10 to 35): shadowed ground brighter than
@@ -1209,6 +1234,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `scenes/test/timber-valley-masks-check.mjs`. Measured on the rail-line probes (1920 x 1080, masks at 128): plants
   34 percent of the frame, lit ground 43 to 44, shaded 0.5 to 0.6; 14,504 to 15,904 pixels are both lit and plant and
   1,173 to 1,259 both shaded and plant (up to 12 percent of the shaded mask), which the check must explain or fail.
+- **Closed 2026-11-26:** the overlap was the shot tool's rounding of half-covered edge pixels (KB-LOOK-MASKTIE1); with it
+  fixed, `packages/scenes/test/timber-valley-masks-check.mjs` finds the plants, lit and shaded masks disjoint on both
+  probes. BOUNCE1 and PENUMBRA1 are tracked in their own entries.
 
 ### Open 2026-11-26: the night sky dome shows clear stars through a smoke pall (KB-SKY-NIGHTPALL1, sky and weather)
 

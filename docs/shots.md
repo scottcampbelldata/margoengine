@@ -93,7 +93,9 @@ draws itself; sub-frame accumulation is for the shots that need it (fast sparks,
   pixel ratio of 1. Each frame is taken down to `size` by the area filter (each output pixel takes every canvas pixel
   by the share of it inside its footprint; Wolberg 1990) in linear light, so a black and white pair makes sRGB 188,
   not 128. Masks are made at the canvas size, `sky` and `water` included, and taken down the same way, so an edge
-  pixel of a mask holds the share it covers. Effects sized in pixels (bloom and depth of field radii) see the larger
+  pixel of a mask holds the share it covers, with an exact half rounding down to 127: 128 and above (inside, to the
+  look checks) means more than half covered, so two masks that never share a sample (plants and lit ground) never both
+  read inside (KB-LOOK-MASKTIE1). Effects sized in pixels (bloom and depth of field radii) see the larger
   canvas.
 - **Sub-frames.** With `subframes` N above 1, each kept frame at time t draws N sub-frames at
   t + (k + 0.5) / N x `shutter` / 360 / `fps` for k = 0 to N - 1, the GPU settled between them, and averages them in

@@ -179,6 +179,31 @@ test('masks downsample by coverage', () => {
   assert.deepEqual([...resampleMask({ grey, width: 3, height: 3, outWidth: 2, outHeight: 2 })], [227, 170, 170, 0]);
 });
 
+// KB-LOOK-MASKTIE1: a supersampled edge pixel half plants and half lit ground read 128 in both masks, so the timber
+// valley's plants mask overlapped lit ground on 14.5k to 15.9k pixels. A mask is inside at 128 only past half coverage.
+test('masks that share no sample stay disjoint after the downsample', () => {
+  const plants = new Uint8Array([255, 0, 255, 255, 0, 0, 255, 0]),
+    lit = plants.map((v) => 255 - v);
+  for (const [w, h, ow, oh] of [
+    [4, 2, 2, 1],
+    [4, 2, 1, 1],
+    [8, 1, 3, 1],
+  ]) {
+    const p = resampleMask({ grey: plants.subarray(0, w * h), width: w, height: h, outWidth: ow, outHeight: oh }),
+      l = resampleMask({ grey: lit.subarray(0, w * h), width: w, height: h, outWidth: ow, outHeight: oh });
+    for (let i = 0; i < p.length; i++) assert.ok(!(p[i] >= 128 && l[i] >= 128), `pixel ${i} of ${w}x${h} in both`);
+  }
+  // Two of four samples covered: 127.5 ties and rounds down; three of four is 191.25, 191.
+  assert.deepEqual(
+    [...resampleMask({ grey: plants.subarray(0, 4), width: 2, height: 2, outWidth: 1, outHeight: 1 })],
+    [191],
+  );
+  assert.deepEqual(
+    [...resampleMask({ grey: Uint8Array.of(255, 0, 255, 0), width: 2, height: 2, outWidth: 1, outHeight: 1 })],
+    [127],
+  );
+});
+
 // KB-SHOT-DEPTH8BIT1: an area mean of a silhouette pixel is a distance of neither surface.
 test('resampleNearness keeps the nearest value of each footprint', () => {
   const value = Float32Array.of(0.25, 0, 0, 0, 0.75, 0, 0, 0, 0.5);
