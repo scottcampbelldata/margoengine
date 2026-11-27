@@ -10,6 +10,7 @@ export class GPULiquid implements EnginePlugin {
     readonly name: string;
     readonly options: GPULiquidOptions;
     readonly count: number;
+    readonly capacity: number;
     readonly stats: LiquidStats;
     surface?: ParticleLiquid;
     forces: LiquidForce[];
@@ -43,6 +44,9 @@ export interface GPULiquidAttachOptions extends GPULiquidOptions {
 
 export interface GPULiquidOptions {
     count?: number;
+    capacity?: number;
+    emitters?: readonly LiquidEmitter[];
+    drains?: readonly LiquidDrain[];
     box?: LiquidBox;
     fill?: LiquidBox;
     resolution?: number;
@@ -94,6 +98,23 @@ export interface LiquidDebugOptions {
     grid?: boolean;
     container?: boolean;
     colliders?: boolean;
+}
+
+export interface LiquidDrain {
+    shape: 'box' | 'sphere';
+    position: LiquidVec3;
+    halfExtents?: LiquidVec3;
+    radius?: number;
+    enabled?: boolean;
+}
+
+export interface LiquidEmitter {
+    position: LiquidVec3;
+    velocity?: LiquidVec3;
+    radius?: number;
+    rate?: number;
+    liquid?: number;
+    enabled?: boolean;
 }
 
 export interface LiquidForce {
@@ -158,12 +179,16 @@ export interface LiquidPointer {
 
 export interface LiquidSnapshot {
     count: number;
+    live: number;
     steps: number;
+    emission: Float64Array;
     particles: Float32Array;
 }
 
 export interface LiquidState {
     particles: Float32Array;
+    live: number;
+    emission: Float64Array;
     impulses: Float64Array;
     grid: Float64Array;
 }
@@ -180,6 +205,8 @@ export interface LiquidStats {
     substep: number;
     realTime: boolean;
     dispatches: number;
+    live: number;
+    capacity: number;
     debugDraws: number;
 }
 
@@ -192,6 +219,8 @@ export const MAX_GPU_LIQUID_PARTICLES = 1048576;
 export const MAX_LIQUIDS = 4;
 
 export const MAX_LIQUID_COLLIDERS = 8;
+
+export const MAX_LIQUID_EMITTERS = 4;
 
 export const MAX_LIQUID_MESH_SAMPLES: number;
 
@@ -279,6 +308,25 @@ export interface ResolvedCollider {
     mesh?: LiquidMeshShape;
 }
 
+export interface ResolvedDrain {
+    kind: 0 | 1;
+    position: LiquidVec3;
+    half: LiquidVec3;
+    enabled: boolean;
+}
+
+export interface ResolvedEmitter {
+    position: LiquidVec3;
+    velocity: LiquidVec3;
+    radius: number;
+    rate: number;
+    liquid: number;
+    enabled: boolean;
+    u: LiquidVec3;
+    w: LiquidVec3;
+    ring: number;
+}
+
 export interface ResolvedLiquidKind {
     fillMin: LiquidVec3;
     fillMax: LiquidVec3;
@@ -293,6 +341,9 @@ export interface ResolvedLiquidKind {
 
 export interface ResolvedLiquidParams {
     count: number;
+    capacity: number;
+    emitters: ResolvedEmitter[];
+    drains: ResolvedDrain[];
     boxMin: LiquidVec3;
     boxMax: LiquidVec3;
     fillMin: LiquidVec3;
@@ -357,6 +408,10 @@ export function bakeLiquidMesh(positions: ArrayLike<number>, indices?: ArrayLike
 export function colliderDistance(c: ResolvedCollider, x: LiquidVec3, normal: number[]): number;
 
 export function createLiquidState(params: ResolvedLiquidParams): LiquidState;
+
+export function emitterPoint(e: ResolvedEmitter, slot: number, k: number, n: number, dt: number, out: number[]): void;
+
+export function inDrain(d: ResolvedDrain, x: ArrayLike<number>): boolean;
 
 export function liquidStateHash(particles: Float32Array): string;
 

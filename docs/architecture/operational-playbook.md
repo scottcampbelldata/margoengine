@@ -11056,8 +11056,10 @@ free-water pairs outside the active density constraints, checked separately from
 
 `GPULiquid` in `@margoengine/water/liquid` is the real-time liquid: MLS-MPM in five WebGPU compute passes a substep (six with surface tension, whose pass takes the gradient of the
 density on the grid for the continuum surface force the grid update applies), at
-most four storage buffers a stage (particles, grid, collider sums, mesh distance fields, plus the uniform), no
-readback in the step. Colliders are signed distances in the WGSL: sphere, box, capsule and plane in closed form, a
+most five storage buffers a stage (particles, grid, collider sums, mesh distance fields, the live count, plus the
+uniform), no readback in the step. Emitters write their particles in one dispatch after the live count, and drains
+are removed once a frame by a stable prefix-sum compaction (block counts, one workgroup's scan, a ranked scatter, the
+new count) and one buffer copy. Colliders are signed distances in the WGSL: sphere, box, capsule and plane in closed form, a
 mesh as a trilinear field (`bakeLiquidMesh`) with its normal by central differences; the collider sums are read and
 cleared in one submit, and `link` hands linked bodies those impulses on the CPU, one frame late. GPU
 maths: every particle-to-grid and collider sum is an integer `atomicAdd` of a fixed-point term (2^16, impulses 2^10), so

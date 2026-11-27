@@ -278,11 +278,11 @@ default density is 1 kg/m³ as in Rapier, not a real material's.
   bound) with `adhesion` to walls and colliders (a film hangs from the ceiling exactly when adhesion beats gravity), and up
   to 4 `liquids` of their own density, viscosity and colour (a heavier one sinks, the floor carries both weights) whose
   colours blend at `mixing`, drawn in their colours by the surface (`ParticleLiquid` `colorOffset`, which any particle
-  system can use). The CPU solvers `physics/pbf`, `physics/dfsph`
+  system can use), and `emitters` and `drains` that add and remove particles while it runs (exactly rate * time
+  particles, the rest kept in order by a GPU prefix-sum compaction; GPU and twin agree on the live count). The CPU solvers `physics/pbf`, `physics/dfsph`
   and `physics/flip` stay the accurate route. Not DONE; open against the wider rival set (three.js and its ecosystem,
-  Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): emitters and drains that add and remove
-  particles at run time;
-  and speed against the rivals' demos, measured in the speed phase.
+  Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): speed against the rivals' demos,
+  measured in the speed phase.
 
 ### P14. LIFE-04 Flocking
 

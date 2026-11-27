@@ -1018,6 +1018,14 @@ debug view through `setPointer`, `setColliders` and `setDebug`):
   `liquid.particleBuffer(engine.gpu)` holds 20 floats a particle (position and density over rest density, velocity and
   liquid index, the APIC matrix row by row, then the linear RGB colour at `LIQUID_COLOR_OFFSET`), to draw or read with
   your own shaders.
+- `capacity` (default `count`, up to 1,048,576) particle slots, the most alive at once; `emitters` (or
+  `options.emitters`, live), up to 4: `{ position, velocity? ([0, -1, 0] m/s), radius? (two spacings), rate?, liquid?
+  (0), enabled? }`, a nozzle facing along its velocity that adds particles over its disc on a Vogel spiral, by default
+  at the jet's flow at rest density (|velocity| pi radius² over a particle's volume); it adds exactly the whole part of
+  rate * time and stops at `capacity`. `drains`, up to 4: `{ shape: 'box' | 'sphere', position, halfExtents? | radius?,
+  enabled? }`, regions that remove every particle that enters them; the rest keep their order (a prefix-sum compaction
+  on the GPU each frame), and the freed slots are reused. `stats.live` counts the live particles (as of the last read-back
+  on WebGPU, `snapshot()` has it exactly).
 - `liquids`, up to 4: `{ fill, density?, viscosity?, color? }` each, sharing the container, the grid and the speed of
   sound; `count` is split between them by the volume of their `fill` boxes (which must not overlap; the first defaults
   to `fill`), and `density`, `viscosity` default to the options' own. A heavier liquid sinks through a lighter one:
@@ -1037,6 +1045,22 @@ WebGL2 compatibility layer the same passes run on the CPU (`stats.backend` is `'
 draws them; keep `count` to a few thousand there. `stepLiquidCPU`, `createLiquidState` and `resolveLiquidParams` are
 that CPU twin, for tests and offline use. Measured compression, the force accuracy on bodies and the limits:
 [limits](../../docs/limits.md#gpu-particle-liquid-gpuliquid). Example page: `examples/gpu-liquid.html`.
+
+A tap pouring into a tank that drains through its floor:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { GPULiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [0, 0.8, 2.2], target: [0, 0.3, 0] } });
+const liquid = GPULiquid.attach(engine, {
+  count: 16384,
+  capacity: 65536,
+  fill: { min: [-0.5, 0, -0.5], max: [0.5, 0.1, 0.5] },
+  emitters: [{ position: [-0.3, 0.8, 0], velocity: [0, -1.5, 0], radius: 0.05 }],
+  drains: [{ shape: 'sphere', position: [0.35, 0, 0.35], radius: 0.08 }],
+});
+engine.render({ delta: 1 / 60 });
+```
 
 Oil on water, with a dye that spreads as you stir:
 

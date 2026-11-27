@@ -22,6 +22,66 @@ export const LIQUID_COLOR_OFFSET = 17;
 export const LIQUID_GRID_STRIDE = 8;
 /** Most liquids one GPULiquid holds. */
 export const MAX_LIQUIDS = 4;
+/** Most emitters and most drains one GPULiquid takes. */
+export const MAX_LIQUID_EMITTERS = 4;
+/** The golden angle in radians, which spreads an emitter's particles over its nozzle (Vogel 1979). */
+export const LIQUID_GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/** A nozzle that adds particles while it runs: a disc facing along `velocity`. */
+export interface LiquidEmitter {
+  /** Centre of the nozzle in world units, inside the container. */
+  position: LiquidVec3;
+  /** Velocity of the jet in m/s; the nozzle faces along it. Default [0, -1, 0]. */
+  velocity?: LiquidVec3;
+  /** Nozzle radius in world units, > 0. Default two particle spacings. */
+  radius?: number;
+  /**
+   * Particles a second, 0 to 10,000,000. Default the jet's flow at rest density, |velocity| * pi radius² over a particle's
+   * volume.
+   */
+  rate?: number;
+  /** Index of the liquid it pours, in `liquids`. Default 0. */
+  liquid?: number;
+  /** Runs while true. Default true. */
+  enabled?: boolean;
+}
+
+/** A region that removes every particle that enters it. */
+export interface LiquidDrain {
+  /** `'box'` (uses `halfExtents`) or `'sphere'` (uses `radius`). */
+  shape: 'box' | 'sphere';
+  /** Centre in world units. */
+  position: LiquidVec3;
+  /** Box half size per axis, each > 0. Default [0.05, 0.05, 0.05]. */
+  halfExtents?: LiquidVec3;
+  /** Sphere radius, > 0. Default 0.05. */
+  radius?: number;
+  /** Removes while true. Default true. */
+  enabled?: boolean;
+}
+
+/** A checked emitter. */
+export interface ResolvedEmitter {
+  position: LiquidVec3;
+  velocity: LiquidVec3;
+  radius: number;
+  rate: number;
+  liquid: number;
+  enabled: boolean;
+  /** Unit vectors across the nozzle. */
+  u: LiquidVec3;
+  w: LiquidVec3;
+  /** Particles on the nozzle's spiral before it repeats: its area over a particle spacing squared. */
+  ring: number;
+}
+
+/** A checked drain: 0 box, 1 sphere, its half size (or radius in x). */
+export interface ResolvedDrain {
+  kind: 0 | 1;
+  position: LiquidVec3;
+  half: LiquidVec3;
+  enabled: boolean;
+}
 /** Most particles one GPULiquid holds. */
 export const MAX_GPU_LIQUID_PARTICLES = 1_048_576;
 /** Most grid nodes one GPULiquid holds (64 MiB of grid). */
@@ -131,10 +191,19 @@ export interface LiquidDebugOptions {
   colliders?: boolean;
 }
 
-/** Options of {@link GPULiquid}; every field but `count`, `box`, `fill`, `resolution`, `seed` and `surface` can change live. */
+/**
+ * Options of {@link GPULiquid}; every field but `count`, `capacity`, `box`, `fill`, `liquids`, `resolution`, `seed` and
+ * `surface` can change live.
+ */
 export interface GPULiquidOptions {
-  /** Particles, integer 1..1,048,576. Default 65,536. */
+  /** Particles at the start, integer 1..1,048,576. Default 65,536. */
   count?: number;
+  /** Most particles at once, room for what the emitters add, integer count..1,048,576. Default `count`. */
+  capacity?: number;
+  /** Up to 4 nozzles that add particles while they run. Default none. */
+  emitters?: readonly LiquidEmitter[];
+  /** Up to 4 regions that remove the particles that enter them. Default none. */
+  drains?: readonly LiquidDrain[];
   /** The container: its walls hold the liquid (free slip). Default { min: [-0.5, 0, -0.5], max: [0.5, 1, 0.5] }. */
   box?: LiquidBox;
   /**
@@ -219,7 +288,12 @@ export interface ResolvedLiquidKind {
 
 /** The resolved, checked parameters the CPU twin and the GPU step run on. */
 export interface ResolvedLiquidParams {
+  /** Particles at the start. */
   count: number;
+  /** Particle slots: the most alive at once. */
+  capacity: number;
+  emitters: ResolvedEmitter[];
+  drains: ResolvedDrain[];
   boxMin: LiquidVec3;
   boxMax: LiquidVec3;
   fillMin: LiquidVec3;
@@ -277,8 +351,12 @@ export interface ResolvedCollider {
 
 /** The liquid's state: interleaved particle records (the GPU buffer's layout), the collider impulse sums and the grid. */
 export interface LiquidState {
-  /** count * LIQUID_PARTICLE_FLOATS floats. */
+  /** capacity * LIQUID_PARTICLE_FLOATS floats: the live particles first, then empty slots (NaN positions). */
   particles: Float32Array;
+  /** Live particles. */
+  live: number;
+  /** Per emitter: particles it has emitted (0..3) and the fraction of a particle it owes (4..7). */
+  emission: Float64Array;
   /** Per collider: impulse on the body (x, y, z) then its moment about the centre (x, y, z), in fixed-point units. */
   impulses: Float64Array;
   /** The grid of the last substep, LIQUID_GRID_STRIDE words a node: after the update velocity, mass, weight, colour sums. */
@@ -287,8 +365,13 @@ export interface LiquidState {
 
 /** A copy of a liquid's state; `GPULiquid.restore` takes it back. */
 export interface LiquidSnapshot {
+  /** Particle slots (the liquid's capacity). */
   count: number;
+  /** Live particles. */
+  live: number;
   steps: number;
+  /** The emitters' counts and owed fractions. */
+  emission: Float64Array;
   particles: Float32Array;
 }
 
@@ -316,8 +399,12 @@ export interface LiquidStats {
   substep: number;
   /** False when the last frame needed more than `maxSubsteps` and ran in slow motion. */
   realTime: boolean;
-  /** Compute dispatches of the last frame (five a substep). */
+  /** Compute dispatches of the last frame (five a substep, six with surface tension, plus the emitters' and drains'). */
   dispatches: number;
+  /** Live particles: exact on the WebGL2 layer, as of the last read-back (forces or snapshot) on WebGPU. */
+  live: number;
+  /** Particle slots, the most alive at once. */
+  capacity: number;
   /** Draw calls of the debug view in the last frame. */
   debugDraws: number;
 }
@@ -360,6 +447,7 @@ const box = (v: unknown, fallback: LiquidBox, name: string): LiquidBox => {
 export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?: number): ResolvedLiquidParams {
   if (!options || typeof options !== 'object') throw liquidError('GPULiquid options must be an object');
   const count = fixedCount ?? num(options.count, 65_536, 'count', 1, MAX_GPU_LIQUID_PARTICLES, true);
+  const capacity = num(options.capacity, count, 'capacity', count, MAX_GPU_LIQUID_PARTICLES, true);
   const container = box(options.box, { min: [-0.5, 0, -0.5], max: [0.5, 1, 0.5] }, 'box');
   const size = [0, 1, 2].map((a) => container.max[a]! - container.min[a]!);
   const fill = box(
@@ -521,8 +609,56 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     container: d.container ?? true,
     colliders: d.colliders ?? true,
   };
+  // Emitters and drains.
+  const emitterList = options.emitters ?? [];
+  if (!Array.isArray(emitterList) || emitterList.length > MAX_LIQUID_EMITTERS)
+    throw liquidError(`GPULiquid emitters must be an array of at most ${MAX_LIQUID_EMITTERS}`);
+  const inside = (x: LiquidVec3, name: string) => {
+    for (let a = 0; a < 3; a++)
+      if (x[a]! < container.min[a]! || x[a]! > container.max[a]!) throw liquidError(`GPULiquid ${name} must lie inside box`);
+    return x;
+  };
+  const emitters = emitterList.map((e, i): ResolvedEmitter => {
+    const name = `emitters[${i}]`;
+    if (!e || typeof e !== 'object') throw liquidError(`GPULiquid ${name} must be { position, velocity?, radius?, rate?, liquid? }`);
+    const position = inside(vec(e.position, [0, 0, 0], `${name}.position`), `${name}.position`);
+    const velocity = vec(e.velocity, [0, -1, 0], `${name}.velocity`, -1e4, 1e4);
+    const radius = num(e.radius, 2 * spacing, `${name}.radius`, 1e-6, 1e6);
+    const liquid = num(e.liquid, 0, `${name}.liquid`, 0, kinds.length - 1, true);
+    if (e.enabled !== undefined && typeof e.enabled !== 'boolean') throw liquidError(`GPULiquid ${name}.enabled must be true or false`);
+    const speed = Math.hypot(velocity[0], velocity[1], velocity[2]);
+    const rate = num(e.rate, (speed * Math.PI * radius * radius) / volume, `${name}.rate`, 0, 1e7);
+    // The nozzle's plane: two unit vectors across the jet's direction (any pair when it has no speed).
+    const n = speed > 0 ? velocity.map((v) => v / speed) : [0, -1, 0];
+    const t = Math.abs(n[1]!) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+    const ux = t[1]! * n[2]! - t[2]! * n[1]!,
+      uy = t[2]! * n[0]! - t[0]! * n[2]!,
+      uz = t[0]! * n[1]! - t[1]! * n[0]!;
+    const ul = Math.hypot(ux, uy, uz);
+    const u: LiquidVec3 = [ux / ul, uy / ul, uz / ul];
+    const w: LiquidVec3 = [n[1]! * u[2] - n[2]! * u[1], n[2]! * u[0] - n[0]! * u[2], n[0]! * u[1] - n[1]! * u[0]];
+    const ring = Math.max(1, Math.round((Math.PI * radius * radius) / (spacing * spacing)));
+    return { position, velocity, radius, rate, liquid, enabled: e.enabled ?? true, u, w, ring };
+  });
+  const drainList = options.drains ?? [];
+  if (!Array.isArray(drainList) || drainList.length > MAX_LIQUID_EMITTERS)
+    throw liquidError(`GPULiquid drains must be an array of at most ${MAX_LIQUID_EMITTERS}`);
+  const drains = drainList.map((d, i): ResolvedDrain => {
+    const name = `drains[${i}]`;
+    if (!d || typeof d !== 'object' || (d.shape !== 'box' && d.shape !== 'sphere'))
+      throw liquidError(`GPULiquid ${name}.shape must be 'box' or 'sphere'`);
+    if (d.enabled !== undefined && typeof d.enabled !== 'boolean') throw liquidError(`GPULiquid ${name}.enabled must be true or false`);
+    const half =
+      d.shape === 'box'
+        ? vec(d.halfExtents, [0.05, 0.05, 0.05], `${name}.halfExtents`, 1e-6, 1e6)
+        : ((r: number): LiquidVec3 => [r, r, r])(num(d.radius, 0.05, `${name}.radius`, 1e-6, 1e6));
+    return { kind: d.shape === 'box' ? 0 : 1, position: vec(d.position, [0, 0, 0], `${name}.position`), half, enabled: d.enabled ?? true };
+  });
   return {
     count,
+    capacity,
+    emitters,
+    drains,
     boxMin: container.min,
     boxMax: container.max,
     fillMin: blocks[0]!.fillMin,
@@ -574,7 +710,8 @@ const pcg = (v: number): number => {
  */
 export function createLiquidState(params: ResolvedLiquidParams): LiquidState {
   const { count, boxMin, boxMax } = params;
-  const particles = new Float32Array(count * LIQUID_PARTICLE_FLOATS);
+  const particles = new Float32Array(params.capacity * LIQUID_PARTICLE_FLOATS);
+  for (let i = count; i < params.capacity; i++) clearSlot(particles, i);
   params.kinds.forEach((k, kind) => {
     const { fillMin, fillMax, lattice } = k;
     const nx = Math.max(1, Math.round((fillMax[0] - fillMin[0]) / lattice[0]));
@@ -598,9 +735,56 @@ export function createLiquidState(params: ResolvedLiquidParams): LiquidState {
   });
   return {
     particles,
+    live: count,
+    emission: new Float64Array(2 * MAX_LIQUID_EMITTERS),
     impulses: new Float64Array(MAX_LIQUID_COLLIDERS * 6),
     grid: new Float64Array(params.nodes * LIQUID_GRID_STRIDE),
   };
+}
+
+/** An empty slot: a NaN position (drawn as nothing) and a negative density ratio. */
+function clearSlot(particles: Float32Array, i: number): void {
+  const b = i * LIQUID_PARTICLE_FLOATS;
+  particles.fill(0, b, b + LIQUID_PARTICLE_FLOATS);
+  particles[b] = particles[b + 1] = particles[b + 2] = NaN;
+  particles[b + 3] = -1;
+}
+
+/**
+ * Where an emitter puts its particle number e, the k-th of the n it adds over a frame of dt seconds: on a Vogel spiral
+ * over its nozzle (slot e mod ring, radius R sqrt((slot + 1/2) / ring), turned by the golden angle a slot), spread
+ * downstream over the distance the jet runs in the frame, so a jet at its default rate fills at rest density.
+ */
+export function emitterPoint(e: ResolvedEmitter, slot: number, k: number, n: number, dt: number, out: number[]): void {
+  const r = e.radius * Math.sqrt((slot + 0.5) / e.ring);
+  const a = slot * LIQUID_GOLDEN_ANGLE;
+  const c = r * Math.cos(a),
+    s = r * Math.sin(a),
+    along = (dt * (k + 0.5)) / n;
+  for (let i = 0; i < 3; i++) out[i] = e.position[i]! + e.u[i]! * c + e.w[i]! * s + e.velocity[i]! * along;
+}
+
+/** Particles each emitter adds over dt: from its owed fraction plus rate * dt, the whole part. */
+export function emitterCounts(p: ResolvedLiquidParams, emission: Float64Array, dt: number): number[] {
+  return p.emitters.map((e, k) => (e.enabled ? Math.floor(emission[MAX_LIQUID_EMITTERS + k]! + e.rate * dt + 1e-9) : 0));
+}
+
+/** Advances the emitters' counts and owed fractions by a frame that added `counts`. */
+export function advanceEmission(p: ResolvedLiquidParams, emission: Float64Array, dt: number, counts: number[]): void {
+  p.emitters.forEach((e, k) => {
+    if (!e.enabled) return;
+    emission[k] = emission[k]! + counts[k]!;
+    emission[MAX_LIQUID_EMITTERS + k] = Math.max(0, emission[MAX_LIQUID_EMITTERS + k]! + e.rate * dt - counts[k]!);
+  });
+}
+
+/** True when x lies in drain d. */
+export function inDrain(d: ResolvedDrain, x: ArrayLike<number>): boolean {
+  const dx = x[0]! - d.position[0],
+    dy = x[1]! - d.position[1],
+    dz = x[2]! - d.position[2];
+  if (d.kind === 1) return dx * dx + dy * dy + dz * dz < d.half[0] * d.half[0];
+  return Math.abs(dx) < d.half[0] && Math.abs(dy) < d.half[1] && Math.abs(dz) < d.half[2];
 }
 
 /** FNV-1a of the particle bytes, as 8 hex digits. */
@@ -1018,8 +1202,50 @@ export function stepLiquidCPU(state: LiquidState, params: ResolvedLiquidParams, 
     throw liquidError(`GPULiquid step dt is ${String(dt)}; pass seconds from 0 to 1`);
   const { n, h } = liquidSubsteps(params, dt, cap);
   state.impulses.fill(0);
+  if (!n) return 0;
+  emit(state, params, n * h);
   for (let s = 0; s < n; s++) substep(state, params, h);
+  if (params.drains.length) compact(state);
   return n;
+}
+
+/** The emitters' particles of a frame of dt seconds, written after the live ones while there is room. */
+function emit(state: LiquidState, p: ResolvedLiquidParams, dt: number): void {
+  if (!p.emitters.length) return;
+  const counts = emitterCounts(p, state.emission, dt);
+  const at = [0, 0, 0];
+  p.emitters.forEach((e, k) => {
+    const n = counts[k]!;
+    const kind = p.kinds[e.liquid]!;
+    for (let j = 0; j < n && state.live < p.capacity; j++) {
+      const slot = (state.emission[k]! + j) % e.ring;
+      emitterPoint(e, slot, j, n, dt, at);
+      const b = state.live * LIQUID_PARTICLE_FLOATS;
+      state.particles.fill(0, b, b + LIQUID_PARTICLE_FLOATS);
+      for (let a = 0; a < 3; a++) {
+        state.particles[b + a] = Math.min(p.boxMax[a]!, Math.max(p.boxMin[a]!, at[a]!));
+        state.particles[b + 4 + a] = e.velocity[a]!;
+      }
+      state.particles[b + 3] = 1;
+      state.particles[b + 7] = e.liquid;
+      state.particles.set(kind.color, b + LIQUID_COLOR_OFFSET);
+      state.live++;
+    }
+  });
+  advanceEmission(p, state.emission, dt, counts);
+}
+
+/** Removes the drained particles (density ratio below zero), keeping the others in order, and clears the freed slots. */
+function compact(state: LiquidState): void {
+  const F = LIQUID_PARTICLE_FLOATS;
+  let to = 0;
+  for (let i = 0; i < state.live; i++) {
+    if (!(state.particles[i * F + 3]! >= 0)) continue;
+    if (to !== i) state.particles.copyWithin(to * F, i * F, (i + 1) * F);
+    to++;
+  }
+  for (let i = to; i < state.live; i++) clearSlot(state.particles, i);
+  state.live = to;
 }
 
 function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void {
@@ -1054,8 +1280,9 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
 
   // P2G: weight n_i += w (the number density), mass m_i += w m_p and APIC momentum (m v)_i += w m_p (v + C d), in units
   // of particleMass; the colour sums when the colours mix.
-  for (let i = 0; i < p.count; i++) {
+  for (let i = 0; i < state.live; i++) {
     const b = i * F;
+    if (!(particles[b + 3]! >= 0)) continue;
     const mr = p.kinds[particles[b + 7]!]!.massRatio;
     for (let a = 0; a < 3; a++) base[a] = stencil(p, particles[b + a]!, a, w, a * 4);
     for (let c = 0; c < 3; c++)
@@ -1077,8 +1304,9 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
 
   // P2G, stress: density from the grid's mass (mirrored across the walls), Tait pressure (zero below rest density) and
   // viscous stress; the momentum term is -dt vol sigma D^-1 d.
-  for (let i = 0; i < p.count; i++) {
+  for (let i = 0; i < state.live; i++) {
     const b = i * F;
+    if (!(particles[b + 3]! >= 0)) continue;
     for (let a = 0; a < 3; a++) base[a] = stencil(p, particles[b + a]!, a, w, a * 4);
     let rho = 0;
     let near = 0;
@@ -1271,8 +1499,9 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
       }
 
   // G2P: velocity and APIC C = sum w v (D^-1 d)^T, advect, out of the colliders, inside the walls.
-  for (let i = 0; i < p.count; i++) {
+  for (let i = 0; i < state.live; i++) {
     const b = i * F;
+    if (!(particles[b + 3]! >= 0)) continue;
     for (let a = 0; a < 3; a++) base[a] = stencil(p, particles[b + a]!, a, w, a * 4);
     let vx = 0,
       vy = 0,
@@ -1355,5 +1584,7 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         particles[o] = particles[o]! + (tint[a]! / around - particles[o]!) * mixing;
       }
     }
+    // A particle that entered a drain is gone: its density ratio below zero marks it until the frame's compaction.
+    for (const d of p.drains) if (d.enabled && inDrain(d, x)) particles[b + 3] = -1;
   }
 }

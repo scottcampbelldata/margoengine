@@ -276,6 +276,30 @@ window.check = async () => {
       if (b > r + 25 && x > W / 2) bluePixels++;
     }
   twoLiquid.dispose();
+
+  // An emitter pouring into a tank with a drain on its floor: three frames on the GPU against the twin (the emit pass,
+  // the drain marks and the four compaction passes): the same live count, the same particles in the same order.
+  const flowOptions = {
+    count: compat ? 1024 : 16384,
+    capacity: compat ? 2048 : 32768,
+    fill: { min: [-0.5, 0, -0.5], max: [0.5, 0.15, 0.5] },
+    emitters: [{ position: [0, 0.6, 0], velocity: [0, -2, 0], radius: 0.08 }],
+    drains: [{ shape: 'box', position: [0.3, 0.05, 0], halfExtents: [0.1, 0.1, 0.5] }],
+    surface: false,
+  };
+  const flow = GPULiquid.attach(engine, flowOptions);
+  for (let k = 0; k < 3; k++) flow.step(1 / 60);
+  const flowGpu = await flow.snapshot();
+  const flowParams = resolveLiquidParams(flow.options, flowOptions.count);
+  const flowTwin = createLiquidState(flowParams);
+  for (let k = 0; k < 3; k++) stepLiquidCPU(flowTwin, flowParams, 1 / 60);
+  let flowGap = 0;
+  for (let i = 0; i < Math.min(flowGpu.live, flowTwin.live) * F; i++)
+    if (i % F < 3) flowGap = Math.max(flowGap, Math.abs(flowGpu.particles[i] - flowTwin.particles[i]));
+  let flowEmpty = 0;
+  for (let i = flowGpu.live; i < flowGpu.count; i++) if (Number.isNaN(flowGpu.particles[i * F])) flowEmpty++;
+  const flowLive = [flowGpu.live, flowTwin.live, flowOptions.count, flowGpu.count - flowGpu.live, flowEmpty];
+  flow.dispose();
   engine.dispose();
 
   return {
@@ -316,6 +340,8 @@ window.check = async () => {
     surfaceBack,
     afterDisposeLit: nonBg(frameAfterDispose),
     twoGap,
+    flowGap,
+    flowLive,
     colorGap,
     redPixels,
     bluePixels,

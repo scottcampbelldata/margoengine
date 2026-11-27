@@ -277,6 +277,68 @@ test('two liquids: the floor carries both weights, the heavier sinks through the
     assert.throws(() => resolveLiquidParams(bad), (e) => e.code === 'unsupported' && /errors#gpu-liquid/.test(e.message), JSON.stringify(bad));
 });
 
+test('emitters add exactly rate * time particles at rest density, drains remove what enters them in order', () => {
+  // A jet pouring down at 1 m/s from a nozzle of radius 0.05 m: its default rate is the flow at rest density, pi r^2 v /
+  // V0 particles a second, and every frame adds the whole part of what it owes, so after T seconds it has added
+  // floor(rate T) (to rounding of the owed fraction) while there is room.
+  const base = {
+    count: 500,
+    capacity: 4000,
+    box: { min: [-0.3, 0, -0.3], max: [0.3, 0.8, 0.3] },
+    fill: { min: [-0.3, 0, -0.3], max: [0.3, 0.05, 0.3] },
+    emitters: [{ position: [0, 0.6, 0], velocity: [0, -1, 0], radius: 0.05 }],
+  };
+  const p = resolveLiquidParams(base);
+  const V0 = p.lattice[0] * p.lattice[1] * p.lattice[2];
+  const rate = p.emitters[0].rate;
+  assert.ok(Math.abs(rate - (Math.PI * 0.05 ** 2 * 1) / V0) < 1e-9 * rate);
+  const s = createLiquidState(p);
+  for (let k = 0; k < 30; k++) stepLiquidCPU(s, p, 1 / 60);
+  assert.equal(s.live - p.count, Math.floor(rate * 0.5 + 1e-6), `added ${s.live - p.count} against rate * T = ${rate * 0.5}`);
+  assert.equal(s.emission[0], s.live - p.count);
+  for (let i = 0; i < s.live; i++) assert.ok(Number.isFinite(s.particles[i * F + 1]) && s.particles[i * F + 3] >= 0);
+  for (let i = s.live; i < p.capacity; i++) assert.ok(Number.isNaN(s.particles[i * F]), 'slots past the live count are empty');
+  // At capacity the emitter stops adding.
+  const full = resolveLiquidParams({ ...base, capacity: 600 });
+  const sf = createLiquidState(full);
+  for (let k = 0; k < 30; k++) stepLiquidCPU(sf, full, 1 / 60);
+  assert.equal(sf.live, 600);
+  // A drain on the floor takes every particle that enters it and keeps the rest in their order.
+  const pd = resolveLiquidParams({ ...base, emitters: [], drains: [{ shape: 'box', position: [0, 0, 0], halfExtents: [0.1, 0.2, 0.1] }] });
+  const sd = createLiquidState(pd);
+  // Tag each particle with its index in its colour (colours ride along unchanged without mixing).
+  for (let i = 0; i < sd.live; i++) sd.particles[i * F + 17] = i / sd.live;
+  stepLiquidCPU(sd, pd, 1 / 60);
+  assert.ok(sd.live < pd.count, `the drain took ${pd.count - sd.live} particles`);
+  for (let i = 0; i < sd.live; i++) {
+    const b = i * F;
+    assert.ok(!(Math.abs(sd.particles[b]) < 0.1 && sd.particles[b + 1] < 0.2 && Math.abs(sd.particles[b + 2]) < 0.1), 'no live particle in the drain');
+    if (i) assert.ok(sd.particles[b + 17] > sd.particles[b + 17 - F], 'the survivors keep their order');
+  }
+  // Emitters and drains together repeat bit for bit, also from a copied state.
+  const both = { ...base, drains: [{ shape: 'sphere', position: [0.2, 0.02, 0.2], radius: 0.08 }], seed: 2 };
+  const run = (frames, from) => {
+    const q = resolveLiquidParams(both);
+    const st = from ?? createLiquidState(q);
+    for (let k = 0; k < frames; k++) stepLiquidCPU(st, q, 1 / 60);
+    return st;
+  };
+  const whole = run(20);
+  const half = run(10);
+  const copy = { ...half, particles: half.particles.slice(), emission: half.emission.slice(), grid: half.grid.slice() };
+  assert.equal(liquidStateHash(run(10, copy).particles), liquidStateHash(whole.particles));
+  for (const bad of [
+    { capacity: 10, count: 20 },
+    { emitters: Array.from({ length: 5 }, () => ({ position: [0, 0.5, 0] })) },
+    { emitters: [{ position: [0, 2, 0] }] },
+    { emitters: [{ position: [0, 0.5, 0], liquid: 1 }] },
+    { emitters: [{ position: [0, 0.5, 0], rate: -1 }] },
+    { drains: [{ shape: 'cone', position: [0, 0, 0] }] },
+    { drains: [{ shape: 'sphere', position: [0, 0, 0], radius: 0 }] },
+  ])
+    assert.throws(() => resolveLiquidParams(bad), (e) => e.code === 'unsupported' && /errors#gpu-liquid/.test(e.message), JSON.stringify(bad));
+});
+
 test('the same options give the same state, and a copied state repeats the same steps', () => {
   const options = { count: 600, seed: 9, colliders: [{ shape: 'sphere', position: [0, 0.2, 0], radius: 0.1 }] };
   const run = (frames) => {
@@ -298,10 +360,12 @@ test('the same options give the same state, and a copied state repeats the same 
 test('GPULiquid.restore checks the whole snapshot before it changes anything', () => {
   const liquid = new GPULiquid({ count: 8 });
   const good = createLiquidState(resolveLiquidParams({ count: 8 })).particles;
-  const bad = (particles, extra = {}) => ({ count: 8, steps: 0, particles, ...extra });
+  const bad = (particles, extra = {}) => ({ count: 8, live: 8, steps: 0, emission: new Float64Array(8), particles, ...extra });
   assert.throws(() => liquid.restore(bad(good, { count: 9 })), { code: 'unsupported' });
   assert.throws(() => liquid.restore(bad(good.subarray(0, 8 * F - 1))), { code: 'unsupported' });
   assert.throws(() => liquid.restore(bad(good, { steps: -1 })), { code: 'unsupported' });
+  assert.throws(() => liquid.restore(bad(good, { live: 9 })), { code: 'unsupported' });
+  assert.throws(() => liquid.restore(bad(good, { emission: new Float64Array(8).fill(-1) })), { code: 'unsupported' });
   const nan = good.slice();
   nan[8 * F - 1] = NaN;
   assert.throws(() => liquid.restore(bad(nan)), /not finite/);

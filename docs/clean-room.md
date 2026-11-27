@@ -15033,6 +15033,13 @@ compute shaders), and no companion code of any paper was opened.
   [Adaptively Sampled Distance Fields](https://doi.org/10.1145/344779.344899) (SIGGRAPH 2000): a sampled distance field
   read by trilinear interpolation, with its normal from the field's gradient, as a collider's level set; the capsule
   and plane distances are the closed forms (segment distance less the radius, and n . (x - p)).
+- H. Vogel, [A better way to construct the sunflower head](https://doi.org/10.1016/0025-5564(79)90080-4) (Mathematical
+  Biosciences 44, 1979): points k = 0.. at radius R sqrt((k + 1/2) / N) and the golden angle apart cover a disc evenly,
+  which places an emitter's particles over its nozzle without a lattice.
+- W. Daniel Hillis and Guy L. Steele, [Data Parallel Algorithms](https://doi.org/10.1145/7902.7903) (CACM 29(12),
+  1986), and Guy E. Blelloch, [Prefix Sums and Their Applications](https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf) (CMU
+  technical report, 1990): the inclusive scan inside a workgroup and the per-block counts scanned once more, so the drains'
+  compaction keeps the particles in order and repeats exactly.
 - Barbara Solenthaler and Renato Pajarola,
   [Density Contrast SPH Interfaces](https://doi.org/10.2312/SCA/SCA08/211-218) (SCA 2008): with liquids of different
   densities the density is taken from the particles' number density and each particle's pressure from its own rest

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20975042,
+  "total": 20978274,
   "history": [
     {
       "date": "2026-10-24",
@@ -14682,6 +14682,12 @@
       "commit": "lane-B",
       "reason": "KB-SKY-PALLFALLOFF1: fire glow spots in the sky look and fog and the weather drive clustering the burning segments. Measured sky 25583 to 26345, sky/fog 3571 to 4210, sky/scenes 26659 to 27411, sky/look 2808 to 3337, weather 8735 to 8841, weather/drive 7795 to 8834",
       "grew": 5253
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "water/liquid 38616 to 41848 B ceiling (built 37491 to 40629 B gzip): GPULiquid capacity, emitters and drains (FLUID-02/03, parity bar P13): an emit pass and its commit, the drains' marks in G2P, and a stable prefix-sum compaction in four compute passes (block counts, a one-workgroup scan, a ranked scatter, the new count), with their CPU twin and the live count in snapshots. They run inside the same frame encode as the step, so a split entry would only move the same class's passes. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16336,7 +16342,7 @@
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
-    "@margoengine/water/liquid": 38616,
+    "@margoengine/water/liquid": 41848,
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,

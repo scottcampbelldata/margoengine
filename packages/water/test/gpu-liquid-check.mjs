@@ -95,6 +95,13 @@ try {
     assert.ok(r.twoGap < 1e-4, `two liquids: worst position gap ${r.twoGap}`);
     assert.ok(r.colorGap < 1e-3, `two liquids: worst colour gap ${r.colorGap}`);
   }
+  // Emitters and drains: the GPU's emit and compaction passes against the twin.
+  const [gpuLive, twinLive, startCount, emptySlots, nanSlots] = r.flowLive;
+  assert.equal(gpuLive, twinLive, 'the same live count after the emitter and the drain');
+  assert.notEqual(gpuLive, startCount, 'the emitter and drain changed the count');
+  assert.equal(nanSlots, emptySlots, 'every slot past the live count is empty');
+  if (r.compat) assert.equal(r.flowGap, 0);
+  else assert.ok(r.flowGap < 1e-4, `emitter and drain: worst position gap ${r.flowGap}`);
   assert.ok(r.redPixels > 200 && r.bluePixels > 200, `the surface draws each liquid's colour: ${r.redPixels} red, ${r.bluePixels} blue px`);
   console.log(
     `ok gpu liquid (${r.stats.backend}): ${r.count} particles, ${r.stats.nodes} nodes, hash ${r.hashes[0]}, ` +

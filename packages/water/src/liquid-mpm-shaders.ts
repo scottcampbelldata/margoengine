@@ -5,13 +5,17 @@
 // - grid: per node two vec4i, the fixed-point weight, mass, momentum and colour sums while particles scatter, then the
 //   node's velocity, mass and weight as f32 bits after the grid update (the colour sums kept);
 // - forces: per collider eight i32, the fixed-point impulse on the body and its moment about the centre;
-// - sdf: the distance fields of the mesh colliders, one after another.
+// - sdf: the distance fields of the mesh colliders, one after another;
+// - tally: the live particle count (word 0); every particle pass skips the slots past it and the drained particles
+//   (density ratio below zero) before them.
 // Every scatter is an integer atomicAdd, so the sums and the whole step are the same on every run. A stage binds at most
-// four storage buffers (WebGPU's default limit is eight). The build strips the comments inside the WGSL strings
+// five storage buffers (WebGPU's default limit is eight). The build strips the comments inside the WGSL strings
 // (docs/conventions.md, "Shader comments").
 
-/** Floats of the simulation uniform: thirteen vec4 of parameters, four of the liquids, then six vec4 per collider. */
-export const LIQUID_SIM_FLOATS = (17 + 6 * 8) * 4;
+/** Floats of the simulation uniform: thirteen vec4 of parameters, four of the liquids, eight of the drains, then six vec4 per collider. */
+export const LIQUID_SIM_FLOATS = (25 + 6 * 8) * 4;
+/** Floats of the emit pass's uniform: two vec4 of the frame, then six vec4 per emitter. */
+export const LIQUID_EMIT_FLOATS = (2 + 6 * 4) * 4;
 /** Floats of the debug view uniform. */
 export const LIQUID_DEBUG_FLOATS = 28;
 
@@ -72,6 +76,8 @@ struct Sim {
   surface: vec4f,
   // per liquid: mass over particleMass, its viscous factor dt nu * mass, unused, unused
   kinds: array<vec4f, 4>,
+  // per drain: centre and kind (0 box, 1 sphere, -1 off), half size or radius; cells.w drains
+  drains: array<vec4f, 8>,
   colliders: array<Collider, 8>,
 }
 @group(0) @binding(0) var<uniform> sim: Sim;
@@ -275,10 +281,12 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 export const LIQUID_P2G_WGSL = /* wgsl */ `${HEADER}
 @group(0) @binding(1) var<storage, read> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read_write> grid: array<atomic<i32>>;
+@group(0) @binding(3) var<storage, read> tally: array<u32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (id.x >= sim.counts.x) { return; }
+  if (id.x >= tally[0]) { return; }
   let p = particles[id.x];
+  if (p.pos.w < 0.0) { return; }
   let s = stencil(p.pos.xyz);
   let mr = sim.kinds[min(u32(p.vel.w), 3u)].x;
   for (var c = 0u; c < 3u; c++) {
@@ -312,6 +320,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 export const LIQUID_STRESS_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}
 @group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read_write> grid: array<atomic<i32>>;
+@group(0) @binding(4) var<storage, read> tally: array<u32>;
 // The grid's mass at node n plus its mirrors across the walls, in particles.
 fn wallMass(n: vec3u) -> f32 {
   let m = vec3u(mirror(0u, n.x), mirror(1u, n.y), mirror(2u, n.z));
@@ -332,8 +341,9 @@ fn wallMass(n: vec3u) -> f32 {
 ${SPLINE_COVER}
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (id.x >= sim.counts.x) { return; }
+  if (id.x >= tally[0]) { return; }
   let p = particles[id.x];
+  if (p.pos.w < 0.0) { return; }
   let s = stencil(p.pos.xyz);
   let hc = sim.boxMax.w;
   var near = 0u;
@@ -548,11 +558,13 @@ export const LIQUID_G2P_WGSL = /* wgsl */ `${HEADER}${collideWGSL(4)}
 @group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read> grid: array<vec4i>;
 @group(0) @binding(3) var<storage, read_write> forces: array<atomic<i32>>;
+@group(0) @binding(5) var<storage, read> tally: array<u32>;
 ${ADD_IMPULSE}
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (id.x >= sim.counts.x) { return; }
+  if (id.x >= tally[0]) { return; }
   var p = particles[id.x];
+  if (p.pos.w < 0.0) { return; }
   let s = stencil(p.pos.xyz);
   var v = vec3f(0.0);
   var b0 = vec3f(0.0);
@@ -603,7 +615,190 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   p.c0 = vec4f(b0, b1.x);
   p.c1 = vec4f(b1.yz, b2.xy);
   p.c2 = vec4f(b2.z, color);
+  // A particle that entered a drain is gone: a density ratio below zero marks it until the frame's compaction.
+  for (var k = 0u; k < sim.cells.w; k++) {
+    let at = sim.drains[2u * k];
+    let half = sim.drains[2u * k + 1u].xyz;
+    let d = x - at.xyz;
+    if (at.w > 0.5 && dot(d, d) < half.x * half.x) { p.pos.w = -1.0; }
+    if (at.w > -0.5 && at.w < 0.5 && all(abs(d) < half)) { p.pos.w = -1.0; }
+  }
   particles[id.x] = p;
+}
+`;
+
+const EMIT_HEADER = /* wgsl */ `
+struct Emitter {
+  // nozzle centre, radius
+  pos: vec4f,
+  // jet velocity, liquid index
+  vel: vec4f,
+  // across the nozzle, the spiral's slots
+  u: vec4f,
+  // across the nozzle, unused
+  w: vec4f,
+  // the liquid's colour, unused
+  color: vec4f,
+  // its first thread, its first spiral slot, the particles it adds this frame, unused
+  idx: vec4u,
+}
+struct Emit {
+  // emitters, particles to add, capacity, unused
+  head: vec4u,
+  // frame length dt, unused
+  frame: vec4f,
+  em: array<Emitter, 4>,
+}
+`;
+
+/**
+ * The emit pass: thread j writes the j-th particle the emitters add this frame into slot live + j while there is room:
+ * on its emitter's Vogel spiral, spread downstream over the frame (emitterPoint in the twin), at the jet's velocity.
+ */
+export const LIQUID_EMIT_WGSL = /* wgsl */ `${HEADER}${EMIT_HEADER}
+@group(0) @binding(1) var<uniform> emit: Emit;
+@group(0) @binding(2) var<storage, read_write> particles: array<Particle>;
+@group(0) @binding(3) var<storage, read> tally: array<u32>;
+const GOLDEN: f32 = 2.399963229728653;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let j = id.x;
+  if (j >= emit.head.y) { return; }
+  let slot = tally[0] + j;
+  if (slot >= emit.head.z) { return; }
+  var k = 0u;
+  for (var e = 1u; e < emit.head.x; e++) { if (j >= emit.em[e].idx.x) { k = e; } }
+  let em = emit.em[k];
+  let jj = j - em.idx.x;
+  let ring = u32(em.u.w);
+  let spiral = (em.idx.y + jj) % ring;
+  let r = em.pos.w * sqrt((f32(spiral) + 0.5) / em.u.w);
+  let a = f32(spiral) * GOLDEN;
+  let along = emit.frame.x * (f32(jj) + 0.5) / f32(em.idx.z);
+  let x = clamp(em.pos.xyz + em.u.xyz * (r * cos(a)) + em.w.xyz * (r * sin(a)) + em.vel.xyz * along, sim.boxMin.xyz, sim.boxMax.xyz);
+  var p: Particle;
+  p.pos = vec4f(x, 1.0);
+  p.vel = em.vel;
+  p.c0 = vec4f(0.0);
+  p.c1 = vec4f(0.0);
+  p.c2 = vec4f(0.0, em.color.xyz);
+  particles[slot] = p;
+}
+`;
+
+/** After the emit pass: the live count grows by what was written, at most to the capacity. */
+export const LIQUID_COMMIT_WGSL = /* wgsl */ `${EMIT_HEADER}
+@group(0) @binding(0) var<uniform> emit: Emit;
+@group(0) @binding(1) var<storage, read_write> tally: array<u32>;
+@compute @workgroup_size(1)
+fn main() {
+  tally[0] = min(emit.head.z, tally[0] + emit.head.y);
+}
+`;
+
+/**
+ * Compaction, pass 1 of 3: the live, undrained particles of each block of 256 slots, counted in workgroup memory.
+ * The three passes keep the particles in order (a stable partition by a prefix sum), so a run repeats exactly.
+ */
+export const LIQUID_COUNT_WGSL = /* wgsl */ `${HEADER}
+@group(0) @binding(1) var<storage, read> particles: array<Particle>;
+@group(0) @binding(2) var<storage, read_write> blocks: array<u32>;
+@group(0) @binding(3) var<storage, read> tally: array<u32>;
+var<workgroup> alive: atomic<u32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3u) {
+  if (li == 0u) { atomicStore(&alive, 0u); }
+  workgroupBarrier();
+  if (id.x < tally[0] && particles[id.x].pos.w >= 0.0) { atomicAdd(&alive, 1u); }
+  workgroupBarrier();
+  if (li == 0u) { blocks[wg.x] = atomicLoad(&alive); }
+}
+`;
+
+/** Compaction, pass 2: one workgroup turns the block counts into their exclusive prefix sums and the total. */
+export const LIQUID_SCAN_WGSL = /* wgsl */ `
+@group(0) @binding(0) var<storage, read_write> blocks: array<u32>;
+// blocks, unused
+@group(0) @binding(1) var<storage, read> span: array<u32>;
+var<workgroup> sums: array<u32, 256>;
+@compute @workgroup_size(256)
+fn main(@builtin(local_invocation_index) li: u32) {
+  let n = span[0];
+  let per = (n + 255u) / 256u;
+  var own = 0u;
+  for (var b = li * per; b < min(n, (li + 1u) * per); b++) { own += blocks[b]; }
+  sums[li] = own;
+  workgroupBarrier();
+  // Hillis and Steele's inclusive scan over the 256 sums.
+  for (var step = 1u; step < 256u; step *= 2u) {
+    var add = 0u;
+    if (li >= step) { add = sums[li - step]; }
+    workgroupBarrier();
+    sums[li] += add;
+    workgroupBarrier();
+  }
+  var run = sums[li] - own;
+  for (var b = li * per; b < min(n, (li + 1u) * per); b++) {
+    let c = blocks[b];
+    blocks[b] = run;
+    run += c;
+  }
+  // The total after the last block.
+  if (li == 255u) { blocks[n] = sums[255]; }
+}
+`;
+
+/**
+ * Compaction, pass 3: each block ranks its live particles in workgroup memory and copies them to their place in
+ * scratch, the drained and empty ones after the total as empty slots (NaN positions, drawn as nothing).
+ */
+export const LIQUID_SCATTER_WGSL = /* wgsl */ `${HEADER}
+@group(0) @binding(1) var<storage, read> particles: array<Particle>;
+@group(0) @binding(2) var<storage, read_write> scratch: array<Particle>;
+@group(0) @binding(3) var<storage, read> blocks: array<u32>;
+@group(0) @binding(4) var<storage, read> tally: array<u32>;
+var<workgroup> ranks: array<u32, 256>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3u) {
+  let i = id.x;
+  var keep = 0u;
+  if (i < tally[0] && particles[i].pos.w >= 0.0) { keep = 1u; }
+  ranks[li] = keep;
+  workgroupBarrier();
+  for (var step = 1u; step < 256u; step *= 2u) {
+    var add = 0u;
+    if (li >= step) { add = ranks[li - step]; }
+    workgroupBarrier();
+    ranks[li] += add;
+    workgroupBarrier();
+  }
+  if (i >= sim.counts.x) { return; }
+  let before = ranks[li] - keep;
+  let start = blocks[wg.x];
+  let total = blocks[(sim.counts.x + 255u) / 256u];
+  if (keep == 1u) {
+    scratch[start + before] = particles[i];
+  } else {
+    var e: Particle;
+    let nan = bitcast<f32>(0x7fc00000u | (i & 0u));
+    e.pos = vec4f(nan, nan, nan, -1.0);
+    e.vel = vec4f(0.0);
+    e.c0 = vec4f(0.0);
+    e.c1 = vec4f(0.0);
+    e.c2 = vec4f(0.0);
+    scratch[total + (wg.x * 256u - start) + (li - before)] = e;
+  }
+}
+`;
+
+/** Compaction, pass 4: the live count becomes the total. */
+export const LIQUID_SETTLE_WGSL = /* wgsl */ `
+@group(0) @binding(0) var<storage, read> blocks: array<u32>;
+@group(0) @binding(1) var<storage, read> span: array<u32>;
+@group(0) @binding(2) var<storage, read_write> tally: array<u32>;
+@compute @workgroup_size(1)
+fn main() {
+  tally[0] = blocks[span[0]];
 }
 `;
 
@@ -651,6 +846,12 @@ fn vertex(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> O
   var corners = array<vec2f, 6>(vec2f(-1, -1), vec2f(1, -1), vec2f(1, 1), vec2f(-1, -1), vec2f(1, 1), vec2f(-1, 1));
   let uv = corners[vi];
   let p = particles[ii];
+  var o: Out;
+  // An empty or drained slot draws nothing (a point outside the clip volume).
+  if (!(p.pos.w >= 0.0)) {
+    o.clip = vec4f(2.0, 2.0, 2.0, 1.0);
+    return o;
+  }
   let world = p.pos.xyz + (view.right.xyz * uv.x + view.up.xyz * uv.y) * view.right.w;
   var t = 0.0;
   if (view.up.w < 1.5) {
@@ -659,7 +860,6 @@ fn vertex(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> O
     // Density over rest density: 0.8 at the bottom of the ramp, 1.2 at the top.
     t = (p.pos.w - 0.8) / 0.4;
   }
-  var o: Out;
   o.clip = view.matrix * vec4f(world, 1.0);
   o.uv = uv;
   o.color = ramp(t);

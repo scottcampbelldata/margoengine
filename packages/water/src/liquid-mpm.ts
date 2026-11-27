@@ -17,8 +17,15 @@ import {
   LIQUID_DEBUG_LINES_WGSL,
   LIQUID_DEBUG_PARTICLES_WGSL,
   LIQUID_G2P_WGSL,
+  LIQUID_COMMIT_WGSL,
+  LIQUID_COUNT_WGSL,
+  LIQUID_EMIT_FLOATS,
+  LIQUID_EMIT_WGSL,
   LIQUID_GRID_WGSL,
   LIQUID_NORMALS_WGSL,
+  LIQUID_SCAN_WGSL,
+  LIQUID_SCATTER_WGSL,
+  LIQUID_SETTLE_WGSL,
   LIQUID_P2G_WGSL,
   LIQUID_SIM_FLOATS,
   LIQUID_STRESS_WGSL,
@@ -31,7 +38,10 @@ import {
   LIQUID_COLOR_OFFSET,
   LIQUID_GRID_STRIDE,
   LIQUID_PARTICLE_FLOATS,
+  advanceEmission,
+  emitterCounts,
   liquidError,
+  MAX_LIQUID_EMITTERS,
   MAX_LIQUID_MESH_SAMPLES,
   liquidSubsteps,
   MAX_LIQUID_COLLIDERS,
@@ -50,6 +60,9 @@ import {
 } from './liquid-mpm-sim.js';
 
 export {
+  MAX_LIQUID_EMITTERS,
+  emitterPoint,
+  inDrain,
   LIQUID_COLOR_OFFSET,
   LIQUID_GRID_STRIDE,
   MAX_LIQUIDS,
@@ -74,6 +87,8 @@ export type {
   LiquidCollider,
   LiquidDebugOptions,
   LiquidForce,
+  LiquidDrain,
+  LiquidEmitter,
   LiquidKindOptions,
   LiquidMeshBakeOptions,
   LiquidMeshShape,
@@ -83,6 +98,8 @@ export type {
   LiquidStats,
   LiquidVec3,
   ResolvedCollider,
+  ResolvedDrain,
+  ResolvedEmitter,
   ResolvedLiquidKind,
   ResolvedLiquidParams,
 } from './liquid-mpm-sim.js';
@@ -162,8 +179,10 @@ export class GPULiquid implements EnginePlugin {
   readonly name: string;
   /** Live options; change the pointer, colliders and debug view through their setters. */
   readonly options: GPULiquidOptions;
-  /** Particle count, fixed at construction. */
+  /** Particles at the start, fixed at construction. */
   readonly count: number;
+  /** Particle slots, the most alive at once (`capacity`, default `count`); the particle buffer holds this many. */
+  readonly capacity: number;
   /** Live statistics. */
   readonly stats: LiquidStats;
   /** The surface `attach` made, or undefined. Its `options` are live. */
@@ -180,7 +199,9 @@ export class GPULiquid implements EnginePlugin {
   private disposed = false;
   private compat = false;
   private params: ResolvedLiquidParams;
-  private pending?: Float32Array;
+  private pending?: LiquidSnapshot;
+  /** The emitters' counts and owed fractions, kept on the CPU for both backends. */
+  private emission = new Float64Array(2 * MAX_LIQUID_EMITTERS);
   private needsInit = true;
   private cpuState?: LiquidState;
   private clocked = false;
@@ -203,10 +224,31 @@ export class GPULiquid implements EnginePlugin {
   private simUniform?: GPUBuffer;
   private gridBuf?: GPUBuffer;
   private forceBuf?: GPUBuffer;
+  /** Word 0: the live particle count. */
+  private tallyBuf?: GPUBuffer;
+  private emitUniform?: GPUBuffer;
+  /** Compaction: the block counts (and total), the block count, the particles' new order. */
+  private blockBuf?: GPUBuffer;
+  private spanBuf?: GPUBuffer;
+  private scratchBuf?: GPUBuffer;
+  private readonly emitData = new ArrayBuffer(LIQUID_EMIT_FLOATS * 4);
   private debugUniform?: GPUBuffer;
   private lineBuf?: GPUBuffer;
   private lineCount = 0;
-  private compute?: { clear: Pass; p2g: Pass; stress: Pass; normals: Pass; grid: Pass; g2p: Pass };
+  private compute?: {
+    clear: Pass;
+    p2g: Pass;
+    stress: Pass;
+    normals: Pass;
+    grid: Pass;
+    g2p: Pass;
+    emit: Pass;
+    commit: Pass;
+    count: Pass;
+    scan: Pass;
+    scatter: Pass;
+    settle: Pass;
+  };
   private debugPipelines = new Map<string, [GPURenderPipeline, GPUBindGroup, GPURenderPipeline]>();
   private lineGroups = new Map<GPURenderPipeline, GPUBindGroup>();
 
@@ -235,6 +277,7 @@ export class GPULiquid implements EnginePlugin {
     this.params = resolveLiquidParams(options);
     this.options = { ...options, count: this.params.count, debug: { ...this.params.debug } };
     this.count = this.params.count;
+    this.capacity = this.params.capacity;
     this.name = `water:gpu-liquid:${++nextLiquidId}`;
     const p = this.params;
     this.stats = {
@@ -250,6 +293,8 @@ export class GPULiquid implements EnginePlugin {
       realTime: true,
       dispatches: 0,
       debugDraws: 0,
+      live: this.count,
+      capacity: this.capacity,
     };
   }
 
@@ -268,7 +313,7 @@ export class GPULiquid implements EnginePlugin {
         particles: {
           positions: buffer,
           velocities: buffer,
-          count: liquid.count,
+          count: liquid.capacity,
           stride: LIQUID_PARTICLE_FLOATS,
           offset: 0,
           velocityOffset: 4,
@@ -427,42 +472,57 @@ export class GPULiquid implements EnginePlugin {
     if (!device) throw fault('state', 'GPULiquid.snapshot needs the liquid attached; call GPULiquid.attach(engine) first');
     this.ensureResources(device);
     const steps = this.stats.steps;
-    if (this.compat) return { count: this.count, steps, particles: this.cpuState!.particles.slice() };
-    const bytes = this.count * LIQUID_PARTICLE_FLOATS * 4;
-    const staging = device.createBuffer({ size: bytes, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    const emission = this.emission.slice();
+    if (this.compat) {
+      const s = this.cpuState!;
+      return { count: this.capacity, live: s.live, steps, emission: s.emission.slice(), particles: s.particles.slice() };
+    }
+    const bytes = this.capacity * LIQUID_PARTICLE_FLOATS * 4;
+    const staging = device.createBuffer({ size: bytes + 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     try {
       const encoder = device.createCommandEncoder();
       encoder.copyBufferToBuffer(this.particleBuf!, 0, staging, 0, bytes);
+      encoder.copyBufferToBuffer(this.tallyBuf!, 0, staging, bytes, 16);
       device.queue.submit([encoder.finish()]);
       await staging.mapAsync(GPUMapMode.READ);
       signal?.throwIfAborted();
-      return { count: this.count, steps, particles: new Float32Array(staging.getMappedRange().slice(0)) };
+      const range = staging.getMappedRange();
+      const live = new Uint32Array(range, bytes, 4)[0]!;
+      this.stats.live = live;
+      return { count: this.capacity, live, steps, emission, particles: new Float32Array(range.slice(0, bytes)) };
     } finally {
       staging.destroy();
     }
   }
 
   /**
-   * Puts the liquid back to a `snapshot` of a liquid of the same count; the steps after it repeat exactly. The whole
-   * snapshot is checked (count, length, finite values, positions inside the container) before anything changes.
+   * Puts the liquid back to a `snapshot` of a liquid of the same capacity; the steps after it repeat exactly. The whole
+   * snapshot is checked (capacity, length, live count, emitters' state, the live particles' values finite, inside the
+   * container and of a liquid this one has) before anything changes; the slots past the live count are emptied.
    */
   restore(snapshot: LiquidSnapshot): void {
     this.assertAlive('restore');
     const F = LIQUID_PARTICLE_FLOATS;
     if (
       !snapshot ||
-      snapshot.count !== this.count ||
+      snapshot.count !== this.capacity ||
       !(snapshot.particles instanceof Float32Array) ||
-      snapshot.particles.length !== this.count * F ||
+      snapshot.particles.length !== this.capacity * F ||
       !Number.isSafeInteger(snapshot.steps) ||
-      snapshot.steps < 0
+      snapshot.steps < 0 ||
+      !Number.isSafeInteger(snapshot.live) ||
+      snapshot.live < 0 ||
+      snapshot.live > this.capacity ||
+      !(snapshot.emission instanceof Float64Array) ||
+      snapshot.emission.length !== 2 * MAX_LIQUID_EMITTERS ||
+      snapshot.emission.some((v) => !Number.isFinite(v) || v < 0)
     )
-      throw liquidError(`GPULiquid.restore takes a snapshot of a liquid of ${this.count} particles, from liquid.snapshot()`);
+      throw liquidError(`GPULiquid.restore takes a snapshot of a liquid of ${this.capacity} particle slots, from liquid.snapshot()`);
     const { boxMin, boxMax } = this.params;
     const data = snapshot.particles;
-    for (let i = 0; i < data.length; i++)
+    for (let i = 0; i < snapshot.live * F; i++)
       if (!Number.isFinite(data[i])) throw liquidError(`GPULiquid.restore: snapshot value ${i} is not finite`);
-    for (let i = 0; i < this.count; i++) {
+    for (let i = 0; i < snapshot.live; i++) {
       for (let a = 0; a < 3; a++) {
         const x = data[i * F + a]!;
         if (x < boxMin[a]! || x > boxMax[a]!)
@@ -472,7 +532,7 @@ export class GPULiquid implements EnginePlugin {
       if (!Number.isInteger(kind) || kind < 0 || kind >= this.params.kinds.length)
         throw liquidError(`GPULiquid.restore: particle ${i} names liquid ${kind}; this liquid has ${this.params.kinds.length}`);
     }
-    this.pending = data.slice();
+    this.pending = { ...snapshot, particles: data.slice(), emission: snapshot.emission.slice() };
     this.needsInit = true;
     this.stats.steps = snapshot.steps;
   }
@@ -564,7 +624,7 @@ export class GPULiquid implements EnginePlugin {
     requireWebGPU(engine, 'GPULiquid');
     const device = engine.gpu!;
     const limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
-    const need = Math.max(this.count * LIQUID_PARTICLE_FLOATS * 4, this.params.nodes * LIQUID_GRID_STRIDE * 4, MAX_LIQUID_MESH_SAMPLES * 4);
+    const need = Math.max(this.capacity * LIQUID_PARTICLE_FLOATS * 4, this.params.nodes * LIQUID_GRID_STRIDE * 4, MAX_LIQUID_MESH_SAMPLES * 4);
     if (need > limit)
       throw fault(
         'unsupported',
@@ -619,7 +679,7 @@ export class GPULiquid implements EnginePlugin {
       const p = this.params;
       this.particleBuf = this.buffer(
         device,
-        this.count * LIQUID_PARTICLE_FLOATS * 4,
+        this.capacity * LIQUID_PARTICLE_FLOATS * 4,
         STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
       );
       this.debugUniform = this.buffer(device, LIQUID_DEBUG_FLOATS * 4, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
@@ -631,14 +691,36 @@ export class GPULiquid implements EnginePlugin {
         this.sdfKey = [];
         this.meshFields(device);
         this.surfBuf = this.buffer(device, 16, STORAGE);
+        this.tallyBuf = this.buffer(device, 16, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
+        this.emitUniform = this.buffer(device, this.emitData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+        const blocks = Math.ceil(this.capacity / 256);
+        this.blockBuf = this.buffer(device, (blocks + 1) * 4, STORAGE);
+        this.spanBuf = this.buffer(device, 16, STORAGE | GPUBufferUsage.COPY_DST);
+        device.queue.writeBuffer(this.spanBuf, 0, new Uint32Array([blocks, 0, 0, 0]));
+        // The compaction's copy of the particles is made on the first frame with a drain.
+        this.scratchBuf = this.buffer(device, LIQUID_PARTICLE_FLOATS * 4, STORAGE);
         this.buildPasses(device);
       }
       this.needsInit = true;
     }
     if (this.needsInit) {
       const state = createLiquidState(this.params);
-      if (this.pending) state.particles.set(this.pending);
+      const pending = this.pending;
+      if (pending) {
+        state.particles.set(pending.particles);
+        state.live = pending.live;
+        state.emission.set(pending.emission);
+        for (let i = pending.live; i < this.capacity; i++) {
+          const b = i * LIQUID_PARTICLE_FLOATS;
+          state.particles.fill(0, b, b + LIQUID_PARTICLE_FLOATS);
+          state.particles[b] = state.particles[b + 1] = state.particles[b + 2] = NaN;
+          state.particles[b + 3] = -1;
+        }
+      }
       this.pending = undefined;
+      this.emission = state.emission.slice();
+      this.stats.live = state.live;
+      if (this.tallyBuf) device.queue.writeBuffer(this.tallyBuf, 0, new Uint32Array([state.live, 0, 0, 0]));
       device.queue.writeBuffer(this.particleBuf, 0, state.particles as Float32Array<ArrayBuffer>);
       this.cpuState = this.compat ? state : undefined;
       this.forceTime = 0;
@@ -654,26 +736,38 @@ export class GPULiquid implements EnginePlugin {
       grid = this.gridBuf!,
       forces = this.forceBuf!,
       particles = this.particleBuf!,
+      tally = this.tallyBuf!,
+      emit = this.emitUniform!,
+      blocks = this.blockBuf!,
+      span = this.spanBuf!,
+      scratch = this.scratchBuf!,
       sdf = this.sdfBuf!,
       surf = this.surfBuf!;
-    const pass = (code: string, buffers: GPUBuffer[]): Pass => {
+    // first: the binding of buffers[0], for a shader that leaves the simulation uniform at 0 unused.
+    const pass = (code: string, buffers: GPUBuffer[], first = 0): Pass => {
       const pipeline = device.createComputePipeline({
         layout: 'auto',
         compute: { module: device.createShaderModule({ code }), entryPoint: 'main' },
       });
       const group = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
-        entries: buffers.map((buffer, binding) => ({ binding, resource: { buffer } })),
+        entries: buffers.map((buffer, i) => ({ binding: first + i, resource: { buffer } })),
       });
       return [pipeline, group];
     };
     this.compute = {
       clear: pass(LIQUID_CLEAR_WGSL, [sim, grid]),
-      p2g: pass(LIQUID_P2G_WGSL, [sim, particles, grid]),
-      stress: pass(LIQUID_STRESS_WGSL, [sim, particles, grid, sdf]),
+      p2g: pass(LIQUID_P2G_WGSL, [sim, particles, grid, tally]),
+      stress: pass(LIQUID_STRESS_WGSL, [sim, particles, grid, sdf, tally]),
       normals: pass(LIQUID_NORMALS_WGSL, [sim, grid, surf, sdf]),
       grid: pass(LIQUID_GRID_WGSL, [sim, grid, forces, sdf, surf]),
-      g2p: pass(LIQUID_G2P_WGSL, [sim, particles, grid, forces, sdf]),
+      g2p: pass(LIQUID_G2P_WGSL, [sim, particles, grid, forces, sdf, tally]),
+      emit: pass(LIQUID_EMIT_WGSL, [sim, emit, particles, tally]),
+      commit: pass(LIQUID_COMMIT_WGSL, [emit, tally]),
+      count: pass(LIQUID_COUNT_WGSL, [particles, blocks, tally], 1),
+      scan: pass(LIQUID_SCAN_WGSL, [blocks, span]),
+      scatter: pass(LIQUID_SCATTER_WGSL, [sim, particles, scratch, blocks, tally]),
+      settle: pass(LIQUID_SETTLE_WGSL, [blocks, span, tally]),
     };
   }
 
@@ -722,9 +816,10 @@ export class GPULiquid implements EnginePlugin {
     const u = this.simU32,
       f = this.simF32;
     const [hx, hy, hz] = p.cell;
-    u.set([p.count, p.nodes, p.colliders.length, p.pointer ? 1 : 0], 0);
+    u.set([this.capacity, p.nodes, p.colliders.length, p.pointer ? 1 : 0], 0);
     u.set([p.dims[0], p.dims[1], p.dims[2], p.dims[0] * p.dims[1]], 4);
-    u.set([p.cells[0], p.cells[1], p.cells[2], 0], 8);
+    u.set([p.cells[0], p.cells[1], p.cells[2], p.drains.length], 8);
+    p.drains.forEach((d, i) => f.set([...d.position, d.enabled ? d.kind : -1, ...d.half, 0], 68 + i * 8));
     f.set([...p.origin, h], 12);
     f.set([hx, hy, hz, p.cellSize / h], 16);
     f.set([1 / hx, 1 / hy, 1 / hz, p.restDensity], 20);
@@ -755,7 +850,7 @@ export class GPULiquid implements EnginePlugin {
           ...(m ? m.center : [0, 0, 0]),
           0,
         ],
-        68 + i * 24,
+        100 + i * 24,
       );
     });
     device.queue.writeBuffer(this.simUniform!, 0, this.simData);
@@ -773,10 +868,18 @@ export class GPULiquid implements EnginePlugin {
       this.surfBuf = this.buffer(device, tension ? p.nodes * 16 : 16, GPUBufferUsage.STORAGE);
       this.compute = undefined;
     }
+    const drains = p.drains.length > 0;
+    if (drains && this.scratchBuf!.size < this.capacity * LIQUID_PARTICLE_FLOATS * 4) {
+      this.scratchBuf!.destroy();
+      this.owned.splice(this.owned.indexOf(this.scratchBuf!), 1);
+      this.scratchBuf = this.buffer(device, this.capacity * LIQUID_PARTICLE_FLOATS * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+      this.compute = undefined;
+    }
     if (!this.compute) this.buildPasses(device);
     const rt = this.compute!;
     this.writeSimUniforms(device, p, h);
-    const particleGroups = Math.ceil(this.count / 256);
+    const particleGroups = Math.ceil(this.capacity / 256);
+    const added = this.writeEmitUniforms(device, p, n * h);
     const nodeGroups = Math.ceil(p.nodes / 256);
     const pass = encoder.beginComputePass();
     const run = ([pipeline, group]: Pass, groups: number) => {
@@ -784,6 +887,12 @@ export class GPULiquid implements EnginePlugin {
       pass.setBindGroup(0, group);
       pass.dispatchWorkgroups(groups);
     };
+    let extra = 0;
+    if (added) {
+      run(rt.emit, Math.ceil(added / 256));
+      run(rt.commit, 1);
+      extra += 2;
+    }
     for (let s = 0; s < n; s++) {
       run(rt.clear, nodeGroups);
       run(rt.p2g, particleGroups);
@@ -792,10 +901,43 @@ export class GPULiquid implements EnginePlugin {
       run(rt.grid, nodeGroups);
       run(rt.g2p, particleGroups);
     }
+    if (drains) {
+      // Compaction: count each block, scan the counts, scatter the kept particles in order, settle the live count.
+      run(rt.count, particleGroups);
+      run(rt.scan, 1);
+      run(rt.scatter, particleGroups);
+      run(rt.settle, 1);
+      extra += 4;
+    }
     pass.end();
+    if (drains) encoder.copyBufferToBuffer(this.scratchBuf!, 0, this.particleBuf!, 0, this.capacity * LIQUID_PARTICLE_FLOATS * 4);
     this.stats.steps += n;
-    this.stats.dispatches = (tension ? 6 : 5) * n;
+    this.stats.dispatches = (tension ? 6 : 5) * n + extra;
     this.forceTime += n * h;
+  }
+
+  /**
+   * The emit pass's uniform for a frame of dt seconds; advances the emitters' counts and returns the particles they add
+   * (the GPU adds them while there is room).
+   */
+  private writeEmitUniforms(device: GPUDevice, p: ResolvedLiquidParams, dt: number): number {
+    if (!p.emitters.length) return 0;
+    const counts = emitterCounts(p, this.emission, dt);
+    const f = new Float32Array(this.emitData),
+      u = new Uint32Array(this.emitData);
+    let total = 0;
+    p.emitters.forEach((e, k) => {
+      const o = 8 + k * 24;
+      const kind = p.kinds[e.liquid]!;
+      f.set([...e.position, e.radius, ...e.velocity, e.liquid, ...e.u, e.ring, ...e.w, 0, ...kind.color, 0], o);
+      u.set([total, this.emission[k]! % e.ring, counts[k]!, 0], o + 20);
+      total += counts[k]!;
+    });
+    u.set([p.emitters.length, total, this.capacity, 0], 0);
+    f.set([dt, 0, 0, 0], 4);
+    advanceEmission(p, this.emission, dt, counts);
+    if (total) device.queue.writeBuffer(this.emitUniform!, 0, this.emitData);
+    return total;
   }
 
   /** Steps the CPU twin and uploads its particles (the WebGL2 layer's route). */
@@ -805,6 +947,7 @@ export class GPULiquid implements EnginePlugin {
     const { h } = liquidSubsteps(p, dt, cap);
     this.stats.steps += n;
     this.stats.dispatches = 0;
+    this.stats.live = state.live;
     this.forces = this.decodeForces((i) => state.impulses[i]!, 6, p.colliders.length, n * h);
     this.deliver((i) => state.impulses[i]!, 6, p.colliders.length, this.links, this.links.map((l) => l.center));
     device.queue.writeBuffer(this.particleBuf!, 0, state.particles as Float32Array<ArrayBuffer>);
@@ -928,7 +1071,7 @@ export class GPULiquid implements EnginePlugin {
     applyView(pass, c);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
-    pass.draw(6, this.count);
+    pass.draw(6, this.capacity);
     pass.end();
     this.stats.debugDraws++;
     if (this.engine) this.engine.stats.drawCalls++;
@@ -1080,6 +1223,7 @@ export class GPULiquid implements EnginePlugin {
     for (const resource of this.owned) resource.destroy();
     this.owned = [];
     this.particleBuf = this.simUniform = this.gridBuf = this.forceBuf = this.debugUniform = this.lineBuf = this.sdfBuf = this.surfBuf = undefined;
+    this.tallyBuf = this.emitUniform = this.blockBuf = this.spanBuf = this.scratchBuf = undefined;
     this.sdfKey = [];
     this.pulling = undefined;
     this.forceTime = 0;

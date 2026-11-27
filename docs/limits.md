@@ -8334,6 +8334,12 @@ each) on a grid of at most 4,194,304 nodes (16 B each), 8 to 256 cells along the
   little, raise `viscosity` to settle sooner). The top layer reads under rest density and carries no pressure, so a free
   surface sinks into the liquid by about a cell. A stiffer liquid needs a higher `speedOfSound` and proportionally more
   substeps.
+- Up to 4 emitters and 4 drains, and at most `capacity` particles alive (1,048,576); an emitter adds nothing while the
+  liquid is full. An emitter is a disc nozzle that places its particles at the jet's velocity; it is not a pressure
+  inlet (it does not hold a flow rate against the liquid's back pressure) and a drain is not an outlet with a pressure:
+  it removes what the flow carries into it, so the efflux through a drain is set by the liquid's own motion, not by an
+  orifice law. Each frame with a drain runs four compaction dispatches and copies the particle buffer once
+  (`capacity` * 80 bytes). Empty slots hold NaN positions, which the surface and debug view draw as nothing.
 - Up to 4 liquids, each with its own density, viscosity and colour, all at one speed of sound and on one grid; no
   two-phase air, no spray or foam of its own (the surface's `whitewater` can draw them from the particles' velocities).
   The liquids do not dissolve into each other: a particle keeps its liquid's density and viscosity, and `mixing` blends
