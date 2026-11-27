@@ -3,8 +3,10 @@
 //! Taubman, "High performance scalable image compression with EBCOT" (IEEE Trans. Image Processing 9(7), 2000,
 //! https://doi.org/10.1109/83.847830). No other decoder's source was read.
 pub mod codestream;
+pub mod dwt;
 pub mod geometry;
 pub mod mq;
+pub mod recon;
 pub mod t1;
 pub mod tier2;
 pub mod tile;
