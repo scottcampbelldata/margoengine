@@ -1317,7 +1317,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,354 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,358 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -6281,6 +6281,8 @@ in `packages/cad/test/cad-limits.test.js`).
 | Getting up (`@margoengine/ragdoll/getup`, 2026-11-06) | By method: two clips, chosen at the root bone only, so a body on its side takes whichever is nearer. `root` is a top-level node. The character turns about the up axis only and the blend covers the rest; a limb far from the clip's pose crosses the body during the blend, with no collision. Not proven on an authored get-up clip: none is in the repository, so the proof plays the rig's Death_A and Death_B backward (stand-in clips, real rig, real physics). |
 | Body shapes from the skin (`@margoengine/ragdoll/hulls`, 2026-11-06) | By method: one skin is read, the first that holds the root bone, since skins have separate bind spaces. A bone the skin has no bind pose for keeps its capsule. Vertices shared evenly by bones count for none at the default `minWeight`, so a hull can stop short of a joint. A hull is convex: a bone that carries a concave part overshoots into the hollow. The box lies along the bone, the smallest over 18 turns 5 degrees apart. Measured on Knight.glb, ray silhouette overlap with the mesh over a front and a side view: capsules 0.13, boxes 0.65, hulls 0.93; on Fox.glb, capsules 0.43, hulls 0.78. Thicker shapes reach the floor sooner: with limits the body cannot meet lying down, such as the default quarter-turn cone on a T-posed arm, a limit and a contact fight and the limb keeps moving (hand at about 0.8 m/s after 16 s on Knight.glb, limits held to under 1 rad over). Skipping the limit correction on touching limbs settled it, but let a spine fold 2.3 rad past its limit, so it is not done; give a fitted body limits it can reach (`swing` 2.5 settles under 0.05 m/s). |
 | Saved profiles (`@margoengine/ragdoll/profile`, 2026-11-06) | By method: bones bind by node name, so a renamed rig needs its profile edited. Limits are measured from the pose the ragdoll is built in, so a profile fits only that pose; the humanoid preset reads a T or A pose and its hinges and ranges are wrong for any other. One cone per joint is narrower than a real shoulder or hip in some directions and wider in others. Mass shares are one published adult male table, de Leva 1996. A hinge is a knee or an elbow only: spines, shoulders and ankles are cones. Proved on Knight.glb, with Mixamo names only as stand-in names on the same rig. |
+| Character-ragdoll bridge (`@margoengine/ragdoll/character`, 2026-11-27) | By method: the capsule takes one collision group of the 16 (default 14, or the highest the ragdoll leaves free), so a ragdoll that fills all 16 is refused. A knockdown hands the fall the velocities the hit boxes had at the last step, so a character that stopped walking a step before is hit standing still. Recovery puts the capsule on the first fixed surface under the hips (a raycast of 100 m), and with no get-up clip blends the bones back where they lie. The bridge keeps no state in a physics snapshot: a restore needs the bridge in the state it had then. |
+| Shared physics debug view (`@margoengine/physics/debug-view`, 2026-11-27) | Enforced: a positive `width`, a live world attached to the engine. By method: everything is drawn as one segment line of `@margoengine/lines`, which needs WebGPU: on the WebGL2 compatibility layer `attach` rejects with Lines' coded `webgpu` error, so pass a `sink` and draw `collect()`'s buffers yourself (one `gl.drawArrays(gl.LINES, ...)`). Lines are rebuilt each frame on the CPU from every source, so a large world costs a buffer copy a frame; no speed figure yet (speed phase). Shapes other than spheres, boxes, capsules, cylinders and cones draw as the box around them, as `physics.debugRender` does. |
 | Balance (`@margoengine/ragdoll/balance`, 2026-11-06) | By method: it stands on joint torques alone by default, every one a pair inside the body with the ankle held to what the sole answers; `carry` is an outside force, off unless set. It adds inertia to feet and shins (0.012 of the whole mass times the leg's length squared) brings the character's island to 8 solver passes at the least, and gives a hull foot a flat sole of four corners while it balances. Its torques are forces through the whole step, so a world set above 8 only helps: over 24 roundings at 8, 10 and 16 passes no figure steps late or falls, and no hips drift 0.0020 m. A stance knee takes its torque from the balance with a spring beside it that has no damper and grows with how far the knee is off its bend, full at 0.15 rad, so `motors.setStrength` does not reach it. It stands and steps at the heading it was added at: no turning or walking. Flat ground only, at the height of the feet; no stairs or slopes. `motors.hit` weakens a limb's motor, not the balance torques, which follow the global `strength` only. Measured over 24 hull roundings each at 8 passes: all seven figures settle with no step after the first second, at 0.0006 m/s at most. Worst drift of the hips over five seconds: Knight.glb 0.0009 m, Barbarian 0.0004, Ranger 0.0006, Rogue 0.0010, Mage 0.0003, Seed-san 0.0019, RiggedFigure 0.0005; no foot slides more than 0.0012 m. On 96 other roundings at 8 passes one Seed-san foot slid 0.0020 m and 8 of the 672 figure runs shook a bone over 0.005 m/s; at 10, 16 and 20 passes none did (known-bugs.md, "A standing figure can shake"). Pushes of 1.5 m/s in four directions over 32 roundings on Knight.glb: 125 of 128 pass the push test's reading and none fall; the old assist passed 122 and fell in none, holding about half the weight from outside. The other three are still stepping six seconds after the push and stand still by fourteen. Those 128 pushes at 8 / 10 / 16 passes, failing the reading / falling within four seconds: Knight 3/0, 1/0, 7/0; Rogue 1/0, 4/0, 2/0; Ranger 7/0, 8/0, 8/0; Mage 21/0, 25/0, 13/0; Barbarian 29/9, 36/14, 43/30; RiggedFigure 96/95, 92/88, 96/96; Seed-san 113/108, 121/120, 128/128. Falls in 128 pushes at 8 passes at 0.5 / 1 / 1.5 m/s: Knight, Ranger, Rogue and Mage 0 / 0 / 0, Barbarian 0 / 8 / 9, RiggedFigure 60 / 63 / 95, Seed-san 69 / 93 / 108, so only the first four stay up at 1.5 m/s and RiggedFigure and Seed-san do not reliably take 0.5 (known-bugs.md, "A push throws"). Not measured: speed, including the cost of the added passes. |
 | Uneven bone scales in ragdolls (`@margoengine/ragdoll`, 2026-11-06) | Enforced: zero and mirrored bones are refused. By method: any positive scale is taken. Bodies are rigid and sized in world units when the ragdoll is built, so a scale animated afterwards does not resize them. A bone's own uneven scale costs nothing: a fall with a stretched spine matches the same rig built unstretched to under 1 mm. A bone turned under an uneven scale above it is skewed, so the bones drawn below it stretch as it turns, as in IK, while the bodies keep their joint distance; the pose holds exactly where the bone went limp and drifts from its body as it turns away. A hull fitted to a skewed bone takes the scales of the bone's axes and not the skew. Proved on Seed-san's own scales (`hair_E`, 0.9995, 1, 0.9986); scales as large as 0.1, 3, 40 only on a stand-in rig. |
 | Swept collision (`@margoengine/kinematics-constraints/swept`, 2026-11-06) | By method: colliders hold still during a check, so a moving obstacle needs its own stepping. The path checked is the shortest arc per bone for a chain, and the shortest arc about the hull's origin for a hull; if your animation plays another path, this one is certified, not yours. A contact is any gap at or below `minClearance` plus `tolerance` (1e-4), and a motion that starts there stops at time 0, so keep `minClearance` below the gap the pose was solved with. A gap of `d` and a speed bound of `s` give a step of `d / s`, so a motion that grazes a surface for a long way takes many steps: past the budget of 4,096 poses it ends `exhausted`, which is not clear; raise `maxSteps` or `tolerance`. |
@@ -15580,6 +15582,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   publishes only the accepted body reactions. Use this factory for changing wetness.
   `packages/physics/tests/coupling/loads-paddle.test.js` and `loads-wading.test.js` check wet momentum,
   drying rejection and replay.
+
+### Open 2026-11-27: a limp ragdoll's spine is drawn 7 cm off its body after a 3 s fall (KB-RAGDOLL-LIMPDRAW1, ragdoll or physics)
+
+- **Repro:** `node --test --test-name-pattern="limp: the ragdoll falls" packages/ragdoll/tests/ragdoll.test.js` on main at
+  256a80a04, with the DYN-07 changes taken out and physics and ragdoll rebuilt: "spine drawn at its body: 0.069 is not 0
+  within 0.02". The other 98 ragdoll tests pass.
+- **Cause:** not found yet. Found while landing DYN-07 (the debug view and the character bridge), which does not change it:
+  the same assertion fails with and without those changes. The node's drawn position and its body's position part after
+  the fall, so either the joint holding the spine to the hips drifts (a physics change on main since the test last passed)
+  or the pose written into the bones lags the bodies.
+- **Next:** bisect `packages/physics/src` on main for the commit where the test turned red, then fix it in the package that
+  owns it with this test as the regression.
 
 ### Open 2026-11-27: a towed flexible pipe's in-line vortex-induced vibration is an order short of the measurement (KB-PHYS-RODVIVIL1, physics loads)
 
@@ -40346,37 +40360,20 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
-## Sediment transport and bed change
-
-`@margoengine/physics/sediment` reads shallow-water depth and discharge and routes suspended and bedload sediment.
-It contributes the Exner elevation change to the same TerrainBed. Water then runs over the updated surface.
+## Character controller quick start
 
 ```ts
-import { TerrainBed } from '@margoengine/physics/earth';
-import { ShallowWaterSolver } from '@margoengine/physics/hydro';
-import { SedimentTransport } from '@margoengine/physics/sediment';
-import { PhysicsWorld } from '@margoengine/physics/world';
-
-const grid = { columns: 4, rows: 2, width: 16, depth: 8, centre: [8, 4] as const };
-const terrain = new TerrainBed();
-const sediment = await SedimentTransport.load();
-const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-world.add(terrain, { ...grid, elevations: () => 0 });
-world.add(new ShallowWaterSolver(), {
-  bed: terrain.bed,
-  depth: 1,
-  velocity: () => [1, 0],
-  sides: { maxX: 'open' },
-});
-world.add(sediment, {
-  grid,
-  mobileDepth: 0.1,
-  grainDiameter: 0.0003,
-  open: { maxX: true },
-});
-world.advance(120);
-console.log(sediment.read(1, 0), sediment.budget, terrain.volume());
+import { Physics } from '@margoengine/physics';
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
+const body = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0.9, 0], colliders: { shape: 'capsule', halfHeight: 0.5, radius: 0.3 } });
+const controller = physics.createCharacterController(body, { applyImpulsesToDynamicBodies: true, characterMass: 70 });
+const step = controller.move([0.08, -0.16, 0]);
+console.log(step.grounded, controller.debugRender().vertices.length);
 ```
+
+## Debug view (`@margoengine/physics/debug-view`)
 
 [README continues: https://margoengine.com/llms/packages/physics.md]
 
@@ -40440,6 +40437,22 @@ capsule body per bone, joined at the bone origins with swing and twist limits. W
 bodies follow the bones as kinematic hit boxes that push the world; `activate()` makes it limp, keeping the momentum the
 animation gave each bone; `deactivate(seconds)` blends the bones back to the animation. Core and physics stay the same
 size: an app that does not import this package ships none of it.
+
+## Quick start
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Physics } from 'margoengine/physics';
+import { Ragdoll } from 'margoengine/ragdoll';
+await Physics.load();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine);
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb');
+Ragdoll.attach(physics, { root: model.nodes.find((n) => n.name === 'hips')! }).activate();
+```
+
+## Full animated ragdoll example
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
@@ -40505,12 +40518,6 @@ const custom = Ragdoll.attach(physics, {
 ```
 
 ## Joints
-
-| Joint | Meaning |
-| --- | --- |
-| `{type: 'cone', swing, twist}` | A ball joint. The bone stays inside a cone of half angle `swing` radians around its rest direction and twists about its own axis between `twist[0]` and `twist[1]` radians. Shoulders, hips, spine, neck. Defaults `swing` π/4, `twist` [-π/6, π/6]. |
-| `{type: 'hinge', axis, limits}` | One axis of rotation, `axis` in the bone's local frame, turning between `limits` radians from the rest pose. Knees, elbows. Default `limits` [-3π/4, 0]. Built as a revolute joint with both frames lined up at rest. |
-| `{type: 'free'}` | A ball joint with no limits. |
 
 [README continues: https://margoengine.com/llms/packages/ragdoll.md]
 
