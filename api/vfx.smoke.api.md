@@ -49,6 +49,11 @@ export class Smoke implements EnginePlugin {
     [Symbol.dispose](): void;
 }
 
+export interface SmokeGallery {
+    axis: 'x' | 'z';
+    walls: readonly [number, number];
+}
+
 export interface SmokeOptions {
     position?: Vec3;
     fire?: SmokeSource;
@@ -57,6 +62,7 @@ export interface SmokeOptions {
     airTemperature?: number;
     stability?: number;
     ceiling?: number;
+    gallery?: SmokeGallery;
     wind?: VFXWind;
     lifetime?: number;
     rate?: number;

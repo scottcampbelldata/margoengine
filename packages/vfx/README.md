@@ -1115,16 +1115,23 @@ console.log(Object.keys(SMOKE_LOOKS).join(', ')); // campfire, houseFire, wildfi
   (`ceilingJetSpeed`, Alpert 1972: 0.96 (Q / H)^(1/3) m/s by the axis, 0.195 Q^(1/3) H^(1/2) / r^(5/6) beyond; the
   layer takes the speed a ceiling height out), held at their height as a buoyant layer. `smoke.column(t)` gives the
   stopped rise and radius. Without it a column in a tunnel climbs through the rock and its old puffs, tens of metres
-  wide, hide the fire (KB-VFX-SMOKEROOF1). The layer runs out in every direction (walls only hide it), and far along it
-  the puffs read one by one (KB-VFX-ROOFDOTS1). Measured on an RTX A6000, WebGPU and the WebGL2 layer
-  (`smoke-check.mjs`): no puff over the roof by more than 4 mm.
+  wide, hide the fire (KB-VFX-SMOKEROOF1).
+- In a tunnel, a corridor or a mine drift, give the two walls too: `gallery: {axis: 'x' | 'z', walls: [low, high]}`
+  (default none; needs a `ceiling`; `axis` is the world axis the gallery runs along, `walls` the world coordinates on
+  the other horizontal axis). The layer turns along the gallery both ways (Delichatsios 1981) at the speed the ceiling
+  jet has where it meets the walls, fills it from wall to wall, and passes neither. Without walls the layer runs out as
+  a disc, whose puffs thin as 1 / distance and far from the fire show one by one (KB-VFX-ROOFDOTS1). The walls are
+  endless flat faces along the whole axis: side drifts, doors and bends are not followed. Measured on an RTX A6000,
+  WebGPU and the WebGL2 layer (`smoke-check.mjs`): no puff over the roof or past a wall by more than 4 mm, and 150 puffs
+  covering 37 m of a 5 m gallery with no stretch over 1.2 m without one (puff radius 0.85 m).
 
   ```ts
   import {Smoke, ceilingJetSpeed} from 'margoengine/vfx/smoke';
   import {Engine} from 'margoengine/core';
 
   const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
-  const smoke = Smoke.attach(engine, {position: [0, 1.6, 0], ceiling: 3.2, heat: 2e5, radius: 0.4});
+  const smoke = Smoke.attach(engine, {position: [0, 1.6, 0], ceiling: 3.2, heat: 2e5, radius: 0.4,
+    gallery: {axis: 'x', walls: [-2.8, 2.8]}});
   console.log(smoke.column(30).rise.toFixed(2)); // 1.08
   console.log(ceilingJetSpeed(1e6, 3).toFixed(2)); // 1.35
   ```

@@ -231,9 +231,31 @@ test('fauld-tunnels: smoke underground stops at the roof, over every fire of the
     ];
   assert.ok(burning.length >= 3);
   for (const [x, z, scale] of burning) {
-    const smoke = m.fauldFireSmoke(x);
+    const smoke = m.fauldFireSmoke(x, 0);
     assert.equal(smoke.ceiling, m.fauldRoofHeight(x));
     assert.ok(z + Math.min(3, 1.6 * scale) < smoke.ceiling, 'every flame stands under its roof');
     assert.ok(Math.max(...smoke.color) < 0.1, 'sooty smoke');
   }
+});
+
+// KB-VFX-ROOFDOTS1: each fire's smoke runs along its own gallery, so every fire stands between that gallery's walls.
+test('fauld-tunnels: every fire of the fire state stands between its gallery walls', () => {
+  const plan = [
+    ...m
+      .dressState('fire')
+      .fx.filter((f) => f[1] === 'fire')
+      .map((f) => [f[2], f[3], f[4]]),
+    ...m.stateLights('fire').fires.map((f) => f.at),
+  ];
+  assert.ok(plan.length >= 3);
+  for (const [px, py, pz] of plan) {
+    const [x, , z] = m.toWorld(px, py, pz),
+      { axis, walls } = m.fauldFireSmoke(x, z).gallery,
+      across = axis === 'x' ? z : x;
+    assert.ok(walls[0] < across && across < walls[1], `fire at ${x}, ${z} between ${walls}`);
+  }
+  assert.deepEqual(m.fauldGallery(125, 23), { axis: 'z', walls: [122.35, 127.65] });
+  const aisle = m.fauldGallery(60, 5.6);
+  assert.equal(aisle.axis, 'x');
+  assert.ok(Math.abs(aisle.walls[0] - 2.8) < 1e-9 && Math.abs(aisle.walls[1] - 8.4) < 1e-9, 'the aisle between piers');
 });

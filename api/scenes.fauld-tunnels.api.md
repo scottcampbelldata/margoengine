@@ -107,10 +107,16 @@ export function dressState(state: FauldTunnelState): {
     fx: readonly FxRow[];
 };
 
-export function fauldFireSmoke(x: number): {
+export function fauldFireSmoke(x: number, z: number): {
     ceiling: number;
+    gallery: ReturnType<typeof fauldGallery>;
     color: [number, number, number];
     opacity: number;
+};
+
+export function fauldGallery(x: number, z: number): {
+    axis: 'x' | 'z';
+    walls: [number, number];
 };
 
 export function fauldRoofHeight(x: number): number;

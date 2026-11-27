@@ -35,6 +35,19 @@ try {
   console.log(
     `ok smoke roof: ${roof.count} puffs, ${roof.over.toFixed(4)} m over, ${roof.under.toFixed(3)} m off the layer, out to ${roof.far.toFixed(1)} m`,
   );
+  const gallery = await page.evaluate(() => window.check.gallery());
+  assert.deepEqual(gallery.errors, [], 'GPU errors in a gallery');
+  assert.ok(gallery.count >= 90 && gallery.settled >= 50, `puffs in the gallery: ${JSON.stringify(gallery)}`);
+  assert.ok(
+    gallery.over <= 0.01 && gallery.past <= 0.01,
+    `a puff passed the roof or a wall: ${JSON.stringify(gallery)}`,
+  );
+  assert.ok(gallery.back <= -5 && gallery.ahead >= 5, `the layer did not run both ways: ${JSON.stringify(gallery)}`);
+  assert.ok(gallery.width >= 2.5, `the layer stayed a thin line in a 5 m gallery: ${JSON.stringify(gallery)}`);
+  assert.ok(gallery.gap <= 2 * gallery.layer, `the layer broke into separate puffs: ${JSON.stringify(gallery)}`);
+  console.log(
+    `ok smoke gallery: ${gallery.count} puffs, ${gallery.past.toFixed(4)} m past a wall, ${gallery.back.toFixed(1)} to ${gallery.ahead.toFixed(1)} m along, ${gallery.width.toFixed(2)} m across, widest gap ${gallery.gap.toFixed(3)} m (puff radius ${gallery.layer.toFixed(2)} m)`,
+  );
   const repeat = await page.evaluate(() => window.check.repeat());
   assert.equal(repeat.differing, 0, `two runs differ: ${JSON.stringify(repeat)}`);
   console.log(`ok smoke repeat: ${repeat.floats} floats the same`);

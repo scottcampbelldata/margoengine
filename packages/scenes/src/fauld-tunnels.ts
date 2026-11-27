@@ -175,13 +175,36 @@ const TUNGSTEN = TUNGSTEN_2700;
 export function fauldRoofHeight(x: number): number {
   return x > 118 ? 3.2 : 3.39;
 }
+/** The vaults and aisles run along x, their rows 5.6 m apart (the plan); half that is a bay's half width. */
+const AISLE_PITCH = 5.6;
+/** The old roadway's timber legs, the faces of its walls (world x; the plan's `tset` rows). */
+const ROADWAY_WALLS = [122.35, 127.65] as const;
 /**
- * The smoke column of a fire underground at `x` metres: it stops at the roof and runs out under it
- * (`Smoke`'s `ceiling`), dark, as bitumen and munitions packing burn sooty.
- * @example fauldFireSmoke(125).ceiling; // 3.2
+ * The gallery round a place of the store (world metres): the old roadway (x past 118, running along z) or the vault
+ * bay or aisle along x whose centre line is nearest.
+ * @example fauldGallery(60, 5.6).walls; // [2.8, 8.4]
  */
-export function fauldFireSmoke(x: number): { ceiling: number; color: [number, number, number]; opacity: number } {
-  return { ceiling: fauldRoofHeight(x), color: [0.08, 0.075, 0.07], opacity: 0.35 };
+export function fauldGallery(x: number, z: number): { axis: 'x' | 'z'; walls: [number, number] } {
+  if (x > 118) return { axis: 'z', walls: [...ROADWAY_WALLS] };
+  const row = Math.round(z / AISLE_PITCH);
+  return { axis: 'x', walls: [(row - 0.5) * AISLE_PITCH, (row + 0.5) * AISLE_PITCH] };
+}
+/**
+ * The smoke column of a fire underground at `(x, z)` world metres: it stops at the roof and runs along the gallery
+ * under it (`Smoke`'s `ceiling` and `gallery`, {@link fauldGallery}), dark, as bitumen and munitions packing burn
+ * sooty.
+ * @example fauldFireSmoke(125, 23).ceiling; // 3.2
+ */
+export function fauldFireSmoke(
+  x: number,
+  z: number,
+): { ceiling: number; gallery: ReturnType<typeof fauldGallery>; color: [number, number, number]; opacity: number } {
+  return {
+    ceiling: fauldRoofHeight(x),
+    gallery: fauldGallery(x, z),
+    color: [0.08, 0.075, 0.07],
+    opacity: 0.35,
+  };
 }
 /** The detonation flash of the blast state, candela (see the blast lamps in `attach`). */
 export const BLAST_FLASH_CD = 1.9e6;
@@ -590,7 +613,7 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
           lights: groups,
           depth: () => stack.depthTexture,
           // Underground the fire's smoke stops at the roof and runs out under it; in the open yard it climbs.
-          ...(yard ? {} : { smoke: { ...fauldFireSmoke(x), depth: () => stack.depthTexture } }),
+          ...(yard ? {} : { smoke: { ...fauldFireSmoke(p[0], p[2]), depth: () => stack.depthTexture } }),
         }),
       );
     else if (yard)

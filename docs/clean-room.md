@@ -11337,6 +11337,14 @@ point at the column's source softened over its radius, the 1,000 W/m^2 to sun-in
 front's column defaults (300 s life, 16 puffs a second, stability 1.5e-4 / s^2, colour [0.24, 0.22, 0.2] at 0.6, the
 source radius of the burning ground clamped to 2 to 60 m, the source at the flame tops).
 
+Added 2026-11-27, a layer between two walls (KB-VFX-ROOFDOTS1):
+
+- M. A. Delichatsios, "The flow of fire gases under a beamed ceiling", Combustion and Flame 43, 1-10, 1981,
+  https://doi.org/10.1016/0010-2180(81)90002-X (abstract and citing summaries read; the full text was not available).
+  Used: between beams or walls the radial ceiling jet passes a transition into a one-dimensional channel flow. Margo's
+  own simplifications: the channel flow keeps Alpert's radial speed at the half width (no further decay, no density
+  jump), and a fan of 0.35 across to along fills the width.
+
 ## Avalanche: weather/avalanche (2026-11-17)
 
 Written from the papers' text and equations only; no other engine's or tool's code was read. Sources: S. B. Savage

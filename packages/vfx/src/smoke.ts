@@ -14,6 +14,10 @@
 //   1972, https://doi.org/10.1007/BF02590543: where a fire's plume meets a flat ceiling H metres over it, it turns into
 //   a jet that runs out under the ceiling at 0.96 (Q / H)^(1/3) m/s within r / H 0.15 of the axis and
 //   0.195 Q^(1/3) H^(1/2) / r^(5/6) beyond (Q the fire's heat release, kW).
+// - M. A. Delichatsios, "The flow of fire gases under a beamed ceiling", Combustion and Flame 43, 1-10, 1981,
+//   https://doi.org/10.1016/0010-2180(81)90002-X: between two walls (a corridor, a beam channel) the radial ceiling jet
+//   turns along the channel into a one-dimensional flow, which no longer thins as 1 / distance. Here it keeps the speed
+//   Alpert's radial jet has where it meets the walls (continuity at constant width and depth).
 //
 // The column's rise at age t is the lower of the calm plume (MTT, from a virtual origin z0 = r0 / ((6/5) alpha) below
 // a source of radius r0) and the bent-over plume (Briggs, x = U t, from the virtual origin where gamma z = r0), capped
@@ -74,6 +78,11 @@ const ROOF_HALF = 1e5;
  * stratified, so a puff stirred out of it returns. With the drag of 4 a second the return is critically damped.
  */
 const LAYER_STIFFNESS = (STILL_AIR_DRAG * STILL_AIR_DRAG) / 4;
+/**
+ * The across-gallery share of the jet's direction: puffs leave the plume in a narrow fan, which fills the gallery from
+ * wall to wall within a few widths, and run along it.
+ */
+const GALLERY_SPREAD = 0.35;
 /** Seconds over which the roof's forces come on after a puff arrives. */
 const ARRIVE_RAMP = 0.5;
 /** Samples of the speed and size curves over a puff's life (the most `overLife` takes). */
@@ -234,15 +243,28 @@ export function ceilingJetSpeed(heat: number, height: number, distance = height)
  * Where a column under a roof stops rising, `headroom` metres over its source: the rise at which the plume, widening by
  * (6/5) alpha a metre from the source radius, has its top at the roof, and that radius, the smoke layer's.
  */
-function underRoof(headroom: number, radius: number): { rise: number; radius: number } {
+function underRoof(headroom: number, radius: number, halfWidth: number): { rise: number; radius: number } {
   const spread = 1.2 * PLUME_ENTRAINMENT,
     rise = Math.max(0, (headroom - radius) / (1 + spread));
-  return { rise, radius: radius + spread * rise };
+  // A layer between walls is no wider than the gallery.
+  return { rise, radius: Math.min(halfWidth, radius + spread * rise) };
 }
+
+/** A huge box that stands for one face: the roof, or a gallery wall. */
+interface Slab {
+  kind: 'box';
+  center: [number, number, number];
+  halfSize: [number, number, number];
+}
+const slab = (): Slab => ({ kind: 'box', center: [0, 0, 0], halfSize: [ROOF_HALF, ROOF_HALF, ROOF_HALF] });
 
 /** The roof as an obstacle and the node constants of the layer under it, all rewritten in place each frame. */
 interface Roof {
-  readonly box: { kind: 'box'; center: [number, number, number]; halfSize: [number, number, number] };
+  readonly box: Slab;
+  /** The gallery's two walls; undefined under an open roof. */
+  readonly walls: readonly [Slab, Slab] | undefined;
+  /** The jet's direction mask: [1, 0, 1] radial, or mostly along the gallery. */
+  readonly spread: [number, number, number];
   /** Minus the layer's centre over the source. */
   readonly from: [number, number, number];
   /** Minus the age at which a puff arrives in the layer, seconds. */
@@ -271,8 +293,8 @@ const layerNodes = (roof: Roof): VFXNodes['graph'] => [
   { op: 'max', inputs: [11, 12] },
   { op: 'const', value: 1 },
   { op: 'min', inputs: [13, 14] },
-  // 16..20: outward from the axis
-  { op: 'const', value: [1, 0, 1] },
+  // 16..20: outward from the axis, mostly along the gallery between two walls
+  { op: 'const', value: roof.spread },
   { op: 'mul', inputs: [6, 16] },
   { op: 'normalize', inputs: [17] },
   { op: 'const', value: roof.push },
@@ -299,6 +321,14 @@ export interface SmokeSource {
 /** Where a fire's flames are and the wind they lean in. */
 const flameOf = (fire: SmokeSource | undefined): { position?: Vec3; wind?: VFXWind } | undefined =>
   (fire?.particles.flames?.options as { position?: Vec3; wind?: VFXWind } | undefined) ?? fire?.flame?.options;
+
+/** The walls of a gallery under a roof ({@link SmokeOptions.gallery}). */
+export interface SmokeGallery {
+  /** The world axis the gallery runs along. */
+  axis: 'x' | 'z';
+  /** The world coordinates of its two walls on the other horizontal axis (z for `axis: 'x'`), the lower first. */
+  walls: readonly [number, number];
+}
 
 /**
  * `Smoke.attach` settings. `position` or `fire` is required. Read every frame (change a field and the next frame shows
@@ -332,6 +362,12 @@ export interface SmokeOptions {
    * and its old puffs, metres wide, hide what is under it).
    */
   ceiling?: number;
+  /**
+   * Two walls under the `ceiling`: a tunnel, a corridor, a mine drift. The layer turns along the gallery in both
+   * directions instead of running out as a disc, so it stays dense far from the fire; no puff passes a wall or grows
+   * wider than the gallery. Chosen at attach with a `ceiling`; its fields are read every frame. Default none.
+   */
+  gallery?: SmokeGallery;
   /**
    * The wind, `[x, z]` m/s or `{sample(x, y, z, t)}` (a `WindField` fits): the column bends over by Briggs' law and
    * leans atan(U / w). Default none, and then a `WeatherDrive` in the scene writes the weather's wind; a wind given
@@ -420,7 +456,7 @@ export class Smoke implements EnginePlugin {
   private readonly speed: number[] = new Array(SAMPLES).fill(1);
   private readonly size: number[] = new Array(SAMPLES).fill(1);
   private readonly point: PlumePoint = { rise: 0, speed: 0, radius: 0, bent: false, level: false };
-  private readonly key = [NaN, NaN, NaN, NaN, NaN, NaN];
+  private readonly key = [NaN, NaN, NaN, NaN, NaN, NaN, NaN];
   private readonly velocity: [number, number, number] = [0, 0, 0];
   private readonly extent: [number, number, number] = [0, 0, 0];
   private readonly rgba: [number, number, number, number] = [0, 0, 0, 0];
@@ -437,11 +473,15 @@ export class Smoke implements EnginePlugin {
     if (fire && !fire.particles?.flames && !fire.flame?.options)
       throw new TypeError('Invalid Smoke fire; pass a Fire from @margoengine/vfx/fire');
     this.options = options;
+    if (options.gallery !== undefined && options.ceiling === undefined)
+      throw new TypeError('Smoke gallery needs a ceiling; pass the roof as ceiling with the walls');
     this.roof =
       options.ceiling === undefined
         ? undefined
         : {
-            box: { kind: 'box', center: [0, 0, 0], halfSize: [ROOF_HALF, ROOF_HALF, ROOF_HALF] },
+            box: slab(),
+            walls: options.gallery === undefined ? undefined : [slab(), slab()],
+            spread: [1, 0, 1],
             from: [0, 0, 0],
             arrive: { op: 'const', value: 0 },
             push: [0, 0, 0],
@@ -483,7 +523,7 @@ export class Smoke implements EnginePlugin {
         ? { schedule: { prewarm: this.lifetime, step: Math.max(0.1, this.lifetime / 600) } }
         : {}),
       // A roof stops a puff dead (no bounce) and the jet under it carries it out.
-      ...(this.roof ? { obstacles: [this.roof.box], bounce: 0 } : {}),
+      ...(this.roof ? { obstacles: [this.roof.box, ...(this.roof.walls ?? [])], bounce: 0 } : {}),
       nodes: {
         graph: [
           { op: 'attribute', value: 'velocity' },
@@ -542,6 +582,8 @@ export class Smoke implements EnginePlugin {
     if (this.roof) this.placeRoof(this.roof, radius);
     else if (o.ceiling !== undefined)
       throw new TypeError('Smoke ceiling is chosen at attach; attach the smoke with a ceiling to move it later');
+    if (o.gallery !== undefined && !this.roof?.walls)
+      throw new TypeError('Smoke gallery is chosen at attach; attach the smoke with a gallery to move it later');
     unit(o.rate ?? 20, 'rate', 0, 100000, true);
     unit(o.turbulence ?? 0.4, 'turbulence', 0, 1000);
     const opacity = unit(o.opacity ?? 0.5, 'opacity', 0, 1),
@@ -550,6 +592,13 @@ export class Smoke implements EnginePlugin {
     for (let i = 0; i < 3; i++) this.rgba[i] = unit(color[i], 'color channel', 0, 1);
     this.rgba[3] = opacity;
     this.extent[0] = this.extent[2] = radius * 0.7;
+    // In a gallery the puffs are born as wide along it as the plume is at the roof, so the layer leaves both ways
+    // whatever the churn does to the rising column.
+    if (this.roof?.walls) {
+      const along = o.gallery?.axis === 'x' ? 0 : 2,
+        layer = underRoof(this.roof.box.center[1] - ROOF_HALF - this.at[1], radius, this.halfWidth());
+      this.extent[along] = Math.max(this.extent[along], layer.radius);
+    }
     const glow = unit(o.glow ?? 1, 'glow', 0, 10);
     // The glow: a point at the source radiating RADIANT_FRACTION of the release (heat is its convective 0.7).
     if (glow > 0) {
@@ -570,7 +619,8 @@ export class Smoke implements EnginePlugin {
     if (typeof ceiling !== 'number' || !Number.isFinite(ceiling))
       throw new RangeError(`Smoke ceiling is ${ceiling}; pass the roof's world height, a finite number of metres`);
     const headroom = ceiling - this.at[1],
-      layer = underRoof(headroom, radius),
+      half = this.placeWalls(roof),
+      layer = underRoof(headroom, radius, half),
       a = PLUME_ENTRAINMENT,
       W = Math.cbrt((25 * buoyancyFlux(this.heat(), this.options.airTemperature)) / (48 * a * a)),
       z0 = radius / (1.2 * a);
@@ -582,8 +632,36 @@ export class Smoke implements EnginePlugin {
     roof.from[2] = -this.at[2];
     // The age at which the calm plume has risen to the layer (plumeRise turned round); a fire that is out never does.
     roof.arrive.value = W > 0 ? -(((z0 + layer.rise) ** (4 / 3) - z0 ** (4 / 3)) * 3) / (4 * W) : -3600;
-    // The jet's speed a ceiling height out; against the horizontal drag the push over that drag is its speed.
-    roof.push[0] = roof.push[2] = STILL_AIR_DRAG * ceilingJetSpeed(this.heat() / 0.7, Math.max(headroom, radius));
+    // The jet's speed a ceiling height out, or where it meets a gallery's walls; against the horizontal drag the push
+    // over that drag is its speed.
+    const height = Math.max(headroom, radius),
+      turn = half === Infinity ? height : Math.max(half, radius);
+    roof.push[0] = roof.push[2] = STILL_AIR_DRAG * ceilingJetSpeed(this.heat() / 0.7, height, turn);
+  }
+  /** Puts the gallery's walls where this frame's options put them; its half width, or Infinity without one. */
+  private placeWalls(roof: Roof): number {
+    if (!roof.walls) return Infinity;
+    const axis = this.options.gallery?.axis,
+      walls = this.options.gallery?.walls;
+    if (axis !== 'x' && axis !== 'z') throw new TypeError("Smoke gallery axis must be 'x' or 'z'");
+    if (!(walls?.length === 2 && Number.isFinite(walls[0]) && Number.isFinite(walls[1]) && walls[0] < walls[1]))
+      throw new RangeError('Smoke gallery walls must be two finite numbers of metres, the lower first');
+    const across = axis === 'x' ? 2 : 0;
+    for (let i = 0; i < 2; i++) {
+      const c = roof.walls[i]!.center;
+      c[0] = this.at[0];
+      c[1] = this.at[1];
+      c[2] = this.at[2];
+      c[across] = walls[i]! + (i ? ROOF_HALF : -ROOF_HALF);
+    }
+    roof.spread[0] = roof.spread[2] = 1;
+    roof.spread[across] = GALLERY_SPREAD;
+    return (walls[1] - walls[0]) / 2;
+  }
+  /** Half the gallery's width, metres; Infinity without one. */
+  private halfWidth(): number {
+    const walls = this.options.gallery?.walls;
+    return walls ? (walls[1] - walls[0]) / 2 : Infinity;
   }
   /** The wind the column follows this frame: its own, else what the fire or the weather wrote on the puffs. */
   private wind(): number {
@@ -598,6 +676,7 @@ export class Smoke implements EnginePlugin {
       wind = this.wind(),
       stability = o.stability ?? 0,
       headroom = o.ceiling === undefined ? Infinity : o.ceiling - this.at[1],
+      half = this.halfWidth(),
       key = this.key;
     if (
       key[0] === flux &&
@@ -605,10 +684,12 @@ export class Smoke implements EnginePlugin {
       key[2] === radius &&
       key[3] === stability &&
       key[4] === this.lifetime &&
-      key[5] === headroom
+      key[5] === headroom &&
+      key[6] === half
     )
       return;
     key[5] = headroom;
+    key[6] = half;
     key[0] = flux;
     key[1] = wind;
     key[2] = radius;
@@ -619,7 +700,7 @@ export class Smoke implements EnginePlugin {
     const p = this.point,
       w0 = plumeRise(0, flux, 0, radius, 0, p).speed;
     this.velocity[1] = w0;
-    const roof = headroom === Infinity ? undefined : underRoof(headroom, radius);
+    const roof = headroom === Infinity ? undefined : underRoof(headroom, radius, half);
     for (let k = 0; k < SAMPLES; k++) {
       plumeRise((k / (SAMPLES - 1)) * this.lifetime, flux, wind, radius, stability, p);
       // From the roof on the speed curve holds still: its changes add to a puff's velocity, and one that went on
@@ -637,7 +718,7 @@ export class Smoke implements EnginePlugin {
     const o = this.options,
       p = plumeRise(seconds, buoyancyFlux(this.heat(), o.airTemperature), this.wind(), this.radius(), o.stability ?? 0);
     if (o.ceiling !== undefined) {
-      const roof = underRoof(o.ceiling - this.at[1], this.radius());
+      const roof = underRoof(o.ceiling - this.at[1], this.radius(), this.halfWidth());
       if (p.rise >= roof.rise) {
         p.rise = roof.rise;
         p.speed = 0;

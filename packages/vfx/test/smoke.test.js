@@ -514,6 +514,67 @@ test('a ceiling stops the column at the roof and spreads it there (Alpert 1972)'
   open.dispose();
 });
 
+// KB-VFX-ROOFDOTS1: the layer under a roof ran out as a disc, its puffs thinning as 1 / distance until they showed one
+// by one; between two walls it runs along the gallery instead.
+test('a gallery turns the layer along its two walls and keeps it between them (Delichatsios 1981)', () => {
+  const h = optionalGPU(),
+    smoke = Smoke.attach(h.engine, {
+      position: [4, 1, -2],
+      ceiling: 3.2,
+      gallery: { axis: 'x', walls: [-3, 0.2] },
+      heat: 2e5,
+      radius: 0.4,
+      prewarm: false,
+    });
+  h.frame();
+  const o = smoke.effect.options,
+    [, low, high] = o.obstacles,
+    layer = smoke.column(60).radius;
+  near(low.center[2] + low.halfSize[2], -3, 1e-9, 'the first wall ends at z -3');
+  near(high.center[2] - high.halfSize[2], 0.2, 1e-9, 'the second wall starts at z 0.2');
+  near(o.emissionExtent[0], layer, 1e-12, 'born as wide along the gallery as the layer');
+  near(o.emissionExtent[2], 0.28, 1e-12, 'across it as before');
+  const at = (x, z) =>
+      evaluateNodes(o.nodes.graph, {
+        position: [x, 3.2 - layer, z],
+        velocity: [0, 0, 0],
+        size: 1,
+        color: [1, 1, 1],
+        life: 30,
+        age: 30,
+      }),
+    // The jet leaves along the gallery at the speed it has where it meets the walls, half the 3.2 m width out.
+    push = 4 * ceilingJetSpeed(2e5 / 0.7, 2.2, 1.6),
+    off = at(7, -1);
+  near(Math.hypot(off[0], off[2]), push, 1e-9, 'the jet speed times the drag');
+  near(off[2] / off[0], (0.35 * 1) / 3, 1e-9, 'mostly along the gallery');
+  assert.ok(at(1, -2)[0] < 0, 'and the other way on the other side');
+  // The walls are read each frame; a narrow gallery caps the puffs.
+  smoke.options.gallery = { axis: 'z', walls: [3.6, 4.5] };
+  h.frame();
+  near(o.obstacles[1].center[0] + o.obstacles[1].halfSize[0], 3.6, 1e-9, 'turned to run along z');
+  near(Math.max(...o.overLife.size) * 0.4, 0.45, 1e-12, 'no puff wider than the gallery');
+  near(smoke.column(60).radius, 0.45, 1e-12, 'nor the column');
+  assert.ok(Math.abs(at(4.1, 3)[2]) > 10 * Math.abs(at(4.1, 3)[0]), 'pushed along z');
+  for (const walls of [[1, 1], [2, 1], [0, NaN], [0]]) {
+    smoke.options.gallery = { axis: 'x', walls };
+    assert.throws(() => h.frame(), RangeError, String(walls));
+  }
+  smoke.options.gallery = { axis: 'y', walls: [0, 1] };
+  assert.throws(() => h.frame(), TypeError, 'a horizontal axis');
+  smoke.dispose();
+  assert.throws(
+    () => Smoke.attach(h.engine, { position: [0, 0, 0], gallery: { axis: 'x', walls: [-1, 1] } }),
+    TypeError,
+    'walls need a roof',
+  );
+  const roofOnly = Smoke.attach(h.engine, { position: [0, 0, 0], ceiling: 3, prewarm: false });
+  assert.equal(roofOnly.effect.options.obstacles.length, 1, 'no gallery, no walls');
+  roofOnly.options.gallery = { axis: 'x', walls: [-1, 1] };
+  assert.throws(() => h.frame(), TypeError, 'walls are chosen at attach');
+  roofOnly.dispose();
+});
+
 test('ceiling jet speed: 0.96 (Q/H)^(1/3) by the axis, 0.195 Q^(1/3) H^(1/2) / r^(5/6) out (Alpert 1972)', () => {
   near(ceilingJetSpeed(1e6, 3, 0), 0.96 * Math.cbrt(1000 / 3), 1e-12, 'axis');
   near(ceilingJetSpeed(1e6, 3), (0.195 * 10 * Math.sqrt(3)) / 3 ** (5 / 6), 1e-12, 'a height out');

@@ -604,6 +604,11 @@ class Smoke implements EnginePlugin {
     [Symbol.dispose](): void;
 }
 
+interface SmokeGallery {
+    axis: 'x' | 'z';
+    walls: readonly [number, number];
+}
+
 interface SmokeOptions {
     position?: Vec3;
     fire?: SmokeSource;
@@ -612,6 +617,7 @@ interface SmokeOptions {
     airTemperature?: number;
     stability?: number;
     ceiling?: number;
+    gallery?: SmokeGallery;
     wind?: VFXWind;
     lifetime?: number;
     rate?: number;
