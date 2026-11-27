@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21053188,
+  "total": 21054342,
   "history": [
     {
       "date": "2026-10-24",
@@ -14803,6 +14803,12 @@
       "commit": "terrain-far-ring",
       "reason": "new entry @margoengine/terrain/far, a coarser ring of ground past a streamed terrain (a second tile window and a continuous height blend): 3,542 B gzip, ceiling 3,798. terrain/stream 14,823 -> 15,683 (ceiling 15,268 -> 16,154): its window of tiles moved to a class both levels use (with the far plumbing, about 780 B), the rest is the root, which grew 17,619 -> 17,701 for the shader source seam (rvt 6,941 -> 6,981). A far ring kept inside stream would have put its shader in every streaming app; a separate far terrain mesh would have needed stitching and a second pass. Core and stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "a826259019",
+      "reason": "scatter: covered rings draw an ambient veil so SSAO and GTAO take only the light a pixel holds under blended grass (KB-SCENES-GRASSBLACK1, black blades); 28,978 to 29,381 B gzip. It reuses the colour pass pipelines, which a split entry would have had to expose",
+      "grew": 1
     }
   ],
   "items": {
@@ -15928,7 +15934,7 @@
     "@margoengine/save/scene-state": 1267,
     "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 6151,
-    "@margoengine/scatter": 29109,
+    "@margoengine/scatter": 30263,
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/scatter/grass": 2855,
     "@margoengine/scatter/imposter": 2968,

@@ -5515,6 +5515,15 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   `Mesh & FacadeMesh` (the internal class and the public interface), so `setParent` accepts either. `examples/kitty-hawk`
   lost its cast. Regression: tests/public-engine-types.test.js (KB-GLTF-MESHTYPE1).
 
+### Open 2026-11-27: blended meshes and particles over a surface do not veil its ambient light (KB-SSAO-BLENDVEIL1, post, vfx)
+
+- **Repro:** not reproduced yet; read from the code. Attach `GTAO` and draw dense dark smoke or a blended mesh in front
+  of an occluded wall, before the PostStack's composite: the composite takes the wall's whole ambient light times
+  (1 - visibility) out of the blended colour, as it did under grass (KB-SCENES-GRASSBLACK1). A likely cause of the flat
+  black smoke in Fauld frame fr096, not yet checked.
+- **Cause:** only `Scatter` registers an ambient veil (`packages/shared/ambient-veil.js`); vfx particles, smoke and
+  core's blended meshes register none. SSGI and SSR under blended coverage are not measured.
+
 ### Fixed 2026-11-27: the dune coast's grass blades showed black fragments (KB-SCENES-GRASSBLACK1, post and scatter)
 
 - **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=camp-buildings`: near and
