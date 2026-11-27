@@ -17500,6 +17500,35 @@ KVLCC2's 1.4 m model 4.10), to KRISO's first 20/5 overshoot at h/T 1.2, 3.8 degr
 - h/T 2.0: the reach.
 Proof: `packages/physics/tests/ship.test.js`, "banks and shallows against measurement".
 
+### Bank effects by Lataire's model (SEA-09, `bankLoads`, 2026-11-27)
+
+`packages/physics/src/ship/bank.ts` (the hull's part), written from:
+- E. Lataire, "Experiment based mathematical modelling of ship-bank interaction", PhD thesis, Ghent University, 2014,
+  https://biblio.ugent.be/publication/5778797 (section 9.1 and 9.2, eqs. 9.1 to 9.16, read on the page images: Y_F's
+  repulsion as 1 - Fr^2 times a ramp in T^2 / (h - T)^2, Y_A always attraction, both the displacement force times the
+  inverse distance to the bank times the Tuck number with the influence width B (5 Fr_h + 5) and the limited blockage,
+  and the boundary layer's influence thickness, eq. 9.11). His coefficients are per ship and not tabulated.
+- J. T. Duffy, "Modelling of ship-bank interaction and ship squat for ship-handling simulation", PhD thesis, University of
+  Tasmania, 2008 (read: the reversal from attraction to repulsion above a depth Froude number that falls as T / (h - T)
+  rises; his +-5 to 10 percent uncertainty of the sway force and yaw moment).
+- M. Vantorre, G. Delefortrie, K. Eloot and E. Laforce, "Experimental investigation of ship-bank interaction forces",
+  MARSIM 2003 (Figs. 4 and 5, read off 250 dpi page renders: container carrier D, 1000 Y' and 1000 N' at y_B 0.28 to 0.78,
+  h/T 1.07 to 1.5, Fn 0.032 to 0.081, to 2, 3 and 10 units at h/T 1.5, 1.2 and 1.1 or less; bulk carrier C2 to 4 and 2
+  units; eq. 1, Norrbin's vertical-bank formula, for the deep-water moment; eqs. 12 to 18 kept for the propeller).
+- G. Delefortrie, J. Verwilligen, K. Eloot and E. Lataire, "Bank interaction effects on ships in 6 DOF", Ocean Eng. 310,
+  118614, 2024, doi:10.1016/j.oceaneng.2024.118614 (open manuscript; Table 3: A01's forward and aft forces, the validation;
+  Table 4: R^2 0.47 to 0.94 of FHR's own fits, and 0.9 called sufficient).
+- W. Van Hoydonck, S. Toxopeus, K. Eloot et al., "Bank effects for KVLCC2", J. Mar. Sci. Technol. 24, 174-199, 2019,
+  doi:10.1007/s00773-018-0545-3 (Table 4, the validation).
+No simulation code was read. The fit is this package's own:
+- One set of constants for any hull. The forward force's Froude-dependent repulsion scales with C_B and its depth-only
+  repulsion with 1 - C_B. Each hull's own fit gave these two in nearly those proportions: 1.35e-3 and 1.40e-3 per unit
+  C_B, and 1.18e-3 and 1.13e-3 per unit 1 - C_B.
+- The forward attraction is 0.8975 of the aft. That ratio gives Norrbin's deep-water ratio N / (L Y) = -0.0025 / 0.0926.
+- The boundary layer's constant is 0.1.
+- The fit is weighted least squares over both hulls' force and moment, each weighted by its reading error, and
+  cross-validated by holding out each depth in turn.
+
 ### The ship's squat limit and default shaft depth (SEA-09, `SQUAT_FROUDE_LIMIT`, `shaftDepth`, 2026-11-27)
 
 - The squat laws hold up to a depth Froude number of 0.7 (Huuska's limit, where the flow under the ship is still

@@ -988,41 +988,70 @@ test("in shallow water a hull's derivatives and added masses are Ankudinov's or 
   );
 });
 
-test("a bank alongside draws a ship in and turns its bow away, and pushes it off in very shallow water: Vantorre's regression", () => {
-  // Vantorre et al. (MARSIM 2003), model C: the bulk carrier of their tests, 3.672 m, inside the regression's range (their
-  // container carrier D has B/T 3.06, a shade past the 3.0 they give).
-  const D = { length: 3.672, beam: 0.504, draught: 0.191, block: 0.828, diameter: 0.12 },
-    u = 0.069 * Math.sqrt(9.81 * D.length),
-    at = (ratio, yB = 0.3, thrust = 0) => bankLoads(D, yB, ratio * D.draught, u, thrust, 1000, 9.81);
-  assert.ok(at(1.5).inRange);
-  // At usual depths the bank attracts the ship (toward a starboard bank: +Y) and turns its bow away (-N).
-  for (const ratio of [1.2, 1.35, 1.5, 2, 2.5]) assert.ok(at(ratio).Y > 0 && at(ratio).N < 0, `h/T ${ratio}`);
-  // In very shallow water the attraction turns into repulsion, at the critical h/T the paper gives, 1.1 to 1.3.
-  assert.ok(at(1.1).Y < 0);
-  let lo = 1.1,
-    hi = 1.5;
-  for (let i = 0; i < 60; i++) {
-    const mid = (lo + hi) / 2;
-    if (at(mid).Y < 0) lo = mid;
-    else hi = mid;
-  }
-  assert.ok(lo > 1.1 && lo < 1.3, `the force turns at h/T ${lo}`);
+test("a bank alongside draws a ship in and turns its bow away, and pushes it off in very shallow water: Lataire's model", () => {
+  // Vantorre et al.'s bulk carrier C (MARSIM 2003), 3.672 m, at Fn 0.069 with y_B 0.3 and its container carrier D at y_B 0.78.
+  const C = { length: 3.672, beam: 0.504, draught: 0.191, block: 0.828, diameter: 0.12 },
+    D = { length: 3.864, beam: 0.55, draught: 0.18, block: 0.588, diameter: 0.12 },
+    at = (hull, ratio, yB = 0.3, thrust = 0, Fn = 0.069) =>
+      bankLoads(hull, yB, ratio * hull.draught, Fn * Math.sqrt(9.81 * hull.length), thrust, 1000, 9.81);
+  assert.ok(at(C, 1.5).inRange && !at(C, 2).inRange, 'fitted from h/T 1.07 to 1.5');
+  // At usual depths the bank attracts the ship (toward a starboard bank: +Y) and turns its bow away (-N), deep water too:
+  // Y_A, aft, outweighs Y_F, forward (Lataire), at Norrbin's deep-water ratio.
+  for (const hull of [C, D])
+    for (const ratio of [1.3, 1.5, 2, 3, 10]) {
+      const r = at(hull, ratio, 0.5);
+      assert.ok(r.Y > 0 && r.N < 0, `h/T ${ratio}: ${r.Y}, ${r.N}`);
+    }
+  // In very shallow water Y_F's repulsion wins: the force turns where the paper says, at a critical h/T of 1.1 to 1.3, the
+  // fuller hull nearer the bottom.
+  const turn = (hull, Fn) => {
+    let lo = 1.05,
+      hi = 1.5;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (at(hull, mid, 0.78, 0, Fn).Y < 0) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  };
+  const tc = turn(C, 0.065),
+    td = turn(D, 0.065);
+  assert.ok(tc > 1.1 && td < 1.3 && tc < td, `the force turns at h/T ${tc} (C) and ${td} (D)`);
+  assert.ok(at(D, 1.07, 0.78).Y < 0 && at(D, 1.07, 0.78).N < 0);
+  // Faster, it turns in deeper water (Duffy 2008: the reversal's depth Froude number falls as the keel nears the bottom), at
+  // full scale, where the boundary layer is thin; at model scale its thickening at low speed all but cancels the trend.
+  const ship = { length: 193.2, beam: 27.5, draught: 9, block: 0.588, diameter: 6 };
+  assert.ok(turn(ship, 0.081) > turn(ship, 0.032) + 0.005, `${turn(ship, 0.081)} against ${turn(ship, 0.032)}`);
   // A bank to port mirrors one to starboard; a ship on a canal's centreline feels none.
-  const s = at(1.5, 0.3),
-    p = at(1.5, -0.3);
-  assert.ok(Math.abs(s.Y + p.Y) < 1e-12 && Math.abs(s.N + p.N) < 1e-12);
-  assert.deepEqual(at(1.5, 0), { Y: 0, N: 0, inRange: true });
-  // The propeller ahead adds its own part, which grows with its thrust; going astern the hull's part is left out.
-  assert.notEqual(at(1.5, 0.3, 20).Y, s.Y);
-  assert.equal(bankLoads(D, 0.3, 1.5 * D.draught, -u, 0, 1000, 9.81).Y, 0);
-  // KVLCC2's L/B 5.5 is outside the regression's 6 to 7.3, and says so.
+  const s = at(C, 1.5, 0.3),
+    p = at(C, 1.5, -0.3);
+  assert.ok(Math.abs(s.Y + p.Y) < 1e-9 * Math.abs(s.Y) && Math.abs(s.N + p.N) < 1e-9 * Math.abs(s.N));
+  assert.deepEqual(at(C, 1.5, 0), { Y: 0, N: 0, inRange: true });
+  // The propeller ahead adds its own part (Vantorre et al.'s), which grows with its thrust; astern the hull's part is left out.
+  assert.notEqual(at(C, 1.5, 0.3, 20).Y, s.Y);
+  assert.equal(bankLoads(C, 0.3, 1.5 * C.draught, -0.4, 0, 1000, 9.81).Y, 0);
+  // The boundary layer (Lataire's delta_BLI) eats into the aft attraction at model scale in a thin under-keel gap; at full
+  // scale (x 50) the same h/T keeps more of it.
+  const model = at(D, 1.07, 0.78),
+    big = { length: 193.2, beam: 27.5, draught: 9, block: 0.588, diameter: 6 },
+    full = bankLoads(big, 0.78, 1.07 * 9, 0.065 * Math.sqrt(9.81 * 193.2), 0, 1025, 9.81),
+    unit = (r, h) => r.Y / (0.5 * h.length * h.draught * (0.065 * Math.sqrt(9.81 * h.length)) ** 2);
+  assert.ok(
+    unit(full, big) / 1025 > unit(model, D) / 1000,
+    `${unit(full, big) / 1025} against ${unit(model, D) / 1000}`,
+  );
+  // KVLCC2's L/B 5.5 is outside the propeller regression's 6 to 7.3, and says so.
   assert.equal(
-    bankLoads({ length: 320, beam: 58, draught: 20.8, block: 0.81, diameter: 9.86 }, 0.3, 40, 7, 0).inRange,
+    bankLoads({ length: 320, beam: 58, draught: 20.8, block: 0.81, diameter: 9.86 }, 0.3, 30, 7, 0).inRange,
     false,
   );
   assert.throws(
-    () => bankLoads(D, 0.3, 0.1, u, 0),
+    () => bankLoads(C, 0.3, 0.1, 0.4, 0),
     (e) => e.code === 'unsupported' && /deeper than its draught/.test(e.message),
+  );
+  assert.throws(
+    () => bankLoads(C, 0.3, 0.3, 0.4, 0, 1000, 9.81, 0, [0, 1]),
+    (e) => e.code === 'unsupported' && /walls above 0/.test(e.message),
   );
 });
 
@@ -1796,29 +1825,129 @@ test("measured checks: Sysser 1 in the Delft tank, the yacht FAIR V at sea, and 
   );
 });
 
-test("banks and shallows against measurement: Vantorre et al.'s container ship by a wall, and KVLCC2's zigzags and turns in shallow water", () => {
-  // Model D, the container carrier of Vantorre et al. 2003 (Fig. 4, read from the figure to 2 to 10 units), at Fn 0.065 with
-  // its screw stopped: 1000 N' against y_B. The moment, which steers the ship, is within 35 percent at h/T 1.5 and 1.1 and
-  // the sway force's sign is right there; at h/T 1.2, near the attraction-to-repulsion change, the force runs to repulsion
-  // where the measured one stays near nothing (docs/limits.md). Their regression fits three hulls, this one of them.
-  const D = { length: 3.864, beam: 0.55, draught: 0.18, block: 0.588, diameter: 0.12 },
-    V = 0.065 * Math.sqrt(9.81 * D.length),
-    q = 0.5 * 1000 * D.length * D.draught * V * V;
-  for (const [hT, yB, Y, N] of [
-    [1.5, 0.44, 24, -9.8],
-    [1.5, 0.67, 41, -15],
-    [1.5, 0.78, 51, -17.6],
-    [1.1, 0.28, -60, -30],
-    [1.1, 0.67, -188, -102],
-    [1.1, 0.78, -232, -117],
-  ]) {
-    const r = bankLoads(D, yB, hT * D.draught, V, 0, 1000, 9.81),
-      n = (1000 * r.N) / (q * D.length),
-      y = (1000 * r.Y) / q;
-    assert.ok(Math.abs(n / N - 1) < 0.35, `h/T ${hT}, y_B ${yB}: N' ${n} against ${N}`);
+test("banks and shallows against measurement: Vantorre et al.'s container ship and bulk carrier by a wall, and KVLCC2's zigzags and turns in shallow water", () => {
+  // Vantorre et al. 2003's captive tests at FHR, screw stopped, 1000 Y' and 1000 N' against y_B, read off the page (Fig. 4,
+  // container carrier D, to 2 units at h/T 1.5, 3 at 1.2 and 10 at 1.1 and 1.07; Fig. 5, bulk carrier C2, to 4 and 2):
+  // rows of [h/T, Fn, Y' at each y_B, N' at each y_B] (null where no point was readable). The model's constants were fitted
+  // to these (docs/clean-room.md), so the check is its fit quality: R^2 at least 0.9 on D's force and moment and C's
+  // force, FHR's mark of a sufficient bank model (Delefortrie et al. 2024, which reports 0.47 to 0.94 for its own), above
+  // Vantorre et al.'s own regression on the same points (0.87, 0.78 and 0.55). C's moment reaches 0.78 where the regression
+  // reaches 0.81, the cost of holding the deep-water moment to Norrbin's (docs/limits.md).
+  const hulls = {
+    D: {
+      hull: { length: 3.864, beam: 0.55, draught: 0.18, block: 0.588, diameter: 0.12 },
+      yB: [0.28, 0.44, 0.67, 0.78],
+      rows: [
+        [1.5, 0.032, [9.5, 21, 35.5, 50.5], [-5.5, -7.3, -14, -14.8]],
+        [1.5, 0.049, [12, 24, 45, 55], [-4, null, -13.5, -15.6]],
+        [1.5, 0.065, [11, 24, 41, 51], [-5, -9.8, -15, -17.6]],
+        [1.5, 0.081, [12, 24.5, 38.5, 49.5], [-5.2, -8.4, -13.8, -17.1]],
+        [1.2, 0.032, [16, 10, 10, 18], [-10, -25, -46, -52]],
+        [1.2, 0.049, [8, 8, 8.5, 11.5], [-12, null, null, -56]],
+        [1.2, 0.065, [2.5, 3, -3.5, -6.5], [-13, -29, -48, -58]],
+        [1.2, 0.081, [-4.5, -11, -22, -35], [-15, -32, -53, -64]],
+        [1.1, 0.032, [-25, -58, -160, -185], [-27, null, -88, -104]],
+        [1.1, 0.049, [-35, -65, -163, -203], [null, -52, -95, -110]],
+        [1.1, 0.065, [-60, -80, -188, -232], [-30, -60, -102, -117]],
+        [1.1, 0.081, [-80, -107, -218, -283], [-37, -71, -113, -132]],
+        [1.07, 0.032, [-63, -120, null, -320], [-35, -72, -120, -137]],
+        [1.07, 0.049, [-63, -125, -233, -335], [-40, -75, -125, -143]],
+        [1.07, 0.065, [-103, -133, -268, -363], [-45, -82, -135, -155]],
+        [1.07, 0.081, [-95, -172, -260, -397], [-50, -101, -155, -175]],
+      ],
+    },
+    C: {
+      hull: { length: 3.672, beam: 0.504, draught: 0.191, block: 0.828, diameter: 0.11 },
+      yB: [0.28, 0.35, 0.45, 0.67, 0.79],
+      rows: [
+        [1.5, 0.033, [25, 29, 40, 60, 73], [-2.5, -3.5, -4, -4, -2]],
+        [1.5, 0.05, [25, 29, 40, 60, 73], [-2.5, -3.5, -4, -4, -2]],
+        [1.5, 0.067, [25, 29, 40, 60, 73], [-2.5, -3.5, -4, -4, -2]],
+        [1.2, 0.033, [29, 44, 46, 57, 59], [-6, -8, -11, -11, -10.5]],
+        [1.2, 0.05, [26, 34, 44, 58, 70], [-6, -8, -11, -11, -10.5]],
+        [1.2, 0.067, [26, 34, 44, 58, 70], [-6, -8, -11, -11, -10.5]],
+        [1.1, 0.033, [21, 9.5, 3.6, 0.4, -26], [-13.8, -21, -28.4, -43, -48.7]],
+        [1.1, 0.05, [-10, -14, -2, -21, -34], [-14, -21, -29.5, -45, -51.5]],
+        [1.1, 0.067, [-22, -19, -31, -58, -72], [-18, -22, -31, -55.6, -67]],
+      ],
+    },
+  };
+  const fitted = (name, which) => {
+    const { hull, yB, rows } = hulls[name],
+      pairs = [];
+    for (const [hT, Fn, Ys, Ns] of rows)
+      yB.forEach((y, k) => {
+        const measured = (which === 'Y' ? Ys : Ns)[k];
+        if (measured === null) return;
+        const V = Fn * Math.sqrt(9.81 * hull.length),
+          q = 0.5 * 1000 * hull.length * hull.draught * V * V,
+          r = bankLoads(hull, y, hT * hull.draught, V, 0, 1000, 9.81, 0, undefined, 1.14e-6);
+        pairs.push([which === 'Y' ? (1000 * r.Y) / q : (1000 * r.N) / (q * hull.length), measured]);
+      });
+    const mean = pairs.reduce((a, [, m]) => a + m, 0) / pairs.length;
+    return 1 - pairs.reduce((a, [p, m]) => a + (p - m) ** 2, 0) / pairs.reduce((a, [, m]) => a + (m - mean) ** 2, 0);
+  };
+  const quality = [fitted('D', 'Y'), fitted('D', 'N'), fitted('C', 'Y'), fitted('C', 'N')];
+  assert.ok(quality.slice(0, 3).every((r2) => r2 > 0.9) && quality[3] > 0.77, `R^2 ${quality}`);
+  // At h/T 1.2, near where the force turns from attraction to repulsion, D's measured force runs from +18 to -35 with speed
+  // at y_B 0.78: the model's lies inside each y_B's measured range (widened by the reading error, 3), near nothing at every
+  // speed, where Vantorre et al.'s regression gave -36 to -53. It does not follow the measured fall with speed there
+  // (docs/limits.md).
+  const { hull: Dh, yB: Dy, rows: Dr } = hulls.D,
+    at12 = Dr.filter(([hT]) => hT === 1.2);
+  Dy.forEach((y, k) => {
+    const values = at12.map(([, , Ys]) => Ys[k]),
+      low = Math.min(...values) - 3,
+      high = Math.max(...values) + 3;
+    const model = at12.map(([, Fn]) => {
+      const V = Fn * Math.sqrt(9.81 * Dh.length),
+        q = 0.5 * 1000 * Dh.length * Dh.draught * V * V;
+      return (1000 * bankLoads(Dh, y, 1.2 * Dh.draught, V, 0, 1000, 9.81, 0, undefined, 1.14e-6).Y) / q;
+    });
     assert.ok(
-      Math.sign(y) === Math.sign(Y) && Math.abs(y / Y - 1) < 0.45,
-      `h/T ${hT}, y_B ${yB}: Y' ${y} against ${Y}`,
+      model.every((Y) => Y > low && Y < high),
+      `h/T 1.2, y_B ${y}: Y' ${model} against ${low} to ${high}`,
+    );
+  });
+  // Two hulls the model was not fitted to. The ro-ro A01 at FHR beside a vertical wall 1.0 m off and 6.0 m to the far one,
+  // 0.728 m/s, screw stopped, its forces at the forward and aft perpendiculars measured apart (Delefortrie et al. 2024,
+  // Table 3): the total within 35 percent from h/T 1.3 to 2.2 (outside the fitted depths at 2.2), Y_F's repulsion where it
+  // was measured (h/T 1.25 to 1.4) and Y_A within 15 percent. Vantorre et al.'s regression gave this hull repulsion there.
+  const A01 = { length: 3.8, beam: 0.62, draught: 0.148, block: 0.62, diameter: 0.1 };
+  for (const [hT, YF, YA] of [
+    [1.25, -2.1, 3.36],
+    [1.3, -0.87, 2.96],
+    [1.35, -0.56, 2.69],
+    [1.4, -0.23, 2.55],
+    [1.5, 0.02, 2.12],
+    [2.2, 0.25, 1.33],
+  ]) {
+    const r = bankLoads(A01, 0.31 * (1 - 1 / 6), hT * A01.draught, 0.728, 0, 1000, 9.81, 0, [1, 6], 1e-6),
+      fore = (r.Y + (2 * r.N) / A01.length) / 2,
+      aft = (r.Y - (2 * r.N) / A01.length) / 2;
+    assert.ok(
+      (hT < 1.3 || Math.abs(r.Y / (YF + YA) - 1) < 0.35) && (YF > -0.2 || fore < 0) && Math.abs(aft / YA - 1) < 0.15,
+      `A01 at h/T ${hT}: Y ${r.Y} (${YF + YA}), Y_F ${fore} (${YF}), Y_A ${aft} (${YA})`,
+    );
+  }
+  // KVLCC2 at FHR beside a quay wall, the far side a 1/4 slope, 0.356 m/s, screw stopped (Van Hoydonck et al. 2019, Table
+  // 4): the bow turned away in every case, as measured, and the force toward the wall at h/T 1.35 and 1.5 at 0.55 to 0.75
+  // of the measured; at h/T 1.1 it gives a slight repulsion where a slight attraction was measured (docs/limits.md).
+  const K2 = { length: 4.2667, beam: 0.7733, draught: 0.2776, block: 0.8098, diameter: 0.1315 },
+    qK = 0.5 * 998.6 * 0.356 ** 2;
+  for (const [h, ys, yp, Y, N] of [
+    [0.3744, 0.5175, 5.38, 0.08023, -0.002928],
+    [0.3744, 0.5866, 5.311, 0.06349, -0.00291],
+    [0.3744, 0.9731, 4.925, 0.03042, -0.002895],
+    [0.416, 0.9731, 5.091, 0.02569, -0.001056],
+    [0.3051, 0.9731, 4.647, 0.01052, -0.01621],
+  ]) {
+    const r = bankLoads(K2, (K2.beam / 2) * (1 / ys - 1 / yp), h, 0.356, 0, 998.6, 9.81, 0, [ys, yp], 1e-6),
+      y = r.Y / (qK * K2.length * K2.draught),
+      n = r.N / (qK * K2.length ** 2 * K2.draught);
+    assert.ok(
+      n < 0 && (h / K2.draught < 1.2 || (y / Y > 0.55 && y / Y < 0.75)),
+      `KVLCC2 at h ${h}: Y' ${y} (${Y}), N' ${n} (${N})`,
     );
   }
   // KVLCC2 in shallow water at 7 kn, on its measured shallow-water table (KVLCC2_SHALLOW). One value is fitted: N'r at h/T

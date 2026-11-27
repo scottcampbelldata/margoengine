@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20907092,
+  "total": 20907440,
   "history": [
     {
       "date": "2026-10-24",
@@ -14583,6 +14583,12 @@
       "commit": "03f278d5a9",
       "reason": "audio/vocoder new at 4805 B: offline phase vocoder time stretch and pitch shift, its own Node-safe entry; resample moved its filter loop into a module both share, root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "pending",
+      "reason": "physics/ship 35,946 ceiling to its new size 36,294 (+348 B): the bank model's hull part by Lataire's form fitted to Vantorre et al.'s tests, in place of the regression's hull table. One function of one model; nothing to split. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15461,7 +15467,7 @@
     "@margoengine/physics/seakeeping": 40620,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 35946,
+    "@margoengine/physics/ship": 36294,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 161433,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 51881,

@@ -907,9 +907,10 @@ export class ShipSolver implements Solver<ShipParams> {
   }
 
   /**
-   * The banks' sway force and yaw moment (Vantorre et al. 2003, `bankLoads`): the nearest wall alongside on each side,
-   * within half a ship length of the midship along it, gives y_B = (B / 2) (1 / y_s - 1 / y_p); the depth less the last
-   * step's sinkage is the effective depth.
+   * The banks' sway force and yaw moment (`bankLoads`: Lataire's model for the hull, Vantorre et al.'s regression for the
+   * propeller): the nearest wall alongside on each side, within half a ship length of the midship along it, gives
+   * y_B = (B / 2) (1 / y_s - 1 / y_p) and the water within the influence width; the last step's sinkage sets the
+   * propeller's effective depth.
    */
   private bank(
     mid: Vec3,
@@ -944,8 +945,9 @@ export class ShipSolver implements Solver<ShipParams> {
     }
     if (!Number.isFinite(starboard) && !Number.isFinite(port)) return none;
     const yB = (M.beam / 2) * (1 / starboard - 1 / port),
-      depth = this.depthAt(mid[0], mid[2]) - Math.max(0, sinkage);
-    if (!(depth > M.draught)) return none;
+      depth = this.depthAt(mid[0], mid[2]),
+      sunk = Math.max(0, sinkage);
+    if (!(depth - sunk > M.draught)) return none;
     return bankLoads(
       {
         length: M.length,
@@ -960,6 +962,8 @@ export class ShipSolver implements Solver<ShipParams> {
       thrust,
       this.density,
       this.g,
+      sunk,
+      [starboard, port],
     );
   }
 

@@ -4664,6 +4664,7 @@ What it gives the rest of the engine:
 - `wash(t)`: where each race boils up to the surface, for a `FoamSolver` ship's `wash`, so the stern boils white even at the quay.
 - The bow thruster: its ideal thrust (4 rho A)^(1/3) P^(2/3) times 0.55, falling to half near a speed of 0.4 of the jet's and recovering beyond.
 - Suction toward a quay or bank alongside: the return flow squeezed through the gap.
+- Bank effects (`bankLoads`): a bank or quay alongside draws the ship in and turns its bow away, and in very shallow water pushes the bow off, by Lataire's model fitted to Vantorre et al.'s captive tests; `status(i).bankInRange` says whether the ship is within the fitted depths and speeds.
 
 Any hull, not only KVLCC2: `empiricalModel({length, beam, draught, block, trim, centre, propeller: {diameter}, rudder: {area, span}})` builds the MMG model from the hull's dimensions:
 - Kijima's (1990) linear derivatives, and for a full hull (C_B 0.7 and above) his nonlinear ones in their own v'|v'| form;

@@ -7,6 +7,8 @@ import { FlowField, SeaSource, SeaSurface } from "@margoengine/math/fields";
 
 export const B4_70_FOUR_QUADRANT: FourQuadrant;
 
+export const BANK_TUCK_LIMIT = 0.62;
+
 export interface BSeriesPropeller {
     readonly blades: number;
     readonly area: number;
@@ -869,7 +871,7 @@ export function bSeriesCurves(prop: BSeriesPropeller): PropellerCurves & {
 
 export function bankInRange(hull: BankHull, depth: number): boolean;
 
-export function bankLoads(hull: BankHull, yB: number, depth: number, u: number, thrust: number, density?: number, gravity?: number): BankLoads;
+export function bankLoads(hull: BankHull, yB: number, depth: number, u: number, thrust: number, density?: number, gravity?: number, sinkage?: number, sides?: readonly [number, number], viscosity?: number): BankLoads;
 
 export function besselI1(x: number): number;
 
