@@ -16404,6 +16404,22 @@ depth/transform bounds and the separate hooked per-unit-transmittance route
 remain outside this repair. See [native-volume-range.md](native-volume-range.md).
 The other transport and thickness-map gaps above remain open limitations,
 not accepted proof that the renderers are equivalent.
+Measured 2026-11-27 (KB4000, lane A, 474533d24e): the direct-lit transmission residual (foreground MAE 13.06
+against Cycles direct) sits on the spheres, rows 3 to 5 of an 8 x 8 grid of the frame holding 2.0 of 2.6 million
+absolute levels. The default native route draws transmission as a tint over what is behind it and samples no
+background: the Rough Transmission row is as sharp as the smooth one, and no sphere lenses the checker as Cycles'
+solid glass does. Lensing is the glTF thin-walled rule (no KHR_materials_volume in TransmissionTest), so that part is
+Cycles', not Margo's; the roughness blur is the route's. `@margoengine/materials/transmission` already blurs the
+captured scene by roughness (transmission-pass.ts, `margoTransmissionLevel`), so the next step is the proof run with
+that installation beside the default one, then the default route's choice between them.
+
+### Open 2026-11-27: the transmission proof's viewer row is 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
+
+- **Repro:** `node scripts/reference-rendering/proof.mjs --case=transmission` on 474533d24e (RTX A6000, WebGPU):
+  `absolute: 1590949 > measured 1590947` against the sample-viewer reference (proof-contract.mjs).
+- **Cause:** not found. The frozen budget is the first measurement (batch 160); some change since moved two channel
+  levels. Next: bisect the gltf and core shader commits since the last passing proof folder in
+  `engine-bench/batch-160/transmission` (proof-native-1794448455574-24364), one build and proof run each.
 
 NVIDIA 617.42 and Intel Arc 4x MSAA blending variation remains the documented
 driver defect. AMD Radeon(TM) Graphics / RDNA 2, driver 32.0.21042.62, is the
