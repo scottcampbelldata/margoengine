@@ -1933,6 +1933,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   bases brighten by up to 45, 33, 27 levels (noon 5 against the old pi). The ridge and fire-line views frame no column,
   so they are unchanged bit for bit. Weak spot left: KB-VFX-COLUMNAMBIENT1.
 
+### Fixed 2026-11-27: dune grass grew indoors in the camp, and the Wright flights climbed nose-high (KB-SCENES-CAMPGRASS1, KB-FLYER-LEVEL1)
+
+- **Repro:** `grassCover({grass: 1})` of `@margoengine/scenes/dune-coast` was above 0 inside the hangar and shed
+  (x -96 to -62.5, z 27.5 to 32.5); `wrightFlightPose` flew a sin^0.5 rise and fall with a fast climb off the rail.
+- **Cause:** the dune coast's cover had no mask for the camp yard; the flight height was one arch over the whole flight.
+- **Fix:** the yard is bare sand in `coverOf`; the flights ease up to a nearly level band and down again. Regression:
+  packages/scenes/test/scenes.test.js, packages/procedural/test/flyer.test.js. Ported from the unlanded `kitty` branch.
+
 ### Open 2026-11-27: the firelit smoke pall at night glows evenly (KB-SKY-PALLFALLOFF1, sky and weather)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=ridge,fire-line --query=hour=22 --out=<folder>`:
