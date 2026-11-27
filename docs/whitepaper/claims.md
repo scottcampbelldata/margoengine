@@ -6658,3 +6658,10 @@ horizontal translation, heave, roll and pitch. The regression compares independe
 kinetic energy and wave energy in a live anisotropic body. The water gains 1,097.17 J with a maximum residual
 of 0.00083 J against a 0.0311 J f32 roundoff bound. Turning feedback off gives a 2,719.02 J imbalance. Both
 arena layouts replay exactly. This is an energy check for the stated model. [Test](../../packages/physics/tests/coupling/loads-free-hull-wake.test.js)
+
+### SEA-12 code-built and imported hulls use the same loads
+
+A closed, flared displacement mesh was supplied directly from code and round-tripped through a glTF binary file.
+The advancing, initially heeled hull rises, rights itself and drives the live wake. With matching geometry and
+mass properties, both versions give bit-identical rigid motion, wake samples and frame-zero replay.
+[Coupling test](../../packages/physics/tests/coupling/seakeeping.test.js)

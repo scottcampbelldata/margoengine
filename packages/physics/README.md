@@ -3418,11 +3418,19 @@ For a moving cabin, attach its fixed fittings and camera to the hull's rigid pos
 
 #### Hull motion drives a dispersive wake
 
+`HullSolver` takes the same displacement mesh for a boat built in code or loaded from a model. Pass closed,
+outward-wound triangles in body-local metres, with X along the hull and Y up. Apply an imported node's mesh
+scale and pivot to the displacement vertices before binding them. Match the rigid body's mass, centre of
+mass, inertia and starting pose when comparing two versions of a boat. The render mesh and its materials can
+be authored independently of the submerged shape.
+
 Set the second argument of `HullSolver` to enable signed waterplane sources, then give its `wakeSourceField` to `WakeSolver`. Both run at the world base rate in the same origin cell. Set `advance: true` to displace water at the leading end and draw it in behind the hull as it moves, alongside sources from heave, pitch and roll. It uses the rigid body's signed forward speed through the mean current and the hull mesh at its still-water draft. Omit `advance` to keep only the vertical motion sources. When a ship already supplies its advance wake through `ShipSolver` pressure, use one advance source per hull. Use a `minimumRadius` at least as large as half the wake cell diagonal so every source reaches the grid. Omit it for the geometric patch radius. Use the wake as a `SpectralSea` patch and pass that sea to the hull to return its pressure. The example enables `waterBelow` so the hull can also sample subsurface flow for drag and diffraction. Give the same wake to `WaterWake` to draw it.
 
 For an advancing hull whose draft matters, set `submergedAdvance` instead of `advance` and connect `hull.submergedWakeSource` as the third argument to `WakeSolver`. Give two through nine increasing edges in metres down from still water, beginning at zero. The last edge must cover the hull’s reference draft and stay above the bed. The solver distributes each advancing face’s signed flux over the difference of its wetted section spans, then projects the depth bands to the surface with the linear finite-depth Green function. The original five-word source still carries heave, pitch and roll. For the optional port, `wake.submergedSourceWork()` reports the nonzero rows and extra forward transforms in the last executed step. Keep the source footprint inside the grid for continuous subcell
 placement that preserves signed volume and its first horizontal moments. These are advancing sources for a prescribed
-or driven course. The transfer does not supply matched wave-making work to the rigid body.
+or driven course. The submerged footprint is at least half a longitudinal station interval and respects
+`minimumRadius`. Its lateral spread comes from the samples on each wetted span. For work accounting use the
+free or prescribed wake coupling in the loads entry below.
 
 ```ts
 import {Physics} from 'margoengine/physics';

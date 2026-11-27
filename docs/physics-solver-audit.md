@@ -1284,6 +1284,16 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   at the same checkpoint, and aft RMS is 38.46 mm. These two spacings show that the profile discrepancy survives
   grid refinement. Neither the source weights nor the tank inputs were fitted to that cut.
 
+  The strip orientation correction in `28cd511079` leaves the structured KCS loft's 469 signed samples and
+  the 2-, 5- and 8-length world hashes bit-identical at both spacings. At the common 120 Hz solver rate, the
+  0.25 m and 0.125 m physical grids give 13.647 mm and 14.401 mm signed RMS error after eight lengths. Their
+  predicted RMS is 25.515 mm and 26.295 mm alongside 15.325 mm measured. The two profiles differ by 2.712 mm
+  RMS. The freeze uses the fixed bare hull at 2.196 m/s, 0.3418 m draft, 7 m water depth and y/L = 0.15094065,
+  with a 1/16 Froude length scale and no fitted phase or scale. The receiving grid uses an absorbing border.
+  The reported experimental scale is 0.4695 mm. [NMRI case and geometry](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/a1-1/index.html)
+  [Independent signed wave cut](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/data/KCS_data/fixed/wave_cut.dat)
+  [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
+
   The straight-quay coupling in `fbee5a3b75` enforces zero normal flow in the controlled reflected mode.
   The normal velocity is below 2×10⁻¹⁵ m/s, with an open-control speed of 3.88 mm/s in the live hull test.
   A separate low-crest browser fixture draws the coupled surface within 2.47×10⁻⁸ m of the solver on both renderers.
@@ -1343,6 +1353,16 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   ends with 4.255 MJ of water energy. The independent water integral and prescribed work differ by
   8.77×10⁻⁷ J, and the film 1:07 snapshot repeats the film 1:11 hash `94c58054fcc32923`.
   The original shot still needs resolved diffraction around the finite quay and its spray transfer.
+
+  The indexed waterline contour runs from x = −79.00 to 201.00 m and z = −105.10 to −10.55 m.
+  Both reviewed cameras see open water beside the east return at [206, −16] m. The archived apron stops
+  3.98 m above the seabed, so extending that footprint to the bed changes the modeled geometry. Its exact
+  shutters bracket vessel ticks 3765–3766 at 1:07 and 4005–4006 at 1:11. The transverse wake wavelengths are
+  1.424 and 1.435 m at those anchors, and the Kelvin cusp wavelength is about 0.95 m. At 0.15 m spacing the
+  full finite return needs at least 1.728 million projected cells before adding a sponge. The public
+  source grid cap is 1.049 million and the straight image cannot preserve the return's water topology.
+  The missing SEA-04 boundary receiver must accept the same-tick hull sources and publish height, velocity
+  at depth and its own discrete work receipt. The renderer, hull and spray need that same accepted state.
 
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original

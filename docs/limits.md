@@ -10580,8 +10580,8 @@ centre of mass. Use one undamped rigid substep at 60 Hz with gyroscopic forces e
 translation locked. The wake is periodic, with uniform depth, zero sponge and no independent sources, and the
 wave model supplies zero yaw torque. Contact, wake reflection, sway and nonlinear wetted geometry evolution
 within a time step are outside this work bound. The three waterplane modes and one advancing mode share the
-same normalized source projection. The optional loads entry measures 52,122 B gzip. Correcting the shared wet
-strip integral takes the seakeeping entry from 39,443 to 39,460 B gzip.
+same normalized source projection. The optional loads entry measures 52,117 B gzip and seakeeping measures
+39,456 B gzip after the wet strip and submerged source corrections.
 
 ### Straight quay reflection and spray (SEA-12)
 
@@ -10599,6 +10599,12 @@ loads and 2,172 B for Water wake.
 `HullSolver` with the wake option publishes two five-word f64 records per reference waterplane station. The stamp uses one longitudinal midpoint and two transverse Gauss samples for a centreline-symmetric waterplane. Volume comes from small heave, pitch and roll about the reference draft. A wholly dry or submerged hull emits no waterplane flux. The model uses a signed surface-volume source. Its finite-depth wave propagation is handled by `WakeSolver`, and the hull's reaction still comes from its seakeeping solver. The projection has no three-dimensional radiation calibration or matched energy exchange with the wake grid.
 
 With `submergedAdvance`, each depth band uses an equivalent contiguous lateral interval preserving the section area and first lateral moment. This covers eccentric and asymmetric sections. Disconnected spans are represented by one interval. Two Gauss points on each signed span difference give at most four nodes per station face and band. The bands use the reference upright draft and move with the hull’s horizontal pose. The option supports at most eight bands, 16,384 fixed rows per port and 1,048,576 grid cells. Each active band adds one forward FFT and no extra inverse transform. A nonzero source must reach the wake grid. With full stencil support, each radial tap is distributed to the four adjacent grid centres by bilinear area weights. This preserves the signed volume and its horizontal first moments through subcell motion. A patch clipped by the grid edge retains its volume if it reaches a grid centre. Include the hull’s trajectory and source footprint in the grid to preserve its moments.
+
+The submerged patch radius is the greater of the caller's minimum radius and half a longitudinal station interval.
+The transverse points already describe the span. An unchanging full-beam radius attenuated an exact longitudinal
+box mode as the grid tightened. The controlled mode now matches the integrated end-face flux, finite-depth transfer
+and bilinear grid weights. A second live test compares a closed workboat generated in code and imported from GLB.
+Matching body-local geometry and rigid mass properties give identical sampled wake, rigid motion and seek.
 
 The finite-depth transfer is the band average of cosh(k(y+D))/cosh(kD) for y measured up from still water. At k=0 it transmits the full volume. This is the no-flux-bed harmonic Green transfer underlying the Havelock source’s deep-water exponential factor in Eq. 4 of Tuck, Scullen and Lazauskas, *Ship-wave patterns in the spirit of Michell* (2000). WakeSolver advances the resulting surface with the linear potential equations in Tessendorf, *Simulating Ocean Water* (1999–2004), Eqs. 20–21 and 51–52. Tests check depth transfer at fixed wavelengths on three grids, net flux and first moments of an eccentric hull, and frame-zero replay on both arena layouts. The projected source describes linear waves. A straight quay can impose a separate reflecting boundary. The body–wake work ledger remains open. Resolve the desired waveform and independent measured amplitudes before use as a physical reference. [Tuck, Scullen and Lazauskas](https://www.scullen.com.au/DSc/Publications/tuck_scullen_lazauskas_00e.pdf) · [Tessendorf](https://jtessen.people.clemson.edu/reports/papers_files/coursenotes2004.pdf)
 

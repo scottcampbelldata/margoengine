@@ -180,6 +180,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/physics/tests/coupling/seakeeping.test.js` checks all cyclic triangle variants
   against exact rectangular sections and checks the signed wake volume and first moment on both arena layouts.
 
+### Fixed 2026-11-27: projected advancing sources apply the beam twice (KB-LOADS-WAKEWIDTH)
+
+- **Repro:** In `coupling/seakeeping.test.js`, advance the 2 × 1 × 1 m eccentric hull at 1.5 m/s with a
+  submerged source on 0.25 m cells. The longitudinal Fourier coefficient is 0.016374 m³. Integrating the
+  end-face flux and finite-depth transfer with the known bilinear weights gives 0.016987 m³.
+- **Cause and fix:** The lateral Gauss points already encode beam. Spreading each point by half the entire
+  beam applies an extra filter that stays as the grid tightens. Base the numerical radius on the longitudinal
+  station interval and the caller's minimum. The exact end-face mode, signed volume, first moment and
+  frame-zero replay pass on both arena layouts.
+
 ### Open 2026-11-27: First Wake’s authored stern sweeps into the quay (KB-LOADS-FIRSTWAKEQUAY, First Wake)
 
 - **Repro:** In the archived First Wake scene, transform the Survey ship’s GLB positions by the scale and
