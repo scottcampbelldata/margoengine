@@ -411,6 +411,16 @@ export function worldMemory(shared?: boolean): WebAssembly.Memory;
 
 // Not exported from this entry, but used by the exports above:
 
+interface AeroLaw {
+    readonly aspectRatio: number;
+    readonly drag: number;
+    readonly vortexLift: number;
+    readonly friction: number;
+    readonly slope: number;
+    readonly stall: number;
+    readonly stallSine: number;
+}
+
 interface BodyOptions {
     type?: BodyType;
     position?: Vec3;
@@ -2272,6 +2282,13 @@ interface Skin {
     weight: Float32Array;
 }
 
+interface SoftAerodynamics {
+    aspectRatio?: number;
+    drag?: number;
+    vortexLift?: number;
+    friction?: number;
+}
+
 class SoftBodies implements PhysicsAttachment {
     tethersDirty: boolean;
     steps: number;
@@ -2422,6 +2439,10 @@ class SoftBody {
     airDrag: boolean;
     tetherStretch: number | null;
     tetherCount: number;
+    aero: AeroLaw;
+    get aerodynamics(): Required<SoftAerodynamics>;
+    setAerodynamics(aero: SoftAerodynamics | null): this;
+    get stallAngle(): number;
     skinMax: Float32Array | null;
     skinBack: Float32Array | null;
     skinFrom: Float32Array;
@@ -2648,6 +2669,8 @@ class SoftBodyDesc {
     setLinearDamping(damping: number): this;
     setAirDrag(on: boolean): this;
     airDrag: boolean;
+    setAerodynamics(aero: SoftAerodynamics | null): this;
+    aero: AeroLaw;
     setTethers(stretch?: number | null): this;
     tethers: number | null;
     setSkinConstraints(maxDistance: number | ArrayLike<number> | null, backstop?: number | ArrayLike<number> | null): this;

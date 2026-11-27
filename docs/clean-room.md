@@ -12325,6 +12325,18 @@ Written clean room from the papers and the public glTF specification below; no e
 - N. Magnenat-Thalmann, R. Laperrière and D. Thalmann, "Joint-dependent local deformations for hand animation and object grasping", Graphics Interface 1988 (linear blend skinning).
 - Khronos Group, glTF 2.0 Specification, section 3.7.3, Skins (joint matrices, JOINTS_0 and WEIGHTS_0). https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
 
+### Cloth faces in the air: attached lift, stall and separated flow (`@margoengine/physics/soft`, 2026-11-27)
+
+Written clean room from the papers below; no engine's source and no companion code was read. Each face of a cloth is a thin plate meeting the air at an angle. In attached flow its normal force coefficient is Polhamus's, K_p sin a cos a + K_v sin^2 a, with K_p Helmbold's lift slope for a wing of the body's aspect ratio and K_v pi (Polhamus's slender limit); the flow separates where that reaches the square plate's normal force C_N90, past which the coefficient is Lindenburg's fit to flat-plate data, C_N90 sin a / (0.56 + 0.44 sin a); skin friction acts along the face. The normal coefficient per sin a is finite edge-on, so each load is linear in the face's speed through the air with the rest frozen, taken implicitly over the step. Measured validation: the lift slope and the angle of the most lift against low-aspect-ratio flat plates in a wind tunnel (Torres and Mueller 2004, read from their figures as tabulated in the Energies paper below).
+
+- E. C. Polhamus, "A Concept of the Vortex Lift of Sharp-Edge Delta Wings Based on a Leading-Edge-Suction Analogy", NASA TN D-3767, 1966. https://ntrs.nasa.gov/citations/19670003842
+- H. B. Helmbold, "Der unverwundene Ellipsenflügel als tragende Fläche", Jahrbuch der Deutschen Luftfahrtforschung, 1942 (the low-aspect-ratio lift slope 2 pi AR / (2 + sqrt(AR^2 + 4))).
+- C. Lindenburg, "Investigation into Rotor Blade Aerodynamics", ECN-C--03-025, Energy research Centre of the Netherlands, 2003 (the separated flat plate's normal force).
+- S. F. Hoerner, *Fluid-Dynamic Drag*, 1965 (the square plate's 1.17).
+- G. E. Torres and T. J. Mueller, "Low-Aspect-Ratio Wing Aerodynamics at Low Reynolds Numbers", AIAA Journal 42(5), 865-873, 2004. https://doi.org/10.2514/1.439
+- Energies 8(4), 2438, 2015, table 1, which tabulates Torres and Mueller's angle of the most lift and K_p for aspect ratios 0.5, 0.75 and 1 from their figures 6 and 10. https://www.mdpi.com/1996-1073/8/4/2438
+- F. Keckeisen, S. Kimmerle et al., "Modelling Effects of Wind Fields in Cloth Animations", WSCG 2004 (wind on cloth triangles).
+
 ### Shape matching (`@margoengine/physics/soft`, 2026-11-24)
 
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.

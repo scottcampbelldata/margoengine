@@ -4,6 +4,7 @@
 import { standardDensity } from '@margoengine/math/atmosphere';
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
+import { atan2 } from '@margoengine/math/pinned';
 import { LoadOnce } from '../../shared/load-once.js';
 import type { PhysicsBody } from './body.js';
 import type { PhysicsCollider } from './collider.js';
@@ -2099,6 +2100,17 @@ export class SoftBodyDesc {
   }
   /** @internal */ airDrag = true;
   /**
+   * How the body's faces meet the air ({@link SoftAerodynamics}; every field has a default): each face of a cloth is a thin
+   * plate that takes lift and drag as the air meets it, attached flow below its stall and separated flow above. Pass `null` for
+   * the defaults (a square plate).
+   * @throws RangeError for a value out of its range.
+   */
+  setAerodynamics(aero: SoftAerodynamics | null): this {
+    this.aero = checkedAero(aero ?? {});
+    return this;
+  }
+  /** @internal */ aero: AeroLaw = checkedAero({});
+  /**
    * Long range attachments (Kim, Chentanez and Mueller 2012): each free particle is tied to its nearest pinned particle and
    * may stand no farther from it than `stretch` times its rest distance through the cloth (the shortest path over the edges).
    * A hanging sheet then cannot sag past its threads however long it is and however few passes the step takes, which iterating
@@ -2249,6 +2261,22 @@ export class SoftBody {
     | number
     | null = null;
   /** @internal How many tethers it holds now. */ tetherCount = 0;
+  /** @internal How its faces meet the air (SoftBodyDesc.setAerodynamics). */ aero: AeroLaw = checkedAero({});
+  /** How the body's faces meet the air ({@link SoftBodyDesc.setAerodynamics}), with every default filled in. */
+  get aerodynamics(): Required<SoftAerodynamics> {
+    const { aspectRatio, drag, vortexLift, friction } = this.aero;
+    return { aspectRatio, drag, vortexLift, friction };
+  }
+  /** Changes how the body's faces meet the air, from the next step ({@link SoftBodyDesc.setAerodynamics}). */
+  setAerodynamics(aero: SoftAerodynamics | null): this {
+    this.check();
+    this.aero = checkedAero(aero ?? {});
+    return this;
+  }
+  /** The angle in radians, from 0 to pi/2, past which the air leaves its faces (where attached flow would pass the plate's square-on normal force). */
+  get stallAngle(): number {
+    return this.aero.stall;
+  }
   /** @internal Each particle's max distance from its skinned point (see SoftBodyDesc.setSkinConstraints). */
   skinMax: Float32Array | null = null;
   /** @internal Each particle's backstop behind the skin, Infinity for none. */ skinBack: Float32Array | null = null;
@@ -3655,6 +3683,7 @@ export class SoftBodies implements PhysicsAttachment {
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
     body.edgeShear = Float32Array.from(desc.edgeShear);
     body.airDrag = desc.airDrag;
+    body.aero = desc.aero;
     body.tetherStretch = desc.tethers;
     if (desc.tethers !== null) this.tethersDirty = true;
     if (desc.skinMax) {
@@ -5626,19 +5655,24 @@ export class SoftBodies implements PhysicsAttachment {
   }
 
   /**
-   * The air on a body of triangles: each face a flat plate, F = -1/2 rho C_N A |u_n| u_n n with u_n the speed of the face
-   * through the air along its normal (its corners' mean velocity less the wind at its middle), C_N the square plate's 1.17
-   * (Hoerner 1965) and rho the flow field's density or the standard atmosphere's at the face's height (ISO 2533). Over the step
-   * the face's normal speed follows the closed form of quadratic drag, u / (1 + k |u| dt) with k = 1/2 rho C_N A w (w the
-   * face's inverse mass at its middle), so a light cloth in a fast wind slows to the air's speed and never past it; each corner
-   * takes a third of the impulse. Air along the face (skin friction) is left out: for a cloth it is a few hundred times less.
+   * The air on a body of triangles: each face a thin plate (its corners' mean velocity less the wind at its middle is u, the
+   * angle the air meets it a, rho the flow field's density or the standard atmosphere's at the face's height, ISO 2533). Across
+   * the face it takes the normal force q A C_N(a), q = 1/2 rho |u|^2: in attached flow Polhamus's potential and vortex lift,
+   * C_N = K_p sin a cos a + K_v sin^2 a (K_p Helmbold's lift slope at the body's aspect ratio), until that reaches the plate's
+   * square-on coefficient C_N90; past it the flow has separated, C_N = C_N90 sin a / (0.56 + 0.44 sin a) (Lindenburg 2003, from
+   * Hoerner's plates). Along the face it takes the skin friction q A C_f. So a face square to the air is pushed with C_N90, one
+   * at a small angle is lifted across the air, and a face edge-on is only rubbed. Both are linear in the face's speed through
+   * the air with the rest frozen (C_N / sin a times |u| across, C_f |u| along), and each is taken implicitly over the step,
+   * u / (1 + k w dt) with k = 1/2 rho A coefficient |u| and w the face's inverse mass at its middle, so a light cloth in a fast
+   * wind comes to the air's speed and never past it; each corner takes a third of the impulse.
    */
   private airDrag(body: SoftBody, c: Columns, dt: number): void {
     const list = body.triangleList,
       first = body.firstParticle,
       time = this.physics.stepCount * dt,
       wind = this.wind,
-      sample = this.airSample;
+      sample = this.airSample,
+      law = body.aero;
     for (let t = 0; t < list.length; t += 3) {
       const a = first + list[t]!,
         b = first + list[t + 1]!,
@@ -5678,25 +5712,36 @@ export class SoftBodies implements PhysicsAttachment {
         else if (wind !== null) air = wind;
         rho = standardDensity(middle[1]);
       }
-      const un =
-        ((c.vx[a]! + c.vx[b]! + c.vx[d]!) / 3 - air[0]) * n[0] +
-        ((c.vy[a]! + c.vy[b]! + c.vy[d]!) / 3 - air[1]) * n[1] +
-        ((c.vz[a]! + c.vz[b]! + c.vz[d]!) / 3 - air[2]) * n[2];
+      const rx = (c.vx[a]! + c.vx[b]! + c.vx[d]!) / 3 - air[0],
+        ry = (c.vy[a]! + c.vy[b]! + c.vy[d]!) / 3 - air[1],
+        rz = (c.vz[a]! + c.vz[b]! + c.vz[d]!) / 3 - air[2],
+        speed = Math.sqrt(rx * rx + ry * ry + rz * rz);
       // Under the water's surface the water takes the face instead (waterLoads).
       const dry = this.water ? 1 - this.submerged(middle[0], middle[1], middle[2], 0, time) : 1;
-      if (un === 0 || !(dry > 0)) continue;
-      const k = 0.5 * rho * PLATE_DRAG * area * w * dry,
-        after = un / (1 + k * Math.abs(un) * dt),
-        // The impulse at the face's middle along n that takes its normal speed from un to after; each corner a third.
-        impulse = (after - un) / w / 3;
+      if (!(speed > 0) || !(dry > 0)) continue;
+      const un = rx * n[0] + ry * n[1] + rz * n[2],
+        tx = rx - un * n[0],
+        ty = ry - un * n[1],
+        tz = rz - un * n[2],
+        sine = Math.min(1, Math.abs(un) / speed),
+        scale = 0.5 * rho * area * speed * w * dry * dt,
+        // Across: C_N / sin a, finite edge-on (K_p there). Along: C_f.
+        across = plateNormalPerSine(law, sine),
+        afterN = un / (1 + scale * across),
+        shrinkT = 1 / (1 + scale * law.friction) - 1,
+        // The impulse at the face's middle that takes its speed through the air to those; each corner a third.
+        jn = (afterN - un) / w / 3,
+        jx = jn * n[0] + (shrinkT * tx) / w / 3,
+        jy = jn * n[1] + (shrinkT * ty) / w / 3,
+        jz = jn * n[2] + (shrinkT * tz) / w / 3;
       for (const [row, wr] of [
         [a, wa],
         [b, wb],
         [d, wd],
       ] as const) {
-        c.vx[row] = c.vx[row]! + wr * impulse * n[0];
-        c.vy[row] = c.vy[row]! + wr * impulse * n[1];
-        c.vz[row] = c.vz[row]! + wr * impulse * n[2];
+        c.vx[row] = c.vx[row]! + wr * jx;
+        c.vy[row] = c.vy[row]! + wr * jy;
+        c.vz[row] = c.vz[row]! + wr * jz;
       }
     }
   }
@@ -6344,6 +6389,84 @@ function barycentric(a: [Vec3, Vec3, Vec3, Vec3], p: Vec3): number[] {
 export { SailForce, type SailOptions } from './sail.js';
 // Skinned cloth: the skinned mesh a cloth is held to, from a skeleton's joint matrices.
 export { type SkinBinding, type SkinnedVertices, skinVertices } from './soft-skinning.js';
+
+/**
+ * How the faces of a cloth meet the air ({@link SoftBodyDesc.setAerodynamics}). Each face is a thin plate: attached flow
+ * (Polhamus's potential and vortex lift) below its stall, separated flow (Lindenburg's flat plate) above it, and skin friction
+ * along it.
+ */
+export interface SoftAerodynamics {
+  /**
+   * The cloth's span squared over its area, as the air sees it (default 1, a square): it sets the attached lift slope by
+   * Helmbold's formula, 2 pi AR / (2 + sqrt(AR^2 + 4)) per radian, and with it the stall. A flag flown from its short side
+   * (twice as long as tall) is 0.5; a sail or a banner held by its long side 2 to 6.
+   */
+  aspectRatio?: number;
+  /** The normal-force coefficient of a face square to the air, C_N90 (default 1.17, a square flat plate, Hoerner 1965). */
+  drag?: number;
+  /** Polhamus's vortex-lift constant K_v (default pi, the limit for a slender plate, whose edges shed the vortices). */
+  vortexLift?: number;
+  /** The skin-friction coefficient along a face (default 0.004, a turbulent plate). */
+  friction?: number;
+}
+
+/** @internal A face's air law with its stall worked out. */
+export interface AeroLaw {
+  readonly aspectRatio: number;
+  readonly drag: number;
+  readonly vortexLift: number;
+  readonly friction: number;
+  /** Helmbold's lift slope at the aspect ratio. */
+  readonly slope: number;
+  /** The angle past which the flow separates: where attached flow's normal force reaches `drag`. */
+  readonly stall: number;
+  /** sin(stall). */
+  readonly stallSine: number;
+}
+
+function checkedAero(aero: SoftAerodynamics): AeroLaw {
+  const { aspectRatio = 1, drag = 1.17, vortexLift = Math.PI, friction = 0.004 } = aero;
+  if (!(aspectRatio > 0 && Number.isFinite(aspectRatio)))
+    throw new RangeError(
+      `An aspect ratio is a positive number (got ${aspectRatio}); pass one above 0, or leave it unset for 1.`,
+    );
+  for (const [value, label] of [
+    [drag, 'drag'],
+    [vortexLift, 'vortexLift'],
+    [friction, 'friction'],
+  ] as const)
+    if (!(value >= 0 && Number.isFinite(value)))
+      throw new RangeError(`The ${label} coefficient is 0 or more (got ${value}); pass a finite number of 0 or above.`);
+  const slope = (2 * Math.PI * aspectRatio) / (2 + Math.sqrt(aspectRatio * aspectRatio + 4)),
+    attached = (sine: number) => slope * sine * Math.sqrt(1 - sine * sine) + vortexLift * sine * sine;
+  // The first angle where attached flow's normal force reaches the square plate's: bisection on sin a, from where it rises.
+  let low = 0,
+    high = 1;
+  if (attached(1) < drag) {
+    // Attached flow never reaches it (a very small drag coefficient with no vortex lift): it never separates by this rule.
+    low = 1;
+  } else
+    for (let i = 0; i < 60; i++) {
+      const mid = (low + high) / 2;
+      if (attached(mid) < drag) low = mid;
+      else high = mid;
+    }
+  return {
+    aspectRatio,
+    drag,
+    vortexLift,
+    friction,
+    slope,
+    stall: atan2(low, Math.sqrt(1 - low * low)),
+    stallSine: low,
+  };
+}
+
+/** A face's normal-force coefficient over the sine of the angle the air meets it: finite edge-on, so it can damp. */
+function plateNormalPerSine(law: AeroLaw, sine: number): number {
+  if (sine < law.stallSine) return law.slope * Math.sqrt(1 - sine * sine) + law.vortexLift * sine;
+  return law.drag / (0.56 + 0.44 * sine);
+}
 
 /** One skin limit a particle, from one number or a list, each 0 or more (Infinity: no limit). */
 function skinValues(values: number | ArrayLike<number>, particles: number, label: string): Float32Array {
