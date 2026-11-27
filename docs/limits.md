@@ -1427,7 +1427,10 @@ By method (2026-11-27, stand-in headset only, no AR device): at 4 samples a capt
 eye one sample at a time, which the WebGL2 layer answers with the resolved depth (GLSL ES 3.00 has no multisample
 samplers), so under an effect an AR edge pixel's coverage there is 0 or 1, where WebGPU keeps quarters; the colour's
 brightest channel still gives a partly covered pixel partial alpha where coverage is 0. With no effect the two match.
-Content that writes no depth is as opaque as its brightest channel on both (KB-XR-ARNODEPTH1).
+Content drawn after the main pass that writes no depth (a line with depthWrite false, a glow) takes its own alpha as
+coverage on both (KB-XR-ARNODEPTH1, fixed). Transparent meshes inside the main pass that write no depth still take their
+brightest channel: xr's AR alpha pass runs after the main pass, so it cannot tell their pixels from empty ones. Under
+FXAA a depthless line's one-pixel rim is partly covered, colour and alpha alike, as the filter blends it.
 
 ## Geometry
 

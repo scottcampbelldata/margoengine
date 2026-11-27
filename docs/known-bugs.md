@@ -122,13 +122,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - The 1,137 pixels of alpha 241 first seen at 4 samples were not a depth bug: the page's line wrote no depth
   (KB-XR-ARNODEPTH1).
 
-### Open 2026-11-27: in AR, content that writes no depth is only as opaque as its brightest channel (KB-XR-ARNODEPTH1, xr)
+### Fixed 2026-11-27: in AR, content that writes no depth was only as opaque as its brightest channel (KB-XR-ARNODEPTH1, xr, shared)
 
-- **Repro:** the page of `packages/xr/tests/ar-effects.browser.mjs` with the line's default `depthWrite: false`: under
-  Tonemap its green pixels have alpha 241 of 255 (1,137 of them at 4 samples). A black line there has alpha 0.
-- **Cause:** the AR blit (`packages/xr/src/eyes.ts`) has no coverage for such a pixel: the eye's colour alpha does not
-  survive every post effect, so it takes depth coverage, or the brightest channel where no depth was written.
-- **Workaround:** `depthWrite: true` on a `Line` makes it opaque.
+- **Repro:** `node packages/xr/tests/ar-effects.browser.mjs` (and its layer half): the line with its default
+  `depthWrite: false`. Before the fix its green pixels had alpha 241 of 255 under Tonemap (1,137 at 4 samples), a black
+  line had alpha 0, and under TAA every empty pixel became opaque once the eye's alpha was used.
+- **Cause:** core clears a view to an opaque colour (core colours have no alpha), so the eye's alpha was 1 everywhere and
+  the AR blit (`packages/xr/src/eyes.ts`) could only take depth coverage, or the brightest channel where no depth was
+  written. TAA, not told the eye is premultiplied, wrote alpha 1 into its history.
+- **Fixed:** right after the main pass xr's AR alpha pass writes alpha 0 on every sample nothing drew (depth-0 triangle,
+  depthCompare 'equal', alpha-only mask), as TransparentCanvas does, so later draws leave their coverage in alpha; the blit
+  takes the largest of depth share, that alpha and the brightest channel; AR eyes mark the engine premultiplied for the
+  session (`markPremultiplied`, shared/straight-display.js). Regression: the same check's depthless round (40 checks
+  failed without the fix). Main-pass transparents without depth still take the brightest channel (docs/limits.md).
+- **Sources:** T. Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984,
+  https://graphics.pixar.com/library/Compositing/paper.pdf ; A. R. Smith, "Image Compositing Fundamentals", Microsoft
+  Technical Memo 4, 1995, http://alvyray.com/Memos/CG/Microsoft/4_comp.pdf ; WebXR Device API (W3C), XREnvironmentBlendMode
+  'alpha-blend', https://www.w3.org/TR/webxr-ar-module-1/#xrenvironmentblendmode-enum ; WebGPU (W3C), GPUColorWrite and
+  depth compare, https://www.w3.org/TR/webgpu/ .
 
 ### Fixed 2026-11-27: SSAO and DOF lost passes drawn after the scene, lines among them (KB-POST-LATEDRAW1, post, dof)
 

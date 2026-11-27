@@ -3346,8 +3346,16 @@ XR objects. Missing: a real headset.
 `xrCompatible: true`, so `XR.create` shares its device and draws each eye as one view of `engine.render({views})`: every
 package pass and post effect runs per eye as it runs per view on the desktop. Each eye renders into a texture, a blit copies
 it into the layer's sub-image, and a second blit writes the layer's forward depth24plus depth as 1 minus the scene's reversed
-depth (the nearest sample). In AR the alpha is the share of samples that wrote depth, or the brightest channel where none
-did. Evidence: `tests/modern-xr-passes.ts` in `modern:test:xr:browser`, both eyes byte-equal to a desktop render of the same
+depth (the nearest sample). In AR the alpha is the share of samples that wrote depth, or the eye's own alpha, or the
+brightest channel. The eye's alpha is coverage since KB-XR-ARNODEPTH1 (2026-11-27): core clears a view opaque, so right
+after the main pass xr's AR alpha pass (order 1e-6, a depth-0 triangle with depthCompare 'equal' and an alpha-only write
+mask) sets alpha 0 on every sample nothing drew, and later draws blend their own alpha over it (Porter and Duff 1984). AR
+eyes also mark the engine premultiplied (`markPremultiplied` in shared/straight-display.js, as TransparentCanvas does)
+for the session, so TAA keeps coverage in its history and display transforms take straight colour. Evidence for the
+depthless case: `packages/xr/tests/ar-effects.browser.mjs`, a line with depthWrite false stays opaque two pixels inside
+under every effect on WebGPU and the layer at 1x and 4x; without the fix 40 checks failed (Tonemap, DOF, Bloom, SSAO, the
+stack). Depthless draws inside the main pass (transparent meshes that write no depth) still take the brightest channel.
+Evidence: `tests/modern-xr-passes.ts` in `modern:test:xr:browser`, both eyes byte-equal to a desktop render of the same
 camera with a line, a point cloud, terrain and bloom, on the RTX A6000 with a stand-in session. On the WebGL2 layer
 (`installXR()`), `packages/webgl2-compat/test/xr-browser.mjs` (in the layer's `test:gpu`) runs the same route with a line
 into a stand-in XRWebGLLayer over a real WebGL framebuffer: `xr.route` is 'engine' and both eyes match the native route

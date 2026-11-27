@@ -5,6 +5,17 @@
 const PREMULTIPLIED = Symbol.for('margoengine.premultiplied-canvas');
 /** True when `engine` draws to a premultiplied canvas, so its display transforms must take straight colour. */
 export const premultipliedCanvas = (engine) => !!engine?.canvas?.[PREMULTIPLIED];
+/**
+ * Marks `engine`'s output premultiplied (`on`) or not, for a pass that makes empty pixels alpha 0 (TransparentCanvas,
+ * the eyes of an AR session), and returns the previous mark. Without a canvas it marks nothing and returns false.
+ */
+export function markPremultiplied(engine, on) {
+  const canvas = engine?.canvas;
+  if (!canvas) return false;
+  const before = !!canvas[PREMULTIPLIED];
+  canvas[PREMULTIPLIED] = on;
+  return before;
+}
 // `vec4f(toDisplay(colour),alpha)`, the colour holding up to two levels of parentheses and the alpha a plain name.
 const displayCall = /vec4f\(toDisplay\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\),([\w.]+)\)/g;
 /**

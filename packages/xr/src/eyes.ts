@@ -4,9 +4,11 @@ import type { XREyeTarget } from './eye-target.js';
 // one view of `engine.render({views})` drawn into a texture: every package pass (lines, points, terrain, shadows, post
 // effects) runs per eye as it runs per view on the desktop. A blit then moves each eye into the layer's sub-image, and
 // the scene's reversed depth into the compositor's forward depth (WebXR Device API: a projection maps depthNear to 0).
-import { Camera, type Engine, type RenderView } from '@margoengine/core/extension';
+import { Camera, type Engine, type FrameGraph, type PassContext, type RenderView } from '@margoengine/core/extension';
 import { compatTier } from '../../shared/compat.js';
 import { margoError } from '../../shared/errors.js';
+import { applyView } from '../../shared/view-rect.js';
+import { markPremultiplied } from '../../shared/straight-display.js';
 import type { XRBinding, XRProjectionLayer, XRView, XRViewerPose } from './types.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -38,6 +40,22 @@ const coverageShader = `@vertex fn vertex(@builtin(vertex_index) i: u32) -> @bui
 }
 `;
 
+// AR alpha (KB-XR-ARNODEPTH1). Core clears a view to an opaque colour, so the eye's alpha was 1 everywhere and the blit
+// took coverage from depth alone, or from the brightest channel where no depth was written: a depthless line was only
+// as opaque as its brightest channel (a black one vanished). Right after the main pass, this triangle at depth 0 passes
+// only where a sample still holds the reversed-depth clear (nothing drew there) and writes alpha 0 there, colour masked
+// off. Every later draw then blends its own alpha over it (Porter and Duff 1984, "over" on premultiplied colour), so the
+// eye's alpha is the coverage of everything drawn, depth or none, and post effects that carry the source alpha keep it.
+const clearAlphaShader = `@vertex fn vertex(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  return vec4f(array<vec2f, 3>(vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3))[i], 0, 1);
+}
+@fragment fn fragment() -> @location(0) vec4f {
+  return vec4f(0);
+}
+`;
+/** The order of the AR alpha pass: after core's main pass (0), before any package pass (lines draw at 20). */
+const CLEAR_ALPHA_ORDER = 1e-6;
+
 /** WGSL of the blit: a full-screen triangle that reads the eye at its own pixel, the layer's viewport offset removed. */
 function blit(samples: number, ar: boolean, resolved: boolean): string {
   const depth = samples > 1 ? 'texture_depth_multisampled_2d' : 'texture_depth_2d';
@@ -61,7 +79,9 @@ ${resolved ? '@group(0) @binding(3) var k: texture_2d<f32>;' : ''}
     // AR: the clear is black and the real world shows where nothing was drawn. Drawn samples, or light from a pass
     // that writes no depth (a glow, an unlit line), keep the pixel; the colour is already premultiplied by the black
     // clear. (The comment sits here, not in the WGSL, so the shipped shader carries no comment text: KB-WGSL1.)
-    ar ? `return vec4f(c.rgb, clamp(max(${share}, max(c.r, max(c.g, c.b))), 0.0, 1.0));` : 'return vec4f(c.rgb, 1.0);'
+    ar
+      ? `return vec4f(c.rgb, clamp(max(max(${share}, c.a), max(c.r, max(c.g, c.b))), 0.0, 1.0));`
+      : 'return vec4f(c.rgb, 1.0);'
   }
 }
 @fragment fn depth(@builtin(position) p: vec4f) -> @builtin(frag_depth) f32 {
@@ -87,10 +107,73 @@ export class EyeViews {
     delta: 0,
     culling: true,
   };
+  /** While true, the AR alpha pass (see `clearAlphaShader`) runs in this object's eye views. */
+  private ar = false;
+  /**
+   * The engine's premultiplied mark before AR eyes set it, while they hold it: with empty pixels at alpha 0 the eye is
+   * premultiplied colour over the real world, so TAA keeps coverage in its history and display transforms take
+   * straight colour, as on a TransparentCanvas (shared/straight-display.js).
+   */
+  private premultipliedBefore?: boolean;
+  private readonly alphaPipelines = new Map<string, GPURenderPipeline>();
+  private alphaModule?: GPUShaderModule;
+  /** The frame graphs holding the AR alpha pass (one per scene drawn), with their removers. */
+  private readonly alphaGraphs = new Map<FrameGraph, () => void>();
+  private readonly alphaDescriptor: GPURenderPassDescriptor & {
+    colorAttachments: GPURenderPassColorAttachment[];
+    depthStencilAttachment: GPURenderPassDepthStencilAttachment;
+  } = {
+    colorAttachments: [{ view: undefined!, loadOp: 'load', storeOp: 'store' }],
+    depthStencilAttachment: { view: undefined!, depthReadOnly: true },
+    label: 'XR AR alpha',
+  };
   constructor(
     private readonly engine: Engine,
     private readonly device: GPUDevice,
   ) {}
+
+  private readonly clearAlpha = (context: PassContext): void => {
+    if (!this.ar || context.backend !== 'webgpu' || context.device !== this.device) return;
+    if (!this.eyes.some((eye) => eye.view.id === context.view?.id)) return;
+    const depthFormat = context.descriptor.depthStencil!.format,
+      count = context.descriptor.multisample?.count ?? 1,
+      key = `${context.format} ${depthFormat} ${count}`;
+    let pipeline = this.alphaPipelines.get(key);
+    if (!pipeline) {
+      const module = (this.alphaModule ??= this.device.createShaderModule({
+        code: clearAlphaShader,
+        label: 'XR AR alpha',
+      }));
+      pipeline = this.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        // 8 is GPUColorWrite.ALPHA: the colour stays as drawn.
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: context.format, writeMask: 8 }] },
+        depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: 'equal' },
+        multisample: { count },
+        label: 'XR AR alpha',
+      });
+      this.alphaPipelines.set(key, pipeline);
+    }
+    const descriptor = this.alphaDescriptor,
+      depth = descriptor.depthStencilAttachment;
+    descriptor.colorAttachments[0].view = context.color;
+    depth.view = context.depth;
+    if (depthFormat.includes('stencil')) depth.stencilReadOnly = true;
+    else delete depth.stencilReadOnly;
+    const pass = context.encoder.beginRenderPass(descriptor);
+    applyView(pass, context);
+    pass.setPipeline(pipeline);
+    pass.draw(3);
+    pass.end();
+  };
+
+  /** Adds the AR alpha pass to the frame graph of the scene about to be drawn, once per graph. */
+  private watchAlpha(): void {
+    const graph = this.engine.frameGraph;
+    if (this.alphaGraphs.has(graph)) return;
+    this.alphaGraphs.set(graph, graph.add({ name: 'xr:ar-alpha', order: CLEAR_ALPHA_ORDER, execute: this.clearAlpha }));
+  }
 
   /** Moves eye `i`'s camera to `view`: its pose and its projection, with depth reversed. */
   private place(eye: Eye, view: XRView, projection: ArrayLike<number>): void {
@@ -262,6 +345,11 @@ export class EyeViews {
       images.push(image);
     }
     this.options.delta = delta;
+    this.ar = ar;
+    if (ar) {
+      this.watchAlpha();
+      this.premultipliedBefore ??= markPremultiplied(this.engine, true);
+    } else this.unmark();
     this.engine.render(this.options);
     const encoder = this.device.createCommandEncoder({ label: 'XR eyes' });
     for (let i = 0; i < images.length; i++) {
@@ -335,8 +423,17 @@ export class EyeViews {
     binding.present?.(layer);
   }
 
+  /** Gives the engine back the premultiplied mark it had before AR eyes. */
+  private unmark(): void {
+    if (this.premultipliedBefore === undefined) return;
+    markPremultiplied(this.engine, this.premultipliedBefore);
+    this.premultipliedBefore = undefined;
+  }
+
   /** Frees the eyes' textures and buffers; the engine and its device stay. */
   dispose(): void {
+    this.unmark();
+    this.ar = false;
     for (const eye of this.eyes) {
       eye.color?.destroy();
       eye.depth?.destroy();
@@ -346,5 +443,9 @@ export class EyeViews {
     this.eyes.length = 0;
     this.views.length = 0;
     this.pipelines = undefined;
+    for (const remove of this.alphaGraphs.values()) remove();
+    this.alphaGraphs.clear();
+    this.alphaPipelines.clear();
+    this.alphaModule = undefined;
   }
 }

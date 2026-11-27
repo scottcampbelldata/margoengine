@@ -3,6 +3,9 @@
 // with a stand-in headset (packages/webgl2-compat/test/xr.html) and the engine route: every pixel inside the solid
 // meshes and an opaque line (depthWrite) with no effect stays opaque under every effect, and empty space stays
 // see-through. The shared scene-depth capture (acquireDepth) and StencilBuffer redirect the depth too.
+// KB-XR-ARNODEPTH1: the same line with its default depthWrite false writes no depth, so its alpha is its own coverage
+// (xr's AR alpha pass): every pixel two inside it stays opaque under every effect, as with depth. Before, it took its
+// brightest channel (green 241 of 255 under Tonemap) and TAA made empty space opaque.
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +31,11 @@ let html = replace(
     }
   const options = { antialias: query.get('samples') === '4',`,
 );
-html = replace(html, 'width: 6 }', 'width: 6, depthWrite: true }');
+html = replace(
+  html,
+  'width: 6 }',
+  "width: 6, depthWrite: new URLSearchParams(location.search).get('lineDepth') !== '0' }",
+);
 html = replace(
   html,
   'const xr = await XR.create(engine);',
@@ -88,10 +95,10 @@ try {
   await browser.page.route('**/packages/webgl2-compat/test/xr.html*', (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: html }),
   );
-  const eyes = async (backend, samples, effect) => {
-    const key = `${backend}/${samples}x/${effect}`;
+  const eyes = async (backend, samples, effect, lineDepth = 1) => {
+    const key = `${backend}/${samples}x/${effect}/line depth ${lineDepth}`;
     await browser.page.goto(
-      `${origin}/packages/webgl2-compat/test/xr.html?mode=${backend}&route=engine&samples=${samples}&effect=${effect}`,
+      `${origin}/packages/webgl2-compat/test/xr.html?mode=${backend}&route=engine&samples=${samples}&effect=${effect}&lineDepth=${lineDepth}`,
     );
     await browser.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
     const result = await browser.page.evaluate(() => ({
@@ -109,15 +116,21 @@ try {
     for (const samples of [1, 4]) {
       const base = await eyes(backend, samples, 'none');
       plain[`${backend}/${samples}`] = base;
-      for (const effect of effects) {
-        const drawn = await eyes(backend, samples, effect);
+      for (const [effect, lineDepth] of [
+        ...effects.map((effect) => [effect, 1]),
+        ...['none', ...effects].map((effect) => [effect, 0]),
+      ]) {
+        const drawn = await eyes(backend, samples, effect, lineDepth);
         for (let eye = 0; eye < 2; eye++) {
-          const solid = inside(base[eye], 255, 1),
+          // Without depth, a screen-space filter (FXAA) blends colour and coverage alike one pixel into the line's
+          // edge, so its partly covered rim is checked from two pixels in.
+          const solid = inside(base[eye], 255, lineDepth ? 1 : 2),
             empty = inside(base[eye], 0, 3);
           const check = {
             backend,
             samples,
             effect,
+            lineDepth,
             eye,
             solid: solid.length,
             seeThrough: solid.filter((i) => drawn[eye][i] !== 255).length,
