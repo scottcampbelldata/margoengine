@@ -6,6 +6,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: the shot tool's 8-bit encode leaves a colour on an exact code without dither (KB-SHOT-DITHERMOD1, tools/shot; held: needs its own plan)
+
+- **Repro:** `tools/shot/pixels.js` `resolveFrame` adds a blue-noise dither of (rank + 0.5) / 4096 - 0.5, inside
+  plus or minus half a level (rectangular), before rounding to 8 bits. timber-valley `ridge-smoke`, `--once --seconds
+  1.1` (RTX A6000, WebGPU), early probe (frame 9), the look check's flat (65 x 65 windows of identical pixels) on the
+  float frame before the dither and on the 8-bit frame after it: 10.06 against 11.27 percent at commit cb2603fc5c, and
+  11.66 against 12.95 percent with the sky and haze work (KB-SKY-SANDGREY1, KB-SKY-HAZEHORIZON1).
+- **Cause:** the canvas is 8-bit, so a constant area reaches the encode on an exact code (55 percent of the float values
+  of a valley-aerial frame lie within 0.001 of one), and a rectangular dither of one level's width moves a value
+  within 1/8192 of a code in no pixel: the noise there is none, beside full noise half a level away. That is the noise
+  modulation of rectangular dither; a triangular dither of two levels' width makes the error's power the same for every
+  value (S. P. Lipshitz, R. A. Wannamaker and J. Vanderkooy, "Quantization and Dither: A Theoretical Survey", J. Audio
+  Eng. Soc. 40(5), 1992; R. A. Wannamaker, S. P. Lipshitz, J. Vanderkooy and J. N. Wright, "A Theory of Nonsubtractive
+  Dither", IEEE Trans. Signal Process. 48(2), 2000, https://doi.org/10.1109/78.823966). So how many pixels of a flat area
+  the look checks count depends on where its colour falls between two codes.
+- **Held:** a triangular dither changes what every look bar sees, and the flat check would need a redesign that keeps it
+  exactly as strict; that needs its own plan (manager, 2026-11-27).
+
 ### Fixed 2026-11-27: a fire's burn-out worked out every spent cell's spread again each step (KB-VFX-BURNOUTWORK1, vfx)
 
 - **Repro (before):** timber-valley `fire: 'burnt'` (`burnOut`, smoke-day weather, seed 1910): the aftermath shot's
