@@ -604,3 +604,21 @@ real-GPU closest/any-hit and fragment tests. The rendered `Shadows.attach` proof
 compares receiver pixels to independent CPU rays for the complete Khronos model,
 with default and quarter-turn UV transforms, opaque control, restored resources
 and map fallback. Both lit and shaded receiver pixels are required.
+
+## Exact first frames on the WebGL2 layer
+
+`shadows.ready` is a promise that settles once every frame draws the shadows as it will from then on. On the WebGL2
+compatibility layer the first `Shadows` of a page fetches its compatibility route (`import()`) when it attaches, and
+until it arrives the soft filter's blocker search spans its widest, so those first frames' penumbrae differ. On WebGPU,
+and once the route has loaded (another `Shadows`, a device restore), it is already settled. Await it before a frame that
+must be exact, such as a film frame or a pixel comparison:
+
+```ts
+import {EngineKernel,box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const shadows = Shadows.attach(engine);
+shadows.add(engine.createMesh().setGeometry(box()).setPosition([0,1,0]));
+await shadows.ready;
+engine.render();
+```

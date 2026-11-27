@@ -2,8 +2,20 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
-const b = await openBrowser({ startPath: '/packages/scatter/test/attributes.html', port: 'free' }),
+const page = '/packages/scatter/test/attributes.html',
+  b = await openBrowser({ startPath: page, openPath: '/tools/shot/blank.html', port: 'free' }),
   errors = [];
+// The race of KB-SCATTER-ATTRCOMPAT1 on demand. The shadows compatibility route (fetched on the WebGL2 layer only) is
+// held until the first reference frame has been shown, as a loaded machine fetched it late: a page that draws before
+// Shadows.ready shows that reference without the route and its pair with it, so the pair differs every time. A page
+// that awaits ready cannot show the reference before the route, so the hold ends after 10 s.
+let release;
+const released = new Promise((done) => (release = done));
+await b.page.route('**/packages/shadows/dist/compat-*.js', async (route) => {
+  await Promise.race([released, new Promise((done) => setTimeout(done, 10000))]);
+  await route.continue();
+});
+await b.page.goto(new URL(page, b.page.url()).href);
 b.page.on('pageerror', (e) => errors.push(e.message));
 b.page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text());
@@ -31,6 +43,7 @@ await runSuite(
               restore,
               custom,
             });
+            if (reference) release();
             assert.deepEqual(r.errors, []);
             images.push((await decodePNG(await b.page.locator('canvas').screenshot())).data);
           }

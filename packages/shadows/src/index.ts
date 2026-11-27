@@ -550,6 +550,8 @@ export class Shadows implements EnginePlugin {
   private nearestRoute?: import('./compat.js').NearestRoute;
   /** True on the WebGL2 layer while ./compat.js loads: the nearest-depth reduction waits for it. */
   private nearestWaiting = false;
+  /** Settles once the device's route is in place: see {@link Shadows.ready}. */
+  private routeReady: Promise<void> = Promise.resolve();
   /** The map changed since the last reduction (while the filter was not `'soft'`, or before the first frame). */
   private nearestStale = true;
   private readonly nearestSeed = new Uint32Array(4).fill(0x3f800000);
@@ -1024,6 +1026,23 @@ export class Shadows implements EnginePlugin {
   // Frames whose clock moved since time 0: the soft filter's noise turn (`jitter`).
   private jitterFrames = 0;
   /** Seconds of frame time the effects' own clocks have moved by (a `lightPattern`'s scroll). A fresh one reads 0. */
+  /**
+   * Settles once every frame draws the shadows as it will from then on. On the WebGL2 compatibility layer the first
+   * Shadows of a page loads its compatibility route (a dynamic import) when it attaches, and until that has loaded the
+   * soft filter's blocker search spans its widest, so the penumbrae of those first frames differ. Resolved at once on
+   * WebGPU, and whenever the route has loaded before (another Shadows, a device restore). Read it after attaching, and
+   * await it before a frame that must be exact: a film frame, a pixel comparison (KB-SCATTER-ATTRCOMPAT1).
+   *
+   * @example
+   * ```ts
+   * const shadows = Shadows.attach(engine);
+   * await shadows.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
+  }
   get time(): number {
     return this.elapsed;
   }
@@ -1057,6 +1076,7 @@ export class Shadows implements EnginePlugin {
     const device = this.device;
     // Once the route has loaded, every later setup (a device restore, another Shadows) takes it at once: waiting for
     // import() again let the first frames on the new device run the WebGPU kernel on the layer's CPU tier.
+    this.routeReady = Promise.resolve();
     if (compatRoute && compatTier(device) === 'webgl2') this.nearestRoute = new compatRoute.NearestRoute(device);
     else {
       const route = loadCompatRoute(device, () => import('./compat.js'));
@@ -1077,6 +1097,12 @@ export class Shadows implements EnginePlugin {
           throw error;
         },
       );
+      // After the handlers above: by then the route (or, if it failed, the WebGPU kernel) is in place.
+      if (route)
+        this.routeReady = route.then(
+          () => undefined,
+          () => undefined,
+        );
     }
     this.validate();
     this.checkLimits();

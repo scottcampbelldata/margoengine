@@ -1475,17 +1475,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (and its bind groups per view) per key. Regression: `packages/terrain/test/capture.test.js` and
   `packages/water/test/capture.test.js` ("in two effects").
 
-### Open 2026-11-26: the instance attributes check on the WebGL2 layer differed once in its first case (KB-SCATTER-ATTRCOMPAT1, scatter, webgl2-compat)
+### Fixed 2026-11-27: the instance attributes check on the WebGL2 layer differed once in its first case (KB-SCATTER-ATTRCOMPAT1, shadows, scatter test)
 
 - **Repro:** `MARGO_COMPAT=1 node packages/scatter/test/attributes.browser.mjs` (workstation, RTX A6000): it failed once
   in 6 runs at its first case (samples 1, custom false, edited false, restore false), `ScatterInstances` and
   `AttributedScatter` drawing different pixels, run right after the 22 WebGPU scatter browser checks and while
   `npm run quality` ran; the next 5 runs passed all 18 cases, as did one run on origin/main.
-- **Cause:** not found yet. Both sides are `ScatterInstances` code (the lane B Scatter capture change does not reach
-  it); the first case is the first frame pair after the page loads, so a compatibility-layer pipeline or texture that
-  is not ready when `waitForPipelines` returns is the first suspect.
-- **Owed:** a repro that fails on demand (the first case under load), the root cause in its owning package and a
-  regression test.
+- **Cause:** not the scatter upload, the layer's buffer sync or the read-back. On the WebGL2 layer the first `Shadows`
+  of a page fetches its compatibility route by `import()` (`packages/shadows/src/index.ts`, KB-COMPAT-CPUBUDGET1), and
+  until it arrives the nearest-depth reduction waits, so the PCSS blocker search spans its widest and the penumbrae
+  differ. Later `Shadows` take the cached route at once. `waitForPipelines` counts pipelines only, so under load the
+  first reference frame was drawn before the route and its pair after it; 12 busy cores made it fail 5 runs in 20.
+  Nothing told a caller when the frames stop changing.
+- **Fix:** `Shadows.ready`, a promise that settles once the route (or, if it failed, the WebGPU kernel) is in place,
+  at once on WebGPU and whenever the route loaded before. The check awaits it before its frames.
+- **Tests:** `packages/scatter/test/attributes.browser.mjs` holds the route until the first reference frame is shown
+  (10 s at most), so a page that draws before `ready` fails its first case every time (3 of 3 without the await, at
+  samples 1, custom false, edited false, restore false); with it, 18 of 18 cases on the WebGL2 layer (3 runs) and on
+  WebGPU. `packages/shadows/test/compat-route-wait.test.js`: `ready` is pending until the route and the next frame
+  reduces on it; settled at once on WebGPU and once the route is cached.
 
 ### Fixed 2026-11-26: water added to SceneTargets or MeshBlend built an invalid capture stage (KB-WATER-TARGETS1, water, post)
 

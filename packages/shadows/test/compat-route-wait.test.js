@@ -30,12 +30,34 @@ test('on the WebGL2 layer the nearest-depth reduction waits for its route instea
   frame();
   assert.equal(kernels(), 0, 'no WebGPU atomics kernel while the route loads');
   assert.equal(levels(), 0, 'the route has not built its level yet');
-  for (let i = 0; i < 50 && !levels(); i++) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    frame();
-  }
-  assert.equal(levels(), 1, 'the first frame after the route arrives reduces the map on it');
+  // KB-SCATTER-ATTRCOMPAT1: those frames draw the widest blocker search, so a caller that needs exact frames waits for
+  // `ready`, which is pending until the route is in place and settles with it.
+  const pending = Symbol('pending');
+  assert.equal(await Promise.race([shadows.ready, Promise.resolve(pending)]), pending, 'ready waits for the route');
+  await shadows.ready;
+  frame();
+  assert.equal(levels(), 1, 'the first frame after ready reduces the map on the route');
   assert.equal(kernels(), 0, 'the WebGPU atomics kernel is not compiled on the layer');
   shadows.dispose();
   h.cleanup();
+});
+
+test('ready is settled at once on WebGPU, and on the WebGL2 layer once the route has loaded before', async () => {
+  const settled = async (shadows) => {
+    const pending = Symbol('pending');
+    return (await Promise.race([shadows.ready, Promise.resolve(pending)])) !== pending;
+  };
+  for (const vendor of ['nvidia', 'margo-webgl2']) {
+    const h = optionalGPU(),
+      engine = h.engine;
+    engine.gpu.adapterInfo = { vendor };
+    engine.gpu.limits.maxTextureDimension2D = 8192;
+    engine.gpu.limits.maxTextureArrayLayers = 256;
+    engine.lighting = { direction: new Float32Array([1, 2, 3, 3]) };
+    const shadows = new Shadows({ resolution: 64 });
+    engine.use(shadows);
+    assert.ok(await settled(shadows), vendor);
+    shadows.dispose();
+    h.cleanup();
+  }
 });

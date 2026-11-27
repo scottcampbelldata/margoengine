@@ -171,6 +171,7 @@ export class Shadows implements EnginePlugin {
         declarations: string;
         direct(direct: string, normal?: string): string;
     };
+    get ready(): Promise<void>;
     get time(): number;
     resetTime(): void;
     advanceTime(delta: number): void;
