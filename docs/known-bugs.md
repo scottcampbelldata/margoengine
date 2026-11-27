@@ -110,6 +110,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Open:** the in-line wake's coupling at a flexible cylinder's high modes, calibrated on one riser data set and checked
   on another.
 
+### Open 2026-11-27: KVLCC2 is too course-stable in shallow water (KB-SHIP-SHALLOW1, physics ship)
+
+- **Repro:** `shallowWater(KVLCC2_L7, depth)` at 7 kn full scale (`packages/physics/tests/ship.test.js`, "banks and shallows
+  against measurement").
+  - At h/T 1.2 the first overshoot of a 20/5 zigzag is 2.1 degrees, where KRISO measured 3.8 (Yun et al. 2015) and FHR
+    4.7 (Eloot et al. 2015).
+  - At h/T 1.5 it is 3.3, where KRISO measured 8.0.
+  - In a 35 degree turn the model reaches 40 degrees of heading 3.3 L along at h/T 1.2 and 2.3 L at 1.5, where KRISO
+    measured 2.0 and 1.7.
+  - The trend with depth is right; the size is not.
+- **Cause, not yet found.** Ankudinov et al.'s 1990 factors on Yasukawa and Yoshimura's deep-water derivatives make the
+  hull too stable as it shoals. Eloot et al. report the same of other mathematical models at 20 percent under-keel
+  clearance. Even at h/T 2.0 and in deep water the model turns slower at 7 kn than KRISO's h/T 2.0 test. The deep-water
+  derivatives at this low speed, and the shallow-water rudder and propeller interaction constants (kept from deep water),
+  are the next suspects.
+- **Ruled out:** Kijima et al.'s 1990 factors, which turn KVLCC2 tighter in shallow water against every measurement.
+- **What to use:** the trend (wider turns and smaller overshoots as the water shoals) for direction, not KVLCC2's numbers
+  in shallow water.
+
 ### Open 2026-11-27: KCS heels out too far as it starts a turn and too little in the steady turn (KB-SHIP-HEEL1, physics ship)
 
 - **Repro:** `KCS_MODEL` at Fn 0.26, 35 degrees of rudder (`packages/physics/tests/ship.test.js`, "KCS heels outward in its

@@ -1763,3 +1763,62 @@ test("measured checks: Sysser 1 in the Delft tank, the yacht FAIR V at sea, and 
     (e) => e.code === 'unsupported' && /Four-quadrant/.test(e.message),
   );
 });
+
+test("banks and shallows against measurement: Vantorre et al.'s container ship by a wall, and KVLCC2's zigzags and turns in shallow water", () => {
+  // Model D, the container carrier of Vantorre et al. 2003 (Fig. 4, read from the figure to 2 to 10 units), at Fn 0.065 with
+  // its screw stopped: 1000 N' against y_B. The moment, which steers the ship, is within 35 percent at h/T 1.5 and 1.1 and
+  // the sway force's sign is right there; at h/T 1.2, near the attraction-to-repulsion change, the force runs to repulsion
+  // where the measured one stays near nothing (docs/limits.md). Their regression fits three hulls, this one of them.
+  const D = { length: 3.864, beam: 0.55, draught: 0.18, block: 0.588, diameter: 0.12 },
+    V = 0.065 * Math.sqrt(9.81 * D.length),
+    q = 0.5 * 1000 * D.length * D.draught * V * V;
+  for (const [hT, yB, Y, N] of [
+    [1.5, 0.44, 24, -9.8],
+    [1.5, 0.67, 41, -15],
+    [1.5, 0.78, 51, -17.6],
+    [1.1, 0.28, -60, -30],
+    [1.1, 0.67, -188, -102],
+    [1.1, 0.78, -232, -117],
+  ]) {
+    const r = bankLoads(D, yB, hT * D.draught, V, 0, 1000, 9.81),
+      n = (1000 * r.N) / (q * D.length),
+      y = (1000 * r.Y) / q;
+    assert.ok(Math.abs(n / N - 1) < 0.35, `h/T ${hT}, y_B ${yB}: N' ${n} against ${N}`);
+    assert.ok(
+      Math.sign(y) === Math.sign(Y) && Math.abs(y / Y - 1) < 0.45,
+      `h/T ${hT}, y_B ${yB}: Y' ${y} against ${Y}`,
+    );
+  }
+  // KVLCC2 in shallow water at 7 kn (Yun et al. 2015, KRISO; Eloot et al. 2015, FHR): the first overshoot of a 20/5
+  // zigzag falls from 8.0 degrees at h/T 1.5 to 3.8 and 4.7 at 1.2, and the turn to 40 degrees of heading runs further:
+  // 1.61, 1.69 and 2.00 L at h/T 2.0, 1.5 and 1.2. The model follows the trend but is too course-stable in shallow water
+  // (KB-SHIP-SHALLOW1): overshoots 2.1 and 3.3 degrees, turns 2.1 to 3.3 L.
+  const k = 320 / 7,
+    v0 = (7 * 0.514444) / Math.sqrt(k),
+    rate = 2.32 * DEG * Math.sqrt(k),
+    at = (hT) => {
+      const model = shallowWater(KVLCC2_L7, hT * KVLCC2_L7.draught),
+        z = new Manoeuvring(model, { u: v0 }, { rudderRate: rate });
+      z.revolutions = z.selfPropulsion(v0);
+      z.order = 20 * DEG;
+      let flipped = false,
+        overshoot = null;
+      while (z.time < 2000 && overshoot === null) {
+        z.step(0.05);
+        if (!flipped && z.state.heading > 5 * DEG) (z.order = -20 * DEG), (flipped = true);
+        if (flipped && z.state.r < 0) overshoot = z.state.heading / DEG - 5;
+      }
+      const t = new Manoeuvring(model, { u: v0 }, { rudderRate: rate });
+      t.revolutions = t.selfPropulsion(v0);
+      t.order = 35 * DEG;
+      while (t.state.heading < 40 * DEG) t.step(0.05);
+      return { overshoot, reach: t.state.x / 7 };
+    },
+    h12 = at(1.2),
+    h15 = at(1.5),
+    h20 = at(2);
+  assert.ok(
+    h12.overshoot < h15.overshoot && h12.reach > h15.reach && h15.reach > h20.reach,
+    JSON.stringify([h12, h15, h20]),
+  );
+});

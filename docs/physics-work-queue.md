@@ -507,7 +507,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
 | SEA-08 | Ship seakeeping | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 0ae7b50ae2 |
-| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
+| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | LANDED 2026-11-27: every audit item rebuilt, one line each with its commit and test in [physics-solver-audit.md](physics-solver-audit.md) (heel 3b2e7f40d, shallow 9bc70c24f, waves 2cb031463, planing 0a8cb3001, sailing 3757ece30, oars 1e1f51c75, B-series 19c4a1968 and d4fda7e34, ice d44a80c70, autopilot and Holtrop c6f276858, banks bb82cd307, coded errors and thruster 7b1f858e9, speed order and work counts a7a422029); open defects KB-SHIP-HEEL1 and KB-SHIP-SHALLOW1 |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | BUILDING (codex/physics-sea-12-upgrade) |

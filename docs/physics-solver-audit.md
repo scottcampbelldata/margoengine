@@ -802,7 +802,7 @@ Codex reported its solvers upgraded while the queue still showed them REOPENED o
 5. Add the hull solver to a browser/GPU render fixture, and show a measured scaling record (no Wasm, threads or work counts exist for this solver, so point 6 is unmet).
 6. Bind the production cabin shots (EF-3, EF-10) and re-render.
 
-### SEA-09 Ships under way, manoeuvring (`@margoengine/physics/ship`, commits ebfc65dbb, 3c2f57931, 7fc896c99, 663671e17, f4c07368e), owner Codex: REOPENED
+### SEA-09 Ships under way, manoeuvring (`@margoengine/physics/ship`, commits ebfc65dbb, 3c2f57931, 7fc896c99, 663671e17, f4c07368e; rebuilt 2026-11-27 by Claude), owner Claude: LANDED (open defects KB-SHIP-HEEL1, KB-SHIP-SHALLOW1)
 
 **Checked.** Read packages/physics/src/ship (solver, mmg, empirical, race, propeller, resistance, squat; 2,361 lines), packages/physics/tests/ship.test.js and packages/physics/tests/coupling/ship.test.js, the catalog row, the audit row and notes, and KB-SHIP-DAMP1. Ran `node --test packages/physics/tests/ship.test.js` under run-with-timeout: 18 tests, 18 pass, on packages built from current main (a first run during a rebuild failed the SEA-15 jet test; it passes on the fresh build). `tests/coupling/ship.test.js`: 2 pass. There is no browser or GPU test for this entry.
 
@@ -844,6 +844,26 @@ Codex reported its solvers upgraded while the queue still showed them REOPENED o
 6. Throw MargoError with a help link and fix instead of TypeError and RangeError.
 7. Add a Rust/Wasm path or recorded work counts, and ICE-04 and AERO-02 coupling tests.
 8. Replace the thruster, shaft depth and quay constants with cited values.
+
+**Rebuilt 2026-11-27 (Claude), each audit item with its commit on `main` and its test** (tests in `packages/physics/tests/ship.test.js` unless named):
+1. Race and rudder jet — done before (3c2f57931).
+2. Empirical derivatives — done before (3c2f57931); the KCS model now adds a second measured hull.
+3. 4-DOF MMG with heel — 3b2e7f40d (Fukui et al. 2016, KCS): "KCS heels outward in its turn", "a rigid body held by the ship solver heels in its turn"; its heel angles are an open defect, KB-SHIP-HEEL1.
+4. Shallow-water derivatives — 9bc70c24f (Ankudinov et al. 1990; Kijima's factors tried and refused, they turn KVLCC2 tighter): "in shallow water a hull's derivatives and added masses are Ankudinov's"; against KRISO's and FHR's measured KVLCC2: "banks and shallows against measurement" (trend right, too course-stable: KB-SHIP-SHALLOW1).
+5. Manoeuvring in waves — 2cb031463 (SNNM added resistance, short-wave drift, Yasukawa 2006): "waves' mean drift", "KVLCC2 turns in an irregular head sea" (Hasnan et al. 2019), coupling "ShipSolver in waves".
+6. Savitsky planing — 0a8cb3001 (Savitsky steady; Zarnick strips with Garme's transom dynamic): "a planing hull's steady run" (Shoemaker), "a planing boat on a rigid body" (Fridsma 1969), `coupling/planing.test.js`.
+7. Sailing hull, heel, leeway, keel lift, VPP, AERO-02 — 3757ece30 (DSYHS, ORC 2023): "a sailing yacht", `coupling/sailing.test.js` (with AERO-02's `SailForce` cloth); measured: d4fda7e34, "measured checks" (Sysser 1 in the tank, FAIR V at sea).
+8. Oars — 1e1f51c75 (Caplan and Gardner's Macon blade): "oars" (Holt et al. single scull, Coppel et al. eight), `coupling/rowing.test.js`.
+9. Wageningen B-series — 19c4a1968 and c80430a84 (Oosterveld and van Oossanen 1975): "a Wageningen B-series propeller's open water"; four quadrants from measurement d4fda7e34 (B4-70, Roddy et al.): "measured checks".
+10. `holtropMennen` wired — c6f276858: "a hull given to the ship runs on Holtrop and Mennen's resistance".
+11. Autopilot and track targets — c6f276858: "the autopilot places the closed loop's poles", "the autopilot follows a track of waypoints"; the speed order a7a422029: "the ships' work counts ... and the telegraph holds a speed order through ice".
+12. ICE-04 coupling — d44a80c70 (Riska et al. 1997 level ice; ICE-04 floes): "level ice resists a ship", `coupling/ship.test.js` "ShipSolver with PackIceSolver".
+13. SIMMAN validation — 3b2e7f40d: KCS against MARIN and KRISO, KVLCC2 against SIMMAN 2008 and 2014, bounds from the data's spread; bank effect bb82cd307 (Vantorre et al. 2003): "a bank alongside draws a ship in", and against measured bank forces (Vantorre's container ship, FHR's KVLCC2): "banks and shallows against measurement". Lataire's own data are figures only; the comparison and its limits are in docs/limits.md.
+14. Red flags — the thruster's merit from Beveridge's measurements (7b1f858e9, "a tunnel thruster keeps its momentum bound"); the quay pull replaced by Vantorre's regression (bb82cd307); the squat cap and the shaft depth stated as assumptions in docs/limits.md.
+15. Damping counted twice with HullSolver — done before (KB-SHIP-DAMP1).
+16. Rust/Wasm — recorded work counts instead, a7a422029: "the ships' work counts are deterministic and grow with the fleet", and each coupling test's count check.
+17. Coded errors — 7b1f858e9: "the ship solver refuses what it cannot be made from", and a coded refusal test in each new test above.
+Film controls: heading, track and speed orders (c6f276858, a7a422029), thrust (planing), stroke rate and turn (rowing), heading, FLAT and reef (sailing).
 
 ### SEA-10 Damage, flooding, capsize, sinking (`@margoengine/physics/seakeeping`, `Flooding` in `packages/physics/src/seakeeping/flooding.ts`, commits 533cc7249, 785aea704, 8fb5ed774, a0325f916, 24e67d6ff, f82be85af), owner Codex: REOPENED
 
