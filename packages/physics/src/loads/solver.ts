@@ -15,9 +15,8 @@
 //
 // State: the wake oscillators. Couple it before the rigid solver: `world.couple(['loads', 'rigid'], 'staggered')`.
 import { invalidLoad } from './errors.js';
-import type { FlowField, FlowSample, SeaSurface, Wind } from '@margoengine/math/fields';
+import type { FlowCell, FlowField, FlowSample, SeaSurface, Wind } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
-import { pow } from '@margoengine/math/pinned';
 import { type HullMesh, type WettedLoads, wettedLoads } from '../seakeeping/wetted.js';
 import { regionWords } from '../world/memory.js';
 import {
@@ -32,8 +31,17 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { boxSurface, ellipsoidHydrostatics, meshHydrostatics } from './buoyancy.js';
-import { cylinderCoefficients, sphereDrag, tangentialDrag, wakeStep } from './morison.js';
+import {
+  compactDragArea,
+  compactDragGeometry,
+  type CompactDragGeometry,
+  compactSpinTorque,
+  compactWindLoad,
+} from './compact-drag.js';
+import { bindLoadsKernel, LOADS_KERNEL_WORDS, loadLoadsBuilds, type LoadsBuilds, type LoadsKernel } from './kernel.js';
+import { cylinderCoefficients, tangentialDrag, wakeStep } from './morison.js';
 import { memberOrbit } from './oscillatory.js';
+import { type LocatedWater, localFlow, localSea } from './origin.js';
 import { type LoadRadiationMode, prepareRadiation, type RadiationMode } from './radiation.js';
 import { ellipsoidAddedInertia, ellipsoidAddedMass, equivalentEllipsoid } from './shapes.js';
 import { smoothOscillatoryCylinder } from './smooth-cylinder.js';
@@ -46,7 +54,6 @@ export const SEA_WATER_VISCOSITY = 1.19e-6;
 
 /** The water a {@link LoadSolver} loads bodies in: its surface's height, its flow and its density. */
 export type LoadWater = Pick<SeaSurface, 'elevation' | 'water' | 'density'>;
-type PressureWater = LoadWater & Partial<Pick<SeaSurface, 'pressure'>>;
 
 /** A compact body's shape in its frame: an ellipsoid (semi-axes, m), a sphere (radius), a box (half extents) or a mesh. */
 export type LoadShape =
@@ -61,8 +68,10 @@ export interface LoadBody {
   readonly shape: LoadShape;
   /** Where the shape's centre is in the body's frame, m (default the body's origin; a mesh's own centroid when a mesh). */
   readonly centre?: readonly [number, number, number];
-  /** Drag coefficients along the shape's three axes (default a sphere's by Reynolds number, else 1.0, a bluff body). */
+  /** Drag coefficients along the shape's three axes. The default follows Reynolds number and shape. */
   readonly drag?: number | readonly [number, number, number];
+  /** Scale the independent rotational viscous torque, default 1. */
+  readonly spinDrag?: number;
   /** Added mass coefficients along its three axes (default Lamb's for the ellipsoid; 0.25 of the body's mass across for a diver, `0.68` for a cube). */
   readonly addedMass?: readonly [number, number, number];
   /** Rotational added inertia in m² per displaced kilogram, or 'ellipsoid' for Lamb's value. Default zero. */
@@ -71,7 +80,7 @@ export interface LoadBody {
   readonly radiation?: readonly LoadRadiationMode[];
   /** 'surface' integrates incident pressure on a box or closed mesh. Default 'compact' uses a local plane and point acceleration. */
   readonly pressureModel?: 'compact' | 'surface';
-  /** The wind's drag coefficient on its emerged part (default 1.0). */
+  /** The wind's drag coefficient on its emerged area. The default follows Reynolds number and shape. */
   readonly windage?: number;
 }
 
@@ -107,6 +116,8 @@ export interface LoadParams {
   readonly members?: readonly LoadMember[];
   /** The water's kinematic viscosity, m^2/s (default 1.19e-6). */
   readonly viscosity?: number;
+  /** Metres per PhysicsWorld origin cell, default 4096. Match the containing world when it uses another cell size. */
+  readonly cellSize?: number;
   /** Body rows its `bodyForces` port covers. Omit to use the world's rigid body capacity. */
   readonly capacity?: number;
   readonly level?: RateLevel;
@@ -122,6 +133,7 @@ interface BodyRuntime {
   readonly addedMass: Vec3;
   readonly addedInertia: Vec3;
   readonly radiation: readonly RadiationMode[];
+  readonly dragGeometry: CompactDragGeometry;
   readonly sphere: boolean;
   /** A box's exact half extents, also used for its vertical support. */
   readonly box: Vec3 | undefined;
@@ -145,12 +157,25 @@ export interface MemberLoad {
 
 /** The water's loads on bodies and members. `id` is `'loads'` by default. */
 export class LoadSolver implements Solver<LoadParams> {
+  /** Create a solver that holds body wrenches in one optional Rust/SIMD batch. */
+  static async load({
+    id = 'loads',
+    signal,
+  }: {
+    readonly id?: string;
+    readonly signal?: AbortSignal;
+  } = {}): Promise<LoadSolver> {
+    const solver = new LoadSolver(id);
+    solver.builds = await loadLoadsBuilds(signal);
+    return solver;
+  }
+
   private readonly id: string;
   private host!: SolverHost;
   private level: RateLevel = 0;
   private g = 9.81;
   private nu = SEA_WATER_VISCOSITY;
-  private sea!: PressureWater;
+  private sea!: LocatedWater;
   private flows: readonly FlowField[] = [];
   private wind: Wind | undefined;
   private bodies: BodyRuntime[] = [];
@@ -159,13 +184,28 @@ export class LoadSolver implements Solver<LoadParams> {
   private forces!: Region;
   private wakes!: Region;
   private history: Region | undefined;
+  private builds: LoadsBuilds | undefined;
+  private native: { kernel: LoadsKernel; scratch: Region } | undefined;
+  private heldBodies = 0;
+  private batchCalls = 0;
   private cell: [number, number, number] = [0, 0, 0];
+  private sampleCell: FlowCell = [0, 0, 0];
+  private cellSize = 4096;
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly hydrostatic: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
   private readonly pressure: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
 
   constructor(id = 'loads') {
     this.id = id;
+  }
+
+  /** Counts from the last step. Native workspace size remains fixed for the world's row capacity. */
+  workCounts(): { readonly heldBodies: number; readonly batchCalls: number; readonly scratchBytes: number } {
+    return {
+      heldBodies: this.heldBodies,
+      batchCalls: this.batchCalls,
+      scratchBytes: this.native?.scratch.byteLength ?? 0,
+    };
   }
 
   describe(): SolverDescription {
@@ -188,6 +228,7 @@ export class LoadSolver implements Solver<LoadParams> {
       bodies = [],
       members = [],
       viscosity = SEA_WATER_VISCOSITY,
+      cellSize = 4096,
       level = 0,
     } = params ?? ({} as LoadParams);
     if (!sea || typeof sea.elevation !== 'function' || typeof sea.water?.sample !== 'function')
@@ -200,11 +241,15 @@ export class LoadSolver implements Solver<LoadParams> {
       throw invalidLoad(`A kinematic viscosity is finite m^2/s above 0 (got ${viscosity}); pass one, or 1.19e-6.`);
     if (!(Number.isInteger(level) && level >= 0 && level <= 7))
       throw invalidLoad(`A rate level is a whole number from 0 to 7 (got ${level}); pass one.`);
+    if (!(Number.isFinite(cellSize) && cellSize > 0))
+      throw invalidLoad('Invalid hydrodynamic origin cell size; use the positive length in metres from PhysicsWorld.');
     this.host = host;
     this.g = gravityMagnitude(host.gravity ?? DEFAULT_GRAVITY);
-    this.sea = sea;
-    this.flows = flows;
-    this.wind = wind;
+    this.cellSize = cellSize;
+    const offsetOf = (cell: FlowCell) => this.offsetOf(cell);
+    this.sea = localSea(sea, offsetOf);
+    this.flows = flows.map((flow) => localFlow(flow, offsetOf));
+    this.wind = wind && localFlow(wind, offsetOf);
     this.nu = viscosity;
     this.level = level as RateLevel;
     const rows: number[] = [];
@@ -265,6 +310,16 @@ export class LoadSolver implements Solver<LoadParams> {
     this.forces = host.allocate('forces', Math.max(1, capacity) * FORCE_WORDS * 8, 'f64', LOADS_LAYOUT);
     this.wakes = host.allocate('wakes', Math.max(1, members.length) * 2 * 8, 'f64', LOADS_LAYOUT);
     if (radiationWords > 1) this.history = host.allocate('radiation', radiationWords * 8, 'f64', LOADS_LAYOUT);
+    if (this.builds) {
+      const kernel = bindLoadsKernel(host, this.builds);
+      const scratch = host.allocate(
+        'held-wrench-scratch',
+        Math.max(1, capacity) * LOADS_KERNEL_WORDS * 8,
+        'f64',
+        LOADS_LAYOUT,
+      );
+      this.native = { kernel, scratch };
+    }
     // The wake oscillators start at the free van der Pol cycle's amplitude, q = 2.
     const wakes = regionWords(host.memory, this.wakes) as Float64Array;
     for (let i = 0; i < members.length; i++) wakes[2 * i] = 2;
@@ -322,6 +377,17 @@ export class LoadSolver implements Solver<LoadParams> {
       throw invalidLoad(
         "Surface pressure needs a box or closed mesh and sea.pressure; supply both or choose 'compact'.",
       );
+    const drag = spec.drag;
+    const validDrag = (coefficient: number) => coefficient >= 0 && Number.isFinite(coefficient);
+    if (
+      drag !== undefined &&
+      !(typeof drag === 'number' ? validDrag(drag) : Array.isArray(drag) && drag.length === 3 && drag.every(validDrag))
+    )
+      throw invalidLoad(
+        'Invalid body drag; give one finite nonnegative coefficient or three coefficients along the shape axes.',
+      );
+    if (!validDrag(spec.spinDrag ?? 1) || !validDrag(spec.windage ?? 1))
+      throw invalidLoad('Invalid wind or spin drag; supply finite nonnegative windage and spinDrag values.');
     const sphere = Math.max(...axes) < 1.05 * Math.min(...axes),
       addedMass = (spec.addedMass ? [...spec.addedMass] : ellipsoidAddedMass(axes)) as Vec3;
     if (addedMass.length !== 3 || !addedMass.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient)))
@@ -335,7 +401,8 @@ export class LoadSolver implements Solver<LoadParams> {
       !addedInertia.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient))
     )
       throw invalidLoad('Invalid rotational added inertia; give three finite nonnegative m² values or use ellipsoid.');
-    return { spec, axes, frame, centre, volume, addedMass, addedInertia, radiation, sphere, box, mesh };
+    const dragGeometry = compactDragGeometry(volume, axes, frame, mesh, box);
+    return { spec, axes, frame, centre, volume, addedMass, addedInertia, radiation, dragGeometry, sphere, box, mesh };
   }
 
   /** The water's velocity at a point and time: the sea's water plus every flow (water.ts). */
@@ -348,8 +415,18 @@ export class LoadSolver implements Solver<LoadParams> {
     return waterAcceleration(this.sea, this.flows, x, y, z, t, this.sample, out);
   }
 
+  private offsetOf(cell: FlowCell): Vec3 {
+    return [
+      (this.sampleCell[0] - cell[0]) * this.cellSize,
+      (this.sampleCell[1] - cell[1]) * this.cellSize,
+      (this.sampleCell[2] - cell[2]) * this.cellSize,
+    ];
+  }
+
   step(context: StepContext, _dt: number): void {
     this.cell = [context.cell[0], context.cell[1], context.cell[2]];
+    const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
+    this.sampleCell = port?.cell ?? this.cell;
     const out = regionWords(this.host.memory, this.forces) as Float64Array,
       wakes = regionWords(this.host.memory, this.wakes) as Float64Array,
       dt = 1 / rateOf(context.level),
@@ -357,14 +434,14 @@ export class LoadSolver implements Solver<LoadParams> {
       rho = this.sea.density,
       history = this.history ? (regionWords(this.host.memory, this.history) as Float64Array) : undefined;
     out.fill(0);
-    const port: Port | undefined = context.inputs.get(BODIES_FIELD.name),
-      bodies = port
-        ? new Float32Array(
-            (port.region.memory ?? this.host.memory).buffer,
-            port.region.byteOffset,
-            port.region.byteLength / 4,
-          )
-        : undefined;
+    this.rows.clear();
+    const bodies = port
+      ? new Float32Array(
+          (port.region.memory ?? this.host.memory).buffer,
+          port.region.byteOffset,
+          port.region.byteLength / 4,
+        )
+      : undefined;
     for (const b of this.bodies) {
       if (!bodies) break;
       const at = b.spec.row * BODY_WORDS;
@@ -372,7 +449,10 @@ export class LoadSolver implements Solver<LoadParams> {
       this.loadBody(b, bodies, at, t, dt, rho, history);
     }
     this.members.forEach((m, index) => this.loadMember(m, index, bodies, t, dt, rho, wakes));
-    this.hold(out, bodies);
+    this.heldBodies = this.rows.size;
+    this.batchCalls = 0;
+    if (this.native && bodies && this.heldBodies > 0) this.holdNative(bodies, this.native);
+    else this.hold(out, bodies);
     if (history) history[0] = 1;
   }
 
@@ -479,46 +559,49 @@ export class LoadSolver implements Solver<LoadParams> {
         const along = dot(a, axesWorld[i]!);
         for (let k = 0; k < 3; k++) force[k]! += added[i]! * along * axesWorld[i]![k]!;
       }
-      // Drag on the relative velocity per axis, over the projected area across each axis.
-      const areas = [Math.PI * ay * az, Math.PI * ax * az, Math.PI * ax * ay],
-        diameter = 2 * pow(ax * ay * az, 1 / 3),
-        given = b.spec.drag,
-        cd = (i: number) =>
-          given === undefined
-            ? b.sphere && speed > 0
-              ? sphereDrag((speed * diameter) / this.nu)
-              : 1
-            : typeof given === 'number'
-              ? given
-              : given[i]!;
+      // Use the actual projection normal to each principal axis and the local relative speed.
+      const geometry = b.dragGeometry;
+      const given = b.spec.drag;
       for (let i = 0; i < 3; i++) {
-        const along = dot(vr, axesWorld[i]!),
-          f = 0.5 * rho * cd(i) * areas[i]! * wet * speed * along;
-        for (let k = 0; k < 3; k++) force[k]! += f * axesWorld[i]![k]!;
-      }
-      // A spinning body's drag by strip theory: about axis i, the two others sweep as rods, -1/2 rho C_D w |w| (a_j a_k^4 +
-      // a_k a_j^4) / 2.
-      for (let i = 0; i < 3; i++) {
-        const j = (i + 1) % 3,
-          k2 = (i + 2) % 3,
-          spin = dot(w, axesWorld[i]!),
-          aj = b.axes[j]!,
-          ak = b.axes[k2]!,
-          lever = (aj * ak * ak * ak * ak + ak * aj * aj * aj * aj) / 2,
-          m = -0.5 * rho * cd(i) * wet * spin * Math.abs(spin) * lever;
-        for (let k = 0; k < 3; k++) torque[k]! += m * axesWorld[i]![k]!;
+        const axis = axesWorld[i]!;
+        const area = compactDragArea(
+          geometry,
+          speed,
+          this.nu,
+          geometry.areas[i]!,
+          b.sphere,
+          typeof given === 'number' ? given : given?.[i],
+          i,
+        );
+        const f = 0.5 * rho * area * wet * speed * dot(vr, axis);
+        const m = compactSpinTorque(geometry, i, dot(w, axis), wet, rho, this.nu, b.spec.spinDrag);
+        for (let k = 0; k < 3; k++) {
+          force[k]! += f * axis[k]!;
+          torque[k]! += m * axis[k]!;
+        }
       }
     }
-    // The wind on the emerged part.
-    if (this.wind && wet < 1) {
-      const air = this.wind.sample(centre[0], Math.max(centre[1], surface) + 1, centre[2], t, this.sample),
-        rel: Vec3 = [air.velocity[0] - v[0], 0, air.velocity[2] - v[2]],
-        speed = Math.sqrt(dot(rel, rel)),
-        horizontal = Math.sqrt(ax * ay + ay * az + ax * az),
-        area = Math.PI * horizontal * half * (1 - wet),
-        f = 0.5 * (air.density || 1.225) * (b.spec.windage ?? 1) * area * speed;
-      force[0] += f * rel[0];
-      force[2] += f * rel[2];
+    const wind = this.wind;
+    if (wind) {
+      const load = compactWindLoad(
+        b.dragGeometry,
+        axesWorld,
+        q,
+        depth,
+        v,
+        w,
+        sub(centre, cm),
+        (offset) => wind.sample(centre[0] + offset[0], centre[1] + offset[1], centre[2] + offset[2], t, this.sample),
+        b.sphere,
+        b.spec.windage,
+      );
+      if (load) {
+        const arm = cross(load.offset, load.force);
+        for (let k = 0; k < 3; k++) {
+          force[k]! += load.force[k]!;
+          torque[k]! += arm[k]!;
+        }
+      }
     }
     // The added mass tensor sum_i A_i e_i e_i^T in world axes, held with the row's other loads.
     const acc = this.rowOf(b.spec.row, mass),
@@ -593,6 +676,36 @@ export class LoadSolver implements Solver<LoadParams> {
     this.rows.clear();
   }
 
+  private holdNative(bodies: Float32Array, { kernel, scratch }: { kernel: LoadsKernel; scratch: Region }): void {
+    const words = regionWords(this.host.memory, scratch) as Float64Array;
+    let at = 0;
+    for (const [row, load] of this.rows) {
+      words[at] = row;
+      words[at + 1] = load.mass;
+      words.set(load.force, at + 2);
+      words.set(load.torque, at + 5);
+      words.set(load.added, at + 8);
+      if (load.rotational) words.set(load.rotational, at + 17);
+      else words.fill(0, at + 17, at + 26);
+      const inertia = row * BODY_WORDS + 17;
+      for (let axis = 0; axis < 6; axis++) words[at + 26 + axis] = bodies[inertia + axis]!;
+      at += LOADS_KERNEL_WORDS;
+    }
+    const result = kernel.loads_hold(
+      scratch.byteOffset,
+      this.heldBodies,
+      this.forces.byteOffset,
+      this.forces.byteLength / (FORCE_WORDS * 8),
+      this.g,
+    );
+    if (result !== 0)
+      throw invalidLoad(
+        `Cannot hold hydrodynamic loads at batch row ${result}; supply finite forces and positive body masses.`,
+      );
+    this.batchCalls = 1;
+    this.rows.clear();
+  }
+
   /** A member's Morison load at two Gauss points, with its wake oscillator. */
   private loadMember(
     m: LoadMember,
@@ -624,6 +737,10 @@ export class LoadSolver implements Solver<LoadParams> {
       mass = bodies[at + 16]! > 0 ? 1 / bodies[at + 16]! : 0;
       if (mass === 0) return;
       onBody = true;
+    } else {
+      const offset = this.offsetOf(this.cell);
+      from = sub(from, offset);
+      to = sub(to, offset);
     }
     const axis = sub(to, from),
       length = Math.sqrt(dot(axis, axis));

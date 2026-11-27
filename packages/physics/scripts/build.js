@@ -198,6 +198,8 @@ for (const name of ['pack-ice-kernel.wasm', 'pack-ice-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/pack-ice', name), resolve(dist, name));
 
 await copyFile(resolve(root, 'src/seakeeping/hull-panel-kernel.wasm'), resolve(dist, 'hull-panel-kernel.wasm'));
+for (const name of ['loads-kernel.wasm', 'loads-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/loads', name), resolve(dist, name));
 
 for (const name of ['thin-film-kernel.wasm', 'thin-film-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/thin-film', name), resolve(dist, name));

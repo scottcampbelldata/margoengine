@@ -91,6 +91,20 @@ export const BLUEPRINTS = [
     script: 'packages/physics/scripts/build-hull-panel-kernel.mjs',
   },
   {
+    name: 'loads-kernel',
+    crate: 'packages/physics/loads-kernel',
+    blueprint: 'packages/physics/src/loads/loads-kernel.wasm',
+    script: 'packages/physics/scripts/build-loads-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'loads-kernel-shared',
+    crate: 'packages/physics/loads-kernel',
+    blueprint: 'packages/physics/src/loads/loads-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-loads-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'pbf-kernel',
     crate: 'packages/physics/pbf-kernel',
     blueprint: 'packages/physics/src/pbf/pbf-kernel.wasm',

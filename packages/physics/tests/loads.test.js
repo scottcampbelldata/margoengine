@@ -30,7 +30,7 @@ import {
   wakeAmplification,
   washOnBed,
 } from '../dist/loads.js';
-import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../dist/world.js';
+import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../dist/world.js';
 
 await Physics.load();
 const near = (a, b, t) => Math.abs(a / b - 1) <= t;
@@ -194,7 +194,7 @@ function still(current = [0, 0, 0], elevation = () => 0) {
   };
 }
 
-function world(sea, bodies, members = [], extra = {}, gravity = [0, -9.81, 0]) {
+function world(sea, bodies, members = [], extra = {}, gravity = [0, -9.81, 0], cells = {}) {
   const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity }),
     made = bodies.map((b) =>
       physics.addBody(null, {
@@ -202,19 +202,24 @@ function world(sea, bodies, members = [], extra = {}, gravity = [0, -9.81, 0]) {
         rotation: b.rotation,
         linearDamping: b.damping,
         angularDamping: b.damping,
+        angularVelocity: b.spin,
         colliders: b.collider,
         linearVelocity: b.velocity ?? [0, 0, 0],
       }),
     ),
     loads = new LoadSolver(),
     w = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity })
-      .add(new RigidSolver(), { physics })
-      .add(loads, {
-        sea,
-        bodies: bodies.map((b, i) => ({ row: made[i].row, ...b.load })),
-        members: members.map((m) => ({ ...m, row: m.on === undefined ? undefined : made[m.on].row })),
-        ...extra,
-      })
+      .add(new RigidSolver(), { physics }, cells.rigid)
+      .add(
+        loads,
+        {
+          sea,
+          bodies: bodies.map((b, i) => ({ row: made[i].row, ...b.load })),
+          members: members.map((m) => ({ ...m, row: m.on === undefined ? undefined : made[m.on].row })),
+          ...extra,
+        },
+        cells.loads,
+      )
       .couple(['loads', 'rigid'], 'staggered');
   return { physics, bodies: made, loads, world: w };
 }
@@ -354,6 +359,144 @@ test('SEA-12 a sloping waterline applies mesh pressure when the body centre is d
   assert.ok(near(row[at + 5], (centre[0] + centre[1]) * load, 1e-12));
 });
 
+test('SEA-12 open-water bodies and fixed members transform independent flow cells exactly', () => {
+  const cellSize = 8192;
+  const call = (origin, otherCell) => {
+    const offset = otherCell.map((coordinate, i) => (coordinate - origin[i]) * cellSize);
+    const sea = still([0, 0, 0], (x) => 0.25 * (x + offset[0]) - offset[1]);
+    sea.cell = otherCell;
+    sea.water.cell = otherCell;
+    sea.pressure = (x, y) => 1025.9 * 9.81 * Math.max(0, 0.25 * (x + offset[0]) - (y + offset[1]));
+    const flow = still().water;
+    flow.cell = [origin[0] - 1, origin[1], origin[2]];
+    flow.sample = (x, _y, _z) => ({ velocity: [0.75 + (x - cellSize) / 8, 0, 0], density: 1025.9 });
+    const halfExtents = [1, 0.5, 0.5];
+    const {
+      bodies,
+      loads,
+      world: simulation,
+    } = world(
+      sea,
+      [
+        {
+          position: [0, 0.25, 0],
+          collider: { shape: 'box', halfExtents, mass: 300 },
+          load: { shape: { box: halfExtents }, drag: 0, addedMass: [0, 0, 0], pressureModel: 'surface' },
+        },
+      ],
+      [{ from: [0, -1.5 - offset[1], 0], to: [0, -0.5 - offset[1], 0], diameter: 0.12, period: Infinity }],
+      { flows: [flow], cellSize },
+      [0, -9.81, 0],
+      { rigid: origin, loads: [origin[0], otherCell[1], origin[2]] },
+    );
+    simulation.advance(1);
+    const forces = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+    const at = bodies[0].row * FORCE_WORDS;
+    return [...forces.slice(at, at + FORCE_WORDS), loads.memberLoad(0).force[0]];
+  };
+  const centred = call([0, 0, 0], [0, 0, 0]);
+  const large = [2 ** 28, -(2 ** 29), 2 ** 27];
+  const split = call(large, [large[0] - 1, large[1] + 1, large[2] + 1]);
+  for (const [index, value] of centred.entries()) {
+    assert.ok(Math.abs(split[index] - value) <= 1e-7, `load ${index}: ${split[index]} vs ${value}`);
+  }
+  assert.ok(
+    centred[1] > 0 && centred[6] > 0,
+    'incident pressure and fixed-member offshore current both reach the body frame',
+  );
+});
+
+test('SEA-12 wind shears at an emerged box centroid and acts through its torque arm', () => {
+  const halfExtents = [1, 0.5, 0.5];
+  const samples = [];
+  const wind = {
+    cell: [0, 0, 0],
+    medium: 'air',
+    sample: (_x, y) => {
+      samples.push(y);
+      return { velocity: [8 * y, 0, 0], density: 1.2, temperature: 288 };
+    },
+  };
+  const {
+    bodies,
+    loads,
+    world: simulation,
+  } = world(
+    still(),
+    [
+      {
+        position: [0, 0, 0],
+        collider: { shape: 'box', halfExtents, mass: 1000 },
+        load: { shape: { box: halfExtents }, drag: 0, addedMass: [0, 0, 0], windage: 1 },
+      },
+    ],
+    [],
+    { wind },
+    [0, 0, 0],
+  );
+  simulation.advance(1);
+  const at = bodies[0].row * FORCE_WORDS;
+  const force = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+  const centroid = 0.25;
+  const exact = 0.5 * 1.2 * (0.5 * 1) * (8 * centroid) ** 2;
+  assert.deepEqual(samples, [centroid]);
+  assert.ok(near(force[at], exact, 8 * Number.EPSILON));
+  assert.ok(near(force[at + 5], -centroid * exact, 8 * Number.EPSILON));
+});
+
+test('SEA-12 a rotating sphere retains its viscous torque with translational drag disabled', () => {
+  const radius = 0.1;
+  const spin = 1e-6;
+  const {
+    bodies,
+    loads,
+    world: simulation,
+  } = world(still(), [
+    {
+      position: [0, -1, 0],
+      spin: [spin, 0, 0],
+      collider: { shape: 'sphere', radius, mass: 30 },
+      load: { shape: { sphere: radius }, drag: 0, addedMass: [0, 0, 0] },
+    },
+  ]);
+  simulation.advance(1);
+  const at = bodies[0].row * FORCE_WORDS;
+  const force = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+  const exact = -8 * Math.PI * 1025.9 * SEA_WATER_VISCOSITY * radius ** 3 * spin;
+  // The f32 input is rounded once; the finite-Re correction is Re²/1200 at this spin.
+  const re = (spin * radius ** 2) / SEA_WATER_VISCOSITY;
+  assert.ok(near(force[at + 3], exact, 2 ** -23 + (re * re) / 1200));
+});
+
+test('SEA-12 the acceleration stencil stays in water at a moving free surface', () => {
+  const gravity = 9.81;
+  const acceleration = 0.25;
+  const radius = 0.5;
+  const elevation = (_x, _z, time) => 5 * time;
+  const sea = still([0, 0, 0], elevation);
+  sea.water.sample = (x, y, z, time) => ({
+    velocity: [y < elevation(x, z, time) ? 2 + acceleration * time : 0, 0, 0],
+    density: sea.density,
+  });
+  const {
+    bodies,
+    loads,
+    world: simulation,
+  } = world(sea, [
+    {
+      position: [0, 0.125, 0],
+      collider: { shape: 'sphere', radius, mass: 800 },
+      load: { shape: { sphere: radius }, drag: 0, addedMass: [0, 0, 0] },
+    },
+  ]);
+  simulation.advance(1);
+  const at = bodies[0].row * FORCE_WORDS;
+  const force = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+  assert.ok(force[at + 1] > 0);
+  const exact = (acceleration * force[at + 1]) / gravity;
+  assert.ok(near(force[at], exact, (4 * Number.EPSILON * 3) / (0.002 * acceleration)));
+});
+
 test('SEA-12 Lamb rotational inertia agrees with the independently tabulated ellipsoid tensor', () => {
   assert.deepEqual(ellipsoidAddedInertia([1, 1, 1]), [0, 0, 0]);
   assert.equal(ellipsoidAddedInertia([3, 1, 1])[0], 0);
@@ -439,6 +582,63 @@ test('SEA-12 Cummins radiation matches the implicit memory update and restores t
   assert.equal(simulation.hash(), saved.hash);
   simulation.advance(60);
   assert.equal(simulation.hash(), final);
+});
+
+test('SEA-12 one native wrench batch matches the reference across many rigid bodies and restores the same bits', async () => {
+  const count = 24;
+  const setup = (loads) => {
+    const gravity = [0, -9.81, 0];
+    const simulation = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+    const physics = new Physics(null, { arena: simulation.arena, fixedTimestep: 1 / 60, gravity });
+    const halfExtents = [0.5, 0.25, 0.25];
+    const rows = Array.from({ length: count }, (_, i) =>
+      physics.addBody(null, {
+        position: [(i % 6) * 2, -1, ((i / 6) | 0) * 2],
+        angularVelocity: [0.2, -0.1, 0.06],
+        linearVelocity: [0.5, 0, 0.1],
+        rotation: [0, 0, Math.sin(0.2 * i), Math.cos(0.2 * i)],
+        colliders: { shape: 'box', halfExtents, mass: 200 + 3 * i },
+      }),
+    );
+    simulation
+      .add(new RigidSolver(), { physics })
+      .add(loads, {
+        sea: still([0.7, 0, 1.3]),
+        bodies: rows.map((body, i) => ({
+          row: body.row,
+          shape: { box: halfExtents },
+          addedInertia: i % 2 ? [0.05, 0.1, 0.2] : undefined,
+          radiation: i % 3 ? [{ axis: 1, strength: 30, decayTime: 0.5 }] : [],
+        })),
+      })
+      .couple(['loads', 'rigid'], 'staggered');
+    return { simulation, rows, loads };
+  };
+  const reference = setup(new LoadSolver());
+  const native = setup(await LoadSolver.load());
+  const forces = ({ simulation, loads }) => regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+  for (const tick of [1, 8, 24]) {
+    reference.simulation.advance(tick);
+    native.simulation.advance(tick);
+    assert.deepEqual(forces(native), forces(reference));
+    assert.deepEqual(
+      native.rows.map((row) => row.position),
+      reference.rows.map((row) => row.position),
+    );
+  }
+  const bytesPerRow = 32 * Float64Array.BYTES_PER_ELEMENT;
+  assert.deepEqual(native.loads.workCounts(), {
+    heldBodies: count,
+    batchCalls: 1,
+    scratchBytes: (forces(native).length / FORCE_WORDS) * bytesPerRow,
+  });
+  assert.equal(reference.loads.workCounts().batchCalls, 0);
+  const snapshot = native.simulation.takeSnapshot();
+  native.simulation.advance(36);
+  const final = native.simulation.hash();
+  native.simulation.restoreSnapshot(snapshot.bytes);
+  native.simulation.advance(36);
+  assert.equal(native.simulation.hash(), final);
 });
 
 test('SEA-12 an inclined ellipsoid takes buoyancy through the transformed half-cap centroid', () => {
@@ -638,11 +838,7 @@ test('SEA-12 member force integrates a 7.5 cm wetted length in either endpoint o
 });
 
 test('SEA-12 a harmonically loaded member keeps one peak Keulegan–Carpenter number across phases', () => {
-  let time = 0;
-  const sea = still([0, 0, 0], (_x, _z, t) => {
-    time = t;
-    return 0;
-  });
+  const sea = still();
   const peak = 0.36;
   const period = 2;
   const diameter = 0.08;
@@ -665,6 +861,7 @@ test('SEA-12 a harmonically loaded member keeps one peak Keulegan–Carpenter nu
   const tolerance = 2 * inertiaMax * ((omega * 0.001) ** 2 / 6 + 128 * Number.EPSILON);
   for (const tick of [1, 15, 30, 45, 60, 80, 105, 120]) {
     simulation.advance(tick);
+    const time = (tick - 0.5) / 60;
     const velocity = peak * Math.cos(omega * time);
     const acceleration = -omega * peak * Math.sin(omega * time);
     const exact = 2 * morison(sea.density, diameter, coefficients.drag, coefficients.addedMass, velocity, acceleration);
@@ -707,11 +904,7 @@ test('SEA-12 smooth cylinders predict the held-out Sarpkaya 1976 force coefficie
   let dnvDragError = 0;
   let peakError = 0;
   for (const [kc, measuredMass, measuredDrag, measuredPeak, peakResidual] of measured) {
-    let time = 0;
-    const sea = still([0, 0, 0], (_x, _z, t) => {
-      time = t;
-      return 0;
-    });
+    const sea = still();
     const speed = (kc * diameter) / period;
     sea.water.sample = (_x, _y, _z, t) => ({ velocity: [speed * Math.cos(omega * t), 0, 0], density: sea.density });
     const { loads, world: simulation } = world(
@@ -729,6 +922,7 @@ test('SEA-12 smooth cylinders predict the held-out Sarpkaya 1976 force coefficie
     let peak = 0;
     for (let tick = 1; tick <= steps; tick++) {
       simulation.advance(tick);
+      const time = (tick - 0.5) / 60;
       const phase = omega * time;
       const inertiaBasis = -inertiaScale * Math.sin(phase);
       const dragBasis = Math.cos(phase) * Math.abs(Math.cos(phase));

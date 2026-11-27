@@ -79,6 +79,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/loads-kernel.wasm',
+    label: 'loads-kernel.wasm',
+    kind: 'Rust SIMD batch for hydrodynamic wrenches',
+    measure: 'file',
+    when: 'LoadSolver.load() from the optional /loads entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/loads-kernel-shared.wasm',
+    label: 'loads-kernel-shared.wasm',
+    kind: 'Rust SIMD batch for hydrodynamic wrenches, shared world memory',
+    measure: 'file',
+    when: 'LoadSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/thin-film-kernel-shared.wasm',
     label: 'thin-film-kernel-shared.wasm',
     kind: 'Rust SIMD conservative thin-film flow and capillarity, shared world memory',

@@ -13013,6 +13013,28 @@ and linear and angular momentum through replay. The straight line covers short t
 [Hall (2024), *Generalized Quasi-Static Mooring System Modeling*, §2.1](https://doi.org/10.3390/en17133155) ·
 [Hall and Goupee (2015), *Validation of a lumped-mass mooring line model*](https://doi.org/10.1016/j.oceaneng.2015.05.035)
 
+Compact bodies use actual projected areas and the orientation-dependent Hölzer–Sommerfeld coefficient.
+For the 16 held-out Khan cube points at Reynolds numbers around 500–1500, the RMS coefficient error is
+0.1459. The fixed-unity former law gives 0.3002. The maximum error of the shape law is 0.3215 around
+Reynolds number 510. The test records the published measurement uncertainty and digitization error.
+The wind sample lies at the projected centroid of the clipped area. Analytic box and tilted ellipse
+sections and a projected triangle union test the geometric calculation and the wind's lever arm.
+[A. Hölzer and M. Sommerfeld (2008), *New simple correlation formula for the drag coefficient of non-spherical particles*](https://doi.org/10.1016/j.powtec.2007.08.021) ·
+[M. A. Khan et al. (2018), Fig. 15](https://doi.org/10.1016/j.expthermflusci.2017.12.013)
+
+Spin torque follows Jeffery's creeping-flow ellipsoid resistance with Dennis, Singh and Ingham's
+numerical and asymptotic rotating-sphere correction. For nonspherical bodies the finite-Re correction
+uses the transverse geometric-mean radius. The solver computes translations, wind torque and water
+spin torque separately. [G. B. Jeffery (1922), Eq. 36](https://doi.org/10.1098/rspa.1922.0078) ·
+[S. C. R. Dennis, S. N. Singh and D. B. Ingham (1980), Tables 2–3 and Eqs. 50–55](https://doi.org/10.1017/S0022112080001656)
+
+The native optional batch preserves the order of double-precision operations in the TypeScript
+reference. It packs 32 f64 words per rigid row in the world arena and uses two-lane SIMD for each
+dot product while preserving the reference reduction order. Plain and shared imports each tested
+321 mixed rows bit for bit. The live-world test measures one call for 24 bodies, checks every wrench
+and trajectory against the TypeScript variant and replays the same snapshot hash. Field queries
+convert any separate origins through integer cell differences, with a live test at cell indices up to 2²⁹.
+
 ### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
 
 `packages/physics/src/ship/` (`ShipSolver`, `Manoeuvring`, `Propeller`, `raceVelocity`, `holtropMennen`, `ittc1957`, `squat`,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20655202,
+  "total": 20659977,
   "history": [
     {
       "date": "2026-10-24",
@@ -14167,6 +14167,12 @@
       "commit": "06915b7d54",
       "grew": 1,
       "reason": "SEA-12 implicit angular inertia, radiation and debris contact grow physics/loads from 12619 to 16180 B gzip. The optional ceiling moves from 12998 to 16666 B. Rotation and radiation share the body wrench and snapshot state; a split still needs the loads runtime for the body coupling."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "113a391fde",
+      "grew": 1,
+      "reason": "SEA-12 shape drag, wind silhouette, field cells and the optional Rust binding grow physics/loads from 16180 to 20816 B gzip. The same solver must compose these forces on a shared body row and can select its TypeScript or native wrench path. Each 2,884 B native module is loaded from the optional entry only. A separate geometry entry would still be needed by every caller supplying a shape that pierces the water."
     }
   ],
   "items": {
@@ -15018,7 +15024,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 16666,
+    "@margoengine/physics/loads": 21441,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 8785,

@@ -1,0 +1,100 @@
+// SEA-12 component proof for FW-6 and CY-9. Run under both renderers with a fixed camera.
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { openBrowser } from '../../../scripts/browser.js';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { decodePNG } from '../../../tests/support/png.js';
+
+process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
+const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
+const { page, hardware } = browser;
+const errors = [];
+page.on('pageerror', (error) => errors.push(error.message));
+page.on('console', (message) => {
+  if (message.type() === 'error') errors.push(message.text());
+});
+
+const backend = hardware.compat ? 'webgl2' : 'webgpu';
+const output = process.env.MARGO_KEEP_LOADS_QUAY_FRAMES === '1' ? 'test-results' : undefined;
+if (output) await mkdir(output, { recursive: true });
+const capture = async (key) =>
+  decodePNG(
+    await page.locator('canvas').screenshot(output ? { path: `${output}/loads-quay-${backend}-${key}.png` } : {}),
+  );
+
+function changedPixels(a, b) {
+  let changed = 0;
+  for (let k = 0; k < a.data.length; k += 4) {
+    if (
+      Math.abs(a.data[k] - b.data[k]) +
+        Math.abs(a.data[k + 1] - b.data[k + 1]) +
+        Math.abs(a.data[k + 2] - b.data[k + 2]) >=
+      12
+    )
+      changed++;
+  }
+  return changed;
+}
+
+function visibleObjects(image) {
+  let hull = 0;
+  let debris = 0;
+  for (let k = 0; k < image.data.length; k += 4) {
+    const r = image.data[k],
+      g = image.data[k + 1],
+      b = image.data[k + 2];
+    if (r > g + 30 && r > b + 40) hull++;
+    if (g > b + 40 && r > b + 60 && r > g) debris++;
+  }
+  return { hull, debris };
+}
+
+try {
+  await page.evaluate(async () => {
+    const { createLoadsQuayScene } = await import('/packages/water/test/loads-quay-scene.js');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:480px;height:288px';
+    document.body.replaceChildren(canvas);
+    window.loadsQuay = await createLoadsQuayScene(canvas);
+  });
+  const before = await capture('berth');
+  const receipt = await page.evaluate(() => window.loadsQuay.depart());
+  const unperturbed = await capture('without-wake');
+  await page.evaluate(() => window.loadsQuay.restoreWake());
+  const after = await capture('departure');
+  const movedPixels = changedPixels(before, after),
+    waterPixels = changedPixels(unperturbed, after);
+  const subjects = visibleObjects(after);
+  console.log(JSON.stringify({ backend, ...receipt, movedPixels, waterPixels, subjects }));
+  assert.equal(receipt.replay, receipt.hash);
+  assert.ok(receipt.actual.boat[0] - -3.6 > 1, 'the vessel actually leaves the berth');
+  assert.ok(
+    receipt.expected.boatVelocity[0] - receipt.actual.boatVelocity[0] > 0.1,
+    'wake pressure changes the advancing vessel speed',
+  );
+  assert.ok(receipt.actual.heave > 0.04 && receipt.actual.roll > 0.04, 'the loaded debris both rises and rolls');
+  assert.ok(
+    Math.hypot(...receipt.actual.raft.map((value, i) => value - receipt.expected.raft[i])) > 0.01,
+    'removing only the real hull wake changes the SEA-12 debris trajectory',
+  );
+  assert.ok(receipt.actual.nearFace.wash > 0.02, 'the quay receives incident horizontal wash');
+  assert.ok(
+    Math.abs(receipt.actual.nearFace.crest - receipt.expected.nearFace.crest) > 0.01,
+    'the wake also changes the quay-face crest',
+  );
+  assert.ok(
+    receipt.peakAtQuay > 0.005 && receipt.worst <= 2e-6,
+    `quay wake is physically present and drawn from the same field (${receipt.peakAtQuay} m, ${receipt.worst} m residual)`,
+  );
+  assert.ok(
+    movedPixels > 500 && waterPixels > 100,
+    'the departure and its wake are separately visible at fixed camera',
+  );
+  assert.ok(subjects.hull > 60 && subjects.debris > 60, 'both bodies remain visible on the departure frame');
+  const error = await page.evaluate(() => window.loadsQuay.dispose());
+  assert.equal(error, null);
+  assert.deepEqual(errors, []);
+} finally {
+  await closeAll({ browser });
+}

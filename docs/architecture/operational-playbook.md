@@ -1160,6 +1160,15 @@ paths were rebuilt and differ only in those separators; a second full rebuild ma
 same rebuild on Linux or macOS has not been run yet, so cross-system equality rests on the removed causes, not on a
 second system's bytes. Regression: tests/wasm-blueprints.test.js.
 
+### Section 5 evidence: SEA-12 native hydrodynamic wrench batch
+
+The optional Physics Loads batch has a plain import and a shared-memory import from the same Rust crate.
+Both modules are data-free. Imports leave the world's memory untouched until a call and use an arena-owned stack.
+`loads-kernel.test.js` checks 321 mixed sparse rows on both imports, including axis locks and memory growth.
+`loads.test.js` measures one entry call for 24 live bodies and compares exact forces, trajectories and restored
+state against the TypeScript path. Workspace is 32 f64 words per body capacity. The shared import runs in the same
+synchronous frame schedule.
+
 ### Section 5 evidence: derivatives stay where WGSL takes them on the WebGL2 layer (KB-W2-deriv, 2026-11-15)
 
 The GLSL back end pins every derivative-made value of a fragment (dpdx, dpdy and fwidth in every form, and the

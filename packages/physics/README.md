@@ -4118,11 +4118,18 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
   - `pressureModel: 'surface'` reads incident gauge pressure from `sea.pressure` for a box or closed mesh and integrates its wrench over the actual clipped waterline. The default `'compact'` uses the local plane and point acceleration. Additional `flows` still contribute their own acceleration;
   - added mass per axis from Lamb's ellipsoid integrals, held implicitly so light bodies stay stable;
   - rotational added inertia with `addedInertia: 'ellipsoid'` or three measured m² per displaced kg values along the shape axes. The default is zero. `radiation` supplies passive Cummins modes as `{axis, strength, decayTime}` with axis 0–2 for translation and 3–5 for rotation. A mode contributes `strength * exp(-t / decayTime)` to the radiation kernel. The default is an empty array. Supply coefficients for the body and draft;
-  - quadratic drag on its velocity through the water, a sphere's by Reynolds number (Morrison), else 1.0 or `drag`;
-  - a spinning body's drag;
-  - the wind's drag on its emerged part (`windage`, default 1), so floating debris drifts at a few percent of the wind.
+  - drag on the actual principal projections, from Morrison's sphere correlation or the Hölzer–Sommerfeld shape law, with optional `drag` coefficients;
+  - independent rotational viscous torque. `spinDrag` scales it, default 1;
+  - windage at the area centroid of the emerged silhouette. `windage` overrides the shape- and Reynolds-dependent coefficient.
 - **Members** (`members: [{from, to, diameter, row?}]`): Morison's equation over the clipped wetted length. Set `period` to the dominant harmonic in seconds (default 8) or `Infinity` for steady water. The default `coefficients: 'dnv'` uses the peak orbital speed with DNV and White for roughness (`roughness`, default 5e-5 m) and Reynolds effects. `coefficients: 'sarpkaya-1976'` uses a smooth cylinder (roughness 0) and measured in-line coefficients over the laboratory range. A member takes Eames's tangential drag, and with `vortex: {strouhal, lift}` sheds vortices through Facchinetti's wake oscillator, its lift swinging at St U / D. A member on no `row` is fixed, a pile, and `memberLoad(i)` reports what it takes.
 - **The water** (`sea`): a `SeaSurface`, or any `{elevation, water, density}` such as a flood's (`{elevation: (x, z) => shallow.sample(x, z).surface, water: shallow.flow, density: 1000}`). Add `flows` for currents and races (`ShipSolver.water`) and `wind` for windage.
+
+The sea, current and wind can use separate origin cells. Set `cellSize` to the PhysicsWorld cell length
+if it differs from the default of 4096 m. World-fixed members use the LoadSolver's origin cell.
+
+Use `await LoadSolver.load({id, signal})` for the optional Rust SIMD wrench batch. It uses the containing
+world's plain or shared memory and holds all active rows in one call. The synchronous constructor uses
+the TypeScript reference. `workCounts()` reports the number of held bodies, native calls and reserved scratch bytes.
 
 Omit `capacity` to use the world's rigid body rows. Unsupported load inputs raise `MargoError` with
 code `unsupported` and a repair instruction. [Hydrodynamic input help](https://margoengine.com/errors#hydrodynamic-loads)
@@ -4221,7 +4228,7 @@ const crate = physics.addBody(null, {
 });
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})
-  .add(new LoadSolver(), {sea: still, bodies: [{
+  .add(await LoadSolver.load(), {sea: still, bodies: [{
     row: crate.row, shape: {box: halfExtents}, pressureModel: 'surface', addedInertia: 'ellipsoid',
   }]})
   .couple(['loads', 'rigid'], 'staggered');

@@ -380,6 +380,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   Reproduce with `node --test packages/physics/tests/coupling/loads-debris.test.js`.
   [Haehnel and Daly, TR-02-2, Figs. 13–14](https://archive.org/details/DTIC_ADA398916).
 
+- Shape-dependent drag (SEA-12). The Hölzer–Sommerfeld law has a drag-coefficient RMS error of 0.1459
+  over 16 held-out cube measurements. The previous fixed-unity law gives 0.3002. The maximum error
+  is 0.3215 near Reynolds number 510. Exact geometry tests cover the local-plane emerged area and
+  wind torque. Reproduce with `node --test packages/physics/tests/loads-compact-drag.test.js`.
+  [Khan et al., Fig. 15](https://doi.org/10.1016/j.expthermflusci.2017.12.013).
+
 - Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
   properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
   2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts

@@ -1,6 +1,7 @@
 // The water a load reads at a point: the sea's flow plus every other flow (a current, a ship's race, a river), and its
 // acceleration as a centred difference of that pure velocity in time over 2 ms. Shared by `LoadSolver` and `segmentLoads`.
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
+import { invalidLoad } from './errors.js';
 import type { LoadWater } from './solver.js';
 
 type Vec3 = [number, number, number];
@@ -70,8 +71,19 @@ export function flowAcceleration(
   const a: Vec3 = [0, 0, 0],
     b: Vec3 = [0, 0, 0],
     h = 1e-3;
-  flowVelocity(sea, flows, x, y, z, t + h, sample, a);
-  flowVelocity(sea, flows, x, y, z, t - h, sample, b);
+  let wetY = y;
+  if (sea) {
+    // Hold a single submerged point over the difference interval. The water field can return
+    // exact zero in air, which would otherwise enter the derivative as an impulsive deceleration.
+    const earlier = sea.elevation(x, z, t - h);
+    const later = sea.elevation(x, z, t + h);
+    const lower = Math.min(earlier, later);
+    if (!Number.isFinite(earlier) || !Number.isFinite(later))
+      throw invalidLoad('Invalid elevation in water acceleration; return finite metres at both sample times.');
+    if (y >= lower) wetY = lower - 16 * Number.EPSILON * Math.max(1, Math.abs(lower));
+  }
+  flowVelocity(sea, flows, x, wetY, z, t + h, sample, a);
+  flowVelocity(sea, flows, x, wetY, z, t - h, sample, b);
   out[0] = (a[0] - b[0]) / (2 * h);
   out[1] = (a[1] - b[1]) / (2 * h);
   out[2] = (a[2] - b[2]) / (2 * h);

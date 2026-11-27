@@ -1155,6 +1155,17 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   momentum receipts and passive swim-water reactions remain open.
   `coupling/loads-mooring.test.js` checks the taut tether's fixed-pile reaction, slack engagement, the axial
   oscillator at two world rates, off-centre dynamic attachment impulses, and bit-exact replay.
+  The drag and wind revision replaces the four red-flag shortcuts. `loads-compact-drag.test.js` checks the
+  clipped projected shape, centroid wind, separate spin law and a held-out cube series. The live loads tests
+  cover the resulting wind wrench, submerged spin with translational drag disabled, independent origin cells,
+  and the SIMD batch against the TypeScript rigid trajectory and snapshot. `loads-kernel.test.js` checks both
+  memory builds, including locked axes, sparse rows and malformed input regions.
+  The moving-free-surface test keeps both ends of the acceleration stencil at a common wet point. It guards
+  the false acceleration impulse reproduced by the live sea fixture as a wave crosses a floating body's sample.
+  Water's `loads-quay.browser.mjs` exercises FW-6 and CY-9 at component level. On both GPU backends the existing
+  wake changes the advancing vessel and the debris trajectory, supplies the quay's wash and crest, and
+  drives the rendered mesh. The wake-only draw changes 3,210 WebGPU pixels and 3,214 WebGL2 pixels.
+  The worst wake geometry difference is 0.29 μm. The two rigs replay to hash `3dde8e8d83646b20`.
 
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 

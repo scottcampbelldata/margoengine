@@ -21,6 +21,7 @@ export interface LoadBody {
     readonly shape: LoadShape;
     readonly centre?: readonly [number, number, number];
     readonly drag?: number | readonly [number, number, number];
+    readonly spinDrag?: number;
     readonly addedMass?: readonly [number, number, number];
     readonly addedInertia?: 'ellipsoid' | readonly [number, number, number];
     readonly radiation?: readonly LoadRadiationMode[];
@@ -49,6 +50,7 @@ export interface LoadParams {
     readonly bodies?: readonly LoadBody[];
     readonly members?: readonly LoadMember[];
     readonly viscosity?: number;
+    readonly cellSize?: number;
     readonly capacity?: number;
     readonly level?: RateLevel;
 }
@@ -73,7 +75,16 @@ export type LoadShape = {
 };
 
 export class LoadSolver implements Solver<LoadParams> {
+    static load({ id, signal }?: {
+        readonly id?: string;
+        readonly signal?: AbortSignal;
+    }): Promise<LoadSolver>;
     constructor(id?: string);
+    workCounts(): {
+        readonly heldBodies: number;
+        readonly batchCalls: number;
+        readonly scratchBytes: number;
+    };
     describe(): SolverDescription;
     init(host: SolverHost, params: LoadParams): void;
     step(context: StepContext, _dt: number): void;
