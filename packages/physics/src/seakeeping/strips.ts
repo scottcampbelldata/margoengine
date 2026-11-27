@@ -45,6 +45,23 @@ export function hullSections(
   waterline: number,
   count = 24,
 ): Section[] {
+  return measureSections(mesh, waterline, count);
+}
+
+type SectionMesh = { readonly vertices: ArrayLike<number>; readonly indices: ArrayLike<number> };
+
+/** Wet section areas and first lateral moments, using the same outline as the hydrostatic strips. */
+export function hullSectionMoments(mesh: SectionMesh, waterline: number, count: number) {
+  const lateralMoments = new Float64Array(count);
+  return { sections: measureSections(mesh, waterline, count, lateralMoments), lateralMoments };
+}
+
+function measureSections(
+  mesh: SectionMesh,
+  waterline: number,
+  count: number,
+  lateralMoments?: Float64Array,
+): Section[] {
   const { vertices, indices } = mesh;
   let lo = Infinity,
     hi = -Infinity;
@@ -58,6 +75,7 @@ export function hullSections(
     const x = lo + (s + 0.5) * width;
     let area = 0,
       moment = 0,
+      lateralMoment = 0,
       zmin = Infinity,
       zmax = -Infinity,
       ymin = Infinity;
@@ -94,6 +112,7 @@ export function hullSections(
       area += 0.5 * (z0 + z1) * (y1 - y0);
       // and its first moment about y = 0, the integral of y z dy (z linear along the segment).
       moment += ((y1 - y0) * (z0 * (2 * y0 + y1) + z1 * (y0 + 2 * y1))) / 6;
+      if (lateralMoments) lateralMoment += ((y1 - y0) * (z0 * z0 + z0 * z1 + z1 * z1)) / 6;
       ymin = Math.min(ymin, y0, y1);
       for (const [y, z] of [
         [y0, z0],
@@ -105,6 +124,7 @@ export function hullSections(
         }
     }
     const draft = ymin < waterline ? waterline - ymin : 0;
+    if (lateralMoments) lateralMoments[s] = area < 0 ? -lateralMoment : lateralMoment;
     out.push({
       x,
       width,

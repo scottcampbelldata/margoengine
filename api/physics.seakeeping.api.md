@@ -190,6 +190,7 @@ export interface HullPose {
 export class HullSolver implements Solver<HullParams> {
     readonly id: string;
     readonly wakeSourceField: FieldDescriptor;
+    readonly submergedWakeSource?: SubmergedWakeSource;
     constructor(id?: string, wake?: HullWake, crushDamage?: FieldDescriptor | undefined, girderSeams?: FieldDescriptor | undefined);
     static withShellApertures(field: FieldDescriptor, options?: {
         readonly id?: string;
@@ -222,6 +223,7 @@ export class HullSolver implements Solver<HullParams> {
 export interface HullWake {
     readonly minimumRadius?: number;
     readonly advance?: boolean;
+    readonly submergedAdvance?: readonly number[];
 }
 
 export interface LateralSection {
@@ -512,6 +514,11 @@ interface StepContext {
     readonly seed: number;
     readonly inputs: ReadonlyMap<string, Port>;
     readonly cell: Cell;
+}
+
+interface SubmergedWakeSource {
+    readonly field: FieldDescriptor;
+    readonly depths: readonly number[];
 }
 
 interface Surface {

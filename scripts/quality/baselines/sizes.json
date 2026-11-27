@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20834283,
+  "total": 20837508,
   "history": [
     {
       "date": "2026-10-24",
@@ -14371,6 +14371,12 @@
       "commit": "breakable",
       "reason": "New optional entry @margoengine/physics/breakable (18,787 B gzip): convex objects break on impact into convex rigid pieces (BREAK-01). The convex Voronoi clipper, exact polyhedral mass properties, bond graph with anchors, contact damage, debris policy, snapshot and debug view are one feature that every breakable body uses together; a split would leave each part useless alone and duplicate the cell types across entries. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "feat(physics) SEA-12 submerged hull wake transfer",
+      "grew": 2,
+      "reason": "SEA-12 optional depth and lateral span wake transfer: physics/sea grows from 6405 to 7624 B gzip, ceiling 6661 to 7880 B. physics/seakeeping grows from 37788 to 39440 B gzip, ceiling 38618 to 40624 B. Projection uses the existing wake spectrum and source normalization; the hull uses its existing strip geometry and tick. A split would have to expose those internals and require the caller to wire a second source stage. The core and stage entries have no added imports."
     }
   ],
   "items": {
@@ -15241,8 +15247,8 @@
     "@margoengine/physics/room-sound": 5606,
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
-    "@margoengine/physics/sea": 6661,
-    "@margoengine/physics/seakeeping": 38618,
+    "@margoengine/physics/sea": 7880,
+    "@margoengine/physics/seakeeping": 40624,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 35261,

@@ -11,3 +11,4 @@ export {
   type WakeParams,
   type WakeSample,
 } from './wake.js';
+export { SUBMERGED_WAKE_LAYOUT, SUBMERGED_WAKE_WORDS, type SubmergedWakeSource } from './submerged-wake.js';

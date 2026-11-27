@@ -22,7 +22,14 @@ import {
   volumeBelow,
   wettedLoads,
 } from '../../dist/seakeeping.js';
-import { SpectralSea, WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS, WakeSolver } from '../../dist/sea.js';
+import {
+  SpectralSea,
+  SUBMERGED_WAKE_LAYOUT,
+  SUBMERGED_WAKE_WORDS,
+  WAKE_SOURCE_LAYOUT,
+  WAKE_SOURCE_WORDS,
+  WakeSolver,
+} from '../../dist/sea.js';
 import { SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
 import { kvlcc2Waterline } from './kvlcc2-waterline.js';
 import { freeSection, vHull } from './sections.js';
@@ -2670,4 +2677,96 @@ test('HullSolver with cloth: a curtain in a barge that lists as it floods hangs 
     heel = (2 * Math.asin(body.rotation[0]) * 180) / Math.PI;
   assert.ok(heel > 13 && heel < 14.5, `the barge lists ${heel} degrees`);
   assert.ok(lean < 0.05, `the curtain hangs ${lean} degrees from plumb`);
+});
+
+test('submerged HullSolver wake preserves an eccentric waterplane, fixed work and a real frame-zero replay', async () => {
+  await Physics.load({ threads: true });
+  for (const shared of [false, true]) {
+    const sim = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+    using physics = new Physics(null, { arena: sim.arena, fixedTimestep: 1 / 60, substeps: 1 });
+    const density = 1024;
+    const mesh = boxMesh([2, 1, 1], [0, 0, 0.25]);
+    const body = physics.addBody(null, {
+      linearVelocity: [1.5, 0, 0],
+      enabledTranslations: [true, false, false],
+      lockRotations: true,
+      colliders: { shape: 'convexHull', points: mesh.vertices, mass: density },
+    });
+    const hull = new HullSolver('hull', { minimumRadius: 0.35, submergedAdvance: [0, 0.125, 0.5] });
+    const wake = new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
+    sim
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh }],
+        sea: { density, elevation: () => 0 },
+        addedMass: false,
+        radiation: false,
+        rollDamping: false,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .add(wake, { cells: [48, 32], cellSize: 0.25, depth: 2, sponge: 0, density })
+      .couple(['hull', 'wake', 'rigid'], 'staggered');
+
+    const zero = sim.takeSnapshot();
+    const initial = sim.hash();
+    sim.advance(1);
+    assert.ok(readHullWake(sim, hull).every(({ pressure, volume }) => pressure === 0 && volume === 0));
+    assert.deepEqual(wake.submergedSourceWork(), { rows: 8, transforms: 2 });
+    const { region } = sim.fields.port(hull.submergedWakeSource.field.name);
+    assert.equal(region.layout, SUBMERGED_WAKE_LAYOUT);
+    const words = new Float64Array((region.memory ?? sim.memory).buffer, region.byteOffset, region.byteLength / 8);
+    let arithmeticVolume = 0;
+    for (const [band, thickness] of [
+      [0, 0.125],
+      [1, 0.375],
+    ]) {
+      for (const sign of [-1, 1]) {
+        let volume = 0,
+          firstLateralMoment = 0;
+        for (let i = 0; i < words.length; i += SUBMERGED_WAKE_WORDS) {
+          if (words[i + 3] !== band || Math.sign(words[i + 4]) !== sign) continue;
+          volume += words[i + 4];
+          firstLateralMoment += words[i + 1] * words[i + 4];
+        }
+        nearWake(volume, (sign * 1.5 * thickness) / 60);
+        nearWake(firstLateralMoment, 0.25 * volume);
+        arithmeticVolume += volume;
+      }
+    }
+    nearWake(arithmeticVolume, 0);
+    nearWake(
+      wake.heights().reduce((sum, h) => sum + h * 0.25 ** 2, 0),
+      0,
+    );
+    assert.ok(wake.heights().some((h) => h > 0) && wake.heights().some((h) => h < 0));
+    sim.advance(17);
+    const expected = sim.hash();
+    sim.restoreSnapshot(zero.bytes);
+    assert.equal(sim.hash(), initial);
+    sim.advance(17);
+    assert.equal(sim.hash(), expected);
+  }
+});
+
+test('the submerged source configuration rejects multiple advancing sources and incompatible depths', () => {
+  assert.throws(
+    () => new HullSolver('hull', { advance: true, submergedAdvance: [0, 0.5] }),
+    /set submergedAdvance or advance, not both/,
+  );
+  assert.throws(() => new HullSolver('hull', { submergedAdvance: [0, 0.25, 0.25] }), /depth edges must start at zero/);
+  const sparseDepths = new Array(2);
+  sparseDepths[0] = 0;
+  assert.throws(() => new HullSolver('hull', { submergedAdvance: sparseDepths }), /depth edges must start at zero/);
+  const hull = new HullSolver('hull', { submergedAdvance: [0, 0.5] });
+  assert.throws(
+    () =>
+      new PhysicsWorld().add(new WakeSolver('wake', undefined, hull.submergedWakeSource), {
+        cells: [8, 8],
+        depth: 0.4,
+        sponge: 0,
+      }),
+    /bands extend below the bed/,
+  );
 });

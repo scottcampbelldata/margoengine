@@ -6,7 +6,7 @@
 // angle), and for bits that a snapshot and a second run reproduce.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SpectralSea, WakeSolver } from '../dist/sea.js';
+import { SpectralSea, SUBMERGED_WAKE_LAYOUT, SUBMERGED_WAKE_WORDS, WakeSolver } from '../dist/sea.js';
 import { PhysicsWorld } from '../dist/world.js';
 
 const G = 9.81;
@@ -274,4 +274,81 @@ test("a sea adds its wake's water below the surface, and a wake without waterBel
   const plain = new WakeSolver('plain');
   world().add(plain, { cells: [16, 16], cellSize: 1, sponge: 4 });
   assert.throws(() => plain.velocityAt(0, -1, 0), /waterBelow/);
+});
+
+// A fixed physical domain and wave number at three mesh resolutions. A source centered on every
+// cell with support inside that cell isolates the exact depth transfer from moving support.
+test('submerged wake flux keeps volume, matches finite and deep modal transfer, and bounds its extra FFTs', () => {
+  const source = {
+    field: {
+      name: 'moving-hull.submerged',
+      kind: 'surfaceSampleSet',
+      quantity: 'submergedSeaSource',
+      unit: 'SI',
+      centring: 'particle',
+    },
+    depths: [0, 0.15, 0.3],
+  };
+  const [upper, lower] = source.depths.slice(1);
+  const length = 12.8,
+    k = (2 * Math.PI * 7) / length,
+    A = 0.18,
+    dc = 0.035;
+  for (const depth of [Infinity, 3]) {
+    const transfer = Number.isFinite(depth)
+      ? (Math.sinh(k * (depth - upper)) - Math.sinh(k * (depth - lower))) / (k * (lower - upper) * Math.cosh(k * depth))
+      : (Math.exp(-k * upper) - Math.exp(-k * lower)) / (k * (lower - upper));
+    const omega = Math.sqrt(G * k * Math.tanh(k * depth));
+    for (const nx of [32, 64, 128]) {
+      const nz = nx / 8,
+        dx = length / nx;
+      const sim = world();
+      let region, rows;
+      const publisher = {
+        describe: () => ({
+          id: 'moving-hull',
+          fields: [{ field: source.field, access: 'write' }],
+          rate: 0,
+          stableRate: () => 0,
+        }),
+        init(host) {
+          region = host.allocate('flux', nx * nz * SUBMERGED_WAKE_WORDS * 8, 'f64', SUBMERGED_WAKE_LAYOUT);
+          rows = new Float64Array(host.memory.buffer, region.byteOffset, region.byteLength / 8);
+        },
+        step({ tick }) {
+          rows.fill(0);
+          if (tick !== 0) return;
+          for (let j = 0; j < nz; j++) {
+            const z = (j + 0.5 - nz / 2) * dx;
+            for (let i = 0; i < nx; i++) {
+              const x = (i + 0.5 - nx / 2) * dx;
+              rows.set([x, z, 0.45 * dx, 1, (dc + A * Math.cos(k * x)) * dx * dx], (i + nx * j) * SUBMERGED_WAKE_WORDS);
+            }
+          }
+        },
+        exportPorts: (tick) => [{ field: source.field.name, region, tick, cell: [0, 0, 0] }],
+        importPorts() {},
+        stateRegions: () => [region],
+        extraState: () => [],
+      };
+      const wake = new WakeSolver('wake', undefined, source);
+      sim
+        .add(publisher, {})
+        .add(wake, { cells: [nx, nz], cellSize: dx, depth, sponge: 0 })
+        .advance(1);
+      assert.deepEqual(wake.submergedSourceWork(), { rows: nx * nz, transforms: 1 });
+      for (let i = 0; i < nx * nz; i++) {
+        const x = ((i % nx) + 0.5 - nx / 2) * dx;
+        assert.ok(Math.abs(wake.heights()[i] - dc - A * transfer * Math.cos(omega / 60) * Math.cos(k * x)) < 2e-12);
+      }
+      sim.advance(13);
+      assert.deepEqual(wake.submergedSourceWork(), { rows: 0, transforms: 0 });
+      for (let i = 0; i < nx * nz; i++) {
+        const x = ((i % nx) + 0.5 - nx / 2) * dx;
+        assert.ok(
+          Math.abs(wake.heights()[i] - dc - A * transfer * Math.cos((13 * omega) / 60) * Math.cos(k * x)) < 2e-12,
+        );
+      }
+    }
+  }
 });

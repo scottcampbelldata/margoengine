@@ -5,6 +5,10 @@
 ```ts
 import { FlowCell, FlowField, SeaSource, SeaSurface, SeaSurfaceSample, SeaWater, WaveSpectrumField, WaveSpectrumSample } from "@margoengine/math/fields";
 
+export const SUBMERGED_WAKE_LAYOUT = 1;
+
+export const SUBMERGED_WAKE_WORDS = 5;
+
 export class SpectralSea implements SeaSurface {
     readonly cell: FlowCell;
     readonly water: SeaWater;
@@ -27,6 +31,11 @@ export interface SpectralSeaOptions {
     gravity?: number;
     temperature?: number;
     patches?: readonly SeaPatch[];
+}
+
+export interface SubmergedWakeSource {
+    readonly field: FieldDescriptor;
+    readonly depths: readonly number[];
 }
 
 export const WAKE_HEIGHT_FIELD: FieldDescriptor;
@@ -57,11 +66,15 @@ export interface WakeSample {
 }
 
 export class WakeSolver implements Solver<WakeParams> {
-    constructor(id?: string, sourceField?: FieldDescriptor);
+    constructor(id?: string, sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource);
     describe(): SolverDescription;
     init(host: SolverHost, params?: WakeParams): void;
     velocityAt(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
     step(context: StepContext, dt: number): void;
+    submergedSourceWork(): {
+        readonly rows: number;
+        readonly transforms: number;
+    };
     sample(x: number, z: number, out?: WakeSample): WakeSample;
     get grid(): {
         cells: [number, number];

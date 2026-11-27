@@ -37,6 +37,14 @@ import {
 } from '../crush/port.js';
 import { entryCavityRows, ENTRY_CAVITY_WORDS, isEntryCavityField } from '../entry/cavity-port.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
+import {
+  SUBMERGED_WAKE_LAYOUT,
+  SUBMERGED_WAKE_MAX_ROWS,
+  SUBMERGED_WAKE_QUANTITY,
+  SUBMERGED_WAKE_WORDS,
+  type SubmergedWakeSource,
+  wakeDepths,
+} from '../sea/submerged-wake.js';
 import { atan2 } from '../ship/propeller.js';
 import { regionWords } from '../world/memory.js';
 import {
@@ -83,6 +91,7 @@ import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { isShellApertureField, panelAperture, type ShellAperture, shellApertureRows } from './shell-opening.js';
 import { SHELL_PRESSURE_LAYOUT, SHELL_PRESSURE_WORDS, shellPressureField } from '../crush/shell-aperture.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
+import { submergedWakeNodes, type SubmergedWakeNode } from './submerged-wake.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
 import {
   interceptedBreadth,
@@ -131,6 +140,8 @@ export interface HullWake {
   readonly minimumRadius?: number;
   /** Displace water at the advancing end and draw it in behind the hull. Default false. */
   readonly advance?: boolean;
+  /** Project advancing flux from its actual depth and breadth. Pass one to eight bands covering every reference draft. */
+  readonly submergedAdvance?: readonly number[];
 }
 
 /** What a {@link HullSolver} is made from. */
@@ -330,8 +341,20 @@ export class HullSolver implements Solver<HullParams> {
 
   /** The hull's signed volume source rows, named from the solver's id. Enabled with the wake option. */
   readonly wakeSourceField: FieldDescriptor;
+  /** Optional advancing flux from depth bands, connected as WakeSolver's third argument. */
+  readonly submergedWakeSource?: SubmergedWakeSource;
+
   private wakeSources: Region | null = null;
-  private readonly wakePlanes = new Map<Hull, { waterline: number; sections: readonly Section[] }>();
+  private submergedWakeSources: Region | null = null;
+  private submergedWakeRowsPerHull = 0;
+  private readonly wakePlanes = new Map<
+    Hull,
+    {
+      waterline: number;
+      sections: readonly Section[];
+      submerged?: readonly SubmergedWakeNode[];
+    }
+  >();
   private readonly wakeRadius: number | null;
   private readonly wakeAdvance: boolean;
   private wakeRowsPerHull = 0;
@@ -348,6 +371,23 @@ export class HullSolver implements Solver<HullParams> {
       throw new MargoError('state', 'Invalid hull wake patch radius. Use a finite nonnegative radius in metres.');
     this.wakeRadius = wake ? radius : null;
     this.wakeAdvance = wake?.advance ?? false;
+    if (wake?.submergedAdvance !== undefined) {
+      if (this.wakeAdvance)
+        throw new MargoError(
+          'state',
+          'A hull needs one advancing wake source; set submergedAdvance or advance, not both.',
+        );
+      this.submergedWakeSource = Object.freeze({
+        field: Object.freeze({
+          name: id + '.submergedWakeSources',
+          kind: 'surfaceSampleSet',
+          quantity: SUBMERGED_WAKE_QUANTITY,
+          unit: 'SI',
+          centring: 'particle',
+        }),
+        depths: wakeDepths(wake.submergedAdvance),
+      });
+    }
     if (crushDamage && (crushDamage.kind !== 'surfaceSampleSet' || crushDamage.quantity !== CRUSH_DAMAGE_QUANTITY))
       throw new MargoError('state', 'Pass CrushSolver.damageField to link structural seal damage to a hull.');
     if (girderSeams && (girderSeams.kind !== 'surfaceSampleSet' || girderSeams.quantity !== GIRDER_SEAM_QUANTITY))
@@ -442,6 +482,7 @@ export class HullSolver implements Solver<HullParams> {
         { field: MANOEUVRING_CLAIMS_FIELD, access: 'read', optional: true },
         { field: HULL_BREACHES_FIELD, access: 'write' },
         ...(this.wakeRadius !== null ? [{ field: this.wakeSourceField, access: 'write' as const }] : []),
+        ...(this.submergedWakeSource ? [{ field: this.submergedWakeSource.field, access: 'write' as const }] : []),
         ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
         ...(this.girderSeams ? [{ field: this.girderSeams, access: 'read' as const }] : []),
         ...(this.shellApertures ? [{ field: this.shellApertures.field, access: 'read' as const }] : []),
@@ -576,6 +617,7 @@ export class HullSolver implements Solver<HullParams> {
     if (this.wetChannel)
       this.wetMobility = host.allocate('wet-mobility', capacity * WET_INERTIA_WORDS * 8, 'f64', WET_INERTIA_LAYOUT);
     this.wakeSources = null;
+    this.submergedWakeSources = null;
     this.wakePlanes.clear();
     this.reflectingWaterlines.clear();
     if (this.wakeRadius !== null || hulls.some((hull) => hull.shortWaveResistance)) this.loads.surfacePiercing = false;
@@ -589,6 +631,21 @@ export class HullSolver implements Solver<HullParams> {
         hulls.length * this.wakeRowsPerHull * WAKE_SOURCE_WORDS * 8,
         'f64',
         WAKE_SOURCE_LAYOUT,
+      );
+    }
+    if (this.submergedWakeSource) {
+      this.submergedWakeRowsPerHull = 4 * (this.stations + 1) * (this.submergedWakeSource.depths.length - 1);
+      const rows = hulls.length * this.submergedWakeRowsPerHull;
+      if (rows > SUBMERGED_WAKE_MAX_ROWS)
+        throw new MargoError(
+          'state',
+          'A projected wake field supports up to 16,384 rows; reduce the number of hulls, stations or depth bands.',
+        );
+      this.submergedWakeSources = host.allocate(
+        'submergedWakeSources',
+        rows * SUBMERGED_WAKE_WORDS * Float64Array.BYTES_PER_ELEMENT,
+        'f64',
+        SUBMERGED_WAKE_LAYOUT,
       );
     }
     this.radiation = params.radiation ?? true;
@@ -781,6 +838,10 @@ export class HullSolver implements Solver<HullParams> {
       ? new Float64Array(host.memory.buffer, this.wakeSources.byteOffset, this.wakeSources.byteLength / 8)
       : null;
     wake?.fill(0);
+    const submergedWake = this.submergedWakeSources
+      ? (regionWords(host.memory, this.submergedWakeSources) as Float64Array)
+      : undefined;
+    submergedWake?.fill(0);
     const cell = (this.sea as Partial<SeaSurface>).cell;
     if (cell && (cell[0] !== context.cell[0] || cell[1] !== context.cell[1] || cell[2] !== context.cell[2]))
       throw new MargoError(
@@ -940,12 +1001,25 @@ export class HullSolver implements Solver<HullParams> {
       const wetWake = wake && this.loads.surfacePiercing && bodies[at + 16]! > 0;
       const reflecting = hull.shortWaveResistance && this.loads.surfacePiercing && bodies[at + 16]! > 0;
       const throughWater =
-        (wetWake && this.wakeAdvance) || ((course || reflecting) && course?.speed === undefined)
+        (wetWake && (this.wakeAdvance || this.submergedWakeSource)) ||
+        ((course || reflecting) && course?.speed === undefined)
           ? this.throughWaterSpeed(v, turned, centre, t)
           : 0;
       const speed = course ? (course.speed ?? throughWater) : 0;
       if (wetWake)
-        this.displaceWake(hull, index, 1 / bodies[at + 16]!, pose, centre, v[1]!, spin, throughWater, dt, wake);
+        this.displaceWake(
+          hull,
+          index,
+          1 / bodies[at + 16]!,
+          pose,
+          centre,
+          v[1]!,
+          spin,
+          throughWater,
+          dt,
+          wake,
+          submergedWake,
+        );
       if (reflecting)
         this.reflectShortWaves(hull, 1 / bodies[at + 16]!, turned, t, course?.speed ?? throughWater, loads);
       if (this.radiation)
@@ -1060,11 +1134,19 @@ export class HullSolver implements Solver<HullParams> {
     throughWater: number,
     dt: number,
     rows: Float64Array,
+    submergedRows?: Float64Array,
   ): void {
     let plane = this.wakePlanes.get(hull);
     if (!plane) {
       const waterline = stillWaterline(hull.mesh, mass, this.sea!.density ?? SEA_WATER);
-      plane = { waterline, sections: hullSections(hull.mesh, waterline, this.stations) };
+      const sections = hullSections(hull.mesh, waterline, this.stations);
+      plane = {
+        waterline,
+        sections,
+        submerged: this.submergedWakeSource
+          ? submergedWakeNodes(hull.mesh, waterline, sections, this.submergedWakeSource.depths, this.wakeRadius!)
+          : undefined,
+      };
       this.wakePlanes.set(hull, plane);
     }
     let at = index * this.wakeRowsPerHull * WAKE_SOURCE_WORDS;
@@ -1083,6 +1165,18 @@ export class HullSolver implements Solver<HullParams> {
         rows[at + 2] = radius;
         rows[at + 4] = -area * vertical * dt;
         at += WAKE_SOURCE_WORDS;
+      }
+    }
+    if (submergedRows && throughWater !== 0) {
+      let row = index * this.submergedWakeRowsPerHull * SUBMERGED_WAKE_WORDS;
+      for (const node of plane.submerged!) {
+        const point = rotate(pose.rotation, [node.x, plane.waterline, node.z]);
+        submergedRows[row] = pose.position[0] + point[0];
+        submergedRows[row + 1] = pose.position[2] + point[2];
+        submergedRows[row + 2] = node.radius;
+        submergedRows[row + 3] = node.band;
+        submergedRows[row + 4] = node.area * throughWater * dt;
+        row += SUBMERGED_WAKE_WORDS;
       }
     }
     if (this.wakeAdvance && throughWater !== 0) {
@@ -2263,6 +2357,16 @@ export class HullSolver implements Solver<HullParams> {
       ...(this.wakeSources
         ? [{ field: this.wakeSourceField.name, region: this.wakeSources, tick, cell: [0, 0, 0] as const }]
         : []),
+      ...(this.submergedWakeSources && this.submergedWakeSource
+        ? [
+            {
+              field: this.submergedWakeSource.field.name,
+              region: this.submergedWakeSources,
+              tick,
+              cell: [0, 0, 0] as const,
+            },
+          ]
+        : []),
       ...(this.wetMobility && this.wetChannel
         ? [{ field: this.wetChannel.mobility.name, region: this.wetMobility, tick, cell: [0, 0, 0] as const }]
         : []),
@@ -2280,6 +2384,7 @@ export class HullSolver implements Solver<HullParams> {
       this.history,
       this.courseHistory,
       this.wakeSources,
+      this.submergedWakeSources,
       this.radiated,
       this.waves,
       this.carry,

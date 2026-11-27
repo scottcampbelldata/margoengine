@@ -3205,6 +3205,8 @@ For a moving cabin, attach its fixed fittings and camera to the hull's rigid pos
 
 Set the second argument of `HullSolver` to enable signed waterplane sources, then give its `wakeSourceField` to `WakeSolver`. Both run at the world base rate in the same origin cell. Set `advance: true` to displace water at the leading end and draw it in behind the hull as it moves, alongside sources from heave, pitch and roll. It uses the rigid body's signed forward speed through the mean current and the hull mesh at its still-water draft. Omit `advance` to keep only the vertical motion sources. When a ship already supplies its advance wake through `ShipSolver` pressure, use one advance source per hull. Use a `minimumRadius` at least as large as half the wake cell diagonal so every source reaches the grid. Omit it for the geometric patch radius. Use the wake as a `SpectralSea` patch and pass that sea to the hull to return its pressure. The example enables `waterBelow` so the hull can also sample subsurface flow for drag and diffraction. Give the same wake to `WaterWake` to draw it.
 
+For an advancing hull whose draft matters, set `submergedAdvance` instead of `advance` and connect `hull.submergedWakeSource` as the third argument to `WakeSolver`. Give two through nine increasing edges in metres down from still water, beginning at zero. The last edge must cover the hull’s reference draft and stay above the bed. The solver distributes each advancing face’s signed flux over the difference of its wetted section spans, then projects the depth bands to the surface with the linear finite-depth Green function. The original five-word source still carries heave, pitch and roll. For the optional port, `wake.submergedSourceWork()` reports the nonzero rows and extra forward transforms in the last executed step. These are advancing sources for a prescribed or driven course. The transfer does not supply matched wave-making work to the rigid body.
+
 ```ts
 import {Physics} from 'margoengine/physics';
 import {HullSolver, SEA_WATER} from 'margoengine/physics/seakeeping';
@@ -3227,8 +3229,8 @@ const mesh = {
     2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3,
   ]),
 };
-const hull = new HullSolver('hull', {minimumRadius: 0.35, advance: true});
-const wake = new WakeSolver('wake', hull.wakeSourceField);
+const hull = new HullSolver('hull', {minimumRadius: 0.35, submergedAdvance: [0, 0.0625, 0.125, 0.25, 0.3]});
+const wake = new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
 const sea = new SpectralSea({
   waves: {
     frequencies: Float64Array.of(0.5), directions: Float64Array.of(0), energy: Float64Array.of(0),

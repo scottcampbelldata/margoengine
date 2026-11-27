@@ -18,6 +18,18 @@
 // Determinism: the transforms are the shared FFT (@margoengine/math/fft, pinned twiddles, a fixed order), the per-mode
 // factors come from pinned cos, sin and exp, and the rest is + - * / and sqrt, so a step gives the same bits everywhere.
 import type { SeaSource } from '@margoengine/math/fields';
+import {
+  ProjectedWakeSource,
+  SUBMERGED_WAKE_LAYOUT,
+  SUBMERGED_WAKE_MAX_CELLS,
+  SUBMERGED_WAKE_MAX_ROWS,
+  SUBMERGED_WAKE_QUANTITY,
+  SUBMERGED_WAKE_WORDS,
+  type SubmergedWakeSource,
+  type WakeSourceGrid,
+  wakeDepths,
+  wakePatch,
+} from './submerged-wake.js';
 import { MargoError } from '@margoengine/math/errors';
 import { RealFft2 } from '@margoengine/math/fft';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
@@ -114,6 +126,8 @@ export class WakeSolver implements Solver<WakeParams> {
   private level: RateLevel = 0;
   private sources?: (t: number) => readonly SeaSource[];
   private readonly sourceField?: FieldDescriptor;
+  private readonly submergedSource?: SubmergedWakeSource;
+  private projected?: ProjectedWakeSource;
   private fft!: RealFft2;
   private height!: Region;
   private potential!: Region;
@@ -126,6 +140,7 @@ export class WakeSolver implements Solver<WakeParams> {
   private stepDt = 0;
   private damp!: Float64Array;
   private press!: Float64Array;
+  private patchGrid!: WakeSourceGrid;
   private depth = Infinity;
   /** The depths of the water's velocity layers, m below the still level, and their region (u, v, w per layer). */
   private belowDepths: number[] = [];
@@ -135,12 +150,22 @@ export class WakeSolver implements Solver<WakeParams> {
   /**
    * @param id The solver's id, default 'wake'.
    * @param sourceField Optional layout-1 f64 SeaSource rows from a 60 Hz solver in the same world cell.
+   * @param submergedSource Optional projected advancing-volume source with shared depth bands.
    */
-  constructor(id = 'wake', sourceField?: FieldDescriptor) {
+  constructor(id = 'wake', sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource) {
     if (sourceField && (sourceField.quantity !== 'seaSource' || sourceField.unit !== 'SI'))
       throw new RangeError('Invalid wake source descriptor. Use a seaSource field in SI units.');
     this.id = id;
     this.sourceField = sourceField ? Object.freeze({ ...sourceField }) : undefined;
+    if (submergedSource) {
+      const { field, depths } = submergedSource;
+      if (field?.quantity !== SUBMERGED_WAKE_QUANTITY || field.unit !== 'SI' || field.name === sourceField?.name)
+        throw new MargoError(
+          'state',
+          'Pass a distinct submerged wake source descriptor in SI units, such as HullSolver.submergedWakeSource.',
+        );
+      this.submergedSource = { field: Object.freeze({ ...field }), depths: wakeDepths(depths) };
+    }
   }
 
   describe(): SolverDescription {
@@ -149,6 +174,7 @@ export class WakeSolver implements Solver<WakeParams> {
       fields: [
         { field: WAKE_HEIGHT_FIELD, access: 'write' },
         ...(this.sourceField ? [{ field: this.sourceField, access: 'read' as const }] : []),
+        ...(this.submergedSource ? [{ field: this.submergedSource.field, access: 'read' as const }] : []),
       ],
       rate: this.level,
       stableRate: () => this.level,
@@ -188,16 +214,19 @@ export class WakeSolver implements Solver<WakeParams> {
       throw new RangeError(`A wake's sponge is a whole number of cells under half the grid (got ${sponge}); pass one.`);
     if (!(Number.isInteger(rate) && rate >= 0 && rate <= 7))
       throw new RangeError(`A wake's rate level is 0 to 7 (got ${rate}); pass one.`);
-    if (this.sourceField && rate !== 0)
+    if ((this.sourceField || this.submergedSource) && rate !== 0)
       throw new RangeError('Wake field sources use the world base rate. Set the wake and its publisher to 60 Hz.');
     if (sources !== undefined && typeof sources !== 'function')
       throw new TypeError('A wake takes its sources as a function of time, (t) => SeaSource[]; pass one.');
+    if (this.submergedSource && cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS)
+      throw new MargoError('state', 'A projected wake supports up to 1,048,576 cells; reduce the grid dimensions.');
     this.fft = new RealFft2(cells[0], cells[1]);
     [this.nx, this.nz] = cells;
     this.host = host;
     this.dx = cellSize;
     this.x0 = centre[0] - (this.nx * cellSize) / 2;
     this.z0 = centre[1] - (this.nz * cellSize) / 2;
+    this.patchGrid = { nx: this.nx, nz: this.nz, dx: cellSize, x0: this.x0, z0: this.z0 };
     this.rho = density;
     this.level = rate as RateLevel;
     this.sources = sources;
@@ -248,6 +277,9 @@ export class WakeSolver implements Solver<WakeParams> {
     const size = 2 * half * this.nz;
     this.spectra = [new Float64Array(size), new Float64Array(size), new Float64Array(size)];
     this.depth = depth;
+    this.projected = this.submergedSource
+      ? new ProjectedWakeSource(this.patchGrid, this.submergedSource.depths, depth)
+      : undefined;
     if (waterBelow) {
       const deepest = Math.min(depth, 0.5 * Math.min(this.nx, this.nz) * cellSize);
       this.belowDepths = [0];
@@ -395,6 +427,10 @@ export class WakeSolver implements Solver<WakeParams> {
       g = this.g,
       level = 1 / (this.rho * g);
     fft.forward(h, H);
+    if (this.submergedSource) {
+      const port = context.inputs.get(this.submergedSource.field.name);
+      if (port) this.stampSubmerged(port, context.cell, H);
+    }
     fft.forward(phi, F);
     fft.forward(press, P);
     for (let m = 0; m < K.length; m++) {
@@ -461,26 +497,31 @@ export class WakeSolver implements Solver<WakeParams> {
       throw new RangeError(
         'Invalid sea source. Use a finite place, a finite positive radius, and finite pressure and volume.',
       );
-    const { nx, nz, dx, x0, z0, press } = this,
-      i0 = Math.max(0, Math.floor((x - radius - x0) / dx)),
-      i1 = Math.min(nx - 1, Math.ceil((x + radius - x0) / dx)),
-      j0 = Math.max(0, Math.floor((z - radius - z0) / dx)),
-      j1 = Math.min(nz - 1, Math.ceil((z + radius - z0) / dx));
-    let weight = 0;
-    for (let pass = 0; pass < 2; pass++)
-      for (let j = j0; j <= j1; j++)
-        for (let i = i0; i <= i1; i++) {
-          const px = x0 + (i + 0.5) * dx - x,
-            pz = z0 + (j + 0.5) * dx - z,
-            r = Math.sqrt(px * px + pz * pz);
-          if (r >= radius) continue;
-          const b = 0.5 * (1 + cos((PI * r) / radius));
-          if (pass === 0) weight += b * dx * dx;
-          else {
-            press[i + nx * j]! += pressure * b;
-            if (volume && weight > 0) h[i + nx * j]! += (volume * b) / weight;
-          }
-        }
+    wakePatch(this.patchGrid, x, z, radius, volume, h, pressure, this.press);
+  }
+
+  private stampSubmerged(port: Port, cell: Cell, heightSpectrum: Float64Array): void {
+    const { region } = port;
+    const rowBytes = SUBMERGED_WAKE_WORDS * Float64Array.BYTES_PER_ELEMENT;
+    if (
+      region.type !== 'f64' ||
+      region.layout !== SUBMERGED_WAKE_LAYOUT ||
+      region.byteLength % rowBytes ||
+      region.byteLength / rowBytes > SUBMERGED_WAKE_MAX_ROWS
+    )
+      throw new MargoError('state', 'Use the layout-1 f64 submerged wake port with up to 16,384 rows.');
+    if (cell.some((coordinate, i) => coordinate !== port.cell[i]))
+      throw new MargoError(
+        'state',
+        'Submerged wake sources use another world cell; place the source and wake in the same cell.',
+      );
+    const words = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
+    this.projected!.add(words, this.fft, heightSpectrum);
+  }
+
+  /** Nonzero projected rows and additional forward FFTs in the last executed step. */
+  submergedSourceWork(): { readonly rows: number; readonly transforms: number } {
+    return { rows: this.projected?.rows ?? 0, transforms: this.projected?.bands ?? 0 };
   }
 
   /**

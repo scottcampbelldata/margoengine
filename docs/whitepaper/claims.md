@@ -6636,6 +6636,10 @@ At `λ/L = 0.5` and `Fn = 0.142`, the independently measured KVLCC2 normalized m
 
 The optional native panel solve returns six-axis radiation on a hull in deep water and over a flat bed. The refined hemisphere matches Hulme's analytical surge and heave coefficients within 4 percent, and its combined incident and scattered heave load meets Haskind reciprocity within 0.02 percent at ka = 0.5. The time-stepped hull loses energy to its radiation. A rendered finite-depth hull and wake reproduce on WebGPU and WebGL2. [Clean-room record](../clean-room.md#sea-08-three-dimensional-radiation-and-diffraction-at-finite-frequency)
 
+### SEA-12 submerged hull sources on a finite-depth wake grid
+
+An opt-in port projects each signed depth band of a guided hull onto the linear wake grid. The modal test checks the finite-depth transfer and checks its deep-water limit on three grids covering the same domain and physical wavelengths. A closed eccentric prism preserves signed volume and first lateral moment to roundoff and reproduces its world hash after a seek from tick zero on both arena layouts. The production First Wake diagnostic and signed measured KCS residuals describe where these checks stop. [Tests and measured limits](../limits.md#ship-motion-on-the-wake-grid)
+
 ### SEA-08 ordinary-strip sway, roll and yaw at forward speed
 
 The fixed-heading force port follows all five retained ordinary-strip cross terms within 0.33 percent. The same solver drives and restores the live wake on both renderers. [Clean-room record](../clean-room.md#sea-08-lateral-course-radiation)
