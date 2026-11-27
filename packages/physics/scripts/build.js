@@ -116,6 +116,7 @@ await build({
         rod: resolve(root, 'src/rod/index.ts'),
         breakable: resolve(root, 'src/breakable/index.ts'),
         'debug-view': resolve(root, 'src/debug-view.ts'),
+        'gpu-cloth': resolve(root, 'src/gpu-cloth.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

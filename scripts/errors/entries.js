@@ -8,6 +8,15 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'gpu-cloth',
+    title: '@margoengine/physics/gpu-cloth: cloth stepped on the GPU',
+    kind: 'family',
+    messages: [],
+    cause:
+      'GPUCloth was given something it cannot use: a description that is not a SoftBodyDesc, one without triangles (a rope or a bare particle set), a clothTube, a particle with no positive mass or with more than 16 edges, more than 262,144 particles, a setting out of its range (substeps outside 1 to 64, a timestep outside 1/480 to 1/15 s, a negative compliance, damping, friction, thickness or tether slack, a wind that is not three finite numbers), a particle index out of range, a pin point or collider pose that is not finite, a collider shape other than sphere, capsule, box, plane or sdf, an sdf whose data does not match its size, more than 32 colliders, a pin or collider on a removed body (code state), a snapshot of another cloth, or a call after dispose (code disposed).',
+    fix: 'Build the cloth with SoftBodyDesc.cloth, clothAnisotropic or trimesh (a tube as a trimesh, or step it on the CPU with SoftBodies), keep each setting within the range the README lists, pin particles 0 to count - 1 at finite points, pass colliders as {shape, radius | halfExtents | halfHeight | sdf, position, rotation, body}, remove a collider or unpin a particle before removing its body, restore only a snapshot this cloth took, and make a new GPUCloth after dispose.',
+  },
+  {
     id: 'physics-debug-view',
     title: '@margoengine/physics/debug-view: the shared physics debug view',
     kind: 'family',

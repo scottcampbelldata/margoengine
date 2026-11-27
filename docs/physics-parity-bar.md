@@ -166,8 +166,19 @@ build", 069f20095) and used by `docs/physics-solver-audit.md`:
 - **Collision:** with spheres, capsules, boxes and meshes.
 - **Forces and drawing:** wind and gravity; stretch and bend stiffness; drawn as a skinned or updated mesh at no extra
   cost.
-- **Today:** XPBD cloth is sound. PA-05, 06 and 29 and X-27, 28, 30 and 31 are open. Self-collision and tearing are
-  beyond parity.
+- **Today (2026-11-27):** every checklist item is built. GPU cloth: `GPUCloth` of `@margoengine/physics/gpu-cloth`
+  (XPBD edges by colour in compute, 30 substeps a step, tethers), pinned to points and tied to rigid bodies, meeting
+  spheres, capsules, boxes, planes and meshes as signed distance fields, in the world or on bodies, with wind, gravity
+  and stretch, shear and bend compliance, drawn by `drawGPUCloth` (`@margoengine/gltf/soft-mesh`) from the buffer the
+  compute writes (no readback, no upload); on the WebGL2 layer its CPU twin runs the same passes. CPU cloth:
+  `soft.create` of `@margoengine/physics/soft` (Wasm, two-way contact, self contact, tearing, water), drawn by
+  `drawSoftBody`. Quick start, three.js migration note, debug view (`PhysicsDebugView.add(cloth)`) and the example page
+  `examples/test-pages/cloth.html` (flag on a pole, cloth on a ball, the pointer pushing it) are in. Tests:
+  `packages/physics/tests/gpu-cloth.test.js`, `gpu-cloth-check.mjs` (WebGPU and the WebGL2 layer). PA-06 is fixed; the
+  CPU cloth's PA-05 soft-world snapshots, X-28 face aerodynamics, X-30 tethers and X-31 skinned cloth landed
+  2026-11-27. Open against the eight points: PA-29 (sail thrust reacting on the hull), X-27 (vertex block descent for
+  cloth), measured drape validation (Cusick, ASTM D1388 cantilever), the GPU cloth's one-way ties and its plate-only
+  air, and speed against the rival's demo (quiet speed phase).
 
 ### P7. SOFT-02 Ropes and chains
 

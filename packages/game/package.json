@@ -2499,6 +2499,10 @@
       "types": "./dist/physics/debug-view.d.ts",
       "import": "./dist/physics/debug-view.js"
     },
+    "./physics/gpu-cloth": {
+      "types": "./dist/physics/gpu-cloth.d.ts",
+      "import": "./dist/physics/gpu-cloth.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

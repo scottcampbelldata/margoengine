@@ -3527,6 +3527,10 @@
       "types": "./dist/physics/debug-view.d.ts",
       "import": "./dist/physics/debug-view.js"
     },
+    "./physics/gpu-cloth": {
+      "types": "./dist/physics/gpu-cloth.d.ts",
+      "import": "./dist/physics/gpu-cloth.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20912229,
+  "total": 20929507,
   "history": [
     {
       "date": "2026-10-24",
@@ -14606,6 +14606,12 @@
       "commit": "8706614d6",
       "reason": "@margoengine/physics/soft base 51,881 to 56,034 B gzip budget (measured 54,401 + 3%): adaptive tearing of sheets (soft-adaptive-tear.ts: each face's principal stretch, the cut across it with an inserted vertex and the conforming split of the face beyond, the unzip of vertices the crack divides, and the rebuild of the body), with the cloth aerodynamics and soft-world snapshots landed before it. It runs where the step reports tears, beside the edge and cell tearing it replaces for sheets; a separate entry would load the same soft kernel for any tearing cloth.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "e6722c57b",
+      "reason": "SOFT-01 P6: new optional entry @margoengine/physics/gpu-cloth, 16,774 B gzip (budget 17,278): GPUCloth, cloth stepped in compute on WebGPU (seven WGSL passes) with its CPU twin for the WebGL2 layer and Node, pins on points and bodies, sphere, capsule, box, plane and SDF colliders, tethers, wind, snapshot and debug lines; @margoengine/gltf/soft-mesh gains drawGPUCloth and measures 71,622 B, within its 73,133 B budget. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15453,6 +15459,7 @@
     "@margoengine/physics/flip": 14295,
     "@margoengine/physics/foam": 7674,
     "@margoengine/physics/glacier": 3740,
+    "@margoengine/physics/gpu-cloth": 17278,
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,
     "@margoengine/physics/groundwater": 4158,

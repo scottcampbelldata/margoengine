@@ -18103,3 +18103,45 @@ No rival engine source and no paper's companion code was read.
   across its axis, half from each end; a force F at the arm r turning with its link changes its moment by [F]x [r]x d theta,
   whose symmetric part (F . r) I - (r F^T + F r^T) / 2 is the pin's; taken in by rho / (1 + rho) of it, rho the tension's
   share of the joint's turning stiffness, so bending-held rods keep their explicit, undamped tension.
+### GPU cloth (`@margoengine/physics/gpu-cloth`, SOFT-01, 2026-11-27)
+
+Built from papers and texts only; no engine source was read (three.js's `webgpu_compute_cloth` and Ammo's cloth were
+looked at as running examples and documentation, for what they offer, not how they are written).
+
+- M. Müller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position based dynamics", Journal of Visual Communication and
+  Image Representation 18 (2), 2007, doi 10.1016/j.jvcir.2007.01.005: predict, project the constraints, take the
+  velocity from the move; pins as particles of zero inverse mass.
+- T. Jakobsen, "Advanced Character Physics", Game Developers Conference 2001: Verlet-style velocities from positions
+  and cloth as particles joined by distance constraints relaxed in turn.
+- M. Macklin, M. Müller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", Motion in
+  Games 2016, doi 10.1145/2994258.2994272: the compliance alpha / dt^2 in the distance constraint's step, so stiffness
+  is a material constant (m/N) and not an iteration count.
+- M. Macklin, K. Storey, M. Lu, P. Terdiman, N. Chentanez, S. Jeschke and M. Müller, "Small Steps in Physics
+  Simulation", Symposium on Computer Animation 2019, doi 10.1145/3309486.3340247: one constraint pass in each of many
+  substeps rather than many passes in one step (30 substeps of 1/1800 s by default).
+- M. Fratarcangeli and F. Pellacini, "Scalable Partitioning for Parallel Position Based Dynamics", Computer Graphics
+  Forum 34 (2), 2015, doi 10.1111/cgf.12550: edges coloured so no two of a colour share a particle, each colour one
+  parallel pass (Gauss-Seidel between colours, no atomics); here a greedy colouring, at most 2 x 16 - 1 colours.
+- T. Kim, N. Chentanez and M. Müller, "Long Range Attachments - A Method to Simulate Inextensible Clothing in Computer
+  Games", Symposium on Computer Animation 2012, doi 10.2312/SCA/SCA12/163-169: each free particle kept within its rest
+  distance along the cloth (here the shortest path over the edges) of its nearest pin, with a slack.
+- M. Macklin, M. Müller, N. Chentanez and T.-Y. Kim, "Unified Particle Physics for Real-Time Applications", ACM TOG 33
+  (4), 2014, doi 10.1145/2601097.2601152: contacts as position constraints and Coulomb friction taken in position (the
+  tangential slide relative to the surface cut back by mu times the depth).
+- S. F. Hoerner, Fluid-Dynamic Drag, 1965: a flat plate's normal force coefficient, 1.17, applied per particle to the
+  air's velocity through its faces (the force normal to the face carries both drag and lift).
+- H. Gouraud, "Continuous shading of curved surfaces", IEEE Trans. Computers C-20 (6), 1971: vertex normals as the
+  area-weighted sum of the faces'; E. Lengyel, "Computing Tangent Space Basis Vectors for an Arbitrary Mesh", 2001: the
+  draw tangents from the texture coordinates.
+- Closed-form signed distances from the geometry of a point and a sphere, a segment (capsule) and a box (C. Ericson,
+  Real-Time Collision Detection, Morgan Kaufmann 2005, ch. 5); a mesh as a trilinear signed distance field with its
+  exact in-cell gradient.
+- Margo's own: the velocity kept as state (not (x - previous) / dt), so float32 positions far from the origin keep
+  small accelerations; pins and colliders moved from their last pose to this one by each substep's share of the frame,
+  with friction relative to the collider surface's own motion; the CPU twin runs the GPU's passes in the GPU's order so
+  the WebGL2 layer and Node give the same cloth; gusts as products of sines (no spectrum).
+- Checked against: XPBD statics of a particle on two compliant edges (bisection of the force balance, within the float32
+  floor ulp alpha / (w dt^2)), a falling sheet's terminal speed sqrt(rho_A g / (rho Cd / 2)) to 1e-5, Coulomb's
+  friction angle and g (sin - mu cos) sliding on a 20 degree slope to 0.2 percent, rest at the thickness on a sphere,
+  capsule, box (1e-5 m) and a sphere's trilinear SDF (h^2 / (4 r)), tethers capping a soft strip at 1 + slack, bit-equal
+  hashes across runs and a snapshot restore, and the GPU against the twin within 1e-4 m (measured 8.3e-7 m) on WebGPU.

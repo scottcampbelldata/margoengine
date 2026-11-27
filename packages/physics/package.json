@@ -28,6 +28,7 @@
     "test:browser:granular-flow": "cd ../.. && node packages/physics/tests/granular-flow.browser.mjs",
     "test:browser:lava": "cd ../.. && node packages/physics/tests/lava.browser.mjs",
     "test:browser:lightning": "cd ../.. && node packages/physics/tests/lightning.browser.mjs",
+    "test:browser:gpu-cloth": "cd ../.. && node packages/physics/tests/gpu-cloth-check.mjs && node packages/physics/tests/gpu-cloth-check.mjs --compat",
     "test:browser:rail": "cd ../.. && node packages/physics/tests/rail.browser.mjs && node packages/physics/tests/rail.browser.mjs --compat",
     "test:browser:thin-film": "cd ../.. && node packages/physics/tests/thin-film.browser.mjs && node packages/physics/tests/thin-film.browser.mjs --compat",
     "test:browser:strands": "cd ../.. && node packages/physics/tests/strands.browser.mjs",
@@ -337,6 +338,10 @@
     "./debug-view": {
       "types": "./dist/debug-view.d.ts",
       "import": "./dist/debug-view.js"
+    },
+    "./gpu-cloth": {
+      "types": "./dist/gpu-cloth.d.ts",
+      "import": "./dist/gpu-cloth.js"
     }
   },
   "files": [

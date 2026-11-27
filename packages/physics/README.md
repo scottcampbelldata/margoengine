@@ -1092,6 +1092,93 @@ for (let i = 0; i < 600; i++) physics.step();
 console.log(Math.abs(hose.particlePosition(30)[0]) > 0.05); // true: the swell's orbits sway its free end
 ```
 
+### GPU cloth (`@margoengine/physics/gpu-cloth`)
+
+The same cloth description, stepped in compute on WebGPU and drawn straight from the buffer the compute writes: thousands of particles a frame with no readback and no upload. Build it with `SoftBodyDesc.cloth`, `clothAnisotropic` or `trimesh` (its particles, masses, pins, edges, bend edges, damping, gravity scale and radius carry over) and pick where it runs: `soft.create(desc)` on the CPU, `GPUCloth.attach(engine, desc)` on the GPU.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {drawGPUCloth} from 'margoengine/gltf/soft-mesh';
+import {GPUCloth} from 'margoengine/physics/gpu-cloth';
+import {SoftBodyDesc} from 'margoengine/physics/soft';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 2, 4], target: [0, 0.6, 0]}});
+const cloth = GPUCloth.attach(engine, SoftBodyDesc.cloth([-1, 2, -1], [0.04, 0, 0], [0, 0, 0.04], 51, 51), {wind: [2, 0, 0]});
+cloth.addCollider({shape: 'sphere', radius: 0.6, position: [0, 0.8, 0]});
+drawGPUCloth(engine, cloth);
+engine.start();
+```
+
+A flag tied to a pole that is a rigid body, with its debug lines in the physics debug view:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {drawGPUCloth} from 'margoengine/gltf/soft-mesh';
+import {Physics} from 'margoengine/physics';
+import {PhysicsDebugView} from 'margoengine/physics/debug-view';
+import {GPUCloth} from 'margoengine/physics/gpu-cloth';
+import {FABRICS, SoftBodyDesc} from 'margoengine/physics/soft';
+
+await Physics.load();
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [1, 2, 5], target: [1, 2, 0]}});
+const physics = new Physics(engine);
+const pole = physics.addBody(null, {type: 'kinematicPosition', position: [0, 1.5, 0], colliders: {shape: 'capsule', halfHeight: 1.5, radius: 0.03}});
+// 1.5 m by 0.9 m of sailcloth; column j = 0 .. 9 of row i = 0 runs down the pole.
+const flag = GPUCloth.attach(engine, SoftBodyDesc.cloth([0.04, 3, 0], [0.1, 0, 0], [0, -0.1, 0], 16, 10).setFabric(FABRICS.sailcloth), {physics, wind: [6, 0, 1]});
+for (let j = 0; j < 10; j++) flag.attach(j, pole); // carried by the pole wherever it goes
+flag.addCollider({shape: 'capsule', radius: 0.03, halfHeight: 1.5, body: pole});
+drawGPUCloth(engine, flag, {material: {pbrMetallicRoughness: {baseColorFactor: [0.8, 0.1, 0.1, 1]}}});
+const view = await PhysicsDebugView.attach(engine, physics);
+view.add(flag); // edges coloured by strain, pins, colliders, the wind
+engine.start();
+```
+
+- **A step.** Each fixed step (`timestep`, default 1/60 s) is `substeps` substeps (default 30), each a few compute passes: the particles' normals (for the drag), integrate (gravity, the wind's drag through each face, damping), pins, the edges one colour at a time (compliant distance constraints of XPBD, Macklin, Mueller and Chentanez 2016, solved once a substep in small steps, Macklin et al. 2019), tethers and colliders; after each step a surface pass writes the normals, tangents and draw vertices. No atomics: every thread writes only its own particle or its edge's two (the edges are coloured so no two of a colour share a particle), so a run repeats to the bit on one GPU and driver, and `snapshot()` / `restore()` repeat it from any step. The velocity is state of its own, so float32 positions far from the origin keep small accelerations.
+- **Stiffness.** `stretchCompliance` (structural edges), `shearCompliance` (a cell's diagonals) and `bendCompliance` (the bend edges two along), in m/N: 0 is inextensible (the default for stretch and shear), and the bend default is the CPU cloth's 10 Hz bend edges on the mean particle mass. Tethers (`tethers`, default on) keep every free particle within its rest distance along the cloth, times 1 + `tetherSlack` (default 0.01), of its nearest pin (long range attachments, Kim, Chentanez and Mueller 2012), so a pinned cloth does not stretch under its own swing; they also cap an elastic `stretchCompliance` there, so turn them off for a cloth meant to stretch from its pins.
+- **Pins.** `pin(i, point?)` holds a particle at a point (setting it again moves it over the next step), `attach(i, body, point?)` ties it to a rigid body, read after the physics step every frame, `unpin(i)` lets go; the description's `setPinnedParticles` are pins at their rest points. A tie is one way: the body does not feel the cloth (the CPU cloth's `attachParticle` is two way).
+- **Colliders.** `addCollider({shape, ...})` (up to 32) takes a `sphere` (`radius`), a `capsule` (`radius`, `halfHeight`, along its local y), a `box` (`halfExtents`), a `plane` (`normal`, default up) or an `sdf` (any mesh as a signed distance field: a `MeshSDF` of `margoengine/bvh/sdf` passes as it is), each at `position` and `rotation`, in the world or on a `body`; `friction` (default the cloth's 0.4) is Coulomb's, held in position (Macklin et al. 2014). A moving collider is swept: each substep meets it where it is by then, and friction follows its surface's motion. The returned collider's `position` and `rotation` can be set each frame (a pointer's sphere), and `remove()` takes it away. The cloth keeps `thickness` from every collider (default the description's particle radius, else half its shortest edge).
+- **Air.** `wind` (a velocity, or a function of the cloth's time) with `turbulence` (0 to 1, default 0.25: smooth gusts along and across it), `airDensity` (1.2) and `drag` (1.17): a flat plate's normal force on the air through each face, which carries both its drag and its lift.
+- **Drawing.** `drawGPUCloth(engine, cloth, {material, images})` of `margoengine/gltf/soft-mesh` draws it as a PBR mesh (shadows, picking and the PBR model API included) from the cloth's own `vertexBuffer`; attach it after the cloth. Texture coordinates come from the grid (or `uvs` at construction).
+- **Reading it.** `await cloth.readPositions()` reads the particles back; `positions()` gives the last read (exact on the CPU routes); `debugRender(options)` gives `{vertices, colors}` (edges by strain, `bendEdges`, `pins`, `colliders`, `normals`, `wind`) and plugs into `PhysicsDebugView.add(cloth)`; on the GPU it reads back once a frame, a frame or two behind the picture. `stats` gives the `backend`, `steps`, edge `colors` and `count`.
+- **Routes.** On WebGPU it steps on the GPU. On the WebGL2 compatibility layer, and before it is attached (in Node or a worker), its CPU twin runs the same passes in the same order; `stats.backend` says which. The twin matches the GPU within 1e-6 m after a step.
+- **Errors.** Bad input is a `MargoError` (`unsupported`, `state` for a pin or collider on a removed body, `disposed`) naming the fix, linked to [margoengine.com/errors#gpu-cloth](https://margoengine.com/errors#gpu-cloth).
+
+| Option (default) | Meaning |
+| --- | --- |
+| `physics` (none) | The world whose gravity the cloth takes; set at construction. |
+| `uvs` (the grid) | Texture coordinates, two a particle; set at construction. |
+| `gravity` (the world's, else [0, -9.81, 0]) | m/s^2, times the description's gravity scale. |
+| `wind` ([0, 0, 0]) | m/s, or `(time) => [x, y, z]`, read once a frame. |
+| `turbulence` (0.25) | Gusts, 0 to 1. |
+| `airDensity` (1.2), `drag` (1.17) | kg/m^3 (0 turns the air off), the plate's coefficient. |
+| `stretchCompliance` (0), `shearCompliance` (0), `bendCompliance` (10 Hz) | m/N. |
+| `tethers` (true), `tetherSlack` (0.01) | Long range attachments to the pins. |
+| `damping` (the description's, else 0) | 1/s. |
+| `friction` (0.4) | Coulomb, with every collider that has none of its own. |
+| `thickness` (the particle radius) | Metres kept from colliders. |
+| `timestep` (1/60), `substeps` (30) | A frame runs at most 256 substeps; a longer frame drops the rest. |
+| `paused` (false) | Frames stop stepping; `step(n)` still steps. |
+
+#### Coming from three.js and Ammo cloth
+
+three.js's `webgpu_compute_cloth` example builds the cloth by hand: storage buffers of vertices and of springs, compute functions for the Verlet step, the spring forces, a sphere collider and the wind, a render geometry that reads the vertex buffer, and the pointer moving the sphere. Its `physics_ammo_cloth` example makes a patch with `btSoftBodyHelpers.CreatePatch(corners, segments, fixed)`, tunes `get_m_cfg()` (iterations, damping, friction), sets its total mass, ties nodes to a rigid body with `appendAnchor(node, body, disableCollision, influence)`, adds it to the soft world, and every frame copies the nodes' positions and normals into a `BufferGeometry`. In Margo:
+
+| three.js example | Margo |
+| --- | --- |
+| Vertex and spring storage buffers, built per cloth | `SoftBodyDesc.cloth(origin, du, dv, nu, nv)` (or `trimesh`), then `GPUCloth.attach(engine, desc)` |
+| Verlet, spring and collision compute functions | built in: integrate, edge colours, tethers and colliders a substep |
+| Spring stiffness | `stretchCompliance`, `shearCompliance`, `bendCompliance` (m/N) |
+| A sphere uniform the pointer moves | `const ball = cloth.addCollider({shape: 'sphere', radius})`, then `ball.position = point` each frame; capsules, boxes, planes and SDF meshes too |
+| Wind strength uniform | `wind` and `turbulence` |
+| A render geometry over the vertex buffer | `drawGPUCloth(engine, cloth, {material})` |
+| `CreatePatch(..., fixed)` | `SoftBodyDesc.cloth(...).setPinnedParticles([...])` |
+| `setTotalMass`, `kDP`, `kDF` | `setMass`, `setLinearDamping`, `friction` |
+| `appendAnchor(node, body)` | `cloth.attach(i, body)` on the GPU (one way), or `soft.create(desc).attachParticle(i, body)` on the CPU (two way) |
+| Copy `m_nodes` into a `BufferGeometry` each frame | nothing: `drawGPUCloth` (GPU) or `drawSoftBody` (CPU) |
+| Soft-world debug drawer | `PhysicsDebugView.add(cloth)`, or `view.add(() => soft.debugRender())` for the CPU cloth |
+
+Self-contacts, tearing, two-way coupling with rigid bodies and water are the CPU cloth's (`soft.create`).
+
 ### Solid bodies: tetrahedral cells, plasticity, tearing and clusters
 
 A body made of tetrahedral cells behaves as an elastic solid. Each cell holds the shape its four particles stood in when the body was made, and two constraints on its deformation gradient carry the elasticity: the stable Neo-Hookean energy of Smith, de Goes and Kim (2018) in the constraint form of Macklin and Müller (2021), where an inverted cell comes back and nothing locks near zero volume, or, as an option, the co-rotated linear elasticity of Müller and Gross (2004). Both are solved by XPBD in the same small steps as the edges, so the cells' stiffness is real: a cantilever of Young's modulus E sags by the Euler-Bernoulli deflection rho g A L^4 / (8 E I) as its mesh is refined (a coarse mesh of linear tetrahedra locks and reads stiff: 8 by 2 cells give 55 percent of it, 12 by 3 give 88, 16 by 4 give 99), and a near-incompressible rubber (Poisson's ratio 0.49) keeps its volume within 3 percent under a 30 percent stretch where a foam (0.05) grows with it.

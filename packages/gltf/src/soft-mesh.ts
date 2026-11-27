@@ -6,6 +6,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import type { GPUCloth } from '@margoengine/physics/gpu-cloth';
 import type { SoftBody } from '@margoengine/physics/soft';
 import { GLTFAsset, type GLTFDocument, type GLTFImage } from './asset.js';
 import { PBRModel } from './model.js';
@@ -298,28 +299,7 @@ export class SoftBodyMesh implements EnginePlugin {
     this.surface = new SoftSurface(body, options);
     this.held = this.surface.vertices.slice();
     this.spare = this.surface.vertices.slice();
-    const textures = images.map((_, source) => ({ source }));
-    this.model = new PBRModel(
-      engine,
-      new GLTFAsset(
-        {
-          asset: { version: '2.0' },
-          materials: [
-            {
-              doubleSided: true,
-              pbrMetallicRoughness: { metallicFactor: 0, roughnessFactor: 0.8 },
-              ...material,
-            },
-          ],
-          ...(textures.length ? { textures, images: images.map(() => ({})) } : {}),
-          meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
-          nodes: [{ mesh: 0 }],
-        },
-        [],
-      ),
-      images,
-      [[{ vertices: this.held, indices: this.surface.indices }]],
-    );
+    this.model = sheetModel(engine, this.held, this.surface.indices, material, images);
     engine.use(this.model);
     try {
       engine.use(this);
@@ -372,4 +352,119 @@ export class SoftBodyMesh implements EnginePlugin {
  */
 export function drawSoftBody(engine: EngineKernel, body: SoftBody, options?: SoftBodyMeshOptions): SoftBodyMesh {
   return new SoftBodyMesh(engine, body, options);
+}
+
+/** Options for {@link drawGPUCloth}: the material and images, as {@link drawSoftBody} takes them. */
+export type GPUClothMeshOptions = Pick<SoftBodyMeshOptions, 'material' | 'images'>;
+
+/** The glTF document of a one-primitive mesh drawn with `material` (default a matte sheet seen from both sides). */
+function sheetModel(
+  engine: EngineKernel,
+  vertices: Float32Array,
+  indices: Uint32Array,
+  material: SoftMeshMaterial | undefined,
+  images: readonly GLTFImage[],
+): PBRModel {
+  const textures = images.map((_, source) => ({ source }));
+  return new PBRModel(
+    engine,
+    new GLTFAsset(
+      {
+        asset: { version: '2.0' },
+        materials: [{ doubleSided: true, pbrMetallicRoughness: { metallicFactor: 0, roughnessFactor: 0.8 }, ...material }],
+        ...(textures.length ? { textures, images: images.map(() => ({})) } : {}),
+        meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+        nodes: [{ mesh: 0 }],
+      },
+      [],
+    ),
+    images,
+    [[{ vertices, indices }]],
+  );
+}
+
+/**
+ * A `GPUCloth` of `@margoengine/physics/gpu-cloth` drawn as a PBR mesh. On WebGPU the model draws the vertex buffer the
+ * cloth's compute writes (as a skin's output is drawn): no readback, no upload. On the WebGL2 compatibility layer the cloth
+ * steps on the CPU and the mesh uploads its vertices when they change.
+ */
+export class GPUClothMesh implements EnginePlugin {
+  readonly name = 'gpu-cloth-mesh:' + serial++;
+  /** After the cloth (a late plugin), so a CPU step of this frame is the one uploaded. */
+  readonly late = true;
+  /** The model it draws with: `model.setVisible`, picking and the PBR model API work on it. */
+  readonly model: PBRModel;
+  private engine?: Engine;
+  private disposed = false;
+  private seen = -1;
+  private held: Float32Array;
+  private spare: Float32Array;
+
+  constructor(
+    engine: EngineKernel,
+    readonly cloth: GPUCloth,
+    { material, images = [] }: GPUClothMeshOptions = {},
+  ) {
+    if (!(cloth?.vertices instanceof Float32Array) || !(cloth.indices instanceof Uint32Array))
+      throw new MargoError('unsupported', 'drawGPUCloth takes a GPUCloth of @margoengine/physics/gpu-cloth.');
+    this.held = cloth.vertices.slice();
+    this.spare = cloth.vertices.slice();
+    this.model = sheetModel(engine, this.held, cloth.indices, material, images);
+    engine.use(this.model);
+    try {
+      engine.use(this);
+    } catch (error) {
+      this.model.dispose();
+      throw error;
+    }
+  }
+  setup(engine: Engine): void {
+    this.engine = engine;
+  }
+  onPreUpdate(): void {
+    if (!this.disposed) this.sync();
+  }
+  /** Points the model at the cloth's GPU vertices, or uploads its CPU vertices when they changed (the frame does this). */
+  sync(): this {
+    if (this.disposed)
+      throw new MargoError('disposed', 'GPUClothMesh is disposed; draw the cloth again with drawGPUCloth.');
+    const buffer = this.cloth.vertexBuffer;
+    if (buffer) {
+      for (const p of this.model.primitives)
+        if (p.deformed !== buffer) {
+          p.deformed = buffer;
+          p.deformedOffset = 0;
+        }
+      return this;
+    }
+    for (const p of this.model.primitives) p.deformed = undefined;
+    if (this.cloth.revision === this.seen) return this;
+    this.seen = this.cloth.revision;
+    const next = this.spare;
+    next.set(this.cloth.vertices);
+    this.model.writeGeometry([{ vertices: next, indices: this.cloth.indices }], { start: 0, count: this.cloth.count });
+    this.spare = this.held;
+    this.held = next;
+    return this;
+  }
+  /** Removes the mesh from the engine and frees its buffers. The cloth is not touched. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const p of this.model.primitives) p.deformed = undefined;
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
+    this.model.dispose();
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+}
+
+/**
+ * Draws a GPU cloth with one call: `const mesh = drawGPUCloth(engine, cloth, {material})`. Attach it after the cloth;
+ * `mesh.dispose()` (or `using`) removes it.
+ */
+export function drawGPUCloth(engine: EngineKernel, cloth: GPUCloth, options?: GPUClothMeshOptions): GPUClothMesh {
+  return new GPUClothMesh(engine, cloth, options);
 }

@@ -1,0 +1,129 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>GPU cloth check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body>
+<script type="module">
+import { Engine } from '/packages/core/dist/index.js';
+import { GPUCloth, clothStateHash } from '/packages/physics/dist/gpu-cloth.js';
+import { SoftBodyDesc } from '/packages/physics/dist/soft.js';
+import { drawGPUCloth } from '/packages/gltf/dist/soft-mesh.js';
+
+const W = 320, H = 240;
+// A 1.5 m sheet of 48 x 48 particles, two corners pinned, falling in a gusty wind onto a sphere, a capsule, a box, a
+// signed distance field and the ground: every pass of a substep runs.
+const N = 48;
+const desc = () =>
+  SoftBodyDesc.cloth([-0.75, 1.6, -0.75], [1.5 / (N - 1), 0, 0], [0, 0, 1.5 / (N - 1)], N, N).setPinnedParticles([0, N * N - 1]);
+const options = { wind: [2, 0, 1], turbulence: 0.3 };
+const sphereSDF = () => {
+  const n = 17, data = new Float32Array(n * n * n), h = 0.6 / (n - 1);
+  for (let z = 0; z < n; z++) for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
+    data[x + y * n + z * n * n] = Math.hypot(x * h - 0.3, y * h - 0.3, z * h - 0.3) - 0.2;
+  return { data, size: [n, n, n], min: [-0.3, -0.3, -0.3], max: [0.3, 0.3, 0.3] };
+};
+const dress = (cloth) => {
+  cloth.addCollider({ shape: 'sphere', radius: 0.45, position: [0, 0.8, 0] });
+  cloth.addCollider({ shape: 'capsule', radius: 0.12, halfHeight: 0.5, position: [0.5, 0.9, 0.4], rotation: [0, 0, Math.SQRT1_2, Math.SQRT1_2] });
+  cloth.addCollider({ shape: 'box', halfExtents: [0.2, 0.2, 0.2], position: [-0.5, 0.5, 0.3] });
+  cloth.addCollider({ shape: 'sdf', sdf: sphereSDF(), position: [0.3, 0.5, -0.5] });
+  cloth.addCollider({ shape: 'plane' });
+  return cloth;
+};
+
+window.check = async () => {
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  document.body.append(c);
+  const engine = await Engine.create(c, { backend: 'webgpu', camera: { position: [0, 3.4, 2.4], target: [0, 0.7, 0], near: 0.05, far: 50 } });
+  engine.stop();
+  engine.scene.background = '#0a101a';
+  const errors = [];
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+
+  const cloth = dress(GPUCloth.attach(engine, desc(), options));
+  const twin = dress(new GPUCloth(desc(), options));
+  const start = await cloth.snapshot();
+
+  // One step on the GPU against the CPU twin, from the same state.
+  cloth.step();
+  twin.step();
+  const gpu = await cloth.readPositions(), cpu = twin.positions();
+  let worst = 0, off = 0;
+  for (let i = 0; i < gpu.length; i += 3) {
+    const d = Math.max(Math.abs(gpu[i] - cpu[i]), Math.abs(gpu[i + 1] - cpu[i + 1]), Math.abs(gpu[i + 2] - cpu[i + 2]));
+    worst = Math.max(worst, d);
+    if (d > 1e-4) off++;
+  }
+
+  // Determinism: 60 steps twice from the start give one hash, and so do 30 more from a restore at step 30.
+  cloth.restore(start);
+  cloth.step(30);
+  const mid = await cloth.snapshot();
+  cloth.step(30);
+  const runA = await cloth.hash();
+  cloth.restore(start);
+  cloth.step(60);
+  const runB = await cloth.hash();
+  cloth.restore(mid);
+  cloth.step(30);
+  const runC = await cloth.hash();
+  const finite = (await cloth.readPositions()).every(Number.isFinite);
+
+  const shot = new OffscreenCanvas(W, H);
+  const ctx = shot.getContext('2d', { willReadFrequently: true });
+  const compat = cloth.stats.backend === 'webgl2-compat';
+  const grab = async (delta = 1 / 60) => {
+    engine.render({ delta });
+    if (compat) await engine.gpu.queue.onSubmittedWorkDone();
+    ctx.drawImage(c, 0, 0);
+    return ctx.getImageData(0, 0, W, H).data;
+  };
+  const nonBg = (px) => {
+    let n = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i] > 28 || px[i + 1] > 32 || px[i + 2] > 44) n++;
+    return n;
+  };
+  const diffCount = (a, b) => {
+    let n = 0;
+    for (let i = 0; i < a.length; i += 4)
+      if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 18) n++;
+    return n;
+  };
+
+  cloth.restore(start);
+  const mesh = drawGPUCloth(engine, cloth, { material: { pbrMetallicRoughness: { baseColorFactor: [0.9, 0.2, 0.15, 1] } } });
+  const stepsBefore = cloth.stats.steps;
+  const frame1 = await grab(1 / 60);
+  for (let k = 0; k < 8; k++) engine.render({ delta: 1 / 60 });
+  const frame2 = await grab(1 / 60);
+  const frameSteps = cloth.stats.steps - stepsBefore;
+  cloth.options.paused = true;
+  const pausedA = await grab(1 / 60);
+  const pausedB = await grab(1 / 60);
+  cloth.options.paused = false;
+  await cloth.readPositions();
+  const lines = cloth.debugRender();
+  const stats = { ...cloth.stats };
+  mesh.dispose();
+  cloth.dispose();
+  const frameAfterDispose = await grab(1 / 60);
+  engine.dispose();
+
+  return {
+    compat,
+    count: cloth.count,
+    errors,
+    stats,
+    hashes: [runA, runB, runC],
+    startHash: clothStateHash(start.state),
+    worst,
+    off,
+    finite,
+    frameSteps,
+    lit: nonBg(frame1),
+    moved: diffCount(frame1, frame2),
+    pausedDiff: diffCount(pausedA, pausedB),
+    debugSegments: lines.vertices.length / 6,
+    afterDisposeLit: nonBg(frameAfterDispose),
+  };
+};
+window.ready = true;
+</script></body></html>

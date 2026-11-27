@@ -6,8 +6,24 @@
 import { EngineKernel, Mesh, Scene } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, TranscodedKTX2Result } from "@margoengine/decoders";
+import { GPUCloth } from "@margoengine/physics/gpu-cloth";
 import { SoftBody } from "@margoengine/physics/soft";
 import { Splats } from "@margoengine/splats";
+
+export class GPUClothMesh implements EnginePlugin {
+    readonly cloth: GPUCloth;
+    readonly name: string;
+    readonly late = true;
+    readonly model: PBRModel;
+    constructor(engine: EngineKernel, cloth: GPUCloth, _arg2?: GPUClothMeshOptions);
+    setup(engine: Engine): void;
+    onPreUpdate(): void;
+    sync(): this;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export type GPUClothMeshOptions = Pick<SoftBodyMeshOptions, 'material' | 'images'>;
 
 export class SoftBodyMesh implements EnginePlugin {
     readonly name: string;
@@ -42,6 +58,8 @@ export class SoftSurface {
 export interface SoftSurfaceOptions {
     uvs?: ArrayLike<number>;
 }
+
+export function drawGPUCloth(engine: EngineKernel, cloth: GPUCloth, options?: GPUClothMeshOptions): GPUClothMesh;
 
 export function drawSoftBody(engine: EngineKernel, body: SoftBody, options?: SoftBodyMeshOptions): SoftBodyMesh;
 
