@@ -199,13 +199,15 @@ function frequency(signal, rate, skip = 0) {
   return ((ups.length - 1) * rate) / (ups[ups.length - 1] - ups[0]);
 }
 
-test('a cable whose tension dwarfs its bending stiffness stays whole at 30, 60 and 600 steps a second', (t) => {
+test('a cable whose tension dwarfs its bending stiffness stays whole at 30, 60, 600 and 2,400 steps a second', (t) => {
   // A taut wire mooring or anchor cable: 7.9 m, 1.77 kg/m, bending stiffness 1 N m^2, pinned at both ends and brought to
   // 48 kN over half a second, then plucked at 0.05 m/s across. Its tension pulls each 0.165 m link straight with a stiffness
   // T l, about 2,000 rad/s on a link, which a step of 1/30 or 1/60 s held explicitly blew up to hundreds of metres; held in
-  // the tree's solve it rings at the string's 10.4 Hz, its swing about the 0.76 mm the pluck gives and never past it.
-  // (KB-PHYS-RODSTRING1.)
-  for (const hz of [30, 60, 600]) {
+  // the tree's solve it rings at the string's 10.4 Hz, its swing about the 0.76 mm the pluck gives and never past it. Its
+  // pinned ends stretch 3 % (an axial stiffness of 30 T): at 2,400 steps a second a pin stiff across as 1 / h^2 made rounding
+  // gaps pulls of 10^6 N and the kernel stopped the rod; a pin stiff across as a thousand times its give holds it
+  // (KB-PHYS-RODSTRING1).
+  for (const hz of [30, 60, 600, 2400]) {
     const L = 7.9,
       m = 1.77,
       T = 48000,

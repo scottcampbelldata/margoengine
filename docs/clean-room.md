@@ -18145,3 +18145,5 @@ looked at as running examples and documentation, for what they offer, not how th
   friction angle and g (sin - mu cos) sliding on a 20 degree slope to 0.2 percent, rest at the thickness on a sphere,
   capsule, box (1e-5 m) and a sphere's trilinear SDF (h^2 / (4 r)), tethers capping a soft strip at 1 + slack, bit-equal
   hashes across runs and a snapshot restore, and the GPU against the twin within 1e-4 m (measured 8.3e-7 m) on WebGPU.
+- Own derivation (2026-11-27, `pin_spring`): a pin that gives holds across at a thousand times its give's stiffness, so its
+  across gap is a thousandth of its half link's stretch under the same load and its stiffness does not grow as 1 / h^2.

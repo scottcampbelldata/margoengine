@@ -38,6 +38,8 @@ pub const JOINT_PIN_ALONG: u32 = 1 << 7;
 /// F h^2 / (PIN_STIFFNESS m): a millionth of how far F moves the link alone in a substep, and the tree's matrices still hold
 /// it, a ratio of 10^6 in doubles of 16 digits.
 const PIN_STIFFNESS: f64 = 1e6;
+/// How much stiffer across a pin that gives is than its give along (`pin_spring`).
+const PIN_GIVE: f64 = 1e3;
 /// The share of a pin's tension stiffness across its link taken into a substep's backward Euler solve: all of it, as a pin's
 /// half link is a small part of a rod (it raised an ordinary rod's damping ratio by 6e-4 at 60 steps a second).
 const TENSION_SHARE: f64 = 1.0;
@@ -633,7 +635,14 @@ impl World {
 
     /// The pin's spring to an anchor that moves as it moves now: its stiffness C over the substep and its pull C gap / h.
     fn pin_spring(&self, joint: usize, body: usize, h: f64, gap: D3) -> ([[f64; 3]; 3], D3) {
-        let stiff = PIN_STIFFNESS / self.s(INVERSE_MASS, body) as f64;
+        let mut stiff = PIN_STIFFNESS / self.s(INVERSE_MASS, body) as f64;
+        if self.uu(JOINT_ELASTIC, joint) & JOINT_PIN_ALONG != 0 {
+            // A pin that gives holds across at PIN_GIVE times its give's stiffness, not at a stiffness that grows as 1 / h^2:
+            // at 2,400 steps a second that made a rounding gap of 3e-8 m a pull of 10^6 N on a link, whose turn with the link
+            // the solve holds explicitly, and a stretched rod's end blew up (KB-PHYS-RODSTRING1). Across it still gives a
+            // thousandth of what its half link stretches under the same load.
+            stiff = stiff.min(PIN_GIVE * self.s(JOINT_STIFFNESS_1, joint) as f64 * h * h);
+        }
         let (mut c, mut pull) = ([[0.0f64; 3]; 3], [0.0f64; 3]);
         if self.uu(JOINT_ELASTIC, joint) & JOINT_PIN_ALONG == 0 {
             for i in 0..3 {

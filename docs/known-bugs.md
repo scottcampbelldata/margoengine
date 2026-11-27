@@ -428,22 +428,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   models (the excitation force synchronised to the cross-flow velocity, Thorsen, Saevik and Larsen 2014 and 2016), checked
   on this case and on the paper's bidirectionally sheared cases with no new fitting.
 
-### Open 2026-11-27: a rod pinned at both ends and stretched blows up at fine steps (KB-PHYS-RODSTRING1, physics rod)
+### Fixed 2026-11-27: a pinned rod blew up at coarse steps under high tension, and at fine steps when stretched (KB-PHYS-RODSTRING1, physics rod)
 
-- **Fixed part (2026-11-27):** a cable whose tension dwarfs its bending stiffness (bending stiffness 1 N m^2 at 48 kN) blew up
-  at 30 and 60 steps a second: its tension's stiffness across the links was held explicitly. The tree's solve now holds it
-  (`add_tension_stiffness`, Tournier et al. 2015's geometric stiffness); regression `packages/physics/tests/rod.test.js`, "a
-  cable whose tension dwarfs its bending stiffness".
-- **Repro (open):** a `Rod` of 48 links, 7.9 m, 1.77 kg/m, pinned at both ends and brought to 12 or 48 kN over half a second
-  at 2,400 steps a second: the kernel stops it (a link past 1e15) once the pinned end links stretch by about 3 % (the default
-  axial stiffness 30 T); with the axial stiffness at 1e7 N or 1e9 N (a stretch of 3e-4 or less) it is steady, and at 3 kN it
-  is steady.
-- **Cause, so far:** a trace of the first link shows its pose moving along the rod without speed, fivefold each step before it
-  blows up: the joint passes' pushing pass closes the stretched half link that the pin's spring (`pinJoint` give, held in the
-  tree's solve) holds open. Taking the pin out of the joint passes, freeing only its along axis in the link's frame, and
-  acting the tree's pin rows at the other anchor's foot on the link's axis each moved the failure without removing it.
-- **Open:** one solve for the pin's give (the joint passes and the tree agreeing on it). Until then keep a pinned rod's stretch
-  small (a stiffer `axialStiffness`) when stepping finer than about 2,000 steps a second.
+- **Repro:** a `Rod` of 48 links, 7.9 m, 1.77 kg/m, bending stiffness 1 N m^2, pinned at both ends and brought to 48 kN (its
+  pinned ends stretched 3 %), then plucked: at 30 and 60 steps a second it swung to hundreds of metres; at 2,400 the kernel
+  stopped it (a link past 1e15).
+- **Cause:** two. The tension's stiffness across the links reached them only through the pins' reach along the tree, held
+  explicitly (about 2,000 rad/s on a link at 48 kN). And a pin that gives held across at h^2 k = 10^6 m, a stiffness that
+  grows as 1 / h^2: at 2,400 steps a second a rounding gap of 3e-8 m was a pull of 10^6 N on a link, whose turn with the link
+  the solve held explicitly.
+- **Fix:** the tree's solve holds the tension's stiffness per link (`add_tension_stiffness`, Tournier et al. 2015's
+  geometric stiffness, by the tension's share of each joint's turning stiffness); a pin that gives holds across at a thousand
+  times its give (`pin_spring`, PIN_GIVE). Regression `packages/physics/tests/rod.test.js`, "a cable whose tension dwarfs its
+  bending stiffness stays whole at 30, 60, 600 and 2,400 steps a second" (its swing within the pluck's 0.76 mm at each).
 
 ### Fixed 2026-11-27: KVLCC2 was too course-stable in shallow water (KB-SHIP-SHALLOW1, physics ship)
 

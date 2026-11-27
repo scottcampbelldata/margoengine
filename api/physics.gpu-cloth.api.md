@@ -1466,6 +1466,7 @@ class SoftBodyMaterial {
     arealDensity: number | null;
     bendSoftness: SoftSoftness;
     tearStrain: number;
+    adaptiveTearing: boolean;
     shapeMatchingSoftness: SoftSoftness;
     volumeSoftness: SoftSoftness;
     edgePlasticYield: number;
