@@ -32,6 +32,38 @@ export interface RippleDebugOptions {
     bounds?: boolean;
 }
 
+export class RippleField {
+    readonly size: number;
+    readonly resolution: number;
+    readonly speed: number;
+    readonly damping: number;
+    readonly cellSize: number;
+    constructor(options?: RippleFieldOptions);
+    get origin(): readonly [number, number];
+    get steps(): number;
+    get obstacles(): readonly RippleObstacle[];
+    setObstacles(obstacles: readonly RippleObstacle[]): this;
+    disturb(x: number, z: number, radius?: number, strength?: number): this;
+    wake(from: readonly [number, number], to: readonly [number, number], radius?: number, strength?: number): this;
+    advance(seconds: number): this;
+    step(step: RippleStep): this;
+    sample(x: number, z: number): RippleSample;
+    sampleHeight(x: number, z: number): number;
+    snapshot(): RippleSnapshot;
+    restore(snapshot: RippleSnapshot): this;
+    stateHash(): string;
+}
+
+export interface RippleFieldOptions {
+    size?: number;
+    resolution?: number;
+    speed?: number;
+    damping?: number;
+    center?: readonly [number, number];
+    level?: number;
+    obstacles?: readonly RippleObstacle[];
+}
+
 export interface RippleFrame {
     readonly origin: readonly [number, number];
     readonly resolution: number;
@@ -49,6 +81,7 @@ export interface RippleOptions {
     damping?: number;
     followCamera?: boolean;
     obstacles?: readonly RippleObstacle[];
+    cpu?: boolean;
 }
 
 export type RipplePosition = readonly [number, number, number] | ArrayLike<number> | {
@@ -57,10 +90,42 @@ export type RipplePosition = readonly [number, number, number] | ArrayLike<numbe
     readonly z: number;
 };
 
+export interface RippleSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: number;
+}
+
+export interface RippleSnapshot {
+    readonly origin: readonly [number, number];
+    readonly resolution: number;
+    readonly ticks: number;
+    readonly data: Float32Array;
+}
+
 export interface RippleSphereObstacle {
     readonly kind: 'sphere';
     readonly center: readonly [number, number, number] | readonly [number, number];
     readonly radius: number;
+}
+
+export interface RippleStep {
+    origin: readonly [number, number];
+    cell: number;
+    dt: number;
+    speed2: number;
+    damping: number;
+    shift: readonly [number, number];
+    events: Float32Array;
+    eventCount: number;
+    obstacles: Float32Array;
+    obstacleCount: number;
+}
+
+export interface RippleSurfaceSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: [number, number, number];
 }
 
 export interface RippleTrackOptions {
@@ -101,6 +166,12 @@ export class Ripples implements EnginePlugin {
     wake(from: readonly [number, number], to: readonly [number, number], radius?: number, strength?: number): this;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
+    sampleRipples(x: number, z: number): RippleSample;
+    sample(x: number, z: number): RippleSurfaceSample;
+    sampleHeight(x: number, z: number): number;
+    snapshot(): RippleSnapshot;
+    restore(snapshot: RippleSnapshot): this;
+    stateHash(): string;
     readFrame(options?: {
         signal?: AbortSignal;
     }): Promise<RippleFrame>;

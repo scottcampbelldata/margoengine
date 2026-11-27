@@ -151,6 +151,8 @@ try {
     damping: 0.38,
     followCamera: false,
     obstacles: POND_OBSTACLES,
+    // A CPU copy of the field, so the boat rides the ripples it and the drops make, this frame.
+    cpu: true,
   });
 
   const rain = WaterRain.attach(engine, {
@@ -280,7 +282,7 @@ try {
     const bx = Math.cos(angle) * 8.5;
     const bz = Math.sin(angle * 2) * 3.8 - 1.2;
     const heading = Math.atan2(-Math.sin(angle) * 8.5, Math.cos(angle * 2) * 7.6);
-    boatBody.position = [bx, water.sampleHeight(bx, bz), bz];
+    boatBody.position = [bx, ripples.sampleHeight(bx, bz), bz];
     boatMesh.root.setPosition(boatBody.position);
     boatMesh.root.setRotation([0, heading, 0]);
 

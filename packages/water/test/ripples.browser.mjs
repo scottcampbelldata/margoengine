@@ -141,6 +141,44 @@ try {
     const afterRay = await bodyField.readFrame();
     bodyField.dispose();
 
+    // The CPU copy (cpu: true) against the GPU field it mirrors, after drops, a wake, a wall and a moving body; then a
+    // snapshot restored on both, and the surface query a floating body reads.
+    const mirrored = Ripples.attach(engine, {
+      surface: water,
+      size: 32,
+      resolution: 32,
+      followCamera: false,
+      speed: 3,
+      damping: 0.4,
+      cpu: true,
+      obstacles: [{ kind: 'wall', from: [6, -16], to: [6, 16], thickness: 2 }],
+    });
+    const floater = { position: [-3, 3, 2] };
+    mirrored.trackBody(floater, { radius: 1.5, strength: 0.1 });
+    engine.render({ delta: 0 });
+    mirrored.disturb(-5, -4, 2, 0.2).wake([-8, 6], [0, 6], 1.5, -0.1);
+    let mirrorError = 0;
+    for (let frame = 0; frame < 24; frame++) {
+      floater.position = [-3 + frame * 0.1, frame === 3 ? 0 : floater.position[1], 2];
+      engine.render({ delta: 1 / 60 });
+    }
+    const gpuField = await mirrored.readFrame(),
+      cpuField = mirrored.snapshot();
+    for (let i = 0; i < gpuField.data.length; i++) mirrorError = Math.max(mirrorError, Math.abs(gpuField.data[i] - cpuField.data[i]));
+    const mirrorPeak = cpuField.data.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    const saved = mirrored.snapshot();
+    for (let frame = 0; frame < 10; frame++) engine.render({ delta: 1 / 60 });
+    const later = await mirrored.readFrame();
+    mirrored.restore(saved);
+    for (let frame = 0; frame < 10; frame++) engine.render({ delta: 1 / 60 });
+    const replay = await mirrored.readFrame();
+    let replayError = 0;
+    for (let i = 0; i < later.data.length; i++) replayError = Math.max(replayError, Math.abs(later.data[i] - replay.data[i]));
+    const surfaceSample = mirrored.sample(-5, -4),
+      rippleOnly = mirrored.sampleRipples(-5, -4),
+      waterOnly = water.sample(-5, -4);
+    mirrored.dispose();
+
     const validation = await gpu.popErrorScope();
     engine.dispose();
     return {
@@ -161,6 +199,10 @@ try {
       afterWake: Array.from(afterWake.data),
       rayHit,
       afterRay: Array.from(afterRay.data),
+      mirrorError,
+      mirrorPeak,
+      replayError,
+      surfaceSum: surfaceSample.height - waterOnly.height - rippleOnly.height,
       validation: validation?.message,
     };
   }, observation);
@@ -276,6 +318,13 @@ try {
   // Cell for (-6.5, -6.5) is x = 9, z = 9.
   assert.ok(Math.abs(result.afterRay[(9 * n + 9) * 2] - result.afterWake[(9 * n + 9) * 2]) > 0.05, 'disturbRay injects impulse at hit cell');
 
+  // The CPU copy steps the shader's arithmetic in doubles and stores binary32; the GPU rounds each operation in binary32
+  // (and its exp and smoothstep to a few ulp), so they part by a few ulp of the field a step: bound 1e-6 of its peak
+  // a step over the 24 frames of 2 substeps.
+  assert.ok(result.mirrorPeak > 0.01, `the mirrored field carries waves (${result.mirrorPeak})`);
+  assert.ok(result.mirrorError < 48 * 1e-6 * result.mirrorPeak, `CPU copy against GPU field: ${result.mirrorError}`);
+  assert.ok(result.replayError < 48 * 1e-6 * result.mirrorPeak, `replay from a snapshot: ${result.replayError}`);
+  assert.ok(Math.abs(result.surfaceSum) < 1e-9, 'the surface query is the Water plus the ripples');
   assert.equal(result.validation, undefined);
   assert.deepEqual(errors, []);
   const report = {
@@ -286,6 +335,8 @@ try {
     wallLeak,
     farSideLeak,
     splashPeak,
+    mirrorError: result.mirrorError,
+    replayError: result.replayError,
     queryHeight: result.height,
     scroll: true,
     teleport: true,

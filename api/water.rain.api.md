@@ -102,6 +102,7 @@ interface RippleOptions {
     damping?: number;
     followCamera?: boolean;
     obstacles?: readonly RippleObstacle[];
+    cpu?: boolean;
 }
 
 type RipplePosition = readonly [number, number, number] | ArrayLike<number> | {
@@ -110,10 +111,29 @@ type RipplePosition = readonly [number, number, number] | ArrayLike<number> | {
     readonly z: number;
 };
 
+interface RippleSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: number;
+}
+
+interface RippleSnapshot {
+    readonly origin: readonly [number, number];
+    readonly resolution: number;
+    readonly ticks: number;
+    readonly data: Float32Array;
+}
+
 interface RippleSphereObstacle {
     readonly kind: 'sphere';
     readonly center: readonly [number, number, number] | readonly [number, number];
     readonly radius: number;
+}
+
+interface RippleSurfaceSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: [number, number, number];
 }
 
 interface RippleTrackOptions {
@@ -154,6 +174,12 @@ class Ripples implements EnginePlugin {
     wake(from: readonly [number, number], to: readonly [number, number], radius?: number, strength?: number): this;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
+    sampleRipples(x: number, z: number): RippleSample;
+    sample(x: number, z: number): RippleSurfaceSample;
+    sampleHeight(x: number, z: number): number;
+    snapshot(): RippleSnapshot;
+    restore(snapshot: RippleSnapshot): this;
+    stateHash(): string;
     readFrame(options?: {
         signal?: AbortSignal;
     }): Promise<RippleFrame>;

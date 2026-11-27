@@ -161,3 +161,6 @@ export function seaState(windSpeed: number, options: SeaStateOptions = {}): SeaS
     waves,
   };
 }
+
+// The drawn water as the physics framework's sea, for floating bodies on it (SEA-02, SEA-04 with SEA-12).
+export { seaSurface, type SeaSurfaceOptions, type SurfaceSource } from './sea-surface.js';

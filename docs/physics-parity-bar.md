@@ -147,14 +147,22 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
 - **Rendering (three.js `webgpu_ocean`, `webgl_shaders_ocean`, the Water add-on, Babylon `WaterMaterial`):** FFT or
   Gerstner waves; wind speed and direction; wave height and length; choppiness; reflection and refraction.
 - **Physics:** a height and normal query at any point (on the CPU or one frame behind on the GPU), so things can float.
-- **Today:** PA-11 (GPU readback is async only) and PA-16 (`FFTOcean` has no `setWind`) are open, and both are
-  parity items.
+- **Today (2026-11-27, Claude laptop):** both parity items are built: `FFTOcean.sample` and `Water.sample` answer on the
+  CPU with no readback (matching the GPU frame to 7e-6 m on WebGPU and the WebGL2 layer), `FFTOcean.setWind` re-tunes
+  live, `setDebug` is the debug view, `seaSurface` floats bodies through SEA-12, with a quick start, migration note and
+  `examples/ocean.html` (`packages/water/README.md`). Open: `FFTOcean` reflects a sky gradient, not the scene (`Water`
+  has reflection and refraction); speed is unmeasured (speed phase).
 
 ### P11. SEA-04 Interactive water ripples
 
 - **Ripples (three.js `webgl_gpgpu_water`, `webgpu_compute_water`):** a GPU heightfield; objects and the pointer push
   ripples; ripples spread, reflect and fade; floating objects ride them.
-- **Today:** a stand-in (PA-13, 17, 23).
+- **Today (2026-11-27, Claude laptop):** `Ripples` reflects off obstacles, takes the pointer (`disturbRay`) and moving
+  bodies (`trackBody`), and with `cpu: true` floats bodies on the ripples this frame (`sample`, `seaSurface` with
+  SEA-12), with snapshot and restore; `RippleField` is the same field without a GPU. Tested against the dispersion
+  relation, the method of images and exact damping (`packages/water/test/ripple-field.test.js`), CPU against GPU to
+  3e-6 m. A body's splash and wake are rated from its speed, not its displaced volume; PA-13, 17 and 23 (hull wakes,
+  shot entry, rain) are other rows' parts.
 
 ### P12. SEA-12 Buoyancy
 

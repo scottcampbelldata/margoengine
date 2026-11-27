@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20822659,
+  "total": 20824800,
   "history": [
     {
       "date": "2026-10-24",
@@ -14413,6 +14413,12 @@
       "commit": "2c6bc437e2",
       "grew": 2,
       "reason": "City generator: new optional entry procedural/city, 0 to 26424 B gzip (building rules and the broadleaf tree it meshes included; ceiling 27217 B); procedural/building-settings grows from under 5164 to 5606 B for the city sliders (ceiling 5862 B). Splitting layout from meshes would add a second entry for one call; core plus stage unchanged"
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "2c6bc437e",
+      "reason": "SEA-04 and SEA-02 with SEA-12 (2026-11-27): water/ripples 8,124 to 9,951 for the CPU copy of the field (cpu: true: sample, snapshot, restore, stateHash) and RippleField, the same field without a GPU; water/sea-state 1,380 to 1,694 for seaSurface, the drawn water as the physics framework's SeaSurface. A query in the frame it is asked needs the CPU step beside the GPU's, and a separate entry for RippleField would duplicate the obstacle packing and validation Ripples uses.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16065,10 +16071,10 @@
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,
-    "@margoengine/water/ripples": 8124,
+    "@margoengine/water/ripples": 9951,
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
-    "@margoengine/water/sea-state": 1380,
+    "@margoengine/water/sea-state": 1694,
     "@margoengine/water/settings": 6689,
     "@margoengine/water/shallow-surface": 1962,
     "@margoengine/water/ships": 11259,
