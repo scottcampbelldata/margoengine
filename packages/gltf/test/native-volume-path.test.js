@@ -137,4 +137,12 @@ test('a transmissive volume with a thicknessTexture binds slot 20 and the native
   assert.equal(shader.split('fn margoThickness(').length, 2, 'one margoThickness: the default is not added');
   // The physical shader without slot 20 reads the factor alone.
   assert.match(wgslFunction(source, 'margoThickness'), /return 1\.0;/);
+  // KB4000 step 4: the transmission pass's volume path (thicknessFactor x s.th) takes the map's G too; s.th was fixed at 1,
+  // so the pass absorbed through the whole factor where the map thins it (AttenuationTest's Thickness Texture row).
+  assert.ok(
+    extendedShader(plan).includes(`s.th=textureSample(margoMap${slot},margoSampler${slot},uv(i,20)).g;`),
+    'the surface thickness reads the map',
+  );
+  const unmapped = extendedPlan([], { iridescence: true });
+  assert.ok(extendedShader(unmapped).includes('s.th=vec4f(1).g;'), 'without a map the thickness is 1');
 });

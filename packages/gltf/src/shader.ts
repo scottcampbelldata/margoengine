@@ -1010,6 +1010,9 @@ export function extendedShader(plan: ExtendedPlan): string {
   out =
     patch(extendedPBRShader, [
       ...physicalEdits(sampleOf, bindings),
+      // KHR_materials_volume thickness map (G) scales thicknessFactor for the transmission pass's volume path, as it
+      // does for the native tint (margoThickness); unbound it reads 1.
+      ['s.th=1;', `s.th=${sampleOf('thickness')}.g;`],
       ['uvt:array<vec4f,26>', `uvt:array<vec4f,${plan.slots.length * 2}>`],
       [
         'sheen:vec4f\n}',
