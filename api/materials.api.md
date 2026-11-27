@@ -443,9 +443,10 @@ export class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
-    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement): CasterDisplacement | undefined;
+    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement, _data?: MaterialMeshData): CasterDisplacement | undefined;
+    meshData(_geometry: MeshGeometry): MaterialMeshData | undefined;
     relight(code: string): string;
-    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
+    bindings(device: GPUDevice, engine?: Engine, _data?: MaterialMeshData): GPUBindGroupEntry[];
 }
 
 export interface MaterialFeature {
@@ -503,6 +504,11 @@ export type MaterialMesh<M extends Material | readonly Material[] = Material> = 
     setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
     renderOrder: number;
 };
+
+export interface MaterialMeshData {
+    prepare(geometry: MeshGeometry, range?: GeometryRange): () => void;
+    dispose(): void;
+}
 
 export type MaterialNode = ValueNode | NormalMapNode | MetalRoughNode | ClearcoatNode | TransmissionNode | EmitNode;
 
@@ -623,6 +629,7 @@ export interface MeshGeometry {
         count: number;
         materialIndex: number;
     }[];
+    attributes?: Readonly<Record<string, VertexAttribute>>;
 }
 
 export interface MetalRoughNode {
@@ -952,6 +959,13 @@ export class UnlitMaterial extends Material {
 }
 
 export type ValueNode = ColorNode | ScalarNode | TextureNode | AddNode | MulNode | MixNode;
+
+export interface VertexAttribute {
+    data: ArrayLike<number>;
+    type: VertexAttributeType;
+}
+
+export type VertexAttributeType = 'f32' | 'vec2f' | 'vec3f' | 'vec4f' | 'i32' | 'vec2i' | 'vec3i' | 'vec4i' | 'u32' | 'vec2u' | 'vec3u' | 'vec4u';
 
 export interface VolumeOptions {
     thicknessFactor?: number;

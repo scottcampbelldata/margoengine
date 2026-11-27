@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
+import { MaterialMeshData, MeshGeometry } from "@margoengine/materials";
 
 export interface ChromaticAberrationOptions extends NodePassOptions {
     strength?: number;
@@ -264,6 +265,9 @@ class Program {
         binding: number;
     }[];
     readonly varyings: Node[];
+    attributes?: Resource & {
+        read(geometry: MeshGeometry): MaterialMeshData;
+    };
     readonly functions: Map<string, string>;
     next: number;
     readonly buffers: WeakMap<GPUDevice, {

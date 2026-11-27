@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { compute } from '../../shared/gpu.js';
+import { retire } from '../../shared/frame-resources.js';
 import { ShaderClock } from './clock.js';
 import { Let, push, statement, write } from './control.js';
 import {
@@ -171,9 +172,28 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     }
     return b.buffer;
   }
-  /** Re-upload `data` on next use, replacing what the GPU computed. */
-  update(): void {
-    this.version++;
+  /**
+   * Re-upload `data` on next use, replacing what the GPU computed. With `range` (in elements), only those elements are
+   * written, at once, to each copy that is otherwise up to date.
+   */
+  update(range?: { start: number; count: number }): void {
+    if (!range) {
+      this.version++;
+      return;
+    }
+    const { start, count } = range,
+      width = sizeOf(this.type);
+    if (!Number.isInteger(start) || !Number.isInteger(count) || start < 0 || count < 1 || start + count > this.count)
+      throw new RangeError('Storage update range must be whole elements inside the buffer; pass start and count');
+    for (const [device, b] of this.buffers)
+      if (b.version === this.version)
+        device.queue.writeBuffer(
+          b.buffer,
+          start * width * 4,
+          this.data as Float32Array<ArrayBuffer>,
+          start * width,
+          count * width,
+        );
   }
   /** Element `i` (an `atomicLoad` on an atomic buffer inside a ComputePass; use `atomicLoad` to fix when it reads relative to other atomics). */
   element(i: Index): Node<T> {
@@ -266,7 +286,8 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
   dispose(): void {
     for (const remove of this.lossSubscriptions.values()) remove();
     this.lossSubscriptions.clear();
-    for (const b of this.buffers.values()) b.buffer.destroy();
+    // A frame being encoded may still bind a copy: it is destroyed after that frame is submitted.
+    for (const [device, b] of this.buffers) retire(device, b.buffer);
     this.buffers.clear();
   }
   declare [Symbol.dispose]: () => void;

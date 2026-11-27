@@ -1,4 +1,5 @@
 // Typed shader nodes and the WGSL builder shared by the material, post and compute hosts.
+import type { MaterialMeshData, MeshGeometry } from '@margoengine/materials';
 import { nested } from './scope.js';
 import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -872,6 +873,8 @@ export class Program {
   readonly members: { name: string; type: Type; offset: number; node?: UniformNode; frame?: string }[] = [];
   readonly resources: { resource: Resource; name: string; binding: number }[] = [];
   readonly varyings: Node[] = [];
+  /** @internal The mesh attributes `attribute()` reads, and what packs a mesh's geometry for them. */
+  attributes?: Resource & { read(geometry: MeshGeometry): MaterialMeshData };
   /** @internal Fn specialisation key to WGSL name. */ readonly functions = new Map<string, string>();
   private readonly declarations = new Map<string, string>();
   private readonly canonical = new Map<string, Node>();

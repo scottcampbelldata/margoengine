@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { Material, type MaterialOptions } from '@margoengine/materials';
+import { Material, type MaterialMeshData, type MaterialOptions, type MeshGeometry } from '@margoengine/materials';
 import type { CasterDisplacement } from '../../shared/caster.js';
 import type { SurfaceGraph } from './graph.js';
 import type { Engine } from '@margoengine/core/extension';
@@ -372,7 +372,10 @@ export class NodeMaterial extends Material {
   private readonly depthMove: string[];
   private depthFragment: string;
   private depthFields: string;
-  private depthRecord?: { device: GPUDevice; record: CasterDisplacement };
+  /** One depth record per mesh that has data of its own (else the material's), for the device it was made on. */
+  private readonly depthRecords = new WeakMap<object, { device: GPUDevice; record: CasterDisplacement }>();
+  /** The pipeline key of every depth record: their shader and layout are the same. */
+  private depthKey?: string;
   private readonly colourBindings: number;
   /** `extra` is for subclasses: it compiles nodes of its own after the fragment stage and before the vertex stage. */
   constructor(options: NodeMaterialOptions = {}, extra?: (program: Program) => void) {
@@ -582,32 +585,47 @@ export class NodeMaterial extends Material {
         )
     );
   }
+  /** @internal The mesh attributes this graph reads with `attribute()`, checked and packed for one mesh. */
+  override meshData(geometry: MeshGeometry): MaterialMeshData | undefined {
+    return this.program.attributes?.read(geometry);
+  }
   /** @internal What a depth pass draws: the record of gltf\/pbr's `displacement`, undefined for an unchanged shape. */
-  override caster(device: GPUDevice, engine?: Engine): CasterDisplacement | undefined {
+  override caster(
+    device: GPUDevice,
+    engine?: Engine,
+    _map?: CasterDisplacement,
+    data?: MaterialMeshData,
+  ): CasterDisplacement | undefined {
     if (!this.depthVertex) return undefined;
-    if (this.depthRecord?.device === device) return this.depthRecord.record;
+    const kept = this.depthRecords.get(data ?? this);
+    if (kept?.device === device) return kept.record;
     const body = this.depthVertex + this.depthFragment,
       // Auto layouts hold what the shader reaches, which can be less than the beauty pass binds.
       reached = reachedBindings(this.program.declare(0), body);
     let layout: GPUBindGroupLayout | undefined;
     const record: CasterDisplacement = {
-      key: `n${++depthKeys}`,
+      key: (this.depthKey ??= `n${++depthKeys}`),
       cuts: !!this.depthFragment,
       depth: (code, group) => this.depthShader(code, group),
       velocity: (code, group) => this.velocityShader(code, group),
       move: this.depthMove,
       program: this.program,
       layout: () => (layout ??= device.createBindGroupLayout({ entries: [...reached.values()] })),
-      entries: () => this.program.entries(device, frameHost(engine)).filter((entry) => reached.has(entry.binding)),
+      entries: () =>
+        this.program
+          .entries(device, { ...frameHost(engine), meshData: data })
+          .filter((entry) => reached.has(entry.binding)),
     };
-    this.depthRecord = { device, record };
+    this.depthRecords.set(data ?? this, { device, record });
     return record;
   }
-  override bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
+  override bindings(device: GPUDevice, engine?: Engine, data?: MaterialMeshData): GPUBindGroupEntry[] {
     // The uniforms upload here for every pass, and a block only the depth passes read stays out of the colour pass's group.
     return [
       ...super.bindings(device, engine),
-      ...this.program.entries(device, frameHost(engine)).filter((entry) => entry.binding < this.colourBindings),
+      ...this.program
+        .entries(device, { ...frameHost(engine), meshData: data })
+        .filter((entry) => entry.binding < this.colourBindings),
     ];
   }
 }

@@ -1040,6 +1040,7 @@
       "asin",
       "atan",
       "atan2",
+      "attribute",
       "bitangentWorld",
       "block",
       "bool",

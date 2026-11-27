@@ -4,7 +4,7 @@
 
 ```ts
 import { Engine } from "@margoengine/core/extension";
-import { Material, MaterialOptions } from "@margoengine/materials";
+import { Material, MaterialMeshData, MaterialOptions, MeshGeometry } from "@margoengine/materials";
 
 export const SURFACE_GRAPH_LIMITS: Readonly<{
     nodes: 128;
@@ -248,8 +248,9 @@ class NodeMaterial extends Material {
     surfaceGraph?: SurfaceGraph;
     constructor(options?: NodeMaterialOptions, extra?: (program: Program) => void);
     shader(source: string, group: number): string;
-    caster(device: GPUDevice, engine?: Engine): CasterDisplacement | undefined;
-    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
+    meshData(geometry: MeshGeometry): MaterialMeshData | undefined;
+    caster(device: GPUDevice, engine?: Engine, _map?: CasterDisplacement, data?: MaterialMeshData): CasterDisplacement | undefined;
+    bindings(device: GPUDevice, engine?: Engine, data?: MaterialMeshData): GPUBindGroupEntry[];
 }
 
 interface NodeMaterialOptions extends MaterialOptions {
@@ -279,6 +280,9 @@ class Program {
         binding: number;
     }[];
     readonly varyings: Node[];
+    attributes?: Resource & {
+        read(geometry: MeshGeometry): MaterialMeshData;
+    };
     readonly functions: Map<string, string>;
     next: number;
     readonly buffers: WeakMap<GPUDevice, {

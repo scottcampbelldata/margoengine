@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21089563,
+  "total": 21097038,
   "history": [
     {
       "date": "2026-10-24",
@@ -14887,6 +14887,18 @@
       "commit": "702e74bf55",
       "reason": "SceneTargets integer colour formats (three.js parity row 19): mrt 4,539 to 5,149 gzip, and depth, pixelate, curvature and depth-downsample that include it grow 571 to 608 B: uint and sint outputs, clear range checks and the bytes-per-sample and rg11b10ufloat errors in place of GPU validation failures; a split would put the format checks behind an import() every SceneTargets needs at construction",
       "grew": 5
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "f350c30743",
+      "reason": "attribute() in node materials (three.js parity row 46): shader root 19,220 to 20,774 gzip (named per-vertex attributes: checked interleaved packing per mesh, per-mesh depth records, StorageBuffer ranged update and frame-safe dispose); graph, readback, deform and serialization carry the NodeMaterial and StorageBuffer parts (51 to 341 B). attribute() is shaken out unless imported; a separate entry would save nothing for apps that do not call it",
+      "grew": 5
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "1aaefefa32",
+      "reason": "attribute() in node materials (three.js parity row 46): shader/black-hole 25,814 to 26,087 gzip, the StorageBuffer ranged update and frame-safe dispose it bundles",
+      "grew": 1
     }
   ],
   "items": {
@@ -16142,24 +16154,24 @@
     "@margoengine/selection/hit-details": 16163,
     "@margoengine/selection/spatial": 2313,
     "@margoengine/selection/xray": 13398,
-    "@margoengine/shader": 19769,
-    "@margoengine/shader/black-hole": 26010,
+    "@margoengine/shader": 21398,
+    "@margoengine/shader/black-hole": 26870,
     "@margoengine/shader/compute-texture": 4761,
     "@margoengine/shader/compute-volume": 4961,
-    "@margoengine/shader/deform": 5535,
+    "@margoengine/shader/deform": 6042,
     "@margoengine/shader/editor": 25732,
     "@margoengine/shader/editor-pass": 34097,
     "@margoengine/shader/effects": 9334,
     "@margoengine/shader/glsl": 18767,
     "@margoengine/shader/glsl-material": 40907,
     "@margoengine/shader/glsl-pass": 43072,
-    "@margoengine/shader/graph": 14462,
+    "@margoengine/shader/graph": 14964,
     "@margoengine/shader/lighting": 10704,
     "@margoengine/shader/noise": 5538,
     "@margoengine/shader/pass": 13203,
     "@margoengine/shader/raw": 16417,
-    "@margoengine/shader/readback": 9361,
-    "@margoengine/shader/serialization": 21244,
+    "@margoengine/shader/readback": 9692,
+    "@margoengine/shader/serialization": 22025,
     "@margoengine/shader/shadertoy": 53319,
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/texture-array": 3442,

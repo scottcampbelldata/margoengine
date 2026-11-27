@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Vertex attribute check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {SSAO} from '/packages/post/dist/ssao.js';
+import {TAA} from '/packages/taa/dist/index.js';
+import {NodeMaterial,attribute,positionLocal,time,uniform,vec3,vec4,vertexColor,select} from '/packages/shader/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,4],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const base=planeGeometry(2,2,16,16),count=base.positions.length/3;
+const dark=()=>{engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;};
+const sun=()=>{engine.lighting.direction.set([0.6,0,0.8,Math.PI*2]);engine.lighting.radiance.set([1,1,1,0]);};
+// Per-vertex data of "side" s (two meshes sharing a material hold different values).
+const tintOf=(i,s)=>{const x=base.positions[i*3],y=base.positions[i*3+1];return s?[0.2,(x+1)/2,(y+1)/2]:[(x+1)/2,(y+1)/2,0.3];};
+const liftOf=(i,s)=>{const x=base.positions[i*3],y=base.positions[i*3+1];return s?0.5*(1-x*x):0.6*(1-y*y)+0.2*x;};
+const values=(of,size,s)=>{const out=new Float32Array(count*size);for(let i=0;i<count;i++)out.set([of(i,s)].flat(),i*size);return out;};
+const attributes=s=>({tint:{data:values(tintOf,3,s),type:'vec3f'},lift:{data:values(liftOf,1,s),type:'f32'}});
+const withData=(s=0)=>({...base,attributes:attributes(s)});
+const lifted=(s=0)=>({...base,colors:values(tintOf,3,s),positions:base.positions.map((v,k)=>k%3===2?v+liftOf((k-2)/3,s):v)});
+const flat={color:[0,0,0],toneMapped:false,doubleSided:true,positionNormals:'keep'};
+const look={color:[0.3,0.3,0.3],toneMapped:false,roughness:1,metalness:0,doubleSided:true,positionNormals:'keep'};
+const attributeNodes=()=>({emissiveNode:attribute('tint','vec3f'),positionNode:positionLocal.add(vec3(0,0,attribute('lift','f32')))});
+const place=(mesh,x,scale=0.9)=>{mesh.root.setPosition([x,0,0]);mesh.root.setScale([scale,scale,scale]);return mesh;};
+const group=(...meshes)=>({destroy(){for(const m of meshes)m.destroy();}});
+// Two meshes, one attribute material, each its own data; the reference draws CPU-moved, vertex-coloured meshes.
+const pair=(reference,make=createMesh)=>{dark();
+  if(reference){const m=new NodeMaterial({...flat,emissiveNode:vertexColor().xyz});return group(place(createMesh(engine,lifted(0),m),-1),place(createMesh(engine,lifted(1),m),1));}
+  const m=new NodeMaterial({...flat,...attributeNodes()});return group(place(make(engine,withData(0),m),-1),place(make(engine,withData(1),m),1));};
+const instanced=(engine,geometry,material)=>{const mesh=createInstancedMesh(engine,geometry,material,1);mesh.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));return mesh;};
+// Lit meshes over a wall, with sun shadows: the shadow pass reads each mesh's own attribute.
+const shadowed=reference=>{sun();
+  const wall=createMesh(engine,planeGeometry(8,8),new Material(look));wall.root.setPosition([0,0,-1.5]);
+  const m=reference?new NodeMaterial({...look,emissiveNode:vertexColor().xyz.mul(0.4)}):new NodeMaterial({...look,emissiveNode:attribute('tint','vec3f').mul(0.4),positionNode:positionLocal.add(vec3(0,0,attribute('lift','f32')))});
+  // The reference moves its CPU vertices and keeps the flat normals, as 'keep' does.
+  const meshes=[0,1].map(s=>place(createMesh(engine,reference?lifted(s):{...withData(s),colors:values(tintOf,3,s)},m),s?1:-1,0.8));
+  const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard',distance:8});shadows.add(wall);for(const mesh of meshes)shadows.add(mesh);
+  return {destroy(){engine.removePlugin(shadows.name);wall.destroy();for(const mesh of meshes)mesh.destroy();}};};
+// A position graph that reads no attribute beside a colour graph that does: the depth passes bind no attribute.
+const colourOnly=reference=>{sun();
+  const wall=createMesh(engine,planeGeometry(8,8),new Material(look));wall.root.setPosition([0,0,-1.5]);
+  const m=new NodeMaterial({...look,emissiveNode:(reference?vertexColor().xyz:attribute('tint','vec3f')).mul(0.4),positionNode:positionLocal.add(vec3(0,0.2,0))});
+  const mesh=createMesh(engine,{...(reference?base:withData(0)),colors:values(tintOf,3,0)},m);
+  const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard',distance:8});shadows.add(wall);shadows.add(mesh);
+  return {destroy(){engine.removePlugin(shadows.name);wall.destroy();mesh.destroy();}};};
+// Integer attributes in the fragment stage take the triangle's first vertex: a soup with one id a triangle.
+const soup=()=>{const positions=[],normals=[],ids=[],signs=[];
+  for(let t=0;t<12;t++){const x=(t%4)*0.55-1.1,y=((t/4)|0)*0.6-0.8;positions.push(x,y,0,x+0.5,y,0,x+0.25,y+0.5,0);for(let k=0;k<3;k++){normals.push(0,0,1);ids.push(t*1000003);signs.push(t%2?-5:7,t);}}
+  return {positions,normals,ids,signs};};
+const integers=reference=>{dark();const s=soup(),n=s.ids.length;
+  const colour=i=>{const t=s.ids[i]/1000003;return [(t%4)/4,s.signs[i*2]<0?1:0.25,s.signs[i*2+1]/12];};
+  if(reference)return createMesh(engine,{positions:s.positions,normals:s.normals,colors:Array.from({length:n},(_,i)=>colour(i)).flat()},new NodeMaterial({...flat,emissiveNode:vertexColor().xyz}));
+  const id=attribute('id','u32'),sign=attribute('sign','vec2i');
+  return createMesh(engine,{positions:s.positions,normals:s.normals,attributes:{id:{data:s.ids,type:'u32'},sign:{data:s.signs,type:'vec2i'}}},
+    new NodeMaterial({...flat,emissiveNode:vec3(id.div(1000003).mod(4).toFloat().div(4),select(sign.x.lessThan(0),1,0.25),sign.y.toFloat().div(12))}));};
+const draw=async()=>{for(let i=0;i<3;i++){engine.render();await device.queue.onSubmittedWorkDone();}};
+const scenarios={
+  cpuPair:()=>pair(true),pair:()=>pair(false),instanced:()=>pair(false,instanced),
+  cpuShadow:()=>shadowed(true),shadow:()=>shadowed(false),
+  cpuColourOnly:()=>colourOnly(true),colourOnly:()=>colourOnly(false),
+  cpuIntegers:()=>integers(true),integers:()=>integers(false),
+  // Drawn once with side 0's data, then edited live: a full geometry (the other side, more vertices) and a range.
+  async edited(){const meshes=pair(false),m=new NodeMaterial({...flat,...attributeNodes()});meshes.destroy();
+    const left=place(createMesh(engine,{...planeGeometry(2,2,4,4),attributes:{tint:{data:new Float32Array(75),type:'vec3f'},lift:{data:new Float32Array(25),type:'f32'}}},m),-1),right=place(createMesh(engine,withData(0),m),1);
+    await draw();left.setGeometry(withData(0));
+    const next=withData(0),other=attributes(1);next.attributes.tint.data.set(other.tint.data);next.attributes.lift.data.set(other.lift.data);
+    right.setGeometry(next,{start:0,count:100});await draw();right.setGeometry(next,{start:100,count:count-100});
+    return group(left,right);},
+  // A plain mesh handed the attribute material afterwards.
+  async swapped(){dark();const plain=new Material(flat),m=new NodeMaterial({...flat,...attributeNodes()});
+    const a=place(createMesh(engine,withData(0),plain),-1),b=place(createMesh(engine,withData(1),m),1);await draw();a.material=m;await draw();b.material=plain;await draw();b.material=m;return group(a,b);},
+  // SSAO's geometry pass and TAA's velocity pass bind each mesh's attribute too (no picture compared: no errors).
+  async passes(){sun();const m=new NodeMaterial({...look,emissiveNode:attribute('tint','vec3f'),positionNode:positionLocal.add(vec3(0,time.sin().mul(0.1),attribute('lift','f32')))});
+    const meshes=[0,1].map(s=>place(createMesh(engine,withData(s),m),s?1:-1));
+    const ssao=SSAO.attach(engine);for(const mesh of meshes)ssao.add(mesh);const taa=TAA.attach(engine);for(const mesh of meshes)taa.add?.(mesh);
+    for(let i=0;i<6;i++){meshes[0].root.setPosition([-1+i*0.02,0,0]);engine.render();await device.queue.onSubmittedWorkDone();}
+    return {destroy(){engine.removePlugin(taa.name);engine.removePlugin(ssao.name);for(const mesh of meshes)mesh.destroy();}};},
+};
+// What attribute materials refuse, by message.
+const refused=()=>{const m=new NodeMaterial({emissiveNode:attribute('tint','vec3f')}),messages=[];
+  for(const geometry of [base,{...base,attributes:{tint:{data:new Float32Array(count),type:'f32'}}},{...base,attributes:{tint:{data:new Float32Array(3),type:'vec3f'}}}])
+    try{createMesh(engine,geometry,m);messages.push('accepted');}catch(e){messages.push(e.message);}
+  return messages;};
+window.check={
+  refused,
+  async run(name){device.pushErrorScope('validation');window.current=await scenarios[name]();await draw();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
+  clear(){window.current?.destroy();window.current=null;engine.render();},
+};
+window.ready=true;
+</script></body></html>

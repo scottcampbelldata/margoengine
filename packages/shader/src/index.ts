@@ -1,4 +1,5 @@
 export * from './node.js';
+export { attribute } from './attribute.js';
 export { texture, textureCube, texture3D, type BindableTexture } from './texture.js';
 export {
   block,

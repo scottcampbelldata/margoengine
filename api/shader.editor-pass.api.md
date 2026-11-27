@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { MaterialMeshData, MeshGeometry } from "@margoengine/materials";
 
 export interface PassGraph {
     version: 1;
@@ -422,6 +423,9 @@ class Program {
         binding: number;
     }[];
     readonly varyings: Node[];
+    attributes?: Resource & {
+        read(geometry: MeshGeometry): MaterialMeshData;
+    };
     readonly functions: Map<string, string>;
     next: number;
     readonly buffers: WeakMap<GPUDevice, {
@@ -488,7 +492,10 @@ class StorageBuffer<T extends StorageType = StorageType> implements Resource {
     declare(name: string, group: number, binding: number, write: boolean): string;
     entries(device: GPUDevice): GPUBindingResource[];
     buffer(device: GPUDevice): GPUBuffer;
-    update(): void;
+    update(range?: {
+        start: number;
+        count: number;
+    }): void;
     element(i: Index): Node<T>;
     store(i: Index, value: NodeInput<T>): Store;
     atomicAdd(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;

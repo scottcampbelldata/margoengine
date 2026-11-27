@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { Material, MaterialOptions } from "@margoengine/materials";
+import { Material, MaterialMeshData, MaterialOptions, MeshGeometry, VertexAttributeType } from "@margoengine/materials";
 
 export type Arith<A extends Type, B extends Type> = A extends B ? A : A extends ScalarOf<B> ? B : B extends ScalarOf<A> ? A : A extends `mat${infer K}x${string}` ? B extends `vec${K}f` ? B : never : B extends `mat${infer K}x${string}` ? A extends `vec${K}f` ? A : never : never;
 
@@ -208,8 +208,9 @@ export class NodeMaterial extends Material {
     surfaceGraph?: SurfaceGraph;
     constructor(options?: NodeMaterialOptions, extra?: (program: Program) => void);
     shader(source: string, group: number): string;
-    caster(device: GPUDevice, engine?: Engine): CasterDisplacement | undefined;
-    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
+    meshData(geometry: MeshGeometry): MaterialMeshData | undefined;
+    caster(device: GPUDevice, engine?: Engine, _map?: CasterDisplacement, data?: MaterialMeshData): CasterDisplacement | undefined;
+    bindings(device: GPUDevice, engine?: Engine, data?: MaterialMeshData): GPUBindGroupEntry[];
 }
 
 export interface NodeMaterialOptions extends MaterialOptions {
@@ -267,6 +268,9 @@ export class Program {
         binding: number;
     }[];
     readonly varyings: Node[];
+    attributes?: Resource & {
+        read(geometry: MeshGeometry): MaterialMeshData;
+    };
     readonly functions: Map<string, string>;
     next: number;
     readonly buffers: WeakMap<GPUDevice, {
@@ -342,7 +346,10 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     declare(name: string, group: number, binding: number, write: boolean): string;
     entries(device: GPUDevice): GPUBindingResource[];
     buffer(device: GPUDevice): GPUBuffer;
-    update(): void;
+    update(range?: {
+        start: number;
+        count: number;
+    }): void;
     element(i: Index): Node<T>;
     store(i: Index, value: NodeInput<T>): Store;
     atomicAdd(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
@@ -444,6 +451,8 @@ export const asin: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 export const atan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const atan2: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
+
+export function attribute<T extends VertexAttributeType>(name: string, as: T): Node<T>;
 
 export const bitangentWorld: Node<"vec3f">;
 

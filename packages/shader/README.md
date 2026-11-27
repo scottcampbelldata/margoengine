@@ -418,6 +418,43 @@ createMesh(stage.engine, boxGeometry(1, 1, 1), new NodeMaterial({emissiveNode: v
 
 `node packages/shader/test/inputs-check.mjs` reads each input back as a pixel on a wall the camera faces, with and without tangents, and compiles the instance inputs plain, instanced and in uniform rows.
 
+## Custom vertex attributes
+
+`attribute(name, type)` is a per-vertex value of the mesh being drawn, from its `geometry.attributes`. Types are one to
+four of `f32`, `i32` or `u32` (`'f32'`, `'vec3f'`, `'vec2u'`, ...), and `data` holds one value of that type per vertex,
+component after component. One material serves any number of meshes, each with its own data, and every pass that draws
+the material reads it, shadows included. In `positionNode` it is the vertex's value; in the colour slots it is
+interpolated across the triangle, and integer types take the triangle's first vertex.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {NodeMaterial, attribute, color, mix, positionLocal, vec3} from 'margoengine/shader';
+const stage = await createStage('#app');
+const geometry = planeGeometry(2, 2, 32, 32), vertices = geometry.positions.length / 3;
+const heat = Float32Array.from({length: vertices}, (_, i) => (geometry.positions[i * 3]! + 1) / 2);
+const material = new NodeMaterial({
+  colorNode: mix(color('#2040ff'), color('#ff4020'), attribute('heat', 'f32')),
+  positionNode: positionLocal.add(vec3(0, 0, attribute('heat', 'f32').mul(0.5))),
+});
+const mesh = createMesh(stage.engine, {...geometry, attributes: {heat: {data: heat, type: 'f32'}}}, material);
+heat.fill(1, 0, 33); // the first row of vertices
+mesh.setGeometry({...geometry, attributes: {heat: {data: heat, type: 'f32'}}}, {start: 0, count: 33}); // uploads 33
+```
+
+`createMesh`, `createInstancedMesh`, `setGeometry` and a material swap throw when the geometry lacks an attribute the
+material reads, gives it another type or the wrong number of values, or holds a value that does not fit (`NaN`, a
+fraction for an integer type). The values are copied when the call is made: edit your array, then call `setGeometry`,
+with a range to upload those vertices alone. Meshes that come from elsewhere (a loaded glTF, `BatchedMesh`) have no
+`geometry.attributes`, so a material that reads one cannot draw them. The values of a mesh's attributes are interleaved
+into one read-only storage buffer read by vertex index (one of the vertex stage's storage buffers), so the 80-byte
+vertex and its pipelines are unchanged. `node packages/shader/test/attribute-check.mjs` (and `--compat`) compares meshes
+drawn from attributes with the same meshes built on the CPU, pixel for pixel. Sources: D. Rákos, "Programmable Vertex
+Pulling", in P. Cozzi and C. Riccio (eds.), "OpenGL Insights", CRC Press, 2012
+(<https://www.taylorfrancis.com/books/9781439893777/chapters/10.1201/b12288-29>); W3C, "WebGPU Shading Language",
+built-in values (<https://www.w3.org/TR/WGSL/#built-in-values>).
+
 ## Skinning and morph targets (`@margoengine/shader/deform`)
 
 Deformation as nodes, so a graph can add its own effect on top and every pass draws the result. `skinning()` is linear blend skinning and `morphing()` is morph targets, both as glTF 2.0 defines them; they run in the vertex stage from `storage()` buffers you fill.

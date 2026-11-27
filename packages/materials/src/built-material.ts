@@ -2559,15 +2559,27 @@ export class Material {
    * @internal What depth passes draw in place of the displacement map, for a subclass that moves vertices its own way.
    * `map` is this material's own `displacementMap` record, when it has one, for a subclass that moves on top of it.
    */
-  caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement): CasterDisplacement | undefined {
+  caster(
+    _device: GPUDevice,
+    _engine?: Engine,
+    _map?: CasterDisplacement,
+    _data?: MaterialMeshData,
+  ): CasterDisplacement | undefined {
+    return undefined;
+  }
+  /**
+   * @internal What this material reads of a mesh's `geometry` beyond the packed vertex (NodeMaterial's `attribute()`),
+   * held per mesh and passed back to `bindings` and `caster`; undefined for none. Throws when the geometry lacks it.
+   */
+  meshData(_geometry: MeshGeometry): MaterialMeshData | undefined {
     return undefined;
   }
   /** @internal A subclass's edit of `code` once the scene's lighting effects are composed into it. */
   relight(code: string): string {
     return code;
   }
-  /** @internal gltf\/pbr LightingEffect bindings for one device; `engine` is the drawing engine. */
-  bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
+  /** @internal gltf\/pbr LightingEffect bindings for one device; `engine` draws, `_data` is the mesh's `meshData`. */
+  bindings(device: GPUDevice, engine?: Engine, _data?: MaterialMeshData): GPUBindGroupEntry[] {
     if (mapped(this)) {
       const plan = mapPlan(this),
         rows = this.diffuseRoughnessMap ? 18 : 17,
@@ -2663,6 +2675,40 @@ export interface MeshGeometry {
   colors?: ArrayLike<number>;
   /** Triangle ranges in index units (vertex units without indices). Used with a material array. */
   groups?: readonly { start: number; count: number; materialIndex: number }[];
+  /**
+   * Your own per-vertex values by name, read by a node material's `attribute(name, type)` (`@margoengine/shader`).
+   * `setGeometry` uploads them again, a ranged one only its vertices.
+   */
+  attributes?: Readonly<Record<string, VertexAttribute>>;
+}
+/** The WGSL type of a per-vertex attribute: one to four 32-bit floats, signed or unsigned integers. */
+export type VertexAttributeType =
+  | 'f32'
+  | 'vec2f'
+  | 'vec3f'
+  | 'vec4f'
+  | 'i32'
+  | 'vec2i'
+  | 'vec3i'
+  | 'vec4i'
+  | 'u32'
+  | 'vec2u'
+  | 'vec3u'
+  | 'vec4u';
+/** One named per-vertex attribute: `data` holds one `type` value per vertex, component after component. */
+export interface VertexAttribute {
+  data: ArrayLike<number>;
+  type: VertexAttributeType;
+}
+/** What a material holds for one mesh it draws (`Material.meshData`). */
+export interface MaterialMeshData {
+  /**
+   * Checks `geometry` (all its vertices, or `range`) and returns the commit that takes it; throws, changing nothing,
+   * when it does not fit.
+   */
+  prepare(geometry: MeshGeometry, range?: GeometryRange): () => void;
+  /** Releases the GPU buffers: the mesh was disposed or draws another material. */
+  dispose(): void;
 }
 const packed = new WeakMap<object, PreparedGeometry>();
 /** Packs once per geometry object into gltf/pbr's 80-byte vertex (position, normal, tangent, UV0, UV1, color). Later edits to the object are not seen; `mesh.setGeometry` repacks. */
@@ -3205,14 +3251,16 @@ function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGrou
     { binding: 190, resource: { buffer } },
   ];
 }
-/** A record's material, engine and placeholder ext row: hidden (not enumerable), so `{...record}` copies skip them. */
+/** A record's material, engine, mesh data and placeholder ext row: not enumerable, so `{...record}` copies skip them. */
 const recordMaterial = Symbol('material'),
   recordRuntime = Symbol('runtime'),
   recordExt = Symbol('ext'),
-  recordState = Symbol('renderState');
+  recordState = Symbol('renderState'),
+  recordData = Symbol('meshData');
 type MaterialRecord = PBRMaterial & {
   [recordMaterial]: Material;
   [recordRuntime]: Engine;
+  [recordData]?: MaterialMeshData;
   [recordExt]: number[];
   [recordState]?: PBRRenderState;
 };
@@ -3270,7 +3318,8 @@ const surfaceFields: PropertyDescriptorMap = {
     const map = displacementOf(m, device, g[recordRuntime]);
     return (
       (device &&
-        (m.caster(device, g[recordRuntime], map) ?? m['added'].find((v) => v.caster)?.caster!(device, m, map))) ??
+        (m.caster(device, g[recordRuntime], map, g[recordData]) ??
+          m['added'].find((v) => v.caster)?.caster!(device, m, map))) ??
       map
     );
   }),
@@ -3297,6 +3346,7 @@ class MaterialShading implements PBRMaterialShading {
   constructor(
     private readonly m: Material,
     private readonly runtime: Engine,
+    private readonly data?: MaterialMeshData,
   ) {}
   get replacesTextures(): boolean {
     return mapped(this.m) || bare(this.m);
@@ -3392,7 +3442,7 @@ class MaterialShading implements PBRMaterialShading {
     const m = this.m,
       runtime = this.runtime;
     noteEngine(runtime);
-    const entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime)),
+    const entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime, this.data)),
       all = m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries,
       out = m['clipping'].length ? [...all, { binding: 199, resource: clipUniform(m, runtime.gpu!, runtime) }] : all;
     if (!m['added'].length) return out;
@@ -3405,13 +3455,19 @@ class MaterialShading implements PBRMaterialShading {
  * It is made in one `defineProperties` call from shared descriptors (redefining data properties as accessors would
  * leave each record a dictionary of its own).
  */
-function surface(blank: PropertyDescriptorMap, m: Material, runtime: Engine): PBRMaterial {
+function surface(
+  blank: PropertyDescriptorMap,
+  m: Material,
+  runtime: Engine,
+  data: MaterialMeshData | undefined,
+): PBRMaterial {
   const fields: PropertyDescriptorMap = {};
   for (const key of Object.keys(blank)) if (!(key in surfaceFields) && key !== 'shading') fields[key] = blank[key];
   Object.assign(fields, surfaceFields);
-  fields.shading = { enumerable: true, value: new MaterialShading(m, runtime) };
+  fields.shading = { enumerable: true, value: new MaterialShading(m, runtime, data) };
   fields[recordMaterial] = { value: m };
   fields[recordRuntime] = { value: runtime };
+  fields[recordData] = { value: data };
   fields[recordExt] = { value: blank.ext?.value };
   fields[recordState] = { value: undefined, writable: true };
   return Object.defineProperties({}, fields) as PBRMaterial;
@@ -3536,19 +3592,21 @@ function trackChanges(): void {
     });
   }
 }
-const records = new WeakMap<Material, WeakMap<Engine, PBRMaterial>>();
+const records = new WeakMap<Material | MaterialMeshData, WeakMap<Engine, PBRMaterial>>();
 /**
  * The gltf/pbr material record the meshes of `runtime` draw `m` with: one per material, as glTF primitives that use one
  * material share one record, so gltf/pbr derives a material's shader, pipeline and uniform rows once per frame for
  * all of its meshes instead of once per mesh. `blank` is gltf/pbr's record for the placeholder material (`{}`).
  */
-function recordOf(m: Material, runtime: Engine, blank: PropertyDescriptorMap): PBRMaterial {
-  let byEngine = records.get(m);
-  if (!byEngine) records.set(m, (byEngine = new WeakMap()));
+function recordOf(m: Material, runtime: Engine, blank: PropertyDescriptorMap, data?: MaterialMeshData): PBRMaterial {
+  // A material that reads a mesh's own data takes a record per mesh, as its bindings differ.
+  const owner = data ?? m;
+  let byEngine = records.get(owner);
+  if (!byEngine) records.set(owner, (byEngine = new WeakMap()));
   let record = byEngine.get(runtime);
   if (!record) {
     trackChanges();
-    record = surface(blank, m, runtime);
+    record = surface(blank, m, runtime, data);
     byEngine.set(runtime, record);
   }
   return record;
@@ -3595,6 +3653,16 @@ export function createMesh<M extends Material | readonly Material[]>(
   assigned.forEach(usable);
   const data = packGeometry(geometry),
     groups = meshGroups(geometry, data.indices.length, assigned, array);
+  // What each material reads of this mesh beyond the packed vertex; a swapped-in one reads the `latest` geometry.
+  const own = new Map<Material, MaterialMeshData>();
+  let latest = geometry;
+  const read = (list: readonly Material[]) => {
+    for (const m of list) {
+      const found = own.has(m) ? undefined : m.meshData(latest);
+      if (found) own.set(m, found);
+    }
+  };
+  read(assigned);
   const prepared = groups.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) }));
   const runtime = engineRuntime(engine);
   // Placeholder glTF materials: every value gltf/pbr draws comes from the slot's current Material (`surface`).
@@ -3624,6 +3692,8 @@ export function createMesh<M extends Material | readonly Material[]>(
   model.onDispose(() => {
     for (const release of held.values()) release();
     held.clear();
+    for (const mine of own.values()) mine.dispose();
+    own.clear();
   });
   // gltf/pbr's record for the placeholder material, copied for each material's shared record (own arrays each).
   const fresh = model.primitives[0].material,
@@ -3635,8 +3705,10 @@ export function createMesh<M extends Material | readonly Material[]>(
   // Own and writable, so the per-frame routing check (primitiveAfterOpaque) reads it without a prototype-chain miss.
   blank.extension ??= { value: undefined, writable: true, configurable: true, enumerable: false };
   const point = () => {
-    for (const primitive of model.primitives)
-      primitive.material = recordOf(assigned[primitive.definition.material!], runtime, blank);
+    for (const primitive of model.primitives) {
+      const m = assigned[primitive.definition.material!];
+      primitive.material = recordOf(m, runtime, blank, own.get(m));
+    }
   };
   point();
   const entry: Entry = {
@@ -3658,8 +3730,14 @@ export function createMesh<M extends Material | readonly Material[]>(
           : 'Material mesh material must be one Material; pass a Material (a material array needs a grouped mesh)',
       );
     (list as Material[]).forEach(usable);
+    read(list as Material[]);
     assigned.splice(0, assigned.length, ...(list as Material[]));
     point();
+    for (const [m, mine] of own)
+      if (!assigned.includes(m)) {
+        mine.dispose();
+        own.delete(m);
+      }
     for (let i = 0; i < groups.length; i++) entry.materials[i] = assigned[groups[i].materialIndex];
     if (array) snapshot = Object.freeze([...assigned]);
     hold();
@@ -3688,7 +3766,9 @@ export function createMesh<M extends Material | readonly Material[]>(
         list = meshGroups(next, data.indices.length, assigned, array);
       if (list.length !== current.length || list.some((g, i) => g.materialIndex !== current[i].materialIndex))
         throw new RangeError('Mesh geometry groups must keep their number and material slots; create a new mesh');
+      const commits = Array.from(own.values(), (mine) => mine.prepare(next));
       model.writeGeometry(list.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) })));
+      for (const commit of commits) commit();
       current = list;
     } else {
       const vertices = model.primitives[0].vertices,
@@ -3710,6 +3790,7 @@ export function createMesh<M extends Material | readonly Material[]>(
       let moved = false;
       for (let i = 0; i < chunk.length && !moved; i += 20)
         for (let k = 0; k < 3; k++) moved ||= chunk[i + k] !== vertices[start * 20 + i + k];
+      const commits = Array.from(own.values(), (mine) => mine.prepare(next, range));
       // Moved positions need new array identities: BVH and selection caches key on them.
       const target = owned && !moved ? vertices : vertices.slice();
       target.set(chunk, start * 20);
@@ -3717,7 +3798,9 @@ export function createMesh<M extends Material | readonly Material[]>(
         model.primitives.map((p) => ({ vertices: target, indices: moved ? p.indices.slice() : p.indices })),
         range,
       );
+      for (const commit of commits) commit();
     }
+    latest = next;
     owned = true;
     packed.delete(next);
     return mesh;

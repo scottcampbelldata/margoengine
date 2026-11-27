@@ -388,9 +388,10 @@ class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
-    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement): CasterDisplacement | undefined;
+    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement, _data?: MaterialMeshData): CasterDisplacement | undefined;
+    meshData(_geometry: MeshGeometry): MaterialMeshData | undefined;
     relight(code: string): string;
-    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
+    bindings(device: GPUDevice, engine?: Engine, _data?: MaterialMeshData): GPUBindGroupEntry[];
 }
 
 interface MaterialFeature {
@@ -414,6 +415,11 @@ type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRMode
     setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
     renderOrder: number;
 };
+
+interface MaterialMeshData {
+    prepare(geometry: MeshGeometry, range?: GeometryRange): () => void;
+    dispose(): void;
+}
 
 interface MaterialOptions extends PhysicalOptions {
     shading?: Shading;
@@ -525,6 +531,7 @@ interface MeshGeometry {
         count: number;
         materialIndex: number;
     }[];
+    attributes?: Readonly<Record<string, VertexAttribute>>;
 }
 
 type ParallaxMode = 'offset' | 'occlusion' | 'relief';
@@ -656,6 +663,13 @@ interface TranscodedTexture {
 }
 
 type TransmissionBlend = 'auto' | 'two-draw' | 'dual-source';
+
+interface VertexAttribute {
+    data: ArrayLike<number>;
+    type: VertexAttributeType;
+}
+
+type VertexAttributeType = 'f32' | 'vec2f' | 'vec3f' | 'vec4f' | 'i32' | 'vec2i' | 'vec3i' | 'vec4i' | 'u32' | 'vec2u' | 'vec3u' | 'vec4u';
 
 class WgslMaterial extends Material {
     readonly wgsl: string;

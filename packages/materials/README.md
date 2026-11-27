@@ -365,7 +365,9 @@ smoke.blendSpace = 'display'; // live: back to the default blend next frame
 `createMesh(engine, geometry, material)` draws CPU geometry through glTF PBR's PBR renderer. `MeshGeometry` accepts
 `positions`, `normals`, optional `indices`, `uvs` (UV0), `uvs1` (UV1), `tangents` and RGB/RGBA `colors`. Colours are floats 0 to 1, or a
 `Uint8Array` or `Uint16Array` normalised over its full range, as glTF's `COLOR_0`. Both UV arrays contain two finite
-values per vertex. UV0 defaults to zero; omitted UV1 copies UV0. The vertex layout remains 80 bytes.
+values per vertex. UV0 defaults to zero; omitted UV1 copies UV0. The vertex layout remains 80 bytes. `attributes`
+names any further per-vertex values (`{heat: {data, type: 'f32'}}`), which a node material reads with
+`attribute('heat', 'f32')` (`@margoengine/shader`, "Custom vertex attributes").
 
 ```ts
 import {Material, createMesh, loadTexture} from 'margoengine/materials';

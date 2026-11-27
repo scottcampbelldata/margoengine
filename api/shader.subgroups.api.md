@@ -4,6 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
+import { MaterialMeshData, MeshGeometry } from "@margoengine/materials";
 
 export type FullFloat = 'f32' | 'vec2f' | 'vec3f' | 'vec4f';
 
@@ -203,6 +204,9 @@ class Program {
         binding: number;
     }[];
     readonly varyings: Node[];
+    attributes?: Resource & {
+        read(geometry: MeshGeometry): MaterialMeshData;
+    };
     readonly functions: Map<string, string>;
     next: number;
     readonly buffers: WeakMap<GPUDevice, {

@@ -599,5 +599,10 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   // Then 9,310 B (2026-11-25, minimal 9,292 B to 9,302 B, whole 19,206 B to 19,220 B): ShaderClock gains resetTime,
   // so cutscene resetClocks can put the frame clock back to 0 between films (GAP-FILM-RESET). It lives on the clock
   // NodeMaterial already holds; a split would need a second clock object for one method.
-  assert.ok(minimal.gzip < 9310 && all.gzip < 19250, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // Then 9,370 B and 20,800 B (2026-11-27, minimal 9,302 B to 9,363 B, whole 19,220 B to 20,774 B): attribute() reads
+  // a mesh's named per-vertex attributes (three.js parity row 46). NodeMaterial holds the per-mesh data hook and depth
+  // record (61 B); attribute() itself, its checked packing and StorageBuffer's ranged update are shaken out unless used.
+  // A split into an entry of its own would put `attribute` beside, not among, the other node inputs and save no bytes
+  // for anyone who does not call it.
+  assert.ok(minimal.gzip < 9370 && all.gzip < 20800, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });

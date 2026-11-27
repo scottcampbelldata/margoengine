@@ -110,6 +110,11 @@ interface EnvironmentMap {
 
 type Filter = 'linear' | 'nearest';
 
+interface GeometryRange {
+    start: number;
+    count: number;
+}
+
 type ImageSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement | VideoFrame;
 
 type InstanceAttribute = InstanceAttributeType | {
@@ -408,9 +413,10 @@ class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
-    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement): CasterDisplacement | undefined;
+    caster(_device: GPUDevice, _engine?: Engine, _map?: CasterDisplacement, _data?: MaterialMeshData): CasterDisplacement | undefined;
+    meshData(_geometry: MeshGeometry): MaterialMeshData | undefined;
     relight(code: string): string;
-    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
+    bindings(device: GPUDevice, engine?: Engine, _data?: MaterialMeshData): GPUBindGroupEntry[];
 }
 
 interface MaterialFeature {
@@ -427,6 +433,11 @@ interface MaterialFeature {
     attach?(material: Material): void;
     detach?(material: Material): void;
     readonly instanceRows?: boolean;
+}
+
+interface MaterialMeshData {
+    prepare(geometry: MeshGeometry, range?: GeometryRange): () => void;
+    dispose(): void;
 }
 
 interface MaterialOptions extends PhysicalOptions {
@@ -546,6 +557,22 @@ type MaterialPluginValues = Record<string, number | readonly number[]>;
 type MaterialUVTransform = TextureTransform & {
     center?: readonly [number, number];
 };
+
+interface MeshGeometry {
+    positions: ArrayLike<number>;
+    normals: ArrayLike<number>;
+    uvs?: ArrayLike<number>;
+    uvs1?: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+    tangents?: ArrayLike<number>;
+    colors?: ArrayLike<number>;
+    groups?: readonly {
+        start: number;
+        count: number;
+        materialIndex: number;
+    }[];
+    attributes?: Readonly<Record<string, VertexAttribute>>;
+}
 
 type ParallaxMode = 'offset' | 'occlusion' | 'relief';
 
@@ -680,6 +707,13 @@ type TransmissionBlend = 'auto' | 'two-draw' | 'dual-source';
 type TypeOf<A> = A extends InstanceAttributeType ? A : A extends {
     type: infer T;
 } ? T : never;
+
+interface VertexAttribute {
+    data: ArrayLike<number>;
+    type: VertexAttributeType;
+}
+
+type VertexAttributeType = 'f32' | 'vec2f' | 'vec3f' | 'vec4f' | 'i32' | 'vec2i' | 'vec3i' | 'vec4i' | 'u32' | 'vec2u' | 'vec3u' | 'vec4u';
 
 type Wrap = 'repeat' | 'clamp' | 'mirror';
 
