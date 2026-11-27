@@ -63,6 +63,13 @@ export function payload(data: ArrayBuffer | ArrayBufferView, transfer: boolean):
     : (data.buffer as ArrayBuffer).slice(data.byteOffset, data.byteOffset + data.byteLength);
 }
 
+/** A worker's failure as the error the same decode throws on the calling thread: its code, or a RangeError for 'range'. */
+function workerError(message: string, code: string | undefined): Error {
+  if (code === 'failed') return decodeFailed(message);
+  if (code === 'unsupported') return deviceUnsupported(message);
+  return code === 'range' ? new RangeError(message) : new Error(message);
+}
+
 /**
  * Lazily grown worker pool. Jobs go to an idle worker, a new worker while under the limit, or the least loaded worker.
  * A crashed worker rejects only its own jobs and is replaced on demand; so is a worker whose running job exceeds its time
@@ -172,8 +179,7 @@ export class WorkerPool {
         if (!job) return;
         slot.jobs.delete(data.id);
         this.watch(slot);
-        if (typeof data.error === 'string')
-          job.reject(data.code === 'failed' ? decodeFailed(data.error) : new Error(data.error));
+        if (typeof data.error === 'string') job.reject(workerError(data.error, data.code));
         else job.resolve(data.result);
       };
       worker.onerror = (event) => {
