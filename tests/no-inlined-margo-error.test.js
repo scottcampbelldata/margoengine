@@ -137,10 +137,12 @@ test('sharedHelpers redirects packages/shared/errors.js and hypot.js only for a 
   assert.deepEqual(on.resolveId('../../shared/hypot.js', importer), {
     id: '@margoengine/math/helpers',
     external: true,
+    moduleSideEffects: false,
   });
   assert.deepEqual(on.resolveId('../../shared/errors.js', importer), {
     id: '@margoengine/math/helpers',
     external: true,
+    moduleSideEffects: false,
   });
   assert.equal(on.resolveId('../../shared/finite.js', importer), null);
   assert.equal(on.resolveId('@margoengine/core', importer), null);

@@ -73,7 +73,8 @@ export function sharedHelpers(manifest) {
     resolveId(source, importer) {
       if (!on || !importer || !/^\.{1,2}\//.test(source)) return null;
       const target = resolve(dirname(importer.split('?')[0]), source);
-      return HELPER_FILES.has(target) ? { id: `${MATH}/helpers`, external: true } : null;
+      // Side-effect free, as the entry is: a module that imports nothing from it then keeps no bare import of it.
+      return HELPER_FILES.has(target) ? { id: `${MATH}/helpers`, external: true, moduleSideEffects: false } : null;
     },
   };
 }
