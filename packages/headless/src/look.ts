@@ -59,6 +59,7 @@ export type LookCheckName =
   | 'backends'
   | 'reference'
   | 'penumbra'
+  | 'penumbraPlants'
   | 'stairs'
   | 'colourEdges'
   | 'chromaSmear'
@@ -117,7 +118,17 @@ export const LOOK_CHECKS: Readonly<Record<LookCheckName, { bound: [number, numbe
     nan: { bound: [0, 0], unit: 'pixels', about: 'pixels with a NaN or infinite channel in the float frame' },
     backends: { bound: [0, 0.03], unit: 'FLIP', about: 'mean FLIP difference of WebGPU against the compat layer' },
     reference: { bound: [0, 0.05], unit: 'FLIP', about: 'mean FLIP difference against the 16-sample reference' },
-    penumbra: { bound: [0, 0.7], unit: 'code', about: 'noise standard deviation inside the shadow penumbra mask' },
+    penumbra: {
+      bound: [0, 0.7],
+      unit: 'code',
+      about:
+        'noise standard deviation inside the shadow penumbra on the ground (the penumbra mask less the plants mask)',
+    },
+    penumbraPlants: {
+      bound: [0, 1],
+      unit: 'ratio',
+      about: 'grain of the plants inside the shadow penumbra over the grain of the plants outside it',
+    },
     stairs: { bound: [0, 1], unit: '%', about: 'strong luma edges that are one pixel stair steps' },
     colourEdges: { bound: [0, 10], unit: '%', about: 'strong colour edges one pixel wide, which 4:2:0 smears' },
     chromaSmear: {
@@ -1309,7 +1320,12 @@ export function checkProbe(
       : maskBits(frame, masks[name], name).includes(1)
         ? null
         : `${name} pixels (the ${name} mask is empty)`;
-  run('penumbra', marked('penumbra'), () => penumbra(frame, { mask: masks.penumbra, bound: b('penumbra') }));
+  run('penumbra', marked('penumbra'), () =>
+    penumbra(frame, { mask: masks.penumbra, plants: masks.plants, bound: b('penumbra') }),
+  );
+  run('penumbraPlants', masks.plants ? (marked('penumbra') ?? marked('plants')) : 'the plants mask', () =>
+    penumbraPlants(frame, { penumbra: masks.penumbra, plants: masks.plants, bound: b('penumbraPlants') }),
+  );
   run('stairs', null, () => stairs(frame, { bound: b('stairs') }));
   run('colourEdges', null, () => colourEdges(frame, { bound: b('colourEdges') }));
   run('chromaSmear', null, () => chromaSmear(frame, { bound: b('chromaSmear') }));
@@ -1701,6 +1717,7 @@ export const LOOK_FAMILY_BOUNDS: Readonly<Record<string, Readonly<Record<string,
     // YouTube (percent of one-pixel colour edges), T8 motion (percent of fast edges with too little blur).
     grain: [0, 0.5] as [number, number],
     penumbra: [0, 0.7] as [number, number],
+    penumbraPlants: [0, 1] as [number, number],
     speckle: [0, 5] as [number, number],
     banding: [0, 0.2] as [number, number],
     stairs: [0, 1] as [number, number],
@@ -1951,13 +1968,109 @@ export function chromaSmear(frame: LookImage, { mask, threshold = 6, bound }: Ch
 export interface PenumbraOptions {
   /** The shadow penumbra mask. */
   mask?: LookMask;
+  /** Where the plants are (the `plants` page mask): left out, so the grain is read on the ground alone. */
+  plants?: LookMask;
   bound?: LookBound;
 }
 
-/** T1 in shadow penumbras: the grain of the frame inside the `penumbra` mask (bound 0.7 codes for the family). */
-export function penumbra(frame: LookImage, { mask, bound }: PenumbraOptions = {}): LookResult {
-  const row = grain(frame, { mask, bound: bound ?? LOOK_CHECKS.penumbra.bound });
-  return { ...row, check: 'penumbra' };
+/**
+ * The fewest interior pixels {@link penumbra} and {@link penumbraPlants} read a grain from: 2,055, where the estimate's
+ * relative standard error is 5 percent. Immerkaer's value is a mean of absolute Laplacian responses; for Gaussian noise
+ * each one's standard deviation is sqrt(pi / 2 - 1) = 0.756 of its mean, and a response shares pixels with the 8 around
+ * it, so about one in 9 is independent: (3 x 0.756 / 0.05)^2 = 2,055.
+ */
+export const PENUMBRA_MIN_PIXELS = Math.ceil(((3 * Math.sqrt(Math.PI / 2 - 1)) / 0.05) ** 2);
+
+// Foliage texture detail is not shadow noise. Immerkaer's estimator assumes a region without fine structure, so on a
+// plant (leaves, needles, bark) it reads the plant's own detail as grain: on the timber valley rail-line shot, calm,
+// plants inside the penumbra read 1.218 and 0.921 codes and plants out of it, where no shadow filter runs, 1.610 and
+// 1.289, against 0.558 and 0.504 on the ground in the penumbra (KB-LOOK-TV-PENUMBRA2). Edge pixels bias the estimate
+// upward (Tai and Yang, "A fast method for image noise estimation using Laplacian operator and adaptive edge
+// detection", ISCCSP 2008, https://doi.org/10.1109/ISCCSP.2008.4537384), so T1 reads the ground, where the estimate
+// holds, and holds the plants to their own detail elsewhere in the same frame.
+function without(frame: LookImage, mask: LookMask | undefined, plants: LookMask | undefined, what: string) {
+  const inside = maskBits(frame, mask, what),
+    out = plants ? maskBits(frame, plants, 'plants') : new Uint8Array(inside.length),
+    keep = new Uint8Array(inside.length);
+  for (let i = 0; i < keep.length; i++) keep[i] = inside[i] && !out[i] ? 255 : 0;
+  return keep;
+}
+function both(frame: LookImage, a: LookMask, b: LookMask, what: string, invert = false) {
+  const x = maskBits(frame, a, what),
+    y = maskBits(frame, b, 'plants'),
+    keep = new Uint8Array(x.length);
+  for (let i = 0; i < keep.length; i++) keep[i] = y[i] && (invert ? !x[i] : x[i]) ? 255 : 0;
+  return keep;
+}
+function tooFew(row: LookResult, check: string, what: string): LookResult {
+  return row.detail.pixels >= PENUMBRA_MIN_PIXELS
+    ? row
+    : {
+        ...row,
+        check,
+        value: Number.NaN,
+        pass: false,
+        missing: `${PENUMBRA_MIN_PIXELS} interior pixels of ${what} (${row.detail.pixels} found)`,
+      };
+}
+
+/**
+ * T1 in shadow penumbras: the grain of the ground inside the `penumbra` mask, the `plants` mask left out (bound 0.7
+ * codes for the family), over at least {@link PENUMBRA_MIN_PIXELS} interior pixels. Plants in the penumbra are held by
+ * {@link penumbraPlants}.
+ */
+export function penumbra(frame: LookImage, { mask, plants, bound }: PenumbraOptions = {}): LookResult {
+  const row = {
+    ...grain(frame, {
+      mask: { width: frame.width, height: frame.height, data: without(frame, mask, plants, 'penumbra') },
+      bound: bound ?? LOOK_CHECKS.penumbra.bound,
+    }),
+    check: 'penumbra',
+  };
+  return tooFew(row, 'penumbra', plants ? 'penumbra ground' : 'penumbra');
+}
+
+/** Options of {@link penumbraPlants}. */
+export interface PenumbraPlantsOptions {
+  /** The shadow penumbra mask. */
+  penumbra: LookMask;
+  /** Where the plants are (the `plants` page mask). */
+  plants: LookMask;
+  bound?: LookBound;
+}
+
+/**
+ * T1 on plants in shadow penumbras: the grain of the plants inside the `penumbra` mask over the grain of the plants
+ * outside it, where no shadow filter runs (fully lit or fully shadowed), in the same frame (bound 1: the penumbra adds
+ * no noise to the plants' own detail). Each side reads at least {@link PENUMBRA_MIN_PIXELS} interior pixels.
+ */
+export function penumbraPlants(frame: LookImage, { penumbra, plants, bound }: PenumbraPlantsOptions): LookResult {
+  const { width, height } = frame,
+    use = bound ?? LOOK_CHECKS.penumbraPlants.bound,
+    inside = tooFew(
+      grain(frame, { mask: { width, height, data: both(frame, penumbra, plants, 'penumbra') } }),
+      'penumbraPlants',
+      'plants in the penumbra',
+    ),
+    outside = tooFew(
+      grain(frame, { mask: { width, height, data: both(frame, penumbra, plants, 'penumbra', true) } }),
+      'penumbraPlants',
+      'plants out of the penumbra',
+    ),
+    detail = {
+      inside: inside.value,
+      outside: outside.value,
+      pixels: inside.detail.pixels,
+      outsidePixels: outside.detail.pixels,
+    };
+  const short = inside.missing ?? outside.missing;
+  if (short || !outside.value)
+    return {
+      ...result('penumbraPlants', Number.NaN, use, detail),
+      pass: false,
+      missing: short ?? 'grain on the plants out of the penumbra',
+    };
+  return result('penumbraPlants', inside.value / outside.value, use, detail);
 }
 
 /** Per pixel motion of a frame to the next, in pixels: x then y of each pixel, `width * height * 2` floats. */

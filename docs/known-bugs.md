@@ -86,23 +86,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **T6 after it, rail-line shot `--once --seconds 1.1`:** calm bounce 17.6 and 28.9 percent (was 15.0 and 25.1),
   shadowTint 14.9 and 12.8 b* (was 19.1 and 17.5), both inside their bounds; blowup see KB-LOOK-TV-PALL1.
 
-### Open 2026-11-26: the calm rail-line shot reads penumbra grain 0.92 and 0.81 from the plants' own detail, not shadow noise (KB-LOOK-TV-PENUMBRA2, headless look bar; needs a decision)
+### Fixed 2026-11-26: the calm rail-line shot read penumbra grain 0.92 and 0.81 from the plants' own detail, not shadow noise (KB-LOOK-TV-PENUMBRA2, headless look bar)
 
 - **Repro:** the rail-line shot with `{"weather": "calm"}`, `--once --seconds 1.1`: penumbra 0.919 code early and 0.810
   mid (bound 0.7). The default blowup shot passes (0.576 and 0.593 after KB-TERRAIN-SKYAMBIENT1).
-- **Cause (found 2026-11-26):** the `penumbra` mask (`@margoengine/post/mrt`) is every sun-facing surface whose sun
-  visibility is partial, plants included, and `penumbra` measures it with Immerkaer's estimator ("Fast Noise Variance
-  Estimation", CVIU 64(2), 300-302, 1996), which assumes the image is smooth where it measures. A copy of the calm shot
-  with the page's `plants` mask (MASKOCCLUDE1) splits the rows, same interior and estimator as the check: penumbra on
-  ground 0.558 and 0.504 (passes), penumbra on plants 1.218 and 0.921; plants that are fully lit or fully hidden,
-  where no shadow filter runs, read 1.610 and 1.289, more than in the penumbra; lit ground 0.417 and 0.389. So the
-  excess is the foliage's own detail (needles, leaves, their edges), which the estimator counts as noise (the known
-  bias Tai and Yang correct by leaving edge pixels out: "A fast method for image noise estimation using Laplacian
-  operator and adaptive edge detection", ISCCSP 2008, https://doi.org/10.1109/ISCCP.2008.4537384). Under the pall the
-  sun is 26 times weaker, so the same detail is smaller in codes and the blowup passes. The shadows themselves pass.
-- **Decision owed:** what T1 in penumbras measures. Either the penumbra check leaves the plants' pixels out (the page's
-  `plants` mask, as MASKOCCLUDE1 does for the ground masks), or the grain estimator leaves edge and texture pixels out
-  everywhere (Tai and Yang), which moves every grain reading. No bound or estimator was changed.
+- **Cause:** the `penumbra` mask (`@margoengine/post/mrt`) is every sun-facing surface whose sun visibility is partial,
+  plants included, and `penumbra` measured it with Immerkaer's estimator ("Fast Noise Variance Estimation", CVIU 64(2),
+  300-302, 1996), which assumes the image is smooth where it measures. With the page's `plants` mask (MASKOCCLUDE1),
+  same interior and estimator: penumbra on ground 0.558 and 0.504; penumbra on plants 1.218 and 0.921; plants fully lit
+  or fully hidden, where no shadow filter runs, 1.610 and 1.289, more than in the penumbra. Foliage texture detail is
+  not shadow noise: the estimator counts the plants' needles, leaves and their edges as grain, the bias Tai and Yang
+  correct by leaving edge pixels out ("A fast method for image noise estimation using Laplacian operator and adaptive
+  edge detection", ISCCSP 2008, https://doi.org/10.1109/ISCCSP.2008.4537384).
+- **Fix (manager's ruling, option a with two conditions; the estimator is unchanged everywhere):** `penumbra` reads the
+  ground only, the penumbra mask less the `plants` mask, bound still 0.7, and needs `PENUMBRA_MIN_PIXELS` (2,055)
+  interior pixels, where the estimate's relative standard error is 5 percent, so a sliver cannot pass. The new
+  `penumbraPlants` holds the plants in the penumbra to the plants out of it in the same frame (ratio, bound 1), so
+  shadow-filter noise on foliage still fails. The rail-line shot now records the `plants` mask. Calm, early and mid:
+  penumbra 0.558 and 0.504 over 22,396 and 9,782 pixels, penumbraPlants 0.756 and 0.714; blowup 0.377 and 0.433,
+  penumbraPlants 0.624 and 0.592 (`tools/shot/cli.mjs ... --once --seconds 1.1`, both through `checkProbe`).
+- **Regression:** `packages/headless/tests/look-clean.test.js`, "regression KB-LOOK-TV-PENUMBRA2": a fixed leaf texture
+  under the penumbra fails the old whole-mask reading and passes the new pair; noise put on the ground in the penumbra
+  fails `penumbra`, the same noise on the plants fails `penumbraPlants` and not `penumbra`; and "T1 penumbra and
+  penumbraPlants need PENUMBRA_MIN_PIXELS".
 
 ### Open 2026-11-26: the rail-line shot still shimmers 5.7 to 9.2 percent after the plants' sway was bounded (KB-LOOK-TV-SHIMMER2, BIO-01)
 

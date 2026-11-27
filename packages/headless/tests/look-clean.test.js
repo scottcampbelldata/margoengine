@@ -23,7 +23,9 @@ import {
   motionBlur,
   nightLuma,
   nightPeak,
+  PENUMBRA_MIN_PIXELS,
   penumbra,
+  penumbraPlants,
   reprojectionMotion,
   shadowTint,
   shimmerMoving,
@@ -137,17 +139,81 @@ test('T7 colour edges: a one pixel colour edge fails, one resolved over two or m
 });
 
 test('T1 penumbra: grain inside the penumbra mask is held to 0.7 codes, and only inside it', () => {
+  // 96 x 96, so each half's interior (46 x 94) holds at least PENUMBRA_MIN_PIXELS.
   const rand = noise(7),
-    quiet = image(48, 48, 120),
-    grainy = image(48, 48, (x, y) => (x < 24 ? 120 : Math.round(120 + (rand() - 0.5) * 6))),
-    left = mask(48, 48, (x) => x < 24),
-    right = mask(48, 48, (x) => x >= 24);
+    quiet = image(96, 96, 120),
+    grainy = image(96, 96, (x, y) => (x < 48 ? 120 : Math.round(120 + (rand() - 0.5) * 6))),
+    left = mask(96, 96, (x) => x < 48),
+    right = mask(96, 96, (x) => x >= 48);
   assert.ok(penumbra(quiet, { mask: left }).pass);
   assert.ok(penumbra(grainy, { mask: left }).pass, 'the grain is outside the mask');
   const noisy = penumbra(grainy, { mask: right });
   assert.equal(noisy.check, 'penumbra');
   assert.equal(noisy.pass, false, `grain ${noisy.value}`);
   assert.deepEqual(noisy.bound, [0, 0.7]);
+});
+
+// KB-LOOK-TV-PENUMBRA2. Foliage texture detail is not shadow noise: Immerkaer's estimator reads a plant's own leaves
+// as grain, so T1 reads the penumbra on the ground (the plants mask left out) and holds the plants in the penumbra to
+// the grain of the plants out of it in the same frame. A 128 x 128 frame: flat ground on the left, plants with a fixed
+// leaf texture (+-4 codes, its grain about 2.3) on the right, the penumbra over the top half, where the light is 0.8.
+const leaves = (() => {
+  const rand = noise(11),
+    t = new Float32Array(128 * 128);
+  for (let i = 0; i < t.length; i++) t[i] = (rand() - 0.5) * 8;
+  return t;
+})();
+const plantScene = ({ groundNoise = 0, plantNoise = 0 } = {}) => {
+  const rand = noise(23);
+  return {
+    frame: image(128, 128, (x, y) => {
+      const light = y < 64 ? 0.8 : 1,
+        jitter = (rand() - 0.5) * 2;
+      if (x < 64) return Math.round(100 * light + (y < 64 ? groundNoise * jitter : 0));
+      return Math.round((100 + leaves[y * 128 + x]) * light + (y < 64 ? plantNoise * jitter : 0));
+    }),
+    penumbra: mask(128, 128, (x, y) => y < 64),
+    plants: mask(128, 128, (x) => x >= 64),
+  };
+};
+
+test('regression KB-LOOK-TV-PENUMBRA2: T1 reads the penumbra on the ground, and the plants against their own detail', () => {
+  const clean = plantScene();
+  // Before the fix the check read the whole penumbra mask, the plants' leaves with it: a false failure.
+  const whole = penumbra(clean.frame, { mask: clean.penumbra });
+  assert.equal(whole.pass, false, `the leaves read as grain: ${whole.value}`);
+  const ground = penumbra(clean.frame, { mask: clean.penumbra, plants: clean.plants });
+  assert.ok(ground.pass && ground.value < 0.1, `clean ground ${ground.value}`);
+  assert.ok(ground.detail.pixels >= PENUMBRA_MIN_PIXELS);
+  const leaf = penumbraPlants(clean.frame, clean);
+  assert.equal(leaf.check, 'penumbraPlants');
+  assert.ok(leaf.pass && leaf.value < 0.9, `clean plants ${leaf.value} (${JSON.stringify(leaf.detail)})`);
+  assert.deepEqual(leaf.bound, [0, 1]);
+
+  // Shadow-filter noise on the ground in the penumbra fails the ground check.
+  const noisyGround = plantScene({ groundNoise: 3 });
+  const g = penumbra(noisyGround.frame, { mask: noisyGround.penumbra, plants: noisyGround.plants });
+  assert.equal(g.pass, false, `ground noise ${g.value}`);
+  assert.ok(penumbraPlants(noisyGround.frame, noisyGround).pass, 'the plants are untouched');
+
+  // The same noise on the plants in the penumbra passes the ground check and fails the plants check.
+  const noisyPlants = plantScene({ plantNoise: 4 });
+  assert.ok(penumbra(noisyPlants.frame, { mask: noisyPlants.penumbra, plants: noisyPlants.plants }).pass);
+  const p = penumbraPlants(noisyPlants.frame, noisyPlants);
+  assert.equal(p.pass, false, `plant noise ${p.value} (${JSON.stringify(p.detail)})`);
+  assert.ok(p.value > 1.1, `plant noise ${p.value}`);
+});
+
+test('T1 penumbra and penumbraPlants need PENUMBRA_MIN_PIXELS interior pixels, so a sliver cannot pass', () => {
+  assert.equal(PENUMBRA_MIN_PIXELS, 2055);
+  const { frame, plants } = plantScene(),
+    sliver = mask(128, 128, (x, y) => y < 6);
+  const ground = penumbra(frame, { mask: sliver, plants });
+  assert.equal(ground.pass, false);
+  assert.ok(Number.isNaN(ground.value) && /2055 interior pixels/.test(ground.missing), ground.missing);
+  const leaf = penumbraPlants(frame, { penumbra: sliver, plants });
+  assert.equal(leaf.pass, false);
+  assert.match(leaf.missing, /plants in the penumbra/);
 });
 
 const translate = (tx) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, 0, 0, 1];

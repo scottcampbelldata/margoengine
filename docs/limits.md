@@ -8736,6 +8736,14 @@ The flood draft shots are msaa 1 at supersample 1 and read 2.7 to 22.7 percent `
 tolerance, not yet measured on a moving probe. `detailKept` (T7) is wired into the family: `detailKeptFloor` gives 0.5 for `natural`, 0.6 for `animatedFeature`, and a
 shot naming a family fails its master below the floor (`tools/shot/encode.mjs`); `natural` keeps the warning.
 
+T1 in penumbras (2026-11-26, KB-LOOK-TV-PENUMBRA2): `penumbra` reads the ground only (the penumbra mask less the page's
+`plants` mask), and `penumbraPlants` holds the plants in the penumbra to the plants out of it in the same frame (ratio,
+bound 1), because Immerkaer's estimator reads foliage texture detail as grain. Both need `PENUMBRA_MIN_PIXELS`, 2,055
+interior pixels (5 percent relative standard error), and report the check as missing below it. A shot without a
+`plants` mask reads the whole penumbra and does not run `penumbraPlants`; the plant check compares plants to plants, so
+a frame whose plants are all in the penumbra, or that holds plants of very different detail in and out of it, cannot
+be judged by it.
+
 ## Horses: horses (2026-11-18)
 
 - Enforced: `withers` 1.2 to 2.1 m, `condition` 0.8 to 1.25, `speed` 0 to 25 m/s, `detail` 0, 1 or 2, `maneLength`

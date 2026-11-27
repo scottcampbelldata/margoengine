@@ -135,7 +135,7 @@ export interface LightsOptions {
 
 export type LookBound = number | readonly [number, number];
 
-export type LookCheckName = 'skyClip' | 'grain' | 'speckle' | 'banding' | 'flat' | 'blocks' | 'horizonSeam' | 'waterSeam' | 'lights' | 'foamEdges' | 'crush' | 'flicker' | 'shimmer' | 'nan' | 'backends' | 'reference' | 'penumbra' | 'stairs' | 'colourEdges' | 'chromaSmear' | 'shimmerMoving' | 'motionBlur' | 'silhouette' | 'silhouetteShape' | 'bounce' | 'shadowTint' | 'nightLuma' | 'nightPeak';
+export type LookCheckName = 'skyClip' | 'grain' | 'speckle' | 'banding' | 'flat' | 'blocks' | 'horizonSeam' | 'waterSeam' | 'lights' | 'foamEdges' | 'crush' | 'flicker' | 'shimmer' | 'nan' | 'backends' | 'reference' | 'penumbra' | 'penumbraPlants' | 'stairs' | 'colourEdges' | 'chromaSmear' | 'shimmerMoving' | 'motionBlur' | 'silhouette' | 'silhouetteShape' | 'bounce' | 'shadowTint' | 'nightLuma' | 'nightPeak';
 
 export type LookImage = HeadlessPixels;
 
@@ -204,8 +204,17 @@ export interface MovingFrames {
     motion: LookMotion;
 }
 
+export const PENUMBRA_MIN_PIXELS: number;
+
 export interface PenumbraOptions {
     mask?: LookMask;
+    plants?: LookMask;
+    bound?: LookBound;
+}
+
+export interface PenumbraPlantsOptions {
+    penumbra: LookMask;
+    plants: LookMask;
     bound?: LookBound;
 }
 
@@ -324,7 +333,9 @@ export function nightLuma(frame: LookImage, { mask, bound }?: RegionOptions): Lo
 
 export function nightPeak(frame: LookImage, { mask, bound }?: RegionOptions): LookResult;
 
-export function penumbra(frame: LookImage, { mask, bound }?: PenumbraOptions): LookResult;
+export function penumbra(frame: LookImage, { mask, plants, bound }?: PenumbraOptions): LookResult;
+
+export function penumbraPlants(frame: LookImage, { penumbra, plants, bound }: PenumbraPlantsOptions): LookResult;
 
 export function reprojectionMotion(depth: Float32Array, viewProjection: ArrayLike<number>, nextViewProjection: ArrayLike<number>, width: number, height: number): LookMotion;
 

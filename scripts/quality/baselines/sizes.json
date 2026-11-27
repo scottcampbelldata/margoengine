@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20700383,
+  "total": 20701252,
   "history": [
     {
       "date": "2026-10-24",
@@ -14227,6 +14227,12 @@
       "commit": "ce06986663",
       "reason": "KB-TERRAIN-SKYAMBIENT1: Sky lights a clipmap Terrain (Sky.shader and Sky.finish, the sky lighting feature's terrain patch: skyLighting in place of terrain's flat ambient term, keeping its occlusion factors). Measured gzip: sky from its 24,501 B ceiling to 24,735 B measured (ceiling 25,478), sky/lighting to 4,879 B (ceiling 5,135), sky/scenes to 25,914 B (ceiling 26,692). The patch is part of the lighting feature every ambient sky already loads; a separate entry would make each terrain page import a second sky entry and pass it to Sky. Only these three rows are written; main's physics2d/vehicle row and its repeated history entry are left to their owner.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ba760c1480",
+      "reason": "KB-LOOK-TV-PENUMBRA2: T1's penumbra reads the ground only (the plants mask left out, at least PENUMBRA_MIN_PIXELS interior pixels) and the new penumbraPlants holds the plants in the penumbra to the plants out of it. Measured gzip: headless/look from its 15,956 B ceiling to 16,334 B measured (ceiling 16,825). The two checks share look's grain, mask and result helpers; a second entry would repeat them and give checkProbe an async import. Only this row is written; main's physics rows are left to their owner.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14715,7 +14721,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 15956,
+    "@margoengine/headless/look": 16825,
     "@margoengine/headless/null": 3411,
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,

@@ -532,6 +532,7 @@ test('checkProbe runs what a probe has inputs for and fails a named check it can
   // The clean-frame checks that need their own inputs (look-clean.test.js) and the night checks a shot names are not in this probe.
   const needInputs = [
     'penumbra',
+    'penumbraPlants',
     'shimmerMoving',
     'motionBlur',
     'silhouette',

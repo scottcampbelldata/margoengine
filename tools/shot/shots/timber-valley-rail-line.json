@@ -82,7 +82,8 @@
       "subject",
       "lit",
       "shadow",
-      "sky"
+      "sky",
+      "plants"
     ],
     "horizon": {
       "y": -500
