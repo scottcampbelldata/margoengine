@@ -11,6 +11,7 @@ import { Stroke } from '@margoengine/lines/stroke';
 import { PointsPlugin, PointCloud } from '@margoengine/points';
 import { LineBatches, LineBatch } from '@margoengine/lines/batch';
 import { DebugLines } from '@margoengine/lines/debug';
+import { Splats } from '@margoengine/splats';
 import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { GLTFAsset } from '@margoengine/gltf/asset';
 import { parseOBJ, readZipDirectory, readZipEntry } from '@margoengine/loaders';
@@ -259,4 +260,27 @@ test('LineBatches batches are written as line lists with colours and widths; deb
   assert.deepEqual(json.nodes.find((n) => n.mesh === part.mesh).translation, [0, 0, 3]);
   wire.visible = false;
   assert.ok(!primitivesOf(readGLB(exportGLB(engine)).json).some((p) => p.extras?.lineWidth === 0.02));
+});
+
+test('a splat cloud no scene writer holds is named in a warning, not dropped in silence', async () => {
+  const { engine, box } = await scene(),
+    splats = new Splats({
+      positions: new Float32Array(3),
+      covariances: new Float32Array([1, 0, 0, 1, 0, 1]),
+      colors: new Float32Array([1, 1, 1, 1]),
+    });
+  engine.use(splats);
+  for (const write of [exportGLB, exportOBJ, exportSTL, exportUSDZ]) {
+    const warnings = [];
+    await write(engine, { onWarning: (w) => warnings.push(w) });
+    const left = warnings.filter((w) => w.item === splats);
+    assert.equal(left.length, 1, write.name);
+    assert.equal(left[0].code, 'unsupported');
+    assert.equal(left[0].node, null);
+    assert.match(left[0].message, /exportGaussianGLB/);
+  }
+  // A subtree export asks for that mesh alone.
+  const warnings = [];
+  exportGLB(engine, { root: box, onWarning: (w) => warnings.push(w) });
+  assert.deepEqual(warnings, []);
 });

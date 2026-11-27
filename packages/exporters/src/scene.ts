@@ -434,7 +434,7 @@ export interface ExportWarning {
   code: 'unsupported';
   message: string;
   node: Mesh | ExportNode | null;
-  /** The plugin line or point cloud left out, for a warning about one that follows no mesh. */
+  /** The plugin line, point cloud or splat cloud left out, for a warning about one that follows no mesh. */
   item?: object;
 }
 /** How {@link SceneOptions.pixelArt} samples textures. */
@@ -1835,6 +1835,16 @@ export function collect(
         if (!list) plugged.set(item.mesh, (list = []));
         list.push(item);
       }
+    // A splat cloud of @margoengine/splats is a plugin of its own, and no scene writer holds one.
+    if (options.root === undefined)
+      for (const [name, plugin] of (source as { plugins?: ReadonlyMap<string, unknown> }).plugins ?? [])
+        if (/^splats:\d+$/.test(name))
+          warn({
+            code: 'unsupported',
+            message: `Splat cloud "${name}" left out: scene writers do not hold splats; write its data with exportGaussianGLB (@margoengine/exporters/splats)`,
+            node: null,
+            item: plugin as object,
+          });
     const formOf = `this format writes ${[...writes, 'triangles'].join(' and ')} only`,
       pluginPart = (item: PluginItem): Part | null => {
         plan?.(item.bytes);

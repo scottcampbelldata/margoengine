@@ -146,7 +146,9 @@ unless `onlyVisible: false`.
 glTF gives a point or line no size and recommends 1 px (glTF 2.0 section 3.9.7), and no Khronos extension holds one,
 so another viewer draws them 1 px wide; Godot 4.7.2 keeps the POINTS and LINES surfaces unshaded with `point_size` 1.
 Dashes, joins, caps, point shapes, textures and a batch's `onTop` are not written. A `DebugLines` queue is one frame's
-debug drawing and is never written. STL, 3MF and Roblox call `onWarning` once for a
+debug drawing and is never written. A splat cloud of `@margoengine/splats` is left out by every scene writer, which
+calls `onWarning` with it as `item`; write its data with `exportGaussianGLB` (`@margoengine/exporters/splats`).
+STL, 3MF and Roblox call `onWarning` once for a
 mesh's items and once for each free one, with `node: null` and `item` set to the line or cloud.
 
 ```ts

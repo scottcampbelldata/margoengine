@@ -14,7 +14,7 @@
   "cutscene": ["./curve-editor","./viewport","./nested-editor","./scroll"],
   "decoders": ["./ktx2-hdr6","./zstd","./lz4","./bmp","./texture-rgba","./lzfse","./snappy","./avif"],
   "ecs": ["./objects","./relation-query","./reactive","./serialize","./parallel"],
-  "exporters": ["./collect","./unity-precision","./unity-precision-importer","./unreal-precision","./unreal-precision-importer","./godot-precision-addon","./godot-precision","./godot-flipbook","./optimize-extra","./materials","./splats","./textures","./palette"],
+  "exporters": ["./collect","./unity-precision","./unity-precision-importer","./unreal-precision","./unreal-precision-importer","./godot-precision-addon","./godot-precision","./godot-flipbook","./optimize-extra","./materials","./textures","./palette"],
   "fbx": ["./worker","./textures","./large","./legacy"],
   "fsm": ["./events","./invoke"],
   "geometry": ["./nurbs-edit","./teapot","./hull"],
