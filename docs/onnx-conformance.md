@@ -100,3 +100,16 @@ compared forms and the semantics named here. It is not a numeric test of every o
 | BatchNormalization 1, 6, 7 | `spatial=0` keeps one statistic per feature |
 | RNN, GRU, LSTM 1, 3 | `output_sequence` (accepted; the listed outputs decide) |
 | Scan 8 | batched form with `sequence_lens` and `directions` |
+
+## ai.onnx.ml single-score binary classifiers and calibration (reviewed 2026-11-27)
+
+`packages/compute/tests/onnx-ml-calibration.test.js` covers these. The ai.onnx.ml specification does not say how one
+stored score becomes two class scores, so the rows state what Margo does.
+
+| Case | Margo |
+| --- | --- |
+| SVM pair probability at any finite margin | clamped to 1e-7 .. 1 - 1e-7, then coupled; scores stay in 0..1 and sum to 1 within float32 rounding. 300 seeded trials of 3 to 16 classes with saturated and contradicting pairs converged |
+| A margin that is not a number | the run is refused |
+| LinearClassifier, one coefficient row, two labels | label by `score > 0`; `NONE` gives `[1 - s, s]`, `multi_class` gives `[-s, s]` then the transform, `LOGISTIC` gives `[1 - p, p]`, `PROBIT` transforms `[1 - s, s]` |
+| TreeEnsembleClassifier, every weight on class 0, two labels | weights all nonnegative: `[1 - s, s]`, split at 0.5; otherwise `[-s, s]`, split at 0; one base value joins `s`, two join the expanded scores |
+| `SOFTMAX` and `SOFTMAX_ZERO` on the two cases above (LinearClassifier without `multi_class`) | not applied |
