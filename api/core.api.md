@@ -212,6 +212,8 @@ interface Batch {
         instances: GPUBuffer;
         args: GPUBuffer;
     };
+    draws?: number;
+    multi?: boolean;
     claimed?: boolean;
 }
 

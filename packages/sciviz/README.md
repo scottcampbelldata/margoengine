@@ -1210,7 +1210,7 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
 
 LIC is a separate optional entry: 23,461 B minified gzip in the integrated build (24,165 B ceiling).
 This includes the same full-precision published colormap data as the other colour-bearing entries; the
-normalized pre-restoration measurement was 10,429 B. Core + stage remains under 25,100 B combined gzip (`npm run measure:size` prints the figure).
+normalized pre-restoration measurement was 10,429 B. Core + stage remains under 25,150 B combined gzip (`npm run measure:size` prints the figure).
 
 ## Stream tubes and ribbons
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21054342,
+  "total": 21057012,
   "history": [
     {
       "date": "2026-10-24",
@@ -14809,6 +14809,12 @@
       "commit": "a826259019",
       "reason": "scatter: covered rings draw an ambient veil so SSAO and GTAO take only the light a pixel holds under blended grass (KB-SCENES-GRASSBLACK1, black blades); 28,978 to 29,381 B gzip. It reuses the colour pass pipelines, which a split entry would have had to expose",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "baf47a5b94",
+      "reason": "core feature multi-draw (Scott 2026-11-27, Yes to all): new entry @margoengine/culling/multidraw (MultiDraw: merged geometry ranges, per-range show and hide through indirect argument sets); culling/snapshot keys the draw count; core + stage 25,099 -> 25,149 B gzip; the @margoengine/core entry budget 22,467 -> 23,201 B for the snapshot and multi-draw growth (core 22,369 -> 22,525 B)",
+      "grew": 2
     }
   ],
   "items": {
@@ -15047,7 +15053,7 @@
     "@margoengine/controls/transform": 13104,
     "@margoengine/controls/transitions": 14010,
     "@margoengine/controls/walk": 14226,
-    "@margoengine/core": 22467,
+    "@margoengine/core": 23201,
     "@margoengine/core/extension": 22756,
     "@margoengine/creative": 20097,
     "@margoengine/creative/grass": 6594,
@@ -15070,6 +15076,7 @@
     "@margoengine/culling/lod": 4604,
     "@margoengine/culling/meshlets": 18951,
     "@margoengine/culling/models": 9103,
+    "@margoengine/culling/multidraw": 1936,
     "@margoengine/culling/occlusion": 4090,
     "@margoengine/culling/parts": 14017,
     "@margoengine/culling/shadows": 21314,

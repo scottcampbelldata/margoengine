@@ -1063,6 +1063,10 @@
       "types": "./dist/culling/snapshot.d.ts",
       "import": "./dist/culling/snapshot.js"
     },
+    "./culling/multidraw": {
+      "types": "./dist/culling/multidraw.d.ts",
+      "import": "./dist/culling/multidraw.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

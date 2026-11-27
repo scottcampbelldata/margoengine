@@ -1,3 +1,13 @@
+### Section 5 evidence: multi-draw ranges of one merged geometry, WebGPU and the WebGL2 layer (2026-11-27)
+
+Core draws a redirected batch's `draws` indirect argument sets (20 bytes each, WebGPU drawIndexedIndirect layout) in
+order, or in one `multiDrawIndexedIndirect` call with `multi` in a render pass (never in a bundle).
+`@margoengine/culling/multidraw` keeps one argument set per range, its instance count the batch's while shown and 0
+while hidden, written only when one changes. Evidence: `packages/culling/test/gpu/multidraw-check.mjs` hides and shows
+parts of three merged meshes and matches nine separate-part meshes pixel for pixel, with three indirect draws a frame,
+one multi-draw call through a shim of the call, and no new snapshot recording when a range is hidden, on WebGPU (RTX
+A6000, Edge 158) and on the WebGL2 layer. Missing: a run on a browser that exposes multi-draw-indirect natively.
+
 ### Section 5 evidence: snapshot rendering, WebGPU and the WebGL2 layer (2026-11-27)
 
 Core's `DrawOptions.snapshot` encodes the main draw's batch loop into a `GPURenderBundleEncoder` (WebGPU, "Bundles")

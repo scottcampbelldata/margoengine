@@ -42,6 +42,10 @@ export function rectangleClear(
  * `count`; core still uploads the batch into its own buffer, which stays the source the package reads. A batch with a
  * redirect is drawn even when core collected no instances for it, so a package can supply all of a batch's instances
  * and their visibility on the GPU (`DynamicInstances` in @margoengine/culling).
+ * `draws`, with a redirect only (default 1): the number of 20-byte argument sets in its `args`, drawn in order, for
+ * sub-ranges of one merged geometry (`MultiDraw` in @margoengine/culling/multidraw). `multi` draws them in one
+ * `multiDrawIndexedIndirect` call (the WebGPU multi-draw-indirect proposal; set it only when the device has that
+ * feature), which core uses in a render pass and not in a bundle.
  * `claimed`: set by a package that draws these instances itself (core never sets it, and it persists until the package
  * clears it): core's draws neither bind nor encode the batch and `engine.stats.drawCalls` leaves it out. Pick passes
  * still draw it. */
@@ -53,6 +57,8 @@ export interface Batch {
   dirty?: number;
   mask?: number;
   redirect?: { instances: GPUBuffer; args: GPUBuffer };
+  draws?: number;
+  multi?: boolean;
   claimed?: boolean;
 }
 /** A dirty-row words array (`Batch.rows`) with the 16-bit view of it that `uploadRows` reads, made once. */
@@ -757,8 +763,13 @@ export class GPURenderer implements Renderer {
               target.setVertexBuffer(0, resource.vertex);
               target.setVertexBuffer(1, batch.redirect?.instances ?? resource.instance);
               target.setIndexBuffer(resource.index, 'uint32');
-              if (args) target.drawIndexedIndirect(args, 0);
-              else target.drawIndexed(batch.geometry.indices.length, batch.count);
+              const draws = (batch.redirect && batch.draws) || 1;
+              if (!args) target.drawIndexed(batch.geometry.indices.length, batch.count);
+              else if (batch.redirect && batch.multi && target === pass)
+                (
+                  pass as GPURenderPassEncoder & { multiDrawIndexedIndirect(b: GPUBuffer, o: number, n: number): void }
+                ).multiDrawIndexedIndirect(args, 0, draws);
+              else for (let d = 0; d < draws; d++) target.drawIndexedIndirect(args, d * 20);
             }
           }
         }

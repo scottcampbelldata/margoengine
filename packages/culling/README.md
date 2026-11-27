@@ -394,6 +394,42 @@ against 15.6 and 2.7 ms as core meshes; 18.8 and 2.8 ms at 250,000 against 45.7 
 above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-bugs.md), "DynamicInstances: about
 15-35% more GPU time".
 
+## Many parts in one batch: `MultiDraw`
+
+`MultiDraw` from `margoengine/culling/multidraw` draws index ranges of one merged core geometry as one batch, each
+range shown or hidden on its own: the parts of a building, a prop kit or an assembly cost one core batch, and hiding a
+part writes 20 bytes, with no new geometry. Every core mesh of the geometry draws the shown ranges, so the geometry
+instances as any other.
+
+```ts
+import { Engine, box, PbrMaterial } from 'margoengine/core';
+import { MultiDraw } from 'margoengine/culling/multidraw';
+
+const engine = await Engine.create(document.querySelector('canvas') as HTMLCanvasElement);
+const { geometry, ranges } = MultiDraw.merge([box(1, 1, 1), box(2, 0.2, 2), box(0.2, 3, 0.2)]);
+const wood = new PbrMaterial({ color: '#a07850' });
+for (let i = 0; i < 4; i++) engine.createMesh().setGeometry(geometry).setMaterial(wood).setPosition([i * 3, 0, 0]);
+const parts = MultiDraw.attach(engine, geometry, ranges);
+parts.setVisible(1, false); // every slab hides; cubes and posts draw
+engine.render();
+console.log(parts.isVisible(1), parts.multi); // false, and whether the ranges draw in one call
+```
+
+- `MultiDraw.merge(geometries)` returns the merged geometry and each part's `{first, count}` index range. Ranges of a
+  geometry you built yourself work too: `new MultiDraw(geometry, ranges)`, whole triangles inside its indices.
+- Draw calls: one `multiDrawIndexedIndirect` call where the device has `MULTI_DRAW_FEATURE`
+  (`chromium-experimental-multi-draw-indirect`; request it in `Engine.create(canvas, {features})`), and one indirect
+  draw per range elsewhere, on the WebGL2 layer too, with the same picture. `{multi: true}` without the feature throws
+  MargoError `unsupported`.
+- Shadows, depth replays and snapshots draw the same ranges; with `SnapshotRendering` attached, hiding a range keeps
+  the recording. Picking draws the whole geometry. Do not give the geometry to `CulledMeshes` as well: one package
+  redirects a batch at a time.
+- Core's side is `Batch.draws` and `Batch.multi` (with `Batch.redirect`). Spec: WebGPU drawIndexedIndirect (argument layout indexCount,
+  instanceCount, firstIndex, baseVertex, firstInstance) and the multi-draw-indirect proposal
+  (gpuweb proposals/multi-draw-indirect.md).
+- Checked by `node packages/culling/test/gpu/multidraw-check.mjs` (with `MARGO_COMPAT=1` for the layer): pixel for
+  pixel against separate meshes of each part.
+
 ## Static scenes, recorded once: `SnapshotRendering`
 
 `SnapshotRendering` from `margoengine/culling/snapshot` records the main pass's core draws once into a WebGPU render

@@ -13,7 +13,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Coming from Babylon.js](docs/from-babylon.md) ·
 [Coming from PlayCanvas](docs/from-playcanvas.md)
 
-The core and the stage together are 25,099 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 25,149 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Build something in 5 minutes
@@ -344,12 +344,12 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 25,099 B | 61,731 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 25,149 B | 61,864 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
 the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
-core + stage reaches 25,100 B gzip. It stops with `MEASURE_SIZE_STALE_DIST` when the core or stage dist was
+core + stage reaches 25,150 B gzip. It stops with `MEASURE_SIZE_STALE_DIST` when the core or stage dist was
 built from other sources than the ones checked out (after a rebase, say); run `npm run build:packages` first.
 
 `npm run bench` runs every benchmark suite (size, startup, rendering, loading, physics, memory and more;
@@ -566,7 +566,7 @@ AI agents write the code. Scott Campbell sets the rules in [AGENTS.md](AGENTS.md
 
 Every GPU check runs on our own machines, on real GPUs: NVIDIA RTX A6000, Intel Arc 140V, AMD Radeon 680M, and Apple silicon. Hosted runners have no GPU, so the workflows under `.github/workflows` are the CPU checks. The GPU checks run on those four machines.
 
-The [Size](#size) section states the measured core and stage gzip. The build fails at 25,100 bytes (`scripts/core-budget.js`, through `npm run build:packages` and `npm run measure:size`).
+The [Size](#size) section states the measured core and stage gzip. The build fails at 25,150 bytes (`scripts/core-budget.js`, through `npm run build:packages` and `npm run measure:size`).
 
 A bug fix comes with a regression test that fails without the fix. A commit whose subject starts with `fix` changes a test file, or names the existing test in the message. A public claim goes in the same change, with its proof, in [docs/whitepaper/claims.md](docs/whitepaper/claims.md). `npm run api:check` fails when the reports in `api/` do not match the exports. Open bugs are written up with a repro and the cause in [docs/known-bugs.md](docs/known-bugs.md).
 

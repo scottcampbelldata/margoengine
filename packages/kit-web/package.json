@@ -383,6 +383,10 @@
       "types": "./dist/culling/snapshot.d.ts",
       "import": "./dist/culling/snapshot.js"
     },
+    "./culling/multidraw": {
+      "types": "./dist/culling/multidraw.d.ts",
+      "import": "./dist/culling/multidraw.js"
+    },
     "./decoders/ktx2-hdr6": {
       "types": "./dist/decoders/ktx2-hdr6.d.ts",
       "import": "./dist/decoders/ktx2-hdr6.js"

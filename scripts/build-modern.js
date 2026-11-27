@@ -385,7 +385,9 @@ async function sizeRecords() {
   // 2026-11-27, core feature snapshot rendering under Scott's "Yes to all" (2026-11-27): DrawOptions.snapshot records
   // core's batch loop into a render bundle and replays it: core 22,369 -> 22,479 B (+110 B). Strict ceiling one byte
   // above it.
-  const CORE_ONLY_CEILING = 22_480;
+  // 2026-11-27, core feature multi-draw under the same ruling: a redirected batch draws `draws` indirect argument sets,
+  // in one multiDrawIndexedIndirect call with `multi`: core 22,479 -> 22,525 B (+46 B). Strict ceiling one byte above.
+  const CORE_ONLY_CEILING = 22_526;
   assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
   assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
   const { modules, ...baseSize } = await measureCoreStage();

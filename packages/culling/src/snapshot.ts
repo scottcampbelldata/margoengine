@@ -150,6 +150,11 @@ export class SnapshotRendering implements EnginePlugin {
         key[n++] = redirect?.instances;
         same = same && key[n] === redirect?.args;
         key[n++] = redirect?.args;
+        // Ranges of one geometry (MultiDraw): how many argument sets, and whether in one call.
+        same = same && key[n] === batch.draws;
+        key[n++] = batch.draws;
+        same = same && key[n] === batch.multi;
+        key[n++] = batch.multi;
         // An indirect draw reads its count from core's arguments, written every frame; a direct one bakes it in.
         const count = c.indirect || redirect ? -1 : batch.count;
         same = same && key[n] === count;

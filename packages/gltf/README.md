@@ -297,7 +297,7 @@ are the same module. Its other entries sit beside it: `/pbr-model` (the model cl
 
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage.
 
-Core + stage must remain below **25,100 bytes gzip**; CI rejects 25,100 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
+Core + stage must remain below **25,150 bytes gzip**; CI rejects 25,150 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
 
 ```ts
 import {createStage} from 'margoengine';

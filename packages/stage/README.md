@@ -8,7 +8,7 @@ This package is built from source alongside the engine. See the [package catalog
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
-The build requires the combined core and stage facade, with every base export retained, to stay strictly below 25,100 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
+The build requires the combined core and stage facade, with every base export retained, to stay strictly below 25,150 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
 
 Give the container a height, for example `<div id="scene" style="height:400px"></div>`:
 
