@@ -9050,6 +9050,7 @@ Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
   - a line between pins within 0.007 % of its chain and 0.03 % of the catenary;
   - a taut cable's ring within 0.07 % of the beam-string frequency;
   - strumming that locks to the cable's frequency at reduced velocities 5 and 7 (within 0.3 % and 6 % of its frequency at the tension its bow along the flow gives it), swinging 0.57 and 0.60 diameters, and follows the shedding at 2 (0.014 diameters).
+- A rod or cable its tension holds (tension times a link's length well above its bending spring): its tension's stiffness across the links is solved by backward Euler, so it is stable at any step, and its ringing is damped about 4 % of critical at 30 to 60 steps a second (0.7 % at 600); a rod its bending holds is unchanged (`packages/physics/tests/rod.test.js`, 2026-11-27). A pinned rod stretched by a few per cent blows up past about 2,000 steps a second (KB-PHYS-RODSTRING1).
 - `MooringLine` (2026-11-27): lumped masses on tension-only segments, explicit substeps the axial springs keep stable (a stiff
   line steps finely: 100 m of chain at EA 1e7 in 100 segments takes about 3 s of computer time for a minute; a near-massless
   line without damping can gain energy as its slack segments come taut, so keep its default damping); the seabed flat and

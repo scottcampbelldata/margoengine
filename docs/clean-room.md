@@ -18071,3 +18071,15 @@ read. It replaces the "considered and not built" note of the 2026-11-10 spectrog
   https://arxiv.org/abs/2210.14041 (a three-way split, not built).
 - Foundations: J. L. Flanagan and R. M. Golden, "Phase Vocoder", BSTJ 45(9), 1966,
   doi:10.1002/j.1538-7305.1966.tb01706.x; M. Portnoff, IEEE TASSP 24(3), 1976 (the FFT phase vocoder).
+## physics a taut tree's tension stiffness (2026-11-27)
+
+Files: `packages/physics/kernel/src/multibody.rs` (`add_tension_stiffness`, `pin_tension`), `packages/physics/tests/rod.test.js`.
+No rival engine source and no paper's companion code was read.
+
+- M. Tournier, M. Nesme, B. Gilles and F. Faure, "Stable constrained dynamics", ACM TOG 34(4) 2015,
+  https://doi.org/10.1145/2766969 (its idea, the geometric stiffness of a constraint's force taken into the implicit solve,
+  as widely described; the paper not read).
+- Own derivations: a taut string's energy (T / 2) sum l theta^2 over its links' turns, so each link carries T l on its turn
+  across its axis, half from each end; a force F at the arm r turning with its link changes its moment by [F]x [r]x d theta,
+  whose symmetric part (F . r) I - (r F^T + F r^T) / 2 is the pin's; taken in by rho / (1 + rho) of it, rho the tension's
+  share of the joint's turning stiffness, so bending-held rods keep their explicit, undamped tension.

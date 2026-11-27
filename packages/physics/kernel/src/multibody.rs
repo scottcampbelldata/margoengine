@@ -38,6 +38,9 @@ pub const JOINT_PIN_ALONG: u32 = 1 << 7;
 /// F h^2 / (PIN_STIFFNESS m): a millionth of how far F moves the link alone in a substep, and the tree's matrices still hold
 /// it, a ratio of 10^6 in doubles of 16 digits.
 const PIN_STIFFNESS: f64 = 1e6;
+/// The share of a pin's tension stiffness across its link taken into a substep's backward Euler solve: all of it, as a pin's
+/// half link is a small part of a rod (it raised an ordinary rod's damping ratio by 6e-4 at 60 steps a second).
+const TENSION_SHARE: f64 = 1.0;
 
 type D3 = [f64; 3];
 type M6 = [[f64; 6]; 6];
@@ -430,6 +433,92 @@ impl World {
         (sub(d3(here), d3(there)), d3(speed), sub(d3(here), d3(self.pose_center(body))))
     }
 
+    /// The pull a pin that gives along its link carries, its spring's k (t . gap) along -t; none for a stiff pin, whose pull
+    /// is its gap's correction, not a load.
+    fn pin_tension(&self, joint: usize, body: usize, gap: D3) -> D3 {
+        if self.uu(JOINT_ELASTIC, joint) & JOINT_PIN_ALONG == 0 {
+            return [0.0; 3];
+        }
+        let t = d3(self.pose_rotation(body).rotate(UNIT[1]));
+        let k = self.s(JOINT_STIFFNESS_1, joint) as f64;
+        let along = k * (t[0] * gap[0] + t[1] * gap[1] + t[2] * gap[2]);
+        [-along * t[0], -along * t[1], -along * t[2]]
+    }
+
+    /// The tension's stiffness across the links of a tree, into each link's own cost: a joint whose spring along the links
+    /// (its linY, the rod's stretch) carries a tension T gives each of its two links a stiffness T (l / 2) (I - t t^T) on its
+    /// turn, l / 2 the link's half length to the joint and t its own axis, taken into the substep's backward Euler solve. A taut
+    /// string's energy is (T / 2) sum l theta^2 over its links' turns, so each link carries T l, half from each end (a pin
+    /// gives its end half, `add_pins`). Without it the tension's pull across a link was held explicitly, through the pins'
+    /// reach along the tree, and a cable whose tension dwarfs its bending stiffness zig-zagged apart at a coarse step: at
+    /// 48 kN on 0.29 kg links of 0.165 m, about 2,000 rad/s (Tournier, Nesme, Gilles and Faure, "Stable constrained dynamics",
+    /// ACM TOG 34(4) 2015: the geometric stiffness of a constraint's force; KB-PHYS-RODSTRING1).
+    fn add_tension_stiffness(&mut self, root: usize, h: f64, a0: &mut M6, r0: &mut V6) {
+        let mut at = self.uu(MB_NEXT, root);
+        while at != NONE {
+            let b = at as usize;
+            let joint = self.uu(MB_JOINT, b) as usize;
+            let parent = self.uu(MB_PARENT, b) as usize;
+            if self.tree_springs(joint) & 2 != 0 {
+                let measure = self.joint_measure(joint);
+                let tension = self.s(JOINT_STIFFNESS_1, joint) as f64 * (measure[1] as f64 - self.s(JOINT_TARGET_1, joint) as f64);
+                if tension > 0.0 {
+                    let on_a = self.uu(JOINT_A, joint) as usize == b;
+                    let (mine, theirs) = if on_a { (JOINT_ANCHOR_A_X, JOINT_ANCHOR_B_X) } else { (JOINT_ANCHOR_B_X, JOINT_ANCHOR_A_X) };
+                    for (link, anchor) in [(b, mine), (parent, theirs)] {
+                        if self.flags(link) & KIND != DYNAMIC {
+                            continue;
+                        }
+                        let reach = {
+                            let v = self.v(anchor, joint);
+                            sqrt(v.x * v.x + v.y * v.y + v.z * v.z) as f64
+                        };
+                        let t = d3(self.pose_rotation(link).rotate(UNIT[1]));
+                        // Taken in by the share of the link's turning stiffness the tension is, rho / (1 + rho) with rho its
+                        // pull's T l / 2 over the joint's bending spring: a rod its bending holds keeps the tension explicit and
+                        // undamped (the bending springs are in the solve already); a cable its tension holds takes it in.
+                        let bend = if self.tree_springs(joint) & 8 != 0 { self.s(JOINT_STIFFNESS_3, joint) as f64 } else { 0.0 };
+                        let rho = tension * reach / bend.max(1e-30);
+                        let k = rho / (1.0 + rho) * h * h * tension * reach;
+                        let add = |m: &mut M6, _r: &mut V6| {
+                            for i in 0..3 {
+                                for j in 0..3 {
+                                    let unit = if i == j { 1.0 } else { 0.0 };
+                                    let kij = k * (unit - t[i] * t[j]);
+                                    m[3 + i][3 + j] += kij;
+                                }
+                            }
+                        };
+                        if link == root {
+                            add(a0, r0);
+                        } else {
+                            let d = self.doubles(self.uu(MB_JOINT, link) as usize);
+                            let (mut m, mut r) = ([[0.0f64; 6]; 6], [0.0f64; 6]);
+                            unsafe {
+                                for i in 0..6 {
+                                    for j in 0..6 {
+                                        m[i][j] = *d.add(A_AT + 6 * i + j);
+                                    }
+                                    r[i] = *d.add(R_AT + i);
+                                }
+                            }
+                            add(&mut m, &mut r);
+                            unsafe {
+                                for i in 0..6 {
+                                    for j in 0..6 {
+                                        *d.add(A_AT + 6 * i + j) = m[i][j];
+                                    }
+                                    *d.add(R_AT + i) = r[i];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            at = self.uu(MB_NEXT, b);
+        }
+    }
+
     /// A link's own cost with its pins over a substep of `h`: each a zero-length spring of h^2 k = PIN_STIFFNESS m between its
     /// anchors, backward Euler, the other anchor moving as it moves now: h^2 k J^T J on the mass matrix and
     /// J^T (h^2 k v_other - h k gap) on the right side, J the anchor's velocity from the link's twist.
@@ -464,6 +553,23 @@ impl World {
                         cv += c[i][k] * speed[k];
                     }
                     r[a] += jac[i][a] * (cv - pull[i]);
+                }
+            }
+            // The pin's pull turns with the link: a force F at the arm r gives the moment r x F, and a turn d theta of the link
+            // changes it by [F]x [r]x d theta. Its symmetric part, a stiffness (F . r) I - (r F^T + F r^T) / 2 on the link's turn,
+            // is the tension's stiffness across a taut rod (Tournier, Nesme, Gilles and Faure 2015's geometric stiffness),
+            // taken into the backward Euler solve as h^2 of it where the pin pulls the link outward (F . r > 0; pushed, it
+            // would lower the stiffness, and a chain's links buckle by their own springs). Held explicitly, a cable whose
+            // tension dwarfs its bending stiffness rang at T a / I a link, past what a coarse step holds (KB-PHYS-RODSTRING1).
+            let force = w.pin_tension(joint, body, gap);
+            let reach = force[0] * arm[0] + force[1] * arm[1] + force[2] * arm[2];
+            if reach > 0.0 {
+                for i in 0..3 {
+                    for j in 0..3 {
+                        let unit = if i == j { reach } else { 0.0 };
+                        let k = TENSION_SHARE * h * h * (unit - 0.5 * (arm[i] * force[j] + force[i] * arm[j]));
+                        m[3 + i][3 + j] += k;
+                    }
                 }
             }
         });
@@ -835,6 +941,9 @@ impl World {
                 }
             }
             at = self.uu(MB_NEXT, b);
+        }
+        if with_springs {
+            self.add_tension_stiffness(root, h as f64, &mut a0, &mut r0);
         }
         // From the last link to the first, each hands its subtree's cost, its joint minimised out, to its parent.
         let mut at = last as u32;

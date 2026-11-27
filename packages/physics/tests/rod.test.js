@@ -199,6 +199,57 @@ function frequency(signal, rate, skip = 0) {
   return ((ups.length - 1) * rate) / (ups[ups.length - 1] - ups[0]);
 }
 
+test('a cable whose tension dwarfs its bending stiffness stays whole at 30, 60 and 600 steps a second', (t) => {
+  // A taut wire mooring or anchor cable: 7.9 m, 1.77 kg/m, bending stiffness 1 N m^2, pinned at both ends and brought to
+  // 48 kN over half a second, then plucked at 0.05 m/s across. Its tension pulls each 0.165 m link straight with a stiffness
+  // T l, about 2,000 rad/s on a link, which a step of 1/30 or 1/60 s held explicitly blew up to hundreds of metres; held in
+  // the tree's solve it rings at the string's 10.4 Hz, its swing about the 0.76 mm the pluck gives and never past it.
+  // (KB-PHYS-RODSTRING1.)
+  for (const hz of [30, 60, 600]) {
+    const L = 7.9,
+      m = 1.77,
+      T = 48000,
+      EA = 30 * T,
+      strain = T / EA,
+      L0 = L / (1 + strain),
+      r = 0.0155,
+      physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: 1 / hz }),
+      a = physics.addBody(null, { type: 'fixed', position: [0, 0, -L0 / 2], colliders: [] }),
+      b = physics.addBody(null, { type: 'fixed', position: [0, 0, L0 / 2], colliders: [] });
+    const rod = new Rod(physics, {
+      start: [0, 0, -L0 / 2],
+      end: [0, 0, L0 / 2],
+      segments: 48,
+      radius: r,
+      density: (m * (1 + strain)) / (Math.PI * r * r),
+      bendStiffness: 1,
+      twistStiffness: 1,
+      axialStiffness: EA,
+      damping: 0,
+      attachStart: a,
+      attachEnd: b,
+      body: { canSleep: false },
+    });
+    const ramp = Math.round(hz / 2);
+    for (let i = 1; i <= ramp; i++) {
+      const h = (L0 + ((L - L0) * i) / ramp) / 2;
+      a.setPosition([0, 0, -h]);
+      b.setPosition([0, 0, h]);
+      physics.step();
+    }
+    for (let i = 0; i < ramp; i++) physics.step();
+    rod.segments.forEach((s, i) => s.setLinearVelocity([0, 0.05 * Math.sin((Math.PI * (i + 0.5)) / 48), 0]));
+    let swing = 0;
+    for (let i = 0; i < 4 * hz; i++) {
+      physics.step();
+      swing = Math.max(swing, Math.abs(rod.points()[24 * 3 + 1]));
+    }
+    t.diagnostic(`${hz} steps a second: largest swing ${swing} m`);
+    assert.ok(swing > 1e-4 && swing < 1e-3, `at ${hz} steps a second the cable swung ${swing} m`);
+    physics.dispose();
+  }
+});
+
 test("a taut cable rings at the string's frequency with its bending added", (t) => {
   // Pinned at both ends under tension T with no gravity: omega_1^2 = (pi / L)^2 T / mu + (pi / L)^4 EI / mu, mu its mass per
   // metre. Plucked in its first mode, the middle swings at that frequency. The pluck is small: a cable held at both ends
