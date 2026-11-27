@@ -5,6 +5,8 @@
 ```ts
 import { FlowField, SeaSource, SeaSurface } from "@margoengine/math/fields";
 
+export const B4_70_FOUR_QUADRANT: FourQuadrant;
+
 export interface BSeriesPropeller {
     readonly blades: number;
     readonly area: number;
@@ -63,6 +65,11 @@ export interface EmpiricalRange {
     kijima: boolean;
     yoshimura: boolean;
     outside: string[];
+}
+
+export interface FourQuadrant {
+    readonly thrust: readonly [readonly number[], readonly number[]];
+    readonly torque: readonly [readonly number[], readonly number[]];
 }
 
 export interface HeadingGains {
@@ -380,6 +387,7 @@ export interface PropellerCurves {
     readonly thrust: readonly [number, number, number];
     readonly torque: readonly [number, number, number];
     readonly pitch: number;
+    readonly fourQuadrant?: FourQuadrant;
 }
 
 export interface PropellerLoad {
@@ -865,6 +873,8 @@ export function driftLoads(hull: WaveHull, waves: RegularWaves, heading: number,
 export function empiricalModel(hull: EmpiricalHull): ManoeuvringModel & {
     readonly range: EmpiricalRange;
 };
+
+export function fourQuadrantCoefficients(table: FourQuadrant, beta: number): [number, number];
 
 export function headingGains(a: readonly [number, number, number, number], b: readonly [number, number], omega: number, zeta?: number): HeadingGains | null;
 

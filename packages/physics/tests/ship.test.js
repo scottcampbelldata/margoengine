@@ -32,6 +32,9 @@ import {
   Propeller,
   ShipSolver,
   holtropMennen,
+  B4_70_FOUR_QUADRANT,
+  fourQuadrantCoefficients,
+  yachtWater,
   SailingSolver,
   velocityPrediction,
   yachtWettedArea,
@@ -1649,4 +1652,114 @@ test("the ships' work counts are deterministic and grow with the fleet, and the 
   const s = ships.status(0);
   assert.ok(Math.abs(open - 1) < 0.02, `open water ${open} m/s`);
   assert.ok(s.ice > 0 && Math.abs(s.u - 1) < 0.02, `in ice ${s.u} m/s`);
+});
+
+test("measured checks: Sysser 1 in the Delft tank, the yacht FAIR V at sea, and the B4-70's four quadrants against its open water", () => {
+  // Sysser 1 (den Ouden 2022, DSYHS measurement data, 4TU.ResearchData, CC0; model scale): the bare hull's measured
+  // resistance upright and at 20 degrees of heel (17.3 C), and with its keel and rudder upright (20 C), N, by speed, m/s.
+  // Sysser 1 is one of the series the regression was fitted to: this checks the transcription and the sums, within 9 percent.
+  const sysser1 = {
+      length: 1.6,
+      beam: 0.5072,
+      draught: 0.12704,
+      volume: 0.0376136,
+      waterplane: 0.558566,
+      lcb: 0.83664,
+      lcf: 0.85328,
+      prismatic: 0.56441,
+      midship: 0.64641,
+      keel: { draught: 0.12704 + 0.219, volume: 0.00262, root: 0.414, tip: 0.262, thickness: 0.15, centre: 0.09336 },
+      rudder: { area: 0.0275, chord: 0.11, thickness: 0.12 },
+    },
+    cold = { density: 998.7, viscosity: 1.08e-6, gravity: 9.81 },
+    warm = { density: 998.2, viscosity: 1.004e-6, gravity: 9.81 };
+  for (const [v, r] of [
+    [0.792, 1.1084],
+    [0.99, 1.88482],
+    [1.189, 3.01934],
+    [1.387, 4.75255],
+    [1.585, 9.79318],
+    [1.783, 19.4122],
+    [1.981, 32.7027],
+  ])
+    assert.ok(Math.abs(yachtWater(sysser1, v, 0, 0, cold).upright / r - 1) < 0.09, `upright at ${v} m/s`);
+  for (const [v, r] of [
+    [0.99, 1.77142],
+    [1.189, 3.10665],
+    [1.387, 5.0607],
+    [1.585, 10.1243],
+    [1.783, 19.6024],
+  ]) {
+    const w = yachtWater(sysser1, v, 20 * DEG, 0, cold);
+    assert.ok(Math.abs((w.upright + w.heeled) / r - 1) < 0.08, `heeled at ${v} m/s`);
+  }
+  for (const [v, r] of [
+    [0.8, 1.79466],
+    [1.0, 2.88263],
+    [1.2, 4.44764],
+    [1.4, 6.93821],
+    [1.6, 13.6077],
+    [1.8, 26.6304],
+  ])
+    assert.ok(
+      Math.abs(yachtWater(sysser1, v, 0, 0, warm).resistance / r - 1) < 0.08,
+      `with keel and rudder at ${v} m/s`,
+    );
+  // FAIR V, a KIT-34 sloop sailed at sea (Masuyama et al. 1992, Table 1; Figs. 11 and 12, read from the figures to 0.15
+  // m/s and 2 degrees): measured in true winds of 5 to 8 m/s, its speed and heel by true wind angle. The VPP at 5 and 8 m/s
+  // spans the measured cluster's middle, and its heel the measured range. Its waterplane (C_W 0.7), LCF, keel and rudder
+  // and the boom's height are assumptions; C_M is C_B / C_P.
+  const fair = {
+      length: 8.55,
+      beam: 2.42,
+      draught: 0.41,
+      volume: 3.78 / 1.025,
+      waterplane: 0.7 * 8.55 * 2.42,
+      lcb: 4.275 + 0.238,
+      lcf: 4.275 + 0.32,
+      prismatic: 0.563,
+      midship: 0.398 / 0.563,
+      keel: { draught: 1.94, volume: 0.2, root: 1.2, tip: 0.7, thickness: 0.12, centre: 0.75 },
+      rudder: { area: 0.6, chord: 0.5, thickness: 0.12 },
+    },
+    fairRig = { I: 11.8, J: 3.5, P: 13.3, E: 4.7, boom: 1.5, freeboard: 0.8, mass: 3780, metacentricHeight: 1.307 };
+  for (const [twa, speedLo, speedHi, heelLo, heelHi] of [
+    [42, 2.6, 3.1, 15, 30],
+    [55, 3.2, 3.6, 15, 34],
+    [82, 3.3, 3.6, 10, 25],
+    [112, 3.3, 4.0, 3, 12],
+    [142, 2.1, 3.4, 0, 5],
+  ]) {
+    const light = velocityPrediction(fair, fairRig, 5, twa * DEG),
+      fresh = velocityPrediction(fair, fairRig, 8, twa * DEG),
+      middle = 0.5 * (speedLo + speedHi);
+    assert.ok(
+      middle > light.speed - 0.15 && middle < fresh.speed + 0.15,
+      `${twa}: ${light.speed} to ${fresh.speed} m/s`,
+    );
+    assert.ok(
+      light.heel / DEG < heelHi && fresh.heel / DEG > heelLo,
+      `${twa}: heel ${light.heel / DEG} to ${fresh.heel / DEG}`,
+    );
+  }
+  // The B4-70 at P/D 1.0: NSWC's four-quadrant Fourier fit of MARIN's tests against Oosterveld and van Oossanen's
+  // open-water polynomials (independent fits of the same series) in the first quadrant, within 0.012 in K_T and 0.03 in
+  // 10 K_Q; astern at bollard pull it gives 0.76 of its thrust ahead, where Healey's idealisation gives all of it.
+  const b470 = { blades: 4, area: 0.7, pitch: 1 };
+  for (const J of [0, 0.2, 0.4, 0.6, 0.8, 1.0]) {
+    const [ct, cq] = fourQuadrantCoefficients(B4_70_FOUR_QUADRANT, Math.atan2(J, 0.7 * Math.PI)),
+      s = (Math.PI * (J * J + 0.49 * Math.PI * Math.PI)) / 8,
+      o = wageningenB(b470, J);
+    assert.ok(
+      Math.abs(ct * s - o.kt) < 0.012 && Math.abs(10 * cq * s - 10 * o.kq) < 0.03,
+      `J ${J}: ${ct * s} ${10 * cq * s}`,
+    );
+  }
+  const screw = new Propeller(1, { ...bSeriesCurves(b470), fourQuadrant: B4_70_FOUR_QUADRANT }),
+    astern = screw.load(-10, 0).kt / screw.load(10, 0).kt;
+  assert.ok(Math.abs(astern + 0.756) < 0.005, `${astern}`);
+  assert.throws(
+    () => new Propeller(1, { ...KVLCC2_PROPELLER, fourQuadrant: { thrust: [[1], []], torque: [[1], [1]] } }),
+    (e) => e.code === 'unsupported' && /Four-quadrant/.test(e.message),
+  );
 });

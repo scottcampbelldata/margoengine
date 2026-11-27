@@ -2873,6 +2873,7 @@
       "convertMesh",
       "convexHull",
       "coupleDofs",
+      "estimateMeshMassProperties",
       "eulerToQuat",
       "explosion",
       "geometryPositions",

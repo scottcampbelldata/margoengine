@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20770154,
+  "total": 20770995,
   "history": [
     {
       "date": "2026-10-24",
@@ -14347,6 +14347,12 @@
       "commit": "fix(water) near sea, KB-WATER-TAASMEAR1 send-back",
       "grew": 3,
       "reason": "TAA reads every reactive mask published on the pass context (packages/shared/reactive-mask.js) with no wiring, compiles the masked resolve the first frame one appears and takes the maximum of several in one r8unorm pass; Water publishes its mask. Measured gzip: @margoengine/taa 16913 to 16,969 B (ceiling 17479), taa/upscale-velocity (which bundles TAA) 21660 to 21,723 B (ceiling 22375), water 37247 to 37,313 B (ceiling 38433; the earlier 37,247 was the measured size with no headroom). The registry and the combine pass are part of the resolve every TAA runs; a separate entry would make each scene import and wire it, which is the bug. Only these three rows are written; main's physics rows are left to their owner."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "a7a422029",
+      "reason": "physics/ship 34,420 ceiling to its new size: the B4-70's measured four-quadrant table (31 Fourier terms each for thrust and torque) and its evaluation. Measured data in place of an idealisation; a separate entry would split one propeller model. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15220,7 +15226,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 34420,
+    "@margoengine/physics/ship": 35261,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,

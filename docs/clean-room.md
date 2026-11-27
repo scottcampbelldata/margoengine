@@ -17211,6 +17211,20 @@ Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in hori
 this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
 the ship solver heels in its turn".
 
+### Measured checks for the ships (SEA-09, `B4_70_FOUR_QUADRANT`, `fourQuadrantCoefficients`, 2026-11-27)
+
+- R. F. Roddy, D. E. Hess and W. E. Faller, "A tool to predict the four-quadrant performance of the Wageningen B-screw
+  series for ship performance simulations", Ship Technology Research 54, 103-113, 2007 (eqs. 1 to 6 and Table II, read:
+  beta, C_T*, C_Q* and the quadrants), and L. Zuiker, MSc thesis, TU Delft, 2023, Appendix B, Table B.4 (read: the B4-70
+  P/D 1.0 coefficients from Roddy et al.'s 2006 report, which was not obtained). The table's evaluation with the full A(0)
+  and the torque columns as -10 C_Q* is this package's reading, checked against the open-water polynomials.
+- J. den Ouden, "Delft Systematic Yacht Hull Series measurement data" and "DSYHS hydrostatics data", 4TU.ResearchData,
+  2022, doi:10.4121/21501402.v1 and doi:10.4121/21501375.v1, CC0 (Sysser 1's measured resistance and its hull, keel and
+  rudder, read as values; no file of the dataset is in the tree).
+- Y. Masuyama, I. Nakamura, H. Tatano, K. Takagi and T. Miyakawa, "Sailing performance of ocean cruising yacht by
+  full-scale sea test (part 1)", J. Soc. Naval Arch. Japan 172, 349-364, 1992 (Table 1 and Figs. 11 and 12, read).
+Proof: `packages/physics/tests/ship.test.js`, "measured checks".
+
 ### Sailing yachts (SEA-09, `yachtWater`, `yachtSails`, `velocityPrediction`, `SailingSolver`, 2026-11-27)
 
 `packages/physics/src/ship/sailing.ts`, written from N. Kleijweg, MSc thesis, TU Delft,

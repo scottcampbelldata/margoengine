@@ -79,6 +79,34 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Open:** the in-line wake's coupling at a flexible cylinder's high modes, calibrated on one riser data set and checked
   on another.
 
+### Open 2026-11-27: KCS heels out too far as it starts a turn and too little in the steady turn (KB-SHIP-HEEL1, physics ship)
+
+- **Repro:** `KCS_MODEL` at Fn 0.26, 35 degrees of rudder (`packages/physics/tests/ship.test.js`, "KCS heels outward in its
+  turn"). Its largest heel is 19 degrees where MARIN and KRISO measured 15.0 to 17.0. Its steady heel is 2.9 degrees turning
+  to starboard and 3.7 to port, where they measured 4.6 to 5.1. Advance, tactical diameter and yaw rate are inside or near
+  the measured band, so the turn itself is right and the roll is not.
+- **Cause, not yet found.** The steady turn is also 0.41 to 0.45 of the approach speed, where they measured 0.44 to 0.50.
+  Its drift is 16 degrees, where they measured 19 to 19.7. Both point at too little side force in the steady turn, and
+  the heel follows the side force. A slower, less drifting turn accounts for about a fifth of the shortfall in steady
+  heel, not all of it.
+- **Ruled out (time-boxed, 2026-11-27):**
+  - The roll damping: the decay coefficient from 0.035 to 0.4 moves the peak only from 19.1 to 16.9 degrees and leaves
+    the steady heel unchanged. The peak is quasi-static, set by the early turn's speed.
+  - The added roll inertia: 0 to 0.4 of the ship's own moves the peak by 2 degrees and leaves the steady heel unchanged.
+  - The heel terms in surge, sway and yaw: with all of them off the steady heel is 3.1 degrees.
+  - c_gamma: no effect.
+  - The surge cross term: X'_vr + m'_y in place of X'_vr - m'_y slows the turn to 0.28 of the speed and the heel to 0.3
+    degrees, so the reading in `kcs.ts` stands.
+  - The wake change with drift: symmetric constants give 3.3 degrees on both sides.
+  - GM 0.60 m and KM / d 1.3839 match SIMMAN's and Fukui et al.'s particulars.
+  - The rudder's lever: its depth from 0.40 d to 0.70 d moves the steady heel from 3.8 to 1.9 degrees. The rudder
+    centroid's 0.54 d is the paper's definition.
+- **Still to check:** the added masses. Fukui et al. do not print them, and the Brix and Clarke values set the
+  combined captive terms' split. Also the roll-rate term's sign in the rudder inflow, and whether Fukui et al.'s measured
+  K'_H already holds the added masses' reaction that eq. 4 adds again.
+- **What to use:** for a ship that heels as it turns, the model gives the turn within the measured band and heel to the
+  right side and order. Do not read its heel angles as KCS's to better than 2 degrees.
+
 ### Open 2026-11-27: a capsule-chain rod under tension over a bollard blows up (KB-PHYS-RODWRAP1, physics kernel)
 
 - **Repro:** a `Rod` of 48 links (radius 5 mm, nylon) draped half a turn over a fixed cylinder of radius 0.2 m, a free

@@ -30,6 +30,66 @@ export interface PropellerCurves {
   readonly torque: readonly [number, number, number];
   /** Pitch ratio P / D at 0.7 R (the four quadrants and the race). */
   readonly pitch: number;
+  /** Measured four-quadrant characteristics: given, they set the thrust and torque in every quadrant in place of Healey's. */
+  readonly fourQuadrant?: FourQuadrant;
+}
+
+/**
+ * A propeller's four-quadrant characteristics: C_T* and C_Q* as Fourier series in the advance angle beta = atan2(V_a, 0.7
+ * pi n D), C = (1/100) sum_k A(k) cos(k beta) + B(k) sin(k beta), the thrust and torque by 1/2 rho (V_a^2 + (0.7 pi n D)^2)
+ * (pi / 4) D^2 (and D for the torque) (R. F. Roddy, D. E. Hess and W. E. Faller, Ship Technology Research 54, 103-113,
+ * 2007, eqs. 1 to 6). The torque's columns give -10 C_Q*.
+ */
+export interface FourQuadrant {
+  readonly thrust: readonly [readonly number[], readonly number[]];
+  readonly torque: readonly [readonly number[], readonly number[]];
+}
+
+/**
+ * The Wageningen B4-70 at P / D 1.0 in four quadrants: NSWC's 31-term Fourier fit of MARIN's measurements (Roddy et al.
+ * 2006, as L. Zuiker, MSc thesis, TU Delft, 2023, Appendix B, Table B.4, prints it), A(k) and B(k) x 100; the torque's
+ * columns are -10 C_Q* x 100.
+ */
+export const B4_70_FOUR_QUADRANT: FourQuadrant = Object.freeze({
+  thrust: [
+    [
+      2.6617, 17.802, 1.3828, 2.7871, -1.624, -5.3084, 0.1918, 3.8318, -0.22892, -1.8656, 0.349, 2.2321, -0.35976,
+      0.13606, 0.47192, 0.87235, -0.35748, 0.35955, 0.52896, 0.21045, -0.27057, 0.10509, 0.27733, -0.11596, -0.1745,
+      0.04078, 0.09925, -0.3465, -0.12357, 0.06393, 0.06193,
+    ],
+    [
+      0.0, -74.797, -1.3632, 10.246, -1.0865, 4.7346, 1.1355, -0.9318, -0.72471, 2.3747, 0.86208, 0.00702, -0.36422,
+      0.91758, 0.08938, -0.59364, -0.07095, 0.48825, -0.09059, -0.81163, -0.05666, 0.12011, -0.13042, -0.48187, 0.04541,
+      -0.01947, -0.21858, -0.16314, 0.14865, 0.10185, -0.16735,
+    ],
+  ] as const,
+  torque: [
+    [
+      -2.2945, -26.989, -1.8758, -6.3552, 2.1668, 7.653, -0.56516, -6.2654, 1.9211, 3.3456, -1.2956, -3.1294, 1.2475,
+      -1.4351, -0.83201, 0.03487, 0.89981, -1.4247, -1.1064, 0.27359, 0.6759, -0.57328, -0.22609, 0.70691, -0.03023,
+      -0.46043, 0.25629, 0.76092, 0.00262, -0.19316, 0.31487,
+    ],
+    [
+      0.0, 110.38, -0.52852, -16.544, 1.929, -8.448, -0.90714, 3.1042, 0.68648, -4.5196, -1.0928, -0.04497, 0.72404,
+      -1.5284, -0.23983, 1.6074, -0.66184, -1.2084, 0.58384, 1.3397, -0.29095, -0.08961, 0.54988, 0.14626, -0.4838,
+      0.38709, 0.72114, -0.13767, -0.45823, 0.1052, 0.27547,
+    ],
+  ] as const,
+});
+
+/** C_T* and C_Q* of a four-quadrant table at advance angle `beta` rad. */
+export function fourQuadrantCoefficients(table: FourQuadrant, beta: number): [number, number] {
+  let ct = 0,
+    cq = 0;
+  const [ta, tb] = table.thrust,
+    [qa, qb] = table.torque;
+  for (let k = 0; k < ta.length; k++) {
+    const c = cos(k * beta),
+      s = sin(k * beta);
+    ct += ta[k]! * c + (tb[k] ?? 0) * s;
+    cq += (qa[k] ?? 0) * c + (qb[k] ?? 0) * s;
+  }
+  return [ct / 100, -cq / 1000];
 }
 
 /** The KVLCC2 model propeller (Yasukawa and Yoshimura 2015; 10 K_Q as NMRI measured it): P / D 0.721. */
@@ -76,6 +136,16 @@ export class Propeller {
     if (!(k0! > 0 && q0! > 0 && Number.isFinite(k1) && Number.isFinite(k2) && curves.pitch > 0 && curves.pitch < 3))
       throw shipError(
         'Open-water curves have K_T and K_Q above 0 at bollard pull and a pitch ratio in (0, 3); pass {thrust, torque, pitch}.',
+      );
+    const fq = curves.fourQuadrant;
+    if (
+      fq &&
+      ![fq.thrust?.[0], fq.thrust?.[1], fq.torque?.[0], fq.torque?.[1]].every(
+        (c) => Array.isArray(c) && c.length > 0 && c.length === fq.thrust[0].length && c.every(Number.isFinite),
+      )
+    )
+      throw shipError(
+        'Four-quadrant characteristics are {thrust: [A, B], torque: [A, B]}, Fourier coefficients of one length, finite; pass them, such as B4_70_FOUR_QUADRANT.',
       );
     this.diameter = diameter;
     this.curves = curves;
@@ -152,12 +222,14 @@ export class Propeller {
     }
     const j = n !== 0 ? va / (n * D) : Number.POSITIVE_INFINITY;
     let kt: number, kq: number;
-    if (n > 0 && j >= 0 && j <= this.zeroThrust) [kt, kq] = this.firstQuadrant(j);
+    if (n > 0 && j >= 0 && j <= this.zeroThrust && !this.curves.fourQuadrant) [kt, kq] = this.firstQuadrant(j);
     else {
       // The four-quadrant form, for a propeller turning astern, water coming from astern or a windmilling screw.
       const vp = 0.7 * PI * n * D,
         beta = atan2(va, vp),
-        [ct, cq] = this.quadrants(beta),
+        [ct, cq] = this.curves.fourQuadrant
+          ? fourQuadrantCoefficients(this.curves.fourQuadrant, beta)
+          : this.quadrants(beta),
         speed2 = va * va + vp * vp,
         force = 0.5 * density * speed2 * PI * D * D * 0.25;
       o.thrust = ct * force;
