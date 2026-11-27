@@ -1,7 +1,8 @@
-// GPU liquid: a 1 m tank of 65,536 MLS-MPM particles by default (up to 262,144), stirred by the pointer, with a box to
-// drop in that floats on the force the liquid reports, and the liquid's debug view. @margoengine/water/liquid, docs in
-// packages/water/README.md ("GPU liquid").
+// GPU liquid: a 1 m tank of 65,536 MLS-MPM particles by default (up to 262,144), stirred by the pointer, with a crate to
+// drop in, a physics body linked to the liquid both ways (it floats, tips and pushes the liquid), and the liquid's debug
+// view. @margoengine/water/liquid, docs in packages/water/README.md ("GPU liquid").
 import { createStage } from 'margoengine';
+import { Physics } from '@margoengine/physics';
 import { boxGeometry } from '@margoengine/geometry';
 import { Material, createMesh } from '@margoengine/materials';
 import { projectPoint, screenToWorld } from '@margoengine/math/project';
@@ -51,11 +52,27 @@ try {
   const floor = createMesh(engine, boxGeometry(1.1, 0.04, 1.1), new Material({ color: '#2b3a52', roughness: 0.7 }));
   floor.root.setPosition([0, -0.02, 0]);
   const boxMesh = createMesh(engine, boxGeometry(2 * HALF, 2 * HALF, 2 * HALF), new Material({ color: '#e0a040', roughness: 0.5 }));
-  boxMesh.root.setPosition([0, -10, 0]);
 
-  // The floating box: the page integrates it from gravity and the liquid's force on it (one frame behind on WebGPU),
-  // and hands its pose and velocity back to the liquid as a collider. It stays upright; the torque is not used.
-  const body = { active: false, position: [0, 0, 0] as [number, number, number], velocity: [0, 0, 0] as [number, number, number] };
+  // The crate is a physics body; the tank's floor and walls hold it. Linked to the liquid, it pushes the liquid as it
+  // moves and takes the liquid's force and torque, so it floats at its density's draft and tips over in a wave.
+  await Physics.load({ signal: life.signal });
+  const physics = new Physics(engine);
+  const wall = (position: LiquidVec3, halfExtents: LiquidVec3) =>
+    physics.addBody(null, { type: 'fixed', position, colliders: { shape: 'box', halfExtents } });
+  wall([0, -0.05, 0], [0.6, 0.05, 0.6]);
+  wall([-0.55, 0.4, 0], [0.05, 0.5, 0.6]);
+  wall([0.55, 0.4, 0], [0.05, 0.5, 0.6]);
+  wall([0, 0.4, -0.55], [0.6, 0.5, 0.05]);
+  wall([0, 0.4, 0.55], [0.6, 0.5, 0.05]);
+  const crateDensity = () => slider('sl-rho');
+  const crate = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -10, 0],
+    colliders: { shape: 'box', halfExtents: [HALF, HALF, HALF], density: crateDensity() },
+  });
+  crate.linearDamping = 0.5;
+  crate.angularDamping = 0.5;
+  let link: { unlink(): void } | undefined;
 
   const debugOptions = () => ({
     enabled: byId('btn-debug').getAttribute('aria-pressed') === 'true',
@@ -84,13 +101,14 @@ try {
   window.liquidDemo = { liquid };
   dispose = () => {
     liquid.dispose();
+    physics.dispose();
     stage.dispose();
   };
 
-  const syncCollider = () =>
-    liquid.setColliders(
-      body.active ? [{ shape: 'box', position: body.position, halfExtents: [HALF, HALF, HALF], velocity: body.velocity }] : [],
-    );
+  const linkCrate = (on: boolean) => {
+    link?.unlink();
+    link = on ? liquid.link(crate, { shape: 'box', halfExtents: [HALF, HALF, HALF] }) : undefined;
+  };
 
   // The pointer on the plane through the tank's middle, while a button is held.
   const at = { x: 0, y: 0, z: 0 };
@@ -115,22 +133,27 @@ try {
   canvas.addEventListener('pointercancel', stop);
 
   byId<HTMLButtonElement>('btn-drop').addEventListener('click', () => {
-    body.active = true;
-    body.position = [(Math.random() - 0.5) * 0.4, 0.65, (Math.random() - 0.5) * 0.4];
-    body.velocity = [0, 0, 0];
-    syncCollider();
+    crate.setType('dynamic');
+    crate.colliders[0]!.setDensity(crateDensity());
+    crate.setPosition([(Math.random() - 0.5) * 0.4, 0.65, (Math.random() - 0.5) * 0.4]);
+    crate.setRotation([0, 0, 0, 1]);
+    crate.setLinearVelocity([0, 0, 0]);
+    crate.setAngularVelocity([0, 0, 0]);
+    linkCrate(true);
   });
   byId<HTMLButtonElement>('btn-reset').addEventListener('click', () => {
-    body.active = false;
-    boxMesh.root.setPosition([0, -10, 0]);
-    syncCollider();
+    linkCrate(false);
+    crate.setType('fixed');
+    crate.setPosition([0, -10, 0]);
     liquid.reset();
   });
   countSelect.addEventListener('change', () => {
+    const linked = link !== undefined;
+    link = undefined;
     liquid.dispose();
     liquid = GPULiquid.attach(engine, makeOptions(Number(countSelect.value)));
     window.liquidDemo = { liquid };
-    syncCollider();
+    linkCrate(linked);
   });
 
   const bind = (id: string, apply: (v: number) => void) => {
@@ -142,7 +165,7 @@ try {
   };
   bind('sl-visc', (v) => (liquid.options.viscosity = v));
   bind('sl-radius', () => {});
-  bind('sl-rho', () => {});
+  bind('sl-rho', (v) => crate.colliders[0]!.setDensity(v));
 
   const debugButton = byId<HTMLButtonElement>('btn-debug');
   debugButton.addEventListener('click', () => {
@@ -165,25 +188,9 @@ try {
   let frames = 0;
   let elapsed = 0;
   stage.onTick((dt) => {
-    if (body.active && !liquid.options.paused) {
-      // Semi-implicit Euler on gravity plus the liquid's push; the tank's walls and floor stop the box.
-      const h = Math.min(dt, 1 / 30);
-      const mass = slider('sl-rho') * (2 * HALF) ** 3;
-      const force = liquid.forces[0]?.force ?? [0, 0, 0];
-      for (let a = 0; a < 3; a++) {
-        body.velocity[a]! += ((a === 1 ? -9.81 : 0) + force[a]! / mass) * h;
-        body.velocity[a]! *= Math.exp(-0.5 * h);
-        body.position[a]! += body.velocity[a]! * h;
-        const lo = TANK.min[a]! + HALF,
-          hi = TANK.max[a]! - HALF;
-        if (body.position[a]! < lo || body.position[a]! > hi) {
-          body.position[a] = Math.min(hi, Math.max(lo, body.position[a]!));
-          body.velocity[a] = 0;
-        }
-      }
-      boxMesh.root.setPosition(body.position);
-      syncCollider();
-    }
+    physics.paused = liquid.options.paused === true;
+    boxMesh.root.setPosition(crate.position);
+    boxMesh.root.setQuaternion(crate.rotation);
     frames++;
     elapsed += dt;
     if (elapsed < 0.5) return;

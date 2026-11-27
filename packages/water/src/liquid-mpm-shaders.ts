@@ -3,13 +3,14 @@
 // - particles: per particle five vec4f, (x, y, z, density ratio), (vx, vy, vz, 0) and the rows of the APIC matrix C;
 // - grid: per node four i32, the fixed-point mass and momentum while particles scatter, then the node's velocity and mass as
 //   f32 bits after the grid update;
-// - forces: per collider eight i32, the fixed-point impulse on the body and its moment about the centre.
+// - forces: per collider eight i32, the fixed-point impulse on the body and its moment about the centre;
+// - sdf: the distance fields of the mesh colliders, one after another.
 // Every scatter is an integer atomicAdd, so the sums and the whole step are the same on every run. A stage binds at most
-// three storage buffers (WebGPU's default limit is eight). The build strips the comments inside the WGSL strings
+// four storage buffers (WebGPU's default limit is eight). The build strips the comments inside the WGSL strings
 // (docs/conventions.md, "Shader comments").
 
-/** Floats of the simulation uniform: twelve vec4 of parameters, then five vec4 per collider. */
-export const LIQUID_SIM_FLOATS = (12 + 5 * 8) * 4;
+/** Floats of the simulation uniform: twelve vec4 of parameters, then six vec4 per collider. */
+export const LIQUID_SIM_FLOATS = (12 + 6 * 8) * 4;
 /** Floats of the debug view uniform. */
 export const LIQUID_DEBUG_FLOATS = 28;
 
@@ -25,16 +26,18 @@ struct Particle {
   c2: vec4f,
 }
 struct Collider {
-  // centre, kind (0 sphere, 1 box)
+  // centre, kind (0 sphere, 1 box, 2 capsule, 3 plane, 4 mesh)
   center: vec4f,
-  // radius or half size, friction
+  // sphere radius, box half size, capsule radius and half height, plane unit normal or mesh field half size; friction
   half: vec4f,
   // orientation quaternion
   rot: vec4f,
-  // linear velocity, unused
+  // linear velocity, first sample of a mesh field in sdf
   vel: vec4f,
-  // angular velocity, unused
+  // angular velocity, samples per axis of a mesh field
   ang: vec4f,
+  // centre of a mesh field in the body's frame, unused
+  local: vec4f,
 }
 struct Sim {
   // particles, grid nodes, colliders, pointer on
@@ -117,24 +120,74 @@ fn offsetOf(s: Stencil, o: vec3u) -> vec3f {
 }
 `;
 
-/** Collider distance shared by the stress, grid update and G2P passes. */
-const COLLIDE = /* wgsl */ `
+/**
+ * Collider distance shared by the stress, grid update and G2P passes; `binding` is where the pass binds the mesh fields.
+ */
+const collideWGSL = (binding: number) => /* wgsl */ `
+// Every mesh collider's distance field, one after another.
+@group(0) @binding(${binding}) var<storage, read> sdf: array<f32>;
 // Rotates v by the unit quaternion q.
 fn rotateQ(q: vec4f, v: vec3f) -> vec3f {
   let t = cross(q.xyz, v) + q.w * v;
   return v + 2.0 * cross(q.xyz, t);
 }
+// A mesh field of collider c at the point l of the body's frame: the trilinear sample at l clamped into the field's box,
+// plus the distance from l to that box.
+fn meshSample(c: Collider, l: vec3f) -> f32 {
+  let n = u32(c.ang.w);
+  let first = u32(c.vel.w);
+  let h = c.half.xyz;
+  let p = l - c.local.xyz;
+  let q = clamp(p, -h, h);
+  let g = (q + h) / (2.0 * h) * f32(n - 1u);
+  let i0 = min(vec3u(floor(g)), vec3u(n - 2u));
+  let f = g - vec3f(i0);
+  var v = 0.0;
+  for (var k = 0u; k < 2u; k++) {
+    for (var j = 0u; j < 2u; j++) {
+      for (var i = 0u; i < 2u; i++) {
+        let w = select(1.0 - f.x, f.x, i == 1u) * select(1.0 - f.y, f.y, j == 1u) * select(1.0 - f.z, f.z, k == 1u);
+        v += w * sdf[first + i0.x + i + n * (i0.y + j + n * (i0.z + k))];
+      }
+    }
+  }
+  return v + length(p - q);
+}
 // Signed distance from x to collider k (negative inside), with the outward normal in .xyz.
 fn collide(k: u32, x: vec3f) -> vec4f {
   let c = sim.colliders[k];
   let d = x - c.center.xyz;
-  if (c.center.w < 0.5) {
+  let kind = u32(c.center.w + 0.5);
+  if (kind == 0u) {
     let l = length(d);
     var n = vec3f(0.0, 1.0, 0.0);
     if (l > 0.0) { n = d / l; }
     return vec4f(n, l - c.half.x);
   }
+  if (kind == 3u) {
+    return vec4f(c.half.xyz, dot(d, c.half.xyz));
+  }
   let local = rotateQ(vec4f(-c.rot.xyz, c.rot.w), d);
+  if (kind == 2u) {
+    // The capsule: distance to its axis segment less its radius.
+    let p = local - vec3f(0.0, clamp(local.y, -c.half.y, c.half.y), 0.0);
+    let l = length(p);
+    var n = vec3f(1.0, 0.0, 0.0);
+    if (l > 0.0) { n = p / l; }
+    return vec4f(rotateQ(c.rot, n), l - c.half.x);
+  }
+  if (kind == 4u) {
+    // The mesh: its field, and the normal by central differences half a sample apart.
+    let e = c.half.xyz / (c.ang.w - 1.0);
+    let g = vec3f(
+      meshSample(c, local + vec3f(e.x, 0.0, 0.0)) - meshSample(c, local - vec3f(e.x, 0.0, 0.0)),
+      meshSample(c, local + vec3f(0.0, e.y, 0.0)) - meshSample(c, local - vec3f(0.0, e.y, 0.0)),
+      meshSample(c, local + vec3f(0.0, 0.0, e.z)) - meshSample(c, local - vec3f(0.0, 0.0, e.z)));
+    let l = length(g);
+    var n = vec3f(0.0, 1.0, 0.0);
+    if (l > 0.0) { n = g / l; }
+    return vec4f(rotateQ(c.rot, n), meshSample(c, local));
+  }
   let q = abs(local) - c.half.xyz;
   let sg = select(vec3f(1.0), vec3f(-1.0), local < vec3f(0.0));
   let o = max(q, vec3f(0.0));
@@ -150,6 +203,12 @@ fn collide(k: u32, x: vec3f) -> vec4f {
     n = vec3f(0.0, 0.0, sg.z);
   }
   return vec4f(rotateQ(c.rot, n), outside + min(max(q.x, max(q.y, q.z)), 0.0));
+}
+// The distance alone, without a mesh's six extra samples for its normal.
+fn distanceTo(k: u32, x: vec3f) -> f32 {
+  let c = sim.colliders[k];
+  if (u32(c.center.w + 0.5) == 4u) { return meshSample(c, rotateQ(vec4f(-c.rot.xyz, c.rot.w), x - c.center.xyz)); }
+  return collide(k, x).w;
 }
 // The velocity of collider k's surface at x.
 fn bodyVelocity(k: u32, x: vec3f) -> vec3f {
@@ -199,7 +258,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
  * P2G, stress: density from the grid's mass, with the walls mirrored and the colliders read as liquid at rest, Tait
  * pressure (zero below rest density) and the viscous stress, scattered as -dt vol sigma D^-1 d.
  */
-export const LIQUID_STRESS_WGSL = /* wgsl */ `${HEADER}${COLLIDE}
+export const LIQUID_STRESS_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}
 @group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read_write> grid: array<atomic<i32>>;
 // The node on one axis that mirrors node i across a wall within two cells of it, or NONE. A node on a wall is its own
@@ -246,7 +305,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let hc = sim.boxMax.w;
   var near = 0u;
   for (var k = 0u; k < sim.counts.z; k++) {
-    if (collide(k, p.pos.xyz).w < GHOST_REACH * hc) { near |= 1u << k; }
+    if (distanceTo(k, p.pos.xyz) < GHOST_REACH * hc) { near |= 1u << k; }
   }
   // The particle's density: the grid's mass interpolated back, in particles per cell.
   var rho = 0.0;
@@ -259,7 +318,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
           let x = sim.origin.xyz + vec3f(s.base + o) * sim.cell.xyz;
           var ghost = 0.0;
           for (var k = 0u; k < sim.counts.z; k++) {
-            if ((near & (1u << k)) != 0u) { ghost += splineCover(-collide(k, x).w / hc); }
+            if ((near & (1u << k)) != 0u) { ghost += splineCover(-distanceTo(k, x) / hc); }
           }
           m += ghost * sim.invCell.w;
         }
@@ -309,7 +368,7 @@ fn addImpulse(k: u32, r: vec3f, j: vec3f) {
 `;
 
 /** Grid update: velocity, gravity, the pointer, the speed limit, the colliders (and their impulses), the walls. */
-export const LIQUID_GRID_WGSL = /* wgsl */ `${HEADER}${COLLIDE}
+export const LIQUID_GRID_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}
 @group(0) @binding(1) var<storage, read_write> grid: array<vec4i>;
 @group(0) @binding(2) var<storage, read_write> forces: array<atomic<i32>>;
 ${ADD_IMPULSE}
@@ -366,7 +425,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 `;
 
 /** G2P: velocity and APIC C = sum w v (D^-1 d)^T, advection, out of the colliders (counted), inside the walls. */
-export const LIQUID_G2P_WGSL = /* wgsl */ `${HEADER}${COLLIDE}
+export const LIQUID_G2P_WGSL = /* wgsl */ `${HEADER}${collideWGSL(4)}
 @group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read> grid: array<vec4i>;
 @group(0) @binding(3) var<storage, read_write> forces: array<atomic<i32>>;

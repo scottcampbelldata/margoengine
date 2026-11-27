@@ -3,6 +3,7 @@
 import { Engine } from '/packages/core/dist/index.js';
 import {
   GPULiquid,
+  bakeLiquidMesh,
   createLiquidState,
   liquidStateHash,
   resolveLiquidParams,
@@ -30,12 +31,23 @@ window.check = async () => {
   // 65,536 particles on WebGPU (docs/physics-parity-bar.md P13: tens of thousands at interactive rates); the CPU twin
   // steps 1,024 on the WebGL2 layer.
   const count = compat ? 1024 : 65536;
+  // A cube of half size 0.08 m as a triangle mesh, baked to a distance field.
+  const corners = [];
+  for (let i = 0; i < 8; i++) corners.push(i & 1 ? 0.08 : -0.08, i & 2 ? 0.08 : -0.08, i & 4 ? 0.08 : -0.08);
+  const faces = [[0, 2, 6, 4], [1, 5, 7, 3], [0, 4, 5, 1], [2, 3, 7, 6], [0, 1, 3, 2], [4, 6, 7, 5]];
+  const cube = bakeLiquidMesh(corners, faces.flatMap(([a, b, c, d]) => [a, b, c, a, c, d]), { resolution: 32 });
+  const q = Math.SQRT1_2;
   const options = {
     count,
     seed: 3,
-    // A resting layer 0.4 m deep over the whole floor, with a held sphere in it from the first step.
+    // A resting layer 0.4 m deep over the whole floor, with a held sphere, capsule (lying along x) and mesh cube in it
+    // from the first step.
     fill: { min: [-0.5, 0, -0.5], max: [0.5, 0.4, 0.5] },
-    colliders: [{ shape: 'sphere', position: [0.25, 0.2, 0], radius: 0.1 }],
+    colliders: [
+      { shape: 'sphere', position: [0.25, 0.2, 0], radius: 0.1 },
+      { shape: 'capsule', position: [-0.22, 0.2, 0.25], radius: 0.07, halfHeight: 0.1, rotation: [0, 0, q, q] },
+      { shape: 'mesh', position: [-0.25, 0.2, -0.25], mesh: cube },
+    ],
   };
   const liquid = GPULiquid.attach(engine, options);
   const hash = async () => liquidStateHash((await liquid.snapshot()).particles);
@@ -71,11 +83,13 @@ window.check = async () => {
   // Two seconds of frames: the liquid stays finite and inside the container.
   // The held sphere's force averaged over the last two of three seconds, against Archimedes' rho g V.
   liquid.reset();
-  let lift = 0;
+  const lifts = [0, 0, 0];
   for (let k = 0; k < 180; k++) {
     liquid.step(1 / 60);
-    if (k >= 60) lift += (await liquid.readForces())[0].force[1] / 120;
+    const f = await liquid.readForces();
+    if (k >= 60) for (let i = 0; i < 3; i++) lifts[i] += f[i].force[1] / 120;
   }
+  const lift = lifts[0];
   const archimedes = 1000 * 9.81 * (4 / 3) * Math.PI * 0.1 ** 3;
   const late = (await liquid.snapshot()).particles;
   let outside = 0, nonFinite = 0;
@@ -92,15 +106,59 @@ window.check = async () => {
   const near = (data) => {
     let v = 0, n = 0;
     for (let i = 0; i < count; i++) {
-      const dx = data[i * F] + 0.3, dy = data[i * F + 1] - 0.15, dz = data[i * F + 2];
+      const dx = data[i * F] - 0.3, dy = data[i * F + 1] - 0.3, dz = data[i * F + 2] - 0.3;
       if (dx * dx + dy * dy + dz * dz < 0.01) { v += data[i * F + 6]; n++; }
     }
     return n ? v / n : 0;
   };
-  liquid.setPointer({ position: [-0.3, 0.15, 0], velocity: [0, 0, 2], radius: 0.15, strength: 60 });
+  liquid.setPointer({ position: [0.3, 0.3, 0.3], velocity: [0, 0, 2], radius: 0.15, strength: 60 });
   for (let k = 0; k < 6; k++) liquid.step(1 / 60);
   const pointerVz = near((await liquid.snapshot()).particles);
   liquid.setPointer(null);
+
+  // A box of half size 0.1 m and 500 kg/m³ linked as a body (rotation held), dropped from just above the surface: it
+  // floats, and its mean draft over the last two seconds against Archimedes' m / (rho A) = 0.1 m.
+  liquid.setColliders([]);
+  liquid.reset();
+  const mass = 500 * 0.2 ** 3;
+  const body = {
+    position: [0, 0.52, 0],
+    rotation: [0, 0, 0, 1],
+    linearVelocity: [0, 0, 0],
+    angularVelocity: [0, 0, 0],
+    taken: 0,
+    applyImpulse(j) {
+      for (let a = 0; a < 3; a++) this.linearVelocity[a] += j[a] / mass;
+      this.taken += j[1];
+    },
+    applyTorqueImpulse() {},
+  };
+  const link = liquid.link(body, { shape: 'box', halfExtents: [0.1, 0.1, 0.1] });
+  let centre = 0, low = Infinity, high = -Infinity;
+  for (let k = 0; k < 240; k++) {
+    liquid.step(1 / 60);
+    await liquid.readForces();
+    body.linearVelocity[1] -= 9.81 / 60;
+    for (let a = 0; a < 3; a++) body.position[a] += body.linearVelocity[a] / 60;
+    if (k >= 120) {
+      centre += body.position[1] / 120;
+      low = Math.min(low, body.position[1]);
+      high = Math.max(high, body.position[1]);
+    }
+  }
+  // The free surface away from the box: the highest particle in each 5 cm column of the far corners, plus half a spacing.
+  const floatState = (await liquid.snapshot()).particles;
+  const tops = new Map();
+  for (let i = 0; i < count; i++) {
+    const x = floatState[i * F], y = floatState[i * F + 1], z = floatState[i * F + 2];
+    if (Math.abs(x) < 0.3 || Math.abs(z) < 0.3) continue;
+    const key = Math.floor(x / 0.05) * 100 + Math.floor(z / 0.05);
+    tops.set(key, Math.max(tops.get(key) ?? -Infinity, y));
+  }
+  const level = [...tops.values()].reduce((a, b) => a + b, 0) / tops.size + liquid.spacing / 2;
+  const draft = level - (centre - 0.1);
+  const linked = liquid.forces.length;
+  link.unlink();
 
   const shot = new OffscreenCanvas(W, H);
   const ctx = shot.getContext('2d', { willReadFrequently: true });
@@ -161,7 +219,12 @@ window.check = async () => {
     twinForceY,
     lateForceY: lateForces[0]?.force[1],
     lift,
+    lifts,
     archimedes,
+    draft,
+    bob: high - low,
+    linked,
+    spacing: liquid.spacing,
     outside,
     nonFinite,
     pointerVz,

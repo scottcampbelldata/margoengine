@@ -14977,6 +14977,22 @@ compute shaders), and no companion code of any paper was opened.
   particle-to-grid scatter with atomics on the GPU.
 - Mark Jarzynski and Marc Olano, [Hash Functions for GPU Rendering](https://jcgt.org/published/0009/03/02/) (JCGT 9(3),
   2020): the PCG hash of the start lattice's jitter.
+- Christer Ericson, Real-Time Collision Detection (Morgan Kaufmann, 2005), section 5.1.5, "Closest point on triangle to
+  point": the Voronoi-region test behind `bakeLiquidMesh`'s distance to each triangle.
+- Alec Jacobson, Ladislav Kavan and Olga Sorkine-Hornung,
+  [Robust Inside-Outside Segmentation using Generalized Winding Numbers](https://doi.org/10.1145/2461912.2461916) (ACM
+  TOG 32(4), SIGGRAPH 2013): the sign of the mesh field from the winding number, which holds for meshes with small holes
+  and either winding; and A. Van Oosterom and J. Strackee,
+  [The Solid Angle of a Plane Triangle](https://doi.org/10.1109/TBME.1983.325207) (IEEE TBME 30(2), 1983): the closed
+  form tan(Omega / 2) = det[a b c] / (|a||b||c| + (a.b)|c| + (a.c)|b| + (b.c)|a|) of each triangle's share.
+- Sarah F. Frisken, Ronald N. Perry, Alyn P. Rockwood and Thouis R. Jones,
+  [Adaptively Sampled Distance Fields](https://doi.org/10.1145/344779.344899) (SIGGRAPH 2000): a sampled distance field
+  read by trilinear interpolation, with its normal from the field's gradient, as a collider's level set; the capsule
+  and plane distances are the closed forms (segment distance less the radius, and n . (x - p)).
+- Hu et al. 2018 (above), section 6: two-way rigid coupling by giving the body the opposite of the momentum the grid
+  takes at its boundary. `link` does this between frames: the collider follows the body's pose and velocity, and the
+  summed impulse and moment (about the collider's centre) go to the body through its own `applyImpulse` and
+  `applyTorqueImpulse`, read and cleared on the GPU in one submit so each impulse is applied once.
 - The surface is `ParticleLiquid`'s, from van der Laan, Green and Sainz (I3D 2009) and Truong and Yuksel (I3D 2018),
   cited in `docs/water-liquid.md`.
 

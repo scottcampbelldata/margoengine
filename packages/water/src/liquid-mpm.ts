@@ -28,6 +28,7 @@ import {
   LIQUID_GAMMA,
   LIQUID_PARTICLE_FLOATS,
   liquidError,
+  MAX_LIQUID_MESH_SAMPLES,
   liquidSubsteps,
   MAX_LIQUID_COLLIDERS,
   resolveLiquidParams,
@@ -45,6 +46,7 @@ import {
 } from './liquid-mpm-sim.js';
 
 export {
+  bakeLiquidMesh,
   colliderDistance,
   createLiquidState,
   LIQUID_PARTICLE_FLOATS,
@@ -53,6 +55,8 @@ export {
   MAX_GPU_LIQUID_NODES,
   MAX_GPU_LIQUID_PARTICLES,
   MAX_LIQUID_COLLIDERS,
+  MAX_LIQUID_MESH_SAMPLES,
+  MAX_LIQUID_MESH_WORK,
   resolveLiquidParams,
   stepLiquidCPU,
 } from './liquid-mpm-sim.js';
@@ -62,6 +66,8 @@ export type {
   LiquidCollider,
   LiquidDebugOptions,
   LiquidForce,
+  LiquidMeshBakeOptions,
+  LiquidMeshShape,
   LiquidPointer,
   LiquidSnapshot,
   LiquidState,
@@ -90,6 +96,45 @@ export interface GPULiquidAttachOptions extends GPULiquidOptions {
   surface?: false | Omit<ParticleLiquidOptions, 'particles'>;
 }
 
+/**
+ * A rigid body {@link GPULiquid.link} couples to the liquid. A `PhysicsBody` of `@margoengine/physics` is one; any object
+ * with these members works.
+ */
+export interface LiquidLinkBody {
+  /** World position of the body's origin. */
+  readonly position: ArrayLike<number>;
+  /** World orientation, a unit quaternion [x, y, z, w]. */
+  readonly rotation: ArrayLike<number>;
+  /** Linear velocity of the centre of mass in m/s. */
+  readonly linearVelocity: ArrayLike<number>;
+  /** Angular velocity in rad/s. */
+  readonly angularVelocity: ArrayLike<number>;
+  /** Velocity of the body at a world point; without it, linearVelocity + angularVelocity x (point - position). */
+  velocityAtPoint?(point: [number, number, number]): ArrayLike<number>;
+  /** Applies an impulse in N s at a world point. */
+  applyImpulse(impulse: [number, number, number], point?: [number, number, number]): unknown;
+  /** Applies an angular impulse in N m s. */
+  applyTorqueImpulse(torque: [number, number, number]): unknown;
+}
+
+/** A linked body's collider: a collider whose `position` (default [0, 0, 0]) and `rotation` place it in the body's frame. */
+export type LiquidLinkCollider = Omit<LiquidCollider, 'position'> & { position?: LiquidVec3 };
+
+/** A body coupled to the liquid both ways by {@link GPULiquid.link}. */
+export interface LiquidLink {
+  /** The body. */
+  readonly body: LiquidLinkBody;
+  /** Its collider shape; `position` and `rotation` place it in the body's frame. */
+  readonly collider: LiquidLinkCollider;
+  /** Ends the coupling; the body keeps what it has taken. */
+  unlink(): void;
+}
+
+interface LinkEntry extends LiquidLink {
+  /** World centre of the collider at the last step, where its impulse acts. */
+  center: [number, number, number];
+}
+
 let nextLiquidId = 0;
 
 /**
@@ -114,8 +159,9 @@ export class GPULiquid implements EnginePlugin {
   /** The surface `attach` made, or undefined. Its `options` are live. */
   surface?: ParticleLiquid;
   /**
-   * What each collider took from the liquid over the last stepped frame, in N and N m: one frame behind on WebGPU (read
-   * back by itself while there are colliders), current on the WebGL2 layer.
+   * What each collider (`options.colliders`, then the linked bodies) took from the liquid, in N and N m: on WebGPU the
+   * mean over the frames since the last read (read back by itself every frame while there are colliders, so usually one
+   * frame behind), on the WebGL2 layer the last stepped frame.
    */
   forces: LiquidForce[] = [];
 
@@ -130,8 +176,13 @@ export class GPULiquid implements EnginePlugin {
   private clocked = false;
   private ticked = false;
   private pendingDelta = 0;
-  private lastSimTime = 0;
-  private reading = false;
+  /** Seconds stepped since the force sums were last read and cleared. */
+  private forceTime = 0;
+  private pulling?: Promise<LiquidForce[]>;
+  private links: LinkEntry[] = [];
+  private sdfBuf?: GPUBuffer;
+  private sdfKey: readonly unknown[] = [];
+  private sdfOffsets: number[] = [];
   private lastPointer?: LiquidVec3;
   private surfaceHidden?: boolean;
 
@@ -231,8 +282,62 @@ export class GPULiquid implements EnginePlugin {
       throw fault('disposed', `GPULiquid.${action} cannot run after dispose(); attach a new GPULiquid`);
   }
 
+  /** The options' colliders followed by every linked body's, placed from the body's pose and velocity. */
+  private allColliders(extra: LiquidCollider[] = []): LiquidCollider[] {
+    const own = this.options.colliders ?? [];
+    if (!this.links.length && !extra.length) return own as LiquidCollider[];
+    return [...own, ...this.links.map((l) => linkedCollider(l)), ...extra];
+  }
+
   private resolve(): ResolvedLiquidParams {
-    return (this.params = resolveLiquidParams(this.options, this.count));
+    const p = (this.params = resolveLiquidParams({ ...this.options, colliders: this.allColliders() }, this.count));
+    const base = p.colliders.length - this.links.length;
+    this.links.forEach((l, i) => {
+      const c = p.colliders[base + i]!.position;
+      l.center = [c[0], c[1], c[2]];
+    });
+    return p;
+  }
+
+  /**
+   * Couples `body` to the liquid both ways: every frame its collider follows the body's pose and velocity and pushes the
+   * liquid, and the body takes the liquid's impulse on it (`applyImpulse` at the collider's centre and
+   * `applyTorqueImpulse`) each time the force sums are read, so every impulse reaches it exactly once. `collider`'s
+   * `position` and `rotation` place the shape in the body's frame (default its origin); its velocities come from the
+   * body. Counts toward the 8 colliders.
+   */
+  link(body: LiquidLinkBody, collider: LiquidLinkCollider): LiquidLink {
+    this.assertAlive('link');
+    for (const key of ['position', 'rotation', 'linearVelocity', 'angularVelocity'] as const)
+      if (!body || typeof body !== 'object' || !body[key] || typeof body[key].length !== 'number')
+        throw liquidError(
+          `GPULiquid.link body.${key} must be an array; pass a PhysicsBody or a body with position, rotation, linearVelocity and angularVelocity`,
+        );
+    if (typeof body.applyImpulse !== 'function' || typeof body.applyTorqueImpulse !== 'function')
+      throw liquidError('GPULiquid.link body needs applyImpulse(impulse, point) and applyTorqueImpulse(torque)');
+    if (this.links.some((l) => l.body === body)) throw liquidError('GPULiquid.link: this body is linked already; unlink it first');
+    const entry: LinkEntry = { body, collider, center: [0, 0, 0], unlink: () => this.unlink(entry) };
+    resolveLiquidParams({ ...this.options, colliders: this.allColliders([linkedCollider(entry)]) }, this.count);
+    this.flushForces();
+    this.links.push(entry);
+    return entry;
+  }
+
+  private unlink(entry: LinkEntry): void {
+    const i = this.links.indexOf(entry);
+    if (i < 0 || this.disposed) return;
+    this.flushForces();
+    this.links.splice(i, 1);
+    const n = this.allColliders().length;
+    if (this.forces.length > n) this.forces.length = n;
+  }
+
+  /** Reads the force sums of the steps so far before the colliders change, so no sum spans two collider lists. */
+  private flushForces(): void {
+    if (this.compat || !this.device || !this.forceBuf || !(this.forceTime > 0)) return;
+    this.pull().catch((error: unknown) => {
+      if (!this.disposed) this.engine?.onError(error as Error);
+    });
   }
 
   /** Sets the pointer (a stirring stick), or null for none. Its velocity comes from its motion unless given. */
@@ -246,9 +351,11 @@ export class GPULiquid implements EnginePlugin {
   /** Replaces the colliders (up to 8); `forces` follows the same order. */
   setColliders(colliders: readonly LiquidCollider[]): void {
     this.assertAlive('setColliders');
-    resolveLiquidParams({ ...this.options, colliders }, this.count);
+    resolveLiquidParams({ ...this.options, colliders: [...colliders, ...this.links.map((l) => linkedCollider(l))] }, this.count);
+    this.flushForces();
     this.options.colliders = colliders;
-    if (this.forces.length > colliders.length) this.forces.length = colliders.length;
+    const n = colliders.length + this.links.length;
+    if (this.forces.length > n) this.forces.length = n;
   }
 
   /** Merges debug view settings. */
@@ -294,7 +401,6 @@ export class GPULiquid implements EnginePlugin {
       return;
     }
     const encoder = device.createCommandEncoder();
-    encoder.clearBuffer(this.forceBuf!);
     this.encodeSteps(encoder, device, params, n, h);
     device.queue.submit([encoder.finish()]);
   }
@@ -354,8 +460,9 @@ export class GPULiquid implements EnginePlugin {
   }
 
   /**
-   * Reads what each collider took from the liquid over the last stepped frame (the fixed-point sums, read back from the
-   * GPU); `forces` is kept up to date with it by itself.
+   * Reads what each collider took from the liquid since the last read (the fixed-point sums, read back from the GPU and
+   * cleared in the same submit, so no step is counted twice or missed), hands each linked body its impulse, and updates
+   * `forces`; it runs by itself every frame while there are colliders.
    */
   async readForces(signal?: AbortSignal): Promise<LiquidForce[]> {
     this.assertAlive('readForces');
@@ -363,21 +470,62 @@ export class GPULiquid implements EnginePlugin {
     const device = this.device;
     if (!device) throw fault('state', 'GPULiquid.readForces needs the liquid attached; call GPULiquid.attach(engine) first');
     this.ensureResources(device);
+    if (this.compat) return this.forces.slice(0, this.params.colliders.length);
+    const forces = await this.pull();
+    signal?.throwIfAborted();
+    return forces.slice();
+  }
+
+  /** Copies the force sums out and clears them in one submit, then decodes them and hands linked bodies their impulses. */
+  private pull(): Promise<LiquidForce[]> {
+    if (this.pulling) return this.pulling.then(() => (this.forceTime > 0 ? this.pull() : this.forces));
+    const device = this.device!;
+    const time = this.forceTime;
+    if (!(time > 0)) return Promise.resolve(this.forces);
+    this.forceTime = 0;
     const k = this.params.colliders.length;
-    if (this.compat) return this.forces.slice(0, k);
-    const time = this.lastSimTime;
+    const links = this.links.slice();
+    const centers = links.map((l) => l.center.slice() as [number, number, number]);
     const staging = device.createBuffer({ size: FORCE_BYTES, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
-    try {
-      const encoder = device.createCommandEncoder();
-      encoder.copyBufferToBuffer(this.forceBuf!, 0, staging, 0, FORCE_BYTES);
-      device.queue.submit([encoder.finish()]);
-      await staging.mapAsync(GPUMapMode.READ);
-      signal?.throwIfAborted();
-      const sums = new Int32Array(staging.getMappedRange());
-      return this.decodeForces((i) => sums[i]!, 8, k, time);
-    } finally {
-      staging.destroy();
-    }
+    const encoder = device.createCommandEncoder();
+    encoder.copyBufferToBuffer(this.forceBuf!, 0, staging, 0, FORCE_BYTES);
+    encoder.clearBuffer(this.forceBuf!);
+    device.queue.submit([encoder.finish()]);
+    const done: Promise<LiquidForce[]> = staging
+      .mapAsync(GPUMapMode.READ)
+      .then(() => {
+        const sums = new Int32Array(staging.getMappedRange().slice(0));
+        const forces = this.decodeForces((i) => sums[i]!, 8, k, time);
+        if (this.device === device) {
+          this.forces = forces;
+          this.deliver((i) => sums[i]!, 8, k, links, centers);
+        }
+        return forces;
+      })
+      .finally(() => {
+        staging.destroy();
+        if (this.pulling === done) this.pulling = undefined;
+      });
+    this.pulling = done;
+    return done;
+  }
+
+  /** Hands each linked body (the last of the k colliders) its impulse and angular impulse from the fixed-point sums. */
+  private deliver(
+    sum: (i: number) => number,
+    stride: number,
+    k: number,
+    links: LinkEntry[],
+    centers: [number, number, number][],
+  ): void {
+    const scale = this.params.particleMass / LIQUID_FORCE_FIXED;
+    const base = k - links.length;
+    if (base < 0) return;
+    links.forEach((l, i) => {
+      const o = (base + i) * stride;
+      l.body.applyImpulse([sum(o) * scale, sum(o + 1) * scale, sum(o + 2) * scale], centers[i]);
+      l.body.applyTorqueImpulse([sum(o + 3) * scale, sum(o + 4) * scale, sum(o + 5) * scale]);
+    });
   }
 
   private decodeForces(sum: (i: number) => number, stride: number, k: number, time: number): LiquidForce[] {
@@ -398,7 +546,7 @@ export class GPULiquid implements EnginePlugin {
     requireWebGPU(engine, 'GPULiquid');
     const device = engine.gpu!;
     const limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
-    const need = Math.max(this.count * LIQUID_PARTICLE_FLOATS * 4, this.params.nodes * 16);
+    const need = Math.max(this.count * LIQUID_PARTICLE_FLOATS * 4, this.params.nodes * 16, MAX_LIQUID_MESH_SAMPLES * 4);
     if (need > limit)
       throw fault(
         'unsupported',
@@ -418,26 +566,18 @@ export class GPULiquid implements EnginePlugin {
     graph.add({ name: this.name + ':lines', order: 8, execute: (c) => c.backend === 'webgpu' && this.drawLines(c) });
   }
 
-  /** Takes the frame delta once a tick, and starts reading the colliders' forces of the last frame. */
+  /** Takes the frame delta once a tick, and starts reading the colliders' forces of the frames since the last read. */
   onPreUpdate(delta: number): void {
     if (this.disposed) return;
     this.pendingDelta = delta;
     this.clocked = true;
     this.ticked = true;
-    if (this.compat || this.reading || !this.device || !this.params.colliders.length || !(this.lastSimTime > 0)) return;
-    this.reading = true;
+    if (this.compat || this.pulling || !this.device || !this.forceBuf || !this.params.colliders.length || !(this.forceTime > 0)) return;
     const device = this.device;
-    this.readForces().then(
-      (forces) => {
-        this.reading = false;
-        if (this.device === device) this.forces = forces;
-      },
-      (error: unknown) => {
-        this.reading = false;
-        // A read cut short by dispose() or a device loss has nothing to report.
-        if (!this.disposed && this.device === device) this.engine?.onError(error as Error);
-      },
-    );
+    this.pull().catch((error: unknown) => {
+      // A read cut short by dispose() or a device loss has nothing to report.
+      if (!this.disposed && this.device === device) this.engine?.onError(error as Error);
+    });
   }
 
   /** The particle buffer on `device` (made on first use): the surface's source, and any caller's. */
@@ -466,28 +606,13 @@ export class GPULiquid implements EnginePlugin {
       );
       this.debugUniform = this.buffer(device, LIQUID_DEBUG_FLOATS * 4, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
       if (!this.compat) {
-        const sim = (this.simUniform = this.buffer(device, this.simData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST));
-        const grid = (this.gridBuf = this.buffer(device, p.nodes * 16, STORAGE));
-        const forces = (this.forceBuf = this.buffer(device, FORCE_BYTES, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST));
-        const particles = this.particleBuf;
-        const pass = (code: string, buffers: GPUBuffer[]): Pass => {
-          const pipeline = device.createComputePipeline({
-            layout: 'auto',
-            compute: { module: device.createShaderModule({ code }), entryPoint: 'main' },
-          });
-          const group = device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: buffers.map((buffer, binding) => ({ binding, resource: { buffer } })),
-          });
-          return [pipeline, group];
-        };
-        this.compute = {
-          clear: pass(LIQUID_CLEAR_WGSL, [sim, grid]),
-          p2g: pass(LIQUID_P2G_WGSL, [sim, particles, grid]),
-          stress: pass(LIQUID_STRESS_WGSL, [sim, particles, grid]),
-          grid: pass(LIQUID_GRID_WGSL, [sim, grid, forces]),
-          g2p: pass(LIQUID_G2P_WGSL, [sim, particles, grid, forces]),
-        };
+        this.simUniform = this.buffer(device, this.simData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+        this.gridBuf = this.buffer(device, p.nodes * 16, STORAGE);
+        this.forceBuf = this.buffer(device, FORCE_BYTES, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
+        this.sdfBuf = undefined;
+        this.sdfKey = [];
+        this.meshFields(device);
+        this.buildPasses(device);
       }
       this.needsInit = true;
     }
@@ -497,10 +622,65 @@ export class GPULiquid implements EnginePlugin {
       this.pending = undefined;
       device.queue.writeBuffer(this.particleBuf, 0, state.particles as Float32Array<ArrayBuffer>);
       this.cpuState = this.compat ? state : undefined;
-      this.lastSimTime = 0;
+      this.forceTime = 0;
       this.forces = [];
+      if (this.forceBuf) device.queue.writeBuffer(this.forceBuf, 0, new Int32Array(FORCE_BYTES / 4));
       this.needsInit = false;
     }
+  }
+
+  /** The five compute passes, bound to the current buffers. */
+  private buildPasses(device: GPUDevice): void {
+    const sim = this.simUniform!,
+      grid = this.gridBuf!,
+      forces = this.forceBuf!,
+      particles = this.particleBuf!,
+      sdf = this.sdfBuf!;
+    const pass = (code: string, buffers: GPUBuffer[]): Pass => {
+      const pipeline = device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: device.createShaderModule({ code }), entryPoint: 'main' },
+      });
+      const group = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: buffers.map((buffer, binding) => ({ binding, resource: { buffer } })),
+      });
+      return [pipeline, group];
+    };
+    this.compute = {
+      clear: pass(LIQUID_CLEAR_WGSL, [sim, grid]),
+      p2g: pass(LIQUID_P2G_WGSL, [sim, particles, grid]),
+      stress: pass(LIQUID_STRESS_WGSL, [sim, particles, grid, sdf]),
+      grid: pass(LIQUID_GRID_WGSL, [sim, grid, forces, sdf]),
+      g2p: pass(LIQUID_G2P_WGSL, [sim, particles, grid, forces, sdf]),
+    };
+  }
+
+  /**
+   * The mesh colliders' distance fields in one storage buffer (at least 16 bytes), uploaded again when the list of fields
+   * changes; a bigger list replaces the buffer, and the passes that bind it are made again. Fills `sdfOffsets`.
+   */
+  private meshFields(device: GPUDevice): void {
+    const meshes = this.params.colliders.map((c) => c.mesh);
+    this.sdfOffsets = [];
+    let total = 0;
+    for (const m of meshes) {
+      this.sdfOffsets.push(total);
+      total += m ? m.distances.length : 0;
+    }
+    if (this.sdfBuf && meshes.length === this.sdfKey.length && meshes.every((m, i) => m === this.sdfKey[i])) return;
+    if (!this.sdfBuf || this.sdfBuf.size < total * 4) {
+      if (this.sdfBuf) {
+        this.sdfBuf.destroy();
+        this.owned.splice(this.owned.indexOf(this.sdfBuf), 1);
+      }
+      this.sdfBuf = this.buffer(device, Math.max(16, total * 4), GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      this.compute = undefined;
+    }
+    meshes.forEach((m, i) => {
+      if (m) device.queue.writeBuffer(this.sdfBuf!, this.sdfOffsets[i]! * 4, m.distances as Float32Array<ArrayBuffer>);
+    });
+    this.sdfKey = meshes;
   }
 
   /** The params of this frame, with the pointer's velocity taken from its motion over `dt` when it has none. */
@@ -534,14 +714,31 @@ export class GPULiquid implements EnginePlugin {
     const ptr = p.pointer;
     f.set(ptr ? [...ptr.position, ptr.radius, ...ptr.velocity, ptr.strength] : [0, 0, 0, 1, 0, 0, 0, 0], 40);
     p.colliders.forEach((c, i) => {
-      const o = 48 + i * 20;
-      f.set([...c.position, c.kind, ...c.half, c.friction, ...c.rotation, ...c.velocity, 0, ...c.angularVelocity, 0], o);
+      const m = c.mesh;
+      f.set(
+        [
+          ...c.position,
+          c.kind,
+          ...c.half,
+          c.friction,
+          ...c.rotation,
+          ...c.velocity,
+          this.sdfOffsets[i] ?? 0,
+          ...c.angularVelocity,
+          m ? m.resolution : 0,
+          ...(m ? m.center : [0, 0, 0]),
+          0,
+        ],
+        48 + i * 24,
+      );
     });
     device.queue.writeBuffer(this.simUniform!, 0, this.simData);
   }
 
   /** Encodes `n` substeps of `h` seconds in one compute pass. */
   private encodeSteps(encoder: GPUCommandEncoder, device: GPUDevice, p: ResolvedLiquidParams, n: number, h: number): void {
+    this.meshFields(device);
+    if (!this.compute) this.buildPasses(device);
     const rt = this.compute!;
     this.writeSimUniforms(device, p, h);
     const particleGroups = Math.ceil(this.count / 256);
@@ -562,7 +759,7 @@ export class GPULiquid implements EnginePlugin {
     pass.end();
     this.stats.steps += n;
     this.stats.dispatches = 5 * n;
-    this.lastSimTime = n * h;
+    this.forceTime += n * h;
   }
 
   /** Steps the CPU twin and uploads its particles (the WebGL2 layer's route). */
@@ -572,8 +769,8 @@ export class GPULiquid implements EnginePlugin {
     const { h } = liquidSubsteps(p, dt, cap);
     this.stats.steps += n;
     this.stats.dispatches = 0;
-    this.lastSimTime = n * h;
-    this.forces = this.decodeForces((i) => state.impulses[i]!, 6, p.colliders.length, this.lastSimTime);
+    this.forces = this.decodeForces((i) => state.impulses[i]!, 6, p.colliders.length, n * h);
+    this.deliver((i) => state.impulses[i]!, 6, p.colliders.length, this.links, this.links.map((l) => l.center));
     device.queue.writeBuffer(this.particleBuf!, 0, state.particles as Float32Array<ArrayBuffer>);
   }
 
@@ -597,7 +794,6 @@ export class GPULiquid implements EnginePlugin {
     if (!n) return;
     if (this.compat) this.stepCompat(c.device, p, dt, p.maxSubsteps);
     else {
-      c.encoder.clearBuffer(this.forceBuf!);
       this.encodeSteps(c.encoder, c.device, p, n, h);
     }
   }
@@ -746,11 +942,39 @@ export class GPULiquid implements EnginePlugin {
           circles(c.position, c.half[0], 2);
           continue;
         }
+        const turn = (v: readonly number[]): number[] => {
+          const r = rotateVec(c.rotation, v[0]!, v[1]!, v[2]!);
+          return [c.position[0] + r[0], c.position[1] + r[1], c.position[2] + r[2]];
+        };
+        if (c.kind === 2) {
+          // The capsule: rings round both cap centres and four lines along its sides.
+          const [r, hh] = c.half;
+          const ends = [turn([0, -hh, 0]), turn([0, hh, 0])] as unknown as LiquidVec3[];
+          for (const e of ends) circles(e, r, 2);
+          for (const [x, z] of [[r, 0], [-r, 0], [0, r], [0, -r]]) line(turn([x!, -hh, z!]), turn([x!, hh, z!]), 2);
+          continue;
+        }
+        if (c.kind === 3) {
+          // The plane: a square across the container's size round its point, and its normal.
+          const n = c.half;
+          const t = Math.abs(n[1]) < 0.9 ? [n[2], 0, -n[0]] : [0, -n[2], n[1]];
+          const tl = Math.hypot(t[0]!, t[1]!, t[2]!);
+          const u = [t[0]! / tl, t[1]! / tl, t[2]! / tl];
+          const w = [n[1] * u[2]! - n[2] * u[1]!, n[2] * u[0]! - n[0] * u[2]!, n[0] * u[1]! - n[1] * u[0]!];
+          const size = Math.max(x1 - x0, y1 - y0, z1 - z0) / 2;
+          const at = (a: number, b: number) => c.position.map((v, i) => v + (a * u[i]! + b * w[i]!) * size);
+          const quad = [at(-1, -1), at(1, -1), at(1, 1), at(-1, 1)];
+          for (let i = 0; i < 4; i++) line(quad[i]!, quad[(i + 1) % 4]!, 2);
+          line(c.position, c.position.map((v, i) => v + n[i]! * size * 0.2), 2);
+          continue;
+        }
+        // A box, or a mesh's field box round its centre.
+        const mid = c.mesh ? c.mesh.center : [0, 0, 0];
         const [qx, qy, qz, qw] = c.rotation;
         const corner = (sx: number, sy: number, sz: number) => {
-          const vx = sx * c.half[0],
-            vy = sy * c.half[1],
-            vz = sz * c.half[2];
+          const vx = mid[0]! + sx * c.half[0],
+            vy = mid[1]! + sy * c.half[1],
+            vz = mid[2]! + sz * c.half[2];
           const tx = qy * vz - qz * vy + qw * vx,
             ty = qz * vx - qx * vz + qw * vy,
             tz = qx * vy - qy * vx + qw * vz;
@@ -819,7 +1043,10 @@ export class GPULiquid implements EnginePlugin {
   private release(): void {
     for (const resource of this.owned) resource.destroy();
     this.owned = [];
-    this.particleBuf = this.simUniform = this.gridBuf = this.forceBuf = this.debugUniform = this.lineBuf = undefined;
+    this.particleBuf = this.simUniform = this.gridBuf = this.forceBuf = this.debugUniform = this.lineBuf = this.sdfBuf = undefined;
+    this.sdfKey = [];
+    this.pulling = undefined;
+    this.forceTime = 0;
     this.compute = undefined;
     this.debugPipelines.clear();
     this.lineGroups.clear();
@@ -841,6 +1068,7 @@ export class GPULiquid implements EnginePlugin {
     this.surface = undefined;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
+    this.links = [];
     this.cpuState = undefined;
     this.engine = undefined;
     this.device = undefined;
@@ -851,4 +1079,50 @@ export class GPULiquid implements EnginePlugin {
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();
   }
+}
+
+/** A linked body's collider in world space: its shape placed by the body's pose, moving with the body. */
+function linkedCollider(l: LinkEntry): LiquidCollider {
+  const b = l.body;
+  const c = l.collider;
+  if (!c || typeof c !== 'object')
+    throw liquidError("GPULiquid.link collider must be a collider, for example { shape: 'box', position: [0, 0, 0] }");
+  const bq = [b.rotation[0]!, b.rotation[1]!, b.rotation[2]!, b.rotation[3]!];
+  const lp = c.position ?? [0, 0, 0];
+  const lq = c.rotation ?? [0, 0, 0, 1];
+  const off = rotateVec(bq, lp[0], lp[1], lp[2]);
+  const position: [number, number, number] = [b.position[0]! + off[0], b.position[1]! + off[1], b.position[2]! + off[2]];
+  const w: [number, number, number] = [b.angularVelocity[0]!, b.angularVelocity[1]!, b.angularVelocity[2]!];
+  let v: [number, number, number];
+  if (typeof b.velocityAtPoint === 'function') {
+    const at = b.velocityAtPoint(position);
+    v = [at[0]!, at[1]!, at[2]!];
+  } else {
+    const lv = b.linearVelocity;
+    v = [lv[0]! + w[1] * off[2] - w[2] * off[1], lv[1]! + w[2] * off[0] - w[0] * off[2], lv[2]! + w[0] * off[1] - w[1] * off[0]];
+  }
+  // The body's turn after the shape's own: q_body * q_shape.
+  const [ax, ay, az, aw] = bq as [number, number, number, number];
+  const [bx, by, bz, bw] = lq;
+  const rotation: [number, number, number, number] = [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+  const n = c.shape === 'plane' ? (c.normal ?? [0, 1, 0]) : undefined;
+  const normal = n ? rotateVec(bq, n[0], n[1], n[2]) : undefined;
+  return { ...c, position, rotation, velocity: v, angularVelocity: w, ...(normal ? { normal } : {}) };
+}
+
+/** v turned by the unit quaternion q. */
+function rotateVec(q: readonly number[], vx: number, vy: number, vz: number): [number, number, number] {
+  const qx = q[0]!,
+    qy = q[1]!,
+    qz = q[2]!,
+    qw = q[3]!;
+  const tx = qy * vz - qz * vy + qw * vx,
+    ty = qz * vx - qx * vz + qw * vy,
+    tz = qx * vy - qy * vx + qw * vz;
+  return [vx + 2 * (qy * tz - qz * ty), vy + 2 * (qz * tx - qx * tz), vz + 2 * (qx * ty - qy * tx)];
 }

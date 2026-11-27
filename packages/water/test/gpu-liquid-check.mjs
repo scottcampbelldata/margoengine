@@ -48,6 +48,26 @@ try {
     r.lift >= (1 - q) ** 3 * r.archimedes && r.lift <= (1 + q) ** 3 * r.archimedes,
     `held sphere lift ${r.lift} N against rho g V ${r.archimedes} N (cell ${r.stats.cellSize} m)`,
   );
+  // The capsule (radius 0.07, half length 0.1) and the mesh cube (half size 0.08) against rho g V of shapes a quarter cell
+  // smaller and larger; the cube's field adds up to one of its sample spacings (0.24 m / 31) round its edges.
+  const capsuleV = (r) => Math.PI * r * r * ((4 / 3) * r + 0.2);
+  const cubeV = (a) => (2 * a) ** 3;
+  const d = 0.25 * r.stats.cellSize;
+  const field = (2 * (0.08 + (2 * 0.16) / 32)) / 31;
+  const rhoG = 1000 * 9.81;
+  for (const [i, V, lo, hi, name] of [
+    [1, capsuleV, 0.07 - d, 0.07 + d, 'capsule'],
+    [2, cubeV, 0.08 - d - field, 0.08 + d + field, 'mesh cube'],
+  ])
+    assert.ok(
+      r.lifts[i] >= rhoG * V(lo) && r.lifts[i] <= rhoG * V(hi),
+      `held ${name} lift ${r.lifts[i]} N against rho g V from ${rhoG * V(lo)} to ${rhoG * V(hi)} N`,
+    );
+  // The linked floating box: Archimedes' draft 0.1 m, within a quarter cell (where the grid meets the box), half a particle
+  // spacing (the surface estimate) and half the bob still left over the averaging window.
+  const draftBound = 0.25 * r.stats.cellSize + r.spacing / 2 + r.bob / 2;
+  assert.ok(Math.abs(r.draft - 0.1) <= draftBound, `floating box draft ${r.draft} m against 0.1 m (bound ${draftBound})`);
+  assert.equal(r.linked, 1, 'forces holds the linked body');
   assert.equal(r.nonFinite, 0, 'every particle stays finite');
   assert.equal(r.outside, 0, 'every particle stays inside the container');
   assert.ok(r.pointerVz > 0.3, `liquid at the pointer takes on its velocity: ${r.pointerVz} m/s`);
@@ -63,7 +83,8 @@ try {
   assert.equal(r.afterDisposeLit, 0, `clean canvas after dispose: ${r.afterDisposeLit} px`);
   console.log(
     `ok gpu liquid (${r.stats.backend}): ${r.count} particles, ${r.stats.nodes} nodes, hash ${r.hashes[0]}, ` +
-      `twin gap ${r.worstPos.toExponential(2)} m, force ${r.gpuForceY?.toFixed(3)} N, pointer ${r.pointerVz.toFixed(2)} m/s, ` +
+      `twin gap ${r.worstPos.toExponential(2)} m, force ${r.gpuForceY?.toFixed(3)} N, lifts ${r.lifts.map((x) => x.toFixed(2))} N, ` +
+      `draft ${r.draft.toFixed(4)} m (bob ${r.bob.toFixed(4)}), pointer ${r.pointerVz.toFixed(2)} m/s, ` +
       `lit ${r.litFrame1}, moved ${r.movedPixels}, speed ${r.speedDiff}, lines ${r.linesDiff}`,
   );
 } finally {

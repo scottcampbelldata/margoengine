@@ -1093,7 +1093,7 @@ three.js ships the MLS-MPM liquid as an example, `webgpu_compute_particles_fluid
 in the example's own code, as storage buffers and compute passes written in TSL that the page dispatches every frame,
 with the pointer and the drawing wired up by the page. To use it you copy that code into your project and keep it. In
 Margo it is `GPULiquid.attach(engine, {count})` from `@margoengine/water/liquid`: the container is the `box` you pass,
-in metres; the pointer is `setPointer`; rigid bodies are `colliders` and report their `forces`; `debug.particles:
+in metres; the pointer is `setPointer`; rigid bodies are `colliders` (spheres, boxes, capsules, planes and meshes) that report their `forces`, or a `PhysicsBody` coupled both ways by `link(body, collider)`, where the three.js example has no bodies; `debug.particles:
 'speed'` shows the particles as coloured spheres, and with the debug view off they draw as a refracting liquid surface
 (`ParticleLiquid`); `snapshot()` and `restore()` repeat a run exactly; on a browser without WebGPU the WebGL2 layer
 runs it on the CPU instead of failing.

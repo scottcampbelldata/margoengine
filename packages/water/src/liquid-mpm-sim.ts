@@ -28,6 +28,12 @@ export const LIQUID_PAD = 2;
 export const LIQUID_CFL = 0.4;
 /** Density ratio the pressure is computed at most from, so the fixed-point sums cannot overflow. */
 export const LIQUID_MAX_RATIO = 3;
+/** Collider shapes as the WGSL numbers them. */
+export const LIQUID_COLLIDER_KINDS = { sphere: 0, box: 1, capsule: 2, plane: 3, mesh: 4 } as const;
+/** Most distance samples all of one liquid's mesh colliders hold together (eight fields of 64³). */
+export const MAX_LIQUID_MESH_SAMPLES = 8 * 64 ** 3;
+/** Most triangle-sample pairs one {@link bakeLiquidMesh} call works through, which bounds its time. */
+export const MAX_LIQUID_MESH_WORK = 2 ** 30;
 
 /** An axis-aligned box in world units. */
 export interface LiquidBox {
@@ -49,17 +55,42 @@ export interface LiquidPointer {
   strength?: number;
 }
 
+/**
+ * A signed distance field of a triangle mesh in its own frame, made by {@link bakeLiquidMesh}: `resolution`³ samples on a
+ * lattice spanning `center ± half`, negative inside the mesh.
+ */
+export interface LiquidMeshShape {
+  /** Samples per axis, integer 2..64. */
+  readonly resolution: number;
+  /** Centre of the sampled box in the mesh's frame. */
+  readonly center: LiquidVec3;
+  /** Half size of the sampled box per axis, each > 0. */
+  readonly half: LiquidVec3;
+  /** resolution³ signed distances in world units, x fastest. */
+  readonly distances: Float32Array;
+}
+
 /** A rigid body the liquid flows round: it pushes the liquid, and `GPULiquid.forces` reports what the liquid pushes back. */
 export interface LiquidCollider {
-  /** `'sphere'` (uses `radius`) or `'box'` (uses `halfExtents` and `rotation`). */
-  shape: 'sphere' | 'box';
-  /** Centre in world units. */
+  /**
+   * `'sphere'` (uses `radius`), `'box'` (`halfExtents`, `rotation`), `'capsule'` (`radius`, `halfHeight` along its local
+   * y, `rotation`), `'plane'` (the half space behind `position` across `normal`; the liquid stays on the normal's side)
+   * or `'mesh'` (`mesh` from {@link bakeLiquidMesh}, `rotation`).
+   */
+  shape: 'sphere' | 'box' | 'capsule' | 'plane' | 'mesh';
+  /** Centre in world units: a point on a plane, the origin of a mesh's frame. */
   position: LiquidVec3;
-  /** Sphere radius, > 0. Default 0.1. */
+  /** Sphere or capsule radius, > 0. Default 0.1. */
   radius?: number;
   /** Box half size per axis, each > 0. Default [0.1, 0.1, 0.1]. */
   halfExtents?: LiquidVec3;
-  /** Box orientation, a unit quaternion [x, y, z, w]. Default [0, 0, 0, 1]. */
+  /** Capsule: half the length of its axis segment along its local y, >= 0. Default 0.1. */
+  halfHeight?: number;
+  /** Plane normal, pointing to the liquid's side; any length above 0. Default [0, 1, 0]. */
+  normal?: LiquidVec3;
+  /** Mesh: its distance field from {@link bakeLiquidMesh}. Required for `'mesh'`. */
+  mesh?: LiquidMeshShape;
+  /** Box, capsule or mesh orientation, a unit quaternion [x, y, z, w]. Default [0, 0, 0, 1]. */
   rotation?: readonly [number, number, number, number];
   /** Linear velocity in m/s. Default zero. */
   velocity?: LiquidVec3;
@@ -160,14 +191,17 @@ export interface ResolvedLiquidParams {
 
 /** A checked collider with its defaults filled in. */
 export interface ResolvedCollider {
-  kind: 0 | 1;
+  /** 0 sphere, 1 box, 2 capsule, 3 plane, 4 mesh. */
+  kind: 0 | 1 | 2 | 3 | 4;
   position: LiquidVec3;
-  /** Sphere radius, or box half size. */
+  /** Sphere radius, box half size, capsule radius and half height, plane unit normal, or a mesh field's half size. */
   half: LiquidVec3;
   rotation: readonly [number, number, number, number];
   velocity: LiquidVec3;
   angularVelocity: LiquidVec3;
   friction: number;
+  /** A mesh's distance field. */
+  mesh?: LiquidMeshShape;
 }
 
 /** The liquid's state: interleaved particle records (the GPU buffer's layout) and the collider impulse sums. */
@@ -315,29 +349,48 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   if (!Array.isArray(list)) throw liquidError('GPULiquid colliders must be an array');
   if (list.length > MAX_LIQUID_COLLIDERS)
     throw liquidError(`GPULiquid takes at most ${MAX_LIQUID_COLLIDERS} colliders, not ${list.length}`);
+  let meshSamples = 0;
   const colliders = list.map((c, i): ResolvedCollider => {
     const name = `colliders[${i}]`;
-    if (!c || typeof c !== 'object' || (c.shape !== 'sphere' && c.shape !== 'box'))
-      throw liquidError(`GPULiquid ${name}.shape must be 'sphere' or 'box'`);
+    const kind = c && typeof c === 'object' ? LIQUID_COLLIDER_KINDS[c.shape as keyof typeof LIQUID_COLLIDER_KINDS] : undefined;
+    if (kind === undefined || !Object.hasOwn(LIQUID_COLLIDER_KINDS, c.shape))
+      throw liquidError(`GPULiquid ${name}.shape must be 'sphere', 'box', 'capsule', 'plane' or 'mesh'`);
     const r = c.rotation ?? [0, 0, 0, 1];
     if (!Array.isArray(r) || r.length !== 4 || r.some((x) => typeof x !== 'number' || !Number.isFinite(x)))
       throw liquidError(`GPULiquid ${name}.rotation must be a quaternion [x, y, z, w]`);
     const ql = Math.hypot(r[0]!, r[1]!, r[2]!, r[3]!);
     if (Math.abs(ql - 1) > 1e-3) throw liquidError(`GPULiquid ${name}.rotation must have length 1, not ${ql}`);
-    const half =
-      c.shape === 'sphere'
-        ? ((x: number): LiquidVec3 => [x, x, x])(num(c.radius, 0.1, `${name}.radius`, 1e-6, 1e6))
-        : vec(c.halfExtents, [0.1, 0.1, 0.1], `${name}.halfExtents`, 1e-6, 1e6);
+    let half: LiquidVec3;
+    let mesh: LiquidMeshShape | undefined;
+    if (kind === 0) {
+      const radius = num(c.radius, 0.1, `${name}.radius`, 1e-6, 1e6);
+      half = [radius, radius, radius];
+    } else if (kind === 1) half = vec(c.halfExtents, [0.1, 0.1, 0.1], `${name}.halfExtents`, 1e-6, 1e6);
+    else if (kind === 2)
+      half = [num(c.radius, 0.1, `${name}.radius`, 1e-6, 1e6), num(c.halfHeight, 0.1, `${name}.halfHeight`, 0, 1e6), 0];
+    else if (kind === 3) {
+      const n = vec(c.normal, [0, 1, 0], `${name}.normal`);
+      const l = Math.hypot(n[0], n[1], n[2]);
+      if (!(l > 1e-9)) throw liquidError(`GPULiquid ${name}.normal must not be zero`);
+      half = [n[0] / l, n[1] / l, n[2] / l];
+    } else {
+      mesh = checkMeshShape(c.mesh, `${name}.mesh`);
+      meshSamples += mesh.distances.length;
+      half = mesh.half;
+    }
     return {
-      kind: c.shape === 'sphere' ? 0 : 1,
+      kind,
       position: vec(c.position, [0, 0, 0], `${name}.position`),
       half,
       rotation: [r[0]! / ql, r[1]! / ql, r[2]! / ql, r[3]! / ql],
       velocity: vec(c.velocity, [0, 0, 0], `${name}.velocity`, -1e4, 1e4),
       angularVelocity: vec(c.angularVelocity, [0, 0, 0], `${name}.angularVelocity`, -1e4, 1e4),
       friction: num(c.friction, 0.2, `${name}.friction`, 0, 10),
+      ...(mesh ? { mesh } : {}),
     };
   });
+  if (meshSamples > MAX_LIQUID_MESH_SAMPLES)
+    throw liquidError(`GPULiquid mesh colliders hold ${meshSamples} distance samples, over ${MAX_LIQUID_MESH_SAMPLES}; bake them at a lower resolution`);
   const d = options.debug ?? {};
   if (!d || typeof d !== 'object') throw liquidError('GPULiquid debug must be an object');
   for (const key of ['enabled', 'grid', 'container', 'colliders'] as const)
@@ -436,11 +489,205 @@ const LIMIT = 2e9;
 /** One fixed-point term as the GPU adds it. */
 const fixed = (x: number, scale: number): number => roundEven(Math.min(LIMIT, Math.max(-LIMIT, x * scale)));
 
+/** Checks a mesh field from {@link bakeLiquidMesh} (or one built the same way) and returns it. */
+function checkMeshShape(m: unknown, name: string): LiquidMeshShape {
+  const shape = m as LiquidMeshShape;
+  if (!m || typeof m !== 'object' || !(shape.distances instanceof Float32Array))
+    throw liquidError(`GPULiquid ${name} must be a field from bakeLiquidMesh(positions, indices)`);
+  const n = shape.resolution;
+  if (!Number.isInteger(n) || n < 2 || n > 64 || shape.distances.length !== n * n * n)
+    throw liquidError(`GPULiquid ${name}.resolution must be an integer 2 to 64 with resolution³ distances`);
+  vec(shape.center, [0, 0, 0], `${name}.center`);
+  vec(shape.half, [1, 1, 1], `${name}.half`, 1e-6, 1e6);
+  for (let i = 0; i < shape.distances.length; i++)
+    if (!Number.isFinite(shape.distances[i])) throw liquidError(`GPULiquid ${name}.distances[${i}] is not finite`);
+  return shape;
+}
+
+/** Closest point to p on the triangle abc (Ericson 2005, Real-Time Collision Detection, 5.1.5), as its squared distance. */
+function triangleDistance2(p: number[], t: ArrayLike<number>, o: number): number {
+  const ax = t[o]!, ay = t[o + 1]!, az = t[o + 2]!;
+  const abx = t[o + 3]! - ax, aby = t[o + 4]! - ay, abz = t[o + 5]! - az;
+  const acx = t[o + 6]! - ax, acy = t[o + 7]! - ay, acz = t[o + 8]! - az;
+  const apx = p[0]! - ax, apy = p[1]! - ay, apz = p[2]! - az;
+  const d1 = abx * apx + aby * apy + abz * apz,
+    d2 = acx * apx + acy * apy + acz * apz;
+  let u: number, v: number;
+  const bpx = apx - abx, bpy = apy - aby, bpz = apz - abz;
+  const d3 = abx * bpx + aby * bpy + abz * bpz,
+    d4 = acx * bpx + acy * bpy + acz * bpz;
+  const cpx = apx - acx, cpy = apy - acy, cpz = apz - acz;
+  const d5 = abx * cpx + aby * cpy + abz * cpz,
+    d6 = acx * cpx + acy * cpy + acz * cpz;
+  const va = d3 * d6 - d5 * d4,
+    vb = d5 * d2 - d1 * d6,
+    vc = d1 * d4 - d3 * d2;
+  if (d1 <= 0 && d2 <= 0) (u = 0), (v = 0);
+  else if (d3 >= 0 && d4 <= d3) (u = 1), (v = 0);
+  else if (d6 >= 0 && d5 <= d6) (u = 0), (v = 1);
+  else if (vc <= 0 && d1 >= 0 && d3 <= 0) (u = d1 / (d1 - d3)), (v = 0);
+  else if (vb <= 0 && d2 >= 0 && d6 <= 0) (u = 0), (v = d2 / (d2 - d6));
+  else if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+    const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
+    (u = 1 - w), (v = w);
+  } else {
+    const denom = 1 / (va + vb + vc);
+    (u = vb * denom), (v = vc * denom);
+  }
+  const ex = apx - u * abx - v * acx,
+    ey = apy - u * aby - v * acy,
+    ez = apz - u * abz - v * acz;
+  return ex * ex + ey * ey + ez * ez;
+}
+
+/**
+ * The solid angle the triangle abc spans seen from p (Van Oosterom and Strackee 1983); summed over a mesh and divided by
+ * 4 pi it is the generalized winding number (Jacobson et al. 2013), 1 inside a closed mesh and 0 outside, and about the
+ * same for a mesh with small holes.
+ */
+function solidAngle(p: number[], t: ArrayLike<number>, o: number): number {
+  const ax = t[o]! - p[0]!, ay = t[o + 1]! - p[1]!, az = t[o + 2]! - p[2]!;
+  const bx = t[o + 3]! - p[0]!, by = t[o + 4]! - p[1]!, bz = t[o + 5]! - p[2]!;
+  const cx = t[o + 6]! - p[0]!, cy = t[o + 7]! - p[1]!, cz = t[o + 8]! - p[2]!;
+  const la = Math.hypot(ax, ay, az), lb = Math.hypot(bx, by, bz), lc = Math.hypot(cx, cy, cz);
+  const det = ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+  const div = la * lb * lc + (ax * bx + ay * by + az * bz) * lc + (ax * cx + ay * cy + az * cz) * lb + (bx * cx + by * cy + bz * cz) * la;
+  return 2 * Math.atan2(det, div);
+}
+
+/** Options of {@link bakeLiquidMesh}. */
+export interface LiquidMeshBakeOptions {
+  /** Samples per axis of the field, integer 2..64. Default 32. */
+  resolution?: number;
+  /** Room round the mesh's bounds on every side, in world units, >= 0. Default 2 / resolution of the longest side. */
+  margin?: number;
+}
+
+/**
+ * Bakes a closed triangle mesh (positions [x, y, z, ...] in its own frame, and triangle indices, or none for a triangle
+ * soup) into the signed distance field a `'mesh'` collider uses: the distance to the nearest triangle (Ericson 2005),
+ * negative where the generalized winding number (Jacobson et al. 2013) is above one half in size, so either winding of the
+ * triangles works. The work is resolution³ times
+ * the triangle count, at most {@link MAX_LIQUID_MESH_WORK}; simplify the mesh or lower the resolution past that.
+ */
+export function bakeLiquidMesh(
+  positions: ArrayLike<number>,
+  indices?: ArrayLike<number> | null,
+  options: LiquidMeshBakeOptions = {},
+): LiquidMeshShape {
+  if (!positions || typeof positions.length !== 'number' || positions.length < 9 || positions.length % 3 !== 0)
+    throw liquidError('bakeLiquidMesh positions must be [x, y, z, ...] of at least three vertices');
+  const verts = positions.length / 3;
+  for (let i = 0; i < positions.length; i++)
+    if (typeof positions[i] !== 'number' || !Number.isFinite(positions[i]))
+      throw liquidError(`bakeLiquidMesh positions[${i}] is not a finite number`);
+  const index = indices ?? Array.from({ length: verts }, (_, i) => i);
+  if (typeof index.length !== 'number' || index.length < 3 || index.length % 3 !== 0)
+    throw liquidError('bakeLiquidMesh indices must be three a triangle');
+  const tris = index.length / 3;
+  const corners = new Float64Array(tris * 9);
+  for (let i = 0; i < index.length; i++) {
+    const v = index[i]!;
+    if (!Number.isInteger(v) || v < 0 || v >= verts) throw liquidError(`bakeLiquidMesh indices[${i}] is not a vertex`);
+    corners.set([positions[v * 3]!, positions[v * 3 + 1]!, positions[v * 3 + 2]!], i * 3);
+  }
+  if (!options || typeof options !== 'object') throw liquidError('bakeLiquidMesh options must be an object');
+  const n = num(options.resolution, 32, 'bakeLiquidMesh resolution', 2, 64, true);
+  const lo = [Infinity, Infinity, Infinity],
+    hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < corners.length; i += 3)
+    for (let a = 0; a < 3; a++) {
+      lo[a] = Math.min(lo[a]!, corners[i + a]!);
+      hi[a] = Math.max(hi[a]!, corners[i + a]!);
+    }
+  const longest = Math.max(hi[0]! - lo[0]!, hi[1]! - lo[1]!, hi[2]! - lo[2]!);
+  if (!(longest > 0)) throw liquidError('bakeLiquidMesh positions span no volume');
+  const margin = num(options.margin, (2 * longest) / n, 'bakeLiquidMesh margin', 0, 1e6);
+  if (n ** 3 * tris > MAX_LIQUID_MESH_WORK)
+    throw liquidError(
+      `bakeLiquidMesh would test ${n ** 3 * tris} triangle-sample pairs, over ${MAX_LIQUID_MESH_WORK}; simplify the mesh to ${Math.floor(MAX_LIQUID_MESH_WORK / n ** 3)} triangles or lower the resolution`,
+    );
+  const center: LiquidVec3 = [(lo[0]! + hi[0]!) / 2, (lo[1]! + hi[1]!) / 2, (lo[2]! + hi[2]!) / 2];
+  const half: LiquidVec3 = [0, 1, 2].map((a) => Math.max((hi[a]! - lo[a]!) / 2 + margin, 1e-6)) as unknown as LiquidVec3;
+  const distances = new Float32Array(n ** 3);
+  const p = [0, 0, 0];
+  for (let k = 0, i = 0; k < n; k++)
+    for (let j = 0; j < n; j++)
+      for (let l = 0; l < n; l++, i++) {
+        p[0] = center[0] - half[0] + (2 * half[0] * l) / (n - 1);
+        p[1] = center[1] - half[1] + (2 * half[1] * j) / (n - 1);
+        p[2] = center[2] - half[2] + (2 * half[2] * k) / (n - 1);
+        let best = Infinity,
+          winding = 0;
+        for (let t = 0; t < tris; t++) {
+          best = Math.min(best, triangleDistance2(p, corners, t * 9));
+          winding += solidAngle(p, corners, t * 9);
+        }
+        const d = Math.sqrt(best);
+        distances[i] = Math.abs(winding) / (4 * Math.PI) > 0.5 ? -d : d;
+      }
+  return { resolution: n, center, half, distances };
+}
+
+/** The trilinear sample of a mesh field at local point (x, y, z) clamped into its box, plus the distance to the box. */
+function meshSample(m: LiquidMeshShape, x: number, y: number, z: number): number {
+  const n = m.resolution;
+  const l = [x - m.center[0], y - m.center[1], z - m.center[2]];
+  let outside = 0;
+  const g = [0, 0, 0];
+  for (let a = 0; a < 3; a++) {
+    const q = Math.min(m.half[a]!, Math.max(-m.half[a]!, l[a]!));
+    outside += (l[a]! - q) ** 2;
+    g[a] = ((q + m.half[a]!) / (2 * m.half[a]!)) * (n - 1);
+  }
+  const i0 = g.map((v) => Math.min(n - 2, Math.floor(v)));
+  const f = g.map((v, a) => v - i0[a]!);
+  const at = (i: number, j: number, k: number) => m.distances[i0[0]! + i + n * (i0[1]! + j + n * (i0[2]! + k))]!;
+  let v = 0;
+  for (let k = 0; k < 2; k++)
+    for (let j = 0; j < 2; j++)
+      for (let i = 0; i < 2; i++)
+        v += (i ? f[0]! : 1 - f[0]!) * (j ? f[1]! : 1 - f[1]!) * (k ? f[2]! : 1 - f[2]!) * at(i, j, k);
+  return v + Math.sqrt(outside);
+}
+
 /** Signed distance from `x` to collider `c` and the outward normal there. */
 export function colliderDistance(c: ResolvedCollider, x: LiquidVec3, normal: number[]): number {
   const dx = x[0] - c.position[0],
     dy = x[1] - c.position[1],
     dz = x[2] - c.position[2];
+  if (c.kind === 3) {
+    normal[0] = c.half[0];
+    normal[1] = c.half[1];
+    normal[2] = c.half[2];
+    return dx * c.half[0] + dy * c.half[1] + dz * c.half[2];
+  }
+  if (c.kind === 2 || c.kind === 4) {
+    const [qx, qy, qz, qw] = c.rotation;
+    const [lx, ly, lz] = rotate(-qx, -qy, -qz, qw, dx, dy, dz);
+    let d: number, nx: number, ny: number, nz: number;
+    if (c.kind === 2) {
+      const py = ly - Math.min(c.half[1], Math.max(-c.half[1], ly));
+      const l = Math.hypot(lx, py, lz);
+      [nx, ny, nz] = l > 0 ? [lx / l, py / l, lz / l] : [1, 0, 0];
+      d = l - c.half[0];
+    } else {
+      // The field's gradient by central differences half a sample apart.
+      const m = c.mesh!;
+      const e = m.half.map((h) => h / (m.resolution - 1));
+      d = meshSample(m, lx, ly, lz);
+      nx = meshSample(m, lx + e[0]!, ly, lz) - meshSample(m, lx - e[0]!, ly, lz);
+      ny = meshSample(m, lx, ly + e[1]!, lz) - meshSample(m, lx, ly - e[1]!, lz);
+      nz = meshSample(m, lx, ly, lz + e[2]!) - meshSample(m, lx, ly, lz - e[2]!);
+      const l = Math.hypot(nx, ny, nz);
+      [nx, ny, nz] = l > 0 ? [nx / l, ny / l, nz / l] : [0, 1, 0];
+    }
+    const w = rotate(qx, qy, qz, qw, nx, ny, nz);
+    normal[0] = w[0];
+    normal[1] = w[1];
+    normal[2] = w[2];
+    return d;
+  }
   if (c.kind === 0) {
     const l = Math.hypot(dx, dy, dz);
     if (l > 0) {

@@ -990,11 +990,19 @@ debug view through `setPointer`, `setColliders` and `setDebug`):
 - `pointer` (or `setPointer`): `{ position, velocity?, radius?, strength? }`, a stirring stick. Grid nodes within
   `radius` (default 0.1 times the longest side) take on its `velocity` at `strength` per second (default 40); without a
   velocity it is the pointer's own motion between frames. `null` for none.
-- `colliders` (or `setColliders`), up to 8: `{ shape: 'sphere' | 'box', position, radius? (0.1), halfExtents?
-  ([0.1, 0.1, 0.1]), rotation? (quaternion [x, y, z, w]), velocity?, angularVelocity?, friction? (0.2) }`. The liquid
-  flows round them and is pushed by their motion; `forces[i]` is the force and torque the liquid put on collider i over
-  the last stepped frame (read back by itself, one frame behind on WebGPU), and `readForces()` reads it now. Feed them
-  from your own rigid bodies each frame for two-way coupling.
+- `colliders` (or `setColliders`), up to 8 with the linked bodies: `{ shape, position, rotation? (quaternion
+  [x, y, z, w]), velocity?, angularVelocity?, friction? (0.2) }` with the shape's size: `'sphere'` `radius` (0.1);
+  `'box'` `halfExtents` ([0.1, 0.1, 0.1]); `'capsule'` `radius` (0.1) and `halfHeight` (0.1, half its axis along
+  local y); `'plane'` `normal` ([0, 1, 0], pointing to the liquid's side of the point `position`); `'mesh'` `mesh`, a
+  distance field from `bakeLiquidMesh(positions, indices?, { resolution? (32, 2 to 64), margin? })`, which takes any
+  closed triangle mesh (either winding, or a soup) in its own frame. The liquid flows round them and is pushed by their
+  motion; `forces[i]` is the force and torque the liquid put on collider i, the mean over the frames since the last read
+  (it reads by itself every frame, so one frame behind on WebGPU), and `readForces()` reads it now.
+- `link(body, collider)` couples a rigid body both ways in one call: a `PhysicsBody` of `@margoengine/physics`, or any
+  object with `position`, `rotation`, `linearVelocity`, `angularVelocity`, `applyImpulse(impulse, point)` and
+  `applyTorqueImpulse(torque)`. Each frame the collider (placed in the body's frame by its `position` and `rotation`)
+  follows the body and pushes the liquid, and each read of the force sums hands the body the liquid's impulse on it, so
+  every impulse reaches it exactly once. `unlink()` ends it; a linked body comes after `options.colliders` in `forces`.
 - `paused` false; `step(dt)` advances now in equal substeps (0 to 1 s), also while paused.
 - `surface` (attach only): `ParticleLiquid` options for the surface, or `false` for none; default radius the particle
   spacing. `liquid.surface` is that `ParticleLiquid`, its options live. The particle buffer is also yours:
@@ -1013,6 +1021,26 @@ draws them; keep `count` to a few thousand there. `stepLiquidCPU`, `createLiquid
 that CPU twin, for tests and offline use. Measured compression, the force accuracy on bodies and the limits:
 [limits](../../docs/limits.md#gpu-particle-liquid-gpuliquid). Example page: `examples/gpu-liquid.html`.
 
+Float a physics body in it, and hold a mesh in the flow:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Physics } from '@margoengine/physics';
+import { GPULiquid, bakeLiquidMesh } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [0, 0.8, 2.2], target: [0, 0.3, 0] } });
+await Physics.load();
+const physics = new Physics(engine);
+const crate = physics.addBody(null, { position: [0, 0.6, 0], colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], density: 500 } });
+// A tetrahedron as positions and triangles; any closed glTF mesh works the same way.
+const rock = bakeLiquidMesh([0, 0.1, 0, -0.1, -0.05, -0.08, 0.1, -0.05, -0.08, 0, -0.05, 0.12], [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3]);
+const liquid = GPULiquid.attach(engine, {
+  fill: { min: [-0.5, 0, -0.5], max: [0.5, 0.35, 0.5] },
+  colliders: [{ shape: 'mesh', mesh: rock, position: [0.3, 0.1, 0] }],
+});
+liquid.link(crate, { shape: 'box', halfExtents: [0.1, 0.1, 0.1] }); // it floats at half its height
+engine.render({ delta: 1 / 60 }); // the liquid steps and the physics plugin steps the crate
+```
+
 ### One attach
 
 The solver is part of the engine, with the pointer and the drawing already wired:
@@ -1027,7 +1055,7 @@ engine.render({ delta: 1 / 60 });
 ```
 
 The container is the `box` you pass, in metres; the pointer is `setPointer`; rigid bodies are
-`colliders` and report their `forces`; `debug.particles: 'speed'` shows the particles as coloured spheres, and with the
+`colliders` that report their `forces`, or bodies coupled both ways by `link`; `debug.particles: 'speed'` shows the particles as coloured spheres, and with the
 debug view off they draw as a refracting liquid surface (`ParticleLiquid`); `snapshot()` and `restore()` repeat a run
 exactly; on a browser without WebGPU the WebGL2 layer runs it on the CPU instead of failing.
 

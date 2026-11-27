@@ -8329,12 +8329,23 @@ each) on a grid of at most 4,194,304 nodes (16 B each), 8 to 256 cells along the
   substeps.
 - One liquid, one density and one viscosity; no surface tension, no adhesion, no two-phase air, no spray or foam of its
   own (the surface's `whitewater` can draw them from the particles' velocities).
-- Colliders are up to 8 spheres or boxes moved by the caller (kinematic); no meshes, capsules or planes. The liquid's
-  force on them is exact in total (a floor collider's impulse matches the column's weight and momentum change within the
-  fixed-point rounding, `gpu-liquid.test.js`), but on a small submerged body the grid's cells blur the surface: a held
-  sphere 2.7 cells in radius took 36.8 N of lift against Archimedes' 41.1 N (0.90; WebGPU, 65,536 particles, averaged
-  over 1 to 3 s). On WebGPU `forces` is one frame behind. The page integrating a body from it is explicit, so a body much
-  lighter than the liquid it displaces can oscillate; give it damping.
+- Colliders are up to 8 spheres, boxes, capsules, planes and triangle meshes, moved by the caller or by a linked body
+  (`link`). A mesh is a distance field of at most 64³ samples (`bakeLiquidMesh`, all mesh fields together at most
+  2,097,152 samples), so detail finer than its sample spacing is rounded off (a baked cube's edges by up to one spacing)
+  and a mesh thinner than about a grid cell lets liquid through; the bake tests every sample against every triangle, at
+  most 2^30 pairs (simplify the mesh past that). The liquid's force on them is exact in total (a floor collider's impulse
+  matches the column's weight and momentum change within the fixed-point rounding, `gpu-liquid.test.js`), but on a
+  small submerged body the grid's cells blur the surface: held in a 0.4 m layer (WebGPU, 65,536 particles, cell
+  0.037 m, averaged over 1 to 3 s) a sphere of radius 0.1 m took 35.7 N of lift against Archimedes' 41.1 N (0.87), a
+  capsule of radius 0.07 m and length 0.2 m 35.1 N against 44.3 N (0.79), and a baked mesh cube of half size 0.08 m
+  31.8 N against 40.2 N (0.79): each between rho g V of the shape a quarter cell smaller and larger, the bound
+  `gpu-liquid-check.mjs` holds. A linked box of 500 kg/m³ and half size 0.1 m floated with a mean draft of 0.090 m against
+  Archimedes' 0.100 m (bob 0.014 m over the last 2 of 4 s). On WebGPU the linked body takes its impulse when the force
+  sums are read back, usually the next frame: every impulse arrives exactly once, but a frame late, and when the read
+  lands depends on the GPU, so a run with linked bodies repeats bit for bit only on the CPU twin. The coupling is
+  explicit (the body's motion this frame, the liquid's push a frame later), so a body much lighter than the liquid it
+  displaces can oscillate; give it damping. The moment a linked body takes is about the collider's centre at the last
+  step of the read window, which differs from the exact sum by the centre's travel over that window times the impulse.
 - The pointer blends node velocities towards its own inside a sphere; it is not a solid and takes no force back.
 - No node moves more than one cell a substep: faster liquid (a violent pointer, a body faster than cell / substep,
   15.6 m/s at the defaults) is slowed to that speed. A frame advances at most 1/30 s and takes at most `maxSubsteps`

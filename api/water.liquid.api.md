@@ -17,6 +17,7 @@ export class GPULiquid implements EnginePlugin {
     static attach(engine: EngineKernel, options?: GPULiquidAttachOptions): GPULiquid;
     get spacing(): number;
     get particleMass(): number;
+    link(body: LiquidLinkBody, collider: LiquidLinkCollider): LiquidLink;
     setPointer(pointer: LiquidPointer | null): void;
     setColliders(colliders: readonly LiquidCollider[]): void;
     setDebug(debug: LiquidDebugOptions): void;
@@ -65,10 +66,13 @@ export interface LiquidBox {
 }
 
 export interface LiquidCollider {
-    shape: 'sphere' | 'box';
+    shape: 'sphere' | 'box' | 'capsule' | 'plane' | 'mesh';
     position: LiquidVec3;
     radius?: number;
     halfExtents?: LiquidVec3;
+    halfHeight?: number;
+    normal?: LiquidVec3;
+    mesh?: LiquidMeshShape;
     rotation?: readonly [number, number, number, number];
     velocity?: LiquidVec3;
     angularVelocity?: LiquidVec3;
@@ -96,6 +100,38 @@ export interface LiquidFrameStats {
     particles: number;
     groups: number;
     whitewater: number;
+}
+
+export interface LiquidLink {
+    readonly body: LiquidLinkBody;
+    readonly collider: LiquidLinkCollider;
+    unlink(): void;
+}
+
+export interface LiquidLinkBody {
+    readonly position: ArrayLike<number>;
+    readonly rotation: ArrayLike<number>;
+    readonly linearVelocity: ArrayLike<number>;
+    readonly angularVelocity: ArrayLike<number>;
+    velocityAtPoint?(point: [number, number, number]): ArrayLike<number>;
+    applyImpulse(impulse: [number, number, number], point?: [number, number, number]): unknown;
+    applyTorqueImpulse(torque: [number, number, number]): unknown;
+}
+
+export type LiquidLinkCollider = Omit<LiquidCollider, 'position'> & {
+    position?: LiquidVec3;
+};
+
+export interface LiquidMeshBakeOptions {
+    resolution?: number;
+    margin?: number;
+}
+
+export interface LiquidMeshShape {
+    readonly resolution: number;
+    readonly center: LiquidVec3;
+    readonly half: LiquidVec3;
+    readonly distances: Float32Array;
 }
 
 export interface LiquidPointer {
@@ -139,6 +175,10 @@ export const MAX_GPU_LIQUID_NODES = 4194304;
 export const MAX_GPU_LIQUID_PARTICLES = 1048576;
 
 export const MAX_LIQUID_COLLIDERS = 8;
+
+export const MAX_LIQUID_MESH_SAMPLES: number;
+
+export const MAX_LIQUID_MESH_WORK: number;
 
 export const MAX_LIQUID_PARTICLES = 4194304;
 
@@ -211,13 +251,14 @@ export interface ParticleSource {
 }
 
 export interface ResolvedCollider {
-    kind: 0 | 1;
+    kind: 0 | 1 | 2 | 3 | 4;
     position: LiquidVec3;
     half: LiquidVec3;
     rotation: readonly [number, number, number, number];
     velocity: LiquidVec3;
     angularVelocity: LiquidVec3;
     friction: number;
+    mesh?: LiquidMeshShape;
 }
 
 export interface ResolvedLiquidParams {
@@ -276,6 +317,8 @@ export interface WhitewaterOptions {
     opacity?: number;
     seed?: number;
 }
+
+export function bakeLiquidMesh(positions: ArrayLike<number>, indices?: ArrayLike<number> | null, options?: LiquidMeshBakeOptions): LiquidMeshShape;
 
 export function colliderDistance(c: ResolvedCollider, x: LiquidVec3, normal: number[]): number;
 

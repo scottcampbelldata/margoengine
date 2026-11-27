@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20897849,
+  "total": 20902031,
   "history": [
     {
       "date": "2026-10-24",
@@ -14571,6 +14571,12 @@
       "commit": "fog-height-falloff",
       "reason": "@margoengine/sky 25291 to 25506 B gzip (ceiling 25478 to 26272): the sky fog's exponential height falloff (scaleHeight, base) in the fog shader, its option checks and the exported CPU twin fogOpticalDepth, so a drone looks down through thin air over a haze layer. WGSL comments are stripped; a lazy split would cost more than the 215 B. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "water/liquid 31356 to 35538 B ceiling (built 30442 to 34502 B gzip): GPULiquid gains capsule, plane and triangle-mesh colliders (bakeLiquidMesh: closest-triangle distance and the generalized winding number, a field sampled trilinearly in the WGSL and the CPU twin), link(body, collider) for one-call two-way coupling with physics bodies, the force sums read and cleared in one submit so every impulse reaches a linked body once, and the debug lines of the new shapes (FLUID-02/03, parity bar P13). The mesh bake is the collider's own input and the link drives the same force sums, so a split entry would only re-export the same class. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16220,7 +16226,7 @@
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
-    "@margoengine/water/liquid": 31356,
+    "@margoengine/water/liquid": 35538,
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,

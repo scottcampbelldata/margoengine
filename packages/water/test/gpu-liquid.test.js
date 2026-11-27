@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   GPULiquid,
   LIQUID_PARTICLE_FLOATS as F,
+  bakeLiquidMesh,
   colliderDistance,
   createLiquidState,
   liquidStateHash,
@@ -42,9 +43,11 @@ test('walls and colliders read as liquid at rest: a resting block has its rest d
   const box = { min: [-0.25, 0, -0.25], max: [0.25, 1, 0.25] };
   const fill = { min: [-0.25, 0.2, -0.25], max: [0.25, 0.5, 0.25] };
   const floor = { shape: 'box', position: [0, 0.1, 0], halfExtents: [0.4, 0.1, 0.4] };
+  const plane = { shape: 'plane', position: [0, 0.2, 0], normal: [0, 2, 0] };
   for (const [colliders, from] of [
     [[], 0.2],
     [[floor], 0.2],
+    [[plane], 0.2],
   ]) {
     const p = resolveLiquidParams({
       count: 3000,
@@ -173,6 +176,82 @@ test('collider distances: a sphere and a turned box in closed form', () => {
   assert.ok(Math.abs(colliderDistance(box, [0.75, 0, 0], n) - 0.25) < 1e-12);
   assert.ok(Math.abs(colliderDistance(box, [0, 0.1, 0], n) + 0.15) < 1e-12, 'inside: minus the distance to the nearest face');
   assert.ok(Math.abs(n[1] - 1) < 1e-12);
+});
+
+test('capsule, plane and mesh distances in closed form', () => {
+  const n = [0, 0, 0];
+  // A capsule of radius 0.2 round the segment y in [-0.5, 0.5], turned a quarter about z so its axis lies along -x.
+  const q = Math.SQRT1_2;
+  const capsule = { kind: 2, position: [1, 0, 0], half: [0.2, 0.5, 0], rotation: [0, 0, q, q] };
+  assert.ok(Math.abs(colliderDistance(capsule, [1.2, 1, 0], n) - 0.8) < 1e-12, 'side of the segment');
+  assert.ok(Math.abs(n[1] - 1) < 1e-12);
+  assert.ok(Math.abs(colliderDistance(capsule, [2.5, 0, 0], n) - 0.8) < 1e-12, 'past the end cap');
+  assert.ok(Math.abs(n[0] - 1) < 1e-12);
+  assert.ok(Math.abs(colliderDistance(capsule, [1, 0.05, 0], n) + 0.15) < 1e-12, 'inside');
+  const plane = { kind: 3, position: [0, 1, 0], half: [0, 0.6, 0.8], rotation: [0, 0, 0, 1] };
+  assert.ok(Math.abs(colliderDistance(plane, [5, 1, 1], n) - 0.8) < 1e-12);
+  assert.deepEqual(n, [0, 0.6, 0.8]);
+  // A unit cube baked at 33 samples: in each face's region the exact distance is linear, so the trilinear field is exact
+  // there; elsewhere the field is off by at most a sample spacing (the distance is 1-Lipschitz).
+  const v = [];
+  for (let i = 0; i < 8; i++) v.push(i & 1 ? 0.5 : -0.5, i & 2 ? 0.5 : -0.5, i & 4 ? 0.5 : -0.5);
+  // The cube's faces, two triangles each, wound inward (either winding bakes the same field).
+  const faces = [[0, 2, 6, 4], [1, 5, 7, 3], [0, 4, 5, 1], [2, 3, 7, 6], [0, 1, 3, 2], [4, 6, 7, 5]];
+  const indices = faces.flatMap(([a, b, c, d]) => [a, b, c, a, c, d]);
+  const mesh = bakeLiquidMesh(v, indices, { resolution: 33, margin: 0.25 });
+  const spacing = (2 * mesh.half[0]) / 32;
+  const cube = { kind: 4, position: [0, 2, 0], half: mesh.half, rotation: [0, 0, 0, 1], mesh };
+  assert.ok(Math.abs(colliderDistance(cube, [0.6, 2.05, 0.02], n) - 0.1) < 1e-6, 'outside a face');
+  assert.ok(Math.abs(n[0] - 1) < 1e-6);
+  assert.ok(Math.abs(colliderDistance(cube, [0.45, 2.02, -0.03], n) + 0.05) < 1e-6, 'inside near a face');
+  assert.ok(Math.abs(colliderDistance(cube, [0, 2, 0], n) + 0.5) <= spacing, 'the centre');
+  assert.ok(Math.abs(colliderDistance(cube, [2, 2, 0], n) - 1.5) < 1e-6, 'outside the field: field plus box distance');
+  // A soup of the same triangles without indices bakes the same field.
+  const soup = indices.flatMap((i) => v.slice(i * 3, i * 3 + 3));
+  assert.deepEqual(bakeLiquidMesh(soup, null, { resolution: 9 }).distances, bakeLiquidMesh(v, indices, { resolution: 9 }).distances);
+  const outward = faces.flatMap(([a, b, c, d]) => [a, c, b, a, d, c]);
+  assert.deepEqual(bakeLiquidMesh(v, outward, { resolution: 9 }).distances, bakeLiquidMesh(v, indices, { resolution: 9 }).distances);
+  for (const bad of [
+    () => bakeLiquidMesh([0, 0, 0, 1, 0], null),
+    () => bakeLiquidMesh(v, [0, 1, 99]),
+    () => bakeLiquidMesh(v, indices, { resolution: 65 }),
+    () => bakeLiquidMesh([0, 0, 0, 0, 0, 0, 0, 0, 0], null),
+    () => bakeLiquidMesh(v, Array.from({ length: 3 * 40000 }, (_, i) => i % 8), { resolution: 64 }),
+    () => resolveLiquidParams({ colliders: [{ shape: 'mesh', position: [0, 0, 0] }] }),
+    () => resolveLiquidParams({ colliders: [{ shape: 'mesh', position: [0, 0, 0], mesh: { ...mesh, resolution: 5 } }] }),
+    () => resolveLiquidParams({ colliders: [{ shape: 'plane', position: [0, 0, 0], normal: [0, 0, 0] }] }),
+    () => resolveLiquidParams({ colliders: [{ shape: 'capsule', position: [0, 0, 0], halfHeight: -1 }] }),
+  ])
+    assert.throws(bad, (e) => e.name === 'MargoError' && /errors#gpu-liquid/.test(e.message));
+});
+
+test('GPULiquid.link takes a body with a pose and impulses, counts toward the 8 colliders, and unlinks', () => {
+  const body = () => ({
+    position: [0, 0.5, 0],
+    rotation: [0, 0, 0, 1],
+    linearVelocity: [0, 0, 0],
+    angularVelocity: [0, 0, 0],
+    applyImpulse() {},
+    applyTorqueImpulse() {},
+  });
+  const liquid = new GPULiquid({ count: 8, colliders: Array.from({ length: 7 }, () => ({ shape: 'sphere', position: [0, 0, 0] })) });
+  const a = body();
+  const link = liquid.link(a, { shape: 'box', halfExtents: [0.1, 0.1, 0.1] });
+  assert.equal(link.body, a);
+  assert.throws(() => liquid.link(body(), { shape: 'sphere' }), /at most 8/);
+  assert.throws(() => liquid.link(a, { shape: 'sphere' }), /linked already/);
+  assert.throws(() => liquid.link({ ...body(), applyImpulse: undefined }, { shape: 'sphere' }), { code: 'unsupported' });
+  assert.throws(() => liquid.link({ ...body(), rotation: undefined }, { shape: 'sphere' }), { code: 'unsupported' });
+  link.unlink();
+  liquid.link(body(), { shape: 'capsule', radius: 0.05 });
+  // The debug view draws every shape: a capsule's two cap rings (3 x 32 lines each) and 4 side lines, a plane's square
+  // and normal (5 lines), a box's 12 edges.
+  const lines = (colliders) => new GPULiquid({ count: 8, colliders, debug: { grid: false, container: false } }).debugLines().length / 8;
+  assert.equal(lines([{ shape: 'capsule', position: [0, 0.5, 0] }]), 2 * 96 + 4);
+  assert.equal(lines([{ shape: 'plane', position: [0, 0.1, 0] }]), 5);
+  assert.equal(lines([{ shape: 'box', position: [0, 0.5, 0] }]), 12);
+  liquid.dispose();
+  assert.throws(() => liquid.link(body(), { shape: 'sphere' }), { code: 'disposed' });
 });
 
 test('every bad option is a coded error naming the value, with the help link', () => {
