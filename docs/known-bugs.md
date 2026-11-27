@@ -12837,6 +12837,18 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   (moving it into the bounced light reads 5.53, and the uncovered strip worsens to 6.41). Not established: which of the
   direct chain's own variance estimate or its wavelet stops loses it; at 1 sample a frame each chain's variance comes
   from a 3 x 3 neighbourhood of its own part, a noisier estimate than one of the sum.
+- **Job 2, the `denoisehistory` cost split and three more candidates (2026-11-27, after 1b7150a95a; RTX A6000, WebGPU;
+  denoisehistory, then uncovered, two frames on and kept):** as landed 5.56, 6.01, 4.34, 4.52. Without the 7 x 7 first
+  estimate 5.51, 6.74, 5.12, 4.62: the first estimate costs 0.05 of the 0.09 and the split itself 0.04. The wide-level
+  ratio test ("several times brighter is a gradient") left out of the direct chain, where 1-sample shadow rays give
+  exact zeros beside lit samples: 5.57, 6.15, 4.40, 4.53, rejected. The direct chain unfiltered in space (history
+  only): 5.79, 22.55, 13.90, 6.65, so its light is noisy at 1 sample and its wavelet levels are needed. Remaining lead:
+  the two parts of one path are anti-correlated where the first vertex's continuation either escapes to a light (direct
+  part, the BSDF half of the light's MIS pair) or hits geometry (bounced part); the sum's variance is then below the
+  sum of the parts' variances, which filtering apart gives up. Moving those hits into the bounced part read 5.53 but
+  cost the uncovered strip (6.41). Removing the correlation would need the first vertex's light estimated apart from
+  its continuation (light sampling alone there, or a second BSDF ray for the direct part), a transport and cost
+  trade-off not made here. The 0.09 stays open.
 - **Job 2, what is left:** the uncovered strip is still 1.33 times the kept pixels (6.01 against 4.52), mostly on
   the floor (11.13), and a noise-free guarantee is not met. `denoisehistory`, a moving camera over a whole image of
   another scene, reads 5.54 against 5.47 before and a still camera 2.81 against 2.80: the split alone accounts for it
