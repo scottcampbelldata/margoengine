@@ -321,8 +321,11 @@ export interface PhysicsSnapshot {
   readonly accumulator?: number;
 }
 
-/** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
-export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
+/**
+ * Kind of collision event: `contactstart`, `contactcontinue` and `contactend` for solid contacts, `intersectionstart` and
+ * `intersectionend` for sensors.
+ */
+export type CollisionEventType = 'contactstart' | 'contactcontinue' | 'contactend' | 'intersectionstart' | 'intersectionend';
 /** Two colliders began or stopped touching. */
 export interface CollisionEvent {
   type: CollisionEventType;
@@ -379,6 +382,12 @@ export interface ContactForceEvent {
 /** Events a Physics world emits, keyed by event name. `touching` and `contactPoints` read contacts after a step. */
 export interface PhysicsEventMap {
   contactstart: CollisionEvent;
+  /**
+   * After each step that has a listener, once for each pair of solid colliders that touched before the step and still
+   * touch after it (Babylon's `COLLISION_CONTINUED`), in the order of the pair rows; a pair that began this step has
+   * `contactstart` instead. Either collider must have collision events on (the default).
+   */
+  contactcontinue: CollisionEvent;
   contactend: CollisionEvent;
   intersectionstart: CollisionEvent;
   intersectionend: CollisionEvent;
@@ -1106,6 +1115,42 @@ export class Physics implements EnginePlugin, BodyOwner {
     }
     this.retired.clear();
     kernel.clearEvents();
+    if (this.listeners.get('contactcontinue')?.size) this.gatherContinued(events);
+  }
+  /** `contactcontinue` for every touching solid pair that did not start this step. */
+  private gatherContinued(events: (CollisionEvent | ContactForceEvent)[]): void {
+    const kernel = this.kernel,
+      { pairA, pairB, pairFlags } = kernel.columns,
+      rows = kernel.pairRows,
+      started = new Set<number>();
+    for (const event of events)
+      if (event.type === 'contactstart') {
+        const a = event.colliderA.handle,
+          b = event.colliderB.handle;
+        started.add(a < b ? a * 0x400000 + b : b * 0x400000 + a);
+      }
+    for (let row = 0; row < rows; row++) {
+      const a = pairA[row],
+        b = pairB[row];
+      if (a === 0xffffffff || pairFlags[row] & PAIR_IS_PART || !(pairFlags[row] & PAIR_TOUCHING)) continue;
+      if (started.has(a < b ? a * 0x400000 + b : b * 0x400000 + a)) continue;
+      const colliderA = this.byRow.get(a),
+        colliderB = this.byRow.get(b);
+      if (!colliderA || !colliderB || !(colliderA.emits || colliderB.emits)) continue;
+      if (colliderA.isSensor() || colliderB.isSensor()) continue;
+      const bodyA = colliderA.body,
+        bodyB = colliderB.body;
+      events.push({
+        type: 'contactcontinue',
+        bodyA,
+        bodyB,
+        meshA: bodyA.mesh,
+        meshB: bodyB.mesh,
+        colliderA,
+        colliderB,
+        sensor: false,
+      });
+    }
   }
   private gatherForces(events: (CollisionEvent | ContactForceEvent)[], dt: number): void {
     if (!this.listeners.get('contactforce')?.size) return;

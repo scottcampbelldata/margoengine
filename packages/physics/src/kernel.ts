@@ -1215,6 +1215,10 @@ export class KernelWorld {
   get pairCount(): number {
     return this.api.world_pairs();
   }
+  /** Rows of the pair columns in use after the last step: a free row has `pairA` 0xffffffff. */
+  get pairRows(): number {
+    return this.api.world_pair_rows();
+  }
   /**
    * Every pair as two collider rows, the lower first, after the last step. A pair is near, not yet touching: a fat box
    * holds what the coming step can reach, plus a margin. Colliders of one body and of two fixed bodies are no pair.

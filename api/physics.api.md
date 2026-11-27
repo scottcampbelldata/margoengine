@@ -206,7 +206,7 @@ export interface CollisionEvent {
     removed?: boolean;
 }
 
-export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
+export type CollisionEventType = 'contactstart' | 'contactcontinue' | 'contactend' | 'intersectionstart' | 'intersectionend';
 
 export type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
 
@@ -881,6 +881,7 @@ export class KernelWorld {
     get capacity(): number;
     get colliderCapacity(): number;
     get pairCount(): number;
+    get pairRows(): number;
     pairs(): [number, number][];
     firstPair(collider: number): number;
     nextPair(row: number, collider: number): number;
@@ -1677,6 +1678,7 @@ export class PhysicsCollider {
 
 export interface PhysicsEventMap {
     contactstart: CollisionEvent;
+    contactcontinue: CollisionEvent;
     contactend: CollisionEvent;
     intersectionstart: CollisionEvent;
     intersectionend: CollisionEvent;

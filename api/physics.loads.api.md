@@ -1295,6 +1295,7 @@ class KernelWorld {
     get capacity(): number;
     get colliderCapacity(): number;
     get pairCount(): number;
+    get pairRows(): number;
     pairs(): [number, number][];
     firstPair(collider: number): number;
     nextPair(row: number, collider: number): number;
