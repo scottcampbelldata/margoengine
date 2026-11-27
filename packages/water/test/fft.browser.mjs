@@ -187,21 +187,141 @@ try {
     } catch (error) {
       abortName = error.name;
     }
+    calm.dispose();
+
+    // Live setWind, synchronous CPU sample vs GPU readFrame & WaveQuery, and debug views.
+    const { Water } = await import('/packages/water/dist/index.js');
+    const { WaveQuery } = await import('/packages/water/dist/query.js');
+    const live = FFTOcean.attach(engine, {
+      ...base,
+      spectrum: 'jonswap',
+      amplitude: 1,
+      choppiness: 0,
+      windSpeed: 8,
+      windDirection: [1, 0],
+    });
+    live.setTime(1.5);
+    engine.render({ delta: 0 });
+    const beforeWind = await live.readFrame();
+    live.setWind({ speed: 18, fetch: 150000, direction: [0, 1] });
+    engine.render({ delta: 0 });
+    const afterWind = await live.readFrame();
+    const windChanged = afterWind.data.some((v, i) => Math.abs(v - beforeWind.data[i]) > 0.01);
+    // Device restore must preserve the live setWind state.
+    live.onDeviceRestored(engine);
+    engine.render({ delta: 0 });
+    const afterWindRestored = await live.readFrame();
+    const windRestoredSame = afterWind.data.every((v, i) => v === afterWindRestored.data[i]);
+    // Sync sample() vs GPU readFrame() at choppiness 0.
+    let syncMaxErr = 0;
+    for (let j = 0; j < 4; j++) {
+      for (let i = 0; i < 4; i++) {
+        const x = (i * 128) / 16,
+          z = (j * 128) / 16;
+        const s = live.sample(x, z, 1.5);
+        let gpuY = live.height;
+        for (let c = 0; c < 2; c++) {
+          const L = base.cascades[c].length;
+          const gx = Math.round(((x / L) * 16) % 16);
+          const gz = Math.round(((z / L) * 16) % 16);
+          gpuY += afterWind.data[(c * 256 + gz * 16 + gx) * 12 + 1];
+        }
+        syncMaxErr = Math.max(syncMaxErr, Math.abs(s.height - gpuY));
+      }
+    }
+    // Choppy sync sample() vs GPU WaveQuery.
+    live.setChoppiness(0.8);
+    engine.render({ delta: 0 });
+    const oceanQuery = await WaveQuery.capture(live);
+    const oqSample = oceanQuery.sample(4, -6);
+    const ocSync = live.sample(4, -6, 1.5);
+    const oceanQueryDiff = oqSample ? Math.abs(ocSync.height - oqSample.height) : Infinity;
+
+    // Debug visualization modes render cleanly without validation errors.
+    for (const cfg of [
+      { enabled: true, mode: 'normals', lodRings: true, samplePoints: [[0, 0], [4, -6]] },
+      { enabled: true, mode: 'foam', wireframe: true },
+      { enabled: true, mode: 'jacobian', lodRings: true },
+      { enabled: true, mode: 'wireframe' },
+      false,
+    ]) {
+      live.setDebug(cfg);
+      engine.render({ delta: 0 });
+    }
+    live.dispose();
+
+    // Water synchronous CPU sample() vs GPU WaveQuery.
+    const surface = Water.attach(engine, {
+      size: [64, 64],
+      segments: 64,
+      height: 0.5,
+      waves: [{ direction: [1, 0.25], amplitude: 0.35, wavelength: 24, steepness: 0.35, phase: 0.4 }],
+    });
+    surface.setTime(2.25);
+    engine.render({ delta: 0 });
+    const waterQuery = await WaveQuery.capture(surface);
+    let waterSyncHeightErr = 0,
+      waterSyncNormalErr = 0;
+    for (const [qx, qz] of [[0, 0], [5.3, -4.1], [-8.7, 6.2]]) {
+      const wq = waterQuery.sample(qx, qz);
+      const ws = surface.sample(qx, qz);
+      waterSyncHeightErr = Math.max(waterSyncHeightErr, Math.abs(ws.height - wq.height));
+      waterSyncNormalErr = Math.max(
+        waterSyncNormalErr,
+        Math.hypot(ws.normal[0] - wq.normal[0], ws.normal[1] - wq.normal[1], ws.normal[2] - wq.normal[2]),
+      );
+    }
+    surface.dispose();
+
     const validation = await engine.gpu.popErrorScope();
     engine.dispose();
-    return { same, changed, restoredSame, flatExact, metadataExact, abortName, validation: validation?.message };
+    return {
+      same,
+      changed,
+      restoredSame,
+      flatExact,
+      metadataExact,
+      abortName,
+      windChanged,
+      windRestoredSame,
+      afterWindData: Array.from(afterWind.data),
+      syncMaxErr,
+      oceanQueryDiff,
+      waterSyncHeightErr,
+      waterSyncNormalErr,
+      validation: validation?.message,
+    };
   }, base);
-  assert.deepEqual(lifecycle, {
+  const { afterWindData, syncMaxErr, oceanQueryDiff, waterSyncHeightErr, waterSyncNormalErr, ...lifeFlags } = lifecycle;
+  assert.deepEqual(lifeFlags, {
     same: true,
     changed: true,
     restoredSame: true,
     flatExact: true,
     metadataExact: true,
     abortName: 'AbortError',
+    windChanged: true,
+    windRestoredSame: true,
     validation: undefined,
   });
+  // Verify GPU post-setWind field against independent O(N^4) Fourier oracle.
+  const windOracle = referenceOcean(
+    { ...base, spectrum: 'jonswap', amplitude: 1, choppiness: 0, windSpeed: 18, fetch: 150000, windDirection: [0, 1] },
+    1.5,
+  );
+  let windOracleErr = 0;
+  for (let c = 0; c < 2; c++) {
+    for (let p = 0; p < 256; p++) {
+      windOracleErr = Math.max(windOracleErr, Math.abs(afterWindData[(c * 256 + p) * 12 + 1] - windOracle[c][p * 6 + 1]));
+    }
+  }
+  assert.ok(windOracleErr < 0.001, `setWind GPU output differs from oracle: ${windOracleErr}`);
+  assert.ok(syncMaxErr < 0.001, `FFTOcean.sample differs from GPU readFrame: ${syncMaxErr}`);
+  assert.ok(oceanQueryDiff < 0.05, `FFTOcean.sample differs from WaveQuery: ${oceanQueryDiff}`);
+  assert.ok(waterSyncHeightErr < 0.01, `Water.sample height differs from WaveQuery: ${waterSyncHeightErr}`);
+  assert.ok(waterSyncNormalErr < 0.02, `Water.sample normal differs from WaveQuery: ${waterSyncNormalErr}`);
   assert.deepEqual(errors, []);
-  report.lifecycle = lifecycle;
+  report.lifecycle = { ...lifeFlags, windOracleErr, syncMaxErr, oceanQueryDiff, waterSyncHeightErr, waterSyncNormalErr };
   const backend = browser.hardware?.compat ? 'compat' : 'webgpu';
   await writeFile(`test-results/water-fft-${backend}.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));

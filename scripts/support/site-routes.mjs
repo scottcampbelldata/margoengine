@@ -16,6 +16,8 @@ export const demoPages = [
   'batched-mesh',
   'buoyancy',
   'cyprus-raft',
+  'ocean',
+  'water-ripples',
   'clipping-planes',
   'scene-targets',
   'depth-texture',

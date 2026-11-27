@@ -25,6 +25,24 @@ export const entries = [
     fix: 'Use finite SI inputs. Supply a water field and positive density, a closed outward-wound mesh or positive shape dimensions, and valid rigid rows. Omit the force capacity to use the world capacity. The error names the rejected input and the change to make.',
   },
   {
+    id: 'ocean',
+    title: '@margoengine/water/fft and Water.sample: the ocean surface and its height query',
+    kind: 'family',
+    messages: [],
+    cause:
+      'An `FFTOcean` option or setter (`setWind`, `setChoppiness`, `setFoamThreshold`, `setColor`, `setDebug`) or a height query (`FFTOcean.sample`, `Water.sample`) got a value it cannot use: a resolution that is not a power of two from 16 to 512, more than four cascades or overlapping wavelength bands, a wind speed outside 0.1..100 m/s, a zero or non-finite wind direction, a fetch outside 1..1e7 m, a choppiness outside 0..5, a colour channel outside 0..1, an unknown debug mode, more than 16 debug points, non-finite query coordinates or a time below 0. The message names the value and its range.',
+    fix: 'Pass finite SI values inside the range the message gives: for example `ocean.setWind({speed: 12, direction: [1, 0]})`, `ocean.setChoppiness(1)`, `ocean.setDebug({mode: \'jacobian\'})` and `ocean.sample(x, z)` with world metres.',
+  },
+  {
+    id: 'ripples',
+    title: '@margoengine/water/ripples: interactive ripples',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A `Ripples` option, obstacle, tracked body, ray or event got a value it cannot use: a size outside 1..10000 m, a resolution that is not a whole number from 16 to 512, a speed outside 0.01..100 m/s, a grid that would need more than 512 stable substeps, an obstacle kind other than sphere, cylinder, box or wall, more than 32 obstacles, a radius smaller than one cell, a strength outside -100..100 m, a body without a finite `position`, a zero ray direction, or an unknown debug mode. The message names the value and its range.',
+    fix: 'Pass finite values inside the range the message gives: a `Water` surface, `size` and `resolution` that keep a cell above `speed / 7680 / 0.45` metres, obstacles as `{kind: \'cylinder\', center: [x, z], radius}`, bodies as `{position: [x, y, z]}`, and a radius of at least `size / resolution` metres.',
+  },
+  {
     id: 'rods',
     title: '@margoengine/physics/rod inputs',
     kind: 'family',

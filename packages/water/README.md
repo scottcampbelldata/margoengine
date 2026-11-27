@@ -1948,3 +1948,82 @@ world.advance(1);
 view.update({ sample: () => ({ height: 0 }) }, 1 / 60);
 console.log(view.matrices[12]);
 ```
+
+## Interactive ripples (`@margoengine/water/ripples`)
+
+`Ripples` runs a GPU 2D wave-equation height field over a `Water` surface with circular drops (`disturb`), swept wakes
+(`wake`), world-preserving camera scrolling, an 8-cell absorbing sponge border, **solid obstacle wave reflection**
+(`setObstacles`), **automatic moving-body coupling** (`trackBody` / `untrackBody`), **1-line ray-click ripples**
+(`disturbRay`), and a **built-in GPU debug heatmap** (`setDebug`). It runs on WebGPU and the WebGL2 compatibility layer.
+
+Quick start (8 lines):
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Water } from 'margoengine/water';
+import { Ripples } from 'margoengine/water/ripples';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const water = Water.attach(engine, { size: [64, 64], segments: 128 });
+const ripples = Ripples.attach(engine, { surface: water, obstacles: [{ kind: 'cylinder', center: [4, 0], radius: 1.5 }] });
+ripples.disturb(0, 0, 1.5, -0.2);
+engine.render({ delta: 1 / 60 });
+```
+
+- **Options & defaults**: `surface` (required `Water`), `size` (square world width in m, `1..10000`, default `64`),
+  `resolution` (grid side, integer `16..512`, default `128`), `speed` (wave speed in m/s, `0.01..100`, default `3`),
+  `damping` (velocity decay `/s`, `0..100`, default `0.6`), `followCamera` (scroll in whole cells with camera XZ,
+  default `true`), `obstacles` (optional initial reflecting obstacles, up to `MAX_RIPPLE_OBSTACLES = 32`).
+- **Solid obstacle masking & wave reflection (`setObstacles`)**: pass up to 32 world-space obstacles — `{ kind: 'sphere', center, radius }`, `{ kind: 'cylinder', center, radius, minY?, maxY? }`, `{ kind: 'box', center, halfExtents, rotation? }`, or `{ kind: 'wall', from, to, thickness? }`. Solid cells are held at zero and fluid neighbours apply a homogeneous Neumann boundary condition ($\partial h / \partial n = 0$) so ripples reflect cleanly off hulls, pilings, piers and walls with zero leakage across walls (`test/ripples.browser.mjs`, WebGPU and `MARGO_COMPAT=1`). `ripples.isObstacle(x, z)` checks the same geometry synchronously on CPU.
+- **Automatic moving-body coupling (`trackBody` / `untrackBody`)**: pass any duck-typed object with `{ position }` (`[x, y, z]`, `Float32Array`, or `{ x, y, z }` — works with `@margoengine/physics` bodies, `Floater`, core meshes, or custom objects) and optional `{ radius, strength, halfHeight, splashStrength, minSpeed, obstacle }`. Ripples automatically emit entry/exit splashes when a body crosses the water surface and swept capsule wakes while it moves through water; `obstacle: true` also reflects waves off the moving body.
+- **Interactive pointer helper (`disturbRay`)**: `ripples.disturbRay(origin, direction, radius?, strength?)` intersects a world ray with `surface.seaLevel`, queues a ripple if the hit falls inside the active grid, and returns `[x, y, z]` or `null`.
+- **Debug view (`setDebug`)**: `ripples.setDebug({ enabled: true, mode: 'height' | 'velocity' | 'obstacles', bounds: true })` overlays a live height or vertical-velocity heatmap, hatched solid obstacle masks, the active scroll-grid outline, and the 8-cell absorbing sponge margin directly on the water surface (`setDebug(false)` turns it off).
+- **Live demo**: [examples/water-ripples.html](../../examples/water-ripples.html).
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Water } from 'margoengine/water';
+import { Ripples } from 'margoengine/water/ripples';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const water = Water.attach(engine, { size: [32, 32], segments: 128, waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }] });
+const ripples = Ripples.attach(engine, { surface: water, size: 32, resolution: 128, followCamera: false });
+ripples.setObstacles([{ kind: 'wall', from: [0, -10], to: [0, 10], thickness: 1.5 }]);
+const boat = { position: [-4, 0, 0] as [number, number, number] };
+ripples.trackBody(boat, { radius: 1.0, strength: 0.1 });
+ripples.disturbRay([-5, 10, 0], [0, -1, 0], 1.5, -0.2);
+ripples.setDebug({ enabled: true, mode: 'height', bounds: true });
+boat.position[0] = -2;
+engine.render({ delta: 1 / 60 });
+```
+
+## Height queries and live wind (`Water.sample`, `FFTOcean.sample`, `FFTOcean.setWind`)
+
+Both surfaces answer a height query on the CPU, at once, with no GPU readback, so things can float on what is drawn:
+
+- **`water.sample(x, z, time?)`** (and `sampleHeight`) gives `{height, normal, velocity, time}` of a `Water` at world
+  `(x, z)` and wave-clock `time` (default `water.time`): the swell trains (also after `setWind`), `options.sea` and the
+  `setFarField` profile, the same sums as the vertex shader. The horizontal Gerstner shift is inverted, so the answer is
+  the surface above `(x, z)`, as `WaveQuery` reads it from the GPU.
+- **`ocean.sample(x, z, time?)`** (and `sampleHeight`) gives `{height, displacement, normal, velocity, jacobian, foam,
+  time}` of an `FFTOcean`: the CPU rebuilds the GPU's spectrum (same seed, same hash) and runs the inverse FFTs once per
+  new time, so many queries at one time share one grid. `foam` is the instant Jacobian mask, not the GPU's history.
+- **`ocean.setWind(speed | {speed, fetch?, direction?})`** re-tunes the spectrum live (wind 0.1 to 100 m/s, fetch 1 m to
+  10,000 km); omitted fields keep their values, no buffer is made and the foam history stays. `wind` reads it back.
+  `setChoppiness(0..5)`, `setFoamThreshold(0..1)` and `setColor([r, g, b])` change the look live.
+- **Debug view:** `ocean.setDebug({mode: 'normals' | 'foam' | 'jacobian' | 'wireframe', wireframe, lodRings,
+  samplePoints})` shades the surface by its normals, foam or folding Jacobian (magenta folded, red to amber compressed),
+  draws the draw grid's triangles, a ring per cascade patch, and markers at up to 16 query points; `setDebug(false)`
+  turns it off.
+
+Bad input is a MargoError `unsupported` linking to [errors#ocean](https://margoengine.com/errors#ocean). Live demo:
+[examples/ocean.html](../../examples/ocean.html).
+
+```ts
+import { Engine } from '@margoengine/core';
+import { FFTOcean } from '@margoengine/water/fft';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const ocean = FFTOcean.attach(engine, { windSpeed: 10, choppiness: 1 });
+ocean.setWind({ speed: 18, direction: [0, 1] }).setDebug({ mode: 'jacobian', samplePoints: [[0, 0]] });
+engine.render({ delta: 1 / 60 });
+console.log(ocean.sample(0, 0).height);
+```
+

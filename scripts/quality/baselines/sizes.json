@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20874192,
+  "total": 20881375,
   "history": [
     {
       "date": "2026-10-24",
@@ -14389,6 +14389,12 @@
       "commit": "1e1f51c75",
       "reason": "vfx/flocking 16,660 B new (LIFE-04 P14: GPU boids, separation, alignment and cohesion with a vision cone, predators, attractors, obstacles and bounds in eight compute passes, the instanced bird and fish draw, the debug overlay, snapshots and the CPU twin for the WebGL2 layer), a lazy entry. A split of the CPU twin would save the WebGPU path little and cost the WebGL2 route an extra import; the game and margoengine wrappers re-export it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "256a80a04",
+      "reason": "SEA-02 and SEA-04 taken over from Gemini (2026-11-27): water/fft 7,704 to 11,826 budget for FFTOcean.sample (the CPU twin of the GPU spectrum and its inverse FFTs), setWind and the debug view; water/ripples 4,307 to 8,124 for obstacles, tracked bodies, disturbRay and the debug view; water root 37,193 to 37,677 for Water.sample. A height query must answer in the frame it is asked, so the CPU twin cannot hide behind import(); the obstacle walls and debug shading are the field's own pass.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16025,11 +16031,11 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 38433,
+    "@margoengine/water": 37677,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,
-    "@margoengine/water/fft": 7704,
+    "@margoengine/water/fft": 11826,
     "@margoengine/water/flood": 17569,
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
@@ -16038,7 +16044,7 @@
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,
-    "@margoengine/water/ripples": 4307,
+    "@margoengine/water/ripples": 8124,
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1380,
