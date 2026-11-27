@@ -15985,14 +15985,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `packages/biomes/tests/view-sea-horizon.test.js` (a landlocked valley's water has no horizon, a
   coast's has).
 - **Weak spot left:** the far ground takes each corner's materials from the nearest edge texel, so it draws long
-  smeared streaks running outward from the edge (KB-BIOMES-HORIZONSTREAK1).
+  smeared streaks running outward from the edge (KB-BIOMES-HORIZONSTREAK1, fixed).
 
-### Open 2026-11-27: the far ground past a world's edge draws long streaks (KB-BIOMES-HORIZONSTREAK1, biomes)
+### Fixed 2026-11-27: the far ground past a world's edge drew long streaks (KB-BIOMES-HORIZONSTREAK1, biomes)
 
-- **Repro:** timber-valley, camera at (-1500, 1400, 0) looking at (-3200, 900, 300): bands of material and light run
-  straight outward from the world's edge to the horizon.
-- **Cause:** `BiomeView`'s horizon terrain copies each far corner's weights from the nearest edge texel
-  (`#horizonTerrain`), so one edge texel's material runs the whole 12 km.
+- **Repro (before):** timber-valley, camera at (-1500, 1400, 0) looking at (-3200, 900, 300): bands of material and
+  light ran straight outward from the world's edge to the horizon.
+- **Cause:** every far corner took its nearest edge texel: `BiomeView`'s horizon terrain copied its material weights
+  (`#horizonTerrain`) and `horizonHeights` carried its height out until the mountains took over, so one edge texel's
+  material ran the whole 12 km and its relief ran out as a ridge (a 200 m edge spike stood 169 m over its side 128 m
+  out).
+- **Fix:** each far corner takes the mean of a stretch of edge round its nearest texel, an eighth of its distance wide
+  each way (`HORIZON_SPREAD`, `horizonEdgeMean` on prefix sums round the edge loop), for its height and its material
+  weights, so the edge blurs out with distance, and the weights give way to the whole edge's mean over the ramp the
+  heights give way to the mountains in (`blend`; `packages/biomes/src/horizon.ts`, `view.ts`). A valley leaving the
+  world still carries on near the edge (the existing test holds it within 10 m 64 m out). On the repro view the far
+  ground is now one even ground past the ramp; within about a kilometre of the edge the edge's own broad patches still
+  carry on as soft wedges, as the edge's continuation is meant to (RTX A6000, WebGPU, 960 x 540).
+- **Regression test:** `packages/biomes/tests/horizon.test.js` (one odd edge texel does not run out to the horizon as a
+  streak; `horizonEdgeMean` round the loop).
 
 ### Fixed 2026-11-27: volumetric clouds drew full white through a smoke pall (KB-SKY-PALLCLOUD1, sky)
 
@@ -16085,14 +16096,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   model), without the `lightScale` that takes sky units into the engine sun's units. Fixing it moves the numbers of
   KB-AIR-HAZELIGHT1, KB-AIR-SKYLIGHT1 and the shot look bars, so it needs its own pass.
 
-### Open 2026-11-27: dark beaded trails cross the burned valley's aftermath view at film quality (KB-VFX-DARKTRAILS1, vfx; owner to be confirmed)
+### Fixed 2026-11-27: the "burnt" valley still burned, under dark beaded trails at film quality (KB-VFX-DARKTRAILS1, scenes)
 
-- **Repro:** `packages/scenes/test/timber-valley-still.html?view=aftermath&weather=smoke&fire=burnt&date=1910-08-22&hour=10&w=960&h=540`
-  (film quality, 60 frames): wavy strings of dark soft blobs fill the upper left, near the camera. Not seen at
-  `quality=preview` with 30 frames.
-- **Looked at:** after the scene's `settle(86400)` for `fire: 'burnt'`, all 12 smoke columns still carried 2 to 66 MW,
-  so the fire had not burned out in a day and the "burned" valley still burns; the columns sit 700 m and more from
-  the camera. Which effect draws the strings is not traced.
+- **Repro (before):** `packages/scenes/test/timber-valley-still.html?view=aftermath&weather=smoke&fire=burnt&date=1910-08-22&hour=10&w=960&h=540`
+  (film quality, 60 frames): wavy strings of dark soft blobs filled the upper left; all 12 smoke columns still carried
+  2 to 66 MW after the scene's `settle(86400)`.
+- **Cause:** `fire: 'burnt'` ("run until nothing burns") stopped the fire after one day of fire time, and a surface
+  fire in the valley's timber litter runs on for days. Measured with the scene's fuel, ignitions and smoke-day weather:
+  on the 8 m grid 188,822 of 257,138 fuelled cells burnt and 20 still burning after one day, out after about two; on
+  the film's 4 m grid 233,036 of 1,034,173 burnt after one day and 625,729 after a day and a half.
+- **Fix:** the scene runs the fire with `burnOut` until it goes out (at most `BURN_OUT_LIMIT`, 30 days, past which it
+  throws a coded error rather than show a burning "burnt" valley) (`packages/scenes/src/timber-valley.ts`). The same
+  view now shows no smoke column and no trails (RTX A6000, WebGPU); the scene's build on the film grid takes about
+  11 minutes, most of it the fire. Which effect drew the trails was not traced further: they went with the columns.
+- **Regression test:** `packages/scenes/test/timber-valley.test.js` (burnOut runs a fire past a day to its end and
+  refuses one that never ends).
+- **Weak spot:** in the smoke day's light the south wall's trees read as dark silhouettes, so this frame does not show
+  whether they are charred.
 
 ### Fixed 2026-11-27: SnapshotRendering's stats lost a recording dropped before the next frame (KB-CULL-SNAPSTATS1, culling)
 
