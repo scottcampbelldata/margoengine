@@ -394,6 +394,8 @@ export class SSAO implements EnginePlugin {
         this.slice = writeUniform(c.device, this.uniform!, this.values as Float32Array<ArrayBuffer>, c.view ?? c);
         for (let i = 0; i < 2; i++) {
           this.directionValues[i][2] = this.options.radius ?? 0.5;
+          // 1: an orthographic view, where view depth itself (not its inverse) is affine across a plane.
+          this.directionValues[i][3] = o ? 1 : 0;
           c.device.queue.writeBuffer(this.directions[i], 0, this.directionValues[i]);
         }
       },

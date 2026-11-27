@@ -9864,6 +9864,17 @@ resolve and the equivalent depth attachment view. Physical bandwidth and rival
 speed gains remain unmeasured. [Reproduction and research](../whitepaper/reproduce.md#batch-164-ssao-resolve-work).
 
 
+### Section 5 evidence: post AO blur predicts the centre plane's depth (KB-POST-GTAOFAR1, 2026-11-27)
+
+The SSAO/GTAO bilateral blur (`packages/post/src/shaders.ts` `blurShader`) compares each tap's view depth with the
+depth the centre's plane has at that tap: 1/depth is affine across a plane in screen space (depth itself when
+orthographic; `settings.w` of the pass uniform, written by `ssao.ts`), predicted from the centre and its nearer
+neighbour along the axis. Far grazing ground no longer keeps the 4 x 4 sample pattern. Evidence on an RTX A6000,
+WebGPU and the WebGL2 layer: `gtao-far-browser.mjs` (rows 0.0709/0.0619 before, 0.0311/0.0276 after), and
+`gtao-sky-browser.mjs`, whose crease check reads the raw AO, view depth and G-buffer normals and matches a CPU
+replica of both passes to 1.2e-6. Still missing: the blur loses 4.7 percent (WebGPU) and 5.4 (WebGL2) of a crease's
+total darkness, an accepted difference in limits.md. No core, stage or API change.
+
 ### Batch 159 matrix diagnosis inventory (2026-11-10)
 
 Section 5 evidence now includes all 151 parity cases attempted on three engines,

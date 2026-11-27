@@ -6,16 +6,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-27: ambient occlusion draws a fine pattern over distant flat sand (KB-POST-GTAOFAR1, post; was KB-WATER-FARGRID-KH1's sand half)
+### Fixed 2026-11-27: ambient occlusion drew a fine pattern over distant flat sand (KB-POST-GTAOFAR1, post; was KB-WATER-FARGRID-KH1's sand half)
 
-- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file> --out=<folder>` with the
-  query `cam=880,30,-450&aim=600,3,300&fov=35`: the sand some hundreds of metres out carries one-pixel rows and a
-  checker. With `&occlusion=0` it is gone: the mean second difference between pixel rows over (500, 560) to (760, 700)
-  falls from 11.5 to 0.55 (RTX A6000, WebGPU).
-- **Cause (narrowed, not traced in the shader):** the scene's `GTAO` pass; its per-pixel sample pattern shows where the
-  ground is far and flat.
-- **The report's other half**, a stair-stepped water edge, does not show in the same frame on this main: the edge is an
-  irregular swash line.
+- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file> --out=<folder>`
+  with the query `cam=880,30,-450&aim=600,3,300&fov=35`: the sand some hundreds of metres out carried one-pixel rows
+  and a checker. With `&occlusion=0` it was gone: the mean second difference between pixel rows over (500, 560) to
+  (760, 700) fell from 11.5 to 0.55 (RTX A6000, WebGPU).
+- **Cause:** the AO blur (`packages/post/src/shaders.ts` `blurShader`) weighed each tap by its depth against the
+  centre's, with sigma 0.1 x radius. Far ground at a grazing angle has rows metres apart in depth, so the vertical pass
+  rejected every tap and the 4 x 4 sample pattern stayed.
+- **Fix:** the depth weight compares a tap with the depth the centre's own plane has there: inverse view depth is
+  affine across a plane in screen space (view depth itself for an orthographic view, flag `settings.w` from
+  `ssao.ts`), predicted from the centre and its nearer neighbour along the blur axis. The dune view's rows metric is
+  11.55 to 0.56 (no AO 0.50). Creases now lose 4.7 percent of their total darkness to the blur, against 1.3 before: an
+  accepted difference in [limits.md](limits.md) (GTAO and SSAO blur row).
+- **Regression:** `packages/post/test/gtao-far-browser.mjs` (both backends): row-to-row change 0.0709 and 0.0619
+  before, 0.0311 and 0.0276 after, bound 0.045. `gtao-sky-browser.mjs` (both backends) checks the crease against a CPU
+  replica of both blur passes (1.2e-6), its outer rows, its minimum and its total darkness; `ssao.test.js` pins the
+  orthographic flag.
 
 ### Fixed 2026-11-27: timber-valley's cumulus showed as flat white blobs on the mountain slopes (KB-SKY-CLOUDBLOB1; scenes, sky docs)
 

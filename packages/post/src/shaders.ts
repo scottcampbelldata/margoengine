@@ -127,6 +127,14 @@ export const ssaoShader =
 }
 `;
 // Separable 9-tap bilateral AO blur: Gaussian, depth and normal weights are Margo's own tuning (no external values).
+// The depth weight compares a tap with the depth the centre's own surface has there (KB-POST-GTAOFAR1), not with the
+// centre's depth: on a plane, inverse view depth is affine in screen space (Heckbert and Moreton, "Interpolation for
+// Polygon Texture Mapping and Shading", 1991), so the centre and its nearer neighbour along the blur axis predict
+// every tap of that plane exactly. Comparing with the centre's depth alone rejected a far ground seen at a grazing
+// angle, whose rows lie metres apart in depth, so the vertical pass kept the 4 x 4 sample pattern as rows and a
+// checker. A surface seen square on (depth constant along the axis) is weighted as before, and a tap across an edge
+// is still off the centre's plane and rejected (depth-keyed bilateral reconstruction, McGuire, Mara and Luebke,
+// "Scalable Ambient Obscurance", HPG 2012).
 export const blurShader = `
 @group(0) @binding(0) var input:texture_2d<f32>;
 @group(0) @binding(1) var gbuffer:texture_2d<f32>;
@@ -136,10 +144,18 @@ export const blurShader = `
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
   let p=vec2i(id.xy);let center=textureLoad(gbuffer,p,0);let centre=textureLoad(viewDepth,p,0).r;
+  let axis=vec2i(settings.xy);let limit=vec2i(size)-1;
+  let ahead=textureLoad(viewDepth,clamp(p+axis,vec2i(0),limit),0).r;let behind=textureLoad(viewDepth,clamp(p-axis,vec2i(0),limit),0).r;
+  let forward=abs(ahead-centre)<abs(centre-behind);let near=select(behind,ahead,forward);
+  // Perspective: 1/depth is affine across a plane; orthographic (settings.w 1): depth itself.
+  let ortho=settings.w>0.5;let key=select(1.0/max(centre,1e-30),centre,ortho);
+  let slope=select(0.0,select(-1.0,1.0,forward)*(select(1.0/max(near,1e-30),near,ortho)-key),centre>0.0&&near>0.0);
   var sum=0.0;var total=0.0;
   for(var i=-4;i<=4;i++) {
-    let q=clamp(p+vec2i(settings.xy)*i,vec2i(0),vec2i(size)-1);let neighbor=textureLoad(gbuffer,q,0);
-    let depthWeight=exp(-abs(centre-textureLoad(viewDepth,q,0).r)/max(settings.z*0.1,0.0001));
+    let q=clamp(p+axis*i,vec2i(0),limit);let neighbor=textureLoad(gbuffer,q,0);
+    let along=key+slope*f32(dot(q-p,axis));
+    let expected=select(centre,select(select(centre,1.0/along,along>0.0),along,ortho),slope!=0.0&&any(q!=p));
+    let depthWeight=exp(-abs(expected-textureLoad(viewDepth,q,0).r)/max(settings.z*0.1,0.0001));
     let normalWeight=pow(max(dot(center.xyz,neighbor.xyz),0.0),8.0);
     let w=exp(-f32(i*i)/8)*depthWeight*select(normalWeight,1.0,centre==0);
     sum+=textureLoad(input,q,0).r*w;total+=w;

@@ -195,11 +195,13 @@ test('SSAO retains frame upload arrays, updates radius and restores owned resour
       directions = h.resources.filter((resource) => resource.size === 16),
       data = directions.map((buffer) => writes.get(buffer));
     assert.equal(directions.length, 2);
+    // Axis, radius, then 1 for an orthographic camera (this harness's projection has no perspective row), where the
+    // blur predicts a plane's taps by view depth itself rather than its inverse (KB-POST-GTAOFAR1).
     assert.deepEqual(
       data.map((value) => Array.from(value)),
       [
-        [1, 0, 0.5, 0],
-        [0, 1, 0.5, 0],
+        [1, 0, 0.5, 1],
+        [0, 1, 0.5, 1],
       ],
     );
     const F32 = globalThis.Float32Array;
@@ -223,8 +225,8 @@ test('SSAO retains frame upload arrays, updates radius and restores owned resour
     assert.deepEqual(
       data.map((value) => Array.from(value)),
       [
-        [1, 0, 2, 0],
-        [0, 1, 2, 0],
+        [1, 0, 2, 1],
+        [0, 1, 2, 1],
       ],
     );
     const depth = effect.depthTexture;
@@ -240,8 +242,8 @@ test('SSAO retains frame upload arrays, updates radius and restores owned resour
     assert.deepEqual(
       restored.map((buffer) => Array.from(writes.get(buffer))),
       [
-        [1, 0, 2, 0],
-        [0, 1, 2, 0],
+        [1, 0, 2, 1],
+        [0, 1, 2, 1],
       ],
     );
   } finally {
