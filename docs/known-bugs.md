@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: the quality gate measured a tree another session was writing in (KB-QUALITY-CROSSTREE1)
+
+- **Repro:** during a gate run in one lane's folder, another session's uncommitted sky edits sat in it: `sky/sun`
+  read 2,462 B against a 2,379 B budget and its API read as changed, and both passed once the files were restored
+  (2026-11-16).
+- **Cause:** a session wrote into another lane's tree, and the gate neither said what uncommitted files it was reading
+  nor noticed that they changed under it. `push:main` already refused to push a changed tracked file.
+- **Fixed:** `npm run quality` lists the uncommitted files it measures and fails when one is written, added, restored
+  or committed during the run, or HEAD moves (`scripts/quality/tree-watch.js`). Files that were already there and stay
+  still are listed, not refused: a gate is often run on one's own uncommitted work. Regression:
+  `tests/quality-tree-watch.test.js`.
+
 ### Fixed 2026-11-27: some tests' random generator lost its low bits and repeated early (KB-TEST-LCG1)
 
 - **Repro.** `seed = (seed * 1103515245 + 12345) >>> 0` from seed 3 repeats after 6,445 draws with a period of 419, so a

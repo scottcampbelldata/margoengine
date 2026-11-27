@@ -38,6 +38,7 @@ import {
 import { shaderCommentsGate } from './quality/shader-comments.js';
 import { sizesGate } from './quality/sizes.js';
 import { testsGate } from './quality/tests-floor.js';
+import { treeChanges, treeState } from './quality/tree-watch.js';
 
 const root = resolve(import.meta.dirname, '..');
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -96,6 +97,13 @@ if (usage) {
 
 async function runGates() {
   const started = performance.now();
+  // The gate reads this checkout as it stands: name what is uncommitted, and fail if it changes during the run.
+  const watched = { own: ['scripts/quality/baselines/'] },
+    tree = treeState(root, watched);
+  if (tree.files.size)
+    console.log(
+      `quality tree: measuring ${tree.files.size} uncommitted file(s): ${[...tree.files.keys()].slice(0, 25).join(', ')}${tree.files.size > 25 ? ', ...' : ''}`,
+    );
   const files = repoFiles(root);
   const packages = packageList(root, files);
   const report = {};
@@ -196,6 +204,14 @@ async function runGates() {
       for (const line of problems.slice(0, 25)) console.error(`  ${line}`);
       if (problems.length > 25) console.error(`  ... ${problems.length - 25} more (npm run check:readmes lists all)`);
     } else console.log(`quality ${gate}: ok (${ms} ms)`);
+  }
+  const changes = treeChanges(tree, treeState(root, watched));
+  if (changes.length) {
+    failed++;
+    console.error(
+      `quality tree: FAIL, the tree changed while the gate ran, so its figures are of no single tree. Fix: find what wrote here (another session's work belongs in its own folder), then run again.`,
+    );
+    for (const line of changes.slice(0, 25)) console.error(`  ${line}`);
   }
   if (process.argv.includes('--details')) {
     mkdirSync(join(root, 'test-results'), { recursive: true });

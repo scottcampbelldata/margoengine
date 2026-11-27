@@ -273,6 +273,12 @@ matches the checked-out sources, as after a rebase onto other lanes' work) as re
 rebuild that package to update them. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
 `test-results/quality.json`.
 
+The gate measures the checkout it runs in, so it first lists the uncommitted files it is measuring (`quality tree:`),
+and it fails if that list, a listed file's size or write time, or HEAD differs when it ends
+(`scripts/quality/tree-watch.js`, KB-QUALITY-CROSSTREE1): something else wrote into the folder during the run. Files
+git ignores and the gate's own baselines are left out. A file on the first list that is not yours was written there by
+another session: stop and find out which before you trust a figure.
+
 ### Shader comments
 
 Write WGSL and GLSL comments in the source as usual: every package build strips them from the strings it ships
