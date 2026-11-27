@@ -1,7 +1,8 @@
 import { Physics } from '@margoengine/physics';
+import type { PhysicsDebugView } from '@margoengine/physics/debug-view';
 import { LoadSolver } from '@margoengine/physics/loads';
 import { SpectralSea } from '@margoengine/physics/sea';
-import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+import { BODY_FORCES_FIELD, FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '@margoengine/physics/world';
 import { createStage } from '@margoengine/stage';
 import { Water } from '@margoengine/water';
 import { demoStatus } from './demo-status.ts';
@@ -13,6 +14,8 @@ const reset = document.querySelector<HTMLButtonElement>('#reset')!;
 const time = document.querySelector<HTMLInputElement>('#time')!;
 const elapsed = document.querySelector<HTMLOutputElement>('#elapsed')!;
 const measurement = document.querySelector<HTMLOutputElement>('#measurement')!;
+const showLoads = document.querySelector<HTMLInputElement>('#show-loads')!;
+const loadReadout = document.querySelector<HTMLOutputElement>('#debug-loads')!;
 const rate = 60;
 const lastTick = Number(time.max);
 const life = new AbortController();
@@ -67,10 +70,13 @@ try {
   await Physics.load({ signal: life.signal });
   life.signal.throwIfAborted();
   const world = new PhysicsWorld({ rate: { num: rate, den: 1 } });
-  const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / rate });
+  // RigidSolver owns the clock. The engine attachment lets the shared debug view find this Physics.
+  const physics = new Physics(engine, { arena: world.arena, fixedTimestep: 1 / rate, paused: true });
+  let debugView: PhysicsDebugView | undefined;
   let request = 0;
   release = () => {
     cancelAnimationFrame(request);
+    debugView?.dispose();
     physics[Symbol.dispose]();
     water.dispose();
     stage.dispose();
@@ -88,9 +94,10 @@ try {
     angularDamping: 0.85,
     colliders: { shape: 'box', halfExtents: half, mass: 156 },
   });
+  const loads = new LoadSolver();
   world
     .add(new RigidSolver(), { physics })
-    .add(new LoadSolver(), {
+    .add(loads, {
       sea,
       bodies: [
         { row: buoy.row, shape: { sphere: radius } },
@@ -105,6 +112,74 @@ try {
   let playhead = 0;
   let previous = 0;
   let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const debugLoads = () => {
+    const { region } = loads.exportPorts(tick).find((port) => port.field === BODY_FORCES_FIELD.name)!;
+    const forces = regionWords(region.memory ?? world.memory, region) as Float64Array;
+    const liftSphere = forces[buoy.row * FORCE_WORDS + 1]!;
+    const liftBox = forces[box.row * FORCE_WORDS + 1]!;
+    const rollBox = forces[box.row * FORCE_WORDS + 3]!;
+    loadReadout.value =
+      `Held upward load (cyan) · Sphere ${liftSphere.toFixed(1)} N · Box ${liftBox.toFixed(1)} N` +
+      ` · Box roll torque (amber) ${rollBox.toFixed(1)} N·m`;
+    loadReadout.dataset.loads = JSON.stringify([liftSphere, liftBox, rollBox]);
+    const vertices: number[] = [];
+    const colors: number[] = [];
+    const lift = [0.23, 0.94, 1, 1] as const;
+    const torque = [1, 0.66, 0.13, 1] as const;
+    const liftScale = 1 / 2300; // Drawing scales in metres per N or per N·m.
+    const torqueScale = 1 / 125;
+    const arrow = (
+      [x, y, z]: readonly [number, number, number],
+      dx: number,
+      dy: number,
+      color: readonly [number, number, number, number],
+    ) => {
+      const length = Math.hypot(dx, dy);
+      if (length < 1e-5) return;
+      const head = Math.min(0.085, 0.32 * length) / length;
+      const sx = dx * head;
+      const sy = dy * head;
+      const tipX = x + dx;
+      const tipY = y + dy;
+      vertices.push(x, y, z, tipX, tipY, z);
+      vertices.push(tipX, tipY, z, tipX - sx + 0.5 * sy, tipY - sy - 0.5 * sx, z);
+      vertices.push(tipX, tipY, z, tipX - sx - 0.5 * sy, tipY - sy + 0.5 * sx, z);
+      for (let i = 0; i < 6; i++) colors.push(...color);
+    };
+    arrow(buoy.worldCenterOfMass, 0, liftSphere * liftScale, lift);
+    arrow(box.worldCenterOfMass, 0, liftBox * liftScale, lift);
+    arrow(box.worldCenterOfMass, rollBox * torqueScale, 0, torque);
+    return { vertices: new Float32Array(vertices), colors: new Float32Array(colors) };
+  };
+  showLoads.addEventListener(
+    'change',
+    async () => {
+      if (debugView) {
+        debugView.enabled = showLoads.checked;
+        loadReadout.hidden = !showLoads.checked;
+        return;
+      }
+      if (!showLoads.checked) return;
+      showLoads.disabled = true;
+      try {
+        const { PhysicsDebugView } = await import('@margoengine/physics/debug-view');
+        life.signal.throwIfAborted();
+        const view = await PhysicsDebugView.attach(engine, physics, { world: false, width: 2.4, onTop: true });
+        if (life.signal.aborted) {
+          view.dispose();
+          return;
+        }
+        view.add(debugLoads);
+        debugView = view;
+        loadReadout.hidden = false;
+      } catch (error) {
+        if (!life.signal.aborted) status.error(error);
+      } finally {
+        if (!life.signal.aborted) showLoads.disabled = false;
+      }
+    },
+    { signal: life.signal },
+  );
   const updateButton = () => {
     play.textContent = playing ? 'Pause' : 'Play';
   };
@@ -180,7 +255,7 @@ try {
   updateButton();
   engine.render({ delta: 0 });
   request = requestAnimationFrame(frame);
-  play.disabled = reset.disabled = time.disabled = false;
+  play.disabled = reset.disabled = time.disabled = showLoads.disabled = false;
   status.ready('');
 } catch (error) {
   if (!life.signal.aborted) status.error(error);

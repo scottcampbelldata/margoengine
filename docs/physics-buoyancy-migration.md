@@ -19,3 +19,8 @@ shapes take the dimensions of the corresponding rigid collider. A hull uses a cl
 mesh. Use the same sea coordinates in the renderer and the loads solver.
 [Runnable Physics quick start](../packages/physics/README.md#float-a-rigid-body),
 [Live flotation example](https://margoengine.com/demos/buoyancy.html)
+
+Enable **Show loads** in the flotation example to inspect the held upward load on each body in newtons and the
+box's signed roll torque in newton-metres. The shared `PhysicsDebugView` draws the components from
+`LoadSolver`'s published force rows at each body's centre of mass. The held load includes the solver's implicit
+added-mass response. Read the arrow directions and numeric values as you scrub the example.

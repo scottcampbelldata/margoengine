@@ -11,6 +11,7 @@
     .controls label { display: flex; gap: 8px; align-items: center; }
     button { padding: 6px 12px; cursor: pointer; }
     output { font-variant-numeric: tabular-nums; }
+    #debug-loads { line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -24,8 +25,10 @@
     <button id="reset" type="button" disabled>Reset</button>
     <label for="time">Time <input id="time" type="range" min="0" max="480" value="0" disabled></label>
     <output id="elapsed" for="time">0.00 s</output>
+    <label><input id="show-loads" type="checkbox" aria-controls="debug-loads" disabled> Show loads</label>
   </div>
   <p><output id="measurement">Sphere centre and box heel appear when the scene is ready.</output></p>
+  <output id="debug-loads" for="show-loads time" aria-live="off" hidden></output>
   <p id="status" data-webgpu-status role="status">Starting the buoyancy scene…</p>
   <script type="module">
     import { needsWebGPU } from './needs-webgpu.js';

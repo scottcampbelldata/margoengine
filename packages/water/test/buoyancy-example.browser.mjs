@@ -48,20 +48,57 @@ try {
   const initial = await state();
   const before = await capture('release');
   assert.equal(await page.locator('#play').textContent(), 'Play');
+  const showLoads = page.locator('#show-loads');
+  const readout = page.locator('#debug-loads');
+  const loads = () => readout.evaluate((out) => JSON.parse(out.dataset.loads));
+  const waitLoads = (values) =>
+    page.waitForFunction((want) => document.querySelector('#debug-loads')?.dataset.loads === want, JSON.stringify(values));
+  assert.equal(await readout.isVisible(), false);
+  await showLoads.check();
+  await page.waitForSelector('#debug-loads[data-loads]:not([hidden])');
+  const initialLoads = await loads();
+  const radius = 0.36;
+  const cap = radius + 0.23;
+  const displaced = 1000 * Math.PI * cap ** 2 * (radius - cap / 3);
+  const dryMass = 82;
+  // A sphere carries half the displaced water as added mass. The held force gives the same net acceleration
+  // when applied with the body's dry inverse mass and gravity by RigidSolver.
+  const heldLift = 9.80665 * (dryMass + ((displaced - dryMass) * dryMass) / (dryMass + 0.5 * displaced));
+  assert.ok(Math.abs(initialLoads[0] - heldLift) < 0.001, JSON.stringify({ initialLoads, heldLift }));
+  assert.ok(initialLoads[1] > 0 && initialLoads[2] < 0, 'the heeled crate reports an upward load and a restoring torque');
+  const overlay = await capture('loads');
+  const debugPixels = changedPixels(before, overlay);
+  assert.ok(debugPixels > 50, 'the shared debug view draws force and torque arrows over the physical bodies');
+  const releaseCyan = cyanLoadPixels(before);
+  assert.ok(cyanLoadPixels(overlay) > releaseCyan + 50, 'the renderer draws the cyan load arrows');
+  assert.deepEqual(await state(), initial, 'examining the held loads leaves the paused bodies at the same tick');
+
   await seek(360);
   const settled = await state();
+  await page.waitForFunction(
+    (release) => document.querySelector('#debug-loads')?.dataset.loads !== release,
+    JSON.stringify(initialLoads),
+  );
+  const settledLoads = await loads();
+  assert.ok(Math.abs(settledLoads[2]) < Math.abs(initialLoads[2]), 'the measured righting torque falls as the box rights');
+  await showLoads.uncheck();
+  assert.equal(await readout.isVisible(), false);
   const after = await capture('righted');
   await page.locator('#reset').click();
   assert.deepEqual(await state(), initial);
+  assert.equal(cyanLoadPixels(await capture('reset-hidden')), releaseCyan, 'hiding the diagnostic clears the load arrows');
+  await showLoads.check();
+  await waitLoads(initialLoads);
   await seek(360);
   assert.deepEqual(await state(), settled);
+  await waitLoads(settledLoads);
   assert.equal(await page.locator('#elapsed').textContent(), '6.00 s');
   assert.ok(settled[0] - initial[0] > 0.2, 'the real rigid sphere rises more than twenty centimetres');
   assert.ok(Math.abs(initial[1]) > 25 && Math.abs(settled[1]) < 4, 'the real rigid box returns toward upright');
   const changed = changedPixels(before, after);
   assert.ok(changed > 150, 'the physical motion changes the live rendered scene');
   assert.equal(await page.locator('#viewport').getAttribute('data-error'), null);
-  console.log(JSON.stringify({ backend, initial, settled, changed }));
+  console.log(JSON.stringify({ backend, initial, settled, changed, initialLoads, settledLoads, debugPixels }));
 
   await page.goto(new URL('/examples/cyprus-raft.html?qa=1', page.url()).href);
   await page.waitForSelector('#viewport[data-ready], #viewport[data-error], [data-no-webgpu]', { timeout: 25000 });
@@ -110,4 +147,11 @@ function changedPixels(before, after) {
     if (delta > 20) changed++;
   }
   return changed;
+}
+
+function cyanLoadPixels(image) {
+  let count = 0;
+  for (let i = 0; i < image.data.length; i += 4)
+    if (image.data[i] < 160 && image.data[i + 1] > 190 && image.data[i + 2] > 220) count++;
+  return count;
 }
