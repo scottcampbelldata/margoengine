@@ -7544,6 +7544,35 @@ world.advance(600);
 console.log(blast.kernel, blast.counts);
 ```
 
+Hits. Pass `physics`, the Physics the `RigidSolver` steps, and each fragment's and shot's path is cast against the rigid
+world every step. The first body met stops the fragment at the hit point, as state 3. With `carriers`, the body takes the
+fragment's momentum through `bodyImpulses` at that point. Each hit is a row of `hitsField` (`HIT_WORDS`: point, velocity
+as it struck, mass, body row, time, 1 once hit) and of `hitRows()`. `breakables`, a `BreakableWorld` or anything with
+`applyImpact(point, impulse)`, takes each hit as an impact (BREAK-01).
+
+`plates` (with `new ExplosionSolver(id, { carriers: true, hullPlates: true })`) are hull plates the hits load. Their
+`damageField` is in the crush damage layout, so `new HullSolver(id, undefined, blast.damageField)` opens a hull opening
+whose `crushPatch` is the plate's index once the plate is holed (SEA-10). A hit's seal loss is its kinetic energy into the
+plate over the shear work of punching a plug of the striker's diameter through the plate, pi d h^2 tau / 2
+(`shearStrength` tau, default 145 MPa for mild steel).
+
+```ts
+import { ExplosionSolver } from '@margoengine/physics/explosive';
+import { Physics } from '@margoengine/physics';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: 1 / 60 });
+const wall = physics.addBody(null, { position: [5, 0, 0], colliders: { shape: 'box', halfExtents: [1, 1, 1], mass: 100 } });
+const blast = new ExplosionSolver('blast', { carriers: true });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] })
+  .add(new RigidSolver(), { physics })
+  .add(blast, { physics, charges: [{ position: [0, 0, 0], mass: 1, case: { mass: 2, fragments: 200 } }] })
+  .couple(['blast', 'rigid'], 'staggered');
+world.advance(30);
+console.log(blast.counts.hits, wall.linearVelocity);
+```
+
 ```ts
 import { ExplosionSolver } from '@margoengine/physics/explosive';
 import { PhysicsWorld } from '@margoengine/physics/world';

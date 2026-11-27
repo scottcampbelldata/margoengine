@@ -32,6 +32,9 @@ export {
   FRAGMENT_WORDS,
   GUN_SAMPLES,
   type GunMount,
+  HIT_WORDS,
+  type HullPlate,
+  type ImpactTarget,
 } from './solver.js';
 export {
   closedVesselPressure,

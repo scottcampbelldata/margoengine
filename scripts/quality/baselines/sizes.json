@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20880739,
+  "total": 20882103,
   "history": [
     {
       "date": "2026-10-24",
@@ -14519,6 +14519,12 @@
       "commit": "kernel",
       "reason": "FIRE-05: explosive kernel loader, flight twin and terrain landing (+1573 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "04be3ac77",
+      "reason": "FIRE-05: fragment and shot hits by ray cast, into rigid bodies, breakables and hull plates (+1364 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15359,7 +15365,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 10014,
+    "@margoengine/physics/explosive": 11378,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

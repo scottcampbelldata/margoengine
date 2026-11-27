@@ -24,6 +24,8 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
+import { CRUSH_DAMAGE_QUANTITY, CRUSH_WORDS } from '../crush/port.js';
+import type { Physics } from '../physics.js';
 import { BED_FIELD, BED_LAYOUT, type BedShape, bedVertexCount } from '../earth/bed.js';
 import { canShareMemory, isShared, STACK_BYTES } from '../world/memory.js';
 import { rateOf } from '../world/solver.js';
@@ -55,6 +57,11 @@ const AIR_DENSITY = 1.225;
 /** A cast high explosive's density, kg/m^3 (TNT 1630), for telling a charge on the ground from one in the air. */
 const CHARGE_DENSITY = 1630;
 const WAITING = 0;
+const FLIGHT_FLYING = 1;
+/** A fragment's state once it has struck a body and stopped there. */
+const HIT = 3;
+/** Words of a `hits` row: x, y, z (m), vx, vy, vz (m/s, as it struck), mass (kg), body row, time (s), 1 once hit. */
+export const HIT_WORDS = 10;
 
 /** A cased charge's case, which it throws as fragments when it detonates at or above the surface. */
 export interface ChargeCase {
@@ -118,6 +125,40 @@ export interface ExplosionParams {
   readonly seed?: number;
   /** The ground the charges sit in, for their energy budgets (density, seismic coupling, crater; see `energyBudget`). */
   readonly soil?: GroundOptions;
+  /**
+   * The rigid world the fragments and shots can hit (the Physics the RigidSolver steps): each one's path is cast against
+   * it every step, and the first body met stops it. With `carriers` the hit pushes the body.
+   */
+  readonly physics?: Physics;
+  /** What takes the hits as impacts at their points (a BreakableWorld, BREAK-01): `applyImpact(point, impulse)`. */
+  readonly breakables?: ImpactTarget;
+  /** Hull plates the hits load (the solver must be made with `hullPlates: true`); their damage field opens hull openings. */
+  readonly plates?: readonly HullPlate[];
+}
+
+/** Anything that takes an impact at a point, as BreakableWorld.applyImpact does (BREAK-01). */
+export interface ImpactTarget {
+  applyImpact(point: Vec3, impulse: Vec3, radius?: number): unknown;
+}
+
+/**
+ * A plate of a hull that fragment and shot hits can hole. Each is a row of the solver's `damageField`, in the crush damage
+ * layout (`CRUSH_WORDS`), so a seakeeping hull opening with `crushPatch` set to the plate's index opens when the plate is
+ * holed. A hit inside `radius` of the plate's centre adds its work and impulse; its seal loss is the hit's kinetic energy
+ * into the plate (along the surface normal) over the shear work of punching a plug of the striker's diameter d through the
+ * thickness h, pi d h^2 tau / 2 (the shear force pi d h tau falling to nothing over the plug's travel h), up to 1.
+ */
+export interface HullPlate {
+  /** The hull's rigid body row. */
+  readonly body: number;
+  /** The plate's centre in the body's frame, m. */
+  readonly centre: Vec3;
+  /** How far from the centre a hit counts, m. */
+  readonly radius: number;
+  /** The plate's thickness, m. */
+  readonly thickness: number;
+  /** Its shear strength tau, Pa (default 145 MPa: mild steel's 250 MPa yield times 0.58, by von Mises). */
+  readonly shearStrength?: number;
 }
 
 /** The work a step did. */
@@ -128,6 +169,8 @@ export interface ExplosionCounts {
   readonly fragmentSteps: number;
   /** Integration steps of the guns fired, in the bore and the blowdown. */
   readonly gunSteps: number;
+  /** Fragments and shots that have struck a body (ray casts that hit). */
+  readonly hits: number;
 }
 
 /** What an {@link ExplosionSolver} is made with. */
@@ -139,6 +182,8 @@ export interface ExplosionSolverOptions {
    * cell) rather than on a flat `groundHeight`.
    */
   readonly terrain?: BedShape;
+  /** True when the solver publishes `damageField` for hull plates (`plates` in its params). */
+  readonly hullPlates?: boolean;
 }
 
 type Native = {
@@ -242,6 +287,17 @@ function finite(value: unknown, what: string, fix: string, positive = false): nu
 export class ExplosionSolver implements Solver<ExplosionParams> {
   readonly explosionsField: FieldDescriptor;
   readonly fragmentsField: FieldDescriptor;
+  /** Hits: one `HIT_WORDS` row a fragment, in fragment order (point, velocity as it struck, mass, body row, time, 1 once hit). */
+  readonly hitsField: FieldDescriptor;
+  /** The hull plates' damage, in the crush damage layout, with `hullPlates`. */
+  readonly damageField: FieldDescriptor | null;
+  private physics: Physics | null = null;
+  private breakables: ImpactTarget | null = null;
+  private plates: Required<HullPlate>[] = [];
+  private hitRegion: Region | null = null;
+  private damageRegion: Region | null = null;
+  private diameter: Float64Array = new Float64Array(0);
+  private hitCount = 0;
   private host: SolverHost | null = null;
   private placed: Placed[] = [];
   private explosionRegion: Region | null = null;
@@ -280,6 +336,22 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       unit: 'm, s, J, m J^-1/3, kg',
       centring: 'particle',
     };
+    this.hitsField = {
+      name: `${id}:hits`,
+      kind: 'particleSet',
+      quantity: 'fragment hit point, velocity, mass, body row and time',
+      unit: 'm, m/s, kg, 1, s',
+      centring: 'particle',
+    };
+    this.damageField = options.hullPlates
+      ? {
+          name: `${id}:damage`,
+          kind: 'surfaceSampleSet',
+          quantity: CRUSH_DAMAGE_QUANTITY,
+          unit: 'm, J, N, N s, 1',
+          centring: 'particle',
+        }
+      : null;
     this.fragmentsField = {
       name: `${id}:fragments`,
       kind: 'particleSet',
@@ -324,6 +396,8 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
             ]
           : []),
         ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
+        { field: this.hitsField, access: 'write' as const },
+        ...(this.damageField ? [{ field: this.damageField, access: 'write' as const }] : []),
       ],
     };
   }
@@ -346,6 +420,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     const random = new RandomStream(seed, solverNumber(this.id));
     const fragments: number[][] = [];
     const drags: number[] = [];
+    const diameters: number[] = [];
     const owners: number[] = [];
     this.placed = charges.map((charge, index) => {
       const at = `Charge ${index}`;
@@ -445,6 +520,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
               WAITING,
             ]);
             drags.push(k2);
+            diameters.push(2 * radius);
             owners.push(index);
           }
         }
@@ -487,12 +563,47 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       const area = (Math.PI * options.bore * options.bore) / 4;
       fragments.push([0, 0, 0, 0, 0, 0, options.shotMass, WAITING]);
       drags.push((AIR_DENSITY * drag * area) / (2 * options.shotMass));
+      diameters.push(options.bore);
       owners.push(SHOT_GUN - index);
       return { options, time, body, breech: vec(breech, `${at} breech`), axis: vec(axis, `${at} axis`, true) };
     });
     this.host = host;
     this.gunRegion = host.allocate('guns', Math.max(1, this.guns.length) * GUN_WORDS * 8, 'f64', EXPLOSION_LAYOUT);
     if (this.carriers) this.impulseRegion = host.allocate('recoil', rows * IMPULSE_WORDS * 8, 'f64', 1);
+    this.physics = params.physics ?? null;
+    if (params.breakables !== undefined) {
+      if (typeof params.breakables?.applyImpact !== 'function')
+        throw new TypeError('breakables must have applyImpact(point, impulse), as a BreakableWorld does.');
+      if (!this.physics) throw new MargoError('state', 'Breakables take hits found by ray casts; pass physics too.');
+      this.breakables = params.breakables;
+    }
+    const plates = params.plates ?? [];
+    if (plates.length && !this.damageField)
+      throw new MargoError(
+        'state',
+        'Hull plates need the damage field; make the solver with new ExplosionSolver(id, {hullPlates: true}).',
+      );
+    if (plates.length && !(this.physics && this.carriers))
+      throw new MargoError(
+        'state',
+        'Hull plates take hits on bodies; pass physics and make the solver with carriers: true.',
+      );
+    this.plates = plates.map((plate, k) => {
+      const at = `Plate ${k}`;
+      if (!(Number.isInteger(plate.body) && plate.body >= 0 && plate.body < rows))
+        throw new RangeError(`${at} body must be a rigid body row from 0 to ${rows - 1}; got ${plate.body}.`);
+      return {
+        body: plate.body,
+        centre: vec(plate.centre, `${at} centre`),
+        radius: finite(plate.radius, `${at} radius`, 'Give it in metres.', true),
+        thickness: finite(plate.thickness, `${at} thickness`, 'Give it in metres.', true),
+        shearStrength: finite(plate.shearStrength ?? 145e6, `${at} shear strength`, 'Give it in pascals.', true),
+      };
+    });
+    this.hitRegion = host.allocate('hits', Math.max(1, fragments.length) * HIT_WORDS * 8, 'f64', EXPLOSION_LAYOUT);
+    if (this.damageField)
+      this.damageRegion = host.allocate('plate-damage', Math.max(1, plates.length) * CRUSH_WORDS * 8, 'f64', 1);
+    this.diameter = Float64Array.from(diameters);
     this.explosionRegion = host.allocate(
       'explosions',
       (this.placed.length + this.guns.length) * EXPLOSION_WORDS * 8,
@@ -673,7 +784,22 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     const rate = rateOf(context.level);
     const start = context.tick / rate,
       end = (context.tick + 1) / rate;
-    if (this.guns.length > 0) this.stepGuns(context, start, end);
+    let bodies: Float32Array | null = null;
+    let impulses: Float64Array | null = null;
+    if (this.carriers) {
+      const source = context.inputs.get(BODIES_FIELD.name)?.region;
+      if (!source || source.type !== 'f32' || source.layout !== 2)
+        throw new MargoError(
+          'state',
+          "The guns and hits need the rigid solver's layout-2 bodies field; add a RigidSolver to the world.",
+        );
+      bodies = new Float32Array((source.memory ?? host.memory).buffer, source.byteOffset, source.byteLength / 4);
+      impulses = this.words(this.impulseRegion!);
+      impulses.fill(0);
+    }
+    if (this.guns.length > 0) this.stepGuns(start, end, bodies, impulses);
+    // The fragments' places and speeds at the step's start, for the rays that find what they hit.
+    const before = this.physics ? Float64Array.from(this.fragmentWords()) : null;
     const rows = this.explosions();
     for (let i = 0; i < this.placed.length + this.guns.length; i++)
       if (rows[i * EXPLOSION_WORDS + 3]! < end) rows[i * EXPLOSION_WORDS + 9] = 1;
@@ -740,30 +866,103 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       flying = now;
       this.steps += steps;
     }
+    if (before) flying -= this.hits(before, end, bodies, impulses);
     this.flyingNow = flying;
   }
 
-  /** Fire the guns whose time has come and push their carriers back by the recoil this step holds. */
-  private stepGuns(context: StepContext, start: number, end: number): void {
-    const host = this.live();
-    const words = this.gunWords();
-    let bodies: Float32Array | null = null;
-    let impulses: Float64Array | null = null;
-    if (this.carriers) {
-      const source = context.inputs.get(BODIES_FIELD.name)?.region;
-      if (!source || source.type !== 'f32' || source.layout !== 2)
-        throw new MargoError(
-          'state',
-          "The guns need the rigid solver's layout-2 bodies field; add a RigidSolver to the world before the ExplosionSolver.",
-        );
-      bodies = new Float32Array((source.memory ?? host.memory).buffer, source.byteOffset, source.byteLength / 4);
-      impulses = new Float64Array(
-        host.memory.buffer,
-        this.impulseRegion!.byteOffset,
-        this.impulseRegion!.byteLength / 8,
-      );
-      impulses.fill(0);
+  /**
+   * Casts each fragment's path this step against the rigid world: the first body it meets stops it there, takes its momentum
+   * (through `bodyImpulses`, with `carriers`), gets the hit as an impact if it is breakable, and loads any hull plate it
+   * strikes. Returns how many fragments in flight were stopped.
+   */
+  private hits(before: Float64Array, end: number, bodies: Float32Array | null, impulses: Float64Array | null): number {
+    const physics = this.physics!;
+    const f = this.fragmentWords();
+    const hits = this.words(this.hitRegion!);
+    const plates = this.plates.length ? this.words(this.damageRegion!) : null;
+    const launch = this.words(this.launchRegion!);
+    const shots = this.fragmentCount - this.guns.length;
+    let stopped = 0;
+    for (let i = 0; i < this.fragmentCount; i++) {
+      const o = i * FRAGMENT_WORDS;
+      const was = before[o + 7]!;
+      const now = f[o + 7]!;
+      // Fragments that moved this step: in flight at its start, or launched during it.
+      if (!(was === 1 || (was === 0 && launch[i]! < end)) || now === 0) continue;
+      const p0: Vec3 = [before[o]!, before[o + 1]!, before[o + 2]!];
+      const d: Vec3 = [f[o]! - p0[0], f[o + 1]! - p0[1], f[o + 2]! - p0[2]];
+      const length = hypot(d[0], d[1], d[2]);
+      if (!(length > 0)) continue;
+      const own = i >= shots ? this.guns[i - shots]!.body : -1;
+      const hit = physics.raycast(p0, d, {
+        maxDistance: length,
+        predicate: own >= 0 ? (body) => body.row !== own : undefined,
+      });
+      if (!hit) continue;
+      this.hitCount++;
+      // The fragment's velocity as it struck: what it had at the step's start (one step's drag and gravity not counted).
+      const v: Vec3 = [before[o + 3]!, before[o + 4]!, before[o + 5]!];
+      const m = f[o + 6]!;
+      if (now === FLIGHT_FLYING) stopped++;
+      f.set([hit.point[0], hit.point[1], hit.point[2], 0, 0, 0, m, HIT], o);
+      hits.set([...hit.point, ...v, m, hit.body.row, end, 1], i * HIT_WORDS);
+      const j: Vec3 = [m * v[0], m * v[1], m * v[2]];
+      if (impulses && bodies && hit.body.row * IMPULSE_WORDS < impulses.length) {
+        const at = hit.body.row * BODY_WORDS,
+          row = hit.body.row * IMPULSE_WORDS;
+        const arm: Vec3 = [
+          hit.point[0] - bodies[at + 7]!,
+          hit.point[1] - bodies[at + 8]!,
+          hit.point[2] - bodies[at + 9]!,
+        ];
+        impulses[row] = impulses[row]! + j[0];
+        impulses[row + 1] = impulses[row + 1]! + j[1];
+        impulses[row + 2] = impulses[row + 2]! + j[2];
+        impulses[row + 3] = impulses[row + 3]! + (arm[1] * j[2] - arm[2] * j[1]);
+        impulses[row + 4] = impulses[row + 4]! + (arm[2] * j[0] - arm[0] * j[2]);
+        impulses[row + 5] = impulses[row + 5]! + (arm[0] * j[1] - arm[1] * j[0]);
+      }
+      this.breakables?.applyImpact(hit.point, j);
+      if (plates && bodies)
+        this.loadPlates(plates, bodies, hit.body.row, hit.point, hit.normal, v, m, this.diameter[i]!);
     }
+    return stopped;
+  }
+
+  /** A hit on a hull plate: its work and impulse, and its seal loss by the plug's shear work (see {@link HullPlate}). */
+  private loadPlates(
+    damage: Float64Array,
+    bodies: Float32Array,
+    row: number,
+    point: Vec3,
+    normal: Vec3,
+    v: Vec3,
+    m: number,
+    diameter: number,
+  ): void {
+    for (let k = 0; k < this.plates.length; k++) {
+      const plate = this.plates[k]!;
+      if (plate.body !== row) continue;
+      const at = row * BODY_WORDS;
+      const q = bodies.subarray(at + 3, at + 7);
+      const local = rotate(q, plate.centre);
+      const c: Vec3 = [bodies[at]! + local[0], bodies[at + 1]! + local[1], bodies[at + 2]! + local[2]];
+      if (hypot(point[0] - c[0], point[1] - c[1], point[2] - c[2]) > plate.radius) continue;
+      // The speed into the plate, along its surface normal, does the punching.
+      const into = -(v[0] * normal[0] + v[1] * normal[1] + v[2] * normal[2]);
+      const work = 0.5 * m * Math.max(into, 0) * Math.max(into, 0);
+      const plug = (Math.PI * diameter * plate.thickness * plate.thickness * plate.shearStrength) / 2;
+      const o = k * CRUSH_WORDS;
+      damage[o + 1] = damage[o + 1]! + work;
+      damage[o + 4] = damage[o + 4]! + m * Math.max(into, 0);
+      damage[o + 6] = Math.max(damage[o + 6]!, Math.min(1, work / plug));
+      damage[o + 7] = damage[o + 7]! + 1;
+    }
+  }
+
+  /** Fire the guns whose time has come and push their carriers back by the recoil this step holds. */
+  private stepGuns(start: number, end: number, bodies: Float32Array | null, impulses: Float64Array | null): void {
+    const words = this.gunWords();
     for (let k = 0; k < this.guns.length; k++) {
       const gun = this.guns[k]!;
       const o = k * GUN_WORDS;
@@ -798,6 +997,17 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     return [
       { field: this.explosionsField.name, region: this.explosionRegion!, tick, cell: [0, 0, 0] },
       { field: this.fragmentsField.name, region: this.fragmentRegion!, tick, cell: [0, 0, 0] },
+      { field: this.hitsField.name, region: this.hitRegion!, tick, cell: [0, 0, 0] },
+      ...(this.damageField && this.damageRegion
+        ? [
+            {
+              field: this.damageField.name,
+              region: this.damageRegion,
+              tick,
+              cell: [0, 0, 0] as [number, number, number],
+            },
+          ]
+        : []),
       ...(this.impulseRegion
         ? [
             {
@@ -820,6 +1030,8 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       this.fragmentRegion!,
       this.gunRegion!,
       this.launchRegion!,
+      this.hitRegion!,
+      ...(this.damageRegion ? [this.damageRegion] : []),
       ...(this.impulseRegion ? [this.impulseRegion] : []),
     ];
   }
@@ -830,7 +1042,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
 
   /** The work the last steps did (the fragment steps are counted since the solver was made). */
   get counts(): ExplosionCounts {
-    return { flying: this.flyingNow, fragmentSteps: this.steps, gunSteps: this.gunSteps };
+    return { flying: this.flyingNow, fragmentSteps: this.steps, gunSteps: this.gunSteps, hits: this.hitCount };
   }
 
   /** Charge `index` as the `explosions` field publishes it. @throws RangeError for an index out of range. */
@@ -895,6 +1107,20 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     const o = (this.placed.length + index) * EXPLOSION_WORDS;
     const r = this.explosions().subarray(o, o + EXPLOSION_WORDS);
     return { position: [r[0]!, r[1]!, r[2]!], time: r[3]!, energy: r[4]!, gasMass: r[8]!, detonated: r[9] === 1 };
+  }
+
+  /** A copy of the hits: one `HIT_WORDS` row a fragment, its last word 1 once it has struck a body. */
+  hitRows(): Float64Array {
+    return Float64Array.from(this.words(this.hitRegion!));
+  }
+
+  /** Hull plate `index`'s damage row (crush layout): work, impulse into the plate, seal loss 0 to 1 and hits. */
+  plate(index: number): { work: number; impulse: number; sealLoss: number; hits: number } {
+    if (!(Number.isInteger(index) && index >= 0 && index < this.plates.length))
+      throw new RangeError(`ExplosionSolver has plates 0 to ${this.plates.length - 1}; got ${index}.`);
+    const d = this.words(this.damageRegion!),
+      o = index * CRUSH_WORDS;
+    return { work: d[o + 1]!, impulse: d[o + 4]!, sealLoss: d[o + 6]!, hits: d[o + 7]! };
   }
 
   /** A copy of the fragments: rows of {@link FRAGMENT_WORDS} words (x, y, z, vx, vy, vz, mass, state). */
