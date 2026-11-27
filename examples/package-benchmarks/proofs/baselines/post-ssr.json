@@ -1,17 +1,17 @@
 {
  "proof": "post-ssr",
- "ref": "a826259019",
- "revision": "a8262590192dfc26ba0e452054fe2e0f97f4e39c",
- "capturedAt": "a8262590192dfc26ba0e452054fe2e0f97f4e39c",
+ "ref": "68163189d3",
+ "revision": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
+ "capturedAt": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "a826259019 descends from f5b3575bc0": true
+  "68163189d3 descends from f5b3575bc0": true
  },
  "outputs": {
-  "SSAO, Bloom, FXAA 1x": "2f0df7c03f7360db3b1c9d82fb87c4c8f9bf471528cbf02ce888f2955ddcdd8a",
-  "SSAO, Bloom, FXAA 4x": "a8f1626eac579796a1e4418916d24df2ec433e50d628f0cf700d15b303a476fe",
-  "SSAO 1x": "81b8c1b1bfd43e9505a2f1e90280e40034d146308e0863826f914b81a165974d",
-  "SSAO 4x": "2c7c190ae007460bf346f9039a5b2d0b29dea9c7b9a2994e6037d66541efcbbf",
+  "SSAO, Bloom, FXAA 1x": "48ee9b758580279edab8f7d2ecb642869e79900b784ec26689c297ce85b18c05",
+  "SSAO, Bloom, FXAA 4x": "e2210a71e496720d250e63f8f1a745d4388384d46dcb1b9b38cc3dd427941b64",
+  "SSAO 1x": "19f022ee8c2fc6f3758751c80d2f4c1b5417bfdab81f07ed4f0da5aef23dfe49",
+  "SSAO 4x": "492e212baede9831f078720ba78910e8aa2bb2fe761728e1d3f1185ab48a7849",
   "Bloom, FXAA 1x": "d460cb686feecfcb15dd7244114ab9c960368f59163314c465586db2b53a8ffd",
   "Bloom, FXAA 4x": "327806636a93cf6fafbd9536fbf48a6753f8a2b3e6731d8815191f6e677b7815",
   "FXAA 1x": "bd82cb402018ded54ec058d8dd3697ee3bc2af056e3a87515b2e0b6ff019a01e",

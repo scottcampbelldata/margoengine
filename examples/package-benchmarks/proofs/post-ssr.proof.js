@@ -2,13 +2,13 @@
 // over a story of resizes, option edits, depth-format, sample-count and canvas-format changes, a rejected frame, device
 // restoration and disposal at 1x and 4x, for several effect lists. (The single-effect stories are post-stack.proof.js.)
 // Run: node examples/package-benchmarks/proofs/post-ssr.proof.js [ref] [pin] [--current]   (ref: the commit before SSR, default 7c47a09)
-// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: a826259019 (SSAO's extract pass steps at constant depth along an axis where a pixel stands alone, KB-SSAO-LONEPIXEL1); a7ab55ea49 (the extract shader's comments move out of its WGSL text); 196bb7feb3 (SSAO's normal reconstruction skips background neighbours, KB-SSAO-SILHOUETTE1); e2177dc6e5 (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; 26451c21fb, Bloom's temporal firefly budget; e2177dc6e5 before it) against the working tree;
+// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: 68163189d3 (SSAO's occlusion kernels read occluder depth bindings and its under-blade extract is made only for covered frames, KB-SCATTER-AOFRINGE1; the AO blur predicts the centre plane's depth, KB-POST-GTAOFAR1); a826259019 (SSAO's extract pass steps at constant depth along an axis where a pixel stands alone, KB-SSAO-LONEPIXEL1); a7ab55ea49 (the extract shader's comments move out of its WGSL text); 196bb7feb3 (SSAO's normal reconstruction skips background neighbours, KB-SSAO-SILHOUETTE1); e2177dc6e5 (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; 26451c21fb, Bloom's temporal firefly budget; e2177dc6e5 before it) against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('7c47a09', '3cf1453', 'a826259019'),
+const { ref, pin } = refs('7c47a09', '3cf1453', '68163189d3'),
   { wgsl } = await coreAt(pin),
   post = await versions('post', ref, undefined, pin);
 

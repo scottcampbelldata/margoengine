@@ -1,11 +1,11 @@
 {
  "proof": "post-stack",
- "ref": "a826259019",
- "revision": "a8262590192dfc26ba0e452054fe2e0f97f4e39c",
- "capturedAt": "a8262590192dfc26ba0e452054fe2e0f97f4e39c",
+ "ref": "68163189d3",
+ "revision": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
+ "capturedAt": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "a826259019 descends from f5b3575bc0": true,
+  "68163189d3 descends from f5b3575bc0": true,
   "f044d8ef05 descends from f5b3575bc0": false,
   "creative PostProcessing 1x: f044d8ef05 -> ca366457a3 identical calls": 1813,
   "creative PostProcessing 4x: f044d8ef05 -> ca366457a3 identical calls": 1840
@@ -13,8 +13,8 @@
  "outputs": {
   "post Bloom 1x": "b2c368fd6305b8ae6b8e6d1f707b883da2985ad1933877b5c10ef1bbe92256fa",
   "post Bloom 4x": "854868061a4a534bd1a15163cd1b030d2ac1b14cae64f32ad26d2b23d45c6c3d",
-  "post SSAO 1x": "4708ab97c40f8c5d28016149059c8988a89510e8cba0980fe085ee7529155f26",
-  "post SSAO 4x": "721a5adc6a21e2b133279bf3321e14ae190e7012865684ddaaf3ee2a04d1b0dc",
+  "post SSAO 1x": "fc9a99ff3a678d15c6ca8fe2ce2b38f4220c68679c8e9dd44cff0e56df86dc2c",
+  "post SSAO 4x": "bf261cf503e53896d461e5fb6530550e1556d16e02f21e717f1f45890cc778a7",
   "dof DOF 1x": "d842b72a23273fdce924f8ed358f6558542d07b8a216d7e5f2b580aed130ce72",
   "dof DOF 4x": "a128833f9aa81dc2d6ba70515f5829fc526411169286af6bdfb46b8b85e4db70",
   "tonemap Tonemap 1x": "069b6529ac98ee75bb9505b48aa376bbea2757e544035985b1768f98996cfcf6",
