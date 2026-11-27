@@ -112,7 +112,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/exporters/tests/plugin-lines-points.test.js` (round trip), and `npm run test:gpu:strokes` in packages/gltf
   (widths measured in the frame on WebGPU and the WebGL2 layer).
 
-### Open 2026-11-27: a point cloud's pixel size is written as CSS pixels but drawn in target pixels (KB-POINTS-CSSPX1, points, exporters)
+### Fixed 2026-11-27: a point cloud's pixel size is written as CSS pixels but drawn in target pixels (KB-POINTS-CSSPX1, points, bvh, animation, gltf)
 
 - **Repro:** on a canvas drawn at device pixel ratio 2, a `PointCloud` with `size: 4` (pixels) covers 4 target pixels, 2
   CSS pixels. `exportGLB` writes `pointSize: 4, pointSizeUnits: 'pixels'`, which the exporters README and
@@ -120,13 +120,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `PointsPlugin` sizes pixel points in pixels of the drawn target unless an owner sets `pixelScale` (sciviz
   sets CSS pixels), while `@margoengine/lines` widths and the glTF extras convention are CSS pixels. The exporter reads
   `material.size` as it is and cannot know the target's ratio from the cloud.
-- **Next:** decide one pixel unit for `PointsPlugin` (CSS pixels, as lines) or have the exporter divide by the plugin's
-  `pixelScale` for the canvas at export; either changes drawn sizes on high-DPI screens, so it needs the points owner.
-- **Scope (read 2026-11-27):** one unit has to reach every reader of a pixel size: `writeCloudUniform` and its default
-  scale (`packages/points/src/plugin.ts`), `SurfelPoints.writeCloud` (`surfels.ts`, which ignores `pixelScale`, so
-  sciviz's scale does not reach surfels either), the sprite vertex shader's pixel offset (`shaders.ts`, `params.z`),
-  `@margoengine/bvh` point and sprite picking (`bvh/src/points.ts` takes `size` as drawing-buffer pixels), and the
-  override in `gltf/src/strokes.ts`, which a CSS-pixel default makes redundant.
+  `DeformedPoints` also sized in view pixels, `SurfelPlugin` and pixel sprites ignored any scale, and
+  `@margoengine/bvh` picking took `size` as drawing-buffer pixels.
+- **Fix:** CSS pixels everywhere a point or sprite pixel size is read: the plugin's and surfels' default scale is the
+  target's width over the canvas's CSS width (the `@margoengine/lines` formula), the sprite shader multiplies its pixel
+  offset by it, `PointRaycaster` scales sizes and clamps, `DeformedPoints` scales its size, and the glTF stroke reader's
+  own override is gone. Drawn sizes grow on canvases backed above 1 pixel per CSS pixel (docs/limits.md).
+  Regression: `packages/points/tests/pixel-scale.test.js`, `packages/bvh/tests/points.test.js`,
+  `packages/animation/tests/deformed-points.test.js` and `packages/points/tests/pixel-density-browser.mjs` (WebGPU and
+  the WebGL2 layer, with a reloaded GLB).
 
 ### Fixed 2026-11-27: tests picked a build's compat-*.js chunk by listing order (KB-COMPAT-CHUNKPICK1, scatter, shadows tests)
 

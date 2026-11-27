@@ -15,7 +15,7 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Options for {@link DeformedPoints}; every one is also a live field of the same name. */
 export interface DeformedPointsOptions {
-  /** Point diameter: pixels of the view, or world units when `sizeUnits` is 'world'. Finite, 0 or more. Default 4. */
+  /** Point diameter: CSS pixels, or world units when `sizeUnits` is 'world'. Finite, 0 or more. Default 4. */
   size?: number;
   /** 'pixels' keeps a constant screen size; 'world' shrinks with distance. Default 'pixels'. */
   sizeUnits?: 'pixels' | 'world';
@@ -253,8 +253,11 @@ export class DeformedPoints implements EnginePlugin {
       });
       this.groups = [];
     }
-    const [width, height] = viewSize(c),
-      scale = pointScale(c.camera.matrix, this.size, this.sizeUnits, width, height, this.scale),
+    // A pixel size is CSS pixels, as @margoengine/points and lines: the target's pixels per CSS pixel of the canvas.
+    const css = (e.canvas as { clientWidth?: number } | undefined)?.clientWidth,
+      size = this.sizeUnits === 'pixels' && css ? this.size * (c.width / css) : this.size,
+      [width, height] = viewSize(c),
+      scale = pointScale(c.camera.matrix, size, this.sizeUnits, width, height, this.scale),
       f = this.values;
     f.set(c.camera.matrix);
     f.set(this.color, 32);

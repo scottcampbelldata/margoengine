@@ -182,9 +182,9 @@ struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) 
   var clip:vec4f;
   // World point of this corner: on the quad for world-sized sprites, the centre for pixel-sized ones.
   var wp=world.xyz;
-  if(batch.params.z>0.5){
+  if(batch.params.z>0.0){
     clip=frame.viewProj*world;
-    clip=vec4f(clip.xy+offset*2.0/frame.viewport.xy*clip.w,clip.zw);
+    clip=vec4f(clip.xy+offset*batch.params.z*2.0/frame.viewport.xy*clip.w,clip.zw);
   } else {
     wp=world.xyz+frame.right.xyz*offset.x+frame.up.xyz*offset.y;
     clip=frame.viewProj*vec4f(wp,1.0);

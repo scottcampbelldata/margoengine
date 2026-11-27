@@ -144,6 +144,25 @@ test('a point drawn wider than the threshold hits across its drawn size', async 
   assert.equal(ray.intersectObjects(engine, [metres]).length, 0);
 });
 
+test('on a canvas backed at 2 pixels per CSS pixel, drawn pixel sizes pick in CSS pixels', async () => {
+  const engine = await world();
+  engine.canvas.width = 800;
+  engine.canvas.height = 400;
+  const points = new PointCloud({ positions: [0, 0, 0], material: { size: 20 } }),
+    clamped = new PointCloud({ positions: [0, 0, 0], material: { size: 4, sizeUnits: 'world', maxPixelSize: 20 } }),
+    floored = new PointCloud({ positions: [0, 0, 0], material: { size: 0, minPixelSize: 20 } }),
+    sprite = new SpriteBatch({ material: { sizeUnits: 'pixels' }, sprites: [{ position: [0, 0, 0], size: 20 }] }),
+    ray = new PointRaycaster(),
+    [x, y] = screen(engine, [0, 0, 0]);
+  ray.threshold = 0;
+  for (const [name, target] of Object.entries({ points, clamped, floored, sprite })) {
+    ray.setFromEngine(engine, x + 9, y);
+    assert.equal(ray.intersectObjects(engine, [target]).length, 1, `${name}: 9 CSS pixels from a 20 pixel mark`);
+    ray.setFromEngine(engine, x + 11, y);
+    assert.equal(ray.intersectObjects(engine, [target]).length, 0, `${name}: 11 CSS pixels from a 20 pixel mark`);
+  }
+});
+
 test('a block whose largest point reaches the ray is not skipped', async () => {
   const engine = await world(),
     sizes = new Float32Array(100).fill(1);

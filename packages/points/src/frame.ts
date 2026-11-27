@@ -2,6 +2,15 @@ import type { Camera } from '@margoengine/core';
 import { viewMatrix } from '../../shared/view.js';
 
 /**
+ * Target pixels per CSS pixel for a drawn target `width` pixels wide, the unit of point and sprite pixel sizes, as
+ * `@margoengine/lines` widths: 1 for a canvas without a layout (offscreen, or hidden during a capture).
+ */
+export function cssPixelScale(canvas: object | undefined, width: number): number {
+  const css = (canvas as { clientWidth?: number } | undefined)?.clientWidth;
+  return css ? width / css : 1;
+}
+
+/**
  * Fills the frame uniform of the point shaders (`f`, 36 floats) for a view of `width` x `height` pixels drawn to a
  * target of `format`; `view` is a scratch matrix.
  * Returns whether the camera is orthographic: a clip matrix whose w does not depend on position, such as

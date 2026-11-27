@@ -165,20 +165,8 @@ function draw(
       line = widths ? new stroke!.Stroke({ ...options, widths }) : new lines!.Line(options);
     return [{ owner, item: owner.add(line) }];
   }
-  const owner = plugin(
-      engine,
-      POINTS,
-      () => {
-        const made = new points!.PointsPlugin({ name: POINTS });
-        // The file's pixel sizes are CSS pixels; the plugin's own are pixels of the target.
-        made.pixelScale = (context) => {
-          const canvas = engine.canvas as { clientWidth?: number };
-          return canvas.clientWidth ? context.width / canvas.clientWidth : 1;
-        };
-        return made;
-      },
-      points!.PointsPlugin,
-    ),
+  // The file's pixel sizes are CSS pixels, as the plugin's own are.
+  const owner = plugin(engine, POINTS, () => new points!.PointsPlugin({ name: POINTS }), points!.PointsPlugin),
     { positions, colors } = gather(vertices, indices, alpha),
     sizes = multipliers(item.widths, indices),
     lit = !(material.extensions && 'KHR_materials_unlit' in material.extensions);

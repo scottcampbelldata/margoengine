@@ -18,7 +18,7 @@ import { compatibilityLevel, compatTier, requireCompatTier } from '../../shared/
 import { roundsFloatTargets } from './tier.js';
 import { PointCloud } from './cloud.js';
 import { checkStorage } from './storage-limit.js';
-import { fillFrame } from './frame.js';
+import { cssPixelScale, fillFrame } from './frame.js';
 import { allocateBudget, boxInFrustum, mergeRanges, screenArea, worldBox } from './math.js';
 import { depthPacking, FLAG, FRAME_BYTES, frameWgsl, pointColorWgsl } from './shaders.js';
 
@@ -599,7 +599,7 @@ export class SurfelPlugin implements EnginePlugin {
     return [depth, blend, resolves];
   }
 
-  private writeCloud(cloud: PointCloud, r: CloudGpu, model: ArrayLike<number>): void {
+  private writeCloud(cloud: PointCloud, r: CloudGpu, model: ArrayLike<number>, pixelScale: number): void {
     const m = cloud.material,
       f = r.floats,
       u = r.uints,
@@ -607,9 +607,9 @@ export class SurfelPlugin implements EnginePlugin {
     f.set(model, 0);
     f.set(m.color, 16);
     f[19] = m.alphaTest;
-    f[20] = m.size;
-    f[21] = m.minPixelSize;
-    f[22] = m.maxPixelSize;
+    f[20] = m.sizeUnits === 'pixels' ? m.size * pixelScale : m.size;
+    f[21] = m.minPixelSize * pixelScale;
+    f[22] = m.maxPixelSize * pixelScale;
     f[23] = this.overlap;
     u[24] =
       (cloud.colors && m.vertexColors ? FLAG.colors : 0) |
@@ -640,7 +640,8 @@ export class SurfelPlugin implements EnginePlugin {
       camera = context.camera,
       f = this.frameData,
       [viewWidth, viewHeight] = viewSize(context),
-      orthographic = fillFrame(f, this.view, camera, viewWidth, viewHeight, context.format);
+      orthographic = fillFrame(f, this.view, camera, viewWidth, viewHeight, context.format),
+      pixelScale = cssPixelScale(engine.canvas, context.width);
     device.queue.writeBuffer(gpu.frame, 0, f);
     if (this.fogSource) {
       writeFog(this.fogSource, camera.position, this.fogData);
@@ -660,7 +661,7 @@ export class SurfelPlugin implements EnginePlugin {
       cloud.material.validate();
       const r = this.ensure(cloud);
       this.flush(cloud, r);
-      this.writeCloud(cloud, r, model);
+      this.writeCloud(cloud, r, model, pixelScale);
       s.clouds++;
       const blocks = cloud.blocks,
         first = blocksOf.length;

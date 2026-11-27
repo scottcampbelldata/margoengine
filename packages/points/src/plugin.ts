@@ -5,7 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { PointCloud } from './cloud.js';
 import { checkStorage } from './storage-limit.js';
-import { fillFrame } from './frame.js';
+import { cssPixelScale, fillFrame } from './frame.js';
 import { SpriteBatch, SPRITE_STRIDE } from './sprites.js';
 import type { PointsMaterial, SpriteMaterial, PointsTextureSource } from './material.js';
 import { type BorrowSlot, borrow, lend } from '../../shared/borrowed.js';
@@ -242,9 +242,9 @@ export class PointsPlugin implements EnginePlugin {
     height: number;
   };
   /**
-   * @internal Target pixels per unit of the clouds' pixel sizes (`size` in 'pixels' units, `minPixelSize`,
-   * `maxPixelSize`) for the frame being drawn. Unset, the sizes are pixels of the drawn target. An owner that sizes in CSS
-   * pixels (sciviz) returns the target's pixels per CSS pixel, so the material keeps the caller's values.
+   * @internal Target pixels per CSS pixel for the frame being drawn, applied to pixel sizes (`size` in 'pixels' units,
+   * `minPixelSize`, `maxPixelSize`, pixel sprites). Unset, the drawn target's width over the canvas's CSS width. An
+   * owner that maps differently (sciviz, whose tiled exports draw no canvas pixels) returns its own.
    */
   pixelScale: ((context: GpuContext) => number) | undefined;
   private readonly frameData = new Float32Array(FRAME_BYTES / 4);
@@ -1318,7 +1318,7 @@ export class PointsPlugin implements EnginePlugin {
       gpu = this.gpu,
       camera = context.camera;
     this.writeFrame(context);
-    const pixelScale = this.pixelScale?.(context) ?? 1;
+    const pixelScale = this.pixelScale?.(context) ?? cssPixelScale(engine.canvas, context.width);
     const projScale = this.frameData[18],
       viewWidth = this.frameData[16],
       viewHeight = this.frameData[17];
@@ -1480,7 +1480,8 @@ export class PointsPlugin implements EnginePlugin {
       f[19] = m.opacity;
       f[20] = m.rotation;
       f[21] = m.alphaTest;
-      f[22] = m.sizeUnits === 'pixels' ? 1 : 0;
+      // params.z: target pixels per sprite pixel, or 0 for world-sized sprites.
+      f[22] = m.sizeUnits === 'pixels' ? pixelScale : 0;
       // Clipping planes: count in params.w (negative: intersection), planes from byte 96, unused slots zeroed.
       const planes = m['clipping'];
       f[23] = (planes.length / 4) * (m.clipIntersection ? -1 : 1);

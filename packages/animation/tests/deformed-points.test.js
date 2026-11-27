@@ -205,6 +205,33 @@ test('each primitive draws as one instanced quad strip from its deformed vertice
   engine.dispose();
 });
 
+test('a pixel size is CSS pixels of the canvas; a world size keeps its units', async () => {
+  const engine = await headless(),
+    model = load(engine, skinnedStrip()),
+    gpu = mockGPU(),
+    points = new DeformedPoints(model, { size: 8 }),
+    // A canvas 640 CSS pixels wide under a 1280 pixel target: 2 target pixels per CSS pixel (KB-POINTS-CSSPX1).
+    host = { gpu: gpu.device, canvas: { clientWidth: 640 }, sceneOf() {}, stats: { visible: 0, drawCalls: 0 } };
+  points.setup(host);
+  const run = passes(points),
+    view = context(gpu, { samples: 4 }),
+    scale = (i) => {
+      gpu.record(() => {
+        view.begin(i);
+        run(view.c);
+        view.end();
+      });
+      return [...points['values'].subarray(36, 39)];
+    };
+  assert.deepEqual(scale(0), [16 / 1280, 16 / 720, 1].map(Math.fround));
+  points.set({ sizeUnits: 'world' });
+  const world = pointScale(view.camera.matrix, 8, 'world', 1280, 720);
+  assert.deepEqual(scale(0), [...world]);
+  points.dispose();
+  model.dispose();
+  engine.dispose();
+});
+
 test('the shader keeps its comments outside the WGSL', () => {
   assert.ok(!deformedPointsShader.includes('//'));
   assert.match(deformedPointsShader, /corner\*f\.scale\.xy\*mix\(1\.0,c\.w,f\.scale\.z\)/);

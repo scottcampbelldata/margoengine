@@ -361,7 +361,7 @@ for (const hit of ray.intersectEngine(engine))
   if (hit.target === cloud) console.log('point', hit.index, 'missed its centre by', hit.offset);
 ```
 
-A point hits when the ray passes within `threshold` of its centre, or within its drawn size when that is larger, and a sprite when the ray crosses its drawn quad grown by `threshold`, with `uv` at the hit. The hit's `distance` is along the ray; `offset` is how far the ray passed from the point's centre. Clipping planes, `visible`, and each cloud's size settings count. A cloud that follows a mesh also obeys the raycaster's `layers` and `filter`; one that follows no mesh has neither, and its hits carry `mesh: UNATTACHED`. Sprite transparency is not read: a sprite's whole quad hits.
+A point hits when the ray passes within `threshold` of its centre, or within its drawn size when that is larger, and a sprite when the ray crosses its drawn quad grown by `threshold`, with `uv` at the hit. The hit's `distance` is along the ray; `offset` is how far the ray passed from the point's centre. Clipping planes, `visible`, and each cloud's size settings count: pixel sizes, pixel clamps and pixel sprites are CSS pixels, as `PointsPlugin` draws them. A cloud that follows a mesh also obeys the raycaster's `layers` and `filter`; one that follows no mesh has neither, and its hits carry `mesh: UNATTACHED`. Sprite transparency is not read: a sprite's whole quad hits.
 
 | Option | Default |
 | --- | --- |

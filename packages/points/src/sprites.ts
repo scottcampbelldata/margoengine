@@ -12,7 +12,7 @@ export const SPRITE_STRIDE = 16;
 export interface SpriteOptions {
   /** Local position (the batch's matrix or attached mesh applies). Default [0, 0, 0]. */
   position?: readonly [number, number, number];
-  /** Width and height, or one number for a square. World units or pixels per `material.sizeUnits`. Default 1. */
+  /** Width and height, or one number for a square. World units or CSS pixels per `material.sizeUnits`. Default 1. */
   size?: number | readonly [number, number];
   /** Radians counterclockwise in the screen plane, added to `material.rotation`. Default 0. */
   rotation?: number;

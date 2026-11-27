@@ -211,15 +211,15 @@ export type PointShading = 'flat' | 'sphere';
 export interface PointsMaterialOptions extends BaseMaterialOptions {
   /** Optional screen-door coverage [lower,upper], both in [0,1]. Default full coverage. */
   ditherFade?: readonly [number, number];
-  /** Point diameter: pixels, or world units when `sizeUnits` is 'world'. Per-point sizes multiply it. Default 4. */
+  /** Point diameter: CSS pixels, or world units when `sizeUnits` is 'world'. Per-point sizes multiply it. Default 4. */
   size?: number;
   /** 'pixels' keeps a constant screen size; 'world' attenuates with distance. Default 'pixels'. */
   sizeUnits?: 'pixels' | 'world';
   /** Alias: true is `sizeUnits: 'world'`, false is 'pixels'. */
   sizeAttenuation?: boolean;
-  /** Clamp of the final diameter in pixels. Defaults 1 and 256. */
+  /** Clamp of the final diameter in CSS pixels. Defaults 1 and 256. */
   minPixelSize?: number;
-  /** Upper clamp of the final diameter in pixels; must be at least `minPixelSize`. Default 256. */
+  /** Upper clamp of the final diameter in CSS pixels; must be at least `minPixelSize`. Default 256. */
   maxPixelSize?: number;
   /** 'square', or 'round' (an antialiased disc). Default 'square'. A `map` is sampled across either shape. */
   shape?: PointShape;

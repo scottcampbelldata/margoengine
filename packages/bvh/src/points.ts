@@ -198,14 +198,15 @@ export class PointRaycaster extends Raycaster {
       // Clip w of a local point: a linear form, whose peak over a box sits at a corner picked per axis by sign.
       clip = multiplyMatrices(view.matrix, world, new Float64Array(16)),
       stretch = Math.hypot(...inverse.subarray(0, 3), ...inverse.subarray(4, 7), ...inverse.subarray(8, 11)),
-      { focal } = view;
+      { focal, ratio } = view;
     localRay(inverse, o, d, local, direction);
     let largest = size;
     if (sizes) for (let i = 0; i < sizes.length; i++) if (sizes[i] * size > largest) largest = sizes[i] * size;
     // World radius a point of diameter `value` is drawn at, at clip w `w`.
     const drawn = (value: number, w: number): number => {
-      const px = sizeUnits === 'world' ? (value * focal) / w : value;
-      return (0.5 * Math.min(Math.max(px, minPixelSize), maxPixelSize) * w) / focal;
+      // Pixel sizes and clamps are CSS pixels, as PointsPlugin draws them.
+      const px = sizeUnits === 'world' ? (value * focal) / w : value * ratio;
+      return (0.5 * Math.min(Math.max(px, minPixelSize * ratio), maxPixelSize * ratio) * w) / focal;
     };
     const found: PointRaycasterHit[] = [];
     for (let block = 0; block < blocks.length; block++) {
@@ -252,7 +253,7 @@ export class PointRaycaster extends Raycaster {
 
   private sprites(batch: PickableSprites, world: ArrayLike<number>, view: PickView, out: PointRaycasterHit[]): void {
     const { data, material } = batch,
-      { right, up, back, focal } = view,
+      { right, up, back, focal, ratio } = view,
       o = this.origin,
       d = this.direction,
       facing = d[0] * back[0] + d[1] * back[1] + d[2] * back[2],
@@ -270,7 +271,7 @@ export class PointRaycaster extends Raycaster {
         t = (vx * back[0] + vy * back[1] + vz * back[2]) / facing;
       if (t < this.near || t > this.far) continue;
       // Where the ray crosses the sprite's plane, in the sprite's own axes and units.
-      const unit = pixels ? w / focal : 1,
+      const unit = pixels ? (ratio * w) / focal : 1,
         hx = o[0] + t * d[0] - p[0],
         hy = o[1] + t * d[1] - p[1],
         hz = o[2] + t * d[2] - p[2],

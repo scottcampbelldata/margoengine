@@ -151,7 +151,8 @@ test('parseGLTFAsync draws primitives that ask for a width with the lines and po
   assert.equal(cloud.material.shape, 'round', 'a Bentley point is a disc');
   assert.equal(cloud.material.shading, 'sphere', 'a lit point material shades as a sphere');
   assert.equal(cloud.attachedMesh, node);
-  assert.equal(points.pixelScale({ width: 128 }), 2, 'pixel sizes are CSS pixels');
+  // CSS pixels are the plugin's own unit (@margoengine/points tests/pixel-scale.test.js), so the file needs no override.
+  assert.equal(points.pixelScale, undefined);
   model.dispose();
   assert.equal(instance.plugins.has('gltf-lines'), false, 'the last model gone takes the plugins with it');
   assert.equal(instance.plugins.has('gltf-points'), false);

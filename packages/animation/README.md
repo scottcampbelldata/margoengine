@@ -779,7 +779,7 @@ points.opacity = 0.8; // every option is also a live field
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `size` | `4` | Point diameter: pixels of the view, or world units with `sizeUnits: 'world'`. Finite, 0 or more |
+| `size` | `4` | Point diameter: CSS pixels, or world units with `sizeUnits: 'world'`. Finite, 0 or more |
 | `sizeUnits` | `'pixels'` | `'pixels'` keeps a constant screen size; `'world'` shrinks with distance |
 | `color` | white | `'#rrggbb'`, `'#rgb'` or `0xrrggbb` (sRGB), or a linear `[r, g, b]` array. Change it with `set({color})`; `points.color` reads the linear RGB |
 | `opacity` | `1` | 0 to 1. Below 1 the points blend over what is already drawn and still write depth |
