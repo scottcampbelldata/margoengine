@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21149870,
+  "total": 21151196,
   "history": [
     {
       "date": "2026-10-24",
@@ -14983,6 +14983,12 @@
       "commit": "line-style-export",
       "reason": "Plugin line style and colour modes in the scene writers (Limits gaps row 15): exporters/collect 14,135 to 14,477 B gzip measured, gltf 21,363 to 21,708, gcode 15,398 to 15,745, usdz 22,896 to 23,232, usdz-anim 28,489 to 28,813, dae 15,983 to 16,321, dae-glb 19,801 to 20,130, roblox 24,304 to 24,642, materials 22,203 to 22,547, sparse 25,350 to 25,698, model 9,683 to 9,695 (joins, caps, dashes and draw state written to extras, and colorMode set and add baked into the colours the line draws); the writer sits in the scene collector every one of these formats builds synchronously, so a split would make export async for a few hundred bytes",
       "grew": 11
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "0382682375",
+      "reason": "shader/glsl-pass 43,055 to 43,104 B gzip measured: 0382682375 lets Clustered integrated shadow maps take drawLocalShadow casters (RawMesh, terrain); the caster hook is part of the raw material the pass draws with, so a split would save nothing for the 49 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -16251,7 +16257,7 @@
     "@margoengine/shader/effects": 9334,
     "@margoengine/shader/glsl": 18767,
     "@margoengine/shader/glsl-material": 40907,
-    "@margoengine/shader/glsl-pass": 43072,
+    "@margoengine/shader/glsl-pass": 44398,
     "@margoengine/shader/graph": 14964,
     "@margoengine/shader/lighting": 10704,
     "@margoengine/shader/noise": 5538,
