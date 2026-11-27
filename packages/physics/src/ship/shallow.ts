@@ -98,7 +98,8 @@ export interface ShallowTable {
  *   (Esso Osaka 1.99, KVLCC2's 1.4 m model 4.10), and 2.4 gives KRISO's measured 20/5 overshoot at h/T 1.2, 3.8 degrees.
  * - Surge derivatives and R'0: a bare hull of KVLCC2's L/B, B/T and C_B, Furukawa et al. 2016, Table 2.
  * - a_H, x'_H, gamma_R and 1 - t_P: Esso Osaka, Hirano et al. 1984 and Yoshimura 1986, read off their figures.
- * - w_P0 at every depth and gamma_R at h/T 2.0: Amin and Hasegawa's 2010 regression for KVLCC2's form.
+ * - w_P0 at every depth and gamma_R at h/T 2.0: Amin and Hasegawa's 2010 regression for KVLCC2's form, as Sherif, Xin and
+ *   Zhou reprint it (Brodogradnja 78(1), 2026, Appendix C).
  * - epsilon: a pure car carrier's, Yoshimura 1986, the only measured series.
  */
 export const KVLCC2_SHALLOW: ShallowTable = Object.freeze({

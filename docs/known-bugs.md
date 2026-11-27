@@ -449,7 +449,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Calibration:** one value, N'r at h/T 1.2, where the captive tests disagree twofold. It is fitted to KRISO's 20/5
   overshoot there.
 - **Checked against data not fitted:**
-  - At h/T 1.2: KRISO's 20/10, FHR's two 20/5 overshoots, and the turn's reach and advance, all within 20 percent.
+  - At h/T 1.2: KRISO's 20/10, FHR's two 20/5 overshoots, and the turn's reach, all within 20 percent.
   - At h/T 1.5: the reach within 10 percent, and the 20/10 28 percent under.
   - At h/T 2.0: the reach within 11 percent.
   The 20/5 at h/T 1.5 stays 45 percent under KRISO's 8.0, an accepted difference recorded with its cause in

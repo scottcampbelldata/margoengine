@@ -17453,13 +17453,17 @@ Validated on data not fitted:
   41-51, 1986, https://www.jstage.jst.go.jp/article/kansaiks/200/0/200_41/_pdf (Figs. 5, 9 and 10: 1 - t_P and gamma_R of
   Esso Osaka and epsilon of a pure car carrier against depth, read off the figures).
 - O. M. Amin and K. Hasegawa, "Generalized mathematical model for ship manoeuvrability considering shallow water effect",
-  Conf. Proc. JASNAOE 10, 531-534, 2010, as I. M. Sherif, P. Xin and X. Zhou reprint its formulas (Brodogradnja 78(1),
-  2027, Appendix C): w_P0 at each depth and gamma_R at h/T 2.0, evaluated for KVLCC2.
+  Conf. Proc. JASNAOE 10, 531-534, 2010 (not obtained), as I. M. Sherif, P. Xin and X. Zhou reprint its formulas in
+  "Analysis of turning maneuverability performance of a tanker in shallow water under wind disturbances", Brodogradnja
+  78(1), article 78108, available online 11 November 2026, doi:10.21278/brod78108 (Appendix C, eqs. C3 and C4, read): w_P0
+  at each depth and gamma_R at h/T 2.0, evaluated for KVLCC2.
 - Free-running data the test holds, none of it used to build the table but KRISO's 20/5 at h/T 1.2: K. Yun, D. J. Yeo and
   B. Park, "A study on the manoeuvrability of KVLCC2 in shallow water by free running model test", J. Soc. Naval Arch. Korea
   52(6), 494-500, 2015, doi:10.3744/SNAK.2015.52.6.494 (Tables 5 to 7); K. Eloot, G. Delefortrie, M. Vantorre and
-  F. Quadvlieg, "Validation of ship manoeuvring in shallow water through free-running tests", OMAE2015-41912 (Table 4);
-  Sherif et al. 2027, Table 4.
+  F. Quadvlieg, "Validation of ship manoeuvring in shallow water through free-running tests", OMAE2015-41912,
+  doi:10.1115/OMAE2015-41912 (Table 4, with each overshoot's standard deviation over repeated runs). Sherif et al.'s Table 4
+  also lists a 35 degree turn at h/T 1.2 (advance 2.92 L, "FRMT-15") without naming its source, and KRISO's runs stop at 40
+  degrees of heading, so that advance is not used.
 - Read for the diagnosis: D. Y. Kim, S. H. Kim, J. S. Han, S. J. Kim and K. J. Paik, Brodogradnja 68(4), 2017,
   doi:10.21278/brod68401 (Ankudinov's factors give KVLCC2 overshoots far under KRISO's); G. Delefortrie, K. Eloot, E. Lataire,
   W. Van Hoydonck and M. Vantorre, 4th MASHCON, 273-286, 2016 (a fully measured model is also too course-stable at h/T 1.2).
@@ -17468,7 +17472,7 @@ X'_vr's ratio as that of X'_vr + m'_y, and interpolating in (T/h)^2 are this pac
 
 Calibration. One value is fitted: N'r at h/T 1.2, 2.4 times deep, where the captive tests disagree twofold (Esso Osaka 1.99,
 KVLCC2's 1.4 m model 4.10), to KRISO's first 20/5 overshoot at h/T 1.2, 3.8 degrees. Validated on data not fitted:
-- h/T 1.2: KRISO's 20/10; FHR's two 20/5 overshoots; the 35 degree turn's 40 degree reach and its advance.
+- h/T 1.2: KRISO's 20/10; FHR's two 20/5 overshoots; the 35 degree turn's 40 degree reach.
 - h/T 1.5: the reach and the 20/10.
 - h/T 2.0: the reach.
 Proof: `packages/physics/tests/ship.test.js`, "banks and shallows against measurement".

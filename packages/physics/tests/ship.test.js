@@ -1816,7 +1816,7 @@ test("banks and shallows against measurement: Vantorre et al.'s container ship b
   // KVLCC2 in shallow water at 7 kn, on its measured shallow-water table (KVLCC2_SHALLOW). One value is fitted: N'r at h/T
   // 1.2, to KRISO's first 20/5 overshoot there, 3.8 degrees (Yun et al. 2015). The rest is data not fitted:
   // - h/T 1.2: KRISO's 20/10, 5.5; FHR's 20/5, 4.73 and 8.19 (Eloot et al. 2015); the 35 degree turn's 40 degree reach,
-  //   2.00 L (KRISO), and advance, 2.92 L (Sherif et al. 2027's table of free-running tests).
+  //   2.00 L (KRISO).
   // - h/T 1.5: KRISO's 20/10, 9.3, and reach, 1.69 L; its 20/5, 8.0, the model gives 45 percent under (docs/limits.md).
   // - h/T 2.0: KRISO's reach, 1.61 L.
   // Ankudinov's factors alone (KB-SHIP-SHALLOW1) gave 2.1 and 3.3 degrees at h/T 1.2 and 1.5, and reaches of 3.3 and 2.3 L.
@@ -1844,12 +1844,8 @@ test("banks and shallows against measurement: Vantorre et al.'s container ship b
         t = new Manoeuvring(model, { u: v0 }, { rudderRate: rate });
       t.revolutions = t.selfPropulsion(v0);
       t.order = 35 * DEG;
-      let reach = null;
-      while (t.state.heading < 90 * DEG) {
-        t.step(0.05);
-        if (reach === null && t.state.heading > 40 * DEG) reach = t.state.x / 7;
-      }
-      return { z5: zigzag(20, 5), z10: zigzag(20, 10), reach, advance: t.state.x / 7 };
+      while (t.state.heading < 40 * DEG) t.step(0.05);
+      return { z5: zigzag(20, 5), z10: zigzag(20, 10), reach: t.state.x / 7 };
     },
     h12 = at(1.2),
     h15 = at(1.5),
@@ -1860,8 +1856,7 @@ test("banks and shallows against measurement: Vantorre et al.'s container ship b
     near(h12.z10[0], 5.5, 0.1) &&
       near(h12.z5[0], 4.73, 0.25) &&
       near(h12.z5[1], 8.19, 0.2) &&
-      near(h12.reach, 2.0, 0.12) &&
-      near(h12.advance, 2.92, 0.08),
+      near(h12.reach, 2.0, 0.12),
     `h/T 1.2: ${all}`,
   );
   assert.ok(
