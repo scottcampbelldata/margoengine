@@ -194,14 +194,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   model), without the `lightScale` that takes sky units into the engine sun's units. Fixing it moves the numbers of
   KB-AIR-HAZELIGHT1, KB-AIR-SKYLIGHT1 and the shot look bars, so it needs its own pass.
 
-### Open 2026-11-27: dark beaded trails cross the burned valley's aftermath view at film quality (KB-VFX-DARKTRAILS1, vfx; owner to be confirmed)
+### Fixed 2026-11-27: the "burnt" valley still burned, under dark beaded trails at film quality (KB-VFX-DARKTRAILS1, scenes)
 
-- **Repro:** `packages/scenes/test/timber-valley-still.html?view=aftermath&weather=smoke&fire=burnt&date=1910-08-22&hour=10&w=960&h=540`
-  (film quality, 60 frames): wavy strings of dark soft blobs fill the upper left, near the camera. Not seen at
-  `quality=preview` with 30 frames.
-- **Looked at:** after the scene's `settle(86400)` for `fire: 'burnt'`, all 12 smoke columns still carried 2 to 66 MW,
-  so the fire had not burned out in a day and the "burned" valley still burns; the columns sit 700 m and more from
-  the camera. Which effect draws the strings is not traced.
+- **Repro (before):** `packages/scenes/test/timber-valley-still.html?view=aftermath&weather=smoke&fire=burnt&date=1910-08-22&hour=10&w=960&h=540`
+  (film quality, 60 frames): wavy strings of dark soft blobs filled the upper left; all 12 smoke columns still carried
+  2 to 66 MW after the scene's `settle(86400)`.
+- **Cause:** `fire: 'burnt'` ("run until nothing burns") stopped the fire after one day of fire time, and a surface
+  fire in the valley's timber litter runs on for days. Measured with the scene's fuel, ignitions and smoke-day weather:
+  on the 8 m grid 188,822 of 257,138 fuelled cells burnt and 20 still burning after one day, out after about two; on
+  the film's 4 m grid 233,036 of 1,034,173 burnt after one day and 625,729 after a day and a half.
+- **Fix:** the scene runs the fire with `burnOut` until it goes out (at most `BURN_OUT_LIMIT`, 30 days, past which it
+  throws a coded error rather than show a burning "burnt" valley) (`packages/scenes/src/timber-valley.ts`). The same
+  view now shows no smoke column and no trails (RTX A6000, WebGPU); the scene's build on the film grid takes about
+  11 minutes, most of it the fire. Which effect drew the trails was not traced further: they went with the columns.
+- **Regression test:** `packages/scenes/test/timber-valley.test.js` (burnOut runs a fire past a day to its end and
+  refuses one that never ends).
+- **Weak spot:** in the smoke day's light the south wall's trees read as dark silhouettes, so this frame does not show
+  whether they are charred.
 
 ### Fixed 2026-11-27: SnapshotRendering's stats lost a recording dropped before the next frame (KB-CULL-SNAPSTATS1, culling)
 

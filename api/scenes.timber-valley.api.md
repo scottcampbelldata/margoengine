@@ -22,6 +22,8 @@ export interface Anchor {
     readonly about: string;
 }
 
+export const BURN_OUT_LIMIT: number;
+
 export interface ShotTrack {
     readonly type: 'camera';
     readonly id: 'camera';
@@ -97,6 +99,11 @@ export interface TimberValleySettings {
 }
 
 export function attach(engine: EngineKernel, settings?: TimberValleySettings): Promise<TimberValleyScene>;
+
+export function burnOut(fire: {
+    settle(maxSeconds: number, signal?: AbortSignal): Promise<number>;
+    readonly active: boolean;
+}, signal?: AbortSignal): Promise<number>;
 
 export function check(settings: TimberValleySettings): Filled;
 

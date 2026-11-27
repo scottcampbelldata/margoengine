@@ -206,7 +206,7 @@ anywhere along the valley keeps the creek's channel. The handle gives `height`, 
 | `look` | `animatedFeature` | `animatedFeature`, `natural` |
 | `weather` | `blowup` | `calm` (2 m/s), `redFlag` (9 m/s, 15 percent humidity, 32 C), `blowup` (20 m/s gusting, 12 percent, 30 C), `smoke` (a day under wildfire smoke, the load of `WEATHER_LOOKS.wildfireSmoke`: about 1.6 km of visibility) |
 | `windFrom` | 225 | 0 to 360 degrees, the compass direction the wind blows from |
-| `fire` | `running` | `none`, `running` (for `fireTime` seconds), `burnt` (run until nothing burns) |
+| `fire` | `running` | `none`, `running` (for `fireTime` seconds), `burnt` (run until nothing burns: `burnOut`, days of fire time; the film grid takes about 11 minutes to build) |
 | `fireTime` | 1,800 | 0 to 21,600 s |
 | `houses` | 48 | 0 to 256 lots |
 | `meshes` | none | library models by species key (`BiomeViewOptions.meshes`) |

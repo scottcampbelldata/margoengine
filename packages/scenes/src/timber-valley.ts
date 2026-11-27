@@ -32,6 +32,7 @@ import { GTAO } from '@margoengine/post/gtao';
 import { applyLookFamily, type LookFamilyName } from './look-family.js';
 import type { SceneShot } from './index.js';
 import { timberValleyInfo } from './timber-valley-info.js';
+import { margoError } from '../../shared/errors.js';
 
 /** Settings of {@link attach}. Every one has a default; the defaults are the blowup afternoon of 20 August 1910. */
 export interface TimberValleySettings {
@@ -55,7 +56,7 @@ export interface TimberValleySettings {
   readonly weather?: 'calm' | 'redFlag' | 'blowup' | 'smoke';
   /** Compass direction the wind blows FROM, degrees (0 north, 90 east). Default 225 (the south-west gale). */
   readonly windFrom?: number;
-  /** `none`, `running` (burning for `fireTime` seconds) or `burnt` (run until nothing burns). Default `running`. */
+  /** `none`, `running` (burning for `fireTime` seconds) or `burnt` (run until nothing burns, `burnOut`; days of fire time). Default `running`. */
   readonly fire?: 'none' | 'running' | 'burnt';
   /** Seconds the fire has burned when the scene opens, 0 to 21,600. Default 1,800. */
   readonly fireTime?: number;
@@ -410,7 +411,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
     disposers.push(() => drive.dispose?.());
     if (fireFront) {
       rollFire(drive, fireFront, s.fireTime);
-      if (s.fire === 'burnt') await fireFront.settle(86400, settings.signal);
+      if (s.fire === 'burnt') await burnOut(fireFront, settings.signal);
     }
     const look = (name: LookFamilyName) =>
       applyLookFamily(name, {
@@ -489,6 +490,28 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
   } catch (error) {
     return fail(error);
   }
+}
+
+/** The most fire time `fire: 'burnt'` runs while waiting for the fire to go out, seconds: 30 days. */
+export const BURN_OUT_LIMIT = 30 * 86400;
+
+/**
+ * Runs a fire until nothing burns and no ember waits (`settle`), for `fire: 'burnt'`, and resolves with its fire time.
+ * A surface fire in this valley's timber litter runs on for days (about 2 days of fire time on the 8 m grid): until
+ * 2026-11-27 the scene stopped it after one, so the burned valley still burned (KB-VFX-DARKTRAILS1). Throws a coded
+ * error, never a picture of a fire still burning, if it has not gone out by {@link BURN_OUT_LIMIT}; `signal` aborts it.
+ */
+export async function burnOut(
+  fire: { settle(maxSeconds: number, signal?: AbortSignal): Promise<number>; readonly active: boolean },
+  signal?: AbortSignal,
+): Promise<number> {
+  const time = await fire.settle(BURN_OUT_LIMIT, signal);
+  if (fire.active)
+    throw margoError(
+      'state',
+      `timber-valley fire 'burnt': the fire still burns after ${BURN_OUT_LIMIT} s of fire time; use fire 'running'`,
+    );
+  return time;
 }
 
 /**

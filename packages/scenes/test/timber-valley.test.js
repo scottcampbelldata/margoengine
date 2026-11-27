@@ -205,3 +205,33 @@ test('rollFire burns the past in the weather: far more ground under the gale tha
     w.dispose();
   }
 });
+
+// KB-VFX-DARKTRAILS1: `fire: 'burnt'` stopped the fire after one day of fire time, and the valley's litter fire runs on
+// for about two (8 m grid: 188,822 of 257,138 fuelled cells burnt and 20 still burning after 86,400 s), so the
+// "burned" valley still burned under 12 smoke columns. burnOut runs it until it goes out.
+test("burnOut runs a fire until it goes out, past a day, and refuses one that never does", async () => {
+  const { burnOut, BURN_OUT_LIMIT } = await import('@margoengine/scenes/timber-valley');
+  // A fire that goes out after two days of fire time, settled as FireFront.settle is: up to maxSeconds while active.
+  const slow = (out) => ({
+    time: 0,
+    get active() {
+      return this.time < out;
+    },
+    async settle(maxSeconds) {
+      const end = this.time + maxSeconds;
+      while (this.active && this.time < end) this.time = Math.min(end, this.time + 600);
+      return this.time;
+    },
+  });
+  const twoDays = slow(2 * 86400);
+  assert.equal(await burnOut(twoDays), 2 * 86400);
+  assert.equal(twoDays.active, false);
+  assert.ok(BURN_OUT_LIMIT >= 7 * 86400, `the limit ${BURN_OUT_LIMIT} s leaves a slow fire days to burn out`);
+  await assert.rejects(burnOut(slow(Infinity)), (e) => e.code === 'state' && /still burns/.test(e.message));
+  const stop = new AbortController();
+  stop.abort();
+  await assert.rejects(
+    burnOut({ active: true, settle: async (_, signal) => signal.throwIfAborted() }, stop.signal),
+    (e) => e.name === 'AbortError',
+  );
+});
