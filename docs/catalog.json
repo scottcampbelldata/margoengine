@@ -985,6 +985,7 @@
       "remapTileUVs",
       "setMaterialSortModes",
       "sheen",
+      "sortSettings",
       "specular",
       "tileAnimationFrame",
       "tileAnimator",

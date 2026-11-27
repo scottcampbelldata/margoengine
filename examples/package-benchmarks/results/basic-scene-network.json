@@ -1,18 +1,19 @@
 {
-  "commit": "89530083ef",
+  "commit": "9c58118e4e",
   "dirty": false,
-  "browser": "msedge 158.0.4370.33 headless",
+  "browser": "msedge 158.0.4370.45 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-ClFgCf-J.js",
+      "file": "assets/dist-Qy-_-gaj.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
-        "_version-YYhCZP03.js",
+        "_version-CrCGs6gQ.js",
         "_node-matrix-R9BipGnp-ERCK1iAW.js",
         "_errors-DkwPZuAq.js",
-        "_model-iRvuj19h-oUGoun_-.js",
+        "_mat4-BTlwq2yz.js",
+        "_model-CSAsgQzo-Btibz_XB.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -78,64 +79,64 @@
         "_meshopt-dMxKlVxN.js"
       ]
     },
-    "../../../packages/gltf/dist/compression-D4IkO5vE.js": {
-      "file": "assets/compression-D4IkO5vE-CZHa1Wst.js",
-      "name": "compression-D4IkO5vE",
-      "src": "../../../packages/gltf/dist/compression-D4IkO5vE.js",
+    "../../../packages/geometry/dist/optimize.js": {
+      "file": "assets/optimize-BesG8gNH.js",
+      "name": "optimize",
+      "src": "../../../packages/geometry/dist/optimize.js",
+      "isDynamicEntry": true
+    },
+    "../../../packages/gltf/dist/compression-D3yGZBGs.js": {
+      "file": "assets/compression-D3yGZBGs-B3PwNRbg.js",
+      "name": "compression-D3yGZBGs",
+      "src": "../../../packages/gltf/dist/compression-D3yGZBGs.js",
       "isDynamicEntry": true,
       "imports": [
-        "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-1b8ejkZX-Dmv1-w4E.js"
+        "_errors-D0VAEAiW-CZKkhVCh.js",
+        "_asset-D6V2S9LQ-BiFEHtig.js"
       ]
     },
     "../../../packages/gltf/dist/dds.js": {
-      "file": "assets/dds-Dg-e4ZGI.js",
+      "file": "assets/dds-Z-UzhzXQ.js",
       "name": "dds",
       "src": "../../../packages/gltf/dist/dds.js",
       "isDynamicEntry": true,
       "imports": [
-        "_errors-THVaUwlL-C81vxm_p.js"
+        "_errors-D0VAEAiW-CZKkhVCh.js",
+        "_errors-D4ZctVpl.js"
       ]
     },
     "../../../packages/gltf/dist/extended.js": {
-      "file": "assets/extended-DotInKxU.js",
+      "file": "assets/extended-C5vmANt2.js",
       "name": "extended",
       "src": "../../../packages/gltf/dist/extended.js",
       "isDynamicEntry": true,
       "imports": [
-        "_extended-C_t3TMDR.js"
+        "_extended-BIq7el6q.js"
       ]
     },
     "../../../packages/gltf/dist/index.js": {
-      "file": "assets/dist--0KergdF.js",
+      "file": "assets/dist-B0cjDgRg.js",
       "name": "dist",
       "src": "../../../packages/gltf/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
-        "_geometry-BWFf9YBV.js",
-        "_extension-Bn1Wm_pY.js",
+        "_errors-D0VAEAiW-CZKkhVCh.js",
+        "_geometry-St4k2jhU.js",
+        "_extension-DMa9Y_yu.js",
         "_node-matrix-R9BipGnp-ERCK1iAW.js",
-        "_errors-DkwPZuAq.js",
-        "_errors-THVaUwlL-C81vxm_p.js",
-        "_accessor-DuqjpuxI-DJ8jujwr.js",
-        "_scene-scope-CZDEkd24-B97nmpn7.js"
+        "_accessor-DuqjpuxI-lo3KREZ8.js",
+        "_scene-scope-CZDEkd24-DwPzBn8G.js"
       ]
     },
-    "../../../packages/gltf/dist/optimize-7SEzNA23.js": {
-      "file": "assets/optimize-7SEzNA23-BesG8gNH.js",
-      "name": "optimize-7SEzNA23",
-      "src": "../../../packages/gltf/dist/optimize-7SEzNA23.js",
-      "isDynamicEntry": true
-    },
     "../../../packages/gltf/dist/pbr.js": {
-      "file": "assets/pbr-DdAAyiwZ.js",
+      "file": "assets/pbr-BxOlsIPC.js",
       "name": "pbr",
       "src": "../../../packages/gltf/dist/pbr.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-iRvuj19h-oUGoun_-.js",
-        "_asset-1b8ejkZX-Dmv1-w4E.js",
+        "_model-CSAsgQzo-Btibz_XB.js",
+        "_asset-D6V2S9LQ-BiFEHtig.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -143,30 +144,84 @@
       ]
     },
     "../../../packages/gltf/dist/spec-gloss.js": {
-      "file": "assets/spec-gloss-S8hhvqlw.js",
+      "file": "assets/spec-gloss-DK_4dFDK.js",
       "name": "spec-gloss",
       "src": "../../../packages/gltf/dist/spec-gloss.js",
       "isDynamicEntry": true,
       "imports": [
-        "_errors-THVaUwlL-C81vxm_p.js",
-        "_shader-DPqfUcmp-C-Z2HNyt.js",
+        "_errors-D0VAEAiW-CZKkhVCh.js",
+        "_shader-Dh2DyWHw-C8Al8TJa.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
-        "_extended-C_t3TMDR.js"
+        "_extended-BIq7el6q.js"
       ]
     },
     "../../../packages/gltf/dist/splats.js": {
-      "file": "assets/splats-CE2hR1-R.js",
+      "file": "assets/splats-F9DhyAF7.js",
       "name": "splats",
       "src": "../../../packages/gltf/dist/splats.js",
       "isDynamicEntry": true,
       "imports": [
+        "_errors-D0VAEAiW-CZKkhVCh.js",
         "_preload-helper-CRzLMJPS.js",
-        "_errors-THVaUwlL-C81vxm_p.js",
-        "_scene-scope-CZDEkd24-B97nmpn7.js"
+        "_scene-scope-CZDEkd24-DwPzBn8G.js"
       ],
       "dynamicImports": [
         "../../../packages/splats/dist/data.js",
         "../../../packages/splats/dist/index.js"
+      ]
+    },
+    "../../../packages/gltf/dist/strokes.js": {
+      "file": "assets/strokes-9vl-1AfM.js",
+      "name": "strokes",
+      "src": "../../../packages/gltf/dist/strokes.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_errors-D0VAEAiW-CZKkhVCh.js",
+        "_preload-helper-CRzLMJPS.js",
+        "_scene-scope-CZDEkd24-DwPzBn8G.js",
+        "_asset-D6V2S9LQ-BiFEHtig.js"
+      ],
+      "dynamicImports": [
+        "../../../packages/lines/dist/index.js",
+        "../../../packages/lines/dist/stroke.js",
+        "../../../packages/points/dist/index.js"
+      ]
+    },
+    "../../../packages/lines/dist/index.js": {
+      "file": "assets/dist-Ct7ePcBL.js",
+      "name": "dist",
+      "src": "../../../packages/lines/dist/index.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_version-CrCGs6gQ.js",
+        "_extension-DMa9Y_yu.js",
+        "_errors-DkwPZuAq.js",
+        "_mat4-BTlwq2yz.js",
+        "_color-CMZXT1qw-Q1s-m9dW.js",
+        "_line-CXjNQjrU-Ca9BN2JC.js",
+        "_mesh-BbKd7PYK.js"
+      ]
+    },
+    "../../../packages/lines/dist/stroke.js": {
+      "file": "assets/stroke-BreeS-V_.js",
+      "name": "stroke",
+      "src": "../../../packages/lines/dist/stroke.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_line-CXjNQjrU-Ca9BN2JC.js"
+      ]
+    },
+    "../../../packages/points/dist/index.js": {
+      "file": "assets/dist-CQOJmRZ9.js",
+      "name": "dist",
+      "src": "../../../packages/points/dist/index.js",
+      "isDynamicEntry": true,
+      "imports": [
+        "_version-CrCGs6gQ.js",
+        "_errors-DkwPZuAq.js",
+        "_mat4-BTlwq2yz.js",
+        "_color-CMZXT1qw-Q1s-m9dW.js",
+        "_mesh-BbKd7PYK.js"
       ]
     },
     "../../../packages/splats/dist/compat-CDoDsXE8.js": {
@@ -176,59 +231,62 @@
       "isDynamicEntry": true
     },
     "../../../packages/splats/dist/data.js": {
-      "file": "assets/data-9rnaf5m2.js",
+      "file": "assets/data-CGwEQ_C3.js",
       "name": "data",
       "src": "../../../packages/splats/dist/data.js",
       "isDynamicEntry": true,
       "imports": [
-        "_data-D31W24Wu-C6CXrEen.js"
+        "_data-BDt3mxGg-DB7-SoKW.js",
+        "_compressed-D8_JWt-T-B_cBhHNg.js"
       ]
     },
-    "../../../packages/splats/dist/encode-BA6xu973.js": {
-      "file": "assets/encode-BA6xu973-B4RpAyW6.js",
-      "name": "encode-BA6xu973",
-      "src": "../../../packages/splats/dist/encode-BA6xu973.js",
+    "../../../packages/splats/dist/encode-BfG7xkVn.js": {
+      "file": "assets/encode-BfG7xkVn-d81LU85k.js",
+      "name": "encode-BfG7xkVn",
+      "src": "../../../packages/splats/dist/encode-BfG7xkVn.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-DkwPZuAq.js",
-        "_data-D31W24Wu-C6CXrEen.js"
+        "_data-BDt3mxGg-DB7-SoKW.js"
       ]
     },
     "../../../packages/splats/dist/index.js": {
-      "file": "assets/dist-Dnma_31S.js",
+      "file": "assets/dist-D3JX9MPD.js",
       "name": "dist",
       "src": "../../../packages/splats/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
-        "_version-YYhCZP03.js",
-        "_extension-Bn1Wm_pY.js",
+        "_version-CrCGs6gQ.js",
+        "_extension-DMa9Y_yu.js",
         "_preload-helper-CRzLMJPS.js",
         "_errors-DkwPZuAq.js",
-        "_data-D31W24Wu-C6CXrEen.js"
+        "_color-CMZXT1qw-Q1s-m9dW.js",
+        "_data-BDt3mxGg-DB7-SoKW.js",
+        "_compressed-D8_JWt-T-B_cBhHNg.js"
       ],
       "dynamicImports": [
         "../../../packages/splats/dist/compat-CDoDsXE8.js"
       ]
     },
-    "../../../packages/splats/dist/sog-D0LYo48N.js": {
-      "file": "assets/sog-D0LYo48N-IUyiD-MG.js",
-      "name": "sog-D0LYo48N",
-      "src": "../../../packages/splats/dist/sog-D0LYo48N.js",
+    "../../../packages/splats/dist/sog-Db_cLfxh.js": {
+      "file": "assets/sog-Db_cLfxh-jn1SEk5k.js",
+      "name": "sog-Db_cLfxh",
+      "src": "../../../packages/splats/dist/sog-Db_cLfxh.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-DkwPZuAq.js",
-        "_data-D31W24Wu-C6CXrEen.js",
+        "_data-BDt3mxGg-DB7-SoKW.js",
         "_zip-DNluwYbe-BMVowjJ_.js"
       ]
     },
-    "../../../packages/splats/dist/spz-BTy6CPTp.js": {
-      "file": "assets/spz-BTy6CPTp-DGb4EPj7.js",
-      "name": "spz-BTy6CPTp",
-      "src": "../../../packages/splats/dist/spz-BTy6CPTp.js",
+    "../../../packages/splats/dist/spz-DJR-Fz1_.js": {
+      "file": "assets/spz-DJR-Fz1_-BKNOpYki.js",
+      "name": "spz-DJR-Fz1_",
+      "src": "../../../packages/splats/dist/spz-DJR-Fz1_.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_data-D31W24Wu-C6CXrEen.js",
+        "_data-BDt3mxGg-DB7-SoKW.js",
         "_zip-DNluwYbe-BMVowjJ_.js"
       ],
       "dynamicImports": [
@@ -241,43 +299,59 @@
       "src": "../../../packages/splats/dist/zstd-BPbUkXlY.js",
       "isDynamicEntry": true
     },
-    "_accessor-DuqjpuxI-DJ8jujwr.js": {
-      "file": "assets/accessor-DuqjpuxI-DJ8jujwr.js",
+    "_accessor-DuqjpuxI-lo3KREZ8.js": {
+      "file": "assets/accessor-DuqjpuxI-lo3KREZ8.js",
       "name": "accessor-DuqjpuxI",
       "imports": [
-        "_errors-THVaUwlL-C81vxm_p.js"
+        "_errors-D0VAEAiW-CZKkhVCh.js"
       ]
     },
-    "_asset-1b8ejkZX-Dmv1-w4E.js": {
-      "file": "assets/asset-1b8ejkZX-Dmv1-w4E.js",
-      "name": "asset-1b8ejkZX",
+    "_asset-D6V2S9LQ-BiFEHtig.js": {
+      "file": "assets/asset-D6V2S9LQ-BiFEHtig.js",
+      "name": "asset-D6V2S9LQ",
       "imports": [
+        "_errors-D0VAEAiW-CZKkhVCh.js",
         "_preload-helper-CRzLMJPS.js",
-        "_errors-THVaUwlL-C81vxm_p.js",
-        "_accessor-DuqjpuxI-DJ8jujwr.js"
+        "_accessor-DuqjpuxI-lo3KREZ8.js"
       ],
       "dynamicImports": [
         "../../../packages/gltf/dist/dds.js",
         "../../../packages/gltf/dist/splats.js",
+        "../../../packages/gltf/dist/strokes.js",
         "../../../packages/gltf/dist/spec-gloss.js",
         "../../../packages/gltf/dist/extended.js",
         "../../../packages/decoders/dist/meshopt.js",
-        "../../../packages/gltf/dist/compression-D4IkO5vE.js",
-        "../../../packages/gltf/dist/optimize-7SEzNA23.js"
+        "../../../packages/gltf/dist/compression-D3yGZBGs.js",
+        "../../../packages/geometry/dist/optimize.js"
       ]
     },
-    "_data-D31W24Wu-C6CXrEen.js": {
-      "file": "assets/data-D31W24Wu-C6CXrEen.js",
-      "name": "data-D31W24Wu",
+    "_color-CMZXT1qw-Q1s-m9dW.js": {
+      "file": "assets/color-CMZXT1qw-Q1s-m9dW.js",
+      "name": "color-CMZXT1qw"
+    },
+    "_compressed-D8_JWt-T-B_cBhHNg.js": {
+      "file": "assets/compressed-D8_JWt-T-B_cBhHNg.js",
+      "name": "compressed-D8_JWt-T",
       "imports": [
-        "_preload-helper-CRzLMJPS.js",
-        "_errors-DkwPZuAq.js"
+        "_preload-helper-CRzLMJPS.js"
       ],
       "dynamicImports": [
-        "../../../packages/splats/dist/spz-BTy6CPTp.js",
-        "../../../packages/splats/dist/sog-D0LYo48N.js",
-        "../../../packages/splats/dist/encode-BA6xu973.js"
+        "../../../packages/splats/dist/spz-DJR-Fz1_.js",
+        "../../../packages/splats/dist/sog-Db_cLfxh.js",
+        "../../../packages/splats/dist/encode-BfG7xkVn.js"
       ]
+    },
+    "_data-BDt3mxGg-DB7-SoKW.js": {
+      "file": "assets/data-BDt3mxGg-DB7-SoKW.js",
+      "name": "data-BDt3mxGg",
+      "imports": [
+        "_errors-DkwPZuAq.js",
+        "_color-CMZXT1qw-Q1s-m9dW.js"
+      ]
+    },
+    "_errors-D0VAEAiW-CZKkhVCh.js": {
+      "file": "assets/errors-D0VAEAiW-CZKkhVCh.js",
+      "name": "errors-D0VAEAiW"
     },
     "_errors-D4ZctVpl.js": {
       "file": "assets/errors-D4ZctVpl.js",
@@ -287,29 +361,44 @@
       "file": "assets/errors-DkwPZuAq.js",
       "name": "errors"
     },
-    "_errors-THVaUwlL-C81vxm_p.js": {
-      "file": "assets/errors-THVaUwlL-C81vxm_p.js",
-      "name": "errors-THVaUwlL"
-    },
-    "_extended-C_t3TMDR.js": {
-      "file": "assets/extended-C_t3TMDR.js",
+    "_extended-BIq7el6q.js": {
+      "file": "assets/extended-BIq7el6q.js",
       "name": "extended",
       "imports": [
-        "_shader-DPqfUcmp-C-Z2HNyt.js"
+        "_shader-Dh2DyWHw-C8Al8TJa.js"
       ]
     },
-    "_extension-Bn1Wm_pY.js": {
-      "file": "assets/extension-Bn1Wm_pY.js",
+    "_extension-DMa9Y_yu.js": {
+      "file": "assets/extension-DMa9Y_yu.js",
       "name": "extension",
       "imports": [
-        "_version-YYhCZP03.js"
+        "_version-CrCGs6gQ.js"
       ]
     },
-    "_geometry-BWFf9YBV.js": {
-      "file": "assets/geometry-BWFf9YBV.js",
+    "_geometry-St4k2jhU.js": {
+      "file": "assets/geometry-St4k2jhU.js",
       "name": "geometry",
       "imports": [
-        "_version-YYhCZP03.js"
+        "_errors-D0VAEAiW-CZKkhVCh.js"
+      ]
+    },
+    "_line-CXjNQjrU-Ca9BN2JC.js": {
+      "file": "assets/line-CXjNQjrU-Ca9BN2JC.js",
+      "name": "line-CXjNQjrU",
+      "imports": [
+        "_errors-DkwPZuAq.js",
+        "_color-CMZXT1qw-Q1s-m9dW.js"
+      ]
+    },
+    "_mat4-BTlwq2yz.js": {
+      "file": "assets/mat4-BTlwq2yz.js",
+      "name": "mat4"
+    },
+    "_mesh-BbKd7PYK.js": {
+      "file": "assets/mesh-BbKd7PYK.js",
+      "name": "mesh",
+      "imports": [
+        "_extension-DMa9Y_yu.js"
       ]
     },
     "_meshopt-dMxKlVxN.js": {
@@ -319,25 +408,26 @@
         "_errors-D4ZctVpl.js"
       ]
     },
-    "_model-iRvuj19h-oUGoun_-.js": {
-      "file": "assets/model-iRvuj19h-oUGoun_-.js",
-      "name": "model-iRvuj19h",
+    "_model-CSAsgQzo-Btibz_XB.js": {
+      "file": "assets/model-CSAsgQzo-Btibz_XB.js",
+      "name": "model-CSAsgQzo",
       "imports": [
-        "_version-YYhCZP03.js",
-        "_extension-Bn1Wm_pY.js",
+        "_errors-D0VAEAiW-CZKkhVCh.js",
+        "_version-CrCGs6gQ.js",
+        "_extension-DMa9Y_yu.js",
         "_preload-helper-CRzLMJPS.js",
         "_node-matrix-R9BipGnp-ERCK1iAW.js",
         "_errors-DkwPZuAq.js",
-        "_errors-THVaUwlL-C81vxm_p.js",
-        "_accessor-DuqjpuxI-DJ8jujwr.js",
-        "_scene-scope-CZDEkd24-B97nmpn7.js",
-        "_asset-1b8ejkZX-Dmv1-w4E.js",
-        "_shader-DPqfUcmp-C-Z2HNyt.js",
+        "_mat4-BTlwq2yz.js",
+        "_accessor-DuqjpuxI-lo3KREZ8.js",
+        "_scene-scope-CZDEkd24-DwPzBn8G.js",
+        "_asset-D6V2S9LQ-BiFEHtig.js",
+        "_shader-Dh2DyWHw-C8Al8TJa.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-BT_nk8cK.js"
       ],
       "dynamicImports": [
-        "../../../packages/gltf/dist/compression-D4IkO5vE.js"
+        "../../../packages/gltf/dist/compression-D3yGZBGs.js"
       ]
     },
     "_node-matrix-R9BipGnp-ERCK1iAW.js": {
@@ -352,18 +442,18 @@
       "file": "assets/protocol-DVNA8KK1.js",
       "name": "protocol"
     },
-    "_scene-scope-CZDEkd24-B97nmpn7.js": {
-      "file": "assets/scene-scope-CZDEkd24-B97nmpn7.js",
+    "_scene-scope-CZDEkd24-DwPzBn8G.js": {
+      "file": "assets/scene-scope-CZDEkd24-DwPzBn8G.js",
       "name": "scene-scope-CZDEkd24",
       "imports": [
-        "_version-YYhCZP03.js"
+        "_version-CrCGs6gQ.js"
       ]
     },
-    "_shader-DPqfUcmp-C-Z2HNyt.js": {
-      "file": "assets/shader-DPqfUcmp-C-Z2HNyt.js",
-      "name": "shader-DPqfUcmp",
+    "_shader-Dh2DyWHw-C8Al8TJa.js": {
+      "file": "assets/shader-Dh2DyWHw-C8Al8TJa.js",
+      "name": "shader-Dh2DyWHw",
       "imports": [
-        "_errors-THVaUwlL-C81vxm_p.js"
+        "_errors-D0VAEAiW-CZKkhVCh.js"
       ]
     },
     "_texture-BT_nk8cK.js": {
@@ -374,9 +464,12 @@
       "file": "assets/texture-coordinates-XFsEMdU6-rNEcXW-P.js",
       "name": "texture-coordinates-XFsEMdU6"
     },
-    "_version-YYhCZP03.js": {
-      "file": "assets/version-YYhCZP03.js",
-      "name": "version"
+    "_version-CrCGs6gQ.js": {
+      "file": "assets/version-CrCGs6gQ.js",
+      "name": "version",
+      "imports": [
+        "_errors-D0VAEAiW-CZKkhVCh.js"
+      ]
     },
     "_zip-DNluwYbe-BMVowjJ_.js": {
       "file": "assets/zip-DNluwYbe-BMVowjJ_.js",
@@ -386,13 +479,14 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-BXiRTTJs.js",
+      "file": "assets/index-1139jAM1.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
       "imports": [
-        "_version-YYhCZP03.js",
-        "_geometry-BWFf9YBV.js",
+        "_errors-D0VAEAiW-CZKkhVCh.js",
+        "_geometry-St4k2jhU.js",
+        "_version-CrCGs6gQ.js",
         "_preload-helper-CRzLMJPS.js"
       ],
       "dynamicImports": [
@@ -406,67 +500,58 @@
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
-      "path": "assets/accessor-DuqjpuxI-DJ8jujwr.js",
+      "path": "assets/accessor-DuqjpuxI-lo3KREZ8.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2944,
+      "transferred": 2947,
       "raw": 5774,
-      "gzip": 2574,
-      "brotli": 2282
+      "gzip": 2577,
+      "brotli": 2281
     },
     {
-      "path": "assets/dist--0KergdF.js",
+      "path": "assets/dist-B0cjDgRg.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 5521,
-      "raw": 13656,
-      "gzip": 5149,
-      "brotli": 4672
+      "transferred": 5514,
+      "raw": 13574,
+      "gzip": 5142,
+      "brotli": 4650
     },
     {
-      "path": "assets/errors-DkwPZuAq.js",
+      "path": "assets/errors-D0VAEAiW-CZKkhVCh.js",
       "role": "Shared chunk",
       "encoding": "identity",
-      "transferred": 504,
-      "raw": 183,
-      "gzip": 154,
-      "brotli": 133
+      "transferred": 994,
+      "raw": 673,
+      "gzip": 421,
+      "brotli": 370
     },
     {
-      "path": "assets/errors-THVaUwlL-C81vxm_p.js",
+      "path": "assets/extension-DMa9Y_yu.js",
       "role": "Shared chunk",
       "encoding": "identity",
-      "transferred": 513,
-      "raw": 192,
-      "gzip": 164,
-      "brotli": 136
+      "transferred": 455,
+      "raw": 134,
+      "gzip": 129,
+      "brotli": 109
     },
     {
-      "path": "assets/extension-Bn1Wm_pY.js",
-      "role": "Shared chunk",
-      "encoding": "identity",
-      "transferred": 441,
-      "raw": 120,
-      "gzip": 125,
-      "brotli": 113
-    },
-    {
-      "path": "assets/geometry-BWFf9YBV.js",
+      "path": "assets/geometry-St4k2jhU.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2448,
-      "raw": 4020,
-      "gzip": 2078,
-      "brotli": 1888
+      "transferred": 2472,
+      "raw": 4056,
+      "gzip": 2102,
+      "brotli": 1913
     },
     {
-      "path": "assets/index-BXiRTTJs.js",
+      "path": "assets/index-1139jAM1.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27242,
-      "raw": 65132,
-      "gzip": 26860,
-      "brotli": 23699
+      "transferred": 27453,
+      "raw": 65815,
+      "gzip": 27071,
+      "brotli": 23905
     },
     {
       "path": "assets/node-matrix-R9BipGnp-ERCK1iAW.js",
@@ -487,31 +572,31 @@
       "brotli": 682
     },
     {
-      "path": "assets/scene-scope-CZDEkd24-B97nmpn7.js",
+      "path": "assets/scene-scope-CZDEkd24-DwPzBn8G.js",
       "role": "Shared chunk",
       "encoding": "identity",
       "transferred": 909,
       "raw": 588,
-      "gzip": 339,
-      "brotli": 304
+      "gzip": 338,
+      "brotli": 306
     },
     {
-      "path": "assets/version-YYhCZP03.js",
+      "path": "assets/version-CrCGs6gQ.js",
       "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 957,
-      "raw": 1077,
-      "gzip": 587,
-      "brotli": 526
+      "encoding": "identity",
+      "transferred": 790,
+      "raw": 469,
+      "gzip": 280,
+      "brotli": 249
     },
     {
       "path": "index.html",
       "role": "Page",
       "encoding": "identity",
-      "transferred": 969,
-      "raw": 719,
-      "gzip": 411,
-      "brotli": 260
+      "transferred": 1054,
+      "raw": 804,
+      "gzip": 434,
+      "brotli": 280
     },
     {
       "path": "model.glb",
@@ -524,16 +609,16 @@
     }
   ],
   "total": {
-    "requests": 13,
-    "transferred": 46791,
-    "raw": 96908,
-    "gzip": 40893,
-    "brotli": 36125
+    "requests": 12,
+    "transferred": 46931,
+    "raw": 97334,
+    "gzip": 40946,
+    "brotli": 36175
   },
   "notFetched": [
     {
-      "path": "assets/asset-1b8ejkZX-Dmv1-w4E.js",
-      "raw": 30600
+      "path": "assets/asset-D6V2S9LQ-BiFEHtig.js",
+      "raw": 31517
     },
     {
       "path": "assets/basis_transcoder-DRsa3jdg.js",
@@ -544,24 +629,32 @@
       "raw": 527333
     },
     {
+      "path": "assets/color-CMZXT1qw-Q1s-m9dW.js",
+      "raw": 2482
+    },
+    {
       "path": "assets/compat-CDoDsXE8-CDoDsXE8.js",
       "raw": 1134
     },
     {
-      "path": "assets/compression-D4IkO5vE-CZHa1Wst.js",
-      "raw": 4289
+      "path": "assets/compressed-D8_JWt-T-B_cBhHNg.js",
+      "raw": 1076
     },
     {
-      "path": "assets/data-9rnaf5m2.js",
-      "raw": 335
+      "path": "assets/compression-D3yGZBGs-B3PwNRbg.js",
+      "raw": 4294
     },
     {
-      "path": "assets/data-D31W24Wu-C6CXrEen.js",
-      "raw": 21413
+      "path": "assets/data-BDt3mxGg-DB7-SoKW.js",
+      "raw": 17999
     },
     {
-      "path": "assets/dds-Dg-e4ZGI.js",
-      "raw": 17391
+      "path": "assets/data-CGwEQ_C3.js",
+      "raw": 497
+    },
+    {
+      "path": "assets/dds-Z-UzhzXQ.js",
+      "raw": 17276
     },
     {
       "path": "assets/decoder.worker-CHh-AY-q.js",
@@ -572,12 +665,20 @@
       "raw": 8699
     },
     {
-      "path": "assets/dist-ClFgCf-J.js",
-      "raw": 80088
+      "path": "assets/dist-CQOJmRZ9.js",
+      "raw": 74603
     },
     {
-      "path": "assets/dist-Dnma_31S.js",
-      "raw": 27481
+      "path": "assets/dist-Ct7ePcBL.js",
+      "raw": 45136
+    },
+    {
+      "path": "assets/dist-D3JX9MPD.js",
+      "raw": 27732
+    },
+    {
+      "path": "assets/dist-Qy-_-gaj.js",
+      "raw": 80949
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
@@ -592,7 +693,7 @@
       "raw": 58456
     },
     {
-      "path": "assets/encode-BA6xu973-B4RpAyW6.js",
+      "path": "assets/encode-BfG7xkVn-d81LU85k.js",
       "raw": 10304
     },
     {
@@ -600,12 +701,28 @@
       "raw": 563
     },
     {
-      "path": "assets/extended-C_t3TMDR.js",
-      "raw": 2785
+      "path": "assets/errors-DkwPZuAq.js",
+      "raw": 183
     },
     {
-      "path": "assets/extended-DotInKxU.js",
+      "path": "assets/extended-BIq7el6q.js",
+      "raw": 2780
+    },
+    {
+      "path": "assets/extended-C5vmANt2.js",
       "raw": 59
+    },
+    {
+      "path": "assets/line-CXjNQjrU-Ca9BN2JC.js",
+      "raw": 13619
+    },
+    {
+      "path": "assets/mat4-BTlwq2yz.js",
+      "raw": 2614
+    },
+    {
+      "path": "assets/mesh-BbKd7PYK.js",
+      "raw": 345
     },
     {
       "path": "assets/meshopt-DGT9-Q7J.js",
@@ -616,40 +733,48 @@
       "raw": 7513
     },
     {
-      "path": "assets/model-iRvuj19h-oUGoun_-.js",
-      "raw": 160962
+      "path": "assets/model-CSAsgQzo-Btibz_XB.js",
+      "raw": 162357
     },
     {
-      "path": "assets/optimize-7SEzNA23-BesG8gNH.js",
+      "path": "assets/optimize-BesG8gNH.js",
       "raw": 3727
     },
     {
-      "path": "assets/pbr-DdAAyiwZ.js",
-      "raw": 1058
+      "path": "assets/pbr-BxOlsIPC.js",
+      "raw": 1063
     },
     {
       "path": "assets/protocol-DVNA8KK1.js",
       "raw": 862
     },
     {
-      "path": "assets/shader-DPqfUcmp-C-Z2HNyt.js",
-      "raw": 43128
+      "path": "assets/shader-Dh2DyWHw-C8Al8TJa.js",
+      "raw": 43942
     },
     {
-      "path": "assets/sog-D0LYo48N-IUyiD-MG.js",
+      "path": "assets/sog-Db_cLfxh-jn1SEk5k.js",
       "raw": 11588
     },
     {
-      "path": "assets/spec-gloss-S8hhvqlw.js",
-      "raw": 2872
+      "path": "assets/spec-gloss-DK_4dFDK.js",
+      "raw": 2867
     },
     {
-      "path": "assets/splats-CE2hR1-R.js",
-      "raw": 4169
+      "path": "assets/splats-F9DhyAF7.js",
+      "raw": 4278
     },
     {
-      "path": "assets/spz-BTy6CPTp-DGb4EPj7.js",
+      "path": "assets/spz-DJR-Fz1_-BKNOpYki.js",
       "raw": 4249
+    },
+    {
+      "path": "assets/stroke-BreeS-V_.js",
+      "raw": 2094
+    },
+    {
+      "path": "assets/strokes-9vl-1AfM.js",
+      "raw": 3588
     },
     {
       "path": "assets/texture-BT_nk8cK.js",
