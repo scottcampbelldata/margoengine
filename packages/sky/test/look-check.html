@@ -105,6 +105,23 @@ window.check={samples:sceneSamples,
   await nshot('nightHalf',o=>{n(o);o.atmosphere={layerTransmittance:[0.5,0.5,0.5]};});
   await nshot('nightPall',o=>{n(o);o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6]};});
   await nshot('nightGlow',o=>{n(o);o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6],scatteredLight:[0.02,0.01,0.004]};});
+  // KB-SKY-PALLFALLOFF1: fire spots straight under the eye light the layer brightest overhead, less toward the horizon;
+  // the sight holds a low ray near them; two spots add.
+  const eye=[...engine.camera.position],spot={color:[0.02,0.01,0.004],x:eye[0],z:eye[2],height:eye[1]+1000,reach:1000},pall={layerTransmittance:[1e-6,1e-6,1e-6]};
+  await nshot('nightFire',o=>{n(o);o.atmosphere={...pall,fireSpots:[spot]};});
+  await nshot('nightFireSight',o=>{n(o);o.atmosphere={...pall,fireSpots:[spot],fireSight:500};});
+  await nshot('nightFireTwo',o=>{n(o);o.atmosphere={...pall,fireSpots:[spot,spot]};});
+  // The haze over a fire, on a depth of the test's own, a plane 2 km ahead of a level view: the fog's colour at the
+  // view's centre is its spot's colour times the mean of the falloff along that path, and far less with the spot 20 km
+  // to the side.
+  aim(0);
+  const level=device.createTexture({size:[128,96],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}),wipe=device.createCommandEncoder();
+  wipe.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:level.createView(),depthClearValue:0.5*(100000-2000)/(2000*(100000-0.5)),depthLoadOp:'clear',depthStoreOp:'store'}}).end();
+  device.queue.submit([wipe.finish()]);
+  // Each haze is shot with and without its spot; the difference is what the fire adds.
+  const haze=async(name,aside,density)=>{for(const lit of [true,false]){n(night.options);night.options.fog={depth:()=>level,density,start:0,falloff:'exp2',color:[0,0,0],...(lit?{fireSpots:[{color:[0.8,0.4,0.2],x:eye[0]+aside,z:eye[2]-2000,reach:500}]}:{})};const r=await bands();out[name+(lit?'':'Without')]=Array.from(r.pixels.subarray((48*128+64)*4,(48*128+64)*4+3));}};
+  await haze('hazeFire',0,0.001);await haze('hazeNear',0,0.002);await haze('hazeAside',20000,0.001);
+  delete night.options.fog;level.destroy();
   aim(60);
   await nshot('nightCloud',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={};});
   await nshot('nightCloudPall',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6]};});

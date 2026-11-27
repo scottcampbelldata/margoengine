@@ -3,6 +3,7 @@ import type { SkyFeatures } from './base.js';
 import { DECK_ABOVE, overcastLightWgsl } from './clouds.js';
 import { perSample, sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
+import { checkFireSpots, writeFireSpots } from './fire-spots.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 // Exponential and EXP2 distance fog beyond `start` as the OpenGL fog equations; the height boost
@@ -10,7 +11,23 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 // share (cloudHaze), not the clear sky behind the cloud: a low sun under an overcast no longer tints it gold.
 const fragment = `
 @group(0) @binding(3) var sceneDepth:texture_depth_2d;
-@group(0) @binding(4) var<uniform> fog:array<vec4f,3>;
+@group(0) @binding(4) var<uniform> fog:array<vec4f,19>;
+// The fires' colour on the haze (fog.fireSpots), two vec4 a spot from fog[3]: rgb and the reach R squared, then x, an
+// unused height and z. Each spot adds its colour times the mean of (R^2 / (R^2 + r^2))^1.5 along the path from start to end,
+// seen from above, in closed form: with u along the path from the closest approach to the spot and a^2 = R^2 + d^2, the
+// integral is R^3 u / (a^2 sqrt(a^2 + u^2)). The caller ends the path 2 / density from the eye: the haze's light comes
+// from there (airlight weighted by e^(-density t) has its mean at 1 / density).
+fn fireHaze(start:vec2f,end:vec2f)->vec3f {
+ let path=end-start;let span=length(path);var light=vec3f(0.0);
+ for(var i=0u;i<8u;i++){
+  let spot=fog[3u+2u*i];let R2=spot.w;if(R2<=0.0){break;}let toFire=fog[4u+2u*i].xz-start;
+  if(span<1.0){let near=toFire-path*0.5;light+=spot.rgb*pow(R2/(R2+dot(near,near)),1.5);continue;}
+  let s0=dot(toFire,path/span);let a2=R2+max(dot(toFire,toFire)-s0*s0,0.0);let u1=span-s0;
+  let mean=(R2/a2)*sqrt(R2)*(u1/sqrt(a2+u1*u1)+s0/sqrt(a2+s0*s0))/span;
+  light+=spot.rgb*clamp(mean,0.0,1.0);
+ }
+ return light;
+}
 @fragment fn fogFragment(i:Vertex)->@location(0) vec4f {
  let d=textureLoad(sceneDepth,vec2i(i.position.xy),0);if(d<=0.0){discard;}
  let p=frame.inverse*vec4f(i.uv*vec2f(2,-2)+vec2f(-1,1),d,1);let world=p.xyz/p.w;let offset=world-frame.eye.xyz;
@@ -23,6 +40,7 @@ const fragment = `
  let ray=offset/max(distance,0.0001);var color=fog[1].rgb;if(fog[1].w<0.5){color=skyRadiance(normalize(vec3f(ray.x,max(0.0001,ray.y),ray.z)),0.0);
  if(frame.moonColor.w>0.0&&frame.clouds.x>0.0){let under=(overcastLight(1.0)*(${(9 / 7).toFixed(6)}*(1.0+2.0*max(ray.y,0.0))/3.0)+vec3f(0.006,0.01,0.02)*frame.moonColor.w)*(1.0-clamp(frame.sun.w,0.0,1.0));color=mix(color,under,clamp(frame.clouds.x,0.0,1.0));}
  color=color*exp2(frame.settings.y);}
+ if(fog[3].w>0.0){color+=fireHaze(frame.eye.xz,mix(frame.eye.xz,world.xz,min(1.0,2.0/max(fog[0].x*distance,1e-6))));}
  if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=toDisplay(color);}return vec4f(color,opacity);
 }`;
 /**
@@ -85,6 +103,7 @@ export function fogOpticalDepth(
 export const fog: NonNullable<SkyFeatures['fog']> = {
   validate(fog) {
     if (fog?.color) finiteVector(fog.color, 3, 'Fog color');
+    checkFireSpots(fog?.fireSpots, 'fog.fireSpots');
     if (
       typeof fog !== 'object' ||
       fog === null ||
@@ -108,7 +127,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
   create(code) {
     // The deck's light (clouds.ts overcastLight): the sky's own when it draws the clouds, else compiled in here.
     const shader = code + (code.includes('fn overcastLight(') ? '' : overcastLightWgsl) + fragment,
-      values = new Float32Array(12),
+      values = new Float32Array(76),
       attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' },
       descriptor: GPURenderPassDescriptor = { colorAttachments: [attachment] };
     let uniform: GPUBuffer | undefined,
@@ -137,7 +156,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
         const live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined,
           depthSamples = live ? 4 : depth.sampleCount,
           next = c.format + ':' + samples + ':' + depthSamples;
-        uniform ??= c.device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        uniform ??= c.device.createBuffer({ size: 304, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         if (key !== next) {
           // Per sample over multisampled depth: one draw reading sample_index, or at the compatibility level, which has
           // no sample_index, one masked draw per sample.
@@ -194,6 +213,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
         values[7] = +!!fog.color;
         values[8] = fog.scaleHeight ? 1 / fog.scaleHeight : 0;
         values[9] = fog.base ?? 0;
+        writeFireSpots(values, 12, fog.fireSpots);
         c.device.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);
         attachment.view = c.color;
         const pass = c.encoder.beginRenderPass(descriptor);

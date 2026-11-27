@@ -747,6 +747,39 @@ checks.look = async (page, samples) => {
   const glow = r.nightGlow.mid;
   assert.ok(glow[0] > 1.5 * glow[1] && glow[1] > 1.5 * glow[2], `the pall glows its own colour: ${show('nightGlow')}`);
   assert.ok(Math.abs(lum(r.nightGlow.high) / lum(r.nightGlow.horizon) - 1) < 0.02, 'the glow is even over the dome');
+  // KB-SKY-PALLFALLOFF1: a spot straight over the eye lights the layer its colour overhead and falls off to the
+  // horizon (60 to 80 degrees up r is 180 to 580 m, (1e6 / (1e6 + r^2))^1.5 at least 0.63; 0 to 8 degrees at most
+  // 0.0066); a sight of 500 m holds a low ray there, at 0.7 of the spot; two spots add.
+  const fire = r.nightFire;
+  assert.ok(
+    fire.high[0] > 1.5 * fire.high[1] && fire.high[1] > 1.5 * fire.high[2],
+    `the fire glow's colour: ${show('nightFire')}`,
+  );
+  assert.ok(lum(fire.high) > 0.6 * lum(r.nightGlow.high), `overhead near its full light: ${show('nightFire')}`);
+  assert.ok(lum(fire.horizon) < 0.1 * lum(fire.high), `falls off toward the horizon: ${show('nightFire')}`);
+  assert.ok(
+    lum(r.nightFireSight.horizon) > 0.6 * lum(r.nightGlow.horizon),
+    `the sight holds a low ray near: ${show('nightFireSight')}`,
+  );
+  assert.ok(
+    Math.abs(lum(r.nightFireTwo.high) / lum(fire.high) - 2) < 0.04,
+    `two spots add: ${show('nightFireTwo')}`,
+  );
+  // The haze 2 km ahead of the eye, its spot 500 m wide under that point: with 2 / density = 2 km its light is the
+  // exact mean along the whole path, 500 / sqrt(500^2 + 2000^2); with 2 / density = 1 km the mean over the near half,
+  // 500 (2000 / sqrt(500^2 + 2000^2) - 1000 / sqrt(500^2 + 1000^2)) / 1000; each times the fog's opacity.
+  const whole = 500 / Math.hypot(500, 2000),
+    nearHalf = 0.5 * (2000 / Math.hypot(500, 2000) - 1000 / Math.hypot(500, 1000));
+  for (const [name, mean, opacity] of [
+    ['hazeFire', whole, 1 - Math.exp(-4)],
+    ['hazeNear', nearHalf, 1 - Math.exp(-16)],
+  ])
+    for (let i = 0; i < 3; i++) {
+      const added = r[name][i] - r[name + 'Without'][i],
+        want = [0.8, 0.4, 0.2][i] * mean * opacity;
+      assert.ok(Math.abs(added - want) < 0.006, `${name} channel ${i}: ${added} for ${want}`);
+    }
+  assert.ok(r.hazeAside[0] - r.hazeAsideWithout[0] < 0.01, `the haze falls off away from the fire: ${r.hazeAside}`);
   // The height falloff: the GPU's share of the fog is the CPU twin's, far under the same-density-everywhere share.
   const hf = r.heightFog;
   assert.ok(Math.abs(hf.share - hf.want) < 0.01 && hf.share < 0.3 * hf.even, `the height fog: ${JSON.stringify(hf)}`);

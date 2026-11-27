@@ -254,6 +254,8 @@ export function equilibriumMoisture(humidity: number, temperature: number): numb
 
 export function fireHazeLight(radiantPower: number, width?: number): [number, number, number];
 
+export function fireLayerLight(radiantPower: number, spread?: number, distance?: number): [number, number, number];
+
 export function fogDensity(state: WeatherState): number;
 
 export function fogForVisibility(metres: number, state: Pick<WeatherState, 'rain' | 'snow'> & {

@@ -3700,6 +3700,14 @@ upload of 17 configurations to figures recorded before the change, and the recor
 and the cleared sky differ from the plain one by 0 under both models; a green `rayleighColor` turns the Bruneton high
 sky from (0.077, 0.168, 0.341) to (0.127, 0.341, 0.087); `sunDiscSize` 4 takes the disc from 4 to 32 bright pixels.
 Missing: other GPUs, a reference renderer for the non-Earth air, timing. Since 2026-11-27 (KB-SKY-NIGHTPALL1) the block is 80 floats: `air4` holds `atmosphere.layerTransmittance`, and the look wraps the sky's `cloudSky` (renamed `cloudSkyAbove`) in `lowLayer`, so the night share of the sky and its clouds is seen through a low haze layer at t^(1 / sin e) (e floored at 3 degrees) with the layer's glow (`scatteredLight`) in front, in the sky pass, its reflections and its light alike; at the defaults it is c * 1 + 0 and by day the frame is exact (`features-check.mjs look`, `dayLayerDiff` 0, native and `MARGO_COMPAT=1`).
+Since 2026-11-27 (KB-SKY-PALLFALLOFF1) the block is 144 floats: eight `atmosphere.fireSpots` of two vec4 follow
+(`fires`), which `lowLayer` adds along each ray as `color (R^2 / (R^2 + r^2))^1.5` where the ray meets the spot's lit
+height, no farther across than `atmosphere.fireSight`; the fog's uniform holds eight `fog.fireSpots` from its fourth
+vec4 (304 bytes) and adds the exact mean of the same law along each ray as far as 2 / density. `WeatherDrive` clusters
+the fires' burning segments (weighted k-means, deterministic seeds) and writes both lists. Evidence:
+`features-check.mjs look` on an RTX A6000, native and `MARGO_COMPAT=1`, 4x and 1x: the falloff overhead to horizon, the
+sight, two spots adding and the haze's mean within 0.006 of the closed form; `timber-valley-still.mjs --query=hour=22`
+frames. Missing: multiple scattering sideways in the smoke, a reference path trace of the glow, timing.
 
 `@margoengine/sky/settings` (2026-11-17) is a table of 51 sky, air, cloud, fog, tint, gradient, disc, glow, exposure,
 Tonemap and Grade controls and eleven named looks made only of its values; `applySkySettings` writes them, leaving a

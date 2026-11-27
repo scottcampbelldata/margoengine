@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20969789,
+  "total": 20975042,
   "history": [
     {
       "date": "2026-10-24",
@@ -14676,6 +14676,12 @@
       "commit": "HEAD",
       "reason": "water/liquid 37189 to 38616 B ceiling (built 36105 to 37491 B gzip): GPULiquid takes up to 4 liquids of their own density, viscosity and colour (each liquid's Tait pressure on the shared number density, Solenthaler and Pajarola 2008; the grid node holds weight and mass apart, eight words) with colour mixing, and ParticleLiquid draws each particle's colour (colorOffset: the thickness target carries colour times thickness). FLUID-02/03, parity bar P13. The liquids live in the same passes and the colour in the same surface pass, so a split would duplicate them. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-B",
+      "reason": "KB-SKY-PALLFALLOFF1: fire glow spots in the sky look and fog and the weather drive clustering the burning segments. Measured sky 25583 to 26345, sky/fog 3571 to 4210, sky/scenes 26659 to 27411, sky/look 2808 to 3337, weather 8735 to 8841, weather/drive 7795 to 8834",
+      "grew": 5253
     }
   ],
   "items": {
@@ -15957,7 +15963,7 @@
     "@margoengine/shadows/viewer": 2540,
     "@margoengine/shadows/virtual": 18421,
     "@margoengine/shadows/vsm": 2046,
-    "@margoengine/sky": 26272,
+    "@margoengine/sky": 27135,
     "@margoengine/sky/aerial": 7124,
     "@margoengine/sky/astro": 10457,
     "@margoengine/sky/aurora": 5489,
@@ -15972,12 +15978,12 @@
     "@margoengine/sky/compat-clouds lazy hurricane storm field": 4617,
     "@margoengine/sky/day-presets": 1757,
     "@margoengine/sky/ephemeris": 2235,
-    "@margoengine/sky/fog": 3589,
+    "@margoengine/sky/fog": 4466,
     "@margoengine/sky/hillaire": 10843,
     "@margoengine/sky/hurricane": 2851,
     "@margoengine/sky/lighting": 5135,
     "@margoengine/sky/lightning-bolt": 5591,
-    "@margoengine/sky/look": 3064,
+    "@margoengine/sky/look": 3593,
     "@margoengine/sky/milky-way": 6589,
     "@margoengine/sky/moon": 3810,
     "@margoengine/sky/moonlight": 1950,
@@ -15988,7 +15994,7 @@
     "@margoengine/sky/presets": 1832,
     "@margoengine/sky/reflection": 1325,
     "@margoengine/sky/scene-kits": 3252,
-    "@margoengine/sky/scenes": 26692,
+    "@margoengine/sky/scenes": 28233,
     "@margoengine/sky/settings": 9490,
     "@margoengine/sky/shafts": 12210,
     "@margoengine/sky/shafts base (without hurricane storm field)": 8285,
@@ -16344,13 +16350,13 @@
     "@margoengine/water/splash": 5893,
     "@margoengine/water/underwater": 9344,
     "@margoengine/water/wake": 3362,
-    "@margoengine/weather": 8762,
+    "@margoengine/weather": 9106,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/avalanche": 7451,
     "@margoengine/weather/boundary-layer": 2596,
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
-    "@margoengine/weather/drive": 8000,
+    "@margoengine/weather/drive": 9099,
     "@margoengine/weather/eruption": 10430,
     "@margoengine/weather/gltf": 5981,
     "@margoengine/weather/hail": 5699,

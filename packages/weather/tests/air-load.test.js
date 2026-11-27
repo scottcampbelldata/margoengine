@@ -563,3 +563,115 @@ test("the drive writes its sky's noon sun on the fires' smoke glow", () => {
   drive.update(0);
   assert.equal(front.noon, 1, "the sky's default intensity");
 });
+
+// KB-SKY-PALLFALLOFF1: the fires' light on the pall and the haze was one even glow, so a ridge did not stand out against
+// it. A fire that says where it burns lights them by the cosine law from straight over each source, which spreads the
+// same P / 2 over the plane, and the sources add; fires that say nothing light them evenly as before.
+test("fires that say where they burn light the pall and haze as a spot over each source", async () => {
+  const { fireHazeLight, fireLayerLight, hazeReflectance, smokeColor, SMOKE_LAYER_DEPTH } = await import(
+      '../dist/index.js'
+    ),
+    h = SMOKE_LAYER_DEPTH / 2,
+    peak = fireLayerLight(4e9);
+  near(peak[0], 4e9 / (4 * Math.PI * h * h) / 1000, 1e-12);
+  // Over the plane: the upward half of the power. Its mean over the box's disc: fireHazeLight's even value.
+  let total = 0,
+    disc = 0;
+  const rho = 2000 / Math.sqrt(Math.PI);
+  for (let r = 0.5; r < 2e6; r += r < 2e4 ? 1 : 100) {
+    const e = fireLayerLight(4e9, 0, r)[0] * 1000 * 2 * Math.PI * r * (r < 2e4 ? 1 : 100);
+    total += e;
+    if (r < rho) disc += e;
+  }
+  const rel = (a, b, t) => assert.ok(Math.abs(a / b - 1) <= t, `${a} vs ${b}`);
+  rel(total, 0.5 * 4e9, 2e-3);
+  rel(disc / (2000 * 2000) / 1000, fireHazeLight(4e9)[0], 2e-3);
+  assert.ok(fireLayerLight(4e9, 0, 3000)[0] < 0.1 * peak[0], 'falls off away from the fire');
+  assert.ok(fireLayerLight(4e9, 800)[0] < peak[0], 'a spread fire is softer');
+  assert.throws(() => fireLayerLight(1, -1), /spread/);
+
+  // Two stretches of one front 3 km apart: the west one two segments 200 m apart, 3 GW; the east one 2 GW. The
+  // radiant power is shared by the segments' convective heat.
+  const sun = new Float32Array([0, -0.4, 0.9]),
+    sky = { name: 'sky', options: { lighting: { intensity: 2 }, fog: { falloff: 'exp' } }, sun, airControls: true },
+    segments = [
+      { x: -1600, y: 40, z: -1200, heat: 2e9 },
+      { x: -1400, y: 70, z: -1200, heat: 1e9 },
+      { x: 1400, y: 80, z: -600, heat: 2e9 },
+      { x: 0, y: 0, z: 0, heat: 0 },
+    ],
+    west = { x: -4600 / 3, y: 50, z: -1200, spread: 0, power: 3e9 },
+    east = { x: 1400, y: 80, z: -600, spread: 0, power: 2e9 },
+    placed = { options: {}, smokeEmission: 0, radiantPower: 5e9, segments: () => segments },
+    unplaced = { options: {}, smokeEmission: 0, radiantPower: 1e9 },
+    machine = new WeatherMachine('clear', { seed: 8 }),
+    engine = engineOf(sky),
+    drive = WeatherDrive.attach(engine, {
+      weather: machine,
+      advance: false,
+      fires: [placed, unplaced],
+      smokeFromFire: false,
+    });
+  // The west stretch's RMS distance: 2/3 of its power 200/3 m off its centre, 1/3 of it 400/3 m off.
+  west.spread = Math.sqrt((2 * (200 / 3) ** 2 + (400 / 3) ** 2) / 3);
+  drive.setup(engine);
+  applyWeatherSettings(machine, { smoke: 0.6 });
+  drive.update(0);
+  const a = sky.options.atmosphere,
+    fog = sky.options.fog,
+    back = hazeReflectance({ smoke: 0.6 });
+  assert.equal(a.fireSpots.length, 2);
+  assert.equal(fog.fireSpots.length, 2);
+  for (const [k, src] of [west, east].entries()) {
+    const light = fireLayerLight(src.power, src.spread),
+      on = a.fireSpots[k],
+      hz = fog.fireSpots[k];
+    near(on.x, src.x, 1e-12);
+    near(on.height, src.y + h, 1e-12);
+    near(on.z, src.z, 1e-12);
+    near(on.reach, Math.hypot(h, src.spread), 1e-12);
+    for (let i = 0; i < 3; i++) near(on.color[i], back[i] * light[i], 1e-12);
+    // The haze falls off round the same point by the same law, in the haze's own colour.
+    assert.deepEqual([hz.x, hz.z, hz.reach], [on.x, on.z, on.reach]);
+    for (let i = 0; i < 3; i++) near(hz.color[i], smokeColor()[i] * light[i], 1e-12);
+  }
+  // The even share holds only the fire that says nothing.
+  const even = fireHazeLight(1e9);
+  for (let i = 0; i < 3; i++) near(a.scatteredLight[i], back[i] * even[i], 1e-12);
+  // A low ray sees the layer as far across as the haze's light comes from.
+  near(a.fireSight, 2 / fog.density, 1e-9);
+
+  // More places than the sky takes spots, over two fires: eight sources, the two 100 m apart as one at their centre,
+  // none of the power lost.
+  const at = (x) => ({ x, y: 0, z: 0, heat: 1e9 }),
+    long = Array.from({ length: 9 }, (_, i) => at(i * 1000));
+  placed.segments = () => long;
+  placed.radiantPower = 9e9;
+  unplaced.segments = () => [at(8100)];
+  drive.update(0);
+  assert.equal(a.fireSpots.length, 8);
+  assert.deepEqual([...a.scatteredLight], [0, 0, 0], 'every fire is placed');
+  const merged = a.fireSpots.find((s) => Math.abs(s.x - 8050) < 1e-9);
+  assert.ok(merged, 'the pair 100 m apart merged: ' + a.fireSpots.map((s) => s.x));
+  near(merged.reach, Math.hypot(h, 50), 1e-12);
+  const lit = fireLayerLight(2e9, 50);
+  for (let i = 0; i < 3; i++) near(merged.color[i], back[i] * lit[i], 1e-12);
+  const again = a.fireSpots;
+  drive.update(0);
+  assert.deepEqual(a.fireSpots, again, 'the same fires, the same spots');
+
+  // fireLight 0 leaves the fires out.
+  drive.options.fireLight = 0;
+  drive.update(0);
+  assert.equal(a.fireSpots, undefined);
+  assert.equal(fog.fireSpots, undefined);
+  delete drive.options.fireLight;
+  drive.update(0);
+  assert.equal(a.fireSpots.length, 8);
+  // When the smoke clears the sky gets its own values back.
+  applyWeatherSettings(machine, { smoke: 0 });
+  drive.update(0);
+  assert.equal(a.fireSpots, undefined);
+  assert.equal(a.fireSight, undefined);
+  assert.equal(fog.fireSpots, undefined);
+});

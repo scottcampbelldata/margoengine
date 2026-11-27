@@ -235,6 +235,8 @@ const sky = Sky.attach(engine, {look: {zenithColor: [0.6, 0.2, 1], zenithStrengt
 | `ozone` | 0 to 20 | 0 | Ozone absorption, a multiple of Earth's layer: a deeper blue at twilight |
 | `scatteredLight` | linear RGB 0 to 4 | [0, 0, 0] | Light a low haze layer (smoke, ash, sea spray) scatters down, a share of the zenith sun on level ground: the layer shines evenly over the day sky with that light over pi, so the dome, its reflections, the light it gives the scene and the sky fog take its glow. A `WeatherDrive` writes it under a load |
 | `layerTransmittance` | linear RGB 0 to 1 | [1, 1, 1] | That layer's direct share straight up: the night's own light (stars, moon, twilight, the clouds above) is seen through it, t^(1 / sin e) along a ray e up (e floored at 3 degrees), with the layer's glow (`scatteredLight`) in front, so a starry sky goes out under a thick smoke pall. The day sky takes the layer through `sunColor` and `scatteredLight`, so by day it changes nothing. A `WeatherDrive` writes it under a load |
+| `fireSpots` | up to 8 `{color, x, z, height, reach}` | none | Fires light that layer from below: each ray meets a spot's lit `height` (default 1000 m) r metres across from (`x`, `z`) and takes `color` (a share of the zenith sun, 0 to 4) times `(R^2 / (R^2 + r^2))^1.5`, R the `reach` (default 1000 m); the spots add. Shown at night, as `scatteredLight` is. A `WeatherDrive` writes it from its fires |
+| `fireSight` | 0 to 1e6 m | 0 | No ray takes the `fireSpots` layer farther across than this, the visual range through the smoke, so the sky low behind a ridge takes the light of the haze on it; 0 sets no limit. A `WeatherDrive` writes 2 / fog density |
 
 | `look` | Range | Default | What it does |
 | --- | --- | --- | --- |
@@ -1092,6 +1094,26 @@ const haze = {density: 0.0005, start: 0, scaleHeight: 500, base: 80};
 const down = fogOpticalDepth(haze, 800, 600, 80);   // a drone 520 m over the base looking at the ground: about 0.25
 const level = fogOpticalDepth(haze, 800, 80, 80);   // a level view at the base: 0.4
 console.log(down < level);
+```
+
+### Fires in the haze and on the smoke over them
+
+`fog.fireSpots` adds each fire's colour to the haze round it, and `atmosphere.fireSpots` lights the smoke layer over it
+at night (both at most eight spots, from `@margoengine/sky`'s `SkyFireSpot`). A pixel's haze takes each spot's colour
+times the mean of `(R^2 / (R^2 + r^2))^1.5` along its line of sight seen from above, as far as 2 / `density` from the
+eye, where the haze's light comes from; the mean is the exact line integral (the analytic airlight of Sun,
+Ramamoorthi, Narasimhan and Nayar, SIGGRAPH 2005, https://doi.org/10.1145/1186822.1073309). `atmosphere.fireSight`
+holds the sky's low rays to the same reach (the visual range, Koschmieder 1924), so ridges stand dark against a glow
+that is brightest toward the fires. A `WeatherDrive` writes all three from its fire fronts.
+
+```ts
+import {Sky} from 'margoengine/sky';
+const west = {x: -1500, z: -1200, reach: 1100};
+const sky = new Sky({
+  fog: {density: 0.0007, falloff: 'exp', color: [0.01, 0.006, 0.003], fireSpots: [{...west, color: [0.1, 0.045, 0.012]}]},
+  atmosphere: {fireSpots: [{...west, color: [0.07, 0.03, 0.008], height: 1900}], fireSight: 2 / 0.0007},
+});
+console.log(sky.options.atmosphere?.fireSpots?.length, 'fire lights the layer');
 ```
 
 There are no volumetric light shafts or particle-depth fog here; large scenes need a suitable camera far plane.

@@ -52,6 +52,8 @@ export interface SkyAtmosphereOptions {
     ozone?: number;
     scatteredLight?: Vec3;
     layerTransmittance?: Vec3;
+    fireSpots?: readonly SkyFireSpot[];
+    fireSight?: number;
 }
 
 export interface SkyCloudOptions {
@@ -122,6 +124,14 @@ export interface SkyFeatures {
     };
 }
 
+export interface SkyFireSpot {
+    color: Vec3;
+    x: number;
+    z: number;
+    height?: number;
+    reach?: number;
+}
+
 export interface SkyFogOptions {
     depth?: () => GPUTexture | undefined;
     density?: number;
@@ -131,6 +141,7 @@ export interface SkyFogOptions {
     scaleHeight?: number;
     base?: number;
     color?: Vec3;
+    fireSpots?: readonly SkyFireSpot[];
 }
 
 export interface SkyGradientStop {

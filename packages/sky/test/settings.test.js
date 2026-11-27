@@ -36,7 +36,7 @@ function block(options) {
 
 test('every row is well formed and names are unique', () => {
   assert.equal(byName.size, SKY_SETTINGS.length);
-  assert.equal(SKY_SETTINGS.length, 169);
+  assert.equal(SKY_SETTINGS.length, 170);
   for (const s of SKY_SETTINGS) {
     assert.ok(typeof s.about === 'string' && s.about.length > 10, s.name);
     assert.ok(['number', 'color', 'choice', 'gradient'].includes(s.kind), s.name);
@@ -80,7 +80,10 @@ test('every look and atmosphere field has a row, and each row default is what th
   ]) {
     const names = fields(iface);
     assert.ok(names.length >= 8, iface);
-    for (const field of names) {
+    // `fireSpots` is the data of a scene's fires (a `WeatherDrive` writes it), as `fog.depth` is its texture: no
+    // control; left empty it writes the block it writes absent.
+    assert.deepEqual(block({ atmosphere: { fireSpots: [] } }), plain, 'atmosphere.fireSpots default');
+    for (const field of names.filter((f) => f !== 'fireSpots')) {
       const row = byName.get(`${key}.${field}`);
       assert.ok(row, `${key}.${field} has a row`);
       // The field set to its row default writes exactly the block it writes absent.
@@ -88,7 +91,7 @@ test('every look and atmosphere field has a row, and each row default is what th
     }
   }
   for (const field of fields('SkyCloudOptions')) assert.ok(byName.has(`clouds.${field}`), `clouds.${field}`);
-  for (const field of fields('SkyFogOptions').filter((f) => f !== 'depth'))
+  for (const field of fields('SkyFogOptions').filter((f) => f !== 'depth' && f !== 'fireSpots'))
     assert.ok(byName.has(`fog.${field}`), `fog.${field}`);
   for (const field of ['hours', 'timeScale', 'turbidity', 'exposure', 'model', 'groundAlbedo'])
     assert.ok(byName.has(field), field);

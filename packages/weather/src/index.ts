@@ -109,6 +109,7 @@ export {
   hazeLight,
   hazeReflectance,
   fireHazeLight,
+  fireLayerLight,
   FIRE_LIGHT_COLOR,
   NOON_IRRADIANCE,
   visibility,

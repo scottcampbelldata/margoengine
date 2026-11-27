@@ -459,18 +459,38 @@ test('exponential height fog with a fixed colour packs its uniform every frame',
   h.engine.use(sky);
   h.frame();
   const values = () =>
-    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 48).data), (v) => +v.toFixed(4));
-  assert.deepEqual(values(), [0.01, 0, 1, 0.065, 0.1, 0.2, 0.3, 1, 0, 0, 0, 0]);
+    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 304).data), (v) => +v.toFixed(4));
+  assert.deepEqual(values().slice(0, 12), [0.01, 0, 1, 0.065, 0.1, 0.2, 0.3, 1, 0, 0, 0, 0]);
+  assert.ok(
+    values()
+      .slice(12)
+      .every((v) => v === 0),
+    'no fire: nothing added to the haze',
+  );
   color[0] = 0.5;
   sky.options.fog.density = 0.02;
   Object.assign(sky.options.fog, { scaleHeight: 500, base: 80 });
   h.frame();
-  assert.deepEqual(values().slice(8), [0.002, 80, 0, 0], 'the height falloff: 1 / scaleHeight and the base');
+  assert.deepEqual(values().slice(8, 12), [0.002, 80, 0, 0], 'the height falloff: 1 / scaleHeight and the base');
   assert.deepEqual(values().slice(0, 5), [0.02, 0, 1, 0.065, 0.5]);
   delete sky.options.fog.color;
   delete sky.options.fog.falloff;
   h.frame();
   assert.deepEqual(values().slice(2, 8), [0, 0.065, 0, 0, 0, 0]);
+  // KB-SKY-PALLFALLOFF1: the fires' spots on the haze from float 12, two vec4 each, every frame.
+  sky.options.fog.fireSpots = [{ color: [0.5, 0.25, 0.125], x: 300, z: -40, reach: 1200 }];
+  h.frame();
+  assert.deepEqual(values().slice(12, 20), [0.5, 0.25, 0.125, 1440000, 300, 1000, -40, 0]);
+  delete sky.options.fog.fireSpots;
+  h.frame();
+  assert.ok(
+    values()
+      .slice(12)
+      .every((v) => v === 0),
+    'cleared with the spots',
+  );
+  for (const bad of [[{ color: [5, 0, 0], x: 0, z: 0 }], [{ color: [0, 0, 0], x: 0, z: 0, reach: 0 }], [null]])
+    assert.throws(() => new Sky({ fog: { fireSpots: bad } }), /fog\.fireSpots/);
   sky.dispose();
   depth.destroy();
   assert.ok(h.resources.every((r) => r.destroyed));

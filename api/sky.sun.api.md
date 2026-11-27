@@ -110,6 +110,8 @@ interface SkyAtmosphereOptions {
     ozone?: number;
     scatteredLight?: Vec3;
     layerTransmittance?: Vec3;
+    fireSpots?: readonly SkyFireSpot[];
+    fireSight?: number;
 }
 
 interface SkyCloudOptions {
@@ -117,6 +119,14 @@ interface SkyCloudOptions {
     speed?: number;
     height?: number;
     depth?: number;
+}
+
+interface SkyFireSpot {
+    color: Vec3;
+    x: number;
+    z: number;
+    height?: number;
+    reach?: number;
 }
 
 interface SkyFogOptions {
@@ -128,6 +138,7 @@ interface SkyFogOptions {
     scaleHeight?: number;
     base?: number;
     color?: Vec3;
+    fireSpots?: readonly SkyFireSpot[];
 }
 
 interface SkyGradientStop {

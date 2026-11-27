@@ -146,6 +146,16 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
     1,
     'Direct share a low haze layer lets through straight up: the night sky, moon and clouds are seen through it.',
   ),
+  n(
+    'atmosphere.fireSight',
+    'sun',
+    0,
+    0,
+    1e6,
+    1,
+    'm',
+    'How far across a low ray sees the haze layer the fires light, through the smoke: 0 sets no limit.',
+  ),
   choice(
     'model',
     'air',

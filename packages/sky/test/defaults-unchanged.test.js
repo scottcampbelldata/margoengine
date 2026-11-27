@@ -29,6 +29,8 @@
 // buffer write changed, and only skies with cloud cover between 0 and 1 draw differently (sheet-check.html).
 // Recorded again with the fog's exponential height falloff (2026-11-27, scaleHeight and base): the fog WGSL gained the
 // closed-form term (run only with a scaleHeight) and its uniform one vec4; the same commands in every trace.
+// Recorded again with KB-SKY-PALLFALLOFF1 (2026-11-27): the fog WGSL gained the fire spots' haze (run only with
+// fog.fireSpots) and its uniform sixteen zero vec4s, so fog and fogColour changed; nothing else draws differently.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

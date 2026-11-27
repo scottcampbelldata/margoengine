@@ -159,6 +159,29 @@ export interface SkyFogOptions {
   base?: number;
   /** Fixed linear fog colour instead of the sky's radiance in the view direction. */
   color?: Vec3;
+  /**
+   * Colour fires add to the haze round them, on top of the fog's colour (KB-SKY-PALLFALLOFF1): at most eight spots
+   * ({@link SkyFireSpot}). Each pixel's haze takes each spot's colour times the mean of `(R^2 / (R^2 + r^2))^1.5` (r the
+   * horizontal distance from the spot, R its `reach`), the law the sky's smoke layer takes (`atmosphere.fireSpots`),
+   * along its line of sight seen from above, as far as 2 / `density` from the eye, where the haze's light comes from. The
+   * mean is the exact line integral of that law (the analytic airlight along a ray of B. Sun, R. Ramamoorthi,
+   * S. Narasimhan and S. Nayar, "A Practical Analytic Single Scattering Model for Real Time Rendering", SIGGRAPH 2005,
+   * https://doi.org/10.1145/1186822.1073309). A `WeatherDrive` writes it from its fire fronts. Default none.
+   */
+  fireSpots?: readonly SkyFireSpot[];
+}
+/** One glow a fire puts on a haze (`fog.fireSpots`) or on the smoke layer over it (`atmosphere.fireSpots`). */
+export interface SkyFireSpot {
+  /** Linear RGB 0-4 over the fire: added to the haze's colour, or, on the layer, a share of the zenith sun. */
+  color: Vec3;
+  /** World x of the point over the fire where it is brightest, metres. */
+  x: number;
+  /** World z of that point, metres. */
+  z: number;
+  /** The smoke layer's lit height there, world y, metres (`atmosphere.fireSpots` only). Default 1000. */
+  height?: number;
+  /** How far it reaches from straight over the fire, metres, 1 to 1e6. Default 1000. */
+  reach?: number;
 }
 /** Stylized night: gradient, twinkling stars and a phased moon. Replaces the default night gradient when set; read every frame. */
 export interface SkyNightOptions {
@@ -227,6 +250,24 @@ export interface SkyAtmosphereOptions {
    * smoke, ash and spray. Default [1, 1, 1] (no layer).
    */
   layerTransmittance?: Vec3;
+  /**
+   * Fires under that haze layer light it from below, brightest straight over them (KB-SKY-PALLFALLOFF1): at most eight
+   * spots ({@link SkyFireSpot}), `color` the light the layer sends down over the spot as a share of the zenith sun on
+   * level ground (as `scatteredLight`). Each ray meets a spot's lit `height` at a point r metres across from it, where
+   * the layer takes `(R^2 / (R^2 + r^2))^1.5` of it (an isotropic source's light on a plane, cos / d^2, R the spot's
+   * `reach`), and the spots add, so the layer glows over each fire and falls off between and beyond them and toward
+   * the horizon away from them. Shown at night, in front of the night sky as `scatteredLight` is. A `WeatherDrive`
+   * writes it from its fire fronts. Default none.
+   */
+  fireSpots?: readonly SkyFireSpot[];
+  /**
+   * How far across a ray sees the layer `fireSpots` light, metres, 0 to 1e6: beyond the visual range through the smoke a
+   * low ray meets only the air before it, so it takes the layer at this horizontal distance in place of the far point it
+   * would reach, and the sky low behind a ridge takes the light of the haze on it (the visual range of H. Koschmieder,
+   * "Theorie der horizontalen Sichtweite", Beitraege zur Physik der freien Atmosphaere 12, 1924). 0 (default) sets no
+   * limit. A `WeatherDrive` writes 2 / extinction.
+   */
+  fireSight?: number;
 }
 /** One stop of {@link SkyLookOptions.gradient}: an elevation in degrees, -90 (straight down) to 90, and a linear RGB colour 0-1. */
 export interface SkyGradientStop {
@@ -342,7 +383,7 @@ export interface SkyOptions {
 // which makes the clear noon sky give 0.165 of the light on level ground (Erbs, Klein and Duffie 1982).
 const PREETHAM_SUN = 4 * Math.PI * 0.55;
 // Floats of the look's uniform block after the 64 at byte 256 (`LOOK_FLOATS` of @margoengine/sky/look; a test pins the two).
-const LOOK_FLOATS = 80;
+const LOOK_FLOATS = 144;
 /**
  * How much of a cloud sheet of `coverage` 0 to 1 is the overcast deck (KB-SKY-OVERCAST1): 0 up to 80 percent cover, a
  * smoothstep to 1 at full cover, as the sky draws it. Under the deck the engine sun fades out by the same share.

@@ -98,6 +98,12 @@ export interface FireTarget {
     readonly smokeEmission: number;
     readonly radiantPower?: number;
     noon?: number;
+    segments?(): readonly {
+        readonly x: number;
+        readonly y: number;
+        readonly z: number;
+        readonly heat: number;
+    }[];
 }
 
 export interface FogVolumeTarget {
@@ -136,6 +142,14 @@ export interface SceneFogTarget {
     density: number;
 }
 
+export interface SkyFireSpotTarget {
+    readonly color: readonly [number, number, number];
+    readonly x: number;
+    readonly z: number;
+    readonly height?: number;
+    readonly reach?: number;
+}
+
 export interface SkyLightTarget {
     readonly direction: ArrayLike<number>;
     readonly radiance: ArrayLike<number>;
@@ -152,11 +166,14 @@ export interface SkyTarget {
             density?: number;
             falloff?: 'exp' | 'exp2';
             color?: readonly [number, number, number];
+            fireSpots?: readonly SkyFireSpotTarget[];
         };
         atmosphere?: {
             sunColor?: readonly [number, number, number];
             scatteredLight?: readonly [number, number, number];
             layerTransmittance?: readonly [number, number, number];
+            fireSpots?: readonly SkyFireSpotTarget[];
+            fireSight?: number;
         };
         look?: object;
         lighting?: {

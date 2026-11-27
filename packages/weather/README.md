@@ -1160,8 +1160,9 @@ A `WeatherDrive` does three things for it, all package calls:
   are seen through it along each ray, so a starry sky goes out under a thick pall (KB-SKY-NIGHTPALL1). The moon and
   twilight light the layer from above as the sun does (each through the load at its height, over `lighting.intensity`),
   and the fires light it from below: it sends `hazeReflectance(state)` of their `fireHazeLight` back down (the
-  two-stream slab's reflectance, Meador and Weaver 1980; 0.34, 0.31, 0.27 for a smoke of 0.6), and both go in
-  `scatteredLight`, so a pall over a burning valley glows orange over the whole dome at night. Cleared as `sunColor` is.
+  two-stream slab's reflectance, Meador and Weaver 1980; 0.34, 0.31, 0.27 for a smoke of 0.6). The moon's and
+  twilight's share, and that of fires which do not say where they burn, go in `scatteredLight`, even over the dome.
+  Cleared as `sunColor` is.
 - **The fog takes the smoke colour.** While dust and smoke together are most of the air's extinction, the sky fog's colour
   is `smokeColor()` (a grey brown from the single-scattering albedo of smoke, 0.84 to 0.89) times `smokeLight`, or the
   mix of dust and smoke colours by their share of the extinction.
@@ -1181,6 +1182,26 @@ A `WeatherDrive` does three things for it, all package calls:
   off); a fire that reports no `radiantPower` gives the haze no light. A front that takes a `noon` (`FireFront.noon`)
   is given the sky's `lighting.intensity` each frame, so its columns' glow is referred to the same noon sun as the haze
   (KB-VFX-GLOWUNITS1).
+- **The glow is brightest over the fires.** A fire that also says where it burns (`segments()`, as `FireFront` has:
+  `x`, `y`, `z` and `heat` each) lights the sky and the haze as spots over its sources instead of evenly
+  (KB-SKY-PALLFALLOFF1). The drive shares each fire's `radiantPower` among its segments by heat and clusters all of
+  them into at most eight sources by weighted k-means (Lloyd, IEEE Trans. Inf. Theory 28(2), 1982,
+  https://doi.org/10.1109/TIT.1982.1056489), seeded by power times squared distance (the D^2 weighting of Arthur and
+  Vassilvitskii, "k-means++", SODA 2007, taken at its maximum, as the farthest-point traversal of Gonzalez, Theoretical
+  Computer Science 38, 1985), no two seeds within 500 m, so the same fires give the same sources. Each source's
+  `fireLayerLight(power, spread, distance)` is the light of an isotropic source's upward half on a plane 1 km up,
+  P h / (4 pi (h^2 + s^2 + r^2)^1.5) as a share of the noon sun (the cosine law over the squared distance, Modest,
+  "Radiative Heat Transfer", 2013), whose mean over the box's disc is `fireHazeLight`. The drive writes the sky's
+  `atmosphere.fireSpots` (that light times `hazeReflectance(state)`), `atmosphere.fireSight` (2 / extinction) and
+  `fog.fireSpots` (that light in the haze's own colour). They are cleared as the other values are.
+
+```js
+import { fireLayerLight } from 'margoengine/weather';
+
+// A 3 GW stretch of front spread 350 m: the light on the smoke over it and 3 km away, red channel.
+const over = fireLayerLight(3e9, 350)[0], away = fireLayerLight(3e9, 350, 3000)[0];
+console.log(over.toFixed(3), away.toFixed(4), 'of the noon sun');
+```
 
 ```js
 import { WeatherMachine, fireHazeLight } from 'margoengine/weather';

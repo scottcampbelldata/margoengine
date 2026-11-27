@@ -39,6 +39,7 @@ export {
   type SkyLightingOptions,
   type SkyCloudOptions,
   type SkyFogOptions,
+  type SkyFireSpot,
   type SkyNightOptions,
   type SkyAtmosphereOptions,
   type SkyLookOptions,

@@ -23,9 +23,12 @@ import {
   hazeLight,
   hazeReflectance,
   fireHazeLight,
+  fireLayerLight,
+  SMOKE_LAYER_DEPTH,
   visibility,
   windProfile,
 } from './air.js';
+import { clusterFires, type FirePoint } from './fire-sources.js';
 import { heldFromWeather } from '../../shared/settings.js';
 import { FuelMoistureModel, type DeadFuelMoisture } from './fuel-moisture.js';
 import { grassWind, scatterWind } from './wind-settings.js';
@@ -33,6 +36,16 @@ import { fogDensity, hailSettings, skyWeather, windAt, type SkyWeatherSettings }
 import type { WeatherState } from './state.js';
 import type { WindField } from './wind.js';
 
+/** A glow the drive writes on the sky (`SkyFireSpot` of `@margoengine/sky`). */
+export interface SkyFireSpotTarget {
+  readonly color: readonly [number, number, number];
+  readonly x: number;
+  readonly z: number;
+  readonly height?: number;
+  readonly reach?: number;
+}
+/** What the sky's fog or air takes of the fires. */
+type SpotHolder = { fireSpots?: readonly SkyFireSpotTarget[]; fireSight?: number };
 /** The weather to follow: a `WeatherMachine`, or anything with a `state` (and optionally `update`, `wind` and `time`). */
 export interface DriveSource {
   /** The weather now. */
@@ -58,7 +71,12 @@ export interface SkyLightTarget {
 export interface SkyTarget {
   readonly options: {
     clouds?: { coverage?: number; speed?: number; height?: number };
-    fog?: { density?: number; falloff?: 'exp' | 'exp2'; color?: readonly [number, number, number] };
+    fog?: {
+      density?: number;
+      falloff?: 'exp' | 'exp2';
+      color?: readonly [number, number, number];
+      fireSpots?: readonly SkyFireSpotTarget[];
+    };
     /**
      * The air the sun shines through; smoke dims and reddens its `sunColor`, ash and spray dim it grey, and the light
      * the layers scatter down lights the sky (`scatteredLight`). Made as `{}` under a load when the sky has a `look` or
@@ -68,6 +86,8 @@ export interface SkyTarget {
       sunColor?: readonly [number, number, number];
       scatteredLight?: readonly [number, number, number];
       layerTransmittance?: readonly [number, number, number];
+      fireSpots?: readonly SkyFireSpotTarget[];
+      fireSight?: number;
     };
     look?: object;
     /** The sky's engine lighting: its `intensity` is the noon sun's light the haze colours are referred to. Default 1. */
@@ -102,6 +122,12 @@ export interface FireTarget {
    * `lighting.intensity` here each frame, so the columns over a fire take the same share of the noon light as the haze.
    */
   noon?: number;
+  /**
+   * Its burning segments (`FireFront.segments()`): world metres on the ground and convective heat, watts. A fire that
+   * has them lights the sky's pall and haze as spots over where it burns (KB-SKY-PALLFALLOFF1), its radiant power
+   * shared among them by their heat; one that has none lights them evenly (`fireHazeLight`).
+   */
+  segments?(): readonly { readonly x: number; readonly y: number; readonly z: number; readonly heat: number }[];
 }
 /** A cloud layer (`VolumetricClouds` from `@margoengine/sky/volumetric-clouds`). */
 export interface CloudLayerTarget {
@@ -531,6 +557,12 @@ export class WeatherDrive {
   private readonly skyLights = new WeakMap<object, { original: unknown; wrote: unknown }>();
   // The layerTransmittance each atmosphere had before the drive wrote one, and the one it wrote (KB-SKY-NIGHTPALL1).
   private readonly layerSkies = new WeakMap<object, { original: unknown; wrote: unknown }>();
+  // The fireSpots each fog and atmosphere had before the drive wrote them, and the list it wrote (KB-SKY-PALLFALLOFF1).
+  private readonly spotLists = new WeakMap<
+    object,
+    { original: readonly SkyFireSpotTarget[] | undefined; wrote: readonly SkyFireSpotTarget[] }
+  >();
+  private readonly sights = new WeakMap<object, { original: number | undefined; wrote: number }>();
   private readonly fuelWrote = new WeakMap<object, DeadFuelMoisture>();
   private fuel?: FuelMoistureModel;
 
@@ -637,13 +669,29 @@ export class WeatherDrive {
       if (noon > 0) for (const fire of fires) if ('noon' in fire && fire.noon !== noon) fire.noon = noon;
     }
     // The flames' light on the haze over them (KB-WEATHER-FIREHAZE1), from the fronts that report their radiant power.
-    let radiant = 0;
-    for (const fire of fires) {
+    // Fires that say where they burn light the sky's pall and haze brightest over their sources and less away from them
+    // (`fireLayerLight`, KB-SKY-PALLFALLOFF1); the power of the others lights them evenly (`fireHazeLight`).
+    const scale = o.fireLight ?? 1,
+      burning: FirePoint[] = [];
+    let even = 0;
+    for (const fire of scale > 0 ? fires : []) {
       const p = fire.radiantPower;
-      if (typeof p === 'number' && Number.isFinite(p) && p > 0) radiant += p;
+      if (!(typeof p === 'number' && Number.isFinite(p) && p > 0)) continue;
+      const placed = fire.segments?.().filter(isPlaced) ?? [];
+      let heat = 0;
+      for (const s of placed) heat += s.heat;
+      if (heat > 0) for (const s of placed) burning.push({ x: s.x, y: s.y, z: s.z, power: (p * s.heat) / heat });
+      else even += p;
     }
-    const fireLight = radiant > 0 && (o.fireLight ?? 1) > 0 ? fireHazeLight(radiant, o.smokeWidth) : undefined;
-    if (fireLight) for (let i = 0; i < 3; i++) fireLight[i] *= o.fireLight ?? 1;
+    const fireLight = even > 0 ? fireHazeLight(even, o.smokeWidth) : undefined;
+    if (fireLight) for (let i = 0; i < 3; i++) fireLight[i] *= scale;
+    const spots = clusterFires(burning).map((s) => ({
+      light: fireLayerLight(s.power, s.spread).map((v) => v * scale),
+      x: s.x,
+      z: s.z,
+      height: s.y + SMOKE_LAYER_DEPTH / 2,
+      reach: Math.hypot(SMOKE_LAYER_DEPTH / 2, s.spread),
+    }));
     const here = o.listener?.position ?? o.position ?? [0, 0, 0];
     const eruptions =
       o.eruptions !== undefined
@@ -705,9 +753,10 @@ export class WeatherDrive {
           [o.dustLight ?? 1, o.smokeLight ?? 1, o.ashLight ?? 1, o.sprayLight ?? 1],
           skyTarget,
           fireLight,
+          spots,
         );
       }
-      this.dimSun(skyTarget, state, fireLight);
+      this.dimSun(skyTarget, state, fireLight, spots, s.extinction);
     }
     const grounds =
       o.grounds !== undefined
@@ -907,14 +956,15 @@ export class WeatherDrive {
   // KB-WEATHER-NIGHTHAZE1), so the haze is moonlit at night, not the afternoon's. The fires below add their own light
   // (`fire`, `fireHazeLight`, KB-WEATHER-FIREHAZE1), so the haze over a burning valley glows orange at night.
   private tintFog(
-    fog: { color?: readonly [number, number, number] },
+    fog: SpotHolder & { color?: readonly [number, number, number] },
     state: WeatherState,
     extinction: number,
     lights: readonly number[],
     sky: SkyTarget,
     fire?: readonly number[],
+    spots: readonly Spot[] = [],
   ): void {
-    if (heldFromWeather(fog, 'color')) return;
+    if (heldFromWeather(fog, 'color')) return this.writeSpots(fog, []);
     const record = this.fogColors.get(fog),
       parts = [
         dustExtinction(state.dust),
@@ -934,16 +984,41 @@ export class WeatherDrive {
         for (let i = 0; i < 3; i++) color[i] += share === 1 ? c[i]! * lit : c[i]! * share * lit;
       }
       const light = airLight(sky, state);
+      // The haze round each source takes its light in the haze's own colour (KB-SKY-PALLFALLOFF1).
+      this.writeSpots(
+        fog,
+        spots.map(({ light: on, x, z, reach }) => ({ color: tinted(color, on), x, z, reach })),
+      );
       if (light || fire) for (let i = 0; i < 3; i++) color[i] *= (light ? light[i]! : 1) + (fire ? fire[i]! : 0);
       const original = record && fog.color === record.wrote ? record.original : fog.color;
       this.fogColors.set(fog, { original, wrote: color });
       fog.color = color;
-    } else if (record) {
+    } else {
+      this.writeSpots(fog, []);
+      if (!record) return;
       this.fogColors.delete(fog);
       if (fog.color === record.wrote) {
         if (record.original === undefined) delete fog.color;
         else fog.color = record.original as readonly [number, number, number];
       }
+    }
+  }
+
+  // The fires' spots on the sky's fog or air (`fireSpots`), written and given back as the other colours are: what it had
+  // comes back when no fire says where it burns or the load leaves; a list a person set meanwhile, or one held by a
+  // setting, is left alone.
+  private writeSpots(target: SpotHolder, next: readonly SkyFireSpotTarget[]): void {
+    if (heldFromWeather(target, 'fireSpots')) return;
+    const record = this.spotLists.get(target);
+    if (next.length) {
+      const original = record && target.fireSpots === record.wrote ? record.original : target.fireSpots;
+      this.spotLists.set(target, { original, wrote: next });
+      target.fireSpots = next;
+    } else if (record) {
+      this.spotLists.delete(target);
+      if (target.fireSpots !== record.wrote) return;
+      if (record.original === undefined) delete target.fireSpots;
+      else target.fireSpots = record.original;
     }
   }
 
@@ -989,7 +1064,13 @@ export class WeatherDrive {
   // direct sun the air lets through at the sun's elevation (`sunTransmittance`). With none of them the sky is not
   // touched, so its values stay bit for bit; when they clear the colour it had comes back. A colour a person set
   // meanwhile is kept as the one to come back to.
-  private dimSun(sky: SkyTarget, state: WeatherState, fire?: readonly number[]): void {
+  private dimSun(
+    sky: SkyTarget,
+    state: WeatherState,
+    fire?: readonly number[],
+    spots: readonly Spot[] = [],
+    extinction = 0,
+  ): void {
     const o = sky.options,
       loaded = state.smoke > 0 || state.ash > 0 || state.spray > 0;
     let atm = o.atmosphere;
@@ -997,6 +1078,14 @@ export class WeatherDrive {
     if (atm === undefined) return;
     this.lightSky(atm, state, sky, loaded, fire);
     this.layerSky(atm, state, loaded);
+    // Straight over each source the layer sends back down the light on it times its reflectance, as the even share does.
+    const back = hazeReflectance(state);
+    this.writeSpots(
+      atm,
+      (loaded ? spots : []).map(({ light, x, z, height, reach }) => ({ color: tinted(back, light), x, z, height, reach })),
+    );
+    // A low ray sees the lit layer as far across as the haze's light comes from (the sky fog's 2 / density).
+    this.writeSight(atm, loaded && spots.length && extinction > 0 ? Math.min(1e6, 2 / extinction) : undefined);
     if (heldFromWeather(atm, 'sunColor')) return;
     const record = this.sunColors.get(atm);
     if (loaded) {
@@ -1014,6 +1103,22 @@ export class WeatherDrive {
         if (record.original === undefined) delete atm.sunColor;
         else atm.sunColor = record.original as readonly [number, number, number];
       }
+    }
+  }
+
+  // `atmosphere.fireSight` with the spots, written and given back as they are.
+  private writeSight(atm: SpotHolder, next: number | undefined): void {
+    if (heldFromWeather(atm, 'fireSight')) return;
+    const record = this.sights.get(atm);
+    if (next !== undefined) {
+      const original = record && atm.fireSight === record.wrote ? record.original : atm.fireSight;
+      this.sights.set(atm, { original, wrote: next });
+      atm.fireSight = next;
+    } else if (record) {
+      this.sights.delete(atm);
+      if (atm.fireSight !== record.wrote) return;
+      if (record.original === undefined) delete atm.fireSight;
+      else atm.fireSight = record.original;
     }
   }
 
@@ -1167,3 +1272,23 @@ function nightBlend(sky: SkyTarget): number {
 function sunElevation(sky: SkyTarget): number {
   return Math.asin(sky.sun ? Math.min(1, Math.max(-1, sky.sun[1] ?? 1)) : 1);
 }
+
+/** A source's light straight over it (a share of the noon sun, RGB), where, the layer's lit height and its reach. */
+interface Spot {
+  light: number[];
+  x: number;
+  z: number;
+  height: number;
+  reach: number;
+}
+
+/** A colour times a light, each channel at most 4 (the sky's limit). */
+const tinted = (color: readonly number[], light: readonly number[]): [number, number, number] => [
+  Math.min(4, color[0]! * light[0]!),
+  Math.min(4, color[1]! * light[1]!),
+  Math.min(4, color[2]! * light[2]!),
+];
+
+/** A segment that can be placed: finite, with heat. */
+const isPlaced = (s: { x: number; y: number; z: number; heat: number }): boolean =>
+  s.heat > 0 && [s.x, s.y, s.z, s.heat].every(Number.isFinite);

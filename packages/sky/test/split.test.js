@@ -32,6 +32,8 @@ const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[na
 // Sky.irradiance(); its usage flags only, the same commands, WGSL and uploads in every trace.
 // Recorded again with the fog's exponential height falloff (2026-11-27, scaleHeight and base): the fog WGSL gained the
 // closed-form term (run only with a scaleHeight) and its uniform one vec4; the same commands in every trace.
+// night-fog, afterlight and preetham-clouds-fog recorded again with KB-SKY-PALLFALLOFF1 (2026-11-27): the fog WGSL
+// gained the fire spots' haze and its uniform sixteen zero vec4s; the same commands in every trace.
 test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);

@@ -45,7 +45,7 @@ test('the rewrite reaches every anchor of the sky, its night, clouds, fog, refle
         '*frame.lookCloud.rgb,opacity);',
         'fn cloudSkyAbove(',
         'fn lowLayer(',
-        'lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f}',
+        'lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>}',
       ])
         assert.ok(main.includes(piece), `${model}, night ${!!night}: ${piece}`);
       assert.doesNotMatch(all, /\bBETA_R\b/, 'no shader keeps the constant Rayleigh');
@@ -228,7 +228,7 @@ test('the haze layer light rides the look block and the day sky adds it', () => 
     'the day sky adds the layer light',
   );
   assert.ok(
-    main.includes('lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f}'),
+    main.includes('lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f,fires:array<vec4f,16>}'),
     'the Frame struct ends with the layer light',
   );
   const written = new Float32Array(u.data, 256 + 72 * 4, 3);
@@ -262,10 +262,60 @@ test('the night share of the sky and its clouds are seen through the low layer, 
   assert.equal(main.match(/fn cloudSky\(/g).length, 1, 'one cloudSky, the layered one');
   assert.match(
     main,
-    /c\*mix\(vec3f\(1\.0\),t,frame\.sun\.w\)\+frame\.air3\.rgb\*frame\.sun\.w/,
+    /c\*mix\(vec3f\(1\.0\),t,frame\.sun\.w\)\+\(frame\.air3\.rgb\+fireLayer\(w\)\)\*frame\.sun\.w/,
     'the night share only',
   );
   assert.match(main, /max\(w\.y\/max\(length\(w\),1e-6\),0\.052336\)/, 'slant path floored at 3 degrees, as the sun');
+  sky.dispose();
+  h.cleanup();
+});
+
+// KB-SKY-PALLFALLOFF1: the fires' light on a smoke pall was one even glow over the whole dome, so the ridges between did
+// not stand out against it. It rides floats 80-143 as up to eight spots, two vec4 each, which lowLayer adds along each
+// ray by the cosine law where the ray meets the spot's lit height, no farther across than the sight.
+test("the fires' spots on the layer ride the look block and add along each ray", () => {
+  const air = look.air({}, new Float32Array(9)),
+    block = new Float32Array(LOOK_FLOATS);
+  assert.equal(LOOK_FLOATS, 144);
+  look.write(block, {}, air, 5);
+  assert.ok(
+    block.subarray(80).every((v) => v === 0),
+    'no fire: nothing written',
+  );
+  const fireSpots = [
+    { color: [0.2, 0.1, 0.05], x: 300, z: -40, height: 1500, reach: 1200 },
+    { color: [0.05, 0.02, 0.01], x: -2000, z: 800 },
+  ];
+  look.write(block, { atmosphere: { fireSpots, fireSight: 2600 } }, air, 5);
+  const lit = (c) => c.map((v) => Math.fround((v * 5) / Math.PI));
+  assert.deepEqual([...block.subarray(80, 88)], [...lit([0.2, 0.1, 0.05]), 1440000, 300, 1500, -40, 2600]);
+  assert.deepEqual([...block.subarray(88, 96)], [...lit([0.05, 0.02, 0.01]), 1e6, -2000, 1000, 800, 0]);
+  assert.ok(
+    block.subarray(96).every((v) => v === 0),
+    'the spots left over end the list',
+  );
+  const spot = { color: [0.1, 0.1, 0.1], x: 0, z: 0 };
+  for (const [bad, what] of [
+    [{ fireSpots: Array.from({ length: 9 }, () => spot) }, /at most 8/],
+    [{ fireSpots: [{ ...spot, color: [5, 0, 0] }] }, /fireSpots/],
+    [{ fireSpots: [{ ...spot, reach: 0 }] }, /fireSpots/],
+    [{ fireSpots: [{ ...spot, x: NaN }] }, /fireSpots/],
+    [{ fireSpots: {} }, /fireSpots/],
+    [{ fireSight: -1 }, /fireSight/],
+  ])
+    assert.throws(() => look.validate({ atmosphere: bad }), what);
+  const h = harness(),
+    sky = new Sky({ atmosphere: { fireSpots: [spot] }, timeScale: 0 });
+  h.engine.use(sky);
+  h.frame();
+  const main = h.codes.find((c) => c.includes('fn lowLayer(') && c.includes('fn lookSky('));
+  assert.ok(main.includes('fn fireLayer(w:vec3f)->vec3f'), 'the fire term');
+  assert.ok(main.includes('if(spot.w<=0.0){break;}'), 'the list ends at the first empty spot');
+  assert.ok(
+    main.includes('light+=spot.rgb*pow(spot.w/(spot.w+dot(across,across)),1.5);'),
+    'the cosine law over the squared distance, the spots adding',
+  );
+  assert.ok(main.includes('if(sight>0.0&&run*flat>sight){run=sight/flat;}'), 'no farther across than the sight');
   sky.dispose();
   h.cleanup();
 });

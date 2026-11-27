@@ -661,6 +661,32 @@ export function fireHazeLight(radiantPower: number, width = 2000): [number, numb
 }
 
 /**
+ * The share of the noon sun's light ({@link NOON_IRRADIANCE}) that fires radiating `radiantPower` watts put on the smoke
+ * layer at a point `distance` metres across from straight over them, red, green and blue in the flames' colour
+ * ({@link FIRE_LIGHT_COLOR}) (KB-SKY-PALLFALLOFF1). The upward half of the power leaves the fire as an isotropic source
+ * of intensity P / (4 pi) W/sr, and a horizontal plane h = {@link SMOKE_LAYER_DEPTH} / 2 above it takes
+ * E = P h / (4 pi (h^2 + s^2 + r^2)^1.5) (the cosine law over the squared distance, M. F. Modest, "Radiative Heat
+ * Transfer", 3rd ed., Academic Press, 2013, ch. 1 and 4), the source softened by the fire's `spread` s (its RMS radius).
+ * Over the whole plane it gives P / 2, and with no spread its mean over the box of {@link fireHazeLight} is that
+ * function's value, so the pall glows brightest over each fire and falls off with distance from it. Several fires, or
+ * the clusters of one front (`FireFront.radiantSources`), add. Exactly [0, 0, 0] for no power.
+ * @throws RangeError for a negative or non-finite power, spread or distance.
+ */
+export function fireLayerLight(radiantPower: number, spread = 0, distance = 0): [number, number, number] {
+  for (const [v, name] of [
+    [radiantPower, 'Fire radiant power'],
+    [spread, 'Fire spread'],
+    [distance, 'Distance'],
+  ] as const)
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0)
+      throw new RangeError(name + ' must be a finite number, 0 or more; got ' + String(v));
+  if (radiantPower === 0) return [0, 0, 0];
+  const h = SMOKE_LAYER_DEPTH / 2,
+    share = (radiantPower * h) / (4 * Math.PI * (h * h + spread * spread + distance * distance) ** 1.5) / NOON_IRRADIANCE;
+  return [FIRE_LIGHT_COLOR[0] * share, FIRE_LIGHT_COLOR[1] * share, FIRE_LIGHT_COLOR[2] * share];
+}
+
+/**
  * The share of the light on clean air that still lights the air under the smoke, ash and spray of a state, red, green
  * and blue, with the sun `elevation` radians up: the direct sun the layers let through, t ({@link sunTransmittance}),
  * plus the sunlight they scatter, 1 - t, times the share of it a two-stream slab of the layers passes down
