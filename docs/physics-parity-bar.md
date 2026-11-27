@@ -305,13 +305,15 @@ default staying 1 kg/m³ and documented as Rapier's.
   to 4 `liquids` of their own density, viscosity and colour (a heavier one sinks, the floor carries both weights) whose
   colours blend at `mixing`, drawn in their colours by the surface (`ParticleLiquid` `colorOffset`, which any particle
   system can use), and `emitters` and `drains` that add and remove particles while it runs (exactly rate * time
-  particles, the rest kept in order by a GPU prefix-sum compaction; GPU and twin agree on the live count). The CPU solvers `physics/pbf`, `physics/dfsph`
+  particles, the rest kept in order by a GPU prefix-sum compaction; GPU and twin agree on the live count), and a floating
+  origin for large worlds (`originCell`, `shiftOrigin`: the tank steps in its world cell's frame and a shift of the
+  world's origin changes no bit and draws the same picture). The CPU solvers `physics/pbf`, `physics/dfsph`
   and `physics/flip` stay the accurate route. Not DONE; open against the wider rival set (three.js and its ecosystem,
   Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): speed against the rivals' demos,
   measured in the speed phase; on the eight points, a dam-break front checked against Martin and Moyce (1952)'s
   measurements (their tables were not read yet; the checks today are closed forms, Archimedes, Laplace and the
-  momentum balance), one option that picks a validated fast and accurate tier on the GPU path (today the accurate
-  route is the CPU solvers), and a large-world floating origin for the container.
+  momentum balance), and one option that picks a validated fast and accurate tier on the GPU path (today the accurate
+  route is the CPU solvers).
 
 ### P14. LIFE-04 Flocking
 

@@ -1033,6 +1033,14 @@ debug view through `setPointer`, `setColliders` and `setDebug`):
   default white) tints the light through the surface. `mixing` 0 per second: each particle's colour relaxes towards
   the mean colour of the liquid round it at this rate, so a dye spreads where the liquid stirs; the particles keep
   their own liquid's density and viscosity. With `liquids` or `mixing` the surface draws each particle's colour.
+- `originCell` [0, 0, 0] and `originCellSize` 4096 m (a power of two, as `PhysicsWorld`'s `cellSize`): the world cell the
+  liquid lives in, for large worlds (a floating origin, `docs/physics-framework.md`). Every position in the options, the
+  particle buffer and the debug view is in that cell's frame, whose origin is `liquid.origin` (`originCell *
+  originCellSize`) in the world, so the particles keep f32 precision however far out the tank is; a linked body stays in
+  the world frame. `shiftOrigin(delta)` moves the world's origin by whole cells, as `PhysicsWorld.shiftOrigin` does: the
+  cell becomes `originCell - delta`, the surface's `origin` follows, and no bit of the liquid changes, so it draws where
+  it did in the moved world. `ParticleLiquid`'s own `origin` option ([0, 0, 0]) draws any particles kept in a frame of
+  their own the same way.
 - `debug` (or `setDebug`): `{ enabled, particles: 'speed' | 'density' | 'color' | 'off', speedScale?, grid, container,
   colliders }`; `'color'` shows each particle's own colour. On, it colours every particle by its speed (blue still to red at `speedScale`, default the speed of a
   fall through the container) or by its density over rest density (0.8 blue to 1.2 red), and hides the surface while it

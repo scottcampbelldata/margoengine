@@ -310,6 +310,7 @@ export class GPULiquid implements EnginePlugin {
       liquid.surface = ParticleLiquid.attach(engine, {
         radius: liquid.spacing,
         ...surface,
+        origin: liquid.origin,
         particles: {
           positions: buffer,
           velocities: buffer,
@@ -345,7 +346,36 @@ export class GPULiquid implements EnginePlugin {
   private allColliders(extra: LiquidCollider[] = []): LiquidCollider[] {
     const own = this.options.colliders ?? [];
     if (!this.links.length && !extra.length) return own as LiquidCollider[];
-    return [...own, ...this.links.map((l) => linkedCollider(l)), ...extra];
+    const at = this.origin;
+    return [...own, ...this.links.map((l) => linkedCollider(l, at)), ...extra];
+  }
+
+  /**
+   * World position of the liquid's frame, `originCell * originCellSize`: a particle at p in the buffer (and every
+   * position in the options) lies at origin + p in the world.
+   */
+  get origin(): [number, number, number] {
+    const c = this.options.originCell ?? [0, 0, 0];
+    const s = this.options.originCellSize ?? 4096;
+    return [c[0] * s, c[1] * s, c[2] * s];
+  }
+
+  /**
+   * Moves the world's origin by `delta` whole cells (as `PhysicsWorld.shiftOrigin` does when it follows a camera or a
+   * ship): the liquid's cell becomes `originCell - delta` and its surface follows, so it draws where it did relative to
+   * the moved world, and no bit of the particles, the grid or the step changes. All or nothing.
+   */
+  shiftOrigin(delta: readonly [number, number, number]): this {
+    this.assertAlive('shiftOrigin');
+    if (!Array.isArray(delta) || delta.length !== 3 || delta.some((v) => !Number.isInteger(v)))
+      throw liquidError(`GPULiquid.shiftOrigin delta must be three integers (whole cells), not ${String(delta)}`);
+    const c = this.options.originCell ?? [0, 0, 0];
+    const moved: [number, number, number] = [c[0] - delta[0]!, c[1] - delta[1]!, c[2] - delta[2]!];
+    resolveLiquidParams({ ...this.options, originCell: moved }, this.count);
+    this.flushForces();
+    this.options.originCell = moved;
+    if (this.surface) this.surface.options.origin = this.origin;
+    return this;
   }
 
   private resolve(): ResolvedLiquidParams {
@@ -376,7 +406,7 @@ export class GPULiquid implements EnginePlugin {
       throw liquidError('GPULiquid.link body needs applyImpulse(impulse, point) and applyTorqueImpulse(torque)');
     if (this.links.some((l) => l.body === body)) throw liquidError('GPULiquid.link: this body is linked already; unlink it first');
     const entry: LinkEntry = { body, collider, center: [0, 0, 0], unlink: () => this.unlink(entry) };
-    resolveLiquidParams({ ...this.options, colliders: this.allColliders([linkedCollider(entry)]) }, this.count);
+    resolveLiquidParams({ ...this.options, colliders: this.allColliders([linkedCollider(entry, this.origin)]) }, this.count);
     this.flushForces();
     this.links.push(entry);
     return entry;
@@ -410,7 +440,8 @@ export class GPULiquid implements EnginePlugin {
   /** Replaces the colliders (up to 8); `forces` follows the same order. */
   setColliders(colliders: readonly LiquidCollider[]): void {
     this.assertAlive('setColliders');
-    resolveLiquidParams({ ...this.options, colliders: [...colliders, ...this.links.map((l) => linkedCollider(l))] }, this.count);
+    const at = this.origin;
+    resolveLiquidParams({ ...this.options, colliders: [...colliders, ...this.links.map((l) => linkedCollider(l, at))] }, this.count);
     this.flushForces();
     this.options.colliders = colliders;
     const n = colliders.length + this.links.length;
@@ -599,9 +630,12 @@ export class GPULiquid implements EnginePlugin {
     const scale = this.params.particleMass / LIQUID_FORCE_FIXED;
     const base = k - links.length;
     if (base < 0) return;
+    const [ox, oy, oz] = this.origin;
     links.forEach((l, i) => {
       const o = (base + i) * stride;
-      l.body.applyImpulse([sum(o) * scale, sum(o + 1) * scale, sum(o + 2) * scale], centers[i]);
+      const c = centers[i]!;
+      // The body lives in the world frame: the centre goes back there.
+      l.body.applyImpulse([sum(o) * scale, sum(o + 1) * scale, sum(o + 2) * scale], [c[0] + ox, c[1] + oy, c[2] + oz]);
       l.body.applyTorqueImpulse([sum(o + 3) * scale, sum(o + 4) * scale, sum(o + 5) * scale]);
     });
   }
@@ -1017,7 +1051,11 @@ export class GPULiquid implements EnginePlugin {
       uz = rx * fy;
     const encode = !c.format.includes('float') && !c.format.endsWith('-srgb');
     const u = this.debugData;
-    u.set(c.camera.matrix, 0);
+    // The view drawn in the liquid's frame: the view-projection times the translation to its origin.
+    const m = c.camera.matrix;
+    const [ox, oy, oz] = this.origin;
+    u.set(m, 0);
+    for (let i = 0; i < 4; i++) u[12 + i] = m[i]! * ox + m[4 + i]! * oy + m[8 + i]! * oz + m[12 + i]!;
     u.set([rx, 0, rz, this.spacing * 0.5], 16);
     u.set([ux, uy, uz, p.debug.particles === 'density' ? 2 : p.debug.particles === 'color' ? 3 : 1], 20);
     u.set([p.debug.speedScale, 0, encode ? 1 : 0, 0], 24);
@@ -1261,8 +1299,8 @@ export class GPULiquid implements EnginePlugin {
   }
 }
 
-/** A linked body's collider in world space: its shape placed by the body's pose, moving with the body. */
-function linkedCollider(l: LinkEntry): LiquidCollider {
+/** A linked body's collider in the liquid's frame: its shape placed by the body's pose, moving with the body. */
+function linkedCollider(l: LinkEntry, origin: readonly [number, number, number]): LiquidCollider {
   const b = l.body;
   const c = l.collider;
   if (!c || typeof c !== 'object')
@@ -1271,11 +1309,13 @@ function linkedCollider(l: LinkEntry): LiquidCollider {
   const lp = c.position ?? [0, 0, 0];
   const lq = c.rotation ?? [0, 0, 0, 1];
   const off = rotateVec(bq, lp[0], lp[1], lp[2]);
-  const position: [number, number, number] = [b.position[0]! + off[0], b.position[1]! + off[1], b.position[2]! + off[2]];
+  // The body lives in the world frame; the collider goes into the liquid's (the world point less the liquid's origin).
+  const world: [number, number, number] = [b.position[0]! + off[0], b.position[1]! + off[1], b.position[2]! + off[2]];
+  const position: [number, number, number] = [world[0] - origin[0], world[1] - origin[1], world[2] - origin[2]];
   const w: [number, number, number] = [b.angularVelocity[0]!, b.angularVelocity[1]!, b.angularVelocity[2]!];
   let v: [number, number, number];
   if (typeof b.velocityAtPoint === 'function') {
-    const at = b.velocityAtPoint(position);
+    const at = b.velocityAtPoint(world);
     v = [at[0]!, at[1]!, at[2]!];
   } else {
     const lv = b.linearVelocity;

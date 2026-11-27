@@ -103,6 +103,13 @@ try {
   if (r.compat) assert.equal(r.flowGap, 0);
   else assert.ok(r.flowGap < 1e-4, `emitter and drain: worst position gap ${r.flowGap}`);
   assert.ok(r.redPixels > 200 && r.bluePixels > 200, `the surface draws each liquid's colour: ${r.redPixels} red, ${r.bluePixels} blue px`);
+  // Floating origin: shifting the world's origin by the liquid's cell (the camera moved with it) changes no bit of the
+  // particles and draws the same picture; a few edge pixels may round differently in the camera's f32 matrices.
+  assert.equal(r.originHash[1], r.originHash[0], 'the shift changes no bit of the particles');
+  assert.ok(r.originLit > 200, `the far liquid draws: ${r.originLit} px`);
+  assert.ok(r.originDebugDiff > 200, `the debug view draws in the far cell: ${r.originDebugDiff} px`);
+  assert.ok(r.originJump <= 0.01 * r.originLit, `surface after the shift: ${r.originJump} px moved of ${r.originLit}`);
+  assert.ok(r.originDebugJump <= 0.01 * r.originDebugDiff, `debug view after the shift: ${r.originDebugJump} px moved`);
   console.log(
     `ok gpu liquid (${r.stats.backend}): ${r.count} particles, ${r.stats.nodes} nodes, hash ${r.hashes[0]}, ` +
       `twin gap ${r.worstPos.toExponential(2)} m, force ${r.gpuForceY?.toFixed(3)} N, lifts ${r.lifts.map((x) => x.toFixed(2))} N, ` +

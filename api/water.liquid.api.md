@@ -18,6 +18,8 @@ export class GPULiquid implements EnginePlugin {
     static attach(engine: EngineKernel, options?: GPULiquidAttachOptions): GPULiquid;
     get spacing(): number;
     get particleMass(): number;
+    get origin(): [number, number, number];
+    shiftOrigin(delta: readonly [number, number, number]): this;
     link(body: LiquidLinkBody, collider: LiquidLinkCollider): LiquidLink;
     setPointer(pointer: LiquidPointer | null): void;
     setColliders(colliders: readonly LiquidCollider[]): void;
@@ -64,6 +66,8 @@ export interface GPULiquidOptions {
     pointer?: LiquidPointer | null;
     colliders?: readonly LiquidCollider[];
     debug?: LiquidDebugOptions;
+    originCell?: readonly [number, number, number];
+    originCellSize?: number;
 }
 
 export const LIQUID_COLOR_OFFSET = 17;
@@ -285,6 +289,7 @@ export interface ParticleLiquidOptions {
     whitewater?: WhitewaterOptions;
     narrowBand?: boolean;
     bandVoxel?: number;
+    origin?: readonly [number, number, number];
 }
 
 export interface ParticleSource {
@@ -377,6 +382,8 @@ export interface ResolvedLiquidParams {
     } | null;
     colliders: ResolvedCollider[];
     debug: Required<LiquidDebugOptions>;
+    originCell: readonly [number, number, number];
+    originCellSize: number;
 }
 
 export interface WhitewaterOptions {

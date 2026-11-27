@@ -300,6 +300,28 @@ window.check = async () => {
   for (let i = flowGpu.live; i < flowGpu.count; i++) if (Number.isNaN(flowGpu.particles[i * F])) flowEmpty++;
   const flowLive = [flowGpu.live, flowTwin.live, flowOptions.count, flowGpu.count - flowGpu.live, flowEmpty];
   flow.dispose();
+
+  // A floating origin: a liquid in world cell [1, 0, 0] of 4 m drawn by a camera 4 m along x, then the world's origin
+  // shifted by that cell with the camera moved back: the same picture (surface, debug particles and lines), no jump.
+  engine.scene.background = '#0a101a';
+  const far = GPULiquid.attach(engine, { count: compat ? 1024 : 16384, seed: 2, originCell: [1, 0, 0], originCellSize: 4 });
+  for (let k = 0; k < 3; k++) far.step(1 / 60);
+  far.options.paused = true;
+  const farBefore = liquidStateHash((await far.snapshot()).particles);
+  engine.camera.position = [4, 0.6, 2.2];
+  engine.camera.target = [4, 0.35, 0];
+  const originA = await grab(0);
+  far.setDebug({ enabled: true, particles: 'speed' });
+  const originDebugA = await grab(0);
+  far.setDebug({ enabled: false });
+  far.shiftOrigin([1, 0, 0]);
+  engine.camera.position = [0, 0.6, 2.2];
+  engine.camera.target = [0, 0.35, 0];
+  const originB = await grab(0);
+  far.setDebug({ enabled: true, particles: 'speed' });
+  const originDebugB = await grab(0);
+  const farAfter = liquidStateHash((await far.snapshot()).particles);
+  far.dispose();
   engine.dispose();
 
   return {
@@ -345,6 +367,11 @@ window.check = async () => {
     colorGap,
     redPixels,
     bluePixels,
+    originLit: nonBg(originA),
+    originJump: diffCount(originA, originB),
+    originDebugJump: diffCount(originDebugA, originDebugB),
+    originDebugDiff: diffCount(originA, originDebugA),
+    originHash: [farBefore, farAfter],
   };
 };
 window.ready = true;

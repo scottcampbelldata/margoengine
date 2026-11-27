@@ -162,6 +162,12 @@ export interface ParticleLiquidOptions {
   narrowBand?: boolean;
   /** Voxel size of the narrow band (the paper's 2h), 0.0001..1000. Default 4 * radius (two particle spacings). */
   bandVoxel?: number;
+  /**
+   * World position of the particles' own frame: a particle at p in the buffer draws at origin + p. A simulation that
+   * keeps its particles near its own origin (a floating origin, as GPULiquid's `originCell`) keeps their precision, and
+   * the passes run in that frame with the camera moved into it. Default [0, 0, 0].
+   */
+  origin?: readonly [number, number, number];
 }
 
 /** GPU work of the last frame, for tests and budgets. */
@@ -299,8 +305,8 @@ export class ParticleLiquid implements EnginePlugin {
   }
 
   /**
-   * The narrow band of the last update read back: grid origin, voxel size and dims, full voxels, voxels in layers 1 and
-   * 2, particles counted into voxels and particles in the band.
+   * The narrow band of the last update read back: grid origin (in the particles' frame, see `origin`), voxel size and
+   * dims, full voxels, voxels in layers 1 and 2, particles counted into voxels and particles in the band.
    * @throws MargoError `'state'` without `narrowBand` or before its first frame; the signal's reason when aborted.
    */
   async readNarrowBand(signal?: AbortSignal) {
@@ -386,6 +392,9 @@ export class ParticleLiquid implements EnginePlugin {
       throw fault('state', 'ParticleLiquid narrowBand must be true or false');
     if (o.resolutionScale !== undefined && o.resolutionScale !== 1 && o.resolutionScale !== 0.5)
       throw rangeError('ParticleLiquid resolutionScale must be 1 or 0.5', 'geometry');
+    const at = o.origin;
+    if (at !== undefined && (typeof at !== 'object' || at.length !== 3 || [0, 1, 2].some((i) => !Number.isFinite(at[i]))))
+      throw rangeError('ParticleLiquid origin needs three finite numbers [x, y, z]', 'geometry');
     for (const [name, max] of [
       ['absorption', 100],
       ['color', 10],
@@ -632,11 +641,15 @@ export class ParticleLiquid implements EnginePlugin {
       radius = o.radius ?? 0.05,
       light = this.engine!.lighting;
     v.fill(0);
-    v.set(camera.matrix);
-    if (!invertMatrixStable(camera.matrix, v.subarray(16, 32), this.workspace))
+    // The passes run in the particles' frame: the view-projection times the translation to `origin`, the eye less it.
+    const [ox, oy, oz] = o.origin ?? [0, 0, 0];
+    const m = camera.matrix;
+    v.set(m);
+    for (let i = 0; i < 4; i++) v[12 + i] = m[i]! * ox + m[4 + i]! * oy + m[8 + i]! * oz + m[12 + i]!;
+    if (!invertMatrixStable(v.subarray(0, 16), v.subarray(16, 32), this.workspace))
       throw fault('state', 'ParticleLiquid needs an invertible camera; give it a finite projection');
-    const e = camera.position,
-      t = camera.target;
+    const e: [number, number, number] = [camera.position[0] - ox, camera.position[1] - oy, camera.position[2] - oz],
+      t: [number, number, number] = [camera.target[0] - ox, camera.target[1] - oy, camera.target[2] - oz];
     let fx = t[0] - e[0],
       fy = t[1] - e[1],
       fz = t[2] - e[2];

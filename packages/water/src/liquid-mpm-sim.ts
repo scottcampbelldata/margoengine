@@ -257,6 +257,16 @@ export interface GPULiquidOptions {
   colliders?: readonly LiquidCollider[];
   /** Debug view. Default off. */
   debug?: LiquidDebugOptions;
+  /**
+   * The world cell the liquid lives in, for large worlds (a floating origin, docs/physics-framework.md): every position in
+   * these options, the particle buffer and the debug view is in the frame of this cell, whose origin lies at
+   * `originCell * originCellSize` in the world, so the particles keep f32 precision however far the cell is. Integers
+   * within +-2^31. {@link GPULiquid.shiftOrigin} moves it by whole cells and changes no bit of the liquid's state.
+   * Default [0, 0, 0].
+   */
+  originCell?: readonly [number, number, number];
+  /** Size of a world cell in metres, a power of two from 1 to 2^20 (as `PhysicsWorld`'s `cellSize`). Default 4096. */
+  originCellSize?: number;
 }
 
 /** One liquid of {@link GPULiquidOptions.liquids}. */
@@ -332,6 +342,9 @@ export interface ResolvedLiquidParams {
   pointer: { position: LiquidVec3; velocity: LiquidVec3; radius: number; strength: number } | null;
   colliders: ResolvedCollider[];
   debug: Required<LiquidDebugOptions>;
+  /** The world cell and its size; the frame's origin lies at originCell * originCellSize. */
+  originCell: readonly [number, number, number];
+  originCellSize: number;
 }
 
 /** A checked collider with its defaults filled in. */
@@ -654,7 +667,15 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
         : ((r: number): LiquidVec3 => [r, r, r])(num(d.radius, 0.05, `${name}.radius`, 1e-6, 1e6));
     return { kind: d.shape === 'box' ? 0 : 1, position: vec(d.position, [0, 0, 0], `${name}.position`), half, enabled: d.enabled ?? true };
   });
+  const oc = options.originCell ?? [0, 0, 0];
+  if (!Array.isArray(oc) || oc.length !== 3 || oc.some((v) => !Number.isInteger(v) || v < -(2 ** 31) || v >= 2 ** 31))
+    throw liquidError(`GPULiquid originCell must be three integers within +-2^31, not ${String(oc)}`);
+  const originCellSize = num(options.originCellSize, 4096, 'originCellSize', 1, 2 ** 20);
+  if (!Number.isInteger(Math.log2(originCellSize)))
+    throw liquidError(`GPULiquid originCellSize is ${originCellSize}; pass a power of two of metres from 1 to 2^20, as PhysicsWorld's cellSize`);
   return {
+    originCell: [oc[0]!, oc[1]!, oc[2]!],
+    originCellSize,
     count,
     capacity,
     emitters,

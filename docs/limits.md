@@ -8391,6 +8391,14 @@ each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surfac
   Neither happens in a liquid that is not already failing.
 - Deterministic on one GPU and driver (the same options and steps give the same bits, also after a restore); another GPU
   may round its f32 arithmetic differently, so two GPUs agree to rounding, not bit for bit.
+- Large worlds: the liquid lives in one world cell (`originCell`, cells of `originCellSize`, a power of two up to 2^20 m)
+  and keeps every position in that cell's frame, so a tank anywhere in the world steps with the precision of one near
+  the origin; `shiftOrigin` moves the world's origin by whole cells and changes no bit (`gpu-liquid.test.js`: 20 steps
+  across a shift of 1,000 cells of 4,096 m repeat 20 steps without it, hash for hash; `gpu-liquid-check.mjs`: the
+  surface and debug view draw the same picture before and after a shift, within 1% of the lit pixels, which round
+  differently in the camera's f32 matrices). The container itself does not follow anything: one liquid is one tank of
+  at most 256 cells a side, and the cell only places it. Positions the caller gives (box, colliders, pointer, emitters,
+  drains) are in the liquid's frame; a linked body's are in the world's (origin cell 0), converted in f64 each frame.
 - On the WebGL2 compatibility layer the CPU twin steps it on the main thread: 4,096 particles took about 120 ms a frame
   on a loaded laptop (180 frames in 22 s), so keep a few thousand there.
 - Speed against three.js's `webgpu_compute_particles_fluid` is not measured yet (speed phase, `scripts/speed-phase.json`).

@@ -524,3 +524,54 @@ test('the defaults: 65,536 particles, two spacings a cell, every wall on a node,
   assert.ok(Math.abs(p.speedOfSound - 2 * Math.sqrt(9.81)) < 1e-12);
   assert.ok(p.viscosity <= (p.cellSize * p.cellSize) / (8 * p.maxSubstep));
 });
+
+test('a floating origin: the liquid lives in a world cell, and a shift of the origin changes no bit and moves nothing', () => {
+  // A liquid 1000 cells of 4096 m out along x, with a body linked 0.25 m from its frame's origin, against the same liquid
+  // in cell 0: the debug lines (the linked collider placed in the liquid's frame) are the same to the bit, since
+  // 4,096,000.25 - 4,096,000 is exact. The world's origin then moves to the liquid's cell (and the body with it): the
+  // lines, the steps and the state stay the same to the bit.
+  const S = 4096;
+  const body = (x) => ({
+    position: [x + 0.25, 0.5, 0],
+    rotation: [0, 0, 0, 1],
+    linearVelocity: [0, 0, 0],
+    angularVelocity: [0, 0, 0],
+    applyImpulse() {},
+    applyTorqueImpulse() {},
+  });
+  const make = (cell) => new GPULiquid({ count: 512, seed: 4, originCell: cell, originCellSize: S, debug: { grid: false } });
+  const near = make([0, 0, 0]);
+  const far = make([1000, 0, 0]);
+  assert.deepEqual(far.origin, [1000 * S, 0, 0]);
+  const farBody = body(1000 * S);
+  near.link(body(0), { shape: 'sphere', radius: 0.1 });
+  far.link(farBody, { shape: 'sphere', radius: 0.1 });
+  assert.deepEqual(far.debugLines(), near.debugLines(), 'the linked collider sits where it does in cell 0');
+  const p = resolveLiquidParams(far.options, 512);
+  const run = (steps, shift) => {
+    const s = createLiquidState(p);
+    for (let k = 0; k < steps; k++) {
+      if (k === shift) far.shiftOrigin([1000, 0, 0]);
+      stepLiquidCPU(s, resolveLiquidParams(far.options, 512), 1 / 60);
+    }
+    return liquidStateHash(s.particles);
+  };
+  const straight = run(20, -1);
+  const shifted = run(20, 10);
+  assert.equal(shifted, straight, 'steps across the shift repeat the steps without it');
+  assert.deepEqual(far.options.originCell, [0, 0, 0]);
+  assert.deepEqual(far.origin, [0, 0, 0]);
+  farBody.position[0] -= 1000 * S;
+  assert.deepEqual(far.debugLines(), near.debugLines(), 'no jump: the collider stays put in the liquid frame');
+  far.shiftOrigin([-3, 2, 0]);
+  assert.deepEqual(far.options.originCell, [3, -2, 0]);
+  // Coded errors: a delta that is not whole cells, a cell past 2^31, a cell size that is not a power of two.
+  assert.throws(() => far.shiftOrigin([0.5, 0, 0]), { code: 'unsupported' });
+  assert.throws(() => far.shiftOrigin([-(2 ** 31), 0, 0]), { code: 'unsupported' });
+  assert.deepEqual(far.options.originCell, [3, -2, 0], 'a refused shift changes nothing');
+  for (const options of [{ originCell: [0, 0] }, { originCell: [0.5, 0, 0] }, { originCellSize: 1000 }, { originCellSize: 2 ** 21 }])
+    assert.throws(() => resolveLiquidParams(options), { code: 'unsupported' }, JSON.stringify(options));
+  near.dispose();
+  far.dispose();
+  assert.throws(() => far.shiftOrigin([1, 0, 0]), { code: 'disposed' });
+});
