@@ -31,3 +31,19 @@ test('section clipping evaluates a direct fragment return before discard', () =>
   const code = helpers.sectionShader('@fragment fn transparent(i:Out)->vec4f {return shade(i);}', 0, 2);
   assert.match(code, /let sectionResult=shade\(i\);for\(/);
 });
+
+test('a clip-distance mark is applied after another patch glues its code in front with no newline', () => {
+  const material = helpers.markClipDistances(
+    'struct Out {@builtin(position) clip:vec4f,@location(0) position:vec3f}\n@vertex fn vertex()->Out {var o:Out;return o;}',
+    2,
+    199,
+    'materialClip',
+  );
+  // Clustered's lighting patch ends its functions with `}` and prepends them as they are (KB-CLIP-HWMARK1).
+  for (const code of [material, 'fn light()->f32 {return 1.0;}' + material]) {
+    const out = helpers.markedClipDistances(code);
+    assert.ok(out.startsWith('enable clip_distances;'), 'the mark is found');
+    assert.match(out, /->MargoClipped \{var o:MargoClipped;.*o\.margoClip\[margoP\]=/s);
+  }
+  assert.equal(helpers.markedClipDistances('fn a() {}'), 'fn a() {}', 'unmarked code is left as it is');
+});

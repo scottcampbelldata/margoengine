@@ -3,7 +3,8 @@ import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // not its whole quad, into every shadow pass (`Shadows`, `LocalShadows` spot and point, Clustered's integrated local
 // maps). Without the fix each of those passes shaded the floor under the cut-out half. A RawMesh casts its vertex
 // stage's shape, cut by its fragment's discard, into Shadows, VirtualShadows and LocalShadows spot and point maps, and
-// LocalShadows' cached maps follow its moves and uniform changes.
+// LocalShadows' cached maps follow its moves and uniform changes. With `?hardware` the page asks for 'clip-distances',
+// and clipped casters must cast the same through the rasterizer's clip distances in every pass.
 // Run from the repository root after `npm run build:packages`: node packages/shadows/test/cutout-casters-browser.mjs
 // `--cost` measures frame cost instead and asserts nothing about it.
 import assert from 'node:assert/strict';
@@ -87,13 +88,17 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
       await writeFile('test-results/shadows-cutout-cost.json', JSON.stringify(result, null, 2));
     } else {
       const rows = [],
-        failures = [];
+        failures = [],
+        // Clipped frames by pass, caster and mode, so the hardware path's frames can be held against the discard path's.
+        frames = new Map();
+      let mode = 'discard';
       const run = async (pass, caster, instanced) => {
         const points = passes[pass],
           open = await shot(pass),
           lit = { solid: await patch(open, points.solid), cut: await patch(open, points.cut) },
           image = await shot(pass, caster, instanced),
           row = { pass, caster, instanced: !!instanced };
+        if (caster === 'clipped' || caster === 'clipOff') frames.set(`${mode}:${pass}:${caster}:${!!instanced}`, image);
         for (const half of ['solid', 'cut']) {
           assert.ok(lit[half] > 0.02, `${pass}: the floor is unlit at ${half} (${lit[half]}), so nothing is measured`);
           const ratio = (row[half] = +((await patch(image, points[half])) / lit[half]).toFixed(3));
@@ -188,6 +193,43 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
           rows.push(row);
           console.log(JSON.stringify(row));
         }
+      }
+      // The hardware clip path: the same page on an engine that asks for 'clip-distances'. Every pass that takes material
+      // clipping planes cuts in the rasterizer there (Clustered's integrated maps included), and must cast what the
+      // discard path casts. Where no adapter offers the feature this is recorded and the discard rows above stand.
+      await page.goto(page.url().split('?')[0] + '?hardware');
+      await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+      const hardware = await page.evaluate(() => window.check.hardware);
+      if (!hardware.has) console.log('cut-out casters: no adapter here offers clip-distances; the hardware clip path is not checked');
+      else {
+        mode = 'hardware';
+        const before = await page.evaluate(() => window.check.clipModules());
+        for (const pass of Object.keys(passes)) for (const caster of ['clipped', 'clipOff']) await run(pass, caster);
+        await run('point', 'clipped', true);
+        await run('integratedSpot', 'clipped', true);
+        await run('virtual', 'clipped', true);
+        const compiled = (await page.evaluate(() => window.check.clipModules())) - before;
+        console.log(JSON.stringify({ hardware: true, clipModules: compiled }));
+        // The whole frame, the clipped quad as the camera sees it included, matches the discard path's: a pixel may
+        // differ only where the rasterizer and a per-fragment test round a cut edge differently.
+        for (const [key, image] of frames) {
+          if (!key.startsWith('hardware:')) continue;
+          const other = frames.get(key.replace('hardware:', 'discard:'));
+          let differ = 0,
+            box;
+          for (let i = 0; i < image.data.length; i += 4)
+            if (Math.max(...[0, 1, 2].map((k) => Math.abs(image.data[i + k] - other.data[i + k]))) > 8) {
+              differ++;
+              const x = (i / 4) % image.width,
+                y = Math.floor(i / 4 / image.width);
+              box = box ? [Math.min(box[0], x), Math.min(box[1], y), Math.max(box[2], x), Math.max(box[3], y)] : [x, y, x, y];
+            }
+          const share = differ / (image.width * image.height);
+          console.log(JSON.stringify({ frame: key, differ, share: +share.toFixed(5), box }));
+          if (share > 0.002) failures.push(`${key}: ${differ} pixels differ from the discard path`);
+        }
+        // Each pass's clipped caster compiled through clip_distances, not only the colour pass.
+        assert.ok(compiled >= Object.keys(passes).length, `clip_distances modules compiled: ${compiled}`);
       }
       await writeFile('test-results/shadows-cutout-casters.json', JSON.stringify(rows, null, 2));
       assert.deepEqual(failures, []);

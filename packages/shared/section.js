@@ -61,7 +61,8 @@ export function clipDistances(code, name, position = 'o.position') {
       )
   );
 }
-const distanceMark = /^\/\/ margo clip distances (\w+)$/m;
+// Not anchored at a line start: a patch may prepend its code ending in `}` with no newline (Clustered's lights do).
+const distanceMark = /\/\/ margo clip distances (\w+)$/m;
 /** `code` asking whoever compiles it to apply `clipDistances` with uniform `name`, at `binding` of `group`. */
 export const markClipDistances = (code, group, binding, name) =>
   `// margo clip distances ${name}\n${clipDeclaration(group, binding, name)}${code}`;

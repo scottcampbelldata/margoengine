@@ -2199,12 +2199,15 @@ option, with up to 6 planes. `clipIntersection: true` cuts away only what is beh
 On a device with the optional `clip-distances` feature the planes cut in the rasterizer, before the fragment stage: there
 is no `discard`, so a clipped surface keeps early depth, and multisampling smooths the cut. Ask for it at creation with
 `Engine.create(canvas, { features: ['clip-distances'] })`; an adapter without it leaves the option out and the planes
-discard as before, with the same picture but for pixels on the cut. Cascaded shadow casters take the same path. Four
+discard as before, with the same picture but for pixels on the cut. Directional, virtual and local (point, spot, and
+Clustered's integrated) shadow casters take the same path. `packages/shadows/test/cutout-casters-browser.mjs` runs its
+clipped casters again on an engine that asks for the feature, where an adapter offers it: every frame matches the
+discard path's but for the pixels on the cut edge (42 of 230,400 on an NVIDIA adapter). Four
 things stay on `discard` on such a device: `clipIntersection`, because a wedge is not a union of half spaces; more than
 8 planes, because WGSL's `clip_distances` holds at most 8 (going past 8, or back, compiles the other variant once); a
 material whose vertex outputs reach location 13 (`eye()`, `hair()` with a mesh-axis `direction`), because eight
 distances take two inter-stage slots and instancing one more; and the passes that do not run the colour shader (picking, TAA velocity,
-contact shadows, local shadows).
+contact shadows).
 
 `npm run test:gpu:features --workspace @margoengine/materials` checks native WebGPU and the full WebGL2 compatibility
 device explicitly. Native coverage includes rasterizer cuts; compatibility coverage requires the discard fallback,

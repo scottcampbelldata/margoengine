@@ -5452,9 +5452,9 @@ export class PBRModel implements EnginePlugin {
       }
       checkDrawLimits(c.device, code, m, transmission, this.lighting);
       const inputs = vertexInputs(code, white),
-        module = c.device.createShaderModule({
-          code: markedClipDistances(laterUV ? laterUVShader(inputs.code) : inputs.code),
-        }),
+        // The text the device compiles: hardware clip distances add the vertex stage's reads of the clip planes.
+        compiled = markedClipDistances(laterUV ? laterUVShader(inputs.code) : inputs.code),
+        module = c.device.createShaderModule({ code: compiled }),
         format = mode === 'beauty' ? c.format : 'rgba16float';
       const descriptor: GPURenderPipelineDescriptor = {
         layout: 'auto',
@@ -5549,7 +5549,9 @@ export class PBRModel implements EnginePlugin {
           if (draws.pipelines.size >= 4096) draws.pipelines.clear();
           draws.pipelines.set(name, made);
           // Its groups bind only what its entry points read: the auto layout holds nothing else (KB-OIT-BLENDTHICK1).
-          notePipeline(made, inputs.code, wanted);
+          // Read from the compiled text, as the device does: clip distances read the material's planes in the vertex
+          // stage, which the text before markedClipDistances does not (KB-CLIP-HWGROUP1).
+          notePipeline(made, compiled, wanted);
           if (view) viewPipelines.add(made);
           if (packedCode) packedPipelines.add(made);
           return made;

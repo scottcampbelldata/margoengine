@@ -12,7 +12,12 @@ import {LocalShadows} from '/packages/clustered/dist/shadows.js';
 import {RawShaders,RawShaderMaterial,RawMesh} from '/packages/shader/dist/raw.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const camera={position:[0,10,5],target:[0,0,0],fov:60};
-const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
+// ?hardware asks for the 'clip-distances' feature, so a union of clipping planes cuts in the rasterizer
+// (@builtin(clip_distances)) instead of by discard; clipModules counts the modules compiled that way.
+const hardware=new URLSearchParams(location.search).has('hardware');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera,...(hardware?{features:['clip-distances']}:{})}),device=engine.gpu;
+let clipModules=0;
+{const make=device.createShaderModule.bind(device);device.createShaderModule=d=>{if(/enable clip_distances;/.test(d.code))clipModules++;return make(d);};}
 engine.stop();
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 engine.createMesh().setGeometry(box(14,0.1,14)).setPosition([0,-0.05,0]);
@@ -77,6 +82,8 @@ const passes={
 };
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],unit=v=>{const l=Math.hypot(...v);return v.map(x=>x/l);};
 window.check={
+  hardware:{asked:hardware,has:device.features.has('clip-distances')},
+  clipModules:()=>clipModules,
   async show(pass,caster,instanced){
     clear();
     if(caster in rawCasters)mesh=rawMesh(rawCasters[caster]);
