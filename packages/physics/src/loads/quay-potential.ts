@@ -1,6 +1,8 @@
 import { invalidLoad } from './errors.js';
 import { QuayCoarseCorrection, QUAY_SWEEP } from './quay-multigrid.js';
 
+const ADDITIVE_MIN_CELLS = 32_768;
+
 /** Fixed still-water geometry. The layer closest to the surface comes first. */
 export interface QuayPotentialGrid {
   readonly cells: readonly [number, number];
@@ -253,7 +255,7 @@ export class QuayPotential {
           }
         },
       });
-      this.coarseWork = new Float64Array(count);
+      if (!this.eighthOrder || count < ADDITIVE_MIN_CELLS) this.coarseWork = new Float64Array(count);
     }
   }
 
@@ -479,22 +481,28 @@ export class QuayPotential {
       const i = active ? active[at]! : at;
       out[i]! *= sweep;
     }
-    this.multiply(out, work!, top);
-    for (let at = 0; at < visits; at++) {
-      const i = active ? active[at]! : at;
-      work![i] = rhs[i]! - work![i]!;
+    if (work) {
+      this.multiply(out, work, top);
+      for (let at = 0; at < visits; at++) {
+        const i = active ? active[at]! : at;
+        work[i] = rhs[i]! - work[i]!;
+      }
+      coarse.add(work, out, active);
+      this.multiply(out, work, top);
+      for (let at = 0; at < visits; at++) {
+        const i = active ? active[at]! : at;
+        work[i] = rhs[i]! - work[i]!;
+      }
+      this.precondition(work, work);
+    } else {
+      // The column and Galerkin corrections are independently positive and symmetric.
+      // Their sum avoids two fine matrix products per iteration (Bramble, Pasciak and Xu, 1990).
+      coarse.add(rhs, out, active);
     }
-    coarse.add(work!, out, active);
-    this.multiply(out, work!, top);
-    for (let at = 0; at < visits; at++) {
-      const i = active ? active[at]! : at;
-      work![i] = rhs[i]! - work![i]!;
-    }
-    this.precondition(work!, work!);
     let norm = 0;
     for (let at = 0; at < visits; at++) {
       const i = active ? active[at]! : at;
-      out[i]! += sweep * work![i]!;
+      if (work) out[i]! += sweep * work[i]!;
       norm += rhs[i]! * out[i]!;
     }
     return norm;

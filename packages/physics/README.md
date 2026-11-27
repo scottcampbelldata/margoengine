@@ -5663,6 +5663,11 @@ pages in face order. The aperture and all protected faces retain their conductan
 Galerkin aggregation of [Vaněk, Mandel and Brezina (1996)](https://doi.org/10.1007/BF02238511) and the
 sparse edge storage described by [Bell and Garland (2008)](https://mgarland.org/files/papers/nvr-2008-004.pdf).
 
+On eighth-order grids with at least 32,768 volume cells, the potential solve adds the damped column
+correction to the Galerkin correction. This saves two fine-grid matrix products per iteration and
+one f64 scratch word per volume cell. The acceptance check uses the fine-grid residual.
+[Bramble, Pasciak and Xu, *Parallel multilevel preconditioners* (1990)](https://doi.org/10.1090/S0025-5718-1990-1023042-6)
+
 Set `pressureAtDepth: true` and pass `wake.seaSurface()` to the hull for time-centred Bernoulli pressure
 and depth velocities from the same potential. Give the finite wake its initial state before advancing the
 coupled world. The ordinary hull return uses triangle pressure integration. The wave work ledger tracks
