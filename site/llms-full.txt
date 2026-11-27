@@ -26016,6 +26016,27 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   (the reverted warm draw, the synchronous query behind a warm draw) are fixed above. What stays open here is the
   serial compile's length against limits sized on WebGPU (`stall`: a single program compiles longer than its 10 s
   window) and the denoise references' pass cost, which is speed work under the build phase.
+- **Measured 2026-11-27 (dev PC, RTX A6000, other lanes busy, one run each, diagnostic): what is left of the
+  `denoise` steps is the staged route's cost on the layer, on both ANGLE backends.** The `denoise` case's diffuse scene,
+  milliseconds a sample of one `renderImage` after a 4-sample warm render:
+
+  | Size, samples | Direct3D 11 | ANGLE Vulkan | Native WebGPU |
+  | --- | --- | --- | --- |
+  | 120 x 75, 64 | 2.61 | 1.90 | not run |
+  | 480 x 300 (the case's size), 64 | 22.5 | 17.0 | 3.3 (mostly the call's own overhead) |
+  | 480 x 300, 1,024 | 22.0 | 24.6 | 0.64 |
+  | 960 x 600, 64 | 69.9 | not run | not run |
+
+  At 480 x 300 the page's WebGL calls take 1.7 (Direct3D 11) and 2.1 ms (Vulkan) of a sample, about 6,400 calls with
+  735 draws; the rest is waiting for the GPU. Calls a sample grow with the pixels (505, 6,417 and 21,243 on Direct3D
+  11). So one 16,384-sample reference of this scene is about 360 s on Direct3D 11 and 400 s on ANGLE Vulkan (11 s
+  native), and two such references alone pass the 600 s limit of `test:gpu:denoise`, which also renders an opaque
+  scene's reference and four more cases (arithmetic: the step was not rerun, and the opaque scene was not timed). Direct3D
+  11 measured 0.9 to 1.4 times Vulkan, so the remaining cost is not a Direct3D 11 fault; the serial compile above is.
+  It is Margo's own: compute run as fragment passes (`packages/webgl2-compat`) over the staged tracer
+  (`packages/voxel-pathtracer`), about 35 times native WebGPU a sample here. Which part of a pass costs most on the GPU
+  was not measured. Closing the steps takes a staged route several times cheaper a sample, which is speed work under
+  the build phase, or a ruling like KB6016e's. `stall` passes since e88457054c; no other step was rerun for this note.
 - **Next:** make the staged route cheaper per sample on Direct3D 11 (fewer passes an iteration, or more samples a
   pass) and its programs cheaper to compile (`hit` and `sample`, the largest), or share one reference between the WebGPU and compat legs, then rerun the repro. The tests, their samples and their limits stay as they are. A driver reset (nvlddmkm 153) at 06:03 local
   on 2026-11-15 came during the first of these runs.
