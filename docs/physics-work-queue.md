@@ -338,6 +338,14 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - **Collider:** `BedCollider`, a fixed body holding the kernel's height field, edited in place through
   `PhysicsCollider.setHeights` (the kernel's `refit_grid`): editing the ground every step allocates nothing.
 
+### SEA-13 whitecap shape in the Kitty Hawk s18 frame (logged by the rendering lane, 2026-11-26)
+
+On the dune coast's swell sea (s18, `whitecaps` 0.67, wind 12 m/s) the foam forms in soft-edged bands along the 72 m
+and 41 m swell crests across the frame, not in short patches on the wind-sea crests. Coverage is not the fault (0.42%
+of the sea against Monahan's 1.84%). `whitecap()` in `packages/water/src/index.ts` thresholds the crest term of every
+train, so the longest trains decide where foam forms, and its edge is a metre wide. Recorded as
+KB-WATER-WHITECAPBANDS1 in `docs/known-bugs.md`; not changed outside SEA-13.
+
 ## Scope: solvers only (Scott, 2026-11-26)
 
 The physics engine is the whole job. It is built in two stages:

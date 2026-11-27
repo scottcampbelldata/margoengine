@@ -12761,6 +12761,25 @@ and slopes, the depth and the hollows' openness (0.95, down to 0.75) are chosen
 against the s18 still, whitecaps.browser.mjs's look and whitecap-coverage's
 count. Written from these descriptions.
 
+### Gravity-capillary detail and the sea's reactive mask (2026-11-26, KB-WATER-NEARDETAIL1, KB-WATER-TAASMEAR1)
+- T. Elfouhaily, B. Chapron, K. Katsaros and D. Vandemark, [A unified directional spectrum for long and short wind-driven waves](https://doi.org/10.1029/97JC00467), JGR 102(C7), 1997. The short-wave curvature spectrum B_h = 0.5 a_m (c_m / c) exp(-(k / k_m - 1)^2 / 4), k_m 370 rad/m, c_m 0.23 m/s, a_m = 0.01 (1 + ln(u* / c_m)) below c_m and 0.01 (1 + 3 ln(u* / c_m)) above.
+- J. Wu, [Wind-stress coefficients over sea surface from breeze to hurricane](https://doi.org/10.1029/JC087iC12p09704), JGR 87(C12), 1982. The drag coefficient (0.8 + 0.065 U10) 1e-3 that gives the friction velocity.
+- H. Lamb, *Hydrodynamics*, 6th ed., 1932, sec. 267. The phase speed of capillary-gravity waves, c^2 = g / k + (T / rho) k.
+- C. Cox and W. Munk, [Measurement of the roughness of the sea surface from photographs of the sun's glitter](https://doi.org/10.1364/JOSA.44.000838), JOSA 44(11), 1954. The total mean square slope 0.003 + 0.00512 U the octaves draw part of.
+- E. Bruneton, F. Neyret and N. Holzschuch, [Real-time realistic ocean lighting using seamless transitions from geometry to BRDF](https://doi.org/10.1111/j.1467-8659.2009.01618.x), Computer Graphics Forum 29(2), 2010. Slope variance a pixel resolves is drawn as normals; the rest widens the reflectance lobe, so the sea looks the same at every distance.
+- B. Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014 Advances in Real-Time Rendering. TAA history is valid only for what the motion vectors follow; a surface whose look moves otherwise needs its history distrusted.
+Margo's shortOctave draws five octaves of gradient noise (k 25 to 340 rad/m, a cell 2 pi 0.6 / k long, crests 1.8
+cells long), each scaled to B_h(k) ln 2 of mean square slope at the friction velocity of a 16 x chop m/s wind, drifting
+at Lamb's phase speed and faded by the pixel footprint like the ripple layers; the resolved share comes off the glint
+lobe's Cox and Munk remainder. The reactive mask is the fastest train's deep-water phase speed times the frame's delta
+over the pixel footprint, through smoothstep(0.25, 1). The octave ratios and turns, the 16 m/s per unit of chop and the
+mask's quarter-pixel knee are Margo choices. Water publishes the mask on the pass context and TAA reads every published
+mask with no wiring, taking the maximum of several, the way an upscaler's reactive mask gathers every effect that moves
+without motion vectors into one texture (AMD, "FidelityFX Super Resolution 2", GPUOpen documentation, 2022,
+https://gpuopen.com/fidelityfx-superresolution-2/, the reactive and transparency-and-composition masks; Karis, "High
+Quality Temporal Supersampling", SIGGRAPH 2014 Advances in Real-Time Rendering, for history rejection by such a mask).
+Written from these descriptions.
+
 ## A buried voxel cell and the nearer side (2026-11-25)
 
 `packages/physics/kernel/src/voxel.rs` (`nearer_hidden_side`): when the ghost rule would snap a contact to an exposed face the

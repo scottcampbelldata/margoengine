@@ -61,6 +61,20 @@ Water.attach(engine, {
 });
 ```
 
+The waves move the water's look every frame with no motion vector that follows it, so TAA's history smears them.
+`water.reactiveTexture` is TAA's reactive mask for the sea: 1 where the crests move a pixel or more a frame, 0 where
+nothing moves or no water is drawn. Water publishes it for each frame it draws and TAA reads it by itself, combined with
+any other mask by their maximum (a sea and a river, or TAA's own `reactive`), so there is nothing to wire:
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+import {Water} from 'margoengine/water';
+const kernel = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('canvas')!, {backend: 'webgpu'});
+Water.attach(kernel, {size: [400, 400], segments: 256, chop: 0.75});
+TAA.attach(kernel); // keeps the moving waves sharp with the sea's reactive mask
+```
+
 With `sceneColor`, Water traces the Snell-bent ray against opaque depth in the
 current view. The sampled color and attenuation use the same intersection.
 A ray that leaves the frame takes the last scene texel it crosses on screen;
@@ -162,7 +176,10 @@ components passes a threshold that falls as the amount rises, read a little ahea
 runs down the face, broken into patches by gradient noise, with long foam streaks down-wind toward 1. With
 `terrain`, foam lines ring the land (ground near the sea in a few taps round each point) and drift with the
 backwash, breaker foam grows, and with `spray` more and larger droplets fly from the breakers. `chop` (0 to 1,
-default 0) roughens the normals: the ripple layers grow and a short wind-sea layer joins them.
+default 0) roughens the normals: the ripple layers grow, a short wind-sea layer joins them, and five octaves of
+gravity-capillary waves (25 cm to 1.8 cm) carry the slope of Elfouhaily et al.'s short-wave spectrum for a wind of
+16 x `chop` m/s, so a camera a few metres off sees the fine ripples a real sea has; they fade where a pixel covers
+them, and the slope they no longer show widens the glint instead.
 `water.setWhitecaps(amount)` and
 `water.setChop(amount)` change either from the next frame (a storm slider), and both reject values outside 0 to 1
 with RangeError. At 0 both draw exactly as before.

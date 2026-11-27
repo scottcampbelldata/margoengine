@@ -285,6 +285,7 @@ class Water implements EnginePlugin {
     readonly name: string;
     constructor(options?: WaterOptions);
     static attach(engine: EngineKernel, options?: WaterOptions): Water;
+    get reactiveTexture(): GPUTexture | undefined;
     get coastalDepthTexture(): GPUTexture | undefined;
     get depthTexture(): GPUTexture | undefined;
     get fog(): FogLike | null;

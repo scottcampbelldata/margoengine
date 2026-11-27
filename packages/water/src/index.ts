@@ -28,6 +28,7 @@ import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 import { seaState, whitecapCoverage } from './sea-state.js';
 import { publishSurfaceDepth } from '../../shared/surface-depth.js';
+import { publishReactiveMask } from '../../shared/reactive-mask.js';
 import {
   skyCoordinates,
   skyTexture,
@@ -255,7 +256,10 @@ export interface WaterOptions {
    * `whitecaps` sets the foam by hand (0 is none).
    */
   whitecaps?: number;
-  /** Wind chop on the swell, 0-1: stronger ripples and a short wind-sea layer in the normals. Default 0. Live through `setChop`. */
+  /**
+   * Wind chop on the swell, 0-1: stronger ripples, a short wind-sea layer and the gravity-capillary waves of a 16 x chop
+   * m/s wind (Elfouhaily et al. 1997) in the normals. Default 0. Live through `setChop`.
+   */
   chop?: number;
 }
 // The foam that reaches half white covers fewer crests than pass the threshold (whitecap() thins and breaks them into
@@ -616,6 +620,33 @@ fn shortWaveSlope(p:vec2f,pixelX:vec2f,pixelY:vec2f,k:vec2f,height:f32,warp:vec3
  let phase=dot(k,p)-sqrt(9.81*length(k))*frame.settings.x+warp.x;
  return gradient*(height*cos(phase)*keep);
 }
+// Gravity-capillary waves (KB-WATER-NEARDETAIL1): five octaves of short-crested wind waves from 25 cm down to 1.8 cm
+// (k = 25 to 340 rad/m), the scales where a near camera resolves the sea's slope. Each octave carries the slope variance
+// of Elfouhaily, Chapron, Katsaros and Vandemark's short-wave saturation spectrum (1997, eq. 41-44) over its band,
+// B ln 2, at the friction velocity of the chop's wind (Wu 1982 drag), so the near sea shows the fine relief a real one
+// has at that wind, and travels at each octave's phase speed with capillarity (Lamb 1932, sec. 267). An octave fades
+// out as a pixel's footprint covers its cells, like the ripple layers; the variance it keeps resolved leaves the glint
+// lobe's unresolved share (resolvedShort, seaGlint), so the total slope stays Cox and Munk's at every distance.
+var<private> resolvedShort:f32;
+fn shortWind(chop:f32)->f32 {let u=16.0*chop;return u*sqrt((0.8+0.065*u)*1e-3);}
+fn shortSaturation(k:f32,friction:f32)->f32 {
+ let c=sqrt(9.81/k+7.4e-5*k);let m=0.01*(1.0+select(1.0,3.0,friction>0.23)*log(max(friction,1e-4)/0.23));
+ let r=k/370.0-1.0;return 0.5*max(m,0.0)*(0.23/c)*exp(-0.25*r*r);
+}
+fn shortOctave(xz:vec2f,turn:vec2f,k:f32,friction:f32,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->vec3f {
+ let w=frame.waves[0].wave.xy;let along=vec2f(w.x*turn.x-w.y*turn.y,w.x*turn.y+w.y*turn.x);let across=vec2f(-along.y,along.x);
+ let basis=mat2x2f(along,across);let local=transpose(basis);
+ // Gradient noise peaks near 0.6 cycles a cell, so a cell is 2 pi 0.6 / k metres; crests 1.8 times their spacing long.
+ let s=k/3.77;let scale=vec2f(s,0.55*s);
+ let width=max(length((local*pixelX)*scale),length((local*pixelY)*scale));
+ let detail=1.0-smoothstep(0.25,1.0,width);
+ if(detail<=0.0){return vec3f(0);}
+ let variance=shortSaturation(k,friction)*0.6931472;
+ // The noise's slope is 0.62 RMS per axis in cells: (0.62 h s)^2 (1 + 0.55^2) is the octave's mean square slope.
+ let h=sqrt(variance/1.3025)/(0.62*s);let c=sqrt(9.81/k+7.4e-5*k);
+ let n=noise((local*xz)*scale+frame.settings.x*vec2f(-c,0.12*c)*scale+offset).yz*scale;
+ return vec3f((basis*n)*(h*detail),variance*detail*detail);
+}
 fn fresnel(cosine:f32)->f32 {return 0.02+0.98*pow(1.0-clamp(cosine,0.0,1.0),5.0);}
 fn landNearby(xz:vec2f)->f32 {
  let size=vec2f(textureDimensions(coast));var land=0.0;
@@ -652,7 +683,7 @@ fn whitecap(xz:vec2f,footprint:f32)->f32 {
 fn seaGlint(n:vec3f,v:vec3f,l:vec3f,rough:f32)->f32 {
  let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.001,1.0);
  let h=(v+l)/max(0.0001,length(v+l));let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
- let alpha=rough*rough;let a2=alpha*alpha+frame.foam.y;let denominator=${/* @__PURE__ */ ggxDenominatorOf('n', 'h')};let d=a2/(3.14159265*denominator*denominator);let k=(rough+1.0)*(rough+1.0)*0.125;
+ let alpha=rough*rough;let a2=alpha*alpha+max(0.0,frame.foam.y-${GLINT_LOBE}*resolvedShort);let denominator=${/* @__PURE__ */ ggxDenominatorOf('n', 'h')};let d=a2/(3.14159265*denominator*denominator);let k=(rough+1.0)*(rough+1.0)*0.125;
  let g=nv/(nv*(1.0-k)+k)*nl/max(0.001,nl*(1.0-k)+k);
  return d*g*fresnel(vh)/max(0.004,4.0*nv);
 }
@@ -719,7 +750,7 @@ fn skyColorBase(direction:vec3f,rough:f32)->vec3f {
  return incidentSky(direction,rough);
 }
 fn skyColor(direction:vec3f,rough:f32)->vec3f {return skyColorBase(direction,rough);}
-struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
+struct Result {@location(0) color:vec4f,@location(1) foam:vec4f,@location(2) reactive:vec4f}
 ${displayShader}
 @fragment fn fragment(i:Output)->Result{
  let pixel=vec2i(i.clip.xy);let waterDistance=linear(i.clip.z);let sceneDepth=textureLoad(depth,pixel,0);
@@ -796,7 +827,17 @@ ${displayShader}
   let b=shortWaveSlope(q,dx,dy,vec2f(1.63,-2.21),0.029,vec3f(2.1,0,0)-windPatch*3.4);
   shortWaves=(basis*(a+b))*(chop*gain*(1.0-smoothstep(7.0,13.333334,footprint)));
  }
- let agitated=(slope*(1.0+3.0*chop)+windSea*chop)*gain+shortWaves;
+ var capillary=vec2f(0);
+ if(chop>0.0&&footprint<0.16){
+  let u=shortWind(chop);
+  let o=shortOctave(p,vec2f(0.99255,0.12187),25.0,u,vec2f(0.37,5.1),pixelX,pixelY)
+   +shortOctave(p,vec2f(0.95630,-0.29237),48.0,u,vec2f(8.3,1.9),pixelX,pixelY)
+   +shortOctave(p,vec2f(0.89879,0.43837),92.0,u,vec2f(2.6,7.7),pixelX,pixelY)
+   +shortOctave(p,vec2f(0.78801,-0.61566),177.0,u,vec2f(6.1,3.3),pixelX,pixelY)
+   +shortOctave(p,vec2f(0.68200,0.73135),340.0,u,vec2f(4.4,9.6),pixelX,pixelY);
+  capillary=o.xy;resolvedShort=o.z*gain*gain;
+ }
+ let agitated=(slope*(1.0+3.0*chop)+windSea*chop)*gain+shortWaves+capillary*gain;
  ripple=vec3f(-agitated.x,0,-agitated.y)*(1.0-shown);
  }
  let n=normalize(i.normal+ripple);
@@ -859,14 +900,20 @@ ${displayShader}
  var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
  color=mix(color,foamColor,shown);
  if(frame.cameraData.w<0.5){color=toDisplay(color);}
- return Result(vec4f(color,1),vec4f(foam,0,0,1));
+ // TAA's reactive mask (Water.reactiveTexture, KB-WATER-TAASMEAR1): the waves move the surface's shading with no motion
+ // vector to follow it, so history is distrusted where the fastest train's crests travel more than a quarter pixel
+ // a frame (full by one pixel); far off, where a frame's travel is under that, TAA keeps its history.
+ var travel=0.6;
+ for(var j=0u;j<u32(frame.settings.w);j++){travel=max(travel,sqrt(9.81/max(frame.waves[j].wave.w,1e-4)));}
+ let reactive=smoothstep(0.25,1.0,travel*frame.cameraData.z/max(footprint,1e-6));
+ return Result(vec4f(color,1),vec4f(foam,0,0,1),vec4f(reactive,0,0,1));
 }`;
 // With a shadow source its own filtered visibility (bind group 1) shades the surface; without one the light is unblocked.
 // SSR capture (`setCapture`): the same fragment, ending in what screen-space reflections replace: the sky reflection the
 // water added (times the Fresnel weight and the foam's share) and that weight, with the rippled normal and roughness.
 const captureHead = '@fragment fn fragment(i:Output)->Result{',
   captureTail =
-    /var color=mix\(body,skyColor\(reflect\(-v,n\),rough\),reflection\)\+glint\*shade;[\s\S]*return Result\(vec4f\(color,1\),vec4f\(foam,0,0,1\)\);/;
+    /var color=mix\(body,skyColor\(reflect\(-v,n\),rough\),reflection\)\+glint\*shade;[\s\S]*return Result\(vec4f\(color,1\),vec4f\(foam,0,0,1\),vec4f\(reactive,0,0,1\)\);/;
 // Leave the bounded Water shader intact. The ocean drops the vertex depth clamp on its real grid and adds a flat
 // quad distinguished by negative sample width. Its depth is the sky's and it fills only beyond the original far clip.
 function horizonDepthShader(code: string): string {
@@ -935,6 +982,9 @@ const HORIZON_REACH = 10_000_000;
 interface WaterView {
   foam: GPUTexture[];
   foamViews: GPUTextureView[];
+  // TAA's reactive mask of this view's last frame (Water.reactiveTexture).
+  reactive?: GPUTexture;
+  reactiveView?: GPUTextureView;
   current: number;
   groups: GPUBindGroup[];
   // Resources of each group (the capture pipeline has its own auto layout) and which group this view drew with.
@@ -966,8 +1016,14 @@ export class Water implements EnginePlugin {
     depthStoreOp: 'store',
     stencilReadOnly: true,
   };
+  private readonly reactiveAttachment: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'clear',
+    storeOp: 'store',
+    clearValue: { r: 0, g: 0, b: 0, a: 0 },
+  };
   private readonly presentation: GPURenderPassDescriptor = {
-    colorAttachments: [this.attachment, this.foamAttachment],
+    colorAttachments: [this.attachment, this.foamAttachment, this.reactiveAttachment],
     depthStencilAttachment: this.depthAttachment,
   };
   private readonly copiedDepth: GPURenderPassDepthStencilAttachment = {
@@ -983,6 +1039,8 @@ export class Water implements EnginePlugin {
   };
   private foamMSAA?: GPUTexture;
   private foamMSAAView?: GPUTextureView;
+  private reactiveMSAA?: GPUTexture;
+  private reactiveMSAAView?: GPUTextureView;
   private surfaceDepth?: GPUTexture;
   private surfaceView?: GPUTextureView;
   private copyPipeline?: GPURenderPipeline;
@@ -1012,6 +1070,7 @@ export class Water implements EnginePlugin {
     }),
     (view) => {
       for (const texture of view.foam) texture.destroy();
+      view.reactive?.destroy();
       if (view === this.drawnView) this.drawnView = undefined;
     },
   );
@@ -1312,6 +1371,17 @@ export class Water implements EnginePlugin {
     const effect = new Water(options);
     engineRuntime(engine).use(effect);
     return effect;
+  }
+  /**
+   * TAA's reactive mask for the water, which `@margoengine/taa` reads by itself each frame (nothing to wire; several
+   * waters are combined by their maximum): red is how far to distrust history, 1 where the waves move the surface's look by a pixel or
+   * more a frame and 0 where nothing moves or no water is drawn (`r8unorm`, the frame's size). The waves carry the
+   * shading along with no motion vector that follows it, so without the mask TAA averages ten frames of moving
+   * reflections and ripples into a sideways smear (KB-WATER-TAASMEAR1). Borrowed: the last drawn view's, replaced on
+   * resize; undefined before the first frame.
+   */
+  get reactiveTexture(): GPUTexture | undefined {
+    return this.drawnView?.reactive;
   }
   /** Borrowed coastal state; R is water depth in meters. Undefined before simulation or after restoration. */
   get coastalDepthTexture(): GPUTexture | undefined {
@@ -1882,14 +1952,21 @@ export class Water implements EnginePlugin {
       this.foamMSAA?.destroy();
       this.foamMSAA = undefined;
       this.foamMSAAView = undefined;
+      this.reactiveMSAA?.destroy();
+      this.reactiveMSAA = undefined;
+      this.reactiveMSAAView = undefined;
       if (samples === 4) {
-        this.foamMSAA = c.device.createTexture({
-          size: [c.width, c.height],
-          format: 'r8unorm',
-          sampleCount: 4,
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-        });
+        const multisampled = () =>
+          c.device.createTexture({
+            size: [c.width, c.height],
+            format: 'r8unorm',
+            sampleCount: 4,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+          });
+        this.foamMSAA = multisampled();
         this.foamMSAAView = this.foamMSAA.createView();
+        this.reactiveMSAA = multisampled();
+        this.reactiveMSAAView = this.reactiveMSAA.createView();
       }
     }
     const view = (this.view = this.drawnView = this.views.get(c));
@@ -1905,6 +1982,13 @@ export class Water implements EnginePlugin {
           }),
         );
       view.foamViews = view.foam.map((texture) => texture.createView());
+      view.reactive?.destroy();
+      view.reactive = c.device.createTexture({
+        size: [c.width, c.height],
+        format: 'r8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      view.reactiveView = view.reactive.createView();
       view.built = -1;
       view.current = 0;
     }
@@ -1969,7 +2053,11 @@ export class Water implements EnginePlugin {
             },
           ],
         },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }, { format: 'r8unorm' }] },
+        fragment: {
+          module,
+          entryPoint: 'fragment',
+          targets: [{ format: c.format }, { format: 'r8unorm' }, { format: 'r8unorm' }],
+        },
         primitive: { cullMode: 'none' },
         depthStencil: { format: depth.format, depthCompare: 'greater-equal', depthWriteEnabled: true },
         multisample: { count: samples },
@@ -2133,6 +2221,9 @@ export class Water implements EnginePlugin {
     this.foamAttachment.view = samples === 4 ? this.foamMSAAView! : view.foamViews[view.current];
     this.foamAttachment.resolveTarget = samples === 4 ? view.foamViews[view.current] : undefined;
     this.foamAttachment.storeOp = samples === 4 ? 'discard' : 'store';
+    this.reactiveAttachment.view = samples === 4 ? this.reactiveMSAAView! : view.reactiveView!;
+    this.reactiveAttachment.resolveTarget = samples === 4 ? view.reactiveView : undefined;
+    this.reactiveAttachment.storeOp = samples === 4 ? 'discard' : 'store';
     this.depthAttachment.view = this.surfaceView!;
     const pass = c.encoder.beginRenderPass(this.presentation);
     applyView(pass, c);
@@ -2145,6 +2236,8 @@ export class Water implements EnginePlugin {
     pass.end();
     // The capture's depth holds no water: a later pass that needs the sea's depth (VolumetricFog) reads this one.
     publishSurfaceDepth(c, this.surfaceDepth!);
+    // TAA reads the sea's reactive mask from the pass context by itself, so no scene wires it (KB-WATER-TAASMEAR1).
+    publishReactiveMask(c, view.reactive!);
     this.spray?.draw(
       c,
       this.surfaceDepth!,
@@ -2323,6 +2416,9 @@ export class Water implements EnginePlugin {
     this.foamMSAA?.destroy();
     this.foamMSAA = undefined;
     this.foamMSAAView = undefined;
+    this.reactiveMSAA?.destroy();
+    this.reactiveMSAA = undefined;
+    this.reactiveMSAAView = undefined;
     this.shared?.release();
     this.shared = undefined;
     this.spray?.dispose();

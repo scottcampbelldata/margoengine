@@ -200,7 +200,7 @@ test('ripple normals use gradient noise on five separately turned lattices (the 
     water = new Water({ segments: 4 });
   h.engine.use(water);
   h.frame();
-  const code = h.pipelines.find((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  const code = h.pipelines.find((p) => p.fragment?.targets.length === 3).fragment.module.code;
   // Perlin's quintic fade over corner gradients, not value noise's cubic fade whose slope vanishes on every cell edge.
   assert.match(code, /fn rippleGradient\(cell:vec2i\)->vec2f/);
   assert.match(code, /f\*f\*f\*\(10\.0\+f\*\(6\.0\*f-15\.0\)\)/);
@@ -225,7 +225,7 @@ test('water filters short slopes in their own footprint and keeps the distant wi
     water = new Water({ segments: 4, chop: 0.5 });
   h.engine.use(water);
   h.frame();
-  const code = h.pipelines.find((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  const code = h.pipelines.find((p) => p.fragment?.targets.length === 3).fragment.module.code;
   assert.doesNotMatch(code, /footprint\s*<\s*6\.0/);
   assert.match(code, /length\(\(local\*pixelX\)\*scale\),length\(\(local\*pixelY\)\*scale\)/);
   assert.match(code, /let gradient=k\+warp\.yz/);
@@ -252,7 +252,7 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {return shadowFrame.x;}`,
   const water = new Water({ segments: 4, shadows });
   h.engine.use(water);
   h.frame();
-  const code = h.pipelines.findLast((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  const code = h.pipelines.findLast((p) => p.fragment?.targets.length === 3).fragment.module.code;
   assert.match(code, /@group\(1\) @binding\(1\) var<uniform> shadowFrame/);
   assert.match(code, /fn waterShadow\(p:vec3f\)->f32 \{return shadowVisibility\(p,vec3f\(0,1,0\)\);\}/);
   assert.ok(code.indexOf('@group(1)') > code.indexOf('struct Output'), 'Shadow sampling stays out of surface probes');
@@ -277,7 +277,7 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {return shadowFrame.x;}`,
     unshadowed = new Water({ segments: 4 });
   plain.engine.use(unshadowed);
   plain.frame();
-  const source = plain.pipelines.findLast((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  const source = plain.pipelines.findLast((p) => p.fragment?.targets.length === 3).fragment.module.code;
   assert.match(source, /fn waterShadow\(p:vec3f\)->f32 \{return 1\.0;\}/);
   assert.doesNotMatch(source, /@group\(1\)/);
   unshadowed.dispose();
@@ -637,7 +637,7 @@ test('ocean horizon retains the central grid, grows offshore footprints and appe
     Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 15216).data).subarray(128, 130)),
     [105, -45],
   );
-  const pipeline = h.pipelines.find((p) => p.fragment?.targets.length === 2);
+  const pipeline = h.pipelines.find((p) => p.fragment?.targets.length === 3);
   assert.equal(pipeline.vertex.buffers[0].arrayStride, 12);
   assert.match(pipeline.vertex.module.code, /const HORIZON=true;/);
   ocean.dispose();

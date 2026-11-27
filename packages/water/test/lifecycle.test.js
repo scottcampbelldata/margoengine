@@ -20,7 +20,7 @@ function rig(samples) {
   };
   c.encoder.beginRenderPass = (descriptor) => {
     const pass = begin(descriptor);
-    if (descriptor.colorAttachments?.length === 2) {
+    if (descriptor.colorAttachments?.length === 3) {
       output = (descriptor.colorAttachments[1].resolveTarget ?? descriptor.colorAttachments[1].view).texture;
     }
     return {
@@ -58,7 +58,7 @@ test('water confines its surface draw to an offset view viewport and scissor', (
     draws = [];
   h.context.encoder.beginRenderPass = (descriptor) => {
     const pass = begin(descriptor);
-    if (descriptor.colorAttachments?.length !== 2) return pass;
+    if (descriptor.colorAttachments?.length !== 3) return pass;
     const record = {};
     draws.push(record);
     return {

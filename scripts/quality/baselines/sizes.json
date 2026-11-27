@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20767633,
+  "total": 20767687,
   "history": [
     {
       "date": "2026-10-24",
@@ -14335,6 +14335,12 @@
       "commit": "3757ece30",
       "reason": "physics/ship 34,060 ceiling to its new size: the telegraph's speed order and the ship solvers' work counts. One feature of the ship entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "09adac4901",
+      "grew": 1,
+      "reason": "@margoengine/water grew from 37193 to 37247 B gzip. The surface shader gains five gravity-capillary octaves at the short-wave spectrum of the chop's wind (KB-WATER-NEARDETAIL1) and a third target holding TAA's reactive mask (KB-WATER-TAASMEAR1). Both are WGSL in the one surface shader every Water draws; a separate entry would have to fork that shader."
     }
   ],
   "items": {
@@ -15968,7 +15974,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 37193,
+    "@margoengine/water": 37247,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,

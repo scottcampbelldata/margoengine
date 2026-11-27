@@ -32,6 +32,7 @@ import { animationEntries, displacementGroup, opacityEntries, type CasterCutout 
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { reactiveMasks } from '../../shared/reactive-mask.js';
 import { requireCompatTier } from '../../shared/compat.js';
 export { halton, jitterProjection } from './jitter.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
@@ -67,8 +68,9 @@ export interface TAAOptions {
   /**
    * Reactive mask: a texture whose red channel, 0 to 1, tells TAA how far to distrust history at each pixel (1 keeps
    * none), so particles, blended glTF surfaces and splats that move without motion vectors leave no ghost trail. Draw
-   * their coverage into it each frame; any size (read scaled to the view), filterable float or unorm. Return undefined
-   * for a frame with nothing reactive. Fixed at construction whether a mask is used; the texture may change per frame.
+   * their coverage into it each frame; any size (read scaled to the view), float or unorm. Return undefined for a frame
+   * with nothing reactive; the texture may change per frame. Masks other packages publish for the frame (Water's
+   * `reactiveTexture`) are read without this option and combined with it by their maximum, so a scene wires nothing.
    */
   reactive?: () => GPUTexture | undefined;
   /**
@@ -225,6 +227,13 @@ interface Draw {
  * another engine or one added twice, `'state'` when the camera is not invertible, the scene depth it needs is missing
  * or not sampleable, or `gpuState` is read before a frame.
  */
+/** The maximum of several reactive masks: each drawn over the frame and read scaled to it as the resolve reads one
+ * (texel min(uv x size, size - 1)), its red kept by a max blend. */
+const combineMaskCode = /* wgsl */ `@group(0) @binding(0) var mask:texture_2d<f32>;
+struct V{@builtin(position) p:vec4f,@location(0) uv:vec2f}
+@vertex fn vs(@builtin(vertex_index) i:u32)->V{let u=vec2f(f32((i<<1u)&2u),f32(i&2u));return V(vec4f(u.x*2-1,1-u.y*2,0,1),u);}
+@fragment fn fs(v:V)->@location(0) vec4f{let s=vec2f(textureDimensions(mask));return vec4f(clamp(textureLoad(mask,vec2i(min(v.uv*s,s-1)),0).r,0,1),0,0,1);}`;
+
 export class TAA implements EnginePlugin {
   readonly name = 'taa';
   private engine?: Engine;
@@ -320,8 +329,9 @@ export class TAA implements EnginePlugin {
   private projection = '';
   private format?: GPUTextureFormat;
   private samples = 0;
-  /** Whether the resolve reads a reactive mask: fixed at construction, as the shader is compiled for it. */
-  private readonly masked: boolean;
+  /** Whether the resolve reads a reactive mask: from construction with `reactive`, else from the first frame a mask is
+   * published (the shader is compiled for it then, and stays so). */
+  private masked: boolean;
   /** Variance clipping and thin-feature locks, fixed at construction like the mask. */
   private readonly variance: boolean;
   private readonly locked: boolean;
@@ -630,15 +640,8 @@ export class TAA implements EnginePlugin {
     this.samples = samples;
     // Unorm canvas shaders write sRGB themselves; sRGB attachments and floating-point HDR targets supply linear samples.
     const manualSRGB = +(c.format === 'rgba8unorm' || c.format === 'bgra8unorm');
-    if (!only)
-      this.resolvePipeline = c.device.createComputePipeline({
-        layout: 'auto',
-        compute: {
-          module: c.device.createShaderModule({ code: this.resolveCode() }),
-          entryPoint: 'main',
-          constants: { manualSRGB },
-        },
-      });
+    this.manualSRGB = manualSRGB;
+    if (!only) this.buildResolve(c.device, false);
     const texture = (format: GPUTextureFormat, usage: number) => {
       const t = c.device.createTexture({
         size: [c.width, c.height],
@@ -764,18 +767,28 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         'state',
         'TAA needs the current sampleable single-sample scene depth; provide options.depth for an HDR/SSAO capture',
       );
+    // This frame's masks: the option's and every one published on the pass context for this encoder and view (Water's,
+    // drawn at order 4, before this pass at 9). The first mask compiles the resolve for masks (KB-WATER-TAASMEAR1).
+    const only = this.options.velocityOnly,
+      given = only ? undefined : this.options.reactive?.();
+    if (
+      given &&
+      (!(given.usage & GPUTextureUsage.TEXTURE_BINDING) ||
+        given.dimension !== '2d' ||
+        /depth|stencil|int/.test(given.format))
+    )
+      throw new MargoError(
+        'state',
+        'Invalid TAA reactive mask; return a 2D float or unorm texture with TEXTURE_BINDING usage, e.g. r8unorm',
+      );
+    const masks = only ? [] : [...(given ? [given] : []), ...reactiveMasks(c)];
+    if (masks.length && !this.masked) {
+      this.masked = true;
+      this.buildResolve(c.device);
+      this.depthSource = undefined;
+    }
     if (this.masked) {
-      const mask = this.options.reactive?.();
-      if (
-        mask &&
-        (!(mask.usage & GPUTextureUsage.TEXTURE_BINDING) ||
-          mask.dimension !== '2d' ||
-          /depth|stencil|int/.test(mask.format))
-      )
-        throw new MargoError(
-          'state',
-          'Invalid TAA reactive mask; return a 2D float or unorm texture with TEXTURE_BINDING usage, e.g. r8unorm',
-        );
+      const mask = masks.length > 1 ? this.combineMasks(c, masks) : masks[0];
       if (mask !== this.reactiveSource) {
         this.reactiveSource = mask;
         this.depthSource = undefined;
@@ -906,6 +919,66 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           if (!records.size) this.draws.delete(mesh);
         }
   }
+  /** The resolve pipeline for the options and mask state; `rebind` also rebinds the settle groups to it. */
+  private buildResolve(device: GPUDevice, rebind = true): void {
+    this.resolvePipeline = device.createComputePipeline({
+      layout: 'auto',
+      compute: {
+        module: device.createShaderModule({ code: this.resolveCode() }),
+        entryPoint: 'main',
+        constants: { manualSRGB: this.manualSRGB },
+      },
+    });
+    if (rebind) this.settle?.bind(this.resolvePipeline);
+  }
+  private manualSRGB = 0;
+  /** Several masks in one frame (a sea and a river, or the option's and Water's): their maximum, in a mask of the
+   * frame's size that TAA owns, each read scaled to it as the resolve reads one. */
+  private combineMasks(c: Context, masks: GPUTexture[]): GPUTexture {
+    if (this.combined?.width !== c.width || this.combined.height !== c.height) {
+      this.combined?.destroy();
+      this.combined = c.device.createTexture({
+        label: 'TAA combined reactive mask',
+        size: [c.width, c.height],
+        format: 'r8unorm',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.combinedView = this.combined.createView();
+    }
+    if (!this.combinePipeline) {
+      const module = c.device.createShaderModule({ code: combineMaskCode }),
+        max = { operation: 'max', srcFactor: 'one', dstFactor: 'one' } as const;
+      this.combinePipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vs' },
+        fragment: { module, entryPoint: 'fs', targets: [{ format: 'r8unorm', blend: { color: max, alpha: max } }] },
+      });
+    }
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [{ view: this.combinedView!, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+    });
+    pass.setPipeline(this.combinePipeline);
+    for (const mask of masks) {
+      let group = this.combineGroups.get(mask);
+      if (!group) {
+        group = c.device.createBindGroup({
+          layout: this.combinePipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: mask.createView() }],
+        });
+        this.combineGroups.set(mask, group);
+      }
+      pass.setBindGroup(0, group);
+      pass.draw(3);
+    }
+    pass.end();
+    // Only this frame's masks keep a group: a resized publisher's old texture goes with its group.
+    for (const mask of this.combineGroups.keys()) if (!masks.includes(mask)) this.combineGroups.delete(mask);
+    return this.combined;
+  }
+  private combined?: GPUTexture;
+  private combinedView?: GPUTextureView;
+  private combinePipeline?: GPURenderPipeline;
+  private readonly combineGroups = new Map<GPUTexture, GPUBindGroup>();
   /** The resolve shader for these options: stochastic rejection and the reactive mask are compiled in only when asked for. */
   private resolveCode(): string {
     const code = this.options.stochastic ? stochasticResolve() : resolve;
@@ -1315,6 +1388,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.whiteTexture = this.whiteView = this.whiteSampler = undefined;
     this.blackTexture?.destroy();
     this.blackTexture = this.blackView = this.reactiveSource = undefined;
+    this.combined?.destroy();
+    this.combined = this.combinedView = this.combinePipeline = undefined;
+    this.combineGroups.clear();
     for (const t of this.textures) t.destroy();
     this.settle?.destroy();
     this.settle = undefined;
