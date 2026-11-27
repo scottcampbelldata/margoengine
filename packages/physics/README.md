@@ -5267,20 +5267,19 @@ add the wake to the visible sea. Use the ambient sea for hull pressure to avoid 
 #### Exchange wave work with a hull that heaves and heels
 
 `FreeHullWakeCoupling` pairs the same advancing source with the live convex waterplane. Its other three
-source columns are heave, roll and pitch about the rigid centre of mass. Connect both ports to one wake.
+source columns are heave, roll and pitch about the rigid centre of mass. Connect both ports to one periodic or finite wake.
 Allow all three native rotations and leave gyroscopic forces enabled so anisotropic rotation retains its
 physical kinetic energy. The wave contributes no yaw torque. Lock the unused horizontal translation.
 
 ```ts
 import {Physics} from 'margoengine/physics';
-import {FreeHullWakeCoupling} from 'margoengine/physics/loads';
-import {WakeSolver} from 'margoengine/physics/sea';
+import {FiniteQuayWake, FreeHullWakeCoupling} from 'margoengine/physics/loads';
 import {HullSolver} from 'margoengine/physics/seakeeping';
 import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
 
 await Physics.load();
 const world = new PhysicsWorld({rate: {num: 60, den: 1}});
-const physics = new Physics(null, {arena: world.arena, fixedTimestep: 1 / 60, substeps: 1});
+using physics = new Physics(null, {arena: world.arena, fixedTimestep: 1 / 60, substeps: 1});
 const mesh = {
   vertices: [-1,-0.5,-0.5, 1,-0.5,-0.5, 1,0.5,-0.5, -1,0.5,-0.5,
     -1,-0.5,0.5, 1,-0.5,0.5, 1,0.5,0.5, -1,0.5,0.5],
@@ -5289,22 +5288,35 @@ const mesh = {
 };
 const body = physics.addBody(null, {linearVelocity: [1.25, -0.02, 0], angularVelocity: [0.02, 0, -0.03],
   enabledTranslations: [true, true, false], colliders: {shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1025}});
+const cells = [37, 19] as const;
+const cellSize = 0.25, depth = 3;
+const openZ = new Float64Array(4 * cells[0] * cells[1]).fill(1);
+for (let x = 9; x < 27; x++) openZ[x + 6 * cells[0]] = 0;
 const exchange = new FreeHullWakeCoupling({
-  body, mesh, waterline: 0, depths: [0, 0.25, 0.5], depth: 3, cells: [40, 32], cellSize: 0.4,
+  body, mesh, waterline: 0, depths: [0, 0.25, 0.5], depth, cells, cellSize,
+  finiteReceiver: () => wake,
 });
-const wake = new WakeSolver('wake', exchange.surfaceSource, exchange.submergedSource);
+const wake = new FiniteQuayWake('wake', {
+  surface: exchange.surfaceSource, submerged: exchange.submergedSource,
+});
 world.add(new RigidSolver(), {physics}).add(new HullSolver(), {
   hulls: [{row: body.row, mesh}], sea: {density: 1025, elevation: () => 0},
   addedMass: false, radiation: false, drag: false, rollDamping: false, diffraction: false,
   drift: false, greenWater: false, slamming: false,
-}).add(exchange, undefined).add(wake, exchange.wakeParams())
+}).add(wake, {
+  cells, cellSize, origin: [-cells[0] * cellSize / 2, -cells[1] * cellSize / 2],
+  depths: [0, 0.2, 0.5, 1.2, depth], openZ, sponge: {cells: 3, rate: 2},
+}).add(exchange, undefined)
   .couple(['hull', 'freeHullWake', 'wake', 'rigid'], 'staggered');
 world.advance(30);
 console.log(wake.heights().some((height) => Math.abs(height) > 1e-6)); // true
 ```
 
-Use the matching unforced periodic wake, ambient-only hull pressure, one rigid substep at 60 Hz, and no body
-damping, speed caps, contacts or prescribed motion in this work test. Surge uses the reference depth bands
+Use ambient-only hull pressure, one rigid substep at 60 Hz, zero damping, no speed caps and no contact or
+prescribed motion in this work test. Add the finite wake before the coupling. With a periodic wake, omit
+`finiteReceiver`, add the coupling before `WakeSolver` and initialize the wake with `exchange.wakeParams()`.
+Both variants give the exchange exclusive use of their source ports. For a finite receiver, the wave work
+includes the perimeter sponge's absorbed joules. Surge uses the reference depth bands
 and the live heave and angular samples come from the posed hull's waterplane. The exchange applies only while
 the hull has a single convex waterplane. It approximates the swept geometry over each step around the reference
 draft and omits a yaw source. The wave exchange uses transpose work pairing as in [Peskin (2002), §5](https://math.nyu.edu/~peskin/papers/acta_numerica.pdf).

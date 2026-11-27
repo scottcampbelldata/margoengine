@@ -3,7 +3,7 @@ import test from 'node:test';
 import { RealFft2 } from '@margoengine/math/fft';
 import { conjugateQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
 import { Physics } from '../../dist/index.js';
-import { FreeHullWakeCoupling } from '../../dist/loads.js';
+import { FiniteQuayWake, FreeHullWakeCoupling } from '../../dist/loads.js';
 import { WakeSolver } from '../../dist/sea.js';
 import { HullSolver, volumeBelow } from '../../dist/seakeeping.js';
 import {
@@ -114,6 +114,11 @@ function readWake(world, wake) {
   return 0.5 * density * dx * dx * (g * dot(eta, eta) + kinetic / (nx * nz));
 }
 
+function readFiniteWave(world, wake, cellSize) {
+  const [height, trace, , rise] = wake.stateRegions().map((r) => regionWords(world.memory, r));
+  return 0.5 * density * cellSize ** 2 * (g * dot(height, height) + dot(trace, rise));
+}
+
 function kinetic(body) {
   const spin = rotateByQuaternion(
     rotateByQuaternion(body.angularVelocity, conjugateQuaternion(body.rotation)),
@@ -129,7 +134,7 @@ function kinetic(body) {
   );
 }
 
-function setup(shared, paired, unit) {
+function setup(shared, paired, unit, finite = false) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -g, 0], memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, substeps: 1, gravity: [0, -g, 0] });
   const body = physics.addBody(null, {
@@ -146,21 +151,25 @@ function setup(shared, paired, unit) {
     inertia: [180, 620, 470],
     inertiaFrame: [0, Math.sin(0.11), 0, Math.cos(0.11)],
   });
+  const cells = finite ? [37, 19] : [nx, nz],
+    cellSize = finite ? 0.25 : dx;
+  let wake;
   const exchange = new FreeHullWakeCoupling({
     body,
     mesh,
     waterline: 0,
     depth,
     depths: bands,
-    cells: [nx, nz],
-    cellSize: dx,
+    cells,
+    cellSize,
     density,
     minimumRadius: 0.47,
+    finiteReceiver: finite ? () => wake : undefined,
   });
   const hull = new HullSolver('hull', paired ? undefined : { minimumRadius: 0.47, submergedAdvance: bands });
-  const wake = paired
-    ? new WakeSolver('wake', exchange.surfaceSource, exchange.submergedSource)
-    : new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
+  const surface = paired ? exchange.surfaceSource : hull.wakeSourceField,
+    submerged = paired ? exchange.submergedSource : hull.submergedWakeSource;
+  wake = finite ? new FiniteQuayWake('wake', { surface, submerged }) : new WakeSolver('wake', surface, submerged);
   world.add(new RigidSolver(), { physics }).add(hull, {
     hulls: [{ row: body.row, mesh }],
     sea: { density, elevation: () => 0 },
@@ -173,105 +182,142 @@ function setup(shared, paired, unit) {
     greenWater: false,
     slamming: false,
   });
-  if (paired) world.add(exchange, undefined);
-  world
-    .add(
-      wake,
-      exchange.wakeParams({
-        initial: unit
-          ? undefined
-          : (x, z) => [0.008 * Math.cos((2 * Math.PI * x) / (nx * dx) + (2 * Math.PI * z) / (nz * dx)), 0],
-      }),
-    )
-    .couple(paired ? ['hull', 'freeHullWake', 'wake', 'rigid'] : ['hull', 'wake', 'rigid'], 'staggered');
-  return { world, physics, body, hull, wake, exchange };
+  const initial = unit
+    ? undefined
+    : (x, z) => [0.008 * Math.cos((2 * Math.PI * x) / (nx * dx) + (2 * Math.PI * z) / (nz * dx)), 0];
+  if (paired && !finite) world.add(exchange, undefined);
+  if (finite) {
+    const [xCount, zCount] = cells,
+      plane = xCount * zCount,
+      openZ = new Float64Array(4 * plane).fill(1);
+    for (let x = 9; x < 27; x++) openZ[x + 6 * xCount] = openZ[plane + x + 6 * xCount] = 0;
+    world.add(wake, {
+      cells,
+      cellSize,
+      origin: [(-xCount * cellSize) / 2, (-zCount * cellSize) / 2],
+      depths: [0, 0.2, 0.55, 1.2, depth],
+      openZ,
+      density,
+      initial,
+      sponge: { cells: 3, rate: 2 },
+    });
+    if (paired) world.add(exchange, undefined);
+  } else {
+    world.add(wake, exchange.wakeParams({ initial }));
+  }
+  world.couple(paired ? ['hull', 'freeHullWake', 'wake', 'rigid'] : ['hull', 'wake', 'rigid'], 'staggered');
+  return { world, physics, body, hull, wake, exchange, cellSize };
 }
 
-test('free native anisotropic rotation and the live hull exchange physical work with heave, roll, pitch and surge', (t) => {
-  function run(shared, paired) {
-    const { world, physics, body, hull, wake, exchange } = setup(shared, paired);
-    using _physics = physics;
-    const start = world.takeSnapshot(),
-      firstWave = readWake(world, wake),
-      firstBody = kinetic(body);
-    let checkpoint,
-      maxClosure = 0,
-      workScale = 0,
-      applied = 0,
-      wakeWork = 0,
-      crossResponse = 0;
-    for (let frame = 1; frame <= 84; frame++) {
-      const u = body.linearVelocity,
-        w = body.angularVelocity;
-      const inv = body.effectiveWorldInverseInertia,
-        lin = body.effectiveInverseMass;
-      const initialWake = readWake(world, wake);
-      crossResponse = Math.max(crossResponse, Math.abs(inv[2]));
-      world.advance(frame);
-      const bodyKick = paired
-        ? regionWords(
-            world.memory,
-            exchange.exportPorts(0).find((p) => p.field === BODY_IMPULSES_FIELD.name).region,
-          ).subarray(body.row * IMPULSE_WORDS, (body.row + 1) * IMPULSE_WORDS)
-        : new Float64Array(6);
-      assert.equal(bodyKick[4], 0, 'wake yaw impulse is zero');
-      const du = lin.map((value, i) => value * bodyKick[i]),
-        dw = matrixVector(inv, bodyKick.slice(3));
-      const work = -dot(bodyKick, [
-        ...sum(
-          u,
-          du.map((x) => x / 2),
-        ),
-        ...sum(
-          w,
-          dw.map((x) => x / 2),
-        ),
-      ]);
-      wakeWork += work;
-      const nextWave = readWake(world, wake);
-      if (paired) assert.ok(Math.abs(nextWave - initialWake - work) < 1e-7);
-      const region = hull.exportPorts(0).find((p) => p.field === BODY_FORCES_FIELD.name).region;
-      const f = regionWords(world.memory, region)
-        .slice(body.row * FORCE_WORDS, (body.row + 1) * FORCE_WORDS)
-        .map((x) => x * dt);
-      f[1] -= body.mass * g * dt;
-      const velocityAfterKick = sum(u, du),
-        spinAfterKick = sum(w, dw);
-      const dv = lin.map((value, i) => value * f[i]),
-        dSpin = matrixVector(inv, f.slice(3));
-      applied += dot(f, [
-        ...sum(
-          velocityAfterKick,
-          dv.map((x) => x / 2),
-        ),
-        ...sum(
-          spinAfterKick,
-          dSpin.map((x) => x / 2),
-        ),
-      ]);
-      const k = kinetic(body);
-      maxClosure = Math.max(maxClosure, Math.abs(k + nextWave - firstBody - firstWave - applied));
-      workScale += k + nextWave;
-      if (frame === 31) checkpoint = world.takeSnapshot();
-    }
-    const hash = world.hash(),
-      wave = readWake(world, wake) - firstWave,
-      yaw = body.angularVelocity[1];
-    for (const snap of [checkpoint, start]) {
-      world.restoreSnapshot(snap.bytes);
-      world.advance(84);
-      assert.equal(world.hash(), hash);
-    }
-    return { maxClosure, roundoff: 4 * 2 ** -24 * workScale, wave, wakeWork, applied, crossResponse, yaw, hash };
+function exerciseWaveWork(shared, paired, finite) {
+  const { world, physics, body, hull, wake, exchange, cellSize } = setup(shared, paired, undefined, finite);
+  using _physics = physics;
+  const accountedWave = finite
+    ? () => readFiniteWave(world, wake, cellSize) + wake.work().absorbedJoules
+    : () => readWake(world, wake);
+  const start = world.takeSnapshot(),
+    firstWave = accountedWave(),
+    firstBody = kinetic(body);
+  const steps = finite ? 48 : 84;
+  let checkpoint,
+    maxClosure = 0,
+    workScale = 0,
+    applied = 0,
+    wakeWork = 0,
+    crossResponse = 0;
+  for (let frame = 1; frame <= steps; frame++) {
+    const u = body.linearVelocity,
+      w = body.angularVelocity;
+    const inv = body.effectiveWorldInverseInertia,
+      lin = body.effectiveInverseMass;
+    const initialWake = accountedWave();
+    crossResponse = Math.max(crossResponse, Math.abs(inv[2]));
+    world.advance(frame);
+    const bodyKick = paired
+      ? regionWords(
+          world.memory,
+          exchange.exportPorts(0).find((p) => p.field === BODY_IMPULSES_FIELD.name).region,
+        ).subarray(body.row * IMPULSE_WORDS, (body.row + 1) * IMPULSE_WORDS)
+      : new Float64Array(6);
+    assert.equal(bodyKick[4], 0, 'wake yaw impulse is zero');
+    const du = lin.map((value, i) => value * bodyKick[i]),
+      dw = matrixVector(inv, bodyKick.slice(3));
+    const work = -dot(bodyKick, [
+      ...sum(
+        u,
+        du.map((x) => x / 2),
+      ),
+      ...sum(
+        w,
+        dw.map((x) => x / 2),
+      ),
+    ]);
+    wakeWork += work;
+    const nextWave = accountedWave();
+    if (paired) assert.ok(Math.abs(nextWave - initialWake - work) < 1e-7);
+    if (finite) assert.ok(Math.abs(nextWave - firstWave - wake.work().joules) < 1e-7);
+    const region = hull.exportPorts(0).find((p) => p.field === BODY_FORCES_FIELD.name).region;
+    const f = regionWords(world.memory, region)
+      .slice(body.row * FORCE_WORDS, (body.row + 1) * FORCE_WORDS)
+      .map((x) => x * dt);
+    f[1] -= body.mass * g * dt;
+    const velocityAfterKick = sum(u, du),
+      spinAfterKick = sum(w, dw);
+    const dv = lin.map((value, i) => value * f[i]),
+      dSpin = matrixVector(inv, f.slice(3));
+    applied += dot(f, [
+      ...sum(
+        velocityAfterKick,
+        dv.map((x) => x / 2),
+      ),
+      ...sum(
+        spinAfterKick,
+        dSpin.map((x) => x / 2),
+      ),
+    ]);
+    const k = kinetic(body);
+    maxClosure = Math.max(maxClosure, Math.abs(k + nextWave - firstBody - firstWave - applied));
+    workScale += k + nextWave;
+    if (frame === 31) checkpoint = world.takeSnapshot();
   }
-  const coupled = run(false, true);
-  assert.deepEqual(run(true, true), coupled);
-  const uncoupled = run(false, false);
+  const hash = world.hash(),
+    wave = accountedWave() - firstWave,
+    absorbed = finite ? wake.work().absorbedJoules : 0,
+    yaw = body.angularVelocity[1];
+  for (const snap of [checkpoint, start]) {
+    world.restoreSnapshot(snap.bytes);
+    world.advance(steps);
+    assert.equal(world.hash(), hash);
+  }
+  return {
+    maxClosure,
+    roundoff: 4 * 2 ** -24 * workScale,
+    wave,
+    wakeWork,
+    applied,
+    crossResponse,
+    yaw,
+    hash,
+    absorbed,
+  };
+}
+
+function checkWaveWork(t, finite) {
+  const coupled = exerciseWaveWork(false, true, finite);
+  assert.deepEqual(exerciseWaveWork(true, true, finite), coupled);
+  const uncoupled = exerciseWaveWork(false, false, finite);
   assert.ok(coupled.wave > 20 && coupled.crossResponse > 1e-4 && Math.abs(coupled.yaw) > 1e-3);
   assert.ok(coupled.maxClosure < coupled.roundoff, JSON.stringify(coupled));
   assert.ok(uncoupled.maxClosure > 10 && uncoupled.wakeWork === 0, JSON.stringify(uncoupled));
+  if (finite) assert.ok(coupled.absorbed > 0);
   t.diagnostic(JSON.stringify({ coupled, uncoupled }));
-});
+}
+
+test('free native anisotropic rotation and the live hull exchange physical work with heave, roll, pitch and surge', (t) =>
+  checkWaveWork(t, false));
+
+test('finite curtain exchanges free hull heave, roll, pitch and surge work across an open lower layer', (t) =>
+  checkWaveWork(t, true));
 
 test('locked or disabled gyroscopic rotation is rejected before any active publication changes', () => {
   const { world, physics, body, exchange } = setup(false, true);

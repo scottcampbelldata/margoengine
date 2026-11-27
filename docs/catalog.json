@@ -1289,6 +1289,7 @@
       "Sky",
       "cloudHaze",
       "cloudTransmittance",
+      "fogOpticalDepth",
       "moonAirmass",
       "moonLook",
       "moonPhase",

@@ -219,7 +219,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     const robin = g * half * half;
     for (let i = 0; i < height.length; i++) {
       const original = height[i]!,
-        eta = sponge?.[i] ? original * exp(-sponge[i]! * half) : original,
+        eta = this.heightBeforeKick(original, i, half),
         change = kick[i]!;
       absorbed += 0.5 * (original * original - eta * eta);
       absorbedVolume += original - eta;
@@ -311,43 +311,80 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
 
   /** Check that the guided surge will be the only actuator on this wake. Add the finite wake first. */
   validateSurgeSource(source: SubmergedWakeSource, depth: number, memory: WebAssembly.Memory): void {
+    this.validateMotionSources(source, depth, memory);
+  }
+
+  /** Check that the attached hull owns both displacement ports on the receiving finite wake. */
+  validateMotionSources(
+    source: SubmergedWakeSource,
+    depth: number,
+    memory: WebAssembly.Memory,
+    surface?: FieldDescriptor,
+  ): void {
     if (
       this.host?.memory !== memory ||
-      this.sourceField ||
+      this.sourceField?.name !== surface?.name ||
       !this.submerged ||
       this.submerged.field.name !== source.field.name ||
       this.depths.at(-1) !== depth ||
       this.submerged.depths.length !== source.depths.length ||
       this.submerged.depths.some((value, i) => value !== source.depths[i])
     )
-      throw invalidLoad(
-        'Add the finite wake first with the guided surge as its only source and the same depth bands and bed.',
-      );
+      throw invalidLoad('Add the finite wake first with the coupling’s own displacement sources, depth bands and bed.');
   }
 
   /** Dot products of the accepted finite displacement operator for the guided surge's work solve. */
   surgeProfile(rows: Float64Array, eta: Float64Array, dt: number): { head: number; stiffness: number } {
+    const rise = this.displacementProfile(rows, eta, dt, true);
+    let stiffness = 0;
+    for (const column of rise) stiffness += column * column;
+    return { head: this.profileHead(rise, eta, dt / 2), stiffness };
+  }
+
+  /** Write a unit hull-motion column and return its pairing with the surface after half-step absorption. */
+  motionProfile(rows: Float64Array, out: Float64Array, eta: Float64Array, dt: number, below: boolean): number {
+    if (out.length !== eta.length || out.buffer === eta.buffer)
+      throw invalidLoad('Use a separate full-size surface buffer for the projected hull displacement.');
+    const profile = this.displacementProfile(rows, eta, dt, below);
+    out.set(profile);
+    return this.profileHead(out, eta, dt / 2);
+  }
+
+  private displacementProfile(rows: Float64Array, eta: Float64Array, dt: number, below: boolean): Float64Array {
     if (
-      !this.submerged ||
-      rows.length % SUBMERGED_WAKE_WORDS ||
+      !this.host ||
+      !(below ? this.submerged : this.sourceField) ||
+      rows.length % (below ? SUBMERGED_WAKE_WORDS : WAKE_SOURCE_WORDS) ||
       eta.length !== this.operator.surfaceCells ||
       !(dt > 0 && Number.isFinite(dt))
     )
-      throw invalidLoad('Use complete finite submerged rows, the prior surface and a positive step for guided surge.');
-    const { bulkKick, mid, rise, sponge } = this;
-    bulkKick.fill(0);
-    mid.fill(0);
-    this.stampRows(rows, true);
-    this.operator.project(mid, rise, bulkKick);
-    let head = 0,
-      stiffness = 0;
-    for (let i = 0; i < rise.length; i++) {
-      const column = rise[i]!;
-      const height = sponge?.[i] ? eta[i]! * exp((-sponge[i]! * dt) / 2) : eta[i]!;
-      head += column * height;
-      stiffness += column * column;
+      throw invalidLoad('Use complete finite displacement rows, the prior surface and a positive coupling step.');
+    if (!below) {
+      for (let at = 3; at < rows.length; at += WAKE_SOURCE_WORDS) {
+        if (rows[at] !== 0) throw invalidLoad('Set the pressure column to zero for a surface displacement profile.');
+      }
+      this.kick.fill(0);
+      this.stampRows(rows, false);
+      return this.kick;
     }
-    return { head, stiffness };
+    const { bulkKick, mid, rise } = this;
+    bulkKick.fill(0);
+    if (this.stampRows(rows, true)) {
+      mid.fill(0);
+      this.operator.project(mid, rise, bulkKick);
+    } else rise.fill(0);
+    return rise;
+  }
+
+  private profileHead(profile: Float64Array, eta: Float64Array, half: number): number {
+    let head = 0;
+    for (let i = 0; i < profile.length; i++) head += profile[i]! * this.heightBeforeKick(eta[i]!, i, half);
+    return head;
+  }
+
+  private heightBeforeKick(height: number, i: number, half: number): number {
+    const decay = this.sponge?.[i];
+    return decay ? height * exp(-decay * half) : height;
   }
 
   private scatter(x: number, z: number, radius: number, layer: number, volume: number, pressure?: number): void {

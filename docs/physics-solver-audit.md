@@ -1429,6 +1429,12 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   control generates 468.358 J while retaining its initial speed. The coupled run replays exactly in both
   memory modes. The full free-motion ship and the resolved First Wake shutters are still open.
 
+  `coupling/loads-free-hull-wake.test.js` matches finite-quay returns for heave, roll and pitch as well as surge.
+  It reads the wave potential, elevation and normal flux independently and integrates the native applied rigid
+  loads. The 48-tick run transfers 1,145.211 J into the wave and sponge. Total work closes to 0.000872 J
+  against the f32 bound of 0.01610 J, and both memory modes replay bit for bit from two checkpoints.
+  The remaining First Wake issue is resolving the actual source and propagating its waves through the full scene.
+
   The finite receiver was compared with the 26 measured Briggs M4 submerged-lee probes using an incident
   packet at the published period and height and an identical open-water normalization. At the fixed 14 s
   sample, RMS errors in relative wave height for 30°, 60° and 90° are 0.039, 0.030 and 0.056 at 0.50 m.

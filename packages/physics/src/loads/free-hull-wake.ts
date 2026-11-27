@@ -36,6 +36,7 @@ import {
   IMPULSE_WORDS,
 } from '../world/solvers/rigid.js';
 import { invalidLoad } from './errors.js';
+import type { FiniteQuayWake } from './finite-quay-wake.js';
 import { equivalentEllipsoid } from './shapes.js';
 import type { SurgeWakeOptions } from './surge-wake.js';
 
@@ -186,9 +187,9 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
   >;
   private readonly waterline: number;
   private readonly radius: number;
-  private readonly projection: ProjectedWakeSource;
-  private readonly fft: RealFft2;
-  private readonly spectrum: Float64Array;
+  private readonly periodic?: { projection: ProjectedWakeSource; fft: RealFft2; spectrum: Float64Array };
+  private readonly finiteReceiver?: () => FiniteQuayWake;
+  private finite?: FiniteQuayWake;
   private readonly profiles: Float64Array[];
   private readonly pressure: Float64Array;
   private readonly advancing: Float64Array;
@@ -215,25 +216,31 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
       stations = 24,
       minimumRadius = dx,
       axis = 'x',
+      finiteReceiver,
     } = options ?? ({} as FreeHullWakeOptions);
-    if (options?.finiteReceiver !== undefined)
-      throw invalidLoad('Use a periodic WakeSolver for free hull motion or guided surge with a finite wake.');
+    if (finiteReceiver !== undefined && typeof finiteReceiver !== 'function')
+      throw invalidLoad('Pass finiteReceiver as a function returning the attached FiniteQuayWake.');
     if (!body?.valid || !Number.isFinite(waterline) || (axis !== 'x' && axis !== 'z'))
       throw invalidLoad('Pass a live rigid hull, a finite reference waterline and an X or Z guide.');
     if (
       cells?.length !== 2 ||
-      !cells.every(lengthIsFft) ||
-      cells[0] % 2 !== 0 ||
-      cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS ||
+      (finiteReceiver
+        ? cells.some((n) => !Number.isSafeInteger(n) || n < 1) || cells[0] * cells[1] > 0x1fffffff
+        : !cells.every(lengthIsFft) || cells[0] % 2 !== 0 || cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS) ||
       !(dx > 0) ||
       cells.some((n) => !Number.isFinite(n * dx)) ||
       centre?.length !== 2 ||
       !centre.every(Number.isFinite) ||
       !(depth > 0) ||
+      (finiteReceiver && !Number.isFinite(depth)) ||
       !(density > 0 && Number.isFinite(density)) ||
       !(minimumRadius >= 0 && Number.isFinite(minimumRadius))
     )
-      throw invalidLoad('Use a finite positive FFT grid and density, positive depth, and a finite source radius.');
+      throw invalidLoad(
+        finiteReceiver
+          ? 'Use positive finite wake dimensions, spacing, density and depth, and a finite source radius.'
+          : 'Use a finite positive FFT grid and density, positive depth, and a finite source radius.',
+      );
     const bands = wakeDepths(depths);
     if (
       bands.at(-1)! > depth ||
@@ -257,9 +264,13 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
     this.grid = { nx, nz, dx, x0: centre[0] - (nx * dx) / 2, z0: centre[1] - (nz * dx) / 2 };
     this.settings = { cells: [nx, nz], cellSize: dx, centre: [...centre], depth, density, sponge: 0 };
     this.radius = Math.max(dx, minimumRadius);
-    this.projection = new ProjectedWakeSource(this.grid, bands, depth);
-    this.fft = new RealFft2(nx, nz);
-    this.spectrum = new Float64Array(2 * (nx / 2 + 1) * nz);
+    this.finiteReceiver = finiteReceiver;
+    if (!finiteReceiver)
+      this.periodic = {
+        projection: new ProjectedWakeSource(this.grid, bands, depth),
+        fft: new RealFft2(nx, nz),
+        spectrum: new Float64Array(2 * (nx / 2 + 1) * nz),
+      };
     this.profiles = Array.from({ length: 4 }, () => new Float64Array(nx * nz));
     this.pressure = new Float64Array(nx * nz);
     this.advancing = new Float64Array(this.nodes.length * SUBMERGED_WAKE_WORDS);
@@ -280,6 +291,8 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
 
   /** The receiving wake's matching periodic grid. Other wake sources and damping are outside this exchange. */
   wakeParams({ initial, waterBelow }: Pick<WakeParams, 'initial' | 'waterBelow'> = {}): WakeParams {
+    if (this.finiteReceiver)
+      throw invalidLoad('Set the finite wake’s cells, origin, density and layer depths when adding it.');
     return {
       ...this.settings,
       cells: [...this.settings.cells],
@@ -295,7 +308,10 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
       rate: 0,
       stableRate: () => 0,
       fields: [
-        ...[BODIES_FIELD, BODY_MOBILITY_FIELD, WAKE_HEIGHT_FIELD].map((field) => ({ field, access: 'read' as const })),
+        ...[BODIES_FIELD, BODY_MOBILITY_FIELD, this.receiver()?.heightField ?? WAKE_HEIGHT_FIELD].map((field) => ({
+          field,
+          access: 'read' as const,
+        })),
         { field: this.surfaceSource, access: 'write' },
         { field: this.submergedSource.field, access: 'write' },
         { field: BODY_IMPULSES_FIELD, access: 'accumulate' },
@@ -309,6 +325,22 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
     this.capacity = host.bodyRows();
     if (x !== 0 || z !== 0 || !(scale > 0 && Number.isFinite(scale)) || this.body.row >= this.capacity)
       throw invalidLoad('Add the live rigid body before its coupling and use downward Y gravity.');
+    const finite = this.receiver();
+    if (finite) {
+      finite.validateMotionSources(this.submergedSource, this.settings.depth, host.memory, this.surfaceSource);
+      const { cells, cellSize, origin } = finite.grid,
+        { nx, nz, dx, x0, z0 } = this.grid;
+      if (
+        cells[0] !== nx ||
+        cells[1] !== nz ||
+        cellSize !== dx ||
+        origin[0] !== x0 ||
+        origin[1] !== z0 ||
+        finite.density !== this.settings.density
+      )
+        throw invalidLoad('Use the same XZ grid and density for free hull motion and its finite wake.');
+    }
+    this.finite = finite;
     this.host = host;
     this.scale = scale;
     this.outputs = [
@@ -329,7 +361,13 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
       1,
       this.capacity * BODY_MOBILITY_WORDS * 4,
     ) as Float32Array;
-    const eta = this.read(context, WAKE_HEIGHT_FIELD, 'f64', WAKE_LAYOUT, this.pressure.byteLength) as Float64Array;
+    const eta = this.read(
+      context,
+      this.finite?.heightField ?? WAKE_HEIGHT_FIELD,
+      'f64',
+      WAKE_LAYOUT,
+      this.pressure.byteLength,
+    ) as Float64Array;
     const row = this.body.row,
       b = all.subarray(row * BODY_WORDS, (row + 1) * BODY_WORDS),
       m = response.subarray(row * BODY_MOBILITY_WORDS, (row + 1) * BODY_MOBILITY_WORDS);
@@ -369,15 +407,7 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
         i * SUBMERGED_WAKE_WORDS,
       );
     });
-    this.spectrum.fill(0);
-    this.projection.add(this.advancing, this.fft, this.spectrum);
-    this.fft.inverse(this.spectrum, this.profiles[0]!);
-    for (let i = 1; i < 4; i++) {
-      const grid = this.profiles[i]!;
-      grid.fill(0);
-      for (const sample of samples)
-        wakePatch(this.grid, sample.x, sample.z, this.radius, sample.coefficients[i]!, grid, 0, this.pressure);
-    }
+    const heads = this.profileHeads(samples, eta, dt);
     // B maps the four displacements to the wave height kick. G = rho g dx² BᵀB pairs every
     // combination of columns. Use the native response A to solve p = -dt Bᵀ rho g dx² (eta + B ds/2)
     // with ds = dt (v + A p/2). Equating the two midpoint works survives wake dispersion and native
@@ -393,10 +423,7 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
       r.map((_, j) => (i === j ? 1 : 0) + (dt * dt * r.reduce((sum, x, k) => sum + x * A[k]![j]!, 0)) / 4),
     ) as Rows;
     const v: Vector = [b[10 + this.axis]!, b[11]!, b[13]!, b[15]!];
-    const p = solve(
-      system,
-      G.map((r, i) => -dt * (this.scale * dot(this.profiles[i]!, eta) + (dt * dot(r, v)) / 2)) as Vector,
-    );
+    const p = solve(system, G.map((r, i) => -dt * (this.scale * heads[i]! + (dt * dot(r, v)) / 2)) as Vector);
     const ds = A.map((a, i) => dt * (v[i]! + dot(a, p) / 2)) as Vector;
     if (!p.every(Number.isFinite) || !ds.every(Number.isFinite))
       throw invalidLoad('Use finite wave heights and guided hull velocities.');
@@ -431,6 +458,36 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
   }
   extraState(): readonly Region[] {
     return [];
+  }
+
+  private receiver(): FiniteQuayWake | undefined {
+    const finite = this.finiteReceiver?.();
+    if (this.finiteReceiver && !finite)
+      throw invalidLoad('Create the finite wake before adding its free hull coupling.');
+    return finite;
+  }
+
+  private profileHeads(samples: Sample[], eta: Float64Array, dt: number): number[] {
+    if (this.finite) {
+      const rows = this.surface.subarray(0, samples.length * WAKE_SOURCE_WORDS);
+      const heads = [this.finite.motionProfile(this.advancing, this.profiles[0]!, eta, dt, true)];
+      for (let i = 1; i < 4; i++) {
+        samples.forEach((s, j) => rows.set([s.x, s.z, this.radius, 0, s.coefficients[i]!], j * WAKE_SOURCE_WORDS));
+        heads.push(this.finite.motionProfile(rows, this.profiles[i]!, eta, dt, false));
+      }
+      return heads;
+    }
+    const { fft, projection, spectrum } = this.periodic!;
+    spectrum.fill(0);
+    projection.add(this.advancing, fft, spectrum);
+    fft.inverse(spectrum, this.profiles[0]!);
+    for (let i = 1; i < 4; i++) {
+      const grid = this.profiles[i]!;
+      grid.fill(0);
+      for (const sample of samples)
+        wakePatch(this.grid, sample.x, sample.z, this.radius, sample.coefficients[i]!, grid, 0, this.pressure);
+    }
+    return this.profiles.map((profile) => dot(profile, eta));
   }
 
   private checkBody(): void {

@@ -17816,6 +17816,12 @@ for that same step. Bao, Donev, Griffith, McQueen and Peskin (2017), §2, provid
 principle for reciprocal fluid–body work. Cooper (1987) derives the preservation of quadratic invariants
 by implicit midpoint. [Bao et al.](https://arxiv.org/abs/1701.07169) · [Cooper](https://doi.org/10.1093/imanum/7.1.1)
 
+On the finite domain, apply the same pairing to the four motion columns. Project the advancing column through
+the finite volume operator, and stamp the three convex waterplane columns on the connected wet surface.
+Use the elevation after the first half sponge when computing the transpose. For the combined kick
+`dη = B ds`, the midpoint quadratic work is `ρg dx² (Bᵀη + BᵀB ds/2) · ds`. The test checks that expression
+against the change in elevation and kinetic energy at the surface, including absorber losses.
+
 ### SEA-12 wake reflection at a straight quay
 
 Un-Ryong Rim, Jun-Bom Ko, Chol-Jun Han and Fuad-Mahfud Assidiq, *An Exact Neumann-to-Dirichlet (NtD) Boundary

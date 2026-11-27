@@ -28,10 +28,12 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     init(host: SolverHost, params: FiniteQuayWakeParams): void;
     step(context: StepContext, dt: number): void;
     validateSurgeSource(source: SubmergedWakeSource, depth: number, memory: WebAssembly.Memory): void;
+    validateMotionSources(source: SubmergedWakeSource, depth: number, memory: WebAssembly.Memory, surface?: FieldDescriptor): void;
     surgeProfile(rows: Float64Array, eta: Float64Array, dt: number): {
         head: number;
         stiffness: number;
     };
+    motionProfile(rows: Float64Array, out: Float64Array, eta: Float64Array, dt: number, below: boolean): number;
     get grid(): {
         readonly cells: readonly [number, number];
         readonly cellSize: number;

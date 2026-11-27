@@ -15346,11 +15346,11 @@ The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and
 rotation. Wave work includes surge, heave, roll and pitch. The wet waterplane must be a single convex contour.
 The submerged source uses the reference draft and the other columns use the current waterplane about the live
 centre of mass. Use one undamped rigid substep at 60 Hz with gyroscopic forces enabled and the unused horizontal
-translation locked. The wake is periodic, with uniform depth, zero sponge and no independent sources, and the
-wave model supplies zero yaw torque. Contact, wake reflection, sway and nonlinear wetted geometry evolution
-within a time step are outside this work bound. The three waterplane modes and one advancing mode share the
-same normalized source projection. The optional loads entry measures 52,117 B gzip and seakeeping measures
-39,456 B gzip after the wet strip and submerged source corrections.
+translation locked. The periodic wake uses uniform depth and zero sponge. The finite wake keeps fixed open-face
+geometry and includes optional perimeter absorption in its balance. Both use exclusively the exchange's two
+source ports. The wave model supplies zero yaw torque. Contact, sway and nonlinear wetted geometry evolution
+within a time step are outside this work bound. The three waterplane modes and one advancing mode use the
+same source projection as the selected receiver.
 
 ### Straight quay reflection and spray (SEA-12)
 
@@ -15379,8 +15379,8 @@ Each unforced step uses one harmonic volume solve. A tick with submerged displac
 to transfer those signed volumes to the surface. The accepted normal flux and depth potential come from the
 same midpoint and previous state. The solver uses f64 for state and arithmetic. It retains the volume
 potential in its snapshot. Source work includes the volume kick and the pressure held over the midpoint
-step. Free-hull reaction work needs a matching return operator. Wave breaking, moving obstacles, turbulent
-edge losses and the fine-grid First Wake replay remain open. See the entry size report for the optional loads entry.
+step. Wave breaking, moving obstacles, turbulent edge losses and the fine-grid First Wake replay remain open.
+See the entry size report for the optional loads entry.
 
 `pressureAtDepth` adds one f64 head value per surface and volume cell. It uses the accepted potential's
 midpoint time derivative with linear Bernoulli pressure and one-sided wet interpolation. `seaSurface()`
@@ -15390,8 +15390,11 @@ even when the surface is solid above it.
 The finite `SurgeWakeCoupling` projects a unit station displacement through the same open faces, source
 bands and geometry as the receiving wake. Its return impulse includes perimeter decay before the kick.
 This accounts for longitudinal rigid and wave energy plus the sponge on one guided axis at a fixed draft.
-It requires exclusive use of the submerged source port. Independent heave, roll and pitch still use the
-ordinary pressure loop or the periodic free-hull coupling.
+It requires exclusive use of the submerged source port. The finite `FreeHullWakeCoupling` also uses the
+receiver's wet-side surface kernel for heave, roll and pitch. It pairs all four unit profiles jointly before
+publishing the rigid impulse and volume. On an active tick either coupling uses one volume projection
+to construct its advancing basis and one to apply the scaled source. The three surface unit profiles
+do not require volume solves. The waterplane and guided degrees of freedom above also apply near the fixed quay.
 
 Water's optional wake entry draws the rigid wet mask and the finite-domain heights from the same source.
 The mask is fixed per attachment and occupies one u32 per cell on the GPU. The surface reconstruction
