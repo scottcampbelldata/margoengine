@@ -210,15 +210,23 @@ default staying 1 kg/m³ and documented as Rapier's.
   (XPBD edges by colour in compute, 30 substeps a step, tethers), pinned to points and tied to rigid bodies, meeting
   spheres, capsules, boxes, planes and meshes as signed distance fields, in the world or on bodies, with wind, gravity
   and stretch, shear and bend compliance, drawn by `drawGPUCloth` (`@margoengine/gltf/soft-mesh`) from the buffer the
-  compute writes (no readback, no upload); on the WebGL2 layer its CPU twin runs the same passes. CPU cloth:
+  compute writes (no readback, no upload); on the WebGL2 layer and in Node the same passes run in a Rust kernel with SIMD
+  (`cloth-kernel.wasm`, exact work counts in `stats.work`, 8cc5b7d0e), and `wind` takes the shared `FlowField`
+  (e5b36ab30). CPU cloth:
   `soft.create` of `@margoengine/physics/soft` (Wasm, two-way contact, self contact, tearing, water), drawn by
   `drawSoftBody`. Quick start, three.js migration note, debug view (`PhysicsDebugView.add(cloth)`) and the example page
   `examples/test-pages/cloth.html` (flag on a pole, cloth on a ball, the pointer pushing it) are in. Tests:
   `packages/physics/tests/gpu-cloth.test.js`, `gpu-cloth-check.mjs` (WebGPU and the WebGL2 layer). PA-06 is fixed; the
   CPU cloth's PA-05 soft-world snapshots, X-28 face aerodynamics, X-30 tethers and X-31 skinned cloth landed
-  2026-11-27. Open against the eight points: PA-29 (sail thrust reacting on the hull), X-27 (vertex block descent for
-  cloth), measured drape validation (Cusick, ASTM D1388 cantilever), the GPU cloth's one-way ties and its plate-only
-  air, and speed against the rival's demo (quiet speed phase).
+  2026-11-27, with cloth vertex block descent (X-27, 5fbceae4a) and adaptive tearing; PA-29 is fixed (a sail lashed to
+  a free hull drives it with the whole of its load, 7b0bfd12d). Open against the eight points: (1) one option choosing
+  XPBD or vertex block descent on the GPU cloth (VBD is on the CPU cloth only) and bending from measured KES-FB2
+  rigidity (Bergou et al. 2006 quadratic bending) on both; (2) validation against measured fabrics (ASTM D1388
+  cantilever bending length against the heavy elastica, the Cusick drape coefficient, held-out fabrics: no open
+  tabulated data set with weight, bending rigidity and drape coefficient was found on 2026-11-27); (4) the GPU cloth's
+  ties to dynamic bodies are one way: two-way ties were built and measured (momentum to 2e-5 at 8 substeps) but a box
+  hung on a stiff strip rings and grows, because the body's turn answers a frame late; it needs the body's inertia in the
+  cloth's own solve; (6) one thread on the CPU route; and speed against the rival's demo (quiet speed phase).
 
 ### P7. SOFT-02 Ropes and chains
 
