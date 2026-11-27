@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20767687,
+  "total": 20770154,
   "history": [
     {
       "date": "2026-10-24",
@@ -14341,6 +14341,12 @@
       "commit": "09adac4901",
       "grew": 1,
       "reason": "@margoengine/water grew from 37193 to 37247 B gzip. The surface shader gains five gravity-capillary octaves at the short-wave spectrum of the chop's wind (KB-WATER-NEARDETAIL1) and a third target holding TAA's reactive mask (KB-WATER-TAASMEAR1). Both are WGSL in the one surface shader every Water draws; a separate entry would have to fork that shader."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(water) near sea, KB-WATER-TAASMEAR1 send-back",
+      "grew": 3,
+      "reason": "TAA reads every reactive mask published on the pass context (packages/shared/reactive-mask.js) with no wiring, compiles the masked resolve the first frame one appears and takes the maximum of several in one r8unorm pass; Water publishes its mask. Measured gzip: @margoengine/taa 16913 to 16,969 B (ceiling 17479), taa/upscale-velocity (which bundles TAA) 21660 to 21,723 B (ceiling 22375), water 37247 to 37,313 B (ceiling 38433; the earlier 37,247 was the measured size with no headroom). The registry and the combine pass are part of the resolve every TAA runs; a separate entry would make each scene import and wire it, which is the bug. Only these three rows are written; main's physics rows are left to their owner."
     }
   ],
   "items": {
@@ -15721,10 +15727,10 @@
     "@margoengine/studio/ground": 10534,
     "@margoengine/studio/pathtrace": 1874,
     "@margoengine/studio/pathtrace-materials": 2034,
-    "@margoengine/taa": 16913,
+    "@margoengine/taa": 17479,
     "@margoengine/taa/sharpen": 971,
     "@margoengine/taa/upscale": 9394,
-    "@margoengine/taa/upscale-velocity": 21660,
+    "@margoengine/taa/upscale-velocity": 22375,
     "@margoengine/terrain": 17938,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 5488,
@@ -15974,7 +15980,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 37247,
+    "@margoengine/water": 38433,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,
