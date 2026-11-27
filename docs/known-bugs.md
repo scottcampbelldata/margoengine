@@ -85,6 +85,43 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/decoders/tests/jpeg2000.test.js` "a JP2 file with a restricted ICC profile decodes to sRGB" and
   `cargo test`, `the_first_method_part_1_defines_names_the_colour`.
 
+### Fixed 2026-11-27: a dense smoke column drew one flat colour (KB-VFX-SMOKEFLAT1, vfx, weather)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-ridge-smoke.json --once --seconds 1.1 --out
+  <folder>`: early flat 7.60 percent (bound 5), mid 3.85; the flat pixels are the column (8-bit 90, 58, 32 over a
+  quarter of the frame).
+- **Cause:** a lit billboard took its ambient (`base * ambient`) and the air's light (`VFXLit.air`, added into the
+  ambient) the same from every side. On the ridge the weak smoke-dimmed sun gave a ball at most 0.024 of directional
+  light against 0.10 of ambient and 0.31 of the firelit pall's light, so about 97 percent of the column's light did not
+  depend on the normal, and overlapping puffs gave one colour.
+- **Fix:** `packages/vfx/src/lit.ts` splits both by the isotropic view factors of a tilted surface, (1 + n_y) / 2 of
+  the upper hemisphere and (1 - n_y) / 2 of the lower (Liu and Jordan, Solar Energy 7(2):53-74, 1963; Duffie and
+  Beckman eq. 2.15.1), a two-stream split of the diffuse light (Meador and Weaver, J. Atmos. Sci. 37:630-643, 1980):
+  the ambient from above with the ground's albedo of it from below (`VFXLit.ground`, default 0.2), the air's light from
+  below with the layer's reflectance of it from above (`VFXLit.airReflectance`, default `PALL_REFLECTANCE`, the
+  slab reflectance of a thick smoke pall). Both keep their mean over every normal. `SmokeOptions.ground` and
+  `.airReflectance` and `FireFront.airReflectance` carry them, and `WeatherDrive` writes its haze's reflectance
+  (`hazeReflectance`) with the air. Real frames (RTX A6000, WebGPU, 1920 x 1080): ridge-smoke early flat 7.60 to 2.45,
+  mid 3.85 to 0.0075, every other bar within its bound (early grain 0.069 to 0.085, bound 0.5); the column's puffs are
+  lit from below by the fire and darker on top.
+- **Aftermath column darker, by design (measured):** the timber-valley aftermath still (`--views=aftermath
+  --query=weather=smoke`, 960 x 540) draws its column darker than before the split (box x 0.4-0.6, y 0.3-0.6: 8-bit
+  26,22,22 to 22,15,13; sky and haze unchanged at 86,52,36; crush 0). The camera looks 31 degrees up at it, so the
+  billboard normals (side plus the camera plane's normal times sqrt(1 - |uv|^2)) average n_y -0.34: the sky's ambient
+  (0.1 grey there) comes in at 0.77 of its mean and the fire's air light (0.013, 0.006, 0.002, small after the burn) at
+  1.18 to 1.20, so the column takes 0.82, 0.79, 0.78 of its old linear light, which the tonemap's toe stretches at
+  these codes. Proof: the same frame with every column's split set to its old mean (`ground` 1, `airReflectance`
+  1, 1, 1) matches the frame before the split (0.02 percent of pixels differ, by 1 code); the crane view of the same
+  column, 2.9 degrees up, changes only 26,22,22 to 26,20,20. A burnt floor has a lower albedo than the default 0.2, so
+  the real undersides are darker still; nothing writes the burnt ground's albedo onto the columns yet.
+- **Weak spot left:** the column still reads as stacked smooth balls; the puffs have no noise of their own and no
+  self-shadowing inside the column (Beer-Lambert to its edge).
+- **Regression:** `packages/vfx/test/lit.test.js` (the shader's split and its means, from the uniform the effect
+  writes), `packages/vfx/test/smoke.test.js` (a column and a front carry the values),
+  `packages/weather/tests/air-load.test.js` (the drive writes the reflectance), and the real-GPU `checkLit` of
+  `node packages/vfx/test/features-check.mjs` (every third pixel of the ball against the split, at the defaults and at
+  given values, 1x and 4x MSAA, WebGPU and `MARGO_COMPAT=1`).
+
 ### Fixed 2026-11-27: booleans refused a solid holding a triangle with no area (KB-BOOL-FLAT1, mesh-edit)
 
 - **Repro:** `batchBooleanMeshes` on a closed box with one edge split on one side and closed by a triangle whose

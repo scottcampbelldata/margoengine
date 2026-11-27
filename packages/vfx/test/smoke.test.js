@@ -634,3 +634,59 @@ test('KB-VFX-COLUMNAMBIENT1: a column and a front carry the light of the air rou
   assert.throws(() => (front.air = [0, 0]), /FireFront air/);
   front.dispose();
 });
+
+// KB-VFX-SMOKEFLAT1: the air's light and the ambient lit every side of a puff alike, so a dense column drew flat. The
+// pall's reflectance and the ground's albedo reach the puffs' light, on a column and through a front.
+test('KB-VFX-SMOKEFLAT1: a column and a front carry the pall reflectance and the ground albedo', async () => {
+  const h = optionalGPU(),
+    smoke = Smoke.attach(h.engine, { position: [0, 0, 0], heat: 7e6, prewarm: false });
+  h.frame();
+  assert.equal(smoke.effect.options.lit.airReflectance, undefined, 'unset: the lit default');
+  assert.equal(smoke.effect.options.lit.ground, undefined, 'unset: the lit default');
+  smoke.options.airReflectance = [0.3, 0.2, 0.1];
+  smoke.options.ground = 0.35;
+  h.frame();
+  assert.deepEqual(smoke.effect.options.lit.airReflectance, [0.3, 0.2, 0.1]);
+  assert.equal(smoke.effect.options.lit.ground, 0.35);
+  smoke.options.airReflectance = [0, 1.5, 0];
+  assert.throws(() => h.frame(), /Smoke airReflectance/);
+  delete smoke.options.airReflectance;
+  smoke.options.ground = -0.1;
+  assert.throws(() => h.frame(), /Smoke ground/);
+  delete smoke.options.ground;
+  h.frame();
+  assert.equal(smoke.effect.options.lit.airReflectance, undefined, 'cleared');
+  assert.equal(smoke.effect.options.lit.ground, undefined, 'cleared');
+  smoke.dispose();
+  const { FireFront } = await import('../dist/fire-front.js'),
+    front = FireFront.attach(h.engine, {
+      size: [200, 200],
+      columns: 2,
+      flames: 0,
+      buildingFlames: 0,
+      smoke: { airReflectance: [0.1, 0.1, 0.1] },
+      ignitions: [{ at: [0, 0], radius: 20 }],
+    });
+  front.airReflectance = [0.34, 0.31, 0.27];
+  await front.ready;
+  assert.deepEqual(
+    front.smokeColumns.map((c) => c.options.airReflectance),
+    [
+      [0.34, 0.31, 0.27],
+      [0.34, 0.31, 0.27],
+    ],
+    'a front writes its reflectance on columns it makes later',
+  );
+  front.airReflectance = undefined;
+  assert.deepEqual(
+    front.smokeColumns.map((c) => c.options.airReflectance),
+    [
+      [0.1, 0.1, 0.1],
+      [0.1, 0.1, 0.1],
+    ],
+    "unset: the front's own smoke option",
+  );
+  assert.throws(() => (front.airReflectance = [0, 0, 2]), /airReflectance/);
+  assert.throws(() => (front.airReflectance = [0, 0]), /FireFront airReflectance/);
+  front.dispose();
+});

@@ -1102,6 +1102,10 @@ export class FireFront implements EnginePlugin {
     if (this.airValue) (o as { air?: readonly [number, number, number] }).air = this.airValue;
     else if (this.options.smoke?.air !== undefined) o.air = this.options.smoke.air;
     else delete o.air;
+    if (this.airBackValue)
+      (o as { airReflectance?: readonly [number, number, number] }).airReflectance = this.airBackValue;
+    else if (this.options.smoke?.airReflectance !== undefined) o.airReflectance = this.options.smoke.airReflectance;
+    else delete o.airReflectance;
   }
   /**
    * Light of the air round its smoke columns (`SmokeOptions.air`, shares of the noon sun's light, red, green and blue),
@@ -1122,6 +1126,25 @@ export class FireFront implements EnginePlugin {
     for (const c of this.columns) this.noonOn(c);
   }
   private airValue?: readonly [number, number, number];
+  /**
+   * The reflectance of the smoke pall over this front (`SmokeOptions.airReflectance`, red, green and blue, each 0 to
+   * 1), written on every column now and on those made later: the share of the `air`'s light the pall sends back down,
+   * so the columns are lit from below by the fire and less from above (KB-VFX-SMOKEFLAT1). `WeatherDrive` sets it each
+   * frame to its haze's reflectance. Undefined: the columns' own (`smoke.airReflectance`, default `PALL_REFLECTANCE`).
+   */
+  get airReflectance(): readonly [number, number, number] | undefined {
+    return this.airBackValue;
+  }
+  set airReflectance(value: readonly [number, number, number] | undefined) {
+    if (value !== undefined) {
+      if (!Array.isArray(value) || value.length !== 3)
+        throw new TypeError('FireFront airReflectance must be [r, g, b] or undefined');
+      for (const v of value) finiteIn(v, 'airReflectance', 0, 1);
+    }
+    this.airBackValue = value && [value[0], value[1], value[2]];
+    for (const c of this.columns) this.noonOn(c);
+  }
+  private airBackValue?: readonly [number, number, number];
   /** True while a cell burns or an ignition waits. */
   get active(): boolean {
     return this.burning.length > 0 || this.pending.length > 0;

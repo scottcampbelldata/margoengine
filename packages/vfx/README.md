@@ -480,6 +480,28 @@ default 0.5) lets light reach round the dark side, as it does through thin smoke
 shader's own light loop (falloff, cones, IES and local shadows) at roughness 1 and no metal; sun shadows are looked up
 at the ball's surface point.
 
+The ambient comes from above and `air` (the light of a firelit pall round the particles, shares of the noon sun) from
+below, split by the view factors of a tilted surface, (1 + n_y) / 2 of the sky and (1 - n_y) / 2 of the ground (Liu
+and Jordan, Solar Energy 7(2), 1963; Meador and Weaver's two-stream split, J. Atmos. Sci. 37, 1980). `ground` (0 to 1,
+default 0.2, as Sky `lighting.ground`) is the share of the sky's light the ground sends back up; `airReflectance`
+(linear [r, g, b], each 0 to 1, default `PALL_REFLECTANCE`, a thick smoke pall's) the share of the air's light the
+layer above sends back down. Each keeps its mean over the ball, so a dense column is lit on top by the sky and glows
+underneath from the fire instead of drawing one flat colour; 1 lights every side alike. `WeatherDrive` writes its
+haze's reflectance on its fire fronts' smoke (`FireFront.airReflectance`, `SmokeOptions.airReflectance`).
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {lit, PALL_REFLECTANCE} from 'margoengine/vfx/lit';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// Smoke over a fire: the sky lights its tops, the fire's light on the pall its undersides.
+const smoke = VFX.attach(engine, {
+  capacity: 4096, rate: 400, velocity: [0, 1.5, 0], spread: 0.3, size: 2, lifetime: [3, 5],
+  color: [0.35, 0.33, 0.3, 0.5], lit: {ground: 0.15, air: [0.02, 0.009, 0.003], airReflectance: [...PALL_REFLECTANCE]},
+}, {lit});
+engine.start();
+```
+
 ```ts
 import {EngineKernel} from 'margoengine/core';
 import {VFX} from 'margoengine/vfx/base';
@@ -500,10 +522,11 @@ engine.start();
 
 Under an order-independent pass (`addEffect` from `@margoengine/oit/vfx`) lit particles are lit the same way: the
 pass's declarations take bind group 1 and the lights and shadows move to group 2, within the four groups every
-device offers. `lights` and `shadows` are read at attach; `wrap` and `ambient` (linear RGB, default the engine's
-`radiance[3]` times `ambient`) every frame, on the same object. Lighting is per pixel on the billboards only: ribbons
+device offers. `lights` and `shadows` are read at attach; `wrap`, `ambient` (linear RGB, default the engine's
+`radiance[3]` times `ambient`), `ground`, `air` and `airReflectance` every frame, on the same object. Lighting is per pixel on the billboards only: ribbons
 keep their own fade, and mesh particles their own light. `node packages/vfx/test/features-check.mjs` (real GPU)
-compares every third pixel of a sun-lit particle with the wrap-lit ball shading at any spin and at 1x and 4x MSAA;
+compares every third pixel of a sun-lit particle with the wrap-lit ball shading at any spin and at 1x and 4x MSAA,
+with the ambient from above and the air's light from below at the defaults and at given values;
 `node packages/vfx/test/lit-check.mjs` checks a real engine's clustered point light, a shadow caster and both again
 in an `ExactOIT` pass against the same light computed on the CPU.
 
@@ -1111,10 +1134,14 @@ console.log(Object.keys(SMOKE_LOOKS).join(', ')); // campfire, houseFire, wildfi
   sun 5, `SUN_ILLUMINANCE` in one lit in lux), so a fire is the same share of the noon light in any units
   (KB-VFX-GLOWUNITS1); a `FireFront`'s `noon` writes it on all its columns and `WeatherDrive` sets that from its sky.
   `air` (red, green and blue shares of the noon sun's light, default none, read every frame) is the light of the air
-  round the column, such as a pall lit by the fires below: light of that share from every side adds `air * noon / pi`
-  to the puffs' ambient (`VFXLit.air`), so a column inside a firelit pall takes its light and is not lit by its base
-  alone (KB-VFX-COLUMNAMBIENT1). A `FireFront`'s `air` writes it on all its columns, and `WeatherDrive` sets that to
-  its fires' light on the pall over the front.
+  round the column, such as a pall lit by the fires below: `air * noon / pi` on the whole (`VFXLit.air`), so a column
+  inside a firelit pall takes its light and is not lit by its base alone (KB-VFX-COLUMNAMBIENT1). A `FireFront`'s `air`
+  writes it on all its columns, and `WeatherDrive` sets that to its fires' light on the pall over the front. The air's
+  light comes up from the fires and `airReflectance` (red, green and blue, each 0 to 1, default `PALL_REFLECTANCE`) of
+  it back down from the pall, while `ground` (0 to 1, default 0.2) is the share of the sky's ambient the ground sends
+  up under the column, so the puffs glow underneath and the column has shape instead of one flat colour
+  (KB-VFX-SMOKEFLAT1). A `FireFront`'s `airReflectance` writes it on all its columns, and `WeatherDrive` sets that to
+  its haze's reflectance (`hazeReflectance`).
   So the column over a fire is orange underneath and fades to grey as it climbs, at night with no other light;
   `glow: 0` turns it off. A new puff is opaque within `SMOKE_FADE_IN` (1 s) whatever its lifetime
   (`smokeAlphaCurve`; it was a fifth of the life, 12 s of a minute).

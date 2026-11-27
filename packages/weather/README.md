@@ -1207,7 +1207,9 @@ console.log(red < green && green < blue, green.toFixed(2));
   is given the sky's `lighting.intensity` each frame, so its columns' glow is referred to the same noon sun as the haze
   (KB-VFX-GLOWUNITS1). A front that takes an `air` (`FireFront.air`) is given the fires' light on the pall over it, the
   spots' light below at its heat-weighted centre plus the even light, so its smoke columns glow with the pall round
-  them instead of reading dark against it at night (KB-VFX-COLUMNAMBIENT1).
+  them instead of reading dark against it at night (KB-VFX-COLUMNAMBIENT1). One that also takes an `airReflectance`
+  (`FireFront.airReflectance`) is given its haze's reflectance (`hazeReflectance`) with it, so the columns take that
+  light from below and the pall's share of it from above (KB-VFX-SMOKEFLAT1).
 - **The glow is brightest over the fires.** A fire that also says where it burns (`segments()`, as `FireFront` has:
   `x`, `y`, `z` and `heat` each) lights the sky and the haze as spots over its sources instead of evenly
   (KB-SKY-PALLFALLOFF1). The drive shares each fire's `radiantPower` among its segments by heat and clusters all of

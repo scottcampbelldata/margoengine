@@ -404,6 +404,17 @@ export interface SmokeOptions {
    * (KB-VFX-COLUMNAMBIENT1). Read every frame; `FireFront.air` writes it. Default none.
    */
   air?: readonly [number, number, number];
+  /**
+   * The reflectance of the pall over the column, red, green and blue, each 0 to 1 (`VFXLit.airReflectance`): the
+   * `air`'s light comes up from the fire and the pall sends back this share of it, so the puffs glow underneath
+   * (KB-VFX-SMOKEFLAT1). Read every frame; `FireFront.airReflectance` writes it. Default `PALL_REFLECTANCE`.
+   */
+  airReflectance?: readonly [number, number, number];
+  /**
+   * The ground's albedo under the column, 0 to 1 (`VFXLit.ground`): the sky's ambient lights the puffs' tops and this
+   * share of it their undersides (KB-VFX-SMOKEFLAT1). Read every frame. Default 0.2.
+   */
+  ground?: number;
   /** A puff sprite (RGBA8 sRGB, alpha the coverage), multiplied by the colour. Read at attach. Default: a soft disc. */
   texture?: VFXTexture;
   /** Point and spot lights on the puffs (`Clustered` of `@margoengine/clustered`). Read at attach. Default: the sun and ambient only. */
@@ -624,6 +635,14 @@ export class Smoke implements EnginePlugin {
       for (let i = 0; i < 3; i++) unit(o.air[i], 'air channel', 0, 1000);
       this.lit.air = [o.air[0]!, o.air[1]!, o.air[2]!];
     }
+    if (o.airReflectance === undefined) delete this.lit.airReflectance;
+    else {
+      finiteVector(o.airReflectance, 3, 'Smoke airReflectance');
+      for (let i = 0; i < 3; i++) unit(o.airReflectance[i], 'airReflectance channel', 0, 1);
+      this.lit.airReflectance = [o.airReflectance[0]!, o.airReflectance[1]!, o.airReflectance[2]!];
+    }
+    if (o.ground === undefined) delete this.lit.ground;
+    else this.lit.ground = unit(o.ground, 'ground', 0, 1);
   }
   /** Puts the roof's box and the jet under it where this frame's source, radius, heat and ceiling put them. */
   private placeRoof(roof: Roof, radius: number): void {

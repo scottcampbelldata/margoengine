@@ -10442,6 +10442,17 @@ to 232 floats). Evidence: sky features-check look on WebGPU and `MARGO_COMPAT=1`
 a fully hazed plane 50 km out agreeing exactly (0.52 relative without the fix). Missing: the night's base light still
 differs at the horizon (the fog takes the night sky, the dome sees it through the layer), not yet measured.
 
+**Lit particles: the ambient from above, the air from below (KB-VFX-SMOKEFLAT1, 2026-11-27).** GPU maths change in
+`packages/vfx/src/lit.ts`, both backends from one WGSL source. A lit billboard took its ambient and the air's light
+(`VFXLit.air`) alike from every side, so a dense smoke column drew one flat colour. The shader now splits both by the
+isotropic view factors (1 + n_y) / 2 and (1 - n_y) / 2 (Liu and Jordan 1963; Meador and Weaver's two-stream split,
+1980): the ambient A as 2A / (1 + g) from above and g of that from below (`ground`, default 0.2), the air S as
+2S / (1 + R) from below and R of that from above (`airReflectance`, default `PALL_REFLECTANCE`; `WeatherDrive` writes
+`hazeReflectance`), each mean kept. The lit uniform grows from 96 to 128 bytes (`air`, `airBack`; the ground albedo in
+`ambient.w`). Evidence: `features-check.mjs` `checkLit` on an RTX A6000, WebGPU and `MARGO_COMPAT=1`, 1x and 4x, every
+third pixel within 1.13/255 of the CPU split; `lit-check.mjs` unchanged on both; timber-valley ridge-smoke early flat
+7.60 to 2.45 percent. Missing: self-shadowing inside a column, per-puff noise, timing.
+
 ## Overcast deck on the sky cloud sheet (KB-SKY-OVERCAST1, section 5 evidence, 2026-11-17)
 
 GPU maths change in `packages/sky/src/clouds.ts`, both backends from one WGSL source. At full cover the 2D sheet kept

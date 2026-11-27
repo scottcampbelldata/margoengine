@@ -630,6 +630,8 @@ interface SmokeOptions {
     glow?: number;
     noon?: number;
     air?: readonly [number, number, number];
+    airReflectance?: readonly [number, number, number];
+    ground?: number;
     texture?: VFXTexture;
     lights?: VFXLightSource;
     shadows?: VFXLightSource;
@@ -834,6 +836,8 @@ interface VFXLit {
     };
     noon?: number;
     air?: readonly [number, number, number];
+    ground?: number;
+    airReflectance?: readonly [number, number, number];
 }
 
 interface VFXMeshParticles {

@@ -9,6 +9,8 @@ import { FilmClock } from "@margoengine/math/clock";
 
 export const GLOW_COLOR: readonly [number, number, number];
 
+export const PALL_REFLECTANCE: readonly [number, number, number];
+
 export const lit: VFXExtension<VFXLit>;
 
 // Not exported from this entry, but used by the exports above:
@@ -112,6 +114,8 @@ interface VFXLit {
     };
     noon?: number;
     air?: readonly [number, number, number];
+    ground?: number;
+    airReflectance?: readonly [number, number, number];
 }
 
 interface VFXMeshParticles {

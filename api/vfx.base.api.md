@@ -210,6 +210,8 @@ export interface VFXLit {
     };
     noon?: number;
     air?: readonly [number, number, number];
+    ground?: number;
+    airReflectance?: readonly [number, number, number];
 }
 
 export interface VFXMeshParticles {

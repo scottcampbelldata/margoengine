@@ -112,6 +112,9 @@ try {
     { samples: 4 },
     { samples: 1, wrap: 0, angle: 1.1 },
     { samples: 1, wrap: 1, sun: [0, -1, 0.2] },
+    // KB-VFX-SMOKEFLAT1: the ambient from above and the air's light from below, at the defaults and given.
+    { samples: 1, sun: [0, 0, 1], air: [0.3, 0.2, 0.1] },
+    { samples: 4, sun: [0, 0, 1], ground: 0.5, air: [0.3, 0.2, 0.1], airReflectance: [0.1, 0.5, 1] },
   ]) {
     const name = `lit ${JSON.stringify(options)}`,
       r = await page.evaluate((o) => window.checkLit(o), options);

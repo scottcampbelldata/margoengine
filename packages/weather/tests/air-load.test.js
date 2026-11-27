@@ -718,3 +718,27 @@ test("the drive writes the firelit pall's light on each front's smoke air", asyn
   drive.update(0);
   assert.equal(front.air, undefined, 'no fire, no light');
 });
+
+// KB-VFX-SMOKEFLAT1: the pall's light lit every side of a puff alike, so a dense column drew one flat colour. The drive
+// writes its haze's reflectance with the air, so the columns take the fires' light from below and the pall's share of
+// it from above; a front without the setter is left alone, and none with no light.
+test("the drive writes its haze's reflectance on each front's smoke with the air", async () => {
+  const { hazeReflectance } = await import('../dist/index.js'),
+    sky = { name: 'sky', options: { lighting: { intensity: 5 } }, sun: new Float32Array([0, 1, 0]), airControls: true },
+    front = { options: {}, smokeEmission: 0, radiantPower: 2e9, air: undefined, airReflectance: undefined },
+    plain = { options: {}, smokeEmission: 0, radiantPower: 1e9, air: undefined },
+    machine = new WeatherMachine('clear', { seed: 8 }),
+    engine = engineOf(sky),
+    drive = WeatherDrive.attach(engine, { weather: machine, advance: false, fires: [front, plain] });
+  drive.setup(engine);
+  applyWeatherSettings(machine, { smoke: 0.6 });
+  drive.update(0);
+  const want = hazeReflectance(machine.state);
+  assert.ok(front.air && want[1] > 0.2, 'a smoky pall reflects');
+  assert.deepEqual(front.airReflectance, want);
+  assert.ok(!('airReflectance' in plain), 'a fire without the setter is left alone');
+  front.radiantPower = 0;
+  plain.radiantPower = 0;
+  drive.update(0);
+  assert.equal(front.airReflectance, undefined, 'no light, no reflectance');
+});

@@ -25,7 +25,7 @@ const attach = (options, features) => {
   h.engine.use(effect);
   return { h, effect, bound };
 };
-const uniform = (h) => h.resources.find((r) => r.size === 96 && !r.destroyed && new Float32Array(r.data)[7] > 0);
+const uniform = (h) => h.resources.find((r) => r.size === 128 && !r.destroyed && new Float32Array(r.data)[7] > 0);
 const billboards = (h) => h.pipelines.filter((p) => p.fragment).map((p) => p.vertex.module.code);
 // A light source of the test's own, with the shape of Clustered and Shadows: WGSL for a group, and its entries.
 const source = (name, fn) => {
@@ -42,25 +42,25 @@ test('lit writes the sun, its colour, the ambient, the wrap and the eye each fra
   h.frame();
   const values = () => [...new Float32Array(uniform(h).data)].map((v) => +v.toFixed(5));
   // Sun towards [0, 0.6, 0.8] at intensity 2 times radiance; ambient = radiance.w x ambient; eye = the camera.
-  assert.deepEqual(values(), [0, 0.6, 0.8, 0, 2, 1, 0.5, 0.5, 0.2, 0.4, 0.6, 0, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(values(), [0, 0.6, 0.8, 0, 2, 1, 0.5, 0.5, 0.2, 0.4, 0.6, 0.2, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.337, 0.306, 0.268, 0]);
   effect.options.lit.wrap = 1;
   effect.options.lit.ambient = [0.1, 0, 0];
   h.engine.lighting.direction.set([1, 0, 0, 0]);
   h.frame();
   assert.deepEqual(
     values(),
-    [0, 0, 0, 0, 0, 0, 0, 1, 0.1, 0, 0, 0, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 1, 0.1, 0, 0, 0.2, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.337, 0.306, 0.268, 0],
     'no sun at intensity 0',
   );
   // A fire's glow (KB-VFX-SMOKEROPE1): position and radius, then colour and radiant power, read every frame.
   effect.options.lit.glow = { position: [1, 2, 3], power: 5e6, radius: 4 };
   h.frame();
-  assert.deepEqual(values().slice(16), [1, 2, 3, 4, 1, 0.42, 0.12, 5e6]);
+  assert.deepEqual(values().slice(16, 24), [1, 2, 3, 4, 1, 0.42, 0.12, 5e6]);
   effect.options.lit.glow = { position: [1, 2, 3], power: -1 };
   assert.throws(() => h.frame(), /lit glow/);
   delete effect.options.lit.glow;
   h.frame();
-  assert.deepEqual(values().slice(16), [0, 0, 0, 0, 0, 0, 0, 0], 'no glow, nothing added');
+  assert.deepEqual(values().slice(16, 24), [0, 0, 0, 0, 0, 0, 0, 0], 'no glow, nothing added');
   const code = billboards(h)[0];
   assert.ok(
     code.includes('fn lit(i:Out,c:vec4f)') &&
@@ -158,11 +158,13 @@ test('the glow is the same share of the noon light in a scene at sun 5 and in on
 });
 
 // KB-VFX-COLUMNAMBIENT1: a column over a burning front at night took the glow of one point at its base and the moonlit
-// ambient, and read blue-black against the firelit pall round it. `air`, the pall's light as shares of the noon sun, adds
-// to the ambient as light of that share from every side: a ball shows E / pi, so `air * noon / pi`.
-test("the air's light adds air * noon / pi to the ambient, in any scene units", () => {
+// ambient, and read blue-black against the firelit pall round it. `air`, the pall's light as shares of the noon sun, is
+// light of that share round the ball: a ball shows E / pi on the whole, so `air * noon / pi`, written beside the ambient.
+test("the air's light is air * noon / pi beside the ambient, in any scene units", () => {
   const { h, effect } = attach({ capacity: 8, initialCount: 8, lit: { ambient: [0.01, 0.02, 0.03] } });
-  const ambient = () => [...new Float32Array(uniform(h).data).slice(8, 11)];
+  const all = () => [...new Float32Array(uniform(h).data)],
+    ambient = () => all().slice(8, 11),
+    air = () => all().slice(24, 27);
   h.frame();
   const base = ambient();
   for (const noon of [undefined, 5, 133775 * Math.exp(-0.21)]) {
@@ -170,15 +172,16 @@ test("the air's light adds air * noon / pi to the ambient, in any scene units", 
     else effect.options.lit.noon = noon;
     effect.options.lit.air = [0.004, 0.0016, 0.0004];
     h.frame();
-    const got = ambient();
+    const got = air();
     for (let i = 0; i < 3; i++) {
-      const want = base[i] + (effect.options.lit.air[i] * (noon ?? Math.PI)) / Math.PI;
+      const want = (effect.options.lit.air[i] * (noon ?? Math.PI)) / Math.PI;
       assert.ok(Math.abs(got[i] - want) <= Math.abs(want) * 1e-6, `noon ${noon} channel ${i}: ${got[i]}, want ${want}`);
     }
+    assert.deepEqual(ambient(), base, 'the ambient untouched');
   }
   delete effect.options.lit.air;
   h.frame();
-  assert.deepEqual(ambient(), base, 'no air: the ambient alone');
+  assert.deepEqual(air(), [0, 0, 0], 'no air, no air light');
   for (const bad of [
     [-1, 0, 0],
     [0, 0],
@@ -189,5 +192,58 @@ test("the air's light adds air * noon / pi to the ambient, in any scene units", 
     assert.throws(() => h.frame(), /lit air/);
   }
   assert.throws(() => new VFX({ lit: { air: [1, 1] } }), /lit air/);
+  effect.dispose();
+});
+
+// KB-VFX-SMOKEFLAT1: about 97 percent of a smoke column's light (the ambient and the air's light) was the same for every
+// normal, so a dense column drew one flat colour (timber-valley ridge-smoke early flat 7.60 percent, bound 5). The
+// shader now splits both by the isotropic view factors (1 + n_y) / 2 and (1 - n_y) / 2 (Liu and Jordan 1963): the sky's
+// ambient from above with the ground's albedo of it from below, the air's light from below with the pall's
+// reflectance of it from above, each with its mean over every normal kept. This reruns the shader's split on the CPU
+// from the uniform the effect writes and the WGSL it compiles.
+test('the ambient comes from above and the air from below, each with its mean kept', () => {
+  const { h, effect } = attach({ capacity: 8, initialCount: 8, lit: { ambient: [0.1, 0.1, 0.1], air: [0.5, 0.5, 0.5] } });
+  h.frame();
+  const code = billboards(h)[0];
+  assert.ok(
+    code.includes('let sky=litFrame.ambient.rgb*((1.0+up)+g*(1.0-up))/(1.0+g);') &&
+      code.includes('let air=litFrame.air.rgb*((1.0-up)+r*(1.0+up))/(1.0+r);') &&
+      code.includes('var light=base*(sky+air)+'),
+    'the shader splits the ambient and the air by n.y',
+  );
+  const light = (up) => {
+    const v = new Float32Array(uniform(h).data),
+      g = v[11],
+      a = v[8],
+      s = v[24],
+      r = v[28];
+    return { sky: (a * (1 + up + g * (1 - up))) / (1 + g), air: (s * (1 - up + r * (1 + up))) / (1 + r) };
+  };
+  const top = light(1),
+    under = light(-1),
+    side = light(0);
+  // The ground's default albedo 0.2: the top takes 2A / 1.2, the underside 0.2 of that.
+  assert.ok(Math.abs(top.sky - (2 * 0.1) / 1.2) < 1e-7 && Math.abs(under.sky - top.sky * 0.2) < 1e-7);
+  // The air from below: the underside takes 2S / (1 + R), the top R of that (a thick pall's reflectance by default).
+  assert.ok(under.air > top.air && Math.abs(top.air - under.air * 0.337) < 1e-6);
+  // Mean over every normal (n_y uniform on -1..1 over a sphere): the old flat light.
+  assert.ok(Math.abs((top.sky + under.sky) / 2 - 0.1) < 1e-7 && Math.abs(side.sky - 0.1) < 1e-7);
+  const s = (0.5 * Math.PI) / Math.PI;
+  assert.ok(Math.abs((top.air + under.air) / 2 - s) < 1e-6 && Math.abs(side.air - s) < 1e-6);
+  // 1 lights every side alike, as before the split.
+  effect.options.lit.ground = 1;
+  effect.options.lit.airReflectance = [1, 1, 1];
+  h.frame();
+  assert.ok(Math.abs(light(1).sky - light(-1).sky) < 1e-7 && Math.abs(light(1).air - light(-1).air) < 1e-7);
+  for (const bad of [-0.1, 1.1, NaN]) {
+    effect.options.lit.ground = bad;
+    assert.throws(() => h.frame(), /lit ground/);
+  }
+  effect.options.lit.ground = 0.2;
+  for (const bad of [[0, 0], [0, 2, 0], [NaN, 0, 0]]) {
+    effect.options.lit.airReflectance = bad;
+    assert.throws(() => h.frame(), /lit airReflectance/);
+  }
+  assert.throws(() => new VFX({ lit: { ground: 2 } }), /lit ground/);
   effect.dispose();
 });

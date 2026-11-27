@@ -3,7 +3,10 @@ import type { VFXExtension, VFXLit, VFXLightSource, VFXState } from './base.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
-/** The lit uniform's binding in the billboard's group 0: sun direction, sun colour and wrap, ambient, eye. */
+/**
+ * The lit uniform's binding in the billboard's group 0: sun direction, sun colour and wrap, ambient and ground albedo,
+ * eye, glow, glow colour and power, air, air reflectance.
+ */
 const BINDING = 21;
 
 function once(code: string, from: string, to: string): string {
@@ -17,7 +20,17 @@ function once(code: string, from: string, to: string): string {
  * and stretched with it under `stretch`) has the normal `side + toward * sqrt(1 - |uv|^2)`, with `toward` the camera
  * plane's normal, and lies that far in front of the disc. The sun is diffuse with wrap lighting, `max(0, (n.l + w) /
  * (1 + w))` (Green, "Real-Time Approximations to Subsurface Scattering", GPU Gems 1, ch. 16), over pi as core's
- * Lambert term, times the sun's colour and intensity; the ambient adds `base * ambient`. Clustered lights come from the
+ * Lambert term, times the sun's colour and intensity. The ambient and the air's light are split into the light from
+ * above and from below by the isotropic view factors of a surface tilted from the horizontal, (1 + n_y) / 2 of the
+ * upper hemisphere and (1 - n_y) / 2 of the lower (B. Y. H. Liu and R. C. Jordan, "A Rational Procedure for Predicting
+ * the Long-Term Average Performance of Flat-Plate Solar-Energy Collectors", Solar Energy 7(2):53-74, 1963; J. A. Duffie
+ * and W. A. Beckman, "Solar Engineering of Thermal Processes", 4th ed., 2013, eq. 2.15.1), a two-stream split of the
+ * diffuse light (W. E. Meador and W. R. Weaver, "Two-Stream Approximations to Radiative Transfer in Planetary
+ * Atmospheres", J. Atmos. Sci. 37(3):630-643, 1980). The sky's ambient A comes down and the ground sends back its
+ * albedo g of it: 2A / (1 + g) from above and g times that from below. The air's light S (a fire's light on its pall)
+ * comes up and the layer over the particle sends back its reflectance R of it: 2S / (1 + R) from below and R times that
+ * from above. Both keep their mean over every normal, so a ball seen side-on is as bright as before on the whole, but
+ * lit on top by the sky and underneath by the fire (KB-VFX-SMOKEFLAT1). Clustered lights come from the
  * clustered shader's own `clusterLighting` (its falloff, cones, shadows and BRDF) at roughness 1 and no metal, and sun
  * shadows from the shadow pass's `shadowLit` at the ball's surface point.
  */
@@ -41,12 +54,15 @@ const billboard = (code: string, lit: VFXLit): string => {
   return (
     out +
     /* wgsl */ `
-struct LitFrame {sun:vec4f,sunColor:vec4f,ambient:vec4f,eye:vec4f,glow:vec4f,glowColor:vec4f}
+struct LitFrame {sun:vec4f,sunColor:vec4f,ambient:vec4f,eye:vec4f,glow:vec4f,glowColor:vec4f,air:vec4f,airBack:vec4f}
 @group(0) @binding(${BINDING}) var<uniform> litFrame:LitFrame;
 fn lit(i:Out,c:vec4f)->vec4f {
   let toward=cross(f.right.xyz,f.up.xyz);let z=sqrt(max(0.0,1.0-dot(i.uv,i.uv)));
   let n=normalize(i.litSide.xyz+toward*z);let p=i.litWorld+toward*(z*i.litSide.w);let base=c.rgb;let wrap=litFrame.sunColor.w;
-  var light=base*litFrame.ambient.rgb+${lit.shadows ? `shadowLit(${sun},p,n)` : sun};
+  let up=n.y;let g=litFrame.ambient.w;let r=litFrame.airBack.rgb;
+  let sky=litFrame.ambient.rgb*((1.0+up)+g*(1.0-up))/(1.0+g);
+  let air=litFrame.air.rgb*((1.0-up)+r*(1.0+up))/(1.0+r);
+  var light=base*(sky+air)+${lit.shadows ? `shadowLit(${sun},p,n)` : sun};
   ${lit.lights ? 'light+=clusterLighting(i.clip.xy,p,n,litFrame.eye.xyz,base,1.0,0.0,vec3f(0.04),1.0);' : ''}
   // A fire's glow: a point source of radiant power P (W) at glow.xyz, softened over glow.w metres; its irradiance
   // P / (4 pi (d^2 + r^2)) lights the ball as the noon sun of 1,000 W/m^2 would, with the same wrap: the power is
@@ -106,6 +122,25 @@ function checkAir(a: unknown): void {
       "VFX lit air must be [r, g, b] shares of the noon sun's light, each 0 to 1000; pass e.g. [0.002, 0.0008, 0.0002]",
     );
 }
+/**
+ * The reflectance of a thick smoke pall, red, green and blue (670, 550 and 440 nm): the two-stream slab reflection of
+ * Meador and Weaver (1980) for wildfire smoke, as `hazeReflectance({smoke: 1})` of `@margoengine/weather` gives it.
+ * The share of the air's light that the pall over a column sends back down onto its puffs when none is given.
+ */
+export const PALL_REFLECTANCE: readonly [number, number, number] = [0.337, 0.306, 0.268];
+
+function checkSplit(l: VFXLit): void {
+  if (l.ground !== undefined && !(typeof l.ground === 'number' && l.ground >= 0 && l.ground <= 1))
+    throw new RangeError("VFX lit ground must be the ground's albedo, 0 to 1; pass e.g. 0.2");
+  const r = l.airReflectance;
+  if (
+    r !== undefined &&
+    (!Array.isArray(r) || r.length !== 3 || !r.every((v) => typeof v === 'number' && v >= 0 && v <= 1))
+  )
+    throw new RangeError(
+      'VFX lit airReflectance must be [r, g, b] reflectances of the layer over the particles, each 0 to 1; pass e.g. [0.34, 0.31, 0.27]',
+    );
+}
 function checkNoon(n: unknown): void {
   if (n !== undefined && !(typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 1e7))
     throw new RangeError("VFX lit noon must be the noon sun's engine intensity, above 0 and at most 1e7; pass e.g. 1");
@@ -135,13 +170,14 @@ export const lit: VFXExtension<VFXLit> = {
     checkGlow(l.glow);
     checkNoon(l.noon);
     checkAir(l.air);
+    checkSplit(l);
   },
   billboard: (code, value) => billboard(code, value),
   create(state: VFXState, value, owned) {
     const { device, options } = state,
-      buffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      buffer = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     owned.push(buffer);
-    const values = new Float32Array(24),
+    const values = new Float32Array(32),
       sources = !!(value.lights || value.shadows),
       // The sources' declarations for each group, and a key that changes when they do.
       declared = new Map<number, { lights: string; shadows: string; key: string }>(),
@@ -172,9 +208,17 @@ export const lit: VFXExtension<VFXLit> = {
           values[12 + i] = c.camera.position[i];
         }
         // The air's own light (a lit haze round the particles): light of irradiance E from every side shows a ball
-        // E / pi, so a share s of the noon sun adds s noon / pi to the ambient (KB-VFX-COLUMNAMBIENT1).
+        // E / pi, so a share s of the noon sun is s noon / pi on the whole (KB-VFX-COLUMNAMBIENT1), split by the shader
+        // into the light from below and the layer's reflectance of it from above (KB-VFX-SMOKEFLAT1).
         checkAir(value.air);
-        if (value.air) for (let i = 0; i < 3; i++) values[8 + i] += (value.air[i]! * (value.noon ?? Math.PI)) / Math.PI;
+        checkSplit(value);
+        values.fill(0, 24, 32);
+        const back = value.airReflectance ?? PALL_REFLECTANCE;
+        for (let i = 0; i < 3; i++) {
+          if (value.air) values[24 + i] = (value.air[i]! * (value.noon ?? Math.PI)) / Math.PI;
+          values[28 + i] = back[i]!;
+        }
+        values[11] = value.ground ?? 0.2;
         values[7] = value.wrap ?? 0.5;
         // The glow is read every frame; none (or no power) adds nothing.
         const g = value.glow;

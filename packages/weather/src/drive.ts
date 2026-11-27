@@ -144,6 +144,12 @@ export interface FireTarget {
    */
   air?: readonly [number, number, number];
   /**
+   * The reflectance of the pall over its columns (`FireFront.airReflectance`, KB-VFX-SMOKEFLAT1): the drive writes its
+   * haze's reflectance (`hazeReflectance`) with the `air`, so the columns take the fires' light from below and the
+   * pall's share of it from above.
+   */
+  airReflectance?: readonly [number, number, number];
+  /**
    * Its burning segments (`FireFront.segments()`): world metres on the ground and convective heat, watts. A fire that
    * has them lights the sky's pall and haze as spots over where it burns (KB-SKY-PALLFALLOFF1), its radiant power
    * shared among them by their heat; one that has none lights them evenly (`fireHazeLight`).
@@ -718,7 +724,8 @@ export class WeatherDrive {
     if (fireLight) for (let i = 0; i < 3; i++) fireLight[i] *= scale;
     // The same light on the pall over each fire lights its own columns (KB-VFX-COLUMNAMBIENT1): the spots' light at its
     // heat-weighted centre, plus the even light, so a column over a burning front glows with the pall round it.
-    const clusters = clusterFires(burning);
+    const clusters = clusterFires(burning),
+      pall = hazeReflectance(state);
     for (const fire of fires) {
       if (!('air' in fire)) continue;
       const placed = scale > 0 ? (fire.segments?.().filter(isPlaced) ?? []) : [];
@@ -737,6 +744,7 @@ export class WeatherDrive {
           for (let i = 0; i < 3; i++) air[i]! += l[i]! * scale;
         }
       fire.air = air[0] > 0 || air[1] > 0 || air[2] > 0 ? air : undefined;
+      if ('airReflectance' in fire) fire.airReflectance = fire.air ? pall : undefined;
     }
     const spots = clusters.map((s) => ({
       light: fireLayerLight(s.power, s.spread).map((v) => v * scale),

@@ -396,12 +396,26 @@ export interface VFXLit {
    */
   noon?: number;
   /**
-   * Light of the air round the particles, added to the ambient: red, green and blue shares of the noon sun's light
+   * Light of the air round the particles, beside the ambient: red, green and blue shares of the noon sun's light
    * (`noon`, 1,000 W/m^2) that the haze they sit in receives, as a fire lights its smoke pall from below. Light of that
    * share from every side adds `air * noon / pi` to the ambient, so smoke inside a firelit pall takes the pall's light.
    * Read every frame; `WeatherDrive` writes it on its fire fronts' smoke. Each 0 to 1,000. Default none.
    */
   air?: readonly [number, number, number];
+  /**
+   * The ground's albedo under the particles, 0 to 1: the ambient comes down from the sky and the ground sends back this
+   * share of it, so a particle is lit on top by the sky and less underneath, with the same mean (Liu and Jordan's
+   * isotropic view factors, KB-VFX-SMOKEFLAT1). 1 lights every side alike. Read every frame. Default 0.2, as Sky
+   * `lighting.ground`.
+   */
+  ground?: number;
+  /**
+   * The reflectance of the layer over the particles, red, green and blue, each 0 to 1: the `air`'s light comes up from
+   * below (a fire under its pall) and the layer sends back this share of it from above, so smoke over a fire glows
+   * underneath, with the same mean. 1 lights every side alike. Read every frame; `WeatherDrive` writes its haze's
+   * reflectance on its fire fronts' smoke. Default `PALL_REFLECTANCE`, a thick smoke pall's.
+   */
+  airReflectance?: readonly [number, number, number];
 }
 /**
  * Sub-emitters: a particle that is born from the emitter (`on: 'birth'`, a trail or a flash at the muzzle), dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),

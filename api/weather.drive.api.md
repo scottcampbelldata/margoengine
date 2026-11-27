@@ -99,6 +99,7 @@ export interface FireTarget {
     readonly radiantPower?: number;
     noon?: number;
     air?: readonly [number, number, number];
+    airReflectance?: readonly [number, number, number];
     segments?(): readonly {
         readonly x: number;
         readonly y: number;
