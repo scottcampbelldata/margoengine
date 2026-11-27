@@ -41741,6 +41741,7 @@ This first scene needs no model or texture files. For a reader moving from anoth
 - `examples/clipping-planes.html`: Section planes on every material
 - `examples/depth-texture.html`: A depth texture that any material can sample
 - `examples/flight-helmet.html`: The Khronos Flight Helmet with PBR materials
+- `examples/gpu-flocking.html`: 16,384 GPU birds or fish fleeing the pointer, live flocking rules and the flock's debug view
 - `examples/khronos-gallery.html`: Khronos glTF sample assets
 - `examples/gallery/index.html`: The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md))
 - `examples/kinematics-constraints.html`: Arm clearance check with the kinematics package
