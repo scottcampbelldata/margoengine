@@ -333,6 +333,10 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     if points > limits.vertices.min(16_777_216) {
         return Err(Error::Limit);
     }
+    // E53: a sequential mesh holds at most three points per face.
+    if mesh && mapping.is_none() && points > faces.saturating_mul(3) {
+        return Err(Error::Invalid);
+    }
     let nindices = faces.checked_mul(3).ok_or(Error::Overflow)?;
     if nindices > limits.indices {
         return Err(Error::Limit);
@@ -342,6 +346,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     if let Some(mapping) = &mapping {
         corner_indices(&mut indices, &mapping.corner_to_point)?;
     } else if mesh {
+        // E54: connectivity byte 0 is entropy coded, any other value raw.
         match c.byte()? {
             0 => {
                 let symbols = entropy::symbols(&mut c, nindices, 1, &mut budget)?;
@@ -356,7 +361,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                     *dst = u32::try_from(previous).map_err(|_| Error::Invalid)?;
                 }
             }
-            1 => {
+            _ => {
                 for dst in &mut indices {
                     *dst = if points < 256 {
                         c.le(1)?
@@ -369,7 +374,6 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                     };
                 }
             }
-            _ => return Err(Error::Invalid),
         }
         if indices.iter().any(|v| *v as usize >= points) {
             return Err(Error::Invalid);
@@ -411,6 +415,11 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
         } else {
             c.count()?
         };
+        // E55: a file may hold no attribute decoder, but a decoder holds at
+        // least one attribute.
+        if n == 0 {
+            return Err(Error::Invalid);
+        }
         if n > (c.data.len() - c.at) / 6 {
             return Err(Error::Truncated);
         }

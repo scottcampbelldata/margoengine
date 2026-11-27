@@ -16974,6 +16974,25 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/metadata-header.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder differed on damaged streams (batch 133, E50 to E57)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  accepted meshes the prebuilt rejects (too many start faces, a start face over
+  a split's broken fan, more than three points per face, an empty attributes
+  decoder); returned other point counts on one degenerate split mesh; and
+  refused streams the prebuilt decodes (unused or extra split events, short
+  symbol or start-face blobs, raw connectivity bytes other than 1, clouds with
+  no attributes decoder).
+- **Cause:** `native/draco/src/edgebreaker.rs` bounded faces at twice the
+  symbols, left a merged vertex a representative, compacted merged vertices
+  without walking their fans, required every event and split target to be used
+  and stopped bit reads at the blob; `sequential.rs` and `kd.rs` had other
+  count and byte rules.
+- **Fix:** the observed rules
+  ([E50 to E57](clean-room.md#batch-133-e50-to-e57-damaged-streams-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/damaged.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -17012,31 +17031,20 @@ E26 to E40):
 - Not probed: position-reading predictors on attribute decoders with seams that
   split vertices, and constrained multi-parallelogram before 2.2 beyond the
   retained cases.
-- Damaged streams from the E48/E49 probe: a few version 1.0 and 2.2 inputs where
-  Margo accepts or refuses unlike the prebuilt, among them a mesh and a KD cloud
-  with no attributes that the prebuilt decodes and Margo refuses.
+- Point clouds of version 1.3: Margo answers `Unsupported`. The prebuilt reads
+  some 1.x clouds relabelled 1.3, but admitting them to Margo's 1.x layout gave
+  other output, so the layout is not established. Repro: any `E56 no decoder`
+  cloud with minor version 3, for example hex
+  `445241434f0103000000000000000000`.
+- KD clouds of version 2.3 with two or more attributes decoders: Margo answers
+  `Unsupported`; the prebuilt reads all decoder attribute lists, then each
+  decoder's data in order.
+- A version 2.2 standard EdgeBreaker mesh of `tests/fixtures/multi.bin` with the
+  header faces lowered from 12 to 11, symbols from 11 to 10 and splits 0: the
+  prebuilt decodes 12 points, Margo answers `Invalid` (as before E50).
 
-- Damaged EdgeBreaker headers (E44's 60,000 header mutations): with the face
-  and symbol counts raised above what a predictive stream holds, the prebuilt
-  decodes where Margo answers `Truncated`; and Margo decodes one version 2.0
-  stream cut to one symbol and two faces that the prebuilt rejects (it did
-  before E43 too). Repros (hex):
-
-  ```text
-  445241434f02020101000000040500050000011f8002805001ff000003000503000d01090300
-  1d040901002f010300fe00040000000000000000000000000000000000000000000000000000
-  0000000000000000000000000000000000000000000006030001000d1a081503101d7f000000
-  3f000000800380f480000016c2000011c200000cc2000007c207
-  ```
-
-  ```text
-  445241434f020001010000000005020101001c0200000000000000df000100000000000000
-  018004000000009b5f88000000
-  ```
-
-Except for the second damaged-header repro and the damaged E48/E49 inputs, every
-difference measured and left open is a refusal by Margo; no probe in these
-classes found it returning different bytes.
+Except for these refusals, predictor 6 mode 0 and the deliberate index refusal
+in [limits.md](limits.md), no difference found by these probes is open.
 
 ### Historical: batch 133 optional landing GPU request (resume 9)
 

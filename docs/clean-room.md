@@ -6832,6 +6832,28 @@ docs/known-bugs.md. The kept inputs and outputs are
 `f35817367e3af51b793baf59699946b58774f1cfaaa6a7dba758453baa61089d`), checked by
 `tests/layouts.rs`.
 
+### Batch 133 E50 to E57: damaged streams (2026-11-27)
+
+Method: as E26 to E40, Margo-crafted inputs through the public calls of the
+opaque full decoder; its source was not read. Inputs are hand-built version 2.0
+and 2.1 EdgeBreaker streams without attribute decoders (every symbol sequence
+and start-face choice up to eight symbols, then hundreds of thousands of seeded
+random ones with seams, split events and shortened bit streams), crafted
+sequential meshes and point clouds, and the differing inputs of the E44 and
+E48/E49 probes. Each rule is a hypothesis that was kept only when acceptance,
+point count and indices matched on the whole probe.
+
+| # | Rule | Probe |
+| --- | --- | --- |
+| E50 start faces | A mesh has at most one start face for every three symbols: faces - symbols <= symbols / 3, rounded down. | Repeated components of one to four symbols with every start-face count. |
+| E51 vertices merged by splits | Without attribute seams, each merged vertex id, in merge order, is filled by the last vertex that still has a representative corner. That vertex's corners are renamed by walking its fan from the representative, left and then, for an open fan, right of it; a walk meeting a corner that does not name it rejects the stream. A merged vertex keeps no representative, even when the split face names it as its third vertex. | Short sequences exhaustively; random ones. |
+| E52 split events | There may be more events than split symbols or symbols, up to the face count. An event whose symbol is passed (a C or S symbol, which reads none) rejects the stream at the next L, R or E symbol; an event never reached is ignored, so is a split target never used, and a later write to one target replaces it. | One to twelve events over three and six symbols; 300,000 random streams. |
+| E53 sequential points | A sequential mesh with more than three points per face is rejected. | Face and point grids, versions 1.0 to 2.2. |
+| E54 connectivity byte | Zero selects entropy-coded indices, every other value raw ones. The opaque decoder also returns indices at or past the point count; Margo refuses those (docs/limits.md). | Bytes 0, 1, 2, 9, 64 and 255; indices from 0 to 600. |
+| E55 empty decoders | An attributes decoder holding no attribute rejects the stream, in every method; a stream with no decoder is accepted. | Versions 1.0 to 2.3. |
+| E56 clouds without decoders | A KD cloud with no attributes decoder is its point count at every version, with no attributes. | Versions 1.0 to 2.3. |
+| E57 bit readers | The raw symbol bits and the pre-2.2 start-face bits are not bounded by their blob's size: reads continue through the input and give zero past its end. | 200,000 streams with either blob cut short. |
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

@@ -123,6 +123,16 @@ fn kd_stream_ends_match_black_box_outputs_and_rejections() {
     assert_eq!(counts, (134, 80, 54, 0));
 }
 
+/// E50 to E57: damaged streams. Start faces per symbol, vertices merged by
+/// splits, split events, sequential point and connectivity rules, empty
+/// decoders, attribute-free clouds, short symbol streams, and Margo's refusal
+/// of indices past the point count (docs/limits.md).
+#[test]
+fn damaged_streams_match_black_box_outputs_and_rejections() {
+    let counts = check(include_bytes!("fixtures/damaged.bin"));
+    assert_eq!(counts, (589, 304, 285, 0));
+}
+
 /// E48 and E49: only the metadata flag bit is read, from version 1.3, and one
 /// metadata node's children have distinct names.
 #[test]

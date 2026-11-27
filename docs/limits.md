@@ -4629,6 +4629,15 @@ KD stream ends the same way, so the level 6 and int64 refusals above are gone;
 the Wasm is 143,042 bytes. E48 and E49 (header flags and metadata child names,
 the same day) take it to 144,230 bytes (53,773 to 54,309 B gzip -9).
 
+Accepted difference (2026-11-27, E54): a sequential mesh whose indices reach
+the point count or past it decodes in the full prebuilt, which returns them.
+Margo answers `Invalid`: an index naming no point would make whoever draws or
+walks the mesh read past its vertex data. With E50 to E57 the Wasm went from
+144,230 to 144,308 bytes. Cost: such a damaged file loads in the
+prebuilt and not in `draco-native`. Regression:
+`packages/decoders/native/draco/tests/layouts.rs` (`E54 refused index past
+points`).
+
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes
 hot Wasm functions (V8 TurboFan) compiles only the loop a stream uses. On the

@@ -57,7 +57,7 @@ impl StartFaces<'_> {
     fn bit(&mut self) -> Result<bool> {
         match self {
             Self::Binary(binary) => binary.bit(),
-            Self::Direct(bits) => Ok(bits.read(1)? != 0),
+            Self::Direct(bits) => Ok(bits.read(1).unwrap_or(0) != 0),
         }
     }
 }
@@ -184,30 +184,26 @@ impl Topology<'_> {
     // The mapping phases run as separate functions (KB4824a): an engine
     // optimizing one hot phase does not also compile the others.
     #[inline(never)]
-    fn plain_mapping(&self, budget: &mut Budget) -> Result<Mapping> {
+    fn plain_mapping(&mut self, budget: &mut Budget) -> Result<Mapping> {
         let count = self.corners.len();
-        let mut mapping = budget.vector(self.created, 0_usize)?;
-        for (i, v) in mapping.iter_mut().enumerate() {
-            *v = i;
-        }
+        // Each vertex a split merged away is filled by the last live vertex.
         let mut vertices = self.created;
-        for &removed in &self.isolated {
-            while vertices > 0 && self.vertex_corner[mapping[vertices - 1]] == NONE {
+        for i in 0..self.isolated.len() {
+            let removed = self.isolated[i];
+            while vertices > 0 && self.vertex_corner[vertices - 1] == NONE {
                 vertices -= 1;
             }
             if removed >= vertices {
                 continue;
             }
-            vertices = vertices.checked_sub(1).ok_or(Error::Invalid)?;
-            mapping[removed] = mapping[vertices];
-        }
-        let mut inverse = budget.vector(self.created, NONE)?;
-        for (point, &vertex) in mapping[..vertices].iter().enumerate() {
-            inverse[vertex] = point;
+            vertices -= 1;
+            self.move_vertex(vertices, removed, budget)?;
         }
         let mut corner_to_point = budget.vector(count, NONE)?;
         for (out, &vertex) in corner_to_point.iter_mut().zip(&self.corners) {
-            *out = inverse[vertex];
+            if vertex < vertices {
+                *out = vertex;
+            }
         }
         if corner_to_point.contains(&NONE) {
             return Err(Error::Invalid);
@@ -217,6 +213,39 @@ impl Topology<'_> {
             corner_to_point,
             points: vertices,
         })
+    }
+    /// E51: moves vertex `from` to the id `to`, corner by corner around its
+    /// fan: left from its representative, then right of it when the fan is
+    /// open. A walk that reaches a corner of another vertex, or one it has
+    /// already moved, is refused.
+    fn move_vertex(&mut self, from: usize, to: usize, budget: &mut Budget) -> Result<()> {
+        let start = self.vertex_corner[from];
+        let mut c = start;
+        let mut left = true;
+        for _ in 0..=self.corners.len() {
+            budget.steps(1)?;
+            if self.corners.get(c) != Some(&from) {
+                return Err(Error::Invalid);
+            }
+            self.corners[c] = to;
+            c = if left {
+                self.swing_left(c)
+            } else {
+                self.swing_right(c)
+            };
+            if left && c == NONE {
+                left = false;
+                c = self.swing_right(start);
+            }
+            if c == NONE || c == start {
+                self.vertex_corner[to] = start;
+                self.vertex_corner[from] = NONE;
+                self.hole[to] = self.hole[from];
+                self.hole[from] = false;
+                return Ok(());
+            }
+        }
+        Err(Error::Invalid)
     }
     #[inline(never)]
     fn seam_bits(
@@ -423,7 +452,8 @@ pub(crate) fn decode<'a>(
     if vertices > limits.vertices || corners > limits.indices || max_vertices > 16_777_216 {
         return Err(Error::Limit);
     }
-    if symbols > faces || splits > symbols || faces > symbols.saturating_mul(2) {
+    // E50: at most one start face for every three symbols.
+    if symbols > faces || splits > symbols || faces - symbols > symbols / 3 {
         return Err(Error::Invalid);
     }
     // E43: the header vertex count may exceed the vertices the symbols make,
@@ -431,8 +461,11 @@ pub(crate) fn decode<'a>(
     if vertices > corners {
         return Err(Error::Invalid);
     }
+    let input = c.data;
+    let mut traversal_start = 0;
     let mut legacy_traversal = if c.version < 0x202 {
         let size = c.legacy_count()?;
+        traversal_start = c.at;
         let mut traversal = Cursor::new(c.take(size)?);
         traversal.version = c.version;
         Some(traversal)
@@ -441,9 +474,11 @@ pub(crate) fn decode<'a>(
     };
     let event_count = c.legacy_count()?;
     // E44: events may outnumber the header split count.
-    if event_count > symbols {
+    // E52: events may outnumber the symbols too, up to one per face.
+    if event_count > faces {
         return Err(Error::Invalid);
     }
+    budget.steps(event_count)?;
     let mut events = budget.vector(event_count, (0_usize, 0_usize, false))?;
     let mut source = 0_usize;
     for event in &mut events {
@@ -481,17 +516,21 @@ pub(crate) fn decode<'a>(
         }
     }
     let c = legacy_traversal.as_mut().unwrap_or(c);
+    // E57: the symbol and start-face bit readers are not bounded by their
+    // blob's size: they read on through the input, and zero past its end.
     let symbol_data = if traversal != 2 {
-        if c.version < 0x202 {
-            c.fixed_blob(64)?
+        let size = if c.version < 0x202 {
+            c.fixed_blob(64)?.len()
         } else {
-            c.blob(64)?
-        }
+            c.blob(64)?.len()
+        };
+        &input[traversal_start + c.at - size..]
     } else {
         &[]
     };
     let mut start_faces = if c.version < 0x202 {
-        StartFaces::Direct(Bits::new(c.fixed_blob(64)?))
+        let size = c.fixed_blob(64)?.len();
+        StartFaces::Direct(Bits::new(&input[traversal_start + c.at - size..]))
     } else {
         StartFaces::Binary(Binary::read(c)?)
     };
@@ -571,9 +610,6 @@ pub(crate) fn decode<'a>(
         &mut pending,
         budget,
     )?;
-    if !events.is_empty() || pending.iter().any(|v| *v != NONE) {
-        return Err(Error::Invalid);
-    }
     let mut made_faces = symbols;
     while let Some(a) = stack.pop() {
         if !start_faces.bit()? {
@@ -643,10 +679,10 @@ fn connect<'a, const T: u8>(
         let symbol = if predicted_ok {
             predicted as u32
         } else if T != 2 {
-            if symbol_bits.read(1)? == 0 {
+            if symbol_bits.read(1).unwrap_or(0) == 0 {
                 0
             } else {
-                1 | (symbol_bits.read(2)? << 1)
+                1 | (symbol_bits.read(2).unwrap_or(0) << 1)
             }
         } else if active_context == NONE {
             7
@@ -748,7 +784,7 @@ fn connect<'a, const T: u8>(
         }
         if symbol == 7 || symbol == 3 || symbol == 5 {
             let encoder_id = symbols - id - 1;
-            if events.last().is_some_and(|event| event.0 == encoder_id) {
+            if events.last().is_some_and(|event| event.0 >= encoder_id) {
                 split_events(symbols, id, nc, events, pending)?;
             }
         }
@@ -785,7 +821,6 @@ fn split(
     topo.pair(a, nc + 2)?;
     topo.pair(b, nc + 1)?;
     parent[removed] = v;
-    topo.vertex_corner[removed] = NONE;
     if topo.isolated.len() == topo.isolated.capacity() {
         // E44: more merges than the header's split count; one growth to the
         // symbol count bounds them all.
@@ -826,6 +861,11 @@ fn split_fan(
         return Err(Error::Invalid);
     }
     topo.vertex_corner[p] = nc + 2;
+    // E51: the merged vertex keeps no representative, even when the split face
+    // names it as its third vertex.
+    if let Some(&removed) = topo.isolated.last() {
+        topo.vertex_corner[removed] = NONE;
+    }
     Ok(())
 }
 
@@ -839,10 +879,16 @@ fn split_events(
     pending: &mut [usize],
 ) -> Result<()> {
     let encoder_id = symbols - id - 1;
-    while events.last().is_some_and(|event| event.0 == encoder_id) {
-        let (_, target, right) = events.pop().ok_or(Error::Invalid)?;
+    // E52: an event whose symbol was passed over (a C or S symbol) is refused
+    // at the next C-less symbol; events never reached, and splits never used,
+    // are ignored.
+    while events.last().is_some_and(|event| event.0 >= encoder_id) {
+        let (source, target, right) = events.pop().ok_or(Error::Invalid)?;
+        if source != encoder_id {
+            return Err(Error::Invalid);
+        }
         let target = symbols - target - 1;
-        if target <= id || pending[target] != NONE {
+        if target <= id {
             return Err(Error::Invalid);
         }
         pending[target] = if right { next(nc) } else { prev(nc) };

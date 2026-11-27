@@ -233,17 +233,30 @@ fn tree(c: &mut Cursor, points: usize, dimensions: usize, budget: &mut Budget) -
 }
 
 pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Result<Geometry> {
-    if c.version != 0x203 {
-        return Err(Error::Unsupported);
-    }
     let points = c.le(4)? as usize;
     if points > limits.vertices {
         return Err(Error::Limit);
     }
-    if c.byte()? != 1 {
+    let decoders = c.byte()?;
+    // E56: a cloud with no attribute decoder is its point count, at every
+    // version.
+    if decoders == 0 {
+        return Ok(Geometry {
+            points,
+            mesh: false,
+            indices: Vec::new(),
+            attributes: Vec::new(),
+            metadata: None,
+        });
+    }
+    if c.version != 0x203 || decoders != 1 {
         return Err(Error::Unsupported);
     }
     let count = c.count()?;
+    // E55: a decoder holds at least one attribute.
+    if count == 0 {
+        return Err(Error::Invalid);
+    }
     if count > (c.data.len() - c.at) / 5 {
         return Err(Error::Truncated);
     }
