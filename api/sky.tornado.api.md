@@ -158,6 +158,7 @@ export interface TornadoSky {
         readonly exposure?: number;
         readonly model?: string;
     };
+    readonly pictureScale?: number;
     readonly sunIlluminance?: number;
     readonly sunTransmittance?: ArrayLike<number>;
 }

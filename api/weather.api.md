@@ -284,6 +284,13 @@ export function hazeLight(state: {
     readonly spray?: number;
 }, elevation: number): [number, number, number];
 
+export function hazeLightDecay(state: {
+    readonly dust?: number;
+    readonly smoke?: number;
+    readonly ash?: number;
+    readonly spray?: number;
+}, extinction?: number): [number, number, number];
+
 export function hazeReflectance(state: {
     readonly smoke?: number;
     readonly ash?: number;

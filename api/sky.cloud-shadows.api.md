@@ -163,6 +163,14 @@ interface ResolvedHurricane {
     swirl: number;
 }
 
+interface SkyFireSpot {
+    color: Vec3;
+    x: number;
+    z: number;
+    height?: number;
+    reach?: number;
+}
+
 interface VolumetricCloudFlash {
     position: Vec3;
     intensity: number;
@@ -209,9 +217,16 @@ interface VolumetricCloudSky {
             readonly sunIntensity?: number;
             readonly scatteredLight?: ArrayLike<number>;
             readonly layerTransmittance?: ArrayLike<number>;
+            readonly fireSpots?: readonly SkyFireSpot[];
+            readonly fireSight?: number;
+        };
+        readonly fog?: {
+            readonly density?: number;
+            readonly fireSpots?: readonly SkyFireSpot[];
         };
     };
     readonly zenithSun?: number;
+    readonly pictureScale?: number;
     readonly reflectionTexture?: GPUTexture | undefined;
     readonly lightScale?: number;
     readonly lights?: readonly {

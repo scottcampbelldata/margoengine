@@ -262,6 +262,7 @@ interface SkyFogOptions {
     base?: number;
     color?: Vec3;
     fireSpots?: readonly SkyFireSpot[];
+    lightDecay?: Vec3;
 }
 
 interface SkyGradientStop {
@@ -340,6 +341,7 @@ interface SkyOptions {
     timeScale?: number;
     turbidity?: number;
     exposure?: number;
+    balance?: boolean;
     lighting?: SkyLightingOptions;
     atmosphere?: SkyAtmosphereOptions;
     look?: SkyLookOptions;

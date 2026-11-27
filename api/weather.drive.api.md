@@ -168,6 +168,7 @@ export interface SkyTarget {
             falloff?: 'exp' | 'exp2';
             color?: readonly [number, number, number];
             fireSpots?: readonly SkyFireSpotTarget[];
+            lightDecay?: readonly [number, number, number];
         };
         atmosphere?: {
             sunColor?: readonly [number, number, number];
@@ -175,8 +176,10 @@ export interface SkyTarget {
             layerTransmittance?: readonly [number, number, number];
             fireSpots?: readonly SkyFireSpotTarget[];
             fireSight?: number;
+            sunIntensity?: number;
         };
         look?: object;
+        exposure?: number;
         lighting?: {
             intensity?: number;
         };
@@ -186,6 +189,8 @@ export interface SkyTarget {
     readonly twilightLight?: SkyLightTarget;
     readonly airControls?: boolean;
     readonly sun?: ArrayLike<number>;
+    readonly zenithSun?: number;
+    readonly pictureScale?: number;
 }
 
 export interface VfxTarget {

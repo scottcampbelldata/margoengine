@@ -40,6 +40,7 @@ export interface AerialSky {
         readonly altitude?: number;
     };
     readonly sunIlluminance?: number;
+    readonly pictureScale?: number;
     readonly resolvedAtmosphere?: Readonly<Required<AtmosphereParameters>>;
 }
 
