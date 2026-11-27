@@ -24,13 +24,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `tests/check-downloads.test.js`, `tests/download-script-arguments.test.js` and the
   `*-download.test.js` files of decoders, loaders and biomes.
 
-### Open 2026-11-27: the stated size of margoengine/web is stale (KB-KITS-WEBSIZE1)
+### Fixed 2026-11-27: the stated size of margoengine/web is stale (KB-KITS-WEBSIZE1)
 
 - **Repro.** `node --test tests/umbrella.test.js` after `npm run build:packages`: `margoengine/web: 106118 B,
   docs/guides/kits.md says 103021 B`, past the 3 percent the test allows. Found on a tree based on 272eb08a9b; the
   web kit holds no tilemap entry, so the tilemap work that found it adds nothing to it.
-- **Cause.** Not traced to its commits yet: the roots the kit bundles have grown since the row was last measured. The
-  fix is to name what grew, check each growth is under its entry's ceiling, and restate the row with that history.
+- **Cause.** The row was measured before 2026-11-20 and the roots the kit bundles grew afterwards through features and
+  bug fixes, each under its size ceiling. Traced by building the kit's packages as they were on 2026-11-20 (103,300 B)
+  and swapping packages and commits one at a time; no code carried twice was added.
+- **Fix.** [docs/guides/kits.md](guides/kits.md) states 106,118 B and names the growth by package and commit.
+- **Regression test:** `tests/umbrella.test.js` ("a kit costs only what the app uses, and its full size is what
+  docs/guides/kits.md states").
 
 ### Open 2026-11-27: some tests' random generator loses its low bits and repeats early (KB-TEST-LCG1)
 

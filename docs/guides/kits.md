@@ -131,12 +131,20 @@ The web row rose from 96,802 B on 2026-11-15, when tonemap gained its Bradford w
 vignette colour, centre, roundness and blend.
 The viz row rose from 266,957 B on 2026-11-16, measured again after it had drifted past the 3 percent check while the
 sciviz, post/stack and tonemap roots it bundles grew (their size ceilings rose by 2,097, 798 and 901 B that day).
+The web row rose from 103,021 B on 2026-11-27 (2,818 B over a build of the kit's packages as they were on 2026-11-20),
+measured again after it passed the 3 percent check. By package, each root under its size ceiling: tonemap 946 B (the
+auto exposure mask following the device restore rule, d0cc35ea50; no light rim on a transparent canvas, e323a96e86),
+environment 950 B (borrowed GPU textures surviving a device restore, 4e1f611ed8; one imported copy of the math helpers
+in place of a copy per decoder, 3054ddb5f6, which made the web starter smaller and this everything-at-startup bundle
+larger), shadows 692 B (moving casters leaving the cached map, ada4ac4803; cascades fitted to instances, b6781020ba; the
+soft filter's noise, 5feaab3d71) and core 381 B (its approved changes and bug fixes through multi-draw, c04ed9040d).
+Controls, stage and the other roots together fell by 151 B.
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
 | `margoengine/game` | Games | 383,226 B |
 | `margoengine/viz` | Visualization | 284,907 B |
-| `margoengine/web` | Web scenes | 103,021 B |
+| `margoengine/web` | Web scenes | 106,118 B |
 
 `node scripts/kit-install-check.mjs` packs the checkout, serves a read-only local registry, installs in new folders
 inside this lane's ignored test-results directory with an isolated cache, and compares every installed engine
