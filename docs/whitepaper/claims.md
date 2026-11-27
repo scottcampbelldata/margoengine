@@ -5949,14 +5949,14 @@ shader swings the breaker index along each crest in short-crested sections and g
 differ only in shader module text; every other call and argument is the same. packages/water/test/surf-crests.browser.mjs
 holds the claim. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
-Proof capture (2026-11-26, KB-WATER-WHITEWATERLIGHT1): the water-ssr --current proof advances to 70871dfd45, whose surface
+Proof capture (2026-11-26, KB-WATER-WHITEWATERLIGHT1): the water-ssr --current proof advances to 57f57c8bd8, whose surface
 shader lights foam as a bubble layer (foamLight: sky light for every kind of foam, a two-stream layer reflectance, lumps
 and hollows, a wrapped sun). The call logs differ only in shader module text; every other call and argument is the
 same. packages/water/test/whitewater-light.browser.mjs holds the claim. Reproduce with
 `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
 Proof capture (2026-11-26, KB-WATER-NEARDETAIL1, KB-WATER-TAASMEAR1): the water-ssr --current proof advances to
-fd1c691532, whose surface shader adds five gravity-capillary octaves to the normal at the chop's wind and writes TAA's reactive
+51560d9b19, whose surface shader adds five gravity-capillary octaves to the normal at the chop's wind and writes TAA's reactive
 mask to a third target. The call logs differ only in shader module text and the third colour target with its texture;
 every other call and argument is the same. packages/water/test/near-detail.browser.mjs holds the claim. Reproduce with
 `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
