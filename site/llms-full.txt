@@ -15524,7 +15524,7 @@ The independent fixed bare KRISO container-ship (KCS) signed wave cut at 1.09864
 
 At 0.25 m per cell the original stencil gave 14.88 and 14.85 mm of profile RMS error at 14 approach lengths and 60 or 120 Hz. Refining the mesh from 0.025 to 0.0125 m vertically and 96 to 192 stations changed the reconstructed displacement from 1.6412 to 1.6449 m³, closer to the published 1.6490 m³. At eight approach lengths and 60 Hz, this mesh, eight instead of four transfer bands, and a 4 m instead of 2 m numerical sponge gave 15.34, 15.38, and 15.11 mm respectively. The subcell stencil reduced the 60 Hz error from 15.10 to 13.86 mm at eight lengths and from 14.88 to 13.60 mm at 14 lengths. Aft of x/L = 0.75 the corrected signed profile reaches 34.60 mm RMS where the measured profile gives 17.90 mm, with correlation 0.987. This residual persists with fixed physical inputs and no fitting. The linear source does not enforce impermeability of the disturbed flow at the hull. The experiment reports an unsteady wet transom flow that is outside this source model. [NMRI model particulars](https://www.nmri.go.jp/archives/institutes/fluid_performance_evaluation/cfd_rd/cfdws15/kcs_gc.html) · [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
 
-The optional sea entry is 7,817 B gzip with a 7,880 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
+The optional sea entry is 7,859 B gzip with a 7,880 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
 
 ## Node versions for test and tool scripts (scripts/support/node-compat.mjs, 2026-11-26)
 
@@ -17991,13 +17991,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   longer overlap; walls hide the part that runs into them instead of turning it along the tunnel.
 - **Owed in vfx:** a layer that fills a gallery (two walls turn the jet along it) with puffs that widen as they thin.
 
-### Open 2026-11-27: a fire's sparks draw white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
+### Fixed 2026-11-27: a fire's sparks drew white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr091.json --stills --out <folder>`: the embers beside the
-  flames are white streaks while the flames are orange.
-- **Cause:** not yet traced; the likely one is that the hearth kit's ember radiance, set for a scene at its own
-  exposure, is far over the pre-exposed frame's white, so every channel clips.
-- **Owed in vfx:** embers whose radiance follows the flame's peak, with a test and a real frame.
+  flames were white streaks while the flames were orange.
+- **Cause:** a `Fire` with `flameLength` kept the hearth kit's embers at intensity 5 (birth colour 1, 0.6, 0.2), set for
+  the hearth close-up's own exposure. Its `Flame` volume holds every channel under its `peak` (1) through a camera
+  shoulder; the sparks were five times that in red and three times in green, so under the tunnel's exposure and
+  3,200 K balance every channel clipped and they read white.
+- **Fix:** beside a flame volume the embers' brightest channel over their life is the flame's peak radiance
+  (`Flame.peakRadiance`, its `peak` times its `radiance`, new) times the fire's `power`; a hearth fire with particle
+  flames keeps its kit's embers. Real frame (fr091 mid still, RTX A6000): spark pixels with red over 120 in the spark
+  field 963 before, 401 after; of them near white (green and blue over 170) 126 before, 0 after; mean blue 130 to 91.
+- **Regression:** `packages/vfx/test/fire.test.js`, "a flame volume's embers are no brighter in any channel than the
+  flame's peak, at any power" (fails on the parent: the embers stood at 5 times the peak).
 
 ### Fixed 2026-11-27: smoke indoors climbed through the roof and veiled its own fire (KB-VFX-SMOKEROOF1, vfx and scenes)
 

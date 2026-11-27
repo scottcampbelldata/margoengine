@@ -1014,6 +1014,15 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
 6. Output a breaking read for SEA-13 and a rain-ring source; document `wakeHeight` in the physics README.
 7. Move FFTs to Wasm SIMD and record work counts.
 
+**Upgrade in progress.**
+- Items 5 and 6 in part. `96f97c0344` converts WakeSolver input and port errors to coded errors
+  with a fix and documents `wakeHeight`. `sea-wake.test.js` checks grid, initial state and source errors.
+- The existing `coupling/loads-quay-wake.test.js` checks the straight-wall standing mode and the hull-driven
+  reflected wake. Finite diffraction acceptance will use the measured Briggs M4 gauges and the independent
+  with-cylinder WG9 series from DHI Test 008, with the separate no-cylinder record for the incident input.
+  [Briggs, Thompson and Vincent, 1995](https://doi.org/10.1061/%28ASCE%290733-950X%281995%29121%3A1%2823%29)
+  [DHI Test 008](https://www.ccp-wsi.ac.uk/catalogue/test_cases/test_case_008/)
+
 ### SEA-02 Ocean surface synthesis and query (`@margoengine/physics/sea`, commits 52b68ca65, 4514375c8, 713c344ef, 3dbda315d; patches added by 33ab69766 and 4ec0717e8), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/sea/surface.ts` (415 lines), `tests/sea-surface.test.js`, the `sea-wake.test.js` patch tests, the audit row, the catalog row, `docs/limits.md` row "Sea surface" and the demo-review rows. `git log --since=2026-11-25` on the sea source shows no change to the wave synthesis since the audit: only error wording (713c344ef) and the wake `patches` and `waterBelow` hooks. Ran under run-with-timeout: `sea-surface.test.js` + `sea-wake.test.js`: 20 tests, 20 pass, 0 fail. `packages/water/test/sea-agreement.browser.mjs` (WebGPU, Apple Metal): passed (2043 vertices, 408 waves, worst 0.0% of its bound, largest difference 0.0020 mm). Not run: the WebGL2 `--compat` variant, and `coupling/seakeeping.test.js` (it tests the hull, not this surface).
