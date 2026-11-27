@@ -230,6 +230,11 @@ there, add a line below with the solver ID and what is needed, and build against
   The optional Physics entries use the existing contract type, match ICE-02 and the wake through declared ports, and
   use no static module window. A canonical per-body contact impulse port would support iceberg grounding and ship contact.
 
+- **KB-VOX-ORIGIN2** (voxel debris, for the owner of the `Physics` class): give `Physics` a `PhysicsWorld.shiftOrigin`-style
+  rebase (bodies, velocities, sleep state and driven mesh poses kept relative to a float64 origin), so
+  `@margoengine/voxel/physics` can follow it and `VoxelDebris` can accept `origin` with `physics`. It refuses the
+  pair until then ([known-bugs.md](known-bugs.md)).
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.
