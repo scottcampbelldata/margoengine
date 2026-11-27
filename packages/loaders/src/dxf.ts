@@ -74,7 +74,7 @@ export interface DXFLayer {
   visible: boolean;
 }
 
-/** A TEXT or MTEXT entity: the string (MTEXT formatting codes removed) and where it stands. */
+/** A TEXT, MTEXT or block attribute: the string (formatting and control codes resolved) and where it stands. */
 export interface DXFText {
   text: string;
   /** Insertion point, in the output's units. */
@@ -87,6 +87,8 @@ export interface DXFText {
   normal: [number, number, number];
   layer: string;
   color: DXFColor;
+  /** The attribute tag, on texts of `ATTRIB` and `ATTDEF` entities only. */
+  tag?: string;
 }
 
 /** An ACIS solid, body or region: its SAT text (decoded) and the placement of the block reference that holds it. */
@@ -116,6 +118,7 @@ export interface DXFResult {
   lines: DXFLines;
   /** POINT entities, xyz each. */
   points: Float32Array;
+  /** TEXT and MTEXT, and the visible attributes of block references. */
   texts: DXFText[];
   layers: DXFLayer[];
   solids: DXFSolid[];
@@ -316,6 +319,16 @@ function readPairs(bytes: Uint8Array, decode: (b: Uint8Array) => string): { code
 /** `\U+XXXX` escapes (pre-2007 files) to characters. */
 const unicode = (s: string) =>
   s.replace(/\\U\+([0-9a-fA-F]{4})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
+
+/**
+ * The `%%` control codes of text strings (Autodesk, "Control Codes and Special Characters"): degrees, plus/minus,
+ * diameter, a percent sign and a character by number; the overscore, underscore and strikethrough toggles are dropped.
+ */
+const controlCodes = (s: string) =>
+  s.replace(/%%(%|\d{3}|[cdkopu])/gi, (_, c: string) => {
+    const at = 'cdp%'.indexOf(c.toLowerCase());
+    return at >= 0 ? '∅°±%'[at] : c.length > 1 ? String.fromCharCode(Number(c)) : '';
+  });
 
 /** MTEXT's inline formatting codes removed: paragraphs become line breaks. */
 function plainMText(s: string): string {
@@ -625,10 +638,13 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
     color: DXFColor;
     depth: number;
   }
-  const emit = (e: Entity, context: Context): void => {
-    const first = (code: number) => {
+  const emit = (e: Entity & { attributes?: Entity[] }, context: Context): void => {
+    const attribute = e.type === 'ATTRIB' || e.type === 'ATTDEF',
+      // A multiline attribute's MTEXT follows code 101 and repeats codes with other meanings: lookups stop there.
+      embedded = attribute ? e.codes.indexOf(101) : -1,
+      first = (code: number) => {
         const k = e.codes.indexOf(code);
-        return k < 0 ? undefined : e.values[k];
+        return k < 0 || (embedded >= 0 && k > embedded) ? undefined : e.values[k];
       },
       n = (code: number, fallback = 0) => num(first(code), fallback);
     if (n(67) === 1) {
@@ -775,12 +791,24 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
         return;
       }
       case 'TEXT':
-      case 'MTEXT': {
+      case 'MTEXT':
+      case 'ATTRIB':
+      case 'ATTDEF': {
+        const flags = attribute ? n(70) : 0,
+          definition = e.type === 'ATTDEF';
+        // Invisible attributes are not drawn. In a block only a constant definition is: an ATTRIB of each INSERT
+        // stands for every other one. A definition outside a block shows its tag.
+        if (flags & 1 || (definition && context.depth > 0 && !(flags & 2))) return;
         const mtext = e.type === 'MTEXT',
-          raw = mtext
-            ? e.codes.flatMap((c, k) => (c === 3 ? [str(e.values[k])] : [])).join('') + str(first(1))
-            : str(first(1)),
-          aligned = !mtext && (n(72) !== 0 || n(73) !== 0) && first(11) !== undefined,
+          /** The strings of the 250-character chunks (code 3) after index `from`. */
+          chunks = (from: number) =>
+            e.codes.flatMap((c, k) => (k > from && c === 3 ? [str(e.values[k])] : [])).join(''),
+          tail = embedded >= 0 ? e.codes.indexOf(1, embedded) : -1,
+          multiline = tail >= 0 ? chunks(embedded) + str(e.values[tail]) : '',
+          raw =
+            definition && context.depth === 0 ? str(first(2)) : multiline || (mtext ? chunks(-1) : '') + str(first(1)),
+          // Attributes keep the vertical justification in code 74, TEXT in 73.
+          aligned = !mtext && (n(72) !== 0 || n(attribute ? 74 : 73) !== 0) && first(11) !== undefined,
           o = ocs(extrusion),
           local = mtext
             ? [n(10), n(20), n(30)]
@@ -792,14 +820,16 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
               : direction(o, Math.cos(angle), Math.sin(angle), 0),
           position = apply(m, local[0], local[1], local[2]),
           height = n(40) * Math.hypot(m[4], m[5], m[6]);
+        if (attribute && !raw) return;
         texts.push({
-          text: mtext ? plainMText(raw) : unicode(raw),
+          text: controlCodes(mtext || multiline ? plainMText(raw) : unicode(raw)),
           position,
           height,
           direction: direction(m, xAxis[0], xAxis[1], xAxis[2]),
           normal: direction(m, ...direction(o, 0, 0, 1)),
           layer: layerName,
           color,
+          ...(attribute && { tag: unicode(str(first(2))) }),
         });
         return;
       }
@@ -834,6 +864,16 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
             if (inserts > maxInserts)
               throw new LoaderError(F, 'limit', `block references exceed maxInserts ${maxInserts}`);
             const local = mul(mul(placed, translate(c * n(44), r * n(45), 0)), scaled);
+            // Attributes are stored where the first copy shows them, in this INSERT's own space.
+            if (e.attributes) {
+              const from = apply(placed, 0, 0, 0),
+                to = apply(placed, c * n(44), r * n(45), 0),
+                matrix = mul(m, translate(to[0] - from[0], to[1] - from[1], to[2] - from[2]));
+              if ((r || c) && (inserts += e.attributes.length) > maxInserts)
+                throw new LoaderError(F, 'limit', `block references exceed maxInserts ${maxInserts}`);
+              for (const child of e.attributes)
+                emit(child, { matrix, layer: layerName, color, depth: context.depth + 1 });
+            }
             for (const child of block.entities)
               emit(child, { matrix: mul(m, local), layer: layerName, color, depth: context.depth + 1 });
           }
@@ -882,8 +922,6 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
       }
       case 'VERTEX':
       case 'SEQEND':
-      case 'ATTRIB':
-      case 'ATTDEF':
       case 'VIEWPORT':
         return;
       default:
@@ -957,7 +995,7 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
         false,
       );
   };
-  /** Attaches each POLYLINE's VERTEX entities to it (and drops an INSERT's ATTRIBs), up to SEQEND. */
+  /** Attaches each POLYLINE's VERTEX entities and each INSERT's ATTRIB entities to it, up to SEQEND. */
   const gather = (list: Entity[]): Entity[] => {
     const out: Entity[] = [];
     for (let k = 0; k < list.length; k++) {
@@ -971,7 +1009,10 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
         out.push(e);
         let j = k + 1;
         while (j < list.length && list[j].type === 'ATTRIB') j++;
-        if (j > k + 1 && j < list.length && list[j].type === 'SEQEND') k = j;
+        if (j > k + 1 && j < list.length && list[j].type === 'SEQEND') {
+          out[out.length - 1] = Object.assign(e, { attributes: list.slice(k + 1, j) });
+          k = j;
+        }
       } else out.push(e);
     }
     return out;

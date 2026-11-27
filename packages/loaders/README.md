@@ -65,7 +65,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parsePLY` | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; `edge` elements (`vertex1`, `vertex2`) as `lineIndices`; files without faces become point clouds; unknown elements and properties skipped |
 | `parseSTL` | See [STL](#stl) |
 | `parse3MF` (async) | Own ZIP reader (stored and deflate through `DecompressionStream('deflate-raw')`, CRC-32 checked); objects, meshes, components, build items, 3x4 transforms; `basematerials` and materials-extension `colorgroup` colors; production-extension `p:path` parts; unit conversion to meters |
-| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting removed); 3DSOLID, BODY and REGION ACIS data decoded to SAT text. `HATCH` with [`readDXFHatch`](#dxf-hatches). Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
+| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting and `%%` control codes resolved); [block attributes](#dxf-block-attributes) in `texts`; 3DSOLID, BODY and REGION ACIS data decoded to SAT text. `HATCH` with [`readDXFHatch`](#dxf-hatches). Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
 | `parsePCD` | `DATA ascii`, `binary`, `binary_compressed` (own LZF decompressor); x y z, normal_x/y/z, packed `rgb`/`rgba`, `intensity`, any other field skipped |
 | `parseOFF` | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals) |
 | `parseXYZ` | xyz, xyz+rgb, xyz+normal, xyz+normal+rgb, xyz+intensity, PTS (xyz+intensity+rgb), chemistry XYZ |
@@ -606,6 +606,32 @@ engine.start();
 - Parameters (`newparam`, `setparam`, `param`, `SIDREF`) resolve through the instance tree, so two instances of one robot keep their own joints. `axis_info` limits replace a joint's own.
 - `poseDAEJoints(dae, values, {clamp})` returns a `DAEPose` like `poseDAE`'s. A bound `<rotate>` becomes a rotation about the joint's axis by the value, and a bound `<translate>` the axis times the value; axes you leave out stand at their `value`. Values are held inside the limits unless `clamp: false`. An unknown name, a value that is not finite or a change to a locked axis throws a `RangeError`. The pose holds joints only: it does not play the file's animations.
 - Not evaluated: `formula` (coupled or mimic joints, reported in `warnings`: pose those axes yourself), closed-loop attachments, tool frames (`frame_tip`, `frame_tcp`) and kinematics held in another file. Inverse kinematics is not part of the format.
+
+## DXF block attributes
+
+`parseDXF` returns the visible attributes of block references (room numbers, tags, title block fields) in `texts`,
+each with its `tag`.
+
+```ts
+import { parseDXF } from '@margoengine/loaders';
+
+// A block reference with one attribute.
+const groups = [
+  0, 'SECTION', 2, 'BLOCKS', 0, 'BLOCK', 2, 'Door', 10, 0, 20, 0, 0, 'ENDBLK', 0, 'ENDSEC',
+  0, 'SECTION', 2, 'ENTITIES', 0, 'INSERT', 66, 1, 2, 'Door', 10, 4, 20, 2,
+  0, 'ATTRIB', 10, 4.2, 20, 2.1, 40, 0.25, 1, 'D12 %%c900', 2, 'NUMBER', 70, 0, 0, 'SEQEND', 0, 'ENDSEC', 0, 'EOF',
+];
+const drawing = parseDXF(new TextEncoder().encode(groups.join('\n')));
+for (const { tag, text, position } of drawing.texts) console.log(tag, text, position); // NUMBER D12 ∅900 [4.2, 2.1, 0]
+```
+
+- An `ATTRIB` stands where the file puts it and takes the `INSERT`'s layer (when it is on layer 0) and colour (BYBLOCK).
+  An `INSERT` with rows and columns repeats its attributes with each copy.
+- Constant attribute definitions of a block are drawn with the block; an attribute definition outside a block shows its
+  tag. Invisible attributes and empty values are left out.
+- A multiline attribute reads the MTEXT after its group code 101.
+- `TEXT`, `MTEXT` and attributes resolve the `%%d`, `%%p`, `%%c`, `%%%` and `%%nnn` control codes and drop the
+  `%%u`, `%%o` and `%%k` toggles.
 
 ## DXF hatches
 

@@ -17678,3 +17678,17 @@ https://doi.org/10.1111/j.1467-8659.2012.03047.x. All four were located by web s
 splitting, oriented-box lot cuts with street access), not their full parameter sets. Tensor fields, growth rules and
 skeleton parcels are not implemented. No paper's companion code and no other engine's city example or library was read
 or copied; the three.js example is known here by its name only.
+
+## DXF block attributes and control codes (2026-11-27)
+
+The `ATTRIB` and `ATTDEF` reading and the `%%` control codes of `packages/loaders/src/dxf.ts` are written from:
+
+- Autodesk, *DXF Reference*, "ATTRIB (DXF)" (attribute flags, the vertical justification in code 74, the alignment
+  point, the multiline attribute codes),
+  https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-DXF/files/GUID-7DD8B495-C3F8-48CD-A766-14F9D7D0DD9B.htm.
+- Autodesk, *AutoCAD LT Help*, "Control Codes and Special Characters" (`%%d`, `%%p`, `%%c` as U+2205, `%%%`, `%%nnn`
+  and the toggles), read as a web search summary,
+  https://help.autodesk.com/cloudhelp/2018/ENU/AutoCAD-LT/files/GUID-968CBC1D-BA99-4519-ABDD-88419EB2BF92.htm.
+
+The `101 Embedded Object` marker of a multiline attribute is not named on that page and is not yet proven on a real
+file. No other project's source was read.

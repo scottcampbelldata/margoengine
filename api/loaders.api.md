@@ -508,6 +508,7 @@ export interface DXFText {
     normal: [number, number, number];
     layer: string;
     color: DXFColor;
+    tag?: string;
 }
 
 export interface FetchOptions {

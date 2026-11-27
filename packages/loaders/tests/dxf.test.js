@@ -323,3 +323,111 @@ test('$INSUNITS 21 to 24 are the US survey foot, inch, yard and mile', () => {
   assert.equal(unit(23), 3600 / 3937);
   assert.equal(unit(24), 6336000 / 3937);
 });
+
+/** The pairs of an entity: its type, then [code, value] pairs. */
+const entity = (type, ...pairs) => [[0, type], ...pairs];
+const point = (x, y, code = 10) => [
+  [code, x],
+  [code + 10, y],
+  [code + 20, 0],
+];
+
+const attributed = (...entities) =>
+  new TextEncoder().encode(
+    dxf([
+      ...section('BLOCKS', [
+        ...entity('BLOCK', [2, 'Tag'], ...point(0, 0)),
+        // A prompted definition (the INSERT's ATTRIB stands for it) and a constant one.
+        ...entity('ATTDEF', ...point(1, 1), [40, 1], [1, 'default'], [2, 'ROOM'], [70, 0]),
+        ...entity('ATTDEF', ...point(2, 3), [40, 1], [1, 'fixed'], [2, 'KIND'], [70, 2]),
+        ...entity('ATTDEF', ...point(2, 4), [40, 1], [1, 'secret'], [2, 'COST'], [70, 3]),
+        [0, 'ENDBLK'],
+      ]),
+      ...section('ENTITIES', entities.flat()),
+    ]),
+  );
+
+test('parseDXF draws the visible attributes of a block reference where the file puts them', () => {
+  const result = parseDXF(
+    attributed(
+      entity('INSERT', [8, 'Doors'], [62, 5], [66, 1], [2, 'Tag'], ...point(10, 20), [50, 90]),
+      // An ATTRIB's point is in the drawing's space: the INSERT neither moves nor turns it again.
+      entity('ATTRIB', [8, '0'], [62, 0], ...point(11, 22), [40, 2], [1, 'Hall %%c25 %%d'], [2, 'ROOM'], [70, 0]),
+      entity('ATTRIB', ...point(0, 0), [40, 2], [1, 'hidden'], [2, 'COST'], [70, 1]),
+      // 74 (not 73, the field length) is the vertical justification that makes code 11 the position.
+      entity('ATTRIB', ...point(0, 0), [40, 1], [1, 'low'], [2, 'LOW'], [70, 0], [73, 8], [74, 2], ...point(7, 8, 11)),
+      entity('ATTRIB', ...point(3, 3), [40, 1], [1, 'field'], [2, 'LEN'], [70, 0], [73, 8], ...point(9, 9, 11)),
+      entity('ATTRIB', ...point(4, 4), [40, 1], [1, ''], [2, 'EMPTY'], [70, 0]),
+      entity('SEQEND'),
+    ),
+  );
+  assert.deepEqual(result.skipped, {});
+  const by = Object.fromEntries(result.texts.map((t) => [t.tag, t]));
+  assert.deepEqual(Object.keys(by).sort(), ['KIND', 'LEN', 'LOW', 'ROOM']);
+  assert.equal(by.ROOM.text, 'Hall ∅25 °');
+  assert.deepEqual(by.ROOM.position, [11, 22, 0]);
+  assert.equal(by.ROOM.height, 2);
+  // Layer 0 and BYBLOCK take the INSERT's.
+  assert.equal(by.ROOM.layer, 'Doors');
+  assert.deepEqual(by.ROOM.color, [0, 0, 1]);
+  assert.deepEqual(by.LOW.position, [7, 8, 0]);
+  assert.deepEqual(by.LEN.position, [3, 3, 0]);
+  // The constant definition is the block's own: moved to (10, 20) and turned a quarter.
+  assert.equal(by.KIND.text, 'fixed');
+  assert.deepEqual(by.KIND.position.map(Math.round), [7, 22, 0]);
+});
+
+test('parseDXF repeats attributes over the rows and columns of an INSERT, within maxInserts', () => {
+  const file = attributed(
+    entity('INSERT', [66, 1], [2, 'Tag'], ...point(0, 0), [50, 90], [70, 2], [44, 10], [71, 1]),
+    entity('ATTRIB', ...point(1, 2), [40, 1], [1, 'a'], [2, 'ROOM'], [70, 0]),
+    entity('SEQEND'),
+  );
+  const rooms = parseDXF(file).texts.filter((t) => t.tag === 'ROOM');
+  assert.deepEqual(
+    rooms.map((t) => t.position.map(Math.round)),
+    [
+      [1, 2, 0],
+      [1, 12, 0],
+    ],
+  );
+  assert.throws(
+    () => parseDXF(file, { maxInserts: 2 }),
+    (error) => error instanceof LoaderError && error.code === 'limit',
+  );
+});
+
+test('parseDXF reads attribute definitions, multiline attributes and %% control codes', () => {
+  const result = parseDXF(
+    attributed(
+      entity('ATTDEF', ...point(0, 0), [40, 1], [1, 'unused'], [2, 'TITLE'], [70, 0]),
+      entity('INSERT', [66, 1], [2, 'Tag'], ...point(0, 0)),
+      // AutoCAD 2018's multiline attribute: the MTEXT after code 101 holds the whole string and repeats codes.
+      entity(
+        'ATTRIB',
+        ...point(5, 5),
+        [40, 1],
+        [1, 'first'],
+        [2, 'NOTE'],
+        [70, 0],
+        [101, 'Embedded Object'],
+        ...point(50, 50),
+        [72, 1],
+        ...point(1, 0, 11),
+        [3, 'first\\P'],
+        [1, '{\\fArial;second} %%p1'],
+      ),
+      entity('SEQEND'),
+      entity('TEXT', ...point(0, 0), [40, 1], [1, '%%UUnder%%u 100%%% %%065 %%P2 %%C3 90%%D']),
+      entity('MTEXT', ...point(0, 0), [40, 1], [1, '45%%d']),
+    ),
+  );
+  const note = result.texts.find((t) => t.tag === 'NOTE');
+  assert.equal(note.text, 'first\nsecond ±1');
+  assert.deepEqual(note.position, [5, 5, 0]);
+  assert.equal(result.texts.find((t) => t.tag === 'TITLE').text, 'TITLE');
+  assert.deepEqual(
+    result.texts.filter((t) => t.tag === undefined).map((t) => t.text),
+    ['Under 100% A ±2 ∅3 90°', '45°'],
+  );
+});
