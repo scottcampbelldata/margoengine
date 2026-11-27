@@ -1015,7 +1015,7 @@ console.log(town.length, Object.keys(town[0].parts).length > 5); // 1 true
 | Option | Default (`japan-2011-house`) | Range | Meaning |
 | --- | --- | --- | --- |
 | `width`, `depth` | 9.1, 7.28 | 3 to 120 m | footprint along the front (x) and front to back (z) |
-| `storeys` | [2.9, 2.9] | 1 to 12 of 2.2 to 8 m | floor to floor height of each storey from the ground up |
+| `storeys` | [2.9, 2.9] | 1 to 60 of 2.2 to 8 m | floor to floor height of each storey from the ground up |
 | `plinth` | 0.5 | 0 to 2 m | ground floor height over the ground |
 | `wall`, `reveal` | 0.15, 0.08 | 0.08 to 1, 0.02 to 0.5 m | wall thickness; how far glass and doors sit back (at most 0.9 of the wall) |
 | `roof` | `hip` | `flat`, `gable`, `hip`, `hip-gable`, `shed` | roof shape |
@@ -1034,7 +1034,7 @@ console.log(town.length, Object.keys(town[0].parts).length > 5); // 1 true
 | `door`, `doors` | [0.9, 2.1], [-1] | 0.6 to 8 m; bay indices, -1 the middle | door size and which front ground floor bays hold one |
 | `storefront`, `awning` | false, false | | shop windows over a bulkhead with transoms; a canvas awning |
 | `porch`, `porchWidth` | 0, 1 | 0 to 5 m; 0.2 to 1 | front porch depth and width share |
-| `balcony`, `balconyFloor`, `balconyWidth` | 0.91, 1, 0.6 | 0 to 3 m; 1 to 11; 0.2 to 1 | front balcony |
+| `balcony`, `balconyFloor`, `balconyWidth` | 0.91, 1, 0.6 | 0 to 3 m; 1 to 59; 0.2 to 1 | front balcony |
 | `chimney`, `chimneyAt` | false, [0.4, 0] | -0.9 to 0.9 each | a chimney and its place as shares of the half width and depth |
 | `gutters`, `cornerBoards`, `casings`, `bands`, `cornice`, `brackets` | true, false, false, false, false, false | | trim |
 | `detail` | `mid` | `far`, `mid`, `near` | small geometry |
@@ -1068,6 +1068,90 @@ import {generateBuilding} from 'margoengine/procedural/building-rules';
 const house = generateBuilding({style: 'western-1910-house'});
 console.log(house.rooms.length, house.furniture.some((f) => f.kind === 'bed')); // 8 true
 ```
+
+## City generator (`@margoengine/procedural/city`)
+
+`generateCity(options)` plans a whole town from one seed: streets and avenues in a `grid`, `organic` or `radial`
+layout, the blocks between them, parks and land use by distance from the centre, lots along the streets, the options of
+one rule-built building per lot and places for street trees and lamps. It is plain data in metres, Y up, and the same
+options give the same city. `buildCity(city, options)` turns it into meshes merged by material and by square chunk:
+road surface, lane lines, zebra crossings, kerbs, pavements, ground, trees, lamps and every building at a level of
+detail set by its distance from `focus`.
+
+```ts
+import {generateCity, buildCity} from 'margoengine/procedural/city';
+
+const city = generateCity({layout: 'radial', width: 300, depth: 300, seed: 5});
+const meshes = await buildCity(city, {focus: [0, 0]});
+console.log(city.blocks.length > 10, city.buildings.length > 100, meshes.parts.length > 50); // true true true
+```
+
+Drawing it is one mesh per part:
+
+```ts
+import {createStage, Geometry, PbrMaterial} from 'margoengine';
+import {generateCity, buildCity} from 'margoengine/procedural/city';
+import {addShadows} from 'margoengine/stage/shadows';
+
+const app = await createStage('#scene', {camera: {position: [230, 150, 250], target: [0, 0, 10], near: 1, far: 3000}});
+const {parts} = await buildCity(generateCity({seed: 3}), {focus: [60, 60]});
+for (const {geometry, material} of parts)
+  app.engine
+    .createMesh()
+    .setGeometry(new Geometry(geometry.positions, geometry.normals!, geometry.indices!))
+    .setMaterial(new PbrMaterial({...material, doubleSided: false}));
+await addShadows(app);
+```
+
+| `generateCity` option | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `width`, `depth` | 400, 400 | 60 to 4000 m | size between the middles of the edge streets |
+| `outline` | none | convex, 3 to 64 corners | the town's shape instead of a rectangle |
+| `layout` | `grid` | `grid`, `organic`, `radial` | street pattern |
+| `blockWidth`, `blockDepth` | 90, 60 | 30 to 500 m | target block size |
+| `angle` | 0 | +/-2pi | turn of the grid or first spoke |
+| `irregularity` | 0.25 | 0 to 1 | how uneven streets and lots are |
+| `streetWidth`, `avenueWidth` | 8, 16 | 4 to 30 m; street width to 60 m | kerb to kerb |
+| `avenueEvery` | 4 | 0 to 100 | every this many streets or rings is an avenue; `organic`: the first cuts; 0 none |
+| `spokes` | 8 | 3 to 24 | `radial` spoke streets |
+| `sidewalk`, `curb` | 2.5, 0.15 | 0 to 8 m; 0 to 0.5 m | pavement width and height |
+| `lotFrontage`, `lotDepth` | 18, 26 | 6 to 200 m; 8 to 120 m | target lot (downtown 1.4, houses 0.8, industry 2 times the width) |
+| `setback`, `spacing` | 2 for houses else 0; 0 downtown else 1 | 0 to 20 m | smallest gap to the street; between neighbours |
+| `centre`, `downtownRadius` | middle; 0.22 of the smaller size | inside the outline; 0 to 4000 m | where downtown is and how far it reaches |
+| `minStoreys`, `maxStoreys` | 2, 24 (4 in 1910) | 1 to 60 | downtown and commercial heights, tallest at the centre |
+| `parks`, `industry` | 0.08, 0.15 | 0 to 1 | share of blocks that are parks; share of the outer ring that is industry |
+| `era` | `modern` | `modern`, `western-1910` | the building styles |
+| `styles` | by era | weights per use | replaces the styles of a use, for example `{residential: {'western-1910-house': 1}}` |
+| `treeSpacing`, `lampSpacing` | 11, 30 | 0 (none) or 1 m up | street furniture |
+| `origin`, `seed`, `signal` | `[0, 0, 0]`, 1, none | | world position of the zero point; the town drawn; abort |
+
+The result lists `nodes` and `roads` (each with its two nodes, width, `avenue` or `street` and length), `blocks` (kerb
+and inner polygons, use, centre, area), `lots` (a `BuildingLot` with its polygon, so `townBuildings` takes them too),
+`buildings` (options for `generateBuilding`), `trees`, `lamps` and the asphalt `edge`. Porches, steps, balconies and
+eaves stay inside their lot.
+
+| `buildCity` option | Default | Meaning |
+| --- | --- | --- |
+| `detail` | `auto` | `auto`, or one of `massing`, `far`, `mid`, `near` for every building |
+| `focus`, `distances` | the centre; `[25, 70, 260]` | `auto`: nearer than each distance takes near, mid, far; past the last, massing |
+| `chunk` | 120 m | mesh chunk size, so a renderer can cull |
+| `markings`, `furniture` | true, true | lane lines and crossings; tree and lamp meshes |
+| `variants` | 4 | wall colours per style, 1 to 8 |
+| `maxTriangles` | 20,000,000 | stops with a `MargoError` past it |
+| `onProgress`, `signal` | none | called per building; abort |
+
+The work yields to the event loop about every 12 ms. On a rebuild around a moving camera, call `buildCity` again with
+the new `focus`. The ground is flat and the roads are straight; see [limits](../../docs/limits.md). The sliders are
+`CITY_SETTINGS`, `citySettingDefaults` and `cityOptionsFromSettings` of `@margoengine/procedural/building-settings`.
+
+The method follows Parish and Müller, [Procedural Modeling of Cities](https://doi.org/10.1145/383259.383292)
+(SIGGRAPH 2001: streets, blocks, lots, buildings by land use and distance); Chen, Esch, Wonka, Müller and Zhang,
+[Interactive Procedural Street Modeling](https://doi.org/10.1145/1360612.1360702) (ACM TOG 2008: grid and radial
+patterns, major and minor roads); Yang, Wang, Vouga and Wonka,
+[Urban Pattern: Layout Design by Hierarchical Domain Splitting](https://doi.org/10.1145/2508363.2508405) (ACM TOG 2013:
+streets as recursive cuts); and Vanegas, Kelly, Weber, Halatsch, Aliaga and Müller,
+[Procedural Generation of Parcels in Urban Modeling](https://doi.org/10.1111/j.1467-8659.2012.03047.x) (CGF 2012: lots
+from the oriented box, each on a street).
 
 ## Joined plans, dormers and towers (`@margoengine/procedural/building-plans`)
 
@@ -1190,6 +1274,7 @@ Technical Paper 134 rev. 2; Fyson (ed.) 1985, *Design of Small Fishing Vessels* 
 step, unit, about, live). None is live: each rebuilds geometry. `buildingOptionsFromSettings(values)` and
 `harbourOptionsFromSettings(values)` turn a panel's values into generator options, setting only the names given so the
 chosen style keeps its own defaults; `buildingSettingDefaults()` and `harbourSettingDefaults()` give a fresh panel.
+`CITY_SETTINGS`, `citySettingDefaults()` and `cityOptionsFromSettings(values)` do the same for `generateCity`.
 
 ```ts
 import {buildingOptionsFromSettings} from 'margoengine/procedural/building-settings';

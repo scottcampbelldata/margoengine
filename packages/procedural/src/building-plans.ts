@@ -703,7 +703,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
         ...shared,
         width: s,
         depth: s,
-        storeys: [...o.storeys, ...Array(towerStoreys).fill(Math.min(last, 3.2))].slice(0, 12),
+        storeys: [...o.storeys, ...Array(towerStoreys).fill(Math.min(last, 3.2))].slice(0, 60),
         roof: 'hip',
         pitch: towerPitch,
         overhang: Math.min(o.overhang, 0.5),

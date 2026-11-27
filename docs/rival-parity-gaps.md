@@ -127,8 +127,8 @@ From the three.js examples gallery, example by example (names only).
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| COLLADA kinematics: joints with axes and limits bound to scene nodes, so a loaded model is posed by joint value (`parseDAE` reads geometry, skins, morphs and keyframes) | three.js examples (`webgl_loader_collada_kinematics`) | DONE (`parseDAEKinematics`, `poseDAEJoints` of `@margoengine/loaders/dae-kinematics`; not yet checked on an exporter's file) | S to M |  |
-| City generator: streets, blocks and lots filled with rule-built buildings in one call (`generateBuilding` and road graphs exist separately) | three.js examples (`webgpu_generator_city`) | PARTIAL | M |  |
+| COLLADA kinematics: joints with axes and limits bound to scene nodes, so a loaded model is posed by joint value (`parseDAE` reads geometry, skins, morphs and keyframes) | three.js examples (`webgl_loader_collada_kinematics`) | DONE (`parseDAEKinematics`, `poseDAEJoints` of `@margoengine/loaders/dae-kinematics`; not yet checked on an exporter's file) | S to M | becdab786d |
+| City generator: streets, blocks and lots filled with rule-built buildings in one call (`generateBuilding` and road graphs exist separately) | three.js examples (`webgpu_generator_city`) | DONE (`generateCity` and `buildCity` of `@margoengine/procedural/city`: grid, organic and radial streets, land use, lots, a building per lot at a distance level of detail, markings, trees and lamps; flat ground only) | M |  |
 
 ## Lane D: tools, runtime and interaction
 

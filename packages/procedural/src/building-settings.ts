@@ -1,5 +1,5 @@
-// Every option of the building rules (`@margoengine/procedural/building-rules`) and the harbour pieces
-// (`@margoengine/procedural/harbour`) as slider rows on the shared shape (packages/shared/settings.js; the model is
+// Every option of the building rules (`@margoengine/procedural/building-rules`), the harbour pieces
+// (`@margoengine/procedural/harbour`) and the city generator (`@margoengine/procedural/city`) as slider rows on the shared shape (packages/shared/settings.js; the model is
 // @margoengine/sky/settings). None is live: each one rebuilds geometry, so a panel calls the generator again when one
 // moves. The row defaults are the defaults of the generators (the building rows the `japan-2011-house` style); the
 // option builders map only the values given, so a style's own defaults hold for every row left out.
@@ -18,6 +18,7 @@ import {
   type BuildingStyle,
 } from './building-rules.js';
 import type { BuildingPlanOptions } from './building-plans.js';
+import type { CityOptions } from './city.js';
 import type {
   BreakwaterOptions,
   FishingBoatOptions,
@@ -55,7 +56,7 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
   c('style', 'mass', BUILDING_STYLES, 'The style set every other default comes from.'),
   n('width', 'mass', 9.1, 3, 120, 0.1, 'm', 'Footprint along the front.'),
   n('depth', 'mass', 7.28, 3, 120, 0.1, 'm', 'Footprint from front to back.'),
-  n('storeys', 'mass', 2, 1, 12, 1, '', 'Number of storeys.'),
+  n('storeys', 'mass', 2, 1, 60, 1, '', 'Number of storeys.'),
   n('storeyHeight', 'mass', 2.9, 2.2, 8, 0.05, 'm', 'Floor to floor height of every storey (with storeys).'),
   n('plinth', 'mass', 0.5, 0, 2, 0.01, 'm', 'Ground floor height above the ground.'),
   c('roof', 'roof', ['hip', 'gable', 'hip-gable', 'shed', 'flat'], 'Roof shape; hip-gable is the irimoya.'),
@@ -97,7 +98,7 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
   n('porch', 'frontage', 0, 0, 5, 0.05, 'm', 'Front porch depth (0 none).'),
   n('porchWidth', 'frontage', 1, 0.2, 1, 0.01, '', 'Porch width as a share of the front.'),
   n('balcony', 'frontage', 0.91, 0, 3, 0.01, 'm', 'Front balcony depth (0 none).'),
-  n('balconyFloor', 'frontage', 1, 1, 11, 1, '', 'Storey the balcony is on (1 is the second).'),
+  n('balconyFloor', 'frontage', 1, 1, 59, 1, '', 'Storey the balcony is on (1 is the second).'),
   n('balconyWidth', 'frontage', 0.6, 0.2, 1, 0.01, '', 'Balcony width as a share of the front.'),
   c('chimney', 'trim', offOn, 'A chimney (pitched roofs).'),
   c('gutters', 'trim', onOff, 'Gutters and downspouts.'),
@@ -276,4 +277,46 @@ export function buildingPlanOptionsFromSettings(values: BuildingSettingValues): 
   for (const [name, value] of Object.entries(values)) (PLAN_INDEX.has(name) ? plan : rest)[name] = value;
   checkSettings(PLAN_INDEX, plan, 'building plan', 'the rows in @margoengine/procedural/building-settings');
   return { ...buildingOptionsFromSettings(rest), ...plan } as BuildingPlanOptions;
+}
+
+/** Every city control, in panel order. All rebuild (live false). */
+export const CITY_SETTINGS: readonly BuildingSetting[] = [
+  c('layout', 'streets', ['grid', 'organic', 'radial'], 'The street pattern.'),
+  n('width', 'streets', 400, 60, 4000, 10, 'm', 'Town size along x.'),
+  n('depth', 'streets', 400, 60, 4000, 10, 'm', 'Town size along z.'),
+  n('blockWidth', 'streets', 90, 30, 500, 1, 'm', 'Target block length.'),
+  n('blockDepth', 'streets', 60, 30, 500, 1, 'm', 'Target block depth.'),
+  n('angle', 'streets', 0, -6.28, 6.28, 0.01, 'rad', 'Turn of the grid or of the first spoke.'),
+  n('irregularity', 'streets', 0.25, 0, 1, 0.01, '', 'How uneven the streets and lots are.'),
+  n('streetWidth', 'streets', 8, 4, 30, 0.5, 'm', 'Street width, kerb to kerb.'),
+  n('avenueWidth', 'streets', 16, 4, 60, 0.5, 'm', 'Avenue width (at least the street width).'),
+  n('avenueEvery', 'streets', 4, 0, 100, 1, '', 'Every this many streets is an avenue (0 none).'),
+  n('spokes', 'streets', 8, 3, 24, 1, '', 'Spoke streets of the radial layout.'),
+  n('sidewalk', 'streets', 2.5, 0, 8, 0.1, 'm', 'Pavement width.'),
+  n('curb', 'streets', 0.15, 0, 0.5, 0.01, 'm', 'Pavement height over the road.'),
+  n('lotFrontage', 'lots', 18, 6, 200, 1, 'm', 'Target lot width on the street.'),
+  n('lotDepth', 'lots', 26, 8, 120, 1, 'm', 'Target lot depth.'),
+  c('era', 'town', ['modern', 'western-1910'], 'The building styles.'),
+  n('downtownRadius', 'town', 88, 0, 4000, 1, 'm', 'Downtown radius (0 none).'),
+  n('minStoreys', 'town', 2, 1, 60, 1, '', 'Fewest storeys downtown.'),
+  n('maxStoreys', 'town', 24, 1, 60, 1, '', 'Most storeys downtown (at least the fewest).'),
+  n('parks', 'town', 0.08, 0, 1, 0.01, '', 'Share of blocks that are parks.'),
+  n('industry', 'town', 0.15, 0, 1, 0.01, '', 'Share of the outer ring that is industry.'),
+  n('seed', 'town', 1, 1, 9999, 1, '', 'The town drawn from these rules.'),
+  n('treeSpacing', 'street furniture', 11, 0, 100, 1, 'm', 'Space between street trees (0 none).'),
+  n('lampSpacing', 'street furniture', 30, 0, 200, 1, 'm', 'Space between street lamps (0 none).'),
+];
+const CITY_INDEX = settingIndex(CITY_SETTINGS);
+/** Every city setting at its default. */
+export function citySettingDefaults(): Record<string, BuildingSettingValue> {
+  return settingDefaults(CITY_SETTINGS) as Record<string, BuildingSettingValue>;
+}
+/**
+ * The options for `generateCity` that the given setting values make. Only the names given are set, so the era's own
+ * defaults (such as the most storeys) hold for the rest.
+ * @throws TypeError for an unknown name; RangeError for a value out of range.
+ */
+export function cityOptionsFromSettings(values: BuildingSettingValues): CityOptions {
+  checkSettings(CITY_INDEX, values, 'city', 'the rows in @margoengine/procedural/building-settings');
+  return { ...values } as CityOptions;
 }

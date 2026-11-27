@@ -17577,3 +17577,18 @@ treat crest level and vertical-wall wave conditions separately from the transpor
 binding uses consecutive solver samples to locate a rising crest crossing and interpolate the liquid velocity.
 The VFX particles visualize that crossing. An overtopping discharge, a wave-impact breakup or a measured droplet
 size distribution is outside this Water binding. [EurOtop](https://www.overtopping-manual.com/assets/downloads/EurOtop_II_2018_Final_version.pdf)
+
+## City generator (2026-11-27)
+
+`packages/procedural/src/city.ts`, `city-geometry.ts` and `city-mesh.ts` are Margo's own, written from these papers'
+described methods: Y. Parish and P. Müller, "Procedural Modeling of Cities", SIGGRAPH 2001,
+https://doi.org/10.1145/383259.383292; G. Chen, G. Esch, P. Wonka, P. Müller and E. Zhang, "Interactive Procedural
+Street Modeling", ACM TOG 27(3), 2008, https://doi.org/10.1145/1360612.1360702; Y.-L. Yang, J. Wang, E. Vouga and
+P. Wonka, "Urban Pattern: Layout Design by Hierarchical Domain Splitting", ACM TOG 32(6), 2013,
+https://doi.org/10.1145/2508363.2508405; and C. Vanegas, T. Kelly, B. Weber, J. Halatsch, D. Aliaga and P. Müller,
+"Procedural Generation of Parcels in Urban Modeling", Computer Graphics Forum 31(2), 2012,
+https://doi.org/10.1111/j.1467-8659.2012.03047.x. All four were located by web search on
+2026-11-27; the details used are the published method outlines (street hierarchy, grid and radial patterns, recursive
+splitting, oriented-box lot cuts with street access), not their full parameter sets. Tensor fields, growth rules and
+skeleton parcels are not implemented. No paper's companion code and no other engine's city example or library was read
+or copied; the three.js example is known here by its name only.

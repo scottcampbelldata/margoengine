@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20794744,
+  "total": 20822659,
   "history": [
     {
       "date": "2026-10-24",
@@ -14407,6 +14407,12 @@
       "commit": "SEA-12 straight quay",
       "grew": 2,
       "reason": "@margoengine/physics/loads 43,472 to 44,592 B gzip and @margoengine/water/wake 1,680 to 2,172 B. The optional entries reuse their existing hull port and draw path for the reflected boundary, wet-side clip and crest-triggered spray. A split would require extra coupled imports for users of the same wall. Core, stage and the physics root are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "2c6bc437e2",
+      "grew": 2,
+      "reason": "City generator: new optional entry procedural/city, 0 to 26424 B gzip (building rules and the broadleaf tree it meshes included; ceiling 27217 B); procedural/building-settings grows from under 5164 to 5606 B for the city sliders (ceiling 5862 B). Splitting layout from meshes would add a second entry for one call; core plus stage unchanged"
     }
   ],
   "items": {
@@ -15380,9 +15386,10 @@
     "@margoengine/procedural": 18709,
     "@margoengine/procedural/building-plans": 17803,
     "@margoengine/procedural/building-rules": 13427,
-    "@margoengine/procedural/building-settings": 5164,
+    "@margoengine/procedural/building-settings": 5862,
     "@margoengine/procedural/buildings": 1758,
     "@margoengine/procedural/caves": 1677,
+    "@margoengine/procedural/city": 27217,
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,

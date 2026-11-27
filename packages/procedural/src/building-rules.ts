@@ -82,7 +82,7 @@ export interface BuildingRuleOptions {
   readonly width?: number;
   /** Footprint along local z (front to back), metres, 3 to 120. */
   readonly depth?: number;
-  /** Floor to floor height of each storey from the ground floor up, 1 to 12 entries of 2.2 to 8 m. */
+  /** Floor to floor height of each storey from the ground floor up, 1 to 60 entries of 2.2 to 8 m. */
   readonly storeys?: readonly number[];
   /** Height of the ground floor above the ground, metres, 0 to 2. */
   readonly plinth?: number;
@@ -128,7 +128,7 @@ export interface BuildingRuleOptions {
   readonly porchWidth?: number;
   /** Front balcony depth, metres, 0 (none) to 3. */
   readonly balcony?: number;
-  /** Storey the balcony is on (1 is the second storey), 1 to 11. */
+  /** Storey the balcony is on (1 is the second storey), 1 to 59. */
   readonly balconyFloor?: number;
   /** Balcony width as a share of the front, 0.2 to 1. */
   readonly balconyWidth?: number;
@@ -595,10 +595,10 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
   if (
     !Array.isArray(storeys) ||
     storeys.length < 1 ||
-    storeys.length > 12 ||
+    storeys.length > 60 ||
     !storeys.every((h) => typeof h === 'number' && h >= 2.2 && h <= 8)
   )
-    fail('storeys', '1 to 12 floor to floor heights of 2.2 to 8 m');
+    fail('storeys', '1 to 60 floor to floor heights of 2.2 to 8 m');
   const doors = o.doors === undefined ? s.doors : o.doors;
   if (!Array.isArray(doors) || doors.length > 16 || !doors.every((d) => Number.isInteger(d) && d >= -1 && d < 64))
     fail('doors', 'up to 16 bay indices (integers from -1 to 63)');
@@ -632,7 +632,7 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
     porch: num(o, 'porch', 0, 5, s.porch),
     porchWidth: num(o, 'porchWidth', 0.2, 1, s.porchWidth),
     balcony: num(o, 'balcony', 0, 3, s.balcony),
-    balconyFloor: num(o, 'balconyFloor', 1, 11, s.balconyFloor, true),
+    balconyFloor: num(o, 'balconyFloor', 1, 59, s.balconyFloor, true),
     balconyWidth: num(o, 'balconyWidth', 0.2, 1, s.balconyWidth),
     chimney: bool(o, 'chimney', s.chimney),
     chimneyAt: tuple(o, 'chimneyAt', 2, -0.9, 0.9, s.chimneyAt) as [number, number],

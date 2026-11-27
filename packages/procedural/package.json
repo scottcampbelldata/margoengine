@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/procedural",
   "version": "1.0.0",
-  "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.",
+  "description": "Procedural cities with streets, lots and buildings, cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -105,6 +105,10 @@
     "./building-settings": {
       "types": "./dist/building-settings.d.ts",
       "import": "./dist/building-settings.js"
+    },
+    "./city": {
+      "types": "./dist/city.d.ts",
+      "import": "./dist/city.js"
     },
     "./caves": {
       "types": "./dist/caves.d.ts",

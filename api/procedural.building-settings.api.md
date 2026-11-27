@@ -15,6 +15,8 @@ export type BuildingSettingValue = number | string;
 
 export type BuildingSettingValues = Readonly<Record<string, BuildingSettingValue>>;
 
+export const CITY_SETTINGS: readonly BuildingSetting[];
+
 export const HARBOUR_SETTINGS: readonly BuildingSetting[];
 
 export function buildingOptionsFromSettings(values: BuildingSettingValues): BuildingRuleOptions;
@@ -24,6 +26,10 @@ export function buildingPlanOptionsFromSettings(values: BuildingSettingValues): 
 export function buildingPlanSettingDefaults(): Record<string, BuildingSettingValue>;
 
 export function buildingSettingDefaults(): Record<string, BuildingSettingValue>;
+
+export function cityOptionsFromSettings(values: BuildingSettingValues): CityOptions;
+
+export function citySettingDefaults(): Record<string, BuildingSettingValue>;
 
 export function harbourOptionsFromSettings(values: BuildingSettingValues): {
     seaWall: SeaWallOptions;
@@ -139,6 +145,46 @@ interface BuildingWing extends Omit<BuildingRuleOptions, 'origin' | 'yaw' | 'det
     readonly at: readonly [number, number];
     readonly turn?: 0 | 1 | 2 | 3;
 }
+
+type CityEra = 'modern' | 'western-1910';
+
+type CityLayout = 'grid' | 'organic' | 'radial';
+
+interface CityOptions {
+    readonly width?: number;
+    readonly depth?: number;
+    readonly outline?: readonly (readonly [number, number])[];
+    readonly layout?: CityLayout;
+    readonly blockWidth?: number;
+    readonly blockDepth?: number;
+    readonly angle?: number;
+    readonly irregularity?: number;
+    readonly streetWidth?: number;
+    readonly avenueWidth?: number;
+    readonly avenueEvery?: number;
+    readonly spokes?: number;
+    readonly sidewalk?: number;
+    readonly curb?: number;
+    readonly lotFrontage?: number;
+    readonly lotDepth?: number;
+    readonly setback?: number;
+    readonly spacing?: number;
+    readonly centre?: readonly [number, number];
+    readonly downtownRadius?: number;
+    readonly minStoreys?: number;
+    readonly maxStoreys?: number;
+    readonly parks?: number;
+    readonly industry?: number;
+    readonly era?: CityEra;
+    readonly styles?: Readonly<Partial<Record<Exclude<CityUse, 'park'>, Readonly<Partial<Record<BuildingStyle, number>>>>>>;
+    readonly treeSpacing?: number;
+    readonly lampSpacing?: number;
+    readonly origin?: readonly [number, number, number];
+    readonly seed?: number;
+    readonly signal?: AbortSignal;
+}
+
+type CityUse = 'downtown' | 'commercial' | 'residential' | 'industrial' | 'park';
 
 interface FishingBoatOptions {
     readonly length?: number;

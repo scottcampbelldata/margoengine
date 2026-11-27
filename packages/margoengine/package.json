@@ -3879,6 +3879,10 @@
       "types": "./dist/procedural/building-settings.d.ts",
       "import": "./dist/procedural/building-settings.js"
     },
+    "./procedural/city": {
+      "types": "./dist/procedural/city.d.ts",
+      "import": "./dist/procedural/city.js"
+    },
     "./procedural/caves": {
       "types": "./dist/procedural/caves.d.ts",
       "import": "./dist/procedural/caves.js"

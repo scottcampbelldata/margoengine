@@ -112,7 +112,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/tilemap](https://margoengine.com/llms/packages/tilemap.md): 2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax), a chunked renderer at exact…
 - [@margoengine/vfx](https://margoengine.com/llms/packages/vfx.md): GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters.
 - [@margoengine/creative](https://margoengine.com/llms/packages/creative.md): WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.
-- [@margoengine/procedural](https://margoengine.com/llms/packages/procedural.md): Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.
+- [@margoengine/procedural](https://margoengine.com/llms/packages/procedural.md): Procedural cities with streets, lots and buildings, cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a…
 - [@margoengine/wfc](https://margoengine.com/llms/packages/wfc.md): Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking.
 - [@margoengine/splines](https://margoengine.com/llms/packages/splines.md): 3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing.
 
@@ -243,7 +243,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 10 entry points
 - [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 37 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 14 entry points
-- [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 30 entry points
+- [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 31 entry points
 - [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 10 entry points
 - [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 9 entry points
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 18 entry points
