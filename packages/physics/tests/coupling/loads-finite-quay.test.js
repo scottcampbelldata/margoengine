@@ -321,3 +321,96 @@ test('a real advancing hull drives the finite wake and its return pressure chang
     coupled = run(true);
   assert.ok(Math.abs(coupled - calm) > 0.001, `${coupled} and ${calm} m/s`);
 });
+
+test('the multilevel estimate leaves the same finite geometry pressure and open lower-face flux', () => {
+  const depths = [0, 0.12, 0.27, 0.5, 0.64, 0.82, 1];
+  const counts = [];
+  for (const side of [28, 56]) {
+    const nx = side + 1;
+    const nz = side / 2 + 1;
+    const plane = nx * nz;
+    const layers = depths.length - 1;
+    const volume = plane * layers;
+    const dx = 14 / side;
+    const face = Math.floor(nx / 2);
+    const openX = new Float64Array(volume).fill(1);
+    const obstacle = (z) => z >= Math.floor(nz / 4) && z <= Math.ceil((3 * nz) / 4);
+    const exact = new Float64Array(volume);
+    for (let j = 0; j < volume; j++) {
+      const x = j % nx;
+      const z = Math.floor(j / nx) % nz;
+      const layer = Math.floor(j / plane);
+      const y = 0.5 * (depths[layer] + depths[layer + 1]);
+      exact[j] = Math.cos(2 * x * dx) * (1 - y * y) + 0.35 * Math.cos(z * dx - y);
+      if (x === face && obstacle(z)) openX[j] = depths[layer + 1] <= 0.5 ? 0 : 0.7;
+    }
+
+    // Independently assemble the physical source by summing each oriented face
+    // flux of the prescribed 3D potential. Land cuts use the actual finite span.
+    const source = new Float64Array(volume);
+    function stamp(a, b, conductance) {
+      const volumeRate = conductance * (exact[b] - exact[a]);
+      source[a] += volumeRate;
+      source[b] -= volumeRate;
+    }
+    for (let j = 0; j < volume; j++) {
+      const layer = Math.floor(j / plane);
+      const thickness = depths[layer + 1] - depths[layer];
+      if ((j % nx) + 1 < nx) stamp(j, j + 1, thickness * openX[j]);
+      if ((Math.floor(j / nx) % nz) + 1 < nz) stamp(j, j + nx, thickness);
+      if (layer + 1 < layers) {
+        const centreDistance = (depths[layer + 2] - depths[layer]) / 2;
+        stamp(j, j + plane, (dx * dx) / centreDistance);
+      }
+      if (j < plane) source[j] -= (dx * dx * exact[j]) / (depths[1] / 2);
+    }
+    const grid = new QuayPotential({
+      cells: [nx, nz],
+      cellSize: dx,
+      depths,
+      openX,
+    });
+    const surface = new Float64Array(plane);
+    const rise = new Float64Array(plane);
+    const bulk = new Float64Array(volume);
+    const iterations = grid.project(surface, rise, source, 0, bulk);
+    counts.push(iterations);
+    for (let j = 0; j < volume; j++) close(bulk[j], exact[j], 2e-10);
+    const expectedRise = exact.subarray(0, plane).reduce((sum, value) => sum - value / (depths[1] / 2), 0);
+    close(
+      rise.reduce((sum, value) => sum + value, 0),
+      expectedRise,
+      3e-8,
+    );
+    const slitFace = face + nx * Math.floor(nz / 2);
+    assert.equal(grid.faceFlux('x', slitFace, bulk), 0);
+    assert.ok(Math.abs(grid.faceFlux('x', slitFace + 3 * plane, bulk)) > 0.01);
+    const restored = rise.slice();
+    assert.equal(grid.project(surface, rise, source, 0, bulk), iterations);
+    assert.deepEqual(rise, restored);
+  }
+  assert.ok(counts[0] < 40 && counts[1] < 58 && counts[1] < 1.8 * counts[0]);
+});
+
+test('a large sealed quay keeps disconnected wet regions separate in the coarse solve', () => {
+  const nx = 26;
+  const nz = 17;
+  const depths = [0, 0.1, 0.25, 0.43, 0.65, 1];
+  const plane = nx * nz;
+  const volume = plane * (depths.length - 1);
+  const wall = 12;
+  const openX = Float64Array.from({ length: volume }, (_, i) => (i % nx === wall ? 0 : 1));
+  const grid = new QuayPotential({
+    cells: [nx, nz],
+    cellSize: 0.2,
+    depths,
+    openX,
+  });
+  const trace = Float64Array.from({ length: plane }, (_, i) => (i % nx > wall ? Math.cos(i * 0.1) : 0));
+  const rise = new Float64Array(plane);
+  const bulk = new Float64Array(volume);
+  grid.project(trace, rise, undefined, 0, bulk);
+  for (let i = 0; i < volume; i++) if (i % nx <= wall) assert.equal(bulk[i], 0);
+  assert.ok(bulk.some((value) => Math.abs(value) > 0.1));
+  for (let i = 0; i < volume; i++) if (i % nx === wall) assert.equal(grid.faceFlux('x', i), 0);
+});

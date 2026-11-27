@@ -10637,13 +10637,16 @@ carry zero normal flow. Adjacent wet cells exchange a shared conductance times t
 The base and outside faces are closed. The optional perimeter sponge damps elevation and books the absorbed
   energy and signed volume. Size its width and run a domain comparison before treating it as an open sea.
 
-The 60 Hz midpoint solves a Robin surface condition with block-column preconditioned conjugate gradients.
+The 60 Hz midpoint solves a Robin surface condition with preconditioned conjugate gradients. Grids with
+at least 2,048 volume cells can use a Galerkin coarse correction. The aggregates follow connected faces in
+each horizontal layer. Protected curtain faces remain distinct on both sides so their lower openings keep
+the original sum of conductances. Smaller grids use the same block-column solve directly.
 Each unforced step uses one harmonic volume solve. A tick with submerged displacement uses one extra solve
 to transfer those signed volumes to the surface. The accepted normal flux and depth potential come from the
 same midpoint and previous state. The solver uses f64 for state and arithmetic. It retains the volume
 potential in its snapshot. Source work includes the volume kick and the pressure held over the midpoint
 step. Free-hull reaction work needs a matching return operator. Wave breaking, moving obstacles, turbulent
-edge losses and the fine-grid First Wake replay remain open. The optional loads entry measures 56,771 B gzip.
+edge losses and the fine-grid First Wake replay remain open. The optional loads entry measures 59,551 B gzip.
 
 `pressureAtDepth` adds one f64 head value per surface and volume cell. It uses the accepted potential's
 midpoint time derivative with linear Bernoulli pressure and one-sided wet interpolation. `seaSurface()`

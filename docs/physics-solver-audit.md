@@ -1411,6 +1411,11 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   work closes and both controls replay exactly. This verifies a two-way connection for the chosen hull.
   Matching the full mechanical return work and resolving the original quay and stern remain open.
 
+  A geometry-preserving Galerkin correction reduces the fine aperture run from 67 to 14 maximum iterations.
+  Complex scattering changes by less than 3×10⁻¹¹ and the run replays exactly. The manufactured three-dimensional
+  case at 0.075 m reduces its harmonic solve from 1,316 to 66 iterations. The regression checks the exact fine
+  potential and open-face flux on two odd grids and confirms a fully sealed side stays exactly at zero.
+
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.

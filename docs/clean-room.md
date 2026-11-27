@@ -17907,6 +17907,15 @@ reference for the half-depth plate. No companion code or measured elevation ente
 [Craig and Sulem](https://doi.org/10.1006/jcph.1993.1164) ·
 [Johansen and Colella](https://crd.lbl.gov/assets/pubs_presos/AMCS/ANAG/A135.pdf) ·
 [Porter and Evans](https://doi.org/10.1017/S0022112095002849)
+
+The larger systems use the Galerkin coarse-space energy `Pᵀ A P` following Vaněk, Mandel and Brezina,
+*Algebraic Multigrid by Smoothed Aggregation for Second and Fourth Order Elliptic Problems* (1996).
+This implementation aggregates connected 2 × 2 horizontal blocks within a single layer. Fixed curtain
+edges remain between aggregates at every level. The coarse residual sums the fine flux work across each
+edge, and paired smoothing gives a symmetric preconditioner for the unchanged fine system. The odd-grid
+manufactured potential catches a wrong conductance or wet region merge.
+[Vaněk, Mandel and Brezina](https://doi.org/10.1007/BF02238511)
+
 ## physics rod vortex-induced vibration calibrated and checked against towed and sheared pipes (2026-11-27)
 
 Files: `packages/physics/src/loads/segments.ts`, `packages/physics/tests/rod-viv.test.js`, `packages/physics/tests/rod.test.js`,

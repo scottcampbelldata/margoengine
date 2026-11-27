@@ -1,4 +1,5 @@
 import { invalidLoad } from './errors.js';
+import { QuayCoarseCorrection, QUAY_SWEEP } from './quay-multigrid.js';
 
 /** Fixed still-water geometry. The layer closest to the surface comes first. */
 export interface QuayPotentialGrid {
@@ -30,6 +31,8 @@ export class QuayPotential {
   private readonly residual: Float64Array;
   private readonly direction: Float64Array;
   private readonly applied: Float64Array;
+  private readonly coarse?: QuayCoarseCorrection;
+  private readonly coarseWork?: Float64Array;
 
   constructor(grid: QuayPotentialGrid) {
     const { cells, cellSize, depths, wet, openX, openZ } = grid ?? {};
@@ -91,6 +94,37 @@ export class QuayPotential {
     this.nx = nx;
     this.iterationLimit = 8 * (nx + nz + layers) + 64;
     this.requireSurfaceConnection();
+    if (count >= 2048 && (nx > 2 || nz > 2)) {
+      const curtainX = new Uint8Array(plane),
+        curtainZ = new Uint8Array(plane);
+      for (let i = 0; i < count; i++) {
+        const cell = i % plane;
+        if ((cell % nx) + 1 < nx && (this.wet[i] !== this.wet[i + 1] || (openX?.[i] ?? 1) < 1)) curtainX[cell] = 1;
+        if (cell + nx < plane && (this.wet[i] !== this.wet[i + nx] || (openZ?.[i] ?? 1) < 1)) curtainZ[cell] = 1;
+      }
+      this.coarse = new QuayCoarseCorrection({
+        size: count,
+        nx,
+        nz,
+        coordinate: (i) => (this.wet[i] ? i : -1),
+        anchors: (i) => (i < plane ? 1 : 0),
+        faces: (visit) => {
+          for (let i = 0; i < count; i++) {
+            if (!this.wet[i]) continue;
+            const cell = i % plane,
+              east = this.east[i]!,
+              north = this.north[i]!,
+              down = this.down[i]!;
+            const fenceX = curtainX[cell] !== 0,
+              fenceZ = curtainZ[cell] !== 0;
+            if (east || (fenceX && this.wet[i + 1])) visit(i, i + 1, east, fenceX);
+            if (north || (fenceZ && this.wet[i + nx])) visit(i, i + nx, north, fenceZ);
+            if (down) visit(i, i + plane, down, false);
+          }
+        },
+      });
+      this.coarseWork = new Float64Array(count);
+    }
   }
 
   private readonly nx: number;
@@ -157,17 +191,19 @@ export class QuayPotential {
     const face = cellArea / (topDistance + surfaceLength);
     if (!(face > 0 && Number.isFinite(face))) throw invalidLoad('Use a finite positive surface conductance.');
     this.factorColumns(face);
+    this.coarse?.prepare(face);
     potential.fill(0);
     for (let i = 0; i < n; i++) {
       const top = i < plane && wet[i] ? face : 0;
       const rhs = (top ? top * surface[i]! : 0) - (source?.[i] ?? 0);
       residual[i] = rhs;
     }
-    let energyResidual = this.precondition(residual, direction);
-    const threshold = energyResidual * 1e-24;
-    if (!Number.isFinite(energyResidual)) throw invalidLoad('Scale the inputs to a finite potential solve.');
+    let columnResidual = this.precondition(residual, direction);
+    const threshold = columnResidual * 1e-24;
+    if (!Number.isFinite(columnResidual)) throw invalidLoad('Scale the inputs to a finite potential solve.');
+    let energyResidual = this.coarsePrecondition(residual, direction, face, columnResidual);
     let iterations = 0;
-    for (; energyResidual > threshold && iterations < this.iterationLimit; iterations++) {
+    for (; columnResidual > threshold && iterations < this.iterationLimit; iterations++) {
       const curvature = this.multiply(direction, applied, face);
       if (!(curvature > 0 && Number.isFinite(curvature)))
         throw invalidLoad('Check that the wet geometry and face fractions form a connected potential solve.');
@@ -176,12 +212,13 @@ export class QuayPotential {
         potential[i]! += stride * direction[i]!;
         residual[i]! -= stride * applied[i]!;
       }
-      const next = this.precondition(residual, applied);
+      columnResidual = this.precondition(residual, applied);
+      const next = this.coarsePrecondition(residual, applied, face, columnResidual);
       const ratio = next / energyResidual;
       for (let i = 0; i < n; i++) direction[i] = applied[i]! + ratio * direction[i]!;
       energyResidual = next;
     }
-    if (!(energyResidual <= threshold))
+    if (!(columnResidual <= threshold))
       throw invalidLoad(
         'The quay potential did not converge. Use a better-conditioned grid and consistent open faces.',
       );
@@ -214,6 +251,24 @@ export class QuayPotential {
     let norm = 0;
     for (let i = out.length - 1; i >= 0; i--) {
       out[i] = inverse[i]! * (out[i]! + (down[i] ? down[i]! * out[i + plane]! : 0));
+      norm += rhs[i]! * out[i]!;
+    }
+    return norm;
+  }
+
+  private coarsePrecondition(rhs: Float64Array, out: Float64Array, top: number, columnNorm: number): number {
+    const { coarse, coarseWork: work } = this;
+    if (!coarse || columnNorm === 0) return columnNorm;
+    for (let i = 0; i < out.length; i++) out[i]! *= QUAY_SWEEP;
+    this.multiply(out, work!, top);
+    for (let i = 0; i < out.length; i++) work![i] = rhs[i]! - work![i]!;
+    coarse.add(work!, out);
+    this.multiply(out, work!, top);
+    for (let i = 0; i < out.length; i++) work![i] = rhs[i]! - work![i]!;
+    this.precondition(work!, work!);
+    let norm = 0;
+    for (let i = 0; i < out.length; i++) {
+      out[i]! += QUAY_SWEEP * work![i]!;
       norm += rhs[i]! * out[i]!;
     }
     return norm;
