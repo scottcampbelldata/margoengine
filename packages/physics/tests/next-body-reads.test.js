@@ -3,6 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const near = (actual, expected, bound, message) =>
   assert.ok(Math.abs(actual - expected) <= bound, `${message}: ${actual} is not within ${bound} of ${expected}`);
@@ -34,9 +39,9 @@ test('damping and dominance read and change after creation', async () => {
   near(body.angularVelocity[1], 3, 1e-3, 'no angular damping keeps the spin');
   body.dominance = -20;
   assert.equal(body.dominance, -20);
-  assert.throws(() => (body.linearDamping = -1), RangeError);
-  assert.throws(() => (body.angularDamping = Number.NaN), RangeError);
-  assert.throws(() => (body.dominance = Number.NaN), RangeError);
+  assert.throws(() => (body.linearDamping = -1), rigidCoded);
+  assert.throws(() => (body.angularDamping = Number.NaN), rigidCoded);
+  assert.throws(() => (body.dominance = Number.NaN), rigidCoded);
   physics.dispose();
 });
 
@@ -68,7 +73,7 @@ test('predicted poses integrate the velocity, and with forces the velocity first
   // A fixed body predicts where it is.
   const floor = physics.addBody(null, { type: 'fixed', position: [3, 0, 0] });
   nearAll(floor.predictPositionUsingVelocity(1).position, [3, 0, 0], 0, 'a fixed body');
-  assert.throws(() => body.predictPositionUsingVelocity(Number.NaN), RangeError);
+  assert.throws(() => body.predictPositionUsingVelocity(Number.NaN), rigidCoded);
   physics.dispose();
 });
 
@@ -158,7 +163,7 @@ test('isMoving, copyFrom and the gyroscopic switch', async () => {
   assert.equal(target.dominance, 3);
   assert.equal(target.ccd, true);
   assert.deepEqual(target.position, [0, 9, 0]);
-  assert.throws(() => target.copyFrom(target), RangeError);
+  assert.throws(() => target.copyFrom(target), rigidCoded);
   // Gyroscopic forces: a body spun off a principal axis has a spin that changes in the world's frame as Euler's equations say; without
   // the term the spin stays as it was.
   const spin = (gyro) => {

@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Promise.all([Physics.load(), RapierPhysics.load()]);
 
@@ -96,7 +101,7 @@ test('a dumbbell rests on its two balls where Rapier rests it, as one collider w
 test('a compound refuses what Rapier refuses, with a fix in the message', () => {
   const physics = new Physics(null),
     body = physics.addBody(null, {});
-  assert.throws(() => body.addCollider({ shape: 'compound', parts: [] }), RangeError);
+  assert.throws(() => body.addCollider({ shape: 'compound', parts: [] }), rigidCoded);
   assert.throws(
     () => body.addCollider({ shape: 'compound', parts: [{ shape: 'custom', desc: {} }] }),
     /cannot be a part/,

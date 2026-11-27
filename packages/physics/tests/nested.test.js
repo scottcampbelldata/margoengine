@@ -5,6 +5,11 @@ import { box } from '@margoengine/core';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { Physics } from '../dist/index.js';
 import { setMeshSource, clearMeshSource } from '../../shared/mesh-source.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -193,9 +198,9 @@ test('follow is refused where it cannot work', async () => {
     physics = new Physics(engine),
     mesh = engine.createMesh(),
     colliders = { shape: 'sphere', radius: 1 };
-  assert.throws(() => physics.addBody(mesh, { follow: true, colliders }), TypeError);
-  assert.throws(() => physics.addBody(mesh, { type: 'fixed', follow: true, colliders }), TypeError);
-  assert.throws(() => physics.addBody(null, { type: 'kinematicPosition', follow: true, colliders }), TypeError);
+  assert.throws(() => physics.addBody(mesh, { follow: true, colliders }), rigidCoded);
+  assert.throws(() => physics.addBody(mesh, { type: 'fixed', follow: true, colliders }), rigidCoded);
+  assert.throws(() => physics.addBody(null, { type: 'kinematicPosition', follow: true, colliders }), rigidCoded);
   assert.equal(physics.bodyCount, 0);
   physics.dispose();
   engine.dispose();

@@ -6,6 +6,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -525,9 +530,9 @@ test('cylinder and cone sizes and borders are checked, and the collider reads th
   );
   assert.throws(
     () => own.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1, borderRadius: -0.1 } }),
-    RangeError,
+    rigidCoded,
   );
-  assert.throws(() => own.addBody(null, { colliders: { shape: 'cone', radius: 0, halfHeight: 1 } }), RangeError);
-  assert.throws(() => own.kernel.addCollider(body.row, 'cylinder', [1, 1]), RangeError);
+  assert.throws(() => own.addBody(null, { colliders: { shape: 'cone', radius: 0, halfHeight: 1 } }), rigidCoded);
+  assert.throws(() => own.kernel.addCollider(body.row, 'cylinder', [1, 1]), rigidCoded);
   own.dispose();
 });

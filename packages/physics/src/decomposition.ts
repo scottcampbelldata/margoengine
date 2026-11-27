@@ -11,6 +11,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { geometryPositions, type ColliderGeometry } from './shapes.js';
 import { concavity as concavityOf, cut, hullOf, Solid, type Plane, type Random } from './decomposition/mesh.js';
 import { searchPlane, type SearchSettings } from './decomposition/search.js';
+import { meshInput } from './rigid-errors.js';
 
 /**
  * Options of {@link convexDecomposition}. `concavity` and `maxConvexHulls` keep Rapier's `VHACDParameters` names; the
@@ -82,7 +83,7 @@ const DENSITY = 3000;
 function count(value: number | undefined, fallback: number, name: string, low: number): number {
   const n = value ?? fallback;
   if (!Number.isInteger(n) || n < low)
-    throw new RangeError(`${name} must be a whole number of at least ${low} (got ${value}).`);
+    throw meshInput(`${name} must be a whole number of at least ${low} (got ${value}).`);
   return n;
 }
 
@@ -93,17 +94,17 @@ function count(value: number | undefined, fallback: number, name: string, low: n
 function solidOf(source: ColliderGeometry): { solid: Solid; center: number[]; size: number } {
   const positions = geometryPositions(source),
     raw = source.indices;
-  if (!raw) throw new TypeError('A convex decomposition needs indices; pass indices or an indexed geometry.');
+  if (!raw) throw meshInput('A convex decomposition needs indices; pass indices or an indexed geometry.');
   if (!raw.length || raw.length % 3)
-    throw new RangeError('A convex decomposition needs whole triangles: three indices each.');
+    throw meshInput('A convex decomposition needs whole triangles: three indices each.');
   const vertexCount = positions.length / 3;
   for (let i = 0; i < raw.length; i++)
     if (!Number.isInteger(raw[i]) || raw[i] < 0 || raw[i] >= vertexCount)
-      throw new RangeError(
+      throw meshInput(
         `Index ${raw[i]} at ${i} is outside the ${vertexCount} vertices; pass indices of existing vertices.`,
       );
   for (let i = 0; i < positions.length; i++)
-    if (!Number.isFinite(positions[i])) throw new RangeError('Convex decomposition vertices must be finite numbers.');
+    if (!Number.isFinite(positions[i])) throw meshInput('Convex decomposition vertices must be finite numbers.');
   const min = [Infinity, Infinity, Infinity],
     max = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < positions.length; i++) {
@@ -113,14 +114,14 @@ function solidOf(source: ColliderGeometry): { solid: Solid; center: number[]; si
   }
   const center = [0, 1, 2].map((a) => (min[a] + max[a]) / 2),
     size = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-  if (!(size > 0)) throw new RangeError('A convex decomposition needs a mesh that spans a volume.');
+  if (!(size > 0)) throw meshInput('A convex decomposition needs a mesh that spans a volume.');
   const scaled = new Float64Array(positions.length);
   for (let i = 0; i < positions.length; i++) scaled[i] = (positions[i] - center[i % 3]) / size;
   let triangles = dropDegenerate(Uint32Array.from(raw));
   if (open(triangles, vertexCount)) {
     triangles = dropDegenerate(weld(scaled, triangles));
     if (open(triangles, vertexCount))
-      throw new RangeError(
+      throw meshInput(
         'A convex decomposition needs a closed mesh: some edges have no triangle on their other side. Close the holes, or use a trimesh collider for a fixed body.',
       );
   }
@@ -132,7 +133,7 @@ function solidOf(source: ColliderGeometry): { solid: Solid; center: number[]; si
     solid = new Solid(scaled, triangles, solid.cap);
   }
   if (!(solid.volume > 0))
-    throw new RangeError('A convex decomposition needs a closed mesh that holds a volume; this one holds none.');
+    throw meshInput('A convex decomposition needs a closed mesh that holds a volume; this one holds none.');
   return { solid, center, size };
 }
 
@@ -190,7 +191,7 @@ interface Entry {
  * physics.addBody(mesh, { colliders: cup });
  * ```
  *
- * @throws RangeError for a mesh that is open, flat or not a whole number of triangles, or for options out of range.
+ * @throws MargoError (code `unsupported`) for a mesh that is open, flat or not a whole number of triangles, or for options out of range.
  * @throws MargoError `timeout` past `timeLimit` or when `signal` times out; the signal's reason when it aborts otherwise.
  */
 export function convexDecomposition(
@@ -199,17 +200,17 @@ export function convexDecomposition(
 ): ConvexDecomposition {
   const threshold = options.concavity ?? 0.05;
   if (!(threshold > 0) || !Number.isFinite(threshold))
-    throw new RangeError(
+    throw meshInput(
       `concavity must be a positive share of the mesh size, such as 0.05 (got ${options.concavity}).`,
     );
   const border = options.borderRadius ?? 0;
   if (!(border >= 0) || !Number.isFinite(border))
-    throw new RangeError(`borderRadius is 0 or more metres and finite (got ${border}); pass 0 for sharp parts.`);
+    throw meshInput(`borderRadius is 0 or more metres and finite (got ${border}); pass 0 for sharp parts.`);
   const maxParts = count(options.maxConvexHulls, 64, 'maxConvexHulls', 1),
     timeLimit = options.timeLimit ?? Infinity,
     signal = options.signal;
   if (!(timeLimit > 0))
-    throw new RangeError(`timeLimit must be a positive number of milliseconds (got ${options.timeLimit}).`);
+    throw meshInput(`timeLimit must be a positive number of milliseconds (got ${options.timeLimit}).`);
   signalCheck(signal);
   // PA-09: no wall-clock bound unless one is asked for, so the outcome never depends on the machine's speed.
   const start = timeLimit < Infinity ? Date.now() : 0,
@@ -268,7 +269,7 @@ export function convexDecomposition(
  * The paper's score of a decomposition (Eq. 10): the largest concavity (Eq. 6) of the mesh clipped to each part's hull,
  * in the units of the `concavity` option. It measures any set of convex parts against the mesh, Rapier's V-HACD
  * parts included, so settings and methods compare on one scale.
- * @throws RangeError for a mesh that `convexDecomposition` would refuse.
+ * @throws MargoError (code `unsupported`) for a mesh that `convexDecomposition` would refuse.
  */
 export function decompositionConcavity(
   mesh: ColliderGeometry,

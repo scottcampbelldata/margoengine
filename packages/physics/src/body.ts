@@ -7,6 +7,7 @@ import { checkVec, matrixOf, multiplyQuat, quatFromTurn, rotateVec, type Quat, t
 import type { ColliderOptions } from './shapes.js';
 import type { PhysicsCollider } from './collider.js';
 import type { PhysicsJoint } from './joints.js';
+import { bodyInput } from './rigid-errors.js';
 
 /** How a body moves: `dynamic` (simulated), `fixed`, or kinematic (driven by position or by velocity). */
 export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
@@ -60,7 +61,7 @@ export interface BodyOptions {
 /** The lock bits of a per-axis freedom tuple: a set bit is an axis held still. */
 function lockBits(enabled: readonly [boolean, boolean, boolean], name: string): number {
   if (!Array.isArray(enabled) || enabled.length !== 3 || enabled.some((axis) => typeof axis !== 'boolean'))
-    throw new TypeError(`${name} must be three booleans [x, y, z]; pass [true, true, true] to free every axis.`);
+    throw bodyInput(`${name} must be three booleans [x, y, z]; pass [true, true, true] to free every axis.`);
   return (enabled[0] ? 0 : 1) | (enabled[1] ? 0 : 2) | (enabled[2] ? 0 : 4);
 }
 
@@ -80,18 +81,18 @@ export interface BodyOwner {
 const capOf = (stored: number): number => (stored > 0 ? stored : Infinity);
 function capIn(speed: number, name: string, unit: string): number {
   if (!(speed > 0))
-    throw new RangeError(
+    throw bodyInput(
       `${name} must be above 0, or Infinity for no cap; pass ${unit}. To stop a body, lock its axes.`,
     );
   return speed === Infinity ? 0 : speed;
 }
 
-/** @throws RangeError unless `rotation` is four finite numbers that are not all zero. */
+/** @throws MargoError (code `unsupported`) unless `rotation` is four finite numbers that are not all zero. */
 export function checkRotation(rotation: Quat): void {
   const [x, y, z, w] = rotation,
     squared = rotation.length === 4 ? x * x + y * y + z * z + w * w : 0;
   if (!(squared > 0) || !Number.isFinite(squared))
-    throw new RangeError('A rotation must be a quaternion [x, y, z, w] of finite numbers, not all zero.');
+    throw bodyInput('A rotation must be a quaternion [x, y, z, w] of finite numbers, not all zero.');
 }
 
 /** A rigid body of the own solver, bound to an optional core mesh. */
@@ -154,7 +155,7 @@ export class PhysicsBody {
   setType(type: BodyType, wakeUp = true): this {
     const kernel = this.world();
     if (typeof type !== 'string' || !['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
-      throw new TypeError(
+      throw bodyInput(
         `Unknown body type ${String(type)}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`,
       );
     if (type === this.kind) return this;
@@ -246,11 +247,11 @@ export class PhysicsBody {
    * smoothly through the step and across steps, and what rides on it (props on a deck, a crate in a lift) feels its
    * acceleration spread through the step instead of all at the step's start. Give it each step with the target, as the
    * motion's own derivative. `null` returns the body to moving at one speed a step.
-   * @throws TypeError for a body that is not kinematicPosition.
+   * @throws MargoError (code `unsupported`) for a body that is not kinematicPosition.
    */
   setNextVelocity(linear: Vec3 | null, angular: Vec3 = [0, 0, 0]): this {
     if (this.type !== 'kinematicPosition')
-      throw new TypeError('A next velocity is for a kinematicPosition body; set its type to kinematicPosition first.');
+      throw bodyInput('A next velocity is for a kinematicPosition body; set its type to kinematicPosition first.');
     const c = this.columns,
       { row } = this;
     if (linear === null) {
@@ -430,7 +431,7 @@ export class PhysicsBody {
   setAdditionalMass(mass: number, inertia: Vec3 = [0, 0, 0]): this {
     checkVec(inertia, 'Inertia');
     if (!(mass >= 0) || mass === Infinity || inertia.some((value) => value < 0))
-      throw new RangeError(
+      throw bodyInput(
         'Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².',
       );
     this.world().setOwnSolid(this.row, mass, this.centerOfMass, inertia);
@@ -466,11 +467,11 @@ export class PhysicsBody {
       computed = this.mass,
       total = mass ?? computed;
     if (!(total >= 0) || total === Infinity)
-      throw new RangeError('Mass must be a finite number of at least 0; pass kilograms.');
+      throw bodyInput('Mass must be a finite number of at least 0; pass kilograms.');
     if (centerOfMass) checkVec(centerOfMass, 'Centre of mass');
     if (inertia) {
       checkVec(inertia, 'Inertia');
-      if (inertia.some((value) => value < 0)) throw new RangeError('Inertia must not be negative; pass kg m².');
+      if (inertia.some((value) => value < 0)) throw bodyInput('Inertia must not be negative; pass kg m².');
     }
     if (inertiaFrame) checkRotation(inertiaFrame);
     const [px, py, pz] = this.principalInertia,
@@ -491,7 +492,7 @@ export class PhysicsBody {
   }
   set linearDamping(value: number) {
     if (!(value >= 0) || !Number.isFinite(value))
-      throw new RangeError('Damping must be a finite number of at least 0; pass 1/s.');
+      throw bodyInput('Damping must be a finite number of at least 0; pass 1/s.');
     this.world().wake(this.row);
     this.columns.linearDamping[this.row] = value;
   }
@@ -501,7 +502,7 @@ export class PhysicsBody {
   }
   set angularDamping(value: number) {
     if (!(value >= 0) || !Number.isFinite(value))
-      throw new RangeError('Damping must be a finite number of at least 0; pass 1/s.');
+      throw bodyInput('Damping must be a finite number of at least 0; pass 1/s.');
     this.world().wake(this.row);
     this.columns.angularDamping[this.row] = value;
   }
@@ -510,7 +511,7 @@ export class PhysicsBody {
     return this.columns.dominance[this.row];
   }
   set dominance(value: number) {
-    if (!Number.isFinite(value)) throw new RangeError('Dominance must be a finite number; 0 is the default group.');
+    if (!Number.isFinite(value)) throw bodyInput('Dominance must be a finite number; 0 is the default group.');
     this.world().wake(this.row);
     this.columns.dominance[this.row] = value;
   }
@@ -649,7 +650,7 @@ export class PhysicsBody {
     dt: number,
     withForces: boolean,
   ): { position: [number, number, number]; rotation: [number, number, number, number] } {
-    if (!Number.isFinite(dt)) throw new RangeError('The time to predict over must be a finite number of seconds.');
+    if (!Number.isFinite(dt)) throw bodyInput('The time to predict over must be a finite number of seconds.');
     this.world();
     const type = this.type;
     if (type === 'fixed') return { position: this.position, rotation: this.rotation };
@@ -675,12 +676,12 @@ export class PhysicsBody {
   /**
    * Takes another body's settings onto this one: kind, damping, gravity scale, dominance, CCD, speed caps, sleep limits, locked axes, extra
    * solver passes, the gyroscopic switch and user data. Its pose, velocity, colliders and joints stay as they are.
-   * @throws RangeError for a body that is not valid, or the body itself.
+   * @throws MargoError (code `unsupported`) for a body that is not valid, or the body itself.
    */
   copyFrom(other: PhysicsBody): this {
     this.world();
     if (other === this || !other.valid)
-      throw new RangeError('copyFrom needs another body that is still in the world; pass a different body.');
+      throw bodyInput('copyFrom needs another body that is still in the world; pass a different body.');
     this.setType(other.type);
     this.linearDamping = other.linearDamping;
     this.angularDamping = other.angularDamping;
@@ -704,7 +705,7 @@ export class PhysicsBody {
     return this.columns.gravityScale[this.row];
   }
   set gravityScale(value: number) {
-    if (!Number.isFinite(value)) throw new RangeError('Gravity scale must be a finite number; 1 is full gravity.');
+    if (!Number.isFinite(value)) throw bodyInput('Gravity scale must be a finite number; 1 is full gravity.');
     this.world().wake(this.row);
     this.columns.gravityScale[this.row] = value;
   }
@@ -717,7 +718,7 @@ export class PhysicsBody {
   }
   set additionalPgsIterations(passes: number) {
     if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
-      throw new RangeError('Additional PGS iterations must be a whole number from 0 to 4294967295; pass extra passes.');
+      throw bodyInput('Additional PGS iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.columns.extraPasses[this.row] = passes;
   }
   /**
@@ -731,7 +732,7 @@ export class PhysicsBody {
   }
   set additionalSubsteps(substeps: number) {
     if (!Number.isInteger(substeps) || substeps < 0 || substeps > 1024)
-      throw new RangeError('Additional substeps must be a whole number from 0 to 1024; pass extra substeps a step.');
+      throw bodyInput('Additional substeps must be a whole number from 0 to 1024; pass extra substeps a step.');
     this.world().wake(this.row);
     this.columns.extraSubsteps[this.row] = substeps;
   }
@@ -752,7 +753,7 @@ export class PhysicsBody {
   }
   set softCcdPrediction(distance: number) {
     if (!(distance >= 0) || !Number.isFinite(distance))
-      throw new RangeError(`softCcdPrediction must be 0 or more and finite (got ${distance}).`);
+      throw bodyInput(`softCcdPrediction must be 0 or more and finite (got ${distance}).`);
     this.columns.softCcd[this.row] = distance;
   }
   /** True when the last step's CCD pass checked this body: CCD is on and it moved further than it is thick. */
@@ -791,7 +792,7 @@ export class PhysicsBody {
   }
   set sleepThreshold(energy: number) {
     if (!(energy > 0))
-      throw new RangeError('sleepThreshold must be above 0 J/kg; use canSleep: false to keep a body awake.');
+      throw bodyInput('sleepThreshold must be above 0 J/kg; use canSleep: false to keep a body awake.');
     this.columns.sleepLimit[this.row] = energy === Infinity ? 0 : energy;
   }
   /** Seconds this body must stay still before it sleeps (default the world's, 0.5). `Infinity` clears it back to the world's. */
@@ -801,7 +802,7 @@ export class PhysicsBody {
   }
   set sleepTime(seconds: number) {
     if (!(seconds > 0))
-      throw new RangeError('sleepTime must be above 0 seconds; use canSleep: false to keep a body awake.');
+      throw bodyInput('sleepTime must be above 0 seconds; use canSleep: false to keep a body awake.');
     this.columns.sleepAfter[this.row] = seconds === Infinity ? 0 : seconds;
   }
   /** Stops all turning, on every world axis, or frees it again. */

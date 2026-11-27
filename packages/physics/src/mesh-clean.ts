@@ -1,6 +1,7 @@
 // Triangle mesh clean-up before the kernel builds a mesh: Rapier's `TriMeshFlags` MERGE_DUPLICATE_VERTICES,
 // DELETE_DEGENERATE_TRIANGLES, DELETE_DUPLICATE_TRIANGLES and DELETE_BAD_TOPOLOGY_TRIANGLES. Each is off by default, as in
 // Rapier, and they apply in that order. Exact comparisons only (no tolerance), so the same mesh always gives the same result.
+import { meshInput } from './rigid-errors.js';
 
 /** Which clean-up steps to run. */
 export interface MeshCleanOptions {
@@ -26,7 +27,7 @@ export function wantsClean(options: MeshCleanOptions): boolean {
 
 /**
  * The mesh after the steps asked for. Vertices no triangle uses stay unless merging joins them.
- * @throws RangeError for an index outside the vertices.
+ * @throws MargoError (code `unsupported`) for an index outside the vertices.
  */
 export function cleanTrimesh(
   vertices: Float32Array,
@@ -36,7 +37,7 @@ export function cleanTrimesh(
   const count = vertices.length / 3;
   for (let i = 0; i < indices.length; i++)
     if (indices[i]! >= count)
-      throw new RangeError(
+      throw meshInput(
         `Trimesh index ${indices[i]} is out of range; keep every index below the ${count} vertices.`,
       );
   let points = vertices,

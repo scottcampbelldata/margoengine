@@ -13,6 +13,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from './math.js';
 import type { ColliderOptions } from './shapes.js';
+import { meshInput } from './rigid-errors.js';
 
 /** The cell a coordinate falls in: the floor of x over the cell size, without a library function. */
 function cellOf(x: number, size: number): number {
@@ -25,7 +26,7 @@ function cellSize(size: number | Vec3 | undefined): Vec3 {
   const s: Vec3 =
     size === undefined ? [1, 1, 1] : typeof size === 'number' ? [size, size, size] : [size[0], size[1], size[2]];
   if (!(s[0] > 0 && s[1] > 0 && s[2] > 0) || !s.every((v) => Number.isFinite(v)))
-    throw new RangeError(
+    throw meshInput(
       `A voxel size is positive and finite on every axis (got ${s.join(', ')}); pass a number or [x, y, z] in metres.`,
     );
   return s;
@@ -36,16 +37,16 @@ function cellSize(size: number | Vec3 | undefined): Vec3 {
  * of a `voxels` collider, three numbers each, sorted by x, then y, then z, each cell once.
  * @param points Packed x, y, z.
  * @param size A cell's edge, or its three edges (default 1).
- * @throws RangeError for a size that is not positive, points that are not whole triples or not finite.
+ * @throws MargoError (code `unsupported`) for a size that is not positive, points that are not whole triples or not finite.
  */
 export function voxelsFromPoints(points: ArrayLike<number>, size?: number | Vec3): { cells: Int32Array; size: Vec3 } {
   const s = cellSize(size);
   if (points.length % 3 !== 0)
-    throw new RangeError(`voxelsFromPoints takes packed x, y, z; ${points.length} numbers are not whole points.`);
+    throw meshInput(`voxelsFromPoints takes packed x, y, z; ${points.length} numbers are not whole points.`);
   const seen = new Map<string, [number, number, number]>();
   for (let i = 0; i < points.length; i += 3) {
     if (!Number.isFinite(points[i]! + points[i + 1]! + points[i + 2]!))
-      throw new RangeError(`Point ${i / 3} is not finite; pass finite coordinates.`);
+      throw meshInput(`Point ${i / 3} is not finite; pass finite coordinates.`);
     const c: [number, number, number] = [
       cellOf(points[i]!, s[0]),
       cellOf(points[i + 1]!, s[1]),
@@ -104,7 +105,7 @@ export type VoxelFill = 'surface' | 'filled';
  * @param vertices Packed x, y, z.
  * @param indices Three vertex indices a triangle.
  * @returns The `cells` and `size` of a `voxels` collider.
- * @throws RangeError for indices out of range, a size that is not positive, or a mesh that would need more than 16,000,000 cells.
+ * @throws MargoError (code `unsupported`) for indices out of range, a size that is not positive, or a mesh that would need more than 16,000,000 cells.
  */
 export function voxelizedMesh(
   vertices: ArrayLike<number>,
@@ -115,7 +116,7 @@ export function voxelizedMesh(
   const s = cellSize(size);
   const count = vertices.length / 3;
   if (!Number.isInteger(count) || indices.length % 3 !== 0)
-    throw new RangeError(
+    throw meshInput(
       'voxelizedMesh takes packed x, y, z vertices and three indices a triangle; pass whole vertices and whole triangles.',
     );
   const surface = new Map<number, [number, number, number]>();
@@ -126,7 +127,7 @@ export function voxelizedMesh(
     const p = [0, 1, 2].map((k) => {
       const i = indices[t + k]!;
       if (!(i >= 0 && i < count))
-        throw new RangeError(`Index ${i} is outside the ${count} vertices; keep every index below it.`);
+        throw meshInput(`Index ${i} is outside the ${count} vertices; keep every index below it.`);
       return [vertices[3 * i]!, vertices[3 * i + 1]!, vertices[3 * i + 2]!] as Vec3;
     }) as [Vec3, Vec3, Vec3];
     tris.push(p);
@@ -146,7 +147,7 @@ export function voxelizedMesh(
   if (!tris.length) return { cells: new Int32Array(0), size: s };
   const dims: [number, number, number] = [high[0] - low[0] + 3, high[1] - low[1] + 3, high[2] - low[2] + 3];
   if (dims[0] * dims[1] * dims[2] > 16_000_000)
-    throw new RangeError(`This mesh needs ${dims[0] * dims[1] * dims[2]} cells at this size; use a larger voxel size.`);
+    throw meshInput(`This mesh needs ${dims[0] * dims[1] * dims[2]} cells at this size; use a larger voxel size.`);
   const key = (x: number, y: number, z: number): number => (x * dims[1] + y) * dims[2] + z;
   const half: Vec3 = [s[0] / 2, s[1] / 2, s[2] / 2];
   for (const tri of tris) {
@@ -208,7 +209,7 @@ export function voxelizedMesh(
 export function meshConnectedComponents(indices: ArrayLike<number>): { component: Uint32Array; count: number } {
   const triangles = indices.length / 3;
   if (!Number.isInteger(triangles))
-    throw new RangeError('meshConnectedComponents takes three indices a triangle; pass whole triangles.');
+    throw meshInput('meshConnectedComponents takes three indices a triangle; pass whole triangles.');
   const parent = new Map<number, number>();
   const find = (v: number): number => {
     let root = v;
@@ -252,12 +253,12 @@ export interface HalfEdgeTopology {
 
 /**
  * The half-edge topology of a triangle mesh, from its indices (three a triangle).
- * @throws RangeError for indices that are not whole triangles.
+ * @throws MargoError (code `unsupported`) for indices that are not whole triangles.
  */
 export function meshHalfEdges(indices: ArrayLike<number>): HalfEdgeTopology {
   const triangles = indices.length / 3;
   if (!Number.isInteger(triangles))
-    throw new RangeError('meshHalfEdges takes three indices a triangle; pass whole triangles.');
+    throw meshInput('meshHalfEdges takes three indices a triangle; pass whole triangles.');
   const n = indices.length,
     out: HalfEdgeTopology = {
       vertex: new Uint32Array(n),
@@ -299,7 +300,7 @@ export type MeshConversion = 'trimesh' | 'convexHull' | 'aabb' | 'obb';
  * `rotation` that place it. `options.borderRadius` rounds the hull (`RoundConvexHull`) and `options.trimesh` carries trimesh flags
  * (`TriMeshWithFlags`). A convex decomposition, rounded or not (`ConvexDecomposition`, `RoundConvexDecomposition`), is its own entry,
  * `convexDecomposition` from `@margoengine/physics/decomposition` with its `borderRadius`.
- * @throws RangeError for a mesh with no triangles or an index out of range.
+ * @throws MargoError (code `unsupported`) for a mesh with no triangles or an index out of range.
  */
 export function convertMesh(
   vertices: ArrayLike<number>,
@@ -335,7 +336,7 @@ export function convertMesh(
   if (out.shape === 'trimesh' && options.trimesh) return { ...out, ...options.trimesh };
   if (out.shape === 'convexHull' && options.borderRadius !== undefined) {
     if (!(options.borderRadius >= 0) || !Number.isFinite(options.borderRadius))
-      throw new RangeError(
+      throw meshInput(
         `borderRadius is 0 or more metres and finite (got ${options.borderRadius}); pass 0 for a sharp hull.`,
       );
     return { ...out, borderRadius: options.borderRadius };
@@ -354,11 +355,11 @@ export interface MeshConversionOptions {
 function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, to: MeshConversion): ColliderOptions {
   const count = vertices.length / 3;
   if (!Number.isInteger(count) || indices.length % 3 !== 0 || indices.length === 0)
-    throw new RangeError('convertMesh takes packed x, y, z vertices and at least one triangle of three indices.');
+    throw meshInput('convertMesh takes packed x, y, z vertices and at least one triangle of three indices.');
   const used = new Set<number>();
   for (let i = 0; i < indices.length; i++) {
     if (!(indices[i]! >= 0 && indices[i]! < count))
-      throw new RangeError(`Index ${indices[i]} is outside the ${count} vertices; pass indices below ${count}.`);
+      throw meshInput(`Index ${indices[i]} is outside the ${count} vertices; pass indices below ${count}.`);
     used.add(indices[i]!);
   }
   if (to === 'trimesh')
@@ -630,7 +631,7 @@ function diagonalizeInertia(
  * open meshes common in AI-generated assets. Closed meshes use exact signed tetrahedra (Mirtich 1996, automatically
  * flipping inside-out winding); open or non-manifold meshes fall back to a uniform voxel grid classified by the exact
  * Van Oosterom & Strackee (1983) / Jacobson et al. (2013) generalized winding number (`|w(p)| >= 0.5`).
- * @throws RangeError for malformed meshes, invalid density/mass/resolution, or zero enclosed volume.
+ * @throws MargoError (code `unsupported`) for malformed meshes, invalid density/mass/resolution, or zero enclosed volume.
  */
 export function estimateMeshMassProperties(
   vertices: ArrayLike<number>,
@@ -639,23 +640,23 @@ export function estimateMeshMassProperties(
 ): MeshMassProperties {
   const count = vertices.length / 3;
   if (!Number.isInteger(count) || indices.length === 0 || indices.length % 3 !== 0)
-    throw new RangeError('estimateMeshMassProperties takes packed x, y, z vertices and whole triangles.');
+    throw meshInput('estimateMeshMassProperties takes packed x, y, z vertices and whole triangles.');
   const { density = 1, mass: targetMass, resolution = 16 } = options;
   if (targetMass !== undefined) {
     if (!(targetMass > 0) || !Number.isFinite(targetMass))
-      throw new RangeError(`Mass must be positive and finite (got ${targetMass}).`);
+      throw meshInput(`Mass must be positive and finite (got ${targetMass}).`);
   } else if (!(density > 0) || !Number.isFinite(density)) {
-    throw new RangeError(`Density must be positive and finite (got ${density}).`);
+    throw meshInput(`Density must be positive and finite (got ${density}).`);
   }
   if (!Number.isInteger(resolution) || resolution < 4 || resolution > 64)
-    throw new RangeError(`Resolution must be an integer from 4 to 64 (got ${resolution}).`);
+    throw meshInput(`Resolution must be an integer from 4 to 64 (got ${resolution}).`);
   for (let i = 0; i < indices.length; i++) {
     const idx = indices[i]!;
     if (!Number.isInteger(idx) || idx < 0 || idx >= count)
-      throw new RangeError(`Index ${idx} is out of range for ${count} vertices.`);
+      throw meshInput(`Index ${idx} is out of range for ${count} vertices.`);
   }
   for (let i = 0; i < vertices.length; i++)
-    if (!Number.isFinite(vertices[i])) throw new RangeError('Mesh vertices must be finite numbers.');
+    if (!Number.isFinite(vertices[i])) throw meshInput('Mesh vertices must be finite numbers.');
 
   const closed = !meshHalfEdges(indices).twin.some((t) => t === 0xffffffff);
   if (closed) {
@@ -764,7 +765,7 @@ export function estimateMeshMassProperties(
     spanZ = maxZ - minZ,
     maxSpan = Math.max(spanX, spanY, spanZ);
   if (!(spanX > 0 && spanY > 0 && spanZ > 0))
-    throw new RangeError('Mesh encloses no volume along at least one axis; give the body mass with setMassProperties.');
+    throw meshInput('Mesh encloses no volume along at least one axis; give the body mass with setMassProperties.');
   const step = maxSpan / resolution;
   const nx = Math.max(2, Math.round(spanX / step)),
     ny = Math.max(2, Math.round(spanY / step)),
@@ -818,7 +819,7 @@ export function estimateMeshMassProperties(
   }
   const insideCount = insideCenters.length / 3;
   if (insideCount === 0)
-    throw new RangeError(
+    throw meshInput(
       'Generalized winding number found no interior volume for this open mesh; close the surface or use setMassProperties.',
     );
   const volume = insideCount * cellVol;

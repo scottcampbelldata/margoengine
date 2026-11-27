@@ -3,6 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -187,7 +192,7 @@ test('a swept box holds the collider at both poses, and a collision box is the b
     'and the prediction grows the box again',
   );
   assert.throws(() => collider.collisionAabb(-1), /0 or more/);
-  assert.throws(() => collider.sweptAabb([0, 0, Number.NaN]), RangeError);
+  assert.throws(() => collider.sweptAabb([0, 0, Number.NaN]), rigidCoded);
   assert.throws(() => collider.sweptAabb([0, 0, 0], [0, 0, 0, 2]), /unit quaternion/);
   physics.dispose();
 });

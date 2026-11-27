@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -225,8 +230,8 @@ test('locked axes hold under impulses and torques, and per-axis freedom reads ba
   assert.ok(pinned.position[2] > 0.2, 'lockTranslations(false) frees the body');
   pinned.lockRotations();
   assert.deepEqual(pinned.enabledRotations, [false, false, false]);
-  assert.throws(() => (flat.enabledTranslations = [true, false]), { name: 'TypeError', message: /three booleans/ });
-  assert.throws(() => (flat.enabledRotations = [1, 0, 1]), { name: 'TypeError', message: /three booleans/ });
+  assert.throws(() => (flat.enabledTranslations = [true, false]), { name: 'MargoError', message: /three booleans/ });
+  assert.throws(() => (flat.enabledRotations = [1, 0, 1]), { name: 'MargoError', message: /three booleans/ });
   dispose(list);
 });
 

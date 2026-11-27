@@ -23,6 +23,7 @@ import type { PhysicsBody } from './body.js';
 import { JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from './kernel.js';
 import { describe, poseOf } from './kinematics.js';
 import type { Multibody } from './multibody.js';
+import { bodyInput } from './rigid-errors.js';
 
 type V = [number, number, number];
 type Q = [number, number, number, number];
@@ -149,7 +150,7 @@ function cholesky(a: number[][], b: number[]): number[] {
       for (let k = 0; k < j; k++) sum -= l[i]![k]! * l[j]![k]!;
       if (i === j) {
         if (!(sum > 0))
-          throw new RangeError(
+          throw bodyInput(
             'The mass matrix is not positive definite: a link has no mass or inertia; give every link a collider with a density, or call setMassProperties on it.',
           );
         l[i]![j] = Math.sqrt(sum);
@@ -245,7 +246,7 @@ export function jacobian(kernel: KernelWorld, multibody: Multibody, link: Physic
   const bodies = [multibody.root, ...multibody.links.map((l) => l.body)],
     at = bodies.indexOf(link);
   if (at < 0)
-    throw new RangeError('That link is not in this tree; pass a body that was given to physics.addMultibody.');
+    throw bodyInput('That link is not in this tree; pass a body that was given to physics.addMultibody.');
   const tree = read(kernel, multibody),
     pose = poseOf(kernel, link.row);
   return jacobianOf(tree, at, add(pose.p, qrot(pose.q, point)));

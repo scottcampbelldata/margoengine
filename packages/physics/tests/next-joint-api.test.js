@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { RAPIER, RapierPhysics } from './oracle.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const G = 9.81;
 const near = (actual, expected) =>
@@ -97,7 +102,7 @@ test('anchors and frames set after creation move the joint: a weight hangs 1 m h
   for (let i = 0; i < 240; i++) physics.step();
   // The anchor on the wall is at y 0.5 and the weight's is 1 above its centre: the centre hangs at -0.5.
   assert.ok(Math.abs(weight.position[1] + 0.5) < 0.01, `hangs at -0.5: ${weight.position[1]}`);
-  assert.throws(() => joint.setAnchorB([0, NaN, 0]), RangeError);
+  assert.throws(() => joint.setAnchorB([0, NaN, 0]), rigidCoded);
   physics.dispose();
 
   // A hinge about X lets a weight on the Z axis swing down; turn both frames so its axis is Z and the weight, on that axis, holds.

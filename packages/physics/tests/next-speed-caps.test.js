@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const speed = (v) => Math.hypot(v[0], v[1], v[2]);
 
@@ -49,9 +54,9 @@ test('no cap by default, Infinity clears one, bad values throw, a cap never touc
   body.maxLinearSpeed = 10;
   body.maxLinearSpeed = Infinity;
   assert.equal(body.maxLinearSpeed, Infinity);
-  assert.throws(() => (body.maxLinearSpeed = 0), RangeError);
-  assert.throws(() => (body.maxAngularSpeed = NaN), RangeError);
-  assert.throws(() => (body.maxAngularSpeed = -1), RangeError);
+  assert.throws(() => (body.maxLinearSpeed = 0), rigidCoded);
+  assert.throws(() => (body.maxAngularSpeed = NaN), rigidCoded);
+  assert.throws(() => (body.maxAngularSpeed = -1), rigidCoded);
   const kin = physics.addBody(null, {
     type: 'kinematicVelocity',
     colliders: [],

@@ -3,6 +3,7 @@
 // `triangles` and `polylist` elements and its node `matrix`). It runs off the step path, so it may use `Math`.
 import type { ColliderOptions } from './shapes.js';
 import { child, multiply, numbers, parseXml, type XmlNode } from './xml.js';
+import { meshInput } from './rigid-errors.js';
 
 /** A triangle mesh read from a file: `vertices` as x, y, z and `indices` three to a triangle. */
 export interface MeshFile {
@@ -38,7 +39,7 @@ function weld(corners: number[]): MeshFile {
 
 /**
  * Reads an STL file, binary or ASCII, into a welded triangle mesh.
- * @throws RangeError for a file that is neither, or that holds no triangle.
+ * @throws MargoError (code `unsupported`) for a file that is neither, or that holds no triangle.
  */
 export function parseSTL(input: ArrayBuffer | Uint8Array | string): MeshFile {
   const corners: number[] = [];
@@ -66,7 +67,7 @@ export function parseSTL(input: ArrayBuffer | Uint8Array | string): MeshFile {
 /**
  * Reads a Wavefront OBJ file into a triangle mesh: `v` lines are vertices, `f` lines faces of any size (fanned from their first corner),
  * with 1-based or negative (from the end) indices and `v/vt/vn` corners; everything else is ignored.
- * @throws RangeError for a face that names a vertex the file does not have, or a file with no triangle.
+ * @throws MargoError (code `unsupported`) for a face that names a vertex the file does not have, or a file with no triangle.
  */
 export function parseOBJ(input: ArrayBuffer | Uint8Array | string): MeshFile {
   const vertices: number[] = [],
@@ -80,14 +81,14 @@ export function parseOBJ(input: ArrayBuffer | Uint8Array | string): MeshFile {
           have = vertices.length / 3,
           at = n < 0 ? have + n : n - 1;
         if (!(at >= 0 && at < have))
-          throw new RangeError(`An OBJ face names vertex ${n}, which the file does not have; fix the face line.`);
+          throw meshInput(`An OBJ face names vertex ${n}, which the file does not have; fix the face line.`);
         return at;
       });
       for (let k = 1; k + 1 < face.length; k++) indices.push(face[0]!, face[k]!, face[k + 1]!);
     }
   }
   if (!indices.length || !vertices.every(Number.isFinite))
-    throw new RangeError('The OBJ file holds no triangle with finite vertices; pass a file with `v` and `f` lines.');
+    throw meshInput('The OBJ file holds no triangle with finite vertices; pass a file with `v` and `f` lines.');
   return { vertices: new Float32Array(vertices), indices: new Uint32Array(indices) };
 }
 
@@ -96,12 +97,12 @@ export function parseOBJ(input: ArrayBuffer | Uint8Array | string): MeshFile {
  * and `polygons` (faces of any size fanned from their first corner), placed by the node's `matrix`, `translate`, `rotate` and `scale`
  * (nested nodes multiply), scaled by the file's `unit` to metres and turned to Y up from its `up_axis`. A geometry no node instances is
  * read as it lies. Textures, materials, skins and animations are ignored.
- * @throws RangeError for a file that is not Collada, an index the file does not have, or a file with no triangle.
+ * @throws MargoError (code `unsupported`) for a file that is not Collada, an index the file does not have, or a file with no triangle.
  */
 export function parseDAE(input: ArrayBuffer | Uint8Array | string): MeshFile {
   const tree = parseXml(text(input)),
     collada = child(tree, 'COLLADA');
-  if (!collada) throw new RangeError('This is not a Collada file: it has no COLLADA element; pass a .dae file.');
+  if (!collada) throw meshInput('This is not a Collada file: it has no COLLADA element; pass a .dae file.');
   const scale =
       Number(
         child(child(collada, 'asset') ?? { name: '', attrs: {}, children: [], text: '' }, 'unit')?.attrs.meter ?? 1,
@@ -141,7 +142,7 @@ export function parseDAE(input: ArrayBuffer | Uint8Array | string): MeshFile {
       if (!vertex || !source) continue;
       const corner = (index: number): void => {
         if (!(index >= 0 && (index + 1) * source.stride <= source.data.length))
-          throw new RangeError(`A Collada face names vertex ${index}, which the file does not have; fix the face.`);
+          throw meshInput(`A Collada face names vertex ${index}, which the file does not have; fix the face.`);
         const [x, y, z] = [
           source.data[index * source.stride]!,
           source.data[index * source.stride + 1]!,
@@ -229,7 +230,7 @@ export function parseDAE(input: ArrayBuffer | Uint8Array | string): MeshFile {
     for (const scene of library.children.filter((c) => c.name === 'visual_scene')) visit(scene, identity);
   for (const [id, g] of geometries) if (!placed.has(id)) addGeometry(g, identity);
   if (!corners.length || !corners.every(Number.isFinite))
-    throw new RangeError(
+    throw meshInput(
       'The Collada file holds no triangle with finite vertices; pass a .dae file with triangles or polylists.',
     );
   // Metres, then Y up: Z up turns about x (x, z, -y) and X up about z (-y, x, z).
@@ -245,7 +246,7 @@ export function parseDAE(input: ArrayBuffer | Uint8Array | string): MeshFile {
 
 function finish(corners: number[], name: string): MeshFile {
   if (!corners.length || !corners.every(Number.isFinite))
-    throw new RangeError(
+    throw meshInput(
       `The ${name} file holds no triangle with finite vertices; pass a binary or ASCII ${name} file.`,
     );
   return weld(corners);
@@ -254,7 +255,7 @@ function finish(corners: number[], name: string): MeshFile {
 /**
  * The collider options for a mesh file, ready for `physics.addBody`: a `trimesh` of it (the default, for fixed bodies) or the convex
  * hull of its points (for a dynamic body). `format` is read from the file when left out: Collada if it holds a `COLLADA` element, OBJ if it starts with `v`, `#`, `o` or `g`, else STL.
- * @throws RangeError for a file that cannot be read.
+ * @throws MargoError (code `unsupported`) for a file that cannot be read.
  */
 export function meshFileCollider(
   input: ArrayBuffer | Uint8Array | string,

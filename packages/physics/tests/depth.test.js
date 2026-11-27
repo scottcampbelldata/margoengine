@@ -3,6 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Physics, Rope, Vehicle } from '../dist/index.js';
 import { convexDecomposition } from '../dist/decomposition.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -189,7 +194,7 @@ rtest('compound colliders weld convex parts into one collider with one mass and 
   near(hit.distance, 4, 0.02, 'ray hits the top of the right sphere');
   assert.equal(physics.raycast([0.5, 5, 0.3], [0, -1, 0])?.body === dumbbell, false, 'the gap between parts is empty');
 
-  assert.throws(() => dumbbell.addCollider({ shape: 'compound', parts: [] }), RangeError);
+  assert.throws(() => dumbbell.addCollider({ shape: 'compound', parts: [] }), rigidCoded);
   assert.throws(
     () => dumbbell.addCollider({ shape: 'compound', parts: [{ shape: 'trimesh', vertices: [], indices: [] }] }),
     /whole triangles/,

@@ -9,6 +9,7 @@ import { eulerToQuat, type Quat, type Vec3 } from './math.js';
 import { depthOf, parentOf } from './mesh-fit.js';
 import { matrixRotation, matrixScale, worldMatrix, type TransformStoreLike } from './transform.js';
 import type { PhysicsBody } from './body.js';
+import { bodyInput } from './rigid-errors.js';
 
 /** Where a body on `mesh` starts. A child mesh gives its world pose, and its world scale for fitting colliders. */
 export function meshPose(
@@ -17,7 +18,7 @@ export function meshPose(
 ): { position: Vec3; rotation: Quat; fitScale?: [number, number, number] } {
   mesh.check();
   if (mesh instanceof CoreMesh && engine && meshRuntime(mesh).engine !== engine)
-    throw new TypeError(
+    throw bodyInput(
       'Physics mesh belongs to another engine; add meshes from the engine this Physics is attached to.',
     );
   if (parentOf(mesh) === -1)
@@ -246,7 +247,7 @@ export class MeshSync {
       );
     for (let i = 0; i < 4; i++)
       if (!Number.isFinite(Math.fround(out[i])) || (i < 3 && !Number.isFinite(Math.fround(position[i]))))
-        throw new RangeError('A physics body pose must be finite; check the body for NaN or Infinity.');
+        throw bodyInput('A physics body pose must be finite; check the body for NaN or Infinity.');
     // The same bits as setPosition and setQuaternion (Engine.writePoses), in one call for every root mesh of a sync.
     if (root) this.batch(root, meshRuntime(mesh).id);
     else mesh.setPosition(position).setQuaternion(out);
@@ -290,7 +291,7 @@ export class MeshSync {
     const m = worldMatrix(store, parent, this.parentScratch),
       inverse = invertMatrix(m, this.inverseScratch);
     if (!inverse)
-      throw new RangeError('Physics body parent has a singular world transform; give the parent a non-zero scale.');
+      throw bodyInput('Physics body parent has a singular world transform; give the parent a non-zero scale.');
     const x = position[0],
       y = position[1],
       z = position[2];

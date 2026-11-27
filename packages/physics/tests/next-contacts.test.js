@@ -3,6 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { KernelWorld, Physics, loadKernel } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Physics.load();
 const G = 9.81;
@@ -212,7 +217,7 @@ test('counts and values the solver cannot use are refused by name', async () => 
       () => {
         world.iterations = bad;
       },
-      { name: 'RangeError', message: /Iterations must/ },
+      { name: 'MargoError', message: /Iterations must/ },
     );
   for (const [options, message] of [
     [{ friction: -1 }, /Friction must/],
@@ -223,12 +228,12 @@ test('counts and values the solver cannot use are refused by name', async () => 
     [{ frictionCombine: 'sum' }, /combine rule/],
     [{ restitutionCombine: 'sum' }, /combine rule/],
   ])
-    assert.throws(() => world.addCollider(body, 'ball', [1], options), { name: 'RangeError', message });
+    assert.throws(() => world.addCollider(body, 'ball', [1], options), { name: 'MargoError', message });
   const physics = new Physics(null, { iterations: 4 }),
     block = physics.addBody(null, { colliders: { shape: 'sphere', radius: 1 } });
   assert.equal(physics.iterations, 4);
-  assert.throws(() => block.colliders[0].setFriction(-1), RangeError);
-  assert.throws(() => block.colliders[0].setRestitution(2), RangeError);
+  assert.throws(() => block.colliders[0].setFriction(-1), rigidCoded);
+  assert.throws(() => block.colliders[0].setRestitution(2), rigidCoded);
   physics.dispose();
 });
 

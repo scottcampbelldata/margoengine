@@ -1,5 +1,6 @@
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { normalizeQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
+import { bodyInput } from './rigid-errors.js';
 
 /** Structural view of core's transform store (`meshRuntime(mesh).engine.store`): local TRS per entity and parent ids. */
 export interface TransformStoreLike {
@@ -19,7 +20,7 @@ const chain = new Int32Array(65),
 export function worldMatrix(store: TransformStoreLike, id: number, out: Float64Array): Float64Array {
   let count = 0;
   for (let node = id; node !== -1; node = store.parents[node]) {
-    if (count === chain.length) throw new RangeError('Parent chain is deeper than 64 nodes; flatten the hierarchy.');
+    if (count === chain.length) throw bodyInput('Parent chain is deeper than 64 nodes; flatten the hierarchy.');
     chain[count++] = node;
   }
   localMatrix(store, chain[--count], out);

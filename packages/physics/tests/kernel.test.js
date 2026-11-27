@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { KernelWorld, loadKernel } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 test('a world before the load says what to do', async () => {
   // This file's first test: nothing in this process has loaded the kernel yet.
@@ -41,7 +46,7 @@ test('reserve keeps rows at their index, and views are rebuilt', async () => {
   const bodyColumns = Object.values(world.columns).filter((column) => column.length === 100_000).length;
   assert.ok(bodyColumns > 50);
   assert.ok(world.bytes >= 100_000 * 4 * bodyColumns);
-  assert.throws(() => world.reserve(2 ** 23), RangeError);
+  assert.throws(() => world.reserve(2 ** 23), rigidCoded);
 });
 
 test('two worlds share no memory', async () => {
@@ -55,5 +60,5 @@ test('two worlds share no memory', async () => {
 
 test('a capacity the kernel refuses throws', async () => {
   await loadKernel();
-  for (const bad of [0, -1, 1.5, Number.NaN, 2 ** 23]) assert.throws(() => new KernelWorld(bad), RangeError);
+  for (const bad of [0, -1, 1.5, Number.NaN, 2 ** 23]) assert.throws(() => new KernelWorld(bad), rigidCoded);
 });

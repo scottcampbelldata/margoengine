@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DistanceJoint, GearJoint, PathJoint, PulleyJoint, Physics, RackAndPinionJoint } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
@@ -105,7 +110,7 @@ test('a pulley rope goes slack when nothing pulls it and the mechanisms are chec
   assert.throws(() => new GearJoint(physics, a, b, { ratio: 0 }), { code: 'unsupported' });
   assert.throws(() => new GearJoint(physics, a, b, { axisA: [0, 0, 0] }), { code: 'unsupported' });
   assert.throws(() => new RackAndPinionJoint(physics, a, b, { radius: -1 }), { code: 'unsupported' });
-  assert.throws(() => new PulleyJoint(physics, a, b, { groundA: [0, 0], groundB: [0, 0, 0] }), RangeError);
+  assert.throws(() => new PulleyJoint(physics, a, b, { groundA: [0, 0], groundB: [0, 0, 0] }), rigidCoded);
   assert.throws(() => new GearJoint(physics, a, b, { frequency: -1 }), { code: 'unsupported' });
 });
 

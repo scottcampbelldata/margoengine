@@ -72,6 +72,7 @@ import {
   type HullRows,
 } from './kernel-shapes.js';
 import { MeshSync, meshPose } from './sync.js';
+import { bodyInput } from './rigid-errors.js';
 
 /** Options for creating a Physics world; every field has a default. */
 export interface PhysicsOptions {
@@ -173,7 +174,7 @@ export class ContactPointModification {
   }
   set distance(value: number) {
     if (!Number.isFinite(value))
-      throw new RangeError(`A contact distance is a finite number of metres (got ${value}); pass one.`);
+      throw bodyInput(`A contact distance is a finite number of metres (got ${value}); pass one.`);
     const c = this.kernel.columns,
       row = this.row,
       body = c.colliderBody[c.pairB[row]!]!,
@@ -215,7 +216,7 @@ export class ContactModification {
   }
   set friction(value: number) {
     if (!(value >= 0) || !Number.isFinite(value))
-      throw new RangeError(`Friction must be finite and not negative (got ${value}).`);
+      throw bodyInput(`Friction must be finite and not negative (got ${value}).`);
     this.kernel.columns.pairFriction[this.row] = value;
   }
   /** Restitution of the pair; set it to override. */
@@ -223,7 +224,7 @@ export class ContactModification {
     return this.kernel.columns.pairRestitution[this.row];
   }
   set restitution(value: number) {
-    if (!(value >= 0 && value <= 1)) throw new RangeError(`Restitution must be from 0 to 1 (got ${value}).`);
+    if (!(value >= 0 && value <= 1)) throw bodyInput(`Restitution must be from 0 to 1 (got ${value}).`);
     this.kernel.columns.pairRestitution[this.row] = value;
   }
   /**
@@ -253,7 +254,7 @@ export class ContactModification {
     checkVec(value, 'Contact normal');
     const squared = value[0] * value[0] + value[1] * value[1] + value[2] * value[2],
       length = root(squared);
-    if (!(squared > 1e-12)) throw new RangeError('A contact normal needs a direction; pass a vector of some length.');
+    if (!(squared > 1e-12)) throw bodyInput('A contact normal needs a direction; pass a vector of some length.');
     const c = this.kernel.columns;
     [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]] = [
       value[0] / length,
@@ -274,17 +275,17 @@ export class ContactModification {
   }
   set userData(value: number) {
     if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
-      throw new RangeError(`A pair's user data is a whole number from 0 to 4294967295 (got ${value}); pass one.`);
+      throw bodyInput(`A pair's user data is a whole number from 0 to 4294967295 (got ${value}); pass one.`);
     this.kernel.columns.pairUser[this.row] = value;
   }
   /**
    * Contact point `k` of the pair, for edits of its anchors and distance (Rapier's solver contact `point` and `dist`). The
    * object is a view of the kernel's row, valid inside the call.
-   * @throws RangeError for a point the pair does not have.
+   * @throws MargoError (code `unsupported`) for a point the pair does not have.
    */
   point(k: number): ContactPointModification {
     if (!Number.isInteger(k) || k < 0 || k >= this.contactCount)
-      throw new RangeError(
+      throw bodyInput(
         `This pair has ${this.contactCount} contact points; pass k from 0 to ${this.contactCount - 1}.`,
       );
     return new ContactPointModification(this.kernel, this.row, this.row * 4 + k);
@@ -293,17 +294,17 @@ export class ContactModification {
    * Makes the collider `platform` a one-way platform: contacts whose normal, taken from the platform to the other collider,
    * lies within `angle` radians (default a quarter turn: the half space above it) of `direction` stay, and the rest are
    * dropped. A body rising through the underside meets nothing, and standing on top it rests.
-   * @throws RangeError when `platform` is neither collider of the pair.
+   * @throws MargoError (code `unsupported`) when `platform` is neither collider of the pair.
    */
   oneWay(platform: PhysicsCollider, direction: Vec3, angle = PI / 2): void {
     checkVec(direction, 'Platform direction');
     if (platform !== this.colliderA && platform !== this.colliderB)
-      throw new RangeError('That collider is not in this pair; pass colliderA or colliderB of the contact.');
+      throw bodyInput('That collider is not in this pair; pass colliderA or colliderB of the contact.');
     const [nx, ny, nz] = this.normal,
       sign = platform === this.colliderA ? 1 : -1,
       squared = direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2],
       length = root(squared);
-    if (!(squared > 0)) throw new RangeError('A platform direction needs some length.');
+    if (!(squared > 0)) throw bodyInput('A platform direction needs some length.');
     const along = (sign * (nx * direction[0] + ny * direction[1] + nz * direction[2])) / length;
     if (along < cosine(angle)) this.clear();
   }
@@ -687,7 +688,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * @throws MargoError (`unsupported`) for an option the own solver does not hold yet.
    */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
-    if ('rapier' in options) throw new TypeError('The own solver takes no rapier option; leave it out.');
+    if ('rapier' in options) throw bodyInput('The own solver takes no rapier option; leave it out.');
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
     this.maxSubsteps = options.maxSubsteps ?? 4;
@@ -696,9 +697,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.timeScale = options.timeScale ?? 1;
     this.paused = options.paused ?? false;
     if (!(this.fixedTimestep > 0 && this.fixedTimestep <= 1))
-      throw new RangeError('fixedTimestep must be in (0, 1] seconds');
+      throw bodyInput('fixedTimestep must be in (0, 1] seconds');
     if (!Number.isInteger(this.maxSubsteps) || this.maxSubsteps < 1)
-      throw new RangeError('maxSubsteps must be a positive integer');
+      throw bodyInput('maxSubsteps must be a positive integer');
     const gravity = options.gravity ?? DEFAULT_GRAVITY;
     checkVec(gravity, 'Gravity');
     this.world = new KernelWorld(1024, 1024, options.arena ? { arena: options.arena } : {});
@@ -770,7 +771,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   set lengthUnit(unit: number) {
     if (!(unit > 0) || !Number.isFinite(unit))
-      throw new RangeError(
+      throw bodyInput(
         `lengthUnit must be a finite number above 0: 1 for metres, 100 for centimetres (got ${unit}).`,
       );
     const kernel = this.kernel,
@@ -897,7 +898,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   update(delta: number): number {
     if (this.disposed) return 0;
     if (!Number.isFinite(delta) || delta < 0)
-      throw new RangeError('delta must be a finite, non-negative number of seconds');
+      throw bodyInput('delta must be a finite, non-negative number of seconds');
     let steps = 0;
     if (!this.paused) {
       const dt = this.fixedTimestep;
@@ -923,7 +924,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * taken. A world already past that frame cannot go back and throws; restore a snapshot instead.
    * @param rate Frames a second as a whole number (24) or the ratio `{num, den}` of two (`{num: 24000, den: 1001}`).
    * @throws MargoError code `state` when the world has taken more steps than that frame allows.
-   * @throws RangeError for a frame that is not a non-negative whole number, a rate that is not whole numbers above 0, or a
+   * @throws MargoError (code `unsupported`) for a frame that is not a non-negative whole number, a rate that is not whole numbers above 0, or a
    * `fixedTimestep` that is not one over a whole number of steps a second (film needs a step that divides the second).
    */
   advance(frame: number, rate: number | { num: number; den: number }): number {
@@ -1194,7 +1195,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   sync(alpha = this.lastAlpha): void {
     if (this.disposed) return;
     if (!Number.isFinite(alpha))
-      throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
+      throw bodyInput('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
     this.meshes.write(!this.interpolate || alpha > 1 ? 1 : alpha < 0 ? 0 : alpha);
     this.attachments.forEach(attachmentSync);
   }
@@ -1210,13 +1211,13 @@ export class Physics implements EnginePlugin, BodyOwner {
     const kernel = this.kernel,
       type: BodyType = options.type ?? 'dynamic';
     if (!['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
-      throw new TypeError(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
+      throw bodyInput(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
     if (mesh && this.byMesh.has(mesh))
       throw new MargoError('state', 'This mesh already has a physics body; remove it first or use the existing body.');
     if (options.follow) {
       if (type !== 'kinematicPosition')
-        throw new TypeError("A body with follow must be a 'kinematicPosition' body; the mesh is what moves it.");
-      if (!(mesh instanceof CoreMesh)) throw new TypeError('A body with follow needs a core Mesh to follow.');
+        throw bodyInput("A body with follow must be a 'kinematicPosition' body; the mesh is what moves it.");
+      if (!(mesh instanceof CoreMesh)) throw bodyInput('A body with follow needs a core Mesh to follow.');
     }
     const start = mesh ? meshPose(mesh, this.engine) : null,
       position = options.position ?? start?.position ?? [0, 0, 0],
@@ -1524,11 +1525,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     const type: BodyType = bodyOptions.type ?? 'dynamic',
       shape = requested ?? (type === 'dynamic' ? 'convexHull' : 'trimesh');
     if (shape !== 'trimesh' && shape !== 'convexHull' && shape !== 'convexDecomposition')
-      throw new TypeError(
+      throw bodyInput(
         `Model colliders must be 'trimesh', 'convexHull' or 'convexDecomposition', not ${String(shape)}; choose one of them.`,
       );
     if (!model?.root || !Array.isArray(model.primitives))
-      throw new TypeError('addModel needs a gltf/pbr model (root and primitives)');
+      throw bodyInput('addModel needs a gltf/pbr model (root and primitives)');
     const groups = new Map<Mesh, ModelPrimitiveLike[]>();
     for (const primitive of model.primitives) {
       if (filter && !filter(primitive)) continue;
@@ -1631,7 +1632,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * `generic`) between them. The joints are made here and are ordinary joints too, with their limits and motors; the tree
    * holds them exactly, so they cannot drift open and a branch is as stiff as a chain.
    * @throws MargoError (`state`) for a body in another multibody, a parent not in the tree yet, or a loop.
-   * @throws RangeError for a tree with no link.
+   * @throws MargoError (code `unsupported`) for a tree with no link.
    */
   addMultibody(root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody {
     for (const body of [
@@ -1688,7 +1689,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * A kinematic character controller for a `kinematicPosition` body whose first collider is a sphere, box, capsule,
    * cylinder or cone. Call `move` once per fixed step, for example from `beforestep`.
    * @throws MargoError (`state`) unless the body belongs to this world.
-   * @throws TypeError unless the body is `kinematicPosition` with a collider.
+   * @throws MargoError (code `unsupported`) unless the body is `kinematicPosition` with a collider.
    */
   createCharacterController(body: PhysicsBody, options: CharacterControllerOptions = {}): CharacterController {
     this.live();
@@ -1707,7 +1708,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * over the ground, jumps and rides platforms: a character the solver pushes and knocks about, in place of the kinematic one. Call
    * `update()` once per fixed step, for example from `beforestep`.
    * @throws MargoError (`state`) unless the body belongs to this world.
-   * @throws TypeError unless the body is `dynamic` with a collider.
+   * @throws MargoError (code `unsupported`) unless the body is `dynamic` with a collider.
    */
   createDynamicCharacter(body: PhysicsBody, options: DynamicCharacterOptions = {}): DynamicCharacter {
     this.live();
@@ -1773,7 +1774,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /**
    * The first hit along a ray, or null. Queries see the poses of the last step, as Rapier's do.
-   * @throws RangeError for an origin or direction that is not three finite numbers, or a zero direction.
+   * @throws MargoError (code `unsupported`) for an origin or direction that is not three finite numbers, or a zero direction.
    */
   raycast(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions = {}): RaycastHit | null {
     checkVec(origin, 'Ray origin');
@@ -1795,7 +1796,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /**
    * Every hit along a ray, nearest first: one a collider. Return false from `options.stop` to end the list there.
-   * @throws RangeError for an origin or direction that is not three finite numbers, or a zero direction.
+   * @throws MargoError (code `unsupported`) for an origin or direction that is not three finite numbers, or a zero direction.
    */
   raycastAll(
     origin: Vec3,
@@ -1842,7 +1843,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * Sweeps a convex shape (sphere, box, capsule, cylinder, cone or convexHull, with its size given) from `position` and
    * `rotation` along `direction` and returns the first collider it touches, or null. `distance` is along the direction's
    * unit. Queries see the poses of the last step, as Rapier's do.
-   * @throws RangeError for a position, rotation or direction that is not finite, or a zero direction; MargoError
+   * @throws MargoError (code `unsupported`) for a position, rotation or direction that is not finite, or a zero direction; MargoError
    * `unsupported` for another query shape.
    */
   shapeCast(
@@ -1899,7 +1900,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * comes within `targetDistance` of is the hit, and `distance` is a time in seconds. A start in contact is a hit at 0 when
    * `stopAtPenetration` (the default), and otherwise only if the shape is moving into the collider. Found by conservative
    * advancement (Mirtich 1996; van den Bergen 2004), so no touch within the time is skipped.
-   * @throws RangeError for a number that is not finite or an end time below 0; MargoError `unsupported` for a compound query
+   * @throws MargoError (code `unsupported`) for a number that is not finite or an end time below 0; MargoError `unsupported` for a compound query
    * shape or a `predicate`.
    */
   shapeCastNonlinear(
@@ -1917,7 +1918,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     const center = motion.centerOfMass ?? [0, 0, 0];
     checkVec(center, 'Center of mass');
     if (!(endTime >= 0) || !Number.isFinite(endTime))
-      throw new RangeError(
+      throw bodyInput(
         `The end time is 0 or more seconds and finite (got ${endTime}); pass how long the shape moves.`,
       );
     this.live();
@@ -1946,7 +1947,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * The point on any collider nearest `point`, or null when no collider is seen. Inside a shape with `solid` true (the
    * default) the point itself; with `solid` false the nearest point of its surface. Inside, `inside` is true and
    * `distance` 0 either way, as on the root entry.
-   * @throws RangeError for a point that is not three finite numbers.
+   * @throws MargoError (code `unsupported`) for a point that is not three finite numbers.
    */
   projectPoint(point: Vec3, options: QueryFilter & { solid?: boolean } = {}): PointProjection | null {
     checkVec(point, 'Point');
@@ -1979,7 +1980,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /**
    * The bodies whose colliders hold `point`, in the order they were added. A trimesh or height field holds no point.
-   * @throws RangeError for a point that is not three finite numbers.
+   * @throws MargoError (code `unsupported`) for a point that is not three finite numbers.
    */
   intersectPoint(point: Vec3, options: QueryFilter = {}): PhysicsBody[] {
     checkVec(point, 'Point');
@@ -1989,7 +1990,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * The bodies whose colliders overlap a convex shape (as `shapeCast` takes) at `position` and `rotation`, in the order
    * they were added.
-   * @throws RangeError for a position or rotation that is not finite; MargoError `unsupported` for another query shape.
+   * @throws MargoError (code `unsupported`) for a position or rotation that is not finite; MargoError `unsupported` for another query shape.
    */
   intersectShape(
     shape: ShapeOptions,
@@ -2025,7 +2026,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * The bodies whose colliders' boxes meet the box from `min` to `max`, in the order they were added. A collider's box is
    * tight to its shape at its pose of the last step (see {@link PhysicsCollider.aabb}).
-   * @throws RangeError for a box that is not finite or has a `min` over its `max`.
+   * @throws MargoError (code `unsupported`) for a box that is not finite or has a `min` over its `max`.
    */
   intersectAabb(min: Vec3, max: Vec3, options: QueryFilter = {}): PhysicsBody[] {
     checkVec(min, 'Box min');
@@ -2038,7 +2039,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * touch in the world: one for two convex colliders, one a pair of children for a compound, one a triangle or cell for a
    * mesh. Normals run from `a` to `b`. A mesh's triangles give their own normals, without the seam smoothing of
    * `fixInternalEdges`.
-   * @throws RangeError for a collider that was removed or a prediction below 0.
+   * @throws MargoError (code `unsupported`) for a collider that was removed or a prediction below 0.
    */
   contactPair(a: PhysicsCollider, b: PhysicsCollider, prediction = 0): ContactManifold[] {
     this.live();
@@ -2151,7 +2152,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /**
    * Whether two colliders overlap now, whether or not their bodies touch in the world. Sensors count.
-   * @throws RangeError for a collider that was removed.
+   * @throws MargoError (code `unsupported`) for a collider that was removed.
    */
   intersectionPair(a: PhysicsCollider, b: PhysicsCollider): boolean {
     this.live();
@@ -2160,7 +2161,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * How far apart two colliders are, with the nearest point on each; 0 when they overlap. Null when none can be read (a
    * half space against a mesh).
-   * @throws RangeError for a collider that was removed.
+   * @throws MargoError (code `unsupported`) for a collider that was removed.
    */
   colliderDistance(a: PhysicsCollider, b: PhysicsCollider): ColliderDistance | null {
     this.live();
@@ -2169,7 +2170,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * A ray against one collider, as Rapier's `collider.castRay`: the hit or null. `maxDistance` defaults to unbounded and
    * `solid` to true.
-   * @throws RangeError for an origin or direction that is not three finite numbers, a zero direction or a removed collider.
+   * @throws MargoError (code `unsupported`) for an origin or direction that is not three finite numbers, a zero direction or a removed collider.
    */
   raycastCollider(
     collider: PhysicsCollider,
@@ -2192,7 +2193,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * The point of one collider nearest `point`, as Rapier's `collider.projectPoint`: inside, with `solid` true (the default)
    * the point itself. Null when nothing can be projected (a mesh holds no inside).
-   * @throws RangeError for a point that is not three finite numbers or a removed collider.
+   * @throws MargoError (code `unsupported`) for a point that is not three finite numbers or a removed collider.
    */
   projectPointOnCollider(
     collider: PhysicsCollider,
@@ -2206,14 +2207,14 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /**
    * Whether `point` is inside one collider, as Rapier's `collider.containsPoint`; a mesh or height field holds no point.
-   * @throws RangeError for a point that is not three finite numbers or a removed collider.
+   * @throws MargoError (code `unsupported`) for a point that is not three finite numbers or a removed collider.
    */
   colliderContainsPoint(collider: PhysicsCollider, point: Vec3): boolean {
     return this.projectPointOnCollider(collider, point, { solid: true })?.inside ?? false;
   }
   /**
    * A shape cast against one collider, as Rapier's `collider.castShape`, with the options of `shapeCast`.
-   * @throws RangeError for a pose or direction that is not finite, a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
+   * @throws MargoError (code `unsupported`) for a pose or direction that is not finite, a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
    */
   castShapeAtCollider(
     collider: PhysicsCollider,
@@ -2288,7 +2289,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /**
    * Whether a convex shape overlaps one collider, as Rapier's `collider.intersectsShape`.
-   * @throws RangeError for a pose that is not finite or a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
+   * @throws MargoError (code `unsupported`) for a pose that is not finite or a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
    */
   colliderIntersectsShape(
     collider: PhysicsCollider,
@@ -2308,14 +2309,14 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * The colliders `collider` touches as of the last step, with solid contact (neither side a sensor): Rapier's
    * `contactPairsWith`.
-   * @throws RangeError for a collider that was removed.
+   * @throws MargoError (code `unsupported`) for a collider that was removed.
    */
   contactPairsWith(collider: PhysicsCollider): PhysicsCollider[] {
     return this.touchingWith(collider, false);
   }
   /**
    * The colliders `collider` overlaps as of the last step where one of the two is a sensor: Rapier's `intersectionPairsWith`.
-   * @throws RangeError for a collider that was removed.
+   * @throws MargoError (code `unsupported`) for a collider that was removed.
    */
   intersectionPairsWith(collider: PhysicsCollider): PhysicsCollider[] {
     return this.touchingWith(collider, true);
@@ -2336,7 +2337,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * The contact manifolds of a collider and a convex query shape at a pose within `prediction` metres of touching (default
    * 0), normals from the collider to the shape: Rapier's `contactShape`.
-   * @throws RangeError for a collider that was removed, a pose that is not finite or a prediction below 0; MargoError `unsupported` for a query shape the solver does not hold.
+   * @throws MargoError (code `unsupported`) for a collider that was removed, a pose that is not finite or a prediction below 0; MargoError `unsupported` for a query shape the solver does not hold.
    */
   contactShape(
     collider: PhysicsCollider,
@@ -2355,7 +2356,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * Casts a collider, with its own shape and pose, along `direction` against one other collider: Rapier's `castCollider`.
    * `distance` is along the direction's unit. Returns the touch of the two, or null.
-   * @throws RangeError for a collider that was removed or a direction that is not finite and nonzero.
+   * @throws MargoError (code `unsupported`) for a collider that was removed or a direction that is not finite and nonzero.
    */
   castColliderOnto(
     moving: PhysicsCollider,
@@ -2393,7 +2394,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** A collider's row, for the kernel; refuses what is not this world's. */
   private rowOf(collider: PhysicsCollider): number {
     if (!collider.valid || this.byRow.get(collider.handle) !== collider)
-      throw new RangeError(
+      throw bodyInput(
         'That collider was removed or belongs to another world; pass a collider from body.colliders.',
       );
     return collider.handle;
@@ -2478,7 +2479,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * Puts the world back as {@link Physics.takeSnapshot} found it. The bodies, colliders and joints must be the ones that were
    * there: one added or removed since is named in the error, and nothing changes.
    * @throws MargoError (`state`) when the bodies, colliders or joints are not the snapshot's.
-   * @throws RangeError for bytes that are not a snapshot of this kernel.
+   * @throws MargoError (code `unsupported`) for bytes that are not a snapshot of this kernel.
    */
   restoreSnapshot(snapshot: PhysicsSnapshot): this {
     this.live();

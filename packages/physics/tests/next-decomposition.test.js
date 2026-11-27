@@ -8,6 +8,11 @@ import { MargoError } from '@margoengine/math/errors';
 import { RapierPhysics } from './oracle.js';
 import { convexDecomposition, decompositionConcavity } from '../dist/decomposition.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Promise.all([Physics.load(), RapierPhysics.load()]);
 
@@ -149,8 +154,8 @@ test('maxConvexHulls caps the parts, timeLimit stops with a timeout, and open or
   assert.throws(() => convexDecomposition(open), /closed mesh/);
   assert.throws(() => convexDecomposition({ vertices: [0, 0, 0, 1, 0, 0, 0, 1, 0] }), /indices/);
   assert.throws(() => convexDecomposition({ vertices: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 3] }), /outside/);
-  assert.throws(() => convexDecomposition(tube(), { concavity: 0 }), RangeError);
-  assert.throws(() => convexDecomposition(tube(), { iterations: 0.5 }), RangeError);
+  assert.throws(() => convexDecomposition(tube(), { concavity: 0 }), rigidCoded);
+  assert.throws(() => convexDecomposition(tube(), { iterations: 0.5 }), rigidCoded);
 });
 
 // PA-09: the default has no wall-clock bound, so a machine whose clock runs a minute per search step still finishes,
@@ -228,6 +233,6 @@ test('borderRadius rounds every part like Rapier round_convex_decomposition, and
   };
   const top = rest(round) - rest(sharp);
   assert.ok(Math.abs(top - 0.05) < 0.01, `a rounded decomposition rests the marble 0.05 m higher (${top})`);
-  assert.throws(() => convexDecomposition(tube(), { borderRadius: -1 }), RangeError);
-  assert.throws(() => convexDecomposition(tube(), { borderRadius: Number.NaN }), RangeError);
+  assert.throws(() => convexDecomposition(tube(), { borderRadius: -1 }), rigidCoded);
+  assert.throws(() => convexDecomposition(tube(), { borderRadius: Number.NaN }), rigidCoded);
 });

@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -215,7 +220,7 @@ test('the query filter leaves out what each option names, as on Rapier', () => {
 
 test('a ray refuses a zero or not finite direction', () => {
   const physics = new Physics(null);
-  assert.throws(() => physics.raycast([0, 0, 0], [0, 0, 0]), RangeError);
-  assert.throws(() => physics.raycast([0, Number.NaN, 0], [0, 1, 0]), RangeError);
+  assert.throws(() => physics.raycast([0, 0, 0], [0, 0, 0]), rigidCoded);
+  assert.throws(() => physics.raycast([0, Number.NaN, 0], [0, 1, 0]), rigidCoded);
   assert.equal(physics.raycast([0, 0, 0], [0, 1, 0]), null);
 });

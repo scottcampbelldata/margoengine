@@ -3,6 +3,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -94,7 +99,7 @@ test('a frame is given with the other and not with an axis', () => {
     () => physics.addJoint(a, b, { type: 'revolute', axis: [0, 1, 0], frameA: IDENTITY, frameB: IDENTITY }),
     { code: 'unsupported' },
   );
-  assert.throws(() => physics.addJoint(a, b, { type: 'revolute' }), TypeError);
+  assert.throws(() => physics.addJoint(a, b, { type: 'revolute' }), rigidCoded);
   physics.dispose();
 });
 
@@ -117,12 +122,12 @@ test('solver passes read and set, for the world and for one island', () => {
   assert.equal(physics.solverIterations, 6);
   physics.solverIterations = 8;
   assert.equal(physics.substeps, 8);
-  assert.throws(() => (physics.solverIterations = 0), RangeError);
-  assert.throws(() => (physics.solverIterations = 1.5), RangeError);
+  assert.throws(() => (physics.solverIterations = 0), rigidCoded);
+  assert.throws(() => (physics.solverIterations = 1.5), rigidCoded);
   assert.equal(body.additionalPgsIterations, 0);
   body.additionalPgsIterations = 4;
   assert.equal(body.additionalPgsIterations, 4);
-  assert.throws(() => (body.additionalPgsIterations = -1), RangeError);
+  assert.throws(() => (body.additionalPgsIterations = -1), rigidCoded);
   physics.dispose();
 });
 

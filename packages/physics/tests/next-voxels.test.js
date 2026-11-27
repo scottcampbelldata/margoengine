@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -204,13 +209,13 @@ test('voxels options are checked as on the root entry', () => {
     1,
     'an empty grid, as Rapier takes one',
   );
-  assert.throws(() => add({ shape: 'voxels', cells: [0, 0, 0] }), TypeError);
-  assert.throws(() => add({ shape: 'voxels', cells: Int32Array.of(0, 0) }), TypeError);
-  assert.throws(() => add({ shape: 'voxels', cells: slab(1), size: [1, 0, 1] }), RangeError);
-  assert.throws(() => add({ shape: 'voxels', cells: slab(1), size: [1, 1] }), RangeError);
+  assert.throws(() => add({ shape: 'voxels', cells: [0, 0, 0] }), rigidCoded);
+  assert.throws(() => add({ shape: 'voxels', cells: Int32Array.of(0, 0) }), rigidCoded);
+  assert.throws(() => add({ shape: 'voxels', cells: slab(1), size: [1, 0, 1] }), rigidCoded);
+  assert.throws(() => add({ shape: 'voxels', cells: slab(1), size: [1, 1] }), rigidCoded);
   const [grid] = add({ shape: 'voxels', cells: slab(1) }).colliders,
     [ball] = add({ shape: 'sphere', radius: 1 }).colliders;
-  assert.throws(() => grid.setVoxel(0.5, 0, 0, true), RangeError);
-  assert.throws(() => ball.setVoxel(0, 0, 0, true), RangeError);
-  assert.throws(() => grid.combineVoxelStates(ball), RangeError);
+  assert.throws(() => grid.setVoxel(0.5, 0, 0, true), rigidCoded);
+  assert.throws(() => ball.setVoxel(0, 0, 0, true), rigidCoded);
+  assert.throws(() => grid.combineVoxelStates(ball), rigidCoded);
 });

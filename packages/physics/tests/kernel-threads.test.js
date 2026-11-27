@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { Arena, worldMemory } from '../dist/world.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Physics.load({ threads: true });
 
@@ -90,8 +95,8 @@ test('threads need a shared memory and a count from 1 to 64, and a shared memory
     (error) => error.code === 'state' && /worldMemory\(true\)/.test(error.message),
   );
   const shared = scene(new Arena(worldMemory(true)));
-  await assert.rejects(shared.kernel.useThreads(0), RangeError);
-  await assert.rejects(shared.kernel.useThreads(65), RangeError);
+  await assert.rejects(shared.kernel.useThreads(0), rigidCoded);
+  await assert.rejects(shared.kernel.useThreads(65), rigidCoded);
   plain.dispose();
   shared.dispose();
 });

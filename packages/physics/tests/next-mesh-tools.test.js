@@ -10,6 +10,11 @@ import {
   voxelizedMesh,
   voxelsFromPoints,
 } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Physics.load();
 const near = (a, b, tolerance, message) =>
@@ -143,7 +148,7 @@ test('convertMesh picks a collider for a mesh: itself, its hull, its box and its
   const flagged = convertMesh(moved, indices, 'trimesh', { trimesh: { oriented: true, mergeDuplicateVertices: true } });
   assert.equal(flagged.oriented, true, 'a trimesh carries its flags');
   assert.equal(convertMesh(moved, indices, 'convexHull', { borderRadius: 0.1 }).borderRadius, 0.1, 'a round hull');
-  assert.throws(() => convertMesh(moved, indices, 'convexHull', { borderRadius: -1 }), RangeError);
+  assert.throws(() => convertMesh(moved, indices, 'convexHull', { borderRadius: -1 }), rigidCoded);
   const hull = convertMesh(moved, indices, 'convexHull');
   assert.equal(hull.shape, 'convexHull');
   assert.equal(hull.points.length, 24);

@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { KernelWorld, loadKernel } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 /** A dynamic body of unit mass and unit moments. */
 function ball(world) {
@@ -134,9 +139,9 @@ test('settings read back, and values that would put a NaN in the state are refus
   assert.equal(world.substeps, 8);
   world.substeps = 2;
   assert.equal(world.substeps, 2);
-  for (const bad of [0, -1, 1.5, Number.NaN]) assert.throws(() => (world.substeps = bad), RangeError);
-  for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) assert.throws(() => world.step(bad), RangeError);
-  assert.throws(() => world.setGravity(Number.NaN, 0, 0), RangeError);
-  assert.throws(() => world.addBody('ghost'), RangeError);
+  for (const bad of [0, -1, 1.5, Number.NaN]) assert.throws(() => (world.substeps = bad), rigidCoded);
+  for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) assert.throws(() => world.step(bad), rigidCoded);
+  assert.throws(() => world.setGravity(Number.NaN, 0, 0), rigidCoded);
+  assert.throws(() => world.addBody('ghost'), rigidCoded);
   assert.equal(world.steps, 0);
 });

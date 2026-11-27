@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -114,7 +119,7 @@ test("a tetrahedron is the convex hull of its four points, with the volume abs(d
       new Physics(null).addBody(null, {
         colliders: { shape: 'tetrahedron', a: [0, 0, 0], b: [1, 0, 0], c: [0, 1, 0], d: [1, 1, 0] },
       }),
-    RangeError,
+    rigidCoded,
   );
   for (const { physics } of worlds) physics.dispose();
 });

@@ -3,6 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Physics.load();
 
@@ -81,8 +86,8 @@ test('the extra substeps of an island are the most its bodies ask, and they are 
   upper.additionalSubsteps = 1;
   lower.additionalSubsteps = 3;
   assert.equal(lower.additionalSubsteps, 3);
-  assert.throws(() => (upper.additionalSubsteps = -1), RangeError);
-  assert.throws(() => (upper.additionalSubsteps = 1.5), RangeError);
+  assert.throws(() => (upper.additionalSubsteps = -1), rigidCoded);
+  assert.throws(() => (upper.additionalSubsteps = 1.5), rigidCoded);
   physics.step();
   physics.dispose();
 });

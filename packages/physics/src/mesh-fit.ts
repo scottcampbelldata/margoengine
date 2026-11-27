@@ -6,6 +6,7 @@ import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import { eulerToQuat, type Vec3 } from './math.js';
 import { geometryPositions, type ColliderGeometry } from './shapes.js';
 import { matrixRotation, worldMatrix } from './transform.js';
+import { meshInput } from './rigid-errors.js';
 
 /** How many parents are above `mesh`. */
 export function depthOf(mesh: Mesh): number {
@@ -103,7 +104,7 @@ export function colliderGeometry(mesh: Mesh, worldScale?: Vec3): { geometry: Col
         !Number.isFinite(vertices[offset + 1]) ||
         !Number.isFinite(vertices[offset + 2])
       )
-        throw new RangeError('Geometry positions must be finite');
+        throw meshInput('Geometry positions must be finite');
     }
     for (let i = 0; i < sourceIndices.length; i++) indices[indexOffset++] = vertexOffset + sourceIndices[i];
     vertexOffset += positions.length / 3;

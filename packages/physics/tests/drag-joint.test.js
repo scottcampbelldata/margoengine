@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DragJoint, Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
@@ -50,7 +55,7 @@ test('a drag joint takes the body by a point off its centre and turns it, and le
 
 test('a drag joint is checked', () => {
   const { physics, body } = grab(1);
-  assert.throws(() => new DragJoint(physics, body, [0, 0], {}), RangeError);
+  assert.throws(() => new DragJoint(physics, body, [0, 0], {}), rigidCoded);
   assert.throws(() => new DragJoint(physics, body, [0, 2, 0], { frequency: 0 }), { code: 'unsupported' });
   assert.throws(() => new DragJoint(physics, body, [0, 2, 0], { damping: -1 }), { code: 'unsupported' });
   const fixed = physics.addBody(null, { type: 'fixed' });

@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { KernelWorld, Physics, loadKernel } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Physics.load();
 const DT = 1 / 60;
@@ -51,8 +56,8 @@ test('a quaternion is normalised by the kernel, and a bad one refused', () => {
   const physics = new Physics(null),
     body = physics.addBody(null, { rotation: [0, 0, 3, 4] });
   assert.deepEqual(body.rotation, [0, 0, Math.fround(0.6), Math.fround(0.8)]);
-  assert.throws(() => body.setRotation([0, 0, 0, 0]), RangeError);
-  assert.throws(() => body.setRotation([0, 0, Number.NaN, 1]), RangeError);
+  assert.throws(() => body.setRotation([0, 0, 0, 0]), rigidCoded);
+  assert.throws(() => body.setRotation([0, 0, Number.NaN, 1]), rigidCoded);
   physics.dispose();
 });
 
@@ -144,7 +149,7 @@ test('a snapshot does not alias the world, and bytes that are not one are refuse
   world.step(DT);
   world.restore(saved);
   assert.equal(world.hash, at);
-  assert.throws(() => world.restore(new Uint8Array(4)), { name: 'RangeError', message: /not a snapshot/ });
+  assert.throws(() => world.restore(new Uint8Array(4)), { name: 'MargoError', message: /not a snapshot/ });
   assert.throws(() => world.restore(new Uint8Array(saved.byteLength)), { message: /not a snapshot/ });
   assert.throws(() => world.restore(saved.subarray(0, 1024)), { message: /not a snapshot/ });
   assert.equal(world.hash, at, 'a refused restore changes nothing');

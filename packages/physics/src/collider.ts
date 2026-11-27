@@ -19,13 +19,14 @@ import { readGroups, writeGroups } from './groups.js';
 import { meshConnectedComponents, meshHalfEdges, type HalfEdgeTopology } from './mesh-tools.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { PhysicsBody } from './body.js';
+import { bodyInput } from './rigid-errors.js';
 
 /** What a collider is, as named in its options. */
 export type ColliderShape = ShapeOptions['shape'];
 /** A cell coordinate, checked: a whole number in 32 bits. */
 function cell(value: number): number {
   if (!Number.isInteger(value) || value < -(2 ** 31) || value >= 2 ** 31)
-    throw new RangeError(
+    throw bodyInput(
       `A voxel cell coordinate is a whole number in 32 bits (got ${value}); pass cell numbers, not metres.`,
     );
   return value;
@@ -46,7 +47,7 @@ export function pairKindBits(kinds: readonly CollisionPairKind[]): number {
   for (const kind of kinds) {
     const at = PAIR_KINDS.indexOf(kind);
     if (at < 0)
-      throw new RangeError(
+      throw bodyInput(
         `Unknown collision pair kind ${String(kind)}; use dynamicDynamic, dynamicKinematic, dynamicFixed, kinematicKinematic, kinematicFixed or fixedFixed.`,
       );
     wanted |= 1 << at;
@@ -151,7 +152,7 @@ export class PhysicsCollider {
    * The box that holds the collider's shape now and at the world pose `nextPosition` and `nextRotation` (default: the pose it
    * has), as Rapier's `compute_swept_aabb`: the two tight boxes merged. A shape's box between the two poses can be larger than
    * this when it turns on the way; the box of a straight move is exact.
-   * @throws RangeError for a position or rotation that is not finite, or a rotation that is not a unit quaternion.
+   * @throws MargoError (code `unsupported`) for a position or rotation that is not finite, or a rotation that is not a unit quaternion.
    * @throws MargoError (`state`) for a collider not in the world yet.
    */
   sweptAabb(nextPosition: Vec3, nextRotation?: Quat): { min: [number, number, number]; max: [number, number, number] } {
@@ -170,7 +171,7 @@ export class PhysicsCollider {
       current: Quat = [c.rotationX[body]!, c.rotationY[body]!, c.rotationZ[body]!, c.rotationW[body]!],
       worldQ = nextRotation ?? multiplyQuat(current, localQ);
     if (worldQ.length !== 4 || !worldQ.every(Number.isFinite) || Math.abs(Math.hypot(...worldQ) - 1) > 1e-3)
-      throw new RangeError('The next rotation is a unit quaternion [x, y, z, w]; pass one.');
+      throw bodyInput('The next rotation is a unit quaternion [x, y, z, w]; pass one.');
     // The body's pose that puts the collider at the given pose: its turn is the collider's less the collider's own, and its
     // place the collider's less the collider's offset turned by it.
     const bodyQ = multiplyQuat(worldQ, [-localQ[0], -localQ[1], -localQ[2], localQ[3]]),
@@ -189,13 +190,13 @@ export class PhysicsCollider {
   /**
    * The box the collider is held in for contacts, as Rapier's `compute_collision_aabb`: its box (which already holds the contact
    * skin, as the shape is that much thicker) grown on every side by `prediction` (default the world's prediction distance).
-   * @throws RangeError for a prediction that is negative or not finite.
+   * @throws MargoError (code `unsupported`) for a prediction that is negative or not finite.
    * @throws MargoError (`state`) for a collider not in the world yet.
    */
   collisionAabb(prediction?: number): { min: [number, number, number]; max: [number, number, number] } {
     const margin = prediction ?? this.kernel.predictionDistance;
     if (!(margin >= 0) || !Number.isFinite(margin))
-      throw new RangeError(`A prediction is 0 or more metres and finite (got ${prediction}); pass a few centimetres.`);
+      throw bodyInput(`A prediction is 0 or more metres and finite (got ${prediction}); pass a few centimetres.`);
     const { min, max } = this.aabb();
     return {
       min: [min[0] - margin, min[1] - margin, min[2] - margin],
@@ -218,7 +219,7 @@ export class PhysicsCollider {
   /**
    * Sets the radius of a sphere, capsule, cylinder or cone, keeping the rest of its shape and its place in the body (Rapier's
    * `setRadius`); the body's mass is worked out again.
-   * @throws RangeError for a radius that is not positive and finite, or a shape that has none.
+   * @throws MargoError (code `unsupported`) for a radius that is not positive and finite, or a shape that has none.
    */
   setRadius(radius: number): this {
     return this.resize('radius', radius);
@@ -231,7 +232,7 @@ export class PhysicsCollider {
   setHalfExtents(halfExtents: Vec3): this {
     checkVec(halfExtents, 'Half extents');
     if (this.shape !== 'box' || !(halfExtents[0] > 0 && halfExtents[1] > 0 && halfExtents[2] > 0))
-      throw new RangeError(
+      throw bodyInput(
         `setHalfExtents takes three positive numbers and a box collider (this is a ${this.shape}); pass [x, y, z].`,
       );
     return this.setShape({ shape: 'box', halfExtents, borderRadius: this.borderRadius(), ...this.placement() });
@@ -243,7 +244,7 @@ export class PhysicsCollider {
   }
   private resize(what: 'radius' | 'halfHeight', value: number): this {
     if (!(value > 0) || !Number.isFinite(value))
-      throw new RangeError(
+      throw bodyInput(
         `A ${what === 'radius' ? 'radius' : 'half height'} is positive and finite (got ${value}); pass a size in metres.`,
       );
     const place = this.placement();
@@ -268,7 +269,7 @@ export class PhysicsCollider {
           ...place,
         });
     }
-    throw new RangeError(
+    throw bodyInput(
       `A ${this.shape} collider has no ${what === 'radius' ? 'radius' : 'half height'} to set; use setShape.`,
     );
   }
@@ -315,11 +316,11 @@ export class PhysicsCollider {
   /**
    * Sets the skin: contacts are made and solved as if the shape were this much thicker; two colliders' skins add up. It
    * takes effect at the next step.
-   * @throws RangeError for a skin that is negative or not finite.
+   * @throws MargoError (code `unsupported`) for a skin that is negative or not finite.
    */
   setContactSkin(skin: number): this {
     if (!(skin >= 0) || !Number.isFinite(skin))
-      throw new RangeError(
+      throw bodyInput(
         `A contact skin is 0 or more metres and finite (got ${skin}); pass a few centimetres, such as 0.01.`,
       );
     this.columns().colliderSkin[this.handle] = skin;
@@ -388,11 +389,11 @@ export class PhysicsCollider {
   /**
    * Sets the force in newtons a pair needs to pass before a contact-force event is made. A pair uses the larger of its two
    * colliders' thresholds.
-   * @throws RangeError for a threshold that is negative or not a number.
+   * @throws MargoError (code `unsupported`) for a threshold that is negative or not a number.
    */
   setContactForceEventThreshold(threshold: number): this {
     if (!(threshold >= 0))
-      throw new RangeError(
+      throw bodyInput(
         `A contact force threshold is 0 or more newtons (got ${threshold}); pass 0 for every contact or a force such as 10.`,
       );
     this.forceThreshold = threshold;
@@ -452,7 +453,7 @@ export class PhysicsCollider {
    * `velocities` (packed xyz, in the collider's frame, metres a second) are each vertex's velocity over that step; left
    * out, each is the vertex's displacement over the step. `now: true` instead moves the mesh at once, with no velocity (a
    * teleport: a refit, then queries see it): for building a mesh up between steps.
-   * @throws RangeError for a count that is not the mesh's, or a position or velocity that is not finite.
+   * @throws MargoError (code `unsupported`) for a count that is not the mesh's, or a position or velocity that is not finite.
    * @throws MargoError code `state` for a collider that is not a trimesh made with `deformable: true`.
    */
   setVertices(positions: ArrayLike<number>, options: { velocities?: ArrayLike<number>; now?: boolean } = {}): void {
@@ -467,11 +468,11 @@ export class PhysicsCollider {
       first = columns.meshFirstVertex[mesh]!,
       { velocities, now = false } = options;
     if (positions.length !== 3 * count)
-      throw new RangeError(
+      throw bodyInput(
         `This mesh has ${count} vertices and setVertices got ${positions.length / 3}; pass one x, y, z per vertex.`,
       );
     if (velocities && velocities.length !== positions.length)
-      throw new RangeError(
+      throw bodyInput(
         `setVertices got ${velocities.length / 3} velocities for ${count} vertices; pass one x, y, z each.`,
       );
     const dt = this.kernel.stepSeconds,
@@ -484,7 +485,7 @@ export class PhysicsCollider {
         const p = positions[3 * i + axis]!,
           v = speed(axis, i);
         if (!Number.isFinite(p) || !Number.isFinite(v))
-          throw new RangeError(`Vertex ${i} is not finite; pass finite numbers.`);
+          throw bodyInput(`Vertex ${i} is not finite; pass finite numbers.`);
         const move = p - target[axis]![first + i]!;
         d += move * move;
       }
@@ -548,7 +549,7 @@ export class PhysicsCollider {
   /** Kilograms a cubic metre; the body's mass, centre and inertia are worked out again at once. */
   setDensity(density: number): this {
     if (!(density >= 0) || density === Infinity)
-      throw new RangeError('Collider density must be a finite number of at least 0; pass kilograms a cubic metre.');
+      throw bodyInput('Collider density must be a finite number of at least 0; pass kilograms a cubic metre.');
     this.columns().colliderDensity[this.handle] = density;
     this.kernel.updateMass(this.body.row);
     return this;
@@ -589,11 +590,11 @@ export class PhysicsCollider {
   /**
    * Sets the border radius of a box, convex hull, triangle, cylinder or cone (Rapier's `setRoundRadius`); what it touched
    * ends and the body's mass is worked out again.
-   * @throws RangeError for a border that is negative or not finite, or a shape that cannot have one.
+   * @throws MargoError (code `unsupported`) for a border that is negative or not finite, or a shape that cannot have one.
    */
   setBorderRadius(border: number): this {
     if (!(border >= 0) || !Number.isFinite(border))
-      throw new RangeError(`A border radius is 0 or more and finite (got ${border}); pass 0 for a sharp edge.`);
+      throw bodyInput(`A border radius is 0 or more and finite (got ${border}); pass 0 for a sharp edge.`);
     const c = this.columns(),
       h = this.handle;
     if (this.shape === 'cylinder' || this.shape === 'cone')
@@ -604,20 +605,20 @@ export class PhysicsCollider {
       // A round triangle meets what it touches through a skin of its border.
       if (this.shape === 'triangle') this.setContactSkin(c.colliderSkin[h] - before + border);
     } else
-      throw new RangeError(`A ${this.shape} has no border radius; use a box, convexHull, triangle, cylinder or cone.`);
+      throw bodyInput(`A ${this.shape} has no border radius; use a box, convexHull, triangle, cylinder or cone.`);
     return this;
   }
   /**
    * Gives the collider mass properties of its own in place of its shape's at its density (Rapier's `setMassProperties`): a
    * mass in kilograms, the centre of mass in the collider's frame, the principal moments of inertia about it and the turn of
    * their axes (default none). The body's mass, centre and inertia are worked out again.
-   * @throws RangeError for numbers that cannot be a body's.
+   * @throws MargoError (code `unsupported`) for numbers that cannot be a body's.
    */
   setMassProperties(mass: number, centerOfMass: Vec3, principalInertia: Vec3, inertiaFrame: Quat = [0, 0, 0, 1]): this {
     checkVec(centerOfMass, 'Centre of mass');
     checkVec(principalInertia, 'Principal inertia');
     if (!(mass >= 0) || !Number.isFinite(mass))
-      throw new RangeError(`A collider's mass properties need a mass of 0 or more kilograms and finite (got ${mass}).`);
+      throw bodyInput(`A collider's mass properties need a mass of 0 or more kilograms and finite (got ${mass}).`);
     this.columns();
     this.kernel.setColliderMassProperties(this.handle, mass, centerOfMass, principalInertia, inertiaFrame);
     return this;
@@ -641,14 +642,14 @@ export class PhysicsCollider {
   /**
    * Sets the mass by setting the density to mass over volume, so it stays in step with a change of shape; the body's mass,
    * centre and inertia are worked out again.
-   * @throws RangeError for a mass that is negative or not finite, or a shape with no volume.
+   * @throws MargoError (code `unsupported`) for a mass that is negative or not finite, or a shape with no volume.
    */
   setMass(mass: number): this {
     if (!(mass >= 0) || !Number.isFinite(mass))
-      throw new RangeError(`A collider mass is 0 or more kilograms and finite (got ${mass}); pass a number such as 1.`);
+      throw bodyInput(`A collider mass is 0 or more kilograms and finite (got ${mass}); pass a number such as 1.`);
     const volume = this.volume();
     if (!(volume > 0))
-      throw new RangeError(
+      throw bodyInput(
         'A collider with no volume has no mass to set; give the body its mass with setMassProperties.',
       );
     return this.setDensity(mass / volume);
@@ -657,12 +658,12 @@ export class PhysicsCollider {
   frictionCombineRule(): CombineRule {
     return COMBINES[combineRule(this.columns().colliderCombine[this.handle], false)]!;
   }
-  /** Sets the friction combine rule, from the next step on. @throws RangeError for a name that is not a rule. */
+  /** Sets the friction combine rule, from the next step on. @throws MargoError (code `unsupported`) for a name that is not a rule. */
   setFrictionCombineRule(rule: CombineRule): this {
     const c = this.columns(),
       at = COMBINES.indexOf(rule);
     if (at < 0)
-      throw new RangeError(
+      throw bodyInput(
         `Unknown combine rule ${String(rule)}; use average, min, multiply, max, clampedSum or geometricMean.`,
       );
     c.colliderCombine[this.handle] = combineBits(at, combineRule(c.colliderCombine[this.handle], true));
@@ -673,30 +674,30 @@ export class PhysicsCollider {
   restitutionCombineRule(): CombineRule {
     return COMBINES[combineRule(this.columns().colliderCombine[this.handle], true)]!;
   }
-  /** Sets the restitution combine rule, from the next step on. @throws RangeError for a name that is not a rule. */
+  /** Sets the restitution combine rule, from the next step on. @throws MargoError (code `unsupported`) for a name that is not a rule. */
   setRestitutionCombineRule(rule: CombineRule): this {
     const c = this.columns(),
       at = COMBINES.indexOf(rule);
     if (at < 0)
-      throw new RangeError(
+      throw bodyInput(
         `Unknown combine rule ${String(rule)}; use average, min, multiply, max, clampedSum or geometricMean.`,
       );
     c.colliderCombine[this.handle] = combineBits(combineRule(c.colliderCombine[this.handle], false), at);
     this.wake();
     return this;
   }
-  /** A height field's cells along z. @throws RangeError for another shape. */
+  /** A height field's cells along z. @throws MargoError (code `unsupported`) for another shape. */
   heightfieldNRows(): number {
     return this.grid().rows;
   }
-  /** A height field's cells along x. @throws RangeError for another shape. */
+  /** A height field's cells along x. @throws MargoError (code `unsupported`) for another shape. */
   heightfieldNCols(): number {
     return this.grid().columns;
   }
   /**
    * A height field's heights, column major as it was made (row r, column c at `r + (rows + 1) * c`), as scaled in its frame:
    * with `heightfieldScale()` of [width, 1, depth].
-   * @throws RangeError for another shape.
+   * @throws MargoError (code `unsupported`) for another shape.
    */
   heightfieldHeights(): Float32Array {
     const { rows, columns } = this.grid(),
@@ -706,7 +707,7 @@ export class PhysicsCollider {
     for (let i = 0; i < out.length; i++) out[i] = c.meshVertexY[first + i];
     return out;
   }
-  /** A height field's scale as `[width, 1, depth]`: its heights are read already scaled. @throws RangeError for another shape. */
+  /** A height field's scale as `[width, 1, depth]`: its heights are read already scaled. @throws MargoError (code `unsupported`) for another shape. */
   heightfieldScale(): [number, number, number] {
     const { rows, columns } = this.grid(),
       c = this.columns(),
@@ -716,13 +717,13 @@ export class PhysicsCollider {
   }
   /**
    * A height field's cell status, a sum of {@link HeightfieldCell} bits: 0 for a plain cell, as Rapier's `cell_status`.
-   * @throws RangeError for another shape, or a cell off the field.
+   * @throws MargoError (code `unsupported`) for another shape, or a cell off the field.
    */
   cellStatus(row: number, column: number): number {
     this.cell(row, column);
     return this.kernel.cellStatus(this.handle, row, column);
   }
-  /** Every cell's status, row r of column c at `r + rows * c`, as Rapier's `cells_statuses`. @throws RangeError for another shape. */
+  /** Every cell's status, row r of column c at `r + rows * c`, as Rapier's `cells_statuses`. @throws MargoError (code `unsupported`) for another shape. */
   cellStatuses(): Uint8Array {
     const { rows, columns } = this.grid(),
       out = new Uint8Array(rows * columns);
@@ -734,7 +735,7 @@ export class PhysicsCollider {
    * Sets a height field's cell status in place, as Rapier's `set_cell_status`: add {@link HeightfieldCell} bits, `zigzag` to
    * split the cell along its other diagonal, `leftRemoved` and `rightRemoved` to make a hole. Contacts on a removed triangle
    * end and what rests on it wakes.
-   * @throws RangeError for another shape, a cell off the field or a status that is not 0 to 7.
+   * @throws MargoError (code `unsupported`) for another shape, a cell off the field or a status that is not 0 to 7.
    */
   setCellStatus(row: number, column: number, status: number): this {
     this.cell(row, column);
@@ -747,20 +748,20 @@ export class PhysicsCollider {
    * ground every step allocates nothing; its box is refit, contacts reach as far as the farthest height moved, and what rests
    * on it wakes: a body on ground that sinks falls, and one on ground that rises is lifted.
    * @returns How far the farthest height moved, m.
-   * @throws RangeError for another shape, a start or a count that runs off the field, or a height that is not finite.
+   * @throws MargoError (code `unsupported`) for another shape, a start or a count that runs off the field, or a height that is not finite.
    */
   setHeights(heights: ArrayLike<number>, start = 0): number {
     const { rows, columns } = this.grid(),
       count = (rows + 1) * (columns + 1);
     if (!Number.isInteger(start) || start < 0 || start + heights.length > count)
-      throw new RangeError(
+      throw bodyInput(
         `setHeights got ${heights.length} heights from point ${start} on a field of ${count} points; pass points 0 to ${count - 1}.`,
       );
     const c = this.columns(),
       first = c.meshFirstVertex[c.colliderHull[this.handle]] + start;
     for (let i = 0; i < heights.length; i++)
       if (!Number.isFinite(heights[i]))
-        throw new RangeError(`Height ${start + i} is ${heights[i]}; pass finite heights.`);
+        throw bodyInput(`Height ${start + i} is ${heights[i]}; pass finite heights.`);
     let farthest = 0;
     for (let i = 0; i < heights.length; i++) {
       const was = c.meshVertexY[first + i],
@@ -782,12 +783,12 @@ export class PhysicsCollider {
       row >= rows ||
       column >= columns
     )
-      throw new RangeError(
+      throw bodyInput(
         `Cell (${row}, ${column}) is off this ${rows} by ${columns} height field; pass a row below ${rows} and a column below ${columns}.`,
       );
   }
   private grid(): { rows: number; columns: number } {
-    if (this.shape !== 'heightfield') throw new RangeError(`A ${this.shape} is no height field; use a heightfield.`);
+    if (this.shape !== 'heightfield') throw bodyInput(`A ${this.shape} is no height field; use a heightfield.`);
     const c = this.columns(),
       row = c.colliderHull[this.handle],
       columns = c.meshColumns[row];
@@ -799,11 +800,11 @@ export class PhysicsCollider {
   }
   /**
    * Sets the friction from the next step on, and wakes the body, as a sleeper would stay on a slope it can no longer hold.
-   * @throws RangeError unless `friction` is finite and not negative.
+   * @throws MargoError (code `unsupported`) unless `friction` is finite and not negative.
    */
   setFriction(friction: number): this {
     if (!(friction >= 0) || !Number.isFinite(friction))
-      throw new RangeError(`Friction must be finite and not negative; 0.5 is a common start (got ${friction}).`);
+      throw bodyInput(`Friction must be finite and not negative; 0.5 is a common start (got ${friction}).`);
     this.columns().colliderFriction[this.handle] = friction;
     this.wake();
     return this;
@@ -813,11 +814,11 @@ export class PhysicsCollider {
   }
   /**
    * Sets the restitution from the next step on.
-   * @throws RangeError unless `restitution` is from 0 to 1.
+   * @throws MargoError (code `unsupported`) unless `restitution` is from 0 to 1.
    */
   setRestitution(restitution: number): this {
     if (!(restitution >= 0 && restitution <= 1))
-      throw new RangeError(
+      throw bodyInput(
         `Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`,
       );
     this.columns().colliderRestitution[this.handle] = restitution;
@@ -865,7 +866,7 @@ export class PhysicsCollider {
   /**
    * `voxels` shape: fills or empties cell (x, y, z) in place, growing the grid for a cell outside it, and keeps the
    * contacts of every other cell. A dynamic body's mass follows at once (Rapier's follows at the next step).
-   * @throws RangeError for a cell that is not three whole numbers, or on another shape.
+   * @throws MargoError (code `unsupported`) for a cell that is not three whole numbers, or on another shape.
    */
   setVoxel(x: number, y: number, z: number, filled: boolean): this {
     this.columns();

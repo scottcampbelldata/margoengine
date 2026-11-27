@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics as Root } from '../dist/index.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 await Promise.all([Physics.load(), Root.load()]);
 
@@ -137,8 +142,8 @@ test('setMassProperties: mass alone scales the inertia, every figure given is th
   // It falls as anything does: mass does not change gravity's pull.
   for (let i = 0; i < 30; i++) physics.step();
   near(tuned.linearVelocity[1], -9.81 * 0.5, 0.02, 'half a second of free fall');
-  assert.throws(() => tuned.setMassProperties({ mass: -1 }), RangeError);
-  assert.throws(() => tuned.setMassProperties({ mass: Infinity }), RangeError);
+  assert.throws(() => tuned.setMassProperties({ mass: -1 }), rigidCoded);
+  assert.throws(() => tuned.setMassProperties({ mass: Infinity }), rigidCoded);
   assert.throws(() => tuned.setMassProperties({ inertia: [1, -1, 1] }), /must not be negative/);
   physics.dispose();
 });
@@ -188,7 +193,7 @@ test('extra passes give an island what a world of that many passes would, and le
   body.additionalPgsIterations = 0xffffffff;
   assert.equal(body.additionalPgsIterations, 0xffffffff);
   body.additionalPgsIterations = 0;
-  assert.throws(() => (body.additionalPgsIterations = 1.5), RangeError);
+  assert.throws(() => (body.additionalPgsIterations = 1.5), rigidCoded);
   physics.dispose();
 });
 

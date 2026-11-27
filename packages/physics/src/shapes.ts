@@ -1,5 +1,6 @@
 import type { Geometry } from '@margoengine/core';
 import type { Quat, Vec3 } from './math.js';
+import { bodyInput } from './rigid-errors.js';
 
 /** Geometry-like source: a core `Geometry` (stride-6 interleaved vertices) or raw arrays. */
 export type ColliderGeometry =
@@ -289,7 +290,7 @@ export function collisionGroups(
   const mask = (value: number | readonly number[]): number => {
     if (typeof value === 'number') {
       if (!Number.isInteger(value) || value < 0 || value > 0xffff)
-        throw new RangeError(
+        throw bodyInput(
           'Group mask must be an integer from 0 to 65535; pass a 16-bit mask or an array of group indices.',
         );
       return value;
@@ -297,7 +298,7 @@ export function collisionGroups(
     let bits = 0;
     for (const group of value) {
       if (!Number.isInteger(group) || group < 0 || group > 15)
-        throw new RangeError('Group indices must be integers from 0 to 15; use one of the 16 groups.');
+        throw bodyInput('Group indices must be integers from 0 to 15; use one of the 16 groups.');
       bits |= 1 << group;
     }
     return bits;
@@ -319,7 +320,7 @@ export interface InteractionGroups {
 /**
  * Makes interaction groups from masks or lists of group indices 0..31. {@link collisionGroups} packs 16 groups a side into one
  * number, as Rapier's JavaScript build does; this keeps 32 and the test mode.
- * @throws RangeError for a mask that is not an integer from 0 to 4,294,967,295, an index outside 0..31 or a test mode that is not `and` or `or`.
+ * @throws MargoError (code `unsupported`) for a mask that is not an integer from 0 to 4,294,967,295, an index outside 0..31 or a test mode that is not `and` or `or`.
  */
 export function interactionGroups(
   memberships: number | readonly number[] = 0xffffffff,
@@ -329,7 +330,7 @@ export function interactionGroups(
   const mask = (value: number | readonly number[]): number => {
     if (typeof value === 'number') {
       if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
-        throw new RangeError(
+        throw bodyInput(
           'A group mask must be an integer from 0 to 4294967295; pass a 32-bit mask or an array of group indices.',
         );
       return value;
@@ -337,13 +338,13 @@ export function interactionGroups(
     let bits = 0;
     for (const group of value) {
       if (!Number.isInteger(group) || group < 0 || group > 31)
-        throw new RangeError('Group indices must be integers from 0 to 31; use one of the 32 groups.');
+        throw bodyInput('Group indices must be integers from 0 to 31; use one of the 32 groups.');
       bits = (bits | (1 << group)) >>> 0;
     }
     return bits;
   };
   if (testMode !== 'and' && testMode !== 'or')
-    throw new RangeError(`Unknown test mode ${String(testMode)}; use 'and' or 'or'.`);
+    throw bodyInput(`Unknown test mode ${String(testMode)}; use 'and' or 'or'.`);
   return Object.freeze({ memberships: mask(memberships), filter: mask(filter), testMode });
 }
 
@@ -370,7 +371,7 @@ export function groupWords(groups: number | InteractionGroups): {
 
 const _positive = (value: unknown, label: string): number => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
-    throw new RangeError(`${label} must be a positive number`);
+    throw bodyInput(`${label} must be a positive number`);
   return value;
 };
 
@@ -380,7 +381,7 @@ export function geometryPositions(source: ColliderGeometry, scale: Vec3 = [1, 1,
   // A core Geometry interleaves position and normal (stride 6); raw sources default to packed xyz.
   const stride = ('stride' in source ? source.stride : undefined) ?? ('bounds' in source ? 6 : 3);
   if (!Number.isInteger(stride) || stride < 3 || vertices.length % stride)
-    throw new RangeError(
+    throw bodyInput(
       'Vertex array length must be a multiple of its stride; pass whole vertices and a stride of at least 3.',
     );
   const count = vertices.length / stride,
@@ -398,7 +399,7 @@ export function bounds(positions: Float32Array): { min: [number, number, number]
       max[a] = Math.max(max[a], positions[i + a]);
     }
   if (!positions.length)
-    throw new RangeError('Geometry has no vertices; give the mesh geometry or set an explicit collider size.');
+    throw bodyInput('Geometry has no vertices; give the mesh geometry or set an explicit collider size.');
   return { min, max };
 }
 
@@ -409,7 +410,7 @@ export function usedVertices(vertices: ArrayLike<number>, indices: ArrayLike<num
   for (let i = 0; i < indices.length; i++) {
     const index = indices[i]!;
     if (!Number.isInteger(index) || index < 0 || index >= count)
-      throw new RangeError('Convex hull index is out of range; keep every index below the vertex count.');
+      throw bodyInput('Convex hull index is out of range; keep every index below the vertex count.');
     used.add(index);
   }
   const points: number[] = [];
@@ -422,6 +423,6 @@ export function usedVertices(vertices: ArrayLike<number>, indices: ArrayLike<num
 export function roundness(border: number | undefined, label: string): number {
   if (border === undefined) return 0;
   if (!(border >= 0) || !Number.isFinite(border))
-    throw new RangeError(`${label} borderRadius must be 0 or more and finite (got ${border}).`);
+    throw bodyInput(`${label} borderRadius must be 0 or more and finite (got ${border}).`);
   return border;
 }

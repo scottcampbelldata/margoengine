@@ -114,6 +114,24 @@ export const entries = [
     fix: "Pass what the message names: [x, y, z] of finite numbers, sizes in SI units above 0 (newtons, newton seconds, metres, m/s²), shares of 0 or more, and one of the named falloffs or modes. A wind force's flow field must be in the physics world's frame.",
   },
   {
+    id: 'physics-bodies',
+    title: '@margoengine/physics bodies, colliders, shapes, queries and the world',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A rigid body, collider, shape, scene query or world setting got an input it cannot use (code unsupported): a position, velocity, force, direction or box that is not three finite numbers (or a zero direction), a rotation that is not a quaternion of finite numbers, a mass, density, damping, size, radius, speed or time that is negative or not finite, a shape name or body type that does not exist, a body, collider or row that was removed or belongs to another world, a body of the wrong type for the call (a next velocity on a body that is not kinematicPosition), a mesh from another engine, a solver option outside its range, or a hierarchy deeper than 64 nodes.',
+    fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
+  },
+  {
+    id: 'physics-meshes',
+    title: '@margoengine/physics mesh colliders, hulls, mesh mass and convex decomposition',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A triangle mesh, convex hull, heightfield, mesh-mass estimate, OBJ file or convex decomposition got a mesh it cannot use (code unsupported): positions that are not a whole number of finite x, y, z triples, indices that are not a whole number of triangles or name a vertex the mesh does not have, fewer than four hull points or points that span no volume, an open, flat or inside-out mesh where a closed one is needed, a heightfield whose heights are not rows by columns of finite numbers, or an option out of range.',
+    fix: "Pass finite positions (three per vertex) and whole triangles of indices below the vertex count; close an open mesh, or give a trimesh `massFallback: 'winding'` (or call `estimateMeshMassProperties`) for an open or non-manifold one; spread hull points over a volume; for a dynamic concave body run `convexDecomposition`. The message names the input and the change to make.",
+  },
+  {
     id: 'physics-instances',
     title: '@margoengine/physics: one body per instance of an instanced mesh',
     kind: 'family',

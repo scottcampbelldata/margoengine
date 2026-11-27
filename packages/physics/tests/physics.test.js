@@ -4,6 +4,11 @@ import { Geometry, box } from '@margoengine/core';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { Physics, collisionGroups, eulerToQuat, geometryPositions } from '../dist/index.js';
 import { setMeshSource, clearMeshSource } from '../../shared/mesh-source.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -1065,7 +1070,7 @@ rtest(
       source = registerPBR(child);
     try {
       assert.throws(() => physics.addBody(foreign.createMesh().setGeometry(box())), {
-        name: 'TypeError',
+        name: 'MargoError',
         message: /another engine/,
       });
       source.primitives[0].vertices[0] = NaN;
@@ -1145,8 +1150,8 @@ rtest('setType switches a body between kinematic and dynamic, keeping its pose a
   for (let i = 0; i < 30; i++) physics.step();
   assert.deepEqual(body.position, held, 'kinematic again: it stays where it was');
   body.setType('kinematicPosition');
-  assert.throws(() => body.setType('sideways'), { name: 'TypeError', message: /use dynamic, fixed/ });
-  assert.throws(() => body.setType('toString'), { name: 'TypeError', message: /use dynamic, fixed/ });
+  assert.throws(() => body.setType('sideways'), { name: 'MargoError', message: /use dynamic, fixed/ });
+  assert.throws(() => body.setType('toString'), { name: 'MargoError', message: /use dynamic, fixed/ });
   body.remove();
   assert.throws(() => body.setType('dynamic'), { code: 'state' });
   physics.dispose();
@@ -1278,7 +1283,7 @@ rtest('additional mass and inertia add to what the colliders give, and 0 takes t
   body.setAdditionalMass(0);
   physics.step();
   near(body.mass, 1, 1e-5, 'taken off');
-  assert.throws(() => body.setAdditionalMass(-1), { name: 'RangeError' });
+  assert.throws(() => body.setAdditionalMass(-1), { name: 'MargoError' });
   physics.dispose();
 });
 

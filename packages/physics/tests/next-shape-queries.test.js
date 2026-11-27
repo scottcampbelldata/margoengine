@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -495,5 +500,5 @@ test('stopAtPenetration and the filter act as Rapier documents them', () => {
   assert.throws(() => own.shapeCast({ shape: 'custom', desc: {} }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), {
     code: 'unsupported',
   });
-  assert.throws(() => own.shapeCast(probe, [0, 0, 0], [0, 0, 0, 1], [0, 0, 0]), RangeError);
+  assert.throws(() => own.shapeCast(probe, [0, 0, 0], [0, 0, 0, 1], [0, 0, 0]), rigidCoded);
 });

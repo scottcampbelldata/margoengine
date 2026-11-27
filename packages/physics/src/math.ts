@@ -1,4 +1,5 @@
 import { eulerToQuaternion } from '@margoengine/math/quat';
+import { bodyInput } from './rigid-errors.js';
 
 /** A 3-component vector [x, y, z]. */
 export type Vec3 = readonly [number, number, number];
@@ -22,10 +23,10 @@ export const tuple4 = (q: { x: number; y: number; z: number; w: number }): [numb
 ];
 
 export function checkVec(value: unknown, label: string): asserts value is Vec3 {
-  if (!Array.isArray(value) && !ArrayBuffer.isView(value)) throw new TypeError(`${label} must be [x, y, z]`);
+  if (!Array.isArray(value) && !ArrayBuffer.isView(value)) throw bodyInput(`${label} must be [x, y, z]`);
   const v = value as ArrayLike<number>;
   if (v.length !== 3 || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2]))
-    throw new RangeError(`${label} must be three finite numbers`);
+    throw bodyInput(`${label} must be three finite numbers`);
 }
 
 /** Same XYZ Euler convention as core's `Mesh.setRotation` (`@margoengine/math/quat` eulerToQuaternion). */

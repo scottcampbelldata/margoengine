@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const drift = (physics, extra = {}) =>
   physics.addBody(null, {
@@ -36,8 +41,8 @@ test('a shorter window sleeps sooner, and Infinity gives the world back', async 
   assert.equal(normal.sleeping, false);
   quick.sleepTime = Infinity;
   assert.equal(quick.sleepTime, 0.5);
-  assert.throws(() => (quick.sleepTime = 0), RangeError);
-  assert.throws(() => (quick.sleepThreshold = -1), RangeError);
-  assert.throws(() => (quick.sleepThreshold = NaN), RangeError);
+  assert.throws(() => (quick.sleepTime = 0), rigidCoded);
+  assert.throws(() => (quick.sleepThreshold = -1), rigidCoded);
+  assert.throws(() => (quick.sleepThreshold = NaN), rigidCoded);
   physics.dispose();
 });

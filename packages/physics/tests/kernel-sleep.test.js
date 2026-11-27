@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { KernelWorld, loadKernel } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 function still(x = 0, rows = 8) {
   const world = new KernelWorld(rows);
@@ -95,7 +100,7 @@ test('the thresholds read back and bad ones are refused', async () => {
     [Number.NaN, 1],
     [1, Number.POSITIVE_INFINITY],
   ])
-    assert.throws(() => world.setSleep(energy, time), RangeError);
+    assert.throws(() => world.setSleep(energy, time), rigidCoded);
 });
 
 test('a dead row is ignored by wake and sleep and reads as awake', async () => {

@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { meshFileCollider, parseDAE, parseOBJ, parseSTL } from '../dist/meshfiles.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 // A unit cube from 0 to 1, as 12 triangles (counter-clockwise from outside).
 const corners = [
@@ -61,9 +66,9 @@ test('STL, binary and ASCII, and OBJ read into the same welded cube', () => {
 });
 
 test('files that cannot be read say what to pass', () => {
-  assert.throws(() => parseSTL('solid empty\nendsolid\n'), RangeError);
+  assert.throws(() => parseSTL('solid empty\nendsolid\n'), rigidCoded);
   assert.throws(() => parseOBJ('v 0 0 0\nf 1 2 3\n'), /vertex 2/);
-  assert.throws(() => parseOBJ('# nothing\n'), RangeError);
+  assert.throws(() => parseOBJ('# nothing\n'), rigidCoded);
 });
 
 test('a cube file is a collider: a trimesh a ray meets at its top, a hull that falls and rests on a floor', async () => {

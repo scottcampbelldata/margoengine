@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RapierPhysics } from './oracle.js';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -62,10 +67,10 @@ test('a world in centimetres with a length unit of 100 plays out as the one in m
 });
 
 test('a length unit is a positive number, set before or after, and a later setSolver replaces what it set', () => {
-  assert.throws(() => new Physics(null, { lengthUnit: 0 }), { name: 'RangeError', message: /lengthUnit.*above 0/ });
+  assert.throws(() => new Physics(null, { lengthUnit: 0 }), { name: 'MargoError', message: /lengthUnit.*above 0/ });
   const physics = new Physics(null);
-  assert.throws(() => (physics.lengthUnit = -1), RangeError);
-  assert.throws(() => (physics.lengthUnit = Number.NaN), RangeError);
+  assert.throws(() => (physics.lengthUnit = -1), rigidCoded);
+  assert.throws(() => (physics.lengthUnit = Number.NaN), rigidCoded);
   physics.lengthUnit = 0.001;
   near(physics.predictionDistance, 0.04 * 0.001, 1e-9);
   physics.lengthUnit = 1;
@@ -132,8 +137,8 @@ test('maxCcdSubsteps 0 turns continuous collision off for the world, whatever th
   assert.ok(shoot(0) > 0, 'with CCD off for the world bullets that ask for it still pass');
   const physics = new Physics(null);
   assert.equal(physics.maxCcdSubsteps, 1);
-  assert.throws(() => (physics.maxCcdSubsteps = -1), { name: 'RangeError', message: /use 0 to turn CCD off/ });
-  assert.throws(() => (physics.maxCcdSubsteps = 1.5), RangeError);
+  assert.throws(() => (physics.maxCcdSubsteps = -1), { name: 'MargoError', message: /use 0 to turn CCD off/ });
+  assert.throws(() => (physics.maxCcdSubsteps = 1.5), rigidCoded);
   physics.maxCcdSubsteps = 0;
   const saved = physics.kernel.snapshot();
   physics.maxCcdSubsteps = 3;
@@ -347,8 +352,8 @@ test('the solver settings do what they say: stiffness, allowed depth, push-out s
   };
   near(parting(0.5), 0.5, 0.1, 'capped at 0.5 m/s');
   near(parting(3), 3, 0.5, 'and at 3 m/s');
-  assert.throws(() => new Physics(null).setSolver({ contactHertz: -1 }), RangeError);
-  assert.throws(() => new Physics(null).setSolver({ warmStart: 2 }), RangeError);
+  assert.throws(() => new Physics(null).setSolver({ contactHertz: -1 }), rigidCoded);
+  assert.throws(() => new Physics(null).setSolver({ warmStart: 2 }), rigidCoded);
 
   // Substeps and passes: the world's name for Rapier's solver iterations and internal passes.
   const physics = new Physics(null);

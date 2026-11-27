@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { KernelWorld, loadKernel } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 test('mass, centre and moments come from the colliders', async () => {
   await loadKernel();
@@ -80,11 +85,11 @@ test('a collider the kernel cannot use is refused with what to do', async () => 
   await loadKernel();
   const world = new KernelWorld(2),
     body = world.addBody('dynamic');
-  assert.throws(() => world.addCollider(5, 'ball', [1]), { name: 'RangeError', message: /holds no body/ });
-  assert.throws(() => world.addCollider(body, 'cloud', [1]), { name: 'RangeError', message: /Unknown shape/ });
-  assert.throws(() => world.addCollider(body, 'box', [1, 1]), { name: 'RangeError', message: /3 finite sizes/ });
-  assert.throws(() => world.addCollider(body, 'ball', [0]), RangeError);
-  assert.throws(() => world.addCollider(body, 'ball', [Number.NaN]), RangeError);
+  assert.throws(() => world.addCollider(5, 'ball', [1]), { name: 'MargoError', message: /holds no body/ });
+  assert.throws(() => world.addCollider(body, 'cloud', [1]), { name: 'MargoError', message: /Unknown shape/ });
+  assert.throws(() => world.addCollider(body, 'box', [1, 1]), { name: 'MargoError', message: /3 finite sizes/ });
+  assert.throws(() => world.addCollider(body, 'ball', [0]), rigidCoded);
+  assert.throws(() => world.addCollider(body, 'ball', [Number.NaN]), rigidCoded);
   assert.throws(() => world.addCollider(body, 'ball', [1], { density: -1 }), { message: /Density/ });
   assert.throws(() => world.addCollider(body, 'ball', [1], { position: [Number.NaN, 0, 0] }), { message: /finite/ });
   assert.throws(() => world.addCollider(body, 'ball', [1], { rotation: [1, 1, 0, 0] }), { message: /unit quaternion/ });

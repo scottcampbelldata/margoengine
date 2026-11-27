@@ -7,6 +7,11 @@ import { box } from '@margoengine/core';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import * as root from '../dist/index.js';
 import * as next from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -71,8 +76,8 @@ for (const [name, Physics] of Object.entries(entries)) {
     const before = physics.stepCount;
     physics.update(DT * 4);
     assert.equal(physics.stepCount, before + 2);
-    assert.throws(() => physics.update(-1), RangeError);
-    assert.throws(() => physics.update(Number.NaN), RangeError);
+    assert.throws(() => physics.update(-1), rigidCoded);
+    assert.throws(() => physics.update(Number.NaN), rigidCoded);
     physics.dispose();
   });
 
@@ -103,7 +108,7 @@ for (const [name, Physics] of Object.entries(entries)) {
     const half = Math.SQRT1_2;
     body.setRotation([0, half, 0, half]);
     near(body.rotation[1], half, 1e-6);
-    assert.throws(() => body.setPosition([Number.NaN, 0, 0]), RangeError);
+    assert.throws(() => body.setPosition([Number.NaN, 0, 0]), rigidCoded);
     physics.dispose();
     engine.dispose();
   });
@@ -254,11 +259,11 @@ for (const [name, Physics] of Object.entries(entries)) {
 
   both('a body is refused what it cannot be', () => {
     const physics = new Physics(null);
-    assert.throws(() => physics.addBody(null, { type: 'liquid' }), TypeError);
-    assert.throws(() => physics.addBody(null, { position: [0, 0] }), RangeError);
-    assert.throws(() => physics.addBody(null, { colliders: { shape: 'box' } }), TypeError);
-    assert.throws(() => new Physics(null, { fixedTimestep: 0 }), RangeError);
-    assert.throws(() => new Physics(null, { maxSubsteps: 0.5 }), RangeError);
+    assert.throws(() => physics.addBody(null, { type: 'liquid' }), rigidCoded);
+    assert.throws(() => physics.addBody(null, { position: [0, 0] }), rigidCoded);
+    assert.throws(() => physics.addBody(null, { colliders: { shape: 'box' } }), rigidCoded);
+    assert.throws(() => new Physics(null, { fixedTimestep: 0 }), rigidCoded);
+    assert.throws(() => new Physics(null, { maxSubsteps: 0.5 }), rigidCoded);
     physics.dispose();
     assert.equal(physics.isDisposed, true);
     assert.equal(physics.update(1), 0);

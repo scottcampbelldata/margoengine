@@ -3,6 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 const near = (actual, expected, bound, message) =>
   assert.ok(Math.abs(actual - expected) <= bound, `${message}: ${actual} is not within ${bound} of ${expected}`);
@@ -24,7 +29,7 @@ test('a world speed cap holds every dynamic body, and a body cap below it still 
   physics.setSolver({ maxLinearSpeed: 0 });
   for (let i = 0; i < 120; i++) physics.step();
   assert.ok(Math.abs(fast.linearVelocity[1]) > 10, 'no cap with 0');
-  assert.throws(() => physics.setSolver({ maxLinearSpeed: -1 }), RangeError);
+  assert.throws(() => physics.setSolver({ maxLinearSpeed: -1 }), rigidCoded);
   physics.dispose();
 });
 
@@ -62,7 +67,7 @@ test('static contact softness sets the stiffness of contacts with fixed bodies a
   near(mixed.between, soft.between, 0.01, 'near the all-soft world');
   const physics = new Physics(null);
   assert.equal(physics.solver.staticContactHertz, 0, 'off by default: contacts use contactHertz');
-  assert.throws(() => physics.setSolver({ staticContactHertz: -1 }), RangeError);
+  assert.throws(() => physics.setSolver({ staticContactHertz: -1 }), rigidCoded);
   physics.dispose();
 });
 
@@ -93,7 +98,7 @@ test('the joint warm start share is read back, and with none a swing that meets 
   assert.equal(physics.solver.warmStartJoints, 1);
   physics.setSolver({ warmStartJoints: 0.5 });
   assert.equal(physics.solver.warmStartJoints, 0.5);
-  assert.throws(() => physics.setSolver({ warmStartJoints: 2 }), RangeError);
+  assert.throws(() => physics.setSolver({ warmStartJoints: 2 }), rigidCoded);
   physics.dispose();
 });
 

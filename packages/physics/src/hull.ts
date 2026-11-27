@@ -13,6 +13,8 @@
 // this way has no holes; a triangle that would touch the region only at a corner waits until it shares a second edge.
 //
 // On the add path, as a game can add colliders in its step: no `Math` at all, so the hull is the same in every browser.
+import { meshInput } from './rigid-errors.js';
+import type { MargoError } from '@margoengine/math/errors';
 
 /** A hull as the kernel takes it: vertices, and faces of vertex indices counter-clockwise seen from outside. */
 export interface HullFaces {
@@ -90,27 +92,27 @@ export function beyond(
   return volume > ORIENT3D_A * permanent;
 }
 
-const degenerate = (): RangeError =>
-  new RangeError(
+const degenerate = (): MargoError =>
+  meshInput(
     'The hull could not close because these points are nearly degenerate; remove near-duplicate points or pass fewer, wider-spread points.',
   );
 
 /**
  * The convex hull of flat x, y, z numbers as kernel faces. Points inside, duplicates and points within rounding of a
  * face are dropped, and triangles in one plane merge into one face.
- * @throws RangeError for fewer than four points, points that are not finite, or points that span no volume.
+ * @throws MargoError (code `unsupported`) for fewer than four points, points that are not finite, or points that span no volume.
  */
 export function buildHull(input: ArrayLike<number>): HullFaces {
   if (input.length % 3)
-    throw new RangeError(`A convex hull got ${input.length} numbers; pass three (x, y, z) per point.`);
+    throw meshInput(`A convex hull got ${input.length} numbers; pass three (x, y, z) per point.`);
   const count = input.length / 3;
-  if (count < 4) throw new RangeError(`A convex hull got ${count} points; pass at least four that span a volume.`);
+  if (count < 4) throw meshInput(`A convex hull got ${count} points; pass at least four that span a volume.`);
   const low = [Infinity, Infinity, Infinity],
     high = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < input.length; i++) {
     const value = input[i];
     if (typeof value !== 'number' || !(value - value === 0))
-      throw new RangeError(`Convex hull point ${(i / 3) | 0} is not finite; pass finite coordinates.`);
+      throw meshInput(`Convex hull point ${(i / 3) | 0} is not finite; pass finite coordinates.`);
     const axis = i % 3;
     if (value < low[axis]) low[axis] = value;
     if (value > high[axis]) high[axis] = value;
@@ -233,7 +235,7 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
         d = x * x + y * y + z * z;
       if (d > best) [best, v0, v1] = [d, extremes[i], extremes[j]];
     }
-  if (v0 === v1) throw new RangeError('The convex hull points all coincide; pass points that span a volume.');
+  if (v0 === v1) throw meshInput('The convex hull points all coincide; pass points that span a volume.');
   const dx = p[v1 * 3] - p[v0 * 3],
     dy = p[v1 * 3 + 1] - p[v0 * 3 + 1],
     dz = p[v1 * 3 + 2] - p[v0 * 3 + 2];
@@ -249,7 +251,7 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
       d = cx * cx + cy * cy + cz * cz;
     if (d > best) [best, v2] = [d, i];
   }
-  if (v2 < 0) throw new RangeError('The convex hull points all lie on one line; pass points that span a volume.');
+  if (v2 < 0) throw meshInput('The convex hull points all lie on one line; pass points that span a volume.');
   const base = addFace(v0, v1, v2);
   let v3 = -1;
   best = fat;
@@ -257,7 +259,7 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
     const d = height(base, i);
     if (d > best || -d > best) [best, v3] = [d > 0 ? d : -d, i];
   }
-  if (v3 < 0) throw new RangeError('The convex hull points all lie in one plane; pass points that span a volume.');
+  if (v3 < 0) throw meshInput('The convex hull points all lie in one plane; pass points that span a volume.');
   // Start again with the base turned so the fourth point is behind it.
   if (height(base, v3) > 0) [v1, v2] = [v2, v1];
   corner.length = across.length = normal.length = offset.length = area.length = 0;
@@ -538,7 +540,7 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
   }
   for (const polygon of polygons)
     if (polygon.length > MAX_FACE_EDGES)
-      throw new RangeError(
+      throw meshInput(
         `A face of this convex hull has ${polygon.length} corners and the solver takes ${MAX_FACE_EDGES}; pass fewer points around that face.`,
       );
 

@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { KernelWorld, loadKernel } from '../dist/index.js';
+// Bad input to a body, collider, shape, query or mesh is a coded MargoError linking its help entry (Part 1, item 3).
+const rigidCoded = (error) =>
+  error?.name === 'MargoError' &&
+  error.code === 'unsupported' &&
+  /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
 
 function resting(options) {
   const world = new KernelWorld(8);
@@ -24,10 +29,10 @@ test('solver settings read back, check their range and survive a snapshot', asyn
   world.setSolver({ contactHertz: 60, jointShare: 0.5, allowedPenetration: 0.001 });
   assert.equal(world.solver.contactHertz, 60);
   assert.equal(world.solver.contactDamping, defaults.contactDamping);
-  assert.throws(() => world.setSolver({ jointShare: 2 }), RangeError);
-  assert.throws(() => world.setSolver({ contactHertz: -1 }), RangeError);
-  assert.throws(() => world.setSolver({ contactMaxPush: NaN }), RangeError);
-  assert.throws(() => world.setSolver({ contactMaxPush: Infinity }), RangeError);
+  assert.throws(() => world.setSolver({ jointShare: 2 }), rigidCoded);
+  assert.throws(() => world.setSolver({ contactHertz: -1 }), rigidCoded);
+  assert.throws(() => world.setSolver({ contactMaxPush: NaN }), rigidCoded);
+  assert.throws(() => world.setSolver({ contactMaxPush: Infinity }), rigidCoded);
   assert.equal(world.solver.jointShare, 0.5, 'a refused call changes nothing');
   const saved = world.snapshot();
   world.setSolver({ contactHertz: 30 });
@@ -53,7 +58,7 @@ test('a world with the same settings replays bit for bit', async () => {
 test('warm start of 1 is the default, and a cold start still rests a box but carries nothing between substeps', async () => {
   await loadKernel();
   assert.equal(new KernelWorld(8).solver.warmStart, 1);
-  assert.throws(() => new KernelWorld(8).setSolver({ warmStart: 1.5 }), RangeError);
+  assert.throws(() => new KernelWorld(8).setSolver({ warmStart: 1.5 }), rigidCoded);
   const warm = resting({});
   const cold = resting({ warmStart: 0 });
   assert.ok(Math.abs(cold.y - 1) < 0.01, `cold rest ${cold.y}`);
