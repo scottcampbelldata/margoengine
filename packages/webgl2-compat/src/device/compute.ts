@@ -3,7 +3,8 @@
 // getBindGroupLayout works synchronously, while the planning, translation and running of compute (the tiers of the
 // roadmap's compute plan) load lazily with the compute entry, before `requestDevice` answers. A
 // (KB-COMPAT-FIRSTTASK1: loaded on first use, the first compute submit waited in the queue).
-import type { IREntryPoint, IRGlobalVar } from '../wgsl/ir.js';
+import { constantOf } from '../wgsl/override-value.js';
+import type { IREntryPoint, IRExpr, IRFunction, IRGlobalVar, IRModule } from '../wgsl/ir.js';
 import { sizeOf, type TextureType } from '../wgsl/types.js';
 import type { CompatDevice } from './device.js';
 import {
@@ -13,7 +14,6 @@ import {
   type CompatPipelineLayout,
   type CompatShaderModule,
   type LayoutEntry,
-  type Uses,
 } from './resources.js';
 import type { Replayer } from './render.js';
 import { OP, type Tape, type TapePool } from './tape.js';
@@ -97,6 +97,50 @@ function autoLayouts(entry: IREntryPoint): CompatBindGroupLayout[] {
   return out;
 }
 
+/**
+ * Why WebGPU refuses an entry point's workgroup on a device (WebGPU "createComputePipeline": each `@workgroup_size`
+ * dimension, their product and the workgroup variables' bytes against the device's limits), or null. A dimension with
+ * no value here is left to the compute planner; an override-sized array counts the length its override resolves to.
+ */
+function workgroupFailure(
+  entry: IREntryPoint,
+  declared: IRModule['globals'],
+  constants: Readonly<Record<string, number | boolean>>,
+  limits: Readonly<Record<string, number>>,
+): string | null {
+  const fn: IRFunction = entry.function;
+  const over = (what: string, value: number, limit: string) =>
+    value > limits[limit] ? `${what} of '${fn.name}' exceeds ${limit} (${limits[limit]}): ${value}` : null;
+  let invocations = 1;
+  for (let i = 0; i < 3; i++) {
+    const v = fn.workgroupSize?.[i] ?? 1;
+    const n = typeof v === 'number' ? v : constantOf(v, constants);
+    if (n === undefined) return null;
+    const axis = 'XYZ'[i];
+    const failure = over(`@workgroup_size ${axis.toLowerCase()}`, n, `maxComputeWorkgroupSize${axis}`);
+    if (failure) return failure;
+    invocations *= n;
+  }
+  let bytes = 0;
+  for (const g of entry.globals) {
+    if (g.kind !== 'var' || g.space !== 'workgroup') continue;
+    const t = (g as IRGlobalVar).type;
+    let size = sizeOf(t);
+    // sizeOf counts an override-sized array as one element.
+    if (t.kind === 'array' && typeof t.count === 'object') {
+      const name = t.count.override;
+      const decl = declared.find((o) => o.kind === 'override' && o.name === name);
+      const length = decl && constantOf({ kind: 'name', decl } as unknown as IRExpr, constants);
+      if (length !== undefined) size *= length;
+    }
+    bytes += Math.ceil(size / 16) * 16;
+  }
+  return (
+    over('the invocations per workgroup', invocations, 'maxComputeInvocationsPerWorkgroup') ??
+    over('the workgroup storage bytes', bytes, 'maxComputeWorkgroupStorageSize')
+  );
+}
+
 /** A GPUComputePipeline: the checked entry point, its bind group layouts and (once built) how it runs. */
 export class CompatComputePipeline {
   label: string;
@@ -141,6 +185,12 @@ export class CompatComputePipeline {
     }
     this.entry = entry;
     this.layouts = this.explicit ? [...this.explicit.bindGroupLayouts] : autoLayouts(entry);
+    const workgroup = workgroupFailure(entry, ir.globals, this.constants, device.limits);
+    if (workgroup) {
+      this.failure = `createComputePipeline${this.label ? ` '${this.label}'` : ''}: ${workgroup}; use a smaller workgroup`;
+      device.validationError(this.failure);
+      return;
+    }
     // Count the complete layout, including unused explicit bindings, across all groups.
     // CPU execution is an implementation route, not permission to exceed the device's contract.
     const counts = new Map<string, number>();

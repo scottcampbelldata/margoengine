@@ -10,8 +10,10 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { readCorpus } from './corpus/store.mjs';
 import {
+  assertEnableRefusal,
   assertOverUnits,
   assertUnmappedCounts,
+  RECORDED_OVER_INVOCATIONS,
   RECORDED_UNMAPPED_ENABLES,
 } from './support/corpus-refusals.mjs';
 import { PARTS, corpusDrawWork, partsOf } from './corpus-draw-parts.mjs';
@@ -59,17 +61,33 @@ try {
     const tiers = Object.entries(compute.tiers)
       .map(([tier, n]) => `  ${n} x ${tier}`)
       .join('\n');
+    const enables = {};
+    for (const refusal of compute.enableRefusals) {
+      assertEnableRefusal(refusal, refusal.name, refusal.id);
+      enables[refusal.name] = (enables[refusal.name] ?? 0) + 1;
+    }
     console.log(
-      `WGSL corpus compute (${parts.filter((p) => p !== 'render').join(', ')}): ${computes.length - compute.validatedInvalid} recorded compute pipelines dispatched on WebGL2, ${compute.validatedInvalid} invalid pipelines correctly rejected (${outOfScope} of the voxel path tracer, checked on their own, not dispatched):\n${tiers}`,
+      `refused for an unmapped enable: ${JSON.stringify(enables)}; refused at creation past 256 invocations: ${compute.overInvocations.length}`,
+    );
+    console.log(
+      `WGSL corpus compute (${parts.filter((p) => p !== 'render').join(', ')}): ${computes.length - compute.validatedInvalid - compute.enableRefusals.length - compute.overInvocations.length} recorded compute pipelines dispatched on WebGL2, ${compute.validatedInvalid} invalid pipelines correctly rejected (${outOfScope} of the voxel path tracer, checked on their own, not dispatched):\n${tiers}`,
     );
     if (compute.failures.length) console.log(`FAILURES ${compute.failures.length}:\n${compute.failures.join('\n')}`);
     assert.deepEqual(compute.failures, []);
     assert.equal(
-      Object.values(compute.tiers).reduce((a, b) => a + b, 0) + compute.validatedInvalid,
+      Object.values(compute.tiers).reduce((a, b) => a + b, 0) +
+        compute.validatedInvalid +
+        compute.enableRefusals.length +
+        compute.overInvocations.length,
       computes.length,
       'every recorded compute pipeline must dispatch or prove its required validation rejection',
     );
-    // Nothing is refused: the light probes' bake kernels, which sample a cube map on the CPU tier, were the last.
+    assertUnmappedCounts(enables, RECORDED_UNMAPPED_ENABLES.compute, 'corpus compute dispatches');
+    assert.ok(
+      compute.overInvocations.length <= RECORDED_OVER_INVOCATIONS.compute,
+      `${compute.overInvocations.length} pipelines past 256 invocations, more than the recorded ${RECORDED_OVER_INVOCATIONS.compute}`,
+    );
+    // Nothing else is refused: the light probes' bake kernels, which sample a cube map on the CPU tier, were the last.
     assert.deepEqual(
       Object.keys(compute.tiers).filter((tier) => tier.startsWith('refused')),
       [],

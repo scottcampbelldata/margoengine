@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { planCompute, runComputeOnCPU } from '../dist/compute.js';
 import { checkWGSL } from '../dist/wgsl.js';
 import { readCorpus } from './corpus/store.mjs';
+import { CompatDevice } from '../dist/device.js';
 import {
   assertEnableRefusal,
   assertUnmappedCounts,
@@ -89,6 +90,26 @@ test('a store straight before a return inside a loop of unknown length counts on
   assert.match(skipped.reason, /loop of unknown length/);
 });
 
+/** The failure createComputePipeline reports for a corpus kernel on the layer's compute limits, or null. */
+function creationFailure(module, entryPoint, constants) {
+  const failure = CompatDevice.prototype.createComputePipeline.call(
+    {
+      limits: {
+        maxBindGroups: 4,
+        maxComputeWorkgroupStorageSize: 16384,
+        maxComputeInvocationsPerWorkgroup: 256,
+        maxComputeWorkgroupSizeX: 256,
+        maxComputeWorkgroupSizeY: 256,
+        maxComputeWorkgroupSizeZ: 64,
+      },
+      loadCompute: async () => {},
+      validationError() {},
+    },
+    { layout: 'auto', compute: { module: { ir: module }, entryPoint, constants } },
+  ).failure;
+  return failure;
+}
+
 test('every compute entry point of the corpus gets a tier; only an unmapped enable is refused, coded and named', () => {
   const { modules } = readCorpus();
   const tiers = { fragment: 0, scatter: 0, cpu: 0 },
@@ -115,12 +136,19 @@ test('every compute entry point of the corpus gets a tier; only an unmapped enab
       } catch (error) {
         // The only other refusal: a kernel compute sized for an adapter granting more than 256 invocations.
         assert.ok(
-          error instanceof RangeError && /more than 256 invocations; use at most 256 \(WebGPU's limit\)/.test(error.message),
+          error instanceof RangeError &&
+            /more than 256 invocations; use at most 256 \(WebGPU's limit\)/.test(error.message),
           `${m.package} ${m.key} ${entryPoint}: ${error}`,
+        );
+        assert.match(
+          creationFailure(module, entryPoint, constants) ?? '',
+          /exceeds maxCompute(WorkgroupSizeX|InvocationsPerWorkgroup) \(256\)/,
+          `${m.package} ${m.key} ${entryPoint}: createComputePipeline refuses it too (KB-COMPAT-WGSIZE1)`,
         );
         overInvocations++;
         continue;
       }
+      assert.equal(creationFailure(module, entryPoint, constants), null, `${m.package} ${m.key} ${entryPoint}`);
       tiers[plan.tier]++;
     }
   }

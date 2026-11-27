@@ -141,7 +141,10 @@ function computeValidationResult(layouts, limits, error) {
 window.dispatchAll = async (records, sources) => {
   const gpu = createCompatGPU();
   const failures = [],
-    tiers = {};
+    tiers = {},
+    // Refusals the Node side asserts and counts (support/corpus-refusals.mjs).
+    enableRefusals = [],
+    overInvocations = [];
   let device, modules;
   let validatedInvalid = 0;
   const fresh = async () => {
@@ -163,7 +166,15 @@ window.dispatchAll = async (records, sources) => {
         compute: { module: module(rec.compute.module), entryPoint: rec.compute.entryPoint, constants: rec.compute.constants },
       });
       const layouts = Array.from({length: device.limits.maxBindGroups}, (_, g) => pipeline.getBindGroupLayout(g));
-      const construction = computeValidationResult(layouts, device.limits, await device.popErrorScope());
+      const created = await device.popErrorScope();
+      if (
+        created?.name === 'GPUValidationError' &&
+        /exceeds maxCompute(WorkgroupSizeX|InvocationsPerWorkgroup) \(256\)/.test(created.message)
+      ) {
+        overInvocations.push(rec.id);
+        continue;
+      }
+      const construction = computeValidationResult(layouts, device.limits, created);
       if (construction.problem) {
         failures.push(`${rec.id}: ${construction.problem}`);
         await fresh();
@@ -213,14 +224,17 @@ window.dispatchAll = async (records, sources) => {
     } catch (error) {
       await device.popErrorScope().catch(() => null);
       const message = String(error?.message ?? error);
-      if (error?.code === 'unsupported') {
+      const enable = /'enable (\w+);'/.exec(message)?.[1];
+      if (error?.code === 'unsupported' && enable) {
+        enableRefusals.push({ id: rec.id, name: enable, code: error.code, message });
+      } else if (error?.code === 'unsupported') {
         const reason = message.replace(/; see .*/, '').replace(/'[^']*'/g, "'...'");
         tiers[`refused: ${reason}`] = (tiers[`refused: ${reason}`] ?? 0) + 1;
       } else failures.push(`${rec.id}: ${message}`.slice(0, 1500));
     }
   }
   device.destroy();
-  return { tiers, failures, validatedInvalid };
+  return { tiers, failures, validatedInvalid, enableRefusals, overInvocations };
 };
 window.ready = true;
 </script>
