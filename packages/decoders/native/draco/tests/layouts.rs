@@ -122,3 +122,11 @@ fn kd_stream_ends_match_black_box_outputs_and_rejections() {
     let counts = check(include_bytes!("fixtures/kd-streams.bin"));
     assert_eq!(counts, (134, 80, 54, 0));
 }
+
+/// E48 and E49: only the metadata flag bit is read, from version 1.3, and one
+/// metadata node's children have distinct names.
+#[test]
+fn metadata_headers_match_black_box_outputs_and_rejections() {
+    let counts = check(include_bytes!("fixtures/metadata-header.bin"));
+    assert_eq!(counts, (101, 46, 55, 0));
+}

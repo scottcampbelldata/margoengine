@@ -16913,6 +16913,19 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/normal-wide.bin`, `header-counts.bin` and `kd-streams.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder differed on header flags and metadata names (batch 133, E48 and E49)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Invalid` for a stream with an unused header flag set, read metadata
+  in streams before version 1.3, and accepted a metadata node with two children
+  of one name, which the prebuilt rejects.
+- **Cause:** `native/draco/src/sequential.rs` refused every other flag bit at
+  every version; `metadata.rs` did not compare child names.
+- **Fix:** the observed rules
+  ([E48 and E49](clean-room.md#batch-133-e48-and-e49-header-flags-and-metadata-names-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/metadata-header.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -16949,8 +16962,11 @@ E26 to E40):
   `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
   int32 arithmetic of that mode is not established.
 - Not probed: position-reading predictors on attribute decoders with seams that
-  split vertices, metadata before 2.2, and constrained multi-parallelogram
-  before 2.2 beyond the retained cases.
+  split vertices, and constrained multi-parallelogram before 2.2 beyond the
+  retained cases.
+- Damaged streams from the E48/E49 probe: a few version 1.0 and 2.2 inputs where
+  Margo accepts or refuses unlike the prebuilt, among them a mesh and a KD cloud
+  with no attributes that the prebuilt decodes and Margo refuses.
 
 - Damaged EdgeBreaker headers (E44's 60,000 header mutations): with the face
   and symbol counts raised above what a predictive stream holds, the prebuilt
@@ -16970,9 +16986,9 @@ E26 to E40):
   018004000000009b5f88000000
   ```
 
-Except for the second damaged-header repro, every difference measured and left
-open is a refusal by Margo; no probe in these classes found it returning
-different bytes.
+Except for the second damaged-header repro and the damaged E48/E49 inputs, every
+difference measured and left open is a refusal by Margo; no probe in these
+classes found it returning different bytes.
 
 ### Historical: batch 133 optional landing GPU request (resume 9)
 

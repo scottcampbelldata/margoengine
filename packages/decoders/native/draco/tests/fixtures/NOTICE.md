@@ -117,3 +117,7 @@ and `kd-streams.bin` (134 cases, E45 to E47) contain Margo-crafted inputs, made
 by changing positions or header counts of the specimens above or by building
 random KD streams, with the full prebuilt decoder's public output or rejection.
 Apache-2.0.
+
+`metadata-header.bin` (101 cases, E48 and E49) contains Margo-crafted header
+flags and metadata blocks inserted into the specimens above, with the full
+prebuilt decoder's public output or rejection. Apache-2.0.

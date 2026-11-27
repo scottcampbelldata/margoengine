@@ -4626,7 +4626,8 @@ octahedron: their vectors match the full prebuilt bit for bit, and the Wasm is
 145,164 bytes. Also since 2026-11-27 (E42 to E47) it wraps predictor 6's int64
 steps, accepts the header vertex and split counts the prebuilt accepts and reads
 KD stream ends the same way, so the level 6 and int64 refusals above are gone;
-the Wasm is 143,042 bytes.
+the Wasm is 143,042 bytes. E48 and E49 (header flags and metadata child names,
+the same day) take it to 144,230 bytes (53,773 to 54,309 B gzip -9).
 
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes

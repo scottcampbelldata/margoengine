@@ -6814,6 +6814,24 @@ accepted cases, SHA-256
 `bada0a5c9f64f18978d20d72a77236c018776825a2190262f3ebac34e48862be`), checked by
 `tests/layouts.rs`.
 
+### Batch 133 E48 and E49: header flags and metadata names (2026-11-27)
+
+Method as E42 to E47. 60,000 inputs took retained streams of every version,
+set random header flags and inserted built or damaged metadata blocks.
+
+| Experiment | Distinguishing observation and rule | Confirmation |
+| --- | --- | --- |
+| E48 header flags | Flag bits other than 32768 never changed the output or acceptance. Before version 1.3 the metadata bit is ignored too: an inserted block is read as geometry. From 1.3 the bit selects the metadata block. | Versions 1.0 to 2.3, meshes and point clouds. |
+| E49 child names | A metadata node with two child nodes of the same name is rejected, at any depth, in attribute or file metadata. Repeated entry keys, attribute ids, an empty key or child name and a child named like an entry are accepted. | Targeted blocks for each case, then the same 60,000 inputs. |
+
+What the 60,000 inputs still differ on is Margo's own decode limits (counts the
+prebuilt accepts above them) and the damaged streams listed in
+docs/known-bugs.md. The kept inputs and outputs are
+`packages/decoders/native/draco/tests/fixtures/metadata-header.bin` (101 cases,
+46 accepted, SHA-256
+`f35817367e3af51b793baf59699946b58774f1cfaaa6a7dba758453baa61089d`), checked by
+`tests/layouts.rs`.
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

@@ -282,11 +282,9 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
         return Err(Error::Unsupported);
     }
     c.version = u16::from(major) * 256 + u16::from(minor);
-    if flags & !32768 != 0 {
-        return Err(Error::Invalid);
-    }
     let mut budget = Budget::new(crate::WORKSPACE_LIMIT);
-    let metadata = if flags & 32768 != 0 {
+    // E48: only the metadata bit of the flags is read, and only from 1.3.
+    let metadata = if c.version >= 0x103 && flags & 32768 != 0 {
         Some(crate::Metadata::read(&mut c, &mut budget)?)
     } else {
         None

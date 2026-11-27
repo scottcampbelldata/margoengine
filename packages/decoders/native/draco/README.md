@@ -57,7 +57,8 @@ version 2.3 are refused (no layout is established), as is the one-triangle norma
 mode that the full prebuilt decodes (docs/known-bugs.md). `tests/layouts.rs` also
 checks 186 cases of normals outside the stored octahedron (E41), 290 of normal
 prediction past int64 (E42), 279 of EdgeBreaker header counts (E43, E44) and 134
-of KD stream ends (E45 to E47).
+of KD stream ends (E45 to E47) and 101 of header flags and metadata names (E48,
+E49).
 
 `node --test packages/decoders/tests/draco-native.test.js` runs native tests,
 builds this Wasm artifact and runs the KD, memory, prediction, metadata, flavor and predictive Wasm

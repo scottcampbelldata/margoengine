@@ -40,6 +40,51 @@ fn bytes(c: &mut Cursor, count: usize, budget: &mut Budget) -> Result<Vec<u8>> {
     out.copy_from_slice(source);
     Ok(out)
 }
+/// E49: one node's children have distinct names; entry keys and attribute ids
+/// may repeat.
+fn distinct_names(children: &[(Vec<u8>, usize)], budget: &mut Budget) -> Result<()> {
+    let count = children.len();
+    if count < 2 {
+        return Ok(());
+    }
+    budget.steps(count.saturating_mul(count.ilog2() as usize + 1))?;
+    let mut names = budget.vector(count, &[][..])?;
+    for (name, child) in names.iter_mut().zip(children) {
+        *name = child.0.as_slice();
+    }
+    heap_sort(&mut names);
+    if names.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(Error::Invalid);
+    }
+    Ok(())
+}
+/// In place and O(n log n) on any input; the standard sort over byte slices
+/// adds 11 KB to the module.
+fn heap_sort(names: &mut [&[u8]]) {
+    fn sift(names: &mut [&[u8]], mut at: usize) {
+        loop {
+            let mut child = 2 * at + 1;
+            if child >= names.len() {
+                return;
+            }
+            if child + 1 < names.len() && names[child] < names[child + 1] {
+                child += 1;
+            }
+            if names[at] >= names[child] {
+                return;
+            }
+            names.swap(at, child);
+            at = child;
+        }
+    }
+    for at in (0..names.len() / 2).rev() {
+        sift(names, at);
+    }
+    for end in (1..names.len()).rev() {
+        names.swap(0, end);
+        sift(&mut names[..end], 0);
+    }
+}
 impl Metadata {
     fn node(&mut self, c: &mut Cursor, budget: &mut Budget) -> Result<usize> {
         let count = c.count()?;
@@ -76,6 +121,7 @@ impl Metadata {
         while let Some(&(parent, next)) = stack.last() {
             budget.steps(1)?;
             if next == self.nodes[parent].children.len() {
+                distinct_names(&self.nodes[parent].children, budget)?;
                 stack.pop();
                 continue;
             }
@@ -104,5 +150,27 @@ impl Metadata {
         }
         out.file = out.tree(c, budget)?;
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::heap_sort;
+
+    #[test]
+    fn heap_sort_orders_every_short_sequence() {
+        // Every sequence of up to six names drawn from four.
+        let pool: [&[u8]; 4] = [b"", b"a", b"ab", b"b"];
+        for length in 0..=6_u32 {
+            for code in 0..4_usize.pow(length) {
+                let mut names: Vec<&[u8]> = (0..length)
+                    .map(|i| pool[code / 4_usize.pow(i) % 4])
+                    .collect();
+                let mut expected = names.clone();
+                expected.sort();
+                heap_sort(&mut names);
+                assert_eq!(names, expected);
+            }
+        }
     }
 }
