@@ -8326,7 +8326,7 @@ ParticleLiquid draws 0 to 4,194,304 particles, all of one radius (0.001 to 100 w
 ### GPU particle liquid (GPULiquid)
 
 `GPULiquid` (`@margoengine/water/liquid`, FLUID-02 and FLUID-03, parity bar P13) steps 1 to 1,048,576 particles (80 B
-each) on a grid of at most 4,194,304 nodes (16 B each), 8 to 256 cells along the container's longest side and at least
+each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surface tension), 8 to 256 cells along the container's longest side and at least
 4 on every side. What it does not do, and what was measured:
 
 - Weakly compressible, not incompressible: the Tait equation lets the liquid compress by about g d / c^2 at depth d. With

@@ -282,7 +282,10 @@ default density is 1 kg/m³ as in Rapier, not a real material's.
   particles, the rest kept in order by a GPU prefix-sum compaction; GPU and twin agree on the live count). The CPU solvers `physics/pbf`, `physics/dfsph`
   and `physics/flip` stay the accurate route. Not DONE; open against the wider rival set (three.js and its ecosystem,
   Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): speed against the rivals' demos,
-  measured in the speed phase.
+  measured in the speed phase; on the eight points, a dam-break front checked against Martin and Moyce (1952)'s
+  measurements (their tables were not read yet; the checks today are closed forms, Archimedes, Laplace and the
+  momentum balance), one option that picks a validated fast and accurate tier on the GPU path (today the accurate
+  route is the CPU solvers), and a large-world floating origin for the container.
 
 ### P14. LIFE-04 Flocking
 
