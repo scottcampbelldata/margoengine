@@ -2487,6 +2487,10 @@
       "types": "./dist/physics/breakable.d.ts",
       "import": "./dist/physics/breakable.js"
     },
+    "./physics/debug-view": {
+      "types": "./dist/physics/debug-view.d.ts",
+      "import": "./dist/physics/debug-view.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"
@@ -2878,6 +2882,10 @@
     "./ragdoll/balance": {
       "types": "./dist/ragdoll/balance.d.ts",
       "import": "./dist/ragdoll/balance.js"
+    },
+    "./ragdoll/character": {
+      "types": "./dist/ragdoll/character.d.ts",
+      "import": "./dist/ragdoll/character.js"
     },
     "./rigging": {
       "types": "./dist/rigging.d.ts",

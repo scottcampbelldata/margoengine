@@ -210,9 +210,12 @@ export type CoefficientCombineRule2D = (typeof CoefficientCombineRule2D)[keyof t
 export class Collider2D {
     readonly body: Body2D;
     readonly shapes: number[];
+    readonly uid: number;
     described: Described | null;
     options: ColliderOptions2D | null;
-    constructor(owner: BodyOwner2D, body: Body2D, shapes: number[], settings: Uint32Array, offset: readonly [number, number], turn: number);
+    constructor(owner: BodyOwner2D, body: Body2D, shapes: number[], settings: Uint32Array, offset: readonly [number, number], turn: number, uid?: number);
+    get rawSettings(): Uint32Array;
+    reapplyMass(): void;
     get handle(): number;
     parent(): Body2D;
     get isRemoved(): boolean;
@@ -484,6 +487,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     addBody(sprite: SpriteLike | null, options?: BodyOptions2D): Body2D;
     addTileMap(map: TileMapSource, options?: TileMapBodyOptions): Body2D;
     addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
+    replaceColliderShapes(collider: Collider2D, shape: ShapeOptions2D, parts: Described[]): void;
     removeCollider(collider: Collider2D): void;
     removeBody(body: Body2D): void;
     get hooks(): Physics2DHooks | null;
@@ -774,6 +778,7 @@ interface BodyOwner2D {
     readonly scale: number;
     addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
     removeCollider(collider: Collider2D): void;
+    replaceColliderShapes(collider: Collider2D, shape: ShapeOptions2D, parts: Described[]): void;
     removeBody(body: Body2D): void;
     lockTranslation(body: Body2D, x: boolean, y: boolean): void;
     retype(body: Body2D, type: BodyType2D): void;

@@ -17532,3 +17532,23 @@ and Finch, Khronos Group, 2008, https://www.khronos.org/files/collada_spec_1_5.p
 file was too large for the fetch tool, so the prose was not reread for this change, and the reading that a bound joint
 value replaces the node transform is this reader's own. No other engine's or library's source was read or copied, and
 no sample file from another project was used: the test documents are written from the schema.
+
+## physics debug view, character debug lines and the character-ragdoll bridge (DYN-07, 2026-11-27)
+
+Files: `packages/physics/src/debug-view.ts` (`PhysicsDebugView`), the `debugRender` of `packages/physics/src/character.ts`
+and `dynamic-character.ts`, `packages/ragdoll/src/ragdoll.ts` (`Ragdoll.debugRender`) and `packages/ragdoll/src/character.ts`
+(`addCharacterRagdoll`). Taken over from a draft by another agent and reviewed line by line; no rival engine source and no
+paper's companion code was read.
+
+- The debug view and the debug lines are Margo's own design: the world's `debugRender` buffers (already Rapier's
+  documented debug-render pipeline, cited with `debug.ts`) merged with any source's, drawn as one segment line.
+- V. B. Zordan, A. Majkowska, B. Chiu and M. Fast, "Dynamic response for motion capture animation", ACM TOG 24(3)
+  (SIGGRAPH 2005), https://doi.org/10.1145/1073204.1073249. Used: an animated character hands its bodies to the simulation
+  at an impact with the velocities the animation gave them, and is handed back to an animation that starts from the
+  simulated pose.
+- A. Shapiro, F. Pighin and P. Faloutsos, "Hybrid control for interactive character animation", Pacific Graphics 2003,
+  https://doi.org/10.1109/PCCGA.2003.1238289. Used: one character switches between kinematic and dynamic control, the
+  controller that is not in charge kept out of the way of the one that is (here the walking capsule is disabled while the
+  ragdoll is limp and moved under the body before control returns).
+- Own: the capsule and the ragdoll's hit boxes are put in disjoint collision groups so the walk never meets its own hit
+  boxes; the slope angle is acos(n . up) of the ground the last move ended on.

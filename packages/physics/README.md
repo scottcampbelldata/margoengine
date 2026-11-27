@@ -49,6 +49,59 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
+## Character controller quick start
+
+```ts
+import { Physics } from '@margoengine/physics';
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
+const body = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0.9, 0], colliders: { shape: 'capsule', halfHeight: 0.5, radius: 0.3 } });
+const controller = physics.createCharacterController(body, { applyImpulsesToDynamicBodies: true, characterMass: 70 });
+const step = controller.move([0.08, -0.16, 0]);
+console.log(step.grounded, controller.debugRender().vertices.length);
+```
+
+## Debug view (`@margoengine/physics/debug-view`)
+
+One debug view for a world and everything on it. `await PhysicsDebugView.attach(engine, physics)` draws the world's
+`debugRender()` lines (colliders, joints, contacts, and any of its options) as one segment line of `@margoengine/lines`
+every frame, after the step; `add(source)` draws any other source of debug lines with them: a `CharacterController`, a
+`DynamicCharacter`, a `Ragdoll` or a character bridge (each has `debugRender()`), or a function returning
+`{vertices, colors}`, which is how a breakable, water or a flock adds its own. The lines package loads only when the view is
+attached, so neither the physics root nor core and stage gain a byte.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { Physics } from 'margoengine/physics';
+import { PhysicsDebugView } from 'margoengine/physics/debug-view';
+await Physics.load();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine);
+physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [10, 0.1, 10] } });
+const player = physics.addBody(null, { type: 'kinematicPosition', position: [0, 1, 0], colliders: { shape: 'capsule', halfHeight: 0.5, radius: 0.3 } });
+const controller = physics.createCharacterController(player);
+const view = await PhysicsDebugView.attach(engine, physics, { world: { boxes: true }, centerOfMass: true });
+const stop = view.add(controller); // the capsule, ground normal, step probe and contacts of its last move
+engine.start();
+```
+
+| Option (default) | Meaning |
+| --- | --- |
+| `enabled` (true) | Draw at all; also a live field. |
+| `world` (`{}`) | What of the world to draw, as `physics.debugRender(options)` takes it (`colliders`, `joints`, `contacts`, `boxes`, `axes`, `solverContacts`, `pseudoNormals`, `filter`, `style`), or `false` for none; a live field. |
+| `centerOfMass` (false) | A cross at each dynamic body's centre of mass; a live field. |
+| `name` (`'physics-debug-view'`) | Plugin name, unique in the scene. |
+| `width` (1.5) | Line width in CSS pixels. |
+| `onTop` (false) | Draw over the scene without the depth test. |
+| `sink` (none) | `{update(lines)}` that takes the merged lines each frame instead of `@margoengine/lines` (a WebGL2 preview, your own renderer, a test). |
+
+`add(source)` returns a function that stops drawing it. `collect()` gives this frame's merged lines (the world's first, then
+each source in the order added); `new PhysicsDebugView(physics)` without an engine gives the same lines, for a test or a
+renderer of your own. Attach it after `Physics`: both are late plugins, so it updates after the step of the same frame.
+`dispose()` removes its line (and the `Lines` plugin when it made one); `using` works. Bad input is a `MargoError` linked to
+[its help entry](https://margoengine.com/errors#physics-debug-view).
+
 ## Sediment transport and bed change
 
 `@margoengine/physics/sediment` reads shallow-water depth and discharge and routes suspended and bedload sediment.

@@ -133,12 +133,19 @@ function multiply(a: Q, b: Q): Q {
   ];
 }
 
-class Lines {
+/** @internal Line segment accumulator producing {@link DebugLines}. */
+export class DebugLineWriter {
   positions: number[] = [];
   colors: number[] = [];
-  segment(a: V, b: V, color: Color): void {
-    this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+  segment(a: readonly number[], b: readonly number[], color: Color): void {
+    this.positions.push(a[0]!, a[1]!, a[2]!, b[0]!, b[1]!, b[2]!);
     this.colors.push(color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3]);
+  }
+  cross(center: readonly number[], size: number, color: Color): void {
+    const [x, y, z] = [center[0]!, center[1]!, center[2]!];
+    this.segment([x - size, y, z], [x + size, y, z], color);
+    this.segment([x, y - size, z], [x, y + size, z], color);
+    this.segment([x, y, z - size], [x, y, z + size], color);
   }
   finish(): DebugLines {
     return { vertices: new Float32Array(this.positions), colors: new Float32Array(this.colors) };
@@ -149,7 +156,7 @@ class Lines {
 type Place = (p: V) => V;
 
 function ring(
-  out: Lines,
+  out: DebugLineWriter,
   place: Place,
   color: Color,
   axis: 0 | 1 | 2,
@@ -166,6 +173,69 @@ function ring(
       };
     out.segment(place(at(i)), place(at(j)), color);
   }
+}
+
+/** @internal Wireframe outline of a sphere, box, capsule, cylinder or cone collider at a world pose (other shapes draw nothing). */
+export function drawPrimitiveOutline(
+  out: DebugLineWriter,
+  collider: PhysicsCollider,
+  position: readonly number[],
+  rotation: readonly number[],
+  color: Color,
+): void {
+  const kind = collider.shape;
+  if (kind !== 'sphere' && kind !== 'box' && kind !== 'capsule' && kind !== 'cylinder' && kind !== 'cone') return;
+  const q: Q = [rotation[0]!, rotation[1]!, rotation[2]!, rotation[3]!],
+    place: Place = (v) => {
+      const r = rotate(q, v);
+      return [position[0]! + r[0], position[1]! + r[1], position[2]! + r[2]];
+    };
+  if (kind === 'sphere') {
+    const r = collider.radius();
+    ring(out, place, color, 0, r, 0);
+    ring(out, place, color, 1, r, 0);
+    ring(out, place, color, 2, r, 0);
+    return;
+  }
+  if (kind === 'box') {
+    const h = collider.halfExtents()!,
+      [a, b, d] = [h.x, h.y, h.z],
+      corner = (i: number): V => [i & 1 ? a : -a, i & 2 ? b : -b, i & 4 ? d : -d];
+    for (let i = 0; i < 8; i++)
+      for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(place(corner(i)), place(corner(i | bit)), color);
+    return;
+  }
+  const a = collider.radius(),
+    b = collider.halfHeight();
+  if (kind === 'cone') {
+    ring(out, place, color, 1, a, -b);
+    for (const [x, z] of [
+      [a, 0],
+      [-a, 0],
+      [0, a],
+      [0, -a],
+    ] as const)
+      out.segment(place([x, -b, z]), place([0, b, 0]), color);
+    return;
+  }
+  ring(out, place, color, 1, a, b);
+  ring(out, place, color, 1, a, -b);
+  for (const [x, z] of [
+    [a, 0],
+    [-a, 0],
+    [0, a],
+    [0, -a],
+  ] as const)
+    out.segment(place([x, b, z]), place([x, -b, z]), color);
+  if (kind === 'capsule')
+    for (const s of [1, -1])
+      for (const [x, z] of [
+        [a, 0],
+        [0, a],
+        [-a, 0],
+        [0, -a],
+      ] as const)
+        out.segment(place([x, b * s, z]), place([0, (b + a) * s, 0]), color);
 }
 
 /**
@@ -191,7 +261,7 @@ export function debugLines(
     } = options,
     style = options.style ?? {},
     paint = (name: keyof DebugStyle, fallback: Color): Color => (style[name] as Color | undefined) ?? fallback,
-    out = new Lines(),
+    out = new DebugLineWriter(),
     c = world.columns,
     list = [...bodies],
     seen = new Set<number>(),
@@ -464,7 +534,13 @@ export function debugLines(
 }
 
 /** The solver's contact points of the last step: a line across each gap and a tick along the normal. */
-function solverLines(world: KernelWorld, seen: ReadonlySet<number>, out: Lines, length: number, color: Color): void {
+function solverLines(
+  world: KernelWorld,
+  seen: ReadonlySet<number>,
+  out: DebugLineWriter,
+  length: number,
+  color: Color,
+): void {
   const c = world.columns;
   for (let i = 0; i < world.solvingPairs; i++) {
     const row = c.solvePairs[i]!,
@@ -497,7 +573,7 @@ function pseudoNormalLines(
   world: KernelWorld,
   row: number,
   pose: { p: V; q: Q },
-  out: Lines,
+  out: DebugLineWriter,
   length: number,
   color: Color,
 ): void {
