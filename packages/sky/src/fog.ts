@@ -9,6 +9,9 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 // Exponential and EXP2 distance fog beyond `start` as the OpenGL fog equations; the height boost
 // (1 + max(-y, 0) h) is Margo's. Under a cloud cover the haze takes the light of the cloud's underside by the cover's
 // share (cloudHaze), not the clear sky behind the cloud: a low sun under an overcast no longer tints it gold.
+// The haze's sky colour before the exposure, and the same seen through a look's low layer (KB-SKY-NIGHTRIDGE1).
+const PLAIN_HAZE = ' color=color*exp2(frame.settings.y);}',
+  LAYER_HAZE = ' color=hazeLayer(color,ray)*exp2(frame.settings.y);}';
 const fragment = `
 @group(0) @binding(3) var sceneDepth:texture_depth_2d;
 @group(0) @binding(4) var<uniform> fog:array<vec4f,20>;
@@ -156,7 +159,12 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
   },
   create(code) {
     // The deck's light (clouds.ts overcastLight): the sky's own when it draws the clouds, else compiled in here.
-    const shader = code + (code.includes('fn overcastLight(') ? '' : overcastLightWgsl) + fragment,
+    // A sky with a look sees its haze's colour through the low layer and its glow (look.ts hazeLayer,
+    // KB-SKY-NIGHTRIDGE1); without one the fog's text is as it was.
+    const shader =
+        code +
+        (code.includes('fn overcastLight(') ? '' : overcastLightWgsl) +
+        (code.includes('fn hazeLayer(') ? fragment.replace(PLAIN_HAZE, LAYER_HAZE) : fragment),
       values = new Float32Array(80),
       attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' },
       descriptor: GPURenderPassDescriptor = { colorAttachments: [attachment] };

@@ -754,6 +754,12 @@ checks.look = async (page, samples) => {
     r.hazeGlow.glow > 0.01 && r.hazeGlow.worst < 0.005,
     `the haze's fire glow in the sky as on the hazed ground: ${JSON.stringify(r.hazeGlow)}`,
   );
+  // KB-SKY-NIGHTRIDGE1: by night a far ground the fog hides fully takes the sky over it, the layer and its glow included
+  // (the ground took the night sky above the layer before the fix).
+  assert.ok(
+    r.nightRidge.level > 0.001 && r.nightRidge.worst < 0.005,
+    `the hazed ground meets the night sky over it: ${JSON.stringify(r.nightRidge)}`,
+  );
   const np = r.nightPlain,
     ratio = (a, k) => lum(a[k]) / lum(np[k]);
   assert.ok(lum(np.high) > 0, 'the night sky draws');

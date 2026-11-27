@@ -1131,7 +1131,9 @@ holds the sky's low rays to the same reach (the visual range, Koschmieder 1924),
 that is brightest toward the fires. The sky draws the haze's glow toward each of its own rays too, by the same law
 along the ray's ground path to 2 / `density`, in front of the layer's by the layer's opacity along the ray (1 -
 `layerTransmittance`^(1 / sin e)), so a far ridge the fog hides fully takes the sky's colour over it
-(KB-SKY-HAZEGLOW1). A `WeatherDrive` writes all three from its fire fronts.
+(KB-SKY-HAZEGLOW1). With a look (any `atmosphere` or `look` option) the fog's colour for a far ground is the sky's
+seen through that layer with its glow in front, as the dome over it is, so by night too a ridge the fog hides fully
+meets the sky (KB-SKY-NIGHTRIDGE1). A `WeatherDrive` writes all three from its fire fronts.
 
 ```ts
 import {Sky} from 'margoengine/sky';

@@ -141,6 +141,17 @@ window.check={samples:sceneSamples,
   const haze=async(name,aside,density)=>{for(const lit of [true,false]){n(night.options);night.options.fog={depth:()=>level,density,start:0,falloff:'exp2',color:[0,0,0],...(lit?{fireSpots:[{color:[0.8,0.4,0.2],x:eye[0]+aside,z:eye[2]-2000,reach:500}]}:{})};const r=await bands();out[name+(lit?'':'Without')]=Array.from(r.pixels.subarray((48*128+64)*4,(48*128+64)*4+3));}};
   await haze('hazeFire',0,0.001);await haze('hazeNear',0,0.002);await haze('hazeAside',20000,0.001);
   delete night.options.fog;level.destroy();
+  // KB-SKY-NIGHTRIDGE1: by night the dome near the horizon is the night sky through the low layer plus its glow, so a
+  // far ground the fog hides fully must take the same, not the night sky above the layer (a pale ridge under an orange
+  // pall). The same pixels over the sky (depth 0) and over a plane 50 km ahead, rays 0.4 to 9 degrees up, a fire ahead.
+  {aim(0);const plane=(z)=>{const t=device.createTexture({size:[128,96],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}),c=device.createCommandEncoder();
+    c.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:t.createView(),depthClearValue:z?0.5*(100000-z)/(z*(100000-0.5)):0,depthLoadOp:'clear',depthStoreOp:'store'}}).end();device.queue.submit([c.finish()]);return t;};
+   const open=plane(0),far=plane(50000),layer={layerTransmittance:[0.02,0.03,0.05],scatteredLight:[0.02,0.01,0.004],fireSpots:[{color:[0.2,0.1,0.04],x:eye[0],z:eye[2]-1500,height:eye[1]+800,reach:1000}]},
+    fog=(depth)=>({depth:()=>depth,density:0.001,start:0,falloff:'exp2',fireSpots:[{color:[0.6,0.3,0.1],x:eye[0],z:eye[2]-1500,reach:1000}]});
+   const rows=async(set)=>{set(night.options);const r=await bands(),px=[];for(let y=36;y<47;y++)for(let x=0;x<128;x+=8)px.push(...r.pixels.subarray((y*128+x)*4,(y*128+x)*4+3));return px;};
+   const skyPx=await rows(o=>{n(o);o.atmosphere=layer;o.fog=fog(open);}),groundPx=await rows(o=>{n(o);o.atmosphere=layer;o.fog=fog(far);});
+   let worst=0,level=0;for(let i=0;i<skyPx.length;i++){worst=Math.max(worst,Math.abs(groundPx[i]-skyPx[i])/Math.max(1e-4,groundPx[i]));level=Math.max(level,groundPx[i]);}
+   out.nightRidge={worst,level,sky:skyPx.slice(0,3),ground:groundPx.slice(0,3)};delete night.options.fog;open.destroy();far.destroy();}
   aim(60);
   await nshot('nightCloud',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={};});
   await nshot('nightCloudPall',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6]};});

@@ -122,6 +122,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `node packages/vfx/test/features-check.mjs` (every third pixel of the ball against the split, at the defaults and at
   given values, 1x and 4x MSAA, WebGPU and `MARGO_COMPAT=1`).
 
+### Fixed 2026-11-27: by night a far ridge in the haze stood pale against the firelit sky over it (KB-SKY-NIGHTRIDGE1, sky)
+
+- **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=ridge --query=hour=22 --out=<folder>`: the
+  hazed far ridges read 8-bit (169, 122, 105) under a sky of (154, 97, 36) right over them (640 x 360, RTX A6000).
+- **Cause:** the sky fog takes the sky's radiance toward the ray as the colour a far ground fades to. By night the
+  dome is the night sky seen through the low haze layer (`layerTransmittance`, t^(1 / sin e)) with the layer's glow
+  (`scatteredLight`) in front (`lowLayer`, KB-SKY-NIGHTPALL1), but the fog took the night sky as it is above the layer,
+  so a fully hazed ridge never met the sky over it.
+- **Fix:** `look.ts` splits `lowLayer` into `hazeLayer` (the layer without the fires) and the fires' glow; the fog
+  passes its sky colour through `hazeLayer` (`fog.ts`; without a look it is the colour as it is), and adds the fires'
+  light on the haze itself as before (KB-SKY-HAZEGLOW1). By day the layer leaves the sky as it was, so the day frame
+  is unchanged.
+- **Regression:** `node packages/sky/test/features-check.mjs` (`look`, `nightRidge`: the same pixels over the night sky
+  and over a plane the fog hides fully, under a layer with its glow and a fire, WebGPU and `MARGO_COMPAT=1`).
+
 ### Fixed 2026-11-27: the fires' layer glow stopped short of the haze's own light under an exp2 sky fog (KB-WEATHER-FIRESIGHT1, weather)
 
 - **Repro:** timber valley under smoke: `WeatherDrive` wrote `atmosphere.fireSight` 1,142 m while the sky fog's own

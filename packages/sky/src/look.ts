@@ -77,9 +77,16 @@ fn nightSky(w:vec3f,footprint:f32)->vec3f {return lookSky(w,physicalNightSky(w,f
 // hazeFires: the haze's spots (fog.fireSpots, in sky units, the fog's path end in the first spot's w): the layer's glow
 // is seen through the haze under it (t) and the haze's own glow is in front (1 - t) by the fog's law, so a far ridge
 // the fog hides takes the sky's colour over it (fireSky, KB-SKY-HAZEGLOW1).
+// hazeLayer: the same low layer without the fires, for the sky fog's colour (fog.ts adds the fires' light on the haze
+// itself): a far ridge the fog hides takes the night sky through the layer and its glow, as the dome over it does, not
+// the night sky above the layer (KB-SKY-NIGHTRIDGE1).
 ${fireSkyWgsl('frame')}fn lowLayer(c:vec3f,w:vec3f)->vec3f {
  let t=pow(max(frame.air4.rgb,vec3f(1e-30)),vec3f(1.0/max(w.y/max(length(w),1e-6),0.052336)));
  return c*mix(vec3f(1.0),t,frame.sun.w)+frame.air3.rgb*frame.sun.w+fireSky(w,t);
+}
+fn hazeLayer(c:vec3f,w:vec3f)->vec3f {
+ let t=pow(max(frame.air4.rgb,vec3f(1e-30)),vec3f(1.0/max(w.y/max(length(w),1e-6),0.052336)));
+ return c*mix(vec3f(1.0),t,frame.sun.w)+frame.air3.rgb*frame.sun.w;
 }
 fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {return lowLayer(cloudSkyAbove(color,backdrop,ray,angularFootprint),ray);}
 `;

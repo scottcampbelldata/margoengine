@@ -10439,8 +10439,10 @@ sky (timber-valley valley-aerial mid banding 0.227 percent: the ridge line, both
 and the haze's glow in front (1 - t) by the fog's own closed form (`fireTrackWgsl`, one source for both; the fog's WGSL
 text is unchanged), with the fog's spots in the look block (`LOOK_FLOATS` 144 to 208) and the `Clouds` uniform (168
 to 232 floats). Evidence: sky features-check look on WebGPU and `MARGO_COMPAT=1`, the same pixels over the sky and over
-a fully hazed plane 50 km out agreeing exactly (0.52 relative without the fix). Missing: the night's base light still
-differs at the horizon (the fog takes the night sky, the dome sees it through the layer), not yet measured.
+a fully hazed plane 50 km out agreeing exactly (0.52 relative without the fix). The night's base light at the horizon
+(the fog took the night sky, the dome sees it through the layer) was fixed the same day by `hazeLayer`
+(KB-SKY-NIGHTRIDGE1): the fog passes its sky colour through the layer and its glow, without the fires, which it adds
+itself; `features-check.mjs look` `nightRidge` pins it on WebGPU and `MARGO_COMPAT=1`.
 
 **Lit particles: the ambient from above, the air from below (KB-VFX-SMOKEFLAT1, 2026-11-27).** GPU maths change in
 `packages/vfx/src/lit.ts`, both backends from one WGSL source. A lit billboard took its ambient and the air's light

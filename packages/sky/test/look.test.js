@@ -355,3 +355,39 @@ test("the haze's fire glow is in front of the layer's, by the fog's law", () => 
   sky.dispose();
   h.cleanup();
 });
+
+// KB-SKY-NIGHTRIDGE1: by night the dome is the night sky through the low layer with its glow in front, while the fog
+// took the night sky above the layer, so a far ridge the fog hid never met the sky over it. With a look the fog's colour
+// passes through `hazeLayer` (the layer without the fires, which the fog adds itself); without one its text is as it was.
+test("the sky fog's colour goes through the look's low layer, and only with a look", async () => {
+  const { tracedGPU } = await import('../../../tests/support/gpu-trace.js');
+  const fogCode = (options) => {
+    const h = tracedGPU(),
+      codes = [],
+      make = h.engine.gpu.createShaderModule.bind(h.engine.gpu);
+    h.engine.gpu.createShaderModule = (d) => (codes.push(d.code), make(d));
+    h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
+    const depth = Object.assign(
+        h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float', usage: globalThis.GPUTextureUsage.TEXTURE_BINDING }),
+        { depthOrArrayLayers: 1 },
+      ),
+      sky = new Sky({ ...options, fog: { depth: () => depth, density: 0.001 }, timeScale: 0 });
+    h.engine.use(sky);
+    sky.onPreUpdate(h.context.delta);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+    sky.dispose();
+    return codes.find((c) => c.includes('fn fogFragment('));
+  };
+  const lit = fogCode({ atmosphere: { layerTransmittance: [0.1, 0.1, 0.1] } });
+  assert.ok(lit.includes(' color=hazeLayer(color,ray)*exp2(frame.settings.y);}'), 'the fog sees the layer');
+  assert.ok(
+    lit.includes(
+      'fn hazeLayer(c:vec3f,w:vec3f)->vec3f {\n let t=pow(max(frame.air4.rgb,vec3f(1e-30)),vec3f(1.0/max(w.y/max(length(w),1e-6),0.052336)));\n return c*mix(vec3f(1.0),t,frame.sun.w)+frame.air3.rgb*frame.sun.w;\n}',
+    ),
+    'the layer and its glow, without the fires',
+  );
+  const plain = fogCode({});
+  assert.ok(!plain.includes('hazeLayer') && plain.includes(' color=color*exp2(frame.settings.y);}'), 'no look, as before');
+});
