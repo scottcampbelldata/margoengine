@@ -33,7 +33,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { reactiveMasks } from '../../shared/reactive-mask.js';
-import { requireCompatTier } from '../../shared/compat.js';
+import { compatTier, requireCompatTier } from '../../shared/compat.js';
 export { halton, jitterProjection } from './jitter.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; VERTEX: number };
 declare const GPUTextureUsage: {
@@ -165,7 +165,9 @@ export interface TAAVelocity {
 /**
  * TAA's object velocity pass as handed to a {@link TAAVelocityPass}: draw with `targets`, `depthStencil` and `samples`,
  * reading `camera` (this frame's jittered view-projection, last frame's in the target, then the target's size and 1 when
- * there is history). One pass per view, each with its own `key`.
+ * there is history). One pass per view, each with its own `key`. Write `@location(0)` as `vec4f(velocity, 0, 1)`: at 4x
+ * MSAA on the WebGL2 layer `targets[0]` is rgba16float and `w` is the pixel's coverage (KB-TAA-COMPATEDGE1); an
+ * rg16float target drops `zw`.
  */
 export interface TAAVelocityFrame {
   readonly context: Extract<PassContext, { backend: 'webgpu' }>;
@@ -317,6 +319,14 @@ export class TAA implements EnginePlugin {
   private motionResolve?: GPURenderPipeline;
   private motionGroup?: GPUBindGroup;
   private motionDepth?: GPUTextureView;
+  /**
+   * 4x MSAA on the WebGL2 layer (KB-TAA-COMPATEDGE1): the layer reads a 4x texture's samples from its resolved copy, so
+   * the motion resolve sees their mean. The camera pass then writes the 1x targets itself and object draws write a
+   * coverage channel (rgba16float, `w` 1) into cleared 4x targets; the resolve divides by the coverage mean.
+   */
+  private coverage = false;
+  /** The object velocity target's format: rgba16float with the coverage channel, else rg16float. */
+  private motionFormat: GPUTextureFormat = 'rg16float';
   private objectPipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
   private instanceHistories = new Map<InstanceRows, InstanceHistory>();
@@ -670,6 +680,8 @@ export class TAA implements EnginePlugin {
     this.lockTextures = [];
     this.format = c.format;
     this.samples = samples;
+    this.coverage = samples === 4 && compatTier(c.device) === 'webgl2';
+    this.motionFormat = this.coverage ? 'rgba16float' : 'rg16float';
     // Unorm canvas shaders write sRGB themselves; sRGB attachments and floating-point HDR targets supply linear samples.
     const manualSRGB = +(c.format === 'rgba8unorm' || c.format === 'bgra8unorm');
     this.manualSRGB = manualSRGB;
@@ -710,7 +722,7 @@ export class TAA implements EnginePlugin {
     this.motionGroup = undefined;
     this.motionDepth = undefined;
     const cameraModule = c.device.createShaderModule({
-      code: samples === 4 ? multisampledCameraVelocity : cameraVelocity,
+      code: samples === 4 && !this.coverage ? multisampledCameraVelocity : cameraVelocity,
     });
     this.cameraPipeline = c.device.createRenderPipeline({
       layout: 'auto',
@@ -720,10 +732,10 @@ export class TAA implements EnginePlugin {
         entryPoint: 'fragment',
         targets: [{ format: 'rg16float' }, { format: 'r32float' }],
       },
-      multisample: c.descriptor.multisample,
+      multisample: this.coverage ? undefined : c.descriptor.multisample,
     });
     if (samples === 4) {
-      for (const format of ['rg16float', 'r32float'] as GPUTextureFormat[]) {
+      for (const format of [this.motionFormat, 'r32float'] as GPUTextureFormat[]) {
         const t = c.device.createTexture({
           size: [c.width, c.height],
           format,
@@ -733,10 +745,20 @@ export class TAA implements EnginePlugin {
         this.textures.push(t);
         this.motionViews.push(t.createView());
       }
+      // With coverage the 4x targets hold only object samples (velocity, 0, 1) over a cleared 0, so their mean is
+      // c x (object, 0, 1) for coverage c; a pixel no object covers keeps what the camera pass wrote (`discard`). That
+      // is exact for one moving surface per pixel; where two meet, their motions mix by coverage.
       const module = c.device.createShaderModule({
-        code:
-          fullscreen +
-          `
+        code: this.coverage
+          ? fullscreen +
+            `
+@group(0) @binding(0) var velocity:texture_multisampled_2d<f32>;
+@group(0) @binding(1) var expected:texture_multisampled_2d<f32>;
+struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
+@fragment fn fragment(i:Fullscreen)->Motion {let p=vec2i(i.clip.xy);let m=textureLoad(velocity,p,0);if(m.w<=0){discard;}
+ var o:Motion;o.velocity=m.xy/m.w;o.depth=textureLoad(expected,p,0).r/m.w;return o;}`
+          : fullscreen +
+            `
 @group(0) @binding(0) var velocity:texture_multisampled_2d<f32>;
 @group(0) @binding(1) var expected:texture_multisampled_2d<f32>;
 @group(0) @binding(2) var depth:texture_depth_multisampled_2d;
@@ -856,7 +878,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         );
       this.depthSource = depth;
     }
-    const views = this.motionViews.length ? this.motionViews : [this.velocityView!, this.expectedView!];
+    const views =
+      this.motionViews.length && !this.coverage ? this.motionViews : [this.velocityView!, this.expectedView!];
     const attachments = views.map((view) => ({ view, loadOp: 'clear' as const, storeOp: 'store' as const }));
     const camera = c.encoder.beginRenderPass({ colorAttachments: attachments });
     applyView(camera, c);
@@ -913,8 +936,10 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       }
       for (const primitive of source.shadowPrimitives) draw(primitive);
     }
+    const drew = pending.length > 0 || drawers.length > 0;
     this.flushMotion(c, pending, drawers);
-    if (this.motionViews.length) {
+    // With coverage and no object draw, the camera pass's 1x targets are already the frame's motion.
+    if (this.motionViews.length && (drew || !this.coverage)) {
       const depth = sceneTarget(c)?.depthSource;
       if (!depth)
         throw new MargoError(
@@ -924,14 +949,17 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       if (this.motionDepth !== depth) {
         this.motionGroup = c.device.createBindGroup({
           layout: this.motionResolve!.getBindGroupLayout(0),
-          entries: [...this.motionViews, depth].map((resource, binding) => ({ binding, resource })),
+          entries: [...this.motionViews, ...(this.coverage ? [] : [depth])].map((resource, binding) => ({
+            binding,
+            resource,
+          })),
         });
         this.motionDepth = depth;
       }
       const pass = c.encoder.beginRenderPass({
         colorAttachments: [this.velocityView!, this.expectedView!].map((view) => ({
           view,
-          loadOp: 'clear',
+          loadOp: this.coverage ? 'load' : 'clear',
           storeOp: 'store',
         })),
       });
@@ -1105,7 +1133,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         ':' +
         c.descriptor.depthStencil!.format +
         ':' +
-        c.descriptor.multisample?.count;
+        c.descriptor.multisample?.count +
+        ':' +
+        this.motionFormat;
     let pipeline = this.objectPipelines.get(key);
     if (!pipeline) {
       const module = c.device.createShaderModule({
@@ -1143,7 +1173,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
             ...(rows ? instanceBuffers : []),
           ],
         },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rg16float' }, { format: 'r32float' }] },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: this.motionFormat }, { format: 'r32float' }] },
         primitive: { cullMode: 'none' },
         depthStencil: { format: c.descriptor.depthStencil!.format, depthWriteEnabled: false, depthCompare: 'equal' },
         multisample: c.descriptor.multisample,
@@ -1338,8 +1368,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   private flushMotion(c: Context, draws: MotionDraw[], drawers: TAAVelocityPass[]): void {
     if (!draws.length && !drawers.length) return;
     const pass = c.encoder.beginRenderPass({
+      // With coverage the camera pass wrote the 1x targets, so the 4x ones start cleared (coverage 0) here.
       colorAttachments: (this.motionViews.length ? this.motionViews : [this.velocityView!, this.expectedView!]).map(
-        (view) => ({ view, loadOp: 'load', storeOp: 'store' }),
+        (view) => ({ view, loadOp: this.coverage ? 'clear' : 'load', storeOp: 'store' }),
       ),
       depthStencilAttachment: {
         view: c.depth,
@@ -1365,7 +1396,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         context: c,
         camera: this.cameraRows.subarray(0, 36),
         key: this,
-        targets: [{ format: 'rg16float' }, { format: 'r32float' }],
+        targets: [{ format: this.motionFormat }, { format: 'r32float' }],
         depthStencil: { format: c.descriptor.depthStencil!.format, depthWriteEnabled: false, depthCompare: 'equal' },
         samples: c.descriptor.multisample?.count ?? 1,
       };

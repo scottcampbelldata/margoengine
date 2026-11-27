@@ -358,6 +358,14 @@ neighbours. WebGL2 shaders cannot read single samples, so the layer's resolved d
 keeps the nearest of four; the neighbours put silhouette texels back on the object. The test scene accumulates 31.96 dB
 on the layer against 31.76 dB natively (30.90 before). Native WebGPU reads are unchanged.
 
+With a 4x capture on the WebGL2 layer, `TAA`'s object velocity draws also write a coverage channel: the 4x motion target
+is `rgba16float` there (`rg16float` on WebGPU, 4 more bytes a sample), its `w` is 1 where an object draw reached a
+sample and 0 elsewhere, and the camera pass writes the 1x targets itself. The layer reads the mean of a pixel's four
+samples, so the resolve divides that mean by its coverage and a silhouette pixel takes the object's whole motion instead
+of a mix with the camera's (KB-TAA-COMPATEDGE1; before, 25 of 10,812 pixels of a moving box kept 0.4 to 0.5 of its
+motion). Where two moving surfaces share a pixel, their motions mix by coverage; WebGPU takes the nearest sample's. A
+`TAAVelocityPass` writes `@location(0)` as `vec4f(velocity, 0, 1)`, as `RawShaders` and `ScatterVelocity` do.
+
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
 
 TAA and TAAUpscale keep the source camera on their transient raster-camera wrappers. The optional

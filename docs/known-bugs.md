@@ -140,7 +140,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** the same check: every moving-box pixel carries 0.6 to 1.4 times its median motion, no standing-box
   pixel moves (WebGPU; in `test:gpu`). It fails on the parent (no box pixel reached).
 
-### Open 2026-11-27: on the WebGL2 layer some silhouette pixels of a moving mesh keep part of the camera's motion (KB-TAA-COMPATEDGE1, taa, webgl2-compat)
+### Fixed 2026-11-27: on the WebGL2 layer some silhouette pixels of a moving mesh kept part of the camera's motion (KB-TAA-COMPATEDGE1, taa, webgl2-compat)
 
 - **Repro:** `node packages/taa/test/instance-velocity-browser.mjs --compat`: 25 of 10,812 pixels of the moving box
   (its right edge, x 475 and 476, and a few on its lower left edge) read 0.4 to 0.5 times the box's motion while their
@@ -158,12 +158,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   'back' with depth 'always': still 10,787, so no front-facing fragment reaches the missing samples; cull 'front'
   with 'always' (back faces cover them): 10,808; the same scene at `antialias: false` (1 sample): 10,819 of 10,819
   right. WebGPU reads single samples, and its resolve takes the box's sample.
-- **Fix (proposed, not built):** let the resolve separate the two layers without per-sample reads. The object pass
-  writes a coverage channel (1) that the camera pass leaves at 0; the resolve recomputes the camera's motion and depth
-  from the pixel's resolved depth (what the camera pass wrote) and unmixes them: object = (mean - (1 - c) x camera) / c
-  for coverage c > 0. That is exact for one object per pixel and the same on WebGPU, where c is 0 or 1. It costs a
-  wider 4x motion target (rgba16float in place of rg16float: 4 more bytes a sample), which needs a ruling.
-  `far-velocity-browser.mjs --compat` asserts only motion above 0, which such pixels pass.
+- **Fix (2026-11-27, lane A, approved as a bug fix):** at 4x on the WebGL2 layer only (`compatTier`), the object
+  velocity draws write a coverage channel: the 4x motion target is rgba16float (4 more bytes a sample; WebGPU keeps
+  rg16float and its nearest-sample resolve) and every object velocity shader writes `vec4f(velocity, 0, 1)` (TAA's own,
+  `RawShaders`' and `ScatterVelocity`'s, which now follow `frame.targets`). The camera pass writes the 1x targets itself
+  and the 4x ones start cleared, so their mean is c x (object, 0, 1); the resolve writes mean / c where c > 0 and keeps the
+  camera's value elsewhere. That is the proposed unmixing, object = (mean - (1 - c) x camera) / c, with the camera's
+  share 0 in the 4x targets, and exact for one moving surface per pixel; two moving surfaces in one pixel mix by
+  coverage. Regression: `instance-velocity-browser.mjs --compat` (now in `test:gpu:compat`; 10,787 of 10,812 before,
+  11,013 of 11,013 after) and `far-velocity-browser.mjs`, which now requires every box pixel within 0.6 to 1.4 times the
+  median motion, not only above 0 (`--compat` before: 32,133 of 32,264 gltf pixels; after: all 32,517 in both cases, and
+  all 32,512 on WebGPU).
 
 ### Fixed 2026-11-27: a voxel-pathtracer unit test failed on a loaded machine; the viewport ignored the fixed band budget (KB-VPT-BANDS-LOAD1, voxel-pathtracer)
 

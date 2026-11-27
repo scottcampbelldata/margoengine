@@ -109,14 +109,20 @@ try {
       return { width, height, moving, gpuErrors };
     }, kind);
   for (const kind of ['gltf', 'core']) {
+    // Every box pixel carries the box's full motion, within the spread its depth gives (the median's 0.6 to 1.4 times).
+    // Motion above 0 alone let a WebGL2-layer silhouette pixel pass with half the box's motion mixed with the camera's
+    // (KB-TAA-COMPATEDGE1).
     const result = await measure(kind),
-      reached = result.moving.filter((vx) => vx > 0).length;
-    console.log(JSON.stringify({ kind, boxPixels: result.moving.length, reached }));
+      sorted = [...result.moving].sort((a, b) => a - b),
+      motion = sorted[sorted.length >> 1] ?? 0,
+      reached = result.moving.filter((vx) => vx > motion * 0.6 && vx < motion * 1.4).length;
+    console.log(JSON.stringify({ kind, boxPixels: result.moving.length, motion, reached }));
+    assert.ok(motion > 1e-3, `${kind}: the box moves on screen (median ${motion} of the view per frame)`);
     assert.ok(result.moving.length > 20_000, `${kind}: the box covers the view (${result.moving.length} pixels)`);
     assert.equal(
       reached,
       result.moving.length,
-      `${kind}: every box pixel carries the box's motion (${reached} reached)`,
+      `${kind}: every box pixel carries the box's full motion (${reached} did)`,
     );
     assert.deepEqual(result.gpuErrors, []);
   }

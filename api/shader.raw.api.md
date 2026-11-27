@@ -174,7 +174,7 @@ export class RawShaderMaterial<U extends {
     prepare(device: GPUDevice, pass: number, owner?: RawShaders): MaterialGpu;
     uniformVersion(): number;
     get writesGBuffer(): boolean;
-    pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, kind: RawPass, c?: RawPassContext, compare?: GPUCompareFunction): GPURenderPipeline | undefined;
+    pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, kind: RawPass, c?: RawPassContext, compare?: GPUCompareFunction, motionFormat?: GPUTextureFormat): GPURenderPipeline | undefined;
 }
 
 export interface RawShaderMaterialOptions {

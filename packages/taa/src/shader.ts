@@ -8,9 +8,11 @@ const frame = `struct Temporal {current:mat4x4f,previous:mat4x4f,inverse:mat4x4f
 @group(0) @binding(0) var<uniform> temporal:Temporal;`;
 export const fullscreen = `struct Fullscreen {@builtin(position) clip:vec4f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Fullscreen {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Fullscreen;o.clip=vec4f(p[i],0,1);return o;}`;
-const motion = `struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
-fn motion(current:vec2f,previous:vec4f)->Motion {var o:Motion;o.velocity=vec2f(0);o.depth=-1;
-  if(previous.w>0){o.velocity=current-(previous.xy/previous.w*vec2f(0.5,-0.5)+0.5);o.depth=previous.z/previous.w;}return o;}`;
+// `velocity.w` is 1, the coverage channel of an rgba16float object target (TAA's KB-TAA-COMPATEDGE1 route on the
+// WebGL2 layer); an rg16float target drops it.
+const motion = `struct Motion {@location(0) velocity:vec4f,@location(1) depth:f32}
+fn motion(current:vec2f,previous:vec4f)->Motion {var o:Motion;o.velocity=vec4f(0,0,0,1);o.depth=-1;
+  if(previous.w>0){o.velocity=vec4f(current-(previous.xy/previous.w*vec2f(0.5,-0.5)+0.5),0,1);o.depth=previous.z/previous.w;}return o;}`;
 // The sky (depth 0, the reversed-Z far plane) moves with the camera's turn like any pixel and keeps history (depth 0)
 // from sky alone, so what is drawn over it with no depth of its own (volumetric clouds, stars, weather) is averaged
 // too; a surface's history there has a greater depth and is still rejected. Before 2026-11-13 the sky had none.

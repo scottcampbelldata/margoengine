@@ -59,10 +59,10 @@ struct Output {@builtin(position) @invariant clip:vec4f,@location(0) current:vec
  if(frame.size.z<=0.0){o.previous.w=-1.0;}
  return o;
 }
-struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
+struct Motion {@location(0) velocity:vec4f,@location(1) depth:f32}
 @fragment fn fragment(i:Output)->Motion {
- ${cover ? 'if(scatterCoverage(i.cover)<=i.cover.w){discard;}' : ''}var o:Motion;o.velocity=vec2f(0);o.depth=-1.0;
- if(i.previous.w>0.0){o.velocity=(i.current.xy/i.current.w-i.previous.xy/i.previous.w)*vec2f(0.5,-0.5);o.depth=i.previous.z/i.previous.w;}
+ ${cover ? 'if(scatterCoverage(i.cover)<=i.cover.w){discard;}' : ''}var o:Motion;o.velocity=vec4f(0,0,0,1);o.depth=-1.0;
+ if(i.previous.w>0.0){o.velocity=vec4f((i.current.xy/i.current.w-i.previous.xy/i.previous.w)*vec2f(0.5,-0.5),0,1);o.depth=i.previous.z/i.previous.w;}
  return o;
 }
 `;
@@ -218,7 +218,7 @@ export class ScatterVelocity {
     split: boolean,
     cover: boolean,
   ): GPURenderPipeline {
-    const key = `${split}:${cover}:${frame.samples}:${frame.depthStencil.format}:${parts.stride}:${!!parts.route}`;
+    const key = `${split}:${cover}:${frame.samples}:${frame.depthStencil.format}:${frame.targets.map((t) => t.format).join()}:${parts.stride}:${!!parts.route}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let text = parts.pose(code(split, cover), parts.route ? 3 : 2);

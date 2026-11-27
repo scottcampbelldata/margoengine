@@ -255,9 +255,9 @@ struct MargoVelocity { @builtin(position) @invariant clip:vec4f, @location(0) pr
 fn margoVelocity(position:vec3f,before:vec3f)->MargoVelocity {return MargoVelocity(camera.viewProjection*mesh.world*vec4f(position,1),margoBefore.viewProjection*margoBefore.world*vec4f(before,1));}
 `;
 const velocityFragment = `
-struct MargoMotion { @location(0) velocity:vec2f, @location(1) depth:f32 }
-@fragment fn margoVelocityFragment(i:MargoVelocity)->MargoMotion {var o:MargoMotion;o.velocity=vec2f(0);o.depth=-1;
-  if(i.previous.w>0&&margoBefore.valid>0){o.velocity=i.clip.xy/camera.resolution-(i.previous.xy/i.previous.w*vec2f(0.5,-0.5)+0.5);o.depth=i.previous.z/i.previous.w;}return o;}
+struct MargoMotion { @location(0) velocity:vec4f, @location(1) depth:f32 }
+@fragment fn margoVelocityFragment(i:MargoVelocity)->MargoMotion {var o:MargoMotion;o.velocity=vec4f(0,0,0,1);o.depth=-1;
+  if(i.previous.w>0&&margoBefore.valid>0){o.velocity=vec4f(i.clip.xy/camera.resolution-(i.previous.xy/i.previous.w*vec2f(0.5,-0.5)+0.5),0,1);o.depth=i.previous.z/i.previous.w;}return o;}
 `;
 // The pick pass reads no part of the caller's fragment stage: a mesh's ID covers its whole shape.
 const pickFragment = '@fragment fn margoPick()->@location(0) u32 {return mesh.pickId;}\n';
@@ -978,6 +978,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     kind: RawPass,
     c: RawPassContext | undefined,
     compare: GPUCompareFunction,
+    velocity: GPUTextureFormat = 'rg16float',
   ): { entry?: string; targets: GPUColorTargetState[]; depthStencil?: GPUDepthStencilState } {
     const format = c?.descriptor.depthStencil?.format as GPUTextureFormat;
     if (kind === 'shadow')
@@ -1002,7 +1003,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     if (kind === 'velocity')
       return {
         entry: 'margoVelocityFragment',
-        targets: [{ format: 'rg16float' }, { format: 'r32float' }],
+        targets: [{ format: velocity }, { format: 'r32float' }],
         depthStencil: { format, depthWriteEnabled: false, depthCompare: 'equal' },
       };
     if (kind === 'gbuffer')
@@ -1039,12 +1040,13 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     kind: RawPass,
     c?: RawPassContext,
     compare: GPUCompareFunction = 'equal',
+    motionFormat: GPUTextureFormat = 'rg16float',
   ): GPURenderPipeline | undefined {
     const topology = mesh.drawTopology,
       strip = topology.endsWith('strip') && mesh.indexFormat,
       samples = c?.descriptor.multisample?.count ?? 1,
       depth = c?.descriptor.depthStencil?.format,
-      key = `${kind}|${mesh.layoutKey}|${topology}|${strip || ''}|${c?.format}|${samples}|${depth}|${compare}|${this.state()}`;
+      key = `${kind}|${mesh.layoutKey}|${topology}|${strip || ''}|${c?.format}|${samples}|${depth}|${compare}|${motionFormat}|${this.state()}`;
     let e = gpu.pipelines.get(key);
     if (e) return e.pipeline;
     e = { state: 'pending' };
@@ -1067,7 +1069,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
       return m;
     };
     device.pushErrorScope?.('validation');
-    const { entry: fragmentEntry, targets, depthStencil } = this.target(kind, c, compare),
+    const { entry: fragmentEntry, targets, depthStencil } = this.target(kind, c, compare, motionFormat),
       velocity = kind === 'velocity',
       vertex = module(velocity ? 'velocity' : 'vertex'),
       fragment =
@@ -2198,7 +2200,9 @@ export class RawShaders implements EnginePlugin {
   drawVelocity(pass: GPURenderPassEncoder, frame: { context: PassContext; camera: Float32Array; key: object }): void {
     const c = frame.context,
       device = this.device,
-      engine = this.engine as unknown as EngineKernel;
+      engine = this.engine as unknown as EngineKernel,
+      // TAA's frame names its motion target's format (rgba16float with a coverage channel at 4x on the WebGL2 layer).
+      motionFormat = (frame as { targets?: readonly GPUColorTargetState[] }).targets?.[0]?.format;
     // The colour pass drew first (frame-graph order 0.5 before TAA's 9) and made the camera block meshes bind there.
     if (c.backend !== 'webgpu' || !device || !engine || c.device !== device || !this.camera) return;
     let state = this.velocityStates.get(frame.key);
@@ -2255,7 +2259,7 @@ export class RawShaders implements EnginePlugin {
       m.world.set(world);
       m.frame = state.frame;
       const gpu = material.prepare(device, token, this),
-        pipeline = material.pipeline(this, gpu, device, mesh, 'velocity', c);
+        pipeline = material.pipeline(this, gpu, device, mesh, 'velocity', c, 'equal', motionFormat);
       if (pipeline) draws.push({ mesh, pipeline, gpu, call, group: m.group });
     }
     if (time !== undefined) state.time = time;
