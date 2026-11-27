@@ -1,10 +1,10 @@
 {
-  "commit": "22d3e015ab",
+  "commit": "187f21fba3",
   "dirty": false,
   "browser": "msedge 158.0.4370.45 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-8kd4roRv.js",
+      "file": "assets/dist-BtybKAU9.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
@@ -13,7 +13,7 @@
         "_node-matrix-R9BipGnp-ERCK1iAW.js",
         "_errors-DkwPZuAq.js",
         "_mat4-BTlwq2yz.js",
-        "_model-CgHUlnHa-DTc_gKD7.js",
+        "_model-DUCBKlU6-CwHTLGXT.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -86,13 +86,13 @@
       "isDynamicEntry": true
     },
     "../../../packages/gltf/dist/compression-CyUGU4DR.js": {
-      "file": "assets/compression-CyUGU4DR-kn_aiYY4.js",
+      "file": "assets/compression-CyUGU4DR-DV3WO6Dk.js",
       "name": "compression-CyUGU4DR",
       "src": "../../../packages/gltf/dist/compression-CyUGU4DR.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
-        "_asset-0FOEpFiE-CE1xE94T.js"
+        "_asset-0FOEpFiE-DUrpGpYv.js"
       ]
     },
     "../../../packages/gltf/dist/dds.js": {
@@ -106,12 +106,12 @@
       ]
     },
     "../../../packages/gltf/dist/extended.js": {
-      "file": "assets/extended-C5vmANt2.js",
+      "file": "assets/extended-CaDGiYJi.js",
       "name": "extended",
       "src": "../../../packages/gltf/dist/extended.js",
       "isDynamicEntry": true,
       "imports": [
-        "_extended-BIq7el6q.js"
+        "_extended-DeFSscbz.js"
       ]
     },
     "../../../packages/gltf/dist/index.js": {
@@ -129,14 +129,14 @@
       ]
     },
     "../../../packages/gltf/dist/pbr.js": {
-      "file": "assets/pbr-C064HpeB.js",
+      "file": "assets/pbr-SQYhqDOx.js",
       "name": "pbr",
       "src": "../../../packages/gltf/dist/pbr.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-CgHUlnHa-DTc_gKD7.js",
-        "_asset-0FOEpFiE-CE1xE94T.js",
+        "_model-DUCBKlU6-CwHTLGXT.js",
+        "_asset-0FOEpFiE-DUrpGpYv.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -144,15 +144,15 @@
       ]
     },
     "../../../packages/gltf/dist/spec-gloss.js": {
-      "file": "assets/spec-gloss-DK_4dFDK.js",
+      "file": "assets/spec-gloss-BaJoBo0T.js",
       "name": "spec-gloss",
       "src": "../../../packages/gltf/dist/spec-gloss.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
-        "_shader-Dh2DyWHw-C8Al8TJa.js",
+        "_shader-BhezFWhF-BkP2G29q.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
-        "_extended-BIq7el6q.js"
+        "_extended-DeFSscbz.js"
       ]
     },
     "../../../packages/gltf/dist/splats.js": {
@@ -171,7 +171,7 @@
       ]
     },
     "../../../packages/gltf/dist/strokes.js": {
-      "file": "assets/strokes-DB-wfOcL.js",
+      "file": "assets/strokes-BQYaZy7O.js",
       "name": "strokes",
       "src": "../../../packages/gltf/dist/strokes.js",
       "isDynamicEntry": true,
@@ -179,7 +179,7 @@
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_preload-helper-CRzLMJPS.js",
         "_scene-scope-CZDEkd24-DwPzBn8G.js",
-        "_asset-0FOEpFiE-CE1xE94T.js"
+        "_asset-0FOEpFiE-DUrpGpYv.js"
       ],
       "dynamicImports": [
         "../../../packages/lines/dist/index.js",
@@ -306,8 +306,8 @@
         "_errors-D0VAEAiW-CZKkhVCh.js"
       ]
     },
-    "_asset-0FOEpFiE-CE1xE94T.js": {
-      "file": "assets/asset-0FOEpFiE-CE1xE94T.js",
+    "_asset-0FOEpFiE-DUrpGpYv.js": {
+      "file": "assets/asset-0FOEpFiE-DUrpGpYv.js",
       "name": "asset-0FOEpFiE",
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
@@ -361,11 +361,11 @@
       "file": "assets/errors-DkwPZuAq.js",
       "name": "errors"
     },
-    "_extended-BIq7el6q.js": {
-      "file": "assets/extended-BIq7el6q.js",
+    "_extended-DeFSscbz.js": {
+      "file": "assets/extended-DeFSscbz.js",
       "name": "extended",
       "imports": [
-        "_shader-Dh2DyWHw-C8Al8TJa.js"
+        "_shader-BhezFWhF-BkP2G29q.js"
       ]
     },
     "_extension-DMa9Y_yu.js": {
@@ -408,9 +408,9 @@
         "_errors-D4ZctVpl.js"
       ]
     },
-    "_model-CgHUlnHa-DTc_gKD7.js": {
-      "file": "assets/model-CgHUlnHa-DTc_gKD7.js",
-      "name": "model-CgHUlnHa",
+    "_model-DUCBKlU6-CwHTLGXT.js": {
+      "file": "assets/model-DUCBKlU6-CwHTLGXT.js",
+      "name": "model-DUCBKlU6",
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_version-CrCGs6gQ.js",
@@ -421,8 +421,8 @@
         "_mat4-BTlwq2yz.js",
         "_accessor-DuqjpuxI-lo3KREZ8.js",
         "_scene-scope-CZDEkd24-DwPzBn8G.js",
-        "_asset-0FOEpFiE-CE1xE94T.js",
-        "_shader-Dh2DyWHw-C8Al8TJa.js",
+        "_asset-0FOEpFiE-DUrpGpYv.js",
+        "_shader-BhezFWhF-BkP2G29q.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-BT_nk8cK.js"
       ],
@@ -449,9 +449,9 @@
         "_version-CrCGs6gQ.js"
       ]
     },
-    "_shader-Dh2DyWHw-C8Al8TJa.js": {
-      "file": "assets/shader-Dh2DyWHw-C8Al8TJa.js",
-      "name": "shader-Dh2DyWHw",
+    "_shader-BhezFWhF-BkP2G29q.js": {
+      "file": "assets/shader-BhezFWhF-BkP2G29q.js",
+      "name": "shader-BhezFWhF",
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js"
       ]
@@ -479,7 +479,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-B1CF2ui-.js",
+      "file": "assets/index-BZU8GZaM.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -545,13 +545,13 @@
       "brotli": 1913
     },
     {
-      "path": "assets/index-B1CF2ui-.js",
+      "path": "assets/index-BZU8GZaM.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27451,
+      "transferred": 27453,
       "raw": 65815,
-      "gzip": 27069,
-      "brotli": 23912
+      "gzip": 27071,
+      "brotli": 23908
     },
     {
       "path": "assets/node-matrix-R9BipGnp-ERCK1iAW.js",
@@ -596,7 +596,7 @@
       "transferred": 1054,
       "raw": 804,
       "gzip": 433,
-      "brotli": 278
+      "brotli": 281
     },
     {
       "path": "model.glb",
@@ -610,14 +610,14 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 46929,
+    "transferred": 46931,
     "raw": 97334,
-    "gzip": 40943,
-    "brotli": 36180
+    "gzip": 40945,
+    "brotli": 36179
   },
   "notFetched": [
     {
-      "path": "assets/asset-0FOEpFiE-CE1xE94T.js",
+      "path": "assets/asset-0FOEpFiE-DUrpGpYv.js",
       "raw": 31545
     },
     {
@@ -641,7 +641,7 @@
       "raw": 1076
     },
     {
-      "path": "assets/compression-CyUGU4DR-kn_aiYY4.js",
+      "path": "assets/compression-CyUGU4DR-DV3WO6Dk.js",
       "raw": 4395
     },
     {
@@ -661,7 +661,7 @@
       "raw": 17774
     },
     {
-      "path": "assets/dist-8kd4roRv.js",
+      "path": "assets/dist-BtybKAU9.js",
       "raw": 80949
     },
     {
@@ -705,12 +705,12 @@
       "raw": 183
     },
     {
-      "path": "assets/extended-BIq7el6q.js",
-      "raw": 2780
+      "path": "assets/extended-CaDGiYJi.js",
+      "raw": 59
     },
     {
-      "path": "assets/extended-C5vmANt2.js",
-      "raw": 59
+      "path": "assets/extended-DeFSscbz.js",
+      "raw": 2780
     },
     {
       "path": "assets/line-CXjNQjrU-Ca9BN2JC.js",
@@ -733,7 +733,7 @@
       "raw": 7513
     },
     {
-      "path": "assets/model-CgHUlnHa-DTc_gKD7.js",
+      "path": "assets/model-DUCBKlU6-CwHTLGXT.js",
       "raw": 162715
     },
     {
@@ -741,7 +741,7 @@
       "raw": 3727
     },
     {
-      "path": "assets/pbr-C064HpeB.js",
+      "path": "assets/pbr-SQYhqDOx.js",
       "raw": 1058
     },
     {
@@ -749,15 +749,15 @@
       "raw": 862
     },
     {
-      "path": "assets/shader-Dh2DyWHw-C8Al8TJa.js",
-      "raw": 43942
+      "path": "assets/shader-BhezFWhF-BkP2G29q.js",
+      "raw": 43982
     },
     {
       "path": "assets/sog-Db_cLfxh-jn1SEk5k.js",
       "raw": 11588
     },
     {
-      "path": "assets/spec-gloss-DK_4dFDK.js",
+      "path": "assets/spec-gloss-BaJoBo0T.js",
       "raw": 2867
     },
     {
@@ -773,7 +773,7 @@
       "raw": 2094
     },
     {
-      "path": "assets/strokes-DB-wfOcL.js",
+      "path": "assets/strokes-BQYaZy7O.js",
       "raw": 4668
     },
     {
