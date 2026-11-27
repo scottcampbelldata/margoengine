@@ -18,6 +18,10 @@ await postBrowser(
       const canvas = document.querySelector('canvas'),
         engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 5], target: [0, 0, 0] } });
       engine.stop();
+      // The backdrop the 100 px bar was measured on: linear 0.018, 0.023, 0.035, what the capture held of core's clear
+      // colour before KB-CLEAR-DEFAULT1. The streak's faint tail lifts a display byte only over it, so the check names
+      // it rather than take core's default, which the tone map now draws near black (KB-CLEAR-CHECKS1).
+      engine.scene.background = '#242a35';
       engine
         .createMesh()
         .setGeometry(box(0.06, 0.06, 0.06))

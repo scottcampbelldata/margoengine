@@ -205,7 +205,11 @@ window.runTests = async () => {
       const got = out.irradianceAt(n),
         want = c.irradianceAt(n);
       for (let k = 0; k < 3; k++)
-        assert(Math.abs(got[k] - want[k]) <= 1e-5 * Math.max(1, want[k]), `irradiance at ${n}: ${got} vs ${want}`);
+        // Relative to the value's size: the hot texel rings the SH negative at some normals (KB-CLEAR-CHECKS1).
+        assert(
+          Math.abs(got[k] - want[k]) <= 1e-5 * Math.max(1, Math.abs(want[k])),
+          `irradiance at ${n}: ${got} vs ${want}`,
+        );
     }
     blend.dispose();
     c.dispose();
