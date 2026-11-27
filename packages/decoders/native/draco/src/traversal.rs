@@ -225,12 +225,17 @@ pub(crate) fn sequence(
     } else {
         walk.depth_first(budget)?;
     }
+    // E62: a vertex no traversal reaches, left by header counts below what the
+    // connectivity was built with, takes the first entry, for the predictors as
+    // for the output. A mesh with a face has at least one entry.
+    for entry in &mut walk.sequence.vertex_entry {
+        if *entry == NONE {
+            *entry = 0;
+        }
+    }
     for (c, &point) in mapping.corner_to_point.iter().enumerate() {
         let entry = walk.sequence.vertex_entry[walk.corners()[c]];
-        if entry == NONE
-            || (walk.sequence.point_entry[point] != NONE
-                && walk.sequence.point_entry[point] != entry)
-        {
+        if walk.sequence.point_entry[point] != NONE && walk.sequence.point_entry[point] != entry {
             return Err(Error::Invalid);
         }
         walk.sequence.point_entry[point] = entry;

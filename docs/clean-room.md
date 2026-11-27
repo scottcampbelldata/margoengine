@@ -6883,6 +6883,19 @@ published specification's attribute descriptor table.
 | E60 version 1.3 | Version 1.3 streams, point clouds and meshes, use the 1.2 layout except that an attribute's unique id is a varint, not two bytes. | All 250 rewritten streams match; 1.2 streams only relabelled are rejected by both. |
 | E61 normalized byte | Any nonzero normalized byte means true, at every version. A semantic above 4 rejects the stream. | All 256 values of both bytes. |
 
+### Batch 133 E62: vertices no traversal reaches (2026-11-27)
+
+Method: as E26 to E40, public calls of the opaque full decoder only; its source
+was not read. Retained EdgeBreaker meshes had their header face and symbol
+counts lowered by up to three, with the split count kept or zeroed. Two
+hypotheses were compared: the first entry for the output only, and for the
+predictors too. The first differed on 24 streams; the second matched every
+stream both accept (10,243).
+
+| # | Rule | Probe |
+| --- | --- | --- |
+| E62 unreached vertices | A vertex that no attribute traversal reaches takes entry zero, both for its output value and where a predictor looks it up. | Lowered header counts, versions 1.1 to 2.2. |
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

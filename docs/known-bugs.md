@@ -17060,6 +17060,18 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/version13.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder refused meshes with an unreached vertex (batch 133, E62)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Invalid` for a 2.2 mesh of `tests/fixtures/multi.bin` with the
+  header faces lowered from 12 to 11, symbols from 11 to 10 and splits 0.
+- **Cause:** `native/draco/src/traversal.rs` refused a mesh in which the
+  attribute traversal leaves a vertex without an entry.
+- **Fix:** the vertex takes entry zero
+  ([E62](clean-room.md#batch-133-e62-vertices-no-traversal-reaches-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/unreached.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -17110,9 +17122,12 @@ E26 to E40):
   probability byte is 0:
   `445241434f020300010000ae000000010100020100000307000000ae0000000006244e363c820614000000d3591f17174c1a89e9023259a4007f8a6ec439b3040000000000000008000000a46a6b1e34593001`.
   Valid streams are not known to differ. Cause: not yet established.
-- A version 2.2 standard EdgeBreaker mesh of `tests/fixtures/multi.bin` with the
-  header faces lowered from 12 to 11, symbols from 11 to 10 and splits 0: the
-  prebuilt decodes 12 points, Margo answers `Invalid` (as before E50).
+- Lowered header counts: one retained 2.2 mesh, with some lowered face and
+  symbol counts, decodes in the prebuilt and answers `Unsupported` in Margo,
+  which reads the second attribute at another offset; two 1.1 variants answer
+  `Invalid`. Repro:
+  `445241434f02020101000000060300030000026f0bff02014001ff000002000603000b03050200160101fe00042c040000f2050000ac07000084000000580300008c0200007c0400005a04000032030000b2050000da050000aa0400006c070000360600001601000052030000640000007804000005010004550100007b0200000d0200004b0200006c020000c4020000aa000000a9000000c90200000903000089000000970200002c01000026059bc8d02220000000e000000020`.
+  Cause: not yet established.
 
 Except for these refusals, predictor 6 mode 0 and the deliberate index refusal
 in [limits.md](limits.md), no difference found by these probes is open.

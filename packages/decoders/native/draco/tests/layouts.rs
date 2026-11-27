@@ -152,3 +152,9 @@ fn version_13_and_normalized_bytes_match_black_box_outputs() {
     let counts = check(include_bytes!("fixtures/version13.bin"));
     assert_eq!(counts, (123, 99, 24, 0));
 }
+
+#[test]
+fn unreached_vertices_match_black_box_outputs() {
+    let counts = check(include_bytes!("fixtures/unreached.bin"));
+    assert_eq!(counts, (122, 122, 0, 0));
+}
