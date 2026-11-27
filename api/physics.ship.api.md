@@ -124,6 +124,10 @@ export interface HoltropResistance {
     thrust: number;
 }
 
+export const KCS_MODEL: ManoeuvringModel;
+
+export const KCS_PROPELLER: PropellerCurves;
+
 export const KVLCC2_L7: ManoeuvringModel;
 
 export const KVLCC2_PROPELLER: PropellerCurves;
@@ -138,6 +142,7 @@ export class Manoeuvring {
     time: number;
     constructor(model: ManoeuvringModel, state?: Partial<ManoeuvringState>, options?: {
         readonly density?: number;
+        readonly gravity?: number;
         readonly rudderRate?: number;
         readonly resistance?: (speed: number) => number;
     });
@@ -164,6 +169,22 @@ export interface ManoeuvringForces {
     race: number;
     inflow: number;
     torque: number;
+    K: number;
+}
+
+export interface ManoeuvringHeel {
+    readonly metacentricHeight: number;
+    readonly gravityDepth: number;
+    readonly gyration?: number;
+    readonly addedInertia?: number;
+    readonly decay?: number;
+    readonly hullDepth?: number;
+    readonly rudderDepth?: number;
+    readonly straightening?: number;
+    readonly surge?: readonly number[];
+    readonly sway?: readonly number[];
+    readonly yaw?: readonly number[];
+    readonly roll?: readonly number[];
 }
 
 export interface ManoeuvringModel {
@@ -200,6 +221,7 @@ export interface ManoeuvringModel {
         readonly kappa: number;
         readonly position?: number;
     };
+    readonly heel?: ManoeuvringHeel;
 }
 
 export interface ManoeuvringState {
@@ -210,6 +232,8 @@ export interface ManoeuvringState {
     v: number;
     r: number;
     rudder: number;
+    heel?: number;
+    rollRate?: number;
 }
 
 export class Propeller {
@@ -301,6 +325,7 @@ export interface Ship {
         readonly bandwidth?: number;
         readonly damping?: number;
     };
+    readonly roll?: 'model' | 'hull';
 }
 
 export interface ShipControl {
@@ -358,6 +383,8 @@ export interface ShipStatus {
     v: number;
     r: number;
     rudder: number;
+    heel: number;
+    rollRate: number;
     forces: ManoeuvringForces;
     sinkage: number;
     trim: number;

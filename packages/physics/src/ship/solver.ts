@@ -19,7 +19,7 @@
 // State: each ship's rudder angle. Its controls (revolutions, rudder order, thruster) are inputs, set with `control()`.
 import type { FlowField, FlowSample, SeaSource, SeaSurface } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
-import { atan2, cos, exp, pow } from '@margoengine/math/pinned';
+import { atan2, cos, exp, hypot, pow, sin } from '@margoengine/math/pinned';
 import type { SeaQuery } from '../seakeeping/wetted.js';
 import { regionWords } from '../world/memory.js';
 import {
@@ -150,6 +150,12 @@ export interface Ship {
    * 0.8). Higher answers faster and works the rudder harder.
    */
   readonly autopilot?: { readonly bandwidth?: number; readonly damping?: number };
+  /**
+   * For a model with heel: what holds the ship upright. 'model' (default) gives the body the model's restoring moment g m GM
+   * sin(phi) and roll damping with its own roll moments; 'hull' leaves the restoring and damping to a HullSolver floating
+   * the body, whose pressures give them.
+   */
+  readonly roll?: 'model' | 'hull';
 }
 
 /** A quay or a bank, as a vertical wall along the segment from `from` to `to`, [x, z] m. */
@@ -198,6 +204,9 @@ export interface ShipStatus {
   r: number;
   /** Rudder angle, rad. */
   rudder: number;
+  /** Heel, rad (starboard down positive), and roll rate, rad/s, of the body. */
+  heel: number;
+  rollRate: number;
   /** The MMG forces of the step. */
   forces: ManoeuvringForces;
   /** Sinkage at the midship, m, and trim by the stern, rad, from its squat. */
@@ -249,6 +258,8 @@ export class ShipSolver implements Solver<ShipParams> {
   private capacity = 0;
   private density = 1025;
   private g = 9.81;
+  /** The world's up, against its gravity (+Y with none). */
+  private vertical: Vec3 = [0, 1, 0];
   private depth: ShipParams['depth'];
   private walls: readonly ShipWall[] = [];
   private runtime: Runtime[] = [];
@@ -305,6 +316,9 @@ export class ShipSolver implements Solver<ShipParams> {
     this.level = level as RateLevel;
     this.density = density;
     this.g = gravityMagnitude(host.gravity ?? DEFAULT_GRAVITY);
+    const gv = host.gravity ?? DEFAULT_GRAVITY,
+      gl = hypot(gv[0], gv[1], gv[2]);
+    this.vertical = gl > 0 ? [-gv[0] / gl, -gv[1] / gl, -gv[2] / gl] : [0, 1, 0];
     this.depth = depth;
     this.walls = walls;
     let top = -1;
@@ -312,6 +326,12 @@ export class ShipSolver implements Solver<ShipParams> {
       if (!(Number.isInteger(ship?.row) && ship.row >= 0))
         throw shipError(`A ship's body row is a whole number, 0 or more (got ${ship?.row}); pass the body's row.`);
       top = Math.max(top, ship.row);
+      if (ship.roll !== undefined && ship.roll !== 'model' && ship.roll !== 'hull')
+        throw shipError(`A ship's roll is held by 'model' or 'hull' (got ${String(ship.roll)}); pass one.`);
+      if (ship.model?.heel && ship.roll !== 'hull' && !(this.g > 0))
+        throw shipError(
+          "A ship that heels is held upright by its weight over its metacentric height, and this world has no gravity; give the PhysicsWorld its gravity (the rigid bodies' own physics may still have none), or roll: 'hull' with a HullSolver.",
+        );
       if (
         ship.thruster &&
         !(
@@ -384,6 +404,8 @@ export class ShipSolver implements Solver<ShipParams> {
           v: 0,
           r: 0,
           rudder: 0,
+          heel: 0,
+          rollRate: 0,
           forces: mmg.forces(mmg.state),
           sinkage: 0,
           trim: 0,
@@ -558,14 +580,23 @@ export class ShipSolver implements Solver<ShipParams> {
         inverseMass = bodies[at + 16]!,
         mid = add(origin, rotate(q, ship.midship ?? [0, 0, 0])),
         up = rotate(q, ship.up ?? [0, 1, 0]),
-        f = rotate(q, ship.forward ?? [1, 0, 0]),
-        s = cross(f, up),
+        vertical = this.vertical,
+        // MMG's horizontal body axes: the body's forward laid level, starboard level across it, z down the vertical, so a
+        // heeled or trimmed hull's sway and yaw stay horizontal.
+        ahead = rotate(q, ship.forward ?? [1, 0, 0]),
+        levelled = sub(ahead, scale(vertical, dot(ahead, vertical))),
+        levelLength = hypot(levelled[0], levelled[1], levelled[2]),
+        f = levelLength > 1e-9 ? scale(levelled, 1 / levelLength) : ahead,
+        s = cross(f, vertical),
         // Velocity at the midship: the centre's plus spin x (midship - centre).
         vm = add(velocity, cross(spin, sub(mid, centre))),
         u = dot(vm, f),
         v = dot(vm, s),
         // Yaw rate about MMG's z, which points down.
-        r = -dot(spin, up);
+        r = -dot(spin, vertical),
+        // Heel: the body's up leaning toward starboard (starboard down), and its roll rate.
+        phi = atan2(dot(up, s), dot(up, vertical)),
+        p = dot(spin, f);
       // In shallow water the hull's derivatives and added masses are the depth's (Kijima et al. 1990; Li and Wu 1990),
       // made again when the draught over depth moves by a hundredth.
       const depth = this.depthAt(mid[0], mid[2]),
@@ -585,7 +616,7 @@ export class ShipSolver implements Solver<ShipParams> {
         order = Math.max(-mmg.rudderLimit, Math.min(mmg.rudderLimit, ordered ?? control.rudder)),
         turn = mmg.rudderRate * dt;
       rudders[index] = rudders[index]! + Math.max(-turn, Math.min(turn, order - rudders[index]!));
-      const state = { x: 0, z: 0, heading: 0, u, v, r, rudder: rudders[index]! },
+      const state = { x: 0, z: 0, heading: 0, u, v, r, rudder: rudders[index]!, heel: phi, rollRate: p },
         forces = mmg.forces(state, status.forces);
       let X = forces.X,
         Y = forces.Y,
@@ -632,11 +663,14 @@ export class ShipSolver implements Solver<ShipParams> {
         ay = my * 0.5 * rho * L * L * d,
         az = jz * 0.5 * rho * L * L * L * L * d,
         xG = dot(sub(centre, mid), f),
-        // The body's yaw inertia about its centre: 1 / (up . I^-1 up).
+        // The body's yaw inertia about its centre: 1 / (z . I^-1 z) about the vertical.
         iinv =
-          up[0] * (bodies[at + 17]! * up[0] + bodies[at + 18]! * up[1] + bodies[at + 19]! * up[2]) +
-          up[1] * (bodies[at + 18]! * up[0] + bodies[at + 20]! * up[1] + bodies[at + 21]! * up[2]) +
-          up[2] * (bodies[at + 19]! * up[0] + bodies[at + 21]! * up[1] + bodies[at + 22]! * up[2]),
+          vertical[0] *
+            (bodies[at + 17]! * vertical[0] + bodies[at + 18]! * vertical[1] + bodies[at + 19]! * vertical[2]) +
+          vertical[1] *
+            (bodies[at + 18]! * vertical[0] + bodies[at + 20]! * vertical[1] + bodies[at + 21]! * vertical[2]) +
+          vertical[2] *
+            (bodies[at + 19]! * vertical[0] + bodies[at + 21]! * vertical[1] + bodies[at + 22]! * vertical[2]),
         izG = iinv > 0 ? 1 / iinv : 0,
         mu = mass + ax,
         mv = mass + ay,
@@ -656,9 +690,30 @@ export class ShipSolver implements Solver<ShipParams> {
         w = ship.row * FORCE_WORDS;
       for (let k = 0; k < 3; k++) {
         out[w + k]! += Fx * f[k]! + Fy * s[k]!;
-        // MMG's z points down: a moment about it is minus one about up.
-        out[w + 3 + k]! -= Mz * up[k]!;
+        // MMG's z points down: a moment about it is minus one about the vertical.
+        out[w + 3 + k]! -= Mz * vertical[k]!;
       }
+      const H = M.heel;
+      if (H) {
+        // The roll (Fukui et al. 2016, eq. 4): the hull's and rudder's moments about G, the added masses' reaction at z_H, and
+        // the model's restoring moment and damping unless a HullSolver's pressures give them; the body takes its own inertia's
+        // share, the rest is the added inertia J_xx.
+        const fi =
+            f[0] * (bodies[at + 17]! * f[0] + bodies[at + 18]! * f[1] + bodies[at + 19]! * f[2]) +
+            f[1] * (bodies[at + 18]! * f[0] + bodies[at + 20]! * f[1] + bodies[at + 21]! * f[2]) +
+            f[2] * (bodies[at + 19]! * f[0] + bodies[at + 21]! * f[1] + bodies[at + 22]! * f[2]),
+          ixx = fi > 0 ? 1 / fi : 0,
+          jxx = (H.addedInertia ?? 0.2) * ixx;
+        let K = forces.K + ((H.hullDepth ?? 0.5 * d) - H.gravityDepth) * (ay * dv + ax * u * r);
+        if (ship.roll !== 'hull') {
+          const c44 = this.g * mass * H.metacentricHeight;
+          K -= ((2 * (H.decay ?? 0.035)) / Math.PI) * Math.sqrt(c44 * (ixx + jxx)) * p + c44 * sin(phi);
+        }
+        const own = ixx > 0 ? (K * ixx) / (ixx + jxx) : 0;
+        for (let k = 0; k < 3; k++) out[w + 3 + k]! += own * f[k]!;
+      }
+      status.heel = phi;
+      status.rollRate = p;
       // Squat in shallow water.
       const h = this.depthAt(mid[0], mid[2]),
         speed = Math.sqrt(u * u + v * v);

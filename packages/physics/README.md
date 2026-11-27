@@ -4172,6 +4172,24 @@ Each ship is `{row, model}` and takes these settings:
 - `block` and `addedMass`: `addedMass: false` leaves the surge, sway and yaw added mass to a HullSolver's strips (the ship still claims their damping).
 - `hull`: the hull's form for `holtropMennen` (`{length, beam, draughtFore, draughtAft, volume, lcb, midship, waterplane, ...}`). Given, the straight run's resistance at each speed is Holtrop and Mennen's, rising with the waves the hull makes, in place of the model's constant R'_0; `revolutionsFor` balances it.
 - `autopilot`: `{bandwidth, damping}`, the heading loop's natural frequency in units of U / L (default 1) and its damping ratio (default 0.8).
+- `roll`: for a model with `heel`, what holds the ship upright: `'model'` (default) gives the body the model's restoring moment g m GM sin(phi) and roll damping, and needs the world's gravity; `'hull'` leaves them to a HullSolver floating the body.
+
+A model with `heel` rolls as it turns, by Fukui et al.'s (2016) four-degree-of-freedom MMG model: the hull's forces gain heel terms from captive tests at fixed heel, the roll moment about the centre of gravity balances the hull's and rudder's moments against the restoring moment g m GM sin(phi) and the roll damping of the decay test, and the heeled rudder's force carries cos(phi). `heel` is `{metacentricHeight, gravityDepth, gyration, addedInertia, decay, hullDepth, rudderDepth, straightening, surge, sway, yaw, roll}`: GM and the centre of gravity's depth below the water plane are needed, the rest default (k_xx 0.4 B, J_xx 0.2 I_xx, decay coefficient 0.035, the hull's side force at half the draught, the rudder's at its centroid, no heel terms; without `roll` the hull's roll moment is its side force at `hullDepth`). `KCS_MODEL` is the KCS container ship's 2.19 m model with its heel terms at GM 0.60 m full scale. A high-GM ship such as KVLCC2 barely heels; a container ship heels out 15 to 19 degrees as it starts a hard turn and turns about 8 percent tighter for it. Under the solver, sway and yaw act in MMG's horizontal body axes, so a heeled or trimmed hull's forces stay level, and `status(i).heel` and `rollRate` read the body's roll.
+
+```ts
+import {KCS_MODEL, Manoeuvring} from 'margoengine/physics/ship';
+
+// KCS's model at Fn 0.26 (24 kn full scale), GM 0.60 m, hard over: it heels out about 19 degrees as it starts to turn.
+const kcs = new Manoeuvring(KCS_MODEL, {u: 1.206}, {rudderRate: ((2.32 * Math.PI) / 180) * Math.sqrt(105)});
+kcs.revolutions = kcs.selfPropulsion(1.206);
+kcs.order = (35 * Math.PI) / 180;
+let most = 0;
+while (kcs.time < 10) {
+  kcs.step(0.01);
+  most = Math.min(most, kcs.state.heel);
+}
+console.log(Math.round((-most * 180) / Math.PI)); // 19
+```
 
 The solver also takes `depth` (a number or a function of (x, z): for squat, and for shallow water), `walls` (quays and banks, `{from, to}`) and `density`. A wall alongside, within half a ship length of the midship along it, pushes the ship by Vantorre et al.'s (2003) regression of captive tests (`bankLoads`): toward the bank and bow away at usual depths, off it in very shallow water (below h/T about 1.2), and the propeller ahead draws the stern in; `status(i).suction` and `bankMoment` read the force and moment, and `bankInRange` whether the hull is in the regression's range. Where the water is under ten draughts deep, each ship runs on its model corrected for the depth (`shallowWater(model, depth)`): every hull derivative and the sway and yaw added masses by Ankudinov et al. (1990), the surge added mass by Li and Wu (1990), held at h / T 1.2 below that; the model is made again when the draught over depth moves by a hundredth. A ship then turns wider as the water shoals, as ships do.
 
@@ -4213,7 +4231,7 @@ The race is resolved: `water` gives the axial jet together with:
 On their own: `resolvedRace(race, point)`, `raceNumbers`, `inceptionIndex`, `cavityRadius`, `coreDeficit`, `VortexCavity` and `collapseTime`.
 
 The parts work on their own too:
-- `Manoeuvring`: the MMG ship stepped by Runge-Kutta, with `selfPropulsion(speed)`.
+- `Manoeuvring`: the MMG ship stepped by Runge-Kutta, with `selfPropulsion(speed)`; with a model's `heel` it carries `state.heel` and `state.rollRate`, and `forces().K` is the hull's and rudder's roll moment about G.
 - `Propeller`: open-water K_T and K_Q, four quadrants by Healey's lift and drag fitted to the curves, and the race's far-wake speed. `raceVelocity(race, point)` is the jet's velocity at a point.
 - `wageningenB({blades, area, pitch, reynolds}, J)`: a Wageningen B-series propeller's K_T and K_Q by Oosterveld and van Oossanen's (1975) polynomials, with their Reynolds correction; `bSeriesCurves(propeller)` fits MMG's quadratic curves to them from bollard pull to zero thrust, for a model's `propeller.curves`.
 - `holtropMennen(hull, speed)`: Holtrop and Mennen's resistance with the wake fraction, thrust deduction and eta_R; `ittc1957(Re)` is the friction line.

@@ -17137,6 +17137,35 @@ carrier: attraction at usual depths turning to repulsion between h/T 1.1 and 1.2
 text says. Leaving out the hull's part astern, and the propeller-with-speed part without gravity, are this package's
 own. Proof: `packages/physics/tests/ship.test.js`, "a bank alongside draws a ship in and turns its bow away".
 
+### A ship's heel in its turns (SEA-09, `ManoeuvringModel.heel`, `KCS_MODEL`, 2026-11-26)
+
+`packages/physics/src/ship/mmg.ts` (the roll equation, the heel terms, the rudder's cos(phi) and roll-rate inflow),
+`packages/physics/src/ship/kcs.ts` and the roll in `packages/physics/src/ship/solver.ts`, written from:
+- Y. Fukui, H. Yokota, H. Yano, M. Kondo, T. Nakano and Y. Yoshimura, "4-DOF mathematical model for manoeuvring simulation
+  including roll motion", J. JASNAOE 24, 167-179, 2016, https://www.jstage.jst.go.jp/article/jjasnaoe/24/0/24_167/_article/-char/en
+  (all 13 pages read: Table 1's KCS particulars, eqs. 4 to 9, Tables 3 and 4's hull, propeller and rudder coefficients with
+  their heel terms, Figs. 10 and 16 to 20).
+- H. Yasukawa and N. Hirata, "Hydrodynamic derivatives and maneuverability of a ship navigating with heel", J. JASNAOE 17,
+  19-29, 2013, https://www.jstage.jst.go.jp/article/jjasnaoe/17/0/17_19/_article/-char/en (eqs. 1 to 5, Tables 2 and 3: the
+  v' phi^2, r' phi^2 and phi^2 terms and the side force's depth 0.5 to 0.7 d).
+- H. Yasukawa and Y. Yoshimura, "Investigation of roll-coupling effect on ship maneuverability", J. JASNAOE 17, 57-64, 2013,
+  https://www.jstage.jst.go.jp/article/jjasnaoe/17/0/17_57/_article/-char/en (eqs. 2 to 4 and 54, Tables 1 to 3: the decay
+  coefficient a_0 0.035).
+- H. Yasukawa, "Simulations of ship maneuvering in waves (1st report: turning motion)", J. JASNAOE 4, 127-136, 2006,
+  https://www.jstage.jst.go.jp/article/jjasnaoe/4/0/4_0_127/_article/-char/en (eqs. 1 to 7: the restoring moment g m GM sin(phi)).
+- The SIMMAN 2008 workshop's KCS and KVLCC2 conditions (GM, k_xx, KG, speeds, rudder rates; http://www.simman2008.dk/KCS/kcs_geometry.htm,
+  http://www.simman2008.dk/KVLCC/KVLCC2/kvlcc2_geometry.html) and SIMMAN 2014's SVA propeller VP1193 open-water table
+  (https://simman2014.dk/wp-content/uploads/2015/07/KCS-Propeller-Openwater-Data-SVA-Model.pdf), read.
+- Measured data the test holds: G.-H. Yun, H.-J. Choi, D.-J. Kim et al., "A study on the manoeuvring performance of KCS by
+  scale ratio using free-running model tests", J. Soc. Naval Arch. Korea 58(6), 415-423, 2021, doi:10.3744/SNAK.2021.58.6.415
+  (Tables 1 to 5: KRISO's three models and MARIN's); SIMMAN 2014's KVLCC2 free-running results as R. F. Suarez, J. C. Berndt
+  and M. Abdel-Maksoud tabulate Quadvlieg et al. 2014 (arXiv 2606.17121, Tables 3 and 4); SIMMAN 2008's as I.-T. Kim et al.,
+  IJNAOE 13, 466-477, 2021, Tables 7 and 8, tabulate them; the ITTC Manoeuvring Committee's 26th report, p. 143.
+No simulation code was read. Turning Fukui et al.'s drift angle into MMG's v', returning their captive tests' combined
+Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in horizontal body axes on a heeled rigid body are
+this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
+the ship solver heels in its turn".
+
 ### The Wageningen B-screw series (SEA-09, `wageningenB`, `bSeriesCurves`, 2026-11-26)
 
 `packages/physics/src/ship/bseries.ts`, written from M. W. C. Oosterveld and P. van Oossanen, "Further computer-analyzed

@@ -3,6 +3,7 @@ export * from './autopilot.js';
 export * from './bank.js';
 export * from './bseries.js';
 export * from './empirical.js';
+export * from './kcs.js';
 export * from './mmg.js';
 export * from './propeller.js';
 export * from './race.js';

@@ -25,6 +25,7 @@ import {
   inceptionIndex,
   raceNumbers,
   resolvedRace,
+  KCS_MODEL,
   KVLCC2_L7,
   KVLCC2_PROPELLER,
   Manoeuvring,
@@ -1005,5 +1006,159 @@ test("a Wageningen B-series propeller's open water by Oosterveld and van Oossane
   assert.throws(
     () => wageningenB({ blades: 8, area: 0.7, pitch: 1 }, 0.5),
     (e) => e.code === 'unsupported' && /2 to 7 blades/.test(e.message),
+  );
+});
+
+/** A 35 degree turn of `model` at `speed` m/s to `side` (1 starboard, -1 port): advance and tactical diameter over L, heel and yaw rate. */
+function turn(model, speed, side, rudderRate, dt = 0.01) {
+  const s = new Manoeuvring(model, { u: speed }, { rudderRate });
+  s.revolutions = s.selfPropulsion(speed);
+  s.order = side * 35 * DEG;
+  const L = model.length;
+  let advance,
+    diameter,
+    peak = 0;
+  while (diameter === undefined && s.time < 600) {
+    s.step(dt);
+    peak = Math.max(peak, -side * s.state.heel);
+    const h = Math.abs(s.state.heading);
+    if (advance === undefined && h >= Math.PI / 2) advance = s.state.x / L;
+    if (h >= Math.PI) diameter = Math.abs(s.state.z) / L;
+  }
+  // The steady turn: its heel averaged over the roll's ringing, its speed and yaw rate.
+  const start = s.time;
+  let sum = 0,
+    n = 0;
+  while (s.time < start + 60) {
+    s.step(dt);
+    if (s.time > start + 20) (sum += s.state.heel), n++;
+  }
+  return {
+    advance,
+    diameter,
+    peak,
+    heel: (-side * sum) / n,
+    speed: Math.hypot(s.state.u, s.state.v) / speed,
+    r: Math.abs(s.state.r),
+  };
+}
+
+test("KCS heels outward in its turn and turns tighter for it, as SIMMAN's free-running tests show (Fukui et al.'s roll)", () => {
+  // KCS at Fn 0.26 (24 kn), GM 0.60 m, rudder 2.32 deg/s full scale: MARIN and KRISO's free-running models (Yun et al.
+  // 2021, Tables 1 to 5, both sides averaged) turned with advance 2.92 to 2.99 L and tactical diameter 2.70 to 2.79 L, heeled
+  // out 15.0 to 17.0 degrees at most and 4.6 to 5.1 degrees steady, at 10.5 to 11.9 kn and 1.11 to 1.22 deg/s.
+  const scale = 230 / KCS_MODEL.length,
+    speed = 0.26 * Math.sqrt(9.81 * KCS_MODEL.length),
+    rate = 2.32 * DEG * Math.sqrt(scale),
+    starboard = turn(KCS_MODEL, speed, 1, rate),
+    port = turn(KCS_MODEL, speed, -1, rate),
+    upright = turn({ ...KCS_MODEL, heel: undefined }, speed, 1, rate),
+    mean = (k) => (starboard[k] + port[k]) / 2,
+    within = (value, lo, hi, tolerance) => value >= lo * (1 - tolerance) && value <= hi * (1 + tolerance);
+  assert.ok(
+    within(starboard.advance, 2.92, 2.99, 0) && within(starboard.diameter, 2.7, 2.79, 0),
+    JSON.stringify(starboard),
+  );
+  // Both sides: the propeller's wake changes with drift by KVLCC2's constants (KCS's are not published), so the sides differ.
+  assert.ok(
+    within(mean('advance'), 2.92, 2.99, 0.03) && within(mean('diameter'), 2.7, 2.79, 0.03),
+    JSON.stringify(port),
+  );
+  // It heels outward, the most as it starts to turn, then steady; upright it turns 8 percent wider (Fukui et al. fig. 18).
+  assert.ok(
+    within(starboard.peak / DEG, 15, 17, 0.2) && within(port.peak / DEG, 15, 17, 0.2),
+    `${starboard.peak / DEG} ${port.peak / DEG}`,
+  );
+  // Steady it heels 2.9 and 3.7 degrees against the measured 4.6 to 5.1 (docs/limits.md).
+  assert.ok(mean('heel') / DEG > 2.5 && mean('heel') / DEG < 5.1, `${starboard.heel / DEG} ${port.heel / DEG}`);
+  assert.ok(upright.diameter > 1.05 * starboard.diameter && upright.peak === 0, JSON.stringify(upright));
+  assert.ok(within(mean('speed') * 24, 10.5, 11.9, 0.05), `${mean('speed') * 24} kn`);
+  assert.ok(
+    within(mean('r') / DEG / Math.sqrt(scale), 1.11, 1.22, 0.05),
+    `${mean('r') / DEG / Math.sqrt(scale)} deg/s`,
+  );
+  // KVLCC2 (GM 5.71 m, KG 18.6 m; its side force at half its draught) barely heels: the fourth degree matters little for it
+  // (ITTC 2011, p. 143), and both sides of the L7 model turn within 3 percent of SIMMAN's free-running tests (advance 3.08 to
+  // 3.25 L, tactical diameter 3.08 to 3.34 L: Quadvlieg et al. 2014, SIMMAN 2008, MARIN).
+  const k = 320 / 7,
+    tanker = { ...KVLCC2_L7, heel: { metacentricHeight: 5.71 / k, gravityDepth: (20.8 - 18.6) / k } },
+    kSpeed = (15.5 * 0.514444) / Math.sqrt(k),
+    a = turn(tanker, kSpeed, 1, 1.76 * DEG * Math.sqrt(k), 0.02),
+    b = turn(tanker, kSpeed, -1, 1.76 * DEG * Math.sqrt(k), 0.02),
+    flat = turn(KVLCC2_L7, kSpeed, 1, 1.76 * DEG * Math.sqrt(k), 0.02);
+  assert.ok(a.peak / DEG < 2 && Math.abs(a.diameter / flat.diameter - 1) < 0.02, JSON.stringify([a, flat]));
+  assert.ok(
+    within((a.advance + b.advance) / 2, 3.08, 3.25, 0.03) && within((a.diameter + b.diameter) / 2, 3.08, 3.34, 0.03),
+    JSON.stringify(b),
+  );
+});
+
+test('a rigid body held by the ship solver heels in its turn as the four-degree MMG ship does', () => {
+  const M = KCS_MODEL,
+    kx = Math.sqrt((4 * M.draught ** 2 + M.beam ** 2) / 12),
+    model = {
+      ...M,
+      centre: 0,
+      gyration: Math.sqrt((M.length ** 2 + M.beam ** 2) / 12),
+      heel: { ...M.heel, gyration: kx },
+    },
+    speed = 0.26 * Math.sqrt(9.81 * M.length),
+    rate = 2.32 * DEG * Math.sqrt(230 / M.length),
+    // The world's gravity holds the ship upright through its GM; the rigid bodies' own has none (no buoyancy here).
+    physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+    body = physics.addBody(null, {
+      linearVelocity: [speed, 0, 0],
+      colliders: { shape: 'box', halfExtents: [M.length / 2, M.draught, M.beam / 2], mass: 1025 * M.volume },
+    }),
+    ships = new ShipSolver(),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(ships, { ships: [{ row: body.row, model, rudderRate: rate }] })
+      .couple(['ship', 'rigid'], 'staggered'),
+    reference = new Manoeuvring(model, { u: speed }, { rudderRate: rate, gravity: 9.81 }),
+    n = reference.selfPropulsion(speed);
+  reference.revolutions = n;
+  reference.order = 35 * DEG;
+  ships.control(0).revolutions = n;
+  ships.control(0).rudder = 35 * DEG;
+  let first = 0,
+    worst = 0,
+    peak = 0;
+  for (let t = 1; t <= 60 * 12; t++) {
+    world.advance(t);
+    reference.step(1 / 60);
+    const off = Math.abs(ships.status(0).heel - reference.state.heel);
+    if (t <= 60 * 4) first = Math.max(first, off);
+    worst = Math.max(worst, off);
+    peak = Math.max(peak, -reference.state.heel);
+  }
+  // Through the peak heel of 16 degrees in the first 4 s within 1 degree; over 12 s (four roll periods, the body's restoring
+  // moment taken a step behind) within 2.5; and on the same path.
+  assert.ok(
+    peak > 15 * DEG && first < 1 * DEG && worst < 2.5 * DEG,
+    `${first / DEG}, ${worst / DEG} of ${peak / DEG} degrees`,
+  );
+  const p = body.position;
+  assert.ok(Math.hypot(p[0] - reference.state.x, p[2] - reference.state.z) < 0.02 * M.length, `${p}`);
+  // A ship that heels needs gravity for its restoring moment, and a roll held by 'model' or 'hull'.
+  const flat = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+    other = flat.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 0.1, 0.15], mass: 40 } });
+  assert.throws(
+    () =>
+      new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] })
+        .add(new RigidSolver(), { physics: flat })
+        .add(new ShipSolver(), { ships: [{ row: other.row, model }] }),
+    (e) => e.code === 'unsupported' && /no gravity/.test(e.message),
+  );
+  assert.throws(
+    () =>
+      new PhysicsWorld({ rate: { num: 60, den: 1 } })
+        .add(new RigidSolver(), { physics: flat })
+        .add(new ShipSolver(), { ships: [{ row: other.row, model, roll: 'keel' }] }),
+    (e) => e.code === 'unsupported' && /'model' or 'hull'/.test(e.message),
+  );
+  assert.throws(
+    () => new Manoeuvring({ ...M, heel: { ...M.heel, metacentricHeight: 0 } }),
+    (e) => e.code === 'unsupported' && /metacentric height above 0/.test(e.message),
   );
 });

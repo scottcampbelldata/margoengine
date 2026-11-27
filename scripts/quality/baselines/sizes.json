@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20736300,
+  "total": 20737454,
   "history": [
     {
       "date": "2026-10-24",
@@ -14275,6 +14275,12 @@
       "commit": "c78be3a4cf",
       "grew": 1,
       "reason": "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table) 821,878 to 822,364 B gzip and ceiling 821324 to 847035. The pre-existing cap was already below the rebased parent. The SEA-12 centre-of-mass refresh writes the world pose alongside the mass columns in the existing native kernel so the first coupled buoyancy step uses the correct arm. A separate module would need another request and access to the same packed mass and pose columns."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "19c4a1968",
+      "reason": "physics/ship 20,305 ceiling to its new size: a ship's heel by Fukui et al.'s four-degree MMG model (the hull's heel terms, the roll equation, the heeled rudder) and the KCS model with its heel set. Roll is what a container ship's measured turn needs (8 percent tighter, 15 to 19 degrees of heel); a separate entry would load the MMG step it extends twice. One feature of the ship entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15148,7 +15154,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 20305,
+    "@margoengine/physics/ship": 21459,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,
