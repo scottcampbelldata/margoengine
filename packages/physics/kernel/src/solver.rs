@@ -27,7 +27,10 @@
 // first point a heavy box on a light one walks (`a_heavy_box_stands_on_a_light_one`).
 //
 // Restitution follows Muller et al. 2020: a point struck in this substep notes its approach speed, and after relaxing is
-// solved to -e times that speed. Slower than two substeps of gravity is rest, not a bounce. A point struck while its gap
+// solved to -e times that speed. The approach is the pre-solve one (Muller et al.'s v_n before the constraints run), noted
+// for every point of a bouncy pair before the warm start (`note_approach`): a speed one pair's push gave a body within the
+// substep is no approach of its next pair, or a strike carried through a body would bounce off both of its pairs and the
+// energy would grow (three balls in a row 2 mm apart took 1.5 times the energy they were given). Slower than two substeps of gravity is rest, not a bounce. A point struck while its gap
 // is still open notes the speed it will meet the surface with, gravity's gain over the gap added.
 use crate::contact::tangent_of;
 use crate::integrate::apply_inverse_inertia;
@@ -479,6 +482,27 @@ impl World {
         }
     }
 
+    /// Each substep, before the warm start: every point of a pair with restitution notes its normal speed as it stands, the
+    /// pre-solve approach (Muller et al. 2020) a strike is bounced from. Pairs with no restitution are skipped, so a scene
+    /// with no bounce does no more work.
+    pub fn note_approach(&mut self) {
+        for i in self.window.pairs.0..self.window.pairs.1 {
+            let row = self.uu(SOLVE_PAIRS, i) as usize;
+            if self.s(PAIR_RESTITUTION, row) <= 0.0 {
+                continue;
+            }
+            let (a, b) = self.pair_bodies(row as u32);
+            let (body_a, body_b) = self.pair_moving(row, a, b);
+            let normal = self.v(PAIR_NORMAL_X, row);
+            let surface_normal = self.v(PAIR_SURFACE_X, row).dot(normal);
+            for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
+                let at = row * MANIFOLD + k;
+                let speed = body_b.at(self.v(CONTACT_ARM_B_X, at)).sub(body_a.at(self.v(CONTACT_ARM_A_X, at))).dot(normal) - surface_normal;
+                self.set_s(CONTACT_APPROACH, at, speed);
+            }
+        }
+    }
+
     /// Each substep: the impulses the points carry, before anything is solved.
     pub fn warm_start(&mut self) {
         let share = self.header().warm_start;
@@ -865,7 +889,8 @@ impl World {
             let gap = on_b.sub(on_a).dot(normal) - surface_normal * h * (turn as f32);
             (hold[k], was[k]) = (pressed, pressed);
             speed[k] = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal) - surface_normal;
-            approach[k] = speed[k];
+            // A bouncy pair's approach is its pre-solve speed (`note_approach`), not one an earlier pair's push gave in this pass.
+            approach[k] = if bounce > 0.0 { self.s(CONTACT_APPROACH, at) } else { speed[k] };
             open[k] = gap;
             (bias[k], scale[k], leak[k]) = if gap > 0.0 {
                 (gap / h, 1.0, 0.0)

@@ -18234,3 +18234,17 @@ No code landed from this work; recorded for the known-bugs entry KB-PHYS-RODVIVS
   submitted version, NTNU Open, read); M. J. Thorsen, "Time domain analysis of vortex-induced vibrations", PhD thesis, NTNU
   2016 (open, read): the synchronization model, its C_v and synchronization curves (Figs. 7 and 4, read from the figures'
   vector paths), the damping fit 0.31 + 0.89 y0 / D, the amplitude from zero crossings and its smoothing.
+
+## physics restitution from the pre-solve approach (DYN-01, 2026-11-27)
+
+No paper's companion code and no other engine's source was read.
+
+- Matthias Müller, Miles Macklin, Nuttapong Chentanez, Stefan Jeschke and Tae-Yong Kim, "Detailed Rigid Body Simulation
+  with Extended Position Based Dynamics", Computer Graphics Forum 39(8) (SCA 2020),
+  https://doi.org/10.1111/cgf.14105: restitution sets a contact's normal speed to -e times its pre-solve normal speed,
+  the speed before the constraints of the substep run.
+- Erin Catto, "Solver2D" (2024), https://box2d.org/posts/2024/02/solver2d/: soft step, relaxing and restitution as a
+  last pass over the points struck.
+- Exact solutions used in `packages/physics/tests/rigid-validation.test.js`: elastic collision of equal masses (the
+  struck ball stops, the next takes its speed); rebound height e² h from Newton's law of restitution; g (sin t - mu cos t)
+  for Coulomb sliding; 5/7 g sin t for a solid sphere rolling without slipping (I = 2/5 m r²).

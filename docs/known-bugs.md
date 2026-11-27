@@ -163,6 +163,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
   `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
 
+### Fixed 2026-11-27: a strike carried through a ball bounced off both of its contacts and made energy (KB-PHYS-BOUNCECHAIN1, physics)
+
+- **Repro:** with no gravity, three spheres of restitution 1 in a row 2 mm apart, the first struck at 1 m/s, left at -0.5,
+  0.5 and 1 m/s, 1.5 times the energy (five balls: 4 times).
+- **Cause:** `kernel/src/solver.rs` noted a struck point's approach speed inside the pushing pass, after the pairs solved
+  before it had pushed its bodies, so the push the first pair gave the middle ball was the second pair's approach, and
+  restitution bounced both.
+- **Fix:** `note_approach` notes every bouncy point's normal speed before the warm start (the pre-solve speed of Müller et
+  al. 2020) and a strike bounces from that; pairs without restitution are skipped. Regression:
+  `packages/physics/tests/rigid-validation.test.js` "Newton's cradle".
+
 ### Fixed 2026-11-27: the tracked vehicle threw plain RangeError and TypeError (KB-PHYS-TRACKEDERR1, physics)
 
 - **Repro:** `new TrackedVehicle(physics, chassis, {tracks: []})` threw a `RangeError` with no help link, where

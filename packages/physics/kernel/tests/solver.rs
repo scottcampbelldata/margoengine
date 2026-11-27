@@ -391,6 +391,32 @@ fn a_ball_bounces_to_e_squared_of_its_drop() {
 }
 
 #[test]
+fn a_strike_passes_down_a_spaced_row_of_balls_and_makes_no_energy() {
+    // Elastic balls of equal mass 2 mm apart: the struck ball stops and the next takes its speed, one pair at a time. A
+    // strike noted inside the pushing pass bounced off both pairs of the middle ball and left -0.5, 0.5 and 1 (KB-PHYS-BOUNCECHAIN1).
+    for gap in [0.002f32, 0.02] {
+        let mut w = world(3);
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+        let balls: Vec<u32> = (0..3)
+            .map(|i| {
+                let (body, collider) = ball(&mut w, v3(i as f32 * (1.0 + gap) - if i == 0 { 0.05 } else { 0.0 }, 0.0, 0.0), false);
+                w.set_s(COLLIDER_RESTITUTION, collider as usize, 1.0);
+                w.set_s(COLLIDER_FRICTION, collider as usize, 0.0);
+                w.set_u(COLLIDER_COMBINE, collider as usize, COMBINE_MAX << 2);
+                body
+            })
+            .collect();
+        w.set_v(LINEAR_X, balls[0] as usize, v3(1.0, 0.0, 0.0));
+        for _ in 0..240 {
+            w.step(DT);
+        }
+        let v: Vec<f32> = balls.iter().map(|&b| w.v(LINEAR_X, b as usize).x).collect();
+        assert!(v[0].abs() < 1e-3 && v[1].abs() < 1e-3 && (v[2] - 1.0).abs() < 1e-3, "gap {gap}: {v:?}");
+        assert!(v.iter().map(|x| x * x).sum::<f32>() <= 1.0 + 1e-5, "gap {gap}: energy grew, {v:?}");
+    }
+}
+
+#[test]
 fn a_ball_bounces_to_e_squared_at_four_substeps_of_one_pass() {
     // The cost of Rapier's and Box2D v3's defaults. A strike is seen while the gap is still open, and the speed of that moment
     // is short of the speed at the surface by what gravity adds over the gap: from 1 m at e 0.5 the first peak was 0.2432 m.

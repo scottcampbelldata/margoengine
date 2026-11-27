@@ -324,6 +324,7 @@ impl World {
             tick(self, 10, inner);
             self.hold_multibodies();
             self.refresh_joints();
+            self.note_approach();
             self.warm_start();
             self.warm_start_joints();
             self.warm_start_couplings();
