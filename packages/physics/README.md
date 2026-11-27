@@ -3196,6 +3196,7 @@ const host: SolverHost = {
   allocate: arena.allocate.bind(arena),
   resize: arena.resize.bind(arena),
   free: arena.free.bind(arena),
+  cell: [0, 0, 0],
   port: () => undefined,
   bodyRows: () => 0,
 };
@@ -4969,7 +4970,7 @@ kcs.order = (35 * Math.PI) / 180;
 let most = 0;
 while (kcs.time < 10) {
   kcs.step(0.01);
-  most = Math.min(most, kcs.state.heel);
+  most = Math.min(most, kcs.state.heel ?? 0);
 }
 console.log(Math.round((-most * 180) / Math.PI)); // 17
 ```

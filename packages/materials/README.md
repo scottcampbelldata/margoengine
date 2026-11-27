@@ -778,7 +778,7 @@ engine.use(new Tonemap());
 
 const pane = new Material({color: '#40c060', transmission: 0.9, roughness: 0.4});
 createMesh(engine, planeGeometry(1, 1), pane);
-console.log(engine.gpu.features.has('dual-source-blending') ? 'one draw' : 'two draws');
+console.log(engine.gpu?.features.has('dual-source-blending') ? 'one draw' : 'two draws');
 pane.transmissionBlend = 'two-draw';
 ```
 

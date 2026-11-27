@@ -206,8 +206,8 @@ const width = 200, height = 200;
 const cost = new Float64Array(width * height).fill(1);
 for (let y = 11; y < height; y++) cost[y * width + 100] = Infinity; // a wall with a gap at the top
 const grid = { width, height, cost };
-const plain = findPath(grid, [10, 190], [190, 190]);
-const jump = findPath(grid, [10, 190], [190, 190], { jumpPoints: true });
+const plain = findPath(grid, [10, 190], [190, 190])!;
+const jump = findPath(grid, [10, 190], [190, 190], { jumpPoints: true })!;
 console.log(plain.cost.toFixed(2), jump.cost.toFixed(2)); // 435.73 435.73
 console.log(plain.searched, jump.searched); // 27208 6
 ```
@@ -229,12 +229,12 @@ const cost = new Float64Array(width * height).fill(1);
 for (let y = 11; y < height; y++) cost[y * width + 100] = Infinity; // a wall with a gap at the top
 const grid = { width, height, cost };
 const plan = new PathReplanner(grid, [190, 190]);
-const first = plan.findPath([10, 190]);
+const first = plan.findPath([10, 190])!;
 console.log(first.cost.toFixed(2), first.searched); // 435.73 27046
 const [x, y] = first.cells[5]; // a wall appears ahead of the unit
 cost[y * width + x] = Infinity;
-const next = plan.update([[x, y]]).findPath(first.cells[4]);
-console.log(next.searched, findPath(grid, first.cells[4], [190, 190]).searched); // 92 27207
+const next = plan.update([[x, y]]).findPath(first.cells[4])!;
+console.log(next.searched, findPath(grid, first.cells[4], [190, 190])!.searched); // 92 27207
 ```
 
 | Piece | What it does |
@@ -263,8 +263,8 @@ const cost = new Float64Array(width * height).fill(1);
 for (let y = 11; y < height; y++) cost[y * width + 100] = Infinity;
 const grid = { width, height, cost };
 const graph = new PathHierarchy(grid); // clusters of 16, detour 3
-const full = findPath(grid, [10, 190], [190, 190]);
-const path = graph.findPath([10, 190], [190, 190]);
+const full = findPath(grid, [10, 190], [190, 190])!;
+const path = graph.findPath([10, 190], [190, 190])!;
 console.log(path.cost.toFixed(2), path.searched, full.searched); // 435.73 4503 27208
 cost[5 * width + 100] = Infinity; // a change rebuilds the clusters around it
 graph.update([[100, 5]]);

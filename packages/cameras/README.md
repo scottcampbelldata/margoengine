@@ -604,14 +604,14 @@ or the least blocked one. CPU only: 32 x 18 frame rays and 15 subject rays a vie
 knows only the ground and the cylinders you give it: buildings, overhangs and leaf shapes are not seen.
 
 ```js
-import { clearestShot } from '@margoengine/cameras/clearance';
+import { clearestShot, type SightView } from '@margoengine/cameras/clearance';
 
 // A bank 5 m high between a long low lens and its subject, and a trunk 10 m off the lens.
 const scene = {
-  ground: (x, z) => (z > 60 && z < 140 ? 5 : 0),
+  ground: (x: number, z: number) => (z > 60 && z < 140 ? 5 : 0),
   occluders: [{ x: 0, z: 287, bottom: 0, top: 12, radius: 0.6 }],
 };
-const view = ({ turn, height }) => ({
+const view = ({ turn, height }: { turn: number; height: number }): SightView => ({
   position: [297 * Math.sin(turn), height, 297 * Math.cos(turn)],
   target: [0, 2, 0],
   fov: 6,
