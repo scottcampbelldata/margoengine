@@ -25,6 +25,11 @@ export interface ZIPEntry {
 export interface ZIPOptions extends ArchiveProgress {
   /** Largest archive allowed, in bytes, checked before any entry is read. Default 256 MiB; at most 4 GiB - 1 (ZIP32). */
   maxBytes?: number;
+  /**
+   * Deflates (method 8) each entry that gets smaller; the rest stay stored. The bytes then depend on the platform's
+   * deflate, and `maxBytes` still counts the entries uncompressed. Default false.
+   */
+  compress?: boolean;
 }
 
 const MAX_ZIP = 0xffffffff,
@@ -36,15 +41,15 @@ const size = (data: ZIPEntry['data'], text: Uint8Array | undefined): number =>
   text ? text.length : data instanceof Uint8Array ? data.length : (data as Blob).size;
 
 /**
- * A ZIP archive of `entries`, stored without compression (PNG and GLB are compressed already), UTF-8 names, dated
- * 1980-01-01 so the same files always give the same bytes. The whole size is checked against `maxBytes` before any
+ * A ZIP archive of `entries`, stored without compression unless `compress` is set (PNG and GLB are compressed
+ * already), UTF-8 names, dated 1980-01-01 so the same files always give the same bytes. The whole size is checked against `maxBytes` before any
  * entry is read.
  * @throws TypeError for an entry without a safe relative name (no `..`, `\`, `:`, leading `/`, control characters) or
  * with other data; RangeError for duplicate names, more than 65,535 entries or an archive over `maxBytes`.
  */
 export async function encodeZIP(
   entries: readonly ZIPEntry[],
-  { signal, onProgress, maxBytes = DEFAULT_ZIP }: ZIPOptions = {},
+  { signal, onProgress, maxBytes = DEFAULT_ZIP, compress = false }: ZIPOptions = {},
 ): Promise<Uint8Array> {
   signal?.throwIfAborted();
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 22 || maxBytes > MAX_ZIP)
@@ -79,7 +84,7 @@ export async function encodeZIP(
   });
   const out = new Uint8Array(total),
     view = new DataView(out.buffer),
-    central: [Uint8Array, number, number, number][] = [];
+    central: [Uint8Array, number, number, number, number, number][] = [];
   let at = 0;
   for (let i = 0; i < plan.length; i++) {
     signal?.throwIfAborted();
@@ -90,30 +95,36 @@ export async function encodeZIP(
       throw new RangeError(
         'A ZIP entry changed size while being written; do not change the data while the archive is being written',
       );
-    const crc = crc32(bytes);
+    const crc = crc32(bytes),
+      packed = compress && bytes.length ? await deflate(bytes) : bytes,
+      method = packed.length < bytes.length ? 8 : 0,
+      stored = method ? packed : bytes;
+    signal?.throwIfAborted();
     view.setUint32(at, 0x04034b50, true);
     view.setUint16(at + 4, 20, true);
     view.setUint16(at + 6, 0x0800, true); // UTF-8 names
+    view.setUint16(at + 8, method, true);
     view.setUint16(at + 12, DOS_DATE, true);
     view.setUint32(at + 14, crc, true);
-    view.setUint32(at + 18, bytes.length, true);
+    view.setUint32(at + 18, stored.length, true);
     view.setUint32(at + 22, bytes.length, true);
     view.setUint16(at + 26, name.length, true);
     out.set(name, at + 30);
-    out.set(bytes, at + 30 + name.length);
-    central.push([name, crc, bytes.length, at]);
-    at += 30 + name.length + bytes.length;
+    out.set(stored, at + 30 + name.length);
+    central.push([name, crc, bytes.length, at, method, stored.length]);
+    at += 30 + name.length + stored.length;
     onProgress?.(i + 1, plan.length);
   }
   const directory = at;
-  for (const [name, crc, length, offset] of central) {
+  for (const [name, crc, length, offset, method, packed] of central) {
     view.setUint32(at, 0x02014b50, true);
     view.setUint16(at + 4, 20, true);
     view.setUint16(at + 6, 20, true);
     view.setUint16(at + 8, 0x0800, true);
+    view.setUint16(at + 10, method, true);
     view.setUint16(at + 14, DOS_DATE, true);
     view.setUint32(at + 16, crc, true);
-    view.setUint32(at + 20, length, true);
+    view.setUint32(at + 20, packed, true);
     view.setUint32(at + 24, length, true);
     view.setUint16(at + 28, name.length, true);
     view.setUint32(at + 42, offset, true);
@@ -125,8 +136,17 @@ export async function encodeZIP(
   view.setUint16(at + 10, plan.length, true);
   view.setUint32(at + 12, at - directory, true);
   view.setUint32(at + 16, directory, true);
-  return out;
+  // The buffer was sized for stored entries; a deflated archive gives back its own bytes only.
+  return at + 22 === out.length ? out : out.slice(0, at + 22);
 }
+
+/** Raw DEFLATE (RFC 1951), as ZIP method 8 holds it. */
+const deflate = async (bytes: Uint8Array): Promise<Uint8Array> =>
+  new Uint8Array(
+    await new Response(
+      new Blob([bytes as Uint8Array<ArrayBuffer>]).stream().pipeThrough(new CompressionStream('deflate-raw')),
+    ).arrayBuffer(),
+  );
 
 /** Grid of a sprite atlas: {@link spriteAtlasLayout}'s result. */
 export interface AtlasLayout {

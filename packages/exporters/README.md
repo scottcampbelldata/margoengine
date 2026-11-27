@@ -1386,13 +1386,39 @@ console.log(`${file.length} bytes`);
 | `unit` | `'millimeter'` | `micron`, `millimeter`, `centimeter`, `inch`, `foot` or `meter`. Scene lengths are metres, as in glTF, and are converted, so a 1 m cube is 1000 long in `'millimeter'` |
 | `upAxis` | `'y'` | The scene's up axis. A printer's Z is up, so `'y'` turns the scene to stand on the bed; `'z'` leaves it as it is |
 | `title` | none | The file's Title metadata, and the assembly's name |
-| `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `false` writes a build item for each node |
+| `metadata` | none | `designer`, `description`, `copyright`, `licenseTerms`, `rating`, `creationDate`, `modificationDate` and `application`, the names the core specification defines, and `custom: [{ namespace, name, value, preserve }]` for your own |
+| `thumbnail` | none | PNG or JPEG bytes, written as the package thumbnail. A CMYK JPEG is refused |
+| `displayProperties` | `true` | Writes metalness, roughness and the metallic-roughness map as physically based display properties |
+| `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `'components'` writes one object made of components that share meshes. `false` writes a build item for each node |
+| `compress` | `true` | Deflates the package's parts. `false` stores them |
+| `onMeshCheck` | none | Called for each mesh written with `{ name, openEdges, nonManifoldEdges, flippedEdges, insideOut }` |
 | `signal` | none | Stops the archive step |
 | The collector's options | as `exportGLB` | What the scene collects |
 
-A scene of several nodes is one object whose mesh holds every part where the scene put it, each part a shell of its own, so a slicer keeps the parts together and prints their union. Slicers read each build item as an object to move and scale on its own, components included, and PrusaSlicer 2.9.7 crashes on overlapping ones; a model is one thing to them. A part drawn fifty times is stored fifty times this way. With `assembly: false` each geometry and material pair is one object and each node a build item that places it, so a part is stored once, for a plate of separate prints that do not overlap. Vertices are welded by position within a part, in the file's unit and at Float32, because a slicer needs triangles that share their edges; a triangle that leaves with no area goes. A reflection is written into the triangles, so no item carries one and nothing turns inside out.
+A scene of several nodes is one object whose mesh holds every part where the scene put it, each part a shell of its own, so a slicer keeps the parts together and prints their union. Slicers read each build item as an object to move and scale on its own, components included, and PrusaSlicer 2.9.7 crashes on overlapping ones; a model is one thing to them. A part drawn fifty times is stored fifty times this way. With `assembly: 'components'` it is stored once: the object is made of components, which the specification keeps in place relative to each other, though a slicer that reads each component as an object of its own (PrusaSlicer 2.9.7) treats them as separate. With `assembly: false` each geometry and material pair is one object and each node a build item that places it, so a part is stored once, for a plate of separate prints that do not overlap. The primitives of one node, one for each material of a mesh, are one mesh: those that do not close on their own are welded together, so a solid painted in two materials stays a solid. Vertices are welded by position within a node, in the file's unit and at Float32, because a slicer needs triangles that share their edges; a triangle that leaves with no area goes. A reflection is written into the triangles, so no item carries one and nothing turns inside out.
 
-Base colours become `basematerials` and vertex colours a `colorgroup`, corner by corner, both in sRGB with alpha when it is not 1. A material's base colour texture is written as the materials extension's `texture2d` (the image under `/3D/Textures/`, its wrap as `tilestyleu` and `tilestylev`, a nearest magnification filter as `filter`) and a `texture2dgroup` of coordinates for each corner, with the glTF texture transform applied and v turned to point up as 3MF's origin is the lower left. It needs the geometry to carry the UV set the texture names (`texCoord`); without it the mesh keeps its colours. A base colour factor or vertex colours that are not white become a `colorgroup` under the texture, multiplied with it in a `multiproperties` (materials extension section 5), so the image is stored as it is and a tinted texture keeps its tint in `parse3MFMaterials`, `create3MFMesh` and any reader of the extension. The tint's alpha is left out, as the extension takes the first layer as opaque. Other maps (normal, metallic, emissive) are not written, so a textured model exports as its shape, skin and morphs applied, with its picture where the slicer or viewer reads the extension. A material without a texture keeps its flat colour. Welding closes seams but does not repair a mesh: an open one is written as it is, and a slicer will say so. A model with parts floating over the bed needs supports on, as on any slicer: with nothing on the first layer PrusaSlicer stops at "no extrusions in the first layer".
+Base colours become `basematerials`, named after their materials, and vertex colours a `colorgroup`, corner by corner, both in sRGB with alpha when it is not 1. A material's base colour texture is written as the materials extension's `texture2d` (the image under `/3D/Textures/`, its wrap as `tilestyleu` and `tilestylev`, a nearest magnification filter as `filter`) and a `texture2dgroup` of coordinates for each corner, with the glTF texture transform applied and v turned to point up as 3MF's origin is the lower left. It needs the geometry to carry the UV set the texture names (`texCoord`); without it the mesh keeps its colours. A base colour factor or vertex colours that are not white become a `colorgroup` under the texture, multiplied with it in a `multiproperties` (materials extension section 5), so the image is stored as it is and a tinted texture keeps its tint in `parse3MFMaterials`, `create3MFMesh` and any reader of the extension. The tint's alpha is left out, as the extension takes the first layer as opaque. Metalness and roughness that differ from the extension's own 0 and 1 are written as `pbmetallicdisplayproperties`, one entry for each base material and colour, and a textured material's as `pbmetallictexturedisplayproperties`. Its glTF metallic-roughness map is decoded and written again as a lossless PNG with roughness in red and metalness in green, as the extension reads one image used for both, which can be larger than a JPEG source; a map on another UV set, texture transform or wrap than the base colour texture is left out with an `onWarning`. The format has no normal, emissive or occlusion map, so a textured model exports as its shape, skin and morphs applied, with its picture where the slicer or viewer reads the extension. A material without a texture keeps its flat colour. Welding closes seams but does not repair a mesh: an open one is written as it is, and a slicer will say so. `onMeshCheck` tells you first:
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+// One triangle, so three edges have nothing on their other side.
+const sheet = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0]),
+  normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+  indices: new Uint32Array([0, 1, 2]),
+};
+const file = await export3MF(
+  { nodes: [{ name: 'Sheet', geometry: sheet, material: { name: 'Brass', metalness: 1, roughness: 0.3 } }] },
+  {
+    metadata: { designer: 'Ada', licenseTerms: 'CC0-1.0' },
+    onMeshCheck: (mesh) => console.log(mesh.name, mesh.openEdges),
+  },
+);
+console.log(`${file.length} bytes`);
+```
+
+The package follows the 3MF Consortium's [Core Specification 1.4.0](https://github.com/3MFConsortium/spec_core) and [Materials and Properties Extension 1.2.1](https://github.com/3MFConsortium/spec_materials), on a ZIP of DEFLATE entries ([RFC 1951](https://www.rfc-editor.org/rfc/rfc1951)). The mesh check counts the solid conditions of core section 4.1; M. Attene, M. Campen and L. Kobbelt, "Polygon Mesh Repairing: An Application Perspective", ACM Computing Surveys 45(2), 2013, [doi:10.1145/2431211.2431214](https://doi.org/10.1145/2431211.2431214), surveys these defects and their repair. A model with parts floating over the bed needs supports on, as on any slicer: with nothing on the first layer PrusaSlicer stops at "no extrusions in the first layer".
 
 ## Collision and UV animation per engine
 
@@ -1700,7 +1726,7 @@ stops between frames or entries and rejects with its reason, returning nothing p
 | --- | --- |
 | `spriteAtlasLayout(count, frameWidth, frameHeight, columns?, maxSize = 8192)` | `{columns, rows, width, height}`, checked before any frame renders: at most `maxSize` (up to 16384) per side and 8192 x 8192 pixels in all |
 | `packSpriteAtlas(count, frame, {columns?, maxSize?})` | The atlas pixels and every frame's rectangle; frame `i` at column `i % columns`, row `floor(i / columns)`, copied exactly at full size (no trimming or filtering), anywhere (no canvas) |
-| `encodeZIP(entries, {maxBytes?})` | A stored (uncompressed) ZIP of `{name, data}` (Uint8Array, Blob or UTF-8 string), UTF-8 names, dated 1980-01-01 so the same files give the same bytes; safe relative names only, size checked against `maxBytes` (default 256 MiB, ZIP32 limit 4 GiB) before any entry is read |
+| `encodeZIP(entries, {maxBytes?, compress?})` | A ZIP, stored unless `compress` deflates the entries that get smaller, of `{name, data}` (Uint8Array, Blob or UTF-8 string), UTF-8 names, dated 1980-01-01 so the same files give the same bytes; safe relative names only, size checked against `maxBytes` (default 256 MiB, ZIP32 limit 4 GiB) before any entry is read |
 | `encodeSequenceZIP(count, frame, {name?, pad?, folder?, manifest?, entries?})` | Numbered lossless PNGs (`frames/frame07.png`) and `manifest.json`; stops as soon as `maxBytes` is spent |
 | `encodeAtlasZIP(count, frame, {columns?, image?, manifest?, entries?})` | One atlas PNG and `manifest.json` with each frame's rectangle |
 

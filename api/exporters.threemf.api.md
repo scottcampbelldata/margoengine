@@ -10,8 +10,40 @@ export interface Export3MFOptions extends SceneOptions {
     unit?: ThreeMFUnit;
     upAxis?: 'y' | 'z';
     title?: string;
-    assembly?: boolean;
+    metadata?: ThreeMFMetadata;
+    thumbnail?: Uint8Array;
+    displayProperties?: boolean;
+    assembly?: boolean | 'components';
+    compress?: boolean;
+    onMeshCheck?: (report: ThreeMFMeshReport) => void;
     signal?: AbortSignal;
+}
+
+export interface ThreeMFCustomMetadata {
+    namespace: string;
+    name: string;
+    value: string;
+    preserve?: boolean;
+}
+
+export interface ThreeMFMeshReport {
+    name?: string;
+    openEdges: number;
+    nonManifoldEdges: number;
+    flippedEdges: number;
+    insideOut: boolean;
+}
+
+export interface ThreeMFMetadata {
+    designer?: string;
+    description?: string;
+    copyright?: string;
+    licenseTerms?: string;
+    rating?: string;
+    creationDate?: string;
+    modificationDate?: string;
+    application?: string;
+    custom?: readonly ThreeMFCustomMetadata[];
 }
 
 export type ThreeMFUnit = keyof typeof UNITS;

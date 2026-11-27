@@ -120,6 +120,7 @@ export interface ZIPEntry {
 
 export interface ZIPOptions extends ArchiveProgress {
     maxBytes?: number;
+    compress?: boolean;
 }
 
 export function capture(engine: EngineKernel, options: CaptureOptions): {
@@ -144,7 +145,7 @@ export function encodeSequenceZIP(count: number, frame: FrameSource, { name, pad
 
 export function encodeWEBM(count: number, frame: FrameSource, { fps, bitsPerSecond }?: WEBMOptions): Promise<Uint8Array>;
 
-export function encodeZIP(entries: readonly ZIPEntry[], { signal, onProgress, maxBytes }?: ZIPOptions): Promise<Uint8Array>;
+export function encodeZIP(entries: readonly ZIPEntry[], { signal, onProgress, maxBytes, compress }?: ZIPOptions): Promise<Uint8Array>;
 
 export function packSpriteAtlas(count: number, frame: FrameSource, { columns, maxSize, signal, onProgress }?: SpriteAtlasOptions): Promise<SpriteAtlas>;
 

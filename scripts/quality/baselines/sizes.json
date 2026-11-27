@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20934049,
+  "total": 20942373,
   "history": [
     {
       "date": "2026-10-24",
@@ -14624,6 +14624,12 @@
       "commit": "blast",
       "reason": "FIRE-04 blast loading (+2385 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "08c21f5dcc",
+      "reason": "exporters/threemf 19,618 to 28,528 B gzip: deflate, metadata, thumbnail, metallic display properties, components and the mesh check, plus the JPEG reader and PNG writer as lazy chunks that only a metallic-roughness map loads; a second entry would split one writer",
+      "grew": 1
     }
   ],
   "items": {
@@ -15017,7 +15023,7 @@
     "@margoengine/exporters/sparse": 25614,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 21060,
+    "@margoengine/exporters/threemf": 29384,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,
