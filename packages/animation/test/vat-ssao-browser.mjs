@@ -1,8 +1,11 @@
-// Real-GPU proof that SSAO darkens a VATCrowd (gap row 138): `ssao.add(crowd)` makes the crowd an SSAO source, so
+// Real-GPU proof that SSAO darkens a VATCrowd, a SkinnedCrowd and a MorphedCrowd (gap row 138): `ssao.add(crowd)`
+// makes the crowd an SSAO source, so
 // it writes its normal, depth and ambient light into SSAO's G-buffer pass. The crowd here is a floor (a hand-built
 // one-frame VAT quad facing up) with a core box standing on it: next to the box's foot the crowd's floor is darker
 // with the source added than without it, and far from the box it keeps its ambient light (nothing is taken out where
-// nothing occludes). Without the source the crowd's pixels are left as drawn.
+// nothing occludes). Without the source the crowd's pixels are left as drawn. The skinned floor's bind pose sits 0.5
+// below y = 0 and its one bone lifts it; the morphed floor sits 1 below, its bone lifts 0.5 and its live target the
+// other 0.5, so the occlusion pass matches the core floor only if it skins and morphs as the beauty pass does.
 // Run from the repository root after building packages, with a hard limit:
 //   node scripts/run-with-timeout.mjs run --max=5 -- node packages/animation/test/vat-ssao-browser.mjs
 // (MARGO_COMPAT=1 for the WebGL2 compatibility layer).
@@ -21,12 +24,19 @@ page.on("console", (m) => {
 });
 
 try {
-  const report = await page.evaluate(async () => {
+  for (const kind of ["vat", "skinned", "morphed"]) {
+  const report = await page.evaluate(async (kind) => {
     const { EngineKernel, Camera, box, PbrMaterial } =
       await import("/packages/core/dist/index.js");
     const { SSAO } = await import("/packages/post/dist/ssao.js");
     const { Clustered } = await import("/packages/clustered/dist/index.js");
     const { VATCrowd } = await import("/packages/animation/dist/vat.js");
+    const { SkinnedCrowd } = await import(
+      "/packages/animation/dist/instanced-skin.js"
+    );
+    const { MorphedCrowd } = await import(
+      "/packages/animation/dist/instanced-morph.js"
+    );
     const { waitForPipelines } = await import("/scripts/support/gpu-ready.js");
     // A 12 x 12 floor at y = 0 facing +y (counter-clockwise seen from above), both rows the same pose.
     const corners = [
@@ -52,6 +62,53 @@ try {
         );
         vat.texels.set([0, 1, 0, 0], (row * 8 + v * 2 + 1) * 4);
       }
+    // The same floor as a one-bone bake (two identical rows, texels 0 to 5, the bone lifting by 0.5) and as a bake
+    // with one live target "lift" (entry texel 6 pointing at the offsets from texel 8, two texels per vertex).
+    const bindY = kind === "morphed" ? -1 : -0.5;
+    const bones = {
+      bones: 1,
+      rows: 2,
+      width: 16,
+      texels: new Float32Array(64),
+      vertexCount: 4,
+      vertices: new Float32Array(24),
+      joints: new Uint32Array(32),
+      weights: new Float32Array(32),
+      indices: vat.indices,
+      uvs: vat.uvs,
+      clips: vat.clips,
+    };
+    for (let row = 0; row < 2; row++)
+      for (let k = 0; k < 3; k++) {
+        const t = [0, 0, 0, 0];
+        t[k] = 1;
+        if (k === 1) t[3] = 0.5;
+        bones.texels.set(t, (row * 3 + k) * 4);
+      }
+    for (let v = 0; v < 4; v++) {
+      bones.vertices.set([corners[v][0], bindY, corners[v][1], 0, 1, 0], v * 6);
+      bones.weights[v * 8] = 1;
+    }
+    const morphBake = {
+      ...bones,
+      morphs: {
+        names: ["lift"],
+        weights: new Float32Array([1]),
+        vertices: new Uint32Array(16),
+        blocks: 1,
+      },
+    };
+    morphBake.texels.set([8, 0, 0, 0], 6 * 4);
+    for (let v = 0; v < 4; v++) {
+      morphBake.texels.set([0, 0.5, 0, 0], (8 + v * 2) * 4);
+      morphBake.morphs.vertices.set([6, 1, v, 0], v * 4);
+    }
+    const make = (engine) =>
+      kind === "vat"
+        ? VATCrowd.attach(engine, vat, { roughness: 0.9 })
+        : kind === "skinned"
+          ? SkinnedCrowd.attach(engine, bones, { roughness: 0.9 })
+          : MorphedCrowd.attach(engine, morphBake, { roughness: 0.9 });
     const problems = [];
     const shoot = async (mode) => {
       const canvas = document.createElement("canvas");
@@ -69,7 +126,7 @@ try {
       );
       // The key light from below the floor: the floor's light is the hemisphere fill SSAO takes out.
       engine.lighting.direction.set([0, 1, 0, 1]);
-      const crowd = VATCrowd.attach(engine, vat, { roughness: 0.9 });
+      const crowd = make(engine);
       if (!mode.startsWith("core")) crowd.add();
       else
         engine
@@ -134,7 +191,7 @@ try {
         problems.push(e.error.message),
       );
       engine.lighting.direction.set([0, 1, 0, 1]);
-      const crowd = VATCrowd.attach(engine, vat, { roughness: 0.9 });
+      const crowd = make(engine);
       if (core)
         engine
           .createMesh()
@@ -183,7 +240,7 @@ try {
       lit: await shoot("lit"),
       problems,
     };
-  });
+  }, kind);
   assert.deepEqual(report.problems, [], "no GPU validation errors");
   assert.deepEqual(pageErrors, [], "no page errors");
   // The floor right in front of the box's foot: scan the centre column up from the bottom edge for the box.
@@ -227,6 +284,7 @@ try {
       );
   console.log(
     JSON.stringify({
+      kind,
       ...rows,
       views: viewsWorst,
       single: singleWorst,
@@ -266,7 +324,8 @@ try {
     rows.source,
     "a clustered effect with no lights in range changes nothing",
   );
-  console.log(`vat-ssao: PASS on ${compat ? "WebGL2 layer" : "WebGPU"}`);
+  console.log(`vat-ssao ${kind}: PASS on ${compat ? "WebGL2 layer" : "WebGPU"}`);
+  }
 } finally {
   await closeAll({ browser });
 }
