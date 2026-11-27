@@ -6,6 +6,17 @@
 import { Geometry, Mesh } from "@margoengine/core";
 import { Bed, FlowField, FlowSample, SeaSource, SeaSurface, Wind } from "@margoengine/math/fields";
 
+export interface BodyLoad {
+    readonly active: boolean;
+    readonly submerged: number;
+    readonly wet: number;
+    readonly centre: Vec3;
+    readonly centreOfBuoyancy: Vec3;
+    readonly depth: number;
+    readonly buoyancy: Vec3;
+    readonly force: Vec3;
+}
+
 export const CUBE_ADDED_MASS = 0.68;
 
 export const DIVER_ADDED_MASS = 0.25;
@@ -16,6 +27,8 @@ export interface EquivalentEllipsoid {
     directions: [[number, number, number], [number, number, number], [number, number, number]];
     volume: number;
 }
+
+export const FLOATING_SIDES = 64;
 
 export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     readonly id: string;
@@ -84,6 +97,30 @@ export interface FiniteQuayWakeParams extends QuayPotentialGrid {
         readonly velocity?: (time: number) => readonly [number, number, number, number, number, number];
         readonly startTime?: number;
     };
+}
+
+export interface FloatingBody {
+    readonly valid: boolean;
+    readonly row: number;
+    readonly colliders: readonly {
+        readonly handle: number;
+        readonly shape: string;
+    }[];
+}
+
+export interface FloatingOptions {
+    readonly drag?: LoadBody['drag'];
+    readonly spinDrag?: number;
+    readonly windage?: number;
+    readonly addedInertia?: LoadBody['addedInertia'];
+    readonly pressureModel?: LoadBody['pressureModel'];
+}
+
+export interface FloatingWorld {
+    readonly kernel: {
+        readonly columns: Columns;
+    };
+    getBodies(): readonly FloatingBody[];
 }
 
 export interface FloodBlockageBody {
@@ -231,6 +268,7 @@ export interface LoadBody {
     readonly row: number;
     readonly shape: LoadShape;
     readonly centre?: readonly [number, number, number];
+    readonly rotation?: readonly [number, number, number, number];
     readonly drag?: number | readonly [number, number, number];
     readonly spinDrag?: number;
     readonly addedMass?: readonly [number, number, number];
@@ -273,6 +311,19 @@ export interface LoadCoupledRadiationResonance {
     readonly frequency: number;
     readonly decayRate: number;
     readonly strength: number;
+}
+
+export interface LoadDebugOptions {
+    readonly submerged?: boolean;
+    readonly waterline?: boolean;
+    readonly centreOfBuoyancy?: boolean;
+    readonly forces?: boolean;
+    readonly forceScale?: number;
+}
+
+export interface LoadLines {
+    vertices: Float32Array;
+    colors: Float32Array;
 }
 
 export interface LoadMember {
@@ -379,6 +430,8 @@ export class LoadSolver implements Solver<LoadParams> {
     describe(): SolverDescription;
     init(host: SolverHost, params: LoadParams): void;
     step(context: StepContext, _dt: number): void;
+    bodyLoad(index: number): BodyLoad;
+    debugRender(options?: LoadDebugOptions): LoadLines;
     memberLoad(index: number): MemberLoad;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
@@ -705,6 +758,8 @@ export function equivalentEllipsoid(mesh: {
 
 export function finiteQuayPointSource(name: string): FieldDescriptor;
 
+export function floating(physics: FloatingWorld, bodies: FloatingBody | readonly FloatingBody[], options?: FloatingOptions): LoadBody[];
+
 export function floodBlockageExchange(input: FloodBlockageInput): FloodBlockageExchange;
 
 export function goda(design: number, period: number, depth: number, options?: {
@@ -859,6 +914,8 @@ interface ColliderSettings {
 type ColliderShape = ShapeOptions['shape'];
 
 type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
+
+type Columns = Record<string, ArrayLike<number>>;
 
 type CombineRule = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
 
