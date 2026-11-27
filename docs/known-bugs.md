@@ -17216,13 +17216,16 @@ E26 to E40):
 - Historical KD point clouds (method 1 before version 2.3): Margo answers
   `Unsupported`. The prebuilt rejects every 2.3 body relabelled 1.0 to 2.2, so
   the older layout is unknown and no such file is tracked.
-- Predictor 6 prediction mode 0 (one triangle, before version 2.2): the
-  prebuilt decodes, Margo answers `Unsupported`. It equals the first incident
-  triangle's normal on small coordinates; at coordinates near 16,000 and above
-  no tested integer model reproduced meshes with several triangles. Repro: the
-  `E35 one-triangle normal mode` cases in
-  `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
-  int32 arithmetic of that mode is not established.
+- Predictor 6 prediction mode 0 (one triangle, before version 2.2), narrowed
+  by E67 on 2026-11-27: Margo decodes it as the first triangle's normal added
+  once for every triangle around the vertex, which matches the prebuilt on
+  every one of 24,000 probe streams it decodes. Where a component of that sum
+  leaves int32 (positions spread wider than about 2^14), the prebuilt's
+  arithmetic is still not established: a 32-bit sum explains most vertices but
+  not those whose single cross product already leaves int32, so Margo answers
+  `Unsupported` there. Repro: the status 2 cases of
+  `packages/decoders/native/draco/tests/fixtures/normal-mode0.bin`. Cause: the
+  prebuilt's integer widths past int32 are not established.
 - Damaged seamed meshes of version 2.2 (mutation probes of 2026-11-27, after
   E63 to E66): of the differences left, most are streams the prebuilt decodes
   and Margo refuses as truncated or in the EdgeBreaker symbol and start-face

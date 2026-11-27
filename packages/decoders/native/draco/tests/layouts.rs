@@ -2,9 +2,10 @@
 //! orientations and normal data the mesh predictors use, KD values of width 32
 //! and the wrap transform, and E41's normals outside the octahedron. Every
 //! input is Margo-crafted; expected output is the
-//! opaque full decoder's public output, or its rejection. The one-triangle
-//! normal mode (E35) is not established, so its cases expect `Unsupported`
-//! although the opaque decoder accepts them.
+//! opaque full decoder's public output, or its rejection. Status 2 marks a
+//! stream the opaque decoder accepts and Margo refuses as `Unsupported`. The
+//! two one-triangle normal cases of E35 decode since E67; normal-mode0.bin
+//! holds their outputs.
 use margoengine_draco::{Error, Limits, decode};
 
 fn num(data: &[u8], at: &mut usize) -> u32 {
@@ -37,8 +38,9 @@ fn check(data: &[u8]) -> (u32, u32, u32, u32) {
                 rejected += 1;
             }
             2 => {
-                if decode(input, Limits::default()) != Err(Error::Unsupported) {
-                    failures.push(format!("{name}: must be unsupported"));
+                let decodes = name.starts_with("E35 one-triangle");
+                if (decode(input, Limits::default()) == Err(Error::Unsupported)) == decodes {
+                    failures.push(format!("{name}: unsupported must be {}", !decodes));
                 }
                 unsupported += 1;
             }
@@ -163,6 +165,15 @@ fn unreached_vertices_match_black_box_outputs() {
 fn decoder_header_and_predictor_bytes_match_black_box_outputs() {
     let counts = check(include_bytes!("fixtures/headers.bin"));
     assert_eq!(counts, (365, 122, 243, 0));
+}
+
+/// E67: predictor 6 mode 0 (before 2.2) adds the first triangle's normal once
+/// for every triangle around the vertex; streams whose product leaves int32
+/// stay `Unsupported`.
+#[test]
+fn one_triangle_normal_mode_matches_black_box_outputs() {
+    let counts = check(include_bytes!("fixtures/normal-mode0.bin"));
+    assert_eq!(counts, (178, 162, 0, 16));
 }
 
 // E66: the opaque glTF build reads predictor 3 of a current stream as the

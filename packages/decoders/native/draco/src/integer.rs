@@ -20,6 +20,8 @@ pub(crate) struct Integer {
     crease: [Vec<bool>; 4],
     orientations: Vec<bool>,
     flips: Vec<bool>,
+    /// E67: predictor 6 prediction mode 0 (before 2.2).
+    one_triangle: bool,
     version: u16,
 }
 impl Integer {
@@ -115,6 +117,7 @@ impl Integer {
             crease: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
             orientations: Vec::new(),
             flips: Vec::new(),
+            one_triangle: false,
             version: c.version,
         };
         if method == -2 {
@@ -194,10 +197,11 @@ impl Integer {
         if method == 6 {
             // E35: before 2.2 a prediction mode byte follows the transform
             // data. Mode 1 sums every triangle around the vertex, the only
-            // rule from 2.2. Mode 0 is not established.
+            // rule from 2.2. E67: mode 0 adds the first triangle's normal
+            // once for every triangle around the vertex.
             if c.version < 0x202 {
                 match c.byte()? {
-                    0 => return Err(Error::Unsupported),
+                    0 => out.one_triangle = true,
                     1 => {}
                     _ => return Err(Error::Invalid),
                 }
@@ -303,6 +307,7 @@ impl Integer {
                     row,
                     parent.ok_or(Error::Invalid)?,
                     self.flips[row],
+                    self.one_triangle,
                     max,
                     budget,
                 )?;

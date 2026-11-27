@@ -394,6 +394,7 @@ impl Mesh<'_, '_> {
         id: usize,
         parent: Positions,
         flip: bool,
+        one_triangle: bool,
         max: i32,
         budget: &mut Budget,
     ) -> Result<[i32; 2]> {
@@ -406,8 +407,21 @@ impl Mesh<'_, '_> {
         let mut normal = [0_i64; 3];
         let mut corner = start;
         let mut left = true;
+        let mut triangles = 0_i128;
         while corner != NONE {
             budget.steps(1)?;
+            triangles += 1;
+            if one_triangle {
+                corner = self.swing(corner, left);
+                if corner == start {
+                    break;
+                }
+                if corner == NONE && left {
+                    left = false;
+                    corner = self.swing(start, false);
+                }
+                continue;
+            }
             let a = sub(self.position(next(corner), parent)?, position);
             let b = sub(self.position(prev(corner), parent)?, position);
             // E42: every difference, product and sum wraps in int64.
@@ -425,6 +439,23 @@ impl Mesh<'_, '_> {
             if corner == NONE && left {
                 left = false;
                 corner = self.swing(start, false);
+            }
+        }
+        if one_triangle {
+            // E67: mode 0 is the first triangle's normal (that of the entry
+            // corner) times the number of triangles the swing visits. The
+            // opaque decoder's result is established while every component
+            // of that product fits int32; past it no tested integer model
+            // matched every vertex, so Margo refuses the stream.
+            let a = self.position(next(start), parent)?;
+            let b = self.position(prev(start), parent)?;
+            let a: [i128; 3] = std::array::from_fn(|i| i128::from(a[i]) - i128::from(position[i]));
+            let b: [i128; 3] = std::array::from_fn(|i| i128::from(b[i]) - i128::from(position[i]));
+            for (c, component) in normal.iter_mut().enumerate() {
+                let next = (c + 1) % 3;
+                let prev = (c + 2) % 3;
+                let value = (a[next] * b[prev] - a[prev] * b[next]) * triangles;
+                *component = i64::from(i32::try_from(value).map_err(|_| Error::Unsupported)?);
             }
         }
         // E42: the sum is compared and divided as uint64, since a component
