@@ -3441,8 +3441,17 @@ export class PBRModel implements EnginePlugin {
   private glassActive(): boolean {
     return this.primitives.some(
       (p) =>
-        linearBlends(p.material) || (!this.takesTransparent(p.material) && !this.transmission && transmits(p.material)),
+        linearBlends(p.material) || (!this.takesTransparent(p.material) && transmits(p.material)),
     );
+  }
+  /**
+   * Whether the transmission hook draws `m` in this view. A hook whose `takes(c)` is false (no scene source: an
+   * environment probe face, an external renderer pass, an XR view without a capture) leaves `m` on the tinted blend, so
+   * nothing disappears (KB4000).
+   */
+  private transmitted(m: PBRMaterial, c: Context): boolean {
+    const hook = this.transmission;
+    return !!hook && transmits(m) && hook.takes?.(c) !== false;
   }
   /**
    * KB3148b: a draw found a linear-blend material and no capture (the option was set after the model joined the frame
@@ -3546,7 +3555,7 @@ export class PBRModel implements EnginePlugin {
       const p = r.primitive,
         m = p.material;
       if (p.topology || r.batch || r.mergedInto) continue;
-      if (this.takesTransparent(m) || (this.transmission && transmits(m))) continue;
+      if (this.takesTransparent(m) || this.transmitted(m, c)) continue;
       if (!p.instances && !p.deformed && !m.shading?.replacesTextures && !m.maps.some(Boolean)) continue;
       p.node.check();
       const a = p.node.matrix,
@@ -4171,7 +4180,7 @@ export class PBRModel implements EnginePlugin {
               ? deferred || !(transmission ? transmits(m) : this.takesTransparent(m))
               : capture
                 ? deferred || blended(m) || m.ext![0]
-                : mode === 'beauty' && !deferred && (this.takesTransparent(m) || (!!this.transmission && transmits(m)))
+                : mode === 'beauty' && !deferred && (this.takesTransparent(m) || this.transmitted(m, c))
         )
           continue;
         if (phase !== 'all' && (blended(m) || deferred) !== (phase === 'blend')) continue;
@@ -4523,7 +4532,7 @@ export class PBRModel implements EnginePlugin {
       node = p.node;
     if (r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p)) return false;
     const oit = this.transparency;
-    if (this.takesTransparent(m) || (this.transmission && transmits(m))) return false;
+    if (this.takesTransparent(m) || this.transmitted(m, c)) return false;
     if (phase !== 'all' && blended(m) !== (phase === 'blend')) return false;
     // The run's view block holds the camera, lights and target only while they are unchanged; nothing but a full
     // draw (its callbacks) can change them during a run, so one check serves the draws until the next full draw.
@@ -5325,8 +5334,10 @@ export class PBRModel implements EnginePlugin {
       glassTarget = display && !!nativeGlass(c),
       linearBlend = display && linearBlends(m),
       native = glassTarget && ((transmits(m) && m.renderState?.blend === undefined) || linearBlend);
-    // A caller-owned pass blends linearly only when it lends a snapshot hook (PBRDeviceRenderer.draw `snapshot`).
-    if (linearBlend && !glassTarget && !external) this.wantGlass();
+    // A caller-owned pass blends linearly only when it lends a snapshot hook (PBRDeviceRenderer.draw `snapshot`). A
+    // transmission hook's surface drawn here (the hook took no source this frame) asks for the capture too, so the hook
+    // reads the display scene from the next frame (KB4000; a materials mesh joins no capture on its own).
+    if ((linearBlend || (!!this.transmission && transmits(m))) && !glassTarget && !external) this.wantGlass();
     if (native) code = linearBlend ? linearBlendShader(code) : nativeGlassShader(code);
     if (mode === 'occlusion') {
       const rewritten = occlusionShader(code);

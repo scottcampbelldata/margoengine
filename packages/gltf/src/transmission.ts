@@ -13,6 +13,9 @@ import {
 } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransmission } from './model.js';
 import { sceneTarget } from '../../shared/msaa.js';
+import { linearHdr } from '../../shared/hdr-format.js';
+import { neutralInverseShader } from '../../shared/display.js';
+import { nativeGlass } from '../../materials/src/native-glass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { groupCode, alphaBlend } from '../../shared/pass.js';
@@ -101,15 +104,26 @@ const copy = /* wgsl */ `
 @fragment fn level0(@builtin(position) p:vec4f)->@location(0) vec4f {
   return textureLoad(source,vec2i(p.xy),0);
 }
-`;
+// A display-encoded source holds toDisplay(light): the PBR Neutral curve, then the sRGB transfer (shared/display.js).
+// Level 0 undoes both, so every mip averages scene light (an encoded average is a darker blur) and margoTransmission
+// adds the same light it would on an HDR target; the glass shader's own display transform then applies the curve once,
+// so clear IOR 1 glass shows exactly what is behind it (a plain decode applied the curve twice: 230 drew 225).
+@fragment fn level0Display(@builtin(position) p:vec4f)->@location(0) vec4f {
+  let c=textureLoad(source,vec2i(p.xy),0);
+  let x=clamp(c.rgb,vec3f(0.0),vec3f(1.0));
+  return vec4f(pbrNeutralInverse(select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045))),c.a);
+}
+${neutralInverseShader}`;
 const over: GPUBlendState = alphaBlend;
 let serial = 0;
 
 /**
  * Real transmission: `transmission.add(model)` makes a gltf/pbr model's or materials mesh's transmissive surfaces refract
  * the opaque scene behind them, blurred by roughness and attenuated through `thickness` of the volume, instead of tinting
- * the background. Needs an HDR scene capture (a PostStack with an HDR or display effect, such as Tonemap or Bloom). The scene is
- * copied (a mip chain) only on frames where a transmissive surface draws. WebGPU only.
+ * the background. It reads the view's scene capture: an HDR or display PostStack target, or gltf's native glass capture of
+ * the display target (decoded to linear light). A view with neither (an environment probe face, an external renderer
+ * pass) keeps the tinted blend (`takes`). The scene is copied (a mip chain) only on frames where a transmissive surface
+ * draws. WebGPU only.
  */
 export class Transmission implements EnginePlugin, PBRTransmission {
   readonly name = 'transmission:' + serial++;
@@ -129,7 +143,8 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   private source?: GPUTexture;
   private sourceGroup?: GPUBindGroup;
   private sampler?: GPUSampler;
-  private pipelines?: { level0: GPURenderPipeline; reduce: GPURenderPipeline };
+  private pipelines?: { level0: GPURenderPipeline; display: GPURenderPipeline; reduce: GPURenderPipeline };
+  private sourcePipeline?: GPURenderPipeline;
   private context?: Context;
   private pass?: GPURenderPassEncoder;
   /** Reused back-to-front list. Filled from the model map each frame so equal distances stay in insertion order. */
@@ -202,15 +217,18 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
     const c = this.context!,
-      target = sceneTarget(c)!,
+      target = sceneTarget(c),
       encoder = c.encoder,
       p = this.pipelines!;
-    target.resolve(encoder);
-    if (this.source !== target.resolvedColor) {
-      this.source = target.resolvedColor;
+    target?.resolve(encoder);
+    const source = target ? target.resolvedColor : nativeGlass(c)!.resolved!(c)!;
+    if (this.source !== source) {
+      this.source = source;
+      // An sRGB view format decodes on load; a float target holds linear light; unorm holds encoded values.
+      this.sourcePipeline = linearHdr(source.format) || source.format.endsWith('-srgb') ? p.level0 : p.display;
       this.sourceGroup = c.device.createBindGroup({
-        layout: p.level0.getBindGroupLayout(0),
-        entries: [{ binding: 0, resource: this.source.createView() }],
+        layout: this.sourcePipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: source.createView() }],
       });
     }
     for (let level = 0; level < this.levels.length; level++) {
@@ -218,7 +236,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
         label: 'transmission:copy',
         colorAttachments: [{ view: this.levels[level], loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
       });
-      pass.setPipeline(level ? p.reduce : p.level0);
+      pass.setPipeline(level ? p.reduce : this.sourcePipeline!);
       pass.setBindGroup(0, level ? this.reduceGroups[level - 1] : this.sourceGroup!);
       pass.draw(3);
       pass.end();
@@ -231,17 +249,15 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     applyView(this.pass, c);
     return this.pass;
   }
+  /** @internal gltf\/pbr transmission hook: whether this view has a scene to read (else its surfaces keep the tint). */
+  takes(c: Context): boolean {
+    return !this.disposed && (!!sceneTarget(c) || !!nativeGlass(c)?.resolved?.(c, false));
+  }
   private render(c: Context): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.
     currentFrame(c.device, c.view ?? c);
-    if (this.disposed || !this.models.size) return;
-    const target = sceneTarget(c),
-      device = c.device;
-    if (target?.resolvedColor.format !== 'rgba16float')
-      throw margoError(
-        'state',
-        'Transmission needs an HDR scene capture: attach a PostStack with an HDR or display effect (such as Tonemap or Bloom) first',
-      );
+    if (this.disposed || !this.models.size || !this.takes(c)) return;
+    const device = c.device;
     if (!this.pipelines) {
       const pipeline = (code: string, entryPoint: string) => {
         const module = device.createShaderModule({ code });
@@ -252,7 +268,11 @@ export class Transmission implements EnginePlugin, PBRTransmission {
           fragment: { module, entryPoint, targets: [{ format: 'rgba16float' }] },
         });
       };
-      this.pipelines = { level0: pipeline(copy, 'level0'), reduce: pipeline(mipShader(false), 'fragment') };
+      this.pipelines = {
+        level0: pipeline(copy, 'level0'),
+        display: pipeline(copy, 'level0Display'),
+        reduce: pipeline(mipShader(false), 'fragment'),
+      };
       this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     }
     if (this.texture?.width !== c.width || this.texture.height !== c.height) {
@@ -302,7 +322,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   }
   private release(): void {
     retire(this.device!, this.texture);
-    this.texture = this.view = this.source = this.sourceGroup = undefined;
+    this.texture = this.view = this.source = this.sourceGroup = this.sourcePipeline = undefined;
     this.levels = [];
     this.reduceGroups = [];
   }

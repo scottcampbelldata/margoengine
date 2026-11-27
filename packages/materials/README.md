@@ -899,8 +899,9 @@ material releases its map uniform buffers; textures remain caller-owned.
 `Transmission` pass. `dispersion` defaults to 0, accepts finite nonnegative values (including values above 1), and
 stays live. It uses `KHR_materials_dispersion`'s 20/Abbe-number convention. Red, green and blue sample the opaque
 scene along separate refracted rays; red's IOR is clamped to at least 1. Zero preserves the existing refraction.
-The effect needs nonzero volume thickness; IOR 1 leaves all three channels together. Without a refraction capture,
-the existing tinted-background path remains unchanged.
+The effect needs nonzero volume thickness; IOR 1 leaves all three channels together. `Transmission` reads an HDR
+capture, an LDR one or the native glass capture of the display target (gltf README, "scene-copy refraction pass");
+a view with none keeps the existing tinted-background path.
 
 glTF parsing and export preserve `KHR_materials_dispersion`. The retained glTF renderer uses the existing
 `extendedMaterials` decoder opt-in; `install(model)` and caller-owned `transmission({dispersion, ...})` also support

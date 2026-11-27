@@ -4,6 +4,7 @@ export function acquireNativeGlass(engine: Engine, active: () => boolean, scene?
 export function nativeGlass(context: Context):
   | {
       copy?(context: Context): void;
+      resolved?(context: Context, resolve?: boolean): GPUTexture | undefined;
       reopen?(pass: GPURenderPassEncoder): GPURenderPassEncoder;
       entries: GPUBindGroupEntry[];
     }

@@ -1178,6 +1178,9 @@ interface PBRTransmission {
     bindings(): GPUBindGroupEntry[];
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+    takes?(context: Extract<PassContext, {
+        backend: 'webgpu';
+    }>): boolean;
 }
 
 interface PBRTransparency {

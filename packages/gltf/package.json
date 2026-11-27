@@ -35,6 +35,7 @@
     "test:gpu:materials": "cd ../.. && node scripts/gltf-pbr-materials-gpu-check.js",
     "test:gpu:viewer": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node scripts/stage-viewer-gpu-check.js --compat",
     "test:gpu:native-volume": "cd ../.. && node packages/gltf/scripts/test-native-volume.mjs && node packages/gltf/scripts/test-native-volume.mjs --compat",
+    "test:gpu:transmission": "cd ../.. && node packages/gltf/scripts/test-screen-transmission-browser.mjs && node packages/gltf/scripts/test-screen-transmission-browser.mjs --compat",
     "test:gpu:spec-gloss": "cd ../.. && node packages/gltf/scripts/test-spec-gloss-browser.mjs && node packages/gltf/scripts/test-spec-gloss-browser.mjs --compat",
     "test:gpu:colour-space": "cd ../.. && node packages/gltf/scripts/test-extended-colour-space-browser.mjs && node packages/gltf/scripts/test-extended-colour-space-browser.mjs --compat",
     "test:gpu:dds": "cd ../.. && node packages/gltf/scripts/test-dds-browser.mjs && node packages/gltf/scripts/test-dds-browser.mjs --compat",

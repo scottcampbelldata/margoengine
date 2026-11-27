@@ -363,12 +363,31 @@ for (const samples of [4, 1])
     assert.equal(of(after, 'pass.drawIndexed').length, 3, 'opaque mesh, then the glass twice (tint, lit)');
   });
 
-test('Transmission needs an HDR scene capture', async () => {
+// KB4000 step 2: a display scene is a source too (it threw "needs an HDR scene capture" before). An LDR capture (FXAA's)
+// and the native glass capture of the display target are display-encoded, so level 0 inverts the display transform;
+// the mip chain then holds scene light, as from an HDR capture.
+test('Transmission reads a display scene through the inverse display transform', async () => {
   for (const post of [null, 'ldr']) {
     const { engine, frame } = await scene({ post }),
       transmission = Transmission.attach(engine);
     transmission.add(createMesh(engine, sphereGeometry(1, 8, 4), new Material({ transmission: 1 })));
-    assert.throws(() => frame(0), /HDR scene capture/);
+    // Without a PostStack the first frame keeps the tint and asks for gltf's native glass capture, which joins after it.
+    const first = frame(0);
+    await null;
+    const log = frame(1),
+      created = [...first, ...log],
+      copies = passes(log).filter((p) => p.label === 'transmission:copy');
+    assert.ok(copies.length > 0, `${post}: the scene is copied`);
+    const entries = of(created, 'renderPipeline')
+      .map((e) => e[2])
+      .filter((p) => p.label === 'transmission:copy')
+      .map((p) => p.fragment.entryPoint);
+    assert.ok(entries.includes('level0Display'), `${post}: display source decodes (${entries})`);
+    const code = of(created, 'module')
+      .map((e) => e[2].code)
+      .find((c) => c.includes('fn level0Display('));
+    assert.match(code, /fn pbrNeutralInverse\(/);
+    transmission.dispose();
   }
   assert.throws(() => new Transmission({ order: 0 }), RangeError);
 });

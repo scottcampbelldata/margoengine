@@ -9752,6 +9752,12 @@ Native thickness maps landed 2026-11-26 (KB4000: `thicknessTexture.g` scales the
 slot 20 of the extended shader; packages/gltf/test/native-volume-path.test.js and the 64-pixel slab proof). Boundary
 tracing, the hooked route's per-unit range and complete reference-image losses remain separate. Research and reproduction:
 [native-volume-range.md](../native-volume-range.md).
+KB4000 step 2 (2026-11-27): the scene-copy pass (`@margoengine/gltf/transmission`) reads display targets through the
+inverse of the PBR Neutral display transform (`shared/display.js` `pbrNeutralInverse` and its WGSL twin), so its mip
+chain holds scene light on HDR and display targets alike; `PBRTransmission.takes(c)` keeps the tint where a view has
+no capture. Evidence: packages/gltf/scripts/test-screen-transmission-browser.mjs on WebGPU and the WebGL2 layer (1x
+and 4x; clear IOR 1 glass equals the tint, IOR 1.5 roughness 0.6 blurs the checker spread from 112 to 1.7, one copy
+chain per frame for two models). Missing: proof frames on the default load (step 4).
 
 ## Draco float range review (section 5 evidence, 2026-11-10)
 

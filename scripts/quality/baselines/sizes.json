@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21151196,
+  "total": 21154109,
   "history": [
     {
       "date": "2026-10-24",
@@ -14989,6 +14989,12 @@
       "commit": "0382682375",
       "reason": "shader/glsl-pass 43,055 to 43,104 B gzip measured: 0382682375 lets Clustered integrated shadow maps take drawLocalShadow casters (RawMesh, terrain); the caster hook is part of the raw material the pass draws with, so a split would save nothing for the 49 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "92993352b2",
+      "reason": "KB4000 step 2, the scene-copy transmission pass reads display targets: gltf/transmission 4,122 to 4,860 B gzip (+738: the inverse PBR Neutral display transform and sRGB decode at level 0, the display copy pipeline, takes() and the native glass source lookup), gltf/pbr-model 71,692 to 71,877 B (+185: per-view routing through PBRTransmission.takes, the capture request for hooked glass on a display target, the native glass resolved() source). Measured on built entries of 92993352b2 and of the change; both exceed their ceilings (4,378 and 71,859), so the ceilings take measured + headroom. The bytes are the feature: transmission on the canvas without an HDR PostStack, exact through clear glass; gltf/transmission is lazy, and a split of pbr-model's routing would cost a second chunk on every glass load.",
+      "grew": 2
     }
   ],
   "items": {
@@ -15460,7 +15466,7 @@
     "@margoengine/gltf/metadata": 2432,
     "@margoengine/gltf/pbr": 95806,
     "@margoengine/gltf/pbr-instancing": 3387,
-    "@margoengine/gltf/pbr-model": 71859,
+    "@margoengine/gltf/pbr-model": 74034,
     "@margoengine/gltf/physics": 9449,
     "@margoengine/gltf/prepare": 38242,
     "@margoengine/gltf/progressive": 105020,
@@ -15474,7 +15480,7 @@
     "@margoengine/gltf/strokes": 2304,
     "@margoengine/gltf/texture-coordinates": 824,
     "@margoengine/gltf/textured": 9754,
-    "@margoengine/gltf/transmission": 4378,
+    "@margoengine/gltf/transmission": 5116,
     "@margoengine/gltf/worker": 96392,
     "@margoengine/headless": 3309,
     "@margoengine/headless/accumulate": 4620,

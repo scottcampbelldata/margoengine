@@ -20,6 +20,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     begin(): GPURenderPassEncoder;
+    takes(c: Context): boolean;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -107,6 +108,10 @@ interface Chunk {
     hi: number;
     free: Map<number, number[]>;
 }
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type Context = Extract<PassContext, {
     backend: 'webgpu';
@@ -1155,6 +1160,9 @@ interface PBRTransmission {
     bindings(): GPUBindGroupEntry[];
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+    takes?(context: Extract<PassContext, {
+        backend: 'webgpu';
+    }>): boolean;
 }
 
 interface PBRTransparency {

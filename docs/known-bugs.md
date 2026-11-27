@@ -16805,6 +16805,14 @@ solid glass does. Lensing is the glTF thin-walled rule (no KHR_materials_volume 
 Cycles', not Margo's; the roughness blur is the route's. `@margoengine/materials/transmission` already blurs the
 captured scene by roughness (transmission-pass.ts, `margoTransmissionLevel`), so the next step is the proof run with
 that installation beside the default one, then the default route's choice between them.
+Step 2 (2026-11-27, lane A): the scene-copy pass, now `@margoengine/gltf/transmission`, takes a display scene too. It
+threw "needs an HDR scene capture" on every display target; it now reads gltf's native glass capture (or an LDR
+PostStack target) and undoes the display transform at level 0 (PBR Neutral inverted, then the sRGB decode), so clear
+IOR 1 glass equals the tint pixel for pixel (a plain sRGB decode left the curve in and drew 230 as 225), and
+`PBRTransmission.takes(c)` keeps the tint in views with no capture. A materials mesh with the hook asks for the
+capture as linear blends do. Regression: packages/gltf/scripts/test-screen-transmission-browser.mjs (native and
+--compat, 1x and 4x), tests/display-neutral-inverse.test.js, packages/materials/test/physical.test.js. Steps 3
+(`depthWrite`) and 4 (default wiring, proofs) remain, so KB4000 stays open.
 
 ### Fixed 2026-11-27: the transmission proof's viewer row was 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
 

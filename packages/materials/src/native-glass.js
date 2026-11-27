@@ -121,6 +121,14 @@ class NativeGlass {
     pass.draw(3);
     pass.end();
   }
+  // KB4000: the resolved scene colour drawn so far into this capture (display-encoded, single-sampled), for gltf's
+  // screen-space transmission pass; undefined when this capture does not own the view's live colour. `resolve` false
+  // only asks whether there is one.
+  resolved(c, resolve = true) {
+    if (frames.get(c) !== this || !this.redirected || c.color !== this.colorView) return undefined;
+    if (resolve && this.multisample) c.encoder.beginRenderPass(this.resolution).end();
+    return this.color;
+  }
   present(c, nested) {
     if (frames.get(c) !== this || (!nested && this.redirected && c.color !== this.colorView)) return;
     if (this.redirected) {

@@ -607,14 +607,23 @@ behind each transmissive primitive of the models it is given:
 import { Engine } from '@margoengine/core';
 import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Transmission } from '@margoengine/gltf/transmission';
-import { PostStack } from '@margoengine/post';
-import { Tonemap } from '@margoengine/tonemap';
 
 const engine = await Engine.create(document.querySelector('canvas'));
-PostStack.attach(engine, [new Tonemap()]);
 const glass = Transmission.attach(engine);
 glass.add(await loadGLTF(engine, '/glass.glb'));
 ```
+
+It needs no post effect. It reads the view's scene capture: an HDR `PostStack` target as light, or a display-encoded
+one (an LDR `PostStack`, or the native glass capture gltf/pbr keeps for glass on the canvas) through the inverse of the
+display transform, Khronos PBR Neutral then sRGB, so the copy holds scene light either way and clear IOR 1 glass shows
+exactly what is behind it. Display white reads as the least light that shows as white (`neutralWhite` in
+`shared/display.js`, about 13.5), so rough glass over a clipped white background blurs it brighter than an HDR capture
+would. A view with no capture (an environment probe face, a `createRenderer` pass) keeps the tinted blend.
+
+Transmission hook (`model.setTransmission(hook)`, `PBRTransmission` in `@margoengine/gltf/pbr`): the hook's
+`declarations`, `bindings`, `targets` and `begin` draw the model's transmissive primitives in its own pass, and its
+optional `takes(context)` says per view whether it does; where it returns false those primitives keep the tinted blend
+in the beauty pass.
 
 `loadGLTF(engine, url, {optimize: true})` runs the import step of `@margoengine/geometry/optimize` on each opaque primitive
 as it packs: the same triangles in the order the vertex cache and early depth test read fastest, with `BLEND` primitives

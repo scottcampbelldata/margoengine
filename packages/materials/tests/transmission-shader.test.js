@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { transmission, Transmission } from '../dist/transmission.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
+import { neutralInverseShader, pbrNeutral, pbrNeutralInverse } from '../../shared/display.js';
 import { wgslModule } from './support/wgsl-subset.js';
 
 const W = 200,
@@ -503,7 +504,7 @@ test('pass hook: blur grows with roughness, Beer uses margoVolume per world unit
 
 test('mip chain: level0 copies texel for texel, every next level is the shared area filter', () => {
   const source = readFileSync(new URL('../../gltf/src/transmission.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n'),
-    copy = /const copy = \/\* wgsl \*\/ `([\s\S]*?)`;/.exec(source)[1];
+    copy = /const copy = \/\* wgsl \*\/ `([\s\S]*?)`;/.exec(source)[1].replace('${neutralInverseShader}', neutralInverseShader);
   assert.ok(/@vertex fn vertex\(/.test(copy) && /@fragment fn level0\(/.test(copy));
   // The reduction is shared/mipmaps.js's area filter (each source texel weighted by its overlap with the destination
   // texel). The old 2x2 box from texel 2p dropped an odd last column and row; the GPU readback that compares each level
@@ -517,4 +518,18 @@ test('mip chain: level0 copies texel for texel, every next level is the shared a
     textureLoad: (_t, at) => value(at),
   });
   assert.deepEqual(shader.call('level0', [3.5, 2.5, 0, 1]), [3, 2, 6, 1]);
+  // KB4000: a display-encoded source (toDisplay = PBR Neutral, then sRGB) reads back as the scene light it shows.
+  const encode = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055);
+  for (const light of [[0.02, 0.3, 0.6], [0.9, 0.5, 0.1], [4, 2, 0.5]]) {
+    const shown = pbrNeutral(light).map(encode),
+      display = wgslModule(copy.replace(/@vertex fn vertex[\s\S]*?\n\}\n/, ''), {
+        source: 'level',
+        textureDimensions: () => [5, 4],
+        textureLoad: () => [...shown, 1],
+      }),
+      read = display.call('level0Display', [0.5, 0.5, 0, 1]);
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs(read[i] - light[i]) < 1e-4 * Math.max(1, light[i]), `${light} -> ${read}`);
+    assert.equal(read[3], 1);
+    assert.deepEqual(pbrNeutralInverse(pbrNeutral(light)).map((x) => +x.toFixed(4)), light.map((x) => +x.toFixed(4)));
+  }
 });

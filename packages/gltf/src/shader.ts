@@ -1,3 +1,4 @@
+import type { PassContext } from '@margoengine/core/extension';
 import { packBaseShader } from './base-textures-shader.js';
 import { iridescenceWgsl } from '../../shared/iridescence.js';
 export { iridescenceWgsl } from '../../shared/iridescence.js';
@@ -767,6 +768,11 @@ export interface PBRTransmission {
   readonly targets: readonly GPUColorTargetState[];
   /** This frame's transmission pass: the scene colour and depth (read-only); begun on the first draw, ended by the owner. */
   begin(): GPURenderPassEncoder;
+  /**
+   * Whether the hook draws this view's transmissive primitives (it has a scene to read in `context`). When false they
+   * keep the tinted blend in the beauty pass. Omitted: always true.
+   */
+  takes?(context: Extract<PassContext, { backend: 'webgpu' }>): boolean;
 }
 const base = '  color=layers(s,v,l,color);',
   transmitted = new Map<string, Map<string, string>>();
