@@ -139,10 +139,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   expected depth is the box's own (about 0.0159), so none of their four samples is sky. The same 25 pixels show with
   the two boxes as plain gltf/pbr meshes moved by their nodes (a control run), so instancing is not the cause; WebGPU
   gives every pixel its full motion.
-- **Cause (suspected, not proven):** the layer resolves TAA's 4x motion targets by the mean of the four samples
-  (`src/shader.ts`, `skySample` note); samples where the velocity pass's 'equal' depth test fails keep the camera
-  pass's motion and a reprojected depth of the same surface, so the mean halves the motion. Why 'equal' fails on those
-  edge samples on ANGLE but not on WebGPU (sample positions or @invariant in the GLSL translation) is not yet found.
+- **Cause (proven 2026-11-27, lane A, on 24ce05b217):** coverage, not the 'equal' test. These are silhouette pixels
+  where the box covers 2 of the 4 samples and the sky the rest. The WebGL2 layer reads every sample of a 4x texture
+  from its blit-resolved copy (GLSL ES 3.00 has no sampler2DMS), so TAA's motion resolve (`src/index.ts`,
+  `motionResolve`) cannot pick the nearest sample and takes the mean of the four. The camera pass reads one resolved
+  depth per pixel and broadcasts one value to all four samples; where the depth resolve kept a box sample, that value
+  is the box's reprojected depth with the camera's motion (0), not `skySample`. The mean then halves the motion and
+  passes the expected-depth filter. Evidence on an RTX A6000 (patched built copy of the object pass, the same 25
+  pixels each time): depth test 'equal' or 'greater-equal' with cull 'none': 10,787 of 10,812 pixels right; cull
+  'back' with depth 'always': still 10,787, so no front-facing fragment reaches the missing samples; cull 'front'
+  with 'always' (back faces cover them): 10,808; the same scene at `antialias: false` (1 sample): 10,819 of 10,819
+  right. WebGPU reads single samples, and its resolve takes the box's sample.
+- **Fix (proposed, not built):** let the resolve separate the two layers without per-sample reads. The object pass
+  writes a coverage channel (1) that the camera pass leaves at 0; the resolve recomputes the camera's motion and depth
+  from the pixel's resolved depth (what the camera pass wrote) and unmixes them: object = (mean - (1 - c) x camera) / c
+  for coverage c > 0. That is exact for one object per pixel and the same on WebGPU, where c is 0 or 1. It costs a
+  wider 4x motion target (rgba16float in place of rg16float: 4 more bytes a sample), which needs a ruling.
   `far-velocity-browser.mjs --compat` asserts only motion above 0, which such pixels pass.
 
 ### Fixed 2026-11-27: a voxel-pathtracer unit test failed on a loaded machine; the viewport ignored the fixed band budget (KB-VPT-BANDS-LOAD1, voxel-pathtracer)
