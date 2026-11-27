@@ -13689,12 +13689,15 @@ Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
   - a line between pins within 0.007 % of its chain and 0.03 % of the catenary;
   - a taut cable's ring within 0.07 % of the beam-string frequency;
   - strumming that locks to the cable's frequency at reduced velocities 5 and 7 (within 0.3 % and 6 % of its frequency at the tension its bow along the flow gives it), swinging 0.57 and 0.60 diameters, and follows the shedding at 2 (0.014 diameters).
-- Vortex-induced vibration against a measurement (`packages/physics/tests/rod-viv.test.js`, 2026-11-27): the towing-tank pipe of Fu et al. (2025, arXiv 2502.05748; 7.90 m, 31 mm, 3000 N, towed at 0.40 and 1.60 m/s), measured values read from their Figs. 5 and 7:
-  - cross-flow dominant mode as measured at both speeds (first and third), in-line dominant mode as measured at 1.60 m/s (fifth); at 0.40 m/s the rod's in-line is the second mode where the test shows the first, as both of the paper's own predictions also give;
-  - cross-flow RMS +31 % and -21 % of the measured 0.369 D and 0.460 D (held to 35 %), the mean bow along the flow +10 % and -19 % of the measured 0.230 D and 4.154 D (held to 25 %). The paper states no scatter; its own CFD and VIVANA predictions miss the cross-flow RMS by up to 27 % and the bow by up to 10 %, so the bounds are the rod's measured accuracy with a margin, not a scatter;
-  - the in-line RMS is an order short: 0.028 D and 0.010 D against 0.0885 D and 0.175 D (KB-PHYS-RODVIVIL1);
-  - the pipe's tensioner springs are an axial stiffness of 1e5 N, soft enough that the bow changes the tension by under 7 %; the paper gives the tensioner no stiffness.
-- `segmentLoads` `vortex.amplify` (default false) adds Vandiver's measured growth of the mean drag with the cross-flow swing, 1 + 1.043 (2 y_rms / D)^0.65. The drag on the flow relative to the swinging segment already raises the mean drag (13 % on the towed pipe at 1.60 m/s), and the fit measured all of it, so on top it counts that part twice: on the towed pipe it bowed the pipe to 6.24 D against the measured 4.15 D.
+- Vortex-induced vibration against measurements (`packages/physics/tests/rod-viv.test.js`, 2026-11-27): the pipes of Fu et al. (2025, arXiv 2502.05748), measured values read from their Figs. 5, 7, 9 and 12. The wake's two amplitudes (`lift` 0.56, `drag` 0.53 at Re 5e4) were calibrated on the uniform 1.6 m/s case's cross-flow and in-line RMS (+2.5 % and -1.8 % after calibration; a change of 0.01 in either moves them about 1.5 % and 3 %); everything else is held out and held to the miss of the paper's own validated CFD on that case:
+  - uniform 1.6 m/s: modes as measured (third across, fifth in line); the bow -8.3 % (CFD +9.8 %, held to it);
+  - uniform 0.4 m/s: modes as measured (first and first, where the paper's CFD gives the second in line); across +2.4 % (CFD -23 %), in line +0.4 % (CFD -11 %), bow +8.4 % (held to 10 %);
+  - linear shear to 0.6 m/s: modes as measured (first across, second in line); across +8.7 % (CFD +18 %), in line +52 % (CFD +93 %), bow -25 % (CFD +28 %);
+  - linear shear to 1.0 m/s: second mode across as measured, bow -22 % (CFD +24 %); its RMS across -42 % and in line -18 % fall short (KB-PHYS-RODVIVSHEAR1);
+  - not yet run against the paper's bidirectionally sheared cases;
+  - the tensioners' springs are a soft axial stiffness (1e5 N and 2e4 N), so the bow changes the tension by a few per cent; the paper gives them none. The damping time gives the paper's damping ratio at the first mode (the rod's damping is stiffness-proportional, higher at higher modes).
+- The wake's forces take the water's own speed across a segment, its motion turning only their direction; the fluctuating drag follows the cross-flow wake (q^2 less its mean) by default, so a symmetric swing drives only symmetric in-line modes. `inLineWake: 'own'` keeps Srinil and Zanganeh's separate in-line wake.
+- `segmentLoads` `vortex.amplify` (default false) puts Vandiver's measured growth of the mean drag with the cross-flow swing, 1 + 1.043 (2 y_rms / D)^0.65, in place of the growth the drag on the relative flow already gives; on the towed pipe it bows the pipe 45 % past the measurement, where the relative flow's growth with the in-line motion is within 8.3 %.
 
 The world's region allocator (`Arena`, 2026-11-26): a WebAssembly memory cannot shrink, so freed regions are reused by later ones that fit (lowest free block first) and the top comes down as the highest region goes, but the memory keeps its largest size. Its free blocks are a list searched in address order, a cost in the number of free blocks per call, fine for the few hundred regions a world holds. Regions are handed out on the main thread only, never during a threaded step. The rigid kernel lives in an arena's regions (its world's block, a 1 MiB stack and 720 KiB of batch-query records, about 1.8 MiB above the world's own size), one kernel per memory, and on a shared memory it needs the threaded build (`loadKernel({threads: true})`, about 247 KB deflated, loaded only on that call). Threads (`useThreads`, `stepAsync`) solve a step's islands only: the broad and narrow phases, the island build and the step's end run on the main thread, so a world of one big island gains nothing, and a thread is a worker with a 1 MiB stack region. `stepAsync` is asynchronous, so the engine plugin's `Physics.step` keeps stepping on one thread. The soft and 2D kernels still run in memories of their own until they move into world regions.
 
@@ -15548,6 +15551,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: packages that load a WebGL2 route by import() draw their first frames differently until it arrives (KB-COMPAT-READY1, culling, dof, sky, splats, vfx, compute, voxel-pathtracer, scatter)
+
+- **Repro:** the class KB-SCATTER-ATTRCOMPAT1 found in shadows. On the WebGL2 layer each of these packages fetches its
+  compatibility route with `loadCompatRoute` when it attaches; until it arrives it waits or runs its WebGPU route on
+  the layer's CPU tier. `packages/dof/tests/dof.test.js` ("DOF alone on the WebGL2 layer shows the sharp scene"): the
+  first frames of a page show the scene sharp, later ones blurred, and nothing told a caller when frames stop changing.
+- **Cause:** `packages/shared/compat.js` said "no frame is drawn differently" while the route loads; that held only
+  where a check measured it. A check or film frame drawn on a loaded machine before the route differs from one after.
+- **Fix, per package:** a `ready` promise (`routeSettled` in `packages/shared/compat.js`), documented in the README
+  and awaited by the package's own checks. Done: dof. Left: culling, sky lighting, splats, vfx, compute,
+  voxel-pathtracer, scatter's `Scatter`, then a quality step that fails on a route without `ready`.
+
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
 - **Repro:** Playwright WebKit 27.2 on Windows 11:
@@ -15939,20 +15954,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Next:** bisect `packages/physics/src` on main for the commit where the test turned red, then fix it in the package that
   owns it with this test as the regression.
 
-### Open 2026-11-27: a towed flexible pipe's in-line vortex-induced vibration is an order short of the measurement (KB-PHYS-RODVIVIL1, physics loads)
+### Open 2026-11-27: a flexible pipe in strongly sheared flow swings 40 % short of the measurement across it (KB-PHYS-RODVIVSHEAR1, physics loads)
 
-- **Repro:** `packages/physics/tests/rod-viv.test.js`, the towing-tank pipe of Fu et al. (2025): the rod's in-line RMS is
-  0.028 D at 0.40 m/s and 0.010 D at 1.60 m/s, where the test measured 0.0885 D and 0.175 D. The mode is right at 1.60 m/s
-  (fifth) and the cross-flow amplitude within 31 %.
-- **Cause:** the in-line excitation at twice the shedding frequency comes from the lift turned by the cross-flow swing, the
-  drag's modulation by it, and the in-line wake oscillator of Srinil and Zanganeh (2012, C_D0 0.2, Lambda 12, calibrated on
-  rigid cylinders). Against the in-line drag damping, rho C_D D U per metre (50 N s/m^2 at 1.60 m/s), those give about
-  0.02 D at most; at 1.60 m/s without the in-line wake the rod gives 0.0087 D, with it 0.0101 D, and at a fluctuating drag
-  of 0.6, three times the published one, still 0.033 D. Measured, the fluid feeds the in-line motion (in-line lock-in at twice the cross-flow frequency), which the
-  strip model's wake does not reproduce at its published coefficients. Raising them to fit this one test would be a fit
-  to one pipe; a calibration needs a second data set (the Chaplin et al. 2005 riser data, awaited) to validate against.
-- **Open:** the in-line wake's coupling at a flexible cylinder's high modes, calibrated on one riser data set and checked
-  on another.
+- **Repro:** `packages/physics/tests/rod-viv.test.js`, Fu et al. (2025)'s linearly sheared pipe at 1.0 m/s (their Fig. 12):
+  the rod swings 0.235 D RMS across in the measured second mode where the test measured 0.407 D (-42 %), and 0.085 D in
+  line in the second mode where it measured 0.104 D in the third (-18 %). The bow is within 22 % (the paper's CFD +24 %), and
+  the same pipe at 0.6 m/s is within the paper's CFD on every quantity.
+- **Cause, so far:** not the Reynolds scaling (without it, 0.229 D), not the discretisation, and only in part the damping:
+  the rod's damping is stiffness-proportional, so the pipe's 2.58 % at its first mode is 5.7 % at its second; matched at the
+  second it swings 0.246 D. Strip wake models feed a mode only where the local shedding frequency meets it, so a strongly
+  sheared flow feeds less span than the measurement shows; the paper's CFD resolves the wake along the span and is within
+  5 %.
+- **Open:** the wakes' correlation along the span in sheared flow (a coupling between neighbouring wake oscillators, as in
+  diffusive wake models), checked on this case and on the paper's bidirectionally sheared cases.
+
+### Open 2026-11-27: a rod whose tension dwarfs its bending stiffness blows up at some steps (KB-PHYS-RODSTRING1, physics rod)
+
+- **Repro:** a `Rod` of 48 links, 7.9 m, 1.77 kg/m, bending stiffness 1 N m^2, pinned at both ends and brought to 48 kN over
+  half a second, then plucked (no water, no material damping): at 60 steps a second it swings to hundreds of metres within
+  a second, at 600 it rings steadily (damping ratio 4e-6), and at 2,400 the kernel stops it (a body past 1e15). The same rod
+  with 1,470 N m^2 at 3 kN is steady at 60, 600 and 1,200.
+- **Cause, so far:** at the coarse step, a link turned across its line meets the tension as a stiffness T / l (290 kN/m on a
+  0.29 kg link, about 1,000 rad/s), which a 60 Hz step holds only if the multibody's implicit solve holds it, and it holds
+  the links' own springs, not the tension's. That does not explain the failure at the finest step, which is not yet found.
+- **Open:** find the fine-step failure; then hold the tension's stiffness across the links in the tree's implicit solve.
 
 ### Fixed 2026-11-27: KVLCC2 was too course-stable in shallow water (KB-SHIP-SHALLOW1, physics ship)
 
