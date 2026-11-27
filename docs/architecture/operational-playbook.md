@@ -1,3 +1,10 @@
+### Section 5 evidence: orthographic SSAO blur with the eye inside the part (2026-11-27)
+
+`scripts/ssao-gpu-check.js` reads back SSAO's blurred occlusion for an orthographic eye far off and one inside the part
+and requires them within one display level (KB-SSAO-ORTHOBLUR1): 0.0395 before, 0.0002 after on the RTX A6000 and AMD
+RDNA2, 0.0031 on the WebGL2 layer. The blur's plane prediction now runs on negative orthographic depths too. Missing:
+the Intel Arc 140V rerun of KB-GPU-PRECHECKS1.
+
 ### Section 5 evidence: a radius-0 light in the sized clustered shader is the plain shader's text (2026-11-27)
 
 `scripts/clustered-sphere-light-gpu-check.js` requires a light of radius 0 beside a sized light to shade bit for bit as

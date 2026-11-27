@@ -1614,6 +1614,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/gltf/scripts/test-native-volume.mjs` and `packages/oit/test/gpu/blending-check.mjs` pass. gltf/pbr is
   91,150 B gzip.
 
+### Fixed 2026-11-27: orthographic SSAO blurred differently with the eye inside the part (KB-SSAO-ORTHOBLUR1, post)
+
+- **Repro (before):** `MARGO_GPU=amd node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position
+  along the view: 96 bytes over 2, worst 5" (93 bytes on the RTX A6000 at eaf8d4cc82). Reading SSAO's own textures for
+  the far eye and the eye inside the part: depth, gbuffer, view depth (a constant 5.5923 apart) and the raw occlusion
+  agree, and the blurred occlusion differs by up to 0.0395, on the RTX A6000 and AMD alike.
+- **Cause:** with the eye inside the part, surfaces behind it have a negative orthographic view depth (37,536 pixels
+  here). The bilateral blur (`packages/post/src/shaders.ts`, `blurShader`) took its plane prediction only where the
+  centre and its neighbour were above 0, a perspective rule, so those pixels compared every tap with the centre's own
+  depth and blurred apart from the same pixels seen from farther away.
+- **Fix:** in orthographic views the prediction needs both depths non-zero (0 marks no surface); perspective keeps
+  above 0.
+- **Regression:** `scripts/ssao-gpu-check.js` now also reads back the blurred occlusion for both eyes and requires them
+  within one display level: 0.0395 before, 0.0002 after natively and 0.0031 on the WebGL2 layer (one kernel sample of one
+  pixel crosses its depth test at 6 m and not at 0.4 m, float32 rounding of the sample position). The picture check
+  passes after on AMD, the RTX A6000 and `MARGO_COMPAT=1`.
+
 ### Fixed 2026-11-27: a radius-0 light beside a sized light shaded 13 to 16 ulps off on AMD (KB-CLUSTERED-SIZEDZERO1, clustered)
 
 - **Repro (before):** `MARGO_GPU=amd node scripts/clustered-sphere-light-gpu-check.js` (workstation AMD RDNA2 iGPU,
@@ -1644,6 +1661,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
     "[Device] is lost" (the parent run); past the 4-minute limit on main.
   - `node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position along the view: 3 bytes over 2,
     worst 7".
+    On AMD RDNA2 the same assertion read 96 bytes over 2, worst 5: the blur's plane prediction skipped negative
+    orthographic depths, fixed 2026-11-27 (KB-SSAO-ORTHOBLUR1 below); the Arc still waits for a rerun.
   - `node packages/sky/test/features-check.mjs sleet astro hillaire`: "sleet off by more than one half-float step".
 - **Cause:** not established for any of the four; each is owed to its package (core lighting, biomes, post, sky),
   found and fixed with its own regression. Two more were fixed: the material back-side check (KB-PICK-MIRRORROWS1)

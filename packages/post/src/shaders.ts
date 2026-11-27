@@ -134,7 +134,8 @@ export const ssaoShader =
 // angle, whose rows lie metres apart in depth, so the vertical pass kept the 4 x 4 sample pattern as rows and a
 // checker. A surface seen square on (depth constant along the axis) is weighted as before, and a tap across an edge
 // is still off the centre's plane and rejected (depth-keyed bilateral reconstruction, McGuire, Mara and Luebke,
-// "Scalable Ambient Obscurance", HPG 2012).
+// "Scalable Ambient Obscurance", HPG 2012). A surface is any depth but 0: orthographic depth is negative
+// behind the eye, so the prediction there needs both depths non-zero, not above 0 (KB-SSAO-ORTHOBLUR1).
 export const blurShader = `
 @group(0) @binding(0) var input:texture_2d<f32>;
 @group(0) @binding(1) var gbuffer:texture_2d<f32>;
@@ -149,7 +150,7 @@ export const blurShader = `
   let forward=abs(ahead-centre)<abs(centre-behind);let near=select(behind,ahead,forward);
   // Perspective: 1/depth is affine across a plane; orthographic (settings.w 1): depth itself.
   let ortho=settings.w>0.5;let key=select(1.0/max(centre,1e-30),centre,ortho);
-  let slope=select(0.0,select(-1.0,1.0,forward)*(select(1.0/max(near,1e-30),near,ortho)-key),centre>0.0&&near>0.0);
+  let slope=select(0.0,select(-1.0,1.0,forward)*(select(1.0/max(near,1e-30),near,ortho)-key),select(centre>0.0&&near>0.0,centre!=0.0&&near!=0.0,ortho));
   var sum=0.0;var total=0.0;
   for(var i=-4;i<=4;i++) {
     let q=clamp(p+axis*i,vec2i(0),limit);let neighbor=textureLoad(gbuffer,q,0);

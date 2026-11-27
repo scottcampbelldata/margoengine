@@ -66,6 +66,10 @@ try {
           }),
           runtime = engineRuntime(engine),
           device = runtime.gpu;
+        // Single-sample textures may be copied out, so the blurred occlusion can be read back (KB-SSAO-ORTHOBLUR1).
+        const createTexture = device.createTexture.bind(device);
+        device.createTexture = (d) =>
+          createTexture({ ...d, usage: d.usage | ((d.sampleCount ?? 1) > 1 ? 0 : GPUTextureUsage.COPY_SRC) });
         device.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
         if (ortho) engine.use(new CameraProjection({ height: 5 }));
         const material = new PbrMaterial({ color: '#c8c8c8', roughness: 0.8 });
@@ -119,6 +123,26 @@ try {
         const error = await device.popErrorScope();
         if (error) gpuErrors.push(error.message);
         window.ao.current = {
+          // The blurred occlusion (r32float), the second blur pass's output: SSAO's eighth texture when it owns its
+          // capture (scene, depth, gbuffer, view depth, ambient, raw, x, y).
+          async blurred() {
+            const t = effect?.textures?.[7];
+            if (!t || t.format !== 'r32float') return null;
+            const row = Math.ceil((t.width * 4) / 256) * 256,
+              buffer = device.createBuffer({
+                size: row * t.height,
+                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+              });
+            const encoder = device.createCommandEncoder();
+            encoder.copyTextureToBuffer({ texture: t }, { buffer, bytesPerRow: row }, [t.width, t.height]);
+            device.queue.submit([encoder.finish()]);
+            await buffer.mapAsync(GPUMapMode.READ);
+            const rows = new Float32Array(buffer.getMappedRange().slice(0)),
+              out = [];
+            for (let y = 0; y < t.height; y++) out.push(...rows.subarray((y * row) / 4, (y * row) / 4 + t.width));
+            buffer.destroy();
+            return out;
+          },
           dispose() {
             gltf?.dispose();
             engine.dispose();
@@ -197,10 +221,12 @@ try {
   const darkening = async (options) => {
     const p = (await scene({ ...options, enabled: false })).points,
       off = await shot(),
-      on = (await scene(options), await shot());
+      on = (await scene(options), await shot()),
+      blurred = await page.evaluate(() => window.ao.current.blurred());
     return {
       points: p,
       on,
+      blurred,
       off,
       delta: Object.fromEntries(Object.entries(p).map(([k, v]) => [k, +(at(off, v) - at(on, v)).toFixed(1)])),
     };
@@ -242,6 +268,21 @@ try {
     assert.ok(
       over === 0 && worst <= 1,
       `orthographic SSAO depends on the eye position along the view: ${over} bytes over 2, worst ${worst}`,
+    );
+    // The same for the blurred occlusion itself, before the display rounds it (KB-SSAO-ORTHOBLUR1): with the eye inside
+    // the part, surfaces behind it have a negative view depth, and the blur took its plane prediction only where both
+    // depths were above 0, so the rows where the depth crosses 0 blurred apart, 0.0395 on the RTX A6000 and AMD RDNA2
+    // alike; on AMD that showed as 96 bytes over 2 in the picture. After: 0.0002 natively; 0.0031 on the WebGL2 layer,
+    // where one kernel sample of one pixel (186, 180) lands on the other side of its depth test at 6 m than at 0.4 m
+    // (float32 rounding of the sample position), and the blur spreads that 1/32. The bound is one display level.
+    assert.ok(near.blurred && far.blurred, "SSAO's blurred occlusion is read back");
+    let blurWorst = 0;
+    for (let i = 0; i < near.blurred.length; i++)
+      blurWorst = Math.max(blurWorst, Math.abs(near.blurred[i] - far.blurred[i]));
+    result.orthographic.eyeMove.blurred = blurWorst;
+    assert.ok(
+      blurWorst <= 1 / 255,
+      `the blurred orthographic occlusion moves ${blurWorst} with the eye along the view`,
     );
   }
 
