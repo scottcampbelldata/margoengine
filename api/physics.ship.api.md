@@ -264,6 +264,94 @@ export interface ManoeuvringState {
     rollRate?: number;
 }
 
+export interface PlaningBoat {
+    readonly row: number;
+    readonly beam: number;
+    readonly deadrise: number;
+    readonly length: number;
+    readonly transom?: readonly [number, number, number];
+    readonly forward?: readonly [number, number, number];
+    readonly up?: readonly [number, number, number];
+    readonly propeller?: readonly [number, number, number];
+    readonly thrustAngle?: number;
+}
+
+export interface PlaningControl {
+    thrust: number;
+}
+
+export interface PlaningHull {
+    readonly beam: number;
+    readonly deadrise: number;
+    readonly mass: number;
+    readonly lcg: number;
+    readonly vcg?: number;
+    readonly thrustDepth?: number;
+    readonly thrustAngle?: number;
+}
+
+export interface PlaningLoads {
+    normal: number;
+    friction: number;
+    centre: number;
+    lambda: number;
+    keel: number;
+    chine: number;
+    speedCoefficient: number;
+    lift: number;
+    inRange: boolean;
+}
+
+export interface PlaningParams {
+    readonly boats: readonly PlaningBoat[];
+    readonly waterLevel?: number;
+    readonly density?: number;
+    readonly viscosity?: number;
+    readonly roughness?: number;
+    readonly capacity?: number;
+    readonly level?: RateLevel;
+}
+
+export interface PlaningRun extends PlaningLoads {
+    trim: number;
+    thrust: number;
+    resistance: number;
+}
+
+export class PlaningSolver implements Solver<PlaningParams> {
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: PlaningParams): void;
+    control(index: number): PlaningControl;
+    status(index: number): PlaningStatus;
+    step(context: StepContext, _dt: number): void;
+    importPorts(_tick: number): void;
+    exportPorts(tick: number): readonly Port[];
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface PlaningStatus {
+    trim: number;
+    immersion: number;
+    speed: number;
+    speedCoefficient: number;
+    normal: number;
+    friction: number;
+    keel: number;
+    chine: number;
+    lambda: number;
+    resistance: number;
+    airborne: boolean;
+}
+
+export interface PlaningWater {
+    readonly density?: number;
+    readonly viscosity?: number;
+    readonly gravity?: number;
+    readonly roughness?: number;
+}
+
 export class Propeller {
     readonly diameter: number;
     readonly curves: PropellerCurves;
@@ -595,6 +683,8 @@ export function liWuAddedMass(ratio: number, hull: {
     readonly block: number;
 }): [number, number, number];
 
+export function planingLoads(hull: PlaningHull, trim: number, lambda: number, speed: number, options?: PlaningWater): PlaningLoads;
+
 export function raceNumbers(race: ResolvedRace): RaceNumbers;
 
 export function raceVelocity(race: PropellerRace, point: readonly [number, number, number], out?: [number, number, number]): [number, number, number];
@@ -602,6 +692,8 @@ export function raceVelocity(race: PropellerRace, point: readonly [number, numbe
 export function resolvedRace(race: ResolvedRace, point: readonly [number, number, number], out?: [number, number, number]): [number, number, number];
 
 export function rudderLiftSlope(aspect: number): number;
+
+export function savitsky(hull: PlaningHull, speed: number, options?: PlaningWater): PlaningRun;
 
 export function scaleModel(model: ManoeuvringModel, factor: number): ManoeuvringModel;
 

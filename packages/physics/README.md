@@ -4256,8 +4256,22 @@ The parts work on their own too:
 - `Manoeuvring`: the MMG ship stepped by Runge-Kutta, with `selfPropulsion(speed)`; with a model's `heel` it carries `state.heel` and `state.rollRate`, and `forces().K` is the hull's and rudder's roll moment about G.
 - `Propeller`: open-water K_T and K_Q, four quadrants by Healey's lift and drag fitted to the curves, and the race's far-wake speed. `raceVelocity(race, point)` is the jet's velocity at a point.
 - `wageningenB({blades, area, pitch, reynolds}, J)`: a Wageningen B-series propeller's K_T and K_Q by Oosterveld and van Oossanen's (1975) polynomials, with their Reynolds correction; `bSeriesCurves(propeller)` fits MMG's quadratic curves to them from bollard pull to zero thrust, for a model's `propeller.curves`.
+- `savitsky(hull, speed, water)`: a prismatic planing hull running steady by Savitsky's (1964) equations: its trim, mean wetted length, the keel's and chine's wetted lengths, the normal force at his centre of pressure, the bottom's friction and the thrust and resistance, with the thrust line's depth and angle (`{beam, deadrise, mass, lcg, vcg, thrustDepth, thrustAngle}`); `planingLoads(hull, trim, lambda, speed)` is the bottom's loads at a given attitude.
 - `holtropMennen(hull, speed)`: Holtrop and Mennen's resistance with the wake fraction, thrust deduction and eta_R; `ittc1957(Re)` is the friction line.
 - `squat`, `icorels` and `huuska`, `rudderLiftSlope` (Fujii) and `thrusterThrust`.
+
+Planing boats run on rigid bodies under a `PlaningSolver`: each boat's prismatic bottom (`{row, beam, deadrise, length, transom, forward, up, propeller, thrustAngle}`) is cut into strips across the keel, each a wedge entering the water by Zarnick's (1978) momentum theory: the rate of change of its added mass's momentum, its cross-flow drag and its buoyancy, the added masses moved to the left of the heave and pitch equations, falling to nothing at the transom by Garme's function. The body rises, trims and runs at its own attitude, and porpoises where a real boat does. Set `control(i).thrust`, read `status(i)` (trim, immersion, speed, normal force, friction, wetted lengths, resistance, airborne). Couple it before the rigid solver and give it the rigid solver's `level` (its fixedTimestep's: a 1 m model wants 1/480 s); the world needs gravity. Surge, heave and pitch only.
+
+```ts
+import {savitsky} from 'margoengine/physics/ship';
+
+// Shoemaker's planing model 29 (b 16 in, deadrise 20 degrees, 80 lb) at 18 kn in fresh water: trim 4.2 degrees and 14.7 lb
+// of drag, where the tank measured 4.0 degrees and 15.2 lb.
+const lb = 4.4482216, inch = 0.0254;
+const run = savitsky({beam: 16 * inch, deadrise: (20 * Math.PI) / 180, mass: (80 * lb) / 9.81, lcg: 18.5 * inch}, 18.01 * 0.514444,
+  {density: 999, viscosity: 1.14e-6, gravity: 9.81, roughness: 0});
+console.log(((run.trim * 180) / Math.PI).toFixed(1), (run.resistance / lb).toFixed(1)); // 4.2 14.7
+```
 
 ```ts
 import {addedResistance, irregularDriftLoads} from 'margoengine/physics/ship';

@@ -17176,6 +17176,28 @@ Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in hori
 this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
 the ship solver heels in its turn".
 
+### Planing hulls (SEA-09, `savitsky`, `planingLoads`, `PlaningSolver`, 2026-11-27)
+
+`packages/physics/src/ship/planing.ts` and `packages/physics/src/ship/planing-solver.ts`, written from:
+- D. Savitsky, "Hydrodynamic design of planing hulls", Marine Technology 1(1), 71-95, 1964, as F. Ekman, C. Naudo Ribas and
+  F. Rydelius, KTH report 2016, https://kth.diva-portal.org/smash/get/diva2:1033545/FULLTEXT01.pdf (eqs. 2.1 to 2.13), and
+  P. Ghadimi, S. Tavakoli, M. A. Feizi Chekab and A. Dashtimanesh, J. Naval Arch. Marine Eng. 12, 73-94, 2015, doi:
+  10.3329/jname.v12i2.22351 (eqs. 9 and 16 to 34) reproduce it (read); the original was not obtained. P. G. Alourdas,
+  SNAME Greek Section 2016 (pp. 3 to 5, read): Shoemaker's NACA TN 509 model 29 measured.
+- E. E. Zarnick, "A nonlinear mathematical model of motions of a planing boat in regular waves", DTNSRDC-78/032, 1978,
+  https://www.archive.org/download/nonlinearmathema00zarn/nonlinearmathema00zarn_bw.pdf (eqs. 2 to 16 and Appendix A
+  read; Appendix B, its program listing, was not opened).
+- K. Garme's transom function as P. Ghadimi, S. M. Sajedi and S. Tavakoli, Scientia Iranica B 26(3), 1316-1334, 2019
+  (eqs. 21 to 24), and R. Algarin and O. Tascon, Ship Sci. Technol. 8(15), 35-43, 2014 (eqs. 28 to 30), print it (read);
+  Garme's 2005 paper itself was not obtained.
+- G. Fridsma, "A systematic study of the rough-water performance of planing boats", Davidson Laboratory report 1275, 1969,
+  https://archive.org/details/DTIC_AD0708694 (Table 1 and Fig. 11, read from the figure): the measurements the test holds.
+- M. Martin, DTNSRDC report 76-0068, 1976 (read for Day and Haag's porpoising measure and the alternatives).
+No planing code was read. Writing Zarnick's equations in body axes on a rigid body, the strips' forward difference for
+d(m_a V)/dxi and weighting the added masses and buoyancy by Garme's function as well as the momentum forces are this
+package's own. Proof: `packages/physics/tests/ship.test.js`, "a planing hull's steady run" and "a planing boat on a rigid
+body", and `packages/physics/tests/coupling/planing.test.js`.
+
 ### A ship's mean wave drift (SEA-09, `addedResistance`, `driftLoads`, `irregularDriftLoads`, `ShipParams.waves`, 2026-11-27)
 
 `packages/physics/src/ship/waves.ts` and the waves in `packages/physics/src/ship/mmg.ts` and `solver.ts`, written from:

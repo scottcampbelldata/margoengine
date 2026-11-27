@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20757574,
+  "total": 20760416,
   "history": [
     {
       "date": "2026-10-24",
@@ -14311,6 +14311,12 @@
       "commit": "d44a80c70",
       "reason": "physics/ship 22,000 ceiling to its new size: the waves' mean drift loads (the ITTC's SNNM added resistance, the short-wave waterline reflection with its draft factor, Bretschneider's spectrum) in the MMG forces. Manoeuvring in waves is the ship's own forces; a separate entry would carry the MMG step twice. One feature of the ship entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "2cb031463",
+      "reason": "physics/ship 24,361 ceiling to its new size: planing hulls, Savitsky's steady equations and the PlaningSolver's Zarnick strips with Garme's transom. A planing boat is a ship of the same entry, sharing its errors and frame; a separate entry would save the MMG step's bytes for planing-only scenes only. One feature of the ship entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15184,7 +15190,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 24361,
+    "@margoengine/physics/ship": 27203,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,

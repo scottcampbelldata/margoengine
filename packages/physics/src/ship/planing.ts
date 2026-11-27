@@ -13,7 +13,7 @@
 // tan alpha = (pi / 2) tan tau / tan beta (Ghadimi et al. eq. 9) and reaches the chine b / 2 out.
 //
 // Measured: Shoemaker's prismatic model 29 (NACA TN 509, 1934; b 16 in, deadrise 20 degrees, 80 lb) as P. G. Alourdas,
-// SNAME Greek Section 2016, tabulates it (read): the tests' drag and trim (planing.test in tests/ship.test.js).
+// SNAME Greek Section 2016, tabulates it (read): its drag and trim are what tests/ship.test.js holds the equations to.
 import { cos, ln, pow, sin } from '@margoengine/math/pinned';
 import { shipError } from './errors.js';
 
@@ -53,10 +53,9 @@ export interface PlaningLoads {
   lambda: number;
   keel: number;
   chine: number;
-  /** C_v = V / sqrt(g b), C_Lbeta, and the dynamic part of C_Lbeta (the flat plate's 0.0120 term, deadrise-corrected). */
+  /** C_v = V / sqrt(g b), and C_Lbeta. */
   speedCoefficient: number;
   lift: number;
-  dynamic: number;
   /** Whether Savitsky's regression covers it: 0.6 <= C_v <= 13, 2 <= tau <= 15 degrees, lambda <= 4, chines wetted. */
   inRange: boolean;
 }
@@ -86,7 +85,10 @@ function water(options: PlaningWater): Required<PlaningWater> {
     gravity: options.gravity ?? 9.80665,
     roughness: options.roughness ?? 0.0004,
   };
-  if (!(w.density > 0 && w.viscosity > 0 && w.gravity > 0 && w.roughness >= 0) || !Object.values(w).every(Number.isFinite))
+  if (
+    !(w.density > 0 && w.viscosity > 0 && w.gravity > 0 && w.roughness >= 0) ||
+    !Object.values(w).every(Number.isFinite)
+  )
     throw shipError(
       `Planing water needs a density, viscosity and gravity above 0 and a roughness of 0 or more (got ${Object.values(w).join(', ')}); pass them.`,
     );
@@ -104,23 +106,19 @@ function deadriseLift(cl0: number, b: number): number {
   return cl0 > 0 ? cl0 - 0.0065 * b * pow(cl0, 0.6) : 0;
 }
 
-/**
- * The bottom's loads at a trim `trim` rad and a mean wetted length over beam `lambda`, at `speed` m/s (Savitsky 1964). An
- * `attack` rad, the bottom's own sinking or pitching over the speed, adds to the trim in the lift (quasi-steady).
- */
+/** The bottom's loads at a trim `trim` rad and a mean wetted length over beam `lambda`, at `speed` m/s (Savitsky 1964). */
 export function planingLoads(
   hull: PlaningHull,
   trim: number,
   lambda: number,
   speed: number,
-  options: PlaningWater & { readonly attack?: number } = {},
+  options: PlaningWater = {},
 ): PlaningLoads {
   check(hull);
   const w = water(options),
     b = hull.beam,
     beta = hull.deadrise * DEG,
     t = trim * DEG,
-    te = Math.max(0, (trim + (options.attack ?? 0)) * DEG),
     cv = speed / Math.sqrt(w.gravity * b),
     q = 0.5 * w.density * speed * speed,
     out: PlaningLoads = {
@@ -132,11 +130,10 @@ export function planingLoads(
       chine: 0,
       speedCoefficient: cv,
       lift: 0,
-      dynamic: 0,
       inRange: false,
     };
   if (!(lambda > 0 && t > 0 && speed > 0)) return out;
-  const [dynamic, buoyant] = plate(te, lambda, cv),
+  const [dynamic, buoyant] = plate(t, lambda, cv),
     cl0 = dynamic + buoyant,
     clb = deadriseLift(cl0, beta),
     // The deadrise's share of the dynamic part, for the bottom velocity.
@@ -149,7 +146,6 @@ export function planingLoads(
     cp = 0.75 - 1 / ((5.21 * cv * cv) / (lambda * lambda) + 2.39),
     rise = (b * sin(hull.deadrise)) / cos(hull.deadrise) / (Math.PI * (sin(trim) / ct));
   out.lift = clb;
-  out.dynamic = dyn;
   out.normal = (q * b * b * clb) / ct;
   out.friction = (0.5 * w.density * vm * vm * cf * lambda * b * b) / cos(hull.deadrise);
   out.centre = cp * lambda * b;

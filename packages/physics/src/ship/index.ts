@@ -6,6 +6,8 @@ export * from './empirical.js';
 export * from './ice.js';
 export * from './kcs.js';
 export * from './mmg.js';
+export * from './planing.js';
+export * from './planing-solver.js';
 export * from './propeller.js';
 export * from './race.js';
 export * from './resistance.js';

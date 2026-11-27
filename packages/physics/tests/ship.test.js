@@ -32,6 +32,8 @@ import {
   Propeller,
   ShipSolver,
   holtropMennen,
+  savitsky,
+  PlaningSolver,
   addedResistance,
   besselI1,
   besselK1,
@@ -1322,4 +1324,103 @@ test("KVLCC2 turns in an irregular head sea as Hasnan et al.'s free-running mode
     // 15 percent short of the measured drift (docs/limits.md), within twice its 9 percent spread between runs.
     assert.ok(drift > 0.56 * 0.8 && drift < 0.58 * 1.2, `drift ${drift}`);
   }
+});
+
+test("a planing hull's steady run by Savitsky's equations: Shoemaker's model 29 in the tank", () => {
+  // NACA TN 509 model 29 (b 16 in, deadrise 20 degrees, 80 lb, fresh water) as Alourdas 2016 tabulates it: measured trim 4.0
+  // degrees at both speeds, drag 15.20 lb at 18.01 kn and 16.0 lb at 20.92 kn.
+  const lb = 4.4482216,
+    inch = 0.0254,
+    kn = 0.514444;
+  for (const [speed, lcg, trim, drag] of [
+    [18.01, 18.5, 4.0, 15.2],
+    [20.92, 18.3, 4.0, 16.0],
+  ]) {
+    const run = savitsky({ beam: 16 * inch, deadrise: 20 * DEG, mass: (80 * lb) / 9.81, lcg: lcg * inch }, speed * kn, {
+      density: 999,
+      viscosity: 1.14e-6,
+      gravity: 9.81,
+      roughness: 0,
+    });
+    assert.ok(Math.abs(run.resistance / lb / drag - 1) < 0.04, `drag ${run.resistance / lb} lb against ${drag}`);
+    assert.ok(Math.abs(run.trim / DEG / trim - 1) < 0.15 && run.inRange, `trim ${run.trim / DEG} against ${trim}`);
+  }
+  assert.throws(
+    () => savitsky({ beam: 0.4, deadrise: 2, mass: 36, lcg: 0.47 }, 9),
+    (e) => e.code === 'unsupported' && /deadrise/.test(e.message),
+  );
+});
+
+test('a planing boat on a rigid body runs at the trim and wetted length Fridsma measured, and porpoises where his did', () => {
+  // Fridsma 1969 (Fig. 11): a prismatic model 1.143 m long, beam 0.2286 m, deadrise 20 degrees, C_Delta 0.608, pitch gyration
+  // 0.25 L, its centre of gravity 60, 65 and 70 percent of its length aft of the bow; trim, degrees, and mean wetted length
+  // over the beam, read from the figure (+-0.2 degrees, +-0.05). At 70 percent and C_v 3.99 it porpoised.
+  const g = 9.81,
+    B = 0.2286,
+    L = 5 * B,
+    beta = 20 * DEG,
+    mass = 0.608 * 999 * B ** 3,
+    hz = 480,
+    run = (aft, cv) => {
+      const lcg = (1 - aft) * L,
+        vcg = (B / 4) * Math.tan(beta),
+        V = cv * Math.sqrt(g * B),
+        t0 = 4 * DEG,
+        y0 = -0.03 + lcg * Math.sin(t0) + vcg * Math.cos(t0),
+        physics = new Physics(null, { fixedTimestep: 1 / hz, gravity: [0, -g, 0] }),
+        body = physics.addBody(null, {
+          position: [0, y0, 0],
+          rotation: [0, 0, Math.sin(t0 / 2), Math.cos(t0 / 2)],
+          linearVelocity: [V, 0, 0],
+          // A box 0.866 L long has the pitch gyration 0.25 L.
+          colliders: { shape: 'box', halfExtents: [0.433 * L, 0.02, B / 2], mass },
+        }),
+        planing = new PlaningSolver(),
+        world = new PhysicsWorld({ rate: { num: hz, den: 1 }, gravity: [0, -g, 0] })
+          .add(new RigidSolver(), { physics })
+          .add(planing, {
+            boats: [
+              { row: body.row, beam: B, deadrise: beta, length: L, transom: [-lcg, -vcg, 0], propeller: [0, 0, 0] },
+            ],
+            density: 999,
+            viscosity: 1.14e-6,
+            roughness: 0,
+            level: 3,
+          })
+          .couple(['planing', 'rigid'], 'staggered');
+      // Towed: the thrust found to hold the speed over 20 s, then held for 25 s.
+      let thrust = 0.11 * mass * g,
+        held = 0,
+        n = 0;
+      const trims = [],
+        lambdas = [];
+      for (let t = 1; t <= hz * 45; t++) {
+        const s = planing.status(0);
+        if (t < hz * 20) {
+          thrust = Math.max(0, thrust + (1.5 * mass * (V - s.speed)) / hz);
+          if (t > hz * 15) (held += thrust), n++;
+        } else if (t === hz * 20) thrust = held / n;
+        planing.control(0).thrust = thrust;
+        world.advance(t);
+        if (t > hz * 35) trims.push(planing.status(0).trim / DEG), lambdas.push(planing.status(0).lambda);
+      }
+      const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+      return { trim: mean(trims), lambda: mean(lambdas), swing: Math.max(...trims) - Math.min(...trims) };
+    };
+  for (const [aft, cv, trim, lambda] of [
+    [0.6, 2.0, 3.8, 3.95],
+    [0.6, 3.33, 4.2, 3.1],
+    [0.65, 2.0, 5.5, 3.45],
+    [0.65, 2.66, 5.7, 2.8],
+    [0.65, 3.99, 4.3, 2.45],
+    [0.7, 2.0, 8.1, 2.7],
+    [0.7, 3.33, 5.5, 2.15],
+  ]) {
+    const r = run(aft, cv);
+    assert.ok(Math.abs(r.trim / trim - 1) < 0.1, `${aft} ${cv}: trim ${r.trim} against ${trim}`);
+    assert.ok(Math.abs(r.lambda / lambda - 1) < 0.12, `${aft} ${cv}: wetted length ${r.lambda} against ${lambda}`);
+    // Day and Haag's porpoising: a pitch swing of 2 degrees or more.
+    assert.ok(r.swing < 2, `${aft} ${cv}: swings ${r.swing} degrees`);
+  }
+  assert.ok(run(0.7, 3.99).swing > 2);
 });
