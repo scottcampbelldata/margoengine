@@ -573,10 +573,14 @@ const stream = TerrainStream.attach(engine, {
   },
   async load(x, z, signal) {
     const response = await fetch(`/tiles/${x}/${z}.f32`, {signal});   // your tile server
-    return response.ok ? {heights: new Float32Array(await response.arrayBuffer())} : null;
+    if (response.status === 404) return null;                       // no data there: the tile keeps `fill`
+    if (!response.ok) throw new Error(`tile ${x},${z}: HTTP ${response.status}`); // retried, then failed
+    return {heights: new Float32Array(await response.arrayBuffer())};
   },
+  retries: 3,                                          // default 2; waits up to 250, 500, 1,000 ms (retryDelay)
 });
 engine.start();
+addEventListener('online', () => stream.retry());     // failed tiles start over when the network comes back
 await stream.ready();                                  // every tile of the first window is in
 stream.onChange((change) => console.log(change));      // bands uploaded, or the window moved (`shifted`)
 ```
@@ -596,8 +600,18 @@ stream.onChange((change) => console.log(change));      // bands uploaded, or the
   `version` follow it. For queries, build `new TerrainQuery(stream.heights, stream.columns, stream.columns,
   stream.terrain.options)` and on each `onChange` refresh it over the band, or rebuild it when `shifted`.
 - `ready(signal?)` resolves once the current window is all in (uploads go in as frames are drawn) and rejects with a
-  tile's load error; a failed tile keeps `fill` until it leaves the window. `options.signal` aborts every load.
-  `dispose()` aborts the loads and disposes the terrain.
+  tile's load error once its retries are spent; a failed tile keeps `fill` until it leaves the window or `retry()`
+  starts it over. `options.signal` aborts every load. `dispose()` aborts the loads and disposes the terrain.
+- Retries: a tile whose `load` rejects is loaded again up to `retries` times (0 to 16, default 2), retry k after a
+  random wait up to `retryDelay * 2^k` ms (default 250, capped at 30 s): exponential backoff (Metcalfe and Boggs 1976)
+  with full jitter (Brooker 2015), so tiles that failed together, or many clients after one outage, do not all ask
+  again at once. An aborted load and a tile of the wrong shape (a bug in `load`, which a retry would repeat) are not
+  retried. `retry()` starts every failed tile, and every one waiting for a retry, over at once with its full retries,
+  and returns how many; a tile leaving the window drops its wait and its count.
+  Sources: R. M. Metcalfe and D. R. Boggs, "Ethernet: Distributed Packet Switching for Local Computer Networks",
+  Communications of the ACM 19(7), 1976, https://doi.org/10.1145/360248.360253 (binary exponential backoff); M.
+  Brooker, "Exponential Backoff And Jitter", AWS Architecture Blog, 2015,
+  https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/ (full jitter against synchronised retries).
 - Memory: the window's heightmap, a scratch copy and the CPU copy, 4 bytes a texel each (12 MB at 1,024 x 1,024), plus
   three times 4 bytes a texel per weight texture. The window must fit the device's 2D texture limit.
 
@@ -607,7 +621,10 @@ in a 2 x 2 window: through moves along +X, +Z, -X and -Z, a move inside the marg
 the CPU copy, the GPU heightmap read back and the weights hold exactly the mosaic's texels for the expected tiles, the
 streamed terrain draws exactly the pixels of a plain `Terrain` given that window whole, no frame uploads more than the
 budget (16,384 texels: 17 frames for the first four tiles), and a stream disposed mid-load aborts it and rejects
-`ready` with MargoError `'disposed'` (Radeon 680M). Cost not timed.
+`ready` with MargoError `'disposed'` (Radeon 680M). Retries (2026-11-27, RTX A6000): tiles failing twice each load on
+their third try with two retries and their third try's heights are uploaded; with one retry `ready` rejects with the
+last error after two tries a tile, `retry()` starts the four over and they load; a tile of the wrong shape is tried
+once. Cost not timed.
 
 ## Sculpt and paint brushes: `@margoengine/terrain/sculpt`
 

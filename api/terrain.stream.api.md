@@ -19,6 +19,7 @@ export class TerrainStream implements EnginePlugin {
     get tile(): readonly [number, number];
     get version(): number;
     resident(x: number, z: number): boolean;
+    retry(): number;
     onChange(callback: (change: TerrainStreamChange) => void): () => void;
     ready(signal?: AbortSignal): Promise<void>;
     setup(engine: Engine): void;
@@ -47,6 +48,8 @@ export interface TerrainStreamOptions extends Omit<TerrainOptions, 'textures' | 
     readonly concurrency?: number;
     readonly fill?: number;
     readonly signal?: AbortSignal;
+    readonly retries?: number;
+    readonly retryDelay?: number;
 }
 
 export interface TerrainStreamTile {

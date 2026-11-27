@@ -63,13 +63,25 @@ export interface TerrainStreamOptions extends Omit<TerrainOptions, 'textures' | 
   readonly fill?: number;
   /** Aborts every load; no new ones start, and `ready` rejects with its reason. */
   readonly signal?: AbortSignal;
+  /**
+   * Times a tile whose `load` rejects is loaded again before it counts as failed, 0 to 16. Default 2. A tile of the
+   * wrong shape and an aborted load are not retried. `retry()` starts every failed tile over.
+   */
+  readonly retries?: number;
+  /**
+   * Base wait before a retry in milliseconds, 0 or more. Default 250. Retry k (from 0) waits a random time up to
+   * `retryDelay * 2^k`, capped at 30 s (exponential backoff with full jitter), so tiles that failed together do not
+   * all ask again at once.
+   */
+  readonly retryDelay?: number;
 }
 
 type Slot =
   | { state: 'loading'; controller: AbortController }
   | { state: 'queued'; tile: TerrainStreamTile; row: number }
   | { state: 'resident' }
-  | { state: 'failed'; error: unknown };
+  | { state: 'failed'; error: unknown }
+  | { state: 'waiting'; timer: ReturnType<typeof setTimeout> };
 interface Waiter {
   resolve(): void;
   reject(reason: unknown): void;
@@ -126,6 +138,8 @@ export class TerrainStream implements EnginePlugin {
   readonly #window: [number, number] = [0, 0];
   readonly #origin: [number, number] = [0, 0];
   readonly #slots = new Map<string, Slot>();
+  /** Retries made so far per tile in the window, cleared when it loads, leaves the window or `retry()` runs. */
+  readonly #attempts = new Map<string, number>();
   readonly #waiters = new Set<Waiter>();
   readonly #listeners = new Set<(change: TerrainStreamChange) => void>();
   #engine?: Engine;
@@ -154,11 +168,13 @@ export class TerrainStream implements EnginePlugin {
       !integer(o.budget ?? 65536, 1, 2 ** 26) ||
       !integer(o.concurrency ?? 4, 1, 64) ||
       !Number.isFinite(Math.fround(o.fill ?? 0)) ||
+      !integer(o.retries ?? 2, 0, 16) ||
+      !((o.retryDelay ?? 250) >= 0 && Number.isFinite(o.retryDelay ?? 250)) ||
       !Array.isArray(origin) ||
       !origin.every((v) => Number.isFinite(v))
     )
       throw new RangeError(
-        'Invalid terrain stream options; give tileSize above 0, tileTexels 2..1024, an even window 2..16, weights 0..4 (4 layers each), budget and concurrency (1..64) whole numbers, and a finite fill and origin.',
+        'Invalid terrain stream options; give tileSize above 0, tileTexels 2..1024, an even window 2..16, weights 0..4 (4 layers each), budget and concurrency (1..64) whole numbers, retries 0..16, a retryDelay of 0 ms or more, and a finite fill and origin.',
       );
     this.#o = o;
     this.#t = o.tileTexels;
@@ -188,6 +204,8 @@ export class TerrainStream implements EnginePlugin {
         'concurrency',
         'fill',
         'signal',
+        'retries',
+        'retryDelay',
       ],
       rest = Object.fromEntries(Object.entries(o).filter(([key]) => !own.includes(key)));
     // The terrain reads `origin` every frame; the stream moves this array's values with the window.
@@ -230,6 +248,22 @@ export class TerrainStream implements EnginePlugin {
     return this.#slots.get(x + ',' + z)?.state === 'resident';
   }
   /**
+   * Starts every failed tile of the window over, and every tile waiting for a retry at once, each with its full
+   * `retries` again (after the network comes back, say: `addEventListener('online', () => stream.retry())`). Returns how
+   * many tiles it started over; they load as frames are drawn.
+   */
+  retry(): number {
+    let count = 0;
+    for (const [key, slot] of this.#slots)
+      if (slot.state === 'failed' || slot.state === 'waiting') {
+        if (slot.state === 'waiting') clearTimeout(slot.timer);
+        this.#slots.delete(key);
+        this.#attempts.delete(key);
+        count++;
+      }
+    return count;
+  }
+  /**
    * Calls `callback` for every change to the heightmap, for a `TerrainQuery` over `heights`: refresh it over a band's
    * rectangle, or build a new one (`origin` moved) when `shifted`. Returns the remover.
    */
@@ -240,7 +274,8 @@ export class TerrainStream implements EnginePlugin {
   }
   /**
    * Resolves once every tile of the current window is loaded and uploaded (uploads go in as frames are drawn).
-   * Rejects with a tile's load error, `signal`'s or the stream's abort reason, or MargoError `'disposed'`.
+   * Rejects with a tile's load error once its `retries` are spent, `signal`'s or the stream's abort reason, or MargoError
+   * `'disposed'`.
    */
   ready(signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -315,7 +350,9 @@ export class TerrainStream implements EnginePlugin {
       const [x, z] = key.split(',').map(Number);
       if (this.#inside(x, z)) continue;
       if (slot.state === 'loading') slot.controller.abort();
+      if (slot.state === 'waiting') clearTimeout(slot.timer);
       this.#slots.delete(key);
+      this.#attempts.delete(key);
     }
     const device = this.#device!,
       encoder = device.createCommandEncoder(),
@@ -389,11 +426,12 @@ export class TerrainStream implements EnginePlugin {
       .then(
         (tile) => {
           if (this.#slots.get(key) !== slot || this.disposed) return;
+          this.#attempts.delete(key);
           this.#slots.set(key, tile ? { state: 'queued', tile: this.#check(tile), row: 0 } : { state: 'resident' });
         },
         (error) => {
           if (this.#slots.get(key) !== slot || this.disposed) return;
-          this.#slots.set(key, { state: 'failed', error });
+          this.#failed(key, error, signal.aborted);
         },
       )
       .catch((error) => {
@@ -404,6 +442,28 @@ export class TerrainStream implements EnginePlugin {
         this.#loading--;
         this.#settle();
       });
+  }
+
+  /**
+   * A load of tile `key` rejected: waits and frees the slot for #schedule to load it again while retries are left (never
+   * for an aborted load), else marks it failed. Retry k waits a random time up to retryDelay * 2^k, capped at 30 s
+   * (exponential backoff with full jitter).
+   */
+  #failed(key: string, error: unknown, aborted: boolean): void {
+    const done = this.#attempts.get(key) ?? 0;
+    if (aborted || done >= (this.#o.retries ?? 2)) {
+      this.#slots.set(key, { state: 'failed', error });
+      return;
+    }
+    this.#attempts.set(key, done + 1);
+    const wait = Math.random() * Math.min(30_000, (this.#o.retryDelay ?? 250) * 2 ** done),
+      slot: Slot = {
+        state: 'waiting',
+        timer: setTimeout(() => {
+          if (this.#slots.get(key) === slot) this.#slots.delete(key);
+        }, wait),
+      };
+    this.#slots.set(key, slot);
   }
 
   #check(tile: TerrainStreamTile): TerrainStreamTile {
@@ -559,9 +619,12 @@ export class TerrainStream implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const slot of this.#slots.values()) if (slot.state === 'loading') slot.controller.abort();
+    for (const slot of this.#slots.values())
+      if (slot.state === 'loading') slot.controller.abort();
+      else if (slot.state === 'waiting') clearTimeout(slot.timer);
     this.#settle();
     this.#slots.clear();
+    this.#attempts.clear();
     this.#listeners.clear();
     this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.terrain.dispose();

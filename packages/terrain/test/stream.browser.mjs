@@ -10,6 +10,9 @@
 // 2. the streamed terrain draws exactly the pixels of a plain Terrain given that window's heights and weights whole;
 // 3. no frame uploads more texels than the budget.
 // Then a stream disposed with a load in flight aborts the load and rejects `ready` with MargoError 'disposed'.
+// Then retries: every tile failing twice loads on its third try and `ready` resolves; with one retry, `ready` rejects with
+// the load's error after two tries each, and `retry()` starts the failed tiles over with their retries again; a tile of
+// the wrong shape is not retried.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -239,6 +242,77 @@ await runSuite(
       pending.dispose();
       await waiting;
       const disposed = { aborted: held?.aborted ?? false, rejection, terrain: pending.terrain.disposed };
+      // Retries, on a 2 x 2 window of 4 x 4 tiles: `load` fails each tile's first `fails` tries.
+      const settle = async (s) => {
+          let state = null;
+          s.ready().then(
+            () => (state = 'resolved'),
+            (e) => (state = String(e.message ?? e)),
+          );
+          for (let i = 0; i < 3000 && !state; i++) {
+            await new Promise((r) => setTimeout(r, 1));
+            reference.engine.render({ delta: 1 / 60 });
+          }
+          return state;
+        },
+        flaky = (options, fails, shape = false) => {
+          const tries = new Map(),
+            s = TerrainStream.attach(reference.engine, {
+              ...common,
+              tileSize,
+              tileTexels: 4,
+              window: 2,
+              colors,
+              retryDelay: 1,
+              ...options,
+              async load(x, z) {
+                const key = `${x},${z}`,
+                  n = (tries.get(key) ?? 0) + 1;
+                tries.set(key, n);
+                if (shape) return { heights: new Float32Array(3) };
+                if (n <= fails.count) throw new Error(`tile ${key} try ${n} failed`);
+                return { heights: new Float32Array(16).fill(n) };
+              },
+            });
+          return { s, tries };
+        };
+      const twice = flaky({ retries: 2 }, { count: 2 }),
+        twiceState = await settle(twice.s),
+        twiceTries = [...twice.tries.values()],
+        twiceResident = [0, 1].flatMap((j) =>
+          [0, 1].map((i) => twice.s.resident(twice.s.tile[0] + i, twice.s.tile[1] + j)),
+        ),
+        twiceHeight = twice.s.heights[0];
+      twice.s.dispose();
+      const failing = { count: 2 },
+        once = flaky({ retries: 1 }, failing),
+        onceState = await settle(once.s),
+        onceTries = [...once.tries.values()];
+      // The source comes back: retry() starts the four failed tiles over, which now load at their next try.
+      failing.count = 0;
+      const restarted = once.s.retry(),
+        againState = await settle(once.s),
+        againTries = [...once.tries.values()],
+        nothingLeft = once.s.retry();
+      once.s.dispose();
+      const bad = flaky({ retries: 3 }, { count: 0 }, true),
+        badState = await settle(bad.s),
+        badTries = [...bad.tries.values()];
+      bad.s.dispose();
+      const retries = {
+        twiceState,
+        twiceTries,
+        twiceResident,
+        twiceHeight,
+        onceState,
+        onceTries,
+        restarted,
+        againState,
+        againTries,
+        nothingLeft,
+        badState: badState.startsWith('Invalid terrain stream tile'),
+        badTries,
+      };
       const errors = [await streamed.engine.gpu.popErrorScope(), await reference.engine.gpu.popErrorScope()]
         .filter(Boolean)
         .map((e) => e.message);
@@ -246,7 +320,7 @@ await runSuite(
       stream.dispose();
       streamed.engine.dispose();
       reference.engine.dispose();
-      return { out, worstFrame, budget, loads, abortedOnMoves, disposed, errors };
+      return { out, worstFrame, budget, loads, abortedOnMoves, disposed, retries, errors };
     });
     assert.deepEqual(result.errors, []);
     for (const stop of result.out) {
@@ -264,6 +338,19 @@ await runSuite(
     assert.ok(result.out[0].ground > 1000, `ground drawn: ${result.out[0].ground} pixels`);
     assert.ok(result.worstFrame <= result.budget, `frame uploads within the budget: ${result.worstFrame}`);
     assert.deepEqual(result.disposed, { aborted: true, rejection: 'disposed', terrain: true });
+    const r = result.retries;
+    assert.equal(r.twiceState, 'resolved', 'two failures each, two retries: ready resolves');
+    assert.deepEqual(r.twiceTries, [3, 3, 3, 3], 'each tile loaded on its third try');
+    assert.deepEqual(r.twiceResident, [true, true, true, true]);
+    assert.equal(r.twiceHeight, 3, "the third try's heights are uploaded");
+    assert.match(r.onceState, /^tile -?\d+,-?\d+ try 2 failed$/, 'one retry: ready rejects with the last load error');
+    assert.deepEqual(r.onceTries, [2, 2, 2, 2], 'each tile tried twice');
+    assert.equal(r.restarted, 4, 'retry() starts the four failed tiles over');
+    assert.equal(r.againState, 'resolved');
+    assert.deepEqual(r.againTries, [3, 3, 3, 3]);
+    assert.equal(r.nothingLeft, 0, 'nothing failed is left to retry');
+    assert.ok(r.badState, 'a tile of the wrong shape fails');
+    assert.deepEqual(r.badTries, [1, 1, 1, 1], 'and is not retried');
     await writeFile('test-results/terrain-stream.json', JSON.stringify({ hardware, result }, null, 1));
     console.log(
       'ok terrain stream:',

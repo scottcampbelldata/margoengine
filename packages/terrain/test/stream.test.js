@@ -23,6 +23,11 @@ test('terrain streams check their options before attaching', () => {
     { concurrency: 65 },
     { fill: NaN },
     { origin: [0, Infinity] },
+    { retries: -1 },
+    { retries: 17 },
+    { retries: 1.5 },
+    { retryDelay: -1 },
+    { retryDelay: NaN },
   ])
     assert.throws(() => TerrainStream.attach(engine, { ...base, ...options }), RangeError, JSON.stringify(options));
   assert.throws(() => TerrainStream.attach(engine, { ...base, load: undefined }), TypeError);
