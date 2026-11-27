@@ -250,7 +250,11 @@ a gate passes on what its baseline records and fails on anything new or worse, n
 `readme-types`, has no baseline: every example of every package README and guide must type-check against the built
 packages (`npm run check:readmes` prints the same list; its known list only shrinks). It runs here, in every fast gate,
 because a change to one package can break another package's example while a lane runs only its own package tests; on
-2026-11-18 ten such errors were on main, seen only by the full verify after the push.
+2026-11-18 ten such errors were on main, seen only by the full verify after the push. A second strict step, `compat-routes`
+(`scripts/quality/compat-routes.js`), fails on a package source that loads a WebGL2 compatibility route with
+`loadCompatRoute` and gives callers no `ready` promise (`routeSettled` from `packages/shared/compat.js`) and no proof of
+identical frames recorded in `scripts/quality/compat-route-proofs.json`: such a package draws its first frames on the
+layer before the route arrives, and they can differ (KB-COMPAT-READY1). Its `owed` list only shrinks.
 
 | Gate | Items | Fails when |
 | --- | --- | --- |

@@ -7,11 +7,13 @@
 //   api          TSDoc on public exports; throws follow docs/conventions.md (via npm run hygiene)
 //   clean-room   no three.js / Babylon / other engines in packages/**; no unlisted third-party dependency
 //   shader-comments  comment text inside the shader strings of any package dist (scripts/shader-comments.mjs)
-// and one strict step with no baseline:
+// and strict steps with no baseline:
 //   readme-types  every README and guide example of every package type-checks (scripts/check-readme-types.mjs). It runs
 //                 here, in every fast gate, because a change to one package can break another package's example, and
 //                 a lane runs only its own package tests (2026-11-18: ten such errors reached main, caught only by the
 //                 full verify after the push). Its known list shrinks only (npm run check:readmes -- --shrink).
+//   compat-routes  every package that loads a WebGL2 route with loadCompatRoute gives a `ready` promise or a recorded
+//                 proof of identical frames (scripts/quality/compat-routes.js, KB-COMPAT-READY1); its owed list shrinks.
 // Needs `npm run build:packages` and current api/ reports (sizes, api and shader-comments read dist/).
 // Options: --gate=a,b (run some), --update (write shrunk baselines), --update --reason="..." (accept growth, logged),
 // --summary (print the biggest offenders), --details (write test-results/quality.json with every item and block).
@@ -21,6 +23,7 @@ import { readmeTypeProblems } from './check-readme-types.mjs';
 import { stalePackages } from './package-stamps.mjs';
 import { apiGate } from './quality/api.js';
 import { cleanRoomGate } from './quality/clean-room.js';
+import { compatRouteProblems } from './quality/compat-routes.js';
 import { duplicatesGate } from './quality/duplicates.js';
 import { packageList, repoFiles } from './quality/packages.js';
 import {
@@ -175,6 +178,10 @@ async function runGates() {
     'readme-types': {
       run: () => readmeTypeProblems(root).problems,
       fix: 'fix the example, or the package type it shows is wrong; npm run check:readmes prints the same list',
+    },
+    'compat-routes': {
+      run: () => compatRouteProblems(root),
+      fix: "give the package a `ready` promise (routeSettled from packages/shared/compat.js), document it and await it in the package's checks, or record a proof of identical frames in scripts/quality/compat-route-proofs.json",
     },
   };
   for (const [gate, def] of Object.entries(STRICT)) {
