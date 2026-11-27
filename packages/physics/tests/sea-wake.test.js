@@ -144,15 +144,30 @@ test('a snapshot restores the wake bit for bit, and a second run gives the same 
   assert.equal(a.w.hash(), hash, 'a restored run');
 });
 
-test('bad grids and sources are refused', () => {
-  const w = world();
-  assert.throws(() => w.add(new WakeSolver('a'), { cells: [63, 64] }), RangeError);
-  assert.throws(() => w.add(new WakeSolver('b'), { cells: [64, 64], sponge: 40 }), RangeError);
-  assert.throws(() => w.add(new WakeSolver('c'), { cellSize: 0 }), RangeError);
-  assert.throws(() => w.add(new WakeSolver('d'), { sources: [] }), TypeError);
-  const bad = new WakeSolver('e');
-  w.add(bad, { cells: [16, 16], sponge: 2, sources: () => [{ x: 0, z: 0, radius: 0, pressure: 1, volume: 0 }] });
-  assert.throws(() => w.advance(1), RangeError);
+test('wake grid, initial state and sources report coded errors with the correction', () => {
+  const stateError = (message) => ({ name: 'MargoError', code: 'state', message });
+  for (const [params, message] of [
+    [{ cells: [45, 64] }, /even nx/],
+    [{ cells: [64, 56] }, /only factors 2, 3 and 5/],
+    [{ cells: [64, 64], sponge: 40 }, /under half the grid/],
+    [{ cellSize: 0 }, /cell size is above 0/],
+    [{ centre: null }, /finite centre/],
+    [{ sources: [] }, /function of time/],
+    [{ initial: [] }, /Pass a function initial/],
+    [{ cells: [16, 16], sponge: 0, initial: () => [Infinity, 0] }, /finite numbers/],
+  ]) {
+    assert.throws(() => world().add(new WakeSolver(), params), stateError(message));
+  }
+  assert.throws(
+    () => new WakeSolver('bad-field', { name: 'height', quantity: 'height', unit: 'm' }),
+    stateError(/Use a seaSource field in SI units/),
+  );
+  const w = world().add(new WakeSolver(), {
+    cells: [16, 16],
+    sponge: 2,
+    sources: () => [{ x: 0, z: 0, radius: 0, pressure: 1, volume: 0 }],
+  });
+  assert.throws(() => w.advance(1), stateError(/finite positive radius/));
 });
 
 test('wake sources refuse non-finite radii and registry sources require the base rate', () => {

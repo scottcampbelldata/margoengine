@@ -10804,7 +10804,7 @@ The independent fixed bare KRISO container-ship (KCS) signed wave cut at 1.09864
 
 At 0.25 m per cell the original stencil gave 14.88 and 14.85 mm of profile RMS error at 14 approach lengths and 60 or 120 Hz. Refining the mesh from 0.025 to 0.0125 m vertically and 96 to 192 stations changed the reconstructed displacement from 1.6412 to 1.6449 m³, closer to the published 1.6490 m³. At eight approach lengths and 60 Hz, this mesh, eight instead of four transfer bands, and a 4 m instead of 2 m numerical sponge gave 15.34, 15.38, and 15.11 mm respectively. The subcell stencil reduced the 60 Hz error from 15.10 to 13.86 mm at eight lengths and from 14.88 to 13.60 mm at 14 lengths. Aft of x/L = 0.75 the corrected signed profile reaches 34.60 mm RMS where the measured profile gives 17.90 mm, with correlation 0.987. This residual persists with fixed physical inputs and no fitting. The linear source does not enforce impermeability of the disturbed flow at the hull. The experiment reports an unsteady wet transom flow that is outside this source model. [NMRI model particulars](https://www.nmri.go.jp/archives/institutes/fluid_performance_evaluation/cfd_rd/cfdws15/kcs_gc.html) · [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
 
-The optional sea entry is 7,817 B gzip with a 7,880 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
+The optional sea entry is 7,859 B gzip with a 7,880 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
 
 ## Node versions for test and tool scripts (scripts/support/node-compat.mjs, 2026-11-26)
 

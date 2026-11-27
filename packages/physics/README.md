@@ -3500,6 +3500,10 @@ world state (snapshot, restore, hash). `sample(x, z)` gives the wake's height, s
 to `SpectralSea` as one of its `patches` and the sea's `sample`, `elevation` and `pressure` carry it, so a hull floats on
 its own wake and on the ships around it.
 
+The solver publishes `wakeHeight` at each step as a layout-`WAKE_LAYOUT` f64 field in metres.
+`grid` gives its dimensions, spacing and first corner. Cells run along X first, then Z.
+Invalid wake parameters and sources report a `MargoError` with code `state` and a message that names the fix.
+
 ```ts
 import {SpectralSea, WakeSolver} from 'margoengine/physics/sea';
 import {PhysicsWorld} from 'margoengine/physics/world';

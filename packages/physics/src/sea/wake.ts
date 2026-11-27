@@ -50,6 +50,12 @@ import { regionWords } from '../world/memory.js';
 const PI = 3.141592653589793;
 const ORIGIN: Cell = [0, 0, 0];
 
+function wakeFftLength(length: number): boolean {
+  if (!Number.isInteger(length) || length < 4 || length > 4096) return false;
+  for (const radix of [2, 3, 5]) while (length % radix === 0) length /= radix;
+  return length === 1;
+}
+
 /** The wake's surface height, published at each step for whatever draws or reads it. */
 export const WAKE_HEIGHT_FIELD: FieldDescriptor = {
   name: 'wakeHeight',
@@ -154,7 +160,7 @@ export class WakeSolver implements Solver<WakeParams> {
    */
   constructor(id = 'wake', sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource) {
     if (sourceField && (sourceField.quantity !== 'seaSource' || sourceField.unit !== 'SI'))
-      throw new RangeError('Invalid wake source descriptor. Use a seaSource field in SI units.');
+      throw new MargoError('state', 'Invalid wake source descriptor. Use a seaSource field in SI units.');
     this.id = id;
     this.sourceField = sourceField ? Object.freeze({ ...sourceField }) : undefined;
     if (submergedSource) {
@@ -182,8 +188,7 @@ export class WakeSolver implements Solver<WakeParams> {
   }
 
   /**
-   * @throws RangeError for cells that are not an even x and lengths of factors 2, 3 and 5 (4 to 4096 each), a cell size,
-   * density or depth that is not above 0, a sponge that leaves no water, or a rate level outside 0 to 7.
+   * @throws MargoError (state) for invalid grid, water, rate or source parameters, with the correction in the message.
    */
   init(host: SolverHost, params: WakeParams = {}): void {
     const {
@@ -198,26 +203,37 @@ export class WakeSolver implements Solver<WakeParams> {
       initial,
       waterBelow = false,
     } = params;
-    if (!(cells.length === 2 && cells.every((n) => Number.isInteger(n) && n >= 4 && n <= 4096)))
-      throw new RangeError(`A wake grid has 4 to 4096 whole cells along x and z (got ${cells}); pass two.`);
+    if (!(cells?.length === 2 && wakeFftLength(cells[0]) && wakeFftLength(cells[1]) && cells[0] % 2 === 0))
+      throw new MargoError(
+        'state',
+        'Pass wake cells [nx, nz] from 4 to 4096 with only factors 2, 3 and 5 and an even nx.',
+      );
     for (const [name, value] of [
       ['cell size', cellSize],
       ['density', density],
       ['depth', depth],
     ] as const)
-      if (!(value > 0)) throw new RangeError(`A wake's ${name} is above 0 (got ${value}); pass one.`);
+      if (!(value > 0)) throw new MargoError('state', `A wake's ${name} is above 0 (got ${value}); pass one.`);
     if (!(Number.isFinite(cellSize) && Number.isFinite(density)))
-      throw new RangeError('A wake needs a finite cell size and density; pass them.');
-    if (!(centre.length === 2 && centre.every(Number.isFinite)))
-      throw new RangeError('A wake grid needs a finite centre [x, z]; pass one.');
+      throw new MargoError('state', 'A wake needs a finite cell size and density; pass them.');
+    if (!(centre?.length === 2 && Number.isFinite(centre[0]) && Number.isFinite(centre[1])))
+      throw new MargoError('state', 'A wake grid needs a finite centre [x, z]; pass one.');
     if (!(Number.isInteger(sponge) && sponge >= 0 && 2 * sponge < Math.min(cells[0], cells[1])))
-      throw new RangeError(`A wake's sponge is a whole number of cells under half the grid (got ${sponge}); pass one.`);
+      throw new MargoError(
+        'state',
+        `A wake's sponge is a whole number of cells under half the grid (got ${sponge}); pass one.`,
+      );
     if (!(Number.isInteger(rate) && rate >= 0 && rate <= 7))
-      throw new RangeError(`A wake's rate level is 0 to 7 (got ${rate}); pass one.`);
+      throw new MargoError('state', `A wake's rate level is 0 to 7 (got ${rate}); pass one.`);
     if ((this.sourceField || this.submergedSource) && rate !== 0)
-      throw new RangeError('Wake field sources use the world base rate. Set the wake and its publisher to 60 Hz.');
+      throw new MargoError(
+        'state',
+        'Wake field sources use the world base rate. Set the wake and its publisher to 60 Hz.',
+      );
     if (sources !== undefined && typeof sources !== 'function')
-      throw new TypeError('A wake takes its sources as a function of time, (t) => SeaSource[]; pass one.');
+      throw new MargoError('state', 'A wake takes its sources as a function of time, (t) => SeaSource[]; pass one.');
+    if (initial !== undefined && typeof initial !== 'function')
+      throw new MargoError('state', 'Pass a function initial(x, z) => [height, potential] or omit it for still water.');
     if (this.submergedSource && cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS)
       throw new MargoError('state', 'A projected wake supports up to 1,048,576 cells; reduce the grid dimensions.');
     this.fft = new RealFft2(cells[0], cells[1]);
@@ -232,7 +248,7 @@ export class WakeSolver implements Solver<WakeParams> {
     this.sources = sources;
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
-    if (!(this.g > 0)) throw new RangeError('A wake needs gravity; give the world a gravity above 0.');
+    if (!(this.g > 0)) throw new MargoError('state', 'A wake needs gravity; give the world a gravity above 0.');
     const n = this.nx * this.nz,
       half = this.nx / 2 + 1;
     this.height = host.allocate(`${this.id}:height`, n * 8, 'f64', WAKE_LAYOUT);
@@ -259,16 +275,14 @@ export class WakeSolver implements Solver<WakeParams> {
           r = sponge > 0 && edge < sponge ? (sponge - edge) / sponge : 0;
         this.damp[i + this.nx * j] = 3 * r * r;
       }
-    if (initial !== undefined) {
-      if (typeof initial !== 'function')
-        throw new TypeError('A wake starts from initial(x, z) => [height, potential]; pass a function or none.');
+    if (initial) {
       const h = regionWords(host.memory, this.height) as Float64Array,
         phi = regionWords(host.memory, this.potential) as Float64Array;
       for (let j = 0; j < this.nz; j++)
         for (let i = 0; i < this.nx; i++) {
           const [a, b] = initial(this.x0 + (i + 0.5) * cellSize, this.z0 + (j + 0.5) * cellSize);
           if (!(Number.isFinite(a) && Number.isFinite(b)))
-            throw new RangeError("A wake's initial height and potential are finite numbers; pass them.");
+            throw new MargoError('state', "A wake's initial height and potential are finite numbers; pass them.");
           h[i + this.nx * j] = a;
           phi[i + this.nx * j] = b;
         }
@@ -467,9 +481,12 @@ export class WakeSolver implements Solver<WakeParams> {
   private stampField(port: Port, cell: Cell, height: Float64Array): void {
     const { region } = port;
     if (region.type !== 'f64' || region.layout !== WAKE_SOURCE_LAYOUT || region.byteLength % (WAKE_SOURCE_WORDS * 8))
-      throw new RangeError('Invalid wake source layout. Use five f64 words per layout-1 source row.');
+      throw new MargoError('state', 'Invalid wake source layout. Use five f64 words per layout-1 source row.');
     if (cell.some((coordinate, i) => coordinate !== port.cell[i]))
-      throw new RangeError('Wake source coordinates use another world cell. Set the source and wake to the same cell.');
+      throw new MargoError(
+        'state',
+        'Wake source coordinates use another world cell. Set the source and wake to the same cell.',
+      );
     const words = regionWords(this.host.memory, region) as Float64Array;
     for (let at = 0; at < words.length; at += WAKE_SOURCE_WORDS) {
       const x = words[at]!;
@@ -494,7 +511,8 @@ export class WakeSolver implements Solver<WakeParams> {
         Number.isFinite(volume)
       )
     )
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'Invalid sea source. Use a finite place, a finite positive radius, and finite pressure and volume.',
       );
     wakePatch(this.patchGrid, x, z, radius, volume, h, pressure, this.press);
