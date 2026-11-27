@@ -1015,6 +1015,22 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
 7. Move FFTs to Wasm SIMD and record work counts.
 
 **Upgrade in progress.**
+- Item 2 in part. `6a73b7c01e` and `coupling/sea04-hull-boundary.test.js` check impermeable mean hull faces,
+  a prescribed oscillating hull with reciprocal pressure and signed work, heave, late registration and exact
+  replay. The work residual is 1.44e−13 J. Large advancing geometry and its Kelvin reflection remain open.
+- Item 3 measured comparison. `6a73b7c01e` and [sea04-stem](../packages/physics/scripts/sea04-stem.md) record
+  two published Wigley conditions. Fine surface sources give 16.42 and 14.53 mm at the stem against
+  43.84 and 39.94 mm measured. Depth bands give 9.52 and 9.28 mm. Wetted-side through-flow remains open.
+- Item 4 in part. `9d36eb9d75` and `sea04-cauchy-poisson.test.js` verify the finite-depth release ring against
+  a Hankel integral, with 1.20e−8 maximum normalized error and exact replay.
+- Item 6. `9d36eb9d75` and `sea-wake-breaking.test.js` check the fixed onset ratio against independently
+  observed crest cases. `coupling/sea04-foam.test.js` checks the live wake-to-foam and spray read, held
+  multi-rate deposition and exact replay. The read is diagnostic and does not simulate overturning.
+- Item 6 measured rain check. The model’s crests are 32–56 mm farther out after 0.8 s. Refining from
+  1.6 to 1 mm changes the crest positions by at most 0.25 mm. The ±40 ms observation window does not close
+  the gap. The single pressure pulse does not capture delayed drop coalescence, crown and stalk collapse.
+  [Craeye et al., 1999](https://pure.tue.nl/ws/files/1414355/Metis133016.pdf)
+  [Reproduction](../packages/physics/scripts/sea04-rain-measured.mjs)
 - Item 5. `38b0cfd3eb` and `coupling/sea04-bathymetry.test.js` check local bed depth and the live
   4:1 depth step. The reflection and transmission magnitudes are 0.33357 and 1.32693 against
   the long-wave limits 1/3 and 4/3, with 2.29e−12 J energy closure.
