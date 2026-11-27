@@ -1,6 +1,7 @@
 // Gate 3, tests floor: every package has tests that `npm run verify` runs (tests/*.test.js, packages/*/tests/*.test.js,
-// packages/*/test/*.test.js), and every public entry is imported by at least one of them (or by a helper module next to
-// them). An import counts by bare specifier ('@margoengine/x/sub'), by path to the entry's dist or src file
+// packages/*/tests/coupling/*.test.js, packages/*/test/*.test.js), and every public entry is imported by at least one
+// of them (or by a helper module next to them). An import counts by bare specifier ('@margoengine/x/sub'), by path to
+// the entry's dist or src file
 // ('packages/x/dist/sub.js', '../src/sub.ts', resolved from the test file), in static imports, import() and plain
 // strings handed to import(pathToFileURL(...)).
 // Items: `untested <package>` -> 1, `unimported <specifier>` -> 1.
@@ -9,8 +10,9 @@
 import { dirname, join, normalize } from 'node:path';
 import { readRepoFile, slash } from './packages.js';
 
-const RUN = /^(tests\/[^/]+\.test\.js|packages\/[^/]+\/tests?\/[^/]+\.test\.js)$/;
-const HELPER = /^(tests\/[^/]+|packages\/[^/]+\/tests?\/[^/]+)\.(js|mjs)$/;
+// The folders verify runs tests from (scripts/verify.mjs; tests/quality-tests-globs.test.js holds the two together).
+const RUN = /^(tests\/[^/]+\.test\.js|packages\/[^/]+\/(test|tests|tests\/coupling)\/[^/]+\.test\.js)$/;
+const HELPER = /^(tests\/[^/]+|packages\/[^/]+\/(test|tests|tests\/coupling)\/[^/]+)\.(js|mjs)$/;
 
 export function testsGate({ root, files, packages }) {
   const tests = files.filter((f) => RUN.test(f));

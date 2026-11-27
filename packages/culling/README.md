@@ -434,7 +434,7 @@ console.log(parts.isVisible(1), parts.multi); // false, and whether the ranges d
 
 `SnapshotRendering` from `margoengine/culling/snapshot` records the main pass's core draws once into a WebGPU render
 bundle and replays it every frame after that, so the CPU no longer encodes a pipeline, buffer and draw call per batch;
-only changed instance rows are uploaded, as always. Babylon.js calls this snapshot rendering.
+only changed instance rows are uploaded, as always.
 
 ```ts
 import { Engine, box, PbrMaterial } from 'margoengine/core';

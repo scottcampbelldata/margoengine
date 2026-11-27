@@ -6,6 +6,27 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: SnapshotRendering's stats lost a recording dropped before the next frame (KB-CULL-SNAPSTATS1, culling)
+
+- **Repro:** `node --test packages/culling/test/snapshot.test.js`: draw a frame that records, call `reset()` (or restore
+  the device, or dispose) and read `stats`; `recorded` was one short.
+- **Cause:** a recording is counted when the plugin next looks at the view, and `reset`, `onDeviceRestored` and
+  `dispose` threw the bundle or the view away without looking. Found writing the entry's first unit test.
+- **Fixed:** `reset` counts each view's recording before dropping it, and restore and dispose go through it.
+- **Regression test:** `packages/culling/test/snapshot.test.js`.
+
+### Fixed 2026-11-27: the tests gate did not count the coupling tests (KB-QUALITY-COUPLINGTESTS1, scripts)
+
+- **Repro:** `npm run quality -- --gate=tests` on 1806536124: nine physics entries, `tissue`, `rail`, `seismic`,
+  `lightning`, `strands`, `outdoor-sound`, `drainage-fog`, `vortices` and `aeolian`, read as imported by no test.
+- **Cause:** `npm run verify` runs `packages/*/tests/coupling/*.test.js`, and the gate's file pattern stopped at
+  `packages/*/tests/*.test.js`. The two other items were real: `@margoengine/audio/outdoor` and
+  `@margoengine/culling/snapshot` had browser checks only.
+- **Fixed:** the gate counts the coupling folder and its helpers; both entries have unit tests
+  (`packages/audio/tests/outdoor.test.js`, `packages/culling/test/snapshot.test.js`).
+- **Regression test:** `tests/quality-tests-globs.test.js` (every test folder the verify command names counts; the
+  coupling case fails on the old pattern).
+
 ### Fixed 2026-11-27: the lock left out gltf's lines and points peers, so the api gate crashed (KB-LOCK-GLTFPEERS1)
 
 - **Repro:** `node --test tests/package-lock-sync.test.js` or `npm run quality -- --gate=api` on a5342703e3: hygiene
@@ -13596,7 +13617,8 @@ Fixed 2026-11-11 (bug sweep L3b, KB1843): the gathers are now scatter as gather 
 
 ### README examples still need matching inputs and repairs
 
-**Status:** open (owner: readme runner).
+**Status:** open. The one listed example, the ragdoll's get-up, is owned by people (it needs get-up clips on a
+humanoid rig); the runner has nothing of its own left on the list.
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
   Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 101 are left there, each with its error. The voxel-pathtracer introduction now builds a complete generated model instead of fetching an absent raw array; its package regression executes the actual scene setup and the browser runner checks capture. A new failure fails the step, and

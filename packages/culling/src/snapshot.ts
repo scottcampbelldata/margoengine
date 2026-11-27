@@ -41,9 +41,9 @@ let serial = 0;
 
 /**
  * Snapshot rendering for core meshes: the main pass's draws are recorded once into a render bundle and replayed while
- * the scene's draws stay the same (Babylon.js calls this snapshot rendering). Moving, recolouring or re-materialling
- * meshes keeps the recording, since those only change instance rows, which are uploaded as always. Adding or removing a
- * mesh of a new geometry, a batch that starts or stops drawing, a geometry whose buffers are rebuilt, a mirrored or
+ * the scene's draws stay the same. Moving, recolouring or re-materialling meshes keeps the recording, since those only
+ * change instance rows, which are uploaded as always. Adding or removing a mesh of a new geometry, a batch that starts
+ * or stops drawing, a geometry whose buffers are rebuilt, a mirrored or
  * double-sided mesh appearing in a batch, a culling package redirecting a batch, a new shader variant or new bindings
  * from another package: each is seen before the draw and records again. Each view (by `RenderView.id`) keeps its own
  * recording. Runs on WebGPU and on the WebGL2 compatibility layer, which replays its recorded command list.
@@ -106,7 +106,11 @@ export class SnapshotRendering implements EnginePlugin {
   }
   /** Records every view again on its next frame. */
   reset(): void {
-    for (const state of this.views.values()) state.snapshot.bundle = undefined;
+    for (const state of this.views.values()) {
+      // A recording made since the last look is counted before it goes.
+      this.observe(state);
+      state.snapshot.bundle = undefined;
+    }
   }
   private observe(state: ViewState): void {
     const bundle = state.snapshot.bundle;
@@ -169,6 +173,7 @@ export class SnapshotRendering implements EnginePlugin {
     this.frames++;
   }
   onDeviceRestored(engine: Engine): void {
+    this.reset();
     this.views.clear();
     this.setup(engine);
   }
@@ -176,6 +181,7 @@ export class SnapshotRendering implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
+    this.reset();
     this.views.clear();
     this.engine = undefined;
   }

@@ -15901,6 +15901,27 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: SnapshotRendering's stats lost a recording dropped before the next frame (KB-CULL-SNAPSTATS1, culling)
+
+- **Repro:** `node --test packages/culling/test/snapshot.test.js`: draw a frame that records, call `reset()` (or restore
+  the device, or dispose) and read `stats`; `recorded` was one short.
+- **Cause:** a recording is counted when the plugin next looks at the view, and `reset`, `onDeviceRestored` and
+  `dispose` threw the bundle or the view away without looking. Found writing the entry's first unit test.
+- **Fixed:** `reset` counts each view's recording before dropping it, and restore and dispose go through it.
+- **Regression test:** `packages/culling/test/snapshot.test.js`.
+
+### Fixed 2026-11-27: the tests gate did not count the coupling tests (KB-QUALITY-COUPLINGTESTS1, scripts)
+
+- **Repro:** `npm run quality -- --gate=tests` on 1806536124: nine physics entries, `tissue`, `rail`, `seismic`,
+  `lightning`, `strands`, `outdoor-sound`, `drainage-fog`, `vortices` and `aeolian`, read as imported by no test.
+- **Cause:** `npm run verify` runs `packages/*/tests/coupling/*.test.js`, and the gate's file pattern stopped at
+  `packages/*/tests/*.test.js`. The two other items were real: `@margoengine/audio/outdoor` and
+  `@margoengine/culling/snapshot` had browser checks only.
+- **Fixed:** the gate counts the coupling folder and its helpers; both entries have unit tests
+  (`packages/audio/tests/outdoor.test.js`, `packages/culling/test/snapshot.test.js`).
+- **Regression test:** `tests/quality-tests-globs.test.js` (every test folder the verify command names counts; the
+  coupling case fails on the old pattern).
+
 ### Fixed 2026-11-27: the lock left out gltf's lines and points peers, so the api gate crashed (KB-LOCK-GLTFPEERS1)
 
 - **Repro:** `node --test tests/package-lock-sync.test.js` or `npm run quality -- --gate=api` on a5342703e3: hygiene
@@ -16838,6 +16859,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   found and fixed with its own regression. Two more were fixed: the material back-side check (KB-PICK-MIRRORROWS1)
   and the OIT real-file check (KB-OIT-BLENDTHICK1), both above. On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.
 
+- **Rechecked 2026-11-27 on the RTX A6000 (origin/main 8d31e3f9d5, after `npm run build:packages`):** all four pass
+  under `node scripts/run-with-timeout.mjs --max=6 --`: the clustered sphere-light check (no failures), the biomes
+  browser check, the SSAO GPU check and `sky/test/features-check.mjs sleet astro hillaire`. The failures are seen on
+  the Intel Arc 140V only, so the row waits for a run on that laptop.
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 
 - **Repro:** `node scripts/run-with-timeout.mjs -- node packages/vfx/test/flame-check.mjs --only graded` (and with
@@ -26956,6 +26981,9 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
 - **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
   results kept, watching for an `out-of-memory` error.
 
+- **Rechecked under load 2026-11-27, not reproduced:** six rounds on origin/main 8d31e3f9d5 (RTX A6000), each three GPU pages at once: two WebGL2-layer pages (ANGLE Vulkan) running `node packages/voxel-pathtracer/tests/browser-check.mjs --compat analytic viewport` beside one WebGPU page tracing the heavy `native4k largemodels` viewport cases as load; logs kept under the lane folder. All 12 layer runs read "clear glass" 1.0000
+  (sd 0, 1,861 px) and "emissive media sigma 0.125" 10.1120 (sd 0.1841); no `out-of-memory` or validation line. The row
+  stays open on the three failures of 2026-11-10 and 2026-11-11.
 ### Path tracer viewport: the converged image after a device restore differed once on the WebGL2 layer under GPU load (KB-C34h, 2026-11-11, open, not reproduced)
 
 - **Repro (not reproduced since):** `node packages/voxel-pathtracer/tests/browser-check.mjs --compat viewport`, inside
@@ -26984,6 +27012,9 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
   pixels (case 2.7 to 4.4 s). The row stays open on the one failure of 2026-11-11 and waits for a repeat's
   `restored.where` line.
 
+- **Rechecked under load 2026-11-27, not reproduced:** the same six loaded rounds as the
+  furnace entry above (12 layer runs of `--compat analytic viewport` under load): every `restored` read 0 differing
+  pixels, max 0.
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
 Release exception: SSGI multiBounce off differs below the GL calls (driver).
@@ -29481,7 +29512,8 @@ Fixed 2026-11-11 (bug sweep L3b, KB1843): the gathers are now scatter as gather 
 
 ### README examples still need matching inputs and repairs
 
-**Status:** open (owner: readme runner).
+**Status:** open. The one listed example, the ragdoll's get-up, is owned by people (it needs get-up clips on a
+humanoid rig); the runner has nothing of its own left on the list.
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
   Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 101 are left there, each with its error. The voxel-pathtracer introduction now builds a complete generated model instead of fetching an absent raw array; its package regression executes the actual scene setup and the browser runner checks capture. A new failure fails the step, and
@@ -32300,6 +32332,22 @@ depth/transform bounds and the separate hooked per-unit-transmittance route
 remain outside this repair. See [native-volume-range.md](native-volume-range.md).
 The other transport and thickness-map gaps above remain open limitations,
 not accepted proof that the renderers are equivalent.
+Measured 2026-11-27 (KB4000, lane A, 474533d24e): the direct-lit transmission residual (foreground MAE 13.06
+against Cycles direct) sits on the spheres, rows 3 to 5 of an 8 x 8 grid of the frame holding 2.0 of 2.6 million
+absolute levels. The default native route draws transmission as a tint over what is behind it and samples no
+background: the Rough Transmission row is as sharp as the smooth one, and no sphere lenses the checker as Cycles'
+solid glass does. Lensing is the glTF thin-walled rule (no KHR_materials_volume in TransmissionTest), so that part is
+Cycles', not Margo's; the roughness blur is the route's. `@margoengine/materials/transmission` already blurs the
+captured scene by roughness (transmission-pass.ts, `margoTransmissionLevel`), so the next step is the proof run with
+that installation beside the default one, then the default route's choice between them.
+
+### Open 2026-11-27: the transmission proof's viewer row is 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
+
+- **Repro:** `node scripts/reference-rendering/proof.mjs --case=transmission` on 474533d24e (RTX A6000, WebGPU):
+  `absolute: 1590949 > measured 1590947` against the sample-viewer reference (proof-contract.mjs).
+- **Cause:** not found. The frozen budget is the first measurement (batch 160); some change since moved two channel
+  levels. Next: bisect the gltf and core shader commits since the last passing proof folder in
+  `engine-bench/batch-160/transmission` (proof-native-1794448455574-24364), one build and proof run each.
 
 NVIDIA 617.42 and Intel Arc 4x MSAA blending variation remains the documented
 driver defect. AMD Radeon(TM) Graphics / RDNA 2, driver 32.0.21042.62, is the
