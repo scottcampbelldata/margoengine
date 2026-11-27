@@ -214,7 +214,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/oit API](https://margoengine.com/llms/api/oit.md): 8 entry points
 - [@margoengine/lod API](https://margoengine.com/llms/api/lod.md): 7 entry points
 - [@margoengine/culling API](https://margoengine.com/llms/api/culling.md): 12 entry points
-- [@margoengine/points API](https://margoengine.com/llms/api/points.md): 12 entry points
+- [@margoengine/points API](https://margoengine.com/llms/api/points.md): 13 entry points
 - [@margoengine/sprites API](https://margoengine.com/llms/api/sprites.md): 12 entry points
 - [@margoengine/lines API](https://margoengine.com/llms/api/lines.md): 15 entry points
 - [@margoengine/text API](https://margoengine.com/llms/api/text.md): 11 entry points
@@ -419,6 +419,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Reading the three.js parity counts](https://margoengine.com/llms/docs/three-parity-matrix.md): The table in threejs-parity.md was rewritten by feature group on 2026-10-31 and recounted on 2026-11-26: 195 features, 189 COVERED, 3…
 - [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`), one row per feature group. It is for roadmap…
 - [Toon parity, batch 194](https://margoengine.com/llms/docs/toon-parity.md): Job 1 is already implemented by `@margoengine/rigging/mtoon`, commit 1f0b43783. Reuse `MToon.attach(model)`; do not create a second…
+- [ANGLE D3D11: a draw into a fresh texture is sometimes lost while the page is being captured](https://margoengine.com/llms/docs/upstream-reports/KB-ANGLE-CAPTUREDRAW1/report.md): Goes to: ANGLE, Chromium, NVIDIA. Page: `lost-draw.html`, raw WebGL2 with no library.
 - [ANGLE D3D11 (Intel Arc): the same WebGL2 shaders and inputs give a different float result from one browser launch to the next (draft, no standalone repro yet)](https://margoengine.com/llms/docs/upstream-reports/KB-WATER-FLOODFILM-COMPAT1/report.md): Draft for the ANGLE issue tracker (and Intel). Not filed. Margo row: KB-WATER-FLOODFILM-COMPAT1 (flood film on the WebGL2 layer).
 - [WebKit (Windows build): drawImage composites an unpremultiplied ImageBitmap as premultiplied](https://margoengine.com/llms/docs/upstream-reports/KB-WEBKIT-BITMAPALPHA1/report.md): Draft for bugs.webkit.org, product WebKit, component Canvas. Not filed. Margo row: KB-WEBKIT-BITMAPALPHA1.
 - [Firefox on Windows: a WGSL function named `dx` fails to compile (DXC redefinition error)](https://margoengine.com/llms/docs/upstream-reports/KB0003/report.md): Draft for bugzilla.mozilla.org, product Core, component Graphics: WebGPU. Not filed. Margo row: KB0003 in docs/known-bugs.md.
