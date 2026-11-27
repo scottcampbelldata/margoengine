@@ -17602,6 +17602,16 @@ paper's companion code was read.
 - Own: the capsule and the ragdoll's hit boxes are put in disjoint collision groups so the walk never meets its own hit
   boxes; the slope angle is acos(n . up) of the ground the last move ended on.
 
+### SEA-12 work of a projected hull displacement
+
+V. E. Zakharov, *Stability of periodic waves of finite amplitude on the surface of a deep fluid* (1968), §2,
+uses wave energy as the Hamiltonian with gravitational potential energy quadratic in elevation. At the discrete
+finite-depth WakeSolver kick the surface potential is unchanged and height changes by dη. The added energy is
+ρg dx² Σ dη(η + dη/2). The meter applies the same depth-band projection as the receiving solver. With a straight
+impermeable quay the image domain has equal energy on either side, so the wet domain takes half of the sum.
+The test separately reads the live potential and computes its energy with the finite-depth modes k tanh(kD).
+[Zakharov](https://zakharov75.itp.ac.ru/static/local/zve75/zakharov/1968/1968-03-art3A10.10072FBF00913182.pdf)
+
 ### SEA-12 wake reflection at a straight quay
 
 Un-Ryong Rim, Jun-Bom Ko, Chol-Jun Han and Fuad-Mahfud Assidiq, *An Exact Neumann-to-Dirichlet (NtD) Boundary

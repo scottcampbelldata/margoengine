@@ -1299,6 +1299,12 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   the reviewed shot. The diagnostic changes the earlier ship motion. The archived shot has yet to be corrected
   and rendered with a resolved reflective wake.
 
+  The new prescribed-path ledger in `coupling/loads-prescribed-wake.test.js` reads the exact submerged sources
+  from an advancing HullSolver and covers 60 ticks with actual propagation. It accounts for 447.5221 J in open
+  water and 485.6044 J in the wet half of a reflecting quay, with maximum errors of 2.16×10⁻¹² J and
+  4.21×10⁻¹² J against independent water-state energy and exact replay. This accounts for work in the prescribed
+  source. The full wake reaction on free hulls and the original finite-quay render are still open.
+
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.

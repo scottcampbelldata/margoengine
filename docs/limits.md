@@ -10514,6 +10514,15 @@ The granular-flow entry is 5,965 B gzip under a 6,221 B ceiling. The plain SIMD 
 
 The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and Stage gain zero bytes.
 
+### Prescribed hull wake work (SEA-12)
+
+`PrescribedWakeWork` accounts for a single receiving wake’s submerged volume source at 60 Hz. Grid size, depth,
+  density and pose cell match WakeSolver. Add the source before the meter and the receiving wake after it.
+  Excludes separate pressure and height forcing, downstream sponge loss and other rigid or actuator work.
+  Set `mirrored` only on a symmetric straight-quay grid with mirrored state and forcing. The ledger uses one
+  forward transform per occupied depth band and one inverse transform on an active tick. The loads entry
+  measures 46,812 B gzip.
+
 ### Straight quay reflection and spray (SEA-12)
 
 `QuayWakeBoundary` mirrors both hull source layouts about a vertical wall parallel to X. The +Z half is wet.

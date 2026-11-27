@@ -101,6 +101,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   overflow. `packages/physics/tests/coupling/loads-swim-actuators.test.js` checks paired water and body impulses
   against the unshifted swimmer and verifies exact replay.
 
+### Open 2026-11-27: the ordinary hull wake pressure and projected volume do different work (KB-LOADS-WAKEWORK, physics loads)
+
+- **Repro:** In a periodic 48 × 32 finite-depth wake, drive a 2 × 1 × 1 m box (draft 0.5 m) at 1.25 m/s.
+  Over 60 ticks the free rigid hull lost 451.938 J while the wake gained 226.089 J with feedback enabled.
+- **Cause:** The triangle pressure uses the local surface rise through depth. The projected volume uses a
+  finite-depth modal transfer and normalized grid support. The pressure return is not the adjoint of that
+  source. The prescribed work meter and its live energy regression account for the source kick. Free hull
+  reaction and original-shot verification remain open.
+
 ### Open 2026-11-27: First Wake’s authored stern sweeps into the quay (KB-LOADS-FIRSTWAKEQUAY, First Wake)
 
 - **Repro:** In the archived First Wake scene, transform the Survey ship’s GLB positions by the scale and

@@ -4969,6 +4969,47 @@ faces, breaking and overtopping require their own models. The boundary acts on t
 supplied offshore sea spectrum still requires its own reflecting conditions.
 [Rim et al. (2025), §2](https://doi.org/10.1002/eng2.70041).
 
+#### Measure work from a powered hull's wake
+
+`PrescribedWakeWork` reads the same projected volume source as `WakeSolver`. Its work is the change in
+the wave's gravitational energy during the volume kick, including the kick's quadratic term.
+Add the volume publisher first, then the meter and receiving wake, in one 60 Hz staggered group.
+Use the receiving wake only for that projected source. Any separate pressure forces or additional
+wave sources need their own work measurements. Set `mirrored` to true when the source already includes
+its straight-quay image and the boundary and initial state are symmetric.
+
+```ts
+import {boxGeometry} from 'margoengine/geometry';
+import {Physics} from 'margoengine/physics';
+import {PrescribedWakeWork} from 'margoengine/physics/loads';
+import {SpectralSea, WakeSolver} from 'margoengine/physics/sea';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver, worldMemory} from 'margoengine/physics/world';
+await Physics.load();
+const density = 1024, depth = 3;
+const world = new PhysicsWorld({memory: worldMemory(false)});
+using physics = new Physics(null, {arena: world.arena, fixedTimestep: 1 / 60});
+const body = physics.addBody(null, {
+  position: [-2, 0, 0], linearVelocity: [1.25, 0, 0], enabledTranslations: [true, false, false],
+  enabledRotations: [false, false, false], colliders: {shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1024},
+});
+const geometry = boxGeometry(2, 1, 1);
+const sea = new SpectralSea({waves: {
+  frequencies: Float64Array.of(0.5), directions: Float64Array.of(0), energy: Float64Array.of(0), depth, density,
+}});
+const hull = new HullSolver('hull', {minimumRadius: 0.35, submergedAdvance: [0, 0.25, 0.5]});
+const source = hull.submergedWakeSource!;
+const meter = new PrescribedWakeWork({source, grid: {cells: [48, 32], cellSize: 0.25, centre: [0, 0], depth, density}});
+const wake = new WakeSolver('wake', undefined, source);
+world.add(new RigidSolver(), {physics}).add(hull, {
+  hulls: [{row: body.row, mesh: {vertices: geometry.positions, indices: geometry.indices}}], sea,
+  drag: false, radiation: false, addedMass: false, greenWater: false,
+}).add(meter, undefined).add(wake, meter.wakeParams({sponge: 0}))
+  .couple(['hull', 'prescribedWakeWork', 'wake', 'rigid'], 'staggered');
+world.advance(18);
+console.log(meter.work().total > 0); // true
+```
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.
