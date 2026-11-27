@@ -522,11 +522,19 @@ disposal releases them.
   camera (diffuse, glass and cloud scenes): turning 0.001 degrees per frame 2.40 / 6.08 / 5.22 before, 0.98 / 2.33 /
   1.60 now; turning 0.5 degrees per frame 2.40 / 6.05 / 5.00 before, 2.13 / 2.78 / 2.32 now. Where a move uncovers a
   surface (behind an object the camera passes) the history starts again there, so those pixels are noisier for a few
-  frames. Measured (`denoisedisocclusion`: pillars passing before a wall lit by bounce light, 1 sample per frame, a
-  4-pixel strip uncovered per frame, the same on WebGPU and the WebGL2 layer): the pixels uncovered in the last frame
-  are 6.49 from the converged image, those uncovered in the two frames before 4.74, those that keep their history
-  4.64 (one raw sample: 66.66). The gap is a darker, smoothly wrong strip, not grain, and 8 samples per frame leave
-  most of it (`docs/known-bugs.md`, under the oracle for uncovered pixels). 8 frames after the camera stops the diffuse and cloud scenes are 1.10 and 2.28 against 0.96 and 2.03 without
+  frames. The denoiser therefore filters the direct light (what the lights and the sky shine on the surfaces seen,
+  shadows included: paths with at most one scattering event) apart from the bounced light, each with its own sums,
+  variance, history and five wavelet levels. A pixel with fewer than 4 samples and no history takes a wide 7 x 7
+  first estimate of its bounced light only, so the sun's shadow edges there stay sharp. Measured
+  (`denoisedisocclusion`: pillars passing before a wall lit by bounce light, a lamp and sun stripes, 1 sample per
+  frame, a 4-pixel strip uncovered per frame): the pixels uncovered in the last frame are 6.09 from the converged
+  image, those uncovered in the two frames before 4.45, those that keep their history 4.53 (one raw sample: 66.66);
+  before the split they read 6.49, 4.74 and 4.64. Shadow edges on the uncovered pixels keep 0.725 of the converged
+  image's contrast (0.657 before). The WebGL2 layer reads 6.08, 4.45, 4.54 and 0.728. What is left of the gap is a
+  slightly darker strip, not grain (`docs/known-bugs.md`, under the oracle for uncovered pixels). The split costs 6
+  filter passes and 64 bytes a pixel (48 with a caustic chain, whose spare buffer the direct chain ends in): 127 and
+  95 MiB at 1920 x 1080. Where a caustic and a direct lane together do not fit one storage binding, the direct light
+  is filtered with the rest, as before. 8 frames after the camera stops the diffuse and cloud scenes are 1.10 and 2.28 against 0.96 and 2.03 without
   history (the glass scene 1.95 against 2.03). A camera that never moves gives the same image as before. Every camera
   pose draws its own sample sequence, so equal inputs still give equal images. Cost at 1920 x 1080: two more images of
   history, kept in two textures (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame; scenes without glass,
@@ -677,7 +685,7 @@ viewport frame in 24 ms against 9 ms.
 | Voxel data | grids plus 512-byte mixed bricks (1,024 bytes with half-block shapes) within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
 | Environment map | 8192 x 4096, and width x height x 16 bytes within the binding size (4096 x 2048 at the default) |
 | Emissive faces | their tables (12 bytes each), with the scene records, block textures and other light tables in one binding (about 11 million at the default) |
-| Viewport | every image 16 bytes per pixel within the binding size (8.3 million pixels at the default, so 3840 x 2160 is traced at its native size, denoised or not); the denoiser's two history images are textures within `maxTextureDimension2D` (8192 at the default). Larger canvases are traced at a lower resolution, keeping the aspect: `stats.requestedWidth`/`requestedHeight` give the size asked for, `stats.limitedBy` the limit that reduced it, and `traceViewportSize(width, height, device.limits, options)` predicts it |
+| Viewport | every image 16 bytes per pixel within the binding size (8.3 million pixels at the default, so 3840 x 2160 is traced at its native size, denoised or not); the denoiser's history images (two, and two for the direct light's chain) are textures within `maxTextureDimension2D` (8192 at the default); a scene with focusing materials keeps its caustic and direct sums side by side in one buffer of 32 bytes per pixel, and where that does not fit the binding size (3840 x 2160 at the default) the direct light is filtered with the rest. Larger canvases are traced at a lower resolution, keeping the aspect: `stats.requestedWidth`/`requestedHeight` give the size asked for, `stats.limitedBy` the limit that reduced it, and `traceViewportSize(width, height, device.limits, options)` predicts it |
 | Accumulation | float32 sums: refinement is expected to slow past about a million samples per pixel (not measured) |
 | GPU work a submission | at most 2^20 paths x 192 loop iterations (about 201 million path-iterations, 2^20 paths at the default 8 bounces; fewer paths at more bounces). A new tracer starts at a sixteenth of that and then sizes its row bands to what its GPU finishes in about 50 ms, measured from submission to completion (at most twice the step before). Every viewport band and every `renderImage` band is a submission of its own, so a GPU that preempts only between submissions (AMD reports packet boundaries) never holds more than one band against Windows' 2 s watchdog. Bands change no pixel's sums; sample runs follow the fixed figure, so images do not depend on the GPU's speed. A converged viewport (`maxSamples`) submits no trace work; a hidden tab draws no frames, so the viewport traces nothing there (`renderImage` keeps running until it finishes) |
 
@@ -722,7 +730,10 @@ walks, and the larger shader is slower even where there is no glass. Noise per s
 time in the material scene (about 17% more noise at equal time); the caustic scene's time was not measured. The earlier
 version also converged to a wrong image where glass rests on another model (the floor under it was black). The
 denoiser's second (caustic) chain, used only when a material can focus light (glass, or metal or a coat with roughness
-below about 0.32), adds three images of the canvas's size and six filter passes.
+below about 0.32), adds three images of the canvas's size and six filter passes. The direct chain (2026-11-26) adds
+six passes and 64 bytes a pixel, 48 beside a caustic chain (127 and 95 MiB at 1920 x 1080, 32 and 16 bytes a pixel
+for a capture, which keeps no history): the memory of the denoised rows above grows by that, and their times predate
+it (not measured again: speed work is deferred).
 
 CPU: packing that 256^3 model takes 43-59 ms (attach or a new revision); `setScene` with unchanged revisions 0.2-0.5 ms;
 a new physical sky (other turbidity, intensity or sun direction) bakes in 50-63 ms, an unchanged one 1.4-3.8 ms;
@@ -735,7 +746,8 @@ Numbers on other GPUs are not measured.
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
   camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
-  materials that focus light), a new denoised image after every restart (also one that converges in a single frame)
+  materials that focus light; the direct chain, its own history read where the last restart wrote it, and neither
+  where two lanes do not fit a binding), a new denoised image after every restart (also one that converges in a single frame)
   and when the viewport's history is kept, used or dropped, upload reuse, growth to the binding limit, disposal, device
   restore and device switch, pass order, PNG encoding with tile placement, AOV mapping, cancellation, pausing, device
   loss during a capture, and the frame uniform's lighting values; the exported defaults, `resolveTraceOptions` and
@@ -805,10 +817,12 @@ Numbers on other GPUs are not measured.
   - the viewport denoiser while the camera moves (30 frames, 1 sample each): RMS 5.47 against the converged image,
     raw frames 16.00, a still camera 2.80, the same on the WebGL2 layer (each step waits for its sample to land);
   - a camera that moves every frame and never waits for a sample (`denoisemoving`, 30 frames, steps a tenth as
-    long): RMS 4.14 against the converged image at the last position and 16.09 raw on WebGPU, 4.38 and 16.07 on the
+    long): RMS 4.24 against the converged image at the last position and 16.09 raw on WebGPU, 4.47 and 16.07 on the
     WebGL2 layer, where the frame shows the batch that landed (one raw sample at rest: 16.09);
-  - the pixels a camera move uncovers (24 frames, 1 sample each, pillars before a wall): RMS 6.49 against the
-    converged image where the last frame uncovered them, 4.74 two frames on, 4.64 where the history was kept;
+  - the pixels a camera move uncovers (24 frames, 1 sample each, pillars before a wall): RMS 6.09 against the
+    converged image where the last frame uncovered them, 4.45 two frames on, 4.53 where the history was kept, and
+    shadow edges there keep 0.725 of the converged image's contrast (the case fails below 0.68, where a filter
+    blurs the sun's stripes);
   - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path; camera motion of 2
     units with the shutter open moves a 1-unit line's centroid by 0.9977 (1) and widens its profile to a standard
     deviation of 0.6455 units (the box convolution's sqrt(5/12) = 0.6455);

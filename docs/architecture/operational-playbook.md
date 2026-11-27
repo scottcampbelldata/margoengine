@@ -11001,8 +11001,26 @@ Evidence that now exists: `packages/voxel-pathtracer/tests/browser-check.mjs den
 `test:gpu:denoise`) classes the pixels of a moving camera's last frame by when their first hit came into view and
 bounds the viewport denoiser's error on the uncovered ones against the pixels that keep their history (6.49, 4.74 and
 4.64 of 255 on an RTX A6000, the same on WebGPU and the WebGL2 layer). `denoisehistory` and this case wait for each
-step's sample to land, so both run on the layer's route. Still missing: a filter that brings the uncovered pixels to
-the level of the rest (five candidates measured worse, docs/known-bugs.md Batch 99 job 2).
+step's sample to land, so both run on the layer's route.
+
+Direct and bounced light filtered apart (KB1664, 2026-11-26). The trace kernel sums the light of paths with at most
+one scattering event apart from the rest (beside the caustic part, in the same buffer: with both, two lanes a pixel),
+and the denoiser runs a third chain on it: its own prepare, variance, history and five levels. The bounced light of a
+pixel with fewer than 4 samples and no history then takes a wide 7 x 7 first estimate, which no longer touches a
+shadow's edge. Evidence that now exists: the case reads 6.09, 4.45 and 4.53 on WebGPU, 6.08, 4.45 and 4.54 on the
+layer on ANGLE Vulkan and 6.07, 4.44 and 4.53 on ANGLE Direct3D 11 (shadow edges 0.726 there), and bounds them (6.3,
+4.6, 4.7); it measures the shadow edges on the uncovered pixels against
+the converged image (0.725 of its contrast kept, 0.728 on the layer, 0.657 before, 0.47 to 0.56 for a wide estimate of
+the whole radiance) and fails below 0.68. CPU tests hold the pass counts with and without a caustic chain, the lane
+flags, the fall back where two lanes do not fit a storage binding, and which history the direct part's prepare reads
+after a restart, a still frame and a camera move. On the layer the path state stays at 7 pages (190 words): the stored
+result holds only what the loop notes, the sums are joined at the end; the add kernel plans on the scatter tier.
+Still missing: the uncovered pixels at the level of the rest (1.34 times now); the cause of `denoisehistory` reading
+5.54 against 5.47 (docs/known-bugs.md Batch 99 job 2); a time per frame for the six passes (speed work is deferred);
+a second GPU vendor for this case; the whole `test:gpu:denoise` script on the layer inside a time limit (its two
+16,384-sample references take about 6 minutes each on the route; the cases above run there by name). `denoisemoving`
+with the direct chain reads 4.24 on WebGPU, 4.47 on the layer on ANGLE Vulkan and 4.46 on Direct3D 11 (4.14, and 4.38
+on Direct3D 11, before it).
 
 ## Voxel path tracer viewport while the camera moves on the WebGL2 layer (KB-VPT-ROUTE-MOVING, section 5 evidence, 2026-11-26)
 

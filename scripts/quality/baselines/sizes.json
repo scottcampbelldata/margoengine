@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20694800,
+  "total": 20698068,
   "history": [
     {
       "date": "2026-10-24",
@@ -14221,6 +14221,12 @@
       "commit": "89530083ef",
       "reason": "KB-INL1 part B math/helpers entry, records regenerated after the rebase",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "72be40e454",
+      "reason": "KB1664: direct light filtered apart from bounced light in the voxel path tracer's denoiser. @margoengine/voxel-pathtracer 95,364 B min+gzip against a ceiling of 94,957 B: a third filter chain's prepare flags, lane indexes, the 7 x 7 first estimate of the bounced light (spatial) and the direct sums in trace. The bytes buy the uncovered pixels' error going from 6.49 to 6.09 with shadow edges kept (0.725 of the converged contrast against 0.657). A split into its own entry would make every viewport with denoise on load a second chunk for one kernel string that shares its bindings, structs and helpers with the denoiser already in this entry.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15815,7 +15821,7 @@
     "@margoengine/voxel-net/sql-store": 1614,
     "@margoengine/voxel-net/webrtc": 7194,
     "@margoengine/voxel-net/webtransport": 6511,
-    "@margoengine/voxel-pathtracer": 94957,
+    "@margoengine/voxel-pathtracer": 98225,
     "@margoengine/voxel-pathtracer/compose": 1933,
     "@margoengine/voxel-pathtracer/denoise-ml": 7023,
     "@margoengine/voxel-pathtracer/from-engine": 1306,

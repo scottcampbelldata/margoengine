@@ -59,6 +59,7 @@ import {
   FLAG_JITTER,
   FLAG_MOTION,
   FLAG_SPLIT,
+  FLAG_DIRECT,
   FLAG_AREA,
   FLAG_CAMERA_MOTION,
   FLAG_CLEAR_GLASS,
@@ -272,6 +273,7 @@ const MOTION=${FLAG_MOTION}u;
 const JITTER=${FLAG_JITTER}u;
 const CLAMP=${FLAG_CLAMP}u;
 const SPLIT=${FLAG_SPLIT}u;
+const DIRECT=${FLAG_DIRECT}u;
 const AREA_NEE=${FLAG_AREA}u;
 const CAMERA_MOTION=${FLAG_CAMERA_MOTION}u;
 const CLEAR_GLASS=${FLAG_CLEAR_GLASS}u;
@@ -1468,15 +1470,16 @@ fn roulette(thr:ptr<function,vec3f>,bounces:u32)->bool {
 // caustic: the part of color that arrived after a diffuse-like vertex was followed by a specular or glossy one
 // (light focused by glass and mirrors onto diffuse surfaces); the denoiser filters it separately and more widely.
 // primary: 1 when the albedo and normal are the first hit's (0 when seen through glass or a mirror).
-struct Path {color:vec3f,albedo:vec3f,normal:vec3f,inv:f32,caustic:vec3f,primary:f32}
+struct Seen {albedo:vec3f,normal:vec3f,inv:f32,primary:f32}
+struct Path {color:vec3f,caustic:vec3f,direct:vec3f,seen:Seen}
 fn radiance(px:vec2u)->Path {
- var res:Path;
+ var res:Seen;
  var jit=vec2f(0.5);
  if((f.config.z&JITTER)!=0u){jit=vec2f(rand(),rand());}
  motion=1.0;
  if((f.config.z&MOTION)!=0u){motion=1.0-f.weights.z*rand();}
  let ray=cameraRay(vec2f(px)+jit);
- if(dot(ray.d,ray.d)==0.0){res.albedo=vec3f(0.0);res.primary=1.0;return res;}
+ if(dot(ray.d,ray.d)==0.0){res.albedo=vec3f(0.0);res.primary=1.0;return Path(vec3f(0.0),vec3f(0.0),vec3f(0.0),res);}
  var o=ray.o;var d=ray.d;
  var thr=vec3f(1.0);var L=vec3f(0.0);
  var medium=0u;var mInst=NONE;
@@ -1491,7 +1494,7 @@ fn radiance(px:vec2u)->Path {
  // full up to that many, each one after continues with probability 1/2).
  var nd=0u;var ns=0u;var nm=0u;var nu=0u;var nir=0u;
  var feature=true;var tint=vec3f(1.0);var primary=true;
- var diffuse=false;var focused=false;var C=vec3f(0.0);
+ var diffuse=false;var focused=false;var C=vec3f(0.0);var D=vec3f(0.0);
  // Distant-light MIS: density of the last vertex that sampled distant lights, Jacobian of the refractions since,
  // whether the chain is one light sampling also builds (smooth transmissions, mirrors inside light-sampled glass),
  // whether it has left the start vertex's own glass, and the crossings since that turned it (light sampling builds at
@@ -1505,7 +1508,7 @@ fn radiance(px:vec2u)->Path {
  var pending=false;var walking=false;var done=false;
  var wo=vec3f(0.0);var wd=vec3f(0.0);var wMedium=0u;var wInst=NONE;var wT=vec3f(1.0);var wJ=1.0;var wN=0u;var wG=NONE;
  var wEntered=false;var wIn=vec3f(0.0);var wSteps=0u;var wS=vec3f(0.0);var wWant=NONE;var wAdd=vec3f(0.0);
- var wLp=0.0;var wPdf=0.0;var wCaustic=false;
+ var wLp=0.0;var wPdf=0.0;var wCaustic=false;var wDirect=false;
  res.albedo=vec3f(1.0);res.normal=-d;res.primary=1.0;
  let limit=f.config.x*4u+16u+(f.config.x+1u)*16u;
  for(var it=0u;it<limit;it++){
@@ -1564,7 +1567,7 @@ fn radiance(px:vec2u)->Path {
    if(stop){
     walking=false;
     if(ok&&any(wT>vec3f(0.0))){
-     let add=wAdd*wT*wJ*select(1.0,power2(wLp/wJ,wPdf)/wLp,wLp>0.0);L+=add;if(wCaustic){C+=add;}
+     let add=wAdd*wT*wJ*select(1.0,power2(wLp/wJ,wPdf)/wLp,wLp>0.0);L+=add;if(wCaustic){C+=add;}else if(wDirect){D+=add;}
     }
    }
    continue;
@@ -1587,7 +1590,7 @@ fn radiance(px:vec2u)->Path {
   // Uniform fog outside volumes: the segment fades toward the fog's glow (all of it for a ray leaving the scene).
   if(f.fog.z>0.0&&medium==0u){
    let dl=length(d);let tr=select(exp(-f.fog.x*h.t*dl),0.0,h.inst==NONE);
-   let add=thr*fogGlow(d/dl)*(1.0-tr);L+=add;if(focused){C+=add;}
+   let add=thr*fogGlow(d/dl)*(1.0-tr);L+=add;if(focused){C+=add;}else if(bounces<=1u){D+=add;}
    thr*=tr;
    if(h.inst==NONE){break;}
   }
@@ -1599,7 +1602,7 @@ fn radiance(px:vec2u)->Path {
    var ts=INF;
    if(md.sigma>0.0){ts=-log(1.0-rand())/md.sigma;}
    // Emission along the segment by the track-length estimator: E[j min(ts, t)] = j (1 - e^(-sigma t)) / sigma.
-   if(any(md.emit!=vec3f(0.0))){let add=thr*md.emit*min(ts,min(h.t,1e30));L+=add;if(focused){C+=add;}}
+   if(any(md.emit!=vec3f(0.0))){let add=thr*md.emit*min(ts,min(h.t,1e30));L+=add;if(focused){C+=add;}else if(bounces<=1u){D+=add;}}
    if(md.sigma>0.0){
     if(ts<h.t){
      thr*=exp(-md.absorb*ts)*md.albedo;
@@ -1625,11 +1628,11 @@ fn radiance(px:vec2u)->Path {
    if(h.inst==NONE){
     let kept=chainOk&&chainSet&&(deflections==0u||(deflections==1u&&deflectOk&&!glassStart));
     let bg=bounces==0u&&f.background.w>0.0;
-    let add=thr*select(environment(d,select(0.0,sunPdf,kept),jChain,bounces==0u),f.background.xyz,bg);L+=add;if(focused){C+=add;}
+    let add=thr*select(environment(d,select(0.0,sunPdf,kept),jChain,bounces==0u),f.background.xyz,bg);L+=add;if(focused){C+=add;}else if(bounces<=1u){D+=add;}
     break;
    }
    if(h.inst==AREA){
-    let add=thr*areaHit(h.value,d,distance(p,lastVertex),lastPdf);L+=add;if(focused){C+=add;}
+    let add=thr*areaHit(h.value,d,distance(p,lastVertex),lastPdf);L+=add;if(focused){C+=add;}else if(bounces<=1u){D+=add;}
     if(feature){feature=false;res.albedo=tint;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
     break;
    }
@@ -1638,7 +1641,7 @@ fn radiance(px:vec2u)->Path {
    let fade=bitcast<f32>(f.limits.w);
    if(bounces==0u&&fade>0.0&&f.fog.z==0.0&&(h.inst==GROUND||f.groundFade.y>0.0)){
     let w=1.0-exp(-max(0.0,h.t*length(d)-f.groundFade.x)/fade);
-    let add=thr*w*skyBehind(d);L+=add;thr*=1.0-w;
+    let add=thr*w*skyBehind(d);L+=add;D+=add;thr*=1.0-w;
    }
    if(h.inst==GROUND){
     // The plane coordinate is known exactly. An orthographic near plane can be thousands of units away: the
@@ -1714,7 +1717,7 @@ fn radiance(px:vec2u)->Path {
     // Camera rays (nothing scattered yet) see the camera radiance when one is set.
     let e=select(m.emission,m.seen.xyz,bounces==0u&&m.seen.w>0.0);
     var lightHit=h;lightHit.t=distance(p,lastVertex);
-    let add=thr*e*emitWeight(lightHit,n,d,m.emission,lastPdf);L+=add;if(focused){C+=add;}
+    let add=thr*e*emitWeight(lightHit,n,d,m.emission,lastPdf);L+=add;if(focused){C+=add;}else if(bounces<=1u){D+=add;}
    }
    let pb=max(0.0,1.0-m.metal-m.glass);
    soft=pb>1e-6||((m.flags&SMOOTH)==0u&&m.metal>0.0);
@@ -1730,11 +1733,11 @@ fn radiance(px:vec2u)->Path {
    let lobes=select(0u,1u,nd<f.limits.x)|select(0u,2u,ns<(f.limits.y&0xffffu));
    let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk,lobes);L+=add;
    let caustic=focused||(diffuse&&!scatter&&m.metal>0.5&&m.alpha<GLOSSY);
-   if(caustic){C+=add;}
+   if(caustic){C+=add;}else if(bounces==0u){D+=add;}
    if(walk.total>0.0){
     // Walked from the next loop turn on; the path resumes after it.
     pending=true;wo=walk.o;wd=walk.d;wMedium=walk.medium;wInst=walk.mInst;wS=walk.s;wWant=walk.want;
-    wAdd=thr*walk.f;wLp=walk.lp;wPdf=walk.pdf;wCaustic=caustic;
+    wAdd=thr*walk.f;wLp=walk.lp;wPdf=walk.pdf;wCaustic=caustic;wDirect=bounces==0u;
    }
   }
   if(scatter){
@@ -1786,11 +1789,13 @@ fn radiance(px:vec2u)->Path {
   bounces++;
   if(bounces>f.config.x||!roulette(&thr,bounces)){done=true;}
  }
- res.color=L;res.caustic=C;
- if((f.config.z&CLAMP)!=0u){let l=lum(res.color);if(l>f.weights.w){res.color*=f.weights.w/l;res.caustic*=f.weights.w/l;}}
+ var got=Path(L,C,D,res);
+ if((f.config.z&CLAMP)!=0u){let l=lum(L);if(l>f.weights.w){let k=f.weights.w/l;got.color*=k;got.caustic*=k;got.direct*=k;}}
  // Finite values only (dispersive paths may carry negative channel weights; their mean is right).
- if(!all(abs(res.color)<vec3f(1e30))||!all(abs(res.caustic)<vec3f(1e30))){res.color=vec3f(0.0);res.caustic=vec3f(0.0);}
- return res;
+ if(!all(abs(got.color)<vec3f(1e30))||!all(abs(got.caustic)<vec3f(1e30))||!all(abs(got.direct)<vec3f(1e30))){
+  got.color=vec3f(0.0);got.caustic=vec3f(0.0);got.direct=vec3f(0.0);
+ }
+ return got;
 }
 
 @compute @workgroup_size(8,8) fn trace(@builtin(global_invocation_id) gid:vec3u) {
@@ -1798,19 +1803,23 @@ fn radiance(px:vec2u)->Path {
  let px=vec2u(gid.x+f.image.z,gid.y+f.image.w);
  let pixel=px.y*f.image.x+px.x;
  let slot=gid.y*f.tile.x+gid.x;
- var c=vec4f(0.0);var a=vec4f(0.0);var nn=vec4f(0.0);var cs=vec4f(0.0);
+ var c=vec4f(0.0);var a=vec4f(0.0);var nn=vec4f(0.0);var cs=vec4f(0.0);var ds=vec4f(0.0);
  let split=(f.config.z&SPLIT)!=0u;
+ let two=(f.config.z&DIRECT)!=0u;
  for(var s=0u;s<f.tile.w;s++){
   rng=hash((pixel*0x9e3779b1u)^hash(f.tile.z+s+hash(f.config.y)));
   let r=radiance(px);
-  let l=select(lum(r.color),lum(r.color-r.caustic),split);let lc=lum(r.caustic);
+  let rc=select(vec3f(0.0),r.caustic,split);let rd=select(vec3f(0.0),r.direct,two);
+  let l=lum(r.color-rc-rd);let lc=lum(r.caustic);let ld=lum(rd);
   c+=vec4f(r.color,l*l);
   cs+=vec4f(r.caustic,lc*lc);
-  a+=vec4f(r.albedo,r.inv);
-  nn+=vec4f(r.normal,r.primary);
+  ds+=vec4f(rd,ld*ld);
+  a+=vec4f(r.seen.albedo,r.seen.inv);
+  nn+=vec4f(r.seen.normal,r.seen.primary);
  }
- if(f.tile.z==0u){accum[slot]=c;albedo[slot]=a;normals[slot]=nn;if(split){caustics[slot]=cs;}}
- else{accum[slot]+=c;albedo[slot]+=a;normals[slot]+=nn;if(split){caustics[slot]+=cs;}}
+ let both=split&&two;let part=select(slot,2u*slot,both);let dpart=select(slot,2u*slot+1u,both);
+ if(f.tile.z==0u){accum[slot]=c;albedo[slot]=a;normals[slot]=nn;if(split){caustics[part]=cs;}if(two){caustics[dpart]=ds;}}
+ else{accum[slot]+=c;albedo[slot]+=a;normals[slot]+=nn;if(split){caustics[part]+=cs;}if(two){caustics[dpart]+=ds;}}
 }
 
 // Preview while the full tracer compiles (a small kernel compiles in a fraction of the time): the first hit lit by the
@@ -1965,16 +1974,56 @@ fn prevHitPoint(x:f32,y:f32,t:f32)->vec3f {
 fn albedoAt(i:u32)->vec3f {return max(albedo[i].xyz*p.sigma.w,vec3f(0.02));}
 // Variance of a pixel's mean luminance (mean c, mean squared luminance m2); from the 3x3 neighbourhood while there are
 // too few samples.
-fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
+fn causticAt(q:u32)->vec4f {return caustics[q<<((p.size.w>>7u)&1u)];}
+fn directAt(q:u32)->vec4f {return caustics[select(q,2u*q+1u,(p.size.w&2u)!=0u)];}
+fn partLum(q:u32,part:u32)->f32 {
+ let k=p.sigma.w;var lc=0.0;var ld=0.0;
+ if(part==1u||(p.size.w&2u)!=0u){lc=lum(causticAt(q).xyz*k);}
+ if(part==2u||(p.size.w&128u)!=0u){ld=lum(directAt(q).xyz*k);}
+ if(part==1u){return lc;}
+ if(part==2u){return ld;}
+ return lum(accum[q].xyz*k)-lc-ld;
+}
+fn partOf(q:u32,part:u32)->vec3f {
+ let k=p.sigma.w;var cc=vec3f(0.0);var dd=vec3f(0.0);
+ if(part==1u||(p.size.w&2u)!=0u){cc=causticAt(q).xyz*k;}
+ if(part==2u||(p.size.w&128u)!=0u){dd=directAt(q).xyz*k;}
+ if(part==1u){return cc;}
+ if(part==2u){return dd;}
+ return accum[q].xyz*k-cc-dd;
+}
+struct Local {v:f32,c:vec3f,n:f32,white:f32}
+fn spatial(g:vec2u,np:vec3f,t:f32,foot:f32,through:bool)->Local {
+ let k=p.sigma.w;let w=i32(p.size.x);let h=i32(p.size.y);
+ let pp=hitPoint(f32(g.x)+0.5,f32(g.y)+0.5,t);
+ let planar=t>0.0&&!through&&(p.size.w&4u)==0u;let plane=p.sigma.z*foot+1e-6;
+ var s0=0.0;var s1=0.0;var s2=0.0;var sc=vec3f(0.0);var sw=0.0;
+ var above=array<f32,7>();var d2=0.0;var dn=0.0;
+ for(var y=-3;y<=3;y++){var left=-1.0;for(var x=-3;x<=3;x++){
+  let qx=i32(g.x)+x;let qy=i32(g.y)+y;
+  if(qx<0||qy<0||qx>=w||qy>=h){left=-1.0;above[x+3]=-1.0;continue;}
+  let q=u32(qy*w+qx);let nq=normals[q];let lq=length(nq.xyz);let iq=albedo[q].w*k;let tq=select(0.0,1.0/iq,iq>0.0);
+  var wt=select(0.0,1.0,(t>0.0)==(tq>0.0)&&through==(nq.w*k<0.5));
+  if(planar&&wt>0.0){wt=exp(-abs(dot(np,hitPoint(f32(qx)+0.5,f32(qy)+0.5,tq)-pp))/plane);}
+  wt*=pow(max(0.0,dot(np,select(vec3f(0.0,0.0,1.0),nq.xyz/lq,lq>1e-6))),p.sigma.y);
+  let aq=albedoAt(q);let rq=partOf(q,0u);let l=lum(rq)/max(lum(aq),0.02);
+  s0+=wt;s1+=l*wt;s2+=l*l*wt;sc+=rq/aq*wt;sw+=wt*wt;
+  let on=select(-1.0,l,wt>0.5);
+  if(on>=0.0&&left>=0.0){d2+=(on-left)*(on-left);dn+=1.0;}
+  if(on>=0.0&&y>-3&&above[x+3]>=0.0){d2+=(on-above[x+3])*(on-above[x+3]);dn+=1.0;}
+  left=on;above[x+3]=on;
+ }}
+ let d=max(s0,1e-6);let m=s1/d;let v=max(0.0,s2/d-m*m);
+ return Local(v,sc/d,d*d/max(sw,1e-12),select(0.0,d2/dn/(2.0*v+1e-12),dn>=8.0));
+}
+fn variance(i:u32,c:vec3f,m2:f32,part:u32,g:vec2u)->f32 {
  let k=p.sigma.w;let n=1.0/k;let l=lum(c);let w=p.size.x;let h=p.size.y;
  var v=max(0.0,m2-l*l)/max(n-1.0,1.0);
  if(n<4.0){
   var s1=0.0;var s2=0.0;
   for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
    let q=u32(clamp(i32(g.y)+y,0,i32(h)-1))*w+u32(clamp(i32(g.x)+x,0,i32(w)-1));
-   var lq=0.0;
-   if(caustic||(p.size.w&2u)!=0u){lq=lum(caustics[q].xyz*k);}
-   if(!caustic){lq=lum(accum[q].xyz*k)-lq;}
+   let lq=partLum(q,part);
    s1+=lq;s2+=lq*lq;
   }}
   v=max(v,max(0.0,s2/9.0-(s1/9.0)*(s1/9.0)));
@@ -1985,13 +2034,15 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
  let w=p.size.x;let h=p.size.y;
  if(g.x>=w||g.y>=h){return;}
  let i=g.y*w+g.x;let k=p.sigma.w;let n=1.0/k;
- let split=(p.size.w&2u)!=0u;
- var cc=vec3f(0.0);
- if(split){cc=caustics[i].xyz*k;}
- let c=accum[i].xyz*k-cc;let a=albedoAt(i);
+ let split=(p.size.w&2u)!=0u;let lane=(p.size.w&256u)!=0u;
+ var cc=vec3f(0.0);var dd=vec3f(0.0);
+ if(split){cc=causticAt(i).xyz*k;}
+ if((p.size.w&128u)!=0u){dd=directAt(i).xyz*k;}
+ var c=accum[i].xyz*k-cc-dd;var m2=accum[i].w*k;let a=albedoAt(i);
+ if(lane){c=dd;m2=directAt(i).w*k;}
  let la=max(lum(a),0.02);
- var e=c/a;var ev=variance(i,c,accum[i].w*k,false,g.xy)/(la*la);
- if(split){dst2[i]=vec4f(cc/a,variance(i,cc,caustics[i].w*k,true,g.xy)/(la*la));}
+ var e=c/a;var ev=variance(i,c,m2,select(0u,2u,lane),g.xy)/(la*la);
+ if(split&&!lane){dst2[i]=vec4f(cc/a,variance(i,cc,causticAt(i).w*k,1u,g.xy)/(la*la));}
  let nn=normals[i].xyz;let len=length(nn);
  let inv=albedo[i].w*k;
  let t=select(0.0,1.0/inv,inv>0.0);
@@ -2000,6 +2051,9 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
  // Features seen through glass or a mirror (most samples): no plane test, the first hit's plane is not theirs.
  let through=normals[i].w*k<0.5;
  let nrm=select(vec3f(0.0,0.0,1.0),nn/len,len>1e-6);
+ var loc=Local(0.0,vec3f(0.0),0.0,0.0);
+ if(n<4.0&&!lane&&(p.size.w&128u)!=0u){loc=spatial(g.xy,nrm,t,foot,through);ev=max(ev,loc.v);}
+ var count=n;
  // Viewport history (flag 8; 16: it is valid): where the history saw the same surface (position within two footprints,
  // normals within about 25 degrees) its estimate counts as up to 32 samples (8 seen through glass or a mirror, whose
  // reflections move otherwise), fading out by 64 samples of the present (32 while the camera holds still). It is kept
@@ -2016,7 +2070,7 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
      nh=h1.y*max(0.0,1.0-n/select(32.0,64.0,(p.size.w&64u)!=0u));
      // The variance of the blend, and the luminance stop's widening for few samples (atrous) as for n + nh of them.
      let wide=(1.0+2.0/sqrt(n+nh))/(1.0+2.0/sqrt(n));
-     e=(e*n+vec3f(h0,h1.x)*nh)/(n+nh);ev*=n/(n+nh)*wide*wide;
+     e=(e*n+vec3f(h0,h1.x)*nh)/(n+nh);ev*=n/(n+nh)*wide*wide;count=n+nh;
     }
    }
    // The displayed colour's taps (combine reads them bilinearly around q) that saw no occluder in front of this
@@ -2030,12 +2084,14 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
     if(tp<=0.0||(t>0.0&&tp>0.98*d-2.0*foot)){mask|=1u<<k;}
    }
   }
-  let shown=dst[i];
-  textureStore(hout,g.xy,vec4u(packHalves(e.xy),packHalves(vec2f(e.z,min(select(32.0,8.0,through),n+nh))),
-   packHalves(shown.xy),packHalves(vec2f(shown.z,clamp(shown.w,0.0,8.0)+16.0*f32(mask)))));
+  let shown=dst[i];let kept=packHalves(vec2f(e.z,min(select(32.0,8.0,through),n+nh)));
+  if(lane){textureStore(hout,g.xy,vec4u(packHalves(e.xy),kept,pack2x16float(oct(nrm)),bitcast<u32>(t)));}
+  else{textureStore(hout,g.xy,vec4u(packHalves(e.xy),kept,
+   packHalves(shown.xy),packHalves(vec2f(shown.z,clamp(shown.w,0.0,8.0)+16.0*f32(mask)))));}
  }
- dst[i]=vec4f(e,ev);
- guide[i]=vec4f(oct(nrm),t,select(foot,-1.0,through||(p.size.w&4u)!=0u));
+ let own=min(loc.white,1.0)/count;let other=min(loc.white,1.0)/max(loc.n,1.0)+max(0.0,1.0-loc.white);
+ dst[i]=vec4f(mix(e,loc.c,own/max(own+other,1e-6)*clamp((4.0-count)/3.0,0.0,1.0)),ev);
+ if(!lane){guide[i]=vec4f(oct(nrm),t,select(foot,-1.0,through||(p.size.w&4u)!=0u));}
 }
 fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
 @compute @workgroup_size(8,8) fn atrous(@builtin(global_invocation_id) g:vec3u) {
@@ -2075,16 +2131,18 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
  var r=vec4f(sum/ws,vs/(ws*ws));
  // Last level: remodulated, with the variance of its luminance (combine weighs it against the raw mean's).
  if((p.size.w&1u)!=0u){let a=albedoAt(i);let la=max(lum(a),0.02);r=vec4f(r.xyz*a,r.w*la*la);}
+ if((p.size.w&512u)!=0u){r+=dst2[i];}
  dst[i]=r;
 }
 // The filtered estimate of pixel q (both chains, remodulated) and the variance of its luminance.
 fn filteredAt(q:u32,split:bool)->vec4f {var f=dst[q];if(split){f+=src[q];}return vec4f(f.xyz,max(f.w,0.0));}
 // The raw mean of pixel q and the variance of its luminance (regular and caustic parts, as prepare estimates them).
-fn rawAt(q:u32,split:bool,g:vec2u)->vec4f {
- let k=p.sigma.w;var cc=vec3f(0.0);var v=0.0;
- if(split){cc=caustics[q].xyz*k;v=variance(q,cc,caustics[q].w*k,true,g);}
+fn rawAt(q:u32,g:vec2u)->vec4f {
+ let k=p.sigma.w;var cc=vec3f(0.0);var dd=vec3f(0.0);var v=0.0;
+ if((p.size.w&2u)!=0u){cc=causticAt(q).xyz*k;v=variance(q,cc,causticAt(q).w*k,1u,g);}
+ if((p.size.w&128u)!=0u){dd=directAt(q).xyz*k;v+=variance(q,dd,directAt(q).w*k,2u,g);}
  let r=accum[q].xyz*k;
- return vec4f(r,v+variance(q,r-cc,accum[q].w*k,false,g));
+ return vec4f(r,v+variance(q,r-cc-dd,accum[q].w*k,0u,g));
 }
 // Whether pixel i lies on an edge of the image's features: within one pixel of another surface (sky or geometry, a
 // normal turned more than about 25 degrees, a first hit off its plane by more than two footprints), of a different
@@ -2120,12 +2178,12 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
  var d1=0.0;var d2=0.0;var vr=0.0;var vf=0.0;var ws=0.0;var ww=0.0;
  for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
   let qx=u32(clamp(i32(g.x)+x,0,i32(w)-1));let qy=u32(clamp(i32(g.y)+y,0,i32(h)-1));
-  let q=qy*w+qx;let f=filteredAt(q,split);let r=rawAt(q,split,vec2u(qx,qy));
+  let q=qy*w+qx;let f=filteredAt(q,split);let r=rawAt(q,vec2u(qx,qy));
   let wq=select(0.5,1.0,x==0)*select(0.5,1.0,y==0);
   let dl=lum(f.xyz)-lum(r.xyz);d1+=dl*wq;d2+=dl*dl*wq;vr+=r.w*wq;vf+=f.w*wq;ws+=wq;ww+=wq*wq;
  }}
  d1/=ws;d2/=ws;vr/=ws;vf/=ws;
- let f=filteredAt(i,split);let r=rawAt(i,split,g);
+ let f=filteredAt(i,split);let r=rawAt(i,g);
  // The mean difference's variance is the pixels' over the kernel's effective count (ws^2 / sum of squared weights).
  // The squared difference must exceed the variances by more where they come from few samples (and are unsure).
  let ef=f.w+max(0.0,max(d1*d1-(vr+vf)*ww/(ws*ws),d2-(2.0+8.0*p.sigma.w)*(vr+vf)));
@@ -2144,8 +2202,8 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
  let w=p.size.x;let h=p.size.y;
  if(g.x>=w||g.y>=h){return;}
  let i=g.y*w+g.x;
- // Flag 2: there is a caustic chain (src) to add.
- let split=(p.size.w&2u)!=0u;
+ // Flags 2 and 128: there are a caustic or a direct chain (src holds their sum) to add.
+ let split=(p.size.w&130u)!=0u;
  if((p.size.w&8u)==0u){
   dst2[i]=vec4f(weighed(i,g.xy,split),1.0);return;
  }

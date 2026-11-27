@@ -46,6 +46,9 @@ const traced = (device) => {
     u = new Uint32Array(frame.data);
   return { first: u[38], count: u[39], seed: u[41], flags: u[42], width: u[32], height: u[33] };
 };
+// The flags word of denoiser pass k (19 parameter blocks of 512 bytes).
+const denoiseFlags = (device, k) =>
+  new Uint32Array(device.buffers.findLast((b) => b.size === 512 * 19 && !b.destroyed).data)[(k * 512) / 4 + 3];
 const kinds = (passes) =>
   passes.map((p) =>
     p.type === 'render'
@@ -206,11 +209,19 @@ test('converged waits for the image to show on a new target: its display pipelin
   tracer.dispose();
 });
 
-test('denoising adds a prepare, five regular wavelet levels and a combine when new samples arrive', async () => {
+// Prepare, five regular levels, the direct part's prepare and its five levels, combine.
+const PLAIN = '13 dispatch',
+  // And six caustic levels.
+  FOCUSING = '19 dispatch';
+
+test('denoising adds a prepare, five wavelet levels for the bounced and for the direct light each, and a combine', async () => {
   const { tracer, frame, device } = await ready({ denoise: true, maxSamples: 2 });
-  assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3']);
-  assert.equal(traced(device).flags & 64, 0, 'diffuse only: no caustic part to split off');
-  assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3']);
+  assert.deepEqual(kinds(frame()), ['1 dispatch', PLAIN, 'draw3']);
+  assert.equal(traced(device).flags & (64 | 32768), 32768, 'the trace sums the direct part apart; no caustic part');
+  assert.equal(denoiseFlags(device, 0) & 130, 128, 'diffuse only: a direct chain, no caustic chain');
+  assert.equal(denoiseFlags(device, 12) & 256, 256, 'the direct part has a prepare pass of its own');
+  assert.equal(denoiseFlags(device, 17) & 513, 1, 'its last level remodulates; there is no caustic result to add');
+  assert.deepEqual(kinds(frame()), ['1 dispatch', PLAIN, 'draw3']);
   assert.deepEqual(kinds(frame()), ['draw3'], 'converged: the denoised image is reused');
   tracer.dispose();
 });
@@ -218,7 +229,7 @@ test('denoising adds a prepare, five regular wavelet levels and a combine when n
 test('a restarted image is denoised even when its first frame reaches the sample count of the last one', async () => {
   // maxSamples 1: every new image converges in one frame, at the count the previous image was denoised at.
   const { tracer, frame } = await ready({ denoise: true, maxSamples: 1 });
-  assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3']);
+  assert.deepEqual(kinds(frame()), ['1 dispatch', PLAIN, 'draw3']);
   assert.deepEqual(kinds(frame()), ['draw3'], 'converged');
   for (const [name, change] of [
     ['reset', () => tracer.reset()],
@@ -226,7 +237,7 @@ test('a restarted image is denoised even when its first frame reaches the sample
     ['resetOptions', () => tracer.resetOptions(['seed'])],
   ]) {
     change();
-    assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3'], `${name}: the new samples are denoised`);
+    assert.deepEqual(kinds(frame()), ['1 dispatch', PLAIN, 'draw3'], `${name}: the new samples are denoised`);
     assert.deepEqual(kinds(frame()), ['draw3'], `${name}: converged`);
   }
   tracer.dispose();
@@ -235,8 +246,10 @@ test('a restarted image is denoised even when its first frame reaches the sample
 test('materials that focus light add six caustic levels and their buffers; a diffuse scene drops them', async () => {
   const glass = simpleScene({ materials: [{ id: 1, color: [0.9, 0.9, 0.9], type: 'glass' }] }),
     { tracer, frame, device } = await ready({ denoise: true, scene: glass });
-  assert.deepEqual(kinds(frame()), ['1 dispatch', '13 dispatch', 'draw3']);
-  assert.equal(traced(device).flags & 64, 64, 'the trace splits off the caustic part');
+  assert.deepEqual(kinds(frame()), ['1 dispatch', FOCUSING, 'draw3']);
+  assert.equal(traced(device).flags & (64 | 32768), 64 | 32768, 'the trace splits off the caustic and the direct part');
+  assert.equal(denoiseFlags(device, 0) & 130, 130, 'a caustic chain and a direct chain');
+  assert.equal(denoiseFlags(device, 17) & 513, 513, "the direct chain's last level adds the caustic result");
   const withChain = tracer.stats.gpuBytes;
   for (const [name, material] of [
     ['rough metal', { type: 'metal', roughness: 0.5 }],
@@ -244,16 +257,57 @@ test('materials that focus light add six caustic levels and their buffers; a dif
     ['diffuse', { type: 'diffuse' }],
   ]) {
     tracer.setScene(simpleScene({ revision: 2, materials: [{ id: 1, color: [0.5, 0.5, 0.5], ...material }] }));
-    assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3'], name);
+    assert.deepEqual(kinds(frame()), ['1 dispatch', PLAIN, 'draw3'], name);
   }
-  assert.equal(withChain - tracer.stats.gpuBytes, 3 * 64 * 48 * 16, 'three images fewer');
+  // With the caustic chain: two lanes and the chain's two buffers (the direct chain ends in one of them). Without:
+  // the direct part's lane and a buffer for its chain.
+  assert.equal(withChain - tracer.stats.gpuBytes, 2 * 64 * 48 * 16, 'two images fewer');
   for (const material of [
     { type: 'metal', roughness: 0.2 },
     { type: 'plastic', roughness: 0.1 },
   ]) {
     tracer.setScene(simpleScene({ revision: 3, materials: [{ id: 1, color: [0.5, 0.5, 0.5], ...material }] }));
-    assert.deepEqual(kinds(frame()), ['1 dispatch', '13 dispatch', 'draw3'], material.type);
+    assert.deepEqual(kinds(frame()), ['1 dispatch', FOCUSING, 'draw3'], material.type);
   }
+  tracer.dispose();
+});
+
+test('where two lanes a pixel do not fit a storage binding the direct part is filtered with the rest', async () => {
+  // 64 x 48 pixels of 16 bytes: one image fits the binding, the two lanes of a caustic and a direct part do not.
+  const limit = 64 * 48 * 16 * 1.5,
+    glass = simpleScene({ materials: [{ id: 1, color: [0.9, 0.9, 0.9], type: 'glass' }] });
+  for (const [scene, passes, flags, chains] of [
+    // No caustic part: the direct part has the lane to itself.
+    [simpleScene(), PLAIN, 32768, 128],
+    [glass, '13 dispatch', 64, 2],
+  ]) {
+    const h = fakeEngine(fakeDevice({ maxStorageBufferBindingSize: limit })),
+      { tracer, frame, device } = await ready({ denoise: true, scene }, h);
+    assert.deepEqual(kinds(frame()), ['1 dispatch', passes, 'draw3']);
+    assert.equal(traced(device).flags & (64 | 32768), flags, 'the parts summed apart');
+    assert.equal(denoiseFlags(device, 0) & 130, chains);
+    assert.equal(denoiseFlags(device, 18) & 130, chains, 'combine adds the chains prepare split off');
+    tracer.dispose();
+  }
+});
+
+test("the direct part's history is read where the last restart wrote it, and written beside it", async () => {
+  const { tracer, frame, camera } = await ready({ denoise: true });
+  // The bind group of the direct part's prepare (the seventh dispatch of the denoiser's pass).
+  const group = () => {
+    const c = frame()[1].commands,
+      at = c.reduce((a, x, i) => (x[0] === 'dispatchWorkgroups' ? [...a, i] : a), [])[6];
+    return c.findLast((x, i) => i < at && x[0] === 'setBindGroup')[2];
+  };
+  const first = group(),
+    second = group();
+  assert.notEqual(second, first, 'the first frame wrote the history the second reads');
+  assert.notEqual(second.entries[9].resource, first.entries[9].resource);
+  assert.equal(group(), second, 'still: the same history, the estimate written beside it is scratch');
+  camera.position = [21, 14, 24];
+  assert.equal(group(), second, 'a camera move reads it once more and writes the next');
+  assert.equal(group(), first, 'which the frames after read');
+  assert.equal(group(), first);
   tracer.dispose();
 });
 
@@ -261,10 +315,10 @@ test('the viewport denoiser keeps history across camera moves and while still; o
   const { tracer, frame, device, camera } = await ready({ denoise: true });
   // Flags of the prepare (first) and combine (last) passes: 8 keep, 16 use, 64 restarted.
   const history = () => {
-    const u = new Uint32Array(device.buffers.findLast((b) => b.size === 512 * 13 && !b.destroyed).data),
-      first = u[3] & 120,
-      last = u[(12 * 512) / 4 + 3] & 120;
+    const first = denoiseFlags(device, 0) & 120,
+      last = denoiseFlags(device, 18) & 120;
     assert.equal(first, last, 'prepare and combine agree');
+    assert.equal(denoiseFlags(device, 12) & 120, first, "and the direct part's prepare");
     return first;
   };
   frame();
@@ -568,7 +622,8 @@ for (const work of [undefined, 1])
       );
     }
     assert.ok(device.submits > 4, 'four tiles traced');
-    if (work !== undefined) assert.ok(device.submits > 4 * 1024 / 8, 'the forced budget split each tile into 8-row bands');
+    if (work !== undefined)
+      assert.ok(device.submits > (4 * 1024) / 8, 'the forced budget split each tile into 8-row bands');
     assert.equal(
       tracer.stats.gpuBytes,
       h.device.buffers.filter((b) => !b.destroyed).reduce((n, b) => n + b.size, 0) +

@@ -1332,7 +1332,8 @@ window.check={
  // frame, so every frame uncovers a strip of wall and floor beside each pillar, which has no history to reproject.
  // Pixels of the last frame are classed by when their first hit came into view (first-hit maps of the cameras of the
  // last frames): `fresh` in this frame, `young` in the two before, `kept` earlier. 8-bit RGB RMS of each class against
- // the converged image, denoised and raw. `picture`: the last denoised frame and the classes, as PNGs.
+ // the converged image, denoised and raw; and how sharp the shadow edges on the uncovered pixels stay (`shadowEdges`).
+ // `picture`: the last denoised frame and the classes, as PNGs.
  async denoisedisocclusion(picture=false){
   await frames(1);
   const W=canvas.width,H=canvas.height,steps=24,at=(k)=>[[-6+0.5*k,7,34],[-6+0.5*k,6,0]];
@@ -1374,6 +1375,17 @@ window.check={
   const rms=(a,c)=>{let s=0,n=0;for(let i=0;i<W*H;i++){if(cls[i]!==c)continue;for(let k=0;k<3;k++){s+=(a[i*4+k]-ref[i*4+k])**2;n++;}}return {pixels:n/3,rms:Math.sqrt(s/Math.max(n,1))};};
   const out={errors:errors.splice(0)};
   for(const [name,c] of [['fresh',1],['young',2],['kept',3]]){const d=rms(moving,c);out[name]={pixels:d.pixels,rms:d.rms,raw:rms(raw,c).rms};}
+  // Shadow edges on the uncovered pixels (the sun's stripes across the floor and the wall): neighbours, both fresh or
+  // young, whose luminances differ by 12 of 255 or more in the converged image. `kept`: the share of those steps the
+  // frame shows (1: as sharp as the converged image; a filter that blurs the stripes there loses it).
+  const lumAt=(a,i)=>0.2126*a[i*4]+0.7152*a[i*4+1]+0.0722*a[i*4+2],bare=(i)=>cls[i]===1||cls[i]===2;
+  const edges=(a)=>{let num=0,den=0,pairs=0;
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++)for(const j of [1,W]){const i=y*W+x,k=i+j;
+    if((j===1&&x+1>=W)||k>=W*H||!bare(i)||!bare(k))continue;
+    const d=lumAt(ref,k)-lumAt(ref,i);if(Math.abs(d)<12)continue;
+    num+=Math.sign(d)*(lumAt(a,k)-lumAt(a,i));den+=Math.abs(d);pairs++;}
+   return {pairs,kept:num/Math.max(den,1)};};
+  out.shadowEdges={...edges(moving),raw:edges(raw).kept};
   if(picture){
    const png=async(data)=>{const c=new OffscreenCanvas(W,H);c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data),W,H),0,0);return toBase64(await c.convertToBlob({type:'image/png'}));};
    const shade=new Uint8Array(W*H*4);for(let i=0;i<W*H;i++){shade.set([[0,0,0],[255,60,60],[255,200,60],[90,90,90]][cls[i]],i*4);shade[i*4+3]=255;}

@@ -1,5 +1,5 @@
 // The viewport's traced size within the device's limits: every storage buffer holds one 16-byte-per-pixel image (the
-// denoiser's history is in two textures), so a denoised viewport is traced at the size an undenoised one is; the
+// denoiser's history is in textures: two, and two for the direct part's chain), so a denoised viewport is traced at the size an undenoised one is; the
 // history textures stay within maxTextureDimension2D; stats report the requested size and the limit that reduced it.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -32,7 +32,7 @@ test('denoised viewport keeps every storage binding within the device limit, at 
     'no live storage buffer exceeds the binding limit',
   );
   const history = device.textures.filter((t) => !t.destroyed && t.width === 256);
-  assert.equal(history.length, 2, 'two history textures of the viewport size');
+  assert.equal(history.length, 4, "history textures of the viewport size: two, and the direct part's two");
   assert.ok(history.every((t) => t.format === 'rgba32uint'));
   tracer.dispose();
   assert.ok(

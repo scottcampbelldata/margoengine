@@ -12,6 +12,7 @@ import {
   VoxelPathTracer,
 } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
+import { planCompute } from '@margoengine/webgl2-compat/compute';
 
 const attach = (options = {}, harness = fakeEngine()) => ({
   tracer: VoxelPathTracer.attach(harness.engine, { scene: simpleScene(), ...options }),
@@ -639,10 +640,15 @@ test("on the WebGL2 layer trace compiles as the route's staged fragment programs
   };
   const layer = await compiled({ vendor: 'margo-webgl2', architecture: 'webgl2' }),
     sums = layer.modules.find((code) => code.includes('struct Sums'));
-  assert.equal(layer.finish.fragment.targets.length, 4, 'one draw writes all four sums');
+  assert.equal(layer.finish.fragment.targets.length, 5, 'one draw writes all five sums');
   assert.ok(sums.includes('zLoad(g)'), 'the sums read the finished path state of each sample');
   assert.ok(!/\baccum\b/.test(sums), 'the fragment shader stores nothing');
   assert.ok(layer.modules.some((code) => code.includes('fn add')));
+  // The add kernel stores a caustic and a direct lane of one buffer: it reads both before it stores either, or the
+  // layer would run it one invocation at a time in JavaScript ("reads back 'caustics' after storing to it").
+  const add = planCompute({ source: layer.modules.find((code) => code.includes('fn add')), entryPoint: 'add' });
+  assert.equal(add.tier, 'scatter', add.reason);
+  assert.equal(add.targets.find((t) => t.name === 'caustics').stores, 8, 'two lanes of four words');
   for (const stage of ['hit', 'vertex', 'surface', 'shadow'])
     assert.ok(
       layer.draws.some((d) => d.label === `voxel-pathtracer ${stage}`),

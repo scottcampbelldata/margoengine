@@ -13,7 +13,16 @@ import { fakeDevice, fakeEngine, settle, simpleScene } from './support.js';
 function compatDevice() {
   const device = fakeDevice(),
     encoder = device.createCommandEncoder,
-    record = (commands) => new Proxy({}, { get: (_, name) => (...args) => void commands.push([name, ...args]) });
+    record = (commands) =>
+      new Proxy(
+        {},
+        {
+          get:
+            (_, name) =>
+            (...args) =>
+              void commands.push([name, ...args]),
+        },
+      );
   device.adapterInfo = { vendor: 'margo-webgl2', architecture: 'webgl2', device: 'test', description: 'test' };
   device.createCommandEncoder = (d) => {
     const e = encoder(d);
@@ -28,7 +37,12 @@ function compatDevice() {
 // Two eyes a few centimetres apart, as an XR session draws them, each into its own target of the same size.
 function eyes(ids = ['xr-0', 'xr-1']) {
   return ids.map((id, i) => {
-    const camera = new Camera({ position: [20 + i * 0.064, 14, 24], target: [4 + i * 0.064, 3, 4], near: 0.1, far: 500 });
+    const camera = new Camera({
+      position: [20 + i * 0.064, 14, 24],
+      target: [4 + i * 0.064, 3, 4],
+      near: 0.1,
+      far: 500,
+    });
     return { id, camera };
   });
 }
@@ -52,7 +66,12 @@ function drawViews(h, tracer, views, delta = 1 / 60) {
 for (const compat of [false, true])
   test(`two alternating views each accumulate their own image (${compat ? 'WebGL2 route' : 'WebGPU'})`, async () => {
     const h = fakeEngine(compat ? compatDevice() : fakeDevice()),
-      tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), maxSamples: 6, samplesPerFrame: 1, denoise: false });
+      tracer = VoxelPathTracer.attach(h.engine, {
+        scene: simpleScene(),
+        maxSamples: 6,
+        samplesPerFrame: 1,
+        denoise: false,
+      });
     try {
       await tracer.ready;
       const views = eyes(),
@@ -77,30 +96,35 @@ for (const compat of [false, true])
 for (const compat of [false, true])
   test(`a view not drawn for a while is released with its buffers; the plain frame keeps its own image (${compat ? 'WebGL2 route' : 'WebGPU'})`, async () => {
     const h = fakeEngine(compat ? compatDevice() : fakeDevice()),
-      tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), maxSamples: 3, samplesPerFrame: 1, denoise: false }),
+      tracer = VoxelPathTracer.attach(h.engine, {
+        scene: simpleScene(),
+        maxSamples: 3,
+        samplesPerFrame: 1,
+        denoise: false,
+      }),
       image = 64 * 48 * 16,
       live = () => h.device.buffers.filter((b) => !b.destroyed && b.size === image).length,
-      // The route's sums: four rgba32float targets a view, and its scratch set.
+      // The route's sums: five rgba32float targets a view, and its scratch set.
       sums = () => h.device.textures.filter((t) => !t.destroyed && t.format === 'rgba32float').length;
     try {
       await tracer.ready;
       const views = eyes(),
         plain = { id: undefined, camera: h.camera };
-      for (let i = 0; i < 80 && !(tracer.stats.samples === 3 && sums() === (compat ? 16 : 0)); i++) {
+      for (let i = 0; i < 80 && !(tracer.stats.samples === 3 && sums() === (compat ? 20 : 0)); i++) {
         drawViews(h, tracer, [plain, ...views]);
         for (let k = 0; k < 20; k++) await settle();
       }
       assert.equal(tracer.stats.samples, 3);
       // Three images (accum, albedo, normals each): the plain frame and two views.
       assert.equal(live(), 9, 'one set of image buffers per view');
-      if (compat) assert.equal(sums(), 16, "each view's sums are its own");
+      if (compat) assert.equal(sums(), 20, "each view's sums are its own");
       // The views stop (the XR session ended); the plain frame goes on and keeps its image.
       for (let i = 0; i < 10; i++) {
         drawViews(h, tracer, [plain]);
         for (let k = 0; k < 5; k++) await settle();
       }
       assert.equal(live(), 3, "the stopped views' image buffers are destroyed");
-      if (compat) assert.equal(sums(), 8, "the stopped views' sums are destroyed");
+      if (compat) assert.equal(sums(), 10, "the stopped views' sums are destroyed");
       assert.equal(tracer.stats.samples, 3, 'the plain frame kept its samples');
       // A restart (reset) reaches every view, drawn or not.
       tracer.reset();
@@ -115,7 +139,12 @@ for (const compat of [false, true])
 
 test('reset and setScene restart every view, not only the one drawn last', async () => {
   const h = fakeEngine(),
-    tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), maxSamples: 4, samplesPerFrame: 1, denoise: false });
+    tracer = VoxelPathTracer.attach(h.engine, {
+      scene: simpleScene(),
+      maxSamples: 4,
+      samplesPerFrame: 1,
+      denoise: false,
+    });
   try {
     await tracer.ready;
     const views = eyes();
@@ -140,7 +169,12 @@ test('reset and setScene restart every view, not only the one drawn last', async
 // and drew it by target pixel, so a view showed part of its image stretched over its rectangle.
 test('views side by side in one target each trace and draw their own rectangle', async () => {
   const h = fakeEngine(),
-    tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), maxSamples: 2, samplesPerFrame: 1, denoise: false });
+    tracer = VoxelPathTracer.attach(h.engine, {
+      scene: simpleScene(),
+      maxSamples: 2,
+      samplesPerFrame: 1,
+      denoise: false,
+    });
   try {
     await tracer.ready;
     const [left, right] = eyes(['left', 'right']);

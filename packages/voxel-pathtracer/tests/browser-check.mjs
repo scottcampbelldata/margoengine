@@ -762,12 +762,24 @@ try {
       delete report.results.denoisedisocclusion.pictures;
     }
     assert.deepEqual(r.errors, []);
+    console.log(
+      `  shadow edges on the uncovered pixels (${r.shadowEdges.pairs} pairs): ${r.shadowEdges.kept.toFixed(3)} of the converged image's contrast (raw frame ${r.shadowEdges.raw.toFixed(3)})`,
+    );
     assert.ok(r.fresh.pixels >= 1500 && r.young.pixels >= 1500, 'uncovered strips: enough pixels to measure');
-    // Measured 6.49, 4.74 and 4.64 (raw frame 66.66), the same on WebGPU and on the WebGL2 layer. Five candidate
-    // filters for the uncovered pixels read 6.60 to 9.64 (docs/known-bugs.md, Batch 99 job 2).
+    // Measured 6.09, 4.45 and 4.53 (raw frame 66.66) with the direct light filtered apart from the bounced light, whose
+    // first estimate is wide where a pixel has no history (KB1664; docs/known-bugs.md, Batch 99 job 2). Before: 6.49,
+    // 4.74 and 4.64, and five candidate filters of the whole radiance read 6.60 to 9.64.
     assert.ok(r.fresh.rms <= r.fresh.raw / 6, 'uncovered pixels: the denoiser removes most of one raw sample');
-    assert.ok(r.fresh.rms <= r.kept.rms * 1.6, 'uncovered pixels: within reach of the pixels that keep their history');
-    assert.ok(r.young.rms <= r.kept.rms * 1.25, 'two frames after: as the pixels that keep their history');
+    assert.ok(r.fresh.rms <= 6.3, 'uncovered pixels: the error with the direct light filtered apart');
+    assert.ok(r.young.rms <= 4.6, 'two frames after: the error with the direct light filtered apart');
+    assert.ok(r.kept.rms <= 4.7, 'pixels that keep their history: no worse for the split');
+    assert.ok(r.fresh.rms <= r.kept.rms * 1.45, 'uncovered pixels: within reach of the pixels that keep their history');
+    assert.ok(r.young.rms <= r.kept.rms * 1.1, 'two frames after: as the pixels that keep their history');
+    // The sun's stripes stay sharp where the camera uncovers them: 0.725 of the converged image's contrast. A wide
+    // first estimate of the whole radiance kept 0.47 to 0.56 of it (and read 7.4 to 7.5 on the uncovered pixels), the
+    // filter before the split 0.657.
+    assert.ok(r.shadowEdges.pairs >= 200, 'uncovered strips: enough shadow edges to measure');
+    assert.ok(r.shadowEdges.kept >= 0.68, 'uncovered pixels: shadow edges are not blurred');
   }
   if (wanted('motion')) {
     const r = await run('motion');

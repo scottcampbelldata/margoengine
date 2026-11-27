@@ -1,21 +1,36 @@
 // The voxel path tracer's route on the WebGL2 compatibility layer, loaded by import() only there (the WebGL2 roadmap,
-// "Package routes"). `trace` stores four vec4 sums per pixel and adds to them, which would put it on the layer's CPU tier,
+// "Package routes"). `trace` stores five vec4 sums per pixel and adds to them, which would put it on the layer's CPU tier,
 // and the scatter tier would run the whole path once per stored word. Here the WebGPU kernel's path loop runs as a
 // sequence of fragment programs cut from its own text (compat-staged.ts: one traversal a program, which Direct3D's
-// shader compiler needs), its state kept in rgba32uint pages between them; the last program adds the samples into four
+// shader compiler needs), its state kept in rgba32uint pages between them; the last program adds the samples into five
 // rgba32float targets, and a small kernel adds those into the image buffers, where the WebGPU kernel stores them. The
 // CPU drives the loop: it reads a census back between windows of iterations (no synchronous read, so no GPU stall) and
 // stops recording once every path of a part has finished. Every other kernel runs as it stands on the layer's own tiers.
 import { FRAME, TRACE } from './shaders.js';
-import { FLAG_SPLIT } from './layout.js';
+import { FLAG_DIRECT, FLAG_SPLIT } from './layout.js';
 import { LAYERS, liveSteps, loopLimit, stagedTrace, type Stage, type StagedTrace } from './compat-staged.js';
 
 declare const GPUShaderStage: { FRAGMENT: number; COMPUTE: number };
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number; COPY_SRC: number; COPY_DST: number };
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number; QUERY_RESOLVE: number };
+declare const GPUTextureUsage: {
+  TEXTURE_BINDING: number;
+  RENDER_ATTACHMENT: number;
+  COPY_SRC: number;
+  COPY_DST: number;
+};
+declare const GPUBufferUsage: {
+  UNIFORM: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  MAP_READ: number;
+  QUERY_RESOLVE: number;
+};
 declare const GPUMapMode: { READ: number };
 
-/** Adds one dispatch's sums into the image buffers as `trace` does on WebGPU: a run's first samples replace them. */
+/**
+ * Adds one dispatch's sums into the image buffers as `trace` does on WebGPU: a run's first samples replace them. With
+ * a caustic and a direct part `caustics` holds two lanes a pixel (caustic, then direct); both are read before either
+ * is stored, so the layer plans the kernel on its scatter tier (a read after a store would be its CPU tier).
+ */
 export const ADD = /* wgsl */ `${FRAME}
 @group(0) @binding(0) var<uniform> f:Frame;
 @group(0) @binding(1) var<storage,read_write> accum:array<vec4f>;
@@ -26,6 +41,7 @@ export const ADD = /* wgsl */ `${FRAME}
 @group(1) @binding(1) var sumA:texture_2d<f32>;
 @group(1) @binding(2) var sumN:texture_2d<f32>;
 @group(1) @binding(3) var sumS:texture_2d<f32>;
+@group(1) @binding(4) var sumD:texture_2d<f32>;
 @compute @workgroup_size(8,8) fn add(@builtin(global_invocation_id) g:vec3u) {
  if(g.x>=f.tile.x||g.y>=f.tile.y){return;}
  let slot=g.y*f.tile.x+g.x;
@@ -34,7 +50,13 @@ export const ADD = /* wgsl */ `${FRAME}
  accum[slot]=select(accum[slot],vec4f(0.0),first)+textureLoad(sumC,t,0);
  albedo[slot]=select(albedo[slot],vec4f(0.0),first)+textureLoad(sumA,t,0);
  normals[slot]=select(normals[slot],vec4f(0.0),first)+textureLoad(sumN,t,0);
- if((f.config.z&${FLAG_SPLIT}u)!=0u){caustics[slot]=select(caustics[slot],vec4f(0.0),first)+textureLoad(sumS,t,0);}
+ let split=(f.config.z&${FLAG_SPLIT}u)!=0u;let two=(f.config.z&${FLAG_DIRECT}u)!=0u;
+ let both=split&&two;let part=select(slot,2u*slot,both);let dpart=select(slot,2u*slot+1u,both);
+ var cs=vec4f(0.0);var ds=vec4f(0.0);
+ if(split&&!first){cs=caustics[part];}
+ if(two&&!first){ds=caustics[dpart];}
+ if(split){caustics[part]=cs+textureLoad(sumS,t,0);}
+ if(two){caustics[dpart]=ds+textureLoad(sumD,t,0);}
 }
 `;
 
@@ -47,7 +69,7 @@ export interface TraceInputs {
   readonly materials: GPUBuffer;
   readonly env: GPUBuffer;
   readonly tables: GPUBuffer;
-  /** accum, albedo, normals, caustics. */
+  /** accum, albedo, normals, caustics (the caustic and the direct part: with both, two lanes a pixel). */
   readonly images: readonly GPUBufferBinding[];
 }
 
@@ -58,6 +80,8 @@ export interface RouteKernel {
 }
 
 const SUMS = 'rgba32float',
+  // The sums a pixel has: colour, albedo, normal, the caustic part and the direct part.
+  SUM_COUNT = 5,
   STATE = 'rgba32uint',
   // Marks the paths every program skips (the census writes 1 where a path finished an iteration ago).
   MARK = 'stencil8',
@@ -89,7 +113,12 @@ const SUMS = 'rgba32float',
  * PART_PATHS paths or PART_BYTES of state. Parts change no value: a path's state is its own, and `finish` adds a
  * band's samples in sample order whichever part traced them.
  */
-export function partPlan(width: number, rows: number, count: number, pathBytes: number): { rows: number; samples: number } {
+export function partPlan(
+  width: number,
+  rows: number,
+  count: number,
+  pathBytes: number,
+): { rows: number; samples: number } {
   const cap = Math.max(1, Math.min(Math.floor(PART_PATHS * 1.5), Math.floor(PART_BYTES / pathBytes)));
   let bands = Math.max(1, Math.round((width * rows) / PART_PATHS));
   while (bands < rows && width * Math.ceil(rows / bands) > cap) bands++;
@@ -117,7 +146,7 @@ interface Pages {
   markView: GPUTextureView;
 }
 
-/** Four rgba32float targets of a size: `finish` reads one set and draws into another, the add kernel reads them. */
+/** Five rgba32float targets of a size: `finish` reads one set and draws into another, the add kernel reads them. */
 interface SumsTargets {
   width: number;
   height: number;
@@ -194,7 +223,7 @@ export class TraceRoute {
       entries: [buffer(0, 'uniform', C), ...[1, 2, 3, 4].map((b) => buffer(b, 'storage', C))],
     });
     this.#sumsLayout = device.createBindGroupLayout({
-      entries: [0, 1, 2, 3].map((binding) => ({
+      entries: [...Array(SUM_COUNT).keys()].map((binding) => ({
         binding,
         visibility: C | F,
         texture: { sampleType: 'unfilterable-float' as const },
@@ -221,9 +250,15 @@ export class TraceRoute {
     const steps = new Uint32Array((this.#staged.kinds * this.#staged.pages * SLOT) / 4);
     for (let q = 0; q < this.#staged.kinds; q++)
       for (let p = 0; p < this.#staged.pages; p++) steps.set([q, p], ((q * this.#staged.pages + p) * SLOT) / 4);
-    this.#steps = device.createBuffer({ size: steps.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.#steps = device.createBuffer({
+      size: steps.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     device.queue.writeBuffer(this.#steps, 0, steps);
-    this.#parts = device.createBuffer({ size: PART_SLOTS * SLOT, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.#parts = device.createBuffer({
+      size: PART_SLOTS * SLOT,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.#stepGroup = device.createBindGroup({
       layout: this.#stepLayout,
       entries: [
@@ -240,7 +275,10 @@ export class TraceRoute {
     this.#censusModule = device.createShaderModule({ code: this.#staged.census });
     const ks = new Uint32Array((CENSUS_SLOTS * SLOT) / 4);
     for (let j = 0; j < CENSUS_SLOTS; j++) ks[(j * SLOT) / 4] = j * STEP;
-    this.#censusK = device.createBuffer({ size: ks.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.#censusK = device.createBuffer({
+      size: ks.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     device.queue.writeBuffer(this.#censusK, 0, ks);
     this.#readback = device.createBuffer({
       label: 'voxel-pathtracer census',
@@ -290,7 +328,7 @@ export class TraceRoute {
               module,
               entryPoint: 'stage',
               targets: finish
-                ? [{ format: SUMS }, { format: SUMS }, { format: SUMS }, { format: SUMS }]
+                ? Array.from({ length: SUM_COUNT }, () => ({ format: SUMS as GPUTextureFormat }))
                 : Array.from({ length: LAYERS }, () => ({ format: STATE as GPUTextureFormat })),
               ...(tables ? { constants: { TABLES: 1 } } : {}),
             },
@@ -356,14 +394,14 @@ export class TraceRoute {
     return this.#queries;
   }
 
-  // Four sums targets of at least `width` x `height`, made again when `held` is smaller.
+  // Five sums targets of at least `width` x `height`, made again when `held` is smaller.
   #sumsTargets(held: SumsTargets | undefined, width: number, height: number): SumsTargets {
     if (held && held.width >= width && held.height >= height) return held;
     const device = this.#device,
       w = Math.max(width, held?.width ?? 0),
       h = Math.max(height, held?.height ?? 0);
     for (const t of held?.textures ?? []) t.destroy();
-    const textures = [0, 1, 2, 3].map(() =>
+    const textures = [...Array(SUM_COUNT).keys()].map(() =>
         device.createTexture({
           label: 'voxel-pathtracer sums',
           size: [w, h],
@@ -520,9 +558,10 @@ export class TraceRoute {
     // compute dispatch is submitted inside the frame that records it: `onSubmittedWorkDone` asked right after that frame
     // covers them (KB-L6b-ti: they waited for a microtask, and a frame loop then saw each batch land a frame later).
     // The frame uniform as written for this dispatch, copied now: it decides the light kinds drawn (liveSteps).
-    const steps = (this.#device as unknown as { voxelTraceEveryKind?: boolean }).voxelTraceEveryKind === true
-        ? this.#staged.steps
-        : liveSteps(this.#staged, frame?.slice(0)),
+    const steps =
+        (this.#device as unknown as { voxelTraceEveryKind?: boolean }).voxelTraceEveryKind === true
+          ? this.#staged.steps
+          : liveSteps(this.#staged, frame?.slice(0)),
       start = () => this.#run(kernel, inputs, width, rows, count, maxBounces, check, key, add, steps),
       job = this.#pending ? this.#queue.then(start) : start(),
       settled = () => {
@@ -568,7 +607,9 @@ export class TraceRoute {
         const early = checked.early ? horizon.early + 1 : 0;
         this.#horizons.set(
           maxBounces,
-          early >= SHRINK ? { iterations: horizon.iterations - WINDOW, early: 0 } : { iterations: horizon.iterations, early },
+          early >= SHRINK
+            ? { iterations: horizon.iterations - WINDOW, early: 0 }
+            : { iterations: horizon.iterations, early },
         );
       }
     }
@@ -790,7 +831,7 @@ export class TraceRoute {
         pass.draw(3);
         pass.end();
         // The rows just written go back to `sums`.
-        for (let k = 0; k < 4; k++)
+        for (let k = 0; k < SUM_COUNT; k++)
           e.copyTextureToTexture(
             { texture: scratch.textures[k], origin: [0, row0, 0] },
             { texture: sums.textures[k], origin: [0, row0, 0] },

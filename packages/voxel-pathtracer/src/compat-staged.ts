@@ -27,7 +27,7 @@ export interface StagedTrace {
   readonly modules: Readonly<Record<Stage, string>>;
   /** Pages of path state (LAYERS layers of 4 words each). */
   readonly pages: number;
-  /** The pages each program writes (`finish` writes the four sums instead). */
+  /** The pages each program writes (`finish` writes the five sums instead). */
   readonly writes: Readonly<Record<Stage, readonly number[]>>;
   /** Words of path state. */
   readonly words: number;
@@ -111,7 +111,13 @@ const SUN_OFF = 'sunCell=false;';
 const ENTRY = '@compute @workgroup_size(8,8) fn trace(@builtin(global_invocation_id) gid:vec3u) {';
 const SEED = 'rng=hash((pixel*0x9e3779b1u)^hash(f.tile.z+s+hash(f.config.y)));';
 const SAMPLE = 'let r=radiance(px);';
-const SPLIT_FLAG = 'let split=(f.config.z&SPLIT)!=0u;';
+// How radiance ends: `res` (a `Seen`: what the loop noted as it went) joined to the sums as `got`, so a path's state
+// holds the sums once (L, C and D) and not a second time in its stored result; and its return before the loop.
+const RETURN = 'return got;',
+  EARLY = 'return Path(vec3f(0.0),vec3f(0.0),vec3f(0.0),res);';
+const SPLIT_FLAG = 'let split=(f.config.z&SPLIT)!=0u;',
+  // The direct part is summed apart too (a fifth sum).
+  DIRECT_FLAG = 'let two=(f.config.z&DIRECT)!=0u;';
 const IMAGES = /@group\(0\) @binding\((6|7|8|10)\) var<storage,read_write> \w+:array<vec4f>;\n/g;
 // Declarations whose type the initializer does not show.
 const HINTS: Record<string, string> = {
@@ -548,11 +554,12 @@ export function stagedTrace(source: string): StagedTrace {
     lClose = matching(rbody, li + LOOP.length - 1),
     body = rbody.slice(li + LOOP.length, lClose),
     after = rbody.slice(lClose + 1).trimEnd();
-  if (!after.endsWith('return res;') || /\b(for|while|loop)\b/.test(body)) throw stale('the path loop');
-  const epilogue = after.slice(0, -'return res;'.length);
+  if (!after.endsWith(RETURN) || /\b(for|while|loop)\b/.test(body)) throw stale('the path loop');
+  const epilogue = after.slice(0, -RETURN.length);
+  unique(rbody.slice(0, li), EARLY);
   unique(rbody.slice(0, li), LIMIT);
   const known = new Map<string, string>([['px', 'vec2u']]),
-    pro = hoist(rbody.slice(0, li).replace('return res;', '{z_fin=true;break;}'), known, T);
+    pro = hoist(rbody.slice(0, li).replace(EARLY, '{z_fin=true;break;}'), known, T);
 
   // hit | vertex | (the call of direct) | post.
   const hi = unique(body, HIT_END) + HIT_END.length,
@@ -610,6 +617,7 @@ export function stagedTrace(source: string): StagedTrace {
     ri2 = unique(entry, SAMPLE) + SAMPLE.length;
   unique(entry, SEED);
   unique(entry, SPLIT_FLAG);
+  unique(entry, DIRECT_FLAG);
   const accumulate = entry.slice(ri2, entry.indexOf('\n }', ri2));
 
   // The state: control words first (every program writes them), then the path, then the light kind's scratch.
@@ -805,25 +813,27 @@ ${unpackPath}${nonFields.map((d) => ` var ${d.name}:${d.type};\n`).join('')} ${S
  return zStore(S,zstep.page);
 `),
     // The sums so far (the samples before s0, from the previous part) plus these n samples, in sample order.
-    finish = `${prefix}${state}struct Sums {@location(0) c:vec4f,@location(1) a:vec4f,@location(2) n:vec4f,@location(3) s:vec4f}
+    finish = `${prefix}${state}struct Sums {@location(0) c:vec4f,@location(1) a:vec4f,@location(2) n:vec4f,@location(3) s:vec4f,@location(4) d:vec4f}
 @group(3) @binding(0) var zsc:texture_2d<f32>;
 @group(3) @binding(1) var zsa:texture_2d<f32>;
 @group(3) @binding(2) var zsn:texture_2d<f32>;
 @group(3) @binding(3) var zss:texture_2d<f32>;
+@group(3) @binding(4) var zsd:texture_2d<f32>;
 @fragment fn stage(@builtin(position) at:vec4f)->Sums {
  let gid=vec2u(at.xy);
  let zl=vec2u(gid.x,gid.y-zpart.row0);
- var c=vec4f(0.0);var a=vec4f(0.0);var nn=vec4f(0.0);var cs=vec4f(0.0);
- if(zpart.s0>0u){let t=vec2i(gid);c=textureLoad(zsc,t,0);a=textureLoad(zsa,t,0);nn=textureLoad(zsn,t,0);cs=textureLoad(zss,t,0);}
+ var c=vec4f(0.0);var a=vec4f(0.0);var nn=vec4f(0.0);var cs=vec4f(0.0);var ds=vec4f(0.0);
+ if(zpart.s0>0u){let t=vec2i(gid);c=textureLoad(zsc,t,0);a=textureLoad(zsa,t,0);nn=textureLoad(zsn,t,0);cs=textureLoad(zss,t,0);ds=textureLoad(zsd,t,0);}
  ${SPLIT_FLAG}
+ ${DIRECT_FLAG}
  for(var zv=0u;zv<zpart.n;zv++){
   let g=vec2i(vec2u((zv%zpart.sx)*f.tile.x+zl.x,(zv/zpart.sx)*zpart.rows+zl.y));
   let S=zLoad(g);
-  var res=S.res;let L=S.L;let C=S.C;
+  var res=S.res;let L=S.L;let C=S.C;let D=S.D;
   ${epilogue}
-  let r=res;${accumulate}
+  let r=got;${accumulate}
  }
- return Sums(c,a,nn,cs);
+ return Sums(c,a,nn,cs,ds);
 }
 `;
   const modules: Record<Stage, string> = {

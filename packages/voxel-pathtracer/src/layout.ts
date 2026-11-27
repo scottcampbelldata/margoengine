@@ -31,7 +31,8 @@ export const FLAG_SUN = 1,
   FLAG_SUN_DIFFUSE = 2048,
   FLAG_NO_SUN_MEDIA = 4096,
   FLAG_HIDE_SUN = 8192,
-  FLAG_NO_COMPENSATION = 16384;
+  FLAG_NO_COMPENSATION = 16384,
+  FLAG_DIRECT = 32768;
 
 const f32 = new Float32Array(1),
   u32 = new Uint32Array(f32.buffer);

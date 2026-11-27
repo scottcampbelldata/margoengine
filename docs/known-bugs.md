@@ -11476,12 +11476,41 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   estimate that keeps the variance, weighted by estimated errors with a successive-difference test for structure
   (von Neumann 1941, <https://doi.org/10.1214/aoms/1177731677>): 6.64 (3.69, 12.85); it removes the darkening (mean
   -0.27) and lowers the wall by 10 to 16 percent, but blurs the sun stripes in the strip (the two frames after: 7.05
-  to 8.51 there). None beats the filter as it is, so none landed; the case's bounds (uncovered at most 1.6 times the
-  kept pixels, at most a sixth of a raw sample) keep it from getting worse.
-- **Job 2, what is left:** the sun's sharp shadows need one sample and no blur, the bounce light needs many; one
-  filter over their sum cannot serve both in a strip with no history. Filtering direct and indirect light apart
-  (Schied et al. 2017, section 3) would let the uncovered strip's indirect part take the wide first estimate above.
-  That is a second set of accumulators and filter chains: a design decision, not done here. Job 2 remains open.
+  to 8.51 there). None beat the filter as it was, so none landed on the whole radiance.
+- **Job 2, direct and bounced light filtered apart (2026-11-26, KB1664):** the sun's sharp shadows need one sample
+  and no blur, the bounce light needs many; one filter over their sum cannot serve both in a strip with no history.
+  `trace` now sums the light of paths with at most one scattering event that is no caustic apart (a second lane of
+  the caustic buffer: the trace stage has no storage binding to spare), and the denoiser gives it its own prepare
+  pass, variance, history (two more textures, read where the last restart wrote them) and five wavelet levels, as
+  Schied et al. 2017, section 3, filter direct and indirect illumination apart, Mara et al. 2017 the matte and glossy
+  terms, and ReBLUR the diffuse and specular signals. The bounced light of a pixel with fewer than 4 samples and no
+  history takes the 7 x 7 first estimate rejected above, weighted against the pixel's own by estimated errors with
+  the successive-difference test. Measured (RTX A6000, WebGPU; the WebGL2 layer on ANGLE Vulkan in brackets):
+  uncovered in the last frame 6.09 (6.08), in the two frames before 4.45 (4.45), history kept 4.53 (4.54); on the
+  wall 3.90 against 4.11, on the floor with the sun stripes 11.13 against 12.09, mean -0.99 against -1.57. Shadow
+  edges on the uncovered pixels (268 neighbour pairs whose converged luminances differ by 12 of 255 or more) keep
+  0.725 (0.728) of the converged image's contrast, against 0.657 before and 0.47 to 0.56 for the wide first
+  estimates of the whole radiance. The split alone, without the wide estimate, read 6.74, 5.12 and 4.62. The case
+  now fails above 6.3, 4.6 and 4.7, above 1.45 times the kept pixels and below 0.68 of the contrast. On the layer
+  the route's last program writes a fifth sum and the add kernel reads both lanes before it stores either (a read
+  after a store would plan it on the CPU tier); the path state stays at 7 pages (190 words: the sums are joined to
+  what the loop noted at the end, which took 9 words out of the stored result). Cost: 6 passes; 64 bytes a pixel,
+  48 beside a caustic chain; no direct chain where a caustic and a direct lane do not fit one storage binding.
+  Sources: Schied, Kaplanyan, Wyman, Patney, Chaitanya, Burgess, Liu, Dachsbacher, Lefohn and Salvi,
+  "Spatiotemporal Variance-Guided Filtering", HPG 2017,
+  <https://cg.ivd.kit.edu/publications/2017/svgf/svgf_preprint.pdf>; Schied, Peters and Dachsbacher, "Gradient
+  Estimation for Real-Time Adaptive Temporal Filtering", HPG 2018, <https://cg.ivd.kit.edu/atf.php>; Mara, McGuire,
+  Bitterli and Jarosz, "An Efficient Denoising Algorithm for Global Illumination", HPG 2017,
+  <https://cs.dartmouth.edu/wjarosz/publications/mara17towards.pdf>; Zhdan, "Fast Denoising with Self-Stabilizing
+  Recurrent Blurs", GTC 2020, and "ReBLUR: A Hierarchical Recurrent Denoiser", Ray Tracing Gems II, chapter 49,
+  2021, <https://doi.org/10.1007/978-1-4842-7185-8_49>; von Neumann, "Distribution of the Ratio of the Mean Square
+  Successive Difference to the Variance", 1941, <https://doi.org/10.1214/aoms/1177731677>. Papers only; no code read.
+- **Job 2, what is left:** the uncovered strip is still 1.34 times the kept pixels (6.09 against 4.53), mostly on
+  the floor (11.13), and a noise-free guarantee is not met. `denoisehistory`, a moving camera over a whole image of
+  another scene, reads 5.54 against 5.47 before and a still camera 2.81 against 2.80: the split alone accounts for it
+  (5.51 and 2.81 without the wide estimate), each part's variance now coming from its own samples; which term of the
+  two chains loses the 1 percent is not established. Repro: `npm run test:gpu:denoise -w
+  @margoengine/voxel-pathtracer`, the `denoisehistory` line. Job 2 remains open.
 
 ### Batch 99 caustic guide scope
 
