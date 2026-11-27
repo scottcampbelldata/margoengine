@@ -1,7 +1,9 @@
 import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // Real-GPU regression test: a materials mesh with a base colour map or alphaMap and `alphaTest` casts the cut-out shape,
 // not its whole quad, into every shadow pass (`Shadows`, `LocalShadows` spot and point, Clustered's integrated local
-// maps). Without the fix each of those passes shaded the floor under the cut-out half.
+// maps). Without the fix each of those passes shaded the floor under the cut-out half. A RawMesh casts its vertex
+// stage's shape, cut by its fragment's discard, into Shadows, VirtualShadows and LocalShadows spot and point maps, and
+// LocalShadows' cached maps follow its moves and uniform changes.
 // Run from the repository root after `npm run build:packages`: node packages/shadows/test/cutout-casters-browser.mjs
 // `--cost` measures frame cost instead and asserts nothing about it.
 import assert from 'node:assert/strict';
@@ -68,6 +70,9 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
     clipped: { solid: true, cut: false },
     clipOff: { solid: true, cut: true },
   };
+  // RawMesh casters (@margoengine/shader/raw) in the passes that take a drawShadow or drawLocalShadow source.
+  const rawExpected = { raw: { solid: true, cut: true }, rawCut: { solid: true, cut: false } },
+    rawPasses = ['directional', 'virtual', 'spot', 'point'];
   try {
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     if (measuringCost) {
@@ -92,7 +97,7 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
         for (const half of ['solid', 'cut']) {
           assert.ok(lit[half] > 0.02, `${pass}: the floor is unlit at ${half} (${lit[half]}), so nothing is measured`);
           const ratio = (row[half] = +((await patch(image, points[half])) / lit[half]).toFixed(3));
-          if (expected[caster][half] ? ratio > SHADED : ratio < LIT)
+          if ((expected[caster] ?? rawExpected[caster])[half] ? ratio > SHADED : ratio < LIT)
             failures.push(`${pass} ${caster}${instanced ? ' instanced' : ''} ${half}: ${ratio} of its open light`);
         }
         rows.push(row);
@@ -107,6 +112,30 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
       await run('point', 'clipped', true);
       await run('integratedSpot', 'clipped', true);
       await run('virtual', 'clipped', true);
+      for (const pass of rawPasses) for (const caster of Object.keys(rawExpected)) await run(pass, caster);
+      // A raw caster's cached maps follow a move, a uniform its vertex stage reads, and the way back.
+      for (const pass of rawPasses) {
+        const points = passes[pass],
+          open = await shot(pass),
+          lit = { solid: await patch(open, points.solid), cut: await patch(open, points.cut) };
+        await shot(pass, 'raw');
+        for (const [name, shaded] of [
+          ['rawMove', false],
+          ['rawBack', true],
+          ['rawLift', false],
+          ['rawBack', true],
+        ]) {
+          assert.deepEqual(await page.evaluate((n) => window.check.edit(n), name), []);
+          const image = await decodePNG(await page.locator('canvas').screenshot()),
+            row = { pass, caster: 'raw', edit: name };
+          for (const half of ['solid', 'cut']) {
+            const ratio = (row[half] = +((await patch(image, points[half])) / lit[half]).toFixed(3));
+            if (shaded ? ratio > SHADED : ratio < LIT) failures.push(`${pass} raw ${name} ${half}: ${ratio} of its open light`);
+          }
+          rows.push(row);
+          console.log(JSON.stringify(row));
+        }
+      }
       // Live edits redraw the cached map: no test casts the whole quad, the test again cuts it, a new map moves the cut.
       {
         const points = passes.directional,

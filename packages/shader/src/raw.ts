@@ -498,6 +498,9 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
   /** @internal */ readonly gpu = new Map<GPUDevice, MaterialGpu>();
   /** @internal Bumped when the shader code changes. */ revision = 0;
   /** @internal Pipelines finished so far: a static shadow map redraws when a caster's pipeline arrives. */ compiled = 0;
+  /** @internal Bumped by {@link uniformVersion} when the uniform values changed since it last looked. */
+  private uniformChanges = 0;
+  private uniformSeen?: Uint8Array;
   private readonly groups: readonly RawBindGroup[];
   private readonly gbufferName?: string;
   /** @internal The `velocityEntry`, when the material draws its own motion for TAA. */ readonly velocityName?: string;
@@ -835,6 +838,20 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     }
     return gpu;
   }
+  /**
+   * @internal A number that changes when the uniform values change: the block is written from `uniforms` and compared
+   * with the bytes seen last time, so a cached shadow map redraws after a uniform the vertex stage reads changed.
+   */
+  uniformVersion(): number {
+    if (!this.size) return 0;
+    for (const m of this.members) this.write(m);
+    const seen = this.uniformSeen;
+    if (!seen || seen.some((b, i) => b !== this.bytes[i])) {
+      (this.uniformSeen ??= new Uint8Array(this.size)).set(this.bytes);
+      if (seen) this.uniformChanges++;
+    }
+    return this.uniformChanges;
+  }
   private write(m: Member): void {
     const v = (this.uniforms[m.name] as RawUniform | undefined)?.value;
     if (m.count === undefined && !m.fields) return this.put(m.type, m.offset, v, m.name);
@@ -899,7 +916,8 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
         // A fragment only matters to a shadow when it can cut the shape, and its outputs then go nowhere.
         entry: /\bdiscard\b/.test(this.fragmentCode ?? this.vertexCode) ? this.fragmentName : undefined,
         targets: [],
-        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+        // `Shadows` and `VirtualShadows` store depth forward (less-equal), `LocalShadows` reversed (greater).
+        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: compare },
       };
     if (kind === 'pick')
       return {
@@ -1240,6 +1258,16 @@ export interface RawShadowContext {
   /** Cascade index, 0-3. */
   cascade: number;
 }
+/** What `RawMesh.drawLocalShadow` receives: the `LocalShadowDraw` of `@margoengine/clustered/shadows`. */
+export interface RawLocalShadowDraw {
+  context: RawPassContext;
+  /** The layer's open depth pass (reversed depth: near 1, far 0). */
+  pass: GPURenderPassEncoder;
+  /** The layer's world to clip matrix. */
+  matrix: Float32Array;
+  /** The layer index. */
+  layer: number;
+}
 /** Any raw material: a RawShaderMaterial or a subclass such as ShaderMaterial. */
 export type AnyRawShaderMaterial = RawShaderMaterial<{ value: unknown }>;
 /** Options for `new RawMesh(options)`. */
@@ -1450,10 +1478,28 @@ export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
     this.indexDirty = true;
     return this;
   }
-  /** Bumped when a static shadow map must draw this mesh again; `invalidateShadow` bumps it for a moved mesh. */
+  /**
+   * Changes when a cached shadow map must draw this mesh again: new attributes or indices, a newly compiled pipeline,
+   * another material or new uniform values, a moved mesh (its world matrix, the followed core mesh's included) and
+   * `invalidateShadow()`. What it cannot see, such as a vertex stage moving points by `camera.time`, a texture or a
+   * storage buffer, needs `invalidateShadow()` or a caster that redraws every frame.
+   */
   get shadowVersion(): number {
-    return this.changes + this.material.compiled;
+    const engine = (this.owner as unknown as { engine?: EngineKernel } | undefined)?.engine,
+      world = engine && this.worldMatrix(engine),
+      seen = this.seenWorld;
+    if (this.material !== this.seenMaterial) {
+      if (this.seenMaterial) this.changes++;
+      this.seenMaterial = this.material;
+    }
+    if (world && (!seen || seen.some((v, i) => v !== world[i]))) {
+      if (seen) this.changes++;
+      (this.seenWorld ??= new Float32Array(16)).set(world);
+    }
+    return this.changes + this.material.compiled + this.material.uniformVersion();
   }
+  private seenWorld?: Float32Array;
+  private seenMaterial?: AnyRawShaderMaterial;
   /** Redraws a mesh added with `shadows.add(mesh, {static: true})` after its matrix or material changed. */
   invalidateShadow(): void {
     this.changes++;
@@ -1461,6 +1507,13 @@ export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
   /** Draws the mesh into a cascade of `@margoengine/shadows`; pass the mesh to `shadows.add`. */
   drawShadow(context: RawShadowContext): void {
     this.owner?.shadow(this, context);
+  }
+  /**
+   * Draws the mesh into one point, spot, directional or area light map of `@margoengine/clustered/shadows`; pass the
+   * mesh to `localShadows.add` (or Clustered's `addShadowCaster`).
+   */
+  drawLocalShadow(draw: RawLocalShadowDraw): void {
+    this.owner?.localShadow(this, draw);
   }
   /** Releases the GPU buffers and leaves its RawShaders plugin; the mesh cannot be drawn again. */
   dispose(): void {
@@ -1796,6 +1849,11 @@ export class RawShaders implements EnginePlugin {
   private shadowEncoder?: GPUCommandEncoder;
   private shadowPass = 0;
   private readonly shadowWritten: (GPUCommandEncoder | undefined)[] = [];
+  /** Camera blocks per `LocalShadows` layer pass, and the encoder each was last written for. */
+  private readonly localCameras: GPUBuffer[] = [];
+  private readonly localWritten: (GPUCommandEncoder | undefined)[] = [];
+  private localEncoder?: GPUCommandEncoder;
+  private readonly localSlots = new Map<GPURenderPassEncoder, number>();
   private passes = 0;
   private readonly cameraData = new Float32Array(60);
   private readonly view = new Float64Array(16);
@@ -1907,8 +1965,11 @@ export class RawShaders implements EnginePlugin {
     this.camera?.destroy();
     this.camera = undefined;
     for (const key of [...this.velocityStates.keys()]) this.releaseVelocity(key);
-    for (const buffer of this.shadowCameras) buffer.destroy();
+    for (const buffer of [...this.shadowCameras, ...this.localCameras]) buffer?.destroy();
     this.shadowCameras.length = this.shadowWritten.length = 0;
+    this.localCameras.length = this.localWritten.length = 0;
+    this.localEncoder = undefined;
+    this.localSlots.clear();
     this.shadowEncoder = undefined;
   }
   private cameraBuffer(device: GPUDevice): GPUBuffer {
@@ -1977,6 +2038,29 @@ export class RawShaders implements EnginePlugin {
   }
   /** @internal Draws `mesh` into one shadow cascade. Shadow passes run before the colour pass, so it uploads for itself. */
   shadow(mesh: RawMesh, { context: c, pass, matrix, cascade }: RawShadowContext): void {
+    this.depthCaster(mesh, c, pass, matrix, cascade, this.shadowCameras, this.shadowWritten, 'less-equal');
+  }
+  /** @internal Draws `mesh` into one `LocalShadows` layer, whose depth is reversed. */
+  localShadow(mesh: RawMesh, { context: c, pass, matrix }: RawLocalShadowDraw): void {
+    // One camera block per layer pass of this frame's encoder, so two shadow plugins' layers never share one.
+    if (this.localEncoder !== c.encoder) {
+      this.localEncoder = c.encoder;
+      this.localSlots.clear();
+    }
+    let slot = this.localSlots.get(pass);
+    if (slot === undefined) this.localSlots.set(pass, (slot = this.localSlots.size));
+    this.depthCaster(mesh, c, pass, matrix, slot, this.localCameras, this.localWritten, 'greater');
+  }
+  private depthCaster(
+    mesh: RawMesh,
+    c: RawPassContext,
+    pass: GPURenderPassEncoder,
+    matrix: Float32Array,
+    slot: number,
+    cameras: GPUBuffer[],
+    written: (GPUCommandEncoder | undefined)[],
+    compare: GPUCompareFunction,
+  ): void {
     const device = this.device,
       engine = this.engine as unknown as EngineKernel,
       material = mesh.material;
@@ -1988,9 +2072,9 @@ export class RawShaders implements EnginePlugin {
       this.shadowEncoder = c.encoder;
       this.shadowPass = this.nextPass();
     }
-    const camera = (this.shadowCameras[cascade] ??= this.cameraBuffer(device));
-    if (this.shadowWritten[cascade] !== c.encoder) {
-      this.shadowWritten[cascade] = c.encoder;
+    const camera = (cameras[slot] ??= this.cameraBuffer(device));
+    if (written[slot] !== c.encoder) {
+      written[slot] = c.encoder;
       // The cascade's matrix takes both places, so `viewProjection` and `projection * view` each reach the light.
       const f = this.cameraBlock(c.camera, matrix, c.width, c.height, c.delta, 0);
       f.set(identity, 0);
@@ -2000,7 +2084,7 @@ export class RawShaders implements EnginePlugin {
     const call = mesh.upload(device, camera, world);
     if (!call) return;
     const gpu = material.prepare(device, this.shadowPass, this),
-      pipeline = material.pipeline(this, gpu, device, mesh, 'shadow');
+      pipeline = material.pipeline(this, gpu, device, mesh, 'shadow', undefined, compare);
     if (pipeline) drawList(pass, [{ mesh, pipeline, gpu, call, distance: 0 }]);
   }
   /**

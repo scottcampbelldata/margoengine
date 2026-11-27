@@ -9,6 +9,7 @@ import {Shadows} from '/packages/shadows/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {RawShaders,RawShaderMaterial,RawMesh} from '/packages/shader/dist/raw.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const camera={position:[0,10,5],target:[0,0,0],fov:60};
 const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
@@ -48,6 +49,13 @@ const casters={
   hashed30:()=>new PbrMaterial({color:[1,1,1,0.3],features:[alphaHash()]}),
   hashed70:()=>new PbrMaterial({color:[1,1,1,0.7],features:[alphaHash()]}),
 };
+// RawMesh casters: the caller's own WGSL, lifted by a live uniform; rawCut's fragment discards x > -2 (the right half).
+const raw=RawShaders.attach(engine);
+const rawCode=cut=>`struct Out {@builtin(position) clip:vec4f, @location(0) world:vec3f}
+@vertex fn vertex(a:Attributes)->Out {let w=mesh.world*vec4f(a.position+vec3f(0.0,uniforms.lift,0.0),1.0);return Out(camera.viewProjection*w,w.xyz);}
+@fragment fn fragment(i:Out)->@location(0) vec4f {${cut?'if(i.world.x>-2.0){discard;}':''}return margoDisplay(vec4f(0.8,0.8,0.8,1.0));}`;
+const rawCasters={raw:false,rawCut:true};
+const rawMesh=cut=>{const q=quad();return raw.add(new RawMesh({material:new RawShaderMaterial({vertexShader:rawCode(cut),uniforms:{lift:{value:0}}}),attributes:{position:{data:q.positions,type:'vec3f'}},index:q.indices}));};
 const faint=[1,1,1,0.2,1,1,1,0.2,1,1,1,0.2,1,1,1,0.2],geometries={vertexOff:()=>quad(-3,-1,2,-1,1,faint),vertexOn:()=>quad(-3,-1,2,-1,1,faint)};
 let plugins=[],removers=[],mesh,current;
 const clear=()=>{removers.forEach(r=>r());removers=[];plugins.forEach(p=>p.dispose());plugins=[];mesh?.dispose?.();mesh=undefined;};
@@ -56,7 +64,7 @@ const spot={position:[-6,6,0],direction:[1,-1,0],range:40,innerAngle:0.5,outerAn
 const point={position:[-6,6,0],range:40,intensity:400,color:[1,1,1]};
 const sunOff=()=>engine.lighting.radiance.fill(0);
 // LocalShadows (clustered/shadows): point and spot layers in one map array.
-const separate=(light,add)=>{sunOff();const l=Clustered.attach(engine,{grid:[4,4,4]}),s=LocalShadows.attach(engine,{lights:l,resolution:1024});plugins.push(s,l);if(add)removers.push(l.add(add),s.add(add));l.setLights([{...light,castShadow:true}]);};
+const separate=(light,add)=>{sunOff();const l=Clustered.attach(engine,{grid:[4,4,4]}),s=LocalShadows.attach(engine,{lights:l,resolution:1024});plugins.push(s,l);if(add){if(!(add instanceof RawMesh))removers.push(l.add(add));removers.push(s.add(add));}l.setLights([{...light,castShadow:true}]);};
 // Clustered's integrated local shadow maps (`shadows` option, addShadowCaster).
 const integrated=(light,add)=>{sunOff();const l=Clustered.attach(engine,{grid:[4,4,4],shadows:{resolution:512,maxLights:2}});plugins.push(l);if(add)removers.push(l.add(add),l.addShadowCaster(add));l.setLights([{...light,shadow:true}]);};
 const passes={
@@ -71,7 +79,8 @@ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
 window.check={
   async show(pass,caster,instanced){
     clear();
-    if(caster){
+    if(caster in rawCasters)mesh=rawMesh(rawCasters[caster]);
+    else if(caster){
       const material=current=casters[caster]();
       const shape=geometries[caster]?.()??quad();
       if(instanced){mesh=createInstancedMesh(engine,shape,material,1);mesh.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));}
@@ -79,6 +88,8 @@ window.check={
     }
     passes[pass](mesh);
     await render();
+    // Raw pipelines compile asynchronously on first use (colour and each shadow pass): draw again once they are in.
+    if(caster in rawCasters){await raw.ready();await render();}
     return errors.splice(0);
   },
   // Live edits of the cached caster: applied, then one render.
@@ -87,6 +98,10 @@ window.check={
     if(name==='noTest')m.alphaTest=0;
     if(name==='test')m.alphaTest=0.5;
     if(name==='swap'){m.map=split([...white,0],[...white,255]);}
+    // A raw caster moved away, or lifted above the lights by its uniform: a cached map must draw it again.
+    if(name==='rawMove')mesh.matrix[12]=-30;
+    if(name==='rawLift')mesh.material.uniforms.lift.value=60;
+    if(name==='rawBack'){mesh.matrix[12]=0;mesh.material.uniforms.lift.value=0;}
     await render();
     return errors.splice(0);
   },

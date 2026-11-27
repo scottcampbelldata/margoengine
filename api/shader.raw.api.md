@@ -30,6 +30,13 @@ export interface RawBounds {
     radius: number;
 }
 
+export interface RawLocalShadowDraw {
+    context: RawPassContext;
+    pass: GPURenderPassEncoder;
+    matrix: Float32Array;
+    layer: number;
+}
+
 export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
     material: M;
     readonly matrix: Float32Array;
@@ -64,6 +71,7 @@ export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
     get shadowVersion(): number;
     invalidateShadow(): void;
     drawShadow(context: RawShadowContext): void;
+    drawLocalShadow(draw: RawLocalShadowDraw): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
     alive(): void;
@@ -163,6 +171,7 @@ export class RawShaderMaterial<U extends {
     blend(): GPUBlendState | undefined;
     drawnBy?: RawShaders;
     prepare(device: GPUDevice, pass: number, owner?: RawShaders): MaterialGpu;
+    uniformVersion(): number;
     get writesGBuffer(): boolean;
     pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, kind: RawPass, c?: RawPassContext, compare?: GPUCompareFunction): GPURenderPipeline | undefined;
 }
@@ -219,6 +228,7 @@ export class RawShaders implements EnginePlugin {
     cameraBlock(camera: PassContext['camera'], m: ArrayLike<number>, width: number, height: number, delta: number, encoding: number, view?: ArrayLike<number>): Float32Array<ArrayBuffer>;
     nextPass(): number;
     shadow(mesh: RawMesh, { context: c, pass, matrix, cascade }: RawShadowContext): void;
+    localShadow(mesh: RawMesh, { context: c, pass, matrix }: RawLocalShadowDraw): void;
     draw(context: PassContext, mode: 'gbuffer' | 'ambient' | 'occlusion', _color: GPUTextureView, _depth: GPUTextureView, _phase?: 'all' | 'opaque' | 'blend', external?: {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;

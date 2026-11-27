@@ -943,9 +943,16 @@ console.log(picking.rawOf(hit) === mesh);
 - **Shadows.** `shadows.add(mesh)` draws the mesh into every cascade of `Shadows` with your vertex stage, where
   `camera.viewProjection` and `camera.projection * camera.view` are the cascade's light matrix. Both sides cast, whatever
   the material's `cull`, as in the depth pass of every other caster. Your fragment stage runs
-  too when its code holds `discard`, so a cut-out shape casts a cut-out shadow. Transparent materials cast none. For
-  `{static: true}`, call `mesh.invalidateShadow()` after moving the mesh; attribute changes and a newly compiled pipeline
-  redraw the map by themselves. A raw shader receives no shadow unless it samples one itself.
+  too when its code holds `discard`, so a cut-out shape casts a cut-out shadow. Transparent materials cast none.
+  `virtualShadows.add(mesh)` (`@margoengine/shadows/virtual`) and `localShadows.add(mesh)`
+  (`@margoengine/clustered/shadows`, point, spot, extra directional and area lights) cast the same way; Clustered's
+  integrated `shadows` maps take only `shadowPrimitives` casters, so use `LocalShadows` for raw ones. `LocalShadows`
+  and `{static: true}` keep a raw caster's maps until `mesh.shadowVersion` changes: new attributes or indices, a newly
+  compiled pipeline, another material, new uniform values, or a moved mesh (its `matrix` or the core mesh it follows).
+  A vertex stage that moves points by `camera.time`, a texture or a storage buffer needs `mesh.invalidateShadow()` when
+  they change, or `localShadows.add(mesh, {dynamic: true})`. A raw shader receives no shadow unless it samples one
+  itself. `packages/shadows/test/cutout-casters-browser.mjs` checks a whole and a `discard`-cut raw quad in all four
+  passes and the cached maps following a move and a uniform, on WebGPU and the WebGL2 layer.
 - **TAA.** A raw shader's motion is its own code, so TAA sees only a raw mesh's depth and the camera's motion, and a
   shape the shader moves ghosts. Give the material `velocityEntry`: a `@vertex fn` beside your vertex entry, with the same
   inputs, that returns `margoVelocity(position, positionBefore)`, where the vertex is now and where it was last frame, both
