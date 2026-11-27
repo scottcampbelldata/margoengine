@@ -16716,9 +16716,15 @@ that installation beside the default one, then the default route's choice betwee
 
 - **Repro:** `node scripts/reference-rendering/proof.mjs --case=transmission` on 474533d24e (RTX A6000, WebGPU):
   `absolute: 1590949 > measured 1590947` against the sample-viewer reference (proof-contract.mjs).
-- **Cause:** not found. The frozen budget is the first measurement (batch 160); some change since moved two channel
-  levels. Next: bisect the gltf and core shader commits since the last passing proof folder in
-  `engine-bench/batch-160/transmission` (proof-native-1794448455574-24364), one build and proof run each.
+- **Cause (bisected 2026-11-27, lane A):** f586413a53 (KB6016c, Scott's "fix C the core"), which writes core's GGX D
+  denominator as |n x h|^2 + a2 nh^2 so float32 keeps narrow lobes. Its parent 91a5dcc144 draws the frozen picture
+  (frame sha256 2a40e4f9...) and it draws the failing one (e7d0a3c3...), bit for bit in every process, device and
+  frame. The two frames differ in 2 channel values by 1 level each (pixels (284, 240) red 247 to 248 and (198, 241)
+  blue 109 to 110, on the spheres' highlights), which is the whole 2-level excess. Ruled out: the browser (the 11-11
+  tree on Edge 158.0.4370.45 draws the frozen picture) and KB-G2guard's G2 floor (main with the old 1e-4 floor still
+  draws the failing picture). Bisect over the 94 commits touching core, shared, gltf and gltf-pro since 7d0097b621.
+- **Status:** the frozen budget measured the imprecise D; the more precise D moves two highlight values across a
+  rounding step. No budget changed; it needs a ruling (re-derive the viewer budget on KB6016c's evidence, or keep it).
 
 NVIDIA 617.42 and Intel Arc 4x MSAA blending variation remains the documented
 driver defect. AMD Radeon(TM) Graphics / RDNA 2, driver 32.0.21042.62, is the
