@@ -1850,6 +1850,48 @@ No test compares the rod with a measurement: a towed or current-loaded cable, a 
 7. **Coded errors.** `src/rod/index.ts` lines 137, 191, 194, 198, 212, 215, 222, 227, 400, 431, 456, 547 and 550, and `src/loads/segments.ts` lines 236 to 271, throw bare `RangeError` or `TypeError`. Use a coded `MargoError` that names the fix, as the rod's `state` errors already do.
 8. **Scale and film.** Record work counts for a long rod (the 4,096-link limit) and many rods (a kelp forest, a ship's rigging). Add direction inputs: a target shape or pose to blend toward, wind on rods in air (ATMO wind field), and a seeded sway.
 
+## Pass 5, 2026-11-27 (`main` at 85c25e4af)
+
+VERIFIED 0, REOPENED 1. SEA-09 was set LANDED with each audit item given its commit and test. The checks were narrow: SEA-09's own tests and those of the solvers it couples to directly.
+
+### SEA-09 manoeuvring, propulsion, resistance, sailing hull (`@margoengine/physics/ship`, 17 commits c6f276858 to 85c25e4af), owner Claude: REOPENED
+
+**Checked.** `tests/ship.test.js`, `tests/coupling/ship.test.js` (with `PackIceSolver`, `WakeSolver` and `HullSolver`), `coupling/planing.test.js`, `coupling/rowing.test.js` and `coupling/sailing.test.js` (with AERO-02's `SailForce`): 50 tests, 50 pass (41 s, under `scripts/run-with-timeout.mjs`, on packages built from 85c25e4af). Every refusal in `src/ship` is a coded `MargoError` through `shipError` (no bare `RangeError` or `TypeError` is left), and the transcendentals are pinned.
+
+**Audit list.** Items 1 to 12 and 15 to 17 are done as the item lines above state, each test opened and passing:
+- heel, with KB-SHIP-HEEL1 fixed;
+- shallow water, with KB-SHIP-SHALLOW1 fixed;
+- waves, planing, sailing, oars, the B-series and four quadrants;
+- Holtrop and Mennen wired into the solver, the autopilot and track following, ice;
+- work counts in place of a Wasm kernel, which is reasonable for a per-ship ODE;
+- coded errors.
+
+Item 13 (validation) is partly done. Item 14 (red flags) is partly done: the squat speed cap and the shaft depth are still stated assumptions rather than cited values.
+
+**Validation.** Most measured checks are against data that was not fitted:
+- KCS's turn and heel against MARIN and KRISO, inside the band the two facilities span;
+- KVLCC2 against SIMMAN 2008 and 2014;
+- level ice within 1.2 standard deviations of MT Uikku's basin tests;
+- drift within twice its run-to-run spread;
+- the single scull's blade efficiency within two standard deviations.
+
+What is fitted is stated: N'r at h/T 1.2 to KRISO's 20/5, the roll lever and damping to MARIN's peak and final roll, and Sysser 1, which belongs to the Delft series. The 20/5 zigzag at h/T 1.5, 45% under KRISO, is an accepted difference: a fully measured model also misses it, so it sits at the state of the art.
+
+**Fails points** 2 and 8; the other six hold.
+
+**To do before it can be VERIFIED:**
+1. **Derive the hand-set bounds, or record each as an accepted difference with the scatter that supports it.** Each bound should come from the measurement's stated uncertainty (or the figure-reading error) plus the spread between facilities or runs:
+   - the bank moment N' within 35% and the sway force Y' within 45% (`ship.test.js:1810`, `:1812`);
+   - KVLCC2's 20/10 at h/T 1.5 within 30% (`:1868`);
+   - S175's added resistance within 15% per point (`:1275`);
+   - KVLCC2's added resistance within 35% per point (`:1314`);
+   - Shoemaker's planing trim within 15% (`:1378`);
+   - the ORC polar within 15% per point (`:1602`).
+2. **The bank sway force at h/T 1.2 has the wrong sign.** Near the switch from attraction to repulsion it gives repulsion where Vantorre et al.'s measured force stays near zero, and the test leaves that case out. Fix it, for example with the depth dependence of Lataire and Vantorre's later regressions, or put it to the lane manager as an accepted difference. It is documented in `docs/limits.md`.
+3. **Unconfirmed citation.** "I. M. Sherif, P. Xin and X. Zhou, Brodogradnja 78(1), 2027" (`docs/clean-room.md`, the source of the h/T 1.2 advance of 2.92 L and of Amin and Hasegawa's reprinted formulas) could not be found, and its volume is dated after today. Give its DOI, or take the data from Amin and Hasegawa (2010) and a confirmed free-running source.
+4. **The catalog row is stale.** The state column of SEA-09 in `docs/physics-solvers.md` still says heel, leeway, keel lift, oars and planing are not built.
+5. **Squat cap and shaft depth.** The speed cap of 0.69 and the shaft depth d − 0.6 D are still assumptions. Cite them, for example ITTC squat guidance (ITTC 2017, 7.5-02-06-02) and a shaft immersion from the hull's particulars, or derive them.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
