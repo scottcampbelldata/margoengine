@@ -1,6 +1,8 @@
 // Real-GPU check of MorphWeightPlayer (packages/animation/src/morph-gpu.ts): for STEP, LINEAR and CUBICSPLINE weight
 // tracks, each copy's weights after a frame must match sampleTrack on the CPU at that copy's time, looping or held,
-// on 70 copies (140 items), so the last workgroup is part filled and a stray thread would corrupt a neighbour.
+// on 70 copies (140 items), so the last workgroup is part filled and a stray thread would corrupt a neighbour. The
+// player's CPU samples (weightsInto, which a synchronous raycast poses from, KB-BVH-SYNCPOSE-MORPHGPU1) must match the
+// weights read back from the GPU.
 // Runs as `npm run test:gpu:morph -w @margoengine/animation` (check:gpu-packages).
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
@@ -99,7 +101,9 @@ try {
       return values;
     };
     let worst = 0,
+      cpuWorst = 0,
       checks = 0;
+    const cpu = new Float32Array(2);
     const byMode = {};
     let failure = null;
     // The clip's own float32 end time, which the shader reads.
@@ -127,6 +131,8 @@ try {
               local = loop ? ((raw % duration) + duration) % duration : Math.min(Math.max(raw, 0), duration);
             const expected = sampleTrack(track.times, track.values, 2, local, interpolation),
               actual = await read(players[i]);
+            player.weightsInto(players[i], players[i].model.primitives[0], cpu);
+            for (let c = 0; c < 2; c++) cpuWorst = Math.max(cpuWorst, Math.abs(cpu[c] - actual[c]));
             for (let c = 0; c < 2; c++) {
               if (Math.abs(actual[c] - expected[c]) > Math.max(worst, 1e-5))
                 failure = {
@@ -149,13 +155,14 @@ try {
         player.dispose();
       }
     const error = await device.popErrorScope();
-    return { worst, checks, byMode, failure, validation: error?.message ?? null };
+    return { worst, cpuWorst, checks, byMode, failure, validation: error?.message ?? null };
   });
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);
   assert.equal(result.validation, null);
   assert.ok(result.checks >= 3 * 2 * 6 * 70 * 2, 'every copy checked');
   assert.ok(result.worst < 1e-5, `GPU weights differ from sampleTrack by ${result.worst}`);
+  assert.ok(result.cpuWorst < 1e-5, `the player's CPU weights differ from the GPU's by ${result.cpuWorst}`);
 } finally {
   await browser.close();
 }

@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf/pbr";
+import { PBRModel, PBRPrimitive } from "@margoengine/gltf/pbr";
 
 export interface MorphWeightMember {
     offset?: number;
@@ -27,6 +27,7 @@ export class MorphWeightPlayer implements EnginePlugin {
     get count(): number;
     add(animation: Animation, { offset, speed }?: MorphWeightMember): this;
     remove(animation: Animation): boolean;
+    weightsInto(animation: Animation, primitive: PBRPrimitive, out: Float32Array): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     advanceTime(delta: number): void;

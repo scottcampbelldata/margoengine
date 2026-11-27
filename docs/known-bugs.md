@@ -1294,15 +1294,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Owed:** an optional CPU blend on `SkinningMode` (an API addition), given by `dualQuaternionSkinning`, used by
   `Animation`'s CPU pose, with the per-vertex `share`; a GPU check against the read-back pose.
 
-### Open 2026-11-26: a synchronous raycast refuses a model whose morph weights are sampled on the GPU (KB-BVH-SYNCPOSE-MORPHGPU1, animation)
+### Fixed 2026-11-27: a synchronous raycast refused a model whose morph weights are sampled on the GPU (KB-BVH-SYNCPOSE-MORPHGPU1, animation)
 
 - **Repro:** `MorphWeightPlayer.attach(engine, 'Talk').add(animation)`, then `raycaster.intersectEngine(engine)`:
   MargoError `unsupported`, also after `player.remove(animation)` (`packages/animation/tests/sync-pick.test.js`).
 - **Cause:** the player writes the weights straight into the deformation arena on the GPU, so `primitive.weights` is
-  not what is drawn, and after a `remove` the GPU keeps the last weights it wrote. `Animation` gives no CPU pose for a
+  not what is drawn, and after a `remove` the GPU keeps the last weights it wrote. `Animation` gave no CPU pose for a
   morphed primitive from the first `add` on, rather than pose from stale weights.
-- **Owed:** the player's weights on the CPU on demand (its shader is `sampleTrackInto` term for term), handed to the
-  CPU pose, and the last sampled weights kept at `remove`.
+- **Fix:** `MorphWeightPlayer.weightsInto(animation, primitive, out)` samples the weights its dispatch writes on the
+  CPU (`packages/animation/src/morph-gpu.ts`): the copy's float32 time, wrapped as `time % duration`, then
+  `sampleTrackInto`, which the shader repeats term for term; weights no track drives stay the primitive's. While a
+  player drives a copy, `Animation`'s CPU pose takes those samples. `remove` and `dispose` write the weights the last
+  dispatch drew into `primitive.weights`, so they say what the GPU keeps (a copy never drawn keeps its own).
+- **Tests:** `packages/animation/tests/sync-pick.test.js` (the ray follows the player's time, loops, and holds the last
+  drawn weights after `remove`; it threw `unsupported` before); `scripts/animation-morph-gpu-tests.js` compares
+  `weightsInto` with the weights read back from the GPU for 70 copies, STEP, LINEAR and CUBICSPLINE, looping and held
+  (1.85e-6 at most, RTX A6000, WebGPU). The player needs WebGPU, so the WebGL2 layer has nothing to compare.
 
 ### Fixed 2026-11-27: a synchronous raycast refused a BatchedMesh, and AssemblyBVH refused every deformed mesh (KB-BVH-SYNCPOSE-BATCHED1, materials, machinery)
 

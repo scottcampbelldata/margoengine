@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20857727,
+  "total": 20858823,
   "history": [
     {
       "date": "2026-10-24",
@@ -14460,6 +14460,12 @@
       "commit": "2c6bc437e",
       "reason": "water/liquid 18041 to 31356 B ceiling (built 30442 B gzip): GPULiquid (FLUID-02/03, parity bar P13), the MLS-MPM liquid in five compute passes, its collider forces, pointer, snapshots, debug view and the CPU twin the WebGL2 layer steps it with. It sits beside ParticleLiquid, which draws it, so one entry is the real-time liquid; the package is sideEffects: false, so a bundle that imports only ParticleLiquid drops it. A split entry would add a second import and its wrapper re-exports for the same code.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "8b78fa0619",
+      "reason": "@margoengine/animation/morph-gpu 3118 to 4105 B gzip (ceiling 3265 to 4361), root @margoengine/animation 25840 to 25874 B: KB-BVH-SYNCPOSE-MORPHGPU1 samples the player's weights on the CPU for synchronous raycasts with sampleTrackInto, so the entry now imports the sampling chunk (2627 B) that the root entry already loads; every MorphWeightPlayer drives an Animation from the root, so a page loads no new bytes. A copy of the shader's sampling in morph-gpu would duplicate the code the root ships. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14474,7 +14480,7 @@
     "@margoengine/animation/interactivity": 25889,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/mixer": 5048,
-    "@margoengine/animation/morph-gpu": 3265,
+    "@margoengine/animation/morph-gpu": 4361,
     "@margoengine/animation/playback": 2073,
     "@margoengine/animation/point-cache": 1241,
     "@margoengine/animation/pointer": 7420,

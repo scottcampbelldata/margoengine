@@ -5,8 +5,9 @@ import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import type { PBRPrimitive } from '@margoengine/gltf/pbr';
 import type { Animation } from './index.js';
-import type { Interpolation } from './sampling.js';
+import { sampleTrackInto, type Interpolation } from './sampling.js';
 
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
 
@@ -100,7 +101,9 @@ interface Gpu {
  * Plays the morph weight tracks of one glTF clip on many copies of a model with no per-copy CPU work: the tracks upload
  * once, and each frame one compute dispatch per deformation buffer page samples every copy's weights from the player's
  * time and that copy's offset and speed. Only weights are driven: a copy's `Animation` keeps playing its own clip for
- * the body, and weights the player drives are overwritten each frame, so `setMorph` on them has no effect.
+ * the body, and weights the player drives are overwritten each frame, so `setMorph` on them has no effect. A
+ * synchronous raycast (`@margoengine/bvh`) hits a copy at the weights the player draws, sampled on the CPU on demand
+ * with the shader's arithmetic; `remove` writes the weights last drawn into the copy's `primitive.weights`.
  *
  * @example
  * ```ts
@@ -115,7 +118,9 @@ export class MorphWeightPlayer implements EnginePlugin {
   /** Rate multiplier for every copy, finite and >= 0. Default 1. */
   speed = 1;
   playing = true;
-  private readonly members = new Map<Animation, Required<MorphWeightMember>>();
+  /** Each copy's offset and speed, and the player time its weights were last drawn at (unset before a dispatch). */
+  private readonly members = new Map<Animation, Required<MorphWeightMember> & { drawn?: number }>();
+  private sample = new Float32Array(0);
   private readonly loop: boolean;
   private engine?: Engine;
   private gpu?: Gpu;
@@ -163,18 +168,60 @@ export class MorphWeightPlayer implements EnginePlugin {
     if (first && first !== animation && first.model.asset !== animation.model.asset)
       throw new TypeError('MorphWeightPlayer copies must share one asset; clone them with cloneModel');
     this.tracksOf(animation);
-    // The weights on the GPU are this player's from now on, and stay as it left them after `remove`: the copy's
-    // `primitive.weights` are not the pose, so a synchronous CPU query must not pose from them.
-    animation['gpuWeights'] = true;
-    this.members.set(animation, { offset, speed });
+    // The weights on the GPU are this player's from now on: the copy's `primitive.weights` are not the pose, so a
+    // synchronous CPU query poses from the player's samples instead.
+    animation['weightSource'] = this;
+    this.members.set(animation, { offset, speed, drawn: this.members.get(animation)?.drawn });
     this.dirty = true;
     return this;
   }
-  /** Stops driving a copy; its weights stay at the last value the GPU wrote until something else writes them. */
+  /**
+   * Stops driving a copy. Its weights on the GPU stay at the last value the player wrote until something else writes
+   * them, and that value goes into the copy's `primitive.weights`, so they say what is drawn.
+   */
   remove(animation: Animation): boolean {
-    const removed = this.members.delete(animation);
-    this.dirty ||= removed;
-    return removed;
+    const member = this.members.get(animation);
+    if (!member) return false;
+    this.handBack(animation, member);
+    this.members.delete(animation);
+    this.dirty = true;
+    return true;
+  }
+  /** Gives a copy's weights back to its `primitive.weights`: the samples last drawn, if any were. */
+  private handBack(animation: Animation, member: { offset: number; speed: number; drawn?: number }): void {
+    if (member.drawn !== undefined)
+      for (const resource of animation['resources'])
+        this.sampleInto(animation, member, resource.primitive, resource.primitive.weights, member.drawn);
+    if (animation['weightSource'] === this) animation['weightSource'] = undefined;
+  }
+  /** The weights this player's dispatch writes this frame for `primitive` of a copy, into `out` (Animation's CPU pose). */
+  weightsInto(animation: Animation, primitive: PBRPrimitive, out: Float32Array): void {
+    const member = this.members.get(animation);
+    if (member) this.sampleInto(animation, member, primitive, out, this.time);
+  }
+  /**
+   * `morphWeightShader` on the CPU at player time `time`: the copy's float32 time, wrapped as `time % duration` (the
+   * shader's corrected f32 wrap lands there), then every track of the primitive's node sampled by `sampleTrackInto`,
+   * whose arithmetic the shader repeats term for term. Weights no track drives keep their value in `out`.
+   */
+  private sampleInto(
+    animation: Animation,
+    member: { offset: number; speed: number },
+    primitive: PBRPrimitive,
+    out: Float32Array,
+    time: number,
+  ): void {
+    const { duration, tracks } = this.tracksOf(animation),
+      f = Math.fround,
+      span = f(duration);
+    const raw = f(f(f(time) * f(member.speed)) + f(member.offset)),
+      at = this.loop && span > 0 ? ((raw % span) + span) % span : Math.min(Math.max(raw, 0), span);
+    for (const track of tracks) {
+      if (track.node !== primitive.nodeIndex) continue;
+      if (this.sample.length !== track.width) this.sample = new Float32Array(track.width);
+      sampleTrackInto(track.times, track.values, track.width, at, track.interpolation, false, this.sample);
+      out.set(this.sample.subarray(0, Math.min(track.width, out.length)));
+    }
   }
   setup(engine: Engine): void {
     if (this.disposed)
@@ -317,6 +364,7 @@ export class MorphWeightPlayer implements EnginePlugin {
     } finally {
       pass.end();
     }
+    for (const member of this.members.values()) member.drawn = this.time;
   }
   private release(): void {
     const gpu = this.gpu;
@@ -336,6 +384,7 @@ export class MorphWeightPlayer implements EnginePlugin {
     this.disposed = true;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
+    for (const [animation, member] of this.members) this.handBack(animation, member);
     this.members.clear();
   }
   declare [Symbol.dispose]: () => void;

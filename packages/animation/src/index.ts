@@ -82,6 +82,10 @@ interface Track {
   /** The key the previous frame's sample found (key-cursor.ts). */
   cursor: number;
 }
+/** What `MorphWeightPlayer` (morph-gpu.ts) gives the CPU pose: the weights its dispatch writes for a primitive. */
+interface WeightSource {
+  weightsInto(animation: Animation, primitive: PBRPrimitive, out: Float32Array): void;
+}
 interface Clip {
   name: string;
   duration: number;
@@ -138,6 +142,8 @@ interface Deformation {
     deltas: Float32Array;
     palette: Float32Array;
     weights: Float32Array;
+    /** The weights a {@link WeightSource} gives, sampled into here before they are compared with `weights`. */
+    sampled: Float32Array;
   };
   /**
    * The record of an earlier primitive of the same skinned node whose bone range this one shares (batch.ts `add`): it
@@ -483,10 +489,12 @@ export class Animation implements EnginePlugin {
   /** The model whose nodes are the joints: this one, or `options.skeleton`. */
   private readonly joints: PBRModel;
   /**
-   * Set by `MorphWeightPlayer` (morph-gpu.ts) once it writes this Animation's morph weights on the GPU: from then on
-   * `primitive.weights` no longer says what is drawn, so a morphed primitive has no CPU pose.
+   * Set by `MorphWeightPlayer` (morph-gpu.ts) while it writes this Animation's morph weights on the GPU: then
+   * `primitive.weights` does not say what is drawn, so the CPU pose takes the player's samples, its shader's arithmetic
+   * on the CPU (KB-BVH-SYNCPOSE-MORPHGPU1). At `remove` the player writes the weights last drawn back into
+   * `primitive.weights` and clears this.
    */
-  private gpuWeights = false;
+  private weightSource?: WeightSource;
   private readonly prepareDeformation = (context: PBRDeformationContext) => this.deform(context);
   /** The deformation group of the frame graph this Animation's pass is in. */
   private group?: DeformGroup;
@@ -1146,13 +1154,11 @@ export class Animation implements EnginePlugin {
    * vertices changed. Undefined once another deformer or no deformer writes the primitive.
    */
   private cpuPose(r: Deformation): PrimitivePose | undefined {
-    const p = r.primitive,
-      weights = p.weights;
+    const p = r.primitive;
     if (
       !p.deformed ||
       p.deformed !== r.slot.page.output.buffer ||
-      (p.deformedOffset ?? 0) !== r.slot.output.offset * 80 ||
-      (this.gpuWeights && weights.length)
+      (p.deformedOffset ?? 0) !== r.slot.output.offset * 80
     )
       return undefined;
     const posed = (r.posed ??= {
@@ -1162,8 +1168,16 @@ export class Animation implements EnginePlugin {
       influences: r.influences(),
       deltas: r.deltas(),
       palette: new Float32Array(r.joints.length * 16),
-      weights: new Float32Array(weights.length),
+      weights: new Float32Array(p.weights.length),
+      sampled: new Float32Array(p.weights.length),
     });
+    let weights: ArrayLike<number> = p.weights;
+    if (this.weightSource && weights.length) {
+      // Weights no track of the player drives are the primitive's own.
+      posed.sampled.set(p.weights);
+      this.weightSource.weightsInto(this, p, posed.sampled);
+      weights = posed.sampled;
+    }
     let changed = posed.bind !== p.vertices;
     if (changed) {
       posed.bind = p.vertices;

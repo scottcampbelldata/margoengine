@@ -79,9 +79,10 @@ are at the call. It is redone only when a bone, a morph weight or the bind
 vertices changed, and nothing is kept for a model no ray ever asks about; the
 first query reads the influences and morph deltas from the asset once (32 or 64
 bytes per skinned vertex, 48 bytes per vertex and target). `Skin` and
-`GeometryCachePlayer` do the same from their own CPU data. An `Animation` with
-a `skinning` mode, or one whose weights a `MorphWeightPlayer` drives, has no CPU
-pose: those raycasts throw MargoError `unsupported`, and
+`GeometryCachePlayer` do the same from their own CPU data, and so does a
+`MorphWeightPlayer` for the weights it drives (its shader's sampling on the CPU,
+at the copy's time). An `Animation` with a `skinning` mode has no CPU pose:
+those raycasts throw MargoError `unsupported`, and
 `await raycaster.intersectModel(model)` reads the pose back from the GPU.
 
 ```ts
@@ -495,6 +496,8 @@ for (const [i, model] of models.entries()) {
   talk.add(animation, {offset: i * 0.13, speed: 1}); // defaults 0 and 1; add again to change them
 }
 talk.speed = 0.5; // every copy; talk.time, talk.playing and talk.remove(animation) work as you would expect
+// A synchronous raycast hits each face at the weights the player draws. talk.weightsInto(animation, primitive, out)
+// gives them; remove(animation) and dispose() leave the weights last drawn in primitive.weights.
 talk.dispose();
 ```
 

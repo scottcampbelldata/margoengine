@@ -148,7 +148,7 @@ test('a skinning mode has no CPU pose, so a synchronous ray refuses rather than 
   );
 });
 
-test('morph weights the GPU samples are not on the CPU, so that model refuses too', async (t) => {
+test('morph weights a MorphWeightPlayer samples on the GPU reach a synchronous ray, and stay as drawn after remove', async (t) => {
   const engine = await gpuEngine(t),
     fixture = animatedTriangle(),
     { doc, buffers } = fixture,
@@ -167,12 +167,30 @@ test('morph weights the GPU samples are not on the CPU, so that model refuses to
   engine.use(triangle);
   const animation = Animation.attach(triangle);
   animation.playing = false;
-  assert.equal(down(0, 0).intersectObjects(engine, [triangle]).length, 1);
-  const player = MorphWeightPlayer.attach(engine, 'Talk').add(animation);
-  assert.throws(() => down(0, 0).intersectObjects(engine, [triangle]), { code: 'unsupported' });
-  // The GPU keeps the weights the player last wrote, so removing it does not bring the CPU pose back.
-  player.remove(animation);
-  assert.throws(() => down(0, 0).intersectObjects(engine, [triangle]), { code: 'unsupported' });
+  const primitive = triangle.primitives[0],
+    player = MorphWeightPlayer.attach(engine, 'Talk').add(animation);
+  player.playing = false;
+  // 'Talk' takes the weight from 0 to 1 over a second; the target moves every vertex 0.3 along x, so the right edge at
+  // y = -0.55 is at 0.575 + 0.3 w. Before, any ray at this model threw MargoError 'unsupported'.
+  const edge = (x) => down(x, -0.55).intersectObjects(engine, [triangle]).length;
+  assert.deepEqual([edge(0.7), edge(0.5)], [0, 1], 'time 0: weight 0');
+  player.time = 0.99;
+  assert.deepEqual([edge(0.86), edge(0.88)], [1, 0], 'weight 0.99');
+  assert.equal(primitive.weights[0], 0, "the player's samples pose it, not primitive.weights");
+  player.time = 2.5;
+  assert.deepEqual([edge(0.7), edge(0.74)], [1, 0], 'the clip loops: weight 0.5');
+  // A frame's dispatch writes the weights at 2.5 on the GPU; they stay there after remove, and so in primitive.weights.
+  const device = engine.gpu;
+  player['evaluate']({ backend: 'webgpu', device, encoder: device.createCommandEncoder() });
+  player.time = 0.1;
+  assert.equal(player.remove(animation), true);
+  assert.ok(Math.abs(primitive.weights[0] - 0.5) < 1e-6, String(primitive.weights[0]));
+  assert.deepEqual([edge(0.7), edge(0.74)], [1, 0], 'the weights last drawn');
+  // A copy the player never drew keeps its own weights.
+  const again = MorphWeightPlayer.attach(engine, 'Talk').add(animation);
+  again.time = 0.99;
+  again.remove(animation);
+  assert.ok(Math.abs(primitive.weights[0] - 0.5) < 1e-6);
 });
 
 test('a Skin on a createMesh mesh is hit at the skeleton pose by an ordinary scene raycast', async (t) => {
