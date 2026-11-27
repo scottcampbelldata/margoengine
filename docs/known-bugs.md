@@ -932,6 +932,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   found and fixed with its own regression. Two more were fixed: the material back-side check (KB-PICK-MIRRORROWS1)
   and the OIT real-file check (KB-OIT-BLENDTHICK1), both above. On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.
 
+- **Rechecked 2026-11-27 on the RTX A6000 (origin/main 8d31e3f9d5, after `npm run build:packages`):** all four pass
+  under `node scripts/run-with-timeout.mjs --max=6 --`: the clustered sphere-light check (no failures), the biomes
+  browser check, the SSAO GPU check and `sky/test/features-check.mjs sleet astro hillaire`. The failures are seen on
+  the Intel Arc 140V only, so the row waits for a run on that laptop.
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 
 - **Repro:** `node scripts/run-with-timeout.mjs -- node packages/vfx/test/flame-check.mjs --only graded` (and with
@@ -11050,6 +11054,9 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
 - **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
   results kept, watching for an `out-of-memory` error.
 
+- **Rechecked under load 2026-11-27, not reproduced:** six rounds on origin/main 8d31e3f9d5 (RTX A6000), each three GPU pages at once: two WebGL2-layer pages (ANGLE Vulkan) running `node packages/voxel-pathtracer/tests/browser-check.mjs --compat analytic viewport` beside one WebGPU page tracing the heavy `native4k largemodels` viewport cases as load; logs kept under the lane folder. All 12 layer runs read "clear glass" 1.0000
+  (sd 0, 1,861 px) and "emissive media sigma 0.125" 10.1120 (sd 0.1841); no `out-of-memory` or validation line. The row
+  stays open on the three failures of 2026-11-10 and 2026-11-11.
 ### Path tracer viewport: the converged image after a device restore differed once on the WebGL2 layer under GPU load (KB-C34h, 2026-11-11, open, not reproduced)
 
 - **Repro (not reproduced since):** `node packages/voxel-pathtracer/tests/browser-check.mjs --compat viewport`, inside
@@ -11078,6 +11085,9 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
   pixels (case 2.7 to 4.4 s). The row stays open on the one failure of 2026-11-11 and waits for a repeat's
   `restored.where` line.
 
+- **Rechecked under load 2026-11-27, not reproduced:** the same six loaded rounds as the
+  furnace entry above (12 layer runs of `--compat analytic viewport` under load): every `restored` read 0 differing
+  pixels, max 0.
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
 Release exception: SSGI multiBounce off differs below the GL calls (driver).
