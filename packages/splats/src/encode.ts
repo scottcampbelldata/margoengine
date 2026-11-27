@@ -7,6 +7,9 @@ import type { SplatData } from './data.js';
 import { attributesFromSplats } from './ply.js';
 import { crc32 } from '../../shared/crc32.js';
 import { encodeWebpLossless } from './webp.js';
+// Static, not `await import()`: math/errors is shared with the static graph, and a dynamic import of it made an app's
+// bundler build its namespace object and ship the bundler runtime with every splats page (KB-INL1 follow-up).
+import { MargoError } from '@margoengine/math/errors';
 
 /** Options for {@link encodeSpz}. */
 export interface EncodeSpzOptions {
@@ -100,7 +103,6 @@ function smallestThree(rotations: Float32Array, i: number): number {
 
 async function compress(bytes: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
   if (typeof CompressionStream === 'undefined') {
-    const { MargoError } = await import('@margoengine/math/errors');
     throw new MargoError('unsupported', 'This runtime has no CompressionStream; use a current browser or Node 18+.');
   }
   const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'));

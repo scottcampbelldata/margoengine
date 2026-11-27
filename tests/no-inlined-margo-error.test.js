@@ -66,6 +66,22 @@ test('no package that declares @margoengine/math ships its own MargoError class'
   assert.deepEqual(found, [], 'these dist files bundle MargoError instead of importing @margoengine/math/errors');
 });
 
+test('no package dist loads @margoengine/math with a dynamic import', () => {
+  // Math is in every app's static graph, so a dynamic import() of it only makes the app's bundler build the module's
+  // namespace object and ship its runtime helper (splats encode.ts put rolldown/runtime.js in margoengine/viz).
+  const DYNAMIC = /import\(\s*[`"']@margoengine\/math/;
+  assert.match('await import(`@margoengine/math/errors`)', DYNAMIC);
+  assert.doesNotMatch("import{MargoError as e}from'@margoengine/math/errors'", DYNAMIC);
+  const found = [];
+  for (const name of readdirSync(join(root, 'packages'))) {
+    const dist = join(root, 'packages', name, 'dist');
+    if (name === 'math' || name === 'margoengine' || !existsSync(dist)) continue;
+    for (const file of shipped(dist))
+      if (DYNAMIC.test(readFileSync(file, 'utf8'))) found.push(file.slice(root.length + 1).replaceAll('\\', '/'));
+  }
+  assert.deepEqual(found, [], 'these dist files import @margoengine/math dynamically; import it statically');
+});
+
 test('every package that imports @margoengine/math declares it', () => {
   const undeclared = [];
   const imports = (directory) =>

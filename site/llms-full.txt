@@ -27174,6 +27174,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ## Open defects
 
+### Open 2026-11-26: margoengine/viz costs 264 B gzip more than @margoengine/points for PointsPlugin (umbrella, splats, KB-INL1b)
+
+- **Repro:** `npm run build:packages`, then `node --test --test-name-pattern="a kit costs only" tests/umbrella.test.js`: `import { PointsPlugin } from 'margoengine/viz'` bundles the same modules as importing it from `@margoengine/points`, but its entry and static chunks gzip to 27,696 B against 27,432 B, past the test's 64 B.
+- **Cause:** Vite 8's Rolldown still emits a package's `import()` targets when every module that names them is tree-shaken away: `import { Splats } from '@margoengine/splats'` with `Splats` unused emits the encode, sog, spz, zip, zstd and data chunks. Since KB-INL1 (acbe01aba) those dead chunks import `@margoengine/math/color` instead of bundling a copy, so the bundler moves `math/color` out of the entry into a shared chunk, and the entry pays an extra chunk and its import and export names. The dead chunks are never loaded.
+- **Fixed part:** the same failure first showed `\0rolldown/runtime.js` in the kit's modules. splats `encode.ts` loaded `@margoengine/math/errors` with `await import()`, so the app's bundler built that module's namespace object with its runtime helper. It now imports it statically. Regression: `tests/no-inlined-margo-error.test.js` "no package dist loads @margoengine/math with a dynamic import".
+- **Still open:** stop the dead lazy chunks from sharing modules with the entry, or have them dropped (a newer Rolldown, or splats keeping its lazy decoders out of the root graph), without bundling math again.
+
 ### Fixed 2026-11-25: local CI's GPU package step sat in `vfx test:gpu` until its 120-minute limit (check runner, vfx seek check, KB-VFX-SEEKHANG1)
 
 - **Seen:** local CI full run 2026-11-25T13-31-21-828Z, step `check:gpu-packages-no-build`: `packages/vfx/test/seek-check.mjs` printed its n = 600 case and nothing more; the step was killed at 120 minutes, while other lanes were running GPU tests on the same RTX A6000.
