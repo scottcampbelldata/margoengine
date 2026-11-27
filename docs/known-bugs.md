@@ -6,6 +6,28 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: the gameplay-sandbox settlement test looked for scatter's material block in 128-byte uniforms (KB-GS-UNIFORM144, gameplay-sandbox)
+
+- **Repro:** `cd examples/gameplay-sandbox && node --test test/procedural.test.js`: "settlement uploads baked AO and
+  calibrated materials" threw `Cannot read properties of undefined (reading 'slice')` (local CI 3b3db1b109,
+  `verify:test-gameplay-sandbox`).
+- **Cause:** KB-LOOK-TV-SHIMMER1 (1d1729c194) grew scatter's per-batch uniform from 128 to 144 bytes (material[6]
+  carries the sway); the test found the material block by the old size, so it found no glass.
+- **Fix:** the test reads the 144-byte block; the glass colour, metalness and the other asserts hold unchanged.
+- **Regression:** `examples/gameplay-sandbox/test/procedural.test.js` itself.
+
+### Open 2026-11-26: the gameplay-sandbox visual baselines differ after the day's look fixes (KB-GS-GOLDENS1, visual)
+
+- **Repro:** `npm run visual:check -- --only=gameplay-sandbox-high,gameplay-sandbox-light,gameplay-sandbox-phone`
+  (nvidia-ampere-msedge-158, baseline commit 0a9e9367ce): changed 0.458, 0.423 and 0.337 (limit 0.0005).
+- **Attributed so far** (one package's source rolled back at a time, high view): scatter to before SHIMMER1 takes
+  changed to 0.349 (the trees and grass: the new bounded sway); terrain, sky, environment and biomes to before
+  KB-TERRAIN-SKYAMBIENT1, and core's KB-VIEW-SRGB1 plus KB-CLEAR-DEFAULT1 reversed, change nothing. Left: the
+  shoreline water and foam, the clouds and the eyebrow copy ("PLAYGROUND" to "SANDBOX", 895391feac). Candidates since
+  the baseline: water 52c5f0e79f, 5bad7f5ccb, 3424ada843, a551dd9f5a, 0d06a4a3af; sky clouds 4ef090e745; shared GGX
+  70351f3224 (KB6016d). Rolling those back together fails to build against today's shared light terms.
+- **Owed:** prove the rest are those intended fixes, then `visual:update` the three views with the reasons.
+
 ### Fixed 2026-11-26: a supersampled edge pixel half plants and half lit ground was in both masks (KB-LOOK-MASKTIE1, shot tool)
 
 - **Repro:** rail-line shot `--once --seconds 1.1` (supersample 2): `probes/mid.plants.png` and `mid.lit.png` both read
