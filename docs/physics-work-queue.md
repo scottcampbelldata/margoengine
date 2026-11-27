@@ -434,7 +434,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | ICE-04 | Pack ice and floes | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed dbc7a0efd9 |
 | ICE-05 | Ice thermodynamics | physics/ice | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7b64dddf4f |
 | FIRE-04 | Explosive blast loading | none | Claude | CLAIMED (Fauld film) |
-| FIRE-05 | Explosive source and fragments | stand-in | Claude | CLAIMED (Fauld film) |
+| FIRE-05 | Explosive source and fragments | stand-in | Claude | BUILDING (Fauld film; claude/physics2d-kernel-03445e) |
 | FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
 | SOUND-01 | Outdoor propagation | physics/outdoor-sound and audio/outdoor | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 976796766b |
