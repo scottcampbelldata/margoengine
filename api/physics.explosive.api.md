@@ -9,6 +9,47 @@ import { BedGrid } from "@margoengine/math/fields";
 
 export const AIR_DEPTH_SCALE = 0.0012;
 
+export interface Atmosphere {
+    readonly pressure?: number;
+    readonly temperature?: number;
+}
+
+export interface BlastCounts {
+    readonly loads: number;
+    readonly impulse: number;
+}
+
+export interface BlastParams {
+    readonly physics: Physics;
+    readonly air?: Atmosphere;
+    readonly threshold?: number;
+    readonly breakables?: ImpactTarget;
+}
+
+export interface BlastPoint {
+    readonly arrival: number;
+    readonly overpressure: number;
+    readonly impulse: number;
+    readonly duration: number;
+    readonly decay: number;
+    readonly reflected: number;
+}
+
+export class BlastSolver implements Solver<BlastParams> {
+    readonly explosions: FieldDescriptor;
+    readonly id: string;
+    constructor(explosions: FieldDescriptor, id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: BlastParams): void;
+    step(context: StepContext, _dt: number): void;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(_tick: number): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+    get counts(): BlastCounts;
+    pressureAt(point: Vec3, time: number): number;
+}
+
 export interface ChargeCase {
     readonly mass: number;
     readonly geometry?: 'cylinder' | 'sphere';
@@ -333,6 +374,8 @@ export function airborneFraction(scaled: number): number;
 
 export function bedHeight(bed: FlightBed, x: number, z: number): number;
 
+export function blastAt(energy: number, distance: number, air?: Atmosphere): BlastPoint;
+
 export function chargeEnergy(mass: number, explosive?: Explosive): number;
 
 export function closedVesselPressure(propellant: Propellant, loading: number): number;
@@ -345,13 +388,29 @@ export function flyFragments(f: Float64Array, drag: Float64Array, launch: Float6
 
 export function freeAirEquivalent(budget: Pick<EnergyBudget, 'air' | 'ground'>): number;
 
+export function friedlanderDecay(k: number): number;
+
 export function gurneyVelocity(explosive: Explosive): number;
 
+export function impulseSoFar(point: BlastPoint, t: number, reflected?: boolean): number;
+
 export function metalSpeed(gurney: number, geometry: GurneyGeometry, metalToCharge: number, tamperToCharge?: number): number;
+
+export function overpressureAt(point: BlastPoint, t: number, reflected?: boolean): number;
+
+export function projectedArea(e: Vec3, n: Vec3): number;
+
+export function reflectedOverpressure(p: number, ambient?: number): number;
 
 export function scaledCraterRadius(scaled: number, law?: CraterLaw): number;
 
 export function scaledDepth(depth: number, energy: number): number;
+
+export function scaledDuration(Z: number): number;
+
+export function scaledImpulse(Z: number): number;
+
+export function scaledOverpressure(Z: number): number;
 
 export function tntEquivalent(energy: number): number;
 
