@@ -13,5 +13,18 @@ export interface JPEGDecodeOptions {
   maxPixels?: number;
 }
 
+export interface JPEGSamples {
+  width: number;
+  height: number;
+  components: number;
+  precision: number;
+  lossless: boolean;
+  ids: number[];
+  adobeTransform: number;
+  data: Uint8Array | Uint16Array;
+}
+
 export function decodeJPEG(bytes: Uint8Array, options?: JPEGDecodeOptions): DecodedJPEG;
+
+export function decodeJPEGSamples(bytes: Uint8Array, options?: JPEGDecodeOptions): JPEGSamples;
 ```

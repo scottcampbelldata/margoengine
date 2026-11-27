@@ -3,7 +3,9 @@
 // Predictor 2), PackBits, Deflate (Adobe's code 8 and the older 32946, with the engine's shared zlib inflater), CCITT
 // Modified Huffman, T.4 (1D and 2D) and T.6 bilevel coding (Sections 10 and 11, ITU-T T.4 and T.6; ccitt.ts), and JPEG:
 // Compression 7 from TIFF Technical Note 2 (JPEGTables, abbreviated datastreams) and old-style Compression 6 through
-// one JPEGInterchangeFormat datastream, with the engine's shared JPEG decoder. Bilevel and greyscale (WhiteIsZero or
+// one JPEGInterchangeFormat datastream, with the engine's shared JPEG decoder: DCT segments of 8 or 12 bits and lossless
+// segments (ITU-T T.81 Annex H) of 2 to 16 bits, which may hold their strip or tile's samples under another frame shape,
+// as the DNG Specification (Adobe, version 1.7.1.0, "Compression") allows. Bilevel and greyscale (WhiteIsZero or
 // BlackIsZero), RGB and palette images of 1, 2, 4, 8 or 16 bits per sample, CMYK (Section 16, with DotRange) at 8 or
 // 16 bits, YCbCr (Section 21: subsampled data units or planes, YCbCrCoefficients, YCbCrPositioning,
 // ReferenceBlackWhite) and CIE or ICC L*a*b* (Section 23, D65 white) at 8 bits, and 16, 32 or 64-bit float grey or RGB
@@ -149,16 +151,16 @@ function rawTIFF(
     width * height * spp > maxPixels * 4
   )
     throw corrupt('image exceeds sample bound');
+  const jpeg = compression === 6 || compression === 7;
   if (
     ![1, 2, 3].includes(format) ||
-    (format === 3 ? ![16, 32, 64].includes(bits) : ![1, 2, 4, 8, 16, 32].includes(bits)) ||
+    (format === 3 ? ![16, 32, 64].includes(bits) : ![1, 2, 4, 8, 16, 32].includes(bits) && !jpegBits(jpeg, bits)) ||
     (format === 2 && bits < 8)
   )
     throw refuse('sample format');
   if ((tags.get(258) ?? [bits]).some((b) => b !== bits) || (tags.get(339) ?? [format]).some((f) => f !== format))
     throw refuse('mixed sample formats');
   const fillOrder = tag(266, 1),
-    jpeg = compression === 6 || compression === 7,
     ccitt = compression >= 2 && compression <= 4,
     webp = compression === 50001,
     [sh, sv] = tag(262, spp >= 3 ? 2 : 1) === 6 ? (tags.get(530) ?? [2, 2]) : [1, 1];
@@ -171,7 +173,7 @@ function rawTIFF(
   // Pages keep their stored samples: subsampled YCbCr outside JPEG (Section 21 data units) has no per-pixel layout.
   if ((sh !== 1 || sv !== 1) && !(jpeg && planar === 1)) throw refuse('subsampled YCbCr page');
   if (ccitt && (bits !== 1 || spp !== 1)) throw corrupt('CCITT compression needs 1-bit bilevel data');
-  if ((jpeg || webp) && (bits !== 8 || format !== 1))
+  if ((jpeg && (!jpegBits(jpeg, bits) || format !== 1)) || (webp && (bits !== 8 || format !== 1)))
     throw refuse(`${jpeg ? 'JPEG' : 'WebP'} with ${bits}-bit samples`);
   if (webp && (planar !== 1 || (spp !== 3 && spp !== 4)))
     throw corrupt('WebP compression needs 8-bit RGB or RGBA samples, chunky');
@@ -208,7 +210,7 @@ function rawTIFF(
             : Int32Array
         : bits <= 8
           ? Uint8Array
-          : bits === 16
+          : bits <= 16
             ? Uint16Array
             : Uint32Array;
   const samples: TIFFSamples = new Ctor(width * height * spp),
@@ -221,11 +223,9 @@ function rawTIFF(
       stop = Math.max(start + tag(514, 0), ...offsets.map((o, i) => o + counts[i]));
     if (!Number.isSafeInteger(stop) || start + 2 > bytes.length || stop > bytes.length)
       throw corrupt('JPEGInterchangeFormat runs past the end');
-    const frame = decodeJPEGComponents(bytes.subarray(start, stop), { maxPixels }, [spp]);
-    if (frame.width < width || frame.height < height) throw corrupt('JPEG frame is smaller than the image');
+    const at = jpegSegment(bytes.subarray(start, stop), maxPixels, bits, spp, width, height, width, height);
     for (let y = 0; y < height; y++)
-      for (let x = 0; x < width; x++)
-        for (let c = 0; c < spp; c++) samples[(y * width + x) * spp + c] = Math.round(frame.planes[c](x, y));
+      for (let x = 0; x < width; x++) for (let c = 0; c < spp; c++) samples[(y * width + x) * spp + c] = at(x, y, c);
     return { width, height, bits, sampleFormat: format, samplesPerPixel: spp, samples, description, tags, ascii };
   }
   for (let plane = 0; plane < planes; plane++)
@@ -243,16 +243,13 @@ function rawTIFF(
         if (fillOrder === 2 && compression !== 32773) raw = reverseBits(raw);
         if (jpeg) {
           // Technical Note 2: each strip or tile is a JPEG datastream (tables from JPEGTables), components as stored.
-          const frame = decodeJPEGComponents(jpegStream(tables, raw), { maxPixels }, [channels]),
-            w = Math.min(tw, width - bx * tw),
-            h = Math.min(rows, height - by * th);
-          if (frame.width < w || frame.height < h) throw corrupt('JPEG frame is smaller than its strip or tile');
+          const w = Math.min(tw, width - bx * tw),
+            h = Math.min(rows, height - by * th),
+            at = jpegSegment(jpegStream(tables, raw), maxPixels, bits, channels, w, h, tw, rows);
           for (let y = 0; y < h; y++)
             for (let x = 0; x < w; x++)
               for (let c = 0; c < channels; c++)
-                samples[((by * th + y) * width + bx * tw + x) * spp + (planar === 2 ? plane : c)] = Math.round(
-                  frame.planes[c](x, y),
-                );
+                samples[((by * th + y) * width + bx * tw + x) * spp + (planar === 2 ? plane : c)] = at(x, y, c);
           continue;
         }
         let decoded = decompress(compression, raw, size, tw, rows, channels, tag(292, 0), codecs);
@@ -469,6 +466,47 @@ function decompress(
   return rgb;
 }
 
+/** True for a JPEG page whose BitsPerSample a JPEG frame can hold: 8 or 12 for DCT, 2 to 16 lossless. */
+const jpegBits = (jpeg: boolean, bits: number): boolean => jpeg && bits >= 2 && bits <= 16;
+
+/**
+ * Decodes the JPEG datastream of one segment of `segmentWidth` x `segmentHeight` pixels of `channels` samples, of which
+ * the first `width` x `height` pixels lie in the image, and returns the sample at (x, y, channel). A DCT frame has the
+ * segment's components and BitsPerSample as its precision. A lossless frame may hold fewer bits, and may hold the same
+ * samples in another shape (a DNG camera tile is often two components at half the width): its samples then fill the
+ * segment in raster order.
+ */
+function jpegSegment(
+  stream: Uint8Array,
+  maxPixels: number,
+  bits: number,
+  channels: number,
+  width: number,
+  height: number,
+  segmentWidth: number,
+  segmentHeight: number,
+): (x: number, y: number, channel: number) => number {
+  const frame = decodeJPEGComponents(stream, { maxPixels }, [channels, 1, 2, 3, 4]),
+    { planes, lossless, precision } = frame,
+    count = planes.length;
+  if (lossless ? precision > bits : precision !== bits)
+    throw corrupt(`a ${precision}-bit JPEG frame in a ${bits}-bit image`);
+  const line = frame.width * count;
+  if (
+    lossless &&
+    (count !== channels || frame.width !== segmentWidth) &&
+    line * frame.height === segmentWidth * channels * segmentHeight
+  )
+    return (x, y, channel) => {
+      const at = (y * segmentWidth + x) * channels + channel,
+        inLine = at % line;
+      return planes[inLine % count]((inLine / count) | 0, (at / line) | 0);
+    };
+  if (count !== channels) throw corrupt(`a JPEG frame of ${count} components for ${channels} samples per pixel`);
+  if (frame.width < width || frame.height < height) throw corrupt('a JPEG frame is smaller than its strip or tile');
+  return (x, y, channel) => Math.round(planes[channel](x, y));
+}
+
 /** A JPEG segment's datastream with the JPEGTables field's tables in front (TIFF Technical Note 2, abbreviated form). */
 function jpegStream(tables: number[] | undefined, raw: Uint8Array): Uint8Array {
   if (!tables || tables.length < 4) return raw;
@@ -489,8 +527,8 @@ function jpegStream(tables: number[] | undefined, raw: Uint8Array): Uint8Array {
  * @throws RangeError when the image is larger than `maxPixels`.
  * @throws MargoError `failed` when the bytes are not a complete, valid TIFF file, or use a compression, colour space
  * or sample layout outside the ones listed above (signed samples, 24-bit floats, inks other than CMYK, ITU L*a*b*,
- * lossless or 12-bit JPEG, old-style JPEG without JPEGInterchangeFormat), or LZMA, Zstandard or WebP without its
- * decoder in `codecs`.
+ * arithmetic or hierarchical JPEG, old-style JPEG without JPEGInterchangeFormat), or LZMA, Zstandard or WebP without
+ * its decoder in `codecs`.
  * @example
  * const image = parseTIFF(bytes, { codecs: await loadTIFFCodecs(bytes) });
  */
@@ -572,7 +610,7 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
     throw new RangeError(`TIFF is ${width} x ${height}, over maxPixels ${maxPixels}; raise maxPixels to decode it`);
   if (bitsList.some((b) => b !== bits) || (tags.get(339) ?? [1]).some((f) => f !== (float ? 3 : 1)))
     throw refuse('mixed or signed sample formats');
-  if (float ? ![16, 32, 64].includes(bits) : ![1, 2, 4, 8, 16].includes(bits))
+  if (float ? ![16, 32, 64].includes(bits) : ![1, 2, 4, 8, 16].includes(bits) && !jpegBits(jpeg, bits))
     throw refuse(`${bits}-bit ${float ? 'float ' : ''}samples`);
   if (
     ![0, 1, 2, 3, 5, 6, 8, 9].includes(photometric) ||
@@ -605,7 +643,7 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
     throw corrupt('WebP compression needs 8-bit RGB or RGBA samples, chunky');
   if (ccitt && (bits !== 1 || spp !== 1 || photometric > 1))
     throw corrupt('CCITT compression needs 1-bit bilevel data');
-  if (jpeg && bits !== 8) throw refuse(`JPEG with ${bits}-bit samples`);
+  if (jpeg && (!jpegBits(jpeg, bits) || float)) throw refuse(`JPEG with ${bits}-bit samples`);
   const tileW = tiled ? tag(322) : width,
     tileH = tiled ? tag(323) : Math.min(tag(278, height), height),
     offsets = tags.get(tiled ? 324 : 273),
@@ -636,11 +674,9 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
     const start = tag(513),
       stop = Math.max(start + tag(514, 0), ...(offsets ?? []).map((o, i) => o + (counts?.[i] ?? 0)));
     if (start + 2 > bytes.length || stop > bytes.length) throw corrupt('JPEGInterchangeFormat runs past the end');
-    const frame = decodeJPEGComponents(bytes.subarray(start, stop), { maxPixels }, [spp]);
-    if (frame.width < width || frame.height < height) throw corrupt('JPEG frame is smaller than the image');
+    const at = jpegSegment(bytes.subarray(start, stop), maxPixels, bits, spp, width, height, width, height);
     for (let y = 0; y < height; y++)
-      for (let x = 0; x < width; x++)
-        for (let c = 0; c < spp; c++) samples[(y * width + x) * spp + c] = Math.round(frame.planes[c](x, y));
+      for (let x = 0; x < width; x++) for (let c = 0; c < spp; c++) samples[(y * width + x) * spp + c] = at(x, y, c);
   } else {
     if (!offsets || !counts || offsets.length < across * down * planes || counts.length < offsets.length)
       throw corrupt('strip or tile offsets are missing');
@@ -670,12 +706,11 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
           let raw = bytes.subarray(offset, offset + counts[index]);
           if (fillOrder === 2 && compression !== 32773) raw = reverseBits(raw);
           if (jpeg) {
-            const frame = decodeJPEGComponents(jpegStream(tables, raw), { maxPixels }, [perPixel]);
-            if (frame.width < Math.min(segW, limitW - x0) || frame.height < Math.min(segH, limitH - y0))
-              throw corrupt(`JPEG frame of strip or tile ${index} is smaller than the segment`);
-            for (let y = 0; y < Math.min(segH, frame.height); y++)
-              for (let x = 0; x < Math.min(segW, frame.width); x++)
-                for (let c = 0; c < perPixel; c++) put(x, y, c, Math.round(frame.planes[c](x, y)));
+            const w = Math.min(segW, limitW - x0),
+              h = Math.min(segH, limitH - y0),
+              at = jpegSegment(jpegStream(tables, raw), maxPixels, bits, perPixel, w, h, segW, segH);
+            for (let y = 0; y < h; y++)
+              for (let x = 0; x < w; x++) for (let c = 0; c < perPixel; c++) put(x, y, c, at(x, y, c));
             continue;
           }
           let block = decompress(compression, raw, size, segW, segH, perPixel, tag(292, 0), codecs);

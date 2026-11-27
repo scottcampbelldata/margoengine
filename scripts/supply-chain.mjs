@@ -487,6 +487,14 @@ const ASSETS = [
     'test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick). README streams are exact unmodified bufferViews of Avocado (Microsoft CC0) and MeshoptCubeTest (Arseny Kapoulkine CC0), pinned to glTF-Sample-Assets 8f492390ddc7a2ae221a1369ef560589cf8c70fb; extraction script, source/extract SHA-256 and metadata in the fixture notice. No external implementation files copied',
   ],
   [
+    'packages/decoders/tests/fixtures/jpeg-dicom/NOTICE.md',
+    'test-only DICOM JPEG files, unmodified NM1_JPLL and NM1_JPLY of the NEMA DICOM WG04 compressed sample set (ftp://medical.nema.org/MEDICAL/Dicom/DataSets/WG04/), as the pydicom projects distribute them under MIT; pinned sources and SHA-256 in the notice',
+  ],
+  [
+    'packages/decoders/tests/fixtures/jpeg-libjpeg-turbo/NOTICE.md',
+    'Margo generated test images encoded and reference-decoded by the libjpeg-turbo 3.2.1 command-line tools, run as programs; no implementation source read or copied',
+  ],
+  [
     'packages/decoders/tests/fixtures/KTX2-README.md',
     'test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick)',
   ],

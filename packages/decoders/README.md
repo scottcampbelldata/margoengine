@@ -164,6 +164,41 @@ const {width, height, data} = await decodeImage(jpeg);
 console.log(width, height, Array.from(data.slice(0, 4))); // 2 2 [201, 120, 39, 255]
 ```
 
+## JPEG (`@margoengine/decoders/jpeg`)
+
+Reads Huffman coded JPEG as ITU-T T.81 (ISO/IEC 10918-1) defines it, synchronously, in Node, a page or a worker:
+
+| Process | Sample precision |
+| --- | --- |
+| Baseline (SOF0) | 8 bits |
+| Extended sequential (SOF1) and progressive (SOF2) | 8 or 12 bits |
+| Lossless (SOF3, Annex H): selection values 1 to 7, point transform, restart intervals, sampling factors, one or several scans | 2 to 16 bits |
+
+- `decodeJPEG(bytes, {maxPixels?})` returns RGBA8: grey or three components. Samples of other than 8 bits scale to
+  0-255. A lossless file is read as stored RGB unless a JFIF or Adobe marker says it holds YCbCr.
+- `decodeJPEGSamples(bytes, {maxPixels?})` returns the samples at the file's own precision, one to four components,
+  interleaved, as `Uint8Array` or `Uint16Array`, with no colour conversion. Use it for medical and camera data: a
+  lossless file comes out exactly as it was encoded. Signed data (some DICOM images) comes out as its two's complement
+  words; the file's own header says how to read them.
+- Arithmetic coding, hierarchical files, a height given only by a DNL marker and other precisions throw a MargoError
+  `unsupported`; a damaged or cut short file throws `failed`.
+
+```ts
+import {encodeJPEG} from 'margoengine/headless/formats';
+import {decodeJPEGSamples} from 'margoengine/decoders/jpeg';
+
+const grey = new Uint8Array(8 * 8 * 4).map((_, i) => (i % 4 === 3 ? 255 : 128));
+const file = encodeJPEG({width: 8, height: 8, data: grey});
+const {precision, components, lossless, data} = decodeJPEGSamples(file);
+console.log(precision, components, lossless, data.length); // 8 3 false 192
+```
+
+`tests/jpeg-t81.test.js` checks lossless files from libjpeg-turbo 3.2.1 (every selection value, 2 to 16 bits) and the
+NEMA DICOM sample `NM1_JPLL` sample for sample, and 12-bit files within one level of libjpeg-turbo's floating point
+decode. All 13 lossless files of the NEMA DICOM WG04 sample set equal its uncompressed references, and its 10 lossy
+12-bit files are within one level of libjpeg-turbo (`tests/jpeg-nema-corpus.mjs`). T.81 does not fix the inverse DCT's
+arithmetic, so no lossy file has one exact answer. The transform here is double precision.
+
 Native ASTC blocks are refused with code `unsupported`; ETC2 and EAC blocks (`etc2-rgb8unorm`, `etc2-rgb8a1unorm`, `etc2-rgba8unorm`, `eac-r11` and `eac-rg11`, unsigned and signed, with or without `-srgb`) are decoded on the CPU, written from the OpenGL ES 3.0 specification appendix C. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
 
 In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. Install the `webgpu` binding (`npm install webgpu`, tested with 0.6.2) and `@margoengine/headless` alongside Margo. It transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too. This example loads the complete CC0 FlightHelmet by Gary Hsu and Microsoft from a pinned Khronos sample revision:
@@ -288,11 +323,14 @@ Four small synchronous readers, each its own entry and each written from its pub
   0-255), 16, 32 and 64-bit float images (16-bit is the OpenEXR half) as `{format: 'rgba32float', data:
   Float32Array}`, with or without the floating point predictor (Predictor 3, Adobe Photoshop TIFF Technical Note 3,
   2005), as GIS and Photoshop heightmaps use it. Signed samples, 24-bit floats, inks other than CMYK, ITU L*a*b*,
-  lossless and 12-bit JPEG are refused, and so is LERC (Compression 34887), which has no public bitstream
-  specification.
+  arithmetic and hierarchical JPEG are refused, and so is LERC (Compression 34887), which has no public bitstream
+  specification. JPEG strips and tiles may be 8 or 12-bit DCT or lossless at 2 to 16 bits (grey, RGB or CMYK; YCbCr
+  stays 8-bit).
 - `openTIFF(bytes, {maxPixels?, codecs?})` lists every page (BigTIFF too) and `read(index)` returns its stored samples
   with every codec above, FillOrder 2 bilevel data included; JPEG pages keep their stored components (no colour
   conversion), and subsampled YCbCr outside JPEG is refused there, since its data units have no per-pixel layout.
+  A lossless JPEG tile may hold its samples in another frame shape (two components at half the width), as DNG camera
+  files do; the samples fill the tile in raster order.
 - `loadTIFFCodecs(bytes?, {signal?})` (`@margoengine/decoders/tiff-codecs`) resolves the LZMA, Zstandard and WebP
   decoders a file uses, each a separate chunk loaded with `import()` only when one of the file's pages needs it (all
   three without `bytes`); pass the result as `codecs`. Without it (default none) a page in one of those codes throws
@@ -345,7 +383,8 @@ cube maps and arrays go through `uploadTexture` and are handed to materials as a
 `tests/tga.test.js`, `dds.test.js`, `ktx.test.js` and `tiff.test.js` build every supported variant with the encoders in
 `tests/support/texture-encoders.js` and check decoded pixels exactly. `tests/tiff-libtiff.test.js` reads CCITT, JPEG
 and CMYK files written by the libtiff 4.7 tools (`tests/generate-tiff-libtiff.mjs`): CCITT exactly, JPEG within 3 of
-tiff2rgba and djpeg (their integer inverse DCT and chroma rounding differ from this decoder's), CMYK within 1. `scripts/texture-fixtures.mjs` uses the same
+tiff2rgba and djpeg (their integer inverse DCT and chroma rounding differ from this decoder's), CMYK within 1.
+`tests/jpeg-t81.test.js` reads lossless and 12-bit JPEG files (see the JPEG section). `scripts/texture-fixtures.mjs` uses the same
 encoders to write the 64x64 demo checkerboards in `examples/assets/texture-formats/`.
 
 ## GeoTIFF georeference and no-data (`@margoengine/decoders/geotiff`)

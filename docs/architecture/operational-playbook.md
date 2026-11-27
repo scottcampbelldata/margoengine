@@ -11162,3 +11162,15 @@ when a loop inside it continues, and an empty default clause first; nothing else
 Direct3D 11 and Vulkan against a CPU reference; twelve wrong on Direct3D 11 before, none after) and
 `test/glsl.test.js`. The loop shape is in `glassCandidates` of the voxel path tracer and sciviz's AMR ray march. Missing:
 Intel and AMD under Direct3D 11, and a corpus record of the guide's program.
+
+## Lossless and 12-bit JPEG (lane C, 2026-11-26)
+
+- One reader, `packages/shared/jpeg.js`, serves `decoders/jpeg`, `decoders/image`, `decoders/tiff` and the exporters:
+  DCT files of 8 and 12 bits and lossless files of 2 to 16 bits (ITU-T T.81).
+- Quality bar: lossless output is exact (libjpeg-turbo files for every selection value, and the NEMA DICOM references);
+  lossy 12-bit output is within 1 level of libjpeg-turbo's floating point decode. `tests/jpeg-t81.test.js` pins both;
+  `tests/jpeg-nema-corpus.mjs` is the by-hand run over the whole NEMA set.
+- Evidence still missing: ITU-T T.83's compliance streams (sold with the standard), a DNG file from a real camera (the
+  tile shapes are proved with files the test writes) and a TIFF with 12-bit or lossless JPEG from a third-party writer
+  (the strips are libjpeg-turbo's, the TIFF container is the test's).
+- Arithmetic, hierarchical and DNL-height files are refused with code `unsupported`.

@@ -17412,3 +17412,46 @@ Clean-room TypeScript implementation in `packages/physics/src/mesh-tools.ts`, us
 - A. Jacobson, L. Kavan and O. Sorkine-Hornung, [*Robust Inside-Outside Segmentation using Generalized Winding Numbers*](https://doi.org/10.1145/2461912.2461916) (ACM Transactions on Graphics 32(4), 2013): generalized winding-number classification (`|w(p)| >= 0.5`) on a uniform voxel grid for open or non-manifold meshes, followed by parallel-axis voxel inertia accumulation and Jacobi diagonalization.
 
 Only public papers were consulted; no rival or companion implementation source was read.
+
+## Lane C: lossless and 12-bit JPEG (2026-11-26)
+
+`packages/shared/jpeg.js` gained the lossless process (SOF3), 12-bit extended sequential and progressive files, table
+lookup Huffman decoding and `decodeJPEGSamples`; `decoders/tiff` reads them in strips and tiles. Written from the
+specifications and papers below. No decoder or encoder source was read.
+
+- CCITT and ISO/IEC JTC1/SC29/WG1, "T.81: Digital compression and coding of continuous-tone still images" (1992,
+  https://www.w3.org/Graphics/JPEG/itu-t81.pdf): Annex H (lossless prediction, point transform, restart rules and the
+  difference categories), Annex F (12-bit DC and AC ranges), Table B.2 (precisions) and F.2.2.3 (Huffman decoding).
+- A. Moffat and A. Turpin, "On the implementation of minimum-redundancy prefix codes", IEEE Transactions on
+  Communications, 1997, https://people.eng.unimelb.edu.au/ammoffat/abstracts/mt97ieeecomm.html: decoding by a table
+  indexed with the next bits, in place of a loop per bit.
+- M. Liddell and A. Moffat, "Decoding prefix codes", Software: Practice and Experience, 2006,
+  https://people.eng.unimelb.edu.au/ammoffat/abstracts/lm06spe.html: compares decoding methods and finds table methods
+  fast while the table stays small; hence 9 bits, with the length search for longer codes.
+- Adobe, "Digital Negative (DNG) Specification", version 1.7.1.0,
+  https://helpx.adobe.com/camera-raw/digital-negative.html: a lossless tile may be coded as a frame of another shape
+  (two components at half the width).
+- NEMA, DICOM PS3.5, https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_8.2.html: the JPEG transfer
+  syntaxes and encapsulated pixel data the sample files use.
+
+Rivals' feature list: DICOM and DNG lossless JPEG readers on the web take selection values 1 to 7, 8 to 16 bits and
+interleaved components, and WebAssembly builds of libjpeg-turbo add 12-bit lossy data; this reader covers those and
+the point transform, restart intervals and sampling factors. Arithmetic coding stays refused.
+
+Evidence: libjpeg-turbo 3.2.1 (conda-forge win-64 package, run as programs) made the fixtures of
+`tests/generate-jpeg-libjpeg-turbo.mjs`. The NEMA DICOM WG04 sample set
+(ftp://medical.nema.org/MEDICAL/Dicom/DataSets/WG04/; compsamples_jpeg.tar SHA-256
+df4487f691added9ed863424a166db31e954b2acf8efa299b2235259ab5b1883, compsamples_refanddir.tar.bz2
+2477265a9b1435230f0288ae2a30e26de512f6c2b9cd5f6f04bc1a0d5b539c96) was checked whole with
+`tests/jpeg-nema-corpus.mjs`: 13 of 13 lossless files equal the references; 10 of 10 12-bit lossy files differ from
+`djpeg -dct float` by at most 1. ITU-T T.83's compliance data is sold with that standard and was not used.
+
+A fixed bug found on the way: a file cut right after a 0xFF byte of entropy data read as endless zeros and decoded
+without an error. The bit reader now counts every byte it reads past the data.
+
+Rust and WebAssembly were measured and not used. A Rust prototype of the lossless loop (64-bit bit buffer, one
+component), run in turns with the TypeScript decoder in one Node process, per-round minimum of 12: MG1 (14.3 million
+samples) 144 ms against 90 ms, RG1 45 against 32 ms, SC1 45 against 29 ms, MR2 (1 million) 10.3 against 10.2 ms, CT1
+(262,144) 2.6 against 3.8 ms, on a machine shared with other work. The gain, 1.4 to 1.6 times, appears only above about
+1 MB of data, small slices and camera tiles are no faster, and the synchronous `decodeJPEG` and `parseTIFF` calls cannot
+load a module on demand, so Wasm would mean a second, asynchronous decoder.

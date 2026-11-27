@@ -51,7 +51,7 @@ for (const [name, bound] of Object.entries(BOUNDS))
     assert.ok(mean < 1, `${name}: mean ${mean}`);
   });
 
-test('decodeJPEG refuses CMYK and anything but an 8-bit Huffman file, by name', () => {
+test('decodeJPEG refuses CMYK, arithmetic coding and a 12-bit baseline frame, by name', () => {
   assert.throws(() => decodeJPEG(fixture('cmyk.jpg')), /4 components/);
   const arithmetic = fixture('baseline-444.jpg').slice(),
     frame = arithmetic.findIndex((byte, i) => byte === 0xff && arithmetic[i + 1] === 0xc0);

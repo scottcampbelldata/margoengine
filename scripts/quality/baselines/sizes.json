@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20805967,
+  "total": 20814932,
   "history": [
     {
       "date": "2026-10-24",
@@ -14359,6 +14359,12 @@
       "commit": "13b6c14dd0",
       "grew": 4,
       "reason": "@margoengine/physics/world: 16826 → 17627 B gzip, ceiling 17331 → 18156. @margoengine/physics/loads: 42369 → 42849 B gzip, ceiling 42795 → 44135. @margoengine/physics: 915808 → 918308 B gzip, ceiling 916741 → 945858. @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)): 93554 → 95899 B gzip, ceiling 95086 → 98776. The previous receipts predate the current main's winding-number mesh mass changes. SEA-12 retains origin metadata and accumulator shapes where the world owns them, and publishes effective response alongside the rigid state. The measured lazy kernel is 822307 B against the 847035 B ceiling. Splitting world logic into a new entry would add a required import to every coupled scene."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "ca6b1986b8",
+      "reason": "Lossless (SOF3, 2 to 16 bits) and 12-bit JPEG in the shared reader (lane C, 2026-11-26). Measured before -> after: decoders/jpeg 3827 -> 4985, decoders/tiff 13708 -> 14843, exporters/jpeg-read 3827 -> 4887, exporters/textures 10272 -> 11307, fbx worker 130411 -> 132294 B gzip. Worth it: medical and camera files that were refused now decode exactly. A split would need a lazy import, which the synchronous decodeJPEG and parseTIFF cannot do without a new asynchronous API",
+      "grew": 5
     }
   ],
   "items": {
@@ -14647,7 +14653,7 @@
     "@margoengine/decoders/draco-points": 158608,
     "@margoengine/decoders/geotiff": 1690,
     "@margoengine/decoders/image": 1068811,
-    "@margoengine/decoders/jpeg": 4030,
+    "@margoengine/decoders/jpeg": 5241,
     "@margoengine/decoders/jxl": 902154,
     "@margoengine/decoders/ktx": 2851,
     "@margoengine/decoders/ktx2-gpu": 14795,
@@ -14666,7 +14672,7 @@
     "@margoengine/decoders/texture": 914,
     "@margoengine/decoders/texture-rgba": 6391,
     "@margoengine/decoders/tga": 1614,
-    "@margoengine/decoders/tiff": 14040,
+    "@margoengine/decoders/tiff": 15289,
     "@margoengine/decoders/tiff-codecs": 21657,
     "@margoengine/decoders/webp": 11720,
     "@margoengine/decoders/webp-lossless": 3366,
@@ -14734,7 +14740,7 @@
     "@margoengine/exporters/godot-precision-addon": 5995,
     "@margoengine/exporters/hash": 1717,
     "@margoengine/exporters/import-names": 1038,
-    "@margoengine/exporters/jpeg-read": 4030,
+    "@margoengine/exporters/jpeg-read": 5143,
     "@margoengine/exporters/ktx2": 152316,
     "@margoengine/exporters/materials": 22374,
     "@margoengine/exporters/meshopt": 8599,
@@ -14750,7 +14756,7 @@
     "@margoengine/exporters/skin": 2459,
     "@margoengine/exporters/sparse": 25614,
     "@margoengine/exporters/splats": 3056,
-    "@margoengine/exporters/textures": 10316,
+    "@margoengine/exporters/textures": 11647,
     "@margoengine/exporters/threemf": 21060,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
@@ -14766,7 +14772,7 @@
     "@margoengine/exporters/usdz-anim": 28718,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24025,
-    "@margoengine/fbx dist/workers/fbx.js": 132202,
+    "@margoengine/fbx dist/workers/fbx.js": 136263,
     "@margoengine/fbx/character-creator": 5542,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
