@@ -4181,6 +4181,7 @@ On their own: `resolvedRace(race, point)`, `raceNumbers`, `inceptionIndex`, `cav
 The parts work on their own too:
 - `Manoeuvring`: the MMG ship stepped by Runge-Kutta, with `selfPropulsion(speed)`.
 - `Propeller`: open-water K_T and K_Q, four quadrants by Healey's lift and drag fitted to the curves, and the race's far-wake speed. `raceVelocity(race, point)` is the jet's velocity at a point.
+- `wageningenB({blades, area, pitch, reynolds}, J)`: a Wageningen B-series propeller's K_T and K_Q by Oosterveld and van Oossanen's (1975) polynomials, with their Reynolds correction; `bSeriesCurves(propeller)` fits MMG's quadratic curves to them from bollard pull to zero thrust, for a model's `propeller.curves`.
 - `holtropMennen(hull, speed)`: Holtrop and Mennen's resistance with the wake fraction, thrust deduction and eta_R; `ittc1957(Re)` is the friction line.
 - `squat`, `icorels` and `huuska`, `rudderLiftSlope` (Fujii) and `thrusterThrust`.
 

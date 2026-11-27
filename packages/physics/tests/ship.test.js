@@ -18,6 +18,8 @@ import {
   headingGains,
   ankudinovShallow,
   bankLoads,
+  bSeriesCurves,
+  wageningenB,
   liWuAddedMass,
   shallowWater,
   inceptionIndex,
@@ -976,5 +978,32 @@ test("a bank alongside draws a ship in and turns its bow away, and pushes it off
   assert.throws(
     () => bankLoads(D, 0.3, 0.1, u, 0),
     (e) => e.code === 'unsupported' && /deeper than its draught/.test(e.message),
+  );
+});
+
+test("a Wageningen B-series propeller's open water by Oosterveld and van Oossanen's polynomials, and MMG's curves fitted to it", () => {
+  const b470 = { blades: 4, area: 0.7, pitch: 1 },
+    { kt, kq } = wageningenB(b470, 0.5);
+  // The 39 and 47 terms as transcribed, evaluated by hand for a B4-70 at P/D 1.0, J 0.5.
+  assert.ok(Math.abs(kt - 0.27103) < 1e-5 && Math.abs(kq - 0.043433) < 1e-6, `${kt} ${kq}`);
+  // The Reynolds correction against the paper's Figures 4 to 6 (B5-75, P/D 1.0, J 0.5, R_n 2e9: about +0.0016 and -0.0024,
+  // read from the figures to about 0.0003).
+  const b575 = { blades: 5, area: 0.75, pitch: 1 },
+    base = wageningenB(b575, 0.5),
+    high = wageningenB({ ...b575, reynolds: 2e9 }, 0.5);
+  assert.ok(Math.abs(high.kt - base.kt - 0.0016) < 3e-4 && Math.abs(high.kq - base.kq + 0.0024) < 3e-4);
+  // MMG's quadratic curves fitted from bollard pull to zero thrust (J 1.062), within 0.005 in K_T and in 10 K_Q.
+  const curves = bSeriesCurves(b470);
+  assert.ok(Math.abs(curves.zeroThrust - 1.062) < 1e-3 && curves.error < 0.005, `${curves.zeroThrust} ${curves.error}`);
+  // A ship on them: KVLCC2 with a B4-70 of its own diameter self-propels at 15.5 knots full scale.
+  const speed = (15.5 * 0.514444) / Math.sqrt(320 / 7),
+    M = { ...KVLCC2_L7, propeller: { ...KVLCC2_L7.propeller, curves } },
+    ship = new Manoeuvring(M, { u: speed });
+  ship.revolutions = ship.selfPropulsion(speed);
+  for (let t = 0; t < 3000; t++) ship.step(0.02);
+  assert.ok(Math.abs(ship.state.u / speed - 1) < 0.01, `${ship.state.u}`);
+  assert.throws(
+    () => wageningenB({ blades: 8, area: 0.7, pitch: 1 }, 0.5),
+    (e) => e.code === 'unsupported' && /2 to 7 blades/.test(e.message),
   );
 });

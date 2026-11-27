@@ -5,6 +5,13 @@
 ```ts
 import { FlowField, SeaSource, SeaSurface } from "@margoengine/math/fields";
 
+export interface BSeriesPropeller {
+    readonly blades: number;
+    readonly area: number;
+    readonly pitch: number;
+    readonly reynolds?: number;
+}
+
 export interface BankHull {
     readonly length: number;
     readonly beam: number;
@@ -448,6 +455,11 @@ export function ankudinovShallow(ratio: number, hull: {
 
 export function atan2(y: number, x: number): number;
 
+export function bSeriesCurves(prop: BSeriesPropeller): PropellerCurves & {
+    readonly error: number;
+    readonly zeroThrust: number;
+};
+
 export function bankInRange(hull: BankHull, depth: number): boolean;
 
 export function bankLoads(hull: BankHull, yB: number, depth: number, u: number, thrust: number, density?: number, gravity?: number): BankLoads;
@@ -500,6 +512,11 @@ export function steerTrack(track: ShipTrack, x: number, z: number, length: numbe
 export function thrusterAhead(m: number): [number, number];
 
 export function thrusterThrust(power: number, diameter: number, density?: number): number;
+
+export function wageningenB(prop: BSeriesPropeller, J: number): {
+    kt: number;
+    kq: number;
+};
 
 export const wrap: (angle: number) => number;
 

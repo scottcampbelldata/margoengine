@@ -17137,3 +17137,13 @@ carrier: attraction at usual depths turning to repulsion between h/T 1.1 and 1.2
 text says. Leaving out the hull's part astern, and the propeller-with-speed part without gravity, are this package's
 own. Proof: `packages/physics/tests/ship.test.js`, "a bank alongside draws a ship in and turns its bow away".
 
+### The Wageningen B-screw series (SEA-09, `wageningenB`, `bSeriesCurves`, 2026-11-26)
+
+`packages/physics/src/ship/bseries.ts`, written from M. W. C. Oosterveld and P. van Oossanen, "Further computer-analyzed
+data of the Wageningen B-screw series", International Shipbuilding Progress 22(251), 1975, NSMB publication 479 (a scan,
+https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=33effe719f9292950e7f89f1122695256f16a3fe, journal pages 6, 8
+and 9 read: Table 5's K_T and K_Q polynomials, Table 6's Reynolds correction and Figures 4 to 6). The scan's plus signs
+were checked against those figures; Table 6's printed "(log R_n - 301)" is read as 0.301, as every other term has it and
+as the figures need. No B-series code was read. Fitting MMG's quadratics by least squares between bollard pull and zero
+thrust is this package's own. Proof: `packages/physics/tests/ship.test.js`, "a Wageningen B-series propeller's open water".
+

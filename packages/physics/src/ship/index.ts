@@ -1,6 +1,7 @@
 // Ships under way (SEA-09): resistance, propellers and their race, rudders, manoeuvring and squat.
 export * from './autopilot.js';
 export * from './bank.js';
+export * from './bseries.js';
 export * from './empirical.js';
 export * from './mmg.js';
 export * from './propeller.js';
