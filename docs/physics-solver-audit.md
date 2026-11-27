@@ -1294,6 +1294,20 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   [Independent signed wave cut](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/data/KCS_data/fixed/wave_cut.dat)
   [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
 
+  The longitudinal mode of a rectangular hull exposed an extra beam-sized convolution on each lateral
+  quadrature point. `7f6bd00737` removes that second beam dependence. It matches the exact end-face mode,
+  including the known bilinear scatter and depth transfer, in `coupling/seakeeping.test.js`. The same file's
+  code-built and GLB-imported workboat test gives identical rise, righting, rigid trajectory, wake and replay
+  for the same geometry and mass properties. The live free-motion test still closes the combined wake work
+  to 0.00088 J, and the existing coupled quay test passes on WebGPU and WebGL2.
+
+  Under the same KCS freeze the corrected footprint gives 15.764 mm RMS at 0.25 m and 16.536 mm at
+  0.125 m. The fine port still carries 1,300 signed rows with the same band volumes and transverse moment.
+  Its world hash is `1a3ed8eea60cf8b4`. A separate even-reflection control on the previous 0.25 m source
+  shifts the result from 13.647 to 13.684 mm RMS. The footprint correction fixes the analytic source
+  mode and increases the measured profile error. Neither footprint nor the sidewall control closes the
+  held-out case. The independent geometry and forcing inputs were frozen for every comparison.
+
   The straight-quay coupling in `fbee5a3b75` enforces zero normal flow in the controlled reflected mode.
   The normal velocity is below 2×10⁻¹⁵ m/s, with an open-control speed of 3.88 mm/s in the live hull test.
   A separate low-crest browser fixture draws the coupled surface within 2.47×10⁻⁸ m of the solver on both renderers.
@@ -1352,6 +1366,8 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   On the same 1.2 m diagnostic with the actual derived hull and corrected course, the 4,005-tick replay
   ends with 4.255 MJ of water energy. The independent water integral and prescribed work differ by
   8.77×10⁻⁷ J, and the film 1:07 snapshot repeats the film 1:11 hash `94c58054fcc32923`.
+  With the longitudinal footprint correction, the same unresolved diagnostic ends at 6.084 MJ and closes
+  the work to 1.003×10⁻⁶ J. Seeking from 1:07 reproduces the new 1:11 hash `5e69c9b2f04e731b`.
   The original shot still needs resolved diffraction around the finite quay and its spray transfer.
 
   The indexed waterline contour runs from x = −79.00 to 201.00 m and z = −105.10 to −10.55 m.
