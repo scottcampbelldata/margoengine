@@ -145,7 +145,8 @@ a 2700 K lamp of the lighting plan's catalogue (40 W 400 lm, 60 W 690 lm, 100 W 
 hemisphere only) in candela, hand lamps as 40 lm cones standing on the floor in their `tn_handlamp` fitting (the film has
 no people, so no lamp hangs in the air at chest height; `HANDLAMP_ASSET`, `HANDLAMP_STAND`), the nearest and brightest lamps shadowed (`LocalShadows` with
 `shadowBudget`, 16 in `film`, 8 in `preview`), one `LightBounce`, a glowing bulb at each fitting (`flameEmission`),
-lamp-lit `VolumetricFog` (gypsum dust, or smoke after the blast and in the fire), `Fire` and `Smoke` of the state,
+lamp-lit `VolumetricFog` (gypsum dust, or smoke after the blast and in the fire), `Fire` and `Smoke` of the state
+(each smoke column added to the fog, so the lit air lies in front of it: `packages/scenes/test/fauld-smoke-fog.mjs`),
 and a `PostStack` of `GTAO`, `DOF`, `Bloom`, an AgX `Tonemap` white-balanced to 3200 K at the state's one metered
 exposure (`FAULD_STATE_EV`, EV100) and `SMAA`. The yard states use the overcast `PresetScene` sky. `frame(position,
 target, focal, stop)` sets the camera, its field of view on a 36 mm gate and the focus; `advanceTime(seconds)` runs

@@ -657,6 +657,9 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     lights,
     depth: () => stack.depthTexture,
   } as never);
+  // Each smoke column stands in that air: drawn after the fog, with the lit dust between the camera and each puff in
+  // front of it. Left out, a puff far down the drift covered the glow and read flat black (KB-FAULD-SMOKEBLACK1).
+  for (const smoke of [...fires.map((f) => f.smoke), ...smokes]) if (smoke) fog.add(smoke.effect);
   const occlusion = new GTAO({ radius: 1.2, slices: film ? 3 : 2, steps: film ? 8 : 6 } as never),
     dof = new DOF({ focalDistance: 5, aperture: 2.8, filmGauge: 36 }),
     smaa = new SMAA({ quality: 'high' } as never);

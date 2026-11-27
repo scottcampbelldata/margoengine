@@ -5519,10 +5519,34 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 
 - **Repro:** not reproduced yet; read from the code. Attach `GTAO` and draw dense dark smoke or a blended mesh in front
   of an occluded wall, before the PostStack's composite: the composite takes the wall's whole ambient light times
-  (1 - visibility) out of the blended colour, as it did under grass (KB-SCENES-GRASSBLACK1). A likely cause of the flat
-  black smoke in Fauld frame fr096, not yet checked.
+  (1 - visibility) out of the blended colour, as it did under grass (KB-SCENES-GRASSBLACK1). Measured on Fauld frame
+  fr096 (1920 x 1080, RTX A6000, WebGPU, one frozen instant): not seen there. Over the 576,068 pixels the smoke changes,
+  occlusion took 0.015 of 255 levels on average and 0.9 at most (0.023 and 2.9 with the smoke off), because the store
+  has almost no ambient light underground; the frame's flat black smoke was KB-FAULD-SMOKEBLACK1. A repro needs a
+  scene with strong ambient light behind dense dark smoke.
 - **Cause:** only `Scatter` registers an ambient veil (`packages/shared/ambient-veil.js`); vfx particles, smoke and
   core's blended meshes register none. SSGI and SSR under blended coverage are not measured.
+
+### Fixed 2026-11-27: smoke in the Fauld tunnels' dusty air read as flat black shapes (KB-FAULD-SMOKEBLACK1, scenes)
+
+- **Repro (before):** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr096.json --stills --out <folder>`: black blobs
+  and a black band across the upper half; fr093 black blotches in the doorway, fr091 a dark patch over the flames.
+- **Cause:** the scene never added its smoke to its `VolumetricFog`. The fog composites over the opaque scene before
+  the particles draw, so each puff covered the lit dust glow with the smoke's own dim colour and none of the air in
+  front of it. In fr096 that glow is nearly all the light of the middle of the frame (without the fog the walls there
+  are black), so smoke tens of metres off read as holes in it. Ruled out first: occlusion (KB-SSAO-BLENDVEIL1 above,
+  0.9 levels at most) and the local shadow maps (white puffs stayed black without them).
+- **Fix:** `@margoengine/scenes/fauld-tunnels` calls `fog.add(smoke.effect)` for every smoke column: it draws after the
+  fog's composite, each puff behind the in-scattered light and transmittance between the camera and it (Wronski,
+  "Volumetric Fog", SIGGRAPH 2014 Advances in Real-Time Rendering,
+  https://advances.realtimerendering.com/s2014/; premultiplied composite as `VolumetricFog.add` documents).
+- **After:** pixels at or under luma 1.5: fr096 21,705 to 0, fr093 17,112 to 0 (960 x 540, RTX A6000, WebGPU); fr092
+  unchanged (5 pixels by over 4 levels).
+- **Weak spots:** fr096's smoke is now only a faint soft shade in the haze: the columns in view are tens of metres off,
+  and none curls past the casings as the shot list asks. Fog-added smoke draws before the flames and embers, so a flame
+  behind a column is not dimmed by it (docs/limits.md).
+- **Regression:** `packages/scenes/test/fauld-smoke-fog.mjs` (every smoke column is one the fog draws, and fr096 has
+  under 200 black pixels: 4 unfogged and 23,371 black before).
 
 ### Fixed 2026-11-27: the dune coast's grass blades showed black fragments (KB-SCENES-GRASSBLACK1, post and scatter)
 

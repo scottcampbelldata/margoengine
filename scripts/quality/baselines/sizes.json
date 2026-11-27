@@ -14815,6 +14815,12 @@
       "commit": "baf47a5b94",
       "reason": "core feature multi-draw (Scott 2026-11-27, Yes to all): new entry @margoengine/culling/multidraw (MultiDraw: merged geometry ranges, per-range show and hide through indirect argument sets); culling/snapshot keys the draw count; core + stage 25,099 -> 25,149 B gzip; the @margoengine/core entry budget 22,467 -> 23,201 B for the snapshot and multi-draw growth (core 22,369 -> 22,525 B)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "kb-fauld-smokeblack1",
+      "reason": "scenes/fauld-tunnels: every smoke column is added to the volumetric fog, so it draws with the lit air in front of it (KB-FAULD-SMOKEBLACK1, flat black shapes in the fire frames); 13,477 to 13,498 B gzip, the entry having stood 12 B under its ceiling of 13,489. A split would move one line of the place out of the entry that builds it",
+      "grew": 1
     }
   ],
   "items": {
@@ -15974,7 +15980,7 @@
     "@margoengine/scenes/fauld-blast": 10004,
     "@margoengine/scenes/fauld-countryside": 8214,
     "@margoengine/scenes/fauld-crater": 8214,
-    "@margoengine/scenes/fauld-tunnels": 13489,
+    "@margoengine/scenes/fauld-tunnels": 13903,
     "@margoengine/scenes/library": 4468,
     "@margoengine/scenes/look-family": 809,
     "@margoengine/scenes/shot-settings": 1718,

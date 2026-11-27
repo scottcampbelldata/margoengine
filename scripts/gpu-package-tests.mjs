@@ -158,6 +158,8 @@ export const RUNNER_SMOKE = [
 const TOOLS = {
   'packages/scenes/test/fauld-still.mjs':
     'stills of the Fauld film shots; it reads the OS Terrain 50 grid and the crater and tree models from the asset library outside git (MARGO_ASSETS), so it runs by hand per shot (--shots=fr008,...), not as a gate',
+  'packages/scenes/test/fauld-smoke-fog.mjs':
+    'smoke in the dusty air of the Fauld tunnels (KB-FAULD-SMOKEBLACK1); it reads the Fauld models from the asset library outside git (MARGO_ASSET_LIBRARY), so it runs by hand, not as a gate',
   'packages/webgl2-compat/scripts/browser-matrix.mjs':
     'the browser matrix of docs/limits.md (Safari, the iOS Simulator, Firefox, Android Chrome), not a gate: run with --browser (npm run matrix)',
   'scripts/reference-rendering/mip-blend-control.mjs':

@@ -1101,6 +1101,9 @@ console.log(Object.keys(SMOKE_LOOKS).join(', ')); // campfire, houseFire, wildfi
   or a 600th of a long life), `texture` (a puff sprite; default a soft disc), `lights`,
   `shadows` and `depth` (puffs fade 1 m before surfaces). `setHeat`, `setWind`, `setFog`, `refill` (empty the column
   and prewarm it again next frame, for a column moved to a new fire) and `dispose`; `smoke.effect` is the `VFX`.
+- In a `VolumetricFog` (`@margoengine/environment/volumetric`), add the puffs with `fog.add(smoke.effect)`: they then
+  draw after the fog, with the air between the camera and each puff in front of it. Left out, a column in lit haze
+  covers the glow and reads as a flat dark shape (KB-FAULD-SMOKEBLACK1).
 - Glow from below: the puffs are lit by a point at the source radiating `RADIANT_FRACTION` (0.3, Drysdale 2011;
   McGrattan, Baum and Hamins 2000) of the release, `glow` times 0.3 / 0.7 of `heat`, softened over the source radius
   (`VFXLit.glow` of `@margoengine/vfx/lit`: irradiance P / (4 pi (d^2 + r^2)) lights a puff as the scene's noon sun of
