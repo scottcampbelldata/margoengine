@@ -18845,3 +18845,22 @@ or run.
   per-channel and asymmetric ranges, which shaped the per-line and boundary test cases.
 
 The tests (`packages/compute/tests/onnx-quant.test.js`) use values worked by hand from the formulas.
+
+## compute ONNX RegexFullMatch, TfIdfVectorizer and DeformConv (2026-11-27)
+
+Written from public specifications and papers only; no regular expression engine, ONNX runtime or vision library
+source was read.
+
+- ONNX contributors, *RegexFullMatch*, *TfIdfVectorizer* and *DeformConv* operator schemas (2026),
+  https://onnx.ai/onnx/operators/ .
+- The Go Authors, *regexp/syntax* package documentation (2026), https://pkg.go.dev/regexp/syntax : the RE2 syntax
+  table. Ken Thompson, *Regular expression search algorithm* (1968), https://doi.org/10.1145/363347.363387 , and Russ
+  Cox, *Regular Expression Matching Can Be Simple And Fast* (2007), https://swtch.com/~rsc/regexp/regexp1.html : the
+  state-set simulation that never backtracks. Unicode class membership is asked of the platform one code point at a
+  time.
+- Karen Sparck Jones, *A statistical interpretation of term specificity and its application in retrieval* (1972),
+  https://doi.org/10.1108/eb026526 , and David Guthrie et al., *A Closer Look at Skip-gram Modelling* (2006),
+  http://www.lrec-conf.org/proceedings/lrec2006/pdf/357_pdf.pdf : term weighting and skip n-grams.
+- Jifeng Dai et al., *Deformable Convolutional Networks* (2017), https://arxiv.org/abs/1703.06211 , and Xizhou Zhu et
+  al., *Deformable ConvNets v2* (2018), https://arxiv.org/abs/1811.11168 : sampled offsets, bilinear interpolation
+  and the modulation mask.

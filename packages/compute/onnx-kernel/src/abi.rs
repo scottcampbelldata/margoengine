@@ -2,14 +2,14 @@
 // copied by the TS boundary before another call can grow memory or reuse scratch.
 use crate::{
     attrs::Attrs,
-    conversion, element, indexing, linear, loss, misc, ml, ml_linear, ml_svm, ml_tree,
+    conversion, deform, element, indexing, linear, loss, misc, ml, ml_linear, ml_svm, ml_tree,
     normalization,
     proto::Parser,
     quant, random, recurrent, resize, schema, shape, signal, spatial,
     store::Store,
     strings,
     tensor::{Result, Tensor},
-    types, vision,
+    tfidf, types, vision,
     wire::{text, Json},
 };
 #[cfg(test)]
@@ -260,7 +260,9 @@ pub unsafe extern "C" fn supported(node_id: usize, version: u32) -> i32 {
             || loss::supports(&node.op)
             || signal::supports(&node.op)
             || strings::supports(&node.op)
-            || quant::supports(&node.op))) as i32
+            || quant::supports(&node.op)
+            || tfidf::supports(&node.op)
+            || deform::supports(&node.op))) as i32
 }
 #[no_mangle]
 pub unsafe extern "C" fn random_seed(lo: u32, hi: u32) {
@@ -366,6 +368,10 @@ pub unsafe extern "C" fn execute(
             vision::execute(&node.op, &inputs, &attrs, version)
         } else if misc::supports(&node.op) {
             misc::execute(&node.op, &inputs, &attrs, nout)
+        } else if tfidf::supports(&node.op) {
+            tfidf::execute(&inputs, &attrs)
+        } else if deform::supports(&node.op) {
+            deform::execute(&inputs, &attrs)
         } else if quant::supports(&node.op) {
             quant::execute(&node.op, &inputs, &attrs, version)
         } else if resize::supports(&node.op) {

@@ -454,6 +454,7 @@ export class OnnxModel implements Disposable {
               'OptionalHasElement',
               'SequenceMap',
               'StringNormalizer',
+              'RegexFullMatch',
             ].includes(node.op))
         ) &&
         !this.#k.supported(node.kernelIndex, version)
@@ -912,6 +913,19 @@ export class OnnxModel implements Disposable {
         if (!output.length) output.push('');
         const shape = x.shape.length === 1 ? [output.length] : [1, output.length];
         return [this.#upload(new OnnxTensor('string', output, shape), state.owned)];
+      }
+      case 'RegexFullMatch': {
+        if ((opsets[''] ?? 1) < 20 || values.length !== 1 || node.outputs.length !== 1)
+          invalid('RegexFullMatch needs opset >=20 and one input/output');
+        const pattern = attrs.find((a) => a.name === 'pattern') ?? { kind: 3, value: '' };
+        if (attrs.some((a) => a.name !== 'pattern') || pattern.kind !== 3 || typeof pattern.value !== 'string')
+          invalid('RegexFullMatch takes one string attribute, pattern');
+        const x = this.#read(this.#tensor(values[0]));
+        if (x.dtype !== 'string') invalid('RegexFullMatch needs a string tensor');
+        const { fullMatcher } = await import('./onnx-regex.js');
+        const matches = fullMatcher(pattern.value);
+        const output = Uint8Array.from(x.data as readonly string[], (s) => Number(matches(s)));
+        return [this.#upload(new OnnxTensor('bool', output, x.shape), state.owned)];
       }
       case 'SequenceMap': {
         if ((opsets[''] ?? 1) < 17) invalid('SequenceMap requires opset >=17');

@@ -1,6 +1,7 @@
 mod abi;
 mod attrs;
 mod conversion;
+mod deform;
 mod element;
 mod indexing;
 mod linear;
@@ -24,6 +25,7 @@ mod spatial;
 mod store;
 mod strings;
 mod tensor;
+mod tfidf;
 mod types;
 mod vision;
 mod wire;

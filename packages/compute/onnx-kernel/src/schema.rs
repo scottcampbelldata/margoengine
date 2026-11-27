@@ -9,6 +9,8 @@ pub fn minimum(op: &str) -> u32 {
         "QuantizeLinear" | "DequantizeLinear" | "ConvInteger" | "MatMulInteger" | "QLinearConv"
         | "QLinearMatMul" => 10,
         "DynamicQuantizeLinear" => 11,
+        "TfIdfVectorizer" => 9,
+        "DeformConv" => 19,
         "BitShift" => 11,
         "Round" | "CumSum" | "GatherElements" | "GatherND" | "ScatterElements" | "ScatterND"
         | "Range" | "SequenceEmpty" | "SequenceConstruct" | "SequenceAt" | "SequenceErase"
@@ -56,6 +58,7 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
         "ConvInteger" | "MatMulInteger" => (2, 4),
         "QLinearConv" => (8, 9),
         "QLinearMatMul" => (8, 8),
+        "DeformConv" => (3, 5),
         "DFT" => (1, if version < 20 { 2 } else { 3 }),
         "STFT" => (2, 4),
         "StringConcat" => (2, 2),
@@ -181,6 +184,25 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
             "dilations",
             "group",
             "kernel_shape",
+            "pads",
+            "strides",
+        ],
+        "TfIdfVectorizer" => &[
+            "max_gram_length",
+            "max_skip_count",
+            "min_gram_length",
+            "mode",
+            "ngram_counts",
+            "ngram_indexes",
+            "pool_int64s",
+            "pool_strings",
+            "weights",
+        ],
+        "DeformConv" => &[
+            "dilations",
+            "group",
+            "kernel_shape",
+            "offset_group",
             "pads",
             "strides",
         ],

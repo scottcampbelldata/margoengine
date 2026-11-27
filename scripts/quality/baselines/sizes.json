@@ -15097,7 +15097,7 @@
     "@margoengine/compute/linalg": 5745,
     "@margoengine/compute/nn": 19137,
     "@margoengine/compute/nn-extra": 21385,
-    "@margoengine/compute/onnx": 10444,
+    "@margoengine/compute/onnx": 13309,
     "@margoengine/compute/quant": 4183,
     "@margoengine/compute/random": 8328,
     "@margoengine/compute/shape": 3736,

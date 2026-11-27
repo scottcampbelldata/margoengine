@@ -211,10 +211,7 @@ test('ONNX unbuilt operators fail at load with a coded operator and opset diagno
       '',
       28,
       [
-        'RegexFullMatch',
-        'TfIdfVectorizer',
         'ImageDecoder',
-        'DeformConv',
         'Attention',
         'RotaryEmbedding',
         'TensorScatter',
