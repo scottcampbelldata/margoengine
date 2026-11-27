@@ -31,10 +31,10 @@ import { margoError } from '../../shared/errors.js';
 /** Earth's Rayleigh spectrum normalised to its blue (Hillaire 2020 Table 1): `rayleighColor`'s default. */
 export const EARTH_RAYLEIGH_COLOR: Vec3 = [0.005802 / 0.0331, 0.013558 / 0.0331, 1];
 /** Floats of the extra uniform block that follows the sky's 64 at byte 256. */
-export const LOOK_FLOATS = 76;
+export const LOOK_FLOATS = 80;
 // The Frame struct grows by the block; each later field is one vec4 unless noted.
 const FIELDS =
-  ',air0:vec4f,air1:vec4f,air2:vec4f,lookZenith:vec4f,lookHorizon:vec4f,lookGround:vec4f,lookGlow:vec4f,lookShape:vec4f,lookSun:vec4f,lookCloud:vec4f,lookStops:array<vec4f,8>,air3:vec4f}';
+  ',air0:vec4f,air1:vec4f,air2:vec4f,lookZenith:vec4f,lookHorizon:vec4f,lookGround:vec4f,lookGlow:vec4f,lookShape:vec4f,lookSun:vec4f,lookCloud:vec4f,lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f}';
 const lookCode = /* wgsl */ `
 // Recolour at the same Rec. 709 luminance toward tint.rgb, by tint.w times weight.
 fn lookTint(c:vec3f,tint:vec4f,weight:f32)->vec3f {
@@ -61,6 +61,15 @@ fn lookSky(w:vec3f,c:vec3f)->vec3f {
 // air3.rgb: the light a low haze layer scatters down (atmosphere.scatteredLight), its even radiance in sky units.
 fn daySky(direction:vec3f)->vec3f {return lookSky(direction,physicalDaySky(direction)*frame.air2.rgb+frame.air3.rgb);}
 fn nightSky(w:vec3f,footprint:f32)->vec3f {return lookSky(w,physicalNightSky(w,footprint));}
+// air4.rgb: the low haze layer's direct transmittance straight up (atmosphere.layerTransmittance). The night's own light
+// (stars, moon, twilight and the clouds above) comes from above the layer, so its share of the sky (frame.sun.w) is seen
+// through it, t^(1 / sin e) along a ray e up (Beer-Lambert through a flat layer, e floored at 3 degrees as the sun's is),
+// with the layer's own glow (air3, which the day sky adds under its clouds) in front. 1 and 0 leave the sky exactly as is.
+fn lowLayer(c:vec3f,w:vec3f)->vec3f {
+ let t=pow(max(frame.air4.rgb,vec3f(1e-30)),vec3f(1.0/max(w.y/max(length(w),1e-6),0.052336)));
+ return c*mix(vec3f(1.0),t,frame.sun.w)+frame.air3.rgb*frame.sun.w;
+}
+fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {return lowLayer(cloudSkyAbove(color,backdrop,ray,angularFootprint),ray);}
 `;
 /** Replaces `from` by `to` in `code`, and fails loudly when the sky's WGSL no longer holds `from` (a test pins every one). */
 function swap(code: string, from: string | RegExp, to: string, optional = false): string {
@@ -96,6 +105,12 @@ export function extendSky(code: string, full: boolean): string {
   if (!full) return c;
   c = swap(c, 'fn daySky(direction:vec3f)->vec3f {', 'fn physicalDaySky(direction:vec3f)->vec3f {');
   c = swap(c, 'fn nightSky(w:vec3f,footprint:f32)->vec3f {', 'fn physicalNightSky(w:vec3f,footprint:f32)->vec3f {');
+  // Every sky (the main pass and the environment both call cloudSky) is seen through the low layer (lowLayer).
+  c = swap(
+    c,
+    'fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {',
+    'fn cloudSkyAbove(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {',
+  );
   c = swap(
     c,
     'celestialProfile(w,s,SUN_RADIUS,footprint)',
@@ -143,6 +158,7 @@ const AIR_COLORS: [keyof SkyAtmosphereOptions, number][] = [
   ['rayleighColor', 4],
   ['mieColor', 1],
   ['scatteredLight', 4],
+  ['layerTransmittance', 1],
 ];
 const LOOK_NUMBERS: [keyof SkyLookOptions, number, number][] = [
   ['zenithStrength', 0, 1],
@@ -262,5 +278,6 @@ export const look: NonNullable<SkyFeatures['look']> = {
     });
     // A Lambertian layer under irradiance E shines E / pi each way: the share of the zenith sun on the ground, in sky units.
     set3(out, 72, a.scatteredLight ?? [0, 0, 0], (intensity * zenith) / Math.PI);
+    set3(out, 76, a.layerTransmittance ?? [1, 1, 1]);
   },
 };

@@ -107,6 +107,7 @@ export {
   sprayFromWind,
   sunTransmittance,
   hazeLight,
+  hazeReflectance,
   fireHazeLight,
   FIRE_LIGHT_COLOR,
   NOON_IRRADIANCE,

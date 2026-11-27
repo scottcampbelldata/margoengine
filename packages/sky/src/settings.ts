@@ -138,6 +138,14 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
     4,
     'Light a low haze layer (smoke, ash, spray) scatters down, a share of the zenith sun: lights the day sky evenly.',
   ),
+  c(
+    'atmosphere.layerTransmittance',
+    'sun',
+    [1, 1, 1],
+    0,
+    1,
+    'Direct share a low haze layer lets through straight up: the night sky, moon and clouds are seen through it.',
+  ),
   choice(
     'model',
     'air',

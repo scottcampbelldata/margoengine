@@ -155,6 +155,7 @@ export interface SkyTarget {
         atmosphere?: {
             sunColor?: readonly [number, number, number];
             scatteredLight?: readonly [number, number, number];
+            layerTransmittance?: readonly [number, number, number];
         };
         look?: object;
         lighting?: {

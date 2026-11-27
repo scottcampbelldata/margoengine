@@ -97,6 +97,7 @@ interface SkyAtmosphereOptions {
     mieAnisotropy?: number;
     ozone?: number;
     scatteredLight?: Vec3;
+    layerTransmittance?: Vec3;
 }
 
 interface SkyCloudOptions {

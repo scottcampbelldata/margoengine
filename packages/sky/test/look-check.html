@@ -91,7 +91,24 @@ window.check={samples:sceneSamples,
   aim(-30);
   await shot('groundPlain',b);
   await shot('groundTint',o=>{b(o);o.look={groundColor:[0.1,0.2,1],groundStrength:1};});
+  // By day the low layer's transmittance leaves the frame as it was: the day sky takes the layer through sunColor.
+  aim(40);
+  const dayNeutral=await shot('dayNeutral',o=>{b(o);o.atmosphere={};});
+  const dayLayer=await shot('dayLayer',o=>{b(o);o.atmosphere={layerTransmittance:[0.01,0.01,0.01]};});
+  out.dayLayerDiff=maxDiff(dayLayer.pixels,dayNeutral.pixels);
   sky.dispose();
+  // At night (sun 30 degrees down) the night sky and the clouds above are seen through the layer (KB-SKY-NIGHTPALL1).
+  const night=Sky.attach(engine,{timeScale:0,sunDirection:[Math.cos(30*rad),-Math.sin(30*rad),0]});
+  const nshot=async(name,set)=>{set(night.options);out[name]=await bands();return out[name];};
+  const n=(o)=>{for(const k of ['look','atmosphere','clouds'])delete o[k];};
+  await nshot('nightPlain',o=>{n(o);o.atmosphere={};});
+  await nshot('nightHalf',o=>{n(o);o.atmosphere={layerTransmittance:[0.5,0.5,0.5]};});
+  await nshot('nightPall',o=>{n(o);o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6]};});
+  await nshot('nightGlow',o=>{n(o);o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6],scatteredLight:[0.02,0.01,0.004]};});
+  aim(60);
+  await nshot('nightCloud',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={};});
+  await nshot('nightCloudPall',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6]};});
+  night.dispose();
   const error=await device.popErrorScope();
   const result={error:error?.message??null,errors:errors.splice(0)};
   for(const [k,v] of Object.entries(out))result[k]=v&&v.pixels?strip(v):v;

@@ -21,6 +21,7 @@ import {
   sprayFromWind,
   sunTransmittance,
   hazeLight,
+  hazeReflectance,
   fireHazeLight,
   visibility,
   windProfile,
@@ -63,7 +64,11 @@ export interface SkyTarget {
      * the layers scatter down lights the sky (`scatteredLight`). Made as `{}` under a load when the sky has a `look` or
      * takes one (`airControls`).
      */
-    atmosphere?: { sunColor?: readonly [number, number, number]; scatteredLight?: readonly [number, number, number] };
+    atmosphere?: {
+      sunColor?: readonly [number, number, number];
+      scatteredLight?: readonly [number, number, number];
+      layerTransmittance?: readonly [number, number, number];
+    };
     look?: object;
     /** The sky's engine lighting: its `intensity` is the noon sun's light the haze colours are referred to. Default 1. */
     lighting?: { intensity?: number };
@@ -519,6 +524,8 @@ export class WeatherDrive {
   private readonly sunColors = new WeakMap<object, { original: unknown; wrote: unknown }>();
   // The scatteredLight each atmosphere had before the drive wrote one, and the one it wrote (KB-AIR-SKYLIGHT1).
   private readonly skyLights = new WeakMap<object, { original: unknown; wrote: unknown }>();
+  // The layerTransmittance each atmosphere had before the drive wrote one, and the one it wrote (KB-SKY-NIGHTPALL1).
+  private readonly layerSkies = new WeakMap<object, { original: unknown; wrote: unknown }>();
   private readonly fuelWrote = new WeakMap<object, DeadFuelMoisture>();
   private fuel?: FuelMoistureModel;
 
@@ -689,7 +696,7 @@ export class WeatherDrive {
           fireLight,
         );
       }
-      this.dimSun(skyTarget, state);
+      this.dimSun(skyTarget, state, fireLight);
     }
     const grounds =
       o.grounds !== undefined
@@ -971,13 +978,14 @@ export class WeatherDrive {
   // direct sun the air lets through at the sun's elevation (`sunTransmittance`). With none of them the sky is not
   // touched, so its values stay bit for bit; when they clear the colour it had comes back. A colour a person set
   // meanwhile is kept as the one to come back to.
-  private dimSun(sky: SkyTarget, state: WeatherState): void {
+  private dimSun(sky: SkyTarget, state: WeatherState, fire?: readonly number[]): void {
     const o = sky.options,
       loaded = state.smoke > 0 || state.ash > 0 || state.spray > 0;
     let atm = o.atmosphere;
     if (atm === undefined && loaded && (o.look !== undefined || sky.airControls === true)) atm = o.atmosphere = {};
     if (atm === undefined) return;
-    this.lightSky(atm, state, sky, loaded);
+    this.lightSky(atm, state, sky, loaded, fire);
+    this.layerSky(atm, state, loaded);
     if (heldFromWeather(atm, 'sunColor')) return;
     const record = this.sunColors.get(atm);
     if (loaded) {
@@ -1003,11 +1011,15 @@ export class WeatherDrive {
   // layer lit from above does (`scatteredLight`, a share of the zenith sun on the ground, times the sun colour above the
   // air), while `sunColor` takes the dome down by t with the sun. So under a thick load the dome, its reflections, its
   // light on the scene and a fog volume's ambient are the layer's dim grey glow, not the clear sky. Cleared as sunColor is.
+  // At night the moon and twilight light the layer from above in the same way (each its light in units of the noon sun,
+  // as the haze's night light takes it, `airLight`), and the fires under it light it from below: it sends back down
+  // their light times its reflectance (`hazeReflectance`), so a pall over a burning valley glows orange (KB-SKY-NIGHTPALL1).
   private lightSky(
     atm: NonNullable<SkyTarget['options']['atmosphere']>,
     state: WeatherState,
     sky: SkyTarget,
     loaded: boolean,
+    fire?: readonly number[],
   ): void {
     if (heldFromWeather(atm, 'scatteredLight')) return;
     const record = this.skyLights.get(atm);
@@ -1024,9 +1036,25 @@ export class WeatherDrive {
           | readonly [number, number, number]
           | undefined,
         base = original ?? [0, 0, 0],
-        color = [0, 1, 2].map((i) =>
-          Math.min(4, base[i]! + Math.max(0, light[i]! - t[i]!) * up * above[i]!),
-        ) as unknown as readonly [number, number, number];
+        night = [0, 0, 0],
+        reference = sky.options.lighting?.intensity ?? 1;
+      for (const source of [sky.moonUnderClouds, sky.twilightLight]) {
+        const strength = source ? (source.direction[3] ?? 0) : 0,
+          y = source ? Math.min(1, Math.max(-1, source.direction[1] ?? 1)) : 0;
+        if (!source || !(strength > 0) || !(y > 0) || !(reference > 0)) continue;
+        const e = Math.asin(y),
+          through = hazeLight(state, e),
+          direct = sunTransmittance(state, e);
+        for (let i = 0; i < 3; i++)
+          night[i] += (Math.max(0, through[i]! - direct[i]!) * y * strength * (source.radiance[i] ?? 0)) / reference;
+      }
+      if (fire) {
+        const back = hazeReflectance(state);
+        for (let i = 0; i < 3; i++) night[i] += back[i]! * fire[i]!;
+      }
+      const color = [0, 1, 2].map((i) =>
+        Math.min(4, base[i]! + Math.max(0, light[i]! - t[i]!) * up * above[i]! + night[i]!),
+      ) as unknown as readonly [number, number, number];
       this.skyLights.set(atm, { original, wrote: color });
       atm.scatteredLight = color;
     } else if (record) {
@@ -1034,6 +1062,30 @@ export class WeatherDrive {
       if (atm.scatteredLight === record.wrote) {
         if (record.original === undefined) delete atm.scatteredLight;
         else atm.scatteredLight = record.original as readonly [number, number, number];
+      }
+    }
+  }
+
+  // The night's own light (stars, moon, twilight, the clouds above) is seen through the smoke, ash and spray: the sky's
+  // `layerTransmittance` is the direct share straight up (`sunTransmittance` at 90 degrees), which the sky takes along
+  // each ray (KB-SKY-NIGHTPALL1). Untouched with no load; cleared as sunColor is.
+  private layerSky(atm: NonNullable<SkyTarget['options']['atmosphere']>, state: WeatherState, loaded: boolean): void {
+    if (heldFromWeather(atm, 'layerTransmittance')) return;
+    const record = this.layerSkies.get(atm);
+    if (loaded) {
+      const t = sunTransmittance(state, Math.PI / 2),
+        original = (record && atm.layerTransmittance === record.wrote ? record.original : atm.layerTransmittance) as
+          | readonly [number, number, number]
+          | undefined,
+        base = original ?? [1, 1, 1],
+        color: readonly [number, number, number] = [base[0] * t[0], base[1] * t[1], base[2] * t[2]];
+      this.layerSkies.set(atm, { original, wrote: color });
+      atm.layerTransmittance = color;
+    } else if (record) {
+      this.layerSkies.delete(atm);
+      if (atm.layerTransmittance === record.wrote) {
+        if (record.original === undefined) delete atm.layerTransmittance;
+        else atm.layerTransmittance = record.original as readonly [number, number, number];
       }
     }
   }

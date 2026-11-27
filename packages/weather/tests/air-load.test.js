@@ -492,3 +492,56 @@ test('the sky under smoke, ash or spray takes the light the layer scatters down,
   assert.deepEqual(held.options.atmosphere.scatteredLight, [0.2, 0.2, 0.2]);
   assert.equal(plain.options.atmosphere, undefined);
 });
+
+// KB-SKY-NIGHTPALL1: at night under a thick smoke pall the sky dome showed clear stars. The drive writes the layer's
+// direct transmittance straight up as `layerTransmittance` (the sky sees its night through it), and the light the moon,
+// the twilight and the fires under it put on the layer as part of `scatteredLight`; both come back when the load clears.
+test('at night under a pall the sky takes the layer transmittance and its moonlit and firelit glow', async () => {
+  const { fireHazeLight, hazeReflectance } = await import('../dist/index.js');
+  const sun = new Float32Array([0, -0.4, 0.9]),
+    moon = Math.asin(0.5),
+    moonUnderClouds = { direction: new Float32Array([0, 0.5, Math.cos(moon), 0.3]), radiance: [0.8, 0.85, 1] },
+    sky = { name: 'sky', options: { lighting: { intensity: 2 } }, sun, airControls: true, moonUnderClouds },
+    fire = { options: {}, smokeEmission: 0, radiantPower: 4e9 },
+    machine = new WeatherMachine('clear', { seed: 8 }),
+    engine = engineOf(sky),
+    drive = WeatherDrive.attach(engine, { weather: machine, advance: false, fires: fire, smokeFromFire: false });
+  drive.setup(engine);
+  drive.update(0);
+  assert.equal(sky.options.atmosphere, undefined, 'no load: the sky is not touched');
+  const state = { smoke: 0.6 };
+  applyWeatherSettings(machine, state);
+  drive.update(0);
+  const a = sky.options.atmosphere,
+    zenith = sunTransmittance(state, Math.PI / 2);
+  for (let i = 0; i < 3; i++) near(a.layerTransmittance[i], zenith[i], 1e-15);
+  assert.ok(
+    a.layerTransmittance[2] < 1e-5,
+    `a pall that thick lets almost no starlight through: ${a.layerTransmittance}`,
+  );
+  const through = hazeLight(state, moon),
+    direct = sunTransmittance(state, moon),
+    back = hazeReflectance(state),
+    flames = fireHazeLight(4e9),
+    want = [0, 1, 2].map(
+      (i) =>
+        ((through[i] - direct[i]) * 0.5 * moonUnderClouds.direction[3] * moonUnderClouds.radiance[i]) / 2 +
+        back[i] * flames[i],
+    );
+  for (let i = 0; i < 3; i++) near(a.scatteredLight[i], want[i], 1e-12);
+  // At optical depth about 10 in red the slab is nearly semi-infinite: R = g2 / (k + g1) (Meador and Weaver 1980), red albedo 0.89, g 0.62.
+  const g1 = 2 - 0.89 * 1.62,
+    g2 = 0.89 * 0.38;
+  near(back[0], g2 / (Math.sqrt(g1 * g1 - g2 * g2) + g1), 1e-4);
+  assert.ok(want[0] > want[2], 'the firelit pall glows warm');
+  // Thinner smoke lets more of the night through and glows less.
+  applyWeatherSettings(machine, { smoke: 0.05 });
+  drive.update(0);
+  assert.ok(a.layerTransmittance.every((v, i) => v > zenith[i]));
+  applyWeatherSettings(machine, {});
+  drive.update(0);
+  assert.equal(a.layerTransmittance, undefined, 'cleared: the value it had comes back');
+  assert.equal(a.scatteredLight, undefined);
+  // The reflectance is the two-stream slab's: none without a load, and R + T = 1 for a slab that absorbs nothing.
+  assert.deepEqual(hazeReflectance({}), [0, 0, 0]);
+});

@@ -1656,16 +1656,33 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   fixed, `packages/scenes/test/timber-valley-masks-check.mjs` finds the plants, lit and shaded masks disjoint on both
   probes. BOUNCE1 and PENUMBRA1 are tracked in their own entries.
 
-### Open 2026-11-26: the night sky dome shows clear stars through a smoke pall (KB-SKY-NIGHTPALL1, sky and weather)
+### Fixed 2026-11-27: the night sky dome showed clear stars through a smoke pall (KB-SKY-NIGHTPALL1, sky and weather)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=fire-line --query=hour=22 --out=<folder>`: the
-  valley under the blowup's smoke (smoke about 0.6, optical depth about 14) glows orange (KB-WEATHER-FIREHAZE1), while
-  the sky above the ridge is a clear starry night blue, which no pall that thick lets through.
-- **Cause:** a `WeatherDrive` writes the load's light into the sky as `atmosphere.scatteredLight` and dims `sunColor`,
-  and both reach only the day sky (`daySky` in `packages/sky/src/look.ts`); the night dome (stars, moon, twilight) is
-  drawn whatever the load, and the fires' light on the layer (`fireHazeLight`) never reaches the dome.
-- **Owed in sky** (with the drive writing it): the night dome dimmed through the load as the sun is by day, and the
-  layer's own glow (the moon's and the fires' light on it) shown over it, with a regression test and a night still.
+  valley under the blowup's smoke (smoke about 0.6, optical depth about 14) glowed orange (KB-WEATHER-FIREHAZE1), while
+  the sky above the ridge was a clear starry night blue, which no pall that thick lets through.
+- **Cause:** a `WeatherDrive` wrote the load's light into the sky as `atmosphere.scatteredLight` and dimmed
+  `sunColor`, and both reached only the day sky (`daySky` in `packages/sky/src/look.ts`); the night dome (stars,
+  moon, twilight) and the clouds over it were drawn whatever the load, and `scatteredLight` held only the sun's share
+  (times the sine of its height, 0 at night), so the moon's and the fires' light on the layer never reached the dome.
+- **Fix:** sky's look gains `atmosphere.layerTransmittance` (the layer's direct share straight up). The look's
+  `cloudSky` wraps the sky's own (`cloudSkyAbove`) in `lowLayer`: the night share of the sky and its clouds
+  (`frame.sun.w`) is seen through the layer, t^(1 / sin e) along each ray (Beer-Lambert through a flat layer, e floored
+  at 3 degrees as `sunTransmittance` floors the sun), and the layer's glow (`scatteredLight`, which the day sky
+  already adds) shows in front of it; the sky pass, its reflections and its light all call `cloudSky`. With the
+  defaults (1 and 0) the result is c * 1 + 0, exactly as before, and by day (`frame.sun.w` 0) the frame is exact. The
+  drive writes `layerTransmittance` from `sunTransmittance(state, pi / 2)` and adds to `scatteredLight` the moon's
+  and twilight's scattered share (as the sun's: hazeLight less the direct share times the sine of the source's height,
+  over `lighting.intensity`, as `airLight` takes them) and the fires' light sent back down,
+  `hazeReflectance(state)` (new, the two-stream slab reflectance, W. E. Meador and W. R. Weaver, "Two-Stream
+  Approximations to Radiative Transfer in Planetary Atmospheres", J. Atmos. Sci. 37(3), 630-643, 1980,
+  https://doi.org/10.1175/1520-0469(1980)037%3C0630:TSATRT%3E2.0.CO;2) times `fireHazeLight`.
+- **Regression:** `packages/weather/tests/air-load.test.js` ("at night under a pall the sky takes the layer
+  transmittance and its moonlit and firelit glow"), `packages/sky/test/look.test.js` ("the night share of the sky and
+  its clouds are seen through the low layer"), and on a real GPU `packages/sky/test/features-check.mjs look` (WebGPU
+  and `MARGO_COMPAT=1`, RTX A6000): the day frame with a layer set is exact, a half layer takes the high band to
+  0.447 of the clear night, a pall of 1e-6 puts the night and its clouds out (below 1e-4), and the glow is even over
+  the dome in its own colour.
 
 ### Open 2026-11-26: a fire's glow on its smoke ignores the scene's light units (KB-VFX-GLOWUNITS1, vfx)
 

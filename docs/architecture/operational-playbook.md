@@ -3672,7 +3672,7 @@ upload of 17 configurations to figures recorded before the change, and the recor
 `features-check.mjs look` on an RTX A6000, native and `MARGO_COMPAT=1`, 4x and 1x: `look: {}` with `atmosphere: {}`
 and the cleared sky differ from the plain one by 0 under both models; a green `rayleighColor` turns the Bruneton high
 sky from (0.077, 0.168, 0.341) to (0.127, 0.341, 0.087); `sunDiscSize` 4 takes the disc from 4 to 32 bright pixels.
-Missing: other GPUs, a reference renderer for the non-Earth air, timing.
+Missing: other GPUs, a reference renderer for the non-Earth air, timing. Since 2026-11-27 (KB-SKY-NIGHTPALL1) the block is 80 floats: `air4` holds `atmosphere.layerTransmittance`, and the look wraps the sky's `cloudSky` (renamed `cloudSkyAbove`) in `lowLayer`, so the night share of the sky and its clouds is seen through a low haze layer at t^(1 / sin e) (e floored at 3 degrees) with the layer's glow (`scatteredLight`) in front, in the sky pass, its reflections and its light alike; at the defaults it is c * 1 + 0 and by day the frame is exact (`features-check.mjs look`, `dayLayerDiff` 0, native and `MARGO_COMPAT=1`).
 
 `@margoengine/sky/settings` (2026-11-17) is a table of 51 sky, air, cloud, fog, tint, gradient, disc, glow, exposure,
 Tonemap and Grade controls and eleven named looks made only of its values; `applySkySettings` writes them, leaving a

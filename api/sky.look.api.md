@@ -8,7 +8,7 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 
 export const EARTH_RAYLEIGH_COLOR: Vec3;
 
-export const LOOK_FLOATS = 76;
+export const LOOK_FLOATS = 80;
 
 export function extendSky(code: string, full: boolean): string;
 
@@ -101,6 +101,7 @@ interface SkyAtmosphereOptions {
     mieAnisotropy?: number;
     ozone?: number;
     scatteredLight?: Vec3;
+    layerTransmittance?: Vec3;
 }
 
 interface SkyCloudOptions {

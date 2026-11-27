@@ -234,6 +234,7 @@ const sky = Sky.attach(engine, {look: {zenithColor: [0.6, 0.2, 1], zenithStrengt
 | `mieAnisotropy` | -0.95 to 0.95 | 0.8 | Cornette-Shanks asymmetry: higher is a tighter glow round the sun |
 | `ozone` | 0 to 20 | 0 | Ozone absorption, a multiple of Earth's layer: a deeper blue at twilight |
 | `scatteredLight` | linear RGB 0 to 4 | [0, 0, 0] | Light a low haze layer (smoke, ash, sea spray) scatters down, a share of the zenith sun on level ground: the layer shines evenly over the day sky with that light over pi, so the dome, its reflections, the light it gives the scene and the sky fog take its glow. A `WeatherDrive` writes it under a load |
+| `layerTransmittance` | linear RGB 0 to 1 | [1, 1, 1] | That layer's direct share straight up: the night's own light (stars, moon, twilight, the clouds above) is seen through it, t^(1 / sin e) along a ray e up (e floored at 3 degrees), with the layer's glow (`scatteredLight`) in front, so a starry sky goes out under a thick smoke pall. The day sky takes the layer through `sunColor` and `scatteredLight`, so by day it changes nothing. A `WeatherDrive` writes it under a load |
 
 | `look` | Range | Default | What it does |
 | --- | --- | --- | --- |

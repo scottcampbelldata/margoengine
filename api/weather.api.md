@@ -280,6 +280,12 @@ export function hazeLight(state: {
     readonly spray?: number;
 }, elevation: number): [number, number, number];
 
+export function hazeReflectance(state: {
+    readonly smoke?: number;
+    readonly ash?: number;
+    readonly spray?: number;
+}): [number, number, number];
+
 export const isPresetName: (name: unknown) => name is WeatherPresetName;
 
 export function rainRate(state: Pick<WeatherState, 'rain'>): number;

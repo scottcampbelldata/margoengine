@@ -575,6 +575,48 @@ function slabTransmission(tau: number, w: number, g: number): number {
   return (2 * k * e) / (k + g1 + (k - g1) * e * e);
 }
 
+/**
+ * Two-stream diffuse reflectance of the same slab (hemispheric mean closure, Meador and Weaver 1980):
+ * g2 (1 - e^(-2 k tau)) / (k + g1 + (k - g1) e^(-2 k tau)); g2 tau / (1 + g1 tau) for conservative scattering, so R + T
+ * is 1 when nothing is absorbed.
+ */
+function slabReflection(tau: number, w: number, g: number): number {
+  const g1 = 2 - w * (1 + g),
+    g2 = w * (1 - g),
+    k = Math.sqrt(Math.max(0, (g1 - g2) * (g1 + g2)));
+  if (k === 0) return (g2 * tau) / (1 + g1 * tau);
+  const e = Math.exp(-2 * k * tau);
+  return (g2 * (1 - e)) / (k + g1 + (k - g1) * e);
+}
+
+/**
+ * The share of the diffuse light falling on the smoke, ash and spray of a state from below that they send back down,
+ * red, green and blue (670, 550 and 440 nm): the two-stream reflectance of the layers (`slabReflection`, the optical
+ * depths, albedos and asymmetries mixed by optical depth as in {@link hazeLight}). A pall lit by fires under it shines
+ * this share of their light back down at night (KB-SKY-NIGHTPALL1). Exactly [0, 0, 0] with no smoke, ash or spray.
+ */
+export function hazeReflectance(state: {
+  readonly smoke?: number;
+  readonly ash?: number;
+  readonly spray?: number;
+}): [number, number, number] {
+  const smoke = smokeOpticalDepth(state.smoke ?? 0),
+    ash = ashExtinction(state.ash ?? 0) * ASH_LAYER_DEPTH,
+    spray = sprayExtinction(state.spray ?? 0) * SPRAY_LAYER_DEPTH;
+  if (smoke + ash + spray === 0) return [0, 0, 0];
+  return [670, 550, 440].map((nm, i) => {
+    const s = smoke * (nm / 550) ** -SMOKE_ANGSTROM,
+      tau = s + ash + spray,
+      scatter = s * SMOKE_ALBEDO[i]! + ash * ASH_ALBEDO[i]! + spray * SPRAY_ALBEDO[i]!,
+      g =
+        (s * SMOKE_ALBEDO[i]! * SMOKE_ASYMMETRY +
+          ash * ASH_ALBEDO[i]! * ASH_ASYMMETRY +
+          spray * SPRAY_ALBEDO[i]! * SPRAY_ASYMMETRY) /
+        scatter;
+    return slabReflection(tau, scatter / tau, g);
+  }) as [number, number, number];
+}
+
 /** The linear colour of a flame's light (the `GLOW_COLOR` a fire's glow lights its smoke columns with in `@margoengine/vfx/lit`). */
 export const FIRE_LIGHT_COLOR: readonly [number, number, number] = [1, 0.42, 0.12];
 /** The noon sun's irradiance on level ground, W/m^2: the light the haze colours are referred to (share 1). */

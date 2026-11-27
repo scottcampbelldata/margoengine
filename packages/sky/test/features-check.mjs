@@ -733,6 +733,22 @@ checks.look = async (page, samples) => {
       `${model} sunColor tints the sky`,
     );
   }
+  // KB-SKY-NIGHTPALL1: the low layer leaves the day frame exact; at night it takes the sky and its clouds down by
+  // t^(1 / sin e) (the high band 60 to 80 degrees up, the horizon band 0 to 8, floored at 3) and its glow shows in front.
+  assert.equal(r.dayLayerDiff, 0, 'by day layerTransmittance leaves the frame exact');
+  const np = r.nightPlain,
+    ratio = (a, k) => lum(a[k]) / lum(np[k]);
+  assert.ok(lum(np.high) > 0, 'the night sky draws');
+  const half = ratio(r.nightHalf, 'high');
+  // The high band's corners sit lower than its centre column, but every pixel of it is above 45 degrees.
+  assert.ok(half > 0.5 ** Math.SQRT2 && half < 0.5, `half through, high: ${half}`);
+  assert.ok(ratio(r.nightHalf, 'horizon') < 0.5 ** 5, `half through, horizon: ${ratio(r.nightHalf, 'horizon')}`);
+  assert.ok(ratio(r.nightPall, 'all') < 1e-4, `the pall puts the night out: ${show('nightPall')}`);
+  const glow = r.nightGlow.mid;
+  assert.ok(glow[0] > 1.5 * glow[1] && glow[1] > 1.5 * glow[2], `the pall glows its own colour: ${show('nightGlow')}`);
+  assert.ok(Math.abs(lum(r.nightGlow.high) / lum(r.nightGlow.horizon) - 1) < 0.02, 'the glow is even over the dome');
+  assert.ok(lum(r.nightCloud.all) > 0, 'the night clouds draw');
+  assert.ok(lum(r.nightCloudPall.all) < 1e-4 * lum(r.nightCloud.all), `clouds above the pall go out: ${show('nightCloudPall')}`);
   const b = r.bruneton;
   // The air under the Bruneton model: a green Rayleigh spectrum, thin and thick air, heavy and coloured haze, ozone.
   assert.ok(r.rayleighGreen.high[1] > 2.5 * r.rayleighGreen.high[2], `green Rayleigh: ${show('rayleighGreen')}`);

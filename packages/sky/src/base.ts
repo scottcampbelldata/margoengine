@@ -211,6 +211,14 @@ export interface SkyAtmosphereOptions {
    * `sunColor` (the direct share) from its smoke, ash and spray. Default [0, 0, 0] (no layer).
    */
   scatteredLight?: Vec3;
+  /**
+   * The direct transmittance of that haze layer straight up, linear RGB 0-1: the night's own light (stars, the moon,
+   * twilight and the clouds above the layer) is seen through it, t^(1 / sin e) along a ray e up (e floored at 3
+   * degrees), and the layer's glow (`scatteredLight`) shows in front, so a starry sky goes out under a thick smoke pall.
+   * The day sky takes the layer through `sunColor` and `scatteredLight` instead. A `WeatherDrive` writes it from its
+   * smoke, ash and spray. Default [1, 1, 1] (no layer).
+   */
+  layerTransmittance?: Vec3;
 }
 /** One stop of {@link SkyLookOptions.gradient}: an elevation in degrees, -90 (straight down) to 90, and a linear RGB colour 0-1. */
 export interface SkyGradientStop {
@@ -326,7 +334,7 @@ export interface SkyOptions {
 // which makes the clear noon sky give 0.165 of the light on level ground (Erbs, Klein and Duffie 1982).
 const PREETHAM_SUN = 4 * Math.PI * 0.55;
 // Floats of the look's uniform block after the 64 at byte 256 (`LOOK_FLOATS` of @margoengine/sky/look; a test pins the two).
-const LOOK_FLOATS = 76;
+const LOOK_FLOATS = 80;
 /**
  * How much of a cloud sheet of `coverage` 0 to 1 is the overcast deck (KB-SKY-OVERCAST1): 0 up to 80 percent cover, a
  * smoothstep to 1 at full cover, as the sky draws it. Under the deck the engine sun fades out by the same share.

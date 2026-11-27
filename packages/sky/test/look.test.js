@@ -43,7 +43,9 @@ test('the rewrite reaches every anchor of the sky, its night, clouds, fog, refle
         '*(1.0-frame.sun.w)*frame.lookSun.rgb;',
         'thick*3.0*frame.lookCloud.w/',
         '*frame.lookCloud.rgb,opacity);',
-        'lookStops:array<vec4f,8>,air3:vec4f}',
+        'fn cloudSkyAbove(',
+        'fn lowLayer(',
+        'lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f}',
       ])
         assert.ok(main.includes(piece), `${model}, night ${!!night}: ${piece}`);
       assert.doesNotMatch(all, /\bBETA_R\b/, 'no shader keeps the constant Rayleigh');
@@ -225,12 +227,45 @@ test('the haze layer light rides the look block and the day sky adds it', () => 
     main.includes('physicalDaySky(direction)*frame.air2.rgb+frame.air3.rgb'),
     'the day sky adds the layer light',
   );
-  assert.ok(main.includes('lookStops:array<vec4f,8>,air3:vec4f}'), 'the Frame struct ends with the layer light');
+  assert.ok(
+    main.includes('lookStops:array<vec4f,8>,air3:vec4f,air4:vec4f}'),
+    'the Frame struct ends with the layer light',
+  );
   const written = new Float32Array(u.data, 256 + 72 * 4, 3);
   assert.ok(
     written[0] > 0 && written[0] === written[2],
     `the frame writes the layer light from the zenith sun: ${[...written]}`,
   );
+  sky.dispose();
+  h.cleanup();
+});
+
+// KB-SKY-NIGHTPALL1: the night dome drew clear stars under a smoke pall, as the layer reached only the day sky.
+test('the night share of the sky and its clouds are seen through the low layer, with its glow in front', () => {
+  const air = look.air({}, new Float32Array(9)),
+    block = new Float32Array(LOOK_FLOATS);
+  look.write(block, {}, air, 5);
+  assert.deepEqual([...block.subarray(76, 79)], [1, 1, 1], 'no layer: everything through');
+  look.write(block, { atmosphere: { layerTransmittance: [0.5, 0.25, 0.125] } }, air, 5);
+  assert.deepEqual([...block.subarray(76, 79)], [0.5, 0.25, 0.125]);
+  assert.throws(() => look.validate({ atmosphere: { layerTransmittance: [1.5, 1, 1] } }), /layerTransmittance/);
+  const h = harness(),
+    sky = new Sky({ atmosphere: { layerTransmittance: [0.1, 0.1, 0.1] }, timeScale: 0 });
+  h.engine.use(sky);
+  h.frame();
+  const main = h.codes.find((c) => c.includes('@fragment fn fragment(i:Vertex)') && c.includes('fn lookSky('));
+  // Every caller of cloudSky (the sky pass, its reflections and light) now gets the clouds and sky through the layer.
+  assert.match(
+    main,
+    /fn cloudSky\(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32\)->vec3f \{return lowLayer\(cloudSkyAbove\(/,
+  );
+  assert.equal(main.match(/fn cloudSky\(/g).length, 1, 'one cloudSky, the layered one');
+  assert.match(
+    main,
+    /c\*mix\(vec3f\(1\.0\),t,frame\.sun\.w\)\+frame\.air3\.rgb\*frame\.sun\.w/,
+    'the night share only',
+  );
+  assert.match(main, /max\(w\.y\/max\(length\(w\),1e-6\),0\.052336\)/, 'slant path floored at 3 degrees, as the sun');
   sky.dispose();
   h.cleanup();
 });

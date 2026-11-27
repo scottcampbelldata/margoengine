@@ -1155,6 +1155,13 @@ A `WeatherDrive` does three things for it, all package calls:
   `atmosphere.scatteredLight`: the layer lit from above shines evenly over the sky, so under a thick load the dome, its
   reflections, the light it gives the scene and a `VolumetricFog`'s ambient are a dim glow, not the clear sky
   (KB-AIR-SKYLIGHT1). Under the ash fall look the sky reads 19, 26, 33 against 215, 220, 228 in clear air.
+- **The night is seen through the layer.** The drive also writes the sky's `atmosphere.layerTransmittance`, the
+  direct share straight up (`sunTransmittance(state, Math.PI / 2)`): the stars, the moon, twilight and the clouds above
+  are seen through it along each ray, so a starry sky goes out under a thick pall (KB-SKY-NIGHTPALL1). The moon and
+  twilight light the layer from above as the sun does (each through the load at its height, over `lighting.intensity`),
+  and the fires light it from below: it sends `hazeReflectance(state)` of their `fireHazeLight` back down (the
+  two-stream slab's reflectance, Meador and Weaver 1980; 0.34, 0.31, 0.27 for a smoke of 0.6), and both go in
+  `scatteredLight`, so a pall over a burning valley glows orange over the whole dome at night. Cleared as `sunColor` is.
 - **The fog takes the smoke colour.** While dust and smoke together are most of the air's extinction, the sky fog's colour
   is `smokeColor()` (a grey brown from the single-scattering albedo of smoke, 0.84 to 0.89) times `smokeLight`, or the
   mix of dust and smoke colours by their share of the extinction.
