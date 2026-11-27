@@ -28,6 +28,8 @@ const builtins = {
   vec3f: vector(3, f32),
   vec4f: vector(4, f32),
   vec2i: vector(2, toInt),
+  // Column constructor only: a matrix is the array of its columns, as m[k] reads it.
+  mat3x3f: (...columns) => columns.map((c) => c.map((x) => f32(x))),
   f32: (x) => f32(x),
   // f32 to u32 or i32 truncates toward zero; u32 saturates at 0 (WGSL "Conversion" built-ins).
   u32: (x) => Math.max(0, Math.trunc(x)),

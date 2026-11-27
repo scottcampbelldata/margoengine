@@ -8,6 +8,7 @@ import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { pbrNeutral } from '../../shared/display.js';
 import { neutralInverseShader, pbrNeutralInverse } from '../../shared/display-inverse.js';
 import { wgslModule } from './support/wgsl-subset.js';
+import { volumeThicknessMap, volumeThicknessStub } from './support/volume-thickness.js';
 
 const W = 200,
   H = 100,
@@ -406,9 +407,9 @@ test('display-encoded lit and transmitted light add in linear light, and either 
 });
 
 const pass = new Transmission().declarations(2);
-function hook(frame, volume) {
+function hook(frame, volume, thickness = volumeThicknessStub) {
   const samples = [];
-  const shader = wgslModule(dielectricFresnelWGSL + pass, {
+  const shader = wgslModule(dielectricFresnelWGSL + thickness + pass, {
     f: { eye: [...eye, 1], camera, model: identity, ...frame },
     margoVolume: volume,
     margoScene: 'scene',
@@ -444,13 +445,13 @@ test('pass hook: binding declarations, straight read with no path and no blur at
     own = project(p).map((x, k) => x / [W, H][k]);
   for (const roughness of [0, 0.5, 1]) {
     const { shader, samples } = hook({ ext: [0, 1, 0, 0] }, [1, 1, 1, 1]);
-    const out = shader.call('margoTransmission', surface({ roughness }), v, { position: p });
+    const out = shader.call('margoTransmission', surface({ roughness }), v, { position: p, normal: [0, 0, 1] });
     assert.equal(samples[0].level, 0, 'IOR 1 never blurs');
     close(samples[0].uv, own, 1e-6, 'straight behind');
     close(out, [own[0], own[1], 0.5], 1e-6, 'F0 0 at IOR 1: everything behind');
   }
   const flat = hook({ ext: [0, 1.5, 0, 0] }, [0, 1, 1, 1]);
-  flat.shader.call('margoTransmission', surface({ th: 0 }), v, { position: p });
+  flat.shader.call('margoTransmission', surface({ th: 0 }), v, { position: p, normal: [0, 0, 1] });
   close(flat.samples[0].uv, own, 1e-6, 'zero path is the fragment itself');
 });
 
@@ -459,7 +460,10 @@ test('pass hook: half metal transmits (1 - metal) x (1 - the dielectric F), its 
     v = unit(sub(eye, p)),
     own = project(p).map((x, k) => x / [W, H][k]),
     { shader } = hook({ ext: [0, 1, 0, 0] }, [1, 1, 1, 1]),
-    out = shader.call('margoTransmission', surface({ metal: 0.5, f0: [0, 0, 0] }), v, { position: p }),
+    out = shader.call('margoTransmission', surface({ metal: 0.5, f0: [0, 0, 0] }), v, {
+      position: p,
+      normal: [0, 0, 1],
+    }),
     fresnel = (1 - v[2]) ** 5;
   close(
     out,
@@ -474,7 +478,7 @@ test('pass hook: blur grows with roughness, Beer uses margoVolume per world unit
     v = unit(sub(eye, p)),
     levels = [0, 0.2, 0.5, 1].map((roughness) => {
       const { shader, samples } = hook({ ext: [0, 1.5, 0, 0] }, [1, 1, 1, 1]);
-      shader.call('margoTransmission', surface({ roughness }), v, { position: p });
+      shader.call('margoTransmission', surface({ roughness }), v, { position: p, normal: [0, 0, 1] });
       return samples[0].level;
     });
   assert.ok(
@@ -482,30 +486,41 @@ test('pass hook: blur grows with roughness, Beer uses margoVolume per world unit
     String(levels),
   );
   assert.ok(levels[3] <= 8);
-  // Thickness 0.5 x map 1 x mean axis length 2: path 1 world unit.
+  // Thickness 0.5 x map 1 along the refracted chord of a slab scaled by 2 (31b2c8c30f, KB-VOL-TINT-DISPLAY1):
+  // thickness x det(M) / |cof(M) r . n| = 0.5 x 8 / (4 |r.z|), r = -v at IOR 1, so 1 / |v.z| world units.
   const doubled = [
     [2, 0, 0, 0],
     [0, 2, 0, 0],
     [0, 0, 2, 0],
     [0, 0, 0, 1],
   ];
+  const chord = 1 / Math.abs(v[2]);
   const { shader } = hook({ ext: [0, 1, 0, 0], model: doubled }, [0.5, 0.25, 1, 0]);
-  const out = shader.call('margoTransmission', surface(), v, { position: p });
+  const out = shader.call('margoTransmission', surface(), v, { position: p, normal: [0, 0, 1] });
   const { shader: clear } = hook({ ext: [0, 1, 0, 0], model: doubled }, [0.5, 1, 1, 1]);
-  const reference = clear.call('margoTransmission', surface(), v, { position: p });
-  close(out, [reference[0] * 0.25, reference[1], 0], 1e-6, 'Beer');
+  const reference = clear.call('margoTransmission', surface(), v, { position: p, normal: [0, 0, 1] });
+  close(out, [reference[0] * 0.25 ** chord, reference[1], 0], 1e-6, 'Beer');
+  // The host shader's thickness map (KHR_materials_volume thicknessTexture.g) scales the same path.
+  const mapped = hook({ ext: [0, 1, 0, 0], model: doubled }, [0.5, 0.25, 1, 0], volumeThicknessMap(0.5));
+  const half = mapped.shader.call('margoTransmission', surface(), v, { position: p, normal: [0, 0, 1] });
+  close(half, [reference[0] * 0.25 ** (chord / 2), reference[1], 0], 1e-6, 'Beer through the thickness map');
   // Dispersion: three reads, green on the base IOR.
   const spread = hook({ ext: [0, 1.5, 0, 3] }, [0.5, 1, 1, 1]);
-  spread.shader.call('margoTransmission', surface(), v, { position: p });
+  spread.shader.call('margoTransmission', surface(), v, { position: p, normal: [0, 0, 1] });
   assert.equal(spread.samples.length, 3);
   const plain = hook({ ext: [0, 1.5, 0, 0] }, [0.5, 1, 1, 1]);
-  plain.shader.call('margoTransmission', surface(), v, { position: p });
+  plain.shader.call('margoTransmission', surface(), v, { position: p, normal: [0, 0, 1] });
   close(spread.samples[0].uv, plain.samples[0].uv, 0, 'green ray');
 });
 
 test('mip chain: level0 copies texel for texel, every next level is the shared area filter', () => {
-  const source = readFileSync(new URL('../../gltf/src/transmission.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n'),
-    copy = /const copy = \/\* wgsl \*\/ `([\s\S]*?)`;/.exec(source)[1].replace('${neutralInverseShader}', neutralInverseShader);
+  const source = readFileSync(new URL('../../gltf/src/transmission.ts', import.meta.url), 'utf8').replace(
+      /\r\n/g,
+      '\n',
+    ),
+    copy = /const copy = \/\* wgsl \*\/ `([\s\S]*?)`;/
+      .exec(source)[1]
+      .replace('${neutralInverseShader}', neutralInverseShader);
   assert.ok(/@vertex fn vertex\(/.test(copy) && /@fragment fn level0\(/.test(copy));
   // The reduction is shared/mipmaps.js's area filter (each source texel weighted by its overlap with the destination
   // texel). The old 2x2 box from texel 2p dropped an odd last column and row; the GPU readback that compares each level
@@ -521,7 +536,11 @@ test('mip chain: level0 copies texel for texel, every next level is the shared a
   assert.deepEqual(shader.call('level0', [3.5, 2.5, 0, 1]), [3, 2, 6, 1]);
   // KB4000: a display-encoded source (toDisplay = PBR Neutral, then sRGB) reads back as the scene light it shows.
   const encode = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055);
-  for (const light of [[0.02, 0.3, 0.6], [0.9, 0.5, 0.1], [4, 2, 0.5]]) {
+  for (const light of [
+    [0.02, 0.3, 0.6],
+    [0.9, 0.5, 0.1],
+    [4, 2, 0.5],
+  ]) {
     const shown = pbrNeutral(light).map(encode),
       display = wgslModule(copy.replace(/@vertex fn vertex[\s\S]*?\n\}\n/, ''), {
         source: 'level',
@@ -529,8 +548,12 @@ test('mip chain: level0 copies texel for texel, every next level is the shared a
         textureLoad: () => [...shown, 1],
       }),
       read = display.call('level0Display', [0.5, 0.5, 0, 1]);
-    for (let i = 0; i < 3; i++) assert.ok(Math.abs(read[i] - light[i]) < 1e-4 * Math.max(1, light[i]), `${light} -> ${read}`);
+    for (let i = 0; i < 3; i++)
+      assert.ok(Math.abs(read[i] - light[i]) < 1e-4 * Math.max(1, light[i]), `${light} -> ${read}`);
     assert.equal(read[3], 1);
-    assert.deepEqual(pbrNeutralInverse(pbrNeutral(light)).map((x) => +x.toFixed(4)), light.map((x) => +x.toFixed(4)));
+    assert.deepEqual(
+      pbrNeutralInverse(pbrNeutral(light)).map((x) => +x.toFixed(4)),
+      light.map((x) => +x.toFixed(4)),
+    );
   }
 });

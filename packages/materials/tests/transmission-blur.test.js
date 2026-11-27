@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { Transmission } from '../dist/transmission.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { wgslModule } from './support/wgsl-subset.js';
+import { volumeThicknessStub } from './support/volume-thickness.js';
 
 const HEIGHT = 128,
   LEVELS = 9;
@@ -32,7 +33,7 @@ const pass = new Transmission().declarations(2);
 
 function level({ roughness, ior, camera = perspective(1), thickness = 0 }) {
   let read;
-  const shader = wgslModule(dielectricFresnelWGSL + pass, {
+  const shader = wgslModule(dielectricFresnelWGSL + volumeThicknessStub + pass, {
     f: { eye: [0, 0, 3, 1], camera, model: identity, ext: [0, ior, 0, 0] },
     margoVolume: [thickness, 1, 1, 1],
     margoScene: 'scene',
@@ -45,7 +46,7 @@ function level({ roughness, ior, camera = perspective(1), thickness = 0 }) {
     },
   });
   const surface = { n: [0, 0, 1], base: [1, 1, 1, 1], metal: 0, roughness, tr: 1, th: 1, f0: [0, 0, 0], sw: 1 };
-  shader.call('margoTransmission', surface, [0, 0, 1], { position: [0, 0, 0] });
+  shader.call('margoTransmission', surface, [0, 0, 1], { position: [0, 0, 0], normal: [0, 0, 1] });
   return read;
 }
 // Expected: median GGX tilt atan(alpha), Snell at that facet, deviation from straight through, lobe diameter in texels.
