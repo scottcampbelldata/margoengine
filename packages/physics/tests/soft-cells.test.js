@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import { Physics } from '../dist/index.js';
 import { CellMaterial, SoftBodies, SoftBodyDesc, SoftBodyMaterial } from '../dist/soft.js';
 
+/** What a soft-body call throws for input it cannot use: a coded MargoError linking its errors entry. */
+const softRefusal = (e) => e.name === 'MargoError' && e.code === 'unsupported' && /errors#soft-bodies/.test(e.message);
+
 const warn = console.warn;
 console.warn = () => {};
 await Physics.load();
@@ -263,17 +266,17 @@ test('removing a body with cells and clusters leaves the others as they were', a
 
 test('the cell builders and setters check what they are given', async () => {
   const { soft } = await create();
-  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [2, 2, 3]), RangeError, 'cells are cubes');
+  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [2, 2, 3]), softRefusal, 'cells are cubes');
   const flat = new SoftBodyDesc([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]);
   assert.throws(() => flat.setCells([0, 1, 2, 3]), /flat/);
   assert.throws(() => flat.setCells([0, 1, 2, 9]), /not a particle/);
   assert.throws(() => flat.setCells([0, 1, 2]), /four/);
-  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1], rubber({ poissonRatio: 0.5 })), RangeError);
-  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1], rubber({ youngsModulus: 0 })), RangeError);
-  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1]).setClusters([[0, 1]], 5), RangeError);
+  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1], rubber({ poissonRatio: 0.5 })), softRefusal);
+  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1], rubber({ youngsModulus: 0 })), softRefusal);
+  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1]).setClusters([[0, 1]], 5), softRefusal);
   assert.throws(() => SoftBodyDesc.solid([0, 0, 0], 0.1, [2, 2, 2], () => false), /no cells/);
   const body = soft.create(SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1]));
-  assert.throws(() => body.isCellTorn(6), RangeError);
+  assert.throws(() => body.isCellTorn(6), softRefusal);
   assert.equal(body.numCells(), 6);
   near(body.restVolume(), 1, 1e-5, 'six cells make a cube');
 });
@@ -664,13 +667,13 @@ test('volumetric fills a closed mesh with cells that hold it, and a skin rides i
 
 test('volumetric and cuboid are checked, and a cuboid is a box', async () => {
   const { vertices, indices } = boxMesh();
-  assert.throws(() => SoftBodyDesc.volumetric(vertices, [0, 1], 0.2), RangeError);
-  assert.throws(() => SoftBodyDesc.volumetric(vertices, indices, 0), RangeError);
-  assert.throws(() => SoftBodyDesc.volumetric(vertices, [0, 1, 99], 0.2), RangeError);
+  assert.throws(() => SoftBodyDesc.volumetric(vertices, [0, 1], 0.2), softRefusal);
+  assert.throws(() => SoftBodyDesc.volumetric(vertices, indices, 0), softRefusal);
+  assert.throws(() => SoftBodyDesc.volumetric(vertices, [0, 1, 99], 0.2), softRefusal);
   const { soft } = await create();
   const a = soft.create(SoftBodyDesc.cuboid([0, 0, 0], [0.2, 0.1, 0.1], [2, 1, 1]));
   near(a.restVolume(), 0.4 * 0.2 * 0.2, 1e-6, 'a cuboid of half extents fills them');
-  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setSkin(vertices, indices), RangeError);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setSkin(vertices, indices), softRefusal);
 });
 
 const all = (body) => Array.from({ length: body.numParticles() }, (_, i) => i);
@@ -776,7 +779,7 @@ test('a cluster is pinned, driven to a pose, given a spring and removed', async 
   body.removeCluster(cluster);
   assert.equal(body.numClusters(), 0);
   assert.equal(proxy.valid, false, 'the proxy goes with the cluster');
-  assert.throws(() => body.clusterProxy(0), RangeError);
+  assert.throws(() => body.clusterProxy(0), softRefusal);
   // The root body is the cluster of everything, once.
   const root = body.rootBody();
   assert.equal(body.rootBody(), root);
@@ -856,12 +859,12 @@ test('the fem solver gives a stiffness that does not depend on the passes, and h
 
 test('the fem solver is switched by body, checked and carried to pieces', async () => {
   const { soft } = await create();
-  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1]).setSolver('newton'), RangeError);
+  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1]).setSolver('newton'), softRefusal);
   const body = soft.create(SoftBodyDesc.box([0, 0, 0], [0.4, 0.4, 0.4], [2, 2, 2]).setSolver('fem'));
   assert.equal(body.solver, 'fem');
   body.setSolver('constraints');
   assert.equal(body.solver, 'constraints');
-  assert.throws(() => body.setSolver('x'), RangeError);
+  assert.throws(() => body.setSolver('x'), softRefusal);
   soft.splitOnTear = 'cells';
   const event = soft.cut(body.setSolver('fem'), [
     [0.2, -1, -1],

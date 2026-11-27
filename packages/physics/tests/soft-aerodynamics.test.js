@@ -10,6 +10,9 @@ import { standardDensity } from '../../math/dist/atmosphere.js';
 import { Physics } from '../dist/index.js';
 import { SoftBodies, SoftBodyDesc } from '../dist/soft.js';
 
+/** What a soft-body call throws for input it cannot use: a coded MargoError linking its errors entry. */
+const softRefusal = (e) => e.name === 'MargoError' && e.code === 'unsupported' && /errors#soft-bodies/.test(e.message);
+
 await Physics.load();
 
 // 10 kg a particle: heavy enough that a step barely changes the plate's speed through the air, light enough that the step's
@@ -143,8 +146,8 @@ test('a light cloth in a gale is carried to the air, steadily', async () => {
 
 test('aerodynamics check their values', () => {
   const desc = SoftBodyDesc.cloth([0, 0, 0], [1, 0, 0], [0, 0, 1], 2, 2);
-  assert.throws(() => desc.setAerodynamics({ aspectRatio: 0 }), RangeError);
-  assert.throws(() => desc.setAerodynamics({ drag: -1 }), RangeError);
-  assert.throws(() => desc.setAerodynamics({ friction: Number.NaN }), RangeError);
-  assert.throws(() => desc.setAerodynamics({ vortexLift: Number.POSITIVE_INFINITY }), RangeError);
+  assert.throws(() => desc.setAerodynamics({ aspectRatio: 0 }), softRefusal);
+  assert.throws(() => desc.setAerodynamics({ drag: -1 }), softRefusal);
+  assert.throws(() => desc.setAerodynamics({ friction: Number.NaN }), softRefusal);
+  assert.throws(() => desc.setAerodynamics({ vortexLift: Number.POSITIVE_INFINITY }), softRefusal);
 });

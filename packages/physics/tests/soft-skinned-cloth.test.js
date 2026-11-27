@@ -7,6 +7,9 @@ import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { SoftBodies, SoftBodyDesc, skinVertices } from '../dist/soft.js';
 
+/** What a soft-body call throws for input it cannot use: a coded MargoError linking its errors entry. */
+const softRefusal = (e) => e.name === 'MargoError' && e.code === 'unsupported' && /errors#soft-bodies/.test(e.message);
+
 await Physics.load();
 
 const NU = 9,
@@ -161,21 +164,21 @@ test('skinVertices blends joints as linear blend skinning does', () => {
   );
   assert.throws(
     () => skinVertices({ positions: [0, 0, 0], joints: [5, 0, 0, 0], weights: [1, 0, 0, 0] }, identity),
-    RangeError,
+    softRefusal,
   );
 });
 
 test('skin constraints check their lists and the body', async () => {
-  assert.throws(() => capeDesc().setSkinConstraints(-1), RangeError);
-  assert.throws(() => capeDesc().setSkinConstraints([0, 1]), RangeError);
-  assert.throws(() => capeDesc().setSkinConstraints(0.1, Number.NaN), RangeError);
+  assert.throws(() => capeDesc().setSkinConstraints(-1), softRefusal);
+  assert.throws(() => capeDesc().setSkinConstraints([0, 1]), softRefusal);
+  assert.throws(() => capeDesc().setSkinConstraints(0.1, Number.NaN), softRefusal);
   const physics = new Physics(null),
     soft = await SoftBodies.attach(physics),
     plain = soft.create(capeDesc());
   assert.throws(() => plain.setSkinnedPositions(rest), /not skinned/);
   const cape = soft.create(capeDesc().setSkinConstraints(0.1));
-  assert.throws(() => cape.setSkinnedPositions(rest.subarray(3)), RangeError);
-  assert.throws(() => cape.setSkinnedPositions(rest.map((v, k) => (k === 4 ? Number.NaN : v))), RangeError);
+  assert.throws(() => cape.setSkinnedPositions(rest.subarray(3)), softRefusal);
+  assert.throws(() => cape.setSkinnedPositions(rest.map((v, k) => (k === 4 ? Number.NaN : v))), softRefusal);
 });
 
 test('a skinned cape torn in two keeps its skin in both pieces', async () => {

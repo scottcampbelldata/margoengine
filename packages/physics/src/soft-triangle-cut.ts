@@ -1,5 +1,6 @@
 // Subdivide the cap of each tetrahedron intersected by a finite triangle. Shared-face
 // intersections use a common registry, and a cut only releases the covered cap triangles.
+import { softError } from './soft-error.js';
 import type { Vec3 } from './math.js';
 import { incisionPieces } from './soft-incision-connect.js';
 import {
@@ -227,7 +228,7 @@ export function planTriangleCut(
   const normal = cross(subtract(blade[1], blade[0]), subtract(blade[2], blade[0]));
   const scale = Math.max(...normal.map(Math.abs));
   if (!(scale > 0 && Number.isFinite(scale)))
-    throw new RangeError(
+    throw softError(
       'The blade triangle has no representable area. Supply three noncollinear world-space corners.',
     );
   const n = vector((i) => normal[i] / scale);

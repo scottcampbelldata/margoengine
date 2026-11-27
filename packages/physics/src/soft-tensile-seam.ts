@@ -1,3 +1,4 @@
+import { softError } from './soft-error.js';
 import { checkVec, type Vec3 } from './math.js';
 import { cross, dot, subtract, type Tet } from './soft-plane-cut.js';
 
@@ -47,17 +48,17 @@ export function bindTensileSeam(
   cells: readonly number[],
 ): BoundTensileSeam {
   if (!Number.isInteger(cell) || cell < 0 || cell >= cells.length / 4)
-    throw new RangeError('A tensile seam needs a valid cell index. Choose a tetrahedron from setCells.');
+    throw softError('A tensile seam needs a valid cell index. Choose a tetrahedron from setCells.');
   if (!Number.isFinite(openingStrain) || openingStrain <= 0)
-    throw new RangeError('A tensile seam needs a finite strain above zero. Pass a dimensionless openingStrain.');
+    throw softError('A tensile seam needs a finite strain above zero. Pass a dimensionless openingStrain.');
   for (const limit of [slidingStrain, tearingStrain]) {
     if (limit !== undefined && (!Number.isFinite(limit) || limit <= 0))
-      throw new RangeError(
+      throw softError(
         'A seam shear limit needs a finite strain above zero. Pass a positive strain or omit the limit.',
       );
   }
   if (!Array.isArray(triangle) || triangle.length !== 3)
-    throw new RangeError('A tensile seam is triangular. Pass three points in the tetrahedron in rest space.');
+    throw softError('A tensile seam is triangular. Pass three points in the tetrahedron in rest space.');
   for (const point of triangle) checkVec(point, 'Tensile seam point');
   const [a, b, c, d] = cells.slice(cell * 4, cell * 4 + 4) as Tet;
   const position = (p: number): Vec3 => coordinates((axis) => particles[3 * p + axis]!);
@@ -70,7 +71,7 @@ export function bindTensileSeam(
     const q = inCell(subtract(p, origin));
     const barycentric = [1 - q[0] - q[1] - q[2], ...q];
     if (barycentric.some((weight) => !Number.isFinite(weight) || weight < -coordinateTolerance))
-      throw new RangeError('A tensile seam point is outside its cell. Move its triangle inside the tetrahedron.');
+      throw softError('A tensile seam point is outside its cell. Move its triangle inside the tetrahedron.');
     return q;
   };
   const [p, q, r] = triangle;
@@ -78,11 +79,11 @@ export function bindTensileSeam(
   const normal = cross(firstEdge, subtract(r, p));
   const length = Math.sqrt(dot(normal, normal));
   if (!(length > 0 && Number.isFinite(length)))
-    throw new RangeError('The tensile seam has no finite area. Use three noncollinear rest-space points.');
+    throw softError('The tensile seam has no finite area. Use three noncollinear rest-space points.');
   const points = [locate(p), locate(q), locate(r)] as const;
   const onFace = (weight: number): boolean => Math.abs(weight) <= coordinateTolerance;
   if (axes.some((i) => points.every((v) => onFace(v[i]))) || points.every(([x, y, z]) => onFace(1 - x - y - z)))
-    throw new RangeError('The tensile seam lies on a cell face. Move at least one point into the tetrahedron.');
+    throw softError('The tensile seam lies on a cell face. Move at least one point into the tetrahedron.');
   const unitNormal = coordinates((i) => normal[i] / length);
   const shear: { direction: Vec3; threshold: number }[] = [];
   if (slidingStrain !== undefined || tearingStrain !== undefined) {

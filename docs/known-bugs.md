@@ -15,9 +15,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** the soft kernel (`packages/physics/soft-kernel/src/world.rs`, `solve_edge`) stores particle positions as
   absolute float32. Each damped edge correction moves its two particles by equal and opposite amounts far below a
   position's ulp; rounding keeps the move on a particle in a finer binade and drops it on one in a coarser one, so the
-  pair's momentum no longer cancels, and the loss runs one way while the body moves. Far from the origin the integration
-  step itself loses digits. The cure is positions relative to each body's own origin (a floating origin a body), which
-  every soft solve, contact and the GPU handoff read, so it is its own change.
+  pair's momentum no longer cancels; the next pass, seeing the particle unmoved, issues the same correction again, so the
+  loss runs one way while the body moves. Far from the origin the integration step itself loses digits.
+- **What was tried (2026-11-27):** an origin a body at its centre does not cure it, since the measured loss is at the
+  world origin, where a body's own frame is the world's; what removes it is a frame in which the body's particles share
+  one float exponent on each axis (at y = 3 the loss is gone). Kahan-compensated corrections in `solve_edge` double
+  count, because an iterative solve reissues a lost correction (3.05 N s at y = 100). Moving the edge damping to the
+  velocities (as `thread_damping` does for sheets) conserves momentum (3.00045 N s) but lets a 1 g box leave a 1 kg
+  particle cloth at 8.3 m/s where an elastic bounce allows 6.6, so it is not landed. The fix is a body frame whose
+  per-axis offset puts every particle in one binade, which every soft solve, contact and GPU handoff must read.
 - **Kept honest by:** `packages/physics/tests/soft-volume.test.js` ("an impulse moves a soft volume at J / M") holds
   momentum to 1e-3 of the impulse, the measured loss, and `docs/limits.md` states it.
 
@@ -42,7 +48,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   a flat face -1 (`kernel/src/face.rs`, `contact_feature`; 0 is a sharp edge or corner), and the documentation of
   `KernelFaceContacts.curvature` said 0. Every lower triangle kept its row, and the exact contact and friction solves
   grow with the square of the rows.
-- **Fix:** the check takes curvature below 0 on the face and on each corner's contact; the documentation says -1. The
+- **Fix:** the check takes curvature below 0 on the face and on each corner's contact, and leaves out only the faces of a
+  fixed collider (against a moving body the face row carries its push back and friction: with every collider, a 1 g box
+  fell through a cloth, soft.test.js "a contact is stable at a mass ratio of a thousand"); the documentation says -1. The
   same drop takes 1.1 s, 48 rows at rest and 105 at most. Regression: `packages/physics/tests/soft-volume.test.js`
   ("a ball on flat ground keeps no face contact its corners already hold"), at most one row a lower triangle.
 

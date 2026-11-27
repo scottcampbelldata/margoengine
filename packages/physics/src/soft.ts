@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Soft bodies: ropes, cloth and particle meshes on their own small Rust kernel (compliant distance constraints, Macklin,
 // Mueller and Chentanez, "XPBD", 2016; many small steps, Macklin et al., 2019), coupled both ways with the rigid world.
+import { softError } from './soft-error.js';
 import { standardDensity } from '@margoengine/math/atmosphere';
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
@@ -203,7 +204,7 @@ const SOLVER_MODE_MASK = 3 << SOLVER_MODE_SHIFT;
 
 function checkedSolver(solver: SoftSolver): SoftSolver {
   if (typeof SOLVER_CODE[solver] !== 'number')
-    throw new RangeError("Use 'constraints', 'fem', 'vertex-block' or 'projective' for a soft solver.");
+    throw softError("Use 'constraints', 'fem', 'vertex-block' or 'projective' for a soft solver.");
   return solver;
 }
 
@@ -215,9 +216,9 @@ function cellSolverFlag(solver: SoftSolver, model: number): number {
 
 function checkSolverModel(solver: SoftSolver, model: number): void {
   if (solver === 'vertex-block' && model !== CELL_MODEL['neo-hookean'])
-    throw new RangeError('Vertex-block cells use neo-hookean elasticity. Choose the neo-hookean CellMaterial model.');
+    throw softError('Vertex-block cells use neo-hookean elasticity. Choose the neo-hookean CellMaterial model.');
   if (solver === 'projective' && model !== CELL_MODEL.corotated)
-    throw new RangeError('Projective cells use corotated elasticity. Choose the corotated CellMaterial model.');
+    throw softError('Projective cells use corotated elasticity. Choose the corotated CellMaterial model.');
 }
 
 let columnNames: readonly string[] = [];
@@ -548,7 +549,7 @@ export class SoftMeshBinding {
     return new SoftMeshBinding('direct', Array.from(particles), 0);
   }
   static directByPosition(eps: number): SoftMeshBinding {
-    if (!(eps > 0 && Number.isFinite(eps))) throw new RangeError('eps must be a positive number of metres.');
+    if (!(eps > 0 && Number.isFinite(eps))) throw softError('eps must be a positive number of metres.');
     return new SoftMeshBinding('directByPosition', [], eps);
   }
   static skinned(): SoftMeshBinding {
@@ -707,13 +708,13 @@ function strengthWords({ tensile, compressive, shear }: SoftOrthotropicStrength)
   checkVec(shear, 'Orthotropic shear strengths');
   const strengths = [...tensile, ...compressive, ...shear].map(Math.fround);
   if (strengths.some((strength) => !(strength > 0 && Number.isFinite(strength))))
-    throw new RangeError('Orthotropic strengths must be positive finite float32 values. Supply strengths in pascals.');
+    throw softError('Orthotropic strengths must be positive finite float32 values. Supply strengths in pascals.');
   return Object.freeze(strengths);
 }
 
 function checkStrengthModel(strength: readonly number[] | null, material: CellMaterial): void {
   if (strength && material.tearStrain > 0)
-    throw new RangeError('Orthotropic strengths already govern fracture. Set CellMaterial.tearStrain to zero.');
+    throw softError('Orthotropic strengths already govern fracture. Set CellMaterial.tearStrain to zero.');
 }
 
 function criticalBandLengths(material: SoftOrthotropy, strengths: readonly number[]): readonly number[] | null {
@@ -727,7 +728,7 @@ function criticalBandLengths(material: SoftOrthotropy, strengths: readonly numbe
     Math.fround((2 * stiffness[i]! * work) / (failure[i]! * failure[i]!)),
   );
   if (lengths.some((length) => !(length > 0 && Number.isFinite(length))))
-    throw new RangeError(
+    throw softError(
       'Fracture energies give unrepresentable band lengths. Supply positive finite energies in J/m².',
     );
   return Object.freeze(lengths);
@@ -737,7 +738,7 @@ function unitDirection(direction: Vec3, label: string): Vec3 {
   checkVec(direction, label);
   const scale = Math.max(Math.abs(direction[0]), Math.abs(direction[1]), Math.abs(direction[2]));
   if (scale === 0)
-    throw new RangeError(`${label} must be nonzero. Supply a rest-space direction with a nonzero component.`);
+    throw softError(`${label} must be nonzero. Supply a rest-space direction with a nonzero component.`);
   const x = direction[0] / scale;
   const y = direction[1] / scale;
   const z = direction[2] / scale;
@@ -749,7 +750,7 @@ function softFiber(direction: Vec3, modulus: number): SoftFiber | null {
   checkVec(direction, 'Soft fiber direction');
   const stored = Math.fround(modulus);
   if (!Number.isFinite(stored) || modulus < 0 || (modulus > 0 && stored === 0))
-    throw new RangeError(
+    throw softError(
       'Soft fiber modulus is outside the supported range. Use a finite nonnegative float32 value in Pa.',
     );
   if (modulus === 0) return null;
@@ -765,7 +766,7 @@ function orthotropicWords(material: SoftOrthotropy): readonly number[] {
   if (
     [...youngsModuli, ...shearModuli].some((value) => !Number.isFinite(Math.fround(value)) || Math.fround(value) <= 0)
   )
-    throw new RangeError(
+    throw softError(
       'Orthotropic stiffness needs positive moduli. Supply Young’s and shear moduli in the positive float32 range.',
     );
   const [ex, ey, ez] = youngsModuli;
@@ -774,7 +775,7 @@ function orthotropicWords(material: SoftOrthotropy): readonly number[] {
   const c = -poissonRatios[2] * Math.sqrt(ez / ey);
   const det = 1 + 2 * a * b * c - a * a - b * b - c * c;
   if (!(1 - a * a > 0 && det > 0))
-    throw new RangeError(
+    throw softError(
       'Orthotropic compliance is not positive definite. Use a consistent set of moduli and Poisson ratios.',
     );
   const tensor = [
@@ -795,7 +796,7 @@ function orthotropicWords(material: SoftOrthotropy): readonly number[] {
     [xx, yy, zz, ...tensor.slice(6)].some((value) => value <= 0) ||
     !(1 - u * u > 0 && 1 + 2 * u * v * w - u * u - v * v - w * w > 0)
   )
-    throw new RangeError(
+    throw softError(
       'Orthotropic stiffness cannot be represented by the native solver. Use more moderate moduli and ratios.',
     );
   const x = unitDirection(axes?.[0] ?? [1, 0, 0], 'Orthotropic X axis');
@@ -896,30 +897,30 @@ export class CellMaterial {
 
 function checkCellMaterial(m: CellMaterial): void {
   if (!(m.youngsModulus > 0 && Number.isFinite(m.youngsModulus)))
-    throw new RangeError("Young's modulus must be a positive number of pascals.");
+    throw softError("Young's modulus must be a positive number of pascals.");
   if (!(m.poissonRatio >= 0 && m.poissonRatio < 0.5))
-    throw new RangeError("Poisson's ratio must be 0 or more and below 0.5.");
+    throw softError("Poisson's ratio must be 0 or more and below 0.5.");
   if (m.model !== 'neo-hookean' && m.model !== 'corotated' && m.model !== 'volume')
-    throw new RangeError("Cell model must be 'neo-hookean', 'corotated' or 'volume'.");
+    throw softError("Cell model must be 'neo-hookean', 'corotated' or 'volume'.");
   if (!(m.elasticDampingRatio >= 0 && Number.isFinite(m.elasticDampingRatio)))
-    throw new RangeError('elasticDampingRatio must be 0 or more.');
+    throw softError('elasticDampingRatio must be 0 or more.');
   if (m.deformationDamping !== null && !(m.deformationDamping >= 0 && Number.isFinite(m.deformationDamping)))
-    throw new RangeError('deformationDamping must be null, 0 or more.');
+    throw softError('deformationDamping must be null, 0 or more.');
   for (const [value, label] of [
     [m.plasticMax, 'plasticMax'],
     [m.tearSmoothing, 'tearSmoothing'],
   ] as const)
-    if (!(value >= 0 && Number.isFinite(value))) throw new RangeError(`${label} must be 0 or more.`);
+    if (!(value >= 0 && Number.isFinite(value))) throw softError(`${label} must be 0 or more.`);
   if (!(m.interiorStrength >= 1 && Number.isFinite(m.interiorStrength)))
-    throw new RangeError('interiorStrength must be 1 (no difference) or more.');
+    throw softError('interiorStrength must be 1 (no difference) or more.');
   if (!(m.density > 0 && Number.isFinite(m.density)))
-    throw new RangeError('Density must be a positive number of kg/m3.');
+    throw softError('Density must be a positive number of kg/m3.');
   for (const [value, label] of [
     [m.yieldStrain, 'yieldStrain'],
     [m.creep, 'creep'],
     [m.tearStrain, 'tearStrain'],
   ] as const)
-    if (!(value >= 0 && Number.isFinite(value))) throw new RangeError(`${label} must be 0 or more.`);
+    if (!(value >= 0 && Number.isFinite(value))) throw softError(`${label} must be 0 or more.`);
   rubberWords(m);
 }
 
@@ -952,9 +953,9 @@ const NO_CELLS: CellRange = { first: 0, count: 0, clusterFirst: 0, clusterCount:
 
 function checkSoftness(softness: SoftSoftness, label: string): void {
   if (!(softness.naturalFrequency >= 0 && Number.isFinite(softness.naturalFrequency)))
-    throw new RangeError(`${label}: natural frequency must be 0 (rigid) or a positive number of hertz.`);
+    throw softError(`${label}: natural frequency must be 0 (rigid) or a positive number of hertz.`);
   if (!(softness.dampingRatio >= 0 && Number.isFinite(softness.dampingRatio)))
-    throw new RangeError(`${label}: damping ratio must be 0 or more.`);
+    throw softError(`${label}: damping ratio must be 0 or more.`);
 }
 
 function checkMaterial(material: SoftBodyMaterial): void {
@@ -966,11 +967,11 @@ function checkMaterial(material: SoftBodyMaterial): void {
   if (material.shear) {
     const { rigidity, hysteresis } = material.shear;
     if (!(rigidity > 0 && Number.isFinite(rigidity)))
-      throw new RangeError(
+      throw softError(
         'A fabric shear rigidity is a positive number of gf/(cm deg), as KES-F measures it; pass the measured value.',
       );
     if (!(hysteresis >= 0 && Number.isFinite(hysteresis)))
-      throw new RangeError(
+      throw softError(
         'A fabric shear hysteresis is 0 or more gf/cm, as KES-F measures it; pass the measured value.',
       );
   }
@@ -980,15 +981,15 @@ function checkMaterial(material: SoftBodyMaterial): void {
         !(t.strain > 0 && Number.isFinite(t.strain) && t.energy > 0 && Number.isFinite(t.energy)) ||
         !(t.resilience >= 0 && t.resilience <= 100)
       )
-        throw new RangeError(
+        throw softError(
           'A fabric tension is a positive strain (EMT, percent) and energy (WT, gf cm/cm^2) and a resilience (RT) of 0 to 100 percent, as KES-F measures them; pass the measured values.',
         );
   if (material.arealDensity !== null && !(material.arealDensity > 0 && Number.isFinite(material.arealDensity)))
-    throw new RangeError('A fabric areal density is a positive number of kg/m^2, or null; pass one of those.');
+    throw softError('A fabric areal density is a positive number of kg/m^2, or null; pass one of those.');
   checkSoftness(material.shapeMatchingSoftness, 'Shape matching softness');
   checkSoftness(material.volumeSoftness, 'Volume softness');
   if (!(material.tearStrain >= 0 && Number.isFinite(material.tearStrain)))
-    throw new RangeError('tearStrain must be 0 (never) or the stretch fraction that tears an edge.');
+    throw softError('tearStrain must be 0 (never) or the stretch fraction that tears an edge.');
   for (const [value, label] of [
     [material.edgePlasticYield, 'edgePlasticYield'],
     [material.edgePlasticCreep, 'edgePlasticCreep'],
@@ -998,9 +999,9 @@ function checkMaterial(material: SoftBodyMaterial): void {
     [material.maxTearsPerStep, 'maxTearsPerStep'],
     [material.minPiece, 'minPiece'],
   ] as const)
-    if (!(value >= 0 && Number.isFinite(value))) throw new RangeError(`${label} must be 0 or more.`);
+    if (!(value >= 0 && Number.isFinite(value))) throw softError(`${label} must be 0 or more.`);
   if (!['compression', 'stretch', 'both'].includes(material.edgePlasticFlow))
-    throw new RangeError("edgePlasticFlow must be 'compression', 'stretch' or 'both'.");
+    throw softError("edgePlasticFlow must be 'compression', 'stretch' or 'both'.");
 }
 
 /** A rotation is four finite numbers, not all zero, as `PhysicsBody.setRotation` asks (this entry may not import the body). */
@@ -1008,11 +1009,11 @@ function checkRotation(rotation: Quat): void {
   const [x, y, z, w] = rotation,
     squared = rotation.length === 4 ? x * x + y * y + z * z + w * w : 0;
   if (!(squared > 0) || !Number.isFinite(squared))
-    throw new RangeError('A rotation must be a quaternion [x, y, z, w] of finite numbers, not all zero.');
+    throw softError('A rotation must be a quaternion [x, y, z, w] of finite numbers, not all zero.');
 }
 
 const count = (value: number, label: string, least: number): number => {
-  if (!Number.isInteger(value) || value < least) throw new RangeError(`${label} is a whole number, at least ${least}.`);
+  if (!Number.isInteger(value) || value < least) throw softError(`${label} is a whole number, at least ${least}.`);
   return value;
 };
 
@@ -1109,13 +1110,13 @@ const STANDARD_ATMOSPHERE = 101325;
 
 function checkedGas({ pressure, volume, ambientPressure = STANDARD_ATMOSPHERE }: SoftGasPressure): SoftGasPressure {
   if (!(pressure > 0 && Number.isFinite(pressure)))
-    throw new RangeError(
+    throw softError(
       'A gas fill needs a positive finite absolute pressure in Pa. Supply the pressure of the fill.',
     );
   if (volume !== undefined && !(volume > 0 && Number.isFinite(volume)))
-    throw new RangeError('A gas fill needs a positive finite reference volume in m³. Supply the volume of the fill.');
+    throw softError('A gas fill needs a positive finite reference volume in m³. Supply the volume of the fill.');
   if (!(ambientPressure >= 0 && Number.isFinite(Math.fround(ambientPressure))))
-    throw new RangeError(
+    throw softError(
       'External pressure must be finite and non-negative in Pa. Supply ambient pressure or zero for vacuum.',
     );
   return { pressure, volume, ambientPressure };
@@ -1124,7 +1125,7 @@ function checkedGas({ pressure, volume, ambientPressure = STANDARD_ATMOSPHERE }:
 function gasProduct(gas: SoftGasPressure, volume: number): number {
   const product = Math.fround(gas.pressure * (gas.volume ?? volume));
   if (!(product > 0 && Number.isFinite(product)))
-    throw new RangeError(
+    throw softError(
       'The gas pressure-volume product must be a finite positive float32. Adjust the fill or reference volume.',
     );
   return product;
@@ -1206,7 +1207,7 @@ export class SoftBodyDesc {
       }
     }
     if (flat.length % 3 !== 0 || flat.some((v) => !Number.isFinite(v)))
-      throw new RangeError('Particle positions must be finite numbers, three per particle.');
+      throw softError('Particle positions must be finite numbers, three per particle.');
     this.positions = flat;
     this.masses = new Array<number>(flat.length / 3).fill(1);
   }
@@ -1271,11 +1272,11 @@ export class SoftBodyDesc {
       checkVec(origin, 'Tube origin');
       checkVec(axis, 'Tube axis');
       if (!(radiusStart >= 0 && radiusEnd >= 0 && Number.isFinite(radiusStart) && Number.isFinite(radiusEnd)))
-        throw new RangeError('Tube radii must be 0 or more metres.');
+        throw softError('Tube radii must be 0 or more metres.');
       count(around, 'A tube has particles around; the count', 3);
       count(along, 'A tube has rings along it; the count', 2);
       const length = Math.hypot(axis[0], axis[1], axis[2]);
-      if (!(length > 0)) throw new RangeError('The tube axis must have a length.');
+      if (!(length > 0)) throw softError('The tube axis must have a length.');
       const k: Vec3 = [axis[0] / length, axis[1] / length, axis[2] / length],
         // Any unit vector across the axis, then the one across both.
         helper: Vec3 = Math.abs(k[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0],
@@ -1442,7 +1443,7 @@ export class SoftBodyDesc {
   ): SoftBodyDesc {
     const desc = new SoftBodyDesc(vertices);
     if (indices.length % 3 !== 0 || indices.length === 0)
-      throw new RangeError('Indices must be triangles, three per triangle.');
+      throw softError('Indices must be triangles, three per triangle.');
     const seen = new Map<number, number>(),
       key = (a: number, b: number): number => (a < b ? a * desc.particleCount + b : b * desc.particleCount + a),
       opposite = new Map<number, number[]>();
@@ -1450,9 +1451,9 @@ export class SoftBodyDesc {
       const tri = [indices[t]!, indices[t + 1]!, indices[t + 2]!];
       for (const v of tri)
         if (!Number.isInteger(v) || v < 0 || v >= desc.particleCount)
-          throw new RangeError(`Triangle index ${v} must be a vertex (0 to ${desc.particleCount - 1}).`);
+          throw softError(`Triangle index ${v} must be a vertex (0 to ${desc.particleCount - 1}).`);
       if (tri[0] === tri[1] || tri[1] === tri[2] || tri[0] === tri[2])
-        throw new RangeError(`Triangle ${t / 3} repeats a vertex; a triangle needs three different vertices.`);
+        throw softError(`Triangle ${t / 3} repeats a vertex; a triangle needs three different vertices.`);
       desc.triangles.push(...tri);
       for (let k = 0; k < 3; k++) {
         const a = tri[k]!,
@@ -1485,7 +1486,7 @@ export class SoftBodyDesc {
    * cloth (default 0.3). The body needs triangles (`cloth`, `clothTube`, `trimesh`). It costs a search every piece of a step.
    */
   setSelfContacts(on: boolean, { friction = 0.3 }: { friction?: number } = {}): this {
-    if (!(friction >= 0 && Number.isFinite(friction))) throw new RangeError('Friction must be 0 or more.');
+    if (!(friction >= 0 && Number.isFinite(friction))) throw softError('Friction must be 0 or more.');
     this.selfContacts = on;
     this.selfFriction = friction;
     return this;
@@ -1498,7 +1499,7 @@ export class SoftBodyDesc {
    */
   setCollisionGroups(groups: number): this {
     if (!Number.isInteger(groups) || groups < 0 || groups > 0xffffffff)
-      throw new RangeError("Collision groups must be a packed 32-bit word, as a collider's collisionGroups.");
+      throw softError("Collision groups must be a packed 32-bit word, as a collider's collisionGroups.");
     this.groups = groups;
     return this;
   }
@@ -1514,9 +1515,9 @@ export class SoftBodyDesc {
     const detail = typeof options === 'number' ? options : (options.detail ?? 2);
     checkVec(center, 'Sphere centre');
     if (!(radius > 0 && Number.isFinite(radius)))
-      throw new RangeError('Sphere radius must be a positive number of metres.');
+      throw softError('Sphere radius must be a positive number of metres.');
     count(detail, 'detail', 0);
-    if (detail > 5) throw new RangeError('A sphere is subdivided at most 5 times.');
+    if (detail > 5) throw softError('A sphere is subdivided at most 5 times.');
     const t = (1 + Math.sqrt(5)) / 2;
     const points: Vec3[] = [
       [-1, t, 0],
@@ -1666,7 +1667,7 @@ export class SoftBodyDesc {
    */
   setVolumeFactor(factor: number | null): this {
     if (factor !== null && !(factor > 0 && Number.isFinite(factor)))
-      throw new RangeError('Volume factor must be a positive number.');
+      throw softError('Volume factor must be a positive number.');
     this.volumeFactor = factor;
     this.gas = null;
     return this;
@@ -1688,7 +1689,7 @@ export class SoftBodyDesc {
       const total = (this.edgePairs.length + this.bendPairs.length) / 2;
       for (const e of edges)
         if (!Number.isInteger(e) || e < 0 || e >= total)
-          throw new RangeError(`Edge ${e} is not one of the ${total} edges.`);
+          throw softError(`Edge ${e} is not one of the ${total} edges.`);
     }
     this.tension = typeof edges === 'boolean' ? edges : [...edges];
     return this;
@@ -1701,7 +1702,7 @@ export class SoftBodyDesc {
    */
   setDominanceGroup(group: number): this {
     if (!Number.isInteger(group) || group < -128 || group > 127)
-      throw new RangeError('A dominance group must be a whole number from -128 to 127.');
+      throw softError('A dominance group must be a whole number from -128 to 127.');
     this.dominance = group;
     return this;
   }
@@ -1769,7 +1770,7 @@ export class SoftBodyDesc {
     material: CellMaterial = new CellMaterial(),
   ): SoftBodyDesc {
     checkVec(origin, 'Block origin');
-    if (!(cell > 0 && Number.isFinite(cell))) throw new RangeError('Cell size must be a positive number of metres.');
+    if (!(cell > 0 && Number.isFinite(cell))) throw softError('Cell size must be a positive number of metres.');
     const [nx, ny, nz] = counts.map((n) => count(n, 'Cell counts', 1)) as [number, number, number],
       py = ny + 1,
       pz = nz + 1,
@@ -1785,7 +1786,7 @@ export class SoftBodyDesc {
           )
             kept.push([i, j, k]);
     if (kept.length === 0)
-      throw new RangeError(
+      throw softError(
         'The solid has no cells: `inside` accepted no cube of the grid; widen the grid or accept more cubes.',
       );
     for (const [i, j, k] of kept)
@@ -1832,7 +1833,7 @@ export class SoftBodyDesc {
       Math.abs(size[1] / counts[1] - cell) > cell * 1e-6 ||
       Math.abs(size[2] / counts[2] - cell) > cell * 1e-6
     )
-      throw new RangeError('A box has cubic cells: size divided by counts must be the same along every axis.');
+      throw softError('A box has cubic cells: size divided by counts must be the same along every axis.');
     return SoftBodyDesc.solid(origin, cell, counts, undefined, material);
   }
 
@@ -1867,11 +1868,11 @@ export class SoftBodyDesc {
     material: CellMaterial = new CellMaterial(),
   ): SoftBodyDesc {
     if (vertices.length % 3 !== 0 || vertices.length === 0 || indices.length % 3 !== 0 || indices.length === 0)
-      throw new RangeError('A volumetric body needs a mesh: vertices three numbers each, indices three to a triangle.');
-    if (!(size > 0 && Number.isFinite(size))) throw new RangeError('Cell size must be a positive number of metres.');
+      throw softError('A volumetric body needs a mesh: vertices three numbers each, indices three to a triangle.');
+    if (!(size > 0 && Number.isFinite(size))) throw softError('Cell size must be a positive number of metres.');
     for (let i = 0; i < indices.length; i++)
       if (!Number.isInteger(indices[i]) || indices[i]! < 0 || indices[i]! >= vertices.length / 3)
-        throw new RangeError(`Index ${indices[i]} must be a vertex (0 to ${vertices.length / 3 - 1}).`);
+        throw softError(`Index ${indices[i]} must be a vertex (0 to ${vertices.length / 3 - 1}).`);
     const { min, max } = boundsOf(vertices),
       counts = [0, 1, 2].map((a) => Math.max(1, Math.ceil((max[a]! - min[a]!) / size - 1e-9))) as [
         number,
@@ -1888,7 +1889,7 @@ export class SoftBodyDesc {
    */
   setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this {
     if (this.cells.length === 0)
-      throw new RangeError('A skin needs cells to ride in: build the body with cells first.');
+      throw softError('A skin needs cells to ride in: build the body with cells first.');
     this.skin = bindSkin(vertices, indices, this.positions, this.cells);
     return this;
   }
@@ -1917,7 +1918,7 @@ export class SoftBodyDesc {
         toughness.length !== 3 ||
         [0, 1, 2].some((i) => !(toughness[i]! > 0 && Number.isFinite(toughness[i]))))
     )
-      throw new RangeError(
+      throw softError(
         'A coplanar crack needs three finite positive mode energies in J/m². Pass opening, sliding and tearing toughness.',
       );
     this.coplanarToughness = toughness && [toughness[0], toughness[1], toughness[2]];
@@ -1930,17 +1931,17 @@ export class SoftBodyDesc {
    * flow and tearing, see {@link CellMaterial}), and when no mass was set they give each particle its share of their density.
    */
   setCells(tets: ArrayLike<number>, material?: CellMaterial): this {
-    if (tets.length % 4 !== 0) throw new RangeError('Cells must be four particle indices each.');
+    if (tets.length % 4 !== 0) throw softError('Cells must be four particle indices each.');
     const next: number[] = [];
     for (let t = 0; t < tets.length / 4; t++) {
       const four = [0, 1, 2, 3].map((k) => tets[t * 4 + k]!);
       for (const index of four)
         if (!Number.isInteger(index) || index < 0 || index >= this.particleCount)
-          throw new RangeError(`Cell ${t} uses ${index}, which is not a particle; use 0 to ${this.particleCount - 1}.`);
+          throw softError(`Cell ${t} uses ${index}, which is not a particle; use 0 to ${this.particleCount - 1}.`);
       if (new Set(four).size !== 4)
-        throw new RangeError(`Cell ${t} repeats a particle; a cell needs four different particles.`);
+        throw softError(`Cell ${t} repeats a particle; a cell needs four different particles.`);
       if (!(Math.abs(tetDeterminant(this.positions, four[0]!, four[1]!, four[2]!, four[3]!)) > MIN_TET_DETERMINANT))
-        throw new RangeError(`Cell ${t} must be flat: its four particles lie in one plane.`);
+        throw softError(`Cell ${t} must be flat: its four particles lie in one plane.`);
       next.push(...four);
     }
     this.cells = next;
@@ -2051,12 +2052,12 @@ export class SoftBodyDesc {
    */
   setClusters(groups: readonly ArrayLike<number>[], hertz: number): this {
     if (!(hertz > 0 && Number.isFinite(hertz)))
-      throw new RangeError('Cluster stiffness must be a positive number of hertz.');
+      throw softError('Cluster stiffness must be a positive number of hertz.');
     this.clusterGroups = groups.map((group, g) => {
-      if (group.length < 4) throw new RangeError(`Cluster ${g} has at least four particles.`);
+      if (group.length < 4) throw softError(`Cluster ${g} has at least four particles.`);
       return Array.from(group, (index) => {
         if (!Number.isInteger(index) || index < 0 || index >= this.particleCount)
-          throw new RangeError(
+          throw softError(
             `Cluster ${g} uses ${index}, which is not a particle; use 0 to ${this.particleCount - 1}.`,
           );
         return index;
@@ -2103,17 +2104,17 @@ export class SoftBodyDesc {
     return this;
   }
   private checkPairs(pairs: ArrayLike<number>, label: string): number[] {
-    if (pairs.length % 2 !== 0) throw new RangeError(`${label}s must be pairs of particle indices.`);
+    if (pairs.length % 2 !== 0) throw softError(`${label}s must be pairs of particle indices.`);
     const out: number[] = [];
     for (let i = 0; i < pairs.length; i++) {
       const index = pairs[i]!;
       if (!Number.isInteger(index) || index < 0 || index >= this.particleCount)
-        throw new RangeError(`${label} index ${index} must be a particle (0 to ${this.particleCount - 1}).`);
+        throw softError(`${label} index ${index} must be a particle (0 to ${this.particleCount - 1}).`);
       out.push(index);
     }
     for (let i = 0; i < out.length; i += 2)
       if (out[i] === out[i + 1])
-        throw new RangeError(
+        throw softError(
           `${label} ${i / 2} joins particle ${out[i]} to itself; an edge needs two different particles.`,
         );
     return out;
@@ -2162,7 +2163,7 @@ export class SoftBodyDesc {
     for (let i = 0; i < indices.length; i++) {
       const index = indices[i]!;
       if (!Number.isInteger(index) || index < 0 || index >= this.particleCount)
-        throw new RangeError(`Pinned index ${index} must be a particle (0 to ${this.particleCount - 1}).`);
+        throw softError(`Pinned index ${index} must be a particle (0 to ${this.particleCount - 1}).`);
       next.add(index);
     }
     this.pinned = next;
@@ -2175,9 +2176,9 @@ export class SoftBodyDesc {
    */
   setFabric(fabric: Fabric): this {
     if (this.triangles.length === 0)
-      throw new RangeError('A fabric is a woven sheet; give it a body of triangles (cloth, clothTube, trimesh).');
+      throw softError('A fabric is a woven sheet; give it a body of triangles (cloth, clothTube, trimesh).');
     if (!(fabric.arealDensity > 0 && Number.isFinite(fabric.arealDensity)))
-      throw new RangeError('A fabric needs a positive areal density in kg/m^2; set arealDensity.');
+      throw softError('A fabric needs a positive areal density in kg/m^2; set arealDensity.');
     const material = this.material.clone();
     material.shear = { ...fabric.shear };
     material.tensile = { warp: { ...fabric.tensile.warp }, weft: { ...fabric.tensile.weft } };
@@ -2185,7 +2186,7 @@ export class SoftBodyDesc {
     this.setMaterial(material);
     const masses = this.areaMasses(fabric.arealDensity);
     if (masses.some((m) => !(m > 0)))
-      throw new RangeError(
+      throw softError(
         'Every particle of a fabric lies on a triangle with an area; remove loose particles and degenerate triangles.',
       );
     return this.setMasses(masses);
@@ -2208,29 +2209,29 @@ export class SoftBodyDesc {
   /** Mass of every particle in kilograms (default 1). */
   setParticleMass(mass: number): this {
     if (!(mass > 0 && Number.isFinite(mass)))
-      throw new RangeError('Particle mass must be a positive number of kilograms.');
+      throw softError('Particle mass must be a positive number of kilograms.');
     this.masses.fill(mass);
     this.massGiven = true;
     return this;
   }
   /** Total mass, shared evenly. */
   setMass(mass: number): this {
-    if (!(mass > 0 && Number.isFinite(mass))) throw new RangeError('Mass must be a positive number of kilograms.');
+    if (!(mass > 0 && Number.isFinite(mass))) throw softError('Mass must be a positive number of kilograms.');
     return this.setParticleMass(mass / this.particleCount);
   }
   /** One mass per particle. */
   setMasses(masses: ArrayLike<number>): this {
     if (masses.length !== this.particleCount)
-      throw new RangeError(`Give ${this.particleCount} masses, one per particle.`);
+      throw softError(`Give ${this.particleCount} masses, one per particle.`);
     const next = Array.from(masses);
-    if (next.some((m) => !(m > 0 && Number.isFinite(m)))) throw new RangeError('Every particle mass must be positive.');
+    if (next.some((m) => !(m > 0 && Number.isFinite(m)))) throw softError('Every particle mass must be positive.');
     this.masses = next;
     this.massGiven = true;
     return this;
   }
   /** Contact thickness of every particle in metres, and of the body's faces against rigid bodies (default: for a body of triangles the circumradius of its widest triangle; else half the shortest structural edge, or 0.01 with none). */
   setParticleRadius(radius: number): this {
-    if (!(radius >= 0 && Number.isFinite(radius))) throw new RangeError('Particle radius must be 0 or more metres.');
+    if (!(radius >= 0 && Number.isFinite(radius))) throw softError('Particle radius must be 0 or more metres.');
     this.radius = radius;
     return this;
   }
@@ -2254,13 +2255,13 @@ export class SoftBodyDesc {
   }
   /** How much gravity pulls: 1 is the world's gravity (default), 0 none. */
   setGravityScale(scale: number): this {
-    if (!Number.isFinite(scale)) throw new RangeError('Gravity scale must be a number.');
+    if (!Number.isFinite(scale)) throw softError('Gravity scale must be a number.');
     this.gravity = scale;
     return this;
   }
   /** Air drag: speed falls off as 1 / (1 + dt * damping) (default 0). */
   setLinearDamping(damping: number): this {
-    if (!(damping >= 0 && Number.isFinite(damping))) throw new RangeError('Linear damping must be 0 or more.');
+    if (!(damping >= 0 && Number.isFinite(damping))) throw softError('Linear damping must be 0 or more.');
     this.damping = damping;
     return this;
   }
@@ -2329,7 +2330,7 @@ export class SoftBodyDesc {
    */
   setDensity(density: number): this {
     if (!(density > 0 && Number.isFinite(density)))
-      throw new RangeError("A soft body's density is a finite number of kg/m^3 above 0; pass one.");
+      throw softError("A soft body's density is a finite number of kg/m^3 above 0; pass one.");
     this.density = density;
     return this;
   }
@@ -2544,13 +2545,13 @@ export class SoftBody {
       throw new MargoError('state', 'The body is not skinned; give it SoftBodyDesc.setSkinConstraints.');
     const n = this.particles;
     if (positions.length !== 3 * n)
-      throw new RangeError(`Give ${3 * n} skinned coordinates, three a particle (got ${positions.length}).`);
+      throw softError(`Give ${3 * n} skinned coordinates, three a particle (got ${positions.length}).`);
     if (normals !== null && normals.length !== 3 * n)
-      throw new RangeError(`Give ${3 * n} normal coordinates, three a particle (got ${normals.length}).`);
+      throw softError(`Give ${3 * n} normal coordinates, three a particle (got ${normals.length}).`);
     let moved = false;
     for (let k = 0; k < 3 * n; k++) {
       const v = positions[k]!;
-      if (!Number.isFinite(v)) throw new RangeError(`Skinned coordinate ${k} is ${v}; give finite numbers.`);
+      if (!Number.isFinite(v)) throw softError(`Skinned coordinate ${k} is ${v}; give finite numbers.`);
       if (v !== this.skinTo[k]) moved = true;
     }
     if (teleport) {
@@ -2570,7 +2571,7 @@ export class SoftBody {
           ny = normals[3 * i + 1]!,
           nz = normals[3 * i + 2]!,
           length = Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (!Number.isFinite(length)) throw new RangeError(`Normal ${i} is not finite; give finite numbers.`);
+        if (!Number.isFinite(length)) throw softError(`Normal ${i} is not finite; give finite numbers.`);
         const scale = length > 0 ? 1 / length : 0;
         this.skinNormal[3 * i] = nx * scale;
         this.skinNormal[3 * i + 1] = ny * scale;
@@ -2664,7 +2665,7 @@ export class SoftBody {
   private check(index?: number): void {
     if (this.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
     if (index !== undefined && (!Number.isInteger(index) || index < 0 || index >= this.particles))
-      throw new RangeError(`Particle ${index} must be in this body (0 to ${this.particles - 1}).`);
+      throw softError(`Particle ${index} must be in this body (0 to ${this.particles - 1}).`);
   }
   private get c(): ReturnType<SoftBodies['columns']> {
     return this.owner.columns();
@@ -2686,7 +2687,7 @@ export class SoftBody {
   particlePositions(target?: Float32Array): Float32Array {
     this.check();
     if (target !== undefined && (!(target instanceof Float32Array) || target.length !== this.particles * 3))
-      throw new RangeError(
+      throw softError(
         `particlePositions needs a Float32Array target of ${this.particles * 3} numbers, three a particle.`,
       );
     const { x, y, z } = this.c,
@@ -2713,9 +2714,9 @@ export class SoftBody {
   ): Float32Array {
     this.check();
     if (!Number.isFinite(alpha))
-      throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
+      throw softError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
     if (out.length !== this.particles * 3)
-      throw new RangeError(
+      throw softError(
         `out holds ${out.length} numbers for ${this.particles} particles; pass three numbers a particle.`,
       );
     const a = alpha > 1 ? 1 : alpha < 0 ? 0 : alpha,
@@ -2871,9 +2872,9 @@ export class SoftBody {
   setVolumeFactor(factor: number | null): this {
     this.check();
     if (factor !== null && !(factor > 0 && Number.isFinite(factor)))
-      throw new RangeError('Volume factor must be a positive number.');
+      throw softError('Volume factor must be a positive number.');
     if (factor !== null && !this.volumeOn)
-      throw new RangeError('This body needs a closed triangle surface to hold a volume.');
+      throw softError('This body needs a closed triangle surface to hold a volume.');
     this.owner.setVolume(this, factor);
     return this.wake();
   }
@@ -2882,11 +2883,11 @@ export class SoftBody {
   setGasPressure(options: SoftGasPressure): this {
     this.check();
     if (!this.volumeOn)
-      throw new RangeError(
+      throw softError(
         'This body has no closed volume. Create it with SoftBodyDesc.setGasPressure or setVolumeFactor.',
       );
     if (this.cellRange.count)
-      throw new RangeError('Gas needs a hollow shell. Create a closed triangle mesh without tetrahedral cells.');
+      throw softError('Gas needs a hollow shell. Create a closed triangle mesh without tetrahedral cells.');
     const gas = checkedGas(options);
     this.owner.setGas(this, gasProduct(gas, this.owner.surfaceVolume(this)), gas.ambientPressure!);
     return this.wake();
@@ -2982,7 +2983,7 @@ export class SoftBody {
   isEdgeTorn(edge: number): boolean {
     this.check();
     if (!Number.isInteger(edge) || edge < 0 || edge >= this.structural)
-      throw new RangeError(`Edge ${edge} must be a structural edge.`);
+      throw softError(`Edge ${edge} must be a structural edge.`);
     return (this.c.eflags[this.firstEdge + edge]! & TORN) !== 0;
   }
   /** Tears one edge now. */
@@ -3013,7 +3014,7 @@ export class SoftBody {
     this.check();
     const info = this.clusterInfo[cluster];
     if (!Number.isInteger(cluster) || !info)
-      throw new RangeError(`Cluster ${cluster} must be in this body (0 to ${this.clusterInfo.length - 1}).`);
+      throw softError(`Cluster ${cluster} must be in this body (0 to ${this.clusterInfo.length - 1}).`);
     return info;
   }
   /**
@@ -3055,7 +3056,7 @@ export class SoftBody {
   /** Multiplies Young's modulus (both Lame parameters) of every cell all four of whose particles are in the cluster (default 1). */
   setClusterStiffnessScale(cluster: number, scale: number): this {
     const info = this.checkCluster(cluster);
-    if (!(scale >= 0 && Number.isFinite(scale))) throw new RangeError('A stiffness scale must be 0 or more.');
+    if (!(scale >= 0 && Number.isFinite(scale))) throw softError('A stiffness scale must be 0 or more.');
     info.stiffness = scale;
     this.owner.writeCellMaterial(this);
     return this;
@@ -3071,7 +3072,7 @@ export class SoftBody {
   /** Multiplies the tear thresholds (strain and force) of the cells and edges that lie wholly in the cluster (default 1). */
   setClusterTearResistance(cluster: number, scale: number): this {
     const info = this.checkCluster(cluster);
-    if (!(scale > 0 && Number.isFinite(scale))) throw new RangeError('A tear resistance must be a positive number.');
+    if (!(scale > 0 && Number.isFinite(scale))) throw softError('A tear resistance must be a positive number.');
     info.tearResistance = scale;
     this.owner.writeCellMaterial(this);
     this.owner.writeMaterial(this);
@@ -3082,7 +3083,7 @@ export class SoftBody {
     const info = this.checkCluster(cluster);
     if (hertz !== undefined) {
       if (!(hertz > 0 && Number.isFinite(hertz)))
-        throw new RangeError('Shape matching stiffness must be a positive number of hertz.');
+        throw softError('Shape matching stiffness must be a positive number of hertz.');
       info.hertz = hertz;
     }
     info.matching = on;
@@ -3157,7 +3158,7 @@ export class SoftBody {
   private checkCell(cell: number): void {
     this.check();
     if (!Number.isInteger(cell) || cell < 0 || cell >= this.cellRange.count)
-      throw new RangeError(`Cell ${cell} must be in this body (0 to ${this.cellRange.count - 1}).`);
+      throw softError(`Cell ${cell} must be in this body (0 to ${this.cellRange.count - 1}).`);
   }
   /** True once a cell has torn away. */
   isCellTorn(cell: number): boolean {
@@ -3240,7 +3241,7 @@ export class SoftBody {
       );
     checkStrengthModel(this.orthotropicStrength, material);
     if (this.coplanarToughness && (material.model === 'volume' || material.yieldStrain > 0 || material.tearStrain > 0))
-      throw new RangeError(
+      throw softError(
         'Coplanar fracture toughness needs isotropic elastic cells. Use an elastic material without plastic flow or another tear rule.',
       );
     this.cellMaterial = material.clone();
@@ -3276,7 +3277,7 @@ export class SoftBody {
   }
   setLinearDamping(damping: number): this {
     this.check();
-    if (!(damping >= 0 && Number.isFinite(damping))) throw new RangeError('Linear damping must be 0 or more.');
+    if (!(damping >= 0 && Number.isFinite(damping))) throw softError('Linear damping must be 0 or more.');
     this.c.linear_damping[this.handle] = damping;
     return this;
   }
@@ -3346,7 +3347,7 @@ export class SoftBody {
     this.check();
     checkVec(impulse, 'Impulse');
     checkVec(point, 'Point');
-    if (!Number.isFinite(radius)) throw new RangeError('Radius must be a number of metres.');
+    if (!Number.isFinite(radius)) throw softError('Radius must be a number of metres.');
     const { x, y, z } = this.c;
     for (let i = 0; i < this.particles; i++) {
       const row = this.firstParticle + i,
@@ -3365,7 +3366,7 @@ export class SoftBody {
     this.check();
     checkVec(center, 'Centre');
     if (!Number.isFinite(magnitude) || !Number.isFinite(radius))
-      throw new RangeError('Magnitude and radius must be numbers.');
+      throw softError('Magnitude and radius must be numbers.');
     const { x, y, z } = this.c;
     for (let i = 0; i < this.particles; i++) {
       const row = this.firstParticle + i,
@@ -3709,14 +3710,14 @@ export class SoftBodies implements PhysicsAttachment {
     const fiber = desc.fiber && softFiber(desc.fiber.direction, desc.fiber.modulus);
     checkSolverModel(mode, CELL_MODEL[desc.cellMaterial.model]);
     if (desc.orthotropy && (mode !== 'vertex-block' || fiber))
-      throw new RangeError(
+      throw softError(
         'Orthotropic stiffness uses vertex blocks. Select vertex-block and supply either the orthotropic tensor or a separate fiber.',
       );
     checkStrengthModel(desc.orthotropicStrength, desc.cellMaterial);
     const seam = desc.tensileSeam && bindTensileSeam(desc.tensileSeam, desc.positions, desc.cells);
     const nucleus = desc.tensileNucleation;
     if (nucleus !== null && (!Number.isFinite(nucleus) || !(Math.fround(1 + 2 * nucleus) > 1) || !desc.cells.length))
-      throw new RangeError(
+      throw softError(
         'Tensile nucleation needs cells and a positive strain resolvable in f32. Build a solid and increase openingStrain.',
       );
     const toughness = desc.coplanarToughness;
@@ -3728,16 +3729,16 @@ export class SoftBodies implements PhysicsAttachment {
         desc.cellMaterial.model === 'volume' ||
         desc.cellMaterial.yieldStrain > 0)
     )
-      throw new RangeError(
+      throw softError(
         'Coplanar fracture toughness needs isotropic elastic cells. Build tetrahedra without fibers or plastic flow.',
       );
     if (seam && (nucleus !== null || toughness))
-      throw new RangeError(
+      throw softError(
         'Authored and nucleated cracks use different opening rules. Clear one fracture mode with null.',
       );
     const fracture = seam ?? nucleus ?? (toughness ? 0 : null);
     if (fracture !== null && new Set(desc.cells).size !== desc.particleCount)
-      throw new RangeError('A tensile crack needs every particle in a cell. Build a fully tetrahedralized solid.');
+      throw softError('A tensile crack needs every particle in a cell. Build a fully tetrahedralized solid.');
     if (
       fracture !== null &&
       (desc.edgePairs.length ||
@@ -3747,7 +3748,7 @@ export class SoftBodies implements PhysicsAttachment {
         desc.orthotropicStrength ||
         desc.cellMaterial.tearStrain > 0)
     )
-      throw new RangeError(
+      throw softError(
         'A tensile crack needs tetrahedral cells without springs, clusters, skin or native tear limits. Use a separate solid.',
       );
     if (desc.crackBand && !desc.inheritedBand) {
@@ -3756,24 +3757,24 @@ export class SoftBodies implements PhysicsAttachment {
       for (let i = 0; i < desc.cells.length; i += 4) {
         const [a, b, c, d] = [desc.cells[i]!, desc.cells[i + 1]!, desc.cells[i + 2]!, desc.cells[i + 3]!];
         if (Math.abs(tetDeterminant(desc.positions, a, b, c, d)) >= maxDeterminant)
-          throw new RangeError(
+          throw softError(
             'A cell is too coarse for the authored fracture energy. Refine the tetrahedra in the solid.',
           );
       }
     }
     const particles = desc.particleCount;
     if (desc.selfContacts && desc.triangles.length === 0)
-      throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
-    if (particles === 0) throw new RangeError('A soft body has at least one particle.');
+      throw softError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
+    if (particles === 0) throw softError('A soft body has at least one particle.');
     // A body that holds its volume needs a closed surface whose triangles face outward.
     const hasVolume = desc.volumeFactor !== null || desc.gas !== null,
       restVolume = hasVolume ? meshVolume(desc.positions, desc.triangles) : 0;
     if (hasVolume && (!(restVolume > 0) || !closedSurface(desc.triangles)))
-      throw new RangeError('A body that holds its volume needs a closed surface whose triangles face outward.');
+      throw softError('A body that holds its volume needs a closed surface whose triangles face outward.');
     const gas = desc.gas ? checkedGas(desc.gas) : null,
       gasLoad = gas ? gasProduct(gas, restVolume) : 0;
     if (gas && desc.cells.length)
-      throw new RangeError('Gas needs a hollow shell. Create a closed triangle mesh without tetrahedral cells.');
+      throw softError('Gas needs a hollow shell. Create a closed triangle mesh without tetrahedral cells.');
     const structural = desc.edgePairs.length / 2,
       edges = structural + desc.bendPairs.length / 2,
       firstParticle = this.particleCount,
@@ -3903,7 +3904,7 @@ export class SoftBodies implements PhysicsAttachment {
     if (desc.tethers !== null) this.tethersDirty = true;
     if (desc.skinMax) {
       if (desc.skinMax.length !== particles || (desc.skinBack && desc.skinBack.length !== particles))
-        throw new RangeError(
+        throw softError(
           `The skin constraints hold ${desc.skinMax.length} particles but the body has ${particles}; set them after its particles.`,
         );
       body.applySkin(desc.skinMax.slice(), desc.skinBack?.slice() ?? null);
@@ -4214,13 +4215,13 @@ export class SoftBodies implements PhysicsAttachment {
   /** @internal Makes a cluster of a body's particles. */
   addCluster(body: SoftBody, indices: ArrayLike<number>, hertz: number): number {
     if (!(hertz >= 0 && Number.isFinite(hertz)))
-      throw new RangeError('Shape matching stiffness must be 0 (off) or a number of hertz.');
+      throw softError('Shape matching stiffness must be 0 (off) or a number of hertz.');
     const members = Array.from(indices, (index) => {
       if (!Number.isInteger(index) || index < 0 || index >= body.particles)
-        throw new RangeError(`Cluster particle ${index} must be in this body (0 to ${body.particles - 1}).`);
+        throw softError(`Cluster particle ${index} must be in this body (0 to ${body.particles - 1}).`);
       return index;
     });
-    if (members.length < 1) throw new RangeError('A cluster has at least one particle.');
+    if (members.length < 1) throw softError('A cluster has at least one particle.');
     const info: ClusterInfo = {
       members,
       hertz: hertz || DEFAULT_CLUSTER_HERTZ,
@@ -4380,7 +4381,7 @@ export class SoftBodies implements PhysicsAttachment {
       );
     if (count > 0) checkSolverModel(solver, f.model![first]!);
     if (solver !== 'vertex-block' && this.cellOrthotropy(body))
-      throw new RangeError(
+      throw softError(
         'A body with orthotropic stiffness needs vertex-block. Choose vertex-block to retain its tensor.',
       );
     const flags = this.columns().pflags;
@@ -5481,20 +5482,25 @@ export class SoftBodies implements PhysicsAttachment {
     // held a radius above one flat face of a collider hold every point of the triangle between them (the face's point is a
     // convex combination of the corners, and the distance to a plane is affine), so its row would only repeat theirs. On a
     // ball resting on the ground nearly every lower triangle has such a contact, and the repeated rows made the exact contact
-    // and friction solves grow with their square (KB-SOFT-FACEROWS1). A curved surface, a contact hook, a pinned corner or a
-    // corner of another radius keeps its face contact.
+    // and friction solves grow with their square (KB-SOFT-FACEROWS1). Only a fixed collider's face is left out: against a body
+    // that moves, the face row is where the body takes its push back and its friction, and leaving it to the corners let a
+    // light box falling on a heavy cloth through (soft.test.js "a contact is stable at a mass ratio of a thousand"). A
+    // curved surface, a contact hook, a pinned corner or a corner of another radius keeps its face contact too.
     const byRow = new Map<number, Found[]>();
     for (const f of found) {
       const list = byRow.get(f.row);
       if (list) list.push(f);
       else byRow.set(f.row, [f]);
     }
-    const hooked = new Map<number, boolean>(),
-      asksHook = (collider: number): boolean => {
-        let on = hooked.get(collider);
+    const kept = new Map<number, boolean>(),
+      keepsFace = (collider: number): boolean => {
+        let on = kept.get(collider);
         if (on === undefined) {
-          on = !!this.contactHook && !!this.physics.colliderOf(collider)?.activeHooks().modifyContacts;
-          hooked.set(collider, on);
+          const shape = this.physics.colliderOf(collider);
+          on =
+            (!!this.contactHook && !!shape?.activeHooks().modifyContacts) ||
+            this.physics.bodyOfCollider(collider)?.type !== 'fixed';
+          kept.set(collider, on);
         }
         return on;
       },
@@ -5507,7 +5513,7 @@ export class SoftBodies implements PhysicsAttachment {
         thickness: number,
       ): boolean => {
         // The kernel marks a flat face -1 (`contact_feature`); 0 is a sharp edge or corner, above 0 a curved surface.
-        if (!(curvature < 0) || asksHook(collider)) return false;
+        if (!(curvature < 0) || keepsFace(collider)) return false;
         for (const row of rows) {
           if (!(c.w[row]! > 0) || c.radius[row]! < thickness) return false;
           const held = byRow
@@ -5634,7 +5640,7 @@ export class SoftBodies implements PhysicsAttachment {
         hook(contact);
         if (!contact.enabled) continue;
         const length = Math.hypot(...contact.normal);
-        if (!(length > 0) || !Number.isFinite(length)) throw new RangeError('A contact normal must have a length.');
+        if (!(length > 0) || !Number.isFinite(length)) throw softError('A contact normal must have a length.');
         f.normal = [contact.normal[0] / length, contact.normal[1] / length, contact.normal[2] / length];
         f.point = [...contact.point];
         f.velocity = [...contact.velocity];
@@ -5673,7 +5679,7 @@ export class SoftBodies implements PhysicsAttachment {
         hook(contact);
         if (!contact.enabled) continue;
         const length = Math.hypot(...contact.normal);
-        if (!(length > 0) || !Number.isFinite(length)) throw new RangeError('A contact normal must have a length.');
+        if (!(length > 0) || !Number.isFinite(length)) throw softError('A contact normal must have a length.');
         f.normal = [contact.normal[0] / length, contact.normal[1] / length, contact.normal[2] / length];
         f.point = [...contact.point];
         f.velocity = [...contact.velocity];
@@ -6156,7 +6162,7 @@ export class SoftBodies implements PhysicsAttachment {
     // A body with a skin collides by its skin (Rapier's skin collision): the mesh a game draws is the mesh that is met.
     const skin = body.skin !== null;
     if (!skin && body.triangleList.length === 0)
-      throw new RangeError('This body has no triangles or skin; build it with trimesh, cloth, clothTube or setSkin.');
+      throw softError('This body has no triangles or skin; build it with trimesh, cloth, clothTube or setSkin.');
     const host = this.physics.addBody(null, {
       type: 'fixed',
       colliders: {
@@ -6194,7 +6200,7 @@ export class SoftBodies implements PhysicsAttachment {
       );
     const count = mesh.vertices.length / 3;
     if (!Number.isInteger(count) || count < 3)
-      throw new RangeError('A mesh has vertices, three numbers each; pass at least three of them.');
+      throw softError('A mesh has vertices, three numbers each; pass at least three of them.');
     const c = this.columns(),
       near: number[] = [],
       bound: BoundMesh = {
@@ -6206,12 +6212,12 @@ export class SoftBodies implements PhysicsAttachment {
       };
     if (binding.mode === 'direct') {
       if (binding.particles.length !== count)
-        throw new RangeError(
+        throw softError(
           `A direct binding names one particle for each of the ${count} vertices; pass one particle for each vertex.`,
         );
       for (const k of binding.particles)
         if (!Number.isInteger(k) || k < 0 || k >= soft.particles)
-          throw new RangeError(`Particle ${k} must be in this body (0 to ${soft.particles - 1}).`);
+          throw softError(`Particle ${k} must be in this body (0 to ${soft.particles - 1}).`);
       bound.particles = Uint32Array.from(binding.particles, (k) => soft.firstParticle + k);
       bound.weights = new Float32Array(count).fill(1);
     } else if (binding.mode === 'directByPosition') {
@@ -6230,14 +6236,14 @@ export class SoftBodies implements PhysicsAttachment {
             best = row;
           }
         }
-        if (best < 0) throw new RangeError(`Vertex ${v} has no particle within ${binding.eps} m.`);
+        if (best < 0) throw softError(`Vertex ${v} has no particle within ${binding.eps} m.`);
         near.push(best);
       }
       bound.particles = Uint32Array.from(near);
       bound.weights = new Float32Array(count).fill(1);
     } else {
       if (soft.cellRange.count === 0)
-        throw new RangeError('A skinned binding needs a body of cells: build it with box or solid.');
+        throw softError('A skinned binding needs a body of cells: build it with box or solid.');
       const f = this.cellColumns(),
         { first, count: cells } = soft.cellRange;
       bound.per = 4;
@@ -6539,7 +6545,7 @@ export class SoftBodies implements PhysicsAttachment {
   cutTriangle(body: SoftBody, blade: readonly [Vec3, Vec3, Vec3]): SoftTearEvent {
     this.checkSolidCut(body);
     if (!Array.isArray(blade) || blade.length !== 3)
-      throw new RangeError('A finite blade needs three points. Supply the corners of one world-space triangle.');
+      throw softError('A finite blade needs three points. Supply the corners of one world-space triangle.');
     for (const point of blade) checkVec(point, 'Blade point');
     const trackFront = body.tensileNucleation !== null || body.coplanarToughness ? true : undefined;
     const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade, trackFront));
@@ -6855,7 +6861,7 @@ export interface AeroLaw {
 function checkedAero(aero: SoftAerodynamics): AeroLaw {
   const { aspectRatio = 1, drag = 1.17, vortexLift = Math.PI, friction = 0.004 } = aero;
   if (!(aspectRatio > 0 && Number.isFinite(aspectRatio)))
-    throw new RangeError(
+    throw softError(
       `An aspect ratio is a positive number (got ${aspectRatio}); pass one above 0, or leave it unset for 1.`,
     );
   for (const [value, label] of [
@@ -6864,7 +6870,7 @@ function checkedAero(aero: SoftAerodynamics): AeroLaw {
     [friction, 'friction'],
   ] as const)
     if (!(value >= 0 && Number.isFinite(value)))
-      throw new RangeError(`The ${label} coefficient is 0 or more (got ${value}); pass a finite number of 0 or above.`);
+      throw softError(`The ${label} coefficient is 0 or more (got ${value}); pass a finite number of 0 or above.`);
   const slope = (2 * Math.PI * aspectRatio) / (2 + Math.sqrt(aspectRatio * aspectRatio + 4)),
     attached = (sine: number) => slope * sine * Math.sqrt(1 - sine * sine) + vortexLift * sine * sine;
   // The first angle where attached flow's normal force reaches the square plate's: bisection on sin a, from where it rises.
@@ -6956,12 +6962,12 @@ function skinValues(values: number | ArrayLike<number>, particles: number, label
   if (typeof values === 'number') out.fill(values);
   else {
     if (values.length !== particles)
-      throw new RangeError(`Give one ${label} a particle: ${particles} values (got ${values.length}).`);
+      throw softError(`Give one ${label} a particle: ${particles} values (got ${values.length}).`);
     for (let i = 0; i < particles; i++) out[i] = values[i]!;
   }
   for (let i = 0; i < particles; i++)
     if (!(out[i]! >= 0))
-      throw new RangeError(
+      throw softError(
         `A ${label} is 0 or more metres, Infinity for none (got ${typeof values === 'number' ? values : values[i]} at particle ${i}).`,
       );
   return out;
@@ -6970,7 +6976,7 @@ function skinValues(values: number | ArrayLike<number>, particles: number, label
 function checkedTethers(stretch: number | null): number | null {
   if (stretch === null) return null;
   if (!(stretch >= 1) || !Number.isFinite(stretch))
-    throw new RangeError(
+    throw softError(
       `A tether's stretch is 1 or more: how far past its rest distance through the cloth a particle may go (got ${stretch}); pass 1 for none, or null for no tethers.`,
     );
   return stretch;

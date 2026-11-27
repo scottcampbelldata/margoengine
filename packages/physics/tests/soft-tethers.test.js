@@ -7,6 +7,9 @@ import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { SoftBodies, SoftBodyDesc } from '../dist/soft.js';
 
+/** What a soft-body call throws for input it cannot use: a coded MargoError linking its errors entry. */
+const softRefusal = (e) => e.name === 'MargoError' && e.code === 'unsupported' && /errors#soft-bodies/.test(e.message);
+
 await Physics.load();
 
 const NU = 11,
@@ -83,6 +86,6 @@ test('a tear and a pin change tie the particles again', async () => {
 });
 
 test('a tether must allow the rest distance at least', () => {
-  assert.throws(() => SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 3).setTethers(0.9), RangeError);
-  assert.throws(() => SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 3).setTethers(Number.NaN), RangeError);
+  assert.throws(() => SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 3).setTethers(0.9), softRefusal);
+  assert.throws(() => SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 3).setTethers(Number.NaN), softRefusal);
 });

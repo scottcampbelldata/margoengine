@@ -26,6 +26,15 @@ export const entries = [
     fix: 'Pass a live `Physics`, attach it with `await PhysicsDebugView.attach(engine, physics)` after `new Physics(engine)`, give a positive `width` or leave it out, add objects with `debugRender()` or functions returning `{vertices, colors}`, pass another `name` for a second view in one scene, and attach a new view after dispose.',
   },
   {
+    id: 'soft-bodies',
+    title: '@margoengine/physics/soft: ropes, cloth, soft solids and their settings',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A soft-body builder, setting or query was given something it cannot use: a particle, edge, cell or cluster index outside the body, a count, mass, radius, frequency, ratio, strain or pressure that is not a finite number in its range, a material whose moduli or Poisson ratio cannot be represented, a mesh or skin that is not closed triangles where one is needed, arrays of the wrong length, or a call the body cannot take (a gas in a body with cells, a fabric on a body without triangles, a volume on an open surface).',
+    fix: 'Pass indices from 0 to the count the body reports, finite numbers in SI units within the range the message names (kilograms, metres, Hz, Pa), one value per particle or edge where a list is asked for, and a closed outward-wound mesh for volumes, gas and skins; build the body with the builder the message names.',
+  },
+  {
     id: 'soft-volumes',
     title: '@margoengine/physics/soft: soft volumes from a mesh (SoftBodyDesc.volume) and their debug lines',
     kind: 'family',

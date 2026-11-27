@@ -12,6 +12,9 @@ import {
   SoftMeshBinding,
 } from '../dist/soft.js';
 
+/** What a soft-body call throws for input it cannot use: a coded MargoError linking its errors entry. */
+const softRefusal = (e) => e.name === 'MargoError' && e.code === 'unsupported' && /errors#soft-bodies/.test(e.message);
+
 const warn = console.warn;
 console.warn = () => {};
 await Physics.load();
@@ -232,10 +235,10 @@ test('forces, impulses and the material act as documented', async () => {
   near(body.particleVelocity(3)[0], 2, 1e-6, 'particle impulse / particle mass');
   const material = new SoftBodyMaterial();
   material.edgeSoftness = { naturalFrequency: -1, dampingRatio: 1 };
-  assert.throws(() => body.setMaterial(material), RangeError);
-  assert.throws(() => SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 1), RangeError);
-  assert.throws(() => new SoftBodyDesc([0, 0, 0, 1, 0, 0]).setEdges([0, 0]), RangeError);
-  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setPinnedParticles([3]), RangeError);
+  assert.throws(() => body.setMaterial(material), softRefusal);
+  assert.throws(() => SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 1), softRefusal);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0, 1, 0, 0]).setEdges([0, 0]), softRefusal);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setPinnedParticles([3]), softRefusal);
   void physics;
 });
 
@@ -432,10 +435,10 @@ test('cloth falling on cloth stays above it with self contacts, and falls throug
 
 test('self contacts need triangles', async () => {
   const { soft } = await create();
-  assert.throws(() => soft.create(new SoftBodyDesc([0, 0, 0]).setSelfContacts(true)), RangeError);
+  assert.throws(() => soft.create(new SoftBodyDesc([0, 0, 0]).setSelfContacts(true)), softRefusal);
   assert.throws(
     () => SoftBodyDesc.cloth([0, 0, 0], [1, 0, 0], [0, 0, 1], 2, 2).setSelfContacts(true, { friction: -1 }),
-    RangeError,
+    softRefusal,
   );
 });
 
@@ -487,7 +490,7 @@ test('collision groups decide which colliders the particles meet', async () => {
   assert.ok((await run(0x00010001)) > 0, 'a particle of the same group rests on the floor');
   assert.ok((await run(0x00020002)) < -1, 'a particle of another group falls through it');
   const desc = new SoftBodyDesc([0, 0, 0]);
-  assert.throws(() => desc.setCollisionGroups(-1), RangeError);
+  assert.throws(() => desc.setCollisionGroups(-1), softRefusal);
 });
 
 test('a crate hangs from a rope: the rope carries its weight and the crate stays at the rope end', async () => {
@@ -546,7 +549,7 @@ test('a pinned particle drags a light crate along, and a fixed body holds a part
   lone.attachParticle(0, fixed);
   steps(physics, 60);
   near(lone.particlePosition(0)[0], 0.3, 0.01, 'a fixed body keeps its particle at the anchor');
-  assert.throws(() => lone.attachParticle(3, fixed), RangeError);
+  assert.throws(() => lone.attachParticle(3, fixed), softRefusal);
 });
 
 test('a sphere keeps its volume as it lands and squashes, and a volume factor inflates it', async () => {
@@ -580,7 +583,7 @@ test('a sphere keeps its volume as it lands and squashes, and a volume factor in
   near(ball.surfaceVolume(), 2 * rest, rest * 0.06, 'inflated to twice its volume');
   assert.throws(
     () => soft.create(SoftBodyDesc.cloth([0, 0, 0], [1, 0, 0], [0, 0, 1], 2, 2).setVolumeFactor(1)),
-    RangeError,
+    softRefusal,
     'a flat sheet has no volume',
   );
 });
@@ -592,7 +595,7 @@ test('a body whose triangles face inward cannot hold a volume', async () => {
     desc.positions,
     desc.triangles.map((v, k, a) => (k % 3 === 1 ? a[k + 1] : k % 3 === 2 ? a[k - 1] : v)),
   ).setVolumeFactor(1);
-  assert.throws(() => soft.create(flipped), RangeError);
+  assert.throws(() => soft.create(flipped), softRefusal);
 });
 
 test('the stretch of a rope under a heavy load does not depend on the iterations, the substeps or the mass ratio', async () => {
@@ -726,7 +729,7 @@ test('a tension-only rope does not push when slack and pulls when taut', async (
     near(await run(true, hz, [1.5, 1, 0]), 1, 0.05, `a taut tension-only edge pulls (${hz} Hz)`);
   }
   const { soft } = await create();
-  assert.throws(() => new SoftBodyDesc([0, 0, 0, 1, 0, 0]).setEdges([0, 1]).setTensionOnly([5]), RangeError);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0, 1, 0, 0]).setEdges([0, 1]).setTensionOnly([5]), softRefusal);
   void soft;
 });
 
@@ -803,7 +806,7 @@ test('bend edges resist bending by their spring, and builders sew, merge and pla
   near(heavy.mass(), 4, 1e-6, 'setMasses sets each particle');
   near(heavy.centerOfMass()[0], 1.5, 1e-6, 'the centre of mass follows the masses');
   near(heavy.particlePosition(0)[1], 5, 1e-6, 'setTranslation moves the particles');
-  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setMasses([1, 2]), RangeError);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setMasses([1, 2]), softRefusal);
 });
 
 test('the builders take Rapier signatures: anisotropic cloth springs, a tube by radii, a sphere by subdivisions', async () => {
@@ -863,12 +866,12 @@ test('a deformable collider bound to a soft body follows it: direct, direct by p
         { vertices: [9, 9, 9, 9, 9, 10, 9, 10, 9], indices: [0, 1, 2] },
         SoftMeshBinding.directByPosition(0.01),
       ),
-    RangeError,
+    softRefusal,
   );
-  assert.throws(() => soft.createDeformableCollider(cloth, quad, SoftMeshBinding.direct([0, 1])), RangeError);
+  assert.throws(() => soft.createDeformableCollider(cloth, quad, SoftMeshBinding.direct([0, 1])), softRefusal);
   assert.throws(
     () => soft.createDeformableCollider(cloth, quad, SoftMeshBinding.skinned()),
-    RangeError,
+    softRefusal,
     'a cloth has no cells',
   );
 
@@ -935,7 +938,7 @@ test('dominance decides who gives way: the soft body holds against a lower group
   );
   assert.ok(softWins.box > 0.8, `and the box rests on it: ${softWins.box}`);
   assert.ok(boxWins.box < 0.2, `a dominant box is not held by the cloth and falls past it: ${boxWins.box}`);
-  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setDominanceGroup(300), RangeError);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setDominanceGroup(300), softRefusal);
 });
 
 test('an inextensible sheet holds its threads within 0.1 percent at any pass count and load, a surface collider can be made with the body, and a closed surface is oriented', async () => {
@@ -980,7 +983,7 @@ test('an inextensible sheet holds its threads within 0.1 percent at any pass cou
       // The tolerance, and what an f32 length of 10 cm holds besides.
       assert.ok(strain <= 1e-3 + 1e-6, `${extra} extra passes, load ${load}: a thread strains ${strain}`);
     }
-  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setAdditionalSolverIterations(-1), RangeError);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setAdditionalSolverIterations(-1), softRefusal);
 
   const { physics, soft } = await create({ gravity: [0, 0, 0] });
   const plain = soft.create(SoftBodyDesc.cloth([0, 0, 0], [0.1, 0, 0], [0, 0, 0.1], 3, 3));

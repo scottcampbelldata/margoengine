@@ -3,6 +3,7 @@
 // of its bind position carried by up to four joints, each joint's matrix (its world matrix times its inverse bind matrix) by
 // that joint's weight. It is the skinned mesh a renderer draws, worked out on the CPU so a cloth can be held to it.
 
+import { softError } from './soft-error.js';
 /** A mesh bound to a skeleton: four joints and four weights a vertex, as glTF's JOINTS_0 and WEIGHTS_0. */
 export interface SkinBinding {
   /** Bind-pose positions, x, y, z a vertex. */
@@ -37,19 +38,19 @@ export function skinVertices(
     normals = binding.normals ?? null,
     n = positions.length / 3,
     jointCount = matrices.length / 16;
-  if (!Number.isInteger(n)) throw new RangeError(`Give three position numbers a vertex (got ${positions.length}).`);
+  if (!Number.isInteger(n)) throw softError(`Give three position numbers a vertex (got ${positions.length}).`);
   if (joints.length !== 4 * n || weights.length !== 4 * n)
-    throw new RangeError(
+    throw softError(
       `Give four joints and four weights a vertex: ${4 * n} each (got ${joints.length} and ${weights.length}).`,
     );
   if (normals !== null && normals.length !== 3 * n)
-    throw new RangeError(`Give three normal numbers a vertex: ${3 * n} (got ${normals.length}).`);
+    throw softError(`Give three normal numbers a vertex: ${3 * n} (got ${normals.length}).`);
   if (!Number.isInteger(jointCount))
-    throw new RangeError(`Give sixteen numbers a joint matrix (got ${matrices.length}).`);
+    throw softError(`Give sixteen numbers a joint matrix (got ${matrices.length}).`);
   const outP = target?.positions ?? new Float32Array(3 * n),
     outN = normals === null ? null : (target?.normals ?? new Float32Array(3 * n));
   if (outP.length !== 3 * n || (outN !== null && outN.length !== 3 * n))
-    throw new RangeError(`The target arrays must hold ${3 * n} numbers each.`);
+    throw softError(`The target arrays must hold ${3 * n} numbers each.`);
   for (let v = 0; v < n; v++) {
     const px = positions[3 * v]!,
       py = positions[3 * v + 1]!,
@@ -65,7 +66,7 @@ export function skinVertices(
       if (weight === 0) continue;
       const joint = joints[4 * v + k]!;
       if (!Number.isInteger(joint) || joint < 0 || joint >= jointCount)
-        throw new RangeError(`Vertex ${v} uses joint ${joint}, which has no matrix; give 0 to ${jointCount - 1}.`);
+        throw softError(`Vertex ${v} uses joint ${joint}, which has no matrix; give 0 to ${jointCount - 1}.`);
       const m = 16 * joint;
       x += weight * (matrices[m]! * px + matrices[m + 4]! * py + matrices[m + 8]! * pz + matrices[m + 12]!);
       y += weight * (matrices[m + 1]! * px + matrices[m + 5]! * py + matrices[m + 9]! * pz + matrices[m + 13]!);
