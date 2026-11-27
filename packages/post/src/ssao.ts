@@ -458,6 +458,9 @@ export class SSAO implements EnginePlugin {
       order: 30,
       execute: (c) => {
         if (c.backend !== 'webgpu' || this.host) return;
+        // The final resolve waits for composition, so a pass drawn after the extraction (Lines at 20) reaches the
+        // picture at 4 samples (KB-POST-LATEDRAW1). The extraction's 1x depth stays as the occlusion read it.
+        this.captureTarget!.resolve(c.encoder, true, false);
         this.present(c, this.original!);
         this.captureTarget!.restore(c);
       },
@@ -725,8 +728,6 @@ export class SSAO implements EnginePlugin {
       merge.draw(3);
       merge.end();
     }
-    // A PostStack resolves its shared capture once, after every effect has replayed into it.
-    if (!this.host) this.captureTarget!.resolve(c.encoder, true);
   }
   /** Core's lit shader for `c`, returning only its ambient term, drawn depth-equal over the scene. */
   private replayPipeline(c: PostPassContext): GPURenderPipeline {

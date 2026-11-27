@@ -330,16 +330,18 @@ export class DOF implements EnginePlugin {
       },
     });
     if (this.host) return;
+    // Just below 30, where post-processing composes: the blur reads every draw before it (Lines at 20, text at 22,
+    // labels at 24), and the capture's final resolve in dof:coc keeps them at 4 samples (KB-POST-LATEDRAW1).
     graph.add({
       name: 'dof:coc',
-      order: 20,
+      order: 29.8,
       execute: (c) => {
         if (c.backend === 'webgpu' && !this.paused) this.circles(c);
       },
     });
     graph.add({
       name: 'dof:bokeh',
-      order: 21,
+      order: 29.9,
       execute: (c) => {
         if (c.backend === 'webgpu' && !this.paused) this.blur(c);
       },
