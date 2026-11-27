@@ -423,16 +423,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Open:** the wakes' correlation along the span in sheared flow (a coupling between neighbouring wake oscillators, as in
   diffusive wake models), checked on this case and on the paper's bidirectionally sheared cases.
 
-### Open 2026-11-27: a rod whose tension dwarfs its bending stiffness blows up at some steps (KB-PHYS-RODSTRING1, physics rod)
+### Open 2026-11-27: a rod pinned at both ends blows up at coarse steps under high tension, and at fine steps when stretched (KB-PHYS-RODSTRING1, physics rod)
 
-- **Repro:** a `Rod` of 48 links, 7.9 m, 1.77 kg/m, bending stiffness 1 N m^2, pinned at both ends and brought to 48 kN over
-  half a second, then plucked (no water, no material damping): at 60 steps a second it swings to hundreds of metres within
-  a second, at 600 it rings steadily (damping ratio 4e-6), and at 2,400 the kernel stops it (a body past 1e15). The same rod
-  with 1,470 N m^2 at 3 kN is steady at 60, 600 and 1,200.
-- **Cause, so far:** at the coarse step, a link turned across its line meets the tension as a stiffness T / l (290 kN/m on a
-  0.29 kg link, about 1,000 rad/s), which a 60 Hz step holds only if the multibody's implicit solve holds it, and it holds
-  the links' own springs, not the tension's. That does not explain the failure at the finest step, which is not yet found.
-- **Open:** find the fine-step failure; then hold the tension's stiffness across the links in the tree's implicit solve.
+- **Repro (coarse step):** a `Rod` of 48 links, 7.9 m, 1.77 kg/m, bending stiffness 1 N m^2, pinned at both ends, brought to
+  48 kN over half a second, then plucked (no water, no material damping): at 30 and 60 steps a second it swings to
+  hundreds of metres; at 300 to 1,800 it rings steadily.
+- **Repro (fine step):** the same rod at 2,400 steps a second (also at 12 kN, and with 1,470 N m^2 at 48 kN) is stopped by
+  the kernel (a link past 1e15) late in the half second the tension comes on, once the pinned end links stretch by about
+  3 % (the default axial stiffness 30 T); with the axial stiffness at 1e7 N or 1e9 N (a stretch of 3e-4 or less) it is
+  steady at 2,400. The same rod at 3 kN is steady at every rate.
+- **Cause, so far:** two. At coarse steps, a link turned across its line meets the tension as a stiffness T / l (290 kN/m on
+  a 0.29 kg link, about 1,000 rad/s), held explicitly. At fine steps, a trace of the first link shows its pose moving along
+  the rod without speed, fivefold each step before it blows up: the joint passes' pushing pass closes the stretched half
+  link that the pin's spring (`pinJoint` give, held in the tree's solve) holds open. Taking the pin out of the joint passes,
+  freeing only its along axis in the link's frame, and acting the tree's pin rows at the other anchor's foot on the link's
+  axis each moved the failure without removing it; none of them landed.
+- **Open:** one solve for the pin's give (the joint passes and the tree agreeing on it), and the tension's stiffness across
+  the links in the tree's implicit solve. Until then: keep a pinned rod's stretch small (a stiffer `axialStiffness`) when
+  stepping finely, and step a cable whose tension dwarfs its bending stiffness at 300 steps a second or more.
 
 ### Fixed 2026-11-27: KVLCC2 was too course-stable in shallow water (KB-SHIP-SHALLOW1, physics ship)
 
