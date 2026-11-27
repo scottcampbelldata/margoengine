@@ -17793,20 +17793,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** not yet found; the first validation error is not printed.
 - **Owed:** capture the first uncaptured error, fix it in the owning package, with a test.
 
-### Open 2026-11-27: the firelit smoke pall at night glows evenly (KB-SKY-PALLFALLOFF1, sky and weather)
+### Fixed 2026-11-27: the firelit smoke pall at night glowed evenly (KB-SKY-PALLFALLOFF1, sky and weather)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=ridge,fire-line --query=hour=22 --out=<folder>`:
-  the sky dome and the haze over the valley are one orange, so the ridge does not stand out against the sky; a firelit
+  the sky dome and the haze over the valley were one orange, so the ridge did not stand out against the sky; a firelit
   pall is brightest over the fire front and falls off with distance and height.
-- **Cause:** `WeatherDrive` gives the sky layer and the sky fog one colour each (`fireHazeLight`, the box mean over
-  `smokeWidth`) everywhere.
-- **Tried, not landed:** a point source softened by the fires' heat-weighted spread (a plane lit by P h / (4 pi (h^2 +
-  s^2 + r^2)^1.5)) on both the sky (`atmosphere.fireLight`) and the fog (the exact line integral). Sky only left the
-  ridge brighter than the sky; sky and fog leave the fire-line view nearly black (mean 12.5, the check wants over 15),
-  because this scene burns in two clusters about 3 km apart and one softened point between them gives each far less
-  than the even value (0.087 of the noon sun at its centre against 0.285 even).
-- **Owed:** several sources (the fire front's segments clustered into a few spots, the sky and fog summing them), so
-  light near each front matches the even value and falls off between and beyond them, judged on the real frames.
+- **Cause:** `WeatherDrive` gave the sky layer and the sky fog one colour each (`fireHazeLight`, the box mean over
+  `smokeWidth`) everywhere. A first attempt with one softened point over the fires' centre left the fire-line view
+  nearly black (mean 12.5): this scene burns in two stretches about 3 km apart, and the point sat between them.
+- **Fix:** `WeatherDrive` clusters the fires' burning segments (`FireFront.segments()`) into up to eight sources;
+  sky's look and fog take up to eight `fireSpots` that add, the layer where each ray meets it and the haze as the exact mean along the ray
+  as far as 2 / density, with `atmosphere.fireSight` holding the sky's low rays to the same reach; `WeatherDrive` writes
+  them (`fireLayerLight`), keeping the even light for fires that do not say where they burn. At 22:00 on an RTX A6000,
+  960 x 540, the ridge shows dark against a sky brightest toward the fires; mean levels fire-line 20.3 (the check wants
+  over 15), ridge 33.3, aerial-west 23.5.
+- **Not covered:** the light of one scattering from a source below a flat layer: light the smoke carries sideways by
+  scattering again is not modelled, and rays take the layer at one lit height each spot.
+- **Regression:** `packages/weather/tests/air-load.test.js` (a spot over each source, eight at most, restore),
+  `packages/sky/test/look.test.js` and `sky.test.js` (the
+  uniforms and WGSL) and `packages/sky/test/features-check.mjs look` (GPU, WebGPU and WebGL2: the falloff, the sight,
+  two spots adding, the haze's mean along the ray).
 
 ### Open 2026-11-27: a smoke column over a fire at night reads blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx)
 
