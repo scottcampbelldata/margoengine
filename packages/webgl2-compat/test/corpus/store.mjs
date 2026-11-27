@@ -192,6 +192,20 @@ export function recordsOf({ modules }) {
   return modules.map((module) => ({ ...module, errors: 0 }));
 }
 
+/**
+ * `base` ({@link recordsOf}) without the modules whose source a package changed (`keys`), for a recording that adds
+ * the new sources. Refuses a key the corpus does not hold, and one the recording (`recorded`) still creates.
+ */
+export function superseded(base, keys, recorded) {
+  const created = new Set(recorded.map((r) => sha(r.code).slice(0, 16)));
+  for (const key of keys) {
+    if (!base.some((r) => r.key === key)) throw new Error(`--drop=${key}: the corpus holds no module of that key`);
+    if (created.has(key))
+      throw new Error(`--drop=${key}: this recording still creates that source, so nothing superseded it`);
+  }
+  return base.filter((r) => !keys.includes(r.key));
+}
+
 /** Reads the corpus: the manifest and every module's source, checked against the manifest's hash. */
 export function readCorpus(dir = here) {
   const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')),

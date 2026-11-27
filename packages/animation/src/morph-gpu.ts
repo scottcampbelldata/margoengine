@@ -46,12 +46,14 @@ struct Params {time:f32,duration:f32,loops:u32,pad:u32}
     if(at<0.0){at+=p.duration;}
     if(at>=p.duration){at-=p.duration;}
   } else {at=clamp(at,0.0,p.duration);}
-  var lo=0u;var hi=track.keys-1u;
+  // The search ends on any buffer contents: 0 keys must not wrap to 4294967295, and the midpoint must not overflow
+  // past hi (a dispatch that never ends resets the GPU).
+  let last=max(track.keys,1u)-1u;var lo=0u;var hi=last;
   while(lo<hi) {
-    let mid=(lo+hi+1u)/2u;
+    let mid=lo+(hi-lo+1u)/2u;
     if(times[track.times+mid]<=at){lo=mid;}else{hi=mid-1u;}
   }
-  let a=lo;let b=min(a+1u,track.keys-1u);
+  let a=lo;let b=min(a+1u,last);
   let span=times[track.times+b]-times[track.times+a];
   var t=0.0;
   if(span>0.0){t=clamp((at-times[track.times+a])/span,0.0,1.0);}

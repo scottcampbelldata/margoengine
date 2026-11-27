@@ -2253,6 +2253,12 @@ and the product, constants applied) and the workgroup variables' bytes to its de
 does; before, only the lazy planner checked the product, at the first dispatch. Evidence: compute-limits.test.js;
 compute.test.js and the browser corpus compute part hold the recorded oversize kernels to that refusal.
 
+Loops end on any buffer contents (2026-11-27, KB-COMPAT-CORPUSFBO1): a dispatch that never ends resets the GPU, and
+the loss is reported by whatever runs next (KB-COMPAT-LOSSREPORT1, open). The morph weight kernel's key search now
+bounds `keys-1u` and its midpoint. A recording that replaces a changed kernel names the old module with
+`record-wgsl-corpus.mjs --add --drop=<key>`. Evidence: animation morph-gpu.test.js (CPU tier with a work budget),
+scripts/animation-morph-gpu-tests.js native and forced compatibility, the browser corpus compute part (0 failures).
+
 ## A new package brings its records (fast gate, 2026-11-16)
 
 `npm run hygiene` (every push) now runs `assertPackageRecordsCurrent` (scripts/support/package-records.mjs): every stated package count matches docs/catalog.json, margoengine.com/sizes.html can be built from entry-sizes.json and basic-scene-network.json (every catalog package measured, both records from one build), THIRD-PARTY-NOTICES.md is what scripts/supply-chain.mjs renders, and every examples/ folder holding TypeScript belongs to a type-check project. Each problem names the command that fixes it. `npm run catalog:build` now restates every package count (restatePackageCount in scripts/support/public-truth.mjs) instead of only the generated lists. Evidence: @margoengine/scenes landed with four pages stating 104 packages, no entry-sizes row, a stale notices file and examples/dune-coast in no project, and only local CI's full root tests failed; tests/package-records.test.js rebuilds that state in a temporary folder and gets the three reports, and the check run on origin/main's files at 3050f3bcc6 reports all of them. The size scan of tests/public-size-claims.test.js now reads meta descriptions and "core plus the high-level stage", which kept the white paper at 24,843 B and 61,059 B after the measured 24,841 B and 61,046 B.

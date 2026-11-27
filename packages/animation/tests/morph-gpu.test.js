@@ -5,8 +5,21 @@ import assert from 'node:assert/strict';
 import { Animation } from '../dist/index.js';
 import { MorphWeightPlayer, morphWeightShader } from '../dist/morph-gpu.js';
 import { GLTFAsset } from '../../gltf/dist/pbr.js';
+import { runComputeOnCPU } from '../../webgl2-compat/dist/compute.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+
+test('the weight kernel ends on any buffer contents: a track of 0 keys, or of 4294967295 (KB-COMPAT-CORPUSFBO1)', () => {
+  for (const keys of [0, 0xffffffff]) {
+    const buffers = new Map(
+      // Uniform, tracks, times, values, items, members, weights.
+      [16, 32, 16, 16, 16, 8, 16].map((bytes, binding) => [`0:${binding}`, new Uint32Array(bytes / 4)]),
+    );
+    buffers.get('0:1')[1] = keys;
+    // 64 invocations, each with at most 32 halvings of the key range.
+    runComputeOnCPU({ source: morphWeightShader, workgroups: [1], buffers, workBudget: 10_000 });
+  }
+});
 
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const talk = {

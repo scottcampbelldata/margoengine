@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { classify, entryPoints, flagsOf, readCorpus, recordsOf, writeCorpus } from './corpus/store.mjs';
+import { classify, entryPoints, flagsOf, readCorpus, recordsOf, superseded, writeCorpus } from './corpus/store.mjs';
 
 const root = resolve(import.meta.dirname, '..', '..', '..');
 const { manifest, modules } = readCorpus();
@@ -117,6 +117,26 @@ test('a recording added to the corpus keeps every module, its pipelines and its 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('a recording drops only a module the corpus holds and the packages no longer create', () => {
+  const base = recordsOf({ manifest, modules }),
+    old = base[0];
+  const kept = superseded(
+    base,
+    [old.key],
+    [
+      {
+        code: `${old.code}
+// changed`,
+      },
+    ],
+  );
+  assert.equal(kept.length, base.length - 1);
+  assert.ok(!kept.some((r) => r.key === old.key));
+  assert.throws(() => superseded(base, ['0000000000000000'], []), /holds no module of that key/);
+  assert.throws(() => superseded(base, [old.key], [{ code: old.code }]), /still creates that source/);
+  assert.deepEqual(superseded(base, [], []), base);
 });
 
 test('re-recording keeps an owner the corpus settled when a later label names another package (KB-COMPAT-CORPUSRED1)', () => {

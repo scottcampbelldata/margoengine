@@ -140,35 +140,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   call). The browser corpus compute part asserts and counts both refusals. Regression:
   `packages/webgl2-compat/test/compute-limits.test.js`.
 
-### Open 2026-11-27: the browser corpus compute part fails because a recorded animation kernel never ends on the page's zero-filled stand-ins (KB-COMPAT-CORPUSFBO1, webgl2-compat test page, animation)
+### Fixed 2026-11-27: a recorded animation kernel never ended on zero-filled buffers and reset the GPU in the browser corpus compute part (KB-COMPAT-CORPUSFBO1, animation)
 
-- **Repro:** `npm run build -w @margoengine/webgl2-compat`, then `node scripts/run-with-timeout.mjs --max=9.5 -- node
-  packages/webgl2-compat/test/corpus-draw-browser.mjs --part=compute` (Chrome, ANGLE Direct3D 11, RTX A6000). The
-  record that fails is the one after `animation 8b858be2e0a8c694 main` (index 612 of the part): `sky 8bd2180e7c0c8ef7
-  main` (613), and in a run that made a fresh device after it, `compute 8c376d839a33176a main` (614) as well. The
-  fewest records that fail: 612 then 613 through `window.dispatchAll` of `test/corpus-draw.html`; 613 alone, 608 to
-  611 with 613, and every other half of the bisection pass.
-- **Cause (proven):** the page dispatches every kernel with zero-filled stand-in buffers. Kernel 8b858be2e0a8c694
-  (`packages/animation/src/morph-gpu.ts`, `MorphWeightPlayer`) runs on the scatter tier and binary-searches a track's
-  keys with `var hi=track.keys-1u` and `mid=(lo+hi+1u)/2u`. With `keys` 0, `hi` wraps to 0xFFFFFFFF, `mid` wraps to 0
-  and `times[0] <= at` (both 0) keeps `lo` at 0, so the loop never ends. Measured on the machine above with only that
-  kernel: a `readPixels` after the dispatch blocks 5,547 ms (the Windows GPU watchdog), the next program link fails
-  with an empty log, then `webglcontextlost` fires, `device.lost` resolves ('unknown') and the context is restored.
-  The same dispatch with `keys` 1 in the stand-in track table syncs in 1 ms and loses nothing. Nothing reads back after
-  612's dispatch, so the reset lands in the next record, whose CPU-tier upload (`masked::texelFetch` helper link, or
-  `checkFramebufferStatus`, which returns FRAMEBUFFER_UNSUPPORTED 0x8cdd on a lost context) reports it. Which of the
-  two messages shows, and whether 614 is hit too, depends on where the reset falls; recreating the device after the
-  oversize kernels (before KB-COMPAT-WGSIZE1) only moved it.
-- **Ruled out:** resource exhaustion, framebuffer cache key collisions (sub keys use unique storage ids), the
-  translation (the loop behaves as WGSL defines it) and the KB-COMPAT-WGSIZE1 change. The kernel is correct for every
-  input its package gives it: glTF accessor counts are at least 1 (`packages/gltf/src/accessor.ts`) and the CPU twin
-  `sampleTrackInto` refuses a track with no keys.
-- **Not fixed, decision needed:** no stand-in content makes every kernel terminate, so the fix is one of: (1) the
-  morph weight kernel bounds its search for any buffer contents (`max(track.keys,1u)-1u`, same output for valid
-  tracks), then a full `npm run record:wgsl-corpus`, as `--add` keeps the recorded old source; or (2) the corpus page
-  gives this kernel stand-ins inside its contract. The loss probe: create the pipeline on a fresh compat device, bind
-  zero-filled buffers sized as the page does, dispatch one workgroup, then time a 1x1 `readPixels` and watch
-  `webglcontextlost`.
+- **Repro:** `npm run test:browser:compute -w @margoengine/webgl2-compat` (Chrome, ANGLE Direct3D 11, RTX A6000)
+  failed on the record after `animation 8b858be2e0a8c694 main`: `sky 8bd2180e7c0c8ef7 main` (its helper program "did
+  not link", or an incomplete framebuffer 0x8cdd), and in some runs `compute 8c376d839a33176a main` too. The fewest
+  records that failed: those two animation and sky records through `window.dispatchAll` of `test/corpus-draw.html`.
+- **Cause:** the page dispatches every kernel with zero-filled stand-in buffers. `morphWeightShader`
+  (`packages/animation/src/morph-gpu.ts`) binary-searched a track's keys from `track.keys-1u`: with 0 keys it wrapped
+  to 4294967295, the midpoint `(lo+hi+1u)/2u` wrapped to 0 and the loop never ended. A `readPixels` after the dispatch
+  blocked 5,547 ms (the Windows GPU watchdog) and the reset landed in the next record's report. With 1 key the same
+  dispatch finished in 1 ms. The engine's own inputs always have at least one key.
+- **Fix:** the search starts at `max(track.keys,1u)-1u` and takes its midpoint as `lo+(hi-lo+1u)/2u`, so it ends on
+  any buffer contents, with the same result for every valid track. The corpus holds the new source in place of the old
+  one: `record-wgsl-corpus.mjs --add --drop=8b858be2e0a8c694` (the new flag refuses a module the corpus does not hold
+  or one a suite still creates). The corpus compute part passes: 1144 pipelines dispatched, none failed. Regression:
+  `packages/animation/tests/morph-gpu.test.js` "ends on any buffer contents",
+  `packages/webgl2-compat/test/corpus.test.js` "a recording drops only".
 
 ### Open 2026-11-27: after a GPU reset the WebGL2 layer reports the loss as its own link failure or an incomplete framebuffer (KB-COMPAT-LOSSREPORT1, webgl2-compat)
 
