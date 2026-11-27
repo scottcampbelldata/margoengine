@@ -4,14 +4,15 @@
 // restoration) at 1x and 4x, also when the getter is read every frame. The jitter difference is CPU state only.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/taa-velocity.proof.js [ref] [--current]
 // Pinned: baseline 6c20076d (before the getter) against e1a20e13 (the motion-blur commit that added it). Current:
-// 8149bf4e against the working tree (one velocity pass and a shared camera block, speed matrix row 13.7;
+// 90f54f5672 against the working tree (velocity shaders write a coverage channel, KB-TAA-COMPATEDGE1; 8149bf4e first:
+// one velocity pass and a shared camera block, speed matrix row 13.7;
 // docs/whitepaper/claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('6c20076d', 'e1a20e13', 'e2177dc6e5'),
+const { ref, pin } = refs('6c20076d', 'e1a20e13', '90f54f5672'),
   { baseline, candidate } = await versions('taa', ref, undefined, pin);
 
 /** One engine with TAA attached: core meshes (stride 24), an optional PBR velocity source (stride 80), and a frame driver. */
