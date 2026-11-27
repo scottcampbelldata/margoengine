@@ -19,7 +19,7 @@ import {
   floodDragProfiles,
   solveFloodProfile,
 } from './flood-body-drag.js';
-import { FloodDragGrid } from './flood-drag-grid.js';
+import { FloodDragGrid, type PeriodicDragAxes } from './flood-drag-grid.js';
 
 /** Fixed-origin, same-rate participants for a projected drag exchange. */
 export interface ProjectedFloodDragOptions {
@@ -51,6 +51,7 @@ export class ProjectedFloodDragWater {
   readonly fields: ProjectedFloodDragCoupling['fields'];
   private host!: SolverHost;
   private grid!: FloodDragGrid;
+  private periodic!: PeriodicDragAxes;
   private bedCell!: Cell;
   private receiptState!: Region;
   private waterWork!: Float64Array<ArrayBuffer>;
@@ -79,10 +80,11 @@ export class ProjectedFloodDragWater {
     };
   }
 
-  init(host: SolverHost, params: ShallowWaterParams): void {
+  init(host: SolverHost, params: ShallowWaterParams, periodic: PeriodicDragAxes): void {
     if (params.timeScale !== undefined && params.timeScale !== 1)
       throw invalidLoad('Use unit shallow-water time scale for the paired projected drag impulse.');
     this.grid = new FloodDragGrid(params);
+    this.periodic = periodic;
     this.host = host;
     this.bedCell = [...params.bed.cell];
     const size =
@@ -124,6 +126,7 @@ export class ProjectedFloodDragWater {
         water: waterWork,
         dt,
         bottom,
+        periodic: this.periodic,
       });
       if (!result) continue;
       const { exchange, sample, bodyCentre } = result;

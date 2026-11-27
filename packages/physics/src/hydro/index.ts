@@ -547,7 +547,11 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     this.state = host.allocate('state', count * 3 * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.ledger = host.allocate('ledger', LEDGER * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.published = host.allocate('published', count * 3 * 4, 'f32', SURFACE_WATER_LAYOUT);
-    this.projectedDrag?.init(host, params);
+    const [minX, maxX, minZ, maxZ] = this.grid.sides;
+    this.projectedDrag?.init(host, params, [
+      minX === 'periodic' && maxX === 'periodic',
+      minZ === 'periodic' && maxZ === 'periodic',
+    ]);
     if (this.cylinder) {
       if (
         this.scale !== 1 ||

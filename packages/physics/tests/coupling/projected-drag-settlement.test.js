@@ -59,7 +59,7 @@ function receipt(world, coupling, body, tick) {
 test('post-water drag matches the closed quadratic impulse and eccentric moment', async () => {
   await Physics.load();
   using physics = new Physics(null, { fixedTimestep: DT, gravity: CELL });
-  const body = bodyOf(physics);
+  const body = bodyOf(physics, { x: 0.25 });
   const speed = 1.25;
   const depth = 0.75;
   const centre = [0, 0.125, 0];
@@ -226,4 +226,88 @@ test('overlapping drag stencils settle in rigid row order for either supplied pr
     hashes.push(world.hash());
   }
   assert.equal(hashes[0], hashes[1]);
+});
+
+test('periodic seam drag force and rigid velocity converge from both sides', async () => {
+  await Physics.load();
+  const depth = 0.75;
+  const area = 0.2;
+  const dragCoefficient = 1;
+  const fluidMass = DENSITY * depth;
+  const gain = 0.5 * DENSITY * dragCoefficient * area * DT;
+  let previousForce = Infinity;
+  for (const distance of [1 / 8, 1 / 64, 1 / 512]) {
+    const nearShare = 0.5 + distance;
+    const mobility = Math.fround(1 / 20) + (nearShare ** 2 + (1 - nearShare) ** 2) / fluidMass;
+    const slip = 2 * distance;
+    const finalSlip = (2 * slip) / (1 + Math.sqrt(1 + 4 * mobility * gain * slip));
+    const force = (gain * finalSlip ** 2) / DT;
+    let largestForce = 0;
+    for (const [x, sign] of [
+      [-1 + distance, 1],
+      [1 - distance, -1],
+      [1 + distance, 1],
+    ]) {
+      using physics = new Physics(null, { fixedTimestep: DT, gravity: CELL });
+      const body = bodyOf(physics, { x });
+      const coupling = await ShallowWaterSolver.withProjectedBodyDrag([
+        { row: body.row, halfHeight: 0.1, area, dragCoefficient },
+      ]);
+      const world = makeWorld(coupling, physics, {
+        bed: bedOf(2),
+        depth,
+        velocity: (x) => [0, x < 0 ? 1 : -1],
+        roughness: 0,
+        sides: PERIODIC,
+      });
+      world.advance(1);
+      const [, , jz, , yaw] = receipt(world, coupling, body, 0);
+      near(jz / DT, sign * force, (128 * Number.EPSILON * fluidMass) / DT);
+      near(body.linearVelocity[2], Math.fround(Math.fround(jz) * Math.fround(1 / 20)), 2 ** -23 * Math.abs(jz / 20));
+      near(yaw, 0, 128 * Number.EPSILON * fluidMass);
+      const fluidMomentum =
+        fluidMass * (coupling.water.sample(-0.5, 0).velocity[1] + coupling.water.sample(0.5, 0).velocity[1]);
+      near(fluidMomentum, -jz, 128 * Number.EPSILON * fluidMass);
+      largestForce = Math.max(largestForce, Math.abs(jz / DT));
+    }
+    assert.ok(largestForce < previousForce);
+    previousForce = largestForce;
+  }
+});
+
+test('shoreline yaw uses the wet cell image nearest the body and replays across the seam', async () => {
+  await Physics.load();
+  for (const side of ['periodic', 'wall', 'open']) {
+    using physics = new Physics(null, { fixedTimestep: DT, gravity: CELL });
+    const x = 0.875;
+    const body = bodyOf(physics, { x, velocity: [1.25, 0, 0] });
+    const coupling = await ShallowWaterSolver.withProjectedBodyDrag([
+      { row: body.row, halfHeight: 0.125, area: 0.05, dragCoefficient: 1 },
+    ]);
+    const world = makeWorld(coupling, physics, {
+      bed: bedOf(2),
+      depth: (x) => (x < 0 ? 0.75 : 0),
+      velocity: () => [0, 1],
+      roughness: 0,
+      sides: { ...PERIODIC, minX: side, maxX: side },
+    });
+    world.advance(1);
+    const [, , jz, , yaw] = receipt(world, coupling, body, 0);
+    if (side !== 'periodic') {
+      assert.deepEqual([...receipt(world, coupling, body, 0)], [0, 0, 0, 0, 0, 0]);
+      continue;
+    }
+    assert.ok(jz > 0);
+    near(yaw, -(1.5 - x) * jz, 16 * Number.EPSILON * Math.abs(yaw));
+    near(0.5 * body.angularVelocity[1], yaw, 16 * 2 ** -24 * Math.abs(yaw));
+    assert.equal(coupling.water.sample(0.5, 0).depth, 0);
+    const snapshot = world.takeSnapshot();
+    world.advance(12);
+    assert.ok(body.position[0] > 1);
+    assert.notEqual(receipt(world, coupling, body, 11)[2], 0);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(12);
+    assert.equal(world.hash(), hash);
+  }
 });

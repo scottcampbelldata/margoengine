@@ -3829,6 +3829,8 @@ The request takes the previous rigid pose. The water completes its transport and
 then recomputes the wetted profile and implicit drag from its final f64 state. The relay sends the accepted
 horizontal impulse and corresponding moment to rigid on the same tick. Fully dry profiles receive zero.
 The exchange changes horizontal discharge and leaves volume to the water solver.
+On periodic sides the profile samples both sides of the seam and uses local periodic images for its
+moment arms. A one-cell periodic axis contributes one fluid mass.
 
 ```ts
 import {Physics} from 'margoengine/physics';

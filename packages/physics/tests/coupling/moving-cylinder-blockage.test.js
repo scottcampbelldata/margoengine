@@ -346,6 +346,7 @@ async function guidedCylinder(physics, mass, footprint, setup = {}) {
     .add(water, {
       bed,
       depth,
+      velocity: setup.waterVelocity,
       density: DENSITY,
       sides: { minX: 'periodic', maxX: 'periodic', minZ: 'periodic', maxZ: 'periodic' },
     })
@@ -692,4 +693,59 @@ test('a guided footprint closes and reopens a whole cell, then crosses a seam wi
   world.restoreSnapshot(closed.bytes);
   world.advance(36);
   assert.equal(world.hash(), hash);
+});
+
+test('a whole-cell footprint in comoving water crosses 50 seams with conserved volume and replay', async (context) => {
+  await Physics.load();
+  using physics = new Physics(null, { gravity: [0, -G, 0], fixedTimestep: 1 / RATE.num });
+  const grid = { nx: 3, nz: 3, dx: 0.25, dz: 0.25 };
+  const depth = 0.25;
+  const speed = 1.875;
+  const frames = 1200;
+  const centre = [0.25, 0];
+  const footprint = [
+    [-0.125, -0.125],
+    [0.125, -0.125],
+    [0.125, 0.125],
+    [-0.125, 0.125],
+  ];
+  const mass = 2048;
+  const { body, water, world, predictor } = await guidedCylinder(physics, mass, footprint, {
+    centre,
+    depth,
+    grid,
+    velocity: [speed, 0, 0],
+    waterVelocity: () => [speed, 0],
+  });
+  const shape = prepareFootprint(footprint);
+  const expectedVolume = depth * ((grid.nx * grid.nz - 1) * grid.dx * grid.dz);
+  const expectedMomentum = expectedVolume * DENSITY * speed;
+  const locationError = 16 * Number.EPSILON;
+  assert.equal(water.sample(...centre).depth, 0);
+  let saved;
+  for (let frame = 1; frame <= frames; frame++) {
+    world.advance(frame);
+    assert.equal(body.linearVelocity[0], speed);
+    assert.equal(body.linearVelocity[1], 0);
+    near(mass * body.linearVelocity[2], 0, 256 * Number.EPSILON * expectedMomentum);
+    near(water.volume(), expectedVolume, 256 * Number.EPSILON * expectedVolume);
+    if (frame % 8 !== 0) continue;
+    const [{ region }] = predictor.exportPorts(frame - 1);
+    const [, x, z] = regionWords(world.memory, region);
+    const boxWidth = grid.nx * grid.dx;
+    const localX = ((((x + boxWidth / 2) % boxWidth) + boxWidth) % boxWidth) - boxWidth / 2;
+    near(x - centre[0], (speed * frame) / RATE.num, locationError);
+    assert.equal(water.sample(localX, z).depth, 0);
+    const { totals } = waterLedger(water, x, z, shape, grid, depth);
+    near(totals[0], expectedMomentum, 256 * Number.EPSILON * expectedMomentum);
+    near(totals[1], 0, 256 * Number.EPSILON * expectedMomentum);
+    if (frame === 272) saved = world.takeSnapshot();
+  }
+  assert.equal((body.position[0] - centre[0]) / (grid.nx * grid.dx), 50);
+  const hash = world.hash();
+  world.restoreSnapshot(saved.bytes);
+  world.advance(frames, { maxTicks: 517 });
+  world.settle();
+  assert.equal(world.hash(), hash);
+  context.diagnostic(JSON.stringify({ work: water.work, expectedVolume, expectedMomentum, hash }));
 });

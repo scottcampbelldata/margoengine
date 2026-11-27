@@ -1191,7 +1191,9 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   The guided cut-cell upgrade closes and reopens an entire cell without dividing by zero storage.
   `coupling/moving-cylinder-blockage.test.js` accounts for volume, pressure reaction and energy through
   a periodic seam, and reproduces its state hash. The count stays fixed at two substeps per tick at rest
-  from 99% occupancy to full coverage.
+  from 99% occupancy to full coverage. A separate fully closing footprint repeats 50 seams
+  over 1,200 ticks and 7,200 pressure stages with 0.125 m³ of water and 234.375 N·s water
+  momentum conserved to floating-point roundoff and bit-exact replay.
   `loads-radiation-coupled-profile.test.js` compares the full panel fit to its numerical reference and
   checks the independent Vugts width-confined sway–roll experiments. It verifies signed cross terms and
   a reactive pole outside the sample band. `loads-coupled-radiation.test.js` checks all six wrench components
@@ -1204,6 +1206,9 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   Quantitative force phase and free-response amplitude remain outside that frequency qualification.
   `coupling/projected-drag-settlement.test.js` checks accepted drag after Hydro transport, f64 wetness,
   a rejected dry impulse, an independently rewet control, overlap order and bit-identical seek.
+  Its periodic seam regression reproduces the two-sided impulse discontinuity and verifies the wrapped
+  force, nearest-image yaw moment, one-cell alias handling and replay. At 1 μm from the seam, the
+  impulse magnitude falls from 0.0179085 to (6.88×10^{-12}) N·s.
   Water’s `shallow-surface.browser.mjs` draws a single coupled Hydro state. Both renderers show the
   16.331 mm depth change with a draw residual below 0.086 μm and verify the associated rigid
   pressure impulse, volume and replay. The original film shots still need their own playback check.

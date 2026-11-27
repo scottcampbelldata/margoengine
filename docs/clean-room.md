@@ -13093,6 +13093,11 @@ equations 5.1–5.8](https://doi.org/10.1017/S0962492902000077) at the accepted 
 The same force law and reduced mobility as the fixed-wet exchange dissipate the isolated pair's
 kinetic energy. The manufactured shoreline test compares the post-flux momentum to independent
 ordinary HYDRO transport. The split sends each deposited impulse into the next transport step.
+On a periodic axis the stencil wraps storage indices and uses the adjacent geometric images for the
+moment arms. The two weights of a one-cell periodic axis combine before evaluating inverse water
+mass, and their weighted first moment gives the query coordinate. This preserves the normalization
+and first-moment identities of Peskin §5 across the seam. A transverse counterflow and an asymmetric
+wet stencil check the force, rigid response and replay against independent formulas.
 
 The same shallow-water impulse model loads clipped paddle blades at their actual lever arms and wading
 profiles at their centres of pressure. The rigid shaft receives torque from the immersed blade, and a

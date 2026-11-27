@@ -12,6 +12,36 @@ export interface FloodDragGridParams {
   readonly cellSize?: number;
 }
 
+export type PeriodicDragAxes = readonly [x: boolean, z: boolean];
+
+interface AxisSample {
+  readonly index: number;
+  readonly position: number;
+  readonly weight: number;
+}
+
+function axisSamples(point: number, start: number, spacing: number, count: number, periodic: boolean): AxisSample[] {
+  const coordinate = (point - start) / spacing;
+  if (!periodic && !(coordinate >= 0 && coordinate < count)) return [];
+  if (!Number.isFinite(coordinate)) return [];
+  // Both images of a one-cell periodic axis refer to the same fluid mass.
+  // Their weighted first moment is the query point, so combine them here.
+  if (periodic && count === 1) return [{ index: 0, position: point, weight: 1 }];
+  const offset = periodic ? coordinate - 0.5 : Math.max(0, Math.min(count - 1, coordinate - 0.5));
+  const first = Math.floor(offset);
+  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(first + 1))
+    throw invalidLoad('Keep periodic drag positions within the representable cell range or use a closer origin.');
+  const last = periodic ? first + 1 : Math.min(first + 1, count - 1);
+  const samples: AxisSample[] = [];
+  for (let i = first; i <= last; i++)
+    samples.push({
+      index: periodic ? ((i % count) + count) % count : i,
+      position: start + (i + 0.5) * spacing,
+      weight: 1 - Math.abs(offset - i),
+    });
+  return samples;
+}
+
 interface WetCell {
   readonly index: number;
   readonly depth: number;
@@ -108,24 +138,20 @@ export class FloodDragGrid {
     halfHeight: number,
     dt: number,
     bottomAt?: Float64Array,
+    periodic?: PeriodicDragAxes,
   ): DragSample | undefined {
     const [x, y, z] = point;
     const nx = this.bed.columns;
     const nz = this.bed.rows;
-    const a = (x - this.x0) / this.dx;
-    const b = (z - this.z0) / this.dz;
-    if (!(a >= 0 && a < nx && b >= 0 && b < nz)) return undefined;
-    const u = Math.max(0, Math.min(nx - 1, a - 0.5));
-    const v = Math.max(0, Math.min(nz - 1, b - 0.5));
-    const i0 = Math.floor(u);
-    const j0 = Math.floor(v);
+    const across = axisSamples(x, this.x0, this.dx, nx, periodic?.[0] ?? false);
+    const along = axisSamples(z, this.z0, this.dz, nz, periodic?.[1] ?? false);
     const cells: WetCell[] = [];
     const elevations = this.bed.elevations;
     const stride = nz + 1;
     let wet = 0;
-    for (let j = j0; j <= Math.min(j0 + 1, nz - 1); j++)
-      for (let i = i0; i <= Math.min(i0 + 1, nx - 1); i++) {
-        const weight = (1 - Math.abs(u - i)) * (1 - Math.abs(v - j));
+    for (const { index: j, position: sampleZ, weight: weightZ } of along)
+      for (const { index: i, position: sampleX, weight: weightX } of across) {
+        const weight = weightX * weightZ;
         const index = i + nx * j;
         const depth = water[3 * index]!;
         if (!(weight > 0 && depth > DRY)) continue;
@@ -144,8 +170,8 @@ export class FloodDragGrid {
           depth,
           wetWeight,
           wetCentre: (upper + lower) / 2,
-          x: this.x0 + (i + 0.5) * this.dx,
-          z: this.z0 + (j + 0.5) * this.dz,
+          x: sampleX,
+          z: sampleZ,
         });
       }
     if (!(wet > 0)) return undefined;

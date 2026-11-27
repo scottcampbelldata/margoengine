@@ -16,7 +16,7 @@ import {
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, bodyRowsOf, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { invalidLoad } from './errors.js';
 import { floodBlockageExchange, type FloodBlockageBody } from './flood-blockage.js';
-import { FloodDragGrid, type FloodDragGridParams } from './flood-drag-grid.js';
+import { FloodDragGrid, type FloodDragGridParams, type PeriodicDragAxes } from './flood-drag-grid.js';
 
 type Vec3 = readonly [number, number, number];
 type Projection = 'box' | 'ellipsoid';
@@ -118,10 +118,11 @@ export function solveFloodProfile(
     readonly dt: number;
     readonly forcing?: Float64Array;
     readonly bottom?: Float64Array;
+    readonly periodic?: PeriodicDragAxes;
   },
 ) {
   const { centre, halfHeight, area, projection, dragCoefficient } = profile;
-  const { water, dt, forcing, bottom } = input;
+  const { water, dt, forcing, bottom, periodic } = input;
   if (rigid[at + 23] !== 1 || dragCoefficient === 0) return undefined;
   const rotation = normalizeQuaternion(rigid.subarray(at + 3, at + 7));
   const inverse = conjugateQuaternion(rotation);
@@ -131,7 +132,7 @@ export function solveFloodProfile(
   const height = projected(halfHeight, rotateByQuaternion([0, 1, 0], inverse), projection);
   if (!(height > 0 && Number.isFinite(height)))
     throw invalidLoad('Choose a rigid profile with finite positive vertical support.');
-  const sample = grid.sample(water, forcing, profileCentre, height, dt, bottom);
+  const sample = grid.sample(water, forcing, profileCentre, height, dt, bottom, periodic);
   if (!sample) return undefined;
   const body: FloodBlockageBody = {
     centre: bodyCentre,
