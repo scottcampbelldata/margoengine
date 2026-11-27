@@ -5,6 +5,7 @@ import type { XREyeTarget } from './eye-target.js';
 // effects) runs per eye as it runs per view on the desktop. A blit then moves each eye into the layer's sub-image, and
 // the scene's reversed depth into the compositor's forward depth (WebXR Device API: a projection maps depthNear to 0).
 import { Camera, type Engine, type RenderView } from '@margoengine/core/extension';
+import { compatTier } from '../../shared/compat.js';
 import { margoError } from '../../shared/errors.js';
 import type { XRBinding, XRProjectionLayer, XRView, XRViewerPose } from './types.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -19,20 +20,37 @@ interface Eye {
   uniform: GPUBuffer;
   colorGroup?: GPUBindGroup;
   depthGroup?: GPUBindGroup;
+  /** The WebGL2 layer's AR coverage at 4 samples (see `coverageShader`): its 4x target and the resolved share. */
+  cover?: { samples: GPUTexture; resolved: GPUTexture };
   readonly view: RenderView & { target: { color: GPUTexture; depth: GPUTexture } };
 }
 
+// The WebGL2 layer cannot read one sample of a 4x texture (sampler2DMS and a texelFetch by sample come with GLSL ES
+// 3.10; WebGL 2.0 has GLSL ES 3.00): every sample load returns the resolved depth, so a pixel's coverage read 0 or 4 of
+// 4 and AR edges differed from WebGPU (KB-XR-AR4XCOMPAT1). The depth test still runs per sample there (OpenGL ES 3.0.6,
+// section 4.1, per-fragment operations), so this triangle at depth 0, passing where a sample's reversed depth is above
+// it, marks the drawn samples, and the resolve of that target is their share.
+const coverageShader = `@vertex fn vertex(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  return vec4f(array<vec2f, 3>(vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3))[i], 0, 1);
+}
+@fragment fn fragment() -> @location(0) vec4f {
+  return vec4f(1);
+}
+`;
+
 /** WGSL of the blit: a full-screen triangle that reads the eye at its own pixel, the layer's viewport offset removed. */
-function blit(samples: number, ar: boolean): string {
+function blit(samples: number, ar: boolean, resolved: boolean): string {
   const depth = samples > 1 ? 'texture_depth_multisampled_2d' : 'texture_depth_2d';
   // Reversed depth: the scene clears to 0, so a sample above 0 was drawn. Coverage is the share of drawn samples.
   let covered = '0.0';
   for (let s = 0; s < samples; s++) covered += ` + select(0.0, 1.0, textureLoad(d, q, ${s}) > 0.0)`;
+  const share = resolved ? 'textureLoad(k, q, 0).r' : `(${covered}) / ${samples}.0`;
   let nearest = 'textureLoad(d, q, 0)';
   for (let s = 1; s < samples; s++) nearest = `max(${nearest}, textureLoad(d, q, ${s}))`;
   return `@group(0) @binding(0) var c: texture_2d<f32>;
 @group(0) @binding(1) var d: ${depth};
 @group(0) @binding(2) var<uniform> o: vec4i;
+${resolved ? '@group(0) @binding(3) var k: texture_2d<f32>;' : ''}
 @vertex fn vertex(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
   return vec4f(array<vec2f, 3>(vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3))[i], 0, 1);
 }
@@ -43,9 +61,7 @@ function blit(samples: number, ar: boolean): string {
     // AR: the clear is black and the real world shows where nothing was drawn. Drawn samples, or light from a pass
     // that writes no depth (a glow, an unlit line), keep the pixel; the colour is already premultiplied by the black
     // clear. (The comment sits here, not in the WGSL, so the shipped shader carries no comment text: KB-WGSL1.)
-    ar
-      ? `return vec4f(c.rgb, clamp(max((${covered}) / ${samples}.0, max(c.r, max(c.g, c.b))), 0.0, 1.0));`
-      : 'return vec4f(c.rgb, 1.0);'
+    ar ? `return vec4f(c.rgb, clamp(max(${share}, max(c.r, max(c.g, c.b))), 0.0, 1.0));` : 'return vec4f(c.rgb, 1.0);'
   }
 }
 @fragment fn depth(@builtin(position) p: vec4f) -> @builtin(frag_depth) f32 {
@@ -60,7 +76,12 @@ export class EyeViews {
   private readonly eyes: Eye[] = [];
   private readonly views: RenderView[] = [];
   private readonly offset = new Int32Array(4);
-  private pipelines?: { color: GPURenderPipeline; depth?: GPURenderPipeline; key: string };
+  private pipelines?: {
+    color: GPURenderPipeline;
+    depth?: GPURenderPipeline;
+    cover?: GPURenderPipeline;
+    key: string;
+  };
   private readonly options: { views: RenderView[]; delta: number; culling: boolean } = {
     views: this.views,
     delta: 0,
@@ -112,6 +133,7 @@ export class EyeViews {
     if (eye.color?.width === width && eye.color.height === height) return;
     eye.color?.destroy();
     eye.depth?.destroy();
+    this.dropCover(eye);
     eye.color = eye.depth = eye.colorGroup = eye.depthGroup = undefined;
     const target = this.engine.renderTarget!;
     eye.color = this.device.createTexture({
@@ -130,16 +152,59 @@ export class EyeViews {
     eye.view.target = { color: eye.color, depth: eye.depth };
   }
 
+  private dropCover(eye: Eye): void {
+    eye.cover?.samples.destroy();
+    eye.cover?.resolved.destroy();
+    eye.cover = undefined;
+  }
+
+  /** Records the eye's share of drawn samples (see `coverageShader`) and returns the texture holding it. */
+  private cover(eye: Eye, encoder: GPUCommandEncoder, pipeline: GPURenderPipeline): GPUTexture {
+    let cover = eye.cover;
+    if (!cover) {
+      const size = [eye.depth!.width, eye.depth!.height],
+        make = (sampleCount: number, usage: number) =>
+          this.device.createTexture({ size, format: 'r8unorm', sampleCount, usage, label: 'XR eye coverage' });
+      cover = eye.cover = {
+        samples: make(4, GPUTextureUsage.RENDER_ATTACHMENT),
+        resolved: make(1, GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING),
+      };
+      eye.colorGroup = undefined;
+    }
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: cover.samples.createView(),
+          resolveTarget: cover.resolved.createView(),
+          loadOp: 'clear',
+          storeOp: 'discard',
+        },
+      ],
+      depthStencilAttachment: {
+        view: eye.depth!.createView(),
+        depthReadOnly: true,
+        ...(eye.depth!.format.includes('stencil') ? { stencilReadOnly: true } : {}),
+      },
+    });
+    pass.setPipeline(pipeline);
+    pass.draw(3);
+    pass.end();
+    return cover.resolved;
+  }
+
   private build(layer: GPUTextureFormat, ar: boolean, withDepth: boolean): void {
     const key = `${layer} ${ar}`;
     if (this.pipelines?.key === key && (!withDepth || this.pipelines.depth)) return;
-    const samples = this.engine.renderTarget!.samples,
-      module = this.device.createShaderModule({ code: blit(samples, ar), label: 'XR eye blit' }),
+    const { samples, depthFormat } = this.engine.renderTarget!,
+      resolved = ar && samples > 1 && compatTier(this.device) === 'webgl2',
+      module = this.device.createShaderModule({ code: blit(samples, ar, resolved), label: 'XR eye blit' }),
+      coverage = resolved ? this.device.createShaderModule({ code: coverageShader, label: 'XR eye coverage' }) : null,
       layout = this.device.createBindGroupLayout({
         entries: [
           { binding: 0, visibility: 2, texture: { sampleType: 'unfilterable-float' } },
           { binding: 1, visibility: 2, texture: { sampleType: 'depth', multisampled: samples > 1 } },
           { binding: 2, visibility: 2, buffer: {} },
+          ...(resolved ? [{ binding: 3, visibility: 2, texture: { sampleType: 'unfilterable-float' as const } }] : []),
         ],
       }),
       pipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [layout] }),
@@ -157,6 +222,15 @@ export class EyeViews {
             vertex,
             fragment: { module, entryPoint: 'depth', targets: [] },
             depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'always' },
+          })
+        : undefined,
+      cover: coverage
+        ? this.device.createRenderPipeline({
+            layout: 'auto',
+            vertex: { module: coverage, entryPoint: 'vertex' },
+            fragment: { module: coverage, entryPoint: 'fragment', targets: [{ format: 'r8unorm' }] },
+            depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: 'less' },
+            multisample: { count: samples },
           })
         : undefined,
     };
@@ -206,12 +280,14 @@ export class EyeViews {
       this.offset[0] = x;
       this.offset[1] = y;
       this.device.queue.writeBuffer(eye.uniform, 0, this.offset);
+      const share = pipelines.cover && this.cover(eye, encoder, pipelines.cover);
       eye.colorGroup ??= this.device.createBindGroup({
         layout: pipelines.color.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: eye.color!.createView() },
           { binding: 1, resource: eye.depth!.createView({ aspect: 'depth-only' }) },
           { binding: 2, resource: { buffer: eye.uniform } },
+          ...(share ? [{ binding: 3, resource: share.createView() }] : []),
         ],
       });
       const pass = encoder.beginRenderPass({
@@ -264,6 +340,7 @@ export class EyeViews {
     for (const eye of this.eyes) {
       eye.color?.destroy();
       eye.depth?.destroy();
+      this.dropCover(eye);
       eye.uniform.destroy();
     }
     this.eyes.length = 0;
