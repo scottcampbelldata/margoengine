@@ -14778,6 +14778,18 @@ The complete optional soft entry measures 110,995 B gzip, up from 108,726 B, wit
 The separately loaded kernel chunk is 75,819 B gzip, up from 74,174 B, and the native kernel is 211,555 B raw.
 Core plus stage remains 24,820 B gzip.
 
+### Arcade car and vehicle debug lines (DYN-04)
+
+`Vehicle.car` lays out exactly four wheels on a chassis whose up axis is its own +y; a six-wheeled truck or a chassis
+modelled on another up axis takes `new Vehicle` with its own wheels. Its size comes from the chassis's box colliders
+(spheres, capsules, cylinders and cones count by their bounding spheres); a chassis of hulls or meshes needs
+`halfExtents`. The springs rest where the dampers' reading of a still chassis puts them, 4.6% short of the designed
+sag at the defaults (KB-PHYS-VEHICLEREST1), so the body rides a few millimetres higher than `0.8 r`. The tyre models
+and grip keep the `Vehicle` defaults: the full MF 6.x tyre is beyond parity (docs/physics-parity-bar.md, P5).
+`debugRender()` allocates its two arrays on every call, reads the last step (the chassis pose and each wheel's cast),
+and colours a tyre-model wheel as sliding at a combined slip of 0.1, about where the default Magic Formula peaks,
+not at its own model's peak. Speed against the three.js example is measured in the quiet speed phase.
+
 ### Wheel contact and lane tracking (DYN-04)
 
 The clocked driver tracks authored open or closed lanes with measured traction. It uses one wetness word per vehicle with the documented bank convention. It brakes smoothly before an open lane ends. The current driver routes an individual car and uses the supplied route around obstacles. Road colliders reuse their rendered triangle tessellation. A calibrated soft patch uses a constant footprint and the measured pressure exponent. EARTH-05 owns wear and terrain-volume feedback. The paired road and dynamics fixtures cover the existing tyres, drivetrain, motorcycles and tracks alongside the new road controls and terrain interface. The optional road driving entry measures 12,776 B minified and 5,373 B gzip. The Physics root measures 1,339,661 B minified and 865,782 B gzip. Core and Stage gain zero bytes.
@@ -15406,6 +15418,29 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
+
+- **Repro:** `Vehicle.car(physics, chassis)` on a floor (the quick start of `packages/physics/README.md`), 300 steps:
+  the chassis does not move, yet `chassis.linearVelocity[1]` reads -0.0715 m/s every step, and each spring rests at
+  0.1826 m where `rest - sag` is 0.1785 m (compressed 4.6% less than its static sag). A body held still by any per-step impulse
+  (`applyImpulse` from `beforestep`) shows the same -0.0715 m/s.
+- **Cause:** the kernel takes 8 substeps a step and spreads gravity over them, while an impulse from `beforestep` acts
+  once at the start; a body whose position does not change ends the step at `-g dt (n - 1) / (2 n)` = -7/16 of
+  `g dt`. `Vehicle`'s damper (`vehicle.ts`, the suspension loop) reads that velocity as a compression speed and
+  carries part of the weight with it. The fix is a per-substep suspension force (or a damper on the step's mean
+  velocity) in `Vehicle`, which changes every vehicle's ride against the Rapier oracle tests in
+  `tests/next-vehicle.test.js`, so it waits for its own change.
+- **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
+  `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
+
+### Open 2026-11-27: the tracked vehicle still throws plain RangeError and TypeError (KB-PHYS-TRACKEDERR1, physics)
+
+- **Repro:** `new TrackedVehicle(physics, chassis, {tracks: []})` throws a `RangeError` with no help link, where
+  `Vehicle`, `Vehicle.car`, `Motorcycle`, the tyre models and `Drivetrain` throw a `MargoError` linking
+  margoengine.com/errors#vehicles (P5 DYN-04, 2026-11-27).
+- **Cause:** `packages/physics/src/tracked.ts` was left out of that change because the open branch
+  `codex/physics-terramechanics` edits the same file; it takes the same `invalidVehicle` helper once that lands.
+
 ### Fixed 2026-11-27: check:dev-servers called `npx vite build` a server start (KB-DEVSERVERS-BUILD1, scripts)
 
 - **Repro:** `node scripts/check-dev-servers.mjs --docs-only`: `tools/margo-convert/README.md:138` and `:227`,
@@ -15600,6 +15635,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   a lost context by contract. Proved on two real resets: a helper link and a render pass right after the reset (one
   with `isContextLost()` still false) threw nothing, raised no error, both scopes resolved `null` and `device.lost`
   resolved `'unknown'`. Regression: `packages/webgl2-compat/test/lost-report.test.js` (all four fail on the parent).
+  Since 2026-11-27 also in a real browser on every `test:gpu`: `packages/webgl2-compat/test/lost-context-browser.mjs`
+  crashes the browser's own GPU process (CDP `Browser.crashGpuProcess`, not a driver reset), builds a helper program
+  and a new framebuffer while `isContextLost()` is still false on both contexts, and checks that nothing throws, the
+  scope resolves `null`, both devices are lost (`'unknown'`) and no uncaptured error is raised (3 of 3 runs pass at
+  cd4508a015; the helper case threw the "did not link" fault before this fix).
 
 ### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
 
