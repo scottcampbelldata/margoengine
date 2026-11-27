@@ -117,6 +117,8 @@ export type {
   VortexOptions,
   WindOptions,
 } from "./fields.js";
+export { InstancedBodies } from "./instances.js";
+export type { InstancedBodiesOptions, InstancedTarget } from "./instances.js";
 export { DragJoint } from "./drag.js";
 export type { DragOptions } from "./drag.js";
 export { addUniversalJoint, addWheelJoint } from "./joint-presets.js";

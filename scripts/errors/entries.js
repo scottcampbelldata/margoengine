@@ -96,6 +96,15 @@ export const entries = [
     fix: "Pass what the message names: [x, y, z] of finite numbers, sizes in SI units above 0 (newtons, newton seconds, metres, m/s²), shares of 0 or more, and one of the named falloffs or modes. A wind force's flow field must be in the physics world's frame.",
   },
   {
+    id: 'physics-instances',
+    title: '@margoengine/physics: one body per instance of an instanced mesh',
+    kind: 'family',
+    messages: [],
+    cause:
+      '`InstancedBodies` was given a mesh without instances (no `instances.data` Float32Array or `setMatrices`), a `count` that is not a whole number from 1 to the instance capacity, no colliders, or `body(index)` an index past its bodies (code unsupported).',
+    fix: "Pass a mesh from `createInstancedMesh` of `@margoengine/materials` with its instance matrices set, a `count` no larger than its capacity (or leave it out to use `instances.count`), colliders such as `{shape: 'box', halfExtents: [0.5, 0.5, 0.5]}`, and an index from 0 to `bodies.length - 1`.",
+  },
+  {
     id: 'body-driver',
     title: '@margoengine/input/body: webcam hands and body to a skeleton',
     kind: 'family',

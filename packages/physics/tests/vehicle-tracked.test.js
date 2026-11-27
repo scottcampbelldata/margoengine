@@ -156,7 +156,7 @@ test("a tank refuses what makes no sense, and a disposed one lets go", () => {
       new TrackedVehicle(physics, chassis, {
         tracks: [{ position: [0, 0, 0], length: 2, roadWheels: 1 }],
       }),
-    /road wheels/,
+    coded(/road wheels/),
   );
   assert.throws(
     () =>
@@ -164,7 +164,7 @@ test("a tank refuses what makes no sense, and a disposed one lets go", () => {
         tracks: [{ position: [0, 0, 0], length: 2 }],
         maxSpeed: 0,
       }),
-    /maxSpeed/,
+    coded(/maxSpeed/),
   );
   const fixed = physics.addBody(null, {
     type: "fixed",

@@ -754,6 +754,27 @@ radius, strength, height, mode)` and `helper.vortex(origin, radius, strength, he
 with `impulse` set to the force times `physics.fixedTimestep`. Bad input is a `MargoError` linked to
 [its help entry](https://margoengine.com/errors#physics-fields).
 
+## Instanced bodies: thousands of bodies in one draw
+
+`new InstancedBodies(physics, mesh, options)` gives every instance of an instanced mesh (`createInstancedMesh` of `@margoengine/materials`) a body of its own, `bodies[i]` (or `body(i)`) moving instance `i`, as three.js's `physics_rapier_instancing` and Babylon's thin-instance physics do. Each body starts at its instance's matrix (position and rotation; the instance's scale stays in the drawing and is never given to the collider), and after every `sync` the bodies' poses, interpolated as a mesh body's are, go to the instance matrices in one `setMatrices` write, which is skipped once every body sleeps, so thousands of bodies stay one draw call. `options` are those of `addBody` without the pose: `colliders` (required: an instanced mesh has no geometry the physics reads), `type`, damping, CCD and the rest, plus `count` (default the mesh's `instances.count`). Instance matrices are world poses, so keep `mesh.root` at the identity. `remove()` (or `using`) removes the bodies and stops the writes; the bodies are ordinary bodies of the world, so queries, events, snapshots and fields see them as any other.
+
+```ts
+import {Physics, InstancedBodies} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+// Any object with instances {data, capacity, count, setMatrices} works; createInstancedMesh(engine, geometry, material, 1000) gives one.
+const data = new Float32Array(1000 * 24);
+for (let i = 0; i < 1000; i++) data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i % 10, 1 + Math.floor(i / 100), Math.floor(i / 10) % 10, 1], i * 24);
+const mesh = {instances: {data, capacity: 1000, count: 1000, setMatrices: (start: number, m: ArrayLike<number>) => { for (let i = 0; i < m.length / 16; i++) data.set(Array.from(m).slice(i * 16, i * 16 + 16), (start + i) * 24); }}};
+const crates = new InstancedBodies(physics, mesh, {colliders: {shape: 'box', halfExtents: [0.4, 0.4, 0.4]}});
+for (let i = 0; i < 30; i++) physics.step();
+physics.sync(1);
+console.log(crates.body(42).position, data.subarray(42 * 24 + 12, 42 * 24 + 15));
+```
+
+Coming from three.js: the `physics_rapier_instancing` example makes a Rapier body per instance and copies each body's translation and rotation into `InstancedMesh.setMatrixAt` every frame; here that loop is `InstancedBodies`, and `physics.raycast(...)?.body` with `crates.bodies.indexOf(body)` gives the instance index a pointer hit. Bad input is a `MargoError` linked to [its help entry](https://margoengine.com/errors#physics-instances).
+
 ## Universal joint and wheel joint
 
 `addUniversalJoint(physics, bodyA, bodyB, {anchorA, anchorB, frameA, frameB, limitsX, limitsY, motorX, motorY})` joins two bodies at a point so that they turn about the X and Y axes of frame A and cannot twist about Z (a cardan joint): a generic joint with the sliding axes and the twist locked, so `joint.setAxisLimits` and `joint.setAxisMotor` change the limits and drives later. `addWheelJoint(physics, chassis, wheel, {anchor, wheelAnchor, frequency = 4, damping = 0.7, travel, maxTorque, steerable})` hangs a wheel from a chassis on a suspension along Y of the chassis frame (a spring of that natural frequency per kilogram between the travel limits) with the axle along X, and returns `{joint, knuckle, drive(speed), coast(), steer(angle)}`: `drive` spins the wheel toward a speed under the torque cap, and a `steerable` wheel hangs from a knuckle body that `steer` turns about the suspension axis. Swing-twist is the `cone` joint and a D6 is the `generic` joint; both exist already.

@@ -596,6 +596,32 @@ export interface IkTarget {
     rotation?: Quat;
 }
 
+export class InstancedBodies implements PhysicsAttachment {
+    readonly mesh: InstancedTarget;
+    readonly bodies: readonly PhysicsBody[];
+    constructor(physics: Physics, mesh: InstancedTarget, options: InstancedBodiesOptions);
+    body(index: number): PhysicsBody;
+    afterSync(): void;
+    bodyRemoved(body: PhysicsBody): void;
+    remove(): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface InstancedBodiesOptions extends Omit<BodyOptions, 'position' | 'rotation' | 'follow'> {
+    colliders: NonNullable<BodyOptions['colliders']>;
+    count?: number;
+}
+
+export interface InstancedTarget {
+    readonly instances: {
+        readonly data: Float32Array;
+        readonly capacity: number;
+        count: number;
+        setMatrices(start: number, matrices: ArrayLike<number>): unknown;
+    };
+}
+
 export interface InteractionGroups {
     readonly memberships: number;
     readonly filter: number;
