@@ -420,6 +420,26 @@ tentacle.setTarget(null);
 console.log(line.points().length, tentacle.valid); // 51 true
 ```
 
+A rope over bollards, pulleys and fairleads is `WrappedRope`: its mass in nodes, and between two nodes a straight span or
+a wrap over a fixed cylinder that the rope's material slides through (after Sueda, Jones, Levin and Pai's strands, 2011).
+Each wrap holds by static friction while the tensions either side are within the capstan ratio `e^(mu phi)`, `phi` its
+angle, and slides with the high side at that ratio times the low one, so a load over a bollard is held by a fraction of
+its weight, and a winch draws a line in over it. A fixed node is a cleat or a winch (`setNodePosition`); `tension(i)`,
+`holding(i)`, `position(i)` and `velocity(i)` read it. It is a solver of its own, stepped with `step(dt)`.
+
+```ts
+import {WrappedRope} from 'margoengine/physics/rod';
+
+// A 50 kg load on a line over a bollard of 0.2 m, made fast to a cleat: friction 0.3, half a turn.
+const line = new WrappedRope({
+  nodes: [{position: [-0.2, -1, 0], fixed: true}, {position: [0.2, -1, 0], mass: 50}],
+  wraps: [{center: [0, 0, 0], axis: [0, 0, 1], radius: 0.2, friction: 0.3, turn: -1}],
+});
+for (let i = 0; i < 60; i++) line.step(1 / 60);
+const [cleat, load] = line.tension(0);
+console.log(Math.round(load), Math.round(cleat)); // 491 191: the bollard takes the rest
+```
+
 ## Loose props on a moving deck
 
 Props resting on a moving body (cups, plates and chairs in a ship's saloon, crates in a lift) stick, slide and tip as its

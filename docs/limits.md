@@ -8919,7 +8919,14 @@ Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
   - `rod.setTarget` pulls each link with a spring on its own mass, held over a step, so its frequency is held to 0.5 / (2 pi dt) (4.77 Hz at 60 steps a second) and its damping to what the step can take; the pull is a force, so a heavy load or a stiff rod keeps the rod off the shape by load over spring.
   - `swayFlow` is three seeded sines (weights 0.6, 0.3, 0.1; periods 1, 0.53, 0.29 of `period`), each travelling at its own heading within 30 degrees of `direction`: film direction, not a measured gust spectrum.
 - Work counts (`packages/physics/tests/rod-film.test.js`, 2026-11-27, the same on every machine): a rod of n links is one island of n bodies; the broad phase looks at 2n - 3 pairs (none solved, the joints filter them) and the solver solves n joints a step, so a 4,096-link rod does four times a 1,024-link one's work, and 64 rods of 24 links 64 times one rod's. The tree solve is linear in the links. Wall-clock time is a speed-phase item.
-- Open: a rope under tension over a bollard blows up (KB-PHYS-RODWRAP1), so wrapping and seabed chains wait on it.
+- Open: a capsule-chain rod under tension over a bollard blows up (KB-PHYS-RODWRAP1); seabed chains wait on it.
+- `WrappedRope` (2026-11-27): mass in nodes (lump the rope's own mass into them; a span between two nodes is straight, so
+  sag comes from nodes between); one wrap at most between two nodes (put a light node between two pulleys); wraps on fixed
+  cylinders, the rope across each axis in the plane through its centre; a node reaching its cylinder stops the rope with a
+  `state` error; a fixed node holds whatever its side needs, and its reported tension is the least that holds (the load over
+  the capstan ratio). Exact for the capstan Atwood machine; between two wraps an inextensible rope's middle tension is not
+  fixed by statics, so it first slips at one wrap until the middle carries what the other needs. It is not coupled to the
+  rigid world or the framework yet.
 - Measured (`packages/physics/tests/rod.test.js`):
   - a cantilever in a current within 0.03 % of its springs and 0.06 % of the continuous beam at 32 links;
   - a line between pins within 0.007 % of its chain and 0.03 % of the catenary;

@@ -17,20 +17,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/physics/tests/coupling/loads-paddle.test.js` and `loads-wading.test.js` check wet momentum,
   drying rejection and replay.
 
-### Open 2026-11-27: a rope under tension over a bollard blows up, so wrapping cannot be checked against the capstan law (KB-PHYS-RODWRAP1, physics kernel)
+### Open 2026-11-27: a capsule-chain rod under tension over a bollard blows up (KB-PHYS-RODWRAP1, physics kernel)
 
 - **Repro:** a `Rod` of 48 links (radius 5 mm, nylon) draped half a turn over a fixed cylinder of radius 0.2 m, a free
-  10 kg body pinned to each end (`attachStart`, `attachEnd`), gravity on. It blows up within two seconds, with friction
-  0.3 or 0. A steel rope, 32 substeps and 16 links each delay or move the failure; only 1 kg weights on 16 links hold.
-  The same rope draped with free ends rests on a cylinder, a capsule or a box, and a weight on a hanging rope hangs still
-  (KB-PHYS-PINFREE1).
-- **Cause, as measured so far:** the contacts act on each link through its own mass, a few grams, while the rope's tension
-  of about 100 N runs through the multibody's implicit tree solve, which comes after the contact passes. Each substep the
-  tree pulls the links into the cylinder and the contacts push them out against the link's mass alone, so the contact
-  impulses meet a mass far smaller than what pulls, and the exchange gains energy.
-- **Plan:** solve a link's contacts against its articulated effective mass (the tree's response at the contact point,
-  as the pins now see the free body's), or carry the contact into the tree's implicit solve as the pins are. Then the
-  capstan law T2 = T1 e^(mu theta) is SOFT-02's wrapping check (Sueda, Kaufman and Pai 2008).
+  10 kg body pinned to each end, gravity on: it blows up within two seconds, with friction 0.3 or 0.
+- **Cause:** the contacts act on each link through its own mass, a few grams, while the rope's tension of about 100 N runs
+  through the multibody's implicit tree solve after the contact passes, so the exchange gains energy each substep.
+- **Tried (2026-11-27, branches `claude/rodwrap-wip` to `-5`, not landed):** the tree's contacts with fixed bodies in its
+  own implicit solve, with rounds that let go of pulling points and slide those past friction. A chain on a floor and a
+  draped rope rest, and two plain bugs of that code were found (a fixed root's stale contact list; sliding friction past
+  the stop); but the contact set flips between rounds under tension, and the variants either never slide on a slope or
+  do not rest. A fix that keeps the contact passes needs the contacts and the tension in one solve.
+- **What to use instead:** a rope over bollards, pulleys or fairleads is `WrappedRope` (`@margoengine/physics/rod`), whose
+  wraps carry the capstan law exactly (`packages/physics/tests/wrapped-rope.test.js`). The capsule-chain `Rod` stays the
+  rope for free spans, contact with moving bodies and bending.
 
 ### Fixed 2026-11-27: a weight on a rope's end was thrown off, or blew the world up (KB-PHYS-PINFREE1, physics kernel)
 

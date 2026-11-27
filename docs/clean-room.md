@@ -17239,3 +17239,21 @@ Files: `packages/physics/src/loads/segments.ts` (`segmentAirLoads`, `swayFlow`),
 - Own derivations: the target pull as a spring of natural frequency w and damping ratio zeta on each link's own mass, so a
   rod pulled as a whole moves as one critically damped mass, d (1 - (1 + w t) e^(-w t)); the step bound 2 pi f dt <= 0.5 for
   a force held over a step; the rod's work counts, 2n - 3 pairs looked at and n joints for n links.
+
+## physics wrapped rope with capstan friction (2026-11-27)
+
+Files: `packages/physics/src/rod/wrapped.ts` (`WrappedRope`). No rival engine source and no paper's companion code was read.
+
+- S. Sueda, G. L. Jones, D. I. W. Levin and D. K. Pai, "Large-scale dynamic simulation of highly constrained strands",
+  ACM TOG 30(4), 2011, https://doi.org/10.1145/2010324.1964934 (preprint read). Used: Eulerian nodes on a constraint
+  (a circle on a cylinder) that the strand's material slides through, so a wrap is a place, not contacts; Lagrangian
+  nodes as material points. Their wraps are frictionless or without slip; their limitations section leaves finite friction
+  to future work.
+- The capstan equation (L. Euler 1762; J. A. Eytelwein 1808): a rope sliding over a cylinder through an angle phi with
+  friction mu has T_high = T_low e^(mu phi), and holds while the ratio is within it.
+- Own derivations: the gradient of a tangent span plus its arc with respect to its node is the span's unit vector (the
+  rope winds and unwinds as the node moves), so a wrap's sides are inextensible constraints along those vectors; held, each
+  side keeps its material to an anchor fixed on the cylinder; sliding, one total-length constraint with the impulses split
+  by the capstan ratio, T_A' = (rate + T_A0 w_A + T_B0 w_B) / (w_A + k w_B); a fixed node holds whatever the load unless a
+  winch draws its side past its rope, when the rope slides toward it; for an Atwood machine over a capstan one step gives
+  a = g (m2 - k m1) / (m2 + k m1) exactly.
