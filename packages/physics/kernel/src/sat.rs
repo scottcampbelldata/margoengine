@@ -68,9 +68,29 @@ impl Feature {
     }
 }
 
-/// How much a face must lose by before an edge pair or B's face replaces it, in metres. Often several axes tie; contact
-/// points stay coherent when the same kind of feature wins each time (Gregorius 2015).
+/// How much a face must lose by before an edge pair or B's face replaces it, in metres, for shapes that reach 0.2 m or more
+/// from their centre. Often several axes tie; contact points stay coherent when the same kind of feature wins each time
+/// (Gregorius 2015).
 const FACE_BIAS: f32 = 1e-3;
+/// The bias of smaller shapes, as a share of the smaller shape's reach (its farthest vertex from its centre): how far the
+/// separations of two features differ grows with the size of the shapes, so a bias fixed in metres held a feature that had
+/// lost by a large part of a small shape. A domino 48 mm tall, 7 mm thick, kept the face of its own side as the reference
+/// while its edge pressed on the next one, and the toppling wave ran 13 percent slower than in the same row scaled to 0.2 m
+/// (KB-PHYS-DOMINOSCALE1). The share meets the metre bias at a reach of 0.2 m, so larger shapes keep it as it was.
+const FACE_BIAS_SHARE: f32 = 0.005;
+
+/// The bias for a pair: `FACE_BIAS`, or `FACE_BIAS_SHARE` of the smaller reach where that is less.
+fn face_bias(a: &Poly, b: &Poly) -> f32 {
+    let reach = |p: &Poly| {
+        let mut most = 0.0f32;
+        for i in 0..p.vertices {
+            let d = p.vertex(i).sub(p.center);
+            most = most.max(d.dot(d));
+        }
+        sqrt(most)
+    };
+    FACE_BIAS.min(FACE_BIAS_SHARE * reach(a).min(reach(b)))
+}
 /// Edges closer to parallel than this sine squared give no axis: their faces' normals cover the case.
 const PARALLEL: f32 = 1e-6;
 /// Two face normals of one edge this close to opposite are a flat shape's two sides.
@@ -201,8 +221,9 @@ pub fn sat_coherent(a: &Poly, b: &Poly, rel: Pose, limit: f32, last: Option<Feat
     if separation_b > limit {
         return None;
     }
+    let bias = face_bias(a, b);
     let (face, face_separation_best) =
-        if separation_b > separation_a + FACE_BIAS { (Feature::FaceB(face_b), separation_b) } else { (Feature::FaceA(face_a), separation_a) };
+        if separation_b > separation_a + bias { (Feature::FaceB(face_b), separation_b) } else { (Feature::FaceA(face_a), separation_a) };
     let edges = query_edges(a, b, rel);
     let mut best = (face, face_separation_best);
     if let Some((ea, eb, axis, separation)) = edges {
@@ -214,7 +235,7 @@ pub fn sat_coherent(a: &Poly, b: &Poly, rel: Pose, limit: f32, last: Option<Feat
         // a line the face's clip gives whole. Held from the step before, it used to win such ties, and the point hopped from
         // end to end of a box face resting on a block's edge as the box rocked: a voxel debris piece never came to rest. A
         // held face still wins its ties below, so the reference face stays coherent.
-        if separation > face_separation_best + FACE_BIAS {
+        if separation > face_separation_best + bias {
             best = (Feature::Edges(ea, eb, axis), separation);
         }
     }
@@ -224,7 +245,7 @@ pub fn sat_coherent(a: &Poly, b: &Poly, rel: Pose, limit: f32, last: Option<Feat
         _ => None,
     };
     if let Some(held) = held {
-        if held.1 + FACE_BIAS >= best.1 {
+        if held.1 + bias >= best.1 {
             return Some(held);
         }
     }

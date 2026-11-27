@@ -1153,17 +1153,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
   `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
 
-### Open 2026-11-27: a domino wave runs slower in a row of small dominoes than in the same row scaled up (KB-PHYS-DOMINOSCALE1, physics)
+### Fixed 2026-11-27: a domino wave ran slower in a row of small dominoes than in the same row scaled up (KB-PHYS-DOMINOSCALE1, physics)
 
-- **Repro:** `packages/physics/tests/rigid-measured.test.js` `wave(0.33, H)`: the wave speed over sqrt(g H) is 1.32 at H = 48 mm,
-  1.45 at 0.1 m, 1.51 at 0.2 m and 1.55 at 0.5 m. A row that is the same in every dimensionless number should give one
-  speed. The measured speeds (Larham 2008) are matched at 0.2 m; at 48 mm the speed is still inside every published
-  measurement (0.9 to 1.7), which the test holds.
-- **Cause:** not found yet. Ruled out by runs at H = 48 mm: the time step (1/240 s gives 1.30), the substeps (32 give 1.35), the
-  contact frequency and damping (240 Hz, damping 1: 1.32 and 1.35), the length tolerances (`lengthUnit: 0.25` with the step
-  and contact frequency scaled by the time scale: 1.37), adaptive substeps, the block solver, CCD tolerance and island
-  order (no change). Something absolute in metres or seconds that `lengthUnit` does not scale is left; the friction anchor
-  drift and the sleep and wake thresholds are next to check.
+- **Repro:** `packages/physics/tests/rigid-measured.test.js`: the 0.2 m row at the defaults against the 48 mm row with its
+  tolerances and step scaled to it (`lengthUnit: 0.24`, `fixedTimestep` times sqrt(0.24)), the same in every dimensionless
+  number, gave wave speeds over sqrt(g H) of 1.54 and 1.53 at d/H 0.23 and 0.33 at 0.2 m and 1.40 and 1.35 at 48 mm.
+- **Cause:** `kernel/src/sat.rs` held a face as the reference while another feature beat it by up to `FACE_BIAS`, 1 mm, a bias
+  fixed in metres that `lengthUnit` does not reach. On a domino 7.2 mm thick that is a seventh of its thickness: the leaning
+  domino kept its own side as the contact normal while its edge pressed on the next one, so the push and the friction leaned
+  with it.
+- **Fix:** the bias is 1 mm for shapes reaching 0.2 m or more from their centre, and half a percent of the smaller shape's
+  reach below that (`face_bias`), so the feature choice is the same at every size; larger shapes step as before. The scaled
+  rows now give 1.60 and 1.53 against 1.57 and 1.51. Regression: `packages/physics/tests/rigid-measured.test.js` "a row scaled
+  in every dimension topples at one speed". The other runs of the old entry stand: the step, substeps and contact stiffness
+  are not scale terms. What is left at the defaults is resolution, now in `docs/limits.md`: at 60 Hz a 48 mm domino's fall,
+  sqrt(H / g) = 70 ms, spans four steps (a 0.2 m one nine) and the 0.2 mm slop is 3 percent of its thickness, so the default
+  row runs at 1.37 mean over the five spacings against 1.47 at 0.2 m; with `lengthUnit: 0.05` and a 1/240 s step it matches
+  all five of Larham's measurements within 0.1 (same file, "real 48 mm dominoes").
 
 ### Fixed 2026-11-27: a strike carried through a ball bounced off both of its contacts and made energy (KB-PHYS-BOUNCECHAIN1, physics)
 
