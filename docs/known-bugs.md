@@ -867,15 +867,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   which the HDR capture now holds as 0.00139 red where it held 0.018, so the same coverage moved the pixel 13 times less.
   The check sets the same `'#242a35'` background; no bar changed. It passes on WebGPU and the WebGL2 layer.
 
-### Open 2026-11-26: an `-srgb` view target without `viewFormats` fails with a raw validation error (KB-VIEW-SRGB-ERROR1, core)
+### Fixed 2026-11-27: an `-srgb` view target without `viewFormats` failed with a raw validation error (KB-VIEW-SRGB-ERROR1, core)
 
 - **Repro:** `engine.render({ views: [{ camera: engine.camera, viewport: [0, 0, 1, 1], target: { color } }] })`
   with `color` an `rgba8unorm-srgb` texture created without `viewFormats: ['rgba8unorm']`: native WebGPU reports a
   validation error for `createView` and the view draws nothing; the WebGL2 layer draws it.
 - **Cause:** core draws such a target through a view in its non-srgb twin format (KB-VIEW-SRGB1), which WebGPU makes
   only of a texture that names the twin. `GPUTexture` does not expose `viewFormats`, and core adds no check of its own.
-- **Owed:** a coded error with an errors-page link that says to add `viewFormats` (a validation error scope around
-  that `createView`), with its test.
+- **Fix:** core makes that view inside a validation error scope when the target's format is not the one it draws in;
+  a refusal becomes `TypeError: Invalid view target: add viewFormats ['rgba8unorm']` (the format named is the twin),
+  linked to the errors page's `views` entry, which the next frame throws. The uncaptured-error handler keeps the first
+  failure of a frame (`??=`), so the raw command-buffer error that follows does not replace it. No package can hold
+  it: the view is made inside core's frame. Size (`npm run measure:size`, RTX A6000 workstation): core + stage 24,910 B
+  to 24,989 B gzip (raw 61,246 to 61,423), under the 25,000 B limit, which is unchanged. The WebGL2 layer still draws
+  such a target, as before.
+- **Regression:** `packages/core/tests/view-srgb.browser.mjs`, the target without `viewFormats`: native WebGPU must
+  report the coded error (the parent reports `MargoError: [Invalid CommandBuffer] is invalid due to a previous error`
+  and fails it); the WebGL2 layer must draw it. `tests/support/core-draw-gpu.js` gains the device's error scopes.
 
 ### Open 2026-11-26: the far sea shows even parallel rows of crests, as Water's default sea is a sum of eight trains (KB-WATER-FARROWS1, water, SEA-02)
 

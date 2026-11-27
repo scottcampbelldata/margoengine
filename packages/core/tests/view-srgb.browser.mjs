@@ -174,10 +174,22 @@ try {
       engine.stop();
       const device = engine.gpu,
         color = device.createTexture({ size: [size, size], format: 'rgba8unorm-srgb', usage: 21 });
-      device.pushErrorScope('validation');
-      engine.render({ delta: 0, views: [{ camera: engine.camera, viewport: [0, 0, 1, 1], target: { color } }] });
+      // Core reports the refusal as a coded error that names the fix, thrown by the next frame (KB-VIEW-SRGB-ERROR1).
+      const failures = [];
+      engine.onError = (e) => failures.push(e);
+      const draw = () => {
+        try {
+          engine.render({ delta: 0, views: [{ camera: engine.camera, viewport: [0, 0, 1, 1], target: { color } }] });
+        } catch (e) {
+          failures.push(e);
+        }
+      };
+      draw();
       await device.queue.onSubmittedWorkDone();
-      const unnamed = (await device.popErrorScope())?.message ?? '';
+      await new Promise((r) => setTimeout(r, 100));
+      draw();
+      await device.queue.onSubmittedWorkDone();
+      const unnamed = failures.map((e) => `${e.name}: ${e.message}`).join(' | ');
       engine.dispose();
       canvas.remove();
       return { runs, unnamed };
@@ -208,7 +220,11 @@ try {
     );
     console.log(`${mode} target without viewFormats: ${result.unnamed || 'drawn'}`);
     if (mode === 'native')
-      assert.match(result.unnamed, /format/i, 'WebGPU refuses a twin view of a texture that does not name it');
+      assert.match(
+        result.unnamed,
+        /^TypeError: Invalid view target: add viewFormats \['rgba8unorm'\].*margoengine\.com\/errors#views/,
+        'WebGPU refuses a twin view of a texture that does not name it, reported as a coded error',
+      );
     else assert.equal(result.unnamed, '', 'the WebGL2 layer draws a target that does not name its twin');
     await page.close();
   }

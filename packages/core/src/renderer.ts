@@ -452,7 +452,7 @@ export class GPURenderer implements Renderer {
         this.memory = fault('failed', `GPU out of memory: ${error.message}`, 'gpu-lost');
         this.deviceLost = true;
         device.destroy();
-      } else this.failure = fault('failed', error.message, 'gpu-lost');
+      } else this.failure ??= fault('failed', error.message, 'gpu-lost');
     });
   }
 
@@ -566,7 +566,15 @@ export class GPURenderer implements Renderer {
     // By index: the engine passes an array, and an iterator over it would be garbage every frame.
     for (let i = 0; i < batches.length; i++) drawBatches[i] = batches[i];
     drawBatches.length = batches.length;
+    // WebGPU makes the twin view only of a texture that names the twin in viewFormats, which GPUTexture does not expose:
+    // its refusal is reported as a coded error, thrown by the next frame in place of the raw one (KB-VIEW-SRGB-ERROR1).
+    const twin = target && target.color.format !== format;
+    if (twin) this.device.pushErrorScope('validation');
     this.resolveTarget = target?.color.createView({ format }) ?? this.context.getCurrentTexture().createView();
+    if (twin)
+      this.device.popErrorScope().then((error) => {
+        if (error) this.failure = typeError(`Invalid view target: add viewFormats ['${format}']`, 'views');
+      });
     this.msaa = views.length > 1 ? views[0] : undefined;
     const color = this.msaa ?? this.resolveTarget,
       depth = caller ? caller.createView() : views.at(-1)!;

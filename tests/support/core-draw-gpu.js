@@ -65,6 +65,9 @@ export function gpuDrawHarness(t, samples = 1) {
         device.textures.push(texture);
         return texture;
       },
+      // Error scopes as WebGPU has them: nothing here fails validation, so each scope pops empty.
+      pushErrorScope() {},
+      popErrorScope: async () => null,
       createShaderModule: (descriptor) => descriptor,
       createRenderPipeline: (descriptor) => ({ ...descriptor, getBindGroupLayout: () => ({}) }),
       createCommandEncoder: () => ({
