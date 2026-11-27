@@ -38,6 +38,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** `scripts/support/doc-start-command.mjs` `startsServer` leaves the build commands out, one chained part at a
   time, so `vite build && vite preview` is still a start. Regression: `tests/dev-servers.test.js`.
 
+### Fixed 2026-11-27: the voxel path tracer's GPU stall watch failed a case that waited on cold shader compiles (voxel-pathtracer tests)
+
+- **Repro:** `MARGO_COMPAT=1 npm run test:gpu:stall -w @margoengine/voxel-pathtracer` on the WebGL2 layer over ANGLE
+  Direct3D 11 (2026-11-16): the first tracer's cold fxc compiles held the page's thread for over 10 s and the watch
+  (`packages/voxel-pathtracer/tests/progress.mjs`) fired its 10 s stall limit with "2 pipelines compiling".
+- **Cause:** the watch counts finished GPU work, so a wait on the shader compiler looked like a GPU wait that never
+  resolves.
+- **Fix:** while the page's last answer had a pipeline compiling, the limit is the compile limit
+  (`MARGO_GPU_COMPILE_MIN` minutes, default 3) when that is longer; a compile that never ends still fails there, and a
+  stall with nothing compiling fails at the stall limit as before. Ported from the unlanded lane-E commit e78e881c05.
+- **Regression:** `packages/voxel-pathtracer/tests/progress.test.js` (fails on main before the port). The stall check
+  passes on native WebGPU (17.2 s) and on the layer (42.0 s), RTX A6000.
+
 ### Fixed 2026-11-27: VFX ribbons, mesh particles and Flame wrote no TAA reactive mask (KB-TAA-PARTICLEMASK2, vfx)
 
 - **Repro:** `TAA.attach(engine)` with a fast `VFX` that has `ribbons` (`heads: false`) or `mesh`, or a `Flame`:

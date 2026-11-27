@@ -5,7 +5,11 @@
 // - The page counts finished GPU work (onSubmittedWorkDone and mapAsync that settle, compiled pipelines, finished
 //   renderImage calls) and remembers the last renderImage it started and any lost device or uncaptured WebGPU error.
 // - While a case runs, Node reads that count every second: a case whose count does not move for MARGO_GPU_STALL_S
-//   (120 s) fails, naming the case, its last `progress` step, the render and how long it waited.
+//   (120 s) fails, naming the case, its last `progress` step, the render and how long it waited. While the page's
+//   last answer had a pipeline still compiling, the case waits on the shader compiler, not on the GPU, and the limit
+//   is the compile limit (MARGO_GPU_COMPILE_MIN, 3 min) when that is longer: on the WebGL2 layer
+//   over ANGLE Direct3D 11 the first tracer's cold fxc compiles hold the page's thread for over 10 s, and the stall
+//   check's 10 s limit fired there before its first render (test:gpu:stall with MARGO_COMPAT=1).
 // - `--stall-in-render=<k>` (the stand-in tests/stall-check.mjs uses): once the case's k-th renderImage has started, no
 //   GPU wait settles (onSubmittedWorkDone and mapAsync never resolve), as on a device that stopped answering without
 //   being lost.
@@ -86,12 +90,26 @@ export function stallLimitMs(value = process.env.MARGO_GPU_STALL_S) {
   return seconds * 1000;
 }
 
+/** Milliseconds from MARGO_GPU_COMPILE_MIN (minutes, default 3), how long a case may wait on shader compiles alone. */
+export function compileLimitMs(value = process.env.MARGO_GPU_COMPILE_MIN) {
+  const minutes = Number(value ?? 3);
+  if (!(minutes > 0))
+    throw new RangeError(`MARGO_GPU_COMPILE_MIN must be a positive number of minutes, such as 3; got ${value}`);
+  return minutes * 60_000;
+}
+
 /**
  * Resolves `work` (a case's page.evaluate) while the page makes GPU progress; rejects naming `name` and `step()` (the
- * case's last progress line) when nothing finishes on the GPU for `stallMs`. `gaps.longestMs` is set to the longest
- * time the case went without finished GPU work (the margin against the limit).
+ * case's last progress line) when nothing finishes on the GPU for `stallMs`, or for `compileMs` when that is longer
+ * while the page's last answer had a pipeline compiling. `gaps.longestMs` is set to the longest time the case went
+ * without finished GPU work (the margin against the limit).
  */
-export async function watched(page, name, work, { stallMs = stallLimitMs(), step = () => name, gaps = {} } = {}) {
+export async function watched(
+  page,
+  name,
+  work,
+  { stallMs = stallLimitMs(), compileMs = compileLimitMs(), step = () => name, gaps = {} } = {},
+) {
   const t0 = performance.now();
   let outcome;
   const settled = work.then(
@@ -116,12 +134,13 @@ export async function watched(page, name, work, { stallMs = stallLimitMs(), step
       lastChange = now;
     }
     if (s) last = s;
-    if (now - lastChange > stallMs) {
+    const limit = last?.compiling > 0 ? Math.max(stallMs, compileMs) : stallMs;
+    if (now - lastChange > limit) {
       const state = last
         ? `${last.stage || 'no renderImage yet'}; ${last.rendered} of ${last.renders} renders done, ${last.submits} submissions, ${last.compiling} pipelines compiling${last.lost ? `; device lost (${last.lost})` : ''}${last.error ? `; uncaptured WebGPU error: ${last.error}` : ''}`
         : 'the page never answered';
       throw new Error(
-        `${name}: GPU stall, no GPU work finished for ${Math.round((now - lastChange) / 1000)} s (limit ${stallMs / 1000} s, ${Math.round((now - t0) / 1000)} s into the case) at step "${step()}": ${state}${s ? '' : '; the page is not answering'}`,
+        `${name}: GPU stall, no GPU work finished for ${Math.round((now - lastChange) / 1000)} s (limit ${limit / 1000} s, ${Math.round((now - t0) / 1000)} s into the case) at step "${step()}": ${state}${s ? '' : '; the page is not answering'}`,
       );
     }
   }
