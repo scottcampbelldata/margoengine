@@ -27,6 +27,10 @@ const settle = async (n = 12) => {
 const start = async (boxes, exact = false) => {
   engine?.dispose?.();
   engine = await Engine.create(canvas, { backend: 'webgpu', ...(exact && { exactSize: true }) });
+  // The backdrop the bokeh bars were measured on: linear 0.018, 0.023, 0.035, what DOF's capture held of core's clear
+  // colour before KB-CLEAR-DEFAULT1. A blur's faint edge counts as bright only over it, so the check names it rather
+  // than take core's default, which a tone map now draws near black (KB-CLEAR-CHECKS1).
+  engine.scene.background = '#242a35';
   engine.camera.fov = 50;
   engine.camera.near = 0.1;
   engine.camera.far = 100;

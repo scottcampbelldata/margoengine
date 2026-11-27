@@ -67,29 +67,51 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   attachment added after the world began is refused with a coded error.
 - **Regression:** the test above, which fails without the region, and the frame-rate check beside it.
 
-### Open 2026-11-26: eleven package GPU checks failed in the rerun made for the clear colour fix (KB-CLEAR-CHECKS1, cause not established)
+### Open 2026-11-27: six package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
 
-- **Repro:** after `npm run build:packages`, on an Intel Arc 140V (Windows, Edge 158), with the KB-CLEAR-DEFAULT1
-  change in the tree:
-  - `node scripts/clustered-sphere-light-gpu-check.js`
-  - `node packages/dof/tests/gpu/lens-check.mjs`
-  - `node packages/biomes/tests/browser-check.mjs`
-  - `node scripts/test-browser.js --page=blend`
-  - `node packages/oit/test/gpu/real-check.mjs`
-  - `node scripts/material-back-side-gpu-check.js`
-  - `node packages/environment/tests/contact-hardening-browser.mjs --compat`
-  - `node packages/post/test/anamorphic-browser.mjs`
-  - `node packages/materials/test/instance-attributes-browser.mjs`
-  - `node scripts/ssao-gpu-check.js`
-  - `node packages/sky/test/features-check.mjs sleet astro hillaire`
-- **Cause:** not established. None was run on the parent commit, so it is not known which fail because of the new
-  backdrop under an HDR effect and which failed before it. First messages: SSAO "orthographic SSAO depends on the eye
-  position along the view"; anamorphic "the streak reaches 100 px each side: 56, 56"; lens check "three blades are
-  lopsided"; contact hardening (`--compat`) "Reflector: the far end blurs: 5.60 vs mirror 3.68"; back-side materials
-  "GPU comparisons failed"; instance attributes "WGSL compile errors"; OIT "Invalid BindGroup"; biomes "A valid
-  external Instance reference no longer exists"; sky `sleet astro hillaire` a 30 s page load timeout.
-- **Owed:** run each on the parent commit; correct a check that recorded the old backdrop to the computed value, and
-  fix any other failure in its package.
+- **Repro:** `npm run build:packages` on c886aef6c, Intel Arc 140V (Windows, Edge 158), each under
+  `node scripts/run-with-timeout.mjs --max=4 --`. Each fails the same way with `packages/shared/clear-color.js` put back
+  to its state before 583beedbe, so none comes from KB-CLEAR-DEFAULT1:
+  - `node scripts/clustered-sphere-light-gpu-check.js`: the sphere-light diffuse rows ("E = the sphere's cap form
+    factor, horizon included") miss, error 0.0025 to 0.011 at radius 0.02 and the r 0.634 rows.
+  - `node packages/biomes/tests/browser-check.mjs`: `requestDevice` fails with DXGI_ERROR_DEVICE_REMOVED, then
+    "[Device] is lost" (the parent run); past the 4-minute limit on main.
+  - `node packages/oit/test/gpu/real-check.mjs`: "[Invalid CommandBuffer] is invalid due to a previous error".
+  - `node scripts/material-back-side-gpu-check.js`: the 4x instanced back-side rows read `[true,true]` where
+    `[false,false]` is wanted ("4x front instances back automatic gpu", and the explicit and back-instance rows).
+  - `node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position along the view: 3 bytes over 2,
+    worst 7".
+  - `node packages/sky/test/features-check.mjs sleet astro hillaire`: "sleet off by more than one half-float step".
+- **Cause:** not established for any of the six; each is owed to its package (core lighting, biomes, oit, materials,
+  post, sky), found and fixed with its own regression.
+
+### Fixed 2026-11-27: five package GPU checks failed in the rerun made for the clear colour fix (KB-CLEAR-CHECKS1)
+
+- **Repro:** after `npm run build:packages` on c886aef6c, on an Intel Arc 140V (Windows, Edge 158):
+  `node packages/dof/tests/gpu/lens-check.mjs` ("three blades are lopsided, got 3"),
+  `node packages/environment/tests/contact-hardening-browser.mjs --compat` ("Reflector: the far end blurs: 5.60 vs
+  mirror 3.68"), `node packages/post/test/anamorphic-browser.mjs` ("the streak reaches 100 px each side: 56, 56"),
+  `node packages/materials/test/instance-attributes-browser.mjs` ("WGSL compile errors": unresolved value `t_three`)
+  and `node packages/environment/scripts/test-browser.js --page=blend` ("irradiance at 0.48,-0.6,0.64"; the entry
+  first named a `scripts/test-browser.js` that does not exist). Eleven were logged; the six that also fail without
+  583beedbe are KB-GPU-PRECHECKS1 above.
+- **Cause, by an A/B on one tree** (main, then main with only `packages/shared/clear-color.js` at 583beedbe^):
+  - The lens, contact-hardening and anamorphic checks pass with the old clear colour and fail with the new one. Each
+    measures a faint tail (a bokeh edge as red > 12, a reflection's blur spread, a streak lifting a display byte) over a
+    scene that set no background, so over core's clear colour as a capture held it. 583beedbe made a linear capture
+    hold that colour decoded (0.0014, 0.0018, 0.0027 for 0.018, 0.023, 0.035), which a tone map draws near black, so
+    the tails fell under the bars: lens 2,031 to 1,691 bright pixels, the streak 159 to 56 px, the far-end spread 6.47
+    to 5.60. The effects drew the same; the checks had measured against the old backdrop.
+  - Instance attributes: fb926ed24 renamed the test's vec3 attribute `three` to `triple` and left `t_three` in the
+    WGSL `output`. Not from 583beedbe.
+  - Blend: the check's relative tolerance `1e-5 * Math.max(1, want)` took the sign of `want`, so at a normal where the
+    hot texel rings the SH negative (-3.157) it was an absolute 1e-5, under float32's 1.3e-5. Not from 583beedbe.
+- **Fix:** the three backdrop checks set `engine.scene.background = '#242a35'`, whose linear value is the capture's old
+  0.018, 0.023, 0.035, so each names the backdrop its bars were measured on; no bar changed. With it on main: lens
+  2,022 bright pixels, the streak 159 px. The instance-attribute page reads `t_triple`; the blend check takes
+  `Math.abs(want)`.
+- **Regression:** the five checks above, which pass on main with the fix (and the contact check on WebGPU too) and
+  fail without it.
 
 ### Open 2026-11-26: an `-srgb` view target without `viewFormats` fails with a raw validation error (KB-VIEW-SRGB-ERROR1, core)
 
@@ -1083,7 +1105,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   0.023, 0.035 before). With no effect nothing changes: 5,6,9.
 - **Checks drawn over the unset backdrop:** the package GPU checks that can draw core's clear into a capture were run
   again on WebGPU and, where a check has one, its `--compat` run: 240 passed and 11 failed. No check was
-  changed. The 11 are logged open below (KB-CLEAR-CHECKS1); the run was stopped before they were attributed.
+  changed. The 11 were logged as KB-CLEAR-CHECKS1: three checks had measured against the old backdrop and now name
+  it, two had test bugs of their own, and six fail without this fix too (KB-GPU-PRECHECKS1).
 - **Regression:** `tests/clear-capture.test.js` (the value per format for an unset colour; core's attachment and drawn
   clears on a capture, on the canvas and on a view's own float or `-srgb` target); real GPU:
   `packages/post/test/scene-background-browser.mjs`, on WebGPU and with `--compat`: with no background, 5,6,9 with no

@@ -33,6 +33,10 @@ try {
       camera: { position: [0, 2.5, 9], target: [0, -0.4, 0], near: 0.1, far: 100 },
     });
     engine.stop();
+    // The dark backdrop the spread bars were measured on: linear 0.018, 0.023, 0.035, what the reflection capture held
+    // of core's clear colour before KB-CLEAR-DEFAULT1. A blurred reflection's tails widen its spread only over it, so
+    // the check names it rather than take core's default, which a capture now holds near black (KB-CLEAR-CHECKS1).
+    engine.scene.background = '#242a35';
     engine.gpu.pushErrorScope('validation');
     for (const x of [-1.5, 0, 1.5])
       engine
