@@ -79,7 +79,11 @@ export interface FauldTunnelsSettings {
     readonly signal?: AbortSignal;
 }
 
+export const HANDLAMP_ASSET = "fauld-1944/tunnels/tn_handlamp";
+
 export const HANDLAMP_LENS_RADIUS = 0.052;
+
+export const HANDLAMP_STAND: readonly [0.27, 0.046, 0.05];
 
 export const HUNG_Z = 2;
 
