@@ -2355,6 +2355,13 @@ bounds `keys-1u` and its midpoint. A recording that replaces a changed kernel na
 `record-wgsl-corpus.mjs --add --drop=<key>`. Evidence: animation morph-gpu.test.js (CPU tier with a work budget),
 scripts/animation-morph-gpu-tests.js native and forced compatibility, the browser corpus compute part (0 failures).
 
+A texture made on a lost context is not refused (2026-11-27, KB-COMPAT-LOSTMSAA1): `getInternalformatParameter`
+answers null there, so only a format with no renderbuffer reads null as unsupported (lost-report.test.js,
+lost-context-browser.mjs). A frame lost with its device leaves the one before it on the page and prints nothing, so a
+post check that reads one frame after another also reads the canvas in the render's task and the device's loss
+(`scene-background-browser.mjs`; KB-POST-HALFVIEW-ONCE1, still open). `SceneFade` draws on canvas views only
+(KB-FADE-TARGETVIEW1, `scene-fade-target-browser.mjs`, both backends).
+
 A GPU reset is the device's loss (2026-11-27, KB-COMPAT-LOSSREPORT1): Chrome answers the synchronous query that waited
 for a reset (LINK_STATUS and COMPILE_STATUS false with empty logs, checkFramebufferStatus 0x8cdd, getError 0) before
 isContextLost() turns true and CONTEXT_LOST_WEBGL is queued, one task later; no synchronous signal exists (measured, RTX

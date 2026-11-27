@@ -6,14 +6,16 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-27: SceneFade also draws into offscreen target views (KB-FADE-TARGETVIEW1, post)
+### Fixed 2026-11-27: SceneFade also drew into offscreen target views (KB-FADE-TARGETVIEW1, post)
 
-- **Repro:** not yet run. By reading: attach `SceneFade`, capture, warm and start it, then render with a view that
-  has a `target` texture. Its pass runs for that view too.
-- **Cause:** `SceneFade.draw` (`packages/post/src/scene-fade.ts`) does not test `context.view?.target`: it blends the
-  canvas snapshot into the target with a pipeline made for the canvas format and the scene's sample count, where a
-  target takes 1 sample and may have another format.
-- **Fix needs:** skip views with a `target`, and a GPU check with such a view on both backends.
+- **Repro:** `node packages/post/test/scene-fade-target-browser.mjs` (and `--compat`), before the fix (RTX A6000): half
+  way through a fade a 64 x 32 target view in the canvas's format had 924 bytes of the canvas snapshot blended into it;
+  an `rgba16float` target made WebGPU refuse the whole frame ("Attachment state of [RenderPipeline] is not
+  compatible"), and the WebGL2 layer changed 7,068 of its bytes.
+- **Cause:** `SceneFade.draw` (`packages/post/src/scene-fade.ts`) did not test `context.view?.target`: it blended the
+  snapshot into the target with a pipeline made for the canvas format.
+- **Fixed:** the pass skips views with a `target`, before its uniform write. Regression: the check above, with the
+  target view before and after the canvas view and alone.
 
 ### Fixed 2026-11-27: damaged JPEG 2000 files could trap the decoder or keep it busy for minutes (KB-J2K-HOSTILE1, decoders)
 
@@ -79,16 +81,36 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fixed:** the transparent canvas's resolve clips colour and alpha as one point of one box
   (`packages/taa/src/alpha.ts`); 1.1 of 255 after. Opaque canvases keep their shader. Regression: the same check.
 
+### Fixed 2026-11-27: a 4x texture made on a lost WebGL2 context threw a false unsupported error (KB-COMPAT-LOSTMSAA1, webgl2-compat)
+
+- **Repro:** lose the layer's context (`WEBGL_lose_context`) and render a frame with 4 samples before the loss event
+  arrives: `render` threw "WebGL2 compatibility cannot do 4x multisampled rgba8unorm textures (this WebGL2 has no
+  multisample RGBA8 renderbuffers)".
+- **Cause:** `getInternalformatParameter` answers null on a lost context (WebGL 2.0, 3.7), and during a GPU reset
+  before `isContextLost()` turns true; `createTexture` read null as a format without 4x samples.
+- **Fixed:** in `packages/webgl2-compat/src/device/resources.ts`, null for a renderable format refuses nothing: the
+  loss event loses the device, as WebGPU makes textures on a lost device without errors. A format without 4x samples is
+  still refused. Regression: `packages/webgl2-compat/test/lost-report.test.js` and `lost-context-browser.mjs`.
+
 ### Open 2026-11-27: one half-view frame under Tonemap read back untone-mapped on the WebGL2 layer (KB-POST-HALFVIEW-ONCE1, post)
 
 - **Repro:** not reproduced. `node packages/post/test/scene-background-browser.mjs --compat` failed once in a full post
   `test:gpu` chain (RTX A6000, other work loading the CPU): `Tonemap #808080 half view` drew 128 where 116 is right,
   the value of the frame drawn just before it (no effect, same view, an engine since disposed). 12 reruns of the test
   and 300 repeats of the two draws, with and without a loaded CPU, all drew 116.
-- **Cause:** not established. The value fits a screenshot of the previous frame as well as a frame Tonemap did not
-  draw; the layer presents at the end of the submit, so a stale compositor frame is the likelier, unproven.
-- **Next:** on the next failure, shoot the canvas again two animation frames later; a right second shot puts it in the
-  shared screenshot harness (`packages/post/test/post-browser.mjs`).
+- **Cause:** not established, narrowed on 2026-11-27 (RTX A6000, ANGLE Direct3D 11). An instrumented run of the same
+  draws recorded, for each, every image the layer gave the canvas, the canvas read in the render's own task, the
+  uniform words of each full-screen draw, the console and the screenshot: in 882 draws, 378 of them beside a second GPU
+  browser and all under CPU load, each frame was presented once, Tonemap's uniforms were as written, canvas and
+  screenshot agreed, and the page printed nothing. A second probe of the layer's present path alone (a new context each
+  round, the old one lost) took 1,000 screenshots at once after the present, 700 of them with a GPU load, and none was
+  stale. A new device is a new WebGL2 context, so no target of it can hold the earlier frame's value. Losing the
+  Tonemap engine's context before its render reproduces the failure exactly (that frame and its comparison read 128,
+  every later case is right, no console line), because the page keeps the frame before; whether the context was lost in
+  the failed run was not recorded, and that run's harness dropped the page's console on a failed check.
+- **Next:** the check now names the layer on the next failure: it reads the canvas in each render's task and the
+  device's loss, and the shared harness (`packages/post/test/post-browser.mjs`) prints page errors and warnings as they
+  arrive.
 
 ### Fixed 2026-11-27: volume files drew Beer-Lambert in display space, up to 22 levels off (KB-VOL-TINT-DISPLAY1, gltf)
 
