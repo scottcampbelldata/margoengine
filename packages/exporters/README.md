@@ -1455,8 +1455,9 @@ console.log(`${file.length} bytes`);
 | `thumbnail` | none | PNG or JPEG bytes, written as the package thumbnail. A CMYK JPEG is refused |
 | `displayProperties` | `true` | Writes how each material looks: metallic, specular or translucent display properties (below) |
 | `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `'components'` writes one object made of components that share meshes. `false` writes a build item for each node |
-| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber, composite }` (below) |
+| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber, composite, modelResolution, alternatives }` (below) |
 | `itemPartNumber` | none | The `partnumber` of the one build item of a scene written as one object. With `assembly: false`, give each node's through `objectInfo` |
+| `production` | `false` | Writes the production extension: UUIDs, and with `separateParts` a model part for each object (below) |
 | `compress` | `true` | Deflates the package's parts. `false` stores them |
 | `onMeshCheck` | none | Called for each mesh written with `{ name, openEdges, nonManifoldEdges, flippedEdges, insideOut }` |
 | `signal` | none | Stops the archive step |
@@ -1537,6 +1538,33 @@ const materials = [
 const file = await export3MF(
   { nodes: [{ name: 'Fade', geometry }] },
   { objectInfo: () => ({ composite: { materials, ratios: ([, , z]) => [1 - z / 0.04, z / 0.04] } }) },
+);
+console.log(`${file.length} bytes`);
+```
+
+### Production extension
+
+`production: true` writes the [3MF Production Extension](https://github.com/3MFConsortium/spec_production): a UUID on the build and on every item, object, component and alternative, which production systems use to track parts. Each is a random version 4 UUID ([RFC 4122](https://www.rfc-editor.org/rfc/rfc4122)); pass `production: { uuid: ({ element, name, index }) => ... }` to give your own, lower case and none twice, or to write the same bytes twice.
+
+- `separateParts: true` writes each mesh object into `/3D/Objects/object<id>.model` with only the materials and textures it uses. The root part's items and components name them by `p:path`, the package lists `p` in `requiredextensions`, and a reader can load or skip each part on its own. An `other` object and an object with alternatives stay in the root part.
+- `objectInfo` gives a node `alternatives`: other meshes for the same object, in order of preference, each `'fullres'` (default), `'lowres'` or `'obfuscated'`, and `modelResolution` for the node's own mesh. An alternative's transform places it in the node's frame. They need an object of the node's own (`assembly: false` or `'components'`, or one node).
+
+`parse3MF` reads the UUIDs back (`buildUUID`, and each group's `itemUUID`, `componentUUID`, `uuid`, `alternativeUUID` and `modelPath`) and picks representations with its `modelResolution` option. The extension's encrypted parts are the Secure Content extension's, which Margo does not write or decrypt.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+const solid = (size: number) => ({
+  positions: new Float32Array([0, 0, 0, size, 0, 0, 0, size, 0, 0, 0, size]),
+  normals: new Float32Array(12),
+  indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3],
+});
+const file = await export3MF(
+  { nodes: [{ name: 'Bracket', geometry: solid(0.04) }] },
+  {
+    production: { separateParts: true },
+    objectInfo: () => ({ alternatives: [{ node: { geometry: solid(0.039) }, resolution: 'lowres' }] }),
+  },
 );
 console.log(`${file.length} bytes`);
 ```

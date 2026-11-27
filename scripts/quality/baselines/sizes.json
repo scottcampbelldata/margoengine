@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21250617,
+  "total": 21254779,
   "history": [
     {
       "date": "2026-10-24",
@@ -15025,6 +15025,12 @@
       "commit": "building-interiors",
       "reason": "Limits gap row 19: stairs with wells and guards, kitchen, bathroom and toilet fixtures and soft furnishings in rules buildings: procedural/building-rules 13,038 to 17,904 B gzip measured, building-plans 17,288 to 22,260, city 26,424 to 31,190 (it builds with the rules). All three options default on and generateBuilding is synchronous, so a split entry would need a second import before a house had stairs.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf",
+      "reason": "3MF production extension: exporters/threemf 32055 to 33562 B (UUIDs, a model part for each object with the resources it needs, alternative representations; the writer is the one function of the format, so a second entry would write the file twice), loaders/threemf-materials 13872 to 14449 B and threemf-lattice 18009 to 18542 B (the shared reader: namespaced paths and UUIDs, alternatives and the one-level rule).",
+      "grew": 3
     }
   ],
   "items": {
@@ -15423,7 +15429,7 @@
     "@margoengine/exporters/sparse": 26469,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 32340,
+    "@margoengine/exporters/threemf": 34569,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,
@@ -15668,8 +15674,8 @@
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
-    "@margoengine/loaders/threemf-lattice": 18162,
-    "@margoengine/loaders/threemf-materials": 13887,
+    "@margoengine/loaders/threemf-lattice": 19099,
+    "@margoengine/loaders/threemf-materials": 14883,
     "@margoengine/loaders/threemf-mesh": 4316,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,

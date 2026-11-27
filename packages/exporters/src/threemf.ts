@@ -60,6 +60,58 @@ export interface ThreeMFObjectInfo {
    * written. Default none.
    */
   composite?: ThreeMFComposite;
+  /**
+   * What this node's own mesh is for, when alternatives give other representations of it (production extension).
+   * Default `'fullres'`. Needs `production`.
+   */
+  modelResolution?: ThreeMFModelResolution;
+  /**
+   * Other representations of the node's object, in order of preference, each ranked above the node's own mesh. A reader
+   * picks one it can use: a viewer a `lowres` one, a printer a `fullres` one. Needs `production`, and a build item or
+   * component of the node's own (`assembly` `false` or `'components'`, or a single node). Default none.
+   */
+  alternatives?: readonly ThreeMFAlternative[];
+}
+
+/** The intended use of a representation. An `obfuscated` one hides detail and must enclose the `fullres` shape. */
+export type ThreeMFModelResolution = (typeof RESOLUTIONS)[number];
+
+const RESOLUTIONS = ['fullres', 'lowres', 'obfuscated'] as const;
+
+/** One alternative representation of a node's object. */
+export interface ThreeMFAlternative {
+  /**
+   * The mesh and its material, in the frame of the node it stands for: this node's own transform places it there, and
+   * the original's transform then places both.
+   */
+  node: ExportNode;
+  /** Default `'fullres'`. */
+  resolution?: ThreeMFModelResolution;
+}
+
+/** What a UUID of the production extension identifies. */
+export interface ThreeMFElement {
+  element: 'build' | 'item' | 'object' | 'component' | 'alternative';
+  /** The name of the node it places or holds, when it has one. */
+  name?: string;
+  /** Its place among the elements of its kind, from 0, in the order they are written. */
+  index: number;
+}
+
+/** How {@link export3MF} writes the production extension. */
+export interface Export3MFProduction {
+  /**
+   * Writes each mesh object into a model part of its own, `/3D/Objects/object<id>.model`, which the root part's build
+   * items and components name by path, so a reader can load or skip each on its own. An `other` object and an object
+   * with alternatives stay in the root part. Default `false`.
+   */
+  separateParts?: boolean;
+  /**
+   * The UUID of each build, item, object, component and alternative, as 32 lower-case hex digits in the 8-4-4-4-12
+   * form, none used twice. Give the same ones again to track a part across files, or to write the same bytes twice.
+   * Default a random (version 4) UUID.
+   */
+  uuid?: (element: ThreeMFElement) => string;
 }
 
 /** One material of a mixture, written as a `<base>` of a base material group. */
@@ -180,6 +232,11 @@ export interface Export3MFOptions extends SceneOptions {
    * `'components'`). With `assembly: false`, give each node's through `objectInfo`. Default none.
    */
   itemPartNumber?: string;
+  /**
+   * Writes the production extension: a UUID on the build and on each item, object and component, and what
+   * {@link Export3MFProduction} asks for. Default `false`.
+   */
+  production?: boolean | Export3MFProduction;
   /** Deflates the package's parts; `false` stores them. Default `true`. */
   compress?: boolean;
   /** Called once for each mesh written with how it closes. Nothing is repaired. */
@@ -235,6 +292,38 @@ function checkComposite({ materials, ratios }: ThreeMFComposite): ThreeMFComposi
   });
   if (typeof ratios !== 'function') ratioRow(ratios, checked.length);
   return { materials: checked, ratios };
+}
+
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+/** A version 4 UUID (RFC 4122); `crypto.randomUUID` is missing from pages that are not secure contexts. */
+function randomUUID(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-');
+}
+
+/** The attributes that name another property resource, in the XML this writer makes (names are escaped). */
+const REFERENCE = / (?:pid|pids|texid|matid|displaypropertiesid|[a-z]+textureid)="([\d ]+)"/g;
+const idOf = (xml: string): string => / id="(\d+)"/.exec(xml)![1];
+
+/** The property resources that `from` refers to, directly or through one another, in their own order. */
+function resourcesOf(resources: readonly string[], from: string): string[] {
+  const byId = new Map(resources.map((xml) => [idOf(xml), xml])),
+    wanted = new Set<string>(),
+    pending = [from];
+  while (pending.length)
+    for (const [, ids] of pending.pop()!.matchAll(REFERENCE))
+      for (const id of ids.split(' ')) {
+        if (wanted.has(id)) continue;
+        wanted.add(id);
+        const found = byId.get(id);
+        if (found) pending.push(found);
+      }
+  return resources.filter((xml) => wanted.has(idOf(xml)));
 }
 
 /** A base material: its group's resource id and its index there. */
@@ -442,6 +531,10 @@ function upright(world: ArrayLike<number>, zUp: boolean): number[] {
   return out;
 }
 
+/** Reflects positions in X. */
+const FLIP = [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const PRODUCTION = 'http://schemas.microsoft.com/3dmanufacturing/production/2015/06',
+  ALTERNATIVES = 'http://schemas.microsoft.com/3dmanufacturing/production/alternatives/2021/04';
 const CORE = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02',
   MATERIAL = 'http://schemas.microsoft.com/3dmanufacturing/material/2015/02',
   RELATIONSHIP = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/',
@@ -718,8 +811,12 @@ export async function export3MF(
     compress = true,
     onMeshCheck,
     objectInfo,
+    production = false,
     signal,
   } = options;
+  if (typeof production !== 'boolean' && (typeof production !== 'object' || production === null))
+    throw new TypeError('3MF production must be true, false or its options');
+  const { separateParts = false, uuid = randomUUID } = typeof production === 'object' ? production : {};
   if (!Object.hasOwn(UNITS, unit)) throw new RangeError(`3MF unit must be one of ${Object.keys(UNITS).join(', ')}`);
   if (upAxis !== 'y' && upAxis !== 'z') throw new RangeError("3MF upAxis must be 'y' or 'z'");
   if (typeof assembly !== 'boolean' && assembly !== 'components')
@@ -742,7 +839,13 @@ export async function export3MF(
     /** Base material groups, one for each kind of display properties, as a group takes one resource of them. */
     bases = new Map<Look['kind'], { id: number; entries: Map<string, BaseEntry> }>(),
     looks = new Map<Mat, Look>(),
-    objects: string[] = [],
+    /** Every object resource, with the model part it goes into when not the root. */
+    objects: { id: number; xml: string; part?: string }[] = [],
+    /** The model part of each object that has one of its own. */
+    objectParts = new Map<number, string>(),
+    /** The UUIDs given, and how many of each element. */
+    uuids = new Set<string>(),
+    counts = new Map<string, number>(),
     groups: string[] = [],
     /** `texture2d` ids by image bytes and sampling, as materials of one file share images through their own records. */
     textures = new Map<Uint8Array, Map<string, number>>(),
@@ -759,6 +862,8 @@ export async function export3MF(
     /** The object types the build references, for the format's rule about support. */
     printed: { type: ThreeMFObjectType; alone: boolean }[] = [],
     shared = new Map<string, number>(),
+    /** The extensions whose references name another model part, beyond the production one. */
+    pathed = new Set<string>(),
     /** A composite material group for each list of constituents, with the mixtures its triangles use. */
     mixtures = new Map<string, { base: number; id: number; rows: Map<string, number> }>(),
     seen = new Map<object, number>(),
@@ -1065,30 +1170,61 @@ export async function export3MF(
   const named = (name: string | undefined): string => (name ? ` name="${escaped(name)}"` : '');
   const numberedPart = (partNumber: string | undefined, name = 'partnumber'): string =>
     partNumber === undefined ? '' : ` ${name}="${escaped(partNumber)}"`;
+  /** A new UUID for an element, as the attribute `attribute`; nothing without the production extension. */
+  const unique = (element: ThreeMFElement['element'], name: string | undefined, attribute = 'p:UUID'): string => {
+    if (!production) return '';
+    const index = counts.get(element) ?? 0;
+    counts.set(element, index + 1);
+    const given = uuid === randomUUID ? randomUUID() : uuid({ element, name, index });
+    if (typeof given !== 'string' || !UUID.test(given))
+      throw new RangeError('3MF production uuid must return a lower-case UUID in the 8-4-4-4-12 form');
+    if (uuids.has(given)) throw new RangeError(`3MF production uuid ${given} is given twice`);
+    uuids.add(given);
+    return ` ${attribute}="${given}"`;
+  };
+  /** The path attribute of a reference to an object in a model part of its own. */
+  const pathOf = (objectId: number, attribute = 'p:path'): string => {
+    const part = objectParts.get(objectId);
+    return part === undefined ? '' : ` ${attribute}="/${part}"`;
+  };
   const object = (
     vertices: string[],
     faces: string[],
     base: Base,
     name: string | undefined,
-    { type = 'model', partNumber }: ThreeMFObjectInfo,
+    { type = 'model', partNumber, modelResolution }: ThreeMFObjectInfo,
+    alternatives = '',
   ): number => {
-    const at = id++;
-    objects.push(
-      `<object id="${at}" type="${type}" pid="${base.group}" pindex="${base.index}"${named(name)}${numberedPart(partNumber)}>` +
-        `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles></mesh></object>`,
-    );
+    const at = id++,
+      resolution = modelResolution === undefined ? '' : ` pa:modelresolution="${modelResolution}"`,
+      // Only the root part may name another (production extension 3.2), and an unreferenced object stays in it.
+      part = separateParts && type !== 'other' && !alternatives ? `3D/Objects/object${at}.model` : undefined;
+    if (part) objectParts.set(at, part);
+    objects.push({
+      id: at,
+      part,
+      xml:
+        `<object id="${at}" type="${type}"${resolution} pid="${base.group}" pindex="${base.index}"${named(name)}${numberedPart(partNumber)}${unique('object', name)}>` +
+        `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles></mesh>${alternatives}</object>`,
+    });
     return at;
   };
+  const component = (objectId: number, name: string | undefined, transform = ''): string =>
+    `<component objectid="${objectId}"${pathOf(objectId)}${transform}${unique('component', name)}/>`;
   /** An object of components, which takes no property of its own (core specification chapter 4). */
   const assemblyOf = (parts: readonly string[]): number => {
-    const at = id++;
-    objects.push(
-      `<object id="${at}" type="model"${named(title === undefined ? undefined : String(title))}><components>${parts.join('')}</components></object>`,
-    );
+    const at = id++,
+      name = title === undefined ? undefined : String(title);
+    objects.push({
+      id: at,
+      xml: `<object id="${at}" type="model"${named(name)}${unique('object', name)}><components>${parts.join('')}</components></object>`,
+    });
     return at;
   };
-  const item = (objectId: number, partNumber: string | undefined, transform = ''): void => {
-    build.push(`<item objectid="${objectId}"${transform}${numberedPart(partNumber)}/>`);
+  const item = (objectId: number, partNumber: string | undefined, name?: string, transform = ''): void => {
+    build.push(
+      `<item objectid="${objectId}"${pathOf(objectId)}${transform}${numberedPart(partNumber)}${unique('item', name)}/>`,
+    );
   };
   /** What `objectInfo` says of a node, checked. */
   const infoOf = (source: Mesh | ExportNode): ThreeMFObjectInfo & { type: ThreeMFObjectType } => {
@@ -1099,8 +1235,18 @@ export async function export3MF(
         partNumber: partText(given.partNumber, 'partNumber'),
         itemPartNumber: partText(given.itemPartNumber, 'itemPartNumber'),
         composite: given.composite && checkComposite(given.composite),
+        modelResolution: given.modelResolution,
+        alternatives: given.alternatives?.length ? given.alternatives : undefined,
       };
     if (!TYPES.includes(type)) throw new RangeError(`3MF object type must be one of ${TYPES.join(', ')}`);
+    const resolutions = [info.modelResolution, ...(info.alternatives ?? []).map(({ resolution }) => resolution)];
+    if (resolutions.some((r) => r !== undefined && !RESOLUTIONS.includes(r)))
+      throw new RangeError(`3MF model resolution must be one of ${RESOLUTIONS.join(', ')}`);
+    if (info.modelResolution !== undefined || info.alternatives) {
+      if (!production) throw new RangeError('3MF alternatives and model resolutions are in the production extension');
+      if (together)
+        throw new RangeError("3MF alternatives stand for a node's own object; use assembly: false or 'components'");
+    }
     if (info.itemPartNumber !== undefined) {
       if (type === 'other')
         throw new RangeError('3MF keeps an other object out of the build, so it has no build item for itemPartNumber');
@@ -1119,6 +1265,71 @@ export async function export3MF(
         name,
       ),
     );
+  /** One primitive's part, its corners' properties by its material or its node's mixture. */
+  const partOf = (
+    { geometry, material: given }: Drawable,
+    positions: ArrayLike<number>,
+    info: ThreeMFObjectInfo,
+    keys: string[],
+  ): Part => {
+    const material = given ?? fallback;
+    if (info.composite) {
+      const { ratios } = info.composite,
+        mixture = mixtureOf(info.composite),
+        at = geometry.positions;
+      if (textureCoordinates(geometry, material) || vertexColors(geometry, material))
+        warn('3MF writes a composite node as its mixture alone, without its texture or vertex colours');
+      const graded =
+          typeof ratios === 'function'
+            ? (vertex: number): string =>
+                String(mixture.row(ratios([at[vertex * 3], at[vertex * 3 + 1], at[vertex * 3 + 2]])))
+            : undefined,
+        index = typeof ratios === 'function' ? Number(graded!(geometry.indices[0])) : mixture.row(ratios),
+        base = { group: mixture.group, index };
+      // A shared object holds one geometry under one mixture, or one function of its vertices.
+      keys.push(`${numbered(geometry)} ${mixture.key} ${typeof ratios === 'function' ? numbered(ratios) : index}`);
+      return { geometry, material, positions, colors: graded, textured: false, base, mixture: graded && mixture.group };
+    }
+    const coordinates = textureCoordinates(geometry, material),
+      tint = coordinates && tintOf(geometry, material),
+      colors = coordinates
+        ? (vertex: number) => `${coordinates(vertex)} ${tint!(vertex)}`
+        : vertexColors(geometry, material),
+      base = baseOf(material, !!colors && look(material).kind === 'translucent'),
+      found = look(material),
+      map = coordinates && displayProperties ? mapOf(material) : undefined,
+      sampled = found.kind === 'specular' ? [found.map, roughnessMap(material)] : [];
+    // What a shared object's properties depend on.
+    keys.push(
+      `${numbered(geometry)} ${base.group} ${base.index} ${coordinates ? `${textureId(material.baseColorTexture!)} ${JSON.stringify(material.baseColorTextureTransform ?? null)} ${map ? numbered(map.image) : map} ${sampled.map((t) => t && numbered(t.image))}` : ''}`,
+    );
+    return { geometry, material, positions, colors, textured: !!coordinates, base };
+  };
+  /** Writes a node's alternative objects, and gives the element that lists them for its own object. */
+  const alternativesOf = (info: ReturnType<typeof infoOf>, mirrored: boolean, name: string | undefined): string => {
+    if (!info.alternatives) return '';
+    const listed = info.alternatives.map(({ node, resolution = 'fullres' }) => {
+      const drawn = drawables(collect({ nodes: [node] }, options, undefined, 'shape')),
+        parts = drawn.map((item) => {
+          const own = moved(item.geometry.positions, item.world);
+          return partOf(item, mirrored ? moved(own, FLIP) : own, info, []);
+        }),
+        // The alternative's own reflection reverses its triangles once more.
+        reversed = mirrored !== (!!drawn.length && determinant3(drawn[0].world) < 0),
+        welded = weldParts(parts, reversed);
+      if (!welded.length) throw new RangeError('3MF alternatives each need a mesh with triangles');
+      const vertices: string[] = [],
+        faces: string[] = [],
+        { base } = welded[0].part,
+        own = node.name ?? name;
+      check(welded, own);
+      append(welded, vertices, faces, base);
+      const at = object(vertices, faces, base, own, { type: info.type, partNumber: info.partNumber });
+      if (objectParts.has(at)) pathed.add('pa');
+      return `<pa:alternative objectid="${at}"${pathOf(at, 'path')}${unique('alternative', own, 'UUID')} modelresolution="${resolution}"/>`;
+    });
+    return `<pa:alternatives>${listed.join('')}</pa:alternatives>`;
+  };
   const placed = (drawn: readonly Drawable[]): void => {
     const { name, world: matrix } = drawn[0],
       determinant = determinant3(matrix),
@@ -1133,53 +1344,10 @@ export async function export3MF(
       );
     const info = infoOf(drawn[0].source!),
       keys: string[] = [],
-      parts = drawn.map((item): Part => {
-        const { geometry } = item,
-          material = item.material ?? fallback,
-          positions = together
-            ? moved(geometry.positions, upright(matrix, zUp))
-            : mirrored
-              ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
-              : geometry.positions;
-        if (info.composite) {
-          const { ratios } = info.composite,
-            mixture = mixtureOf(info.composite),
-            at = geometry.positions;
-          if (textureCoordinates(geometry, material) || vertexColors(geometry, material))
-            warn('3MF writes a composite node as its mixture alone, without its texture or vertex colours');
-          const graded =
-              typeof ratios === 'function'
-                ? (vertex: number): string =>
-                    String(mixture.row(ratios([at[vertex * 3], at[vertex * 3 + 1], at[vertex * 3 + 2]])))
-                : undefined,
-            index = typeof ratios === 'function' ? Number(graded!(geometry.indices[0])) : mixture.row(ratios),
-            base = { group: mixture.group, index };
-          // A shared object holds one geometry under one mixture, or one function of its vertices.
-          keys.push(`${numbered(geometry)} ${mixture.key} ${typeof ratios === 'function' ? numbered(ratios) : index}`);
-          return {
-            geometry,
-            material,
-            positions,
-            colors: graded,
-            textured: false,
-            base,
-            mixture: graded && mixture.group,
-          };
-        }
-        const coordinates = textureCoordinates(geometry, material),
-          tint = coordinates && tintOf(geometry, material),
-          colors = coordinates
-            ? (vertex: number) => `${coordinates(vertex)} ${tint!(vertex)}`
-            : vertexColors(geometry, material),
-          base = baseOf(material, !!colors && look(material).kind === 'translucent'),
-          found = look(material),
-          map = coordinates && displayProperties ? mapOf(material) : undefined,
-          sampled = found.kind === 'specular' ? [found.map, roughnessMap(material)] : [];
-        // What a shared object's properties depend on.
-        keys.push(
-          `${numbered(geometry)} ${base.group} ${base.index} ${coordinates ? `${textureId(material.baseColorTexture!)} ${JSON.stringify(material.baseColorTextureTransform ?? null)} ${map ? numbered(map.image) : map} ${sampled.map((t) => t && numbered(t.image))}` : ''}`,
-        );
-        return { geometry, material, positions, colors, textured: !!coordinates, base };
+      parts = drawn.map((item) => {
+        const { positions } = item.geometry,
+          placedAt = together ? moved(positions, upright(matrix, zUp)) : mirrored ? moved(positions, FLIP) : positions;
+        return partOf(item, placedAt, info, keys);
       });
     if (together) {
       const welded = weldParts(parts, mirrored);
@@ -1194,7 +1362,8 @@ export async function export3MF(
       append(welded, into.vertices, into.faces, into.base);
       return;
     }
-    const key = `${mirrored} ${JSON.stringify([info.type, info.partNumber])} ${keys.join('|')}`;
+    const others = info.alternatives && numbered(info.alternatives),
+      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others])} ${keys.join('|')}`;
     let at = shared.get(key);
     if (at === undefined) {
       const welded = weldParts(parts, mirrored);
@@ -1204,13 +1373,15 @@ export async function export3MF(
         { base } = welded[0].part;
       check(welded, name);
       append(welded, vertices, faces, base);
-      shared.set(key, (at = object(vertices, faces, base, name, info)));
+      // Resources are defined before they are referred to, so the alternatives come first.
+      const alternatives = alternativesOf(info, mirrored, name);
+      shared.set(key, (at = object(vertices, faces, base, name, info, alternatives)));
     }
     if (info.type === 'other') return;
     const transform = ` transform="${itemTransform(upright(world, zUp), scale)}"`;
     printed.push({ type: info.type, alone: ownItems });
-    if (!ownItems && assembly === 'components') components.push(`<component objectid="${at}"${transform}/>`);
-    else item(at, info.itemPartNumber ?? itemNumber, transform);
+    if (!ownItems && assembly === 'components') components.push(component(at, name, transform));
+    else item(at, info.itemPartNumber ?? itemNumber, name, transform);
   };
   for (const drawn of nodes.values()) {
     signal?.throwIfAborted();
@@ -1226,12 +1397,12 @@ export async function export3MF(
         at = object(vertices, faces, base, own, { type, partNumber });
       if (type === 'other') continue;
       printed.push({ type, alone });
-      ids.push(`<component objectid="${at}"/>`);
-      if (alone) item(at, itemNumber);
+      if (alone) item(at, itemNumber, own);
+      else ids.push(component(at, own));
     }
-    if (ids.length > 1) item(assemblyOf(ids), itemNumber);
+    if (ids.length) item(assemblyOf(ids), itemNumber, title === undefined ? undefined : String(title));
   }
-  if (components.length) item(assemblyOf(components), itemNumber);
+  if (components.length) item(assemblyOf(components), itemNumber, title === undefined ? undefined : String(title));
   if (!build.length)
     throw new RangeError('3MF requires at least one mesh with triangles in an object other than other');
   const supports = (type: ThreeMFObjectType): boolean => type === 'support' || type === 'solidsupport';
@@ -1240,44 +1411,56 @@ export async function export3MF(
       '3MF asks that support be referenced only from an object of components beside the model it supports (core specification section 4.1); this support is not, as the scene is written as separate items or holds no model with it',
     );
   // Each base material group after the display properties it names.
-  const baseXml = [...bases]
-    .map(([kind, { id: group, entries }]) => {
-      const list = [...entries.values()],
-        shown =
-          displayProperties && (kind !== 'metallic' || list.some(({ material }) => finished(material))) ? id++ : 0,
-        element = `${kind === 'translucent' ? 'm:translucent' : kind === 'specular' ? 'm:pbspecular' : 'm:pbmetallic'}displayproperties`;
-      return (
-        (shown
-          ? `<${element} id="${shown}">${list.map(({ material }) => lookXml(material)).join('')}</${element}>`
-          : '') +
-        `<basematerials id="${group}"${shown ? ` displaypropertiesid="${shown}"` : ''}>${list
-          .map(
-            ({ color, material }) =>
-              `<base name="${material.name ? escaped(material.name) : color}" displaycolor="${color}"/>`,
-          )
-          .join('')}</basematerials>`
-      );
-    })
-    .join('');
-  const mixtureXml = [...mixtures]
-      .map(([key, { base, id: group, rows }]) => {
-        const materials = JSON.parse(key) as ThreeMFConstituent[];
-        return (
-          `<basematerials id="${base}">${materials
-            .map(({ name, color }) => `<base name="${escaped(name)}" displaycolor="${color}"/>`)
-            .join('')}</basematerials>` +
-          `<m:compositematerials id="${group}" matid="${base}" matindices="${materials.map((_, i) => i).join(' ')}">` +
-          `${[...rows.keys()].map((values) => `<m:composite values="${values}"/>`).join('')}</m:compositematerials>`
-        );
-      })
-      .join(''),
-    model =
+  const baseXml = [...bases].flatMap(([kind, { id: group, entries }]) => {
+    const list = [...entries.values()],
+      shown = displayProperties && (kind !== 'metallic' || list.some(({ material }) => finished(material))) ? id++ : 0,
+      element = `${kind === 'translucent' ? 'm:translucent' : kind === 'specular' ? 'm:pbspecular' : 'm:pbmetallic'}displayproperties`,
+      materials = `<basematerials id="${group}"${shown ? ` displaypropertiesid="${shown}"` : ''}>${list
+        .map(
+          ({ color, material }) =>
+            `<base name="${material.name ? escaped(material.name) : color}" displaycolor="${color}"/>`,
+        )
+        .join('')}</basematerials>`;
+    return shown
+      ? [`<${element} id="${shown}">${list.map(({ material }) => lookXml(material)).join('')}</${element}>`, materials]
+      : [materials];
+  });
+  const mixtureXml = [...mixtures].flatMap(([key, { base, id: group, rows }]) => {
+    const materials = JSON.parse(key) as ThreeMFConstituent[];
+    return [
+      `<basematerials id="${base}">${materials
+        .map(({ name, color }) => `<base name="${escaped(name)}" displaycolor="${color}"/>`)
+        .join('')}</basematerials>`,
+      `<m:compositematerials id="${group}" matid="${base}" matindices="${materials.map((_, i) => i).join(' ')}">` +
+        `${[...rows.keys()].map((values) => `<m:composite values="${values}"/>`).join('')}</m:compositematerials>`,
+    ];
+  });
+  // Textures first: display properties of base materials never sample one, those of texture groups do.
+  const resources = [...baseXml, ...textureXml, ...groups, ...mixtureXml],
+    /** Each model part of one object, with the resources it needs: a part refers only to its own. */
+    apart = objects
+      .filter((object) => object.part)
+      .map(({ part, xml }) => ({ part: part!, xml, needs: resourcesOf(resources, xml) })),
+    rooted = objects.filter((object) => !object.part).map(({ xml }) => xml),
+    rootNeeds = new Set(resourcesOf(resources, rooted.join(''))),
+    elsewhere = new Set(apart.flatMap(({ needs }) => needs)),
+    rootResources = resources.filter((xml) => rootNeeds.has(xml) || !elsewhere.has(xml)),
+    alternatives = rooted.some((xml) => xml.includes('<pa:alternatives>') || xml.includes(' pa:modelresolution="')),
+    namespaces =
+      ` xmlns="${CORE}" xmlns:m="${MATERIAL}"` +
+      (production ? ` xmlns:p="${PRODUCTION}"` : '') +
+      (alternatives ? ` xmlns:pa="${ALTERNATIVES}"` : ''),
+    // A package whose model parts refer to others must require the extension (production extension chapter 1).
+    required = apart.length ? ` requiredextensions="p${pathed.has('pa') ? ' pa' : ''}"` : '',
+    modelOf = (head: string, body: string, own: readonly string[], items: string): string =>
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
-      `<model unit="${unit}" xml:lang="en-US" xmlns="${CORE}" xmlns:m="${MATERIAL}"${described.namespaces}>` +
-      described.xml +
-      // Textures first: display properties of base materials never sample one, those of texture groups do.
-      `<resources>${baseXml}${textureXml.join('')}${groups.join('')}${mixtureXml}${objects.join('')}</resources>` +
-      `<build>${build.join('')}</build></model>\n`,
+      `<model unit="${unit}" xml:lang="en-US"${head}>${body}<resources>${own.join('')}</resources>${items}</model>\n`,
+    model = modelOf(
+      `${namespaces}${required}${described.namespaces}`,
+      described.xml,
+      [...rootResources, ...rooted],
+      `<build${unique('build', title === undefined ? undefined : String(title))}>${build.join('')}</build>`,
+    ),
     encoder = new TextEncoder(),
     relationships = (entries: readonly (readonly [string, string])[]): Uint8Array =>
       encoder.encode(
@@ -1287,7 +1470,24 @@ export async function export3MF(
             .join('') +
           '</Relationships>\n',
       ),
-    pictures = preview ? [{ name: `Metadata/thumbnail.${preview}`, data: thumbnail! }] : [];
+    pictures = preview ? [{ name: `Metadata/thumbnail.${preview}`, data: thumbnail! }] : [],
+    /** The relationships of the textures among `own`, in the order the textures were added. */
+    sampled = (own: ReadonlySet<string>) =>
+      files.filter((_, i) => own.has(textureXml[i])).map(({ name }) => [name, `${RELATIONSHIP}3dtexture`] as const),
+    rootRelations = [
+      ...sampled(new Set(rootResources)),
+      ...apart.map(({ part }) => [part, `${RELATIONSHIP}3dmodel`] as const),
+    ],
+    parts = apart.flatMap(({ part, xml, needs }) => {
+      const textured = sampled(new Set(needs)),
+        data = encoder.encode(modelOf(namespaces, '', [...needs, xml], '<build/>'));
+      return [
+        { name: part, data },
+        ...(textured.length
+          ? [{ name: part.replace(/([^/]+)$/, '_rels/$1.rels'), data: relationships(textured) }]
+          : []),
+      ];
+    });
   return encodeZIP(
     [
       {
@@ -1311,15 +1511,9 @@ export async function export3MF(
         ]),
       },
       { name: '3D/3dmodel.model', data: encoder.encode(model) },
-      ...(files.length
-        ? [
-            {
-              name: '3D/_rels/3dmodel.model.rels',
-              data: relationships(files.map(({ name }) => [name, `${RELATIONSHIP}3dtexture`] as const)),
-            },
-            ...files,
-          ]
-        : []),
+      ...(rootRelations.length ? [{ name: '3D/_rels/3dmodel.model.rels', data: relationships(rootRelations) }] : []),
+      ...parts,
+      ...files,
       ...pictures,
     ],
     { signal, compress },

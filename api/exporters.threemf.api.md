@@ -16,9 +16,20 @@ export interface Export3MFOptions extends SceneOptions {
     assembly?: boolean | 'components';
     objectInfo?: (node: Mesh | ExportNode) => ThreeMFObjectInfo | undefined;
     itemPartNumber?: string;
+    production?: boolean | Export3MFProduction;
     compress?: boolean;
     onMeshCheck?: (report: ThreeMFMeshReport) => void;
     signal?: AbortSignal;
+}
+
+export interface Export3MFProduction {
+    separateParts?: boolean;
+    uuid?: (element: ThreeMFElement) => string;
+}
+
+export interface ThreeMFAlternative {
+    node: ExportNode;
+    resolution?: ThreeMFModelResolution;
 }
 
 export interface ThreeMFComposite {
@@ -36,6 +47,12 @@ export interface ThreeMFCustomMetadata {
     name: string;
     value: string;
     preserve?: boolean;
+}
+
+export interface ThreeMFElement {
+    element: 'build' | 'item' | 'object' | 'component' | 'alternative';
+    name?: string;
+    index: number;
 }
 
 export interface ThreeMFMeshReport {
@@ -58,11 +75,15 @@ export interface ThreeMFMetadata {
     custom?: readonly ThreeMFCustomMetadata[];
 }
 
+export type ThreeMFModelResolution = (typeof RESOLUTIONS)[number];
+
 export interface ThreeMFObjectInfo {
     type?: ThreeMFObjectType;
     partNumber?: string;
     itemPartNumber?: string;
     composite?: ThreeMFComposite;
+    modelResolution?: ThreeMFModelResolution;
+    alternatives?: readonly ThreeMFAlternative[];
 }
 
 export type ThreeMFObjectType = (typeof TYPES)[number];
@@ -267,6 +288,8 @@ interface PixelArtSampling {
 }
 
 type PrimitiveMode = 'POINTS' | 'LINES' | 'LINE_LOOP' | 'LINE_STRIP' | 'TRIANGLES' | 'TRIANGLE_STRIP' | 'TRIANGLE_FAN' | 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+const RESOLUTIONS: readonly ['fullres', 'lowres', 'obfuscated'];
 
 interface SceneOptions {
     onlyVisible?: boolean;

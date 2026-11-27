@@ -29,6 +29,11 @@ export interface ThreeMFOptions
   units?: 'meters' | 'file';
   /** Component nesting limit. Default 32. */
   maxDepth?: number;
+  /**
+   * Which of a production extension object's alternative representations to read: the first alternative of this
+   * resolution stands in for the object, which is kept when there is none. Default `'fullres'`.
+   */
+  modelResolution?: 'fullres' | 'lowres' | 'obfuscated';
   signal?: AbortSignal;
 }
 
@@ -36,6 +41,8 @@ export interface ThreeMFOptions
 export interface ThreeMFResult extends LoadedGeometry {
   kind: 'mesh';
   unit: string;
+  /** The production extension's UUID of the build, when the package gives one. */
+  buildUUID?: string;
   /** `<metadata>` entries by name, in a null-prototype object (names come from the file). */
   metadata: Record<string, string>;
 }
@@ -52,19 +59,25 @@ interface ObjectData {
   name?: string;
   type: string;
   partNumber?: string;
+  uuid?: string;
   pid?: string;
   pindex?: number;
   mesh?: MeshData;
-  components: { objectId: string; path?: string; transform: Float64Array }[];
+  components: { objectId: string; path?: string; uuid?: string; transform: Float64Array }[];
+  alternatives: { objectId: string; path?: string; uuid?: string; resolution: string }[];
 }
 interface Model {
   unit: string;
   objects: Map<string, ObjectData>;
   properties: Map<string, Color[]>;
   propertyIds: string[];
-  items: { objectId: string; path?: string; transform: Float64Array; partNumber?: string }[];
+  items: { objectId: string; path?: string; uuid?: string; transform: Float64Array; partNumber?: string }[];
   metadata: Record<string, string>;
+  buildUUID?: string;
 }
+
+/** The namespace of the production extension's `path` and `UUID` attributes. */
+const PRODUCTION = 'http://schemas.microsoft.com/3dmanufacturing/production/2015/06';
 
 /** A parsed model part, as an extension of the 3MF reader sees it. */
 export type ThreeMFModel = Model;
@@ -151,7 +164,19 @@ function parseModel(
     // Null prototype: <metadata name="..."> comes from the file (`__proto__`, `constructor`, `hasOwnProperty`).
     metadata: Object.create(null),
   };
-  const propertyIds = model.propertyIds;
+  const propertyIds = model.propertyIds,
+    /** The namespace each prefix was last declared for. */
+    prefixes = new Map<string, string>();
+  /** A production extension attribute, under whatever prefix the part declares for it (`p` when it declares none). */
+  const production = (a: Record<string, string>, local: string): string | undefined => {
+    for (const key in a) {
+      const at = key.indexOf(':');
+      if (at < 0 || key.slice(at + 1) !== local) continue;
+      const prefix = key.slice(0, at);
+      if ((prefixes.get(prefix) ?? (prefix === 'p' ? PRODUCTION : '')) === PRODUCTION) return a[key];
+    }
+    return undefined;
+  };
   let object: ObjectData | undefined,
     colors: Color[] | undefined,
     metadataName: string | undefined,
@@ -166,6 +191,7 @@ function parseModel(
     xml,
     {
       open(name, a) {
+        for (const key in a) if (key.startsWith('xmlns:')) prefixes.set(key.slice(6), a[key]);
         if (extension?.element?.(model, name, a)) return;
         switch (name) {
           case 'model':
@@ -203,9 +229,11 @@ function parseModel(
               name: a.name,
               type: a.type ?? 'model',
               partNumber: a.partnumber,
+              uuid: production(a, 'UUID'),
               pid: a.pid,
               pindex: a.pindex === undefined ? undefined : index(a.pindex, 'pindex'),
               components: [],
+              alternatives: [],
             };
             model.objects.set(a.id, object);
             break;
@@ -258,14 +286,35 @@ function parseModel(
           case 'component': {
             if (!object) throw new LoaderError(F, 'syntax', '<component> outside <object>');
             if (!a.objectid) throw new LoaderError(F, 'syntax', '<component> without objectid');
-            object.components.push({ objectId: a.objectid, path: a['p:path'], transform: parseTransform(a.transform) });
+            object.components.push({
+              objectId: a.objectid,
+              path: production(a, 'path'),
+              uuid: production(a, 'UUID'),
+              transform: parseTransform(a.transform),
+            });
             break;
           }
+          case 'alternative': {
+            if (!object) throw new LoaderError(F, 'syntax', '<alternative> outside <object>');
+            if (!a.objectid) throw new LoaderError(F, 'syntax', '<alternative> without objectid');
+            // The alternatives namespace's own attributes are unqualified, as its schema and sample write them.
+            object.alternatives.push({
+              objectId: a.objectid,
+              path: a.path ?? production(a, 'path'),
+              uuid: a.UUID ?? production(a, 'UUID'),
+              resolution: a.modelresolution ?? 'fullres',
+            });
+            break;
+          }
+          case 'build':
+            model.buildUUID = production(a, 'UUID');
+            break;
           case 'item':
             if (!a.objectid) throw new LoaderError(F, 'syntax', '<item> without objectid');
             model.items.push({
               objectId: a.objectid,
-              path: a['p:path'],
+              path: production(a, 'path'),
+              uuid: production(a, 'UUID'),
               transform: parseTransform(a.transform),
               partNumber: a.partnumber,
             });
@@ -319,9 +368,9 @@ export function cornerProperty(
 const normalizePath = (path: string): string => path.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
 
 /**
- * Parses a 3MF package (core specification, plus basematerials and the materials extension colorgroup, and
- * production extension `p:path` components). Build item and component
- * transforms are baked into the positions, which are converted to meters by default. The result has one
+ * Parses a 3MF package (core specification, plus basematerials and the materials extension colorgroup, and the
+ * production extension: items and components in other model parts, UUIDs and alternative representations). Build item
+ * and component transforms are baked into the positions, which are converted to meters by default. The result has one
  * group per build item object and color; `colors` is present only when some triangle has per-corner colors.
  */
 export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFResult> {
@@ -341,6 +390,8 @@ export async function read3MF(
     throw new LoaderError(F, 'range', 'maxDepth must be a non-negative integer');
   if (options.units !== undefined && options.units !== 'meters' && options.units !== 'file')
     throw new LoaderError(F, 'range', `units must be "meters" or "file"`);
+  if (!['fullres', 'lowres', 'obfuscated', undefined].includes(options.modelResolution))
+    throw new LoaderError(F, 'range', 'modelResolution must be "fullres", "lowres" or "obfuscated"');
   if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b)
     throw new LoaderError(F, 'header', 'not a ZIP package (missing PK signature)');
   const entries = readZipDirectory(bytes, options);
@@ -365,7 +416,9 @@ export async function read3MF(
       F,
     );
   }
-  const models = new Map<string, Model>();
+  const models = new Map<string, Model>(),
+    /** The package path of each model part. */
+    partPaths = new Map<Model, string>();
   const load = async (path: string): Promise<Model> => {
     const key = normalizePath(path);
     let model = models.get(key);
@@ -373,20 +426,25 @@ export async function read3MF(
       if (models.size >= 1024) throw new LoaderError(F, 'limit', 'too many model parts');
       model = parseModel(decodeXML(await read(path)), limit, extension, options.external);
       models.set(key, model);
+      partPaths.set(model, '/' + byPath.get(key)!.name.replace(/^\/+/, ''));
     }
     return model;
   };
   const root = await load(rootPath);
-  // Load every model part referenced through p:path before the synchronous build walk.
-  const pending = [root];
-  while (pending.length) {
-    const model = pending.pop()!;
-    const paths = [
-      ...model.items.map((i) => i.path),
-      ...[...model.objects.values()].flatMap((o) => o.components.map((c) => c.path)),
-    ];
-    for (const path of paths) if (path && !models.has(normalizePath(path))) pending.push(await load(path));
-  }
+  /** The paths a model part's objects name, in components and alternatives. */
+  const named = (model: Model): string[] =>
+    [...model.objects.values()].flatMap((o) =>
+      [...o.components, ...o.alternatives].flatMap(({ path }) => (path ? [path] : [])),
+    );
+  // Load every model part the root names before the synchronous build walk. A part's own build is ignored.
+  for (const path of [...root.items.flatMap(({ path }) => (path ? [path] : [])), ...named(root)]) await load(path);
+  for (const model of models.values())
+    if (model !== root && named(model).length)
+      throw new LoaderError(
+        F,
+        'syntax',
+        `${partPaths.get(model)!.slice(0, 128)}: only the root model part may name another part (production extension 3.2)`,
+      );
   await extension?.ready?.(read, { models, loadModelPart: load });
   throwIfAborted(options.signal, F);
 
@@ -431,8 +489,11 @@ export async function read3MF(
     indices = uints(),
     colors = vertexColors ? floats() : undefined,
     groups: LoadedGroup[] = [];
-  /** The part number of the build item being emitted. */
-  let itemPartNumber: string | undefined;
+  /** The part number and UUID of the build item being emitted. */
+  let itemPartNumber: string | undefined, itemUUID: string | undefined;
+  /** What the production extension says of the object being emitted. */
+  let identity: Pick<LoadedGroup, 'uuid' | 'componentUUID' | 'alternativeUUID'> = {};
+  const wanted = options.modelResolution ?? 'fullres';
   const emitMesh = (model: Model, o: ObjectData, mesh: MeshData, m: Float64Array): void => {
     const vertexCount = mesh.vertices.length / 3,
       triangleCount = mesh.triangles.length / 3;
@@ -502,6 +563,11 @@ export async function read3MF(
       if (o.type !== 'model') group.objectType = o.type;
       if (o.partNumber !== undefined) group.partNumber = o.partNumber;
       if (itemPartNumber !== undefined) group.itemPartNumber = itemPartNumber;
+      if (itemUUID !== undefined) group.itemUUID = itemUUID;
+      if (identity.uuid !== undefined) group.uuid = identity.uuid;
+      if (identity.componentUUID !== undefined) group.componentUUID = identity.componentUUID;
+      if (identity.alternativeUUID !== undefined) group.alternativeUUID = identity.alternativeUUID;
+      if (model !== root) group.modelPath = partPaths.get(model);
       if (bucket.color) group.color = [...bucket.color];
       extension?.group(group, model, o, mesh, bucket.triangles[0]);
       groups.push(group);
@@ -511,7 +577,14 @@ export async function read3MF(
   // Components may reuse an object many times per level: bound the expanded instances, not just the depth, or
   // fan-out^depth references to an empty object never finish (meshes are also bounded by the vertex limits).
   let instances = 0;
-  const emit = (model: Model, id: string, path: string | undefined, m: Float64Array, depth: number): void => {
+  const emit = (
+    model: Model,
+    id: string,
+    path: string | undefined,
+    m: Float64Array,
+    depth: number,
+    componentUUID?: string,
+  ): void => {
     if (depth > maxDepth) throw new LoaderError(F, 'limit', `components nest deeper than ${maxDepth}`);
     if (++instances > MAX_INSTANCES)
       throw new LoaderError(F, 'limit', `the build expands to more than ${MAX_INSTANCES} object instances`);
@@ -520,17 +593,30 @@ export async function read3MF(
       throw new LoaderError(F, 'syntax', `object ${id.slice(0, 32)} references itself through its components`);
     if (o.mesh && o.components.length)
       throw new LoaderError(F, 'syntax', `object ${id.slice(0, 32)} has both a mesh and components`);
+    // Production alternatives: the first one of the resolution asked for stands in for the object, whose own content
+    // has the lowest priority.
+    const alternative = o.alternatives.find(({ resolution }) => resolution === wanted);
+    let [source, shown] = [owner, o];
+    if (alternative) {
+      [source, shown] = object(owner, alternative.objectId, alternative.path);
+      if (shown.alternatives.length)
+        throw new LoaderError(F, 'syntax', `alternative object ${shown.id.slice(0, 32)} has alternatives of its own`);
+      if (shown.mesh && shown.components.length)
+        throw new LoaderError(F, 'syntax', `object ${shown.id.slice(0, 32)} has both a mesh and components`);
+    }
     // Core 3MF: an `other` mesh is never output, however it is reached; the type of an object of components is ignored.
-    if (o.mesh && o.type === 'other') return;
+    if (shown.mesh && shown.type === 'other') return;
     visiting.add(o);
-    extension?.instance?.(owner, o, m, scale, depth);
-    if (o.mesh) emitMesh(owner, o, o.mesh, m);
-    for (const component of o.components)
-      emit(owner, component.objectId, component.path, compose(component.transform, m), depth + 1);
+    extension?.instance?.(source, shown, m, scale, depth);
+    identity = { uuid: o.uuid, componentUUID, alternativeUUID: alternative?.uuid };
+    if (shown.mesh) emitMesh(source, shown, shown.mesh, m);
+    for (const component of shown.components)
+      emit(source, component.objectId, component.path, compose(component.transform, m), depth + 1, component.uuid);
     visiting.delete(o);
   };
   for (const item of root.items) {
     itemPartNumber = item.partNumber;
+    itemUUID = item.uuid;
     emit(root, item.objectId, item.path, item.transform, 0);
   }
   if (!indices.length && !extension?.hasGeometry?.())
@@ -543,6 +629,7 @@ export async function read3MF(
     unit: root.unit,
     metadata: root.metadata,
   };
+  if (root.buildUUID !== undefined) result.buildUUID = root.buildUUID;
   if (colors) result.colors = colors.result();
   return result;
 }

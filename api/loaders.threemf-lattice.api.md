@@ -155,6 +155,11 @@ interface LoadedGroup {
     objectType?: string;
     partNumber?: string;
     itemPartNumber?: string;
+    uuid?: string;
+    itemUUID?: string;
+    componentUUID?: string;
+    alternativeUUID?: string;
+    modelPath?: string;
     color?: [number, number, number, number];
     properties?: Record<string, number | number[]>;
 }
@@ -198,12 +203,14 @@ interface ThreeMFMetallic {
 interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
+    modelResolution?: 'fullres' | 'lowres' | 'obfuscated';
     signal?: AbortSignal;
 }
 
 interface ThreeMFResult extends LoadedGeometry {
     kind: 'mesh';
     unit: string;
+    buildUUID?: string;
     metadata: Record<string, string>;
 }
 

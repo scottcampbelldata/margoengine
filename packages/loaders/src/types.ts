@@ -14,6 +14,16 @@ export interface LoadedGroup {
   partNumber?: string;
   /** The `partnumber` of the build item that placed it (3MF). */
   itemPartNumber?: string;
+  /** The production extension's UUID of the mesh object, or of the object its alternative stands in for (3MF). */
+  uuid?: string;
+  /** The UUID of the build item that placed it (3MF production extension). */
+  itemUUID?: string;
+  /** The UUID of the component that placed the mesh object, when a component did (3MF production extension). */
+  componentUUID?: string;
+  /** The UUID of the alternative read in the object's place (3MF production extension). */
+  alternativeUUID?: string;
+  /** The model part the mesh came from, when it is not the root model part (3MF production extension). */
+  modelPath?: string;
   /** Uniform sRGB color in [0,1], `[r, g, b, a]`, when the file gives this group one color. */
   color?: [number, number, number, number];
   /** Raw source face properties, including scalar values and owned lists (PLY/OFF). */

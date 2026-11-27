@@ -101,6 +101,11 @@ interface LoadedGroup {
     objectType?: string;
     partNumber?: string;
     itemPartNumber?: string;
+    uuid?: string;
+    itemUUID?: string;
+    componentUUID?: string;
+    alternativeUUID?: string;
+    modelPath?: string;
     color?: [number, number, number, number];
     properties?: Record<string, number | number[]>;
 }
@@ -120,10 +125,12 @@ interface Model {
     items: {
         objectId: string;
         path?: string;
+        uuid?: string;
         transform: Float64Array;
         partNumber?: string;
     }[];
     metadata: Record<string, string>;
+    buildUUID?: string;
 }
 
 interface ObjectData {
@@ -131,13 +138,21 @@ interface ObjectData {
     name?: string;
     type: string;
     partNumber?: string;
+    uuid?: string;
     pid?: string;
     pindex?: number;
     mesh?: MeshData;
     components: {
         objectId: string;
         path?: string;
+        uuid?: string;
         transform: Float64Array;
+    }[];
+    alternatives: {
+        objectId: string;
+        path?: string;
+        uuid?: string;
+        resolution: string;
     }[];
 }
 
@@ -163,6 +178,7 @@ type ThreeMFModel = Model;
 interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
+    modelResolution?: 'fullres' | 'lowres' | 'obfuscated';
     signal?: AbortSignal;
 }
 
@@ -174,6 +190,7 @@ interface ThreeMFReadContext {
 interface ThreeMFResult extends LoadedGeometry {
     kind: 'mesh';
     unit: string;
+    buildUUID?: string;
     metadata: Record<string, string>;
 }
 
