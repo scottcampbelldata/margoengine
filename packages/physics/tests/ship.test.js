@@ -15,6 +15,7 @@ import {
   collapseTime,
   coreDeficit,
   empiricalModel,
+  headingGains,
   inceptionIndex,
   raceNumbers,
   resolvedRace,
@@ -722,3 +723,138 @@ function boxMesh([sx, sy, sz]) {
   }
   return { vertices: Float64Array.from(vertices), indices: Uint32Array.from(indices) };
 }
+
+test("the autopilot places the closed loop's poles on the ship's own model, and holds a course-unstable KVLCC2 on a new heading", () => {
+  const speed = (15.5 * 0.514444) / Math.sqrt(320 / 7),
+    M = KVLCC2_L7,
+    reference = new Manoeuvring(
+      { ...M, centre: 0, gyration: Math.sqrt((M.length ** 2 + M.beam ** 2) / 12) },
+      { u: speed },
+    ),
+    { a, b } = reference.linearize(speed);
+  // KVLCC2 is course-unstable: the sway-yaw matrix has an eigenvalue above 0.
+  const trace = a[0] + a[3],
+    det = a[0] * a[3] - a[1] * a[2],
+    top = (trace + Math.sqrt(trace * trace - 4 * det)) / 2;
+  assert.ok(top > 0, `largest eigenvalue ${top}`);
+  // The gains put the characteristic polynomial of [v, r, e, ∫e] at (s + w)^2 (s^2 + 2 z w s + w^2), to rounding.
+  const w = (0.5 * speed) / M.length,
+    k = headingGains(a, b, w, 0.8),
+    // det(sI - (A - B k)) for A = [[a0, a1, 0, 0], [a2, a3, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], by its coefficients.
+    A = [
+      [a[0] - b[0] * k.v, a[1] - b[0] * k.r, -b[0] * k.heading, -b[0] * k.integral],
+      [a[2] - b[1] * k.v, a[3] - b[1] * k.r, -b[1] * k.heading, -b[1] * k.integral],
+      [0, 1, 0, 0],
+      [0, 0, 1, 0],
+    ],
+    // Faddeev-LeVerrier: the characteristic polynomial's coefficients from traces of powers.
+    mul = (x, y) => x.map((row, i) => row.map((_, j) => row.reduce((s, _v, n) => s + x[i][n] * y[n][j], 0))),
+    tr = (x) => x[0][0] + x[1][1] + x[2][2] + x[3][3],
+    A2 = mul(A, A),
+    A3 = mul(A2, A),
+    A4 = mul(A3, A),
+    p1 = tr(A),
+    p2 = tr(A2),
+    p3 = tr(A3),
+    p4 = tr(A4),
+    c3 = -p1,
+    c2 = -(c3 * p1 + p2) / 2,
+    c1 = -(c2 * p1 + c3 * p2 + p3) / 3,
+    c0 = -(c1 * p1 + c2 * p2 + c3 * p3 + p4) / 4,
+    want = [2 * w + 1.6 * w, 2 * w * w + 3.2 * w * w, 2 * w ** 3 + 1.6 * w ** 3, w ** 4];
+  [c3, c2, c1, c0].forEach((c, i) =>
+    assert.ok(Math.abs(c / want[i] - 1) < 1e-6, `coefficient ${i}: ${c} against ${want[i]}`),
+  );
+  // Held on the water: a heading 30 degrees to starboard reached and held, the rudder within its limit.
+  const { body, ships, world } = plane({}, { speed });
+  ships.control(0).revolutions = ships.revolutionsFor(0, speed);
+  ships.control(0).heading = 30 * DEG;
+  let most = 0;
+  for (let t = 1; t <= 60 * 180; t++) {
+    world.advance(t);
+    most = Math.max(most, ships.status(0).heading);
+  }
+  const s = ships.status(0);
+  assert.ok(Math.abs(s.heading - 30 * DEG) < 0.2 * DEG, `heading ${s.heading / DEG}`);
+  assert.ok(Math.abs(s.r) < 1e-3 && Math.abs(s.rudder) < 35 * DEG);
+  // Damped: the overshoot of a ζ 0.8 loop stays small.
+  assert.ok(most < 34 * DEG, `overshoot to ${most / DEG} degrees`);
+  assert.equal(ships.status(0).headingOrdered, 30 * DEG);
+  void body;
+});
+
+test('the autopilot follows a track of waypoints by line of sight, and crabs into a steady crosswind', () => {
+  const speed = (15.5 * 0.514444) / Math.sqrt(320 / 7),
+    L = KVLCC2_L7.length,
+    { body, ships, world } = plane({}, { speed });
+  ships.control(0).revolutions = ships.revolutionsFor(0, speed);
+  // East 20 L, then south-east 40 L more: the second leg 45 degrees to starboard.
+  ships.control(0).track = {
+    waypoints: [
+      [0, 0],
+      [20 * L, 0],
+      [20 * L + 28.28 * L, 28.28 * L],
+    ],
+  };
+  // A steady push to port from a crosswind, a twentieth of the ship's resistance.
+  const push = 0.05 * 0.5 * 1025 * L * KVLCC2_L7.draught * speed * speed * KVLCC2_L7.resistance;
+  // Held from now on: a body's added force stays until it is reset.
+  body.addForce([0, 0, -push]);
+  let worst = 0,
+    turned = 0,
+    last = 0;
+  for (let t = 1; t <= 60 * Math.ceil((64 * L) / speed); t++) {
+    world.advance(t);
+    const s = ships.status(0);
+    if (s.track.leg === 1 && !turned) turned = t;
+    // Settled on the second leg: its second half, once the drift is crabbed into.
+    if (s.track.leg === 1 && turned && t > turned + 60 * ((20 * L) / speed))
+      worst = Math.max(worst, Math.abs(s.track.crossTrack));
+    if (s.track.leg === 1) last = s.track.crossTrack;
+  }
+  const s = ships.status(0);
+  assert.ok(turned > 0, 'it reached the second leg');
+  assert.ok(s.track.done, 'and passed the last waypoint');
+  // Performance targets, not physics bounds: over the leg's second half the turn's swing dies within a tenth of a length,
+  // and by the leg's end the crosswind is crabbed into, within a fiftieth of a length of the line (0.01 L measured).
+  assert.ok(worst > 0 && worst < 0.1 * L, `cross-track ${worst / L} L`);
+  assert.ok(Math.abs(last) < 0.02 * L, `cross-track at the leg's end ${last / L} L`);
+});
+
+test("a hull given to the ship runs on Holtrop and Mennen's resistance: self-propelled at a speed, it holds that speed", () => {
+  const M = scaleModel(KVLCC2_L7, 320 / 7),
+    hull = {
+      length: 320,
+      beam: 58,
+      draughtFore: 20.8,
+      draughtAft: 20.8,
+      volume: 312622,
+      lcb: 3.48,
+      midship: 0.998,
+      waterplane: 0.9,
+      propeller: { diameter: 9.86, blades: 4 },
+    },
+    physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+    speed = 15.5 * 0.514444,
+    body = physics.addBody(null, {
+      linearVelocity: [speed, 0, 0],
+      colliders: { shape: 'box', halfExtents: [160, 20.8, 29], mass: 1025 * M.volume },
+    }),
+    ships = new ShipSolver(),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(ships, { ships: [{ row: body.row, model: { ...M, centre: 0 }, hull }] })
+      .couple(['ship', 'rigid'], 'staggered');
+  ships.control(0).revolutions = ships.revolutionsFor(0, speed);
+  ships.control(0).heading = 0;
+  for (let t = 1; t <= 60 * 300; t++) world.advance(t);
+  const s = ships.status(0),
+    resisted = holtropMennen(hull, s.u).total,
+    pushed = s.forces.thrust * (1 - M.propeller.thrustDeduction);
+  assert.ok(Math.abs(s.u / speed - 1) < 0.005, `${s.u} against ${speed} m/s`);
+  assert.ok(Math.abs(pushed / resisted - 1) < 0.01, `thrust ${pushed} against Holtrop ${resisted} N`);
+  // And the speed is not R'_0's: the same revolutions on the constant coefficient settle elsewhere.
+  const plain = new Manoeuvring({ ...M, centre: 0 }),
+    other = plain.selfPropulsion(speed);
+  assert.notEqual(Math.round(other * 1e6), Math.round(ships.control(0).revolutions * 1e6));
+});

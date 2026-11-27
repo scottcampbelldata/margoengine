@@ -172,15 +172,23 @@ export class Manoeuvring {
   private readonly mass: number;
   private readonly propeller: Propeller;
   private readonly matrix: [number, number, number, number, number];
+  /** The hull's straight-run resistance at a speed, N, in place of R'_0 (a Holtrop and Mennen estimate), or none. */
+  private readonly resistanceAt: ((speed: number) => number) | undefined;
 
   /**
    * @param state The start: position, heading, velocities (default at rest, heading +X).
-   * @param options `density` (default 1025), `rudderRate` (default 2.32 deg/s at full scale per sqrt of the scale, 1.76 deg/s for KVLCC2).
+   * @param options `density` (default 1025), `rudderRate` (default 2.32 deg/s at full scale per sqrt of the scale, 1.76 deg/s
+   * for KVLCC2), and `resistance`, the hull's straight-run resistance in N at a speed in m/s, used in place of R'_0 U^2 (a
+   * Holtrop and Mennen estimate, whose wave resistance rises with the speed as a constant R'_0 cannot).
    */
   constructor(
     model: ManoeuvringModel,
     state: Partial<ManoeuvringState> = {},
-    options: { readonly density?: number; readonly rudderRate?: number } = {},
+    options: {
+      readonly density?: number;
+      readonly rudderRate?: number;
+      readonly resistance?: (speed: number) => number;
+    } = {},
   ) {
     for (const [name, value] of [
       ['length', model?.length],
@@ -192,6 +200,9 @@ export class Manoeuvring {
         throw new RangeError(`A manoeuvring model's ${name} is finite and above 0 (got ${value}); pass it.`);
     this.model = model;
     this.density = options.density ?? 1025;
+    if (options.resistance !== undefined && typeof options.resistance !== 'function')
+      throw new TypeError("A hull's resistance is a function of the speed, m/s, giving N; pass one, or none for R'_0.");
+    this.resistanceAt = options.resistance;
     this.state = { x: 0, z: 0, heading: 0, u: 0, v: 0, r: 0, rudder: 0, ...state };
     this.propeller = new Propeller(model.propeller.diameter, model.propeller.curves);
     this.rudderRate = options.rudderRate ?? 1.76 * DEG;
@@ -242,7 +253,9 @@ export class Manoeuvring {
         [yv, yr, yvvv, yvvr, yvrr, yrrr] = M.sway,
         [nv, nr, nvvv, nvvr, nvrr, nrrr] = M.yaw,
         q = 0.5 * rho * L * d * U * U;
-      XH = q * (-M.resistance + xvv * vp * vp + xvr * vp * rp + xrr * rp * rp + xvvvv * vp * vp * vp * vp);
+      // The straight run's resistance: R'_0 U^2, or the hull's own curve at the surge speed (a Holtrop and Mennen estimate).
+      const straight = this.resistanceAt ? -Math.sign(u) * this.resistanceAt(Math.abs(u)) : -q * M.resistance;
+      XH = straight + q * (xvv * vp * vp + xvr * vp * rp + xrr * rp * rp + xvvvv * vp * vp * vp * vp);
       // Kijima's form: v'|v'| and r'|r'| in place of v'^3 and r'^3.
       const kijima = M.form === 'kijima',
         vOdd = kijima ? vp * Math.abs(vp) : vp * vp * vp,
@@ -356,6 +369,40 @@ export class Manoeuvring {
   }
 
   /**
+   * The ship's sway and yaw linearised about a straight run at `speed` m/s, self-propelled, rudder amidships: d[v, r]/dt =
+   * a [v, r] + b δ, as central differences of the model's own rates (a = [a_vv, a_vr, a_rv, a_rr], b = [b_v, b_r]). What an
+   * autopilot places its poles on; a course-unstable hull shows as a positive eigenvalue of `a`.
+   */
+  linearize(speed: number): { a: [number, number, number, number]; b: [number, number] } {
+    if (!(speed > 0 && Number.isFinite(speed)))
+      throw new RangeError(`A speed is finite m/s above 0 (got ${speed}); pass one.`);
+    const save = this.revolutions,
+      L = this.model.length,
+      out = new Float64Array(6),
+      rate = (v: number, r: number, rudder: number): [number, number] => {
+        this.rates({ x: 0, z: 0, heading: 0, u: speed, v, r, rudder }, out);
+        return [out[4]!, out[5]!];
+      };
+    this.revolutions = this.selfPropulsion(speed);
+    const dv = 1e-4 * speed,
+      dr = (1e-4 * speed) / L,
+      dd = 1e-4,
+      [vp, rp] = [rate(dv, 0, 0), rate(-dv, 0, 0)],
+      [vq, rq] = [rate(0, dr, 0), rate(0, -dr, 0)],
+      [dp, dm] = [rate(0, 0, dd), rate(0, 0, -dd)];
+    this.revolutions = save;
+    return {
+      a: [
+        (vp[0] - rp[0]) / (2 * dv),
+        (vq[0] - rq[0]) / (2 * dr),
+        (vp[1] - rp[1]) / (2 * dv),
+        (vq[1] - rq[1]) / (2 * dr),
+      ],
+      b: [(dp[0] - dm[0]) / (2 * dd), (dp[1] - dm[1]) / (2 * dd)],
+    };
+  }
+
+  /**
    * The propeller revolutions, rev/s, at which the ship runs straight at `speed` m/s (thrust balancing R'_0): what the MMG
    * method holds in its turning and zig-zag tests.
    */
@@ -363,7 +410,9 @@ export class Manoeuvring {
     if (!(speed > 0 && Number.isFinite(speed)))
       throw new RangeError(`A speed is finite m/s above 0 (got ${speed}); pass one.`);
     const M = this.model,
-      resistance = 0.5 * this.density * M.length * M.draught * speed * speed * M.resistance,
+      resistance = this.resistanceAt
+        ? this.resistanceAt(speed)
+        : 0.5 * this.density * M.length * M.draught * speed * speed * M.resistance,
       inflow = speed * (1 - M.propeller.wake),
       save = this.revolutions;
     let lo = 1e-6,

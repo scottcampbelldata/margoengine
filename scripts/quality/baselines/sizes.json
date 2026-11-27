@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20701252,
+  "total": 20703197,
   "history": [
     {
       "date": "2026-10-24",
@@ -14233,6 +14233,12 @@
       "commit": "ba760c1480",
       "reason": "KB-LOOK-TV-PENUMBRA2: T1's penumbra reads the ground only (the plants mask left out, at least PENUMBRA_MIN_PIXELS interior pixels) and the new penumbraPlants holds the plants in the penumbra to the plants out of it. Measured gzip: headless/look from its 15,956 B ceiling to 16,334 B measured (ceiling 16,825). The two checks share look's grain, mask and result helpers; a second entry would repeat them and give checkProbe an async import. Only this row is written; main's physics rows are left to their owner.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "d8821f23c",
+      "reason": "physics/ship 14,644 ceiling to its new size: the autopilot (pole placement on the ship's own linearised model, line-of-sight track following, reference model and drift crab) and the Holtrop hull wired into the solver. One feature of the ship entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15105,7 +15111,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 14644,
+    "@margoengine/physics/ship": 16589,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,

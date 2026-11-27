@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { cos, dot, exp, hypot, ln, pow, sin, sum } from '../dist/pinned.js';
+import { atan, atan2, cos, dot, exp, hypot, ln, pow, sin, sum } from '../dist/pinned.js';
 
 const fromHex = (hex) => new Float64Array(new BigUint64Array([BigInt(`0x${hex}`)]).buffer)[0];
 const toHex = (x) => new BigUint64Array(new Float64Array([x]).buffer)[0].toString(16).padStart(16, '0');
@@ -39,4 +39,26 @@ test('the pinned functions stay close to the exact values, and hypot is the roun
   assert.equal(hypot(3, 4), 5);
   assert.equal(hypot(2, 3, 6), 7);
   assert.throws(() => dot([1], [1, 2]), RangeError);
+});
+
+test('pinned atan and atan2 stay within 2 ulp of the true angle and keep their quadrants and signs', () => {
+  // atan over 30 decades of x, against the engine's (itself within 1 ulp): 4.4e-16 near pi / 2 is 2 ulp there.
+  let worst = 0;
+  for (let i = -3000; i <= 3000; i++) {
+    const x = Math.sinh(i / 150);
+    worst = Math.max(worst, Math.abs(atan(x) - Math.atan(x)) / Math.max(Math.abs(Math.atan(x)), 1e-300) / Number.EPSILON);
+  }
+  assert.ok(worst <= 4, `${worst} ulp`);
+  for (let i = 0; i < 3600; i++) {
+    const a = (i / 3600) * 2 * Math.PI - Math.PI + 1e-9,
+      y = Math.sin(a) * (1 + (i % 5)),
+      x = Math.cos(a) * (1 + (i % 5));
+    assert.ok(Math.abs(atan2(y, x) - Math.atan2(y, x)) <= 4 * Number.EPSILON * Math.PI, `${y}, ${x}`);
+  }
+  assert.equal(atan2(0, -1), Math.PI);
+  assert.ok(Object.is(atan2(-0, 1), -0) && Object.is(atan2(0, 1), 0));
+  assert.equal(atan2(1, 0), Math.PI / 2);
+  assert.equal(atan2(-1, 0), -Math.PI / 2);
+  assert.equal(atan(Infinity), Math.PI / 2);
+  assert.ok(Number.isNaN(atan(Number.NaN)) && Number.isNaN(atan2(Number.NaN, 1)));
 });

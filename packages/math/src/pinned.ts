@@ -232,3 +232,40 @@ export function dot(a: ArrayLike<number>, b: ArrayLike<number>): number {
 export function hypot(x: number, y: number, z = 0): number {
   return Math.sqrt(x * x + y * y + z * z);
 }
+
+/** The series of atan(t) for |t| <= 0.2, by Horner's rule over 13 odd terms: within 1e-17 of atan there. */
+function atanSmall(t: number): number {
+  const t2 = t * t;
+  let s = 1 / 25;
+  // c_0 - t^2 (c_1 - t^2 (c_2 - ...)), c_k = 1 / (2k + 1), the alternating signs carried by the subtractions.
+  for (let k = 11; k >= 0; k--) s = 1 / (2 * k + 1) - t2 * s;
+  return t * s;
+}
+
+/**
+ * atan(x), in (-pi / 2, pi / 2): |x| above 1 by pi / 2 - atan(1 / |x|), then two halvings atan(t) = 2 atan(t / (1 +
+ * sqrt(1 + t^2))) to |t| <= 0.2 and the series there, all in + - * / and the correctly rounded square root, so every engine
+ * gives the same bits (TypeScript only: the kernel's Rust twin has no atan yet). Within 4 ulp; NaN stays NaN.
+ */
+export function atan(x: number): number {
+  if (x !== x) return x;
+  const a = x < 0 ? -x : x;
+  if (a === Infinity) return x < 0 ? -(PIO2_1 + PIO2_2) : PIO2_1 + PIO2_2;
+  const inverted = a > 1,
+    t0 = inverted ? 1 / a : a,
+    t1 = t0 / (1 + Math.sqrt(1 + t0 * t0)),
+    t2 = t1 / (1 + Math.sqrt(1 + t1 * t1)),
+    core = 4 * atanSmall(t2),
+    r = inverted ? PIO2_1 - core + PIO2_2 : core;
+  return x < 0 ? -r : r;
+}
+
+/** atan2(y, x), in (-pi, pi], from {@link atan} by quadrant; atan2(±0, x >= 0) is ±0 and atan2(0, x < 0) is pi. */
+export function atan2(y: number, x: number): number {
+  if (x !== x || y !== y) return Number.NaN;
+  const pi = 2 * (PIO2_1 + PIO2_2);
+  if (x === 0) return y > 0 ? PIO2_1 + PIO2_2 : y < 0 ? -(PIO2_1 + PIO2_2) : y;
+  const r = atan(y / x);
+  if (x > 0) return r;
+  return y < 0 ? r - pi : r + pi;
+}

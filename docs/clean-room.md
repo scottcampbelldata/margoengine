@@ -17041,3 +17041,25 @@ The former extrapolation fit two finite-frequency solves even after their wave a
 N. Salvesen, E. O. Tuck and O. M. Faltinsen, [*Ship Motions and Sea Loads*, 1970, Eqs. 43–54 and Appendix 1](https://trid.trb.org/View/495), give the speed corrections for sway, roll and yaw. For a tapered-ended hull, the engine uses the interior terms after the endpoint contribution vanishes. In the engine's y-up convention, positive yaw points the bow toward negative Z. The lateral slope is therefore minus yaw. The kinematic lateral velocity is the oscillatory sway velocity less the course speed times that slope. The same sway and roll Cummins responses supply the two angular cross terms and the quadratic yaw term. The existing radiation history supplies the past sway velocity and angular velocities. Integrating from the present reconstructs the delayed motions, keeping the finite history independent of the initial absolute location. A fixed heading and small angles define the ordinary-strip approximation. The correction does not provide a translating 3D Green function or blunt-transom end terms.
 
 A forced-oscillation body port exercises the five retained corrections at known frequency and speed, using the frequency-domain lateral coefficients independently of the time-step reconstruction. All five complex amplitudes match within 0.33 percent. The actual hull and wake fixture restores to the same 92073e2cb54e0b8a state on WebGPU and WebGL2, with 11.869 mm at the distant gauge.
+
+### Ship autopilot and Holtrop resistance in the ship solver (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
+
+`packages/physics/src/ship/autopilot.ts`, `Manoeuvring.linearize` and the `resistance` option in `src/ship/mmg.ts`, and the
+autopilot, track and `hull` paths of `src/ship/solver.ts`, written from papers only (no code of any autopilot or toolbox):
+
+- M. Breivik and T. I. Fossen, "Guidance laws for planar motion control", IEEE Conference on Decision and Control 2008,
+  https://skoge.folk.ntnu.no/prost/proceedings/cdc-2008/data/papers/1849.pdf (pages 573 to 574, eqs. 5 to 16, read): the
+  cross-track error, lookahead-based steering χ_d = α_k + atan(-e / Δ) and the along-track switching of waypoints.
+- J. Ackermann, "Der Entwurf linearer Regelungssysteme im Zustandsraum", Regelungstechnik 20, 1972 (as control textbooks
+  restate it): the state feedback that places a controllable single-input system's poles.
+- K. Nomoto, T. Taguchi, K. Honda and S. Hirano, "On the steering qualities of ships", International Shipbuilding Progress
+  4, 1957 (known through textbook restatements): why a first-order steering model cannot be fitted to a course-unstable
+  hull, so the gains are placed on the full sway-yaw linearisation instead.
+- J. Holtrop and G. G. J. Mennen, "An approximate power prediction method", International Shipbuilding Progress 29, 1982,
+  and J. Holtrop, "A statistical re-analysis of resistance and propulsion data", ISP 31, 1984 (already the record of
+  `holtropMennen`).
+
+The reference model easing into a new heading, the gain scheduling by a tenth of the speed, the integral's freeze while
+the rudder is hard over and the drift low-passed over 10 L / U are this package's own arrangement. Proof:
+`packages/physics/tests/ship.test.js` (the three autopilot and Holtrop tests).
+

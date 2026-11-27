@@ -143,6 +143,7 @@ class Flood implements EnginePlugin {
     constructor(options: FloodOptions);
     static attach(engine: Engine, options: FloodOptions): Flood;
     setup(engine: Engine): void;
+    coupleRigidDrag(options: FloodDragOptions): FloodDragSession;
     get time(): number;
     get dt(): number;
     get steps(): number;
@@ -182,6 +183,61 @@ class Flood implements EnginePlugin {
 }
 
 type FloodBoundary = 'wall' | 'open' | 'sea';
+
+interface FloodDragOptions {
+    readonly world: FloodDragWorld;
+    readonly physics: {
+        readonly fixedTimestep: number;
+        stepCount: number;
+    };
+    readonly body: {
+        readonly type: string;
+        readonly mass: number;
+        readonly enabledTranslations: readonly [boolean, boolean, boolean];
+        readonly worldCenterOfMass: readonly [number, number, number];
+        readonly linearVelocity: readonly [number, number, number];
+        applyImpulse(impulse: [number, number, number]): unknown;
+    };
+    readonly area: number;
+    readonly halfHeight: number;
+    readonly dragCoefficient?: number;
+    readonly density?: number;
+    readonly model?: 'horizontal-drag';
+}
+
+interface FloodDragReceipt {
+    readonly tick: number;
+    readonly waterImpulse: readonly [number, number];
+    readonly bodyImpulse: readonly [number, number];
+}
+
+interface FloodDragSession {
+    readonly tick: number;
+    step(options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<FloodDragReceipt>;
+    seek(tick: number, options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<void>;
+}
+
+interface FloodDragWorld {
+    readonly rate: {
+        readonly num: number;
+        readonly den: number;
+    };
+    readonly clock: {
+        readonly frame: number;
+        at(frame: number): unknown;
+    };
+    advance(frame: number): number;
+    hash(): string;
+    takeSnapshot(): {
+        readonly bytes: Uint8Array;
+        readonly hash: string;
+    };
+    restoreSnapshot(bytes: Uint8Array): unknown;
+}
 
 interface FloodMud {
     sediment?: MudSediment;

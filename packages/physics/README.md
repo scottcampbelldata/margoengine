@@ -4097,13 +4097,19 @@ Each ship is `{row, model}` and takes these settings:
 - `thrusterOutlet`: `{halfSpan, depth}` in metres from the centreline and below the design waterline. Requires a
   thruster and a depth at least half its diameter. Omit it to keep the tunnel out of the water field.
 - `block` and `addedMass`: `addedMass: false` leaves the surge, sway and yaw added mass to a HullSolver's strips (the ship still claims their damping).
+- `hull`: the hull's form for `holtropMennen` (`{length, beam, draughtFore, draughtAft, volume, lcb, midship, waterplane, ...}`). Given, the straight run's resistance at each speed is Holtrop and Mennen's, rising with the waves the hull makes, in place of the model's constant R'_0; `revolutionsFor` balances it.
+- `autopilot`: `{bandwidth, damping}`, the heading loop's natural frequency in units of U / L (default 1) and its damping ratio (default 0.8).
 
 The solver also takes `depth` (a number or a function of (x, z), for squat), `walls` (quays and banks, `{from, to}`) and `density`.
 
 Steer with `control(i)`:
 - `revolutions`, rev/s, negative astern; `revolutionsFor(i, speed)` gives the self-propulsion revolutions;
 - `rudder`, the order in radians, positive to starboard;
-- `thruster`, from -1 to 1.
+- `thruster`, from -1 to 1;
+- `heading`, radians on the ground plane from +X toward +Z (the way the ship turns to starboard), or null: the autopilot holds it;
+- `track`, `{waypoints: [[x, z], ...], lookahead, acceptance, loop}`, or null: the autopilot follows the waypoints by line of sight (Breivik and Fossen 2008), with a lookahead of 5 ship lengths and waypoints passed within 1 ship length along the track by default.
+
+The autopilot places the poles of the ship's own manoeuvring model, linearised in sway and yaw at its speed (`Manoeuvring.linearize`), with an integral of the heading error, so a course-unstable hull such as KVLCC2 holds its heading and a steady wind leaves no offset. It eases into a new heading through a second-order reference at its own frequency, places its gains again when the speed changes by a tenth, and on a track crabs into a steady drift low-passed over 10 L / U. `status(i)` then gives its `heading`, `headingOrdered` and `track` (`leg`, `course`, `crossTrack`, positive to starboard of the leg, and `done`).
 
 `status(i)` reads speed, drift, yaw rate, rudder angle, the forces, the squat, the thruster's push and the quay's pull.
 
@@ -4176,6 +4182,10 @@ ships.control(0).revolutions = ships.revolutionsFor(0, 1.18);
 ships.control(0).rudder = (35 * Math.PI) / 180;
 world.advance(60 * 20);
 console.log(body.position[2] > 3); // true: well round to starboard (+Z)
+// The autopilot brings her back to +X and holds it.
+ships.control(0).heading = 0;
+world.advance(60 * 260);
+console.log(Math.abs(ships.status(0).heading) < 0.01); // true
 ```
 
 ```ts

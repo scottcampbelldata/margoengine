@@ -18,7 +18,7 @@
 // State: each ship's rudder angle. Its controls (revolutions, rudder order, thruster) are inputs, set with `control()`.
 import type { FlowField, FlowSample, SeaSource, SeaSurface } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
-import { cos, exp } from '@margoengine/math/pinned';
+import { atan2, cos, exp } from '@margoengine/math/pinned';
 import type { SeaQuery } from '../seakeeping/wetted.js';
 import { regionWords } from '../world/memory.js';
 import {
@@ -33,7 +33,9 @@ import {
 } from '../world/solver.js';
 import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { type HeadingGains, headingGains, type ShipTrack, steerTrack, type TrackState, wrap } from './autopilot.js';
 import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mmg.js';
+import { type HoltropHull, holtropMennen } from './resistance.js';
 import { raceVelocity, thrusterThrust } from './propeller.js';
 import {
   cavityRadius,
@@ -49,6 +51,11 @@ import { squat } from './squat.js';
 
 type Vec3 = [number, number, number];
 const SHIP_LAYOUT = 1;
+/**
+ * f64 words of a ship's autopilot state: the integral, the track's leg, the reference heading and rate, a started flag and
+ * the drift angle low-passed.
+ */
+const PILOT_WORDS = 6;
 const THRUSTER_JET_WORDS = 8;
 /** A tunnel thruster's figure of merit: its thrust over the momentum bound (installed thrusters give about 0.45 to 0.65). */
 export const THRUSTER_MERIT = 0.55;
@@ -79,6 +86,16 @@ export interface Ship {
   readonly gas?: number;
   /** How fast the rudder turns, rad/s (default 2.32 degrees a second, the IMO's 35 to 30 degrees on the other side in 28 s). */
   readonly rudderRate?: number;
+  /**
+   * The hull's form for Holtrop and Mennen's resistance (`holtropMennen`): given, the straight run's resistance at each speed
+   * is theirs, rising with the waves the hull makes, in place of the model's constant R'_0.
+   */
+  readonly hull?: HoltropHull;
+  /**
+   * The autopilot's tuning: its closed loop's natural frequency in units of U / L (default 0.5) and damping ratio (default
+   * 0.8). Higher answers faster and works the rudder harder.
+   */
+  readonly autopilot?: { readonly bandwidth?: number; readonly damping?: number };
 }
 
 /** A quay or a bank, as a vertical wall along the segment from `from` to `to`, [x, z] m. */
@@ -105,11 +122,17 @@ export interface ShipParams {
   readonly level?: RateLevel;
 }
 
-/** A ship's controls: propeller revolutions, rev/s (negative astern), rudder order, rad (positive to starboard), thruster -1 to 1 (positive pushes the bow to starboard). */
+/**
+ * A ship's controls: propeller revolutions, rev/s (negative astern), rudder order, rad (positive to starboard), thruster -1 to
+ * 1 (positive pushes the bow to starboard). With a `heading` (rad on the ground plane, from +X toward +Z, the way the ship
+ * turns to starboard) or a `track`, the autopilot orders the rudder instead of `rudder`.
+ */
 export interface ShipControl {
   revolutions: number;
   rudder: number;
   thruster: number;
+  heading: number | null;
+  track: ShipTrack | null;
 }
 
 /** What a ship is doing, from the last step. */
@@ -137,9 +160,17 @@ export interface ShipStatus {
   race: ResolvedRace | undefined;
   /** The tip vortices' cavitation: whether a cavity stands, its radius, m, the tip's cavitation number and the inception index. */
   cavity: { cavitating: boolean; radius: number; sigma: number; inception: number };
+  /** Its heading on the ground plane, rad (from +X toward +Z), and the heading the autopilot holds (null when off). */
+  heading: number;
+  headingOrdered: number | null;
+  /** On a track: the leg it is on (from waypoint `leg`), its cross-track error, m (positive to starboard of the leg), and whether it passed the last waypoint. */
+  track: TrackState | null;
 }
 
 interface Runtime {
+  /** The autopilot's gains and the speed they were placed at. */
+  gains: HeadingGains | null;
+  gainSpeed: number;
   readonly cavity: VortexCavity;
   readonly ship: Ship;
   readonly mmg: Manoeuvring;
@@ -245,16 +276,37 @@ export class ShipSolver implements Solver<ShipParams> {
         );
       if (ship.rudderRate !== undefined && !(ship.rudderRate > 0 && Number.isFinite(ship.rudderRate)))
         throw new RangeError(`A rudder's rate is finite rad/s above 0 (got ${ship.rudderRate}); pass one.`);
-      const mmg = new Manoeuvring(
-        ship.model,
-        {},
-        { density, rudderRate: ship.rudderRate ?? (65 / 28) * (Math.PI / 180) },
-      );
+      const hull = ship.hull,
+        mmg = new Manoeuvring(
+          ship.model,
+          {},
+          {
+            density,
+            rudderRate: ship.rudderRate ?? (65 / 28) * (Math.PI / 180),
+            ...(hull
+              ? { resistance: (speed: number) => (speed > 0 ? holtropMennen(hull, speed, { density }).total : 0) }
+              : {}),
+          },
+        );
+      const pilot = ship.autopilot ?? {};
+      if (
+        !(
+          (pilot.bandwidth ?? 1) > 0 &&
+          Number.isFinite(pilot.bandwidth ?? 1) &&
+          (pilot.damping ?? 0.8) > 0 &&
+          Number.isFinite(pilot.damping ?? 0.8)
+        )
+      )
+        throw new RangeError(
+          `An autopilot's bandwidth (in U / L) and damping ratio are finite and above 0 (got ${pilot.bandwidth}, ${pilot.damping}); pass them, or leave them for 0.5 and 0.8.`,
+        );
       return {
+        gains: null,
+        gainSpeed: 0,
         cavity: new VortexCavity(ship.gas ?? 1),
         ship,
         mmg,
-        control: { revolutions: 0, rudder: 0, thruster: 0 },
+        control: { revolutions: 0, rudder: 0, thruster: 0, heading: null, track: null },
         status: {
           speed: 0,
           u: 0,
@@ -271,6 +323,9 @@ export class ShipSolver implements Solver<ShipParams> {
           starboard: [0, 0, 1],
           race: undefined,
           cavity: { cavitating: false, radius: 0, sigma: Number.POSITIVE_INFINITY, inception: 0 },
+          heading: 0,
+          headingOrdered: null,
+          track: null,
         },
       };
     });
@@ -281,6 +336,9 @@ export class ShipSolver implements Solver<ShipParams> {
       params.capacity,
     );
     this.rudders = host.allocate('rudders', ships.length * 8, 'f64', SHIP_LAYOUT);
+    // Per ship: the autopilot's integral of its heading error, rad s, the track's leg, and its reference heading and turn
+    // rate, with a flag that the reference has started.
+    this.pilots = host.allocate('pilots', ships.length * PILOT_WORDS * 8, 'f64', SHIP_LAYOUT);
     this.forces = host.allocate('forces', this.capacity * FORCE_WORDS * 8, 'f64', SHIP_LAYOUT);
     // What each ship's model owns of its hull, for a HullSolver on the same body.
     this.claims = host.allocate('claims', this.capacity * 8, 'f64', SHIP_LAYOUT);
@@ -289,6 +347,99 @@ export class ShipSolver implements Solver<ShipParams> {
       : undefined;
     const claims = regionWords(host.memory, this.claims) as Float64Array;
     for (const s of ships) claims[s.row] = CLAIM_DAMPING + (s.addedMass === false ? 0 : CLAIM_ADDED_MASS);
+  }
+
+  private pilots!: Region;
+
+  /**
+   * The autopilot's rudder order for ship `rt` (null when it holds no heading or track): the heading ordered (a track's
+   * course less the drift angle), then δ = -(k_v v + k_r r + k_e e + k_i ∫e) with gains placed on the ship's own model
+   * linearised at its speed, placed again when the speed moves by a tenth. The integral stops while the rudder is hard over.
+   */
+  private autopilot(
+    rt: Runtime,
+    index: number,
+    heading: number,
+    mid: Vec3,
+    u: number,
+    v: number,
+    r: number,
+    dt: number,
+  ): number | null {
+    const { control, status, ship, mmg } = rt,
+      words = regionWords(this.host.memory, this.pilots) as Float64Array,
+      L = ship.model.length;
+    status.heading = heading;
+    let wanted: number | null = null;
+    if (control.track) {
+      const track = control.track;
+      if (!Array.isArray(track.waypoints) || track.waypoints.length < 2)
+        throw new RangeError('A track is {waypoints: [[x, z], ...]} with two or more waypoints; pass them.');
+      const at = PILOT_WORDS * index,
+        state: TrackState = status.track ?? { leg: words[at + 1]!, course: 0, crossTrack: 0, done: false };
+      state.leg = words[at + 1]!;
+      steerTrack(track, mid[0], mid[2], L, state);
+      words[at + 1] = state.leg;
+      status.track = state;
+      // The heading ordered is the course less the drift angle, low-passed over 10 L / U so a steady crosswind or current
+      // is crabbed into without the turns' own sideslip feeding back into the steering.
+      const drift = atan2(v, Math.max(Math.abs(u), 1e-9)),
+        blend = Math.min(1, (dt * Math.max(Math.abs(u), 1e-9)) / (10 * L));
+      words[at + 5] = words[at + 5]! + blend * (drift - words[at + 5]!);
+      wanted = wrap(state.course - words[at + 5]!);
+    } else {
+      status.track = null;
+      if (control.heading !== null && control.heading !== undefined) {
+        if (!Number.isFinite(control.heading))
+          throw new RangeError(
+            `A heading is finite radians (got ${control.heading}); pass one, or null to steer by hand.`,
+          );
+        wanted = control.heading;
+      }
+    }
+    status.headingOrdered = wanted;
+    const at = PILOT_WORDS * index;
+    if (wanted === null) {
+      words[at] = 0;
+      words[at + 4] = 0;
+      return null;
+    }
+    const speed = Math.abs(u);
+    // Too slow to steer by the rudder: hold it amidships, the integral at rest and the reference on the ship.
+    if (speed < 0.02 * Math.sqrt(9.81 * L)) {
+      words[at] = 0;
+      words[at + 4] = 0;
+      return 0;
+    }
+    if (!rt.gains || Math.abs(speed - rt.gainSpeed) > 0.1 * rt.gainSpeed) {
+      const { a, b } = mmg.linearize(speed),
+        pilot = ship.autopilot ?? {};
+      rt.gains = headingGains(a, b, (pilot.bandwidth ?? 1) * (speed / L), pilot.damping ?? 0.8);
+      rt.gainSpeed = speed;
+    }
+    const k = rt.gains;
+    if (!k) return 0;
+    // The reference: the ordered heading reached through a critically damped second-order filter at the loop's own
+    // frequency (Fossen's reference model), so a large change is asked for at a pace the rudder can give; the controller
+    // follows the reference's heading and turn rate.
+    const pilot = ship.autopilot ?? {},
+      w = (pilot.bandwidth ?? 1) * (speed / L);
+    if (words[at + 4] !== 1) {
+      words[at + 2] = heading;
+      words[at + 3] = r;
+      words[at + 4] = 1;
+    }
+    const ref = words[at + 2]!,
+      rate = words[at + 3]!,
+      accel = w * w * wrap(wanted - ref) - 2 * w * rate;
+    words[at + 3] = rate + accel * dt;
+    words[at + 2] = wrap(ref + words[at + 3]! * dt);
+    const e = wrap(heading - words[at + 2]!),
+      integral = words[at]!,
+      raw = -(k.v * v + k.r * (r - words[at + 3]!) + k.heading * e + k.integral * integral),
+      limit = mmg.rudderLimit;
+    if (Math.abs(raw) < limit) words[at] = integral + e * dt;
+    return Math.max(-limit, Math.min(limit, raw));
   }
 
   /** Ship `index`'s controls, to read and set: `ships.control(0).revolutions = 2`. */
@@ -346,9 +497,11 @@ export class ShipSolver implements Solver<ShipParams> {
         r = -dot(spin, up),
         M = ship.model,
         L = M.length;
-      // The rudder turns toward its order.
+      // The rudder turns toward its order: the autopilot's when it holds a heading or a track.
       mmg.revolutions = control.revolutions;
-      const order = Math.max(-mmg.rudderLimit, Math.min(mmg.rudderLimit, control.rudder)),
+      const heading = atan2(f[2], f[0]),
+        ordered = this.autopilot(rt, index, heading, mid, u, v, r, dt),
+        order = Math.max(-mmg.rudderLimit, Math.min(mmg.rudderLimit, ordered ?? control.rudder)),
         turn = mmg.rudderRate * dt;
       rudders[index] = rudders[index]! + Math.max(-turn, Math.min(turn, order - rudders[index]!));
       const state = { x: 0, z: 0, heading: 0, u, v, r, rudder: rudders[index]! },
@@ -743,7 +896,7 @@ export class ShipSolver implements Solver<ShipParams> {
   }
 
   stateRegions(): readonly Region[] {
-    return this.thrusterJets ? [this.rudders, this.thrusterJets] : [this.rudders];
+    return this.thrusterJets ? [this.rudders, this.pilots, this.thrusterJets] : [this.rudders, this.pilots];
   }
 
   extraState(): readonly Region[] {

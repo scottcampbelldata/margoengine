@@ -95,6 +95,15 @@ interface FieldUse {
     readonly optional?: boolean;
 }
 
+interface FloodBodyDragBody {
+    readonly row: number;
+    readonly centre?: Vec3;
+    readonly halfHeight: number | Vec3;
+    readonly area: number | Vec3;
+    readonly projection?: Projection;
+    readonly dragCoefficient: number;
+}
+
 interface GeodeticSite {
     readonly latitude: number;
     readonly longitude: number;
@@ -108,6 +117,26 @@ interface Port {
     readonly cell: Cell;
 }
 
+interface ProjectedFloodDragCoupling {
+    readonly water: ShallowWaterSolver;
+    readonly request: Solver<Record<string, never>>;
+    readonly relay: Solver<Record<string, never>>;
+    readonly order: readonly [string, string, string, string];
+    readonly fields: {
+        readonly request: FieldDescriptor;
+        readonly receipt: FieldDescriptor;
+    };
+}
+
+interface ProjectedFloodDragOptions {
+    readonly id?: string;
+    readonly rigidId?: string;
+    readonly rate?: RateLevel;
+    readonly signal?: AbortSignal;
+}
+
+type Projection = 'box' | 'ellipsoid';
+
 type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 interface Region {
@@ -119,6 +148,30 @@ interface Region {
     readonly memory?: WebAssembly.Memory;
 }
 
+interface RigidCylinderCoupling {
+    readonly water: ShallowWaterSolver;
+    readonly predictor: Solver;
+    readonly reaction: Solver;
+    readonly order: readonly [string, string, string, string];
+}
+
+interface RigidCylinderOptions {
+    readonly id?: string;
+    readonly rigidId?: string;
+    readonly rate?: RateLevel;
+    readonly signal?: AbortSignal;
+}
+
+interface ShallowBlockageBody {
+    readonly bodyRow: number;
+    readonly centre: readonly [number, number];
+}
+
+interface ShallowBlockageFields {
+    readonly motion: FieldDescriptor;
+    readonly reaction: FieldDescriptor;
+}
+
 interface ShallowBuilding {
     readonly min: readonly [number, number];
     readonly max: readonly [number, number];
@@ -128,6 +181,14 @@ interface ShallowBuilding {
 interface ShallowInflow {
     readonly position: readonly [number, number];
     readonly discharge: number | ((time: number) => number);
+}
+
+interface ShallowMovingCylinder extends ShallowBlockageBody {
+    readonly radius: number;
+}
+
+interface ShallowMovingFootprint extends ShallowBlockageBody {
+    readonly footprint: ReadonlyArray<readonly [number, number]>;
 }
 
 interface ShallowRunoffInput {
@@ -174,8 +235,16 @@ interface ShallowWaterParams {
 
 class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     constructor(id?: string, runoff?: ShallowRunoffInput);
+    static withCylinder(cylinder: ShallowMovingCylinder, options?: {
+        readonly id?: string;
+        readonly signal?: AbortSignal;
+    }): Promise<ShallowWaterSolver>;
+    static withRigidCylinder(cylinder: ShallowMovingCylinder, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
+    static withRigidFootprint(footprint: ShallowMovingFootprint, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
+    static withProjectedBodyDrag(bodies: readonly FloodBodyDragBody[], options?: ProjectedFloodDragOptions): Promise<ProjectedFloodDragCoupling>;
     describe(): SolverDescription;
     init(host: SolverHost, params: ShallowWaterParams): void;
+    get blockageFields(): ShallowBlockageFields | undefined;
     get timeScale(): number;
     get waterDensity(): number;
     step(context: StepContext, dt: number): void;
@@ -237,6 +306,8 @@ interface StepContext {
     readonly inputs: ReadonlyMap<string, Port>;
     readonly cell: Cell;
 }
+
+type Vec3 = readonly [number, number, number];
 
 interface WaterSample {
     depth: number;

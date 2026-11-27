@@ -38,6 +38,13 @@ export interface EmpiricalRange {
     outside: string[];
 }
 
+export interface HeadingGains {
+    readonly v: number;
+    readonly r: number;
+    readonly heading: number;
+    readonly integral: number;
+}
+
 export interface HoltropHull {
     readonly length: number;
     readonly beam: number;
@@ -111,9 +118,14 @@ export class Manoeuvring {
     constructor(model: ManoeuvringModel, state?: Partial<ManoeuvringState>, options?: {
         readonly density?: number;
         readonly rudderRate?: number;
+        readonly resistance?: (speed: number) => number;
     });
     forces(s: ManoeuvringState, out?: ManoeuvringForces): ManoeuvringForces;
     step(dt: number): this;
+    linearize(speed: number): {
+        a: [number, number, number, number];
+        b: [number, number];
+    };
     selfPropulsion(speed: number): number;
 }
 
@@ -258,12 +270,19 @@ export interface Ship {
     readonly blades?: number;
     readonly gas?: number;
     readonly rudderRate?: number;
+    readonly hull?: HoltropHull;
+    readonly autopilot?: {
+        readonly bandwidth?: number;
+        readonly damping?: number;
+    };
 }
 
 export interface ShipControl {
     revolutions: number;
     rudder: number;
     thruster: number;
+    heading: number | null;
+    track: ShipTrack | null;
 }
 
 export interface ShipParams {
@@ -328,6 +347,16 @@ export interface ShipStatus {
         sigma: number;
         inception: number;
     };
+    heading: number;
+    headingOrdered: number | null;
+    track: TrackState | null;
+}
+
+export interface ShipTrack {
+    readonly waypoints: readonly (readonly [number, number])[];
+    readonly lookahead?: number;
+    readonly acceptance?: number;
+    readonly loop?: boolean;
 }
 
 export interface ShipWall {
@@ -362,6 +391,13 @@ export const TIP_VORTEX_GONE = 1.5;
 
 export const TIP_VORTEX_STABLE = 0.8;
 
+export interface TrackState {
+    leg: number;
+    course: number;
+    crossTrack: number;
+    done: boolean;
+}
+
 export const VAPOUR_PRESSURE = 1705;
 
 export class VortexCavity {
@@ -381,6 +417,8 @@ export function coreDeficit(circulation: number, core: number, density?: number)
 export function empiricalModel(hull: EmpiricalHull): ManoeuvringModel & {
     readonly range: EmpiricalRange;
 };
+
+export function headingGains(a: readonly [number, number, number, number], b: readonly [number, number], omega: number, zeta?: number): HeadingGains | null;
 
 export function holtropMennen(hull: HoltropHull, speed: number, options?: HoltropOptions): HoltropResistance;
 
@@ -404,7 +442,11 @@ export function scaleModel(model: ManoeuvringModel, factor: number): Manoeuvring
 
 export function squat(c: SquatCase): Squat;
 
+export function steerTrack(track: ShipTrack, x: number, z: number, length: number, state: TrackState): TrackState;
+
 export function thrusterThrust(power: number, diameter: number, density?: number): number;
+
+export const wrap: (angle: number) => number;
 
 // Not exported from this entry, but used by the exports above:
 
