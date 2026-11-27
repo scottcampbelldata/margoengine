@@ -19,7 +19,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Coming from Babylon.js](docs/from-babylon.md) ·
 [Coming from PlayCanvas](docs/from-playcanvas.md)
 
-The core and the stage together are 24,989 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 25,099 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Build something in 5 minutes
@@ -350,12 +350,12 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,989 B | 61,423 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 25,099 B | 61,731 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
 the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
-core + stage reaches 25,000 B gzip. It stops with `MEASURE_SIZE_STALE_DIST` when the core or stage dist was
+core + stage reaches 25,100 B gzip. It stops with `MEASURE_SIZE_STALE_DIST` when the core or stage dist was
 built from other sources than the ones checked out (after a rebase, say); run `npm run build:packages` first.
 
 `npm run bench` runs every benchmark suite (size, startup, rendering, loading, physics, memory and more;
@@ -572,7 +572,7 @@ AI agents write the code. Scott Campbell sets the rules in [AGENTS.md](AGENTS.md
 
 Every GPU check runs on our own machines, on real GPUs: NVIDIA RTX A6000, Intel Arc 140V, AMD Radeon 680M, and Apple silicon. Hosted runners have no GPU, so the workflows under `.github/workflows` are the CPU checks. The GPU checks run on those four machines.
 
-The [Size](#size) section states the measured core and stage gzip. The build fails at 25,000 bytes (`scripts/core-budget.js`, through `npm run build:packages` and `npm run measure:size`).
+The [Size](#size) section states the measured core and stage gzip. The build fails at 25,100 bytes (`scripts/core-budget.js`, through `npm run build:packages` and `npm run measure:size`).
 
 A bug fix comes with a regression test that fails without the fix. A commit whose subject starts with `fix` changes a test file, or names the existing test in the message. A public claim goes in the same change, with its proof, in [docs/whitepaper/claims.md](docs/whitepaper/claims.md). `npm run api:check` fails when the reports in `api/` do not match the exports. Open bugs are written up with a repro and the cause in [docs/known-bugs.md](docs/known-bugs.md).
 
@@ -1340,7 +1340,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,382 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,386 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -5649,7 +5649,7 @@ the missing-test-items audit. The fixture gate rejects the audited
 skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
 It does not establish any of the pending real-file, reference-render or hardware claims.
 
-Margo is a small WebGPU engine: core plus the stage facade is 24,989 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 22,369 B of its 22,370 B cap (2026-11-27: core bug fix KB-VIEW-SRGB-ERROR1, an `-srgb` view target without `viewFormats` reported as a coded error naming the fix, took core from 22,291 B to 22,369 B and core + stage from 24,910 B to 24,989 B; 2026-11-26: core bug fix KB-VIEW-SRGB1, a view's `-srgb` target drawn through a view in its non-srgb twin format so its colour is encoded once, took core from 22,262 B to 22,291 B and core + stage from 24,892 B to 24,910 B; 2026-11-26: core bug fix KB-CLEAR-CAPTURE1, a background clears a capture's linear target (a post effect's float capture) with the colour decoded from sRGB, took core from 22,225 B to 22,262 B and core + stage from 24,846 B to 24,892 B; 2026-11-26: Scott-approved core option `antialias` (GAP-FILM-MSAA), a fixed-size backbuffer with MSAA, took core from 22,202 B to 22,225 B and core + stage from 24,820 B to 24,846 B on the workstation; 2026-11-25: core plugin option `late` (KB-PHYS-FRAMEORDER1, 3edea7a71f) took core from 22,179 B to 22,202 B and core + stage from 24,797 B to 24,820 B on the workstation; macOS and Linux builds measured about 12 B more until the compaction fix b1584af9e (KB-SIZE-PLATFORM2), which makes every platform build the same files; 2026-11-19: core bug fix KB-GLTFA B1, a zero scale is accepted by the setters and the kernel and the vertex stage keeps a finite normal at a zero determinant, took core from 22,224 B to 22,179 B and core + stage from 24,841 B to 24,797 B; 2026-11-15: core bug fix KB-FX273, pick ids written one up over a clear of 0 so Firefox picks nothing off the mesh, took core from 22,226 B to 22,224 B and core + stage from 24,843 B to 24,841 B; 2026-11-15: core bug fix, core's colour vertex declares its clip position `@invariant` so the depth-equal replays of core meshes match its depth bit for bit, took core from 22,220 B to 22,226 B and core + stage from 24,837 B to 24,843 B; 2026-11-15: nine more private Engine members compacted in the build, then core bug fixes KB-STRESS-3 (stop or dispose inside pace leaves no frame waiting), KB-STRESS-2 (dispose inside onPreUpdate ends the frame without an error) and KB-STRESS-1 (dispose stops a device restore in flight), took core from 22,218 B to 22,220 B and core + stage from 24,847 B to 24,837 B; 2026-11-15: core bug fix B3, a device lost during startup or during a restore, before the engine watched it, is restored, and one lost while its own restore was ending is restored again, took core from 22,174 B to 22,218 B and core + stage from 24,798 B to 24,847 B; 2026-11-15: core bug fix B2, a pass or plugin that throws an InvalidStateError or OperationError on a healthy device is reported like any other error instead of being taken as a device loss, took core from 22,219 B to 22,174 B and core + stage from 24,839 B to 24,798 B; 2026-11-14: core bug fix, the frame delta stays one number object, so onFrame callbacks and render no longer allocate a number each frame, took core from 22,217 B to 22,219 B and left core + stage at 24,839 B; 2026-11-14: core bug fix KB3240b, core's direct diffuse is weighted by the dielectric Fresnel of the glTF metal/dielectric mix, so part-metal core meshes are no longer too dark, took core from 22,209 B to 22,217 B and core + stage from 24,830 B to 24,839 B; 2026-11-14: core bug fix KB-G2guard, the height-correlated G2 in core's direct light divides by max(den, 1e-30) so smooth surfaces keep their specular at grazing angles, took core from 22,204 B to 22,209 B and core + stage from 24,825 B to 24,830 B; 2026-11-14: core bug fix, setParent counts the height of the moved subtree against the 64-level limit and the frame graph runs the caller's own pass objects, took core from 22,154 B to 22,204 B and core + stage from 24,778 B to 24,825 B; 2026-11-14: core bug fix, stop() then start() inside a frame callback leaves one frame loop, a disposed scene is released by the batches drawn in it and the material setter refuses a value that is not a PbrMaterial, took core from 22,148 B to 22,154 B and core + stage from 24,772 B to 24,778 B; 2026-11-14: core bug fix, a pick answers its mesh while other meshes are created or removed and a pick asked for inside a frame or inside another pick waits its turn, took core from 22,110 B to 22,148 B and core + stage from 24,732 B to 24,772 B; 2026-11-14: core writes the WebGPU usage flags as their numbers, with no behaviour change, and took core from 22,225 B to 22,110 B and core + stage from 24,844 B to 24,732 B; 2026-11-14: Scott-approved core bug fix, an uncaptured validation error fails the next frame once instead of every later frame, left core at 22,225 B and took core + stage from 24,843 B to 24,844 B; 2026-11-11: Scott-approved stage option `createStage({ background })`, which sets `engine.scene.background` once at creation, took core + stage from 24,825 B to 24,843 B and left core at 22,225 B; 2026-11-11: Scott-approved bug-sweep fix KB6016c, core's GGX D denominator written |n x h|^2 + a2 nh^2 so float32 does not cancel it on smooth surfaces, took core from 22,207 B to 22,225 B and core + stage from 24,808 B to 24,825 B; 2026-11-11: Scott-approved bug-sweep fix KB5875a, height-correlated Smith in core's direct light, a shorter expression, took core from 22,211 B to 22,207 B and core + stage from 24,812 B to 24,808 B; 2026-11-11: Scott-approved bug-sweep fix KB6434a, an out-of-memory uncaptured error reports once and rebuilds the device instead of failing every later frame, took core from 22,145 B to 22,211 B and core + stage from 24,743 B to 24,812 B; 2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 25,099 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,100 bytes; core alone is 22,479 B of its 22,480 B cap (2026-11-27: core feature snapshot rendering, Scott's "Yes to all", took core from 22,369 B to 22,479 B and core + stage from 24,989 B to 25,099 B, the limit rising from 25,000 to 25,100 B; 2026-11-27: core bug fix KB-VIEW-SRGB-ERROR1, an `-srgb` view target without `viewFormats` reported as a coded error naming the fix, took core from 22,291 B to 22,369 B and core + stage from 24,910 B to 24,989 B; 2026-11-26: core bug fix KB-VIEW-SRGB1, a view's `-srgb` target drawn through a view in its non-srgb twin format so its colour is encoded once, took core from 22,262 B to 22,291 B and core + stage from 24,892 B to 24,910 B; 2026-11-26: core bug fix KB-CLEAR-CAPTURE1, a background clears a capture's linear target (a post effect's float capture) with the colour decoded from sRGB, took core from 22,225 B to 22,262 B and core + stage from 24,846 B to 24,892 B; 2026-11-26: Scott-approved core option `antialias` (GAP-FILM-MSAA), a fixed-size backbuffer with MSAA, took core from 22,202 B to 22,225 B and core + stage from 24,820 B to 24,846 B on the workstation; 2026-11-25: core plugin option `late` (KB-PHYS-FRAMEORDER1, 3edea7a71f) took core from 22,179 B to 22,202 B and core + stage from 24,797 B to 24,820 B on the workstation; macOS and Linux builds measured about 12 B more until the compaction fix b1584af9e (KB-SIZE-PLATFORM2), which makes every platform build the same files; 2026-11-19: core bug fix KB-GLTFA B1, a zero scale is accepted by the setters and the kernel and the vertex stage keeps a finite normal at a zero determinant, took core from 22,224 B to 22,179 B and core + stage from 24,841 B to 24,797 B; 2026-11-15: core bug fix KB-FX273, pick ids written one up over a clear of 0 so Firefox picks nothing off the mesh, took core from 22,226 B to 22,224 B and core + stage from 24,843 B to 24,841 B; 2026-11-15: core bug fix, core's colour vertex declares its clip position `@invariant` so the depth-equal replays of core meshes match its depth bit for bit, took core from 22,220 B to 22,226 B and core + stage from 24,837 B to 24,843 B; 2026-11-15: nine more private Engine members compacted in the build, then core bug fixes KB-STRESS-3 (stop or dispose inside pace leaves no frame waiting), KB-STRESS-2 (dispose inside onPreUpdate ends the frame without an error) and KB-STRESS-1 (dispose stops a device restore in flight), took core from 22,218 B to 22,220 B and core + stage from 24,847 B to 24,837 B; 2026-11-15: core bug fix B3, a device lost during startup or during a restore, before the engine watched it, is restored, and one lost while its own restore was ending is restored again, took core from 22,174 B to 22,218 B and core + stage from 24,798 B to 24,847 B; 2026-11-15: core bug fix B2, a pass or plugin that throws an InvalidStateError or OperationError on a healthy device is reported like any other error instead of being taken as a device loss, took core from 22,219 B to 22,174 B and core + stage from 24,839 B to 24,798 B; 2026-11-14: core bug fix, the frame delta stays one number object, so onFrame callbacks and render no longer allocate a number each frame, took core from 22,217 B to 22,219 B and left core + stage at 24,839 B; 2026-11-14: core bug fix KB3240b, core's direct diffuse is weighted by the dielectric Fresnel of the glTF metal/dielectric mix, so part-metal core meshes are no longer too dark, took core from 22,209 B to 22,217 B and core + stage from 24,830 B to 24,839 B; 2026-11-14: core bug fix KB-G2guard, the height-correlated G2 in core's direct light divides by max(den, 1e-30) so smooth surfaces keep their specular at grazing angles, took core from 22,204 B to 22,209 B and core + stage from 24,825 B to 24,830 B; 2026-11-14: core bug fix, setParent counts the height of the moved subtree against the 64-level limit and the frame graph runs the caller's own pass objects, took core from 22,154 B to 22,204 B and core + stage from 24,778 B to 24,825 B; 2026-11-14: core bug fix, stop() then start() inside a frame callback leaves one frame loop, a disposed scene is released by the batches drawn in it and the material setter refuses a value that is not a PbrMaterial, took core from 22,148 B to 22,154 B and core + stage from 24,772 B to 24,778 B; 2026-11-14: core bug fix, a pick answers its mesh while other meshes are created or removed and a pick asked for inside a frame or inside another pick waits its turn, took core from 22,110 B to 22,148 B and core + stage from 24,732 B to 24,772 B; 2026-11-14: core writes the WebGPU usage flags as their numbers, with no behaviour change, and took core from 22,225 B to 22,110 B and core + stage from 24,844 B to 24,732 B; 2026-11-14: Scott-approved core bug fix, an uncaptured validation error fails the next frame once instead of every later frame, left core at 22,225 B and took core + stage from 24,843 B to 24,844 B; 2026-11-11: Scott-approved stage option `createStage({ background })`, which sets `engine.scene.background` once at creation, took core + stage from 24,825 B to 24,843 B and left core at 22,225 B; 2026-11-11: Scott-approved bug-sweep fix KB6016c, core's GGX D denominator written |n x h|^2 + a2 nh^2 so float32 does not cancel it on smooth surfaces, took core from 22,207 B to 22,225 B and core + stage from 24,808 B to 24,825 B; 2026-11-11: Scott-approved bug-sweep fix KB5875a, height-correlated Smith in core's direct light, a shorter expression, took core from 22,211 B to 22,207 B and core + stage from 24,812 B to 24,808 B; 2026-11-11: Scott-approved bug-sweep fix KB6434a, an out-of-memory uncaptured error reports once and rebuilds the device instead of failing every later frame, took core from 22,145 B to 22,211 B and core + stage from 24,743 B to 24,812 B; 2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -6062,7 +6062,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Local exposure (`LocalExposure` in `@margoengine/tonemap/local`, 2026-11-08) | By method: the bilateral blur is separable (horizontal then vertical), an approximation of the 2D filter that can leave a faint halo along thin bright lines; quarter-resolution base (4 by 4 blocks), or 8 by 8, 16 by 16 and so on when three sigma would need more than 32 taps a side (2026-11-15; the blur always reaches three sigma), read bilinearly, so a strong edge in the base softens across one block; the whole source is filtered, not one view rect; three r32float textures (about 1.5 MB at 1920 by 1080 at the default radius); GPU time not measured (LIM-486). Entry `@margoengine/tonemap/local` 2,234 to 2,335 B gzip. | Separable passes keep the cost linear in the radius. | Very fine structures are not separated into their own regions. | Lower `edges` for sharper region borders. |
 | Sprite masks (`SpriteLayer` `mask` in `@margoengine/sprites`, 2026-11-08) | One rect or circle per layer, hard edged. | The test runs per pixel in the layer's fragment shader against one uniform, so a mask costs no extra pass or texture. | By method: a pixel is in or out by its centre, so edges step by whole pixels and do not antialias; a turned or scaled shape needs a rect or circle (no polygons or image masks). Every layer's uniform grew from 16 to 48 B for it. Proved on one GPU, an RTX A6000, pixel for pixel. Time not measured. | Draw into a `target` and composite it with your own mask pass for soft or image masks. |
 | Isometric, staggered and hexagonal maps (`@margoengine/tilemap/iso`, `/hex`, 2026-11-08) | The cells in view are written each frame, 48 B each; one draw per run of one tileset in paint order. Oblique maps, and infinite maps that are not orthogonal, are refused by the Tiled importer; `fromTMX` (TMX through `@margoengine/loaders`) reads orthogonal maps only, as the loader does not carry the orientation. | Drawing in paint order across the whole view is what lets tall tiles cover the cells behind them; a cached 64 x 64 chunk per draw, as `TileMap` uses, would draw a tall tile on a chunk's edge under its neighbour's cells. | By method: the CPU cost grows with the cells in view (not measured); a turned hexagonal tile's edge pixels fall where rounding puts them; a tile wider than its cell may overlap a cell drawn later in the same row. Proved on one GPU, an RTX A6000, pixel for pixel against images painted from the layout rules. Time not measured. | Orthogonal maps draw with `TileMap` and its chunk cache; split a huge view into several targets. |
-| Grid pathfinding (`@margoengine/tilemap/path`, 2026-11-08) | Up to `maxCells` (default 1,000,000) cells searched per call; arrays of the grid's size (about 21 B per cell) made per call. | A tile map is a grid, so a plain heap search over its cells needs no navigation mesh. | By method: one search per call on the calling thread (no incremental or hierarchical search, no jump point pruning); costs are per cell entered, not per edge; a staggered map's left and right cells in one row are two steps apart. Time not measured. | For big open worlds use `@margoengine/navmesh`; for many units to one goal reuse one `flowField`. |
+| Grid pathfinding (`@margoengine/tilemap/path`, 2026-11-08) | Up to `maxCells` (default 1,000,000) cells searched per call; arrays of the grid's size (about 21 B per cell) made per call. | A tile map is a grid, so a plain heap search over its cells needs no navigation mesh. | By method: one search per call on the calling thread (no incremental or hierarchical search; jump point pruning with `jumpPoints` on grids of one cost without corner cutting, plain A* elsewhere); costs are per cell entered, not per edge; a staggered map's left and right cells in one row are two steps apart. Time not measured. | For big open worlds use `@margoengine/navmesh`; for many units to one goal reuse one `flowField`. |
 | Field of view and fog of war (`@margoengine/tilemap/fov`, 2026-11-08) | One scan of up to `max(width, height)` rows per octant per viewer on the calling thread; a mask of `width * height` bytes per call (or the `into` mask), `FogOfWar` keeps two. | Shadowcasting visits only the cells that light can still reach, so a closed room costs its own cells. | By method: sight is from the viewer's cell centre and not symmetric; orthogonal and isometric grids only (staggered and hexagonal refused); no partial light or light levels; the fog image is one pixel per cell, drawn by the caller. Time not measured. | For light levels use `@margoengine/voxel/light-rgb` or a lighting pass; for hex fog test cells with `@margoengine/tilemap/hex` lines. |
 | Pixel-art scaling (`@margoengine/pixel/scale`, 2026-11-08) | One pass a canvas view (or one into `target`), 4 texel reads a pixel for `'sharp-bilinear'` and up to 20 for `'edge'`; the picture covers whole screen pixels. | Covering each screen pixel by its share of each texel keeps art pixels flat and even at any size. | By method: two texels a side are mixed, so below 1 times the picture is not averaged over all it covers; `'edge'` below 2 times draws as `'sharp-bilinear'`; colours mix as stored (sRGB values), not in linear light; texels past the edge repeat the edge. Time not measured. | Draw the art at the size you need below 1 times. |
 | CRT look (`@margoengine/pixel/crt`, 2026-11-08) | One pass a canvas view (or one into `target`), 9 texel reads a pixel. | Working from the art's own rows keeps one scanline per art pixel at any screen size. | By method: a stylised look, not a model of a real tube (no beam spread with brightness, no persistence, no interlace, no colour bleed); one grille pattern (three columns); the art row under each pixel is taken whole, not mixed with the next; colours as stored, not in linear light. Time not measured. | For a measured tube model use a dedicated post pass. |
@@ -6198,7 +6198,8 @@ in `packages/cad/test/cad-limits.test.js`).
 | Terrain and imagery (`@margoengine/tiles/terrain`, 2026-11-07) | Real quantized-mesh tiles proved (LIM-364); imagery only with a STAND-IN. By method: `EPSG:4326` `tms` layers only; availability from `layer.json` `available`, else every tile to `maxzoom` is assumed; one imagery tile per terrain tile; regions span -500 to 9,000 m; skirts at twice the tile's geometric error. | The layer is turned into a 3D Tiles implicit tileset, so the tileset's selection drives it; quantized-mesh tiles carry no availability of their own without the metadata extension. | A layer with `metadataAvailability` (Cesium World Terrain) requests tiles that may not exist; those fail and their parent stays drawn. Imagery near the poles is a level coarser. | Give the layer an `available` list; for sharper polar imagery use a geographic imagery layer. |
 | Terrain height and ray queries (`@margoengine/terrain/query`, 2026-11-07) | By method: the bilinear surface the vertex shader samples, on the CPU; the drawn clipmap is triangles at its cell spacing that morph between rings, so a drawn point can differ from the answer by that triangulation's error (not measured); normals are the shader's central differences, not a terrain's own `normalmap`; nothing outside the heightmap's rectangle; the grid is 2 to 16,384 samples a side; `TerrainQuery.read` reads once and needs `COPY_SRC` on the heightmap; memory is the heights plus two thirds of their count in floats (2.8 MB at 1,025 x 1,025); `triangles` builds up to 16,777,216 vertices a call (24 bytes each plus about 24 of indices, about 800 MB at the cap) and cuts holes by cell centre (LIM-426). | One exact surface that every ring approximates; a CPU tree answers a ray without a GPU round trip. | A foot can float or sink by the ring's triangulation error on coarse rings; edits to the GPU heightmap are not seen until you `refresh` your copy or read again. | Match `cellSize` to the texel spacing so the finest ring's vertices sit on texels; call `refresh` after each edit. |
 | Terrain layer materials (`@margoengine/terrain/layers-pbr`, 2026-11-07) | Enforced: `normal` 0 to 2, `occlusion` 0 to 1, `roughness` 0 to 2 (result 0.02 to 1), `heightBlend` 0 to 1; maps are `rgba8unorm` or `rgba16float` arrays with one layer per terrain layer. By method: dielectric only (B of the surface map is ignored); AO darkens the terrain's own ambient term, not image-based light another effect adds; height blending is one pass (each weight times 2^(8 heightBlend (height - 1))), not a two-pass depth cut-off; where no layer's rule applies the vertex normal and terrain roughness are used; SSR's capture keeps the terrain's normal and roughness; it must be attached before an effect that replaces the terrain shader; proved on one GPU, a Radeon 680M; cost not timed (LIM-430). | A lighting effect patch keeps the root terrain entry and its shader unchanged for everyone who does not import it. | Reflections on wet rock show no normal-map detail; IBL is not occluded. | Bake AO into the colour for IBL scenes; give layers that need sharp height cuts a high `heightBlend`. |
-| Terrain height streaming (`@margoengine/terrain/stream`, 2026-11-07) | Enforced: `tileTexels` 2 to 1,024, an even `window` of 2 to 16 tiles whose texels fit the device's 2D texture limit, `weights` 0 to 4 (4 layers each), `concurrency` 1 to 64; tiles are r32float heights and rgba8unorm weights. By method: the window follows the engine camera only and moves when the camera is more than 0.75 of a tile from its centre, so ground at least (window / 2 - 0.75) tiles away on each axis is in it and nothing past the window is drawn (no far ring of lower resolution); exposed tiles show `fill` until they load; a tile whose load rejects is retried up to `retries` times (0 to 16, default 2) after a jittered exponential wait (`retryDelay` 250 ms base, 30 s cap), then keeps `fill` until it leaves the window or `retry()` starts it over; a tile of the wrong shape is not retried; no normal map or tint texture; painted weights sit where any terrain's weights sit over its bounds (texel centres, up to half a texel from the height samples), so a window move shifts them by 1 / window of a texel; memory is three window-sized copies of 4 bytes a texel plus three per weight texture; proved on one GPU, a Radeon 680M; cost not timed (LIM-435). | Scrolling with GPU copies keeps the root terrain shader, which clamps rather than wraps, unchanged for everyone who does not stream. | A world bigger than the window shows only the window's ground; far mountains past it are not drawn. | Pick a window and tile size whose half-width covers the view distance, or draw far ground with `@margoengine/biomes/far` or a skybox. |
+| Terrain height streaming (`@margoengine/terrain/stream`, 2026-11-07) | Enforced: `tileTexels` 2 to 1,024, an even `window` of 2 to 16 tiles whose texels fit the device's 2D texture limit, `weights` 0 to 4 (4 layers each), `concurrency` 1 to 64; tiles are r32float heights and rgba8unorm weights. By method: the window follows the engine camera only and moves when the camera is more than 0.75 of a tile from its centre, so ground at least (window / 2 - 0.75) tiles away on each axis is in it and nothing past the window is drawn unless `far` adds the coarser ring (next row); exposed tiles show `fill` until they load; a tile whose load rejects is retried up to `retries` times (0 to 16, default 2) after a jittered exponential wait (`retryDelay` 250 ms base, 30 s cap), then keeps `fill` until it leaves the window or `retry()` starts it over; a tile of the wrong shape is not retried; a normal map and a tint stream with the heights when asked (`normals`, `tint`; unloaded normals face up, to 1/255); painted weights sit where any terrain's weights sit over its bounds (texel centres, up to half a texel from the height samples), so a window move shifts them by 1 / window of a texel; memory is three window-sized copies of 4 bytes a texel plus two per weight texture, normal map and tint and one shared RGBA8 scratch; proved on one GPU, a Radeon 680M; cost not timed (LIM-435). | Scrolling with GPU copies keeps the root terrain shader, which clamps rather than wraps, unchanged for everyone who does not stream. | Without a far ring a world bigger than the window shows only the window's ground. | Pass `far: terrainFar(...)` (`@margoengine/terrain/far`), pick a window and tile size whose half-width covers the view distance, or draw far ground with `@margoengine/biomes/far` or a skybox. |
+| Terrain far ring (`@margoengine/terrain/far`, 2026-11-27) | Enforced: `scale` 2 to 64, `tileTexels` 4 to 1,024 (both windows), an even `window` 2 to 16, `blend` above 0 and at most the near reach, `fade` 0 s or more; the far window must reach past the near one (RangeError); one stream per ring. By method: one coarser data level, drawn in a square of `reach` = (window / 2 - 0.75) far tiles less two far samples around the camera; near heights alone to (window / 2 - 0.75) near tiles less two samples less `blend`; a near tile missing, failed or null shows the far ground and fades in; a far tile not loaded yet shows `fill`, only at start and after a jump of the camera (at its usual speed far tiles change only past `reach`); a camera moving more than a near sample a frame can move the blend over a tile exposed the same frame by that excess over `blend`; `levels` defaults to reach the ring, 12 at most. `/deform`, `/displace` and `/relief-lighting` read the near window only (its edge values past it); `TerrainVirtualTexture` bakes the blend as it was until `invalidate`d; `TerrainQuery` sees the near window's heights alone (`far.heightAt` gives the drawn ones); checked on one GPU, an RTX A6000, WebGPU and the WebGL2 layer; cost not timed. | A blend in the height function, the transition region of a geometry clipmap, needs one mesh and so has no seam, and moves with the camera, so window moves are invisible. | One coarse level: a very long view needs a large `scale`, whose far ground is coarse close to the blend. | Choose `scale` and the far `window` for the view; widen `blend` or the near window where the two levels differ visibly. |
 | Terrain sculpt brushes (`@margoengine/terrain/sculpt`, 2026-11-07) | Enforced: an `r32float` heightmap and `rgba8unorm` weights created with usage 15 (storage, copy source and destination, sampled); `radius` and `amount` above 0, `strength` 0 to 1, `layer` within the terrain's layers, `undoLimit` 0 to 1,000 (default 32). By method: brushes work in the heightmap's texels (one dab is one compute pass over the brush's rectangle, at most one submit per dab and weight texture); paint moves weights at least one 8-bit step a dab; `heights` and `weights` follow the GPU only once a stroke's rectangle is read back (`flush()`), and `flatten`'s default height is read from them when the stroke begins; undo and redo wait for pending read backs and must be awaited before the next dab; an rgba16float or rgba8unorm heightmap is not sculptable; proved on one GPU, a Radeon 680M; cost not timed (LIM-437). | A copy of the brush rectangle is read and the terrain's texture written, so no texel is read while another invocation writes it, on any GPU. | A dab right after `undo()` without awaiting it can be overwritten by the undo. | `await sculpt.undo()` before the next dab; use an r32float heightmap for terrain that is edited. |
 | Terrain holes (`@margoengine/terrain/holes`, 2026-11-07) | Enforced: an `r8unorm` or `rgba8unorm` one-layer mask (R below 0.5 is a hole), 1 to 8,192 cells a side in `TerrainHoles`. By method: holes are whole mask cells, cut by cell centre, and their rims are vertical cuts through the surface (no cave walls or skirt: a mesh draws the opening's sides); the clipmap's vertices are not removed, so a hole costs what ground costs to draw; a `TerrainQuery` ray is exact with one mask cell per heightmap cell or coarser by a whole factor, and with a finer mask skips a cell hit inside a hole whole; proved on one GPU, a Radeon 680M; cost not timed (LIM-456). | A per-fragment mask test in every pass keeps shadows, reflections and occlusion in step with what is drawn, at one texel load a fragment. | A hole has no walls: through it, the ground beyond and below shows, but not the sides of the opening. | Model cave mouths and tunnel walls as meshes around the hole. |
 | Terrain runtime virtual texture (`@margoengine/terrain/rvt`, 2026-11-07) | Enforced: `texel` above 0, `size` 256, 512, 1,024, 2,048 or 4,096, 1 to 12 levels, `steep` 0 to 1, up to 4,096 decals, `rgba8unorm-srgb` or `rgba16float`; not with `TerrainMaterials`. By method: the cache holds colour only and is baked top down, so ground steeper than `steep` and ground past the coarsest level draw with the terrain's own shader; `bump` relief shows only there; edits to heights, weights, tint or streamed tiles show after `invalidate(area)`; a road is a decal a segment, so sharp bends leave a gap on their outer side; decal edges blend over about two pixels; proved on one GPU, a Radeon 680M; cost not timed (LIM-463). | Baking the layer blend once into a camera-centred cache makes a pixel of ground cost one or two samples whatever the number of layers and decals, and lets other materials match the ground they stand on. | The cache is colour only: normals, roughness and relief come from the terrain's own shader where it draws. | Keep `steep` below the slopes that stretch; call `invalidate(area)` after sculpting or painting; give roads more points at sharp bends. |
@@ -9348,6 +9349,18 @@ steps, accepts the header vertex and split counts the prebuilt accepts and reads
 KD stream ends the same way, so the level 6 and int64 refusals above are gone;
 the Wasm is 143,042 bytes. E48 and E49 (header flags and metadata child names,
 the same day) take it to 144,230 bytes (53,773 to 54,309 B gzip -9).
+
+Accepted difference (2026-11-27, E54): a sequential mesh whose indices reach
+the point count or past it decodes in the full prebuilt, which returns them.
+Margo answers `Invalid`: an index naming no point would make whoever draws or
+walks the mesh read past its vertex data. With E50 to E57 the Wasm went from
+144,230 to 144,308 bytes. Cost: such a damaged file loads in the
+prebuilt and not in `draco-native`. Regression:
+`packages/decoders/native/draco/tests/layouts.rs` (`E54 refused index past
+points`).
+
+With E58 and E59 (several KD decoders and repeated ids, 2026-11-27), which drop
+the id sort, the Wasm is 137,361 bytes (52,199 B gzip -9).
 
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes
@@ -15816,6 +15829,16 @@ A motor joint's six motors solve one axis at a time, each capped alone, and the 
   with a 3 semitone shift, 8.9 s with formants kept too). A Rust/Wasm version waits for the speed phase's paired runs.
   The event loop gets a turn, and the signal is checked, every 16 vocoder frames.
 
+## Snapshot rendering (2026-11-27)
+
+- `@margoengine/culling/snapshot` records only core's main draw; packages that draw their own batches draw as before,
+  and a draw with extra colour attachments never records (a render bundle must name every attachment format, and a
+  `GPUTextureView` does not expose its format).
+- With `indirect: false` every count change records again; with the default `indirect: true` every core draw of the
+  frame goes through drawIndexedIndirect, one 20-byte argument buffer per geometry.
+- Core + stage 24,989 to 25,099 B gzip (+110 B) for `DrawOptions.snapshot`; the limit is now 25,100 B
+  (`scripts/core-budget.js`).
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -16879,12 +16902,47 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   fails `penumbra`, the same noise on the plants fails `penumbraPlants` and not `penumbra`; and "T1 penumbra and
   penumbraPlants need PENUMBRA_MIN_PIXELS".
 
+### Fixed 2026-11-27: a wind field's turbulence swept past a point at kilometres a second half an hour in (KB-WEATHER-WINDDRIFT1, weather)
+
+- **Repro:** `new WindField({speed: 20, direction: 0.6, gust: 0.8, turbulence: 0.44})`, sampled at one point every
+  1/30 s from t = 1800 s: steps of up to 6.07 m/s a frame (9.1 during a machine's blend), against a few tenths at t = 0.
+  In the timber-valley rail-line shot, the scatter wind read from it swung strength 0.86 to 0.61 and turned 9 degrees in
+  40 ms, and every plant shook.
+- **Cause:** `sample` carried the noise by `directionAt(t) x speed x t`, the gusting direction times the whole elapsed
+  time, so a wobble of 0.06 rad/s moved the pattern 36,000 x 0.06 m a second. `WeatherMachine` also changed the mean
+  wind under a pattern placed by `speed x t`, so a blend made it jump.
+- **Fix:** the pattern is carried by the integral of the mean wind (Taylor 1938): `drift(t)`, `set(options, at)`
+  rebases it at the machine's time, and `resetTime` calls `resetDrift()`. Sources in docs/clean-room.md.
+- **Regression:** `packages/weather/tests/wind-drift.test.js`.
+
+### Fixed 2026-11-27: the timber-valley shot page ran the weather and the fire at twice the shot's speed (KB-SCENES-TVCLOCK1, scenes, weather, vfx)
+
+- **Repro:** the rail-line shot: the weather clock moved 0.00417 s per 0.00208 s sub-frame.
+- **Cause:** the page's `apply` called `scene.advanceTime` each sub-frame, while the engine, on the shot clock, also
+  stepped the WeatherDrive, the FireFront and the sky as plugins.
+- **Fix:** the page leaves them to the engine and throws when a clock moves other than once with the shot. The class is
+  caught in the packages: a WeatherDrive or FireFront run by an engine and stepped with `advanceTime` between two
+  frames in a row throws MargoError `'state'`. One burst (a fire's past rolled) and a seek after `resetTime` pass.
+- **Regression:** `packages/weather/tests/drive-double-step.test.js` and `packages/vfx/test/fire-front-double-step.test.js`
+  (both fail on the parent). On the old page, the page's own check fails the shot (`the weather clock moved 0.00417 s in
+  0.00313 s of shot time`).
+
 ### Open 2026-11-26: the rail-line shot still shimmers 5.7 to 9.2 percent after the plants' sway was bounded (KB-LOOK-TV-SHIMMER2, BIO-01)
 
 - **Repro:** rail-line shot `--once --seconds 1.1` after KB-LOOK-TV-SHIMMER1 (1d1729c194): shimmerMoving 5.71 percent
   early and 7.25 mid at blowup, 6.22 and 9.18 calm (bound 0.5), down from 16.8 to 19.1. Measurement only.
 - **Owner:** plant motion and wind sway belong to BIO-01 (scatter, physics/vegetation); no plant-motion change was made
   here. Candidates named by the SHIMMER1 work: impostor switches and the fire front.
+- **Found 2026-11-27 (lane A), fixed:** the wind every plant read jumped from frame to frame (KB-WEATHER-WINDDRIFT1 and
+  KB-SCENES-TVCLOCK1 below). Grass and trees no longer jitter: over the shot's first 8 frames the change between
+  neighbours grows smoothly with the camera (2.0 to 12.9 percent of the grass band), where with the camera held still
+  it swung between 0.3 and 4 percent. shimmerMoving after both fixes: 5.09 early and 8.48 mid (was 5.98 and 7.63).
+- **Still open, measured at mid:** about half the off pixels are tree and grass edges where a nearer plant covers or
+  uncovers what is behind it in the next frame (occluded 3.4 and depth edge 3.4 percent of the frame), which a
+  camera-only warp cannot match. Inside the plants 2.4 percent and inside the sky 1.0 percent change on their own (sway
+  and smoke). The impostors switch hard (`lodFade: 0` in biomes objects.ts), but no switch was seen in these frames.
+  Next: decide with the manager whether T4 should warp by each pixel's real motion (a velocity mask for the scattered
+  plants) and leave out pixels hidden in the next frame, as optical-flow benchmarks do. The bound stays 0.5.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 
@@ -21299,6 +21357,14 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Fix:** no core change and no change to a locked export: `PBRModel.root` and `nodes` in `@margoengine/gltf` are typed
   `Mesh & FacadeMesh` (the internal class and the public interface), so `setParent` accepts either. `examples/kitty-hawk`
   lost its cast. Regression: tests/public-engine-types.test.js (KB-GLTF-MESHTYPE1).
+
+### Open 2026-11-27: the dune coast's grass blades show black fragments (KB-SCENES-GRASSBLACK1, owner not yet found)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>`: in
+  `landing-rail-view.png` and `camp-buildings.png` (RTX A6000, WebGPU) near and middle tufts carry black dashes and
+  dots along the blades and at their edges.
+- **Cause:** not diagnosed; the same frame shows them on main before KB-SCENES-SHEDBOX1. Candidates: the grass shading
+  of thin blades, GTAO on them (`occlusion: 0` would tell) or their shadows.
 
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 
@@ -32751,6 +32817,39 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/metadata-header.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder differed on damaged streams (batch 133, E50 to E57)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  accepted meshes the prebuilt rejects (too many start faces, a start face over
+  a split's broken fan, more than three points per face, an empty attributes
+  decoder); returned other point counts on one degenerate split mesh; and
+  refused streams the prebuilt decodes (unused or extra split events, short
+  symbol or start-face blobs, raw connectivity bytes other than 1, clouds with
+  no attributes decoder).
+- **Cause:** `native/draco/src/edgebreaker.rs` bounded faces at twice the
+  symbols, left a merged vertex a representative, compacted merged vertices
+  without walking their fans, required every event and split target to be used
+  and stopped bit reads at the blob; `sequential.rs` and `kd.rs` had other
+  count and byte rules.
+- **Fix:** the observed rules
+  ([E50 to E57](clean-room.md#batch-133-e50-to-e57-damaged-streams-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/damaged.bin`.
+
+### Fixed 2026-11-27: optional Draco decoder refused several KD decoders and repeated ids (batch 133, E58 and E59)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Unsupported` for a version 2.3 KD cloud with two or more attributes
+  decoders, and `Invalid` for a version 2 stream in which two attributes share a
+  unique id (the glTF prebuilt accepts that too).
+- **Cause:** `native/draco/src/kd.rs` read one decoder only and refused a
+  repeated id; `sequential.rs` refused repeated ids from version 2.0, a rule no
+  probe had established.
+- **Fix:** the observed layout and rule
+  ([E58 and E59](clean-room.md#batch-133-e58-and-e59-several-kd-decoders-and-repeated-ids-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/kd-decoders.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -32789,31 +32888,23 @@ E26 to E40):
 - Not probed: position-reading predictors on attribute decoders with seams that
   split vertices, and constrained multi-parallelogram before 2.2 beyond the
   retained cases.
-- Damaged streams from the E48/E49 probe: a few version 1.0 and 2.2 inputs where
-  Margo accepts or refuses unlike the prebuilt, among them a mesh and a KD cloud
-  with no attributes that the prebuilt decodes and Margo refuses.
+- Point clouds of version 1.3: Margo answers `Unsupported`. The prebuilt reads
+  some 1.x clouds relabelled 1.3, but admitting them to Margo's 1.x layout gave
+  other output, so the layout is not established. Repro: any `E56 no decoder`
+  cloud with minor version 3, for example hex
+  `445241434f0103000000000000000000`.
+- Damaged KD clouds (found 2026-11-27 by changing single bytes of retained
+  one-decoder streams): some that the prebuilt decodes Margo refuses, and some
+  decode to other values. A refusal repro, a level 3 stream whose number
+  probability byte is 0:
+  `445241434f020300010000ae000000010100020100000307000000ae0000000006244e363c820614000000d3591f17174c1a89e9023259a4007f8a6ec439b3040000000000000008000000a46a6b1e34593001`.
+  Valid streams are not known to differ. Cause: not yet established.
+- A version 2.2 standard EdgeBreaker mesh of `tests/fixtures/multi.bin` with the
+  header faces lowered from 12 to 11, symbols from 11 to 10 and splits 0: the
+  prebuilt decodes 12 points, Margo answers `Invalid` (as before E50).
 
-- Damaged EdgeBreaker headers (E44's 60,000 header mutations): with the face
-  and symbol counts raised above what a predictive stream holds, the prebuilt
-  decodes where Margo answers `Truncated`; and Margo decodes one version 2.0
-  stream cut to one symbol and two faces that the prebuilt rejects (it did
-  before E43 too). Repros (hex):
-
-  ```text
-  445241434f02020101000000040500050000011f8002805001ff000003000503000d01090300
-  1d040901002f010300fe00040000000000000000000000000000000000000000000000000000
-  0000000000000000000000000000000000000000000006030001000d1a081503101d7f000000
-  3f000000800380f480000016c2000011c200000cc2000007c207
-  ```
-
-  ```text
-  445241434f020001010000000005020101001c0200000000000000df000100000000000000
-  018004000000009b5f88000000
-  ```
-
-Except for the second damaged-header repro and the damaged E48/E49 inputs, every
-difference measured and left open is a refusal by Margo; no probe in these
-classes found it returning different bytes.
+Except for these refusals, predictor 6 mode 0 and the deliberate index refusal
+in [limits.md](limits.md), no difference found by these probes is open.
 
 ### Historical: batch 133 optional landing GPU request (resume 9)
 
@@ -35734,7 +35825,7 @@ This package is built from source alongside the engine. See the [package catalog
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
-The build requires the combined core and stage facade, with every base export retained, to stay strictly below 25,000 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
+The build requires the combined core and stage facade, with every base export retained, to stay strictly below 25,100 bytes gzip. It writes measurements to `test-results/modern-bundle-sizes.json`; `npm run measure:size` repeats the gate against the built artifacts. Lazy features and application bootstrap/chunk overhead are measured separately; this is not the complete page download size.
 
 Give the container a height, for example `<div id="scene" style="height:400px"></div>`:
 
@@ -35954,7 +36045,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,989 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 25,099 B gzip.
 
 Use either name; they are interchangeable. Each package also has its own name (`@margoengine/shadows`) for
 apps that want a smaller install.
@@ -37705,10 +37796,6 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 - `using` and `dispose()` end it; use afterwards throws `MargoError` `'disposed'`.
 
 ## Wind
-
-`machine.wind` is a `WindField`, kept in step with the state; make your own with `new WindField({speed, direction, gust, turbulence, gustPeriod, scale, seed})`. `sample(x, y, z, t)` returns a velocity: the mean wind scaled by a gust factor (between `1 - gust` and `1 + gust`), a direction that wobbles up to `0.5 * gust` radians, and turbulence that differs from place to place and blows downwind with the mean. It is a pure function of its arguments, so the same call gives the same vector, and its length never exceeds `speed * (1 + gust + turbulence)`. Use it for rain slant, sway of trees and cloth, or a sound's wind layer.
-
-## Wet and snowy surfaces
 
 [README continues: https://margoengine.com/llms/packages/weather.md]
 
