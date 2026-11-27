@@ -394,6 +394,44 @@ against 15.6 and 2.7 ms as core meshes; 18.8 and 2.8 ms at 250,000 against 45.7 
 above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-bugs.md), "DynamicInstances: about
 15-35% more GPU time".
 
+## Static scenes, recorded once: `SnapshotRendering`
+
+`SnapshotRendering` from `margoengine/culling/snapshot` records the main pass's core draws once into a WebGPU render
+bundle and replays it every frame after that, so the CPU no longer encodes a pipeline, buffer and draw call per batch;
+only changed instance rows are uploaded, as always. Babylon.js calls this snapshot rendering.
+
+```ts
+import { Engine, box, PbrMaterial } from 'margoengine/core';
+import { SnapshotRendering } from 'margoengine/culling/snapshot';
+
+const engine = await Engine.create(document.querySelector('canvas') as HTMLCanvasElement);
+const cube = box(), stone = new PbrMaterial({ color: '#8a8070' });
+for (let i = 0; i < 1000; i++)
+  engine.createMesh().setGeometry(cube).setMaterial(stone).setPosition([(i % 40) * 2, 0, Math.floor(i / 40) * 2]);
+const snapshots = SnapshotRendering.attach(engine);
+engine.render(); // records the bundle
+engine.render(); // replays it
+console.log(snapshots.stats); // { frames: 2, recorded: 1 }
+```
+
+- What keeps the recording: moving, rotating, scaling, recolouring or re-materialling a mesh, and (with the default
+  `indirect: true`) showing or hiding meshes in a batch that keeps drawing, since core then writes the count into its
+  indirect arguments.
+- What records again, seen before every main draw: a batch that starts or stops drawing (a new geometry, the last mesh
+  of a geometry hidden), a geometry whose buffers are rebuilt, a mirrored or double-sided mesh arriving in a batch, a
+  package claiming or redirecting a batch, `indirect: false` and a count change, and, checked by core, a new pipeline or
+  bind group (a package's shader variant or bindings). `reset()` records every view again.
+- Each view keeps its own recording, keyed by `RenderView.id`. `enabled = false` draws as if it were not attached.
+- `stats`: `frames` main draws handed a snapshot, `recorded` of them that recorded. Read it after a frame.
+- Only core's main draw is recorded; packages that draw their own batches (claimed batches, materials meshes) draw as
+  before. A draw with extra colour attachments never records.
+- The same pictures: the GPU check draws every step with snapshots on and off and compares them pixel for pixel, on
+  WebGPU and on the WebGL2 compatibility layer, which replays its recorded command list
+  (`node packages/culling/test/gpu/snapshot-check.mjs`, with `MARGO_COMPAT=1` for the layer).
+- Core's side is `DrawOptions.snapshot` (and `PassContext.snapshot` for the next draw): core records and replays a
+  `Snapshot` record you clear to record again. Spec: WebGPU, "Bundles" (GPURenderBundleEncoder, `executeBundles`,
+  which keeps the pass's viewport and scissor and resets its other state).
+
 ## Occlusion queries for app objects: `OcclusionQueries`
 
 `@margoengine/culling/occlusion` asks the GPU whether boxes or core meshes are hidden behind what the frame drew, with

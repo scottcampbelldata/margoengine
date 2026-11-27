@@ -23,12 +23,27 @@ export interface DrawOptions {
   scissor?: readonly [number, number, number, number];
   /** Stencil clear value when the depth format has stencil; setting it clears stencil even with `clear: false`. Default 0. */
   stencilClear?: number;
+  /**
+   * Record this draw's batches into a WebGPU render bundle the first time and replay it after that (WebGPU
+   * "Bundles", GPURenderBundleEncoder and executeBundles): the CPU no longer encodes each batch, only their changed
+   * rows are uploaded. Core records again when the draw's pipeline or bind group differs from the recording; any other
+   * change to what is drawn (batches, their counts, buffers, `mask` or `redirect`) is the caller's to see, by clearing
+   * `bundle`. Ignored with `colorAttachments`. Default the context's `snapshot`. `@margoengine/culling/snapshot` does this
+   * for the main pass.
+   */
+  snapshot?: Snapshot;
   /** Draw with drawIndexedIndirect. Default the context's `indirect`. */
   indirect?: boolean;
   /** Extra color attachments after the main color target. */
   colorAttachments?: GPURenderPassColorAttachment[];
   /** Marks a draw that writes per-mesh ids (factors.w) into an extra attachment. Core ignores it; a package drawing claimed batches' meshes from its own buffers draws them one mesh at a time so each writes its own id. Default false. */
   partIds?: boolean;
+}
+/** A recorded core draw ({@link DrawOptions.snapshot}): core sets every field; clear `bundle` to record again. */
+export interface Snapshot {
+  bundle?: GPURenderBundle;
+  /** The draw's bind group 0, which names its pipeline too. */
+  group?: GPUBindGroup;
 }
 /**
  * What a {@link FramePass} receives each frame: `delta` in seconds, the drawing-buffer `width`/`height` in pixels,
@@ -78,6 +93,8 @@ export type PassContext = {
       shader: string;
       bindings: GPUBindGroupEntry[];
       indirect: boolean;
+      /** The next core draw's {@link DrawOptions.snapshot}; that draw clears it, so a pass sets it for one draw. */
+      snapshot?: Snapshot;
       descriptor: GPURenderPipelineDescriptor;
       /**
        * For a {@link FramePass} that `joins`: call it just before each `beginRenderPass` on `color` and `depth`, on

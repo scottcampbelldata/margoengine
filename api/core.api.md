@@ -223,6 +223,7 @@ interface DrawOptions {
     viewport?: readonly [number, number, number, number];
     scissor?: readonly [number, number, number, number];
     stencilClear?: number;
+    snapshot?: Snapshot;
     indirect?: boolean;
     colorAttachments?: GPURenderPassColorAttachment[];
     partIds?: boolean;
@@ -294,6 +295,7 @@ type PassContext = {
     shader: string;
     bindings: GPUBindGroupEntry[];
     indirect: boolean;
+    snapshot?: Snapshot;
     descriptor: GPURenderPipelineDescriptor;
     attach?(color: GPURenderPassColorAttachment, depth: GPURenderPassDepthStencilAttachment, last: boolean): void;
     settle?(): void;
@@ -318,6 +320,11 @@ interface Renderer {
     geometryBuffers?(geometry: Geometry): GeometryBuffers;
     render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number, view?: ViewDraw): void;
     dispose(unconfigure?: boolean): void;
+}
+
+interface Snapshot {
+    bundle?: GPURenderBundle;
+    group?: GPUBindGroup;
 }
 
 interface ViewDraw {

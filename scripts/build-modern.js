@@ -382,7 +382,10 @@ async function sizeRecords() {
   // 2026-11-27, core bug fix KB-VIEW-SRGB-ERROR1 under the same rulings: an -srgb view target without viewFormats is
   // reported as a coded error naming the fix (a validation error scope around its twin view), not a raw validation
   // error: core 22,291 -> 22,369 B (+78 B). Strict ceiling one byte above it.
-  const CORE_ONLY_CEILING = 22_370;
+  // 2026-11-27, core feature snapshot rendering under Scott's "Yes to all" (2026-11-27): DrawOptions.snapshot records
+  // core's batch loop into a render bundle and replays it: core 22,369 -> 22,479 B (+110 B). Strict ceiling one byte
+  // above it.
+  const CORE_ONLY_CEILING = 22_480;
   assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
   assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
   const { modules, ...baseSize } = await measureCoreStage();

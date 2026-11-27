@@ -1059,6 +1059,10 @@
       "types": "./dist/culling/occlusion.d.ts",
       "import": "./dist/culling/occlusion.js"
     },
+    "./culling/snapshot": {
+      "types": "./dist/culling/snapshot.d.ts",
+      "import": "./dist/culling/snapshot.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

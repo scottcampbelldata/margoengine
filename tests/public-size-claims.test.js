@@ -6,6 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { documents } from '../scripts/docs-links.mjs';
 import { measureCore, measureCoreStage } from '../scripts/measure-size.js';
+import { CORE_STAGE_GZIP_LIMIT } from '../scripts/core-budget.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const ceiling = /const CORE_ONLY_CEILING = ([\d_]+);/.exec(read('scripts/build-modern.js'));
@@ -59,7 +60,7 @@ const digits = (value) => Number(value.replace(',', ''));
 test('every core + stage size in the public docs equals what measure:size prints', async () => {
   const { raw, gzip } = await measureCoreStage();
   const core = await measureCore();
-  const allowed = new Set([raw, gzip, 25_000, core.raw, core.gzip, CORE_ONLY_CEILING]);
+  const allowed = new Set([raw, gzip, CORE_STAGE_GZIP_LIMIT, core.raw, core.gzip, CORE_ONLY_CEILING]);
 
   const files = ['README.md', 'docs/README.md', 'docs/start-here.md', 'docs/api-overview.md', 'site/index.html'];
   // Bug (2026-11-12): the engine whitepaper page said 21,974 B in six places while the build measured 24,848 B.
@@ -154,7 +155,7 @@ test('the size scan reads prose, tables and tag soup, and ignores unrelated numb
 test('a reader page that calls a core size current states the measured figure', async () => {
   const { raw, gzip } = await measureCoreStage();
   const core = await measureCore();
-  const allowed = new Set([raw, gzip, 25_000, core.raw, core.gzip, CORE_ONLY_CEILING]);
+  const allowed = new Set([raw, gzip, CORE_STAGE_GZIP_LIMIT, core.raw, core.gzip, CORE_ONLY_CEILING]);
   const current = /\b(?:the current (?:consolidated )?build measures|currently measures)\b/i;
   const stale = [];
   for (const file of [...documents(), 'benchmarks/README.md']) {

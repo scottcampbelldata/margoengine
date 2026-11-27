@@ -1,3 +1,15 @@
+### Section 5 evidence: snapshot rendering, WebGPU and the WebGL2 layer (2026-11-27)
+
+Core's `DrawOptions.snapshot` encodes the main draw's batch loop into a `GPURenderBundleEncoder` (WebGPU, "Bundles")
+and replays it with `executeBundles` while the draw's bind group, which names its pipeline, is the recorded one; the
+replay still walks the batches to upload changed rows and write indirect counts. `@margoengine/culling/snapshot`
+keeps one recording per view and compares, before each main draw, what a recording bakes in (batch, its three
+buffers, index count, back-cull choice, redirect buffers, count unless indirect). Evidence:
+`packages/culling/test/gpu/snapshot-check.mjs` draws 16 steps (moves, recolours, hides, a new geometry, a batch that
+stops drawing, a reset, a shader variant and its removal, direct counts) with snapshots on and off: identical pixels,
+recordings only where expected, and no core draw encoded into the pass on a replayed frame, on WebGPU (RTX A6000,
+Edge) and on the WebGL2 layer. Missing: a CPU-time measurement of the encode saved (speed phase deferred).
+
 ### Section 5 evidence: finite flood geometry at inland boundaries (2026-11-27)
 
 The Water shader uses Flood's sea-edge mask when blending the solved field into the ocean. A lake behind a wall or

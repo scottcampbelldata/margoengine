@@ -69,6 +69,10 @@
     "./occlusion": {
       "types": "./dist/occlusion.d.ts",
       "import": "./dist/occlusion.js"
+    },
+    "./snapshot": {
+      "types": "./dist/snapshot.d.ts",
+      "import": "./dist/snapshot.js"
     }
   },
   "files": [
@@ -89,8 +93,8 @@
     "build": "node ../../scripts/build-optional.js culling",
     "test": "npm run build && node --test tests/*.test.js test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs && node packages/culling/test/gpu/parts-check.mjs && node packages/culling/test/gpu/last-pass-check.mjs && node packages/culling/test/gpu/meshes-occlusion-check.mjs && node packages/culling/test/gpu/models-cull-check.mjs && node packages/culling/test/gpu/models-plain-check.mjs && node packages/culling/test/gpu/occluders-check.mjs && node packages/culling/test/gpu/bounds-check.mjs && node packages/culling/test/gpu/shadows-cull-check.mjs && node packages/culling/test/gpu/lod-check.mjs && node packages/culling/test/gpu/meshlets-check.mjs && node packages/culling/test/gpu/meshes-scale-check.mjs && node packages/culling/test/gpu/pick-clear-check.mjs && node packages/culling/test/gpu/occlusion-queries-check.mjs",
-    "test:gpu:webgl2": "cd ../.. && node packages/culling/test/gpu/webgl2-check.mjs && node packages/culling/test/gpu/occlusion-queries-check.mjs --compat",
+    "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs && node packages/culling/test/gpu/parts-check.mjs && node packages/culling/test/gpu/last-pass-check.mjs && node packages/culling/test/gpu/meshes-occlusion-check.mjs && node packages/culling/test/gpu/models-cull-check.mjs && node packages/culling/test/gpu/models-plain-check.mjs && node packages/culling/test/gpu/occluders-check.mjs && node packages/culling/test/gpu/bounds-check.mjs && node packages/culling/test/gpu/shadows-cull-check.mjs && node packages/culling/test/gpu/lod-check.mjs && node packages/culling/test/gpu/meshlets-check.mjs && node packages/culling/test/gpu/meshes-scale-check.mjs && node packages/culling/test/gpu/pick-clear-check.mjs && node packages/culling/test/gpu/occlusion-queries-check.mjs && node packages/culling/test/gpu/snapshot-check.mjs",
+    "test:gpu:webgl2": "cd ../.. && node packages/culling/test/gpu/webgl2-check.mjs && node packages/culling/test/gpu/occlusion-queries-check.mjs --compat && node packages/culling/test/gpu/snapshot-check.mjs --compat",
     "test:gpu:bounds": "cd ../.. && node packages/culling/test/gpu/bounds-extended-check.mjs",
     "test:gpu:sort": "cd ../.. && node packages/culling/test/gpu/sort-check.mjs && node packages/culling/test/gpu/sort-scale-check.mjs"
   }

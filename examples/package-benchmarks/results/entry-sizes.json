@@ -3,9 +3,9 @@
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 61423,
-    "gzip": 24989,
-    "limit": 25000
+    "raw": 61731,
+    "gzip": 25099,
+    "limit": 25100
   },
   "packages": {
     "@margoengine/animation": {
@@ -974,8 +974,8 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53559,
-        "gzip": 22369
+        "raw": 53868,
+        "gzip": 22479
       },
       "./extension": {
         "raw": 53511,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21046877,
+  "total": 21048504,
   "history": [
     {
       "date": "2026-10-24",
@@ -14791,6 +14791,12 @@
       "commit": "tilemap-path-jump-points",
       "reason": "tilemap/path gains jump point search (findPath jumpPoints, Harabor and Grastien 2011 and 2014, no corner cutting) and the searched and scanned work counts: about 2,586 -> 3,273 B gzip, ceiling 2,842 -> 3,529. It reuses the entry's heap, grid checks and octile estimate; a separate entry would carry its own copy of them for about 700 B more. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "473b839d15",
+      "reason": "core feature snapshot rendering (Scott 2026-11-27, Yes to all): new entry @margoengine/culling/snapshot (SnapshotRendering, the per-view recording key that tells core when to record again); core + stage 24,989 -> 25,099 B gzip. Also records the timber-valley -> vfx/fire-front static load (the shot page's fire front, KB-SCENES-TVCLOCK1), which the earlier landing left unrecorded. vfx/fire-front 10,176 -> 10,494 B budget: the double-step guard of KB-SCENES-TVCLOCK1 (a670538b44), unrecorded there",
+      "grew": 3
     }
   ],
   "items": {
@@ -15055,6 +15061,7 @@
     "@margoengine/culling/occlusion": 4090,
     "@margoengine/culling/parts": 14017,
     "@margoengine/culling/shadows": 21314,
+    "@margoengine/culling/snapshot": 1310,
     "@margoengine/culling/sort": 14158,
     "@margoengine/culling/webgl2": 3284,
     "@margoengine/cutscene": 7115,
@@ -16322,8 +16329,8 @@
     "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/events": 2601,
     "@margoengine/vfx/fields": 2079,
-    "@margoengine/vfx/fire": 2548,
-    "@margoengine/vfx/fire-front": 10176,
+    "@margoengine/vfx/fire": 2546,
+    "@margoengine/vfx/fire-front": 10494,
     "@margoengine/vfx/flame": 13074,
     "@margoengine/vfx/flipbook": 1167,
     "@margoengine/vfx/flocking": 17160,
@@ -16716,6 +16723,7 @@
     "leak @margoengine/scenes/timber-valley -> @margoengine/sky/scenes": 1,
     "leak @margoengine/scenes/timber-valley -> @margoengine/sky/volumetric-clouds": 1,
     "leak @margoengine/scenes/timber-valley -> @margoengine/tonemap": 1,
+    "leak @margoengine/scenes/timber-valley -> @margoengine/vfx/fire-front": 1,
     "leak @margoengine/sciviz/atmosphere -> @margoengine/sky/astro": 1,
     "leak @margoengine/sciviz/ometiff -> @margoengine/decoders/tiff": 1,
     "leak @margoengine/shader -> @margoengine/gltf/extended-materials": 1,

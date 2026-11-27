@@ -584,7 +584,10 @@ export class GPURenderer implements Renderer {
     const context = (this.passContext ??= {
       backend: 'webgpu',
       draw: (options: DrawOptions = defaultDraw) => {
-        const context = this.passContext!;
+        const context = this.passContext!,
+          // Taken by this draw alone (DrawOptions.snapshot), also when it ends early.
+          snapshot = options.colorAttachments ? undefined : (options.snapshot ?? context.snapshot);
+        context.snapshot = undefined;
         const viewRect = context.view?.viewport,
           viewport = options.viewport === undefined ? viewRect : options.viewport,
           scissor =
@@ -714,36 +717,57 @@ export class GPURenderer implements Renderer {
             tint,
           });
         let current: GPURenderPipeline | undefined;
+        // A snapshot replays its bundle while the draw's bind group is the recorded one (each group belongs to one
+        // pipeline: core's own, or the one `groups` holds it for); the loop below then only uploads. WebGPU "Bundles":
+        // executeBundles keeps viewport and scissor and resets the rest.
+        const replay = snapshot?.bundle && snapshot.group === group,
+          target =
+            snapshot && !replay
+              ? this.device.createRenderBundleEncoder({
+                  colorFormats: [context.format],
+                  depthStencilFormat: context.descriptor.depthStencil!.format,
+                  sampleCount: context.descriptor.multisample?.count,
+                })
+              : pass;
         // By index: an array iterator would be garbage every draw.
         for (let i = 0; i < drawBatches.length; i++) {
           const batch = drawBatches[i];
           if (drawable(batch)) {
             const p = pipeline === this.pipeline && !bindings.length && !batch.mask ? this.culled : pipeline;
-            if (p !== current) {
-              current = p;
-              pass.setPipeline(p);
-              pass.setBindGroup(0, p === pipeline ? group : this.culledGroup);
-            }
             const resource = this.resources.get(batch.geometry)!;
             if (resource.frame !== this.frameId) this.upload(batch, resource, this.frameId);
-            const redirect = batch.redirect;
-            pass.setVertexBuffer(0, resource.vertex);
-            pass.setVertexBuffer(1, redirect?.instances ?? resource.instance);
-            pass.setIndexBuffer(resource.index, 'uint32');
-            if (redirect) pass.drawIndexedIndirect(redirect.args, 0);
-            else if (options.indirect ?? context.indirect) {
-              resource.indirect ??= this.device.createBuffer({
+            let args = batch.redirect?.args;
+            if (!args && (options.indirect ?? context.indirect)) {
+              args = resource.indirect ??= this.device.createBuffer({
                 size: 20,
                 usage: 264,
               });
               resource.command ??= new Uint32Array([batch.geometry.indices.length, 0, 0, 0, 0]);
               if (resource.command[1] !== batch.count) {
                 resource.command[1] = batch.count;
-                this.device.queue.writeBuffer(resource.indirect, 0, resource.command as Uint32Array<ArrayBuffer>);
+                this.device.queue.writeBuffer(args, 0, resource.command as Uint32Array<ArrayBuffer>);
               }
-              pass.drawIndexedIndirect(resource.indirect, 0);
-            } else pass.drawIndexed(batch.geometry.indices.length, batch.count);
+            }
+            if (!replay) {
+              if (p !== current) {
+                current = p;
+                target.setPipeline(p);
+                target.setBindGroup(0, p === pipeline ? group : this.culledGroup);
+              }
+              target.setVertexBuffer(0, resource.vertex);
+              target.setVertexBuffer(1, batch.redirect?.instances ?? resource.instance);
+              target.setIndexBuffer(resource.index, 'uint32');
+              if (args) target.drawIndexedIndirect(args, 0);
+              else target.drawIndexed(batch.geometry.indices.length, batch.count);
+            }
           }
+        }
+        if (snapshot) {
+          if (!replay) {
+            snapshot.bundle = (target as GPURenderBundleEncoder).finish();
+            snapshot.group = group;
+          }
+          pass.executeBundles([snapshot.bundle!]);
         }
         pass.end();
       },

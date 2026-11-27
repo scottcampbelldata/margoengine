@@ -3,7 +3,7 @@ export { Engine, Mesh, VectorRef } from './engine.js';
 export type { FrameCallback, EngineOptions, Scene } from './engine.js';
 export { TransformStore } from './kernel.js';
 export { FrameGraph } from './plugin.js';
-export type { EnginePlugin, FramePass, PassContext, DrawOptions } from './plugin.js';
+export type { EnginePlugin, FramePass, PassContext, DrawOptions, Snapshot } from './plugin.js';
 export { Geometry, PbrMaterial, box } from './geometry.js';
 export { Camera } from './camera.js';
 export type { Vec3, CameraOptions } from './camera.js';
