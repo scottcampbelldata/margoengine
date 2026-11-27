@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21033919,
+  "total": 21034259,
   "history": [
     {
       "date": "2026-10-24",
@@ -14747,6 +14747,12 @@
       "date": "2026-11-27",
       "commit": "sea-04-capillary-current-viscosity",
       "reason": "@margoengine/physics/sea grows from 7859 to 9129 B gzip and its ceiling from 7880 to 9403 B. The optional modal step retains exact held-pressure forcing under uniform current, surface tension and viscosity. It uses the same source, water velocity and replay state as WakeSolver. Moving the modal step to a separate entry would still require loading and wiring it before the synchronous world setup. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "a6614c4320",
+      "reason": "@margoengine/vfx/fire to 2292 B gzip (ceiling 2208 to 2548): KB-FAULD-FIREDIM1, the keyDistance option passed to the flame and its check. The option belongs to the one call",
+      "grew": 1
     }
   ],
   "items": {
@@ -16278,7 +16284,7 @@
     "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/events": 2601,
     "@margoengine/vfx/fields": 2079,
-    "@margoengine/vfx/fire": 2208,
+    "@margoengine/vfx/fire": 2548,
     "@margoengine/vfx/fire-front": 10176,
     "@margoengine/vfx/flame": 13074,
     "@margoengine/vfx/flipbook": 1167,
