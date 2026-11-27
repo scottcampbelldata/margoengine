@@ -91,8 +91,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   WebGPU: three or four single pixels on the flat sides are about 18 % darker than their neighbours. A plain box and
   a plain box cut the same way show none. The mesh is closed (every edge walked both ways), drawing both sides does
   not change them, and the result holds two triangles with no area.
-- **Cause:** not established. One of four samples missing at a vertex of a sliver fan is the likely reading; the
-  tessellated side faces and the Float32 rounding of the boolean result are the two places to look.
+- **Cause (established for most dots, 2026-11-27):** thin triangles in the boolean's result. The displaced cube alone
+  (4,486 triangles) has none thinner than 1e-4 units; after the difference the 12,146 triangles hold 1,333 such
+  slivers and 2 with no area, with vertices about 3e-6 apart at coordinates near 10, where Float32 steps are about
+  1e-6. A sliver's flat normal is then rounding noise, and where it covers one or two of a pixel's four samples that
+  pixel takes the wrong shade. Colouring the slivers red turned 6 of 11 dark pixels found in the picture red; the
+  other 5 did not change and are not explained. Removing only the 2 triangles with no area changes no pixel.
+- **Fix, not written:** the boolean's output (`@margoengine/mesh-edit`) needs its near-coincident vertices joined and
+  the slivers removed after rounding, keeping the solid closed.
 
 ### Fixed 2026-11-27: in an AR session a post effect made solid meshes see-through (KB-XR-AREFFECTS1, shared, materials)
 
