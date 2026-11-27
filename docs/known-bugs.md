@@ -1954,6 +1954,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the yard is bare sand in `coverOf`; the flights ease up to a nearly level band and down again. Regression:
   packages/scenes/test/scenes.test.js, packages/procedural/test/flyer.test.js. Ported from the unlanded `kitty` branch.
 
+### Open 2026-11-27: a Fauld tunnel shot stops on a GPU error (KB-SCENES-TUNNELGPU1, owner to be found)
+
+- **Repro:** `MARGO_ASSET_LIBRARY=<library> node tools/shot/cli.mjs tools/shot/shots/fauld-fr091.json --stills --out <dir>`
+  (state `fire`, NVIDIA Ampere, WebGPU): the page reports `[Invalid CommandBuffer] is invalid due to a previous error`
+  (`gpu-lost`) after its probe frame, with all 35 WGSL modules compiling. Same on main without this day's lamp change.
+- **Cause:** not yet found; the first validation error is not printed.
+- **Owed:** capture the first uncaptured error, fix it in the owning package, with a test.
+
 ### Open 2026-11-27: the firelit smoke pall at night glows evenly (KB-SKY-PALLFALLOFF1, sky and weather)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=ridge,fire-line --query=hour=22 --out=<folder>`:
