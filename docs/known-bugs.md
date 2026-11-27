@@ -6,6 +6,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
+
+- **Repro:** Playwright WebKit 27.2 on Windows 11:
+  `node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/scripts/browser-matrix.mjs --browser=webkit`, row
+  `bitmapCopies` on the layer is a bug ("the layer breaks a copy rule"). Without Margo:
+  `docs/upstream-reports/KB-WEBKIT-BITMAPALPHA1/bitmap-alpha.html` draws a `premultiplyAlpha: 'none'` bitmap over
+  opaque black and reads (100, 201, 60, 255) for the pixel (100, 201, 60, 1), where Edge reads (0, 1, 0, 255).
+- **Cause:** below Margo: that build's 2D `drawImage` composites a straight bitmap as premultiplied. The layer learns a
+  bitmap's alpha state, which no API states, by comparing the bitmap's uploaded bytes with a 2D canvas copy of it
+  (`copyBitmap`, `packages/webgl2-compat/src/device/render.ts`). Here the two are equal for every bitmap, so a straight
+  one is taken as premultiplied: copied into a premultiplied destination it keeps its colour, and by the same branch a
+  copy into a straight destination divides its colour by alpha (read from the shader: brighter where alpha is between
+  0 and 1). Opaque bitmaps are right either way.
+- **Margo:** not worked around. Every 2D draw tried gives the same bytes, and a premultiplied bitmap may also hold
+  colour over alpha (one taken from a WebGL canvas), so the bytes alone cannot decide. The browser matrix first named
+  the `UNPACK_PREMULTIPLY_ALPHA_WEBGL` upload as the cause; that upload works (a canvas filled by `putImageData`
+  uploads premultiplied). Edge, Firefox and Safari 27.2 on macOS (2026-11-15) keep both copy rules.
+
 ### Open (below Margo) 2026-11-27: an AMD Radeon's native WebGPU gets a helper function's derivative wrong when only a per-pixel branch uses it (KB-AMD-HELPERDERIV1, driver; browser)
 
 - **Repro:** Edge 158, AMD Radeon integrated graphics of a Ryzen 9 9950X (driver 32.0.21042.62), Windows 11, native

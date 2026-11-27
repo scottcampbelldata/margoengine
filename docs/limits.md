@@ -1718,10 +1718,10 @@ only: no timings.
   (KB-AMD-HELPERDERIV1), GTAO creases by at most 0.047 (mean gap 0.00083). Every step of the package's `test:gpu`
   (32 steps, WebGPU against the layer on the same GPU) passes on this GPU, at d88c50b716.
 - WebKit, Windows build: `external` needs `VideoFrame` and the materials video case needs `captureStream`, which this
-  build lacks. `bitmapCopies` is a wrong result on the layer there: uploading a 2D canvas with
-  `UNPACK_PREMULTIPLY_ALPHA_WEBGL` returns straight colour in this build (read back with raw WebGL2), and the layer
-  tells a straight bitmap from a premultiplied one by that upload, so a straight bitmap copied into a premultiplied
-  destination keeps its colour. Safari 27.2 on macOS kept both copy rules on 2026-11-15.
+  build lacks. `bitmapCopies` is a wrong result on the layer there, from a browser defect: the build's 2D `drawImage`
+  composites a `premultiplyAlpha: 'none'` bitmap as premultiplied, and the layer tells a straight bitmap from a
+  premultiplied one by such a draw, so partly transparent straight bitmaps are copied wrong
+  ([known-bugs.md](known-bugs.md), KB-WEBKIT-BITMAPALPHA1). Safari 27.2 on macOS kept both copy rules on 2026-11-15.
 - Still not measured: real phones, Safari's feature rows after `canvasRead` with an unlocked screen, the iOS
   Simulator, a headset, and the integrated-GPU frame budget (timing, deferred by the build phase).
 

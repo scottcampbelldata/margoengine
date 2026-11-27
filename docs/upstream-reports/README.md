@@ -26,4 +26,5 @@ Use the known-bugs ID for the folder and both ID cells in the table. IDs can inc
 | KB5700f | `KB5700f` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (fold-blend-repeat.html, D3D12 and ANGLE D3D11); exact on AMD and Apple |
 | KB6171a | `KB6171a` | ANGLE, Apple | draft only, needs a Mac |
 | KBL3c | `KBL3c` | Mozilla (Firefox WebGL) | yes, Firefox 157 |
+| KB-WEBKIT-BITMAPALPHA1 | `KB-WEBKIT-BITMAPALPHA1` | WebKit | yes, Playwright WebKit 27.2 on Windows (2026-11-27) |
 | KB-WATER-FLOODFILM-COMPAT1 | `KB-WATER-FLOODFILM-COMPAT1` | ANGLE, Intel | yes, Intel Arc 140V, ANGLE D3D11 (2026-11-21: 6 of 32 launches); draft only, no standalone repro |
