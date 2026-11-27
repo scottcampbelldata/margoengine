@@ -1491,6 +1491,10 @@
       "types": "./dist/points/laz-write.d.ts",
       "import": "./dist/points/laz-write.js"
     },
+    "./points/copc-write": {
+      "types": "./dist/points/copc-write.d.ts",
+      "import": "./dist/points/copc-write.js"
+    },
     "./points/e57": {
       "types": "./dist/points/e57.d.ts",
       "import": "./dist/points/e57.js"

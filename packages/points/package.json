@@ -49,6 +49,10 @@
       "types": "./dist/laz-write.d.ts",
       "import": "./dist/laz-write.js"
     },
+    "./copc-write": {
+      "types": "./dist/copc-write.d.ts",
+      "import": "./dist/copc-write.js"
+    },
     "./e57": {
       "types": "./dist/e57.d.ts",
       "import": "./dist/e57.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21015295,
+  "total": 21028140,
   "history": [
     {
       "date": "2026-10-24",
@@ -14718,6 +14718,12 @@
       "commit": "lane-c5",
       "reason": "3MF specular and translucent display properties: exporters/threemf 28528 to 30266 B (writes both kinds, a base material group for each, multiproperties over a translucent base, glossiness maps) and loaders/threemf-mesh 3224 to 4060 B (draws them: specular colour at index 0, transmission and volume with the mean chord as thickness). loaders/threemf-materials 13482 to 13808 B and threemf-lattice 17633 to 17948 B stay within budget. The code is in the one reader, writer and mesh builder of the format; a second entry would parse or write the file twice.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-c5-copc",
+      "reason": "points/copc-write, new optional entry (writeCOPC and writeCOPCTo, out-of-core COPC 1.0 writing; 12470 B with the LAS writer, header reader and LAZ coders it shares). The coders moved to a module both writers load; points/laz-write stays 9869 B and points/copc 15697 B. Apart from the reader, so a viewer loads none of it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15644,6 +15650,7 @@
     "@margoengine/points/las lazy LAZ decoder": 8776,
     "@margoengine/points/laz": 8872,
     "@margoengine/points/laz-write": 10166,
+    "@margoengine/points/copc-write": 12845,
     "@margoengine/points/octree": 9474,
     "@margoengine/points/pick": 5471,
     "@margoengine/points/potree": 17694,

@@ -6716,6 +6716,14 @@ Khronos validator (no errors, the one MULTIPLE_EXTENSIONS warning) and the defau
 the WebGL2 layer.
 [Limits](../limits.md#procedural-grass-blades-batch-64-job-6)
 
+## COPC writer (2026-11-27)
+
+`@margoengine/points/copc-write` writes COPC 1.0 files out of core from a stream of batches. Proof:
+`packages/points/tests/copc-write.test.js` reads its files back through Margo's COPC reader (every point once, inside its
+voxel, one a grid cell in inner nodes) and in order as plain LAZ (every field equal to the source's), writes the same
+cloud through a file store from an async stream, splits the hierarchy into pages, and converts formats 0 to 3. Not yet
+checked with another tool's reader. No speed or rival comparison claim. [Limits](../limits.md)
+
 ## LAZ writer (2026-11-27)
 
 `@margoengine/points/laz-write` writes LASzip-compatible LAZ for point formats 0 to 10. Proof:

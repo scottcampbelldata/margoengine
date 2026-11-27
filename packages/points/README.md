@@ -549,7 +549,59 @@ const source = await CopcSource.open('/scan.copc.laz'); // options: fetch, signa
 OctreeCloud.attach(engine, PointsPlugin.attach(engine, { pointBudget: 2_000_000 }), source, { pointBudget: 2_000_000 });
 ```
 
-Positions and bounds are relative to `source.origin`, the cube's centre, which keeps float32 positions exact for a scan far from zero. Reads only: there is no COPC writer. It reads point formats 6 to 8, as the specification requires. Tested against files written here from the public specification with the package's own test encoder, not yet against files from another tool.
+Positions and bounds are relative to `source.origin`, the cube's centre, which keeps float32 positions exact for a scan far from zero. It reads point formats 6 to 8, as the specification requires. Tested against files written here from the public specification, not yet against files from another tool.
+
+## COPC writer (`margoengine/points/copc-write`)
+
+`writeCOPC(points, options?)` returns a COPC file; `writeCOPCTo(sink, points, options?)` writes one through `sink(bytes, position)`, such as a file handle. The points are one batch or any iterable or async iterable of batches: what `writeLAS` takes, or the bytes of an uncompressed LAS file. Formats 0 to 3 become 6 or 7 with every field and extra byte (the overlap class 12 becomes the overlap flag and class 1).
+
+```ts
+import { writeCOPC } from 'margoengine/points/copc-write';
+
+async function* tiles() {
+  for (let x = 0; x < 4; x++)
+    yield { positions: [x, 0, 0, x, 1, 0], intensity: [10, 20], wkt: 'GEOGCS["WGS 84"]' };
+}
+const file = await writeCOPC(tiles(), { signal: AbortSignal.timeout(60_000) });
+console.log(file.length);
+```
+
+The octree is built top down and out of core: every point first goes to a **store**, then a node keeps the first point in each cell of its sampling grid, writes them as one LAZ chunk in time order, and passes the rest to its eight children through the store. Only the nodes on the way down are in memory when the store is elsewhere. The default store is memory; for a cloud that does not fit, give one over files:
+
+```ts
+import { createReadStream } from 'node:fs';
+import { appendFile, open, rm } from 'node:fs/promises';
+import { writeCOPCTo, type CopcStore } from 'margoengine/points/copc-write';
+
+const store: CopcStore = {
+  append: (key, bytes) => appendFile(`${key}.tmp`, bytes),
+  read: (key) => createReadStream(`${key}.tmp`),
+  delete: (key) => rm(`${key}.tmp`),
+};
+const file = await open('site.copc.laz', 'w');
+const written = await writeCOPCTo(
+  async (bytes, position) => {
+    await file.write(bytes, 0, bytes.length, position);
+  },
+  { positions: [0, 0, 0, 1, 2, 3] },
+  { store },
+);
+await file.close();
+console.log(written.points, written.nodes, written.depth);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `gridSize` | 128 | Cells along each side of a node's grid, 2 to 1024; a node keeps one point a cell, and `spacing` is the cube's side over this |
+| `leafPoints` | 100,000 | A node with at most this many points left keeps them all |
+| `scale` | the first batch's | Coordinate resolution |
+| `wkt` | the first batch's | The CRS; needed when the points state it as GeoTIFF keys |
+| `store` | memory | Where waiting points go |
+| `pageEntries` | 4,096 | Entries in one hierarchy page, 9 or more |
+| `onProgress` | none | `(written, total)` after each node |
+| `signal` | none | Stops the work, empties the store and rejects with the signal's reason |
+
+The offset is the first batch's, so a point more than 2^31 steps of the scale from it is refused with the fix named. Every point is written to the store once per level above its node, so a deep cloud costs that many passes over its far points. Waveform formats (4, 5, 9, 10) are refused, since COPC cannot hold them.
 
 ## GPU picking (`margoengine/points/pick`)
 
