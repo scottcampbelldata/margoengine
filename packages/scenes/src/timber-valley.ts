@@ -198,7 +198,17 @@ export function weatherState(weather: Filled['weather'], windFrom: number): Weat
             ? // 20 August 1910: a dry south-west gale (rangers' accounts of a hurricane-force wind); a 20 m/s mean
               // gusting, 12 percent humidity and 30 C.
               { wind: 20, gust: 0.8, humidity: 0.12, temperature: 30, cloud: 0.15 }
-            : { wind: 6, gust: 0.3, smoke: 0.6, cloud: 0.3, humidity: 0.3, temperature: 22 };
+            : // A day under wildfire smoke: the weather's own `wildfireSmoke` load (about 1.6 km of visibility, a dim
+              // red sun). Its `blackDay` end is dark at noon: 0.6 was that, and the aftermath frame came out black
+              // (KB-LOOK-TV-CRUSH1).
+              {
+                wind: 6,
+                gust: 0.3,
+                smoke: WEATHER_LOOKS.wildfireSmoke.smoke,
+                cloud: 0.3,
+                humidity: 0.3,
+                temperature: 22,
+              };
   return { ...WEATHER_PRESETS.clear, ...base, windDirection } as WeatherState;
 }
 

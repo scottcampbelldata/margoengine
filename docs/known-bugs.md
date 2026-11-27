@@ -6,6 +6,45 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: the timber-valley aftermath drew a black frame under its smoke weather (KB-LOOK-TV-CRUSH1, KB-SKY-SMOKE-BLACK1; scenes)
+
+- **Repro:** `@margoengine/scenes/timber-valley` with the `aftermath` preset (weather `smoke`, fire `burnt`, 22 August
+  10:00). On 2026-11-17 the crush bar read 72 percent and the sky drew black. On main before this fix the sky drew a
+  very dark red, the ground black, 27.5 percent of pixels at or under code 16 and crush 0.26 percent (bound 0.1 for
+  `animatedFeature`).
+- **Cause:** two. The sky took the sun's dimming with nothing for the light the smoke scatters down; that half was
+  fixed on 2026-11-18 (`atmosphere.scatteredLight`, KB-AIR-SKYLIGHT1). The other half was the scene: its `smoke`
+  weather asked for load 0.6 (1,800 micrograms of PM2.5 through a 2 km layer, optical depth 14), where the direct sun
+  is 1e-6 of clear air's and the haze holds 1 percent of the red light and 0.08 percent of the green. That is dark at
+  noon, not the "day under thick smoke" the setting names. `fog.ts` leaving sky pixels alone is not part of it: the sky
+  takes the layer through `sunColor` and `scatteredLight`.
+- **Fix:** `weatherState('smoke')` in `packages/scenes/src/timber-valley.ts` takes the load of the weather package's own
+  `WEATHER_LOOKS.wildfireSmoke` (0.35: about 1.6 km, the direct sun a dim red disc, 20 percent of the red light and 8
+  percent of the green in the haze). The same view now reads 0 percent crush and no pixel at or under code 16, under an
+  orange-grey sky with the ridges visible (RTX A6000, WebGPU, 960 x 540).
+- **Regression test:** `packages/scenes/test/timber-valley.test.js` (the smoke day is daylight; fails on 0.6).
+- **Still open on this view:** the distant haze is much darker than the sky behind it (KB-SKY-PALLHAZE1), dark beaded
+  trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and the horizon past the world edge is a white
+  wedge (KB-BIOMES-WORLDEDGE1).
+
+### Open 2026-11-27: under a smoke load the ground haze is far darker than the sky behind it (KB-SKY-PALLHAZE1, weather and sky)
+
+- **Repro:** the aftermath view above (load 0.35): the ridge about 1 km out, 90 percent haze by the visibility, draws
+  about code (73, 43, 0) against a sky of (212, 153, 118) right behind it, so every ridge is a dark cut-out. A path
+  long enough should end at the sky's own horizon radiance (Koschmieder 1924).
+- **Cause (read in the code, not yet proven by a measurement of both radiances):** the two are in different units.
+  `WeatherDrive.tintFog` writes `sky.fog.color` as the haze's albedo times `hazeLight`, a share where 1 is about a white
+  surface's radiance, and the fog pass draws a fixed colour as it is. The sky draws the same layer's light
+  (`atmosphere.scatteredLight`) as the share times the zenith sun in sky units over pi (about 5 in the `bruneton`
+  model), without the `lightScale` that takes sky units into the engine sun's units. Fixing it moves the numbers of
+  KB-AIR-HAZELIGHT1, KB-AIR-SKYLIGHT1 and the shot look bars, so it needs its own pass.
+
+### Open 2026-11-27: dark beaded trails cross the burned valley's aftermath view at film quality (KB-VFX-DARKTRAILS1, vfx; owner to be confirmed)
+
+- **Repro:** `packages/scenes/test/timber-valley-still.html?view=aftermath&weather=smoke&fire=burnt&date=1910-08-22&hour=10&w=960&h=540`
+  (film quality, 60 frames): wavy strings of dark soft blobs fill the upper left, near the camera. Not seen at
+  `quality=preview` with 30 frames. Cause not traced.
+
 ### Fixed 2026-11-27: SnapshotRendering's stats lost a recording dropped before the next frame (KB-CULL-SNAPSTATS1, culling)
 
 - **Repro:** `node --test packages/culling/test/snapshot.test.js`: draw a frame that records, call `reset()` (or restore

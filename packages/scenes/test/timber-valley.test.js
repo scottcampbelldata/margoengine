@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { sceneInfo, scenes } from '@margoengine/scenes';
 import { checkShotSettings } from '@margoengine/scenes/shot-settings';
 import { attach, check, info, layout, weatherState, world } from '@margoengine/scenes/timber-valley';
-import { WEATHER_SETTINGS } from '@margoengine/weather/settings';
+import { WEATHER_LOOKS, WEATHER_SETTINGS } from '@margoengine/weather/settings';
+import { hazeLight, sunTransmittance } from '@margoengine/weather';
 import { SKY_SETTINGS } from '@margoengine/sky/settings';
 import { FIRE_SETTINGS } from '@margoengine/vfx/settings';
 import { fuelMap } from '@margoengine/biomes/fuel';
@@ -54,6 +55,16 @@ test('the weather states: the blowup gale blows from the south-west toward the n
   assert.ok(Math.sin(gale.windDirection) > 0.7 && Math.cos(gale.windDirection) < -0.7, String(gale.windDirection));
   assert.ok(weatherState('smoke', 225).smoke > 0.3);
   assert.equal(weatherState('redFlag', 225).humidity, 0.15);
+});
+
+test('the smoke day is daylight: the sun still shows and the air keeps a share of its light (KB-LOOK-TV-CRUSH1)', () => {
+  const state = weatherState('smoke', 225);
+  assert.equal(state.smoke, WEATHER_LOOKS.wildfireSmoke.smoke);
+  // The aftermath preset's sun, 10:00 on 22 August at Wallace, stands about 47 degrees up. At smoke 0.6 the direct
+  // sun was 1e-6 of clear air's and the haze held 1 percent of the red light and 0.08 percent of the green: night.
+  const noon = (47 * Math.PI) / 180;
+  assert.ok(hazeLight(state, noon)[0] > 0.1 && hazeLight(state, noon)[1] > 0.05, String(hazeLight(state, noon)));
+  assert.ok(sunTransmittance(state, noon)[0] > 0.001, String(sunTransmittance(state, noon)));
 });
 
 test('the valley: creek and rail fall to the outlet, the town sits on the floor off the rail and creek, the fire starts in fuel', async () => {
