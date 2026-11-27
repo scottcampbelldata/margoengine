@@ -17869,3 +17869,30 @@ reference for the half-depth plate. No companion code or measured elevation ente
 [Craig and Sulem](https://doi.org/10.1006/jcph.1993.1164) ·
 [Johansen and Colella](https://crd.lbl.gov/assets/pubs_presos/AMCS/ANAG/A135.pdf) ·
 [Porter and Evans](https://doi.org/10.1017/S0022112095002849)
+## physics rod vortex-induced vibration calibrated and checked against towed and sheared pipes (2026-11-27)
+
+Files: `packages/physics/src/loads/segments.ts`, `packages/physics/tests/rod-viv.test.js`, `packages/physics/tests/rod.test.js`,
+`packages/physics/tests/loads-segments.test.js`. No rival engine source and no paper's companion code was read; measured
+values are numbers read from the paper's figures, no data file.
+
+- R. N. Govardhan and C. H. K. Williamson, "Defining the 'modified Griffin plot' in vortex-induced vibration: revealing the
+  effect of Reynolds number using controlled damping", J. Fluid Mech. 561 (2006) 147-180,
+  https://doi.org/10.1017/S0022112006000310 (its fit, A* = (1 - 1.12 alpha + 0.30 alpha^2) log10(0.41 Re^0.36), as
+  widely quoted; the paper itself not read). Used: the growth with Re, log10(0.41 Re^0.36), as a ratio to Re 5e4, scaling
+  the wake's lift and fluctuating drag.
+- N. Srinil and H. Zanganeh (2012), as above: their eqs. 3 to 5, the wake forces on the free-stream speed V with the motion
+  turning their direction (F_x = F_D - F_L Y'/V, F_y = F_L + F_D Y'/V).
+- X. Fu et al. (2025), as above, now also their section 3.2 and Table 2 (the linearly sheared pipe, 3.88 m, 28.41 mm,
+  1.24 kg/m, EI 58.6 N m^2, EA 9e5 N, damping 2.58 %, 550 N) and their Figs. 9 and 12 (measured red curves and the CFD and
+  VIVANA curves), read from the figures' SVG paths with their tick marks.
+- Calibration (Scott, 2026-11-27: calibrate on part of the data, validate on the rest): the wake's lift 0.56 and fluctuating
+  drag 0.53 at Re 5e4 were set on the uniform 1.6 m/s case's cross-flow (0.460 D) and in-line (0.175 D) RMS, by a grid of
+  runs at 600 steps a second; sensitivity about 0.07 D across per 0.1 of lift and 0.17 D in line per unit of drag; the
+  0.4 m/s case and the sheared cases are held out.
+- Own derivations: the fluctuating drag as q^2 less its running mean over five shedding periods (2 cos 2 theta for the free
+  wake q = 2 cos theta), so the drag fluctuates in the lift's phase at twice its frequency and a symmetric swing drives only
+  symmetric in-line modes; the free-stream speed in the wake forces, as the relative speed with a wake locked to the
+  motion gives them a mean -rho D U (C / 2) <v p> that took back the mean drag the in-line motion adds; the bow's growth with
+  the in-line motion, U^2 + <x'^2>, from the drag on the relative flow.
+- Found on the way: `Physics.step()` takes no step length (it steps its `fixedTimestep`), so the earlier test's
+  `physics.step(1 / 600)` ran at 60 steps a second, three steps an in-line period; the test now sets `fixedTimestep`.

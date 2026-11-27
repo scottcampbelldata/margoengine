@@ -4992,20 +4992,25 @@ Eames's drag along, and the wake oscillator, here driven by the segment's own ac
 each segment:
 - a force and a moment held for the step (buoyancy of the wetted length, the Froude-Krylov force, the added mass's share
   of the water's acceleration, vortex lift across the flow, and the fluctuating drag along it at twice the shedding
-  frequency from a second wake oscillator, Srinil and Zanganeh's);
+  frequency, tied to the lift's wake);
 - its added mass;
 - its drag as a damping toward the flow, which the structure solves implicitly.
 
 Options:
 - `period`: the waves' period for KC (default 8), or `Infinity` for a steady current;
 - `roughness`, `drag`, `addedMass`, `flows` and `viscosity`;
-- `vortex` (or `false`): `strouhal` (default 0.2), `lift` (a held cylinder's lift amplitude, default 0.3), `drag` (its
-  fluctuating drag amplitude along the flow, default 0.2; 0 for none) and `amplify` (default false: Vandiver's growth of the
-  mean drag with the swing across the flow, on top of the growth the drag on the relative flow already gives).
+- `vortex` (or `false`): `strouhal` (default 0.2); `lift` and `drag`, the wake's lift amplitude across the flow and its
+  fluctuating drag amplitude along it at Re 5e4 (defaults 0.56 and 0.53, calibrated on a towed pipe; `drag` 0 for none);
+  `reynolds` (default true: both grow with the Reynolds number as a free cylinder's swing does, Govardhan and Williamson's
+  fit); `inLineWake` (default `'lift'`: the drag fluctuates with the lift's wake; `'own'`: a wake of its own, Srinil and
+  Zanganeh's); `coupling` and `inLineCoupling` (default 12); and `amplify` (default false: Vandiver's growth of the mean drag
+  with the swing in place of the growth the drag on the relative flow gives).
 
-Measured against a towing-tank pipe (Fu et al. 2025, `tests/rod-viv.test.js`), a rod with these loads vibrates across the
-flow in the measured modes within 31 % of the measured amplitude, and bows within 19 %; its in-line vibration is an order
-short of the measurement (`docs/known-bugs.md`, KB-PHYS-RODVIVIL1).
+Measured against flexible pipes towed and in sheared flow (Fu et al. 2025, `tests/rod-viv.test.js`), a rod with these loads
+vibrates in the measured modes, and on the held-out cases it is at least as close as the paper's own CFD across the flow, in
+line and on the bow, but for a strongly sheared flow's swing (`docs/known-bugs.md`, KB-PHYS-RODVIVSHEAR1). Step it finely
+enough for the vibration: a towed pipe's in-line vibration at 19 Hz needs about 600 steps a second
+(`new Physics(null, {fixedTimestep: 1 / 600})`).
 
 `takeState()` and `restoreState()` keep its wake oscillators beside a world snapshot. Any structure can call it:
 `loads.apply(segments, {time, dt, gravity}, out)`, each segment `{position, tangent, velocity, angularVelocity, diameter,

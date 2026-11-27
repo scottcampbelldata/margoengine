@@ -162,6 +162,33 @@ function tautCable(physics, { n = 32, L0 = 2, strain = 1e-5, radius = 0.005, you
   return rod;
 }
 
+/** The frequency of a signal's largest Fourier component after `skip` samples, at `rate` samples a second, by golden search. */
+function dominant(signal, rate, skip = 0, lo = 0.02, hi = 2) {
+  const tail = signal.slice(skip),
+    mean = tail.reduce((a, b) => a + b, 0) / tail.length,
+    power = (f) => {
+      let c = 0,
+        s = 0;
+      tail.forEach((v, i) => {
+        c += (v - mean) * Math.cos((2 * Math.PI * f * i) / rate);
+        s += (v - mean) * Math.sin((2 * Math.PI * f * i) / rate);
+      });
+      return c * c + s * s;
+    };
+  // The largest of a fine scan, then refined between its neighbours.
+  let best = lo;
+  for (let f = lo; f <= hi; f += 0.002) if (power(f) > power(best)) best = f;
+  let a = best - 0.002,
+    b = best + 0.002;
+  for (let k = 0; k < 40; k++) {
+    const m1 = a + (b - a) * 0.382,
+      m2 = a + (b - a) * 0.618;
+    if (power(m1) > power(m2)) b = m2;
+    else a = m1;
+  }
+  return (a + b) / 2;
+}
+
 /** The frequency of a signal from its upward zero crossings after `skip` samples, at `rate` samples a second. */
 function frequency(signal, rate, skip = 0) {
   const mean = signal.slice(skip).reduce((a, b) => a + b, 0) / (signal.length - skip);
@@ -211,9 +238,9 @@ test('a taut cable in a cross flow strums at its own frequency through lock-in a
   // link). The cable is stiff enough in tension (strain 1e-3) that its swing barely changes its tension, so its frequency in
   // still water is f_w = f_1 sqrt(mu / (mu + C_a rho A)), f_1 the taut cable's in air. The wake sheds at f_s = St U / D. Below
   // lock-in (reduced velocity U / (f_w D) = 2) the cable moves at the shedding frequency, hardly at all; in lock-in (5 and 7)
-  // its motion is taken over by its own frequency while f_s runs 40 % past it, and it swings about half its diameter: a
-  // cylinder free across a flow at a mass ratio near 1 swings up to about one diameter (Khalak and Williamson 1999), and the
-  // wake oscillator, tuned to forced-cylinder data, about half that. The mean drag bows it along the flow, more as it swings
+  // its motion is taken over by its own frequency while f_s runs 40 % past it, and it swings tenths of its diameter (at Re
+  // about 400 the wake is weaker than at the Re 5e4 its amplitudes are set at, by Govardhan and Williamson's fit). The mean
+  // drag bows it along the flow, more as it swings
   // (the drag on the flow relative to it grows), which stretches it and raises its tension and its own frequency: lock-in is
   // judged against the frequency at the bowed cable's tension.
   const L0 = 2,
@@ -276,7 +303,12 @@ test('a taut cable in a cross flow strums at its own frequency through lock-in a
       Math.abs(run.f - run.own) / run.own < 0.15,
       `in lock-in it moved at ${run.f} Hz, its own frequency is ${run.own} Hz`,
     );
-    assert.ok(run.amplitude > 0.3 && run.amplitude < 1.2, `in lock-in it swung ${run.amplitude} D`);
+    // Locked in, it swings tenths of a diameter, more than ten times its swing below lock-in; how far, against a measured
+    // pipe, is tests/rod-viv.test.js.
+    assert.ok(
+      run.amplitude > 10 * below.amplitude,
+      `in lock-in it swung ${run.amplitude} D, below it ${below.amplitude} D`,
+    );
   }
   assert.ok(past.fs > 1.3 * fw, 'the shedding ran well past the cable at Ur 7');
 });
@@ -373,7 +405,8 @@ test('a rod keeps the curl of its rest shape, and its start clamped to its own r
 
 test('a hose standing in the waves sways at their period, and a restored world with its state steps to the same bits', () => {
   // One wave of 1 m at the grid's 13th frequency over deep water; a 2 m hose stands from 6 m down. Its tip moves with the
-  // orbits at the wave's frequency.
+  // orbits at the wave's frequency: the largest part of its motion is at that frequency (the vortices it sheds add motion at
+  // their own, so its zero crossings are not the wave's).
   const { sea, f } = oneWave(1),
     physics = new Physics(null, { gravity: [0, -9.81, 0] });
   const rod = new Rod(physics, {
@@ -393,7 +426,7 @@ test('a hose standing in the waves sways at their period, and a restored world w
     tip.push(rod.points()[20 * 3]);
   }
   const swing = Math.max(...tip.slice(600)) - Math.min(...tip.slice(600)),
-    measured = frequency(tip, 60, 600);
+    measured = dominant(tip, 60, 600);
   assert.ok(swing > 0.05, `the tip swung ${swing} m`);
   assert.ok(Math.abs(measured - f) / f < 0.05, `the tip swayed at ${measured} Hz in waves of ${f} Hz`);
   // The world's snapshot and the rod's own state, taken together, step on to the same bits.
