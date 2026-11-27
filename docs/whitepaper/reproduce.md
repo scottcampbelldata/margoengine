@@ -4663,6 +4663,14 @@ After `npm run build:packages`: `node --test --test-timeout=120000 packages/post
 scene is one lit box on the default background; no external assets.
 
 
+## GPU flocking (LIFE-04, `@margoengine/vfx/flocking`)
+
+Build with `npm run build:packages`. Run `node --test packages/vfx/test/flocking.test.js` for the closed-form flight,
+flap and turn cases, the shared-bucket regression, determinism with snapshot and restore and the WebGL2 route. Run
+`node scripts/run-with-timeout.mjs --max=3 -- node packages/vfx/test/flocking-check.mjs` and the same with `--compat`
+for 16,384 boids on WebGPU (1,536 on the WebGL2 layer): the state hashes, the step against the CPU twin, and the drawn,
+paused, debug and fish frames.
+
 ## Collective animal motion (LIFE-04)
 
 Build with `npm run build:packages`. Run `node --test packages/physics/tests/coupling/schooling.test.js` for

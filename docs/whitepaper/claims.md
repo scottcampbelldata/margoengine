@@ -526,6 +526,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   `node --test packages/physics/tests/coupling/surface-energy.test.js packages/weather/tests/surface-energy.test.js`
   after building Physics and Weather. The original valley scene still needs a complete rainfall-runoff and flood chain.
 
+- GPU flocking (LIFE-04, parity bar P14, `@margoengine/vfx/flocking`): 16,384 boids step on WebGPU with separation,
+  alignment, cohesion, a vision cone, a predator and an obstacle, and draw as one instanced draw. Sixty steps from the
+  seed, twice, and again after a restore at step 30, give one state hash; one step matches the CPU twin within
+  9.5e-7 m; on the WebGL2 layer the flock is its CPU twin bit for bit. In Node a lone boid flies x = v t and flaps at
+  its closed-form rate, and a turn gains exactly the capped lateral acceleration. Reproduce in `reproduce.md`, "GPU
+  flocking". Measured on one Intel Xe2 iGPU; speed against three.js's GPU birds is not measured yet (speed phase).
+
 - Collective animal motion (LIFE-04) with mass 2 kg, density 1,000 kg/m³, drag area 0.004 m² and initial
   velocity 2 m/s in a 0.5 m/s current. A thrust-free member reaches 1.1 m/s at one second within the
   floating-point error bound for the 120 updates. A one-step turn at 2 m/s with a 10 m minimum radius

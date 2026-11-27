@@ -2757,6 +2757,14 @@ after a memory grow, integer-cell coordinate shifts, 24/30/60 fps hashes and sna
 Analytic checks cover quadratic coasting and turn curvature. A crossing-predator fixture covers anticipation
 and regrouping. The original film shots need wiring and review once the locomotion consumers adopt the intent field.
 
+The drawn flock, `GPUFlock` in `@margoengine/vfx/flocking` (LIFE-04, parity bar P14), is not a world solver: it steps
+Reynolds's rules for up to 262,144 boids in eight WebGPU compute passes over a spatial-hash grid and draws them in one
+instanced draw. Its counting sort ends in a rank pass that lists each bucket by boid index, so the atomic scatter's
+order never reaches the step: one GPU and driver give the same state every run, also after snapshot and restore, and
+one 16,384-boid step matches the f64 CPU twin within 1e-6 m (`packages/vfx/test/flocking-check.mjs`, Intel Xe2). On the
+WebGL2 layer the CPU twin steps the flock and the same instanced draw shows it. Evidence still missing: the rival-speed
+comparison (speed phase) and a discrete or AMD GPU run.
+
 The optional `CrushShellSolver` (BREAK-03) places its plain and shared Wasm kernels in the same
 arena, with empty static data and a separate stack for each instance. Build-time placement and
 prefilled-arena checks cover both variants. A failed force evaluation leaves the published

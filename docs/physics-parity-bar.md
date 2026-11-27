@@ -167,7 +167,7 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
 
 - **Flocks (three.js `webgl_gpgpu_birds`, `webgpu_compute_birds`):** GPU boids with separation, alignment and cohesion;
   thousands of agents; a predator or pointer avoidance; drives instanced or animated glTF birds or fish.
-- **Today:** sound on CPU. A GPU path at the rival's agent count is the gap.
+- **Today:** sound on CPU (`@margoengine/physics/schooling`). The GPU path landed 2026-11-27: `GPUFlock` in `@margoengine/vfx/flocking` flies 16,384 boids on WebGPU (the check; up to 262,144) with the three rules, a vision cone, predators or the pointer, attractors and obstacles, as one instanced draw of built-in or glTF birds or fish, with a quick start, a three.js note, `examples/gpu-flocking.html` and a debug view; on the WebGL2 layer its CPU twin steps it. Open: speed against the rival demo, measured in the speed phase.
 
 Not in the 14, but rivals have them, so they meet parity under Part 3: crowds on a navmesh (Babylon), particles with
 forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
@@ -226,7 +226,7 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 | LIFE-01 | Legged animal locomotion | none | Base | REOPENED | MEETS |
 | LIFE-02 | Limbless and small-animal locomotion | none | Base | REOPENED | MEETS |
 | LIFE-03 | Aquatic locomotion | none | Base | REOPENED | MEETS |
-| LIFE-04 | Flocks, schools, herds | T GPU birds | P14 | REOPENED | PERFECT |
+| LIFE-04 | Flocks, schools, herds | T GPU birds | P14 | GPU path landed 2026-11-27 (vfx/flocking); speed phase open | PERFECT |
 | LIFE-05 | Pedestrians and crowds | B navmesh crowd agents | Crowd agents on a navmesh: target, speed, separation, avoidance of obstacles and each other, add and remove agents at runtime | REOPENED | GAP until a crowd-on-navmesh test exists |
 | LIFE-06 | Formations, cavalry charge | none | Base | OPEN | DON'T BUILD |
 | LIFE-07 | Machines with actuators | none beyond P3 motors | Base | OPEN | DON'T BUILD |

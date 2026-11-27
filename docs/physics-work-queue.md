@@ -467,7 +467,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 839a45208b |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 64bedcf038 |
 | LIFE-03 | Aquatic locomotion | physics/life | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 708e96a06b |
-| LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 006faf6368 |
+| LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Claude (laptop), taken over from Gemini on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 006faf6368; P14 GPU path (`@margoengine/vfx/flocking`) landed 2026-11-27 |
 | LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 561885e7a1 |
 | LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
 | FLUID-01 | SPH, divergence-free (accurate mode) | none | Open | OPEN |
