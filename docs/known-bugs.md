@@ -1162,6 +1162,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   and smoke). The impostors switch hard (`lodFade: 0` in biomes objects.ts), but no switch was seen in these frames.
   Next: decide with the manager whether T4 should warp by each pixel's real motion (a velocity mask for the scattered
   plants) and leave out pixels hidden in the next frame, as optical-flow benchmarks do. The bound stays 0.5.
+- **Measured 2026-11-27 (lane A), the check unchanged (Scott's ruling):** on the frames after both fixes the camera
+  moves 8.7 pixels a frame on average at early (max 55) and 25.9 at mid (max 175). Pixels the next frame covers or
+  uncovers (forward z-buffer of the warp) are 1.90 percent of the frame at early and 3.61 at mid; depth-edge pixels
+  not covered are 2.86 and 3.81. Together 4.76 and 7.42 percent, 9.5 and 15 times the 0.5 bound, before any sway, TAA
+  or aliasing: a warp by camera motion cannot match a surface the next frame shows for the first time, so no render
+  fix reaches the bound on this camera path. The rest, which render fixes can reach: plant interiors 0.20 and 0.49,
+  sky 0.06 and 0.17, other 0.07 and 0.40 (0.33 early, already inside the bound; 1.06 mid). Passing as the check
+  stands needs a ruling on the shot (a camera path with less parallax per frame) or on the check; until then lane A
+  works the mid-probe remainder (1.06 percent) only. Script: the lane's sh2-occ.mjs split on the shot's probes.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 
