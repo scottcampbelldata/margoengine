@@ -1264,7 +1264,7 @@ export class WeatherDrive {
       if (this.doubled >= 2)
         throw new MargoError(
           'state',
-          'WeatherDrive was stepped with advanceTime between engine frames that also step it, so its weather runs faster than the engine clock; step it one way: leave it to the engine, or attach it with advance: false and call advanceTime yourself',
+          'WeatherDrive stepped with advanceTime between engine frames runs its weather too fast; leave it to the engine, or attach it with advance: false',
         );
     }
     this.update(delta);
