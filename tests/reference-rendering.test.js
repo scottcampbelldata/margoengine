@@ -346,8 +346,8 @@ for (const family of ['transmission', 'volume'])
     const read = (name) => JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/${name}`, import.meta.url)));
     const receipt = read(`batch-160-amd-${family}.json`),
       baseline = read(`batch-160-${family}.json`);
-    // The volume receipt was measured again when volume files moved to the pass (KB-VOL-TINT-DISPLAY1).
-    assert.equal(receipt.date, family === 'volume' ? '2026-11-27' : '2026-11-11');
+    // Both receipts were measured again when volume files moved to the pass (KB-VOL-TINT-DISPLAY1).
+    assert.equal(receipt.date, '2026-11-27');
     for (const compat of [false, true]) {
       const budgets = amdReceiptBudgets(receipt, baseline, compat);
       assert.deepEqual(Object.keys(budgets), ['viewer', 'full', 'direct']);

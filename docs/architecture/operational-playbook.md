@@ -7178,7 +7178,7 @@ native 1,512,739 / 13,741,199 / 1,746,854; compatibility 1,512,128 / 13,741,752 
 1,747,921. Every unchanged square/max/foreground gate also passes.
 Durable proof paths, report hashes, decoded RGBA hashes and all metrics are in
 results/batch-160-amd-transmission.json and batch-160-amd-volume.json (relative
-to docs/whitepaper). The full volume ceiling remains 13,792,000.
+to docs/whitepaper). The full volume ceiling remains 13,792,000. The AMD transmission receipt was measured again on 2026-11-27 at 31b2c8c30f (viewer/full/direct native 1,393,665 / 3,983,000 / 2,380,895, compatibility 1,371,097 / 3,981,200 / 2,365,175; were 1,577,938 / 4,155,211 / 2,625,420 and 1,554,970 / 4,152,961 / 2,608,796 from 2026-11-11), one decoded RGBA hash per backend; both backends passed the old receipt first.
 The analytic GPU test passes twenty exact slab pixels on each backend; all 47
 gltf/materials runtime README examples pass with zero exceptions.
 The complete changed-package CPU run passes 783 tests with zero failures/skips.
