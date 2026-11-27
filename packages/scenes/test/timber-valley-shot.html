@@ -29,11 +29,27 @@ const targets=SceneTargets.attach(engine,{outputs:{
 targets.add(scene.parts.view.terrain);
 if(scene.parts.view.objects)targets.add(scene.parts.view.objects,{ground:false});
 
-let last=null;
+// The scene's own clocks (the weather drive, the fire front and the sky are engine plugins) run on the engine's frames,
+// and the shot tool's clock is the engine's: they follow the shot clock with nothing more. `apply` once also stepped them
+// with scene.advanceTime, so the weather, its gusts and the fire ran at twice the shot's speed (KB-LOOK-TV-SHIMMER2); it
+// now only checks that each clock has moved once with the shot (within the frame the engine has yet to draw).
+// The fire moves in whole steps of its own (options.step, default 0.5 s), so it may trail the shot by up to one step.
+const clocks=()=>({weather:scene.parts.weather.time,fire:scene.parts.fireFront?.time});
+const lag={weather:0.1,fire:0.1+(scene.parts.fireFront?.options.step??0.5)};
+let first=null;
 globalThis.timberShot={
   engine,scene,
   aovs:()=>({device:engine.gpu,textures:Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)]))}),
-  async apply(state,{time}){if(last!==null&&time>last)scene.advanceTime(time-last);last=time;},
+  async apply(state,{time}){
+    const now=clocks();
+    if(first===null){first={time,...now};return;}
+    const shot=time-first.time;
+    for(const [name,value] of Object.entries(now)){
+      if(value===undefined)continue;
+      const own=value-first[name];
+      if(!(own<=shot+1e-6&&own>=shot-lag[name]))throw new Error(`timber-valley shot: the ${name} clock moved ${own.toFixed(5)} s in ${shot.toFixed(5)} s of shot time; it must follow the shot clock once`);
+    }
+  },
   settings(values){scene.applySettings(values);},
 };
 engine.start();

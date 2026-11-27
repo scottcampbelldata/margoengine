@@ -552,6 +552,10 @@ export class WeatherDrive {
   private disposed = false;
   private engine?: DriveEngine;
   private last?: DriveSettings;
+  /** advanceTime stepped the weather since the engine's last frame with time in it. */
+  private stepped = false;
+  /** How many engine frames in a row found such a step: two or more is a doubled clock. */
+  private doubled = 0;
   private readonly seas = new WeakMap<object, string>();
   private readonly rains = new WeakMap<object, number>();
   private readonly winds = new WeakMap<object, unknown>();
@@ -610,6 +614,8 @@ export class WeatherDrive {
    */
   advanceTime(delta: number): void {
     this.apply(delta, true);
+    // A step besides the engine's own (KB-LOOK-TV-SHIMMER2): see onPreUpdate.
+    if (delta > 0 && this.engine && (this.options.advance ?? true)) this.stepped = true;
   }
 
   /**
@@ -621,6 +627,8 @@ export class WeatherDrive {
     if (this.disposed) throw new MargoError('disposed', 'WeatherDrive is disposed; attach a new WeatherDrive');
     if (this.options.advance ?? true) this.options.weather.resetTime?.();
     this.fuel = this.last = undefined;
+    this.stepped = false;
+    this.doubled = 0;
   }
 
   private apply(delta: number, replay: boolean): DriveSettings {
@@ -1246,6 +1254,19 @@ export class WeatherDrive {
     this.engine = engine as DriveEngine;
   }
   onPreUpdate(delta: number): void {
+    // An engine that runs this drive steps its weather every frame: stepped again with advanceTime between two of its
+    // frames, and again between the next two, the weather runs twice (or more) as fast as the clock that drives both
+    // (KB-LOOK-TV-SHIMMER2: a shot page called scene.advanceTime each sub-frame, so the gale's gusts and the fire ran at
+    // double speed). One burst between frames (rolling a fire's past, a seek after resetTime) is allowed.
+    if (delta > 0) {
+      this.doubled = this.stepped ? this.doubled + 1 : 0;
+      this.stepped = false;
+      if (this.doubled >= 2)
+        throw new MargoError(
+          'state',
+          'WeatherDrive was stepped with advanceTime between engine frames that also step it, so its weather runs faster than the engine clock; step it one way: leave it to the engine, or attach it with advance: false and call advanceTime yourself',
+        );
+    }
     this.update(delta);
   }
 

@@ -806,6 +806,12 @@ export class FireFront implements EnginePlugin {
   spots = 0;
 
   private engine?: Engine;
+  /** advanceTime stepped the fire since the engine's last frame with time in it, not from that frame. */
+  private stepped = false;
+  /** How many engine frames in a row found such a step: two or more is a doubled clock. */
+  private doubled = 0;
+  /** Inside onPreUpdate: the engine's own step. */
+  private fromEngine = false;
   private disposed = false;
   private readonly step: number;
   private readonly seg: number;
@@ -1193,6 +1199,8 @@ export class FireFront implements EnginePlugin {
   advanceTime(delta: number): void {
     if (this.disposed) throw new MargoError('disposed', 'FireFront is disposed; attach a new FireFront');
     finiteIn(delta, 'delta', 0, 86400);
+    // A step besides the engine's own (KB-LOOK-TV-SHIMMER2): see onPreUpdate.
+    if (delta > 0 && this.engine && !this.fromEngine) this.stepped = true;
     this.checkLive();
     this.acc += delta;
     while (this.acc >= this.step - 1e-9) {
@@ -1211,6 +1219,8 @@ export class FireFront implements EnginePlugin {
   resetTime(): void {
     if (this.disposed) return;
     this.time = this.acc = this.embers = this.spots = 0;
+    this.stepped = false;
+    this.doubled = 0;
     this.random = rng(finiteIn(this.options.seed ?? 1, 'seed', 0, 4294967295));
     const states = this.stateOf;
     for (let i = 0; i < states.length; i++) if (states[i] !== NO_FUEL) states[i] = UNBURNT;
@@ -1927,7 +1937,24 @@ export class FireFront implements EnginePlugin {
     }
   }
   onPreUpdate(delta: number): void {
-    this.advanceTime(delta);
+    // An engine that runs this fire steps it every frame: stepped again with advanceTime between two of its frames, and
+    // again between the next two, the fire spreads twice (or more) as fast as the clock that drives both
+    // (KB-LOOK-TV-SHIMMER2). One burst between frames (rolling the fire's past, a seek after resetTime) is allowed.
+    if (delta > 0) {
+      this.doubled = this.stepped ? this.doubled + 1 : 0;
+      this.stepped = false;
+      if (this.doubled >= 2)
+        throw new MargoError(
+          'state',
+          'FireFront was stepped with advanceTime between engine frames that also step it, so it burns faster than the engine clock; step it one way: leave it to the engine, or step a fire made without an engine yourself',
+        );
+    }
+    this.fromEngine = true;
+    try {
+      this.advanceTime(delta);
+    } finally {
+      this.fromEngine = false;
+    }
   }
 
   /** Stops the fire and frees the burn texture; the smoke columns stay attached to the engine until it disposes. */
