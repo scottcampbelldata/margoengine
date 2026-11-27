@@ -141,7 +141,15 @@ export function withoutFlatTriangles(mesh: PolygonMesh): Flattened {
 
   for (let pass = 0, changed = true; changed && pass < MAX_PASSES; pass++) {
     changed = false;
-    const longest = (f: Face): number => Math.max(...f.vertices.map((a, i) => length(a, f.vertices[(i + 1) % 3])));
+    const sidesOf = ({ vertices }: Face): [number, number, number] => [
+        length(vertices[0], vertices[1]),
+        length(vertices[1], vertices[2]),
+        length(vertices[2], vertices[0]),
+      ],
+      longest = (f: Face): number => {
+        const [a, b, c] = sidesOf(f);
+        return Math.max(a, b, c);
+      };
     // The longest first: a cap's neighbor across its longest edge is then never a longer cap.
     const todo = faces
       .filter((f) => f.alive && flat(f))
@@ -150,12 +158,13 @@ export function withoutFlatTriangles(mesh: PolygonMesh): Flattened {
     for (const { f } of todo) {
       if (!f.alive || !flat(f)) continue;
       const error = faceGeometryError(points, f.vertices)!;
-      const sides = f.vertices.map((a, i) => length(a, f.vertices[(i + 1) % 3]));
+      const sides = sidesOf(f),
+        [a, b, c] = sides;
       if (error.includes('degenerate geometry')) {
-        const at = sides.indexOf(Math.min(...sides));
+        const at = sides.indexOf(Math.min(a, b, c));
         collapse(f.vertices[at], f.vertices[(at + 1) % 3]);
         changed = true;
-      } else if (split(f, sides.indexOf(Math.max(...sides)))) changed = true;
+      } else if (split(f, sides.indexOf(Math.max(a, b, c)))) changed = true;
     }
   }
   const out: PolygonFace[] = faces.filter((f) => f.alive).map(({ id, vertices, uv }) => ({ id, vertices, uv }));

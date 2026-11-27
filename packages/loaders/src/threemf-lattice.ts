@@ -3,6 +3,7 @@ import { limits, resolvePath, throwIfAborted, type BinaryInput } from './util.js
 import { read3MFMaterials, type ThreeMFMaterials } from './threemf-materials.js';
 import type { ThreeMFExtension, ThreeMFModel, ThreeMFOptions } from './threemf.js';
 import { readXMLTree, decodeXML } from './xml.js';
+import { attribute, beamReader, choice, finishLattice, index, number } from './threemf-beam-reader.js';
 const F = '3MF';
 /** One beam's native tapered-frustum geometry and endpoint properties, in file units. */
 export interface ThreeMFBeam {
@@ -136,40 +137,13 @@ interface State {
   stacks: Map<string, ThreeMFSliceStack>;
   properties: Map<string, ThreeMFNativeProperty>;
   object?: ThreeMFNativeObject;
-  lattice?: ThreeMFBeamLattice;
   stack?: ThreeMFSliceStack;
   slice?: ThreeMFSlice;
   polygon?: ThreeMFSlicePolygon;
   property?: ThreeMFNativeProperty;
   xyz: number[];
   xy: number[];
-  beamSet?: { name?: string; identifier?: string; beams: number[]; balls: number[] };
 }
-const attribute = (a: Record<string, string>, name: string): string | undefined =>
-  a[name] ?? Object.entries(a).find(([key]) => key.endsWith(':' + name))?.[1];
-function number(value: string | undefined, name: string, fallback?: number): number {
-  const n = value === undefined ? fallback : Number(value);
-  if (n === undefined || !Number.isFinite(n)) throw new LoaderError(F, 'syntax', `${name} must be a finite number`);
-  return n;
-}
-function index(value: string | undefined, name: string): number {
-  const n = number(value, name);
-  if (!Number.isSafeInteger(n) || n < 0 || n >= 2147483648)
-    throw new LoaderError(F, 'range', `${name} must be a nonnegative 31-bit index`);
-  return n;
-}
-function positive(value: string | undefined, name: string, fallback?: number): number {
-  const n = number(value, name, fallback);
-  if (n <= 0) throw new LoaderError(F, 'range', `${name} must be positive`);
-  return n;
-}
-function choice<T extends string>(value: string | undefined, values: readonly T[], fallback: T): T {
-  if (value === undefined) return fallback;
-  if (!values.includes(value as T)) throw new LoaderError(F, 'range', `expected ${values.join(', ')}; got ${value}`);
-  return value as T;
-}
-const cap = (value: string | undefined): ThreeMFBeam['cap1'] =>
-  choice(value, ['sphere', 'hemisphere', 'butt'], 'sphere');
 const own = (a: Record<string, string>): Record<string, string> => Object.assign(Object.create(null), a);
 const normalize = (path: string): string => path.replaceAll('\\', '/').replace(/^\/+/, '').toLowerCase();
 const list = (value: string | undefined, name: string): number[] => {
@@ -196,11 +170,9 @@ export async function parse3MFLattice(
     sliceInstances: ThreeMFLatticeResult['sliceInstances'] = [];
   const ancestors: boolean[] = [];
   let objectCount = 0,
-    references = 0,
     expandedLayers = 0;
-  let beams = 0,
-    balls = 0,
-    slices = 0,
+  const lattices = beamReader(maxBeams);
+  let slices = 0,
     vertices = 0,
     segments = 0;
   const state = (m: ThreeMFModel): State => {
@@ -211,10 +183,6 @@ export async function parse3MFLattice(
     }
     return s;
   };
-  const propertyRef = (a: Record<string, string>, pid?: string, p?: number): { pid?: string; property?: number } => ({
-    pid: a.pid ?? pid,
-    property: a.pindex === undefined ? p : index(a.pindex, 'pindex'),
-  });
   const hooks: ThreeMFExtension = {
     element(m, name, a) {
       const s = state(m),
@@ -259,67 +227,10 @@ export async function parse3MFLattice(
         if (obj) s.xyz.push(number(a.x, 'vertex x'), number(a.y, 'vertex y'), number(a.z, 'vertex z'));
       } else if (name === 'beamlattice') {
         if (!obj || obj.lattice) throw new LoaderError(F, 'syntax', 'beamlattice needs a distinct mesh object');
-        const r = propertyRef(a, m.objects.get(obj.id)?.pid, m.objects.get(obj.id)?.pindex);
-        const lattice: ThreeMFBeamLattice = {
-          radius: positive(a.radius, 'radius'),
-          minLength: positive(a.minlength, 'minlength'),
-          cap: cap(a.cap),
-          ballMode: choice(attribute(a, 'ballmode'), ['none', 'mixed', 'all'], 'none'),
-          clippingMode: choice(a.clippingmode, ['none', 'inside', 'outside'], 'none'),
-          clippingMesh: a.clippingmesh,
-          representationMesh: a.representationmesh,
-          ...r,
-          beams: [],
-          balls: [],
-          sets: [],
-          activeBeams: new Uint32Array(),
-          effectiveBalls: [],
-        };
-        const br = attribute(a, 'ballradius');
-        if (br !== undefined) lattice.ballRadius = positive(br, 'ballradius');
-        if (lattice.ballMode !== 'none' && lattice.ballRadius === undefined)
-          throw new LoaderError(F, 'syntax', 'ballmode needs ballradius');
-        obj.lattice = lattice;
-        s.lattice = lattice;
-      } else if (name === 'beam') {
-        const l = s.lattice;
-        if (!l) throw new LoaderError(F, 'syntax', 'beam outside beamlattice');
-        if (++beams > maxBeams) throw new LoaderError(F, 'limit', 'beam count exceeds maxBeams');
-        if (a.r2 !== undefined && a.r1 === undefined) throw new LoaderError(F, 'syntax', 'r2 requires r1');
-        const r1 = positive(a.r1, 'r1', l.radius),
-          beam: ThreeMFBeam = {
-            v1: index(a.v1, 'v1'),
-            v2: index(a.v2, 'v2'),
-            r1,
-            r2: positive(a.r2, 'r2', r1),
-            cap1: a.cap1 === undefined ? l.cap : cap(a.cap1),
-            cap2: a.cap2 === undefined ? l.cap : cap(a.cap2),
-            pid: a.pid ?? l.pid,
-            p1: a.p1 === undefined ? l.property : index(a.p1, 'p1'),
-            p2: a.p2 === undefined ? l.property : index(a.p2, 'p2'),
-          };
-        l.beams.push(beam);
-      } else if (name === 'ball') {
-        const l = s.lattice;
-        if (!l) throw new LoaderError(F, 'syntax', 'ball outside beamlattice');
-        if (++balls > maxBeams) throw new LoaderError(F, 'limit', 'ball count exceeds maxBeams');
-        l.balls.push({
-          vertex: index(a.vindex, 'vindex'),
-          radius: positive(a.r, 'ball radius', l.ballRadius),
-          pid: a.pid ?? l.pid,
-          property: a.p === undefined ? l.property : index(a.p, 'ball property'),
-        });
-      } else if (name === 'beamset') {
-        if (!s.lattice || s.beamSet) throw new LoaderError(F, 'syntax', 'invalid beamset nesting');
-        s.beamSet = { name: a.name, identifier: a.identifier, beams: [], balls: [] };
-      } else if (name === 'ref' && s.beamSet) {
-        if (++references > maxBeams * 2)
-          throw new LoaderError(F, 'limit', 'beamset references exceed the native primitive budget');
-        s.beamSet.beams.push(index(a.index, 'beam ref'));
-      } else if (name === 'ballref' && s.beamSet) {
-        if (++references > maxBeams * 2)
-          throw new LoaderError(F, 'limit', 'beamset references exceed the native primitive budget');
-        s.beamSet.balls.push(index(a.index, 'ball ref'));
+        const core = m.objects.get(obj.id);
+        obj.lattice = lattices.begin(s, a, core?.pid, core?.pindex);
+      } else if (['beam', 'ball', 'beamset', 'ref', 'ballref'].includes(name)) {
+        lattices.element(s, name, a);
       } else if (name === 'slicestack') {
         if (s.stack || !a.id || s.stacks.has(a.id))
           throw new LoaderError(F, 'syntax', 'invalid slicestack id or nesting');
@@ -368,18 +279,11 @@ export async function parse3MFLattice(
     },
     close(m, name) {
       const s = state(m);
+      lattices.close(s, name);
       if (name === 'object') {
         if (s.object) s.object.vertices = Float64Array.from(s.xyz);
         s.object = undefined;
         s.xyz = [];
-      } else if (name === 'beamlattice') s.lattice = undefined;
-      else if (name === 'beamset' && s.beamSet && s.lattice) {
-        s.lattice.sets.push({
-          ...s.beamSet,
-          beams: Uint32Array.from(s.beamSet.beams),
-          balls: Uint32Array.from(s.beamSet.balls),
-        });
-        s.beamSet = undefined;
       } else if (name === 'slice' && s.slice) {
         s.slice.vertices = Float64Array.from(s.xy);
         s.slice = undefined;
@@ -488,46 +392,9 @@ export async function parse3MFLattice(
             );
           const l = o.lattice;
           if (!l) continue;
-          if (!l.beams.length) throw new LoaderError(F, 'syntax', 'beamlattice requires at least one beam');
           if (!m.objects.get(o.id)?.mesh || m.objects.get(o.id)!.components.length)
             throw new LoaderError(F, 'syntax', 'lattice object requires a mesh');
-          const pointCount = o.vertices.length / 3,
-            active: number[] = [],
-            ends = new Set<number>();
-          l.beams.forEach((beam, i) => {
-            if (beam.v1 === beam.v2 || beam.v1 >= pointCount || beam.v2 >= pointCount)
-              throw new LoaderError(F, 'range', 'invalid beam endpoints');
-            checkProperty(s, beam.pid, beam.p1);
-            checkProperty(s, beam.pid, beam.p2);
-            const a = beam.v1 * 3,
-              b = beam.v2 * 3;
-            if (
-              Math.hypot(
-                o.vertices[a] - o.vertices[b],
-                o.vertices[a + 1] - o.vertices[b + 1],
-                o.vertices[a + 2] - o.vertices[b + 2],
-              ) >= l.minLength
-            ) {
-              active.push(i);
-              ends.add(beam.v1);
-              ends.add(beam.v2);
-            }
-          });
-          l.activeBeams = Uint32Array.from(active);
-          const explicit = new Map<number, ThreeMFBall>();
-          for (const ball of l.balls) {
-            if (ball.vertex >= pointCount || explicit.has(ball.vertex))
-              throw new LoaderError(F, 'range', 'invalid or repeated ball vertex');
-            checkProperty(s, ball.pid, ball.property);
-            explicit.set(ball.vertex, ball);
-          }
-          if (l.ballMode !== 'none')
-            for (const vertex of ends) {
-              const ball = explicit.get(vertex);
-              if (ball) l.effectiveBalls.push({ ...ball });
-              else if (l.ballMode === 'all')
-                l.effectiveBalls.push({ vertex, radius: l.ballRadius!, pid: l.pid, property: l.property });
-            }
+          finishLattice(l, o.vertices, (pid, p) => checkProperty(s, pid, p));
           for (const set of l.sets)
             if (set.beams.some((i) => i >= l.beams.length) || set.balls.some((i) => i >= l.balls.length))
               throw new LoaderError(F, 'range', 'beamset index outside source arrays');

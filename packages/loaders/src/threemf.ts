@@ -3,6 +3,7 @@ import { floats, limits, throwIfAborted, toBytes, uints, type BinaryInput, type 
 import { readZipDirectory, readZipEntry, type ZipEntry, type ZipOptions } from './zip.js';
 import { decodeXML, readXML, type XMLExternalOptions } from './xml.js';
 import { hexColor } from '@margoengine/math/color';
+import type { VolumeFill } from './threemf-volume-colour.js';
 
 const F = '3MF';
 const NONE = 0xffffffff;
@@ -55,6 +56,10 @@ interface MeshData {
   p: Growable<Uint32Array>;
   /** For each triangle of an evaluated mesh, the colour its group takes: that of the triangle it came from. */
   flat?: (Color | undefined)[];
+  /** The volume colour that fills the mesh's solid, sampled onto its surface once the surface is final. */
+  fill?: VolumeFill;
+  /** For a mesh made of several solids' surfaces, the volume colour of each triangle, instead of `fill`. */
+  fills?: (VolumeFill | undefined)[];
 }
 interface BooleanReference {
   objectId: string;

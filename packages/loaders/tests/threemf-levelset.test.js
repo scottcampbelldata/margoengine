@@ -207,7 +207,7 @@ test('a mesh node gives the signed distance and an undefined value takes the fal
   const slab = await parse3MFVolumetric(pack(root, { attributes: 'fallbackvalue="1"' }), file);
   near(volume(slab), 100, 3);
   await assert.rejects(
-    parse3MFVolumetric(pack(implicit(3, node('beamlattice', 'b', [], [['scalar', 'distance']]), 'b.distance')), file),
+    parse3MFVolumetric(pack(implicit(3, node('noise', 'b', [], [['scalar', 'distance']]), 'b.distance')), file),
     { code: 'unsupported' },
   );
 });

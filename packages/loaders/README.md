@@ -1016,7 +1016,7 @@ for (const { positions, indices, groups, matrices } of model.instances) {
 
 ## 3MF volumes and displacement
 
-`parse3MFVolumetric` returns the meshes as `parse3MF` does, with `images` (PNG sheets), `functions` (image samplers and node graphs), `volumes` and the built `objects` that have volume data or a level set, each with its placements and a level set's bounding mesh. References, graph order and types are checked. A built level set is evaluated and meshed, and its surface joins the result's triangles in the object's frame: inside is where the function is below zero within the domain mesh (or its box with `meshbboxonly`), and an undefined value takes `fallbackvalue`. Functions are image stacks (filters and tile styles of the extension) and graphs of native nodes, called functions, gradients, normalized distances and mesh distances included. The surface comes from the Marching Cubes of `@margoengine/procedural` on a grid of `levelSetResolution` cells along the domain's longest side (default 64, at most 512, spacing rounded down to a power of two); a file's `minfeaturesize` asks for two cells to a feature, and `levelSet.unresolved` says the grid could not give them. Edges where the domain cuts the surface are rounded within one cell. `meshLevelSets: false` reads the resources only. Meshing needs the optional `@margoengine/procedural`, `@margoengine/bvh` and `@margoengine/decoders` peers, loaded only for a package with a level set. Volume data (colour, composites, properties) is not sampled onto triangles, and the `beamlattice` node is not evaluated (`unsupported`). The Marching Cubes method and its citations are in the procedural package.
+`parse3MFVolumetric` returns the meshes as `parse3MF` does, with `images` (PNG sheets), `functions` (image samplers and node graphs), `volumes` and the built `objects` that have volume data or a level set, each with its placements and a level set's bounding mesh. References, graph order and types are checked. A built level set is evaluated and meshed, and its surface joins the result's triangles in the object's frame: inside is where the function is below zero within the domain mesh (or its box with `meshbboxonly`), and an undefined value takes `fallbackvalue`. Functions are image stacks (filters and tile styles of the extension) and graphs of native nodes, called functions, gradients, normalized distances and mesh distances included. The surface comes from the Marching Cubes of `@margoengine/procedural` on a grid of `levelSetResolution` cells along the domain's longest side (default 64, at most 512, spacing rounded down to a power of two); a file's `minfeaturesize` asks for two cells to a feature, and `levelSet.unresolved` says the grid could not give them. Edges where the domain cuts the surface are rounded within one cell. `meshLevelSets: false` reads the resources only. Meshing needs the optional `@margoengine/procedural`, `@margoengine/bvh` and `@margoengine/decoders` peers, loaded only for a package with a level set. The `beamlattice` node gives the signed distance to a mesh object's beams and balls, clipped by the lattice's clipping mesh (see `threeMFBeamDistance` below). The colour of a shape's volume data is sampled onto its surface: triangles are split until no side is longer than the spacing (`colorResolution` samples along the longest side, default 32, at most 512; a colour's `minfeaturesize` asks for two samples to a feature, and `colorUnresolved` says they could not be given), the function is read at each corner, its linear channels are clipped to 0..1 and written as sRGB vertex colours, and a triangle with a surface property of its own keeps it. `sampleColors: false` leaves the triangles as the file has them. Composites and properties of volume data are returned as data only. The Marching Cubes method and its citations are in the procedural package.
 
 `parse3MFDisplacement` returns the displaced surface as its triangles, with `maps`, `displacementGroups` (coordinates, factors and unit vectors) and `meshes` (base triangles, each corner's coordinate and the placements) beside it. Each base edge is split until a segment spans at most one texel of its map (`samplesPerTexel`, default 1) and its interpolated vectors turn at most 15 degrees, never into more than `maxSegments` pieces (default 256, rounded down to a power of two). Points move by `(texture * height + offset) * f` along the normalized mix of the corner vectors, with the extension's filters and tile styles. Both sides of an edge split alike, so no crack opens; sides that move apart are joined directly when they use the same vectors and through the base edge when not. Colours follow the base triangles. `tessellate: false` gives the base triangles, as `parse3MF` does. Reading the map needs the optional `@margoengine/decoders` peer. Self-intersections of a displaced surface are not resolved. The subdivision follows the per-edge factors of Fisher, Fatahalian, Boulos, Akeley, Mark and Hanrahan, [DiagSplit: parallel, crack-free, adaptive tessellation for micropolygon rendering](https://graphics.stanford.edu/~mdfisher/Data/DiagSplit.pdf) (2009), as the edge-split patterns of Boubekeur and Schlick, [Generic adaptive mesh refinement](https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch05.html) (GPU Gems 3, 2007).
 
@@ -1063,7 +1063,7 @@ console.log(preview.indices.length / 3);
 
 ## 3MF boolean shapes
 
-`parse3MFBoolean` returns each shape with its `operation`, its `base` and `operands` (each with a transform and, for a mesh, its triangles) and the places the build puts it, and refuses what the extension rules out. Each shape is also evaluated, and its surface joins the result's triangles where the build places it: the exact n-ary boolean of `@margoengine/mesh-edit` applies the operands in order on the base, transforms first, and each face keeps the colour of the surface it came from (none when that surface has no property). Inputs must be closed, outward solids without flat triangles. A base that is a displacement mesh or a level set is not evaluated, and a package that builds a level set is refused (`unsupported`). `evaluate: false` reads the shapes only. Evaluating needs the optional `@margoengine/mesh-edit` peer, loaded only for a package with a shape.
+`parse3MFBoolean` returns each shape with its `operation`, its `base` and `operands` (each with a transform and, for a mesh, its triangles) and the places the build puts it, and refuses what the extension rules out. Each shape is also evaluated, and its surface joins the result's triangles where the build places it: the exact n-ary boolean of `@margoengine/mesh-edit` applies the operands in order on the base, transforms first, and each face keeps the colour of the surface it came from (none when that surface has no property). Inputs must be closed, outward solids; triangles with no area are removed first. This entry does not evaluate a base that is a displacement mesh or a level set, and refuses a package that builds a level set (`unsupported`): `parse3MFEvaluated` below does both. `evaluate: false` reads the shapes only. Evaluating needs the optional `@margoengine/mesh-edit` peer, loaded only for a package with a shape.
 
 ```ts
 import { export3MF } from 'margoengine/exporters/threemf';
@@ -1080,6 +1080,46 @@ console.log(shapes[0].operation, shapes[0].operands.length);
 // The shapes alone, without evaluating them.
 const structure = await parse3MFBoolean(file, { evaluate: false });
 console.log(structure.indices.length);
+```
+
+## 3MF packages that mix extensions
+
+`parse3MFEvaluated` (`/threemf-evaluate`) evaluates every shape of a package in one call: displacement meshes are tessellated, level sets meshed, beam lattices and balls made into triangles and cut by their clipping mesh, boolean shapes evaluated on any of these as their base, and volume colours sampled onto the surfaces that result. It returns what `parse3MFDisplacement`, `parse3MFVolumetric` and `parse3MFBoolean` return, plus `lattices`, and takes their options except the ones that switch evaluation off, with `beamSegments` (sides of a beam around its axis, default 16). A lattice's shells overlap its mesh and each other, which the 3MF positive fill rule reads as one solid; a clipped lattice and a boolean's result are single surfaces. In a boolean's result a face keeps its source's surface property. A face with none takes volume colour as the extension's overlapping order says: the base's for a difference, the last object's for an intersection, and in a union each surface its own. Clipping and booleans need the optional `@margoengine/mesh-edit` peer, level sets also `@margoengine/procedural`, `@margoengine/bvh` and `@margoengine/decoders`.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import { parse3MFEvaluated } from 'margoengine/loaders/threemf-evaluate';
+
+const positions = new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]);
+const geometry = { positions, indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] };
+const file = await export3MF(
+  { nodes: [{ name: 'Truss', geometry }] },
+  {
+    objectInfo: () => ({
+      lattice: { positions: [0, 0, 0.05, 0.05, 0, 0.05], beams: [{ v1: 0, v2: 1 }], radius: 0.002 },
+    }),
+  },
+);
+const { indices, lattices } = await parse3MFEvaluated(file);
+console.log(indices.length / 3, lattices[0].lattice.beams.length);
+// Rounder beams.
+const round = await parse3MFEvaluated(file, { beamSegments: 48 });
+console.log(round.indices.length / 3);
+```
+
+## 3MF beam lattices as triangles
+
+`mesh3MFBeamLattice` (`/threemf-beams`) makes the surface of a lattice, as `parse3MFLattice` returns it, over its mesh's vertices: one closed shell for each active beam (a conical frustum between its radii, closed by a flat `butt`, a `sphere` or the `hemisphere` outside the end) and for each ball, with `parts` naming the triangles of each and `along` placing every vertex on its beam's axis. `threeMFBeamDistance` returns the signed distance to the same solids: exact outside and in sign everywhere; inside overlapping beams it is the depth in the beam the point lies deepest in. Neither applies a clipping mesh. The distance walks a median-split tree of boxes (Wald, Boulos and Shirley, [Ray tracing deformable scenes using dynamic bounding volume hierarchies](https://www.sci.utah.edu/~wald/Publications/2007/BVH/download/togbvh.pdf), ACM Transactions on Graphics 26(1), 2007).
+
+```ts
+import { mesh3MFBeamLattice, threeMFBeamDistance } from 'margoengine/loaders/threemf-beams';
+
+const vertices = [0, 0, 0, 10, 0, 0];
+const lattice = { beams: [{ v1: 0, v2: 1, r1: 2, r2: 1, cap1: 'sphere' as const, cap2: 'butt' as const }] };
+const { positions, indices } = mesh3MFBeamLattice(vertices, lattice, { segments: 32 });
+console.log(positions.length / 3, indices.length / 3);
+const distance = threeMFBeamDistance(vertices, lattice);
+console.log(distance(5, 4, 0), distance(5, 0, 0));
 ```
 
 ## 3MF encrypted parts

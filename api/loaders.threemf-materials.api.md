@@ -83,6 +83,13 @@ interface BooleanReference {
 
 type Color = [number, number, number, number];
 
+interface FieldScope {
+    functions: ReadonlyMap<string, ThreeMFImageSampler | ThreeMFImplicit>;
+    voxels(imageId: string): Voxels;
+    distance(objectId: string, signed: boolean): (x: number, y: number, z: number) => number;
+    lattice(objectId: string): (x: number, y: number, z: number) => number;
+}
+
 class Growable<T extends Float32Array | Uint32Array> {
     array: T;
     length: number;
@@ -129,6 +136,8 @@ interface MeshData {
     pid: Growable<Uint32Array>;
     p: Growable<Uint32Array>;
     flat?: (Color | undefined)[];
+    fill?: VolumeFill;
+    fills?: (VolumeFill | undefined)[];
 }
 
 interface Model {
@@ -197,6 +206,33 @@ interface ThreeMFExtension {
     group(group: LoadedGroup, model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number): void;
 }
 
+interface ThreeMFFunctionNode {
+    id: string;
+    op: string;
+    name?: string;
+    attributes: Record<string, string>;
+    inputs: ThreeMFPort[];
+    outputs: ThreeMFPort[];
+}
+
+interface ThreeMFImageSampler extends ThreeMFResource {
+    kind: 'image';
+    name?: string;
+    imageId: string;
+    filter: 'linear' | 'nearest';
+    tile: [string, string, string];
+    offset: number;
+    scale: number;
+}
+
+interface ThreeMFImplicit extends ThreeMFResource {
+    kind: 'implicit';
+    name?: string;
+    inputs: ThreeMFPort[];
+    nodes: ThreeMFFunctionNode[];
+    outputs: ThreeMFPort[];
+}
+
 type ThreeMFModel = Model;
 
 interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
@@ -206,10 +242,23 @@ interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOption
     signal?: AbortSignal;
 }
 
+interface ThreeMFPort {
+    name: string;
+    type: ThreeMFPortType;
+    ref?: string;
+}
+
+type ThreeMFPortType = 'scalar' | 'vector' | 'matrix' | 'resourceid';
+
 interface ThreeMFReadContext {
     models: ReadonlyMap<string, ThreeMFModel>;
     loadModelPart(path: string): Promise<ThreeMFModel>;
     partPath(model: ThreeMFModel): string | undefined;
+}
+
+interface ThreeMFResource {
+    id: string;
+    modelPath?: string;
 }
 
 interface ThreeMFResult extends LoadedGeometry {
@@ -217,6 +266,26 @@ interface ThreeMFResult extends LoadedGeometry {
     unit: string;
     buildUUID?: string;
     metadata: Record<string, string>;
+}
+
+interface ThreeMFSampledField {
+    functionId: string;
+    channel: string;
+    transform?: number[];
+    minFeatureSize: number;
+    fallback: number;
+}
+
+interface VolumeFill {
+    scope: FieldScope;
+    field: ThreeMFSampledField;
+}
+
+interface Voxels {
+    columns: number;
+    rows: number;
+    sheets: number;
+    data: Uint16Array;
 }
 
 type XMLExternal = ReadonlyMap<string, string>;

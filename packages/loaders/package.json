@@ -209,6 +209,14 @@
       "types": "./dist/geo.d.ts",
       "import": "./dist/geo.js"
     },
+    "./threemf-beams": {
+      "types": "./dist/threemf-beams.d.ts",
+      "import": "./dist/threemf-beams.js"
+    },
+    "./threemf-evaluate": {
+      "types": "./dist/threemf-evaluate.d.ts",
+      "import": "./dist/threemf-evaluate.js"
+    },
     "./threemf-boolean": {
       "types": "./dist/threemf-boolean.d.ts",
       "import": "./dist/threemf-boolean.js"

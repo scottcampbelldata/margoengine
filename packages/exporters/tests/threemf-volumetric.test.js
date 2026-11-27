@@ -145,7 +145,11 @@ test('volume data names image functions, and reads back', async () => {
     'resources are defined before they are named',
   );
 
-  const read = await parse3MFVolumetric(file, { units: 'file' });
+  // The volume's colour is sampled onto the cube's surface; without it the triangles are the file's.
+  const coloured = await parse3MFVolumetric(file, { units: 'file' });
+  assert.ok(coloured.indices.length > 36);
+  assert.ok(coloured.colors || coloured.groups.every((g) => g.color));
+  const read = await parse3MFVolumetric(file, { units: 'file', sampleColors: false });
   assert.equal(read.indices.length, 36);
   assert.equal(read.images[0].name, 'mix');
   assert.deepEqual([read.images[0].rows, read.images[0].columns], [2, 3]);

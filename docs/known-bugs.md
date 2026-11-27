@@ -6,6 +6,33 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: booleans refused a solid holding a triangle with no area (KB-BOOL-FLAT1, mesh-edit)
+
+- **Repro:** `batchBooleanMeshes` on a closed box with one edge split on one side and closed by a triangle whose
+  three corners are in a line threw `TypeError`; a displacement step can make such triangles.
+- **Cause:** every boolean checked its input with the editing rule that each face has area.
+- **Fixed:** the three booleans remove such triangles first, keeping the solid closed (Botsch and Kobbelt 2001;
+  `packages/mesh-edit/src/flat-triangles.ts`). Regression: `packages/mesh-edit/tests/boolean-flat-triangles.test.js`.
+
+### Fixed 2026-11-27: a 3MF boolean could colour a cut face a hair below 0 (KB-3MF-CUTCOLOUR1, loaders)
+
+- **Repro:** a clipped lattice with two property colours read back vertex colours of -6e-17, which a material
+  refuses (`Invalid prepared PBR color`).
+- **Cause:** a point on a face edge interpolated just outside the face triangle it is shaded from
+  (`packages/loaders/src/threemf-csg.ts`).
+- **Fixed:** the interpolated colour is clipped to 0..1. Regression:
+  `packages/loaders/tests/threemf-evaluate.test.js`.
+
+### Open 2026-11-27: isolated darker pixels on the flat sides of a cut displacement mesh (KB-3MF-DOTS1, loaders)
+
+- **Repro:** `parse3MFEvaluated` on a cube of side 10 with a 32 x 32 sine height map on its top (height 2.5) minus
+  a box from (4.3, -1, 4) to (20, 5.2, 20), drawn with one flat-shaded material at 640 x 640 with the engine on
+  WebGPU: three or four single pixels on the flat sides are about 18 % darker than their neighbours. A plain box and
+  a plain box cut the same way show none. The mesh is closed (every edge walked both ways), drawing both sides does
+  not change them, and the result holds two triangles with no area.
+- **Cause:** not established. One of four samples missing at a vertex of a sliver fan is the likely reading; the
+  tessellated side faces and the Float32 rounding of the boolean result are the two places to look.
+
 ### Open 2026-11-27: in an AR session a post effect makes solid meshes see-through (KB-XR-AREFFECTS1, xr, shared)
 
 - **Repro:** the stand-in XR page `packages/webgl2-compat/test/xr.html` with `createXREngine`, an `immersive-ar`

@@ -2,6 +2,7 @@
 // boolean of `@margoengine/mesh-edit`: the base, then each operand in order, where a difference takes the union of the
 // operands away. A face keeps the colour of the surface it came from, as the extension asks for all three operations.
 import { cornerProperty, type ThreeMFMesh, type ThreeMFModel, type ThreeMFObject } from './threemf.js';
+import type { VolumeFill } from './threemf-volume-colour.js';
 import { LoaderError } from './types.js';
 import { floats, uints } from './util.js';
 
@@ -23,6 +24,9 @@ interface Solid {
   vertices: Point[];
   faces: { id: string; vertices: number[]; uv: [number, number][] }[];
   colours: (Color | undefined)[][];
+  /** The volume colour behind each face, and the one that fills the solid. */
+  fills: (VolumeFill | undefined)[];
+  fill?: VolumeFill;
 }
 
 /** Each evaluated shape as its polygons, which a later shape reads without the rounding and splitting of triangles. */
@@ -41,12 +45,15 @@ function triangleSolid(model: ThreeMFModel, object: ThreeMFObject, mesh: ThreeMF
       vertices: Array.from({ length: count }, (_, v) => [...source.subarray(v * 3, v * 3 + 3)] as Point),
       faces: [],
       colours: [],
+      fills: [],
+      fill: mesh.fill,
     };
   for (let t = 0; t < mesh.triangles.length / 3; t++) {
     const corners = [...mesh.triangles.array.subarray(t * 3, t * 3 + 3)];
     if (corners.some((v) => v >= count))
       throw new LoaderError(F, 'range', `a triangle index of object ${object.id} is outside 0..${count - 1}`);
     solid.faces.push(face(t, corners));
+    solid.fills.push(mesh.fills ? mesh.fills[t] : mesh.fill);
     solid.colours.push(
       [0, 1, 2].map((k) => {
         const property = cornerProperty(model, object, mesh, t, k);
@@ -58,7 +65,14 @@ function triangleSolid(model: ThreeMFModel, object: ThreeMFObject, mesh: ThreeMF
 }
 
 /** The solid under a 3MF transform; a mirrored one turns its faces back outward. */
-function placed({ vertices, faces, colours }: Solid, m: ArrayLike<number>): Solid {
+function placed({ vertices, faces, colours, fills, fill }: Solid, m: ArrayLike<number>): Solid {
+  const moved = new Map<VolumeFill, VolumeFill>(),
+    move = (from: VolumeFill | undefined): VolumeFill | undefined => {
+      if (!from) return from;
+      let to = moved.get(from);
+      if (!to) moved.set(from, (to = movedFill(from, m)));
+      return to;
+    };
   const mirrored =
     m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) + m[2] * (m[3] * m[7] - m[4] * m[6]) < 0;
   const turn = <T>(list: T[]): T[] => (mirrored ? [...list].reverse() : list);
@@ -68,7 +82,38 @@ function placed({ vertices, faces, colours }: Solid, m: ArrayLike<number>): Soli
     ),
     faces: faces.map((f, i) => face(i, turn(f.vertices))),
     colours: colours.map(turn),
+    fills: fills.map(move),
+    fill: move(fill),
   };
+}
+
+/** The fill of a solid after the 3MF transform `m`: a point goes back through `m` before the colour's own transform. */
+function movedFill({ scope, field }: VolumeFill, m: ArrayLike<number>): VolumeFill {
+  const [a, b, c, d, e, f, g, h, i, x, y, z] = Array.from(m),
+    determinant = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g),
+    inverse = [
+      e * i - f * h,
+      c * h - b * i,
+      b * f - c * e,
+      f * g - d * i,
+      a * i - c * g,
+      c * d - a * f,
+      d * h - e * g,
+      b * g - a * h,
+      a * e - b * d,
+    ].map((v) => v / determinant),
+    back = [0, 1, 2].map((k) => -(x * inverse[k] + y * inverse[3 + k] + z * inverse[6 + k])),
+    rows = [...inverse, ...back],
+    own = field.transform ?? [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+    // Row vectors: first `rows`, then `own`.
+    transform = Array.from({ length: 12 }, (_, at) => {
+      const r = Math.floor(at / 3),
+        k = at % 3;
+      return (
+        rows[r * 3] * own[k] + rows[r * 3 + 1] * own[3 + k] + rows[r * 3 + 2] * own[6 + k] + (r === 3 ? own[9 + k] : 0)
+      );
+    });
+  return { scope, field: { ...field, transform } };
 }
 
 const sub = (a: Point, b: Point): Point => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -102,8 +147,9 @@ function shade({ vertices, faces, colours }: Solid, at: number): ((p: Point) => 
     const w = sub(p, a),
       s = (vv * dot(w, u) - uv * dot(w, v)) / d,
       t = (uu * dot(w, v) - uv * dot(w, u)) / d;
-    return [0, 1, 2, 3].map(
-      (i) => (1 - s - t) * painted[0][i] + s * painted[best][i] + t * painted[best + 1][i],
+    // Rounding puts a point of an edge a hair outside the triangle; a colour stays a colour.
+    return [0, 1, 2, 3].map((i) =>
+      Math.min(1, Math.max(0, (1 - s - t) * painted[0][i] + s * painted[best][i] + t * painted[best + 1][i])),
     ) as Color;
   };
 }
@@ -134,7 +180,10 @@ export async function booleanMesh(
     throw new LoaderError(F, error instanceof RangeError ? 'limit' : 'syntax', `${label}: ${(error as Error).message}`);
   }
   const points = result.mesh.vertices as Point[],
-    shape: Solid = { vertices: points, faces: [], colours: [] },
+    // The extension's overlapping order: a difference keeps the base's volume, the others take the last object's.
+    filling = (operation === 'difference' ? solids[0] : solids[solids.length - 1])?.fill,
+    shape: Solid = { vertices: points, faces: [], colours: [], fills: [], fill: filling },
+    fills: (VolumeFill | undefined)[] = [],
     vertices = floats(),
     triangles = uints(),
     pids = uints(),
@@ -169,6 +218,9 @@ export async function booleanMesh(
       own = corners.map((p) => paint?.(p));
     shape.faces.push(face(shape.faces.length, [...piece.vertices]));
     shape.colours.push(own);
+    // A union's face is its own solid's surface; the faces of the others bound the filling volume.
+    const fill = operation === 'union' ? solids[input].fills[Number(from)] : filling;
+    shape.fills.push(fill);
     if (paint && group < 0) {
       group = model.propertyIds.length;
       const key = `\0boolean ${id}`;
@@ -195,9 +247,12 @@ export async function booleanMesh(
       // A face whose source has no property has none either.
       pids.push(paint ? group : NONE);
       properties.push3(painting[0], painting[i], painting[i + 1]);
+      fills.push(fill);
     }
   }
   const mesh: ThreeMFMesh = { vertices, triangles, pid: pids, p: properties };
+  if (filling) mesh.fill = filling;
+  if (fills.some(Boolean)) mesh.fills = fills;
   evaluated.set(mesh, shape);
   return mesh;
 }

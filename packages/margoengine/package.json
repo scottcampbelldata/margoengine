@@ -2555,6 +2555,14 @@
       "types": "./dist/loaders/geo.d.ts",
       "import": "./dist/loaders/geo.js"
     },
+    "./loaders/threemf-beams": {
+      "types": "./dist/loaders/threemf-beams.d.ts",
+      "import": "./dist/loaders/threemf-beams.js"
+    },
+    "./loaders/threemf-evaluate": {
+      "types": "./dist/loaders/threemf-evaluate.d.ts",
+      "import": "./dist/loaders/threemf-evaluate.js"
+    },
     "./loaders/threemf-boolean": {
       "types": "./dist/loaders/threemf-boolean.d.ts",
       "import": "./dist/loaders/threemf-boolean.js"

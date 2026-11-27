@@ -88,12 +88,16 @@ export interface ThreeMFVolumetricObject {
         cellSize?: number;
         unresolved?: boolean;
     };
+    colorSpacing?: number;
+    colorUnresolved?: boolean;
     instances: Float64Array[];
 }
 
 export interface ThreeMFVolumetricOptions extends ThreeMFOptions {
     meshLevelSets?: boolean;
     levelSetResolution?: number;
+    sampleColors?: boolean;
+    colorResolution?: number;
 }
 
 export interface ThreeMFVolumetricResult extends ThreeMFResult {

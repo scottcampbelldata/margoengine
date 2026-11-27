@@ -4782,6 +4782,13 @@ no measured astronomical photometric accuracy is claimed.
 
 `export3MF` writes the 3MF volumetric, implicit and displacement extensions, and `parse3MFVolumetric` and `parse3MFDisplacement` read them back (2026-11-27): `packages/exporters/tests/threemf-volumetric.test.js` and `threemf-displacement.test.js` check the written XML against the 3MF Consortium's specification text and read hand-written files after the specifications' examples. Only Margo's readers have read these files. `parse3MFVolumetric` evaluates the function graphs and image stacks and meshes level sets (`packages/loaders/tests/threemf-levelset.test.js`: analytic sphere, box, tetrahedron and mesh-distance shapes, image axis order, node results and the fallback value). `parse3MFDisplacement` subdivides and moves a displaced surface: `packages/loaders/tests/threemf-displacement.test.js` holds it to the extension's formulas (volumes, vertex positions under each filter and tile style, vector factors and turns, the joins of section 5.2 and closed edges). Boolean shapes are written and read the same way (`threemf-boolean.test.js`), and `parse3MFBoolean` evaluates them with the exact mesh boolean (`packages/loaders/tests/threemf-boolean.test.js`: volumes of each operation, nested shapes, mirrored operands and face colours). The secure content extension's unencrypted structure is written and read (`threemf-secure.test.js`); Margo encrypts and decrypts nothing.
 
+`parse3MFEvaluated` evaluates displacement meshes, level sets, beam lattices, boolean shapes and volume colour of one
+3MF package in one call (2026-11-27): `packages/loaders/tests/threemf-evaluate.test.js` checks volumes of booleans
+over each kind of base, clipping, beam and volume colours against values derived from the 3MF Consortium's
+specifications, and `threemf-beams.test.js` checks every cap mode's distance sign against a separate statement of
+the solid and the mesh against the distance. Rendered pictures were looked at on one machine; no slicer, printer or
+other 3MF consumer was run. Limits: [limits.md](../limits.md), "3MF export".
+
 Batch 213 job 2 MToon: direct-light bands, matcap orientation, local-light rim, linear masked UV animation before KHR transforms, material expressions, isolated renderers, G-buffer replay and world/screen outlines have independent GPU oracles. Real Alicia 0.51 and Seed-san 1.0 exercise skinning, morph expressions and exact neutral restoration. Legacy constants match current public material observations, without rival source. Scope, quantization bars and remaining optional-package integration limits: [MToon record](../rigging-mtoon.md). No speed or cross-vendor claim.
 
 ### Batch 211 job 2

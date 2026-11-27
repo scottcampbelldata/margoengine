@@ -28,6 +28,8 @@ export interface FieldScope {
   voxels(imageId: string): Voxels;
   /** The signed distance to a mesh object (negative inside), or the unsigned one. */
   distance(objectId: string, signed: boolean): (x: number, y: number, z: number) => number;
+  /** The signed distance to a mesh object's beam lattice, clipped as the lattice says. */
+  lattice(objectId: string): (x: number, y: number, z: number) => number;
 }
 
 const bad = (message: string): never => {
@@ -362,6 +364,14 @@ function compileNode(
   } else if (op === 'mesh' || op === 'unsignedmesh') {
     const pos = value('pos', 3),
       distance = scope.distance(resource('mesh'), op === 'mesh'),
+      out = result(1);
+    steps.push(
+      () => (out[0] = Number.isFinite(pos[0] + pos[1] + pos[2]) ? defined(distance(pos[0], pos[1], pos[2])) : NaN),
+    );
+  } else if (op === 'beamlattice') {
+    // The distance is exact in any band, so the node's accuraterange asks for nothing more.
+    const pos = value('pos', 3),
+      distance = scope.lattice(resource('beamlattice')),
       out = result(1);
     steps.push(
       () => (out[0] = Number.isFinite(pos[0] + pos[1] + pos[2]) ? defined(distance(pos[0], pos[1], pos[2])) : NaN),
