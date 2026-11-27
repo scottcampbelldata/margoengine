@@ -123,14 +123,17 @@ test('light radius above 0: 20-float records with the radius, the sphere-light s
       declarations,
       /let ray=dot\(delta,rr\)\*rr-delta;let sp=delta\+ray\*clamp\(rs\/max\(length\(ray\),0\.000001\),0\.0,1\.0\);/,
     );
-    // ... and its anisotropic form over the half-vector Jacobian (Walter et al. 2007 eq. 14).
+    // ... and its anisotropic form over the half-vector Jacobian (Walter et al. 2007 eq. 14). Since
+    // KB-CLUSTERED-SIZEDZERO1 (eaf8d4cc82) the sphere terms sit inside if(rs>0.0) and overwrite the point light's d,
+    // g and fresnel there, so a radius-0 light runs the plain statements unchanged instead of a select over both.
+    assert.match(declarations, /pow\(1-vh,5\.0\);\n {4}let rs=light\.size\.x;if\(rs>0\.0\)\{/);
     assert.match(
       declarations,
-      /let along=spread\/max\(svh,0\.0001\);let ax=max\(min\(a\+spread,1\.0\),spread\);let ay=max\(min\(a\+along,1\.0\),along\);let norm=select\(1\.0,\(a\/ax\)\*\(a\/ay\),rs>0\.0\);/,
+      /let along=spread\/max\(svh,0\.0001\);let ax=max\(min\(a\+spread,1\.0\),spread\);let ay=max\(min\(a\+along,1\.0\),along\);/,
     );
     assert.match(
       declarations,
-      /let d=a2\/\(3\.14159265\*pow\(max\(dot\(cross\(n,sh\),cross\(n,sh\)\),step\(snh,0\.0\)\)\+a2\*snh\*snh,2\.0\)\)\*norm;/,
+      /\bd=a2\/\(3\.14159265\*pow\(max\(dot\(cross\(n,sh\),cross\(n,sh\)\),step\(snh,0\.0\)\)\+a2\*snh\*snh,2\.0\)\)\*\(\(a\/ax\)\*\(a\/ay\)\);/,
     );
     assert.match(declarations, /pow\(1-svh,5\.0\);/);
     // The BRDF text the material packages rewrite is unchanged (materials' Lambert and Phong, toon, physical lobes).
@@ -239,10 +242,14 @@ test('sphere light diffuse: the sized loop writes the cap form factor as its nl;
     sized,
     /sfg=clamp\(\(\(sfc\*acos\(sfy\)-sfx\*sfq\)\*sfs\+atan2\(sfq,sfx\)\)\/\(3\.14159265\*sfs\),0\.0,1\.0\);/,
   );
-  assert.match(
-    sized,
-    /let nl=select\(clamp\(dot\(n,l\),0\.0,1\.0\),sfg\*select\(1\.0,max\(distance\*distance,0\.000244140625\)\/\(rs\*rs\),distance<rs\),rs>0\.0\);/,
+  assert.match(sized, /\bnl=sfg\*select\(1\.0,max\(distance\*distance,0\.000244140625\)\/\(rs\*rs\),distance<rs\);/);
+  // KB-CLUSTERED-SIZEDZERO1 (eaf8d4cc82): the sized loop declares the plain loop's nl (as a var) and overwrites it
+  // only inside if(rs>0.0), so a radius-0 light keeps the plain statement.
+  assert.ok(sized.includes('var nl=clamp(dot(n,l),0.0,1.0);') && sized.includes('if(rs>0.0){'));
+  assert.equal(
+    sized.split(/\b(?:let|var) nl=/).length,
+    plain.split(/\b(?:let|var) nl=/).length,
+    'one nl per loop, as before',
   );
-  assert.equal(sized.split('let nl=').length, plain.split('let nl=').length, 'one nl per loop, as before');
   assert.ok(!plain.includes('sfg') && plain.includes('let nl=clamp(dot(n,l),0.0,1.0);'));
 });
