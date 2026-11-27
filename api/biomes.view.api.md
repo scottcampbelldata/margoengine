@@ -143,6 +143,8 @@ export interface GroundImage {
 
 export const HORIZON_SKIRT = 40;
 
+export const HORIZON_SPREAD = 0.125;
+
 export interface HorizonHeights {
     readonly origin: readonly [number, number];
     readonly size: readonly [number, number];
@@ -151,6 +153,8 @@ export interface HorizonHeights {
     readonly depth: number;
     readonly heights: Float32Array;
     readonly nearest: Uint32Array;
+    readonly spread: Float32Array;
+    readonly blend: Float32Array;
     readonly inside: Uint8Array;
 }
 
@@ -219,6 +223,14 @@ export function disturbanceResponse(key: string, kind: 'bark' | 'foliage' | 'sto
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];
 
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array;
+
+export function horizonEdgeMean(grid: {
+    readonly width: number;
+    readonly depth: number;
+}, far: {
+    readonly nearest: Uint32Array;
+    readonly spread: Float32Array;
+}, data: ArrayLike<number>, channels: number): Float32Array;
 
 export function horizonHeights(source: HorizonSource): HorizonHeights;
 

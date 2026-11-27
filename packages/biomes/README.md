@@ -178,6 +178,23 @@ triangulation as the camera pulls back, while plant and material streaming still
 `clipmap.anchor` an explicit `[x, z]` when the shot needs another centre. Use `clipmap.anchor: 'camera'` when
 the camera must travel beyond the fixed outer ring and `clipmap.levels` limits its size.
 
+Past the world's edge, `horizon` draws far ground out to the horizon (`horizonHeights`). Each far corner continues the
+mean of a stretch of the world's edge round its nearest edge texel, an eighth of its distance wide each way
+(`HORIZON_SPREAD`): a valley leaving the world keeps going near the edge, and further out the edge's heights and
+materials blur together instead of running outward as streaks. Over the same ramp in which the heights give way to
+mountains (`far.blend`), the far ground's materials give way to the whole edge's mean. `horizonEdgeMean` takes that mean of any per-texel
+values, such as a material map of your own:
+
+```ts
+import { horizonEdgeMean, horizonHeights } from '@margoengine/biomes/view';
+
+const width = 65, depth = 65;
+const heights = new Float32Array(width * depth).fill(100);
+const far = horizonHeights({ bounds: [0, 0, 512, 512], heights, width, depth, seed: 1 });
+const tone = horizonEdgeMean({ width, depth }, far, new Float32Array(width * depth).fill(0.5), 1);
+console.log(far.width * far.depth === tone.length); // true
+```
+
 ## Alpine treelines
 
 The optional `@margoengine/biomes/treeline` entry builds a placement graph with mature, young and wind-stunted

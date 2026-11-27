@@ -83,14 +83,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `packages/biomes/tests/view-sea-horizon.test.js` (a landlocked valley's water has no horizon, a
   coast's has).
 - **Weak spot left:** the far ground takes each corner's materials from the nearest edge texel, so it draws long
-  smeared streaks running outward from the edge (KB-BIOMES-HORIZONSTREAK1).
+  smeared streaks running outward from the edge (KB-BIOMES-HORIZONSTREAK1, fixed).
 
-### Open 2026-11-27: the far ground past a world's edge draws long streaks (KB-BIOMES-HORIZONSTREAK1, biomes)
+### Fixed 2026-11-27: the far ground past a world's edge drew long streaks (KB-BIOMES-HORIZONSTREAK1, biomes)
 
-- **Repro:** timber-valley, camera at (-1500, 1400, 0) looking at (-3200, 900, 300): bands of material and light run
-  straight outward from the world's edge to the horizon.
-- **Cause:** `BiomeView`'s horizon terrain copies each far corner's weights from the nearest edge texel
-  (`#horizonTerrain`), so one edge texel's material runs the whole 12 km.
+- **Repro (before):** timber-valley, camera at (-1500, 1400, 0) looking at (-3200, 900, 300): bands of material and
+  light ran straight outward from the world's edge to the horizon.
+- **Cause:** every far corner took its nearest edge texel: `BiomeView`'s horizon terrain copied its material weights
+  (`#horizonTerrain`) and `horizonHeights` carried its height out until the mountains took over, so one edge texel's
+  material ran the whole 12 km and its relief ran out as a ridge (a 200 m edge spike stood 169 m over its side 128 m
+  out).
+- **Fix:** each far corner takes the mean of a stretch of edge round its nearest texel, an eighth of its distance wide
+  each way (`HORIZON_SPREAD`, `horizonEdgeMean` on prefix sums round the edge loop), for its height and its material
+  weights, so the edge blurs out with distance, and the weights give way to the whole edge's mean over the ramp the
+  heights give way to the mountains in (`blend`; `packages/biomes/src/horizon.ts`, `view.ts`). A valley leaving the
+  world still carries on near the edge (the existing test holds it within 10 m 64 m out). On the repro view the far
+  ground is now one even ground past the ramp; within about a kilometre of the edge the edge's own broad patches still
+  carry on as soft wedges, as the edge's continuation is meant to (RTX A6000, WebGPU, 960 x 540).
+- **Regression test:** `packages/biomes/tests/horizon.test.js` (one odd edge texel does not run out to the horizon as a
+  streak; `horizonEdgeMean` round the loop).
 
 ### Fixed 2026-11-27: volumetric clouds drew full white through a smoke pall (KB-SKY-PALLCLOUD1, sky)
 

@@ -19,8 +19,15 @@ import type { PassContext } from '@margoengine/core/extension';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
 import { clampInt, divFloor, hash3, imod, ONE, wendland } from '@margoengine/biomes/toolkit';
-import { horizonHeights } from './horizon.js';
-export { horizonHeights, HORIZON_SKIRT, type HorizonHeights, type HorizonSource } from './horizon.js';
+import { horizonEdgeMean, horizonHeights } from './horizon.js';
+export {
+  horizonEdgeMean,
+  horizonHeights,
+  HORIZON_SKIRT,
+  HORIZON_SPREAD,
+  type HorizonHeights,
+  type HorizonSource,
+} from './horizon.js';
 import type { PlantStates, PlantStateSource } from '@margoengine/scatter/states';
 import type { DisturbanceStatesOptions } from './disturbance.js';
 import type { PlacementGraph } from './graph.js';
@@ -117,7 +124,9 @@ export interface BiomeViewOptions {
   /**
    * Far ground past the world's edge out to the horizon (`horizonHeights`): the edge's own relief carried outward,
    * a valley leaving the world keeps going, fading over up to 3 km into ridged mountains as high as the world's relief,
-   * in the world's own edge materials with rock on the steep. It reaches 3 world sizes (at most 48 km) past each edge,
+   * in the world's own edge materials with rock on the steep. Each far point takes the mean of a stretch of edge an
+   * eighth of its distance wide each way (`HORIZON_SPREAD`), so the edge blurs out with distance and no edge texel runs
+   * to the horizon as a streak. It reaches 3 world sizes (at most 48 km) past each edge,
    * a texel about a 64th of the world, and casts no shadow and holds no plants; the scene's fog or aerial perspective
    * hazes it. `'auto'`: drawn when every edge of the world stands over the sea (a coast keeps its sea horizon).
    * Default `'auto'`.
@@ -2011,8 +2020,10 @@ export class BiomeView implements Disposable {
   }
 
   // The far ground of option `horizon`: its own terrain over a ring around the world, the world's material layers, each
-  // corner the weights of the world's edge texel it continues with rock taking the steep (slope 0.7 to 1.2), and a hole
-  // over the world's own ground.
+  // corner the mean weights of the stretch of edge it continues (horizonEdgeMean, widening with distance, so no edge
+  // texel runs on as a streak: KB-BIOMES-HORIZONSTREAK1), giving way with the mountains (far.blend) to the whole edge's
+  // mean, with rock taking the steep (slope 0.7 to 1.2), and a hole over
+  // the world's own ground.
   // The layers keep the world's relief and macro amounts but repeat once per ring texel (the world's repeat 4 m), so the
   // macro tone (24 repeats) spans hundreds of metres where the ring is seen, kilometres off, as the world's 96 m tone
   // does at its own distances; at 4 m it mips to one flat tone there.
@@ -2034,12 +2045,39 @@ export class BiomeView implements Disposable {
       rock = this.materials.indexOf('rock'),
       arrays = this.#weights.length,
       weights = Array.from({ length: arrays }, () => new Uint8Array(far.width * far.depth * 4)),
+      means = this.#weights.map((painted) => horizonEdgeMean({ width: w, depth: d }, far, painted, 4)),
+      // The whole edge's mean weights, which the far ground gives way to with the mountains (far.blend).
+      whole = this.#weights.map((painted) =>
+        horizonEdgeMean(
+          { width: w, depth: d },
+          { nearest: Uint32Array.of(0), spread: Float32Array.of(w + d) },
+          painted,
+          4,
+        ),
+      ),
       holes = new Uint8Array((far.width - 1) * (far.depth - 1));
     for (let j = 0; j < far.depth; j++)
       for (let i = 0; i < far.width; i++) {
-        const c = j * far.width + i,
-          n = far.nearest[c];
-        for (let a = 0; a < arrays; a++) weights[a].set(this.#weights[a].subarray(n * 4, n * 4 + 4), c * 4);
+        const c = j * far.width + i;
+        // The rounded means keep the total they sum to (255 for painted ground): the rounding's remainder goes to the
+        // largest.
+        let total = 0,
+          exact = 0,
+          most = 0,
+          mostAt = 0;
+        for (let a = 0; a < arrays; a++)
+          for (let k = 0; k < 4; k++) {
+            const m = means[a][c * 4 + k] + (whole[a][k] - means[a][c * 4 + k]) * far.blend[c],
+              v = Math.round(m);
+            weights[a][c * 4 + k] = v;
+            total += v;
+            exact += m;
+            if (v > most) {
+              most = v;
+              mostAt = a * 4 + k;
+            }
+          }
+        if (most > 0) weights[mostAt >> 2][c * 4 + (mostAt & 3)] = Math.min(255, Math.max(0, most + Math.round(exact) - total));
         if (rock < 0) continue;
         const left = far.heights[j * far.width + Math.max(0, i - 1)],
           right = far.heights[j * far.width + Math.min(far.width - 1, i + 1)],

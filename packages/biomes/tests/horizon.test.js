@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BiomeWorld } from '../dist/index.js';
 import { presets } from '../dist/presets.js';
 import { BiomeView } from '../dist/view.js';
-import { horizonHeights, HORIZON_SKIRT } from '../dist/view.js';
+import { horizonEdgeMean, horizonHeights, HORIZON_SKIRT, HORIZON_SPREAD } from '../dist/view.js';
 
 test('horizonHeights: the ring meets the world at its edge, skirts under it, and rises into mountains past it', () => {
   // A 1 km world on 8 m texels: a valley floor at 100 m along z = 500 that leaves the west and east edges, walls to 300.
@@ -218,4 +218,55 @@ test('regression KB-TERRAIN-SKYAMBIENT1: a view with a sky gives it its ground a
   } finally {
     globalThis.GPUTextureUsage = usage;
   }
+});
+
+// KB-BIOMES-HORIZONSTREAK1: every far corner copied its nearest edge texel, so one edge texel's height and material ran
+// straight out to the horizon: timber-valley's far ground showed bands of material and light from its edge outward.
+test('regression KB-BIOMES-HORIZONSTREAK1: one odd edge texel does not run out to the horizon as a streak', () => {
+  // A flat 1 km world at 100 m, 8 m texels, with one texel of its west edge (z = 512) at 300 m.
+  const width = 129,
+    heights = new Float32Array(width * width).fill(100),
+    spike = 64 * width;
+  heights[spike] = 300;
+  const far = horizonHeights({ bounds: [0, 0, 1024, 1024], heights, width, depth: width, seed: 3 }),
+    at = (x, z) => far.heights[Math.round((z - far.origin[1]) / far.texel) * far.width + Math.round((x - far.origin[0]) / far.texel)]; // float division
+  assert.equal(at(0, 512), 300, 'the edge itself is the world');
+  // Straight out from the spike and 160 m beside it, at the same distance. Copying the nearest texel, the spike ran
+  // out as a ridge the mountains only slowly took over (about 170 m at 128 m out, 100 m at 256 m); now it is one texel
+  // of a stretch of edge that widens with the distance (HORIZON_SPREAD), so it fades as it goes.
+  const ridge = (x) => at(x, 512) - at(x, 352);
+  assert.ok(ridge(-128) < 60, `128 m out the spike stands ${ridge(-128)} m over its side`);
+  assert.ok(ridge(-256) < 40, `256 m out the spike stands ${ridge(-256)} m over its side`);
+  assert.ok(Math.abs(ridge(-400)) < 40, 'no ridge 400 m out');
+  // The material weights: the far corner straight out from one red edge texel takes it as a share, not whole.
+  const paint = new Uint8Array(width * width * 4);
+  for (let t = 0; t < width * width; t++) paint[t * 4 + 1] = 255;
+  paint[spike * 4] = 255;
+  paint[spike * 4 + 1] = 0;
+  const mean = horizonEdgeMean({ width, depth: width }, far, paint, 4),
+    c = Math.round((512 - far.origin[1]) / far.texel) * far.width + Math.round((-400 - far.origin[0]) / far.texel); // float division
+  assert.ok(mean[c * 4] < 255 / 4, `the red share 400 m out: ${mean[c * 4]}`);
+  assert.ok(Math.abs(mean[c * 4] + mean[c * 4 + 1] - 255) < 1e-3, 'the weights still sum to 255');
+  // The mountains' share: 0 at the edge, all of it past the ramp (512 m for a 1 km world), where a material map gives
+  // way to the whole edge's mean, so even the edge's large patches stop fanning out.
+  assert.equal(far.blend[Math.round((512 - far.origin[1]) / far.texel) * far.width + Math.round(-far.origin[0] / far.texel)], 0); // float division
+  assert.equal(far.blend[c], Math.min(1, far.blend[c]));
+  assert.ok(far.blend[c] > 0.85, `400 m out the mountains have ${far.blend[c]}`);
+  assert.equal(far.blend[0], 1, 'the ring corner, kilometres out');
+});
+
+test('horizonEdgeMean averages round the edge loop, across its corners, and the whole edge once wider than it', () => {
+  // A 3 x 3 grid: its 8 edge texels hold their loop order 0..7 (north row west to east, east column, south row east to
+  // west, west column); the centre holds 50.
+  const data = new Float32Array([0, 1, 2, 7, 50, 3, 6, 5, 4]),
+    grid = { width: 3, depth: 3 },
+    nearest = Uint32Array.from([0, 2, 4, 3, 0]),
+    spread = Float32Array.from([1, 1, 3, 0, 9]),
+    out = horizonEdgeMean(grid, { nearest, spread }, data, 1);
+  assert.equal(out[0], Math.fround((7 + 0 + 1) / 3), 'the north-west corner takes both sides of the loop seam'); // float division
+  assert.equal(out[1], Math.fround((1 + 2 + 3) / 3), 'round the north-east corner'); // float division
+  assert.equal(out[2], 50, 'a texel off the edge keeps its own value');
+  assert.equal(out[3], 7, 'no spread: the texel itself');
+  assert.equal(out[4], 28 / 8, 'wider than the loop: the whole edge'); // float division
+  assert.throws(() => horizonEdgeMean(grid, { nearest, spread }, data, 2), RangeError);
 });

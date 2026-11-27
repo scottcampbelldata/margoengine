@@ -34,10 +34,29 @@ export interface HorizonHeights {
   readonly heights: Float32Array;
   /** Per corner, the world texel its ground continues (`v * width + u` of the source grid). */
   readonly nearest: Uint32Array;
+  /**
+   * Per corner past the edge, the half-width in world texels of the stretch of edge round `nearest` it continues
+   * ({@link HORIZON_SPREAD} of its distance from the world); 0 on and inside the edge. {@link horizonEdgeMean} averages
+   * the world's per-texel values over it.
+   */
+  readonly spread: Float32Array;
+  /**
+   * Per corner, the share 0 to 1 the mountains have taken over from the edge: 0 on and inside the edge, a smoothstep to 1
+   * over the ramp (up to 3 km). The heights give way to the mountains by it; a material map should give way by it to
+   * the whole edge's mean (`BiomeView` does), so the edge's large patches do not fan out to the horizon either.
+   */
+  readonly blend: Float32Array;
   /** Per cell, 1 inside the world's own ground (the ring draws a hole there), else 0. */
   readonly inside: Uint8Array;
 }
 
+/**
+ * How fast the stretch of edge a far corner continues widens with its distance from the world: its half-width over the
+ * distance. Each corner takes the mean of that stretch, so the edge blurs out with distance as rays from it spread;
+ * a corner copying its nearest edge texel ran that one texel's ground and material in a straight streak to the
+ * horizon (KB-BIOMES-HORIZONSTREAK1).
+ */
+export const HORIZON_SPREAD = 0.125;
 /** Metres the ring stands below the world under its first row of cells inside it: a skirt the world's ground hides. */
 export const HORIZON_SKIRT = 40;
 // Corners per world side, about: the ring's texel is the world's size over this, a power of two of view texels.
@@ -111,6 +130,8 @@ export function horizonHeights(source: HorizonSource): HorizonHeights {
     nz = id + 2 * ring + 1,
     out = new Float32Array(nx * nz),
     nearest = new Uint32Array(nx * nz),
+    spread = new Float32Array(nx * nz),
+    blend = new Float32Array(nx * nz),
     inside = new Uint8Array((nx - 1) * (nz - 1));
   let low = Infinity,
     high = -Infinity,
@@ -141,8 +162,23 @@ export function horizonHeights(source: HorizonSource): HorizonHeights {
       }
       const x = x0 + gi * step,
         z = z0 + gj * step,
+        d = Math.hypot(Math.max(0, x0 - x, x - x1), Math.max(0, z0 - z, z - z1));
+      spread[c] = (HORIZON_SPREAD * d) / texel; // float division: world texels
+    }
+  // Each corner past the edge carries on the mean of its stretch of edge, then gives way to the mountains.
+  const edgeHeights = horizonEdgeMean({ width, depth }, { nearest, spread }, heights, 1);
+  for (let j = 0; j < nz; j++)
+    for (let i = 0; i < nx; i++) {
+      const gi = i - ring,
+        gj = j - ring,
+        c = j * nx + i;
+      if (gi > 0 && gi < iw && gj > 0 && gj < id) continue;
+      const x = x0 + gi * step,
+        z = z0 + gj * step,
+        e = edgeHeights[c],
         d = Math.hypot(Math.max(0, x0 - x, x - x1), Math.max(0, z0 - z, z - z1)),
         w = smooth(d / ramp); // float division: 0 at the edge, 1 a ramp out
+      blend[c] = w;
       out[c] = w ? e + (mean - e) * w + w * relief * ridged(seed, x, z) : e;
     }
   // A cell is a hole when all four corners are inside the world and it is not on the first row inside (the skirt).
@@ -160,6 +196,81 @@ export function horizonHeights(source: HorizonSource): HorizonHeights {
     depth: nz,
     heights: out,
     nearest,
+    spread,
+    blend,
     inside,
   };
+}
+
+// The edge texels of a width x depth grid as one loop: the north row west to east, the east column, the south row east
+// to west, the west column; a texel off the edge gives -1.
+function loopIndex(u: number, v: number, width: number, depth: number): number {
+  const a = width - 1,
+    b = depth - 1;
+  if (v === 0) return u;
+  if (u === a) return a + v;
+  if (v === b) return a + b + (a - u);
+  if (u === 0) return 2 * a + b + (b - v);
+  return -1;
+}
+
+/**
+ * Per far corner, the mean of the world's per-texel `data` (`channels` values a texel, `v * width + u`) over the
+ * stretch of edge it continues: `spread[c]` texels each way round the edge loop from `nearest[c]` (the whole edge
+ * once that is wider than it). A corner whose `nearest` is off the edge takes that texel's own values. `channels`
+ * values a corner.
+ * @example
+ * const far = horizonHeights({ bounds, heights, width, depth, seed: 7 });
+ * const weights = horizonEdgeMean({ width, depth }, far, painted, 4); // RGBA weights of the far ground
+ */
+export function horizonEdgeMean(
+  grid: { readonly width: number; readonly depth: number },
+  far: { readonly nearest: Uint32Array; readonly spread: Float32Array },
+  data: ArrayLike<number>,
+  channels: number,
+): Float32Array {
+  const { width, depth } = grid;
+  if (!(width >= 2 && depth >= 2) || !(channels >= 1) || data.length !== width * depth * channels)
+    throw rangeError('horizonEdgeMean needs width x depth x channels values on a 2 x 2 or larger grid', 'biomes');
+  const loop = 2 * (width - 1) + 2 * (depth - 1),
+    sums = new Float64Array((loop + 1) * channels);
+  // Prefix sums round the loop, in double precision.
+  for (let p = 0; p < loop; p++) {
+    const a = width - 1,
+      b = depth - 1,
+      [u, v] = p < a ? [p, 0] : p < a + b ? [a, p - a] : p < 2 * a + b ? [a - (p - a - b), b] : [0, b - (p - 2 * a - b)],
+      t = (v * width + u) * channels;
+    for (let k = 0; k < channels; k++) sums[(p + 1) * channels + k] = sums[p * channels + k] + data[t + k];
+  }
+  const n = far.nearest.length,
+    out = new Float32Array(n * channels),
+    span = (from: number, to: number, k: number) => sums[to * channels + k] - sums[from * channels + k];
+  for (let c = 0; c < n; c++) {
+    const t = far.nearest[c],
+      u = t % width, // float division: view only, width >= 2
+      v = (t - u) / width, // float division: view only, exact whole rows
+      p = loopIndex(u, v, width, depth),
+      r = Math.round(far.spread[c]);
+    if (p < 0 || r <= 0) {
+      for (let k = 0; k < channels; k++) out[c * channels + k] = data[t * channels + k];
+      continue;
+    }
+    if (2 * r + 1 >= loop) {
+      for (let k = 0; k < channels; k++) out[c * channels + k] = sums[loop * channels + k] / loop; // float division: mean
+      continue;
+    }
+    // [p - r, p + r] round the loop, as one or two runs of the prefix sums.
+    const lo = p - r,
+      hi = p + r + 1;
+    for (let k = 0; k < channels; k++) {
+      const sum =
+        lo < 0
+          ? span(loop + lo, loop, k) + span(0, hi, k)
+          : hi > loop
+            ? span(lo, loop, k) + span(0, hi - loop, k)
+            : span(lo, hi, k);
+      out[c * channels + k] = sum / (2 * r + 1); // float division: the mean
+    }
+  }
+  return out;
 }
