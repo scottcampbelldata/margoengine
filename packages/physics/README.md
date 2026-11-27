@@ -7894,6 +7894,47 @@ world.advance(30);
 console.log(carriage.linearVelocity, battery.gun(0).recoilMomentum, battery.muzzleBlast(0).energy);
 ```
 
+### Blast loading (FIRE-04)
+
+`blastAt(energy, distance, air)` is the free-air blast of `energy` joules at `distance` metres. It follows Kinney and
+Graham's (1985) laws, scaled by Sachs's factors to the air's `pressure` (default 101,325 Pa) and `temperature` (default
+288.15 K). It returns:
+
+- `overpressure` (peak side-on, Pa), `impulse` (positive phase, Pa s) and `duration` (s);
+- `arrival`, from the Rankine-Hugoniot shock speed;
+- `decay`, the modified Friedlander wave that carries that impulse;
+- `reflected`, the normally reflected peak.
+
+`overpressureAt(point, t)` and `impulseSoFar(point, t, reflected)` give the wave `t` seconds after it arrives.
+A charge at or under the ground blasts as a free-air charge of `freeAirEquivalent(budget)` (twice its air energy), and
+that matches Ford et al.'s field-measured surface-burst impulse to 12 %.
+
+`BlastSolver` reads an `ExplosionSolver`'s explosions field and loads the rigid bodies the blast reaches; add the
+explosive solver first. Each body takes, along the line from the charge, its box's area seen from the charge times the
+reflected impulse that has arrived. What it has already been given is subtracted, so a body that moves during the
+positive phase gets the whole impulse once. `threshold` (default 200 Pa) is the overpressure below which nothing is
+applied. `breakables` takes each load as an impact (BREAK-01). `pressureAt(point, time)` sums every charge's overpressure
+at a point, for sound and camera shake.
+
+```ts
+import { BlastSolver, ExplosionSolver } from '@margoengine/physics/explosive';
+import { Physics } from '@margoengine/physics';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, -9.81, 0], fixedTimestep: 1 / 60 });
+const shed = physics.addBody(null, { position: [20, 1, 0], colliders: { shape: 'box', halfExtents: [0.5, 1, 1], mass: 100 } });
+const charges = new ExplosionSolver('charges');
+const blast = new BlastSolver(charges.explosionsField);
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] })
+  .add(new RigidSolver(), { physics })
+  .add(charges, { charges: [{ position: [0, 0, 0], time: 0.05, mass: 1 }] })
+  .add(blast, { physics })
+  .couple(['blast', 'rigid'], 'staggered');
+world.advance(30);
+console.log(shed.linearVelocity, blast.counts, blast.pressureAt([0, 1.5, 30], 0.15));
+```
+
 ## Natural lightning and thunder
 
 `LightningSolver` advances a single cloud-to-ground leader in the electric field above a flat plane or a sampled

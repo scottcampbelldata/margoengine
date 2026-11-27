@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20931664,
+  "total": 20934049,
   "history": [
     {
       "date": "2026-10-24",
@@ -14618,6 +14618,12 @@
       "commit": "pending",
       "reason": "physics/ship 36,294 ceiling to its new size 36,541 (+247 B): the ORC's jib downwind set and the jib's blanketing by its overlap. One sail model; nothing to split. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "blast",
+      "reason": "FIRE-04 blast loading (+2385 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15459,7 +15465,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 13198,
+    "@margoengine/physics/explosive": 15583,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

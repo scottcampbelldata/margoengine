@@ -15180,8 +15180,8 @@
         "gzip": 5577
       },
       "./explosive": {
-        "raw": 34927,
-        "gzip": 13198
+        "raw": 41750,
+        "gzip": 15583
       }
     },
     "@margoengine/physics2d": {

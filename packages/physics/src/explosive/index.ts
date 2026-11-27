@@ -50,3 +50,17 @@ export {
   PROPELLANTS,
 } from './gun.js';
 export { bedHeight, type FlightBed, flyFragments } from './flight.js';
+export {
+  type Atmosphere,
+  type BlastPoint,
+  blastAt,
+  friedlanderDecay,
+  impulseSoFar,
+  overpressureAt,
+  projectedArea,
+  reflectedOverpressure,
+  scaledDuration,
+  scaledImpulse,
+  scaledOverpressure,
+} from './blast.js';
+export { type BlastCounts, type BlastParams, BlastSolver } from './blast-solver.js';
