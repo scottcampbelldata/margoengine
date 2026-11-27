@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'rolldown';
-import { launchBrowser } from '../../../../scripts/lib/browser.mjs';
+import { launchBrowser, resolveBrowser } from '../../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../../scripts/support/shutdown.mjs';
 import { listenWebSocket } from '../../dist/node.js';
 import { SignalServer } from '../../dist/signal.js';
@@ -64,6 +64,7 @@ const signals = new SignalServer(),
   listener = await listenWebSocket({ port: 0, host: '127.0.0.1', origins: '*' });
 listener.onconnection = (connection) => signals.accept(connection);
 
+const firefox = resolveBrowser().engine === 'firefox';
 const browser = await launchBrowser({
   headless: true,
   needs: 'dom',
@@ -77,6 +78,21 @@ const browser = await launchBrowser({
     // The strict policy: a page the user never touched starts its AudioContext suspended.
     '--autoplay-policy=document-user-activation-required',
   ],
+  // Firefox takes none of the switches above: its fake microphone plays a 1 kHz tone of its own, and these preferences
+  // give the same open prompts and strict autoplay policy.
+  ...(firefox
+    ? {
+        firefoxUserPrefs: {
+          'media.navigator.streams.fake': true,
+          'media.navigator.permission.disabled': true,
+          'media.peerconnection.ice.obfuscate_host_addresses': false,
+          'media.peerconnection.ice.loopback': true,
+          'media.autoplay.default': 1,
+          'media.autoplay.blocking_policy': 1,
+          'media.autoplay.block-webaudio': true,
+        },
+      }
+    : {}),
 });
 try {
   const url = `ws://127.0.0.1:${listener.port}`;
@@ -171,41 +187,45 @@ try {
     a.id,
   );
 
-  // Screen share beside the voice: B gets live video frames on the screen stream and keeps the voice.
-  await a.page.bringToFront();
-  await a.page.evaluate(() =>
-    window.media.startScreenShare({ constraints: { video: true, audio: false, preferCurrentTab: true } }),
-  );
-  await wait(b, "B receives A's screen", (id) => !!window.media.remotes.get(id)?.screen, a.id);
-  const video = await b.page.evaluate(async (id) => {
-    const element = document.createElement('video');
-    element.muted = true;
-    element.srcObject = window.media.remotes.get(id).screen;
-    document.body.append(element);
-    await element.play();
-    await window.until(() => element.videoWidth > 0);
-    const voice = window.media.remotes.get(id).voice;
-    return {
-      width: element.videoWidth,
-      height: element.videoHeight,
-      voiceTracks: voice?.getAudioTracks().length ?? 0,
-      same: voice === element.srcObject,
-    };
-  }, a.id);
-  assert.ok(video.width > 0 && video.height > 0, `the shared screen has frames, got ${JSON.stringify(video)}`);
-  assert.equal(video.voiceTracks, 1, 'the voice stays beside the screen');
-  assert.equal(video.same, false);
+  // Only Chromium can accept its own tab capture without a person (--auto-accept-this-tab-capture).
+  const screen = !firefox;
+  if (screen) {
+    // Screen share beside the voice: B gets live video frames on the screen stream and keeps the voice.
+    await a.page.bringToFront();
+    await a.page.evaluate(() =>
+      window.media.startScreenShare({ constraints: { video: true, audio: false, preferCurrentTab: true } }),
+    );
+    await wait(b, "B receives A's screen", (id) => !!window.media.remotes.get(id)?.screen, a.id);
+    const video = await b.page.evaluate(async (id) => {
+      const element = document.createElement('video');
+      element.muted = true;
+      element.srcObject = window.media.remotes.get(id).screen;
+      document.body.append(element);
+      await element.play();
+      await window.until(() => element.videoWidth > 0);
+      const voice = window.media.remotes.get(id).voice;
+      return {
+        width: element.videoWidth,
+        height: element.videoHeight,
+        voiceTracks: voice?.getAudioTracks().length ?? 0,
+        same: voice === element.srcObject,
+      };
+    }, a.id);
+    assert.ok(video.width > 0 && video.height > 0, `the shared screen has frames, got ${JSON.stringify(video)}`);
+    assert.equal(video.voiceTracks, 1, 'the voice stays beside the screen');
+    assert.equal(video.same, false);
+  }
 
-  // A late joiner gets both that are already on.
+  // A late joiner gets everything that is already on.
   const c = await join_();
   await wait(
     c,
-    "C receives A's voice and screen",
-    (id) => {
+    "C receives A's voice, and its screen where one is shared",
+    ([id, screen]) => {
       const r = window.media.remotes.get(id);
-      return !!r?.voice && !!r.screen;
+      return !!r?.voice && (!screen || !!r.screen);
     },
-    a.id,
+    [a.id, screen],
   );
   await wait(c, 'C hears A speaking', (id) => window.media.remotes.get(id)?.speaking === true, a.id);
 
@@ -278,7 +298,8 @@ try {
     await wait(who, "a disposed sender's voice goes", (id) => window.media.remotes.get(id)?.voice === null, a.id);
 
   for (const who of [a, b, c]) assert.deepEqual(await who.page.evaluate(() => window.errors), []);
-  console.log(`media proof passed: voice, mute, push-to-talk, screen, late join, restart; ${browser.version()}`);
+  const proved = `voice, mute, push-to-talk, ${screen ? 'screen, ' : ''}late join, restart`;
+  console.log(`media proof passed: ${proved}; ${browser.browserType().name()} ${browser.version()}`);
 } finally {
   clearTimeout(limit);
   await closeAll({ browser, servers: [web] });
