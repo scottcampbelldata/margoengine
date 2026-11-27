@@ -52,7 +52,10 @@ try {
   const readout = page.locator('#debug-loads');
   const loads = () => readout.evaluate((out) => JSON.parse(out.dataset.loads));
   const waitLoads = (values) =>
-    page.waitForFunction((want) => document.querySelector('#debug-loads')?.dataset.loads === want, JSON.stringify(values));
+    page.waitForFunction(
+      (want) => document.querySelector('#debug-loads')?.dataset.loads === want,
+      JSON.stringify(values),
+    );
   assert.equal(await readout.isVisible(), false);
   await showLoads.check();
   await page.waitForSelector('#debug-loads[data-loads]:not([hidden])');
@@ -65,7 +68,10 @@ try {
   // when applied with the body's dry inverse mass and gravity by RigidSolver.
   const heldLift = 9.80665 * (dryMass + ((displaced - dryMass) * dryMass) / (dryMass + 0.5 * displaced));
   assert.ok(Math.abs(initialLoads[0] - heldLift) < 0.001, JSON.stringify({ initialLoads, heldLift }));
-  assert.ok(initialLoads[1] > 0 && initialLoads[2] < 0, 'the heeled crate reports an upward load and a restoring torque');
+  assert.ok(
+    initialLoads[1] > 0 && initialLoads[2] < 0,
+    'the heeled crate reports an upward load and a restoring torque',
+  );
   const overlay = await capture('loads');
   const debugPixels = changedPixels(before, overlay);
   assert.ok(debugPixels > 50, 'the shared debug view draws force and torque arrows over the physical bodies');
@@ -80,13 +86,20 @@ try {
     JSON.stringify(initialLoads),
   );
   const settledLoads = await loads();
-  assert.ok(Math.abs(settledLoads[2]) < Math.abs(initialLoads[2]), 'the measured righting torque falls as the box rights');
+  assert.ok(
+    Math.abs(settledLoads[2]) < Math.abs(initialLoads[2]),
+    'the measured righting torque falls as the box rights',
+  );
   await showLoads.uncheck();
   assert.equal(await readout.isVisible(), false);
   const after = await capture('righted');
   await page.locator('#reset').click();
   assert.deepEqual(await state(), initial);
-  assert.equal(cyanLoadPixels(await capture('reset-hidden')), releaseCyan, 'hiding the diagnostic clears the load arrows');
+  assert.equal(
+    cyanLoadPixels(await capture('reset-hidden')),
+    releaseCyan,
+    'hiding the diagnostic clears the load arrows',
+  );
   await showLoads.check();
   await waitLoads(initialLoads);
   await seek(360);
