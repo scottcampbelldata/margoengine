@@ -3515,6 +3515,10 @@
       "types": "./dist/physics/breakable.d.ts",
       "import": "./dist/physics/breakable.js"
     },
+    "./physics/debug-view": {
+      "types": "./dist/physics/debug-view.d.ts",
+      "import": "./dist/physics/debug-view.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"
@@ -3966,6 +3970,10 @@
     "./ragdoll/balance": {
       "types": "./dist/ragdoll/balance.d.ts",
       "import": "./dist/ragdoll/balance.js"
+    },
+    "./ragdoll/character": {
+      "types": "./dist/ragdoll/character.d.ts",
+      "import": "./dist/ragdoll/character.js"
     },
     "./react": {
       "types": "./dist/react.d.ts",

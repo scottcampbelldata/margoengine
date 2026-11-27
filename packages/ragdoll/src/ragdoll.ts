@@ -4,8 +4,9 @@
 // Written clean room from the public descriptions cited in docs/clean-room.md (swing-twist decomposition, velocity
 // level limit impulses with a Baumgarte bias); no engine's source was read.
 import type { Engine, EnginePlugin, Mesh } from '@margoengine/core/extension';
-import type { ColliderOptions, Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
+import type { ColliderOptions, DebugLines, Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
 import { MargoError } from '@margoengine/math/errors';
+import { ragdollError } from './errors.js';
 import { sceneScope } from '../../shared/scene-scope.js';
 import {
   conjugateQuaternion,
@@ -144,6 +145,18 @@ export interface RagdollPart {
 
 /** One bone or several, as nodes or parts: each stands for itself and every bone under it. */
 export type RagdollLimb = Mesh | RagdollPart | readonly (Mesh | RagdollPart)[];
+
+/** What {@link Ragdoll.debugRender} draws. */
+export interface RagdollDebugOptions {
+  /** Draw each bone's collider shape (capsule, box or hull), tinted by kinematic/limp/blending state. Default true. */
+  capsules?: boolean;
+  /** Draw joint limits (swing cones for cone joints, limit arcs and axis for hinges). Default true. */
+  limits?: boolean;
+  /** Draw bone axis lines and parent-child connectors. Default true. */
+  bones?: boolean;
+  /** Size in metres of swing cones and hinge arcs. Default 0.12. */
+  limitScale?: number;
+}
 
 interface Cone {
   swing: number;
@@ -914,6 +927,183 @@ export class Ragdoll implements EnginePlugin {
   /** The part whose bone is `node`, or undefined. */
   part(node: Mesh): RagdollPart | undefined {
     return this.parts.find((bone) => bone.node === node);
+  }
+
+  /**
+   * Debug line segments for this ragdoll: bone colliders tinted by mode (kinematic blue, limp green, partial amber,
+   * blending cyan), joint swing cones and hinge limit arcs, and bone axes. Same layout as `physics.debugRender()`.
+   */
+  debugRender(options: RagdollDebugOptions = {}): DebugLines {
+    this.live();
+    const { capsules = true, limits = true, bones = true, limitScale = 0.12 } = options;
+    if (!(limitScale > 0) || !Number.isFinite(limitScale))
+      throw ragdollError(`Ragdoll debug limitScale must be a positive finite number of metres (got ${limitScale}).`);
+    const positions: number[] = [],
+      colors: number[] = [];
+    const seg = (a: readonly number[], b: readonly number[], c: readonly [number, number, number, number]): void => {
+      positions.push(a[0]!, a[1]!, a[2]!, b[0]!, b[1]!, b[2]!);
+      colors.push(c[0], c[1], c[2], c[3], c[0], c[1], c[2], c[3]);
+    };
+    const basis = (dir: readonly number[]): [[number, number, number], [number, number, number]] => {
+      const ref: [number, number, number] = Math.abs(dir[1]!) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+      let ux = ref[1] * dir[2]! - ref[2] * dir[1]!,
+        uy = ref[2] * dir[0]! - ref[0] * dir[2]!,
+        uz = ref[0] * dir[1]! - ref[1] * dir[0]!;
+      const ul = Math.hypot(ux, uy, uz) || 1;
+      ux /= ul;
+      uy /= ul;
+      uz /= ul;
+      return [
+        [ux, uy, uz],
+        [dir[1]! * uz - dir[2]! * uy, dir[2]! * ux - dir[0]! * uz, dir[0]! * uy - dir[1]! * ux],
+      ];
+    };
+    const add3 = (a: readonly number[], b: readonly number[], s = 1): [number, number, number] => [
+      a[0]! + b[0]! * s,
+      a[1]! + b[1]! * s,
+      a[2]! + b[2]! * s,
+    ];
+    const poses = this.parts.map((bone) => ({
+      pos: bone.body.valid
+        ? bone.body.position
+        : ([bone.cur[0]!, bone.cur[1]!, bone.cur[2]!] as [number, number, number]),
+      rot: bone.body.valid
+        ? bone.body.rotation
+        : ([bone.cur[3]!, bone.cur[4]!, bone.cur[5]!, bone.cur[6]!] as [number, number, number, number]),
+    }));
+    const N = 16;
+    for (let i = 0; i < this.parts.length; i++) {
+      const bone = this.parts[i]!,
+        { pos, rot } = poses[i]!,
+        dir = rotateByQuaternion(bone.axis, rot),
+        tint: readonly [number, number, number, number] = bone.limp
+          ? bone.weight < 1
+            ? [1, 0.58, 0.15, 1]
+            : [0.25, 0.9, 0.4, 1]
+          : bone.weight > 0
+            ? [0.2, 0.85, 1, 1]
+            : [0.35, 0.6, 1, 1];
+      if (capsules) {
+        if (bone.shape.type === 'capsule') {
+          const r = bone.radius,
+            hh = Math.max(bone.length / 2 - r, 1e-3),
+            mid = add3(pos, dir, bone.length / 2),
+            top = add3(mid, dir, hh),
+            bot = add3(mid, dir, -hh),
+            [u, v] = basis(dir);
+          for (let k = 0; k < N; k++) {
+            const a0 = (k / N) * Math.PI * 2,
+              a1 = ((k + 1) / N) * Math.PI * 2,
+              c0 = Math.cos(a0) * r,
+              s0 = Math.sin(a0) * r,
+              c1 = Math.cos(a1) * r,
+              s1 = Math.sin(a1) * r,
+              o0: [number, number, number] = [u[0] * c0 + v[0] * s0, u[1] * c0 + v[1] * s0, u[2] * c0 + v[2] * s0],
+              o1: [number, number, number] = [u[0] * c1 + v[0] * s1, u[1] * c1 + v[1] * s1, u[2] * c1 + v[2] * s1];
+            seg(add3(top, o0), add3(top, o1), tint);
+            seg(add3(bot, o0), add3(bot, o1), tint);
+          }
+          for (const d of [u, v, [-u[0], -u[1], -u[2]], [-v[0], -v[1], -v[2]]]) {
+            const a = add3(top, d, r),
+              b = add3(bot, d, r);
+            seg(a, b, tint);
+            seg(a, add3(top, dir, r), tint);
+            seg(b, add3(bot, dir, -r), tint);
+          }
+        } else if (bone.shape.type === 'box') {
+          const corners: [number, number, number][] = [];
+          const { center, halfExtents, rotation: br } = bone.shape;
+          for (let k = 0; k < 8; k++) {
+            const local = rotateByQuaternion(
+              [halfExtents[0] * (k & 1 ? 1 : -1), halfExtents[1] * (k & 2 ? 1 : -1), halfExtents[2] * (k & 4 ? 1 : -1)],
+              br,
+            );
+            const inBone = [local[0]! + center[0], local[1]! + center[1], local[2]! + center[2]];
+            const w = rotateByQuaternion(inBone, rot);
+            corners.push([pos[0] + w[0]!, pos[1] + w[1]!, pos[2] + w[2]!]);
+          }
+          for (let k = 0; k < 8; k++)
+            for (const bit of [1, 2, 4]) if (!(k & bit)) seg(corners[k]!, corners[k | bit]!, tint);
+        } else {
+          const pts = bone.shape.points,
+            count = Math.floor(pts.length / 3);
+          const worldPts: [number, number, number][] = [];
+          for (let k = 0; k < count; k++) {
+            const w = rotateByQuaternion([pts[k * 3]!, pts[k * 3 + 1]!, pts[k * 3 + 2]!], rot);
+            worldPts.push([pos[0] + w[0]!, pos[1] + w[1]!, pos[2] + w[2]!]);
+          }
+          for (let k = 0; k < count; k++) seg(worldPts[k]!, worldPts[(k + 1) % count]!, tint);
+        }
+      }
+      if (bones) {
+        seg(pos, add3(pos, dir, bone.length), [0.95, 0.95, 0.85, 1]);
+        if (bone.parent !== -1) seg(poses[bone.parent]!.pos, pos, [0.9, 0.78, 0.3, 0.9]);
+      }
+      if (limits && bone.parent !== -1 && bone.spec) {
+        const restWorld = mul(poses[bone.parent]!.rot, bone.rest, new Float64Array(4)),
+          gold: readonly [number, number, number, number] = [1, 0.8, 0.2, 1];
+        if (bone.spec.type === 'cone') {
+          const restDir = rotateByQuaternion(bone.axis, restWorld),
+            swing = bone.spec.swing ?? Math.PI / 4,
+            [u, v] = basis(restDir),
+            coneCenter = add3(pos, restDir, limitScale * Math.cos(swing)),
+            coneRadius = limitScale * Math.sin(swing);
+          for (let k = 0; k < N; k++) {
+            const a0 = (k / N) * Math.PI * 2,
+              a1 = ((k + 1) / N) * Math.PI * 2,
+              p0: [number, number, number] = [
+                coneCenter[0] + (u[0] * Math.cos(a0) + v[0] * Math.sin(a0)) * coneRadius,
+                coneCenter[1] + (u[1] * Math.cos(a0) + v[1] * Math.sin(a0)) * coneRadius,
+                coneCenter[2] + (u[2] * Math.cos(a0) + v[2] * Math.sin(a0)) * coneRadius,
+              ],
+              p1: [number, number, number] = [
+                coneCenter[0] + (u[0] * Math.cos(a1) + v[0] * Math.sin(a1)) * coneRadius,
+                coneCenter[1] + (u[1] * Math.cos(a1) + v[1] * Math.sin(a1)) * coneRadius,
+                coneCenter[2] + (u[2] * Math.cos(a1) + v[2] * Math.sin(a1)) * coneRadius,
+              ];
+            seg(p0, p1, gold);
+            if (k % 4 === 0) seg(pos, p0, gold);
+          }
+          const curAngle = Math.acos(
+            Math.max(-1, Math.min(1, dir[0]! * restDir[0]! + dir[1]! * restDir[1]! + dir[2]! * restDir[2]!)),
+          );
+          seg(pos, add3(pos, dir, limitScale), curAngle > swing + 0.02 ? [1, 0.25, 0.2, 1] : [0.3, 1, 0.5, 1]);
+        } else if (bone.spec.type === 'hinge') {
+          const axisW = rotateByQuaternion(bone.spec.axis, restWorld),
+            restDir = rotateByQuaternion(bone.axis, restWorld),
+            d = restDir[0]! * axisW[0]! + restDir[1]! * axisW[1]! + restDir[2]! * axisW[2]!;
+          let rx = restDir[0]! - axisW[0]! * d,
+            ry = restDir[1]! - axisW[1]! * d,
+            rz = restDir[2]! - axisW[2]! * d;
+          const rl = Math.hypot(rx, ry, rz);
+          const ref0: [number, number, number] = rl > 1e-4 ? [rx / rl, ry / rl, rz / rl] : basis(axisW)[0];
+          const ref1: [number, number, number] = [
+            axisW[1]! * ref0[2] - axisW[2]! * ref0[1],
+            axisW[2]! * ref0[0] - axisW[0]! * ref0[2],
+            axisW[0]! * ref0[1] - axisW[1]! * ref0[0],
+          ];
+          const [min, max] = bone.spec.limits ?? [-Math.PI * 0.75, 0],
+            arcSteps = 12,
+            arcPt = (angle: number): [number, number, number] => [
+              pos[0] + (ref0[0] * Math.cos(angle) + ref1[0] * Math.sin(angle)) * limitScale,
+              pos[1] + (ref0[1] * Math.cos(angle) + ref1[1] * Math.sin(angle)) * limitScale,
+              pos[2] + (ref0[2] * Math.cos(angle) + ref1[2] * Math.sin(angle)) * limitScale,
+            ];
+          seg(add3(pos, axisW, -limitScale * 0.5), add3(pos, axisW, limitScale * 0.5), [1, 0.5, 0.15, 1]);
+          seg(pos, arcPt(min), gold);
+          seg(pos, arcPt(max), gold);
+          for (let k = 0; k < arcSteps; k++)
+            seg(arcPt(min + ((max - min) * k) / arcSteps), arcPt(min + ((max - min) * (k + 1)) / arcSteps), gold);
+          seg(pos, add3(pos, dir, limitScale), [0.3, 1, 0.5, 1]);
+        } else {
+          const s = limitScale * 0.35;
+          seg([pos[0] - s, pos[1], pos[2]], [pos[0] + s, pos[1], pos[2]], [0.8, 0.85, 0.95, 1]);
+          seg([pos[0], pos[1] - s, pos[2]], [pos[0], pos[1] + s, pos[2]], [0.8, 0.85, 0.95, 1]);
+          seg([pos[0], pos[1], pos[2] - s], [pos[0], pos[1], pos[2] + s], [0.8, 0.85, 0.95, 1]);
+        }
+      }
+    }
+    return { vertices: new Float32Array(positions), colors: new Float32Array(colors) };
   }
 
   setup(engine: Engine): void {

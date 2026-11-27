@@ -4,7 +4,7 @@
 
 ```ts
 import { Engine, EnginePlugin, Mesh } from "@margoengine/core/extension";
-import { Physics, PhysicsBody, PhysicsJoint } from "@margoengine/physics";
+import { DebugLines, Physics, PhysicsBody, PhysicsJoint } from "@margoengine/physics";
 
 export class Ragdoll implements EnginePlugin {
     readonly physics: Physics;
@@ -21,6 +21,7 @@ export class Ragdoll implements EnginePlugin {
     activate(limb?: RagdollLimb): this;
     deactivate(duration?: number, limb?: RagdollLimb): this;
     part(node: Mesh): RagdollPart | undefined;
+    debugRender(options?: RagdollDebugOptions): DebugLines;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     dispose(): void;
@@ -34,6 +35,13 @@ export interface RagdollBone {
     radius?: number;
     mass?: number;
     shape?: RagdollShape;
+}
+
+export interface RagdollDebugOptions {
+    capsules?: boolean;
+    limits?: boolean;
+    bones?: boolean;
+    limitScale?: number;
 }
 
 export type RagdollJoint = {

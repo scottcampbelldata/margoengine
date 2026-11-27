@@ -40,6 +40,7 @@ export { DynamicCharacter } from './dynamic-character.js';
 export type { DynamicCharacterOptions } from './dynamic-character.js';
 export type {
   CharacterControllerOptions,
+  CharacterDebugOptions,
   CharacterLength,
   CharacterCollision,
   CharacterContact,

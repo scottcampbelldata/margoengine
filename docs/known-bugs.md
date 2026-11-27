@@ -199,6 +199,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/physics/tests/coupling/loads-paddle.test.js` and `loads-wading.test.js` check wet momentum,
   drying rejection and replay.
 
+### Open 2026-11-27: a limp ragdoll's spine is drawn 7 cm off its body after a 3 s fall (KB-RAGDOLL-LIMPDRAW1, ragdoll or physics)
+
+- **Repro:** `node --test --test-name-pattern="limp: the ragdoll falls" packages/ragdoll/tests/ragdoll.test.js` on main at
+  256a80a04, with the DYN-07 changes taken out and physics and ragdoll rebuilt: "spine drawn at its body: 0.069 is not 0
+  within 0.02". The other 98 ragdoll tests pass.
+- **Cause:** not found yet. Found while landing DYN-07 (the debug view and the character bridge), which does not change it:
+  the same assertion fails with and without those changes. The node's drawn position and its body's position part after
+  the fall, so either the joint holding the spine to the hips drifts (a physics change on main since the test last passed)
+  or the pose written into the bones lags the bodies.
+- **Next:** bisect `packages/physics/src` on main for the commit where the test turned red, then fix it in the package that
+  owns it with this test as the regression.
+
 ### Open 2026-11-27: a towed flexible pipe's in-line vortex-induced vibration is an order short of the measurement (KB-PHYS-RODVIVIL1, physics loads)
 
 - **Repro:** `packages/physics/tests/rod-viv.test.js`, the towing-tank pipe of Fu et al. (2025): the rod's in-line RMS is

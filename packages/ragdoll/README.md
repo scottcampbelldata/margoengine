@@ -8,6 +8,22 @@ bodies follow the bones as kinematic hit boxes that push the world; `activate()`
 animation gave each bone; `deactivate(seconds)` blends the bones back to the animation. Core and physics stay the same
 size: an app that does not import this package ships none of it.
 
+## Quick start
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Physics } from 'margoengine/physics';
+import { Ragdoll } from 'margoengine/ragdoll';
+await Physics.load();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine);
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb');
+Ragdoll.attach(physics, { root: model.nodes.find((n) => n.name === 'hips')! }).activate();
+```
+
+## Full animated ragdoll example
+
 ```ts
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf/pbr';
@@ -94,6 +110,7 @@ limit does not bounce, and turning about the joint never pulls the joint apart.
 | `weight` | How much of the drawn pose is the ragdoll's, 0 to 1 (the largest of any bone's). Set it while active for a partial blend of the limp bones. |
 | `rootPosition` | World position of the root bone's body: where to move a character before it gets up. |
 | `part(node)` | The part of a node, or undefined. |
+| `debugRender({capsules, limits, bones, limitScale})` | Returns `{vertices, colors}` debug line segments showing bone colliders tinted by mode (kinematic blue, limp green, blending cyan), swing cones, hinge limit arcs, and bone links. |
 | `dispose()` | Removes the bodies and joints and the plugin; the bones keep their last pose. `using` works. |
 
 A bone that is not limp aims its body (a kinematic hit box) at the pose drawn this frame, read after the ragdoll writes it, and the physics step of that frame reaches it (`tests/ragdoll.test.js`, "with Physics added first, a kinematic bone's body is on the pose drawn"). Frame order: `Physics` is a late plugin (core's `late`): the engine updates it after every plugin that is not, whichever was added first, so each frame it steps after the frame's animation and after a ragdoll or follower has set its targets from the pose drawn. A body whose pose comes from an animation (a ragdoll's hit boxes, a body following an animated mesh) is therefore on the pose drawn, on the frame it is drawn (KB-PHYS-FRAMEORDER1, fixed). The shot tool drives the page's own frame loop on the shot's clock, so a film has the same order.
@@ -374,6 +391,39 @@ if (balance.state === 'fallen') motors.fade(0, 0.5);
 A step lands where the capture point will be when the foot comes down, and a hard push makes the capture point run away from the stance foot as e^(omega t), so a step that took its full `stepTime` would land short and the stance foot would be dragged off the ground. Each step takes no longer than the capture point needs to reach the edge of the leg's reach, ln(reach / d) / omega for a capture point d from the stance foot, and no less than 0.4 / omega (0.094 s for a figure 0.26 m tall at the hips): step timing adaptation (Khadiv, Herzog, Moosavian and Righetti, IEEE T-RO 2020) on the capture point of Pratt et al. (2006) and Englsberger et al. (2011). A planted foot's target stays on the ground, so a stance foot a push lifts is pressed back down, and a foot that is off the ground anyway steps next. Both feet are held level, the swing foot heading where the hips head as SIMBICON keeps it (Yin, Loken and van de Panne 2007), and every target stays inside the ankle's cone. The ankle's limits hold under the weight, which they did not on Rapier: `docs/limits.md`, Ragdoll balance. Knight recovers a 1.5 m/s push of its upper body in each of four directions at every solver setting from 2 to 6 iterations, 4, 8 and 16 substeps and warm start on and off, which `node packages/ragdoll/scripts/balance-ab.mjs --sweep` checks.
 
 Every torque is a pair inside the body, so a hard enough blow knocks it over. Set `carry` to lend an outside force, capped at 1.5 times the share asked for; `balance.carried` reads the share of the body's weight it gave at the last step, and is 0 without it. While it balances it adds inertia to the feet and shins, brings the character's island, not the world, to at least 8 solver passes, and stands a foot fitted with a hull on a flat sole of four corners; `dispose` takes all three away. A stance knee takes its torque from the balance, with a spring of its own beside it, so `motors.setStrength` reaches only the swinging leg's knee. Its torques are forces, so more solver passes only steady it, and a force of your own on a bone stays yours. `steps` counts steps, `capture` is the capture point, `tilt` the lean, and `state` is `standing`, `stepping` or `fallen`. Add it with the character standing still, before `activate`. After a fall, get up with `margoengine/ragdoll/getup` and call `reset()`. `motors.setTarget(bone, rotation)` is what it drives the legs with, and is open to any controller: a rotation relative to the parent bone, or `null` for the animation's pose.
+
+## Character controller bridge (`margoengine/ragdoll/character`)
+
+`addCharacterRagdoll({ controller, ragdoll, animator?, motors?, getUp?, root? })` links a `CharacterController` or `DynamicCharacter` with a `Ragdoll` so a walking character avoids self-colliding with its own ragdoll hitboxes, carries walking momentum into `knockdown(bone, impulse)` (disabling the controller capsule while limp, or triggering a partial-limb ragdoll via `{ limb }`), and recovers via `recover()` by relocating the capsule to `ragdoll.rootPosition`, blending out cleanly (via `GetUp` when provided) and re-enabling locomotion with zero pop.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Physics } from 'margoengine/physics';
+import { Ragdoll } from 'margoengine/ragdoll';
+import { addCharacterRagdoll } from 'margoengine/ragdoll/character';
+await Physics.load();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine);
+physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb');
+const capsule = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0.9, 0], colliders: { shape: 'capsule', halfHeight: 0.55, radius: 0.35 } });
+const controller = physics.createCharacterController(capsule, { applyImpulsesToDynamicBodies: true, characterMass: 70 });
+const ragdoll = Ragdoll.attach(physics, { root: model.nodes.find((n) => n.name === 'hips')! });
+const bridge = addCharacterRagdoll({ controller, ragdoll, root: model.root });
+bridge.move([0, -0.16, 0.05]);
+```
+
+| Member | Meaning |
+| --- | --- |
+| `state` | `'walking'`, `'ragdoll'`, or `'recovering'`. |
+| `move(desired, filter?)` | Sweeps a kinematic `CharacterController` while `'walking'` (excluding own ragdoll hitboxes); no-op while limp. |
+| `setTargetVelocity(v)` / `jump(speed)` / `update()` | Drives a `DynamicCharacter` while `'walking'`. |
+| `knockdown(bone?, impulse?, options?)` | Full knockdown (disables controller capsule, activates ragdoll, carries velocity) or partial-limb hit (`{ limb }`). |
+| `isSettled(linearSpeed?, angularSpeed?)` | True when knocked down and all limp bones have slowed below the thresholds. |
+| `recover(options?)` | Relocates capsule to ground under `ragdoll.rootPosition`, blends via `GetUp` or `ragdoll.deactivate`, re-enables controller with zero pop. |
+| `debugRender(options?)` | Combined debug lines for the controller and ragdoll. |
+| `dispose()` | Restores original collision groups, re-enables controller, and disposes internally created helpers. `using` works. |
 
 ## Clean room
 

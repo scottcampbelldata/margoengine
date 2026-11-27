@@ -66,6 +66,16 @@
       <p><strong>Fix.</strong> Release the first owner (call its <code>dispose()</code> or the function it returned) before attaching another, or create a separate target for the second. The message names what is already attached.</p>
     </section>
     <h2>Messages</h2>
+    <section id="physics-debug-view">
+      <h2><a href="#physics-debug-view">@margoengine/physics/debug-view: the shared physics debug view</a></h2>
+      <p><strong>Cause.</strong> The debug view was given something other than a live Physics world, a name that is empty, a width that is not a positive number of CSS pixels, a source with no debugRender() that is not a function, an engine the world is not attached to, or a name another plugin of the scene already has, or it was used after dispose (code disposed).</p>
+      <p><strong>Fix.</strong> Pass a live <code>Physics</code>, attach it with <code>await PhysicsDebugView.attach(engine, physics)</code> after <code>new Physics(engine)</code>, give a positive <code>width</code> or leave it out, add objects with <code>debugRender()</code> or functions returning <code>{vertices, colors}</code>, pass another <code>name</code> for a second view in one scene, and attach a new view after dispose.</p>
+    </section>
+    <section id="ragdolls">
+      <h2><a href="#ragdolls">@margoengine/ragdoll: ragdolls, their debug lines and the character bridge</a></h2>
+      <p><strong>Cause.</strong> A ragdoll, its debug lines or its character bridge was given something it cannot use: a missing controller or ragdoll, an up vector of zero length, a root offset that is not three finite numbers, a collision group outside 0 to 15 or none left free, get-up options without an animator, a call for the other kind of controller (move for a kinematic controller, setTargetVelocity, jump and update for a dynamic one), a bone that is not one of the ragdoll, or a debug limit size that is not a positive number of metres.</p>
+      <p><strong>Fix.</strong> Pass a <code>CharacterController</code> or <code>DynamicCharacter</code> and a <code>Ragdoll</code> on the same world, a non-zero <code>up</code>, finite numbers, a group from 0 to 15, an <code>animator</code> with <code>getUp</code> options, the method of the controller you passed, a node or part from <code>ragdoll.bones</code>, and a positive <code>limitScale</code> in metres.</p>
+    </section>
     <section id="ships">
       <h2><a href="#ships">@margoengine/physics/ship: ships under way</a></h2>
       <p><strong>Cause.</strong> The ship entry was given something it cannot use: a manoeuvring model, hull, propeller, rudder, thruster, wall, track or heading with a missing, negative or non-finite value, a body row that is not a whole number, a speed of 0 or less, or a ship index past its ships. Each message names the value it was given.</p>

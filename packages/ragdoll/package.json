@@ -47,6 +47,10 @@
     "./balance": {
       "types": "./dist/balance.d.ts",
       "import": "./dist/balance.js"
+    },
+    "./character": {
+      "types": "./dist/character.d.ts",
+      "import": "./dist/character.js"
     }
   },
   "files": [

@@ -6,7 +6,8 @@
 // controller with a limit on how fast the velocity may change, over what the ground under it does.
 import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from './body.js';
-import { colliderPose, colliderShape } from './character.js';
+import { colliderPose, colliderShape, type CharacterDebugOptions } from './character.js';
+import { DebugLineWriter, drawPrimitiveOutline, type DebugLines } from './debug.js';
 import { checkVec, type Vec3 } from './math.js';
 import type { Physics, ShapeCastHit } from './physics.js';
 
@@ -106,6 +107,8 @@ export class DynamicCharacter {
   private readonly hoverSpring: { height: number; frequency: number; damping: number; maxForce: number } | null;
   private readonly stairs: { maxHeight: number; minDepth: number } | null;
   private airborne = 0;
+  private lastSlopeAngle = 0;
+  private lastPlatformVelocity: [number, number, number] = [0, 0, 0];
 
   /** @internal */
   constructor(
@@ -177,6 +180,14 @@ export class DynamicCharacter {
   get groundNormal(): [number, number, number] {
     return this.ground ? [...this.ground.normal] : [...this.up];
   }
+  /** Slope angle of the ground under it at the last `update`, in radians (0 when flat or airborne). */
+  get slopeAngle(): number {
+    return this.lastSlopeAngle;
+  }
+  /** World-space velocity of the platform it stood on at the last `update`, in m/s. */
+  get platformVelocity(): [number, number, number] {
+    return [...this.lastPlatformVelocity];
+  }
 
   /**
    * The velocity it is to walk at, in the world's frame, relative to the ground under it. The part along `up` is ignored; on a
@@ -235,6 +246,7 @@ export class DynamicCharacter {
     this.airborne = Math.max(0, this.airborne - dt);
     this.ground = hit && this.airborne === 0 && dot(hit.normal, up) >= this.cosClimb - 1e-6 ? hit : null;
     this.isGrounded = this.ground !== null;
+    this.lastSlopeAngle = this.ground ? Math.acos(Math.max(-1, Math.min(1, dot(this.ground.normal, up)))) : 0;
 
     // Velocity: relative to what it stands on.
     const v = body.linearVelocity,
@@ -244,6 +256,7 @@ export class DynamicCharacter {
           : [0, 0, 0],
       rel = sub(v, base),
       flat = (a: Vec3): [number, number, number] => sub(a, scale(up, dot(a, up)));
+    this.lastPlatformVelocity = [base[0], base[1], base[2]];
     let change: [number, number, number] = [0, 0, 0];
     if (this.ground) {
       const n = this.ground.normal,
@@ -389,6 +402,47 @@ export class DynamicCharacter {
   private limit(v: [number, number, number], max: number): [number, number, number] {
     const l = len(v);
     return l > max ? scale(v, max / l) : v;
+  }
+
+  /**
+   * Debug line segments for this dynamic character: collider wireframe (tinted by grounded/tilted/airborne),
+   * ground normal, upright tilt axis, hover spring ray, and platform velocity vector.
+   */
+  debugRender(options: CharacterDebugOptions = {}): DebugLines {
+    if (this.disposed || !this.body.valid || !this.body.colliders.length)
+      return { vertices: new Float32Array(0), colors: new Float32Array(0) };
+    const {
+        capsule = true,
+        ground = true,
+        platformVelocity = true,
+        normalLength = 0.4,
+        velocityScale = 0.35,
+      } = options,
+      out = new DebugLineWriter(),
+      collider = this.body.colliders[0]!,
+      pose = colliderPose(this.body, collider),
+      bu = rotateBy(this.body.rotation, this.bodyUp),
+      tilt = Math.acos(Math.max(-1, Math.min(1, dot(bu, this.up))));
+    if (capsule) {
+      const tint: readonly [number, number, number, number] =
+        tilt > 0.26 ? [1, 0.55, 0.15, 1] : this.isGrounded ? [0.2, 0.92, 0.45, 1] : [0.25, 0.78, 1, 1];
+      drawPrimitiveOutline(out, collider, pose.position, pose.rotation, tint);
+      out.segment(pose.position, add(pose.position, scale(bu, normalLength)), [1, 0.9, 0.3, 1]);
+    }
+    if (ground && this.ground) {
+      const p = this.ground.point,
+        n = this.ground.normal;
+      out.cross(p, 0.05, [0.25, 1, 0.5, 1]);
+      out.segment(p, add(p, scale(n, normalLength)), [0.25, 1, 0.5, 1]);
+      if (this.hoverSpring) out.segment(pose.position, p, [0.3, 0.9, 1, 0.85]);
+    }
+    if (platformVelocity && len(this.lastPlatformVelocity) > 1e-4) {
+      const origin = this.ground ? this.ground.point : pose.position,
+        end = add(origin, scale(this.lastPlatformVelocity, velocityScale));
+      out.segment(origin, end, [0.95, 0.3, 0.95, 1]);
+      out.cross(end, 0.04, [0.95, 0.3, 0.95, 1]);
+    }
+    return out.finish();
   }
 
   dispose(): void {

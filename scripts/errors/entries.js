@@ -8,6 +8,24 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'physics-debug-view',
+    title: '@margoengine/physics/debug-view: the shared physics debug view',
+    kind: 'family',
+    messages: [],
+    cause:
+      'The debug view was given something other than a live Physics world, a name that is empty, a width that is not a positive number of CSS pixels, a source with no debugRender() that is not a function, an engine the world is not attached to, or a name another plugin of the scene already has, or it was used after dispose (code disposed).',
+    fix: 'Pass a live `Physics`, attach it with `await PhysicsDebugView.attach(engine, physics)` after `new Physics(engine)`, give a positive `width` or leave it out, add objects with `debugRender()` or functions returning `{vertices, colors}`, pass another `name` for a second view in one scene, and attach a new view after dispose.',
+  },
+  {
+    id: 'ragdolls',
+    title: '@margoengine/ragdoll: ragdolls, their debug lines and the character bridge',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A ragdoll, its debug lines or its character bridge was given something it cannot use: a missing controller or ragdoll, an up vector of zero length, a root offset that is not three finite numbers, a collision group outside 0 to 15 or none left free, get-up options without an animator, a call for the other kind of controller (move for a kinematic controller, setTargetVelocity, jump and update for a dynamic one), a bone that is not one of the ragdoll, or a debug limit size that is not a positive number of metres.',
+    fix: 'Pass a `CharacterController` or `DynamicCharacter` and a `Ragdoll` on the same world, a non-zero `up`, finite numbers, a group from 0 to 15, an `animator` with `getUp` options, the method of the controller you passed, a node or part from `ragdoll.bones`, and a positive `limitScale` in metres.',
+  },
+  {
     id: 'ships',
     title: '@margoengine/physics/ship: ships under way',
     kind: 'family',

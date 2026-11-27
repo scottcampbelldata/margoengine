@@ -114,11 +114,12 @@ await build({
         orbit: resolve(root, 'src/orbit/index.ts'),
         rod: resolve(root, 'src/rod/index.ts'),
         breakable: resolve(root, 'src/breakable/index.ts'),
+        'debug-view': resolve(root, 'src/debug-view.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,
     },
-    rollupOptions: { external: packageExternal(root, ['@margoengine/core', '@margoengine/core/extension']) },
+    rollupOptions: { external: packageExternal(root, ['@margoengine/core', '@margoengine/core/extension', '@margoengine/lines']) },
   },
 });
 for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])

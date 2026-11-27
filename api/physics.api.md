@@ -70,11 +70,15 @@ export class CharacterController {
     get grounded(): boolean;
     get collisions(): readonly CharacterCollision[];
     get isSlidingDownSlope(): boolean;
+    get groundNormal(): [number, number, number];
+    get slopeAngle(): number;
+    get platformVelocity(): [number, number, number];
     computedMovement(): [number, number, number];
     computedGrounded(): boolean;
     numComputedCollisions(): number;
     computedCollision(i: number): CharacterCollision | undefined;
     move(desired: Vec3, filter?: CharacterMoveFilter): CharacterMoveResult;
+    debugRender(options?: CharacterDebugOptions): DebugLines;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -100,6 +104,16 @@ export interface CharacterControllerOptions {
     innerBody?: {
         colliders: NonNullable<BodyOptions['colliders']>;
     };
+}
+
+export interface CharacterDebugOptions {
+    capsule?: boolean;
+    ground?: boolean;
+    autostep?: boolean;
+    platformVelocity?: boolean;
+    contacts?: boolean;
+    normalLength?: number;
+    velocityScale?: number;
 }
 
 export type CharacterLength = number | {
@@ -449,10 +463,13 @@ export class DynamicCharacter {
     get grounded(): boolean;
     get platform(): PhysicsBody | null;
     get groundNormal(): [number, number, number];
+    get slopeAngle(): number;
+    get platformVelocity(): [number, number, number];
     setTargetVelocity(velocity: Vec3): this;
     setFacing(direction: Vec3 | null): this;
     jump(speed: number): boolean;
     update(): void;
+    debugRender(options?: CharacterDebugOptions): DebugLines;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
