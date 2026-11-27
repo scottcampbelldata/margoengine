@@ -1636,17 +1636,27 @@ test("a sailing yacht by the Delft series and the ORC's sails: Sysser 44's wette
       135: [4.31, 5.59, 6.68, 7.57, 8.19, 8.7, 9.83, 11.27],
       150: [3.62, 4.76, 5.78, 6.64, 7.41, 8.0, 8.9, 9.9],
     };
+  // The certificate's No Spinnaker polar: the jib, and from 60 degrees the jib downwind set, the faster kept. Tolerance
+  // 2 sqrt(inputs^2 + 2 VPP^2): our assumed GM, keel and rudder move speed by up to 6 percent for GM 2.0 to 3.0 m (2 sigma,
+  // so 3 percent), and each VPP's hull resistance is the Delft series' to +-10 percent (2 sigma), 2.5 percent of speed:
+  // +-9 percent. From 20 knots up, upwind and reaching, the ORC's VPP adds the resistance of a wind-driven sea (its section
+  // 6.8), which this calm-water VPP leaves out: 6 to 15 percent faster there, an accepted difference (docs/limits.md).
   let sum = 0,
     n = 0;
   for (const [twa, speeds] of Object.entries(polar))
     winds.forEach((tws, i) => {
       const run = velocityPrediction(hull, rig, tws * kn, Number(twa) * DEG),
-        off = Math.abs(run.speed / kn / speeds[i] - 1);
-      assert.ok(off < 0.15, `${twa} degrees in ${tws} kn: ${run.speed / kn} kn against ${speeds[i]}`);
-      sum += off;
+        off = run.speed / kn / speeds[i] - 1;
+      assert.ok(
+        Math.abs(off) < 0.092 || (tws >= 20 && Number(twa) <= 90 && off > 0 && off < 0.16),
+        `${twa} degrees in ${tws} kn: ${run.speed / kn} kn against ${speeds[i]}`,
+      );
+      if (Number(twa) >= 120 && Number(twa) <= 135)
+        assert.ok(run.downwind, `${twa} degrees in ${tws} kn: the jib downwind`);
+      sum += Math.abs(off);
       n++;
     });
-  assert.ok(sum / n < 0.06, `${sum / n}`);
+  assert.ok(sum / n < 0.035, `${sum / n}`);
   // On a rigid body (pitch held: nothing floats it here) under the solver, reaching across a 12 kn wind and close-hauled,
   // the yacht settles to the VPP's speed and heel at the true wind angle its helm holds it at.
   for (const twa of [90, 52]) {

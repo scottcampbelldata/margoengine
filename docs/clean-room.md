@@ -17568,7 +17568,7 @@ https://repository.tudelft.nl/file/File_b89cddac-c130-429c-9b24-b71e453a1061 (eq
 read: Keuning and Katgert's 2008 regression and the Sysser hulls), G. Borba Labi, EMSHIP MSc thesis, Liege / Rostock 2019,
 https://matheo.uliege.be/bitstream/2268.2/8502/1/BORBA%20LABI%20%20Gaetan%20(Solent)%20-%20URO.pdf (eqs. 73 to 91, Tables 10
 to 17, read: Keuning and Sonnenberg's 1998 heel, keel, side force and effective span), the ORC VPP Documentation 2023,
-https://orc2.orc.org/rules/ORC%20VPP%20Documentation%202023.pdf (section 5, Tables 5.1 and 5.4, eqs. 5.34 to 5.48, read),
+https://orc2.orc.org/rules/ORC%20VPP%20Documentation%202023.pdf (section 5, Tables 5.1, 5.4 and 5.7, eqs. 5.34 to 5.48, the No Spinnaker configuration's jib downwind set on p. 45 and the blanketing of sections 5.6.2 and 5.6.3, read),
 and P. Teixeira, MSc thesis, IST Lisbon (Tables X-2 and XIII-1, read: the YD-41's particulars and its ORC certificate's
 polar, the measurement the test holds). Keuning and Katgert's, Keuning and Sonnenberg's and Hazen's papers themselves were
 not obtained. No VPP code was read. The heel's effect on the apparent wind, the linear kheff, the depowering order's

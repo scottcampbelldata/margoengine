@@ -105,6 +105,16 @@ const JIB: readonly (readonly number[])[] = [
   [0, 1, 1.375, 1.45, 1.45, 1.25, 0.4, 0, -0.1],
   [0.05, 0.032, 0.031, 0.037, 0.25, 0.35, 0.73, 0.95, 0.9],
 ];
+/**
+ * ORC 2023's asymmetric spinnaker tacked on the centreline (Table 5.7): AWA, deg; C_L; C_D. The "jib downwind" set of the
+ * No Spinnaker configuration flies these on 1.064 times the jib's area from 60 to 180 degrees of true wind, unblanketed
+ * (section 5.2.3, p. 45; section 5.6.3).
+ */
+const DOWNWIND: readonly (readonly number[])[] = [
+  [28, 41, 50, 60, 67, 75, 100, 115, 130, 150, 170, 180],
+  [0.01738, 0.69825, 0.89933, 1.04, 1.072, 1.075, 0.985, 0.805, 0.372, 0.1, 0.02, 0],
+  [0.15405, 0.23925, 0.30877, 0.38852, 0.43624, 0.47713, 0.5453, 0.56574, 0.475, 0.352, 0.29, 0.262],
+];
 /** ORC's fcdmult against FLAT, 0.55 to 1.00. */
 const FLAT_DRAG = [1.06, 1.055, 1.048, 1.035, 1.02, 1.008, 1.002, 1.0, 1.004, 1.06];
 
@@ -166,6 +176,8 @@ export interface YachtRig {
   readonly freeboard: number;
   readonly mass: number;
   readonly metacentricHeight: number;
+  /** The headsail's area, m^2 (default the foretriangle's, I J / 2): a larger one is blanketed by the main past 135 degrees. */
+  readonly headsail?: number;
 }
 
 /** The water's and air's properties for a yacht (defaults: 1025 and 1.19e-6 sea water, 1.225 air, 9.80665 gravity). */
@@ -353,7 +365,8 @@ export interface YachtSails {
 
 /**
  * The mainsail's and jib's forces (ORC 2023, low-tech sets) at apparent wind `awa` rad and `aws` m/s, heeled `heel` rad,
- * flattened to `flat` (0.42 to 1) and reefed to `reef` of their area (0 to 1).
+ * flattened to `flat` (0.42 to 1) and reefed to `reef` of their area (0 to 1); with `downwind` the headsail is ORC's "jib
+ * downwind" set in its place.
  */
 export function yachtSails(
   rig: YachtRig,
@@ -363,11 +376,14 @@ export function yachtSails(
   flat = 1,
   reef = 1,
   fluids: YachtFluids = {},
+  downwind = false,
 ): YachtSails {
-  const { I, J, P, E, boom, freeboard } = rig ?? ({} as YachtRig);
-  if (![I, J, P, E, boom, freeboard].every((v) => v > 0 && Number.isFinite(v)))
+  const { I, J, P, E, boom, freeboard } = rig ?? ({} as YachtRig),
+    fore = 0.5 * I * J,
+    headsail = rig?.headsail ?? fore;
+  if (![I, J, P, E, boom, freeboard, headsail].every((v) => v > 0 && Number.isFinite(v)))
     throw shipError(
-      `A yacht's rig is {I, J, P, E, boom, freeboard} in metres above 0 (got ${[I, J, P, E, boom, freeboard].join(', ')}); pass them.`,
+      `A yacht's rig is {I, J, P, E, boom, freeboard} in metres and its headsail in m^2, above 0 (got ${[I, J, P, E, boom, freeboard, headsail].join(', ')}); pass them.`,
     );
   // The wind in the heeled rig's plane.
   const a = Math.abs(awa),
@@ -376,15 +392,18 @@ export function yachtSails(
     deg = eff / DEG,
     r = Math.max(0.05, Math.min(1, reef)),
     main = 0.5 * P * E * r,
-    jib = 0.5 * I * J * r,
+    jib = (downwind ? 1.064 : 1) * headsail * r,
     ref = main + jib,
     [clm, cdm] = column(MAIN, deg),
-    [clj, cdj] = column(JIB, deg),
-    // The jib is blanketed by the main from 135 degrees (ORC p. 57).
-    bkj = deg <= 135 ? 1 : Math.max(0, 1 - (deg - 135) / 45),
+    [clj, cdj] = column(downwind ? DOWNWIND : JIB, deg),
+    // The jib is blanketed by the main past 135 degrees by the share of its area beyond the foretriangle's, f_j; the jib
+    // downwind is not (ORC p. 57, sections 5.6.2 and 5.6.3).
+    share = (headsail - Math.min(headsail, fore)) / headsail,
+    bkj = downwind || deg <= 135 ? 1 : 1 - share * ((Math.min(180, deg) - 135) / 45),
+    kpj = downwind ? 0.02648 : 0.016,
     clMax = (clm * main + clj * bkj * jib) / ref,
     cd0 = (cdm * main + cdj * bkj * jib) / ref,
-    kpp = clMax !== 0 ? (0.01379 * clm * clm * main + 0.016 * clj * clj * bkj * jib) / (ref * clMax * clMax) : 0,
+    kpp = clMax !== 0 ? (0.01379 * clm * clm * main + kpj * clj * clj * bkj * jib) / (ref * clMax * clMax) : 0,
     // The effective height: ORC's span correction for a masthead rig (fractionality 1, overlap 1, roach 0.2) times kheff,
     // 1.4513 at 20 degrees to 0.80 at 80 degrees (its plot's ends; between them a straight line, an assumption).
     kheff = 1.4513 + (Math.max(20, Math.min(80, deg)) - 20) * ((0.8 - 1.4513) / 60),
@@ -431,6 +450,8 @@ export interface YachtRun {
   apparentSpeed: number;
   drive: number;
   side: number;
+  /** Whether the headsail is ORC's jib downwind set (faster than the jib from 60 degrees of true wind). */
+  downwind: boolean;
 }
 
 /**
@@ -453,113 +474,121 @@ export function velocityPrediction(
     throw shipError(
       `A yacht's rig has its mass, kg, and metacentric height, m, above 0 (got ${rig?.mass}, ${rig?.metacentricHeight}); pass them.`,
     );
-  const g = fluids.gravity ?? 9.80665,
-    lateral = hull.draught + 0.45 * (hull.keel.draught - hull.draught),
-    maxHeel = fluids.maxHeel ?? 30 * DEG,
-    at = (V: number, flat: number, reef = 1) => {
-      // The apparent wind on the course, then the heel where the moments meet (iterated: the heel changes the wind).
-      const wx = tws * cos(twa) + V,
-        wy = tws * sin(Math.abs(twa)),
-        awa = atan2(wy, wx),
-        aws = hypot(wx, wy);
-      let heel = 0,
-        sails = yachtSails(rig, awa, aws, heel, flat, reef, fluids);
-      for (let i = 0; i < 40; i++) {
-        const moment = sails.heel * (sails.centre + lateral) * cos(heel),
-          s = moment / (rig.mass * g * rig.metacentricHeight),
-          next = s >= 1 ? 1.2 : atan2(s, Math.sqrt(1 - s * s));
-        if (Math.abs(next - heel) < 1e-7) break;
-        heel = 0.5 * (heel + next);
-        sails = yachtSails(rig, awa, aws, heel, flat, reef, fluids);
+  // ORC's No Spinnaker configuration: the jib, and from 60 degrees of true wind the jib downwind set too, the faster kept.
+  const predict = (downwind: boolean): YachtRun => {
+    const g = fluids.gravity ?? 9.80665,
+      lateral = hull.draught + 0.45 * (hull.keel.draught - hull.draught),
+      maxHeel = fluids.maxHeel ?? 30 * DEG,
+      at = (V: number, flat: number, reef = 1) => {
+        // The apparent wind on the course, then the heel where the moments meet (iterated: the heel changes the wind).
+        const wx = tws * cos(twa) + V,
+          wy = tws * sin(Math.abs(twa)),
+          awa = atan2(wy, wx),
+          aws = hypot(wx, wy);
+        let heel = 0,
+          sails = yachtSails(rig, awa, aws, heel, flat, reef, fluids, downwind);
+        for (let i = 0; i < 40; i++) {
+          const moment = sails.heel * (sails.centre + lateral) * cos(heel),
+            s = moment / (rig.mass * g * rig.metacentricHeight),
+            next = s >= 1 ? 1.2 : atan2(s, Math.sqrt(1 - s * s));
+          if (Math.abs(next - heel) < 1e-7) break;
+          heel = 0.5 * (heel + next);
+          sails = yachtSails(rig, awa, aws, heel, flat, reef, fluids, downwind);
+        }
+        const unit = yachtWater(hull, V, heel, 1, fluids),
+          leeway = unit.slope > 0 ? (sails.heel * cos(heel)) / unit.slope : 0,
+          water = yachtWater(hull, V, heel, leeway, fluids);
+        return { drive: sails.drive, resistance: water.resistance, heel, leeway, sails, side: water.side };
+      },
+      // The speed where the drive meets the resistance, at a flattening: the fastest such speed (at a crawl the leeway's
+      // induced drag outruns the drive too), found stepping down from Fn 1 and then by bisection.
+      speedAt = (flat: number, reef = 1) => {
+        const top = Math.sqrt(g * hull.length),
+          steps = 40;
+        let lo = 0,
+          hi = top;
+        for (let i = steps - 1; i >= 1; i--) {
+          const v = (top * i) / steps,
+            r = at(v, flat, reef);
+          if (r.drive > r.resistance) {
+            lo = v;
+            hi = (top * (i + 1)) / steps;
+            break;
+          }
+        }
+        if (lo === 0) return 0;
+        for (let i = 0; i < 50; i++) {
+          const mid = 0.5 * (lo + hi),
+            r = at(mid, flat, reef);
+          if (r.drive > r.resistance) lo = mid;
+          else hi = mid;
+        }
+        return 0.5 * (lo + hi);
+      };
+    // The flattening that gives the most speed (golden-section search over 0.42 to 1).
+    let a = 0.42,
+      b = 1;
+    const k = (Math.sqrt(5) - 1) / 2;
+    let c = b - k * (b - a),
+      d = a + k * (b - a),
+      fc = speedAt(c),
+      fd = speedAt(d);
+    for (let i = 0; i < 25; i++) {
+      if (fc > fd) {
+        b = d;
+        d = c;
+        fd = fc;
+        c = b - k * (b - a);
+        fc = speedAt(c);
+      } else {
+        a = c;
+        c = d;
+        fc = fd;
+        d = a + k * (b - a);
+        fd = speedAt(d);
       }
-      const unit = yachtWater(hull, V, heel, 1, fluids),
-        leeway = unit.slope > 0 ? (sails.heel * cos(heel)) / unit.slope : 0,
-        water = yachtWater(hull, V, heel, leeway, fluids);
-      return { drive: sails.drive, resistance: water.resistance, heel, leeway, sails, side: water.side };
-    },
-    // The speed where the drive meets the resistance, at a flattening: the fastest such speed (at a crawl the leeway's
-    // induced drag outruns the drive too), found stepping down from Fn 1 and then by bisection.
-    speedAt = (flat: number, reef = 1) => {
-      const top = Math.sqrt(g * hull.length),
-        steps = 40;
-      let lo = 0,
-        hi = top;
-      for (let i = steps - 1; i >= 1; i--) {
-        const v = (top * i) / steps,
-          r = at(v, flat, reef);
-        if (r.drive > r.resistance) {
-          lo = v;
-          hi = (top * (i + 1)) / steps;
-          break;
+    }
+    let flat = speedAt(1) >= Math.max(fc, fd) ? 1 : 0.5 * (a + b),
+      reef = 1,
+      speed = speedAt(flat),
+      r = at(speed, flat);
+    // Over-pressed (heeled past `maxHeel`), the crew depowers as the ORC's VPP does: flattens to 0.42, then reefs to 40
+    // percent of the area, taking the fastest setting that heels no further.
+    if (r.heel > maxHeel) {
+      let best = -1;
+      for (let i = 0; i <= 24; i++) {
+        const p = i / 24,
+          f = p <= 0.5 ? 1 - 0.58 * (p / 0.5) : 0.42,
+          rf = p <= 0.5 ? 1 : 1 - 0.6 * ((p - 0.5) / 0.5),
+          v = speedAt(f, rf),
+          run = at(v, f, rf);
+        if ((run.heel <= maxHeel || i === 24) && v > best) {
+          best = v;
+          flat = f;
+          reef = rf;
+          speed = v;
+          r = run;
+          if (run.heel <= maxHeel) break;
         }
       }
-      if (lo === 0) return 0;
-      for (let i = 0; i < 50; i++) {
-        const mid = 0.5 * (lo + hi),
-          r = at(mid, flat, reef);
-        if (r.drive > r.resistance) lo = mid;
-        else hi = mid;
-      }
-      return 0.5 * (lo + hi);
+    }
+    return {
+      speed,
+      heel: r.heel,
+      leeway: r.leeway,
+      flat,
+      reef,
+      apparentAngle: r.sails.angle,
+      apparentSpeed: r.sails.speed,
+      drive: r.drive,
+      side: r.side,
+      downwind,
     };
-  // The flattening that gives the most speed (golden-section search over 0.42 to 1).
-  let a = 0.42,
-    b = 1;
-  const k = (Math.sqrt(5) - 1) / 2;
-  let c = b - k * (b - a),
-    d = a + k * (b - a),
-    fc = speedAt(c),
-    fd = speedAt(d);
-  for (let i = 0; i < 25; i++) {
-    if (fc > fd) {
-      b = d;
-      d = c;
-      fd = fc;
-      c = b - k * (b - a);
-      fc = speedAt(c);
-    } else {
-      a = c;
-      c = d;
-      fc = fd;
-      d = a + k * (b - a);
-      fd = speedAt(d);
-    }
-  }
-  let flat = speedAt(1) >= Math.max(fc, fd) ? 1 : 0.5 * (a + b),
-    reef = 1,
-    speed = speedAt(flat),
-    r = at(speed, flat);
-  // Over-pressed (heeled past `maxHeel`), the crew depowers as the ORC's VPP does: flattens to 0.42, then reefs to 40
-  // percent of the area, taking the fastest setting that heels no further.
-  if (r.heel > maxHeel) {
-    let best = -1;
-    for (let i = 0; i <= 24; i++) {
-      const p = i / 24,
-        f = p <= 0.5 ? 1 - 0.58 * (p / 0.5) : 0.42,
-        rf = p <= 0.5 ? 1 : 1 - 0.6 * ((p - 0.5) / 0.5),
-        v = speedAt(f, rf),
-        run = at(v, f, rf);
-      if ((run.heel <= maxHeel || i === 24) && v > best) {
-        best = v;
-        flat = f;
-        reef = rf;
-        speed = v;
-        r = run;
-        if (run.heel <= maxHeel) break;
-      }
-    }
-  }
-  return {
-    speed,
-    heel: r.heel,
-    leeway: r.leeway,
-    flat,
-    reef,
-    apparentAngle: r.sails.angle,
-    apparentSpeed: r.sails.speed,
-    drive: r.drive,
-    side: r.side,
   };
+  const jib = predict(false);
+  if (Math.abs(atan2(sin(twa), cos(twa))) < 60 * DEG) return jib;
+  const set = predict(true);
+  return set.speed > jib.speed ? set : jib;
 }
 
 /** A yacht on a rigid body: its row, hull, rig (none when its sails are another solver's, AERO-02's cloth), and frame. */

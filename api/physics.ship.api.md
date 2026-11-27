@@ -813,6 +813,7 @@ export interface YachtRig {
     readonly freeboard: number;
     readonly mass: number;
     readonly metacentricHeight: number;
+    readonly headsail?: number;
 }
 
 export interface YachtRun {
@@ -825,6 +826,7 @@ export interface YachtRun {
     apparentSpeed: number;
     drive: number;
     side: number;
+    downwind: boolean;
 }
 
 export interface YachtSails {
@@ -960,7 +962,7 @@ export function waveSpectrum(omega: number, h: number, t1: number): number;
 
 export const wrap: (angle: number) => number;
 
-export function yachtSails(rig: YachtRig, awa: number, aws: number, heel: number, flat?: number, reef?: number, fluids?: YachtFluids): YachtSails;
+export function yachtSails(rig: YachtRig, awa: number, aws: number, heel: number, flat?: number, reef?: number, fluids?: YachtFluids, downwind?: boolean): YachtSails;
 
 export function yachtWater(h: YachtHull, speed: number, heel: number, leeway: number, fluids?: YachtFluids): YachtWater;
 
