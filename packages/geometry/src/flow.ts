@@ -146,6 +146,29 @@ export class CurveFlow {
     }
   }
 
+  /** Frames sampled along the curve (`segments` + 1 of them, at equal distances). */
+  get frameCount(): number {
+    return this.segments + 1;
+  }
+
+  /**
+   * The sampled frames as one float table for the GPU: 16 numbers per frame, in order position, tangent, up and side,
+   * each padded to 4 (`[px, py, pz, 0, tx, ty, tz, 0, ux, uy, uz, 0, sx, sy, sz, 0]`). `@margoengine/materials/curve-flow`
+   * reads it to bend meshes in the vertex shader with the same interpolation as {@link CurveFlow.deform}.
+   */
+  frameTable(): Float32Array {
+    const count = this.segments + 1,
+      out = new Float32Array(count * 16);
+    for (let i = 0; i < count; i++)
+      for (let k = 0; k < 3; k++) {
+        out[i * 16 + k] = this.points[i * 3 + k];
+        out[i * 16 + 4 + k] = this.tangents[i * 3 + k];
+        out[i * 16 + 8 + k] = this.ups[i * 3 + k];
+        out[i * 16 + 12 + k] = this.sides[i * 3 + k];
+      }
+    return out;
+  }
+
   /**
    * The frame at `distance` along the curve; a closed curve wraps it.
    *

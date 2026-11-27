@@ -654,6 +654,9 @@ const {position, tangent, up, side} = flow.getFrame(12.5);
   carries on straight along the end tangent.
 - Normals use the inverse transpose of the bend's Jacobian, so they stay perpendicular to the bent surface even with
   `scale`; tangents use the Jacobian. Only vertices move, so a mesh needs enough segments along `axis`.
+- `flow.frameTable()` gives the sampled frames as 16 floats each (position, tangent, up, side, padded to 4) and
+  `flow.frameCount` their number. `curveFlow(flow)` of `@margoengine/materials/curve-flow` bends meshes with them on the
+  GPU, the same bend as `deform`, so sliding a mesh along the curve uploads no geometry.
 - `flow.matrices(count, {axis = 'x', offset = 0, spacing})` gives column-major 4x4 matrices, 16 values each; `spacing`
   defaults to even over the curve. `flow.matrixAt(distance, axis = 'x', target?)` is one matrix, and `target` skips the
   allocation.

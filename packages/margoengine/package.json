@@ -2735,6 +2735,10 @@
       "types": "./dist/materials/instance-attributes.d.ts",
       "import": "./dist/materials/instance-attributes.js"
     },
+    "./materials/curve-flow": {
+      "types": "./dist/materials/curve-flow.d.ts",
+      "import": "./dist/materials/curve-flow.js"
+    },
     "./materials/soot": {
       "types": "./dist/materials/soot.d.ts",
       "import": "./dist/materials/soot.js"

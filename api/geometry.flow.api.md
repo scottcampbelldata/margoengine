@@ -9,6 +9,8 @@ export class CurveFlow {
     readonly length: number;
     readonly closed: boolean;
     constructor(curve: Curve<Vec>, options?: CurveFlowOptions);
+    get frameCount(): number;
+    frameTable(): Float32Array;
     getFrame(distance: number): FlowFrame;
     deform(data: GeometryData, options?: FlowDeformOptions): GeometryData;
     matrixAt(distance: number, axis?: FlowAxis, target?: Float32Array): Float32Array;

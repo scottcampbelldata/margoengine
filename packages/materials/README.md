@@ -1628,6 +1628,61 @@ Rendering](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter
 Instancing](https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-3-inside-geometry-instancing),
 GPU Gems 2, 2005).
 
+### Bending along a curve on the GPU (`@margoengine/materials/curve-flow`)
+
+`curveFlow(flow)` bends a mesh along a curve in the vertex shader: a train on its track, a snake, text along a path, a
+pipe. `flow` is a `CurveFlow` from `@margoengine/geometry/flow`; its frames go to a small float texture once, and the
+plugin maps each vertex exactly as `flow.deform()` does on the CPU, normals included. Sliding the mesh along the curve
+is one uniform write per frame, with no geometry rebuilt or uploaded, and the bend shows in the colour pass and every
+depth pass (shadows, picking, TAA velocity).
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
+import { curveFlow } from 'margoengine/materials/curve-flow';
+import { boxGeometry, CatmullRomCurve3 } from 'margoengine/geometry';
+import { CurveFlow } from 'margoengine/geometry/flow';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { camera: { position: [0, 12, 18], target: [0, 0, 0] } });
+const track = new CatmullRomCurve3([[-8, 0, 0], [-3, 2, -5], [3, 0, 4], [8, 1, 0]], true);
+const flow = new CurveFlow(track, { closed: true, lockUp: true });
+// A long box with plenty of segments along x, so it can follow the bends.
+const train = boxGeometry(6, 1, 1.2, 96, 2, 2);
+const bend = curveFlow(flow, { offset: 0 });
+createMesh(engine, train, new PbrMaterial({ color: '#c0402a', features: [bend] }));
+engine.onFrame((_, delta) => {
+  bend.uniforms.offset += delta * 4; // 4 units a second along the loop
+});
+engine.start();
+```
+
+| Option | Meaning |
+| --- | --- |
+| `axis` | Local axis that runs along the curve: `'x'` (default), `'y'` or `'z'`. Local +y stays up (+z when `axis` is `'y'`), as in `CurveFlow.deform`. Fixed at creation |
+| `offset` | Distance along the curve of local 0 (default 0). Live: `plugin.uniforms.offset` |
+| `scale` | Stretch along the curve (default 1, not 0). Live: `plugin.uniforms.scale` |
+| `fit` | `[low, high]`, the mesh's extent along `axis`: maps it onto the whole curve, `CurveFlow.deform`'s `fit`, with `offset` and `scale` on top (default none) |
+| `name` | Plugin name (default `'curveflow'`); give two flows on one material different names |
+
+`plugin.setFlow(otherFlow)` bends along another curve from the next frame (the same texture is rewritten when the
+frame count matches), and `plugin.dispose()` frees the frame texture once no material uses the plugin. The curve's
+frames, closed loops and `lockUp` come from `CurveFlow` itself. A `CurveFlow` of 1 to 8,191 segments fits (one texel
+column per frame); more throws `RangeError`. Errors are `TypeError` or `RangeError` with
+https://margoengine.com/errors#curve-flow.
+
+Limits: only vertices move, so a mesh needs enough segments along `axis` to follow the bends; the vertex tangent (for
+normal maps) is not bent, so use `flow.deform()` on the CPU for a normal-mapped mesh; mesh `bounds`, CPU raycasts and
+exporters see the unbent mesh, so give a culled mesh bounds that cover the curve or turn culling off for it.
+
+The deformation and its normals follow A. H. Barr, [Global and Local Deformations of Solid
+Primitives](https://doi.org/10.1145/800031.808573) (SIGGRAPH 1984): points go through the deformation and normals
+through the inverse transpose of its Jacobian. The frames are rotation minimizing, after W. Wang, B. Juttler, D. Zheng
+and Y. Liu, [Computation of Rotation Minimizing Frames](https://doi.org/10.1145/1330511.1330513) (ACM TOG 27(1), 2008),
+tabulated by arc length and interpolated between samples as in J. Bloomenthal, "Calculation of Reference Frames along
+a Space Curve" (Graphics Gems, 1990). The GPU check `npm run test:gpu:curve-flow --workspace packages/materials`
+compares the GPU bend with `flow.deform()` pixel for pixel on WebGPU and the WebGL2 layer.
+
 ### Soot and presets (`@margoengine/materials/soot`, `/presets`)
 
 `soot()` darkens a surface where a fire's smoke reaches it and returns a `layered()` layer, so firelight, shadows and

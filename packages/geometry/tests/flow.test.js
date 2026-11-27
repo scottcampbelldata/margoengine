@@ -218,3 +218,17 @@ test('invalid input is refused with the fix in the message', () => {
   assert.throws(() => flow.matrices(-1), /count/);
   assert.throws(() => flow.matrices(2, { spacing: NaN }), /spacing/);
 });
+
+test('frameTable packs every sampled frame as position, tangent, up and side, padded to 4', () => {
+  const flow = new CurveFlow(new CatmullRomCurve3([[0, 0, 0], [4, 2, 1], [8, 0, 3]]), { segments: 8 }),
+    table = flow.frameTable();
+  assert.equal(flow.frameCount, 9);
+  assert.equal(table.length, 9 * 16);
+  for (let i = 0; i < 9; i++) {
+    const frame = flow.getFrame((i / 8) * flow.length);
+    for (const [row, v] of [frame.position, frame.tangent, frame.up, frame.side].entries()) {
+      for (let k = 0; k < 3; k++) assert.ok(Math.abs(table[i * 16 + row * 4 + k] - v[k]) < 1e-5, `frame ${i} row ${row}`);
+      assert.equal(table[i * 16 + row * 4 + 3], 0);
+    }
+  }
+});

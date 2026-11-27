@@ -364,6 +364,20 @@ export const entries = [
     fix: 'Pass a capacity and attributes in range, set rows below the capacity with values of the declared type, lower the capacity or drop attributes for a small device, keep a set alive while a material reads it, and keep @margoengine/materials and @margoengine/gltf at matching versions.',
   },
   {
+    id: 'curve-flow',
+    title: '@margoengine/materials/curve-flow: bending a mesh along a curve on the GPU',
+    kind: 'family',
+    messages: [
+      'curveFlow needs a CurveFlow from @margoengine/geometry/flow; pass one; see https://margoengine.com/errors#curve-flow',
+      "curveFlow axis w is invalid; pass 'x', 'y' or 'z'; see https://margoengine.com/errors#curve-flow",
+      'curveFlow scale 0 flattens the mesh; pass a finite number other than 0; see https://margoengine.com/errors#curve-flow',
+      'curveFlow takes 2 to 8192 frames (CurveFlow segments 1 to 8191), got 9001; pass fewer segments; see https://margoengine.com/errors#curve-flow',
+    ],
+    cause:
+      'curveFlow() checks its options when it is made: the flow must be a CurveFlow (anything with length, closed, frameCount and frameTable()), the axis x, y or z, offset, scale and fit finite, scale not 0, fit an extent with high > low, and the frames must fit one texture row (8,192 texels, the width WebGPU guarantees). setFlow() checks the new flow the same way.',
+    fix: 'Pass a CurveFlow built by @margoengine/geometry/flow with at most 8,191 segments, a valid axis, finite numbers, a non-zero scale and a fit range with high above low.',
+  },
+  {
     id: 'mesh-debug-view',
     title: '@margoengine/inspector/mesh-debug: options, device and mesh size',
     kind: 'family',
