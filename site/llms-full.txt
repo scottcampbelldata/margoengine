@@ -3013,7 +3013,7 @@ three.js ships the MLS-MPM liquid as an example, `webgpu_compute_particles_fluid
 in the example's own code, as storage buffers and compute passes written in TSL that the page dispatches every frame,
 with the pointer and the drawing wired up by the page. To use it you copy that code into your project and keep it. In
 Margo it is `GPULiquid.attach(engine, {count})` from `@margoengine/water/liquid`: the container is the `box` you pass,
-in metres; the pointer is `setPointer`; rigid bodies are `colliders` and report their `forces`; `debug.particles:
+in metres; the pointer is `setPointer`; rigid bodies are `colliders` (spheres, boxes, capsules, planes and meshes) that report their `forces`, or a `PhysicsBody` coupled both ways by `link(body, collider)`, where the three.js example has no bodies; `debug.particles:
 'speed'` shows the particles as coloured spheres, and with the debug view off they draw as a refracting liquid surface
 (`ParticleLiquid`); `snapshot()` and `restore()` repeat a run exactly; on a browser without WebGPU the WebGL2 layer
 runs it on the CPU instead of failing.
@@ -13035,12 +13035,23 @@ each) on a grid of at most 4,194,304 nodes (16 B each), 8 to 256 cells along the
   substeps.
 - One liquid, one density and one viscosity; no surface tension, no adhesion, no two-phase air, no spray or foam of its
   own (the surface's `whitewater` can draw them from the particles' velocities).
-- Colliders are up to 8 spheres or boxes moved by the caller (kinematic); no meshes, capsules or planes. The liquid's
-  force on them is exact in total (a floor collider's impulse matches the column's weight and momentum change within the
-  fixed-point rounding, `gpu-liquid.test.js`), but on a small submerged body the grid's cells blur the surface: a held
-  sphere 2.7 cells in radius took 36.8 N of lift against Archimedes' 41.1 N (0.90; WebGPU, 65,536 particles, averaged
-  over 1 to 3 s). On WebGPU `forces` is one frame behind. The page integrating a body from it is explicit, so a body much
-  lighter than the liquid it displaces can oscillate; give it damping.
+- Colliders are up to 8 spheres, boxes, capsules, planes and triangle meshes, moved by the caller or by a linked body
+  (`link`). A mesh is a distance field of at most 64³ samples (`bakeLiquidMesh`, all mesh fields together at most
+  2,097,152 samples), so detail finer than its sample spacing is rounded off (a baked cube's edges by up to one spacing)
+  and a mesh thinner than about a grid cell lets liquid through; the bake tests every sample against every triangle, at
+  most 2^30 pairs (simplify the mesh past that). The liquid's force on them is exact in total (a floor collider's impulse
+  matches the column's weight and momentum change within the fixed-point rounding, `gpu-liquid.test.js`), but on a
+  small submerged body the grid's cells blur the surface: held in a 0.4 m layer (WebGPU, 65,536 particles, cell
+  0.037 m, averaged over 1 to 3 s) a sphere of radius 0.1 m took 35.7 N of lift against Archimedes' 41.1 N (0.87), a
+  capsule of radius 0.07 m and length 0.2 m 35.1 N against 44.3 N (0.79), and a baked mesh cube of half size 0.08 m
+  31.8 N against 40.2 N (0.79): each between rho g V of the shape a quarter cell smaller and larger, the bound
+  `gpu-liquid-check.mjs` holds. A linked box of 500 kg/m³ and half size 0.1 m floated with a mean draft of 0.090 m against
+  Archimedes' 0.100 m (bob 0.014 m over the last 2 of 4 s). On WebGPU the linked body takes its impulse when the force
+  sums are read back, usually the next frame: every impulse arrives exactly once, but a frame late, and when the read
+  lands depends on the GPU, so a run with linked bodies repeats bit for bit only on the CPU twin. The coupling is
+  explicit (the body's motion this frame, the liquid's push a frame later), so a body much lighter than the liquid it
+  displaces can oscillate; give it damping. The moment a linked body takes is about the collider's centre at the last
+  step of the read window, which differs from the exact sum by the centre's travel over that window times the impulse.
 - The pointer blends node velocities towards its own inside a sphere; it is not a solid and takes no force back.
 - No node moves more than one cell a substep: faster liquid (a violent pointer, a body faster than cell / substep,
   15.6 m/s at the defaults) is slowed to that speed. A frame advances at most 1/30 s and takes at most `maxSubsteps`
@@ -16048,8 +16059,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   second it swings 0.246 D. Strip wake models feed a mode only where the local shedding frequency meets it, so a strongly
   sheared flow feeds less span than the measurement shows; the paper's CFD resolves the wake along the span and is within
   5 %.
-- **Open:** the wakes' correlation along the span in sheared flow (a coupling between neighbouring wake oscillators, as in
-  diffusive wake models), checked on this case and on the paper's bidirectionally sheared cases.
+- **Ruled out (2026-11-27):** the drag's damping outside the lock-in span (a mean drag of 0.5 or 0.25 in place of 1 leaves
+  the swing at 0.27 D and 0.24 D, so the swing is short of excitation, not over-damped); locking each wake's frequency to its
+  segment's own cross-flow frequency within a band of the local shedding (30 %: 0.246 D; 60 %: the third mode, 0.11 D).
+- **Open:** an excitation model that feeds a strongly sheared span as measured, from the published time-domain VIV load
+  models (the excitation force synchronised to the cross-flow velocity, Thorsen, Saevik and Larsen 2014 and 2016), checked
+  on this case and on the paper's bidirectionally sheared cases with no new fitting.
 
 ### Open 2026-11-27: a rod pinned at both ends blows up at coarse steps under high tension, and at fine steps when stretched (KB-PHYS-RODSTRING1, physics rod)
 
