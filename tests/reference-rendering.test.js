@@ -283,12 +283,13 @@ for (const [family, primitives, absolute, square, max] of [
     }
   });
 
-test('volume transport budgets are the 2026-11-11 re-recorded measurements', () => {
+test('volume transport budgets are the measured figures (full re-recorded 2026-11-27 after 212d482e00)', () => {
   const budget = JSON.parse(
     readFileSync(new URL('../docs/whitepaper/results/batch-160-volume-transport.json', import.meta.url)),
   );
-  assert.equal(budget.rows.full.metrics.absolute, 13794699);
-  assert.equal(budget.rows.full.compat.metrics.absolute, 13794699);
+  // KB-REF-VOL-FULL1: the tint reads thicknessTexture (212d482e00); its parent draws 13794699 exactly.
+  assert.equal(budget.rows.full.metrics.absolute, 13834286);
+  assert.equal(budget.rows.full.compat.metrics.absolute, 13834286);
   assert.equal(budget.rows.direct.metrics.absolute, 1807380);
   assert.equal(budget.rows.direct.compat.metrics.absolute, 1807380);
 });

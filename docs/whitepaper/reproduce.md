@@ -2212,7 +2212,7 @@ node scripts/reference-rendering/proof.mjs --case=volume --compat
 
 Each command preserves 72 PNGs and proof.json in a unique external directory,
 validates every original budget, actual AMD adapter and identical decoded RGBA
-bytes. The full volume ceiling is 13,794,699 on NVIDIA since 2026-11-11 (was 13,792,000). Native WebGL2 refusal is
+bytes. The full volume ceiling is 13,834,286 on NVIDIA since 2026-11-27 (13,794,699 from 2026-11-11, 13,792,000 before; KB-REF-VOL-FULL1 in docs/limits.md). Native WebGL2 refusal is
 covered by run.mjs. Run gltf/pbr's native-volume GPU test for twenty exact slab
 readbacks on each backend, and its unit tests for transformed/instanced shader
 math and exact absent normal-map fallbacks. No benchmark is part of this proof.

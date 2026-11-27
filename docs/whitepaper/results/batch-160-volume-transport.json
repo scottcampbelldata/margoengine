@@ -27,27 +27,27 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 13794699,
-        "square": 1393039135,
+        "absolute": 13834286,
+        "square": 1397958988,
         "max": 148,
-        "mae": 17.54086685180664,
-        "rmse": 42.08730045668216,
+        "mae": 17.591204325358074,
+        "rmse": 42.161555667770344,
         "foreground": 150544,
-        "foregroundAbsolute": 13794699,
-        "foregroundMae": 30.544113348921247,
+        "foregroundAbsolute": 13834286,
+        "foregroundMae": 30.631766571013568,
         "changed": 146639
       },
       "compat": {
         "metrics": {
           "pixels": 262144,
-          "absolute": 13794699,
-          "square": 1393039135,
+          "absolute": 13834286,
+          "square": 1397958988,
           "max": 148,
-          "mae": 17.54086685180664,
-          "rmse": 42.08730045668216,
+          "mae": 17.591204325358074,
+          "rmse": 42.161555667770344,
           "foreground": 150544,
-          "foregroundAbsolute": 13794699,
-          "foregroundMae": 30.544113348921247,
+          "foregroundAbsolute": 13834286,
+          "foregroundMae": 30.631766571013568,
           "changed": 146639
         }
       }

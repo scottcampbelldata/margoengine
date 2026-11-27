@@ -2796,7 +2796,7 @@ changed with them; the files hold every field):
 | ior | 2,425,911 / 2,425,911 | 2,411,082 / 2,411,082 (-0.6%) | Smith G2 |
 | transmission Cycles full | 4,131,141 / 4,131,146 | 4,164,102 / 4,164,101 (+0.8%) | linear glass, Smith G2 |
 | transmission Cycles direct | 2,632,772 / 2,632,767 | 2,632,779 / 2,632,778 | linear glass, Smith G2 |
-| volume Cycles full | 13,792,000 / 13,792,000 | 13,794,699 / 13,794,699 (+0.02%) | Smith G2 |
+| volume Cycles full | 13,792,000 / 13,792,000 | 13,794,699 / 13,794,699 (+0.02%); 13,834,286 / 13,834,286 since 2026-11-27 (KB-REF-VOL-FULL1) | Smith G2; thickness map |
 | volume Cycles direct | 1,843,497 / 1,843,497 | 1,807,380 / 1,807,380 (-2.0%) | Smith G2 |
 
 Trade-off: iridescence and clearcoat now sit further from the Sample Viewer picture because Margo filters the
@@ -3644,7 +3644,15 @@ per-world-unit transmittance range limit. See [native volume range](native-volum
 Native WebGL2 explicitly refuses PBR; compatibility is actual
 WebGL2. AMD Radeon(TM) Graphics / RDNA 2, Windows driver 32.0.21042.62, is the
 repeatability adapter because NVIDIA/Intel MSAA blending varies. The full Cycles
-volume absolute ceiling is 13,794,699 (re-recorded 2026-11-11 from 13,792,000). No speed or equivalence claim.
+volume absolute ceiling is 13,834,286 (re-recorded 2026-11-27 from 13,794,699, which was re-recorded 2026-11-11 from
+13,792,000). Accepted reference difference (KB-REF-VOL-FULL1, 2026-11-27, the manager's ruling): bisected over the core,
+shared, gltf and gltf-pro commits since KB6016c to 212d482e00, where the native tint starts reading KHR_materials_volume
+thicknessTexture as the extension defines; its parent b6781020ba draws the old budget exactly (RTX A6000, WebGPU and the
+WebGL2 layer alike). The change moves 1,747 pixels inside the blocks: Cycles full +39,587 (13,794,699 to 13,834,286),
+Cycles direct -63,179 (1,807,380 to 1,744,201), sample viewer -21,089 (1,471,401 to 1,450,312). Cause: glTF's thickness
+model (a baked per-surface stand-in for the path) against Cycles' real path through the geometry, with its internal
+bounces; the full row is pinned exactly at the measured value, no slack, and KB4000's measured-path work must come in under
+it. No speed or equivalence claim.
 
 
 Fresh job 4 AMD volume full Cycles RGB-byte MAE is 17.472838083902996 on
