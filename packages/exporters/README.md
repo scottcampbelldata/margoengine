@@ -935,6 +935,20 @@ Bits of 0 keep a float attribute exact. Integer attributes such as JOINTS_n and 
 
 Draco has no place for morph targets and can reorder vertices, so a primitive with targets stays uncompressed, and so do points, lines, strips and fans. `skipped` names each one with its reason. Primitives that differ only in material share one stream. `compressDraco` refuses a GLB with meshopt buffers, and a file with nothing to compress comes back as the same bytes. One primitive's packed input (indices plus attributes) may be up to 280 MiB, enough for a 10M-triangle scan with float normals and UVs; the encoder peaks at up to 12.9 bytes of memory per input byte, so that is the most that fits its 4 GiB with room to spare. Split a larger mesh into primitives.
 
+`encodeDraco(geometry, options)` writes one triangle mesh or point cloud as a bare Draco stream, the bytes of a `.drc` file:
+
+```ts
+import { encodeDraco } from 'margoengine/exporters/draco';
+
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+const mesh = await encodeDraco({ positions, indices: [0, 1, 2, 0, 2, 3] });
+const intensity = { values: new Uint16Array([10, 20, 30, 40]), width: 1 };
+const cloud = await encodeDraco({ positions, attributes: { intensity } }, { mode: 'points', positionBits: 16 });
+console.log(mesh.faces, cloud.points, cloud.ids.intensity); // 2 4 1
+```
+
+`geometry` takes `positions`, optional `normals`, `uvs`, `colors` (RGB or RGBA), any named `attributes` (1 to 4 values a point) and `indices`. `mode` is `'triangles'` (default; without `indices` every three points make a triangle) or `'points'`. The quantization and speed options of the table above apply, plus `genericBits` (default 0, exact) for float `attributes`. A point cloud keeps every point; below speed 10 the encoder takes the smaller of a sequential stream and a KD-tree stream, which reorders points and quantizes normals on a plain grid, and at `encodeSpeed` or `decodeSpeed` 10 the points keep their order. The KD-tree stream needs every float attribute quantized and int32 values no wider than int32. `ids` gives each attribute's Draco unique id. Both stream kinds decode with Margo's decoders (`DracoDecoder` for meshes, `DracoPointsDecoder` for clouds) and with Google's.
+
 ### KTX2 textures (`@margoengine/exporters/ktx2`)
 
 `compressTextures(glb, options)` stores the textures of a GLB as KTX2 with Basis Universal (`KHR_texture_basisu`), so they stay compressed on the GPU as well as on the wire. `encodeKTX2(image, options)` writes one `.ktx2` file from a PNG, a JPEG or RGBA8 pixels. Margo's clean-room Rust/Wasm encoder requires WebAssembly SIMD and loads on the first call: in a worker in a browser, in process in Node. Image files are read there too, so a page never decodes a large image on its own frame, and neither needs a browser.

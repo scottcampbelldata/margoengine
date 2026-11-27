@@ -75,7 +75,7 @@ export function encodeNativeMesh(module: NativeDracoEncoder, job: DracoJob): Dra
     view.setUint32(0, job.points, true);
     view.setUint32(4, job.indices.length, true);
     view.setUint32(8, job.attributes.length, true);
-    view.setUint32(12, job.encodeSpeed | (job.decodeSpeed << 8), true);
+    view.setUint32(12, job.encodeSpeed | (job.decodeSpeed << 8) | (job.cloud ? 1 << 16 : 0), true);
     bytes.set(new Uint8Array(job.indices.buffer, job.indices.byteOffset, job.indices.byteLength), 16);
     let offset = 16 + job.indices.byteLength;
     const ids: Record<string, number> = {};
@@ -100,7 +100,9 @@ export function encodeNativeMesh(module: NativeDracoEncoder, job: DracoJob): Dra
         'Draco attribute range is not representable in float32 quantization; use quantization bits 0 or rescale the attribute; see https://margoengine.com/errors#unsupported',
       );
     if (status !== 0)
-      throw new RangeError('Draco could not encode the mesh; check finite attributes, quantization bits and indices');
+      throw new RangeError(
+        'Draco could not encode the geometry; check finite attributes, quantization bits and indices',
+      );
     return {
       data: new Uint8Array(
         module.memory.buffer,

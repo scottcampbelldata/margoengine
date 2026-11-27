@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21072421,
+  "total": 21079958,
   "history": [
     {
       "date": "2026-10-24",
@@ -14851,6 +14851,12 @@
       "commit": "exr-zip",
       "reason": "EXRExporter parity: encodeEXR writes ZIPS and ZIP, environment/exr-write 2,084 to 2,648 B gzip measured: the byte split and predictor, chunked zlib through CompressionStream and the compressed offset table in the one writer; a separate entry would repeat the header and sample loops",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "draco-drc",
+      "reason": "DRACOExporter parity: encodeDraco writes bare mesh and point cloud streams; exporters/draco to 98,566 B gzip measured: the encoder Wasm grows 161,503 to 171,045 B (sequential and KD-tree point cloud writers) plus the input checks; the writers share the attribute coders, so a second Wasm module would ship them twice",
+      "grew": 1
     }
   ],
   "items": {
@@ -15217,7 +15223,7 @@
     "@margoengine/exporters/collect": 14143,
     "@margoengine/exporters/dae": 16283,
     "@margoengine/exporters/dae-glb": 20009,
-    "@margoengine/exporters/draco": 93986,
+    "@margoengine/exporters/draco": 101523,
     "@margoengine/exporters/gcode": 15468,
     "@margoengine/exporters/gltf": 21509,
     "@margoengine/exporters/gltf-to-glb": 2735,

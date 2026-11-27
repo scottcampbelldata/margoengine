@@ -1,4 +1,5 @@
 //! Clean-room Draco encoder, built from published format equations.
+mod cloud;
 mod entropy;
 mod prediction;
 mod sequential;
@@ -135,6 +136,12 @@ fn validated_compact(mesh: &Mesh) -> Result<Mesh, &'static str> {
     if mesh.indices.iter().any(|&i| i as usize >= mesh.points) {
         return Err("index outside point range");
     }
+    validate_attributes(mesh)?;
+    Ok(compact(mesh))
+}
+
+/// The checks every geometry's attributes pass, meshes and point clouds alike.
+fn validate_attributes(mesh: &Mesh) -> Result<(), &'static str> {
     if mesh.attributes.is_empty() || mesh.attributes.len() > 255 {
         return Err("invalid attribute count");
     }
@@ -158,7 +165,7 @@ fn validated_compact(mesh: &Mesh) -> Result<Mesh, &'static str> {
             return Err("nonfinite attribute");
         }
     }
-    Ok(compact(mesh))
+    Ok(())
 }
 
 /// Encodes a mesh that `compact` already merged.
@@ -237,13 +244,30 @@ fn scalar_size(kind: u8) -> Option<usize> {
 }
 
 /// Original packet ABI: header points/indices/attributes/speeds, indices, then
-/// kind/type/width/normalized/bits/grid flag and packed scalar bytes per attribute.
+/// kind/type/width/normalized/bits/grid flag and packed scalar bytes per attribute. The speeds word holds the encode
+/// speed, the decode speed and, in its third byte, 1 for a point cloud (which has no indices).
 pub fn encode_packet(packet: &[u8]) -> Result<Vec<u8>, &'static str> {
     Ok(encode_packet_result(packet)?.data)
 }
 
 fn encode_packet_result(packet: &[u8]) -> Result<Encoded, &'static str> {
-    encode_owned(parse_packet(packet)?)
+    encode_parsed(parse_packet(packet)?, point_cloud(packet))
+}
+
+/// The packet's point cloud byte.
+fn point_cloud(packet: &[u8]) -> bool {
+    packet.get(14) == Some(&1)
+}
+
+fn encode_parsed(mesh: Mesh, cloud: bool) -> Result<Encoded, &'static str> {
+    if !cloud {
+        return encode_owned(mesh);
+    }
+    Ok(Encoded {
+        data: cloud::encode(&mesh)?,
+        points: mesh.points,
+        faces: 0,
+    })
 }
 
 /// The mesh a packet holds, copied out of it.
@@ -369,9 +393,11 @@ mod wasm {
         output.data.clear();
         output.points = 0;
         output.faces = 0;
-        let mesh = super::parse_packet(std::slice::from_raw_parts(pointer, length));
+        let packet = std::slice::from_raw_parts(pointer, length);
+        let cloud = super::point_cloud(packet);
+        let mesh = super::parse_packet(packet);
         encoder_free(pointer, length);
-        match mesh.and_then(super::encode_owned) {
+        match mesh.and_then(|mesh| super::encode_parsed(mesh, cloud)) {
             Ok(encoded) => {
                 *output = encoded;
                 0

@@ -1,5 +1,5 @@
-// compressDraco: a GLB in, the same GLB with KHR_draco_mesh_compression geometry out.
-// The optional Rust/Wasm encoder loads on the first compression call.
+// compressDraco: a GLB in, the same GLB with KHR_draco_mesh_compression geometry out. encodeDraco: one mesh or point
+// cloud in, a bare Draco (.drc) stream out. The optional Rust/Wasm encoder loads on the first call.
 import {
   encodeDracoMesh,
   type DracoEncoded,
@@ -228,6 +228,150 @@ interface Planned {
   position: Float32Array;
   grid?: Grid;
   bits: number;
+}
+
+const SCALARS = [Float32Array, Uint32Array, Uint16Array, Int16Array, Uint8Array, Uint8ClampedArray, Int8Array];
+
+/** One attribute for {@link encodeDraco}: packed values, `width` of them a point. */
+export interface DracoAttribute {
+  values: DracoJobAttribute['values'] | Uint8ClampedArray;
+  /** Values a point, 1 to 4. */
+  width: number;
+  /** Integers that stand for 0 to 1 (or -1 to 1). Default false. */
+  normalized?: boolean;
+}
+
+/** What {@link encodeDraco} encodes. Every array holds one entry a point. */
+export interface DracoGeometry {
+  /** x, y, z a point. */
+  positions: Float32Array | Int16Array | Uint16Array | Int8Array | Uint8Array;
+  /** x, y, z a point. */
+  normals?: Float32Array | Int16Array | Int8Array;
+  /** u, v a point. */
+  uvs?: Float32Array | Uint16Array | Uint8Array;
+  /** RGB or RGBA a point; integer colours are taken as normalized. */
+  colors?: Float32Array | Uint16Array | Uint8Array | Uint8ClampedArray;
+  /** Any further attributes, by name (for example `intensity`). */
+  attributes?: Record<string, DracoAttribute>;
+  /** Triangle corners. Leave out for a point cloud, or for triangles listed three points at a time. */
+  indices?: Uint32Array | Uint16Array | readonly number[];
+}
+
+/** Options for {@link encodeDraco}. */
+export interface EncodeDracoOptions extends Omit<CompressDracoOptions, 'encoderPath' | 'tangentBits' | 'weightBits'> {
+  /** 'triangles' (default) or 'points', a point cloud. */
+  mode?: 'triangles' | 'points';
+  /** Quantization bits of the float attributes in `attributes`. Default 0: exact. */
+  genericBits?: number;
+}
+
+/** What {@link encodeDraco} returns. */
+export interface EncodeDracoResult {
+  /** The bytes of a `.drc` file. */
+  data: Uint8Array;
+  /** Draco's unique attribute id of `POSITION`, `NORMAL`, `TEXCOORD_0`, `COLOR_0` and each name in `attributes`. */
+  ids: Record<string, number>;
+  /** Points in the stream: a mesh's equal and unused points are merged or dropped, a point cloud keeps every one. */
+  points: number;
+  /** Triangles in the stream; 0 for a point cloud. */
+  faces: number;
+}
+
+/**
+ * Encodes one triangle mesh or point cloud as a bare Draco stream (a `.drc` file), with the same bundled encoder as
+ * {@link compressDraco}. Float attributes are quantized as the options say. Below speed 10 the encoder may reorder
+ * points (it keeps whichever method gives the smaller stream); at `encodeSpeed` or `decodeSpeed` 10 a point cloud
+ * keeps its order. The input arrays are not changed.
+ *
+ * @example
+ * ```ts
+ * import { encodeDraco } from '@margoengine/exporters/draco';
+ *
+ * const positions = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0]);
+ * const { data } = await encodeDraco({ positions }, { mode: 'points', positionBits: 16 });
+ * ```
+ * @throws TypeError for a missing or mistyped array; RangeError for an option out of range, arrays whose lengths
+ * disagree, an index past the points or a value that is not finite; the signal's reason when aborted.
+ */
+export async function encodeDraco(
+  geometry: DracoGeometry,
+  options: EncodeDracoOptions = {},
+): Promise<EncodeDracoResult> {
+  const { mode = 'triangles', signal } = options,
+    bits = (name: keyof CompressDracoOptions | 'genericBits', fallback: number) =>
+      bitsOf(options as CompressDracoOptions, name as keyof CompressDracoOptions, fallback),
+    encodeSpeed = speedOf(options, 'encodeSpeed'),
+    decodeSpeed = speedOf(options, 'decodeSpeed'),
+    positionBits = bits('positionBits', 14),
+    normalBits = bits('normalBits', 10),
+    texcoordBits = bits('texcoordBits', 12),
+    colorBits = bits('colorBits', 8),
+    genericBits = bits('genericBits', 0);
+  signal?.throwIfAborted();
+  if (mode !== 'triangles' && mode !== 'points') throw new TypeError("encodeDraco mode: pass 'triangles' or 'points'");
+  const cloud = mode === 'points',
+    { positions, normals, uvs, colors, indices } = geometry;
+  if (!ArrayBuffer.isView(positions) || !positions.length || positions.length % 3)
+    throw new TypeError('encodeDraco positions: pass a typed array of x, y, z for at least one point');
+  const points = positions.length / 3,
+    attributes: DracoJobAttribute[] = [];
+  const add = (semantic: string, kind: DracoKind, input: DracoAttribute, quantize: number): void => {
+    const { values, width, normalized = false } = input;
+    // The array types the encoder's packet names. Clamped bytes (canvas pixels) are plain bytes to Draco.
+    const Values = SCALARS.find((type) => values instanceof type);
+    if (!Values)
+      throw new TypeError(
+        `encodeDraco ${semantic}: pass an Int8, Uint8, Int16, Uint16, Uint32 or Float32 array of values`,
+      );
+    if (!Number.isInteger(width) || width < 1 || width > 4 || values.length !== points * width)
+      throw new RangeError(
+        `encodeDraco ${semantic} has ${values.length} values for ${points} points of ${width}; pass 1 to 4 a point`,
+      );
+    // A copy (also of a subclass whose slice is a view, such as Node's Buffer): the worker takes what it is given.
+    const copy = new (Values === Uint8ClampedArray ? Uint8Array : Values)(values) as DracoJobAttribute['values'];
+    attributes.push({ semantic, kind, values: copy, width, normalized, bits: quantize });
+  };
+  const standard = (
+    semantic: string,
+    kind: DracoKind,
+    values: DracoAttribute['values'],
+    width: number,
+    quantize: number,
+    normalized: boolean,
+  ) => add(semantic, kind, { values, width, normalized }, quantize);
+  standard('POSITION', 'POSITION', positions, 3, positionBits, false);
+  if (normals) standard('NORMAL', 'NORMAL', normals, 3, normalBits, !(normals instanceof Float32Array));
+  if (uvs) standard('TEXCOORD_0', 'TEX_COORD', uvs, 2, texcoordBits, !(uvs instanceof Float32Array));
+  if (colors)
+    standard(
+      'COLOR_0',
+      'COLOR',
+      colors,
+      colors.length === points * 4 ? 4 : 3,
+      colorBits,
+      !(colors instanceof Float32Array),
+    );
+  for (const [name, input] of Object.entries(geometry.attributes ?? {})) {
+    if (attributes.some((a) => a.semantic === name))
+      throw new TypeError(`encodeDraco attributes.${name}: the name is taken by a standard attribute`);
+    add(name, 'GENERIC', input, genericBits);
+  }
+  let corners = new Uint32Array(0);
+  if (cloud) {
+    if (indices) throw new TypeError("encodeDraco: a point cloud takes no indices; leave them out or use 'triangles'");
+  } else {
+    corners = indices ? Uint32Array.from(indices) : Uint32Array.from({ length: points }, (_, i) => i);
+    if (!corners.length || corners.length % 3)
+      throw new RangeError('encodeDraco: triangles need three indices (or points) each');
+    for (let i = 0; i < corners.length; i++) {
+      const index = indices ? indices[i] : i;
+      if (!Number.isInteger(index) || index < 0 || index >= points)
+        throw new RangeError(`encodeDraco index ${index} is not one of the ${points} points`);
+    }
+  }
+  const ids = Object.fromEntries(attributes.map((a, id) => [a.semantic, id])),
+    [result] = await encode([{ cloud, indices: corners, points, attributes, encodeSpeed, decodeSpeed }], { signal });
+  return { data: result.data, ids, points: result.points, faces: result.faces };
 }
 
 let native: Promise<import('./draco-native-encode.js').NativeDracoEncoder> | undefined;

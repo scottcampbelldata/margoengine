@@ -18,8 +18,10 @@ export interface DracoJobAttribute {
   grid?: { origin: number[]; range: number };
 }
 
-/** One triangle mesh to encode. */
+/** One triangle mesh or point cloud to encode. */
 export interface DracoJob {
+  /** Encode a point cloud: `indices` is then empty. The bundled encoder only. */
+  cloud?: boolean;
   indices: Uint32Array;
   points: number;
   attributes: DracoJobAttribute[];

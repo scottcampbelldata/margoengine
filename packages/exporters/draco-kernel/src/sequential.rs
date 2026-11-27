@@ -3,11 +3,11 @@ use crate::{
     Attribute, Mesh,
 };
 
-struct Portable {
+pub(crate) struct Portable {
     decoder: u8,
     width: usize,
-    values: Vec<i32>,
-    transform: Vec<u8>,
+    pub(crate) values: Vec<i32>,
+    pub(crate) transform: Vec<u8>,
 }
 
 fn float_values(attribute: &Attribute) -> Vec<f32> {
@@ -18,7 +18,7 @@ fn float_values(attribute: &Attribute) -> Vec<f32> {
         .collect()
 }
 
-fn portable(attribute: &Attribute) -> Result<Portable, &'static str> {
+pub(crate) fn portable(attribute: &Attribute) -> Result<Portable, &'static str> {
     if attribute.data_type != 9 {
         let values = match attribute.data_type {
             1 => attribute.bytes.iter().map(|&n| n as i8 as i32).collect(),
@@ -156,7 +156,9 @@ fn portable(attribute: &Attribute) -> Result<Portable, &'static str> {
     let inverse = maximum / range;
     // The stream stores a float32 range and decoders reconstruct with a float32 step.
     // Refuse a nonrepresentable transform before float-to-integer saturation can corrupt it.
-    if !range.is_finite() || !inverse.is_finite() || !(range * inverse).is_finite()
+    if !range.is_finite()
+        || !inverse.is_finite()
+        || !(range * inverse).is_finite()
         || range / maximum == 0.0
     {
         return Err("attribute range not representable");
@@ -308,6 +310,20 @@ pub fn encode(mesh: &Mesh) -> Result<Vec<u8>, &'static str> {
         out.push(1);
         out.extend(raw);
     }
+    attributes(
+        &mut out,
+        &mesh.attributes,
+        None,
+        None,
+        mesh.encode_speed.max(mesh.decode_speed),
+    )?;
+    Ok(out)
+}
+
+/// A sequential point cloud: the point count, then the attributes as a sequential mesh holds them.
+pub fn encode_points(mesh: &Mesh) -> Result<Vec<u8>, &'static str> {
+    let mut out = b"DRACO\x02\x03\x00\x00\x00\x00".to_vec();
+    out.extend((mesh.points as u32).to_le_bytes());
     attributes(
         &mut out,
         &mesh.attributes,

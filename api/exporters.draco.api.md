@@ -22,11 +22,57 @@ export interface CompressDracoResult {
     skipped: DracoSkippedPrimitive[];
 }
 
+export interface DracoAttribute {
+    values: DracoJobAttribute['values'] | Uint8ClampedArray;
+    width: number;
+    normalized?: boolean;
+}
+
+export interface DracoGeometry {
+    positions: Float32Array | Int16Array | Uint16Array | Int8Array | Uint8Array;
+    normals?: Float32Array | Int16Array | Int8Array;
+    uvs?: Float32Array | Uint16Array | Uint8Array;
+    colors?: Float32Array | Uint16Array | Uint8Array | Uint8ClampedArray;
+    attributes?: Record<string, DracoAttribute>;
+    indices?: Uint32Array | Uint16Array | readonly number[];
+}
+
 export interface DracoSkippedPrimitive {
     mesh: number;
     primitive: number;
     reason: 'not-triangles' | 'morph-targets' | 'no-position' | 'already-compressed';
 }
 
+export interface EncodeDracoOptions extends Omit<CompressDracoOptions, 'encoderPath' | 'tangentBits' | 'weightBits'> {
+    mode?: 'triangles' | 'points';
+    genericBits?: number;
+}
+
+export interface EncodeDracoResult {
+    data: Uint8Array;
+    ids: Record<string, number>;
+    points: number;
+    faces: number;
+}
+
 export function compressDraco(glb: Uint8Array, options?: CompressDracoOptions): Promise<CompressDracoResult>;
+
+export function encodeDraco(geometry: DracoGeometry, options?: EncodeDracoOptions): Promise<EncodeDracoResult>;
+
+// Not exported from this entry, but used by the exports above:
+
+interface DracoJobAttribute {
+    semantic: string;
+    kind: DracoKind;
+    values: Int8Array | Uint8Array | Int16Array | Uint16Array | Uint32Array | Float32Array;
+    width: number;
+    normalized: boolean;
+    bits: number;
+    grid?: {
+        origin: number[];
+        range: number;
+    };
+}
+
+type DracoKind = 'POSITION' | 'NORMAL' | 'COLOR' | 'TEX_COORD' | 'GENERIC';
 ```
