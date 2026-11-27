@@ -211,12 +211,6 @@ test('ONNX unbuilt operators fail at load with a coded operator and opset diagno
       '',
       28,
       [
-        'QuantizeLinear',
-        'DequantizeLinear',
-        'QLinearConv',
-        'QLinearMatMul',
-        'ConvInteger',
-        'MatMulInteger',
         'RegexFullMatch',
         'TfIdfVectorizer',
         'ImageDecoder',

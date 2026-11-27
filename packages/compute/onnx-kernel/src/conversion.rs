@@ -1,5 +1,7 @@
 use crate::attrs::{input, Attrs};
-use crate::tensor::{Number, Result, Tensor};
+use crate::lowfloat::{self, Round};
+use crate::tensor::{is_complex, Number, Result, Tensor};
+use std::sync::Arc;
 pub fn supports(op: &str) -> bool {
     matches!(op, "Cast" | "CastLike")
 }
@@ -18,6 +20,16 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs) -> Result<Vec<Ten
         to as u32
     };
     crate::tensor::width(kind)?;
+    let saturate = a.flag("saturate", true)?;
+    let round = match a.string("round_mode", "up")? {
+        "up" => Round::Up,
+        "down" => Round::Down,
+        "nearest" => Round::Nearest,
+        _ => return Err("Cast round_mode must be up, down or nearest; choose a rounding mode".into()),
+    };
+    if is_complex(kind) || is_complex(x.kind) {
+        return Err("Cast has no complex conversion in ONNX; keep complex tensors in their own type".into());
+    }
     if x.kind == kind {
         return Ok(vec![x.clone()]);
     }
@@ -54,9 +66,9 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs) -> Result<Vec<Ten
                 .map_err(|_| "Cast string is not UTF-8; supply a numeric string")?
                 .trim();
             let lower = s.to_ascii_lowercase();
-            if matches!(kind, 3 | 5 | 6 | 7 | 22) {
+            if matches!(kind, 3 | 5 | 6 | 7 | 22 | 26) {
                 Number::I(s.parse::<i64>().map_err(|_|"Cast integer string is invalid or out of range; supply a representable decimal integer")?)
-            } else if matches!(kind, 2 | 4 | 12 | 13 | 21) {
+            } else if matches!(kind, 2 | 4 | 12 | 13 | 21 | 25) {
                 Number::U(s.parse::<u64>().map_err(|_|"Cast unsigned string is invalid or out of range; supply a representable decimal integer")?)
             } else {
                 let n=match lower.as_str(){"inf"|"+inf"=>f64::INFINITY,"-inf"=>f64::NEG_INFINITY,"nan"|"+nan"|"-nan"=>f64::NAN,_=>s.parse::<f64>().map_err(|_|"Cast float string is invalid; supply a decimal/scientific number or INF/NaN")?};
@@ -65,7 +77,16 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs) -> Result<Vec<Ten
         } else {
             x.get(i)
         };
-        y.set(i, v);
+        match kind {
+            17..=20 | 24 => {
+                Arc::make_mut(&mut y.data)[i] = lowfloat::encode(kind, v.f(), saturate, round)
+            }
+            // ONNX casts to 4-bit and 2-bit integers by rounding ties to even, then truncating.
+            21 | 22 | 25 | 26 if matches!(v, Number::F(_)) => {
+                y.set(i, Number::I(v.f().round_ties_even() as i64))
+            }
+            _ => y.set(i, v),
+        }
     }
     Ok(vec![y])
 }

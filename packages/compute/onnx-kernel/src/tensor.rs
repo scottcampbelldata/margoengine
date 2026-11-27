@@ -1,5 +1,6 @@
 // ONNX's normative tensor type/row-major storage specification, implemented here
 // without generated bindings or an external numeric/runtime dependency.
+use crate::lowfloat::{self, Round};
 use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -94,12 +95,34 @@ pub fn product(shape: &[usize]) -> Result<usize> {
     }
     Ok(size)
 }
+/// Bytes per element; 0 for the packed 4-bit and 2-bit types.
 pub fn width(kind: u32) -> Result<usize> {
-    match kind {1|6|12=>Ok(4),2|3|9=>Ok(1),4|5|10|16=>Ok(2),7|11|13=>Ok(8),21|22=>Ok(0),8=>Ok(1),_=>Err(format!("tensor element type {kind} is not in the supported ONNX numeric/string profile; cast it to a supported type"))}
+    Ok(bits(kind)? / 8)
+}
+/// Storage bits per element (strings count as one byte handle).
+pub fn bits(kind: u32) -> Result<usize> {
+    match kind {
+        25 | 26 => Ok(2),
+        21..=23 => Ok(4),
+        2 | 3 | 8 | 9 | 17..=20 | 24 => Ok(8),
+        4 | 5 | 10 | 16 => Ok(16),
+        1 | 6 | 12 => Ok(32),
+        7 | 11 | 13 | 14 => Ok(64),
+        15 => Ok(128),
+        _ => Err(format!(
+            "tensor element type {kind} is not in the supported ONNX tensor profile; cast it to a supported type"
+        )),
+    }
 }
 pub fn byte_len(kind: u32, n: usize) -> Result<usize> {
-    let w = width(kind)?;
-    Ok(if w == 0 { n.div_ceil(2) } else { n * w })
+    Ok((n * bits(kind)?).div_ceil(8))
+}
+/// Real floating storage, including the low-precision ONNX types.
+pub fn is_float(kind: u32) -> bool {
+    matches!(kind, 1 | 10 | 11 | 16..=20 | 23 | 24)
+}
+pub fn is_complex(kind: u32) -> bool {
+    matches!(kind, 14 | 15)
 }
 
 #[derive(Clone, Debug)]
@@ -201,7 +224,11 @@ impl Tensor {
             ) as f64),
             21 => Number::U(((d[i / 2] >> ((i % 2) * 4)) & 15) as u64),
             22 => Number::I(((((d[i / 2] >> ((i % 2) * 4)) & 15) as i8) << 4 >> 4) as i64),
-            _ => unreachable!("numeric access of a validated string tensor"),
+            17..=20 | 24 => Number::F(lowfloat::decode(self.kind, d[i])),
+            23 => Number::F(lowfloat::decode(23, d[i / 2] >> ((i % 2) * 4))),
+            25 => Number::U(((d[i / 4] >> ((i % 4) * 2)) & 3) as u64),
+            26 => Number::I(((((d[i / 4] >> ((i % 4) * 2)) & 3) as i8) << 6 >> 6) as i64),
+            _ => unreachable!("numeric access of a validated string or complex tensor"),
         }
     }
     pub fn set(&mut self, i: usize, x: Number) {
@@ -222,14 +249,25 @@ impl Tensor {
                 let shift = (i % 2) * 4;
                 d[i / 2] = (d[i / 2] & !(15 << shift)) | ((x.i() as u8 & 15) << shift);
             }
-            _ => unreachable!("numeric write to a validated string tensor"),
+            // Operators without a saturate attribute convert with the Cast defaults.
+            17..=20 | 24 => d[i] = lowfloat::encode(self.kind, x.f(), true, Round::Up),
+            23 => {
+                let shift = (i % 2) * 4;
+                let code = lowfloat::encode(23, x.f(), true, Round::Up);
+                d[i / 2] = (d[i / 2] & !(15 << shift)) | (code << shift);
+            }
+            25 | 26 => {
+                let shift = (i % 4) * 2;
+                d[i / 4] = (d[i / 4] & !(3 << shift)) | ((x.i() as u8 & 3) << shift);
+            }
+            _ => unreachable!("numeric write to a validated string or complex tensor"),
         }
     }
     pub fn copy_element(&mut self, to: usize, source: &Self, from: usize) {
         if self.kind == 8 {
             Arc::make_mut(self.strings.as_mut().unwrap())[to] =
                 source.strings.as_ref().unwrap()[from].clone();
-        } else if self.kind == source.kind && !matches!(self.kind, 21 | 22) {
+        } else if self.kind == source.kind && width(self.kind).unwrap() != 0 {
             let w = width(self.kind).unwrap();
             Arc::make_mut(&mut self.data)[to * w..(to + 1) * w]
                 .copy_from_slice(&source.data[from * w..(from + 1) * w]);

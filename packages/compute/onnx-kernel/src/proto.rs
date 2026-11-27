@@ -425,8 +425,8 @@ impl<'a> Parser<'a> {
                 Tensor::raw(kind, shape.clone(), raw.to_vec())?
             } else {
                 let field = match kind {
-                    1 => 4,
-                    11 => 10,
+                    1 | 14 => 4,
+                    11 | 15 => 10,
                     7 => 7,
                     12 | 13 => 11,
                     _ => 5,
@@ -436,13 +436,14 @@ impl<'a> Parser<'a> {
                         return Err("ONNX tensor payload field disagrees with data_type; export the matching typed payload".into());
                     }
                 }
-                if kind == 1 || kind == 11 {
-                    Tensor::raw(kind, shape.clone(), p.fixed(field, kind == 11)?)?
+                if matches!(kind, 1 | 11 | 14 | 15) {
+                    Tensor::raw(kind, shape.clone(), p.fixed(field, matches!(kind, 11 | 15))?)?
                 } else {
                     let values = p.integers(field)?;
-                    if kind == 21 || kind == 22 {
-                        if values.len() != size.div_ceil(2) || values.iter().any(|v| *v > 255) {
-                            return Err("ONNX 4-bit typed data needs packed byte pairs; pack two nibbles per value".into());
+                    if matches!(kind, 17..=26) {
+                        // 4-bit and 2-bit entries hold one packed byte; 8-bit floats one bit pattern.
+                        if values.len() != byte_len(kind, size)? || values.iter().any(|v| *v > 255) {
+                            return Err("ONNX typed data for 8-bit floats and packed 4-bit or 2-bit types needs one byte per entry; pack the payload as onnx.proto describes".into());
                         }
                         Tensor::raw(
                             kind,

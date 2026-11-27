@@ -1,5 +1,5 @@
 use crate::attrs::{floating, input, same_type, Attrs};
-use crate::tensor::{axis, elements, product, strides, width, Number, Result, Tensor};
+use crate::tensor::{axis, elements, product, strides, bits, Number, Result, Tensor};
 use std::cmp::Ordering;
 
 pub fn supports(op: &str) -> bool {
@@ -220,7 +220,7 @@ pub fn execute(op: &str, inputs: &[Option<Tensor>], a: &Attrs, nout: usize) -> R
         }
         "BitCast" => {
             let to = a.int("to", 0)? as u32;
-            if x.kind == 8 || to == 8 || width(x.kind)? != width(to)? {
+            if x.kind == 8 || to == 8 || bits(x.kind)? != bits(to)? {
                 return Err(
                     "BitCast needs equal bit widths and nonstring types; choose a compatible dtype"
                         .into(),

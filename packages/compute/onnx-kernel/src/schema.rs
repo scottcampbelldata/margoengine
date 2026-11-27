@@ -6,6 +6,9 @@ pub fn minimum(op: &str) -> u32 {
         "Acosh" | "Asinh" | "Atanh" | "Cosh" | "Sinh" | "Erf" | "Sign" | "IsNaN" | "Where"
         | "NonZero" | "OneHot" => 9,
         "Mod" | "IsInf" | "Resize" => 10,
+        "QuantizeLinear" | "DequantizeLinear" | "ConvInteger" | "MatMulInteger" | "QLinearConv"
+        | "QLinearMatMul" => 10,
+        "DynamicQuantizeLinear" => 11,
         "BitShift" => 11,
         "Round" | "CumSum" | "GatherElements" | "GatherND" | "ScatterElements" | "ScatterND"
         | "Range" | "SequenceEmpty" | "SequenceConstruct" | "SequenceAt" | "SequenceErase"
@@ -49,6 +52,10 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
     let (lo, hi) = match op {
         "Constant" | "RandomUniform" | "RandomNormal" => (0, 0),
         "Dropout" => (1, if version < 12 { 1 } else { 3 }),
+        "QuantizeLinear" | "DequantizeLinear" => (2, 3),
+        "ConvInteger" | "MatMulInteger" => (2, 4),
+        "QLinearConv" => (8, 9),
+        "QLinearMatMul" => (8, 8),
         "DFT" => (1, if version < 20 { 2 } else { 3 }),
         "STFT" => (2, 4),
         "StringConcat" => (2, 2),
@@ -139,6 +146,7 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
     }
     let (lo, hi) = match op {
         "TopK" => (2, 2),
+        "DynamicQuantizeLinear" => (3, 3),
         "Unique" => (1, 4),
         "SoftmaxCrossEntropyLoss" => (1, 2),
         "StringSplit" => (2, 2),
@@ -156,6 +164,26 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
         ));
     }
     let attrs: &[&str] = match op {
+        "QuantizeLinear" if version >= 23 => &[
+            "axis",
+            "block_size",
+            "output_dtype",
+            "precision",
+            "saturate",
+        ],
+        "QuantizeLinear" if version >= 21 => &["axis", "block_size", "output_dtype", "saturate"],
+        "QuantizeLinear" if version >= 19 => &["axis", "saturate"],
+        "DequantizeLinear" if version >= 23 => &["axis", "block_size", "output_dtype"],
+        "DequantizeLinear" if version >= 21 => &["axis", "block_size"],
+        "QuantizeLinear" | "DequantizeLinear" if version >= 13 => &["axis"],
+        "ConvInteger" | "QLinearConv" => &[
+            "auto_pad",
+            "dilations",
+            "group",
+            "kernel_shape",
+            "pads",
+            "strides",
+        ],
         "StringSplit" => &["delimiter", "maxsplit"],
         "DFT" if version < 20 => &["axis", "inverse", "onesided"],
         "DFT" => &["inverse", "onesided"],
@@ -334,8 +362,11 @@ pub fn validate(op: &str, version: u32, n: usize, nout: usize, a: &Attrs) -> Res
         "MeanVarianceNormalization" => &["axes"],
         "LRN" => &["alpha", "beta", "bias", "size"],
         "LpNormalization" => &["axis", "p"],
-        "Cast" => &["to", "saturate", "round_mode"],
-        "CastLike" => &["saturate", "round_mode"],
+        "Cast" if version >= 24 => &["to", "saturate", "round_mode"],
+        "Cast" if version >= 19 => &["to", "saturate"],
+        "Cast" => &["to"],
+        "CastLike" if version >= 24 => &["saturate", "round_mode"],
+        "CastLike" if version >= 19 => &["saturate"],
         "Resize" => &[
             "mode",
             "coordinate_transformation_mode",

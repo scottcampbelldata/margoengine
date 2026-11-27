@@ -662,6 +662,34 @@ const x = gpu.array(new Float32Array([4, 1, 3, 2]));
 console.log(gpu.backend, await gpu.sort(x).read(), await x.mean().item()); // 'cpu' in Node: [1, 2, 3, 4] 2.5
 ```
 
+## ONNX models
+
+`@margoengine/compute/onnx` runs an ONNX model on the CPU in SIMD Wasm, in Node and in browsers (no GPU inference).
+`loadOnnx` takes a URL or the model's bytes, and `run` takes named `OnnxTensor` inputs and resolves named outputs.
+
+```ts
+import { loadOnnx, OnnxTensor } from '@margoengine/compute/onnx';
+
+// Normally loadOnnx(new URL('model.onnx', import.meta.url)). These 167 bytes quantize x to uint8 and back.
+const bytes = Uint8Array.from(
+  atob(
+    'CAo6nAEKHAoBeAoBcwoBehIBcSIOUXVhbnRpemVMaW5lYXIKHgoBcQoBcwoBehIBeSIQRGVxdWFudGl6ZUxpbmVhchISY2xlYW4tcm9vbS1maXh0dXJlKgsQAUIBc0oEAAAAPyoIEAJCAXpKAYBaDwoBeBIKCggIARIECgIIBGIPCgFxEgoKCAgCEgQKAggEYg8KAXkSCgoICAESBAoCCARCBAoAEBU=',
+  ),
+  (c) => c.charCodeAt(0),
+);
+using model = await loadOnnx(bytes);
+const result = await model.run({ x: new OnnxTensor('float32', Float32Array.of(-1, 0.2, 1.3, 100), [4]) });
+const q = result.q as OnnxTensor; // uint8 [126, 128, 131, 255]
+const y = result.y as OnnxTensor; // float32 [-1, 0, 1.5, 63.5]
+console.log(q.data, y.data);
+```
+
+Quantized operators follow the ONNX specification: QuantizeLinear and DequantizeLinear (per-tensor, per-axis and
+blocked), DynamicQuantizeLinear, ConvInteger, MatMulInteger, QLinearConv and QLinearMatMul. Every ONNX tensor element
+type up to int2 loads: the 8-bit floats and float4e2m1 keep their bits (Cast converts them, with `saturate` and
+`round_mode`), 4-bit and 2-bit values stay packed, and complex tensors are stored and moved but take no arithmetic.
+[Limits](../../docs/limits.md#batch-180-job-5-temporal-analysis) lists what is not built.
+
 ## Errors, waiting and profiling
 
 Operations queue GPU work and return at once. Anything that waits (`read`, `item`, `done`, `profile`, `filter`) takes

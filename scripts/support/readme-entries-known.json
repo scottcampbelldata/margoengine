@@ -8,7 +8,7 @@
   "cache": ["./stream","./decoded"],
   "cinematic": ["./physical-lens","./ortho"],
   "clustered": ["./area-shapes","./cube-projector","./area-texture","./layers"],
-  "compute": ["./shape","./cpu-wasm","./nn-extra","./onnx","./quant"],
+  "compute": ["./shape","./cpu-wasm","./nn-extra","./quant"],
   "creative": ["./stars","./planet-atmosphere","./grass-terrain","./paint-aniso","./targets-depth"],
   "culling": ["./bounds","./depth"],
   "cutscene": ["./curve-editor","./viewport","./nested-editor","./scroll"],

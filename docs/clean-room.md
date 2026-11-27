@@ -18823,3 +18823,25 @@ the papers' text, no companion code and no other engine's source read.
 - Margo's own: the moat's sin^2 profile and depth, the ridges' Gaussian cross profiles and heights, laying an oblique
   building's horseshoe round its extent along and across the wind, merging shadow dunes by the highest, and the refined
   heightfield (cells split on the coarse triangles, neighbours fanned from their middle).
+
+## compute ONNX quantized operators and element types (2026-11-27)
+
+Written from public specifications and papers only; no ONNX, ONNX Runtime or other runtime source was read, installed
+or run.
+
+- ONNX contributors, *QuantizeLinear*, *DequantizeLinear*, *DynamicQuantizeLinear*, *ConvInteger*, *MatMulInteger*,
+  *QLinearConv*, *QLinearMatMul* and *Cast* operator schemas (2026), https://onnx.ai/onnx/operators/ , and the
+  *Float stored in 8 bits*, *4 bit float*, *4 bit integer* and *2 bit integer* technical pages,
+  https://onnx.ai/onnx/technical/float8.html . Normative text, tables and formulas.
+- onnx.proto field comments (2026), https://raw.githubusercontent.com/onnx/onnx/main/onnx/onnx.proto : element type
+  numbers and the typed payload packing.
+- Benoit Jacob et al., *Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only
+  Inference* (2018), https://arxiv.org/abs/1712.05877 : affine quantization and int32 accumulation. Requantization here
+  stays in float64, which holds every int32 accumulator exactly, in place of the paper's fixed-point multiplier.
+- Paulius Micikevicius et al., *FP8 Formats for Deep Learning* (2022), https://arxiv.org/abs/2209.05433 , and Bita
+  Darvish Rouhani et al., *Microscaling Data Formats for Deep Learning* (2023), https://arxiv.org/abs/2310.10537 :
+  the E4M3 and E5M2 layouts and the E8M0 and E2M1 microscaling types.
+- Markus Nagel et al., *A White Paper on Neural Network Quantization* (2021), https://arxiv.org/abs/2106.08295 :
+  per-channel and asymmetric ranges, which shaped the per-line and boundary test cases.
+
+The tests (`packages/compute/tests/onnx-quant.test.js`) use values worked by hand from the formulas.
