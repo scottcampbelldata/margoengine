@@ -1,9 +1,17 @@
 """Recover the 37 measured markers from Rabaud–Moisy Fig. 2, arXiv v1."""
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import math
+import sys
 import urllib.request
+
+# The arguments are read first: help and a mistyped flag end the run before anything is imported, fetched or written.
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Recover the measured markers. Nothing is fetched without --download.")
+    parser.add_argument("--download", action="store_true", help="fetch the pinned paper if it is not on this machine")
+    ARGS = parser.parse_args()
 
 import pymupdf
 
@@ -23,6 +31,9 @@ def main():
     HERE.mkdir(parents=True, exist_ok=True)
     source = HERE / "sea04-measured-rabaud-moisy.pdf"
     if not source.exists():
+        if not ARGS.download:
+            sys.exit(f"Missing {source} ({URL}). Nothing was fetched. To fetch it, run: "
+                     "python packages/physics/scripts/sea04-measured-rabaud.py --download")
         request = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(request, timeout=15) as response:
             raw = response.read()

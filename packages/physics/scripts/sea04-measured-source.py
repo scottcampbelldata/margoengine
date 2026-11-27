@@ -1,4 +1,5 @@
 """Freeze DHI F1 incident-only inputs or decode the separate held-out gauge."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -7,6 +8,18 @@ import sys
 import urllib.request
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
+
+# The arguments are read first: help and a mistyped word end the run before anything is imported, fetched or written.
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="SEA-04 measured comparison. Only `fetch` downloads.")
+    parser.add_argument("command", nargs="?", choices=("fetch", "plan", "score"))
+    parser.add_argument("variant", nargs="?", default="", choices=("", "crest"))
+    ARGS, unknown = parser.parse_known_args()
+    # Named before a missing command is, so a mistyped flag is the thing the message shows.
+    if unknown:
+        parser.error("unrecognized arguments: " + " ".join(unknown))
+    if ARGS.command is None:
+        parser.error("choose fetch, plan or score")
 
 import numpy as np
 from scipy.special import hankel1, h1vp, jv, jvp
@@ -225,4 +238,4 @@ def score():
 
 
 if __name__ == "__main__":
-    {"fetch":fetch,"plan":input_plan,"score":score}[sys.argv[1]]()
+    {"fetch":fetch,"plan":input_plan,"score":score}[ARGS.command]()

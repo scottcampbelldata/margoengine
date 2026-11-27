@@ -1,34 +1,46 @@
 // Reads the real WebP, DDS and KTX2 files of tests/real-files/manifest.json. KTX2 headers must give the recorded size;
 // WebP and DDS are compared with what outside decoders gave:
 // dwebp's Y, U and V planes byte for byte, its RGBA for lossless files, and the PNG beside each Pillow DDS file. The files
-// are downloaded into a folder given as the first argument and checked by SHA-256; they are never committed.
-// Usage: node packages/decoders/scripts/test-real-textures.mjs <cache folder>
+// are read from the folder given as the argument and checked by SHA-256; they are never committed. Nothing is fetched
+// without --download: an absent or changed file fails the check, which names it.
+// Usage: node packages/decoders/scripts/test-real-textures.mjs <cache folder> [--download]
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeImage } from '../dist/image.js';
 import { readKTX2Index } from '../dist/ktx2-file.js';
 import { decodePNG } from '../dist/png.js';
 import { parseWebP } from '../dist/webp.js';
 import { decodeVP8 } from '../dist/vp8.js';
+import { downloadArguments } from '../../../scripts/support/download-arguments.mjs';
+import { pinnedFiles } from '../../../scripts/support/pinned-files.mjs';
+
+const args = downloadArguments(
+  `Usage: node packages/decoders/scripts/test-real-textures.mjs <cache folder> [--download]
+Reads the pinned WebP, DDS and KTX2 files in the folder and checks them against the manifest.
+  --download   fetch the files that are missing or changed, then check them
+  --help       print this and download nothing`,
+  { download: { type: 'boolean' } },
+  process.argv.slice(2),
+  1,
+);
+if (!args) process.exit(); // process.exit: help or a refused argument, and nothing is open yet
 
 const manifest = JSON.parse(readFileSync(new URL('../tests/real-files/manifest.json', import.meta.url))),
-  folder = process.argv[2];
-if (!folder) throw new TypeError('Pass a folder for the downloaded files');
-mkdirSync(folder, { recursive: true });
+  folder = args.positionals[0];
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
-
-async function fetched(file, url, sha256) {
-  const path = join(folder, file);
-  if (!existsSync(path)) {
-    const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-    if (!response.ok) throw new Error(`${url}: ${response.status}`);
-    writeFileSync(path, new Uint8Array(await response.arrayBuffer()));
-  }
-  const bytes = new Uint8Array(readFileSync(path));
-  if (hash(bytes) !== sha256) throw new Error(`${file} does not match its SHA-256`);
-  return bytes;
-}
+const compares = (row) => row.png && !row.file.startsWith('bc6h') && row.file !== 'bc4_unorm.dds';
+const rows = [
+  ...manifest.webp,
+  ...manifest.dds,
+  ...manifest.dds.filter(compares).map((row) => ({ file: `${row.file}.png`, url: row.png, sha256: row.pngSha256 })),
+  ...manifest.ktx2,
+].map((row) => ({ name: row.file, path: join(folder, row.file), url: row.url, sha256: row.sha256, size: row.bytes }));
+const read = await pinnedFiles(rows, {
+  command: `node packages/decoders/scripts/test-real-textures.mjs ${folder}`,
+  download: args.download,
+});
+const files = new Map(rows.map((row, i) => [row.name, new Uint8Array(read[i])]));
 
 /** The first VP8 chunk at the top level or in the first frame. */
 function vp8Chunk(bytes) {
@@ -61,7 +73,7 @@ let same = 0,
   refused = 0;
 const wrong = [];
 for (const row of manifest.webp) {
-  const bytes = await fetched(row.file, row.url, row.sha256);
+  const bytes = files.get(row.file);
   try {
     const image = parseWebP(bytes);
     if (row.refused) wrong.push(`${row.file}: dwebp refuses it, this decoded it`);
@@ -82,16 +94,16 @@ console.log(`WebP: ${same} the same as dwebp, ${refused} refused by both, of ${m
 let worst = 0,
   compared = 0;
 for (const row of manifest.dds) {
-  const image = await decodeImage(await fetched(row.file, row.url, row.sha256));
-  if (!row.png || row.file.startsWith('bc6h') || row.file === 'bc4_unorm.dds') continue;
-  const reference = decodePNG(await fetched(row.file + '.png', row.png, row.pngSha256));
+  const image = await decodeImage(files.get(row.file));
+  if (!compares(row)) continue;
+  const reference = decodePNG(files.get(`${row.file}.png`));
   for (let i = 0; i < image.data.length; i++) worst = Math.max(worst, Math.abs(image.data[i] - reference.data[i]));
   compared++;
 }
 console.log(`DDS: ${manifest.dds.length} read, ${compared} compared with Pillow's PNG, largest difference ${worst}`);
 if (worst > 1) wrong.push(`DDS differs by ${worst}`);
 for (const row of manifest.ktx2) {
-  const index = readKTX2Index(await fetched(row.file, row.url, row.sha256));
+  const index = readKTX2Index(files.get(row.file));
   if (index.width !== row.width || index.height !== row.height) wrong.push(`${row.file}: size`);
 }
 console.log(`KTX2: ${manifest.ktx2.length} headers read`);

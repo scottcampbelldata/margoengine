@@ -18,6 +18,7 @@ const NODE_SCRIPTS = [
   'packages/loaders/scripts/test-real-files.mjs',
   'packages/sciviz/scripts/fetch-graph-gpu-data.mjs',
   'packages/sciviz/scripts/prepare-stats.mjs',
+  'packages/sky/test/fixtures/horizons/fetch-horizons.mjs',
   'scripts/check-live-island-build.js',
   'scripts/fetch-readme-assets.mjs',
   'scripts/prepare-sciviz-cloud.mjs',
@@ -25,6 +26,8 @@ const NODE_SCRIPTS = [
   'scripts/reference-rendering/fetch-skip-assets.mjs',
 ];
 const PYTHON_SCRIPTS = [
+  'packages/physics/scripts/sea04-measured-rabaud.py',
+  'packages/physics/scripts/sea04-measured-source.py',
   'packages/sciviz/scripts/fetch-amr-sample.py',
   'packages/sciviz/scripts/fetch-idr-crop.py',
   'packages/sciviz/scripts/generate-table-fixtures.py',
@@ -36,7 +39,7 @@ const PYTHON_SCRIPTS = [
 // Scripts that name an outside address and fetch, but are not downloads somebody runs to get files.
 const NOT_DOWNLOADS = {
   'scripts/build-catalog.js': 'a build step that asks the npm registry which versions are published',
-  'scripts/modern-extension-tests.js': 'a browser test that answers those addresses itself',
+  'scripts/modern-extension-tests.js': 'a browser test; it fetches only with --download (check-downloads.test.js)',
   'scripts/reference-rendering/blend-repeat-scene.mjs': 'a scene module another check imports',
   'scripts/umbrella.mjs': 'writes an import map that names a CDN',
 };
@@ -103,7 +106,9 @@ test('every tracked script that downloads is checked here', () => {
   const address =
     /https?:\/\/(?!localhost|127\.|\$\{|margoengine\.com\/errors|www\.w3\.org)[A-Za-z0-9.-]+\.[a-z]{2,}\//;
   const call = /\b(fetch|fetchFixture|urlopen|urlretrieve|cloudStore|get_mapper)\s*\(/;
-  const found = execFileSync('git', ['ls-files', '-z', '--', 'scripts', 'packages/*/scripts', 'tools'], {
+  // `packages/*/scripts` alone matches no file: a wildcard pathspec names whole paths, so it needs the `/**`.
+  const folders = ['scripts', 'tools', ...['scripts', 'test', 'tests'].map((name) => `:(glob)packages/*/${name}/**`)];
+  const found = execFileSync('git', ['ls-files', '-z', '--', ...folders], {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 << 20,
@@ -111,7 +116,9 @@ test('every tracked script that downloads is checked here', () => {
     .split('\0')
     .filter((file) => /\.(c?js|mjs|ts|py)$/.test(file) && !file.includes('/support/'))
     .filter((file) => {
-      if (/(^|\/)(fetch|download)[-_][^/]*$/.test(file)) return true;
+      if (/(^|\/)(fetch|download)[-_][^/]*$/.test(file)) return !/\.test\.[cm]?[jt]s$/.test(file);
+      // Tests name addresses their stand-ins answer; tests/check-downloads.test.js watches what they save.
+      if (/^packages\/[^/]+\/tests?\//.test(file)) return false;
       const code = readFileSync(resolve(root, file), 'utf8').replace(/^\s*(\/\/|#|\*).*$/gm, '');
       return address.test(code) && call.test(code);
     });

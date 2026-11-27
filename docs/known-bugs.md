@@ -6,6 +6,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: checks downloaded files nobody asked for (KB-CHECK-FETCH1; scripts, decoders, loaders, biomes)
+
+- **Repro.** `node packages/decoders/scripts/test-real-textures.mjs <folder>` on a folder holding only the 34 KTX2
+  files fetched the 166 WebP, DDS and PNG files it lacked (25,063,329 bytes). `test:real-files`, `erosion-dem.mjs`, the
+  glTF production, material lobe, PBR box, glTF extension and blend repeat checks did the same with their own caches.
+  `fetch-horizons.mjs` and the SEA-04 marker script downloaded whatever their arguments said, `--help` included.
+- **Cause.** Each treated an absent cache file as a request to download it. The guard added for download scripts missed
+  all of them: it listed package scripts with the pathspec `packages/*/scripts`, which matches no file, and it did not
+  look at checks.
+- **Fix.** `scripts/support/pinned-files.mjs`: a check reads pinned files from its cache and fetches only when started
+  with `--download`; otherwise it fails, naming every missing or changed file and the command. The two scripts read
+  their arguments first, the pathspec is `packages/*/scripts/**`, and `npm run modern:test:extensions -- --download`
+  passes the flag to its suites. The blend repeat fixture is fetched by
+  `node scripts/reference-rendering/fetch-skip-assets.mjs`. The glTF extension check's robot model is now pinned by
+  SHA-256.
+- **Regression test:** `tests/check-downloads.test.js`, `tests/download-script-arguments.test.js` and the
+  `*-download.test.js` files of decoders, loaders and biomes.
+
 ### Open 2026-11-27: the stated size of margoengine/web is stale (KB-KITS-WEBSIZE1)
 
 - **Repro.** `node --test tests/umbrella.test.js` after `npm run build:packages`: `margoengine/web: 106118 B,

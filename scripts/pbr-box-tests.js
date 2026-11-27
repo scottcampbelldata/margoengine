@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { openBrowser } from './browser.js';
 import { ensurePBRBoxAssets } from './support/pbr-box-assets.js';
+import { downloadAllowed } from './support/pinned-files.mjs';
 
 /** Published entry points, the actual Khronos Box, native WebGPU, and the real solver. */
 export async function pbrBoxBrowserChecks(page) {
@@ -495,7 +496,7 @@ export async function pbrBoxBrowserChecks(page) {
 
 export async function runPBRBoxTests() {
   await mkdir('test-results', { recursive: true });
-  const assets = await ensurePBRBoxAssets();
+  const assets = await ensurePBRBoxAssets({ download: downloadAllowed() });
   const browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 5211 }),
     errors = [];
   browser.page.on('pageerror', (error) => errors.push(error.message));

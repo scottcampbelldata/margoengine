@@ -136,7 +136,7 @@ const {width, height, data, lossless} = parseWebP(file);
 console.log(width, height, data.length, lossless); // 1 1 4 true
 ```
 
-Checked against dwebp 1.4.0, run as an outside tool, on 139 real files: the Y, U and V planes byte for byte on every lossy file and RGBA exact on every lossless file. After upsampling, RGB is at most 1 of 255 from dwebp's. `packages/decoders/scripts/test-real-textures.mjs <folder>` repeats it.
+Checked against dwebp 1.4.0, run as an outside tool, on 139 real files: the Y, U and V planes byte for byte on every lossy file and RGBA exact on every lossless file. After upsampling, RGB is at most 1 of 255 from dwebp's. `packages/decoders/scripts/test-real-textures.mjs <folder>` repeats it; it fetches the files only with `--download`, and without it names the ones the folder lacks.
 
 ## Any image to pixels (`@margoengine/decoders/image`, `/bc`)
 

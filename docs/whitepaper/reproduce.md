@@ -1054,7 +1054,7 @@ route is a clone because 1.0.0 is not on npm yet.
 | Instanced and moving boxes against three.js (entries 50, 51, 53, 54) | `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3` and `npm run bench -- dynamic --engines=margo,three-webgpu --runs=3` | yes | `benchmarks/runs/<id>.json` | |
 | Polygon offsets (entry 52) | `npm run build` in `packages/geometry`, then `node packages/geometry/scripts/polygon-bench.mjs` | no | console | |
 | Not repeatable by a script yet | - | - | - | The `Spring` timing (entry 55), the WebGL2 CPU tier's interpreter (entry 72) and the path tracer on the layer (entry 73). Each is on the re-measure list. |
-| WebP and DDS against outside decoders (LIM-285) | `npm run build:packages`, then `node packages/decoders/scripts/test-real-textures.mjs <empty folder>`: downloads the files of `packages/decoders/tests/real-files/manifest.json`, checks each SHA-256, and compares with the planes dwebp 1.4.0 wrote and with Pillow's PNGs | no | prints the counts, exit 1 on any difference |
+| WebP and DDS against outside decoders (LIM-285) | `npm run build:packages`, then `node packages/decoders/scripts/test-real-textures.mjs <empty folder> --download`: downloads the files of `packages/decoders/tests/real-files/manifest.json`, checks each SHA-256, and compares with the planes dwebp 1.4.0 wrote and with Pillow's PNGs | no | prints the counts, exit 1 on any difference |
 | Held textures in Blender (LIM-285) | In Node serve a Khronos glTF-Sample-Assets model folder over HTTP, `loadGLTF(engine, url, {ktx2: nodeKTX2, maxDownloadBytes: 2 ** 29})`, `exportOBJ(engine, {materials: true, textures: true})`, `await writeTextures(result)`, write the files. In Blender `wm.obj_import`, then compare each material's image with the model's source image at `Non-Color`, per channel | no | largest and mean difference of 255 |
 | OBJ, STL and PLY of loaded models in Blender (LIM-277) | On a real page `loadGLTF` a GLB, then `exportSTL(engine)`, `exportPLY(engine, { binary: true })` and `exportOBJ(engine, { materials: true, textures: true, mtlName: 'tex.mtl' })`. In `blender --background --factory-startup` read the source with `import_scene.gltf(guess_original_bind_pose=False)` and the others with `wm.stl_import`, `wm.ply_import` and `wm.obj_import(forward_axis='NEGATIVE_Z', up_axis='Y')`, leaving out the glTF importer's `glTF_not_exported` collection, and compare world bounds. Use models with no clips: a source with clips imports posed. For the OBJ, connect each material's base colour to an emission surface, multiply `map_Kd` by `Kd` decoded from sRGB, draw source and OBJ with Cycles from one orthographic camera and compare pixels | no | console | Blender is run by hand. |
 | COLLADA in Godot and SceneKit (LIM-284) | On a real page `loadGLTF` a GLB and `exportDAE(engine)`. Put the file in an empty Godot 4.7 project, run `--headless --import`, then load it from a script and add up `surface_get_array_index_len`: robot-expressive gives 9,711 and no `Multiple instance_*` error. On a Mac open it with `SCNScene(url:)` and count `geometry.elements`: 19 groups in 14 geometries. | Godot 4.7.2, macOS 27 SceneKit |
@@ -1067,7 +1067,7 @@ route is a clone because 1.0.0 is not on npm yet.
 | Safe writes on POSIX disks (LIM-414) | On macOS or Linux, `node --test packages/save/tests/file-storage.test.js packages/save/tests/safe.test.js` after a build | no | console | By hand, 2026-11-07, macOS APFS and Linux ext4; `npm test` holds the same tests on the machine it runs on. |
 | Safari on a Mac (LIM-026, LIM-233) | `tools/real-proof/README.md`, `safari/`: the same `dist` in Safari and in Edge, then compare the pictures the page posts | no | `report.json` | By hand, 2026-11-06, Safari 27.2 on an Apple M6 and Edge 156 on an RTX A6000. |
 | EXR in Blender (LIM-094) | In Node `encodeEXR` a 17 by 9 float image with values to 1,000 and alpha, `half` and `float`. In `blender --background` load each with `bpy.data.images.load`, set `alpha_mode = 'CHANNEL_PACKED'`, `reload()`, and compare `image.pixels`, whose rows run bottom up | no | console | Without `CHANNEL_PACKED` Blender multiplies colour by alpha. |
-| Real files in Blender (LIM-208) | `REAL_FILES_ONLY=ply,stl,obj,usd npm run test:real-files -w @margoengine/loaders`, then `tools/real-proof/blender_report.py` on what it downloaded and compare bounds; OBJ and USD turn Y up to Z up | no | console | Spider_ascii.stl: Blender merges 56 of the file's 1,368 triangles, the reader keeps them. |
+| Real files in Blender (LIM-208) | `REAL_FILES_ONLY=ply,stl,obj,usd npm run test:real-files -w @margoengine/loaders -- --download`, then `tools/real-proof/blender_report.py` on what it downloaded and compare bounds; OBJ and USD turn Y up to Z up | no | console | Spider_ascii.stl: Blender merges 56 of the file's 1,368 triangles, the reader keeps them. |
 | State machines against Sismic (parallel regions and what follows) | `python -m venv <folder>`, `<folder>/Scripts/python -m pip install sismic==1.6.14`, `npm run build --workspace @margoengine/fsm`, then `MARGO_SISMIC_PYTHON=<folder>/Scripts/python npm run test:outside --workspace @margoengine/fsm` | no | prints charts, steps, moves and differences; rewrites `packages/fsm/test/outside/traces.json` | Exit 1 on any difference. `npm test` replays the recorded traces with no Python. |
 | Meshopt export on real models against outside tools | `compressMeshopt` a GLB, then `gltfpack -i out.glb -o back.glb -noq` and `gltf-transform inspect out.glb`; decode each stream with the `meshoptimizer` package's `MeshoptDecoder.decodeGltfBuffer` and run the Khronos validator on the result | no | console | By hand; no script in the repository. |
 | GLB optimize on real models against outside tools | `optimizeGLB` a GLB with its defaults and with `{ simplify: 0.5, lods: [0.5, 0.25] }`, run the Khronos validator on input and output, then `gltfpack -i out.glb -o back.glb -noq` and `gltf-transform inspect out.glb`; compare the triangles of each node, corner by corner, and each level's vertices with the source's | no | console | By hand; no script in the repository. |
@@ -1659,7 +1659,7 @@ After npm run build:packages, run in PowerShell:
 
 ```powershell
 $env:REAL_FILES_ONLY='pts-pdal,xyz-openbabel,mpd-robotic-arm,amf-zipped-slic3r,amf-rook'
-npm run test:real-files -w @margoengine/loaders
+npm run test:real-files -w @margoengine/loaders -- --download
 ```
 
 The script fetches pinned standard assets with SHA-256 checks; REAL_FILES_DIR chooses an external cache if desired.
@@ -2053,7 +2053,7 @@ Build packages; fetch with node scripts/reference-rendering/fetch-skip-assets.mj
 
 The independent oracle uses Python 3.13, python-plyfile 1.1.3 and NumPy 2.3.4 installed in an outside environment. Run python packages/loaders/scripts/ply-reference.py <external-cache>/ply-horse/horse.ply <output.json>, then compare it with packages/loaders/tests/fixtures/horse-oracle.json. It reads the original file without re-encoding it and records every position/color/index hash. Python is needed to regenerate that oracle, not to run the required Node regression.
 
-For the existing outside-file harness, select REAL_FILES_ONLY=ply-big-endian-vtk and set REAL_FILES_DIR to an outside directory before node packages/loaders/scripts/test-real-files.mjs. REAL_FILES_RENDER=1 adds the real-GPU blank-frame check; run it. The horse contains white RGB and confidence, with no authored normals/UVs. No visual-quality or speed comparison is implied.
+For the existing outside-file harness, select REAL_FILES_ONLY=ply-big-endian-vtk and set REAL_FILES_DIR to an outside directory before node packages/loaders/scripts/test-real-files.mjs --download. REAL_FILES_RENDER=1 adds the real-GPU blank-frame check; run it. The horse contains white RGB and confidence, with no authored normals/UVs. No visual-quality or speed comparison is implied.
 
 ### Batch 56 job 5: idle triangle product still
 
@@ -2360,8 +2360,8 @@ sum mixed call/refusal axes or treat end-instance pages as peak memory.
 
 Build `@margoengine/biomes`, then run
 `node --test --test-timeout=120000 packages/biomes/tests/erosion-wasm.test.js`
-and `node packages/biomes/tests/erosion-dem.mjs` under a 20-minute process-tree
-timeout. The latter downloads only missing pinned standard terrain tiles, checks
+and `node packages/biomes/tests/erosion-dem.mjs --download` under a 20-minute process-tree
+timeout. With `--download` the latter fetches only missing pinned standard terrain tiles; it checks
 every source hash, joins without resampling, converts Terrarium metres to rounded
 integer millimetres, and checks every output hash at the default 32 iterations.
 The SHA-256 references came from Margo's original ordered JS algorithm with only

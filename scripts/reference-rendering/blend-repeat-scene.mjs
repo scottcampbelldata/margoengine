@@ -16,10 +16,16 @@ export function blendRepeatRoot(env = process.env) {
   );
 }
 
-export async function blendRepeatScene(root) {
+/** Reads the fixture under `root`. An absent file is fetched only with `download`; otherwise this fails and names it. */
+export async function blendRepeatScene(root, { download = false } = {}) {
   const folder = join(root, 'IORTestGrid'),
     path = join(folder, 'IORTestGrid.glb');
   if (!existsSync(path)) {
+    assert.ok(
+      download,
+      `Missing ${path} (${sourceURL}). Nothing was fetched. To fetch it, run: ` +
+        'node scripts/reference-rendering/fetch-skip-assets.mjs',
+    );
     const response = await fetch(sourceURL, { signal: AbortSignal.timeout(60000) });
     assert.ok(response.ok, `Fixture download: HTTP ${response.status}`);
     const bytes = Buffer.from(await response.arrayBuffer());

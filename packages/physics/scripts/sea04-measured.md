@@ -45,7 +45,7 @@ The first arXiv PDF's 37 red circles on Figure 2 are the photographic measuremen
 The plan selects the plotted Froude numbers nearest 0.42 and 1.03 within 0.35–1.15, before their angles are read by the scorer. Each case uses 1 m nondimensional hull length, speed Fr×sqrt(gL), and transverse wavelength 2πU²/g. A fixed circular raised-cosine pressure source spans the hull length, with peak static head 0.001L. Deep water, source shape, ramp and window rules are identical in both cases. The source moves eight transverse wavelengths. On the two sides of the track, the solver takes peak positive height over radial windows centred at 2, 3 and 4 wavelengths, with radius ±0.5 wavelength. It reports the angle of maximum crest at each window and the median. The circle is a fixed source surrogate. The photographs do not constrain each ship's pressure footprint, beam, draft or stern geometry.
 
 ```powershell
-python packages/physics/scripts/sea04-measured-rabaud.py
+python packages/physics/scripts/sea04-measured-rabaud.py --download
 node scripts/run-with-timeout.mjs --max 3 -- node packages/physics/scripts/sea04-measured-rabaud.mjs predict
 node packages/physics/scripts/sea04-measured-rabaud.mjs score
 ```

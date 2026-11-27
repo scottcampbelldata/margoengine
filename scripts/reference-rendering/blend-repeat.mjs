@@ -6,6 +6,7 @@ import { openBrowser } from '../browser.js';
 import { compatRun } from '../support/compat-shim.js';
 import { runSuite } from '../support/shutdown.mjs';
 import { blendRepeatRoot, blendRepeatScene, sourceSha256 } from './blend-repeat-scene.mjs';
+import { downloadAllowed } from '../support/pinned-files.mjs';
 
 const value = (name, fallback) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const api = value('api', 'webgpu'),
@@ -18,7 +19,7 @@ assert.ok(Number.isInteger(processes) && processes >= 1 && processes <= 16, '--p
 assert.ok([1, 4].includes(samples), '--samples must be 1 or 4');
 assert.ok(!compatRun(), 'This diagnostic uses raw APIs; use --api=webgl2 rather than --compat');
 const root = blendRepeatRoot(),
-  data = await blendRepeatScene(root),
+  data = await blendRepeatScene(root, { download: downloadAllowed() }),
   out = join(root, 'determinism', `${api}-${samples}-${Date.now()}-${process.pid}`);
 mkdirSync(out, { recursive: true });
 const runs = [];

@@ -2,6 +2,14 @@
 // planets and geocentric for the Moon, in the ecliptic and equinox of J2000, at 51 dates about five years apart (1826.2 days) from
 // 1800-01-02 to 2050-01-01 (TDB; Horizons has Neptune from 1800-01-02). Writes horizons.json beside this file. Run by hand: node packages/sky/test/fixtures/horizons/fetch-horizons.mjs
 import { writeFileSync } from 'node:fs';
+import { downloadArguments } from '../../../../../scripts/support/download-arguments.mjs';
+
+const args = downloadArguments(
+  `Usage: node packages/sky/test/fixtures/horizons/fetch-horizons.mjs
+Asks JPL Horizons for the reference vectors and rewrites horizons.json beside this script.
+  --help   print this and download nothing`,
+);
+if (!args) process.exit(); // process.exit: help or a refused argument, and nothing is open yet
 
 const bodies = {
   mercury: '199',

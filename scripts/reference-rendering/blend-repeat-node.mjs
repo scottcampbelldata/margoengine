@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { create } from 'webgpu';
 import { blendRepeatRoot, blendRepeatScene, sourceSha256 } from './blend-repeat-scene.mjs';
+import { downloadAllowed } from '../support/pinned-files.mjs';
 
 const value = (name, fallback) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const backend = value('backend', 'd3d12'),
@@ -14,7 +15,7 @@ assert.ok(['d3d11', 'd3d12'].includes(backend));
 assert.ok(['nvidia', 'amd'].includes(vendor));
 assert.ok(Number.isInteger(frames) && frames >= 2 && frames <= 4096);
 const root = blendRepeatRoot(),
-  data = await blendRepeatScene(root),
+  data = await blendRepeatScene(root, { download: downloadAllowed() }),
   out = join(root, 'determinism', `node-${backend}-${vendor}-${Date.now()}-${process.pid}`);
 mkdirSync(out, { recursive: true });
 const navigator = { gpu: create([`backend=${backend}`, `adapter=${vendor === 'amd' ? 'AMD' : 'NVIDIA'}`]) },

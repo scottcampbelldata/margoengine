@@ -8,8 +8,9 @@ import {
   sampleAssetBase,
   sampleAssetCommit,
 } from './support/gltf-production-assets.js';
+import { downloadAllowed } from './support/pinned-files.mjs';
 
-const files = await cachedProductionAssets(),
+const files = await cachedProductionAssets({ download: downloadAllowed() }),
   browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 5198 }),
   { page, hardware } = browser,
   errors = [];

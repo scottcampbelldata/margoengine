@@ -8,8 +8,9 @@ import {
   sampleAssetBase,
   sampleAssetCommit,
 } from './support/materials-lobe-assets.js';
+import { downloadAllowed } from './support/pinned-files.mjs';
 
-const files = await cachedLobeAssets(),
+const files = await cachedLobeAssets({ download: downloadAllowed() }),
   browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 5204 }),
   { page, hardware } = browser,
   errors = [];

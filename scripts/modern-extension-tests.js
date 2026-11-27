@@ -4,7 +4,7 @@ import { build } from 'vite';
 import { openBrowser } from './browser.js';
 import { animatedTriangle } from '../tests/support/gltf-pbr-fixture.js';
 import { decodePNG } from '../tests/support/png.js';
-import { readResponse } from '../packages/shared/loading.js';
+import { downloadAllowed, pinnedFiles } from './support/pinned-files.mjs';
 await mkdir('test-results', { recursive: true });
 
 const urls = {
@@ -14,18 +14,18 @@ const urls = {
     'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
 };
 const assets = { helmet: await readFile('examples/assets/scifi-helmet.glb') };
-for (const [name, url] of Object.entries(urls)) {
-  if (assets[name]) continue;
-  const path = 'test-results/' + name + '.glb';
-  try {
-    assets[name] = await readFile(path);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-    const bytes = await readResponse(await fetch(url), { maxBytes: 64 * 1024 * 1024, label: name + ' asset' });
-    assets[name] = Buffer.from(bytes);
-    await writeFile(path, assets[name]);
-  }
-}
+const [robot] = await pinnedFiles(
+  [
+    {
+      path: 'test-results/robot.glb',
+      url: urls.robot,
+      sha256: '047f5e5fb3bb6d378bd1df16ca6137f2a596c99b3a1b5690b4020c05aaf6f319',
+      size: 463988,
+    },
+  ],
+  { command: 'node scripts/modern-extension-tests.js', download: downloadAllowed() },
+);
+assets.robot = robot;
 const demos = { helmet: 'flight-helmet', robot: 'robot-expressive', character: 'character-animation' };
 async function assertRobotMobileLayout(page) {
   const layout = await page.evaluate(() => {

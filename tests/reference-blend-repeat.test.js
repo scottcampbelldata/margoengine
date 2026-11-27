@@ -37,7 +37,10 @@ test('concurrent fixture downloads publish complete verified bytes without overw
   assert.ok(temporary.startsWith(workspaceResults + sep));
   t.after(() => rmSync(temporary, { recursive: true, force: true }));
   t.mock.method(globalThis, 'fetch', async () => new Response(bytes));
-  const [a, b] = await Promise.all([blendRepeatScene(temporary), blendRepeatScene(temporary)]);
+  await assert.rejects(blendRepeatScene(temporary), /Nothing was fetched[\s\S]*fetch-skip-assets/);
+  assert.deepEqual(readdirSync(temporary), [], 'an absent fixture is not fetched unasked');
+  const download = { download: true };
+  const [a, b] = await Promise.all([blendRepeatScene(temporary, download), blendRepeatScene(temporary, download)]);
   assert.equal(a.inputSha256, b.inputSha256);
   assert.deepEqual(readdirSync(join(temporary, 'IORTestGrid')), ['IORTestGrid.glb']);
   assert.deepEqual(readFileSync(join(temporary, 'IORTestGrid', 'IORTestGrid.glb')), bytes);

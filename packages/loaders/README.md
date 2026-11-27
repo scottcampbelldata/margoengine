@@ -211,10 +211,11 @@ The repository's speed matrix (`docs/whitepaper`) measures this loader.
 `tests/real-files/manifest.json` names 123 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
 
 ```sh
-npm run test:real-files -w @margoengine/loaders
+npm run test:real-files -w @margoengine/loaders -- --download
 ```
 
-The script downloads each file by URL into `test-results/real-files`, refuses one whose hash differs, opens it and compares it with something independent: the counts in its own header, a second reader written in the script, or a published fact. It exits 1 on a failure and 2 when a file could not be run, such as a site refusing the download.
+The script fetches nothing unless it is given `--download`: without it, an absent or changed file fails the run, which
+names every one. With it, each file is downloaded by URL into `test-results/real-files`. The script refuses one whose hash differs, opens it and compares it with something independent: the counts in its own header, a second reader written in the script, or a published fact. It exits 1 on a failure and 2 when a file could not be run, such as a site refusing the download.
 
 The MPD proof resolves all 13 embedded submodels and the external library/sticker parts with no missing files or warnings.
 The PDAL PTS and Open Babel chemistry XYZ checks compare every coordinate, intensity and colour against the source text.
@@ -223,7 +224,7 @@ oracle, including constellation translation/rotation. To run those rows on Power
 
 ```powershell
 $env:REAL_FILES_ONLY='pts-pdal,xyz-openbabel,mpd-robotic-arm,amf-zipped-slic3r,amf-rook'
-npm run test:real-files -w @margoengine/loaders
+npm run test:real-files -w @margoengine/loaders -- --download
 ```
 
 | Variable | Default | What it does |
@@ -1270,7 +1271,7 @@ for (const item of animation.frame(12.5)) // fractions blend between keyframes
 - **Keyframes.** Bezier easing, per axis where the file gives it, hold keys, spatial curves on positions (the ease is a share of the arc length), and paths that blend between keys. Colours from 0 to 255 in files older than Bodymovin 4.1.9 are read as such.
 - **Clear the canvas yourself.** `draw` paints over what is there, so call `clearRect` between frames.
 - **`unsupported`.** Masks, track mattes, text layers, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners and star roundness are not drawn. Each one the file uses is named in this list, so check it when a file looks wrong. Expressions are ignored and are not listed.
-- **Proof.** Eight real exports match lottie-web 5.12.2 within 1 of 255 grey levels on a 16 by 16 grid (`REAL_FILES_ONLY=lottie npm run test:real-files`). Files that lean on masks, mattes or expressions differ: see `docs/limits.md`.
+- **Proof.** Eight real exports match lottie-web 5.12.2 within 1 of 255 grey levels on a 16 by 16 grid (`REAL_FILES_ONLY=lottie npm run test:real-files -- --download`). Files that lean on masks, mattes or expressions differ: see `docs/limits.md`.
 
 ## XML
 

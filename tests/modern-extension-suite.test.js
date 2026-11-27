@@ -22,7 +22,8 @@ const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf
 test('modern:test:extensions runs every suite as its own time-limited step', () => {
   const scripts = JSON.parse(read('package.json')).scripts;
   assert.equal(scripts['modern:test:extensions'], 'node scripts/modern-extension-suite.mjs');
-  assert.match(read('scripts/modern-extension-suite.mjs'), /await runLimited\(`node \$\{step\}`/);
+  // The only thing added to a step's command is the suite's own --download flag (tests/check-downloads.test.js).
+  assert.match(read('scripts/modern-extension-suite.mjs'), /await runLimited\(`node \$\{step\}\$\{flag\}`/);
   for (const step of STEPS) assert.ok(existsSync(new URL('../' + step, import.meta.url)), step);
   assert.equal(new Set(STEPS).size, STEPS.length);
 });

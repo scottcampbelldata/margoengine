@@ -9,5 +9,6 @@ for (const script of [
   new URL('./animation-influences-browser-tests.js', import.meta.url),
   new URL('./gltf-production-assets-tests.js', import.meta.url),
 ]) {
-  execFileSync(process.execPath, [fileURLToPath(script)], { stdio: 'inherit' });
+  // The flags pass through: --download is what lets the production assets check fetch its files.
+  execFileSync(process.execPath, [fileURLToPath(script), ...process.argv.slice(2)], { stdio: 'inherit' });
 }

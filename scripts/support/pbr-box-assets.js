@@ -1,8 +1,6 @@
-import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { pinnedFiles } from './pinned-files.mjs';
 
 const revision = 'edc7c9e67c639d230715049ee31f9a96a6babbbe';
 const source = `https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/${revision}/Models/Avocado/glTF-Draco/`;
@@ -13,29 +11,17 @@ const files = [
   ['Avocado_normal.png', 3271114, '25783c211761b7e32497fdd3e2490f3bac05b738e5e2bc62fc5b78a270bb4e50'],
   ['Avocado_roughnessMetallic.png', 1655059, '33ee80f7ccfd36825acfbd5ef0a51326bea49e33efed852dca44798798bd6901'],
 ];
-const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
-
-/** Complete, unmodified Draco asset; large CC0 textures stay in the ignored test cache. */
-export async function ensurePBRBoxAssets() {
-  const directory = fileURLToPath(new URL('../../test-results/pbr-box-avocado/', import.meta.url));
-  await mkdir(directory, { recursive: true });
-  await Promise.all(
-    files.map(async ([name, size, hash]) => {
-      const path = join(directory, name);
-      let bytes;
-      try {
-        bytes = await readFile(path);
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
-      }
-      if (bytes?.byteLength === size && digest(bytes) === hash) return;
-      const response = await fetch(source + name, { signal: AbortSignal.timeout(60000) });
-      assert.ok(response.ok, `Avocado fixture download failed: ${name} (${response.status})`);
-      bytes = Buffer.from(await response.arrayBuffer());
-      assert.equal(bytes.byteLength, size, `Avocado fixture size changed: ${name}`);
-      assert.equal(digest(bytes), hash, `Avocado fixture hash changed: ${name}`);
-      await writeFile(path, bytes);
-    }),
+/**
+ * Complete, unmodified Draco asset; large CC0 textures stay in the ignored test cache. Absent or changed files are
+ * fetched only with `download` (the check's --download flag); otherwise this fails and names them.
+ */
+export async function ensurePBRBoxAssets({
+  download = false,
+  directory = fileURLToPath(new URL('../../test-results/pbr-box-avocado/', import.meta.url)),
+} = {}) {
+  await pinnedFiles(
+    files.map(([name, size, sha256]) => ({ path: join(directory, name), url: source + name, size, sha256 })),
+    { command: 'node scripts/pbr-box-tests.js', download },
   );
   return {
     directory,

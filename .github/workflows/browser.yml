@@ -107,7 +107,7 @@ jobs:
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
       - name: Verify extensions and demos in WebGPU
-        run: npm run modern:test:extensions
+        run: npm run modern:test:extensions -- --download
         env:
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'

@@ -65,6 +65,7 @@ import { parseVRML, parseX3D } from '../dist/vrml.js';
 import { parseVTKXML } from '../dist/vtk-xml.js';
 import { parseUSDAInWorker } from '../dist/worker.js';
 import { downloadArguments } from '../../../scripts/support/download-arguments.mjs';
+import { pinnedFiles } from '../../../scripts/support/pinned-files.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(here, '../../..');
@@ -1190,20 +1191,35 @@ async function zipReader(bytes) {
 }
 
 const args = downloadArguments(
-  `Usage: npm run test:real-files -w @margoengine/loaders
-Downloads every file in tests/real-files/manifest.json, checks its hash and opens it with the loader.
-It takes no flags. Environment variables:
+  `Usage: npm run test:real-files -w @margoengine/loaders -- [--download]
+Checks the hash of every file in tests/real-files/manifest.json and opens it with the loader. Nothing is fetched
+without --download: an absent or changed file fails the check, which names it.
+  --download           fetch the files that are not on this machine yet
+Environment variables:
   REAL_FILES_DIR       where downloads go (default test-results/real-files)
   REAL_FILES_RUNTIMES  folder holding the comparison runtimes (npm run test:real-files:runtimes)
   REAL_FILES_ONLY      comma-separated formats or ids to run
   REAL_FILES_RENDER    1 draws every geometry on the GPU
   --help               print this and download nothing`,
+  { download: { type: 'boolean' } },
 );
 if (args) {
+  const wanted = manifest.files.filter((item) => !only || only.includes(item.format) || only.includes(item.id));
+  // Every absent or changed file is named at once, before any of them is opened.
+  if (!args.download)
+    await pinnedFiles(
+      wanted.flatMap((item) =>
+        [item, ...(item.companions ?? [])].map((file) => ({
+          path: file.repo ? resolve(repository, file.repo) : resolve(root, item.format, file.file),
+          url: file.url,
+          sha256: file.sha256,
+        })),
+      ),
+      { command: 'npm run test:real-files -w @margoengine/loaders --' },
+    );
   const report = [];
   const drawings = [];
-  for (const item of manifest.files) {
-    if (only && !only.includes(item.format) && !only.includes(item.id)) continue;
+  for (const item of wanted) {
     const row = { id: item.id, format: item.format, file: item.file };
     try {
       const bytes = await fetchChecked(item, item.format);

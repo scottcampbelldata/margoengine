@@ -311,7 +311,8 @@ copy and stays valid after another call or disposal. Input heights are unchanged
 
 The full real-DEM correctness command is
 `node packages/biomes/tests/erosion-dem.mjs`, after the package build, under a
-20-minute process limit. It recreates 64 pinned Mapzen Terrarium tiles from
+20-minute process limit. Add `--download` the first time: without it nothing is
+fetched, and a missing tile fails the check, which names it. It recreates 64 pinned Mapzen Terrarium tiles from
 USGS data without resampling and checks the default 32-round output against
 the independent ordered JS reference hashes. Fixture URLs, attribution, hashes
 and the small real-data unit-test crop are in `tests/fixtures/erosion-dem*.json`.

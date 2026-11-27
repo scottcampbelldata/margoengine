@@ -5,10 +5,12 @@ import { resolve } from 'node:path';
 import { fetchFixture } from '../support/fetch-fixture.mjs';
 import { externalAssets, externalAssetRoot, requireExternalAssets } from '../support/external-test-assets.mjs';
 import { downloadArguments } from '../support/download-arguments.mjs';
+import { blendRepeatRoot, blendRepeatScene } from './blend-repeat-scene.mjs';
 
 const args = downloadArguments(
   `Usage: node scripts/reference-rendering/fetch-skip-assets.mjs
-Downloads the pinned external test assets (scripts/support/external-test-assets.json) that are missing or changed.
+Downloads the pinned external test assets (scripts/support/external-test-assets.json) that are missing or changed,
+and the blend repeat check's fixture.
   --help   print this and download nothing`,
 );
 if (args) {
@@ -28,6 +30,7 @@ if (args) {
     );
   }
   requireExternalAssets();
+  await blendRepeatScene(blendRepeatRoot(), { download: true });
   clearTimeout(deadline);
   console.log(`Required external test assets ready: ${externalAssets.length} in ${root}; no environment export needed`);
 }

@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pinnedFiles } from './pinned-files.mjs';
 import { cachedProductionAssets, sampleAssetBase, sampleAssetCommit } from './gltf-production-assets.js';
 
 export { sampleAssetBase, sampleAssetCommit };
@@ -55,38 +54,41 @@ const pins = [
   ],
 ];
 
-/** Complete, unmodified upstream assets, pinned by both source commit and bytes. */
-export async function cachedLobeAssets() {
-  const root = resolve('test-results/materials-lobe-assets'),
-    files = [];
-  for (const [path, bytes, sha256] of pins) {
-    const cache = resolve(root, ...path.split('/'));
-    let data;
-    try {
-      data = await readFile(cache);
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      const response = await fetch(sampleAssetBase + path);
-      assert.ok(response.ok, 'Lobe asset download failed: ' + path);
-      assert.ok(
-        Number(response.headers.get('content-length') ?? bytes) <= 8 * 1024 * 1024,
-        'Lobe fixture exceeds download limit',
-      );
-      data = Buffer.from(await response.arrayBuffer());
-      assert.equal(data.length, bytes, 'Lobe fixture size changed: ' + path);
-      assert.equal(createHash('sha256').update(data).digest('hex'), sha256, 'Lobe fixture digest changed: ' + path);
-      await mkdir(dirname(cache), { recursive: true });
-      await writeFile(cache, data);
-    }
-    assert.equal(data.length, bytes, 'Cached lobe fixture size changed: ' + path);
-    assert.equal(
-      createHash('sha256').update(data).digest('hex'),
-      sha256,
-      'Cached lobe fixture digest changed: ' + path,
-    );
-    files.push({ path, url: sampleAssetBase + path, bytes, sha256, data });
-  }
-  files.push(...(await cachedProductionAssets()).filter((file) => file.path.startsWith('AnisotropyBarnLamp/')));
+/**
+ * Complete, unmodified upstream assets, pinned by both source commit and bytes. Absent or changed files are fetched
+ * only with `download` (the check's --download flag); otherwise this fails and names them. The barn lamp's files live
+ * in the production assets' cache.
+ */
+export async function cachedLobeAssets({
+  download = false,
+  root = resolve('test-results/materials-lobe-assets'),
+  productionRoot,
+  command = 'node scripts/material-extension-tests.js',
+} = {}) {
+  const rows = pins.map(([file, size, sha256]) => ({
+    file,
+    path: resolve(root, ...file.split('/')),
+    url: sampleAssetBase + file,
+    size,
+    sha256,
+  }));
+  const read = await pinnedFiles(rows, { command, download });
+  const files = rows.map(({ file, url, size, sha256 }, i) => ({
+    path: file,
+    url,
+    bytes: size,
+    sha256,
+    data: read[i],
+  }));
+  files.push(
+    ...(await cachedProductionAssets({
+      download,
+      command,
+      root: productionRoot,
+      only: (file) => file.startsWith('AnisotropyBarnLamp/'),
+    })),
+  );
+  await mkdir(root, { recursive: true });
   await writeFile(
     resolve(root, 'source-manifest.json'),
     JSON.stringify(

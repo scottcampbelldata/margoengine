@@ -1,7 +1,6 @@
-import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pinnedFiles } from './pinned-files.mjs';
 
 export const sampleAssetCommit = 'edc7c9e67c639d230715049ee31f9a96a6babbbe';
 export const sampleAssetBase = `https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/${sampleAssetCommit}/Models/`;
@@ -59,31 +58,34 @@ const pins = [
   ],
 ];
 
-/** Download complete, unmodified files only when absent; never accept a changed cache. */
-export async function cachedProductionAssets() {
-  const root = resolve('test-results/gltf-production-assets'),
-    files = [];
-  for (const [path, bytes, sha256] of pins) {
-    const cache = resolve(root, ...path.split('/'));
-    let data;
-    try {
-      data = await readFile(cache);
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      const response = await fetch(sampleAssetBase + path);
-      assert.ok(response.ok, 'Asset download failed: ' + path);
-      const declared = Number(response.headers.get('content-length') ?? bytes);
-      assert.ok(declared <= 8 * 1024 * 1024, 'Production fixture exceeds download limit');
-      data = Buffer.from(await response.arrayBuffer());
-      assert.equal(data.length, bytes, 'Asset byte count changed: ' + path);
-      assert.equal(createHash('sha256').update(data).digest('hex'), sha256, 'Asset digest changed: ' + path);
-      await mkdir(dirname(cache), { recursive: true });
-      await writeFile(cache, data);
-    }
-    assert.equal(data.length, bytes, 'Cached asset byte count changed: ' + path);
-    assert.equal(createHash('sha256').update(data).digest('hex'), sha256, 'Cached asset digest changed: ' + path);
-    files.push({ path, url: sampleAssetBase + path, bytes, sha256, data });
-  }
+/**
+ * The complete, unmodified files, read from the cache. Absent or changed files are fetched only with `download` (the
+ * check's --download flag); otherwise this fails and names them. `only` picks files by their path.
+ */
+export async function cachedProductionAssets({
+  download = false,
+  root = resolve('test-results/gltf-production-assets'),
+  command = 'node scripts/gltf-production-assets-tests.js',
+  only = () => true,
+} = {}) {
+  const rows = pins
+    .filter(([file]) => only(file))
+    .map(([file, size, sha256]) => ({
+      file,
+      path: resolve(root, ...file.split('/')),
+      url: sampleAssetBase + file,
+      size,
+      sha256,
+    }));
+  const read = await pinnedFiles(rows, { command, download });
+  const files = rows.map(({ file, url, size, sha256 }, i) => ({
+    path: file,
+    url,
+    bytes: size,
+    sha256,
+    data: read[i],
+  }));
+  await mkdir(root, { recursive: true });
   await writeFile(
     resolve(root, 'source-manifest.json'),
     JSON.stringify(

@@ -5,6 +5,7 @@
 // lock's 30 minute limit. Limit per step: MARGO_GPU_TEST_TIMEOUT_MIN, default 10 minutes (scripts/support/run-limited.mjs).
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { downloadArguments } from './support/download-arguments.mjs';
 import { runLimited, testLimitMs } from './support/run-limited.mjs';
 
 /**
@@ -25,11 +26,23 @@ export const STEPS = [
 
 /** Runs the steps in order and exits 1 at the first that fails or runs out of time, naming it. */
 async function main() {
+  const args = downloadArguments(
+    `Usage: npm run modern:test:extensions -- [--download]
+  --download   let the suites fetch their pinned asset files that are missing; without it they fail and name them
+  --help       print this and run nothing`,
+    { download: { type: 'boolean' } },
+  );
+  if (!args) return;
+  const flag = args.download ? ' --download' : '';
   const root = resolve(import.meta.dirname, '..'),
     limitMs = testLimitMs(undefined);
   for (const step of STEPS) {
     console.log(`modern:test:extensions: ${step}`);
-    const result = await runLimited(`node ${step}`, { cwd: root, limitMs, label: `modern:test:extensions ${step}` });
+    const result = await runLimited(`node ${step}${flag}`, {
+      cwd: root,
+      limitMs,
+      label: `modern:test:extensions ${step}`,
+    });
     if (!result.ok) {
       console.error(result.message ?? `modern:test:extensions: ${step} failed after ${result.seconds} s`);
       process.exitCode = 1;
