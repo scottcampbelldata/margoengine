@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bedSurface } from '../../dist/earth.js';
-import { ShallowWaterSolver } from '../../dist/hydro.js';
+import { DRY, ShallowWaterSolver } from '../../dist/hydro.js';
+import { Physics } from '../../dist/index.js';
 import { LeggedLocomotion } from '../../dist/legged.js';
 import { FloodWadingSolver } from '../../dist/loads.js';
-import { PhysicsWorld } from '../../dist/world.js';
+import { PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const rate60 = { num: 60, den: 1 };
@@ -112,4 +113,110 @@ test('wading refuses mismatched rates that would otherwise apply only a fraction
     code: 'unsupported',
     message: /Match the wading and legged rate levels.+#hydrodynamic-loads/,
   });
+});
+
+test('settled wading exchanges only the signed momentum accepted by Hydro after water transport', async (t) => {
+  const rate = { num: 240, den: 1 };
+  const dt = 1 / rate.num;
+  const bed = bedSurface({ columns: 1, rows: 1, width: 1, depth: 1, centre: [0, 0] }, new Float64Array(4));
+  const initialDepth = 2 * DRY;
+  const finalDryDepth = DRY / 2;
+  const wader = { ...profile, centreOffset: -1.9, halfHeight: 0.2, area: 1 };
+  for (const draining of [false, true]) {
+    const legs = await LeggedLocomotion.load({ readLoad: true });
+    const world = new PhysicsWorld({ rate, gravity }).add(legs, {
+      bodies: [{ kind: 'biped', mass, position: [0, 2, 0], velocity: [2, 0, 0] }],
+    });
+    const level = world.levelOf('legged-locomotion');
+    assert.equal(level, 2);
+    const { water, wading } = await ShallowWaterSolver.withFloodLoads({
+      wading: { bed, density, rate: level, bodies: [wader] },
+    });
+    world
+      .add(water, {
+        bed,
+        density,
+        depth: initialDepth,
+        roughness: 0,
+        sides,
+        rate: level,
+        // Water is initially still. Removing mass carries no horizontal source term.
+        inflows: draining ? [{ position: [0, 0], discharge: (finalDryDepth - initialDepth) / dt }] : [],
+      })
+      .couple(['water', 'legged-locomotion'], 'staggered');
+
+    const before = legs.read(0).velocity[0];
+    world.advance(1);
+    const { depth, velocity } = water.sample(0, 0);
+    const waterImpulse = density * depth * velocity[0];
+    const accepted = wading.readBody(0);
+    const bodyImpulse = mass * (legs.read(0).velocity[0] - before);
+    close(depth, draining ? finalDryDepth : initialDepth, 1e-18, 'transported depth');
+    if (draining) {
+      assert.deepEqual(accepted, [0, 0, 0]);
+      assert.equal(bodyImpulse, 0);
+      assert.equal(waterImpulse, 0);
+    } else {
+      const wet = initialDepth / (2 * wader.halfHeight);
+      const inverseMass = 1 / mass + 1 / (density * initialDepth);
+      const bodyDrag = accepted[0] * dt;
+      const remainingSlip = before + inverseMass * bodyDrag;
+      close(bodyDrag, -0.5 * density * wet * wader.area * dt * remainingSlip ** 2, 2e-13, 'accepted drag law');
+      assert.ok(bodyDrag < -1e-5 && waterImpulse > 1e-5);
+      close(bodyImpulse, bodyDrag, 1e-12, 'live legged momentum');
+      close(waterImpulse, -bodyDrag, 1e-12, 'paired water momentum');
+      close(accepted[1], density * 9.81 * wet * wader.volume, 1e-13, 'accepted buoyancy');
+    }
+    t.diagnostic(`${draining ? 'drying' : 'wet'} residual ${bodyImpulse + waterImpulse} N·s`);
+
+    const snapshot = world.takeSnapshot();
+    world.advance(3);
+    const end = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    assert.equal(world.hash(), snapshot.hash);
+    world.advance(3);
+    assert.equal(world.hash(), end);
+  }
+});
+
+test('a paddle and wader settle through the same wet cell and transfer momentum on the same tick', async () => {
+  const rate = { num: 240, den: 1 };
+  const dt = 1 / rate.num;
+  const depth = 0.05;
+  const shaftMass = 20;
+  const bed = bedSurface({ columns: 1, rows: 1, width: 1, depth: 1, centre: [0, 0] }, new Float64Array(4));
+  await Physics.load();
+  using physics = new Physics(null, { fixedTimestep: dt, gravity });
+  const shaft = physics.addBody(null, {
+    position: [0, depth, 0],
+    linearVelocity: [1, 0, 0],
+    colliders: { shape: 'sphere', radius: 0.1, mass: shaftMass },
+  });
+  const legs = await LeggedLocomotion.load({ readLoad: true });
+  const world = new PhysicsWorld({ rate, gravity })
+    .add(new RigidSolver(), { physics })
+    .add(legs, { bodies: [{ kind: 'biped', mass, position: [0, 2, 0] }] });
+  const level = world.levelOf('legged-locomotion');
+  const { water, paddle, wading } = await ShallowWaterSolver.withFloodLoads({
+    paddle: {
+      bed,
+      density,
+      rate: level,
+      blades: [
+        { row: shaft.row, centre: [0, 0, 0], normal: [1, 0, 0], area: 0.2, halfHeight: 0.1, dragCoefficient: 1 },
+      ],
+    },
+    wading: { bed, density, rate: level, bodies: [{ ...profile, centreOffset: -1.95 }] },
+  });
+  world
+    .add(water, { bed, depth, density, sides, roughness: 0 })
+    .couple(['water', 'rigid', 'legged-locomotion'], 'staggered');
+  world.advance(1);
+
+  const blade = paddle.readBlade(0)[0];
+  const leg = wading.readBody(0)[0] * dt;
+  assert.ok(blade < 0 && leg > 0);
+  close(shaftMass * (shaft.linearVelocity[0] - 1), blade, 2e-6, 'same-tick shaft receipt');
+  close(mass * legs.read(0).velocity[0], leg, 1e-12, 'same-tick leg receipt');
+  close(density * depth * water.sample(0, 0).velocity[0] + blade + leg, 0, 1e-12, 'shared wet-cell momentum');
 });

@@ -1,6 +1,6 @@
 import { gravityMagnitude } from '@margoengine/math/gravity';
 import { hypot } from '@margoengine/math/pinned';
-import { FORCING_WORDS, SURFACE_WATER_FIELD, SURFACE_WATER_FORCING_FIELD } from '../hydro/index.js';
+import { FORCING_WORDS, SURFACE_WATER_FIELD, SURFACE_WATER_FORCING_FIELD } from '../hydro/fields.js';
 import { LEGGED_LOAD_FIELD, LEGGED_POSE_FIELD } from '../legged/index.js';
 import { GROUND_LOCOMOTION_LAYOUT } from '../locomotion/index.js';
 import {
@@ -14,7 +14,7 @@ import {
   type StepContext,
 } from '../world/solver.js';
 import { invalidLoad } from './errors.js';
-import { FloodDragGrid, type FloodDragGridParams, floodDragImpulse } from './flood-drag-grid.js';
+import { FloodDragGrid, type FloodDragGridParams, floodDragImpulse, type PeriodicDragAxes } from './flood-drag-grid.js';
 
 const POSE_WORDS = 14;
 const LOAD_WORDS = 3;
@@ -45,6 +45,8 @@ export interface FloodWadingParams extends FloodDragGridParams {
 /**
  * Loads a legged body with buoyancy and pressure drag. The horizontal reaction returns to the live shallow-water grid.
  * Orselli and Duarte (2011), Joint forces and torques when walking in shallow water, DOI 10.1016/j.jbiomech.2011.01.017.
+ * Use `ShallowWaterSolver.withFloodLoads({ wading })` when the receiving cells can dry or rewet during transport.
+ * The standalone step assumes the receiving cells remain wet throughout the tick.
  * The single upright profile resolves total COM drag and buoyancy. Use segment loads for resolved limb forces and
  * three-dimensional flow when vertical jets, limb wakes, or wave generation by displaced volume matter.
  */
@@ -105,7 +107,29 @@ export class FloodWadingSolver implements Solver<FloodWadingParams> {
     return new Float64Array(this.host.memory.buffer, region.byteOffset, region.byteLength / 8);
   }
 
-  step({ inputs, tick }: StepContext, dt: number): void {
+  step(context: StepContext, dt: number): void {
+    this.exchange(context, dt);
+  }
+
+  /** Settle the paired force against Hydro's final wetted state before publishing it to the legs. */
+  settleFlood(
+    context: StepContext,
+    dt: number,
+    water: Float64Array,
+    bottom: Float64Array,
+    periodic: PeriodicDragAxes,
+  ): void {
+    this.exchange(context, dt, water, bottom, periodic);
+    this.grid!.applyReaction(water, this.words(this.forcing), dt);
+  }
+
+  private exchange(
+    { inputs, tick }: StepContext,
+    dt: number,
+    settledWater?: Float64Array,
+    bottom?: Float64Array,
+    periodic?: PeriodicDragAxes,
+  ): void {
     const forces = this.words(this.loads);
     const forcing = this.words(this.forcing);
     const port = inputs.get(LEGGED_POSE_FIELD.name);
@@ -122,14 +146,14 @@ export class FloodWadingSolver implements Solver<FloodWadingParams> {
     const host = this.host!;
     const grid = this.grid!;
     const poses = new Float64Array((region.memory ?? host.memory).buffer, region.byteOffset, region.byteLength / 8);
-    const water = grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
+    const water = settledWater ?? grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
     forces.fill(0);
     forcing.fill(0);
     for (const [i, body] of this.bodies.entries()) {
       if (!body) continue;
       const at = i * POSE_WORDS;
       const centre = grid.point([poses[at]!, poses[at + 1]! + body.centreOffset, poses[at + 2]!], port!.cell);
-      const sample = grid.sample(water, forcing, centre, body.halfHeight, dt);
+      const sample = grid.sample(water, forcing, centre, body.halfHeight, dt, bottom, periodic);
       if (!sample) continue;
       const vx = sample.vx - poses[at + 3]!;
       const vz = sample.vz - poses[at + 5]!;

@@ -1,6 +1,6 @@
 import { hypot } from '@margoengine/math/pinned';
 import { conjugateQuaternion, normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
-import { FORCING_WORDS, SURFACE_WATER_FIELD, SURFACE_WATER_FORCING_FIELD } from '../hydro/index.js';
+import { FORCING_WORDS, SURFACE_WATER_FIELD, SURFACE_WATER_FORCING_FIELD } from '../hydro/fields.js';
 import { regionWords } from '../world/memory.js';
 import {
   isRateLevel,

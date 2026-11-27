@@ -1,5 +1,6 @@
 import type { Bed } from '@margoengine/math/fields';
-import { DRY, FORCING_WORDS, SURFACE_WATER_LAYOUT, WATER_DENSITY } from '../hydro/index.js';
+import { FORCING_WORDS, SURFACE_WATER_LAYOUT, WATER_DENSITY } from '../hydro/fields.js';
+import { DRY } from '../hydro/shallow.js';
 import type { Cell, Port, SolverHost } from '../world/solver.js';
 import { invalidLoad } from './errors.js';
 
@@ -204,6 +205,18 @@ export class FloodDragGrid {
       forcing[at + 1]! -= scale * z;
       if (!Number.isFinite(forcing[at]) || !Number.isFinite(forcing[at + 1]))
         throw invalidLoad('Choose water depth, step duration and body drag whose discharge rates are finite.');
+    }
+  }
+
+  /** Apply the paired horizontal reaction to the finalized water without changing its depth. */
+  applyReaction(water: Float64Array, forcing: Float64Array, dt: number): void {
+    for (let index = 0; index < this.count; index++) {
+      const source = index * FORCING_WORDS;
+      const target = index * 3;
+      const x = forcing[source]!;
+      const z = forcing[source + 1]!;
+      if (x !== 0) water[target + 1]! += dt * x;
+      if (z !== 0) water[target + 2]! += dt * z;
     }
   }
 }

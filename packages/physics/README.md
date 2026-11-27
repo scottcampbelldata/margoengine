@@ -4463,12 +4463,14 @@ world.advance(1);
 console.log(body.linearVelocity[0] > 0);
 ```
 
-`FloodPaddleSolver` pushes a rigid shaft through each submerged blade's specified frontal area, normal and
-drag coefficient. It adds the opposite horizontal impulse to the shallow water. Couple it before
-`ShallowWaterSolver` and the rigid solver at their common rate. `readBlade(index)` reads its impulse.
-`FloodWadingSolver` exchanges horizontal drag with `LeggedLocomotion` and adds the immersed profile's buoyancy
-to its support load. Enable `readLoad` on the legged solver and use that solver's `world.levelOf` for both water
-and wading. The world order is wading, water, legs. `readBody(index)` reads the wading force.
+Use `ShallowWaterSolver.withFloodLoads({paddle, wading})` when cells can dry or rewet. Pass either
+profile list or both. Hydro settles the paddle's frontal drag and the wader's drag and buoyancy
+against the finalized wet depth. Register the rigid or legged producers first, then register the
+returned water with the same bed, density and rate. Use a staggered group that steps the water
+before those recipients. `paddle.readBlade(index)` and `wading.readBody(index)` report the applied
+loads. Enable `readLoad` on `LeggedLocomotion` and match its `world.levelOf` when it sets the rate.
+The standalone `FloodPaddleSolver` and `FloodWadingSolver` use the pre-transport forcing port for
+persistently wet exchange stencils.
 
 To return swimmer drag, opt in to `passiveReaction` on `SwimSolver` and add `SwimDragToWater` with the same
 bed and rate as the receiving shallow water. Add `SwimDragToWater.actuators()` to return the tail and fin
@@ -4502,21 +4504,20 @@ console.log(water.sample(0, 0).velocity);
 import {bedSurface} from 'margoengine/physics/earth';
 import {ShallowWaterSolver} from 'margoengine/physics/hydro';
 import {LeggedLocomotion} from 'margoengine/physics/legged';
-import {FloodWadingSolver} from 'margoengine/physics/loads';
 import {PhysicsWorld} from 'margoengine/physics/world';
 
 const legs = await LeggedLocomotion.load({readLoad: true});
-const water = new ShallowWaterSolver();
-const wading = new FloodWadingSolver();
 const bed = bedSurface({columns: 2, rows: 2, width: 2, depth: 2, centre: [0, 0]}, new Float64Array(9));
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(legs, {bodies: [{kind: 'biped', mass: 75, position: [0, 1.2, 0]}]});
 const rate = world.levelOf('legged-locomotion');
+const {water, wading} = await ShallowWaterSolver.withFloodLoads({
+  wading: {bed, bodies: [{mass: 75, centreOffset: -0.5, halfHeight: 0.4, area: 0.2, volume: 0.03, dragCoefficient: 1}], rate},
+});
 world.add(water, {bed, depth: 1, roughness: 0, velocity: () => [1, 0], rate});
-world.add(wading, {bed, bodies: [{mass: 75, centreOffset: -0.5, halfHeight: 0.4, area: 0.2, volume: 0.03, dragCoefficient: 1}], rate});
-world.couple(['floodWading', 'water', 'legged-locomotion'], 'staggered');
+world.couple(['water', 'legged-locomotion'], 'staggered');
 world.advance(1);
-console.log(wading.readBody(0)[1] > 0);
+console.log(wading!.readBody(0)[1] > 0);
 ```
 
 A moving slender structure (a `Rod`'s links, a hose, a mooring line) takes its loads from `segmentLoads(sea, options)`

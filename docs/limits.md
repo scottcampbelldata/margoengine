@@ -10609,6 +10609,15 @@ rebuilding the exchange. This group needs shallow water without the separate gui
 The depth-averaged grid carries hydrostatic vertical pressure. The Life entry measures 6,884 B gzip, up from 6,645 B. Its optional plain and shared Wasm
 assets are 6,890 and 6,981 B raw. Core and Stage gain zero bytes.
 
+`ShallowWaterSolver.withFloodLoads` settles paddle and wading profiles after finite-volume transport.
+The same-rate body recipients consume the settled loads in the same tick. It uses the final f64 depth,
+bed and periodic cell images. Each exchange changes only horizontal water momentum and leaves depth
+unchanged. Waders receive buoyancy from the final immersed profile. The water applies paddle exchanges
+first and then wading exchanges in input order. Use the fixed bed origin and unit water time scale.
+The standalone pre-transport adapters require a persistently wet exchange stencil.
+[Labbé et al., Physics of rowing oars (2019), Eq. 3a](https://doi.org/10.1088/1367-2630/ab4226),
+[Orselli and Duarte, Joint forces and torques when walking in shallow water (2011), section 2.4](https://ebm.ufabc.edu.br/publications/md/JB11b.pdf)
+
 The optional projected rigid drag settlement supports wetting and drying on standard shallow water.
 This raises the Hydro entry from 14,291 to 18,841 B gzip, including periodic stencil handling.
 It resolves the final f64 wetted profile, applies one horizontal impulse exchange per body per tick,

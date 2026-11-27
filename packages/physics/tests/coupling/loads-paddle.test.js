@@ -127,3 +127,95 @@ test('live blade, water, and shaft states replay across both presentation and sn
     frames: 12,
   });
 });
+
+const initialDepth = 2e-6;
+const bladeHalfHeight = 2e-6;
+const bladeArea = 0.1;
+const initialSpeed = 0.75;
+const shaftRadius = 0.1;
+
+async function withdrawingFlood(physics, { remaining, x = 0, floor = 0 }) {
+  const bed = bedSurface({ columns: 1, rows: 1, width: 1, depth: 1, centre: [0, 0] }, new Float64Array(4));
+  const shaft = physics.addBody(null, {
+    position: [x, floor, 0],
+    linearVelocity: [initialSpeed, 0, 0],
+    colliders: { shape: 'sphere', radius: shaftRadius, mass },
+  });
+  const { water, paddle } = await ShallowWaterSolver.withFloodLoads({
+    paddle: {
+      bed,
+      density,
+      blades: [
+        {
+          row: shaft.row,
+          centre: [0, 0, 0],
+          normal: [1, 0, 0],
+          area: bladeArea,
+          halfHeight: bladeHalfHeight,
+          dragCoefficient: 1,
+        },
+      ],
+    },
+  });
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] })
+    .add(new RigidSolver(), { physics })
+    .add(water, {
+      bed,
+      density,
+      depth: initialDepth,
+      roughness: 0,
+      sides,
+      buildings: floor > 0 ? [{ min: [-0.5, -0.5], max: [0.5, 0.5], height: floor }] : [],
+      inflows: [{ position: [0, 0], discharge: (remaining - initialDepth) / dt }],
+    })
+    .couple(['water', 'rigid'], 'staggered');
+  return { world, water, paddle, shaft };
+}
+
+test('SEA-12 a blade receives zero exchange when Hydro dries its cell during the same tick', async () => {
+  using physics = new Physics(null, { fixedTimestep: dt, gravity: [0, 0, 0] });
+  const finalDepth = 0.5e-6;
+  const { world, water, paddle, shaft } = await withdrawingFlood(physics, { remaining: finalDepth });
+  assert.equal(water.sample(0, 0).depth, initialDepth);
+  world.advance(1);
+  const bottom = water.sample(0, 0);
+  close(bottom.depth, finalDepth, 1e-20, 'the wet cell crosses the dry tolerance within the transport step');
+  assert.deepEqual(bottom.velocity, [0, 0]);
+  assert.deepEqual(paddle.readBlade(0), [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(shaft.linearVelocity, [initialSpeed, 0, 0]);
+});
+
+test('SEA-12 a blade across a periodic seam settles its signed drag from the finalized water and raised bed', async () => {
+  using physics = new Physics(null, { fixedTimestep: dt, gravity: [0, 0, 0] });
+  const floor = 0.2;
+  const finalDepth = 1.5e-6;
+  const { world, water, paddle, shaft } = await withdrawingFlood(physics, { remaining: finalDepth, x: 0.6, floor });
+  const initialY = shaft.worldCenterOfMass[1];
+  world.advance(1);
+  const current = water.sample(0, 0);
+  close(current.depth, finalDepth, 1e-20, 'the water stays wet after the first drawdown');
+  close(current.surface - current.depth, floor, 1e-15, 'the finalized bed is raised');
+  const [jx, jy, jz, , , torqueZ] = paddle.readBlade(0);
+  assert.ok(jx < 0 && current.velocity[0] > 0);
+  assert.ok(jy === 0 && jz === 0);
+  const arm = floor + finalDepth / 2 - initialY;
+  const waterMass = density * finalDepth;
+  const shaftInertia = (2 * mass * shaftRadius ** 2) / 5;
+  const mobility = 1 / waterMass + Math.fround(1 / mass) + arm * arm * Math.fround(1 / shaftInertia);
+  const slip = -initialSpeed - mobility * jx;
+  const wettedArea = (bladeArea * finalDepth) / (2 * bladeHalfHeight);
+  close(jx, 0.5 * dt * density * wettedArea * Math.abs(slip) * slip, 5e-13, 'finalized quadratic drag');
+  close(torqueZ, -arm * jx, 5e-15, 'the pressure arm uses the updated bed and waterline');
+  close(waterMass * current.velocity[0], -jx, 1e-16, 'the present water tick accepts the signed opposite impulse');
+  close(mass * (shaft.linearVelocity[0] - initialSpeed), jx, 2 ** -22 * mass, 'the same tick moves the shaft');
+
+  const checkpoint = world.takeSnapshot();
+  world.advance(8);
+  const hash = world.hash();
+  const end = shaft.linearVelocity;
+  world.restoreSnapshot(checkpoint.bytes);
+  assert.equal(world.hash(), checkpoint.hash);
+  world.advance(8);
+  assert.equal(world.hash(), hash);
+  assert.deepEqual(shaft.linearVelocity, end);
+});

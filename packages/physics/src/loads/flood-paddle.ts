@@ -2,7 +2,7 @@ import { hypot } from '@margoengine/math/pinned';
 import { rotateByQuaternion } from '@margoengine/math/quat';
 import { add, cross, dot, scale } from '@margoengine/math/vec3';
 import { atContact, impulseAt } from '../crush/rigid-contact.js';
-import { FORCING_WORDS, SURFACE_WATER_FIELD, SURFACE_WATER_FORCING_FIELD } from '../hydro/index.js';
+import { FORCING_WORDS, SURFACE_WATER_FIELD, SURFACE_WATER_FORCING_FIELD } from '../hydro/fields.js';
 import {
   type Port,
   type RateLevel,
@@ -15,7 +15,7 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { invalidLoad } from './errors.js';
-import { FloodDragGrid, type FloodDragGridParams, floodDragImpulse } from './flood-drag-grid.js';
+import { FloodDragGrid, type FloodDragGridParams, floodDragImpulse, type PeriodicDragAxes } from './flood-drag-grid.js';
 
 type Vector = readonly [number, number, number];
 
@@ -48,9 +48,10 @@ function vector(value: Vector): boolean {
 /**
  * Reciprocal pressure drag for upright blades in depth-averaged water. The shaft and blade kinematics come from
  * actual rigid bodies, so a joint motor sees the water torque. The water receives the opposite horizontal impulse.
- * Labbé et al. (2019), Physics of Rowing Oars, Eq. 4, DOI 10.1088/1367-2630/ab4226, pressure-drag term.
- * Couple before both the shallow-water solver and the rigid solver at their rate. Use resolved fluid for unsteady
- * blade lift, added mass, exit splash or vertical momentum.
+ * Labbé et al. (2019), Physics of Rowing Oars, Eq. (3a), DOI 10.1088/1367-2630/ab4226.
+ * For persistently wet cells, put the standalone solver before both water and rigid in a same-rate staggered group.
+ * Where cells can dry during transport, install the blade with ShallowWaterSolver.withFloodLoads and put the
+ * integrated water before rigid. Use resolved fluid for unsteady lift, added mass, exit splash or vertical momentum.
  */
 export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
   private host?: SolverHost;
@@ -111,7 +112,29 @@ export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
     return new Float64Array(this.host.memory.buffer, region.byteOffset, region.byteLength / 8);
   }
 
-  step({ inputs, tick }: StepContext, dt: number): void {
+  step(context: StepContext, dt: number): void {
+    this.exchange(context, dt);
+  }
+
+  /** Settle one exchange against Hydro's finalized depth, discharge and bed before that tick's rigid step. */
+  settleFlood(
+    context: StepContext,
+    dt: number,
+    water: Float64Array,
+    bottom: Float64Array,
+    periodic: PeriodicDragAxes,
+  ): void {
+    this.exchange(context, dt, water, bottom, periodic);
+    this.grid!.applyReaction(water, this.words(this.forcing), dt);
+  }
+
+  private exchange(
+    { inputs, tick }: StepContext,
+    dt: number,
+    finalWater?: Float64Array,
+    bottom?: Float64Array,
+    periodic?: PeriodicDragAxes,
+  ): void {
     const output = this.words(this.impulses);
     const forcing = this.words(this.forcing);
     const reactions = this.words(this.reactions);
@@ -129,7 +152,7 @@ export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
     const host = this.host!;
     const grid = this.grid!;
     const bodies = new Float32Array((region.memory ?? host.memory).buffer, region.byteOffset, region.byteLength / 4);
-    const water = grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
+    const water = finalWater ?? grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
     output.fill(0);
     forcing.fill(0);
     reactions.fill(0);
@@ -143,7 +166,7 @@ export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
       if (!(length > 0)) continue;
       const direction: Vector = [worldNormal[0] / length, 0, worldNormal[2] / length];
       const local = grid.point(centre, port!.cell);
-      const sample = grid.sample(water, forcing, local, blade.halfHeight, dt);
+      const sample = grid.sample(water, forcing, local, blade.halfHeight, dt, bottom, periodic);
       if (!sample) continue;
       const point = grid.fromBed(sample.point, port!.cell);
       const body = atContact(bodies, output, blade.row, point, direction);

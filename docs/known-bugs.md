@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: paddle and wading loads settle with the final wet cells (KB-LOADS-ACTUATORDRY)
+
+- **Repro:** Put a moving paddle or legged body over a 2 µm periodic water cell and draw it down to
+  0.5 µm in one step. The body receives a drag impulse while the shallow water drops the staged
+  reaction at its dry threshold.
+- **Cause and fix:** The legacy adapters computed both impulses using the pre-transport water.
+  `ShallowWaterSolver.withFloodLoads` computes the paired exchange after wet/dry transport and
+  publishes only the accepted body reactions. Use this factory for changing wetness.
+  `packages/physics/tests/coupling/loads-paddle.test.js` and `loads-wading.test.js` check wet momentum,
+  drying rejection and replay.
+
 ### Open 2026-11-27: a rope under tension over a bollard blows up, so wrapping cannot be checked against the capstan law (KB-PHYS-RODWRAP1, physics kernel)
 
 - **Repro:** a `Rod` of 48 links (radius 5 mm, nylon) draped half a turn over a fixed cylinder of radius 0.2 m, a free

@@ -36,17 +36,35 @@ import {
 } from '../world/solver.js';
 import type { ShallowBlockageFields, ShallowMovingCylinder, ShallowMovingFootprint } from './blockage-contract.js';
 import type { CylinderBlockage } from './cylinder.js';
+import {
+  FORCING_WORDS,
+  SURFACE_WATER_FIELD,
+  SURFACE_WATER_FORCING_FIELD,
+  SURFACE_WATER_LAYOUT,
+  SURFACE_WATER_POTENTIAL_FIELD,
+  WATER_DENSITY,
+} from './fields.js';
 import type { RigidCylinderCoupling, RigidCylinderOptions } from './cylinder-rigid.js';
 import type { FloodBodyDragBody } from '../loads/flood-body-drag.js';
+import type { FloodActuatorWater, FloodLoadsCoupling, FloodLoadsOptions } from '../loads/flood-actuator-settlement.js';
 import type {
   ProjectedFloodDragCoupling,
   ProjectedFloodDragOptions,
   ProjectedFloodDragWater,
 } from '../loads/flood-drag-settlement.js';
 export type { RigidCylinderCoupling, RigidCylinderOptions } from './cylinder-rigid.js';
+export type { FloodLoadsCoupling, FloodLoadsOptions } from '../loads/flood-actuator-settlement.js';
 export type { ProjectedFloodDragCoupling, ProjectedFloodDragOptions } from '../loads/flood-drag-settlement.js';
 import { DRY, manning, type ShallowGrid, type ShallowSide, shallowRates, velocityOf } from './shallow.js';
 
+export {
+  FORCING_WORDS,
+  SURFACE_WATER_FIELD,
+  SURFACE_WATER_FORCING_FIELD,
+  SURFACE_WATER_LAYOUT,
+  SURFACE_WATER_POTENTIAL_FIELD,
+  WATER_DENSITY,
+} from './fields.js';
 export { DRY, manning, type ShallowGrid, type ShallowSide, shallowRates, velocityOf } from './shallow.js';
 export {
   SHALLOW_BLOCKAGE_LAYOUT,
@@ -59,52 +77,10 @@ export {
   type ShallowMovingFootprint,
 } from './blockage-contract.js';
 
-/** The registry field of the water on the ground: per cell h (m), hu and hv (m^2/s), owned by {@link ShallowWaterSolver}. */
-export const SURFACE_WATER_FIELD: FieldDescriptor = {
-  name: 'surfaceWater',
-  kind: 'uniformGrid',
-  quantity: 'waterDepthAndDischarge',
-  unit: 'm, m^2/s',
-  centring: 'cell',
-};
-/** The layout of the solver's regions: per cell (x fastest), h, hu, hv. */
-export const SURFACE_WATER_LAYOUT = 1;
-/**
- * The registry field the water takes waves' forcing from, owned by {@link ShallowWaterSolver}: per cell, the force of the
- * waves' radiation stress over the water's density (m^2/s^2 along x and z: the momentum per area per second it adds), the
- * waves' Stokes drift (m/s along x and z: the water's momentum is Lagrangian, its bed friction acts on what is left of it),
- * and the waves' rms orbital velocity at the bed (m/s: it stirs the bed friction). Contributors (the surf zone) add; the
- * registry sums them by contributor, then cell.
- */
-export const SURFACE_WATER_FORCING_FIELD: FieldDescriptor = {
-  name: 'surfaceWaterForcing',
-  kind: 'uniformGrid',
-  quantity: 'waveForcing',
-  unit: 'm^2/s^2, m/s',
-  centring: 'cell',
-};
-/**
- * The registry field of the forces on the water that are the gradient of a height (SEA-07): per cell a forcing potential
- * psi, m (f64), owned by {@link ShallowWaterSolver}. The water adds it to its bed in its hydrostatic reconstruction, so the
- * force is -g h grad(psi) and water at rest stands at -psi to rounding: the inverse barometer (p - p_ref) / (rho g) and minus
- * the equilibrium tide. Contributors (`SurgeSolver` of `@margoengine/physics/surge`) add; the registry sums them by
- * contributor, then cell.
- */
-export const SURFACE_WATER_POTENTIAL_FIELD: FieldDescriptor = {
-  name: 'surfaceWaterPotential',
-  kind: 'uniformGrid',
-  quantity: 'forcingPotential',
-  unit: 'm',
-  centring: 'cell',
-};
 /** The Earth's rotation rate, rad/s (IERS Conventions 2010). */
 export const EARTH_ROTATION = 7.292115e-5;
 /** The Earth's mean radius, m (for the beta plane). */
 const EARTH_RADIUS = 6.371e6;
-/** f64 words of a cell's record in `surfaceWaterForcing`: force x, z over density, Stokes drift x, z, rms orbital velocity. */
-export const FORCING_WORDS = 5;
-/** Fresh water's density, kg/m^3. */
-export const WATER_DENSITY = 1000;
 /** Manning's n of a natural channel, clean and straight (Chow 1959, table 5-6), s/m^(1/3): the default roughness. */
 export const DEFAULT_ROUGHNESS = 0.03;
 
@@ -220,6 +196,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private cylinder?: CylinderBlockage;
   private cylinderCouplingRate?: RateLevel;
   private projectedDrag?: ProjectedFloodDragWater;
+  private floodLoads?: FloodActuatorWater;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
   private bedShape!: BedShape;
@@ -319,6 +296,20 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     return coupling;
   }
 
+  /**
+   * Exchange paddle and wader loads with Hydro after wet/dry transport. Register the water after
+   * the body producers are configured. In a same-rate staggered group, step the water before its
+   * rigid and legged recipients so they apply its accepted reactions on the same tick.
+   */
+  static async withFloodLoads(options: FloodLoadsOptions): Promise<FloodLoadsCoupling> {
+    options?.signal?.throwIfAborted();
+    const { FloodActuatorWater } = await import('../loads/flood-actuator-settlement.js');
+    options?.signal?.throwIfAborted();
+    const water = new ShallowWaterSolver(options?.id);
+    water.floodLoads = new FloodActuatorWater(water, options ?? {});
+    return water.floodLoads.coupling;
+  }
+
   private static async withMovingBlockage(
     shape: ShallowMovingCylinder | ShallowMovingFootprint,
     options: { readonly id?: string; readonly signal?: AbortSignal },
@@ -374,6 +365,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
               { field: this.projectedDrag.fields.receipt, access: 'write' as const },
             ]
           : []),
+        ...(this.floodLoads?.fields ?? []),
       ],
       rate: this.level,
       stableRate: () => this.level,
@@ -441,7 +433,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     const {
       courant = 0.4,
       density = WATER_DENSITY,
-      rate = this.cylinderCouplingRate ?? this.projectedDrag?.rate ?? 0,
+      rate = this.cylinderCouplingRate ?? this.projectedDrag?.rate ?? this.floodLoads?.rate ?? 0,
       timeScale = 1,
     } = params;
     if (this.cylinderCouplingRate !== undefined && rate !== this.cylinderCouplingRate)
@@ -473,6 +465,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     this.courant = courant;
     this.density = density;
     this.level = rate as RateLevel;
+    this.floodLoads?.init(host, bed, density, rate, timeScale);
     this.rain = params.rain;
     this.wind = params.wind;
     // A field is read at the world's time, its state then; it must run at the water's time scale (one that does not say
@@ -726,6 +719,11 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     }
     ledger[3]! += 1;
     if (dragRequest) this.projectedDrag!.settle(dragRequest, this.words(), this.grid.bed, dt);
+    if (this.floodLoads)
+      this.floodLoads.settle(context, dt, this.words(), this.grid.bed, [
+        this.grid.sides[0] === 'periodic',
+        this.grid.sides[2] === 'periodic',
+      ]);
     this.publish();
   }
 
@@ -949,11 +947,18 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   exportPorts(tick: number): readonly Port[] {
     const water = { field: SURFACE_WATER_FIELD.name, region: this.published, tick, cell: this.cell };
     if (this.cylinder) return [water, this.cylinder.reaction(tick, this.cell)];
+    if (this.floodLoads) return [water, ...this.floodLoads.exportPorts(tick, this.cell)];
     return this.projectedDrag ? [water, this.projectedDrag.receipt(tick, this.cell)] : [water];
   }
 
   stateRegions(): readonly Region[] {
-    return [this.state, this.ledger, ...(this.cylinder?.states() ?? []), ...(this.projectedDrag?.stateRegions() ?? [])];
+    return [
+      this.state,
+      this.ledger,
+      ...(this.cylinder?.states() ?? []),
+      ...(this.projectedDrag?.stateRegions() ?? []),
+      ...(this.floodLoads?.stateRegions() ?? []),
+    ];
   }
 
   extraState(): readonly Region[] {

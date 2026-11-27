@@ -1224,7 +1224,10 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   and sampled peak wash by 0.022 m/s. The rig held the authored horizontal track and attitude.
   Its hull dimensions came from the scene and the proxy mass from displacement. These are paired
   simulation results. Production wall reflection, splash and foam still need their surface bindings.
-  Cyprus playback also remains open.
+  The original First Wake render hull's 331,065 triangles contain 171 open, nonmanifold or
+  inconsistent edges after welding coincident vertices. Of these, 116 have an endpoint below the
+  authored waterline. The hydrostatics mesh validator rejects this surface, which is why the
+  diagnostic uses a closed solver proxy. Cyprus playback also remains open.
 
 **Commit and test receipts on public main**
 
