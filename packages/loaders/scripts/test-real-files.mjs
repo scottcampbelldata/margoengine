@@ -59,6 +59,8 @@ import { parsePDB } from '../dist/pdb.js';
 import { parseSVG } from '../dist/svg.js';
 import { loadTextures } from '../dist/textures.js';
 import { parseTTF, textGeometry } from '../dist/font.js';
+import { parseDAEKinematics } from '../dist/dae-kinematics.js';
+import { readDXFHatch } from '../dist/dxf-hatch.js';
 import { parseVRML, parseX3D } from '../dist/vrml.js';
 import { parseVTKXML } from '../dist/vtk-xml.js';
 import { parseUSDAInWorker } from '../dist/worker.js';
@@ -424,7 +426,7 @@ const checks = {
     return { result: `${checkGeometry(g, { triangles })}, ${g.textures.length} textures`, draw: [mesh(g)] };
   },
   async dxf(bytes, item) {
-    const parsed = parseDXF(bytes),
+    const parsed = parseDXF(bytes, { hatch: readDXFHatch }),
       string = text(bytes),
       binary = item.variant === 'binary',
       entities = binary ? null : dxfEntities(string),
@@ -434,13 +436,27 @@ const checks = {
     assert.equal(parsed.version, string.match(/AC10\d\d/)?.[0] ?? '', '$ACADVER');
     assert.ok(triangles >= entity('3DFACE'), '3DFACE');
     assert.ok(lines >= entity('LINE'), 'LINE');
-    assert.equal(parsed.texts.length, entity('TEXT') + entity('MTEXT'), 'TEXT and MTEXT');
-    for (const name of ['3DSOLID', 'HATCH'])
-      if (entity(name))
-        assert.ok(
-          Object.keys(parsed.skipped).some((k) => k.startsWith(name)),
-          `${name} is reported as skipped`,
-        );
+    // Every visible text and attribute outside blocks (these files hold none inside one).
+    assert.equal(
+      parsed.texts.length,
+      entity('TEXT') + entity('MTEXT') + entity('ATTRIB') + entity('ATTDEF'),
+      'TEXT, MTEXT and attributes',
+    );
+    if (entity('3DSOLID'))
+      assert.ok(
+        Object.keys(parsed.skipped).some((k) => k.startsWith('3DSOLID')),
+        '3DSOLID is reported as skipped',
+      );
+    assert.equal(parsed.skipped.HATCH, undefined, 'every model-space HATCH is read');
+    if (item.facts?.hatchArea) {
+      const p = parsed.mesh.positions;
+      let area = 0;
+      for (let i = 0; i < p.length; i += 9)
+        area +=
+          Math.abs((p[i + 3] - p[i]) * (p[i + 7] - p[i + 1]) - (p[i + 6] - p[i]) * (p[i + 4] - p[i + 1])) /
+          (2 * parsed.unit ** 2);
+      assert.ok(Math.abs(area - item.facts.hatchArea) < 1e-4, `solid hatch area ${area}`);
+    }
     const draw = [];
     if (triangles) {
       checkGeometry(parsed.mesh);
@@ -534,6 +550,29 @@ const checks = {
     assert.equal(g.positions.length / 3 >= 0, true);
     const shown = { kind: 'mesh', positions: g.positions, indices: g.indices, normals: g.normals, uvs: g.uvs };
     return { result: `${checkGeometry(shown, { triangles })}, file v ${vertices}${materials}`, draw: [mesh(shown)] };
+  },
+  async daeKinematics(bytes, item) {
+    const error = item.facts?.error;
+    if (error) {
+      assert.throws(() => parseDAEKinematics(bytes), { code: error });
+      return { result: `refused as '${error}': the file is not well-formed XML` };
+    }
+    const xml = new TextDecoder().decode(bytes).replace(/<!--[\s\S]*?-->/g, ''),
+      // A file with a kinematics scene instances one model, once; without a scene nothing is posed.
+      joints = /<kinematics_scene[\s>]/.test(xml) ? count(xml, /<instance_joint\s/g) : 0,
+      dae = parseDAEKinematics(bytes);
+    assert.equal(dae.joints.length, joints, 'joint axes');
+    if (!joints)
+      assert.ok(
+        dae.warnings.some((w) => w.includes('no kinematics scene')),
+        dae.warnings.join('; '),
+      );
+    if (item.facts?.axes)
+      assert.deepEqual(
+        dae.joints.map((j) => [j.name, j.min, j.max, j.targets.length]),
+        item.facts.axes,
+      );
+    return { result: `${joints} joint axes, ${dae.warnings.length} warnings` };
   },
   async dae(bytes, item) {
     const string = new TextDecoder().decode(bytes),
