@@ -11096,6 +11096,9 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
   open: a repeat will name whether the renderer exited, with its status, or the page was closed or replaced.
 - **2026-11-13, Radeon 680M (ANGLE Direct3D 11):** `MARGO_COMPAT=1` all 23 checks pass, renderer JS heap 11.8 MB
   after the first check; no page loss.
+- **2026-11-27, RTX A6000, 24 busy CPU loops on 32 threads (lane A, d6b04f0ce1):** not reproduced. Three native
+  and three `MARGO_COMPAT=1` runs of `packages/gltf/scripts/test-extensions-browser.js`, all 23 checks passing each
+  time, each ending with a `memory {...}` line and no `page-loss` line. Logs `.lane/ext-*.log` in the lane A worktree.
 - **2026-11-19, workstation, under load:** `MARGO_COMPAT=1` three runs back to back while the gltf fast gate (lint,
   `build:packages`, `test:changed`, owner fixtures) ran beside them: all 23 checks passed each time, no page loss.
   The renderer JS heap grew from 13.6 MB used (17.2 MB total) after the first check to 60 to 85 MB used (about 130 MB
@@ -12776,6 +12779,8 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   repeat fails on its own line. On 701d54269a (RTX A6000) it passed 3 of 3 runs on the WebGL2 layer
   (ANGLE D3D11) and on native WebGPU, both pins included. Regression:
   packages/gltf/scripts/test-extensions-browser.js ('a repeat capture of the plain model').
+  2026-11-27 (lane A, RTX A6000, 24 busy CPU loops on 32 threads): not reproduced in 3 native and 3 `MARGO_COMPAT=1`
+  runs on d6b04f0ce1; both KTX2 streaming pins passed every time.
 - `gltf/test:gpu:materials`: the all-authored-map shader combined with shadows,
   clustered local shadows and IBL exceeds the adapter's 16 fragment texture image
   units after translation. The fixture counts WGSL sampled textures but does not
@@ -14807,6 +14812,13 @@ the row with its fix.
   every answer of 400 or more (`OWNER_GPU_PAGE:` lines) when a leaf ends this way, so a recurrence names the module
   and status. Each leaf's dev server has its own optimizer cache and no file watcher (`scripts/browser.js`), and no
   heat-guard pause or stall fell in the run.
+- **2026-11-27 (lane A, RTX A6000, d6b04f0ce1, 24 busy CPU loops on 32 threads):** three runs of
+  `node scripts/check-owner-lifetime-gate.mjs --packages=culling`. The fetch failure did not recur, but runs 1 and 2
+  printed `owner/lifetime GPU culling/BoxCulledModels.attach (WebGL2 compatibility) failed` with no reason, after which
+  the gate printed nothing more and was killed by its 900 s timeout (exit 124). The leaf's native run passed 13 of 13
+  each time. Run 3, which may have started after the 60-minute load ended, passed every leaf. So under load this leaf
+  fails on the WebGL2 layer in 2 of 3 runs, and the gate neither reports why nor ends. Next: print the leaf's error
+  and find what keeps the gate alive after it, then the failure itself. Logs `.lane/owner-culling-*.log`.
 
 ## Sciviz comparison gaps
 
