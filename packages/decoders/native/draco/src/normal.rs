@@ -99,29 +99,16 @@ pub(crate) fn unit(s: i32, t: i32, bits: u8) -> Result<[f32; 3]> {
         return Err(Error::Invalid);
     }
     let max = (1_i32 << bits) - 2;
-    if !(0..=max).contains(&s) || !(0..=max).contains(&t) {
-        return Err(Error::Invalid);
-    }
-    // E11 candidate: an algebraically equivalent octahedral unfolding. Every
-    // operation rounds to f32. Subtraction order on the negative hemisphere
-    // preserves the oracle's +0 without an input-specific zero repair.
+    // E11 and E41: the octahedral unfolding, every operation rounded to f32.
+    // Values outside 0..=max are not refused; the negative hemisphere moves each
+    // component by the overshoot -x, which fixes their rounding too.
     let scale = 2_f32 / max as f32;
     let mut y = s as f32 * scale - 1.0;
     let mut z = t as f32 * scale - 1.0;
     let x = 1.0 - y.abs() - z.abs();
-    if x < 0.0 {
-        let old_y = y;
-        y = if old_y < 0.0 {
-            z.abs() - 1.0
-        } else {
-            1.0 - z.abs()
-        };
-        z = if z < 0.0 {
-            old_y.abs() - 1.0
-        } else {
-            1.0 - old_y.abs()
-        };
-    }
+    let over = if x < 0.0 { -x } else { 0.0 };
+    y += if y < 0.0 { over } else { -over };
+    z += if z < 0.0 { over } else { -over };
     let norm = x * x + y * y + z * z;
     if norm < 1e-6 {
         return Ok([0.0; 3]);

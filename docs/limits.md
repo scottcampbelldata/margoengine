@@ -4621,7 +4621,9 @@ prediction mode of streams before 2.2, normals outside the stored octahedron,
 and normal prediction that would overflow int64 ([repros](known-bugs.md#open-batch-133-optional-decoder-replacement-gaps)).
 The glTF flavor shares these rules and was not compared with the glTF prebuilt
 on them. The Wasm went from 142,749 to 145,234 bytes (54,149 to 54,979 B
-gzip -9).
+gzip -9). Since 2026-11-27 (E41) it no longer refuses normals outside the stored
+octahedron: their vectors match the full prebuilt bit for bit, and the Wasm is
+145,164 bytes.
 
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes

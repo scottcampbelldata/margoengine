@@ -6756,6 +6756,32 @@ state is still validated, and an empty stream is rejected). All 369 retained
 2.3 KD bodies relabelled 1.0 to 2.2 are rejected by both decoders, so no
 historical KD layout is established.
 
+### Batch 133 E41: normals outside the stored octahedron (2026-11-27)
+
+Method: as E26 to E40, Margo-crafted inputs through the public calls of the
+vendored full decoder (Wasm SHA-256
+`c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2`), compared
+bit for bit. No codec or wrapper source, disassembly or remembered internals
+were used, and no new publication was needed: the octahedral map is E11's.
+
+Observation: on point `(9, 9)` at 2 bits the decoder returns the vector the
+published unfolding gives for the zigzag-decoded values `(-5, -5)`, so nothing
+refuses a value outside `0..=max`. A sweep of 5,440 files (quantization 0 to 33,
+symbol widths 1 to 4 bytes, 296,960 normals) then showed that quantizations
+outside 2 to 30 are rejected and that the earlier E11 form of the negative
+hemisphere differs in rounding on 98,357 normals once values are far outside.
+Of eight f32 operation orders, one matches all 296,960: with
+`x = 1 - |y| - |z|` and `over = max(-x, 0)`, each of `y` and `z` moves by
+`+over` when it is negative and `-over` otherwise, before normalization. The
+inputs are unchanged for values inside the octahedron (the retained E11 to E40
+fixtures). The kept inputs and outputs are
+`packages/decoders/native/draco/tests/fixtures/octahedron.bin` (186 cases: 116
+unpredicted, 70 predicted mesh layouts of E35 to E39 with the stored
+quantization narrowed under the transform maximum; SHA-256
+`2319e6ae2c8ed242ec430f9dff73cc0c5e026d1ff0d561177f3e5ea3aec2c37c`), checked by
+`tests/layouts.rs`; the module before this rule fails 176 of them. The emitter
+was a session script and is not retained.
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

@@ -55,8 +55,9 @@ before version 2.2 and with the older transform, the normal maximum, duplicate
 decoder ids, the wrap transform and 32-bit KD values. KD point clouds before
 version 2.3 are refused (no layout is established), as are these inputs that the
 full prebuilt decodes: a KD level 6 split on an exhausted dimension, the
-one-triangle normal mode, normals outside the stored octahedron and
-int64-overflowing normal prediction (docs/known-bugs.md).
+one-triangle normal mode and int64-overflowing normal prediction
+(docs/known-bugs.md). `tests/layouts.rs` also checks 186 cases of normals outside
+the stored octahedron (E41).
 
 `node --test packages/decoders/tests/draco-native.test.js` runs native tests,
 builds this Wasm artifact and runs the KD, memory, prediction, metadata, flavor and predictive Wasm

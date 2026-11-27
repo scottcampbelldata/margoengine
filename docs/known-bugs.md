@@ -16805,6 +16805,19 @@ HTML and needs no GPU; an unnecessary GPU wrapper first expired
 before test startup. Its failure is retained separately. No competing
 teardown fix or busy-machine exemption was applied in this lane.
 
+### Fixed 2026-11-27: optional Draco decoder refused normals outside the stored octahedron (batch 133, E41)
+
+- **Repro:** `445241434f020200000000010000000101010903000003fe0001090902` through
+  `@margoengine/decoders/draco-native`: `Invalid`, where the full prebuilt returns
+  a unit vector.
+- **Cause:** `unit` in `packages/decoders/native/draco/src/normal.rs` refused
+  values outside the quantization range, and its unfolding rounded differently
+  from the prebuilt on values far outside it.
+- **Fix:** the refusal is gone and the negative hemisphere moves by the overshoot
+  ([E41](clean-room.md#batch-133-e41-normals-outside-the-stored-octahedron-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/octahedron.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -16855,10 +16868,6 @@ E26 to E40):
   `E35 one-triangle normal mode` cases in
   `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
   int32 arithmetic of that mode is not established.
-- Normals outside the stored octahedron (unpredicted or wrapped symbols beyond
-  the quantization width, or a transform maximum wider than it): the prebuilt
-  returns a vector, Margo answers `Invalid`. Repro:
-  `445241434f020200000000010000000101010903000003fe0001090902`.
 - Predictor 6 with coordinates near the int32 limits, or unsigned 32-bit
   positions before 2.0 near theirs: the prebuilt decodes, Margo answers
   `Overflow` where a 64-bit step would overflow.

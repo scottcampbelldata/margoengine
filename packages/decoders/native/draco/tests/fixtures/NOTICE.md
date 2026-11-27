@@ -107,3 +107,7 @@ no implementation source, wrapper text or disassembly was read.
 `docs/clean-room.md`) with the full prebuilt decoder's public output or
 rejection; two cases record where Margo refuses an input that decoder accepts.
 Apache-2.0, like the other Margo specimens.
+
+`octahedron.bin` contains 186 Margo-crafted inputs (E41) with the full prebuilt
+decoder's public output: unpredicted normal symbols and E35 to E39 mesh layouts
+with a narrowed normal quantization. Apache-2.0.

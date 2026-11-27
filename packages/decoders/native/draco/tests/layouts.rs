@@ -1,6 +1,7 @@
 //! Layout rules found by E26 to E40 in docs/clean-room.md: which positions,
 //! orientations and normal data the mesh predictors use, KD values of width 32
-//! and the wrap transform. Every input is Margo-crafted; expected output is the
+//! and the wrap transform, and E41's normals outside the octahedron. Every
+//! input is Margo-crafted; expected output is the
 //! opaque full decoder's public output, or its rejection. The one-triangle
 //! normal mode (E35) is not established, so its cases expect `Unsupported`
 //! although the opaque decoder accepts them.
@@ -18,9 +19,9 @@ fn blob<'a>(data: &'a [u8], at: &mut usize) -> &'a [u8] {
     out
 }
 
-#[test]
-fn crafted_layouts_match_black_box_outputs_and_rejections() {
-    let data = include_bytes!("fixtures/layouts.bin");
+/// Decodes every case of a retained fixture and compares; returns the counts of
+/// all, accepted, rejected and Margo-only refused cases.
+fn check(data: &[u8]) -> (u32, u32, u32, u32) {
     let mut at = 0;
     let count = num(data, &mut at);
     let (mut accepted, mut rejected, mut unsupported) = (0, 0, 0);
@@ -80,5 +81,20 @@ fn crafted_layouts_match_black_box_outputs_and_rejections() {
         failures.len()
     );
     assert_eq!(at, data.len());
-    assert_eq!((count, accepted, rejected, unsupported), (284, 233, 49, 2));
+    (count, accepted, rejected, unsupported)
+}
+
+#[test]
+fn crafted_layouts_match_black_box_outputs_and_rejections() {
+    let counts = check(include_bytes!("fixtures/layouts.bin"));
+    assert_eq!(counts, (284, 233, 49, 2));
+}
+
+/// E41: normals outside the stored octahedron, unpredicted symbols at every
+/// quantization and byte width, and predicted mesh normals whose transform
+/// maximum is wider than the stored width.
+#[test]
+fn normals_outside_the_octahedron_match_black_box_outputs() {
+    let counts = check(include_bytes!("fixtures/octahedron.bin"));
+    assert_eq!(counts, (186, 186, 0, 0));
 }
