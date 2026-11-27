@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20858823,
+  "total": 20859456,
   "history": [
     {
       "date": "2026-10-24",
@@ -14466,6 +14466,12 @@
       "commit": "8b78fa0619",
       "reason": "@margoengine/animation/morph-gpu 3118 to 4105 B gzip (ceiling 3265 to 4361), root @margoengine/animation 25840 to 25874 B: KB-BVH-SYNCPOSE-MORPHGPU1 samples the player's weights on the CPU for synchronous raycasts with sampleTrackInto, so the entry now imports the sampling chunk (2627 B) that the root entry already loads; every MorphWeightPlayer drives an Animation from the root, so a page loads no new bytes. A copy of the shader's sampling in morph-gpu would duplicate the code the root ships. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "ground-split",
+      "reason": "FIRE-05: the ground share split into ground shock, crater work and heat (+633 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15306,7 +15312,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 3676,
+    "@margoengine/physics/explosive": 4309,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

@@ -26,9 +26,16 @@ export interface ChargeOptions {
     readonly case?: ChargeCase;
 }
 
-export const EXPLOSION_LAYOUT = 1;
+export interface CraterLaw {
+    readonly optimalDepth: number;
+    readonly maxRadius: number;
+    readonly surfaceRadius: number;
+    readonly decay: number;
+}
 
-export const EXPLOSION_WORDS = 10;
+export const EXPLOSION_LAYOUT = 2;
+
+export const EXPLOSION_WORDS = 14;
 
 export const EXPLOSIVES: {
     readonly tnt: {
@@ -74,6 +81,11 @@ export interface EnergyBudget {
     readonly scaledDepth: number;
     readonly air: number;
     readonly ground: number;
+    readonly groundShock: number;
+    readonly craterWork: number;
+    readonly heat: number;
+    readonly craterRadius: number;
+    readonly craterMass: number;
 }
 
 export interface ExplosionCounts {
@@ -85,6 +97,7 @@ export interface ExplosionParams {
     readonly charges: readonly ChargeOptions[];
     readonly groundHeight?: number;
     readonly seed?: number;
+    readonly soil?: GroundOptions;
 }
 
 export class ExplosionSolver implements Solver<ExplosionParams> {
@@ -109,6 +122,10 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         scaledDepth: number;
         gasMass: number;
         detonated: boolean;
+        groundShock: number;
+        craterWork: number;
+        heat: number;
+        craterRadius: number;
     };
     fragments(): Float64Array;
 }
@@ -123,7 +140,18 @@ export const FRAGMENT_WORDS = 8;
 
 export const GURNEY_FRACTION = 0.7;
 
+export interface GroundOptions {
+    readonly density?: number;
+    readonly gravity?: number;
+    readonly seismicCoupling?: number;
+    readonly craterRadius?: number;
+    readonly depthRatio?: number;
+    readonly law?: CraterLaw;
+}
+
 export type GurneyGeometry = 'cylinder' | 'sphere' | 'flatSandwich' | 'openFacedSandwich' | 'asymmetricSandwich';
+
+export const SONDER_CRATER_LAW: CraterLaw;
 
 export const TNT_JOULES_PER_KG = 4184000;
 
@@ -131,11 +159,13 @@ export function airborneFraction(scaled: number): number;
 
 export function chargeEnergy(mass: number, explosive?: Explosive): number;
 
-export function energyBudget(energy: number, depth?: number): EnergyBudget;
+export function energyBudget(energy: number, depth?: number, options?: GroundOptions, aboveGround?: boolean): EnergyBudget;
 
 export function gurneyVelocity(explosive: Explosive): number;
 
 export function metalSpeed(gurney: number, geometry: GurneyGeometry, metalToCharge: number, tamperToCharge?: number): number;
+
+export function scaledCraterRadius(scaled: number, law?: CraterLaw): number;
 
 export function scaledDepth(depth: number, energy: number): number;
 

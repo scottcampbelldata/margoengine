@@ -30,19 +30,25 @@ import {
   energyBudget,
   type Explosive,
   EXPLOSIVES,
+  type GroundOptions,
   type GurneyGeometry,
   gurneyVelocity,
   metalSpeed,
 } from './charge.js';
 
 /** The layout version of the explosion and fragment regions. */
-export const EXPLOSION_LAYOUT = 1;
-/** Words of an `explosions` row: x, y, z (m), time (s), energy, air, ground (J), scaled depth (m J^-1/3), gas mass (kg), detonated (0 or 1). */
-export const EXPLOSION_WORDS = 10;
+export const EXPLOSION_LAYOUT = 2;
+/**
+ * Words of an `explosions` row: x, y, z (m), time (s), energy, air, ground (J), scaled depth (m J^-1/3), gas mass (kg),
+ * detonated (0 or 1), then the ground's share split: ground shock, crater work, heat (J), and the crater's radius (m).
+ */
+export const EXPLOSION_WORDS = 14;
 /** Words of a `fragments` row: x, y, z (m), vx, vy, vz (m/s), mass (kg), state (0 waiting, 1 flying, 2 landed). */
 export const FRAGMENT_WORDS = 8;
 
 const AIR_DENSITY = 1.225;
+/** A cast high explosive's density, kg/m^3 (TNT 1630), for telling a charge on the ground from one in the air. */
+const CHARGE_DENSITY = 1630;
 const WAITING = 0;
 const FLYING = 1;
 const LANDED = 2;
@@ -87,6 +93,8 @@ export interface ExplosionParams {
   readonly groundHeight?: number;
   /** The seed of the fragments' masses and directions (default 0): another seed breaks the same cases another way. */
   readonly seed?: number;
+  /** The ground the charges sit in, for their energy budgets (density, seismic coupling, crater; see `energyBudget`). */
+  readonly soil?: GroundOptions;
 }
 
 /** The work a step did. */
@@ -103,6 +111,10 @@ interface Placed {
   readonly energy: number;
   readonly air: number;
   readonly ground: number;
+  readonly groundShock: number;
+  readonly craterWork: number;
+  readonly heat: number;
+  readonly craterRadius: number;
   readonly scaledDepth: number;
   readonly gasMass: number;
   readonly fragments: number;
@@ -169,6 +181,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     if (!Number.isFinite(ground))
       throw new RangeError(`Ground height must be a finite number of metres; got ${ground}.`);
     this.ground = ground;
+    const soil = params.soil ?? {};
     const seed = params.seed ?? 0;
     if (!(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff))
       throw new RangeError(`Seed must be a whole number from 0 to 2^32 - 1; got ${seed}.`);
@@ -195,7 +208,9 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         `${at} depth`,
         'Give the depth of its centre below the surface in metres.',
       );
-      const budget = energyBudget(energy, depth);
+      // A charge at depth 0 whose centre is higher than its own radius over the ground is in the air: no crater, no shock.
+      const radius = pow((3 * mass) / (4 * Math.PI * CHARGE_DENSITY), 1 / 3);
+      const budget = energyBudget(energy, depth, soil, depth === 0 && p[1] - ground > radius);
       let count = 0;
       let drag = 0;
       if (charge.case && depth === 0) {
@@ -282,6 +297,10 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         energy,
         air: budget.air,
         ground: budget.ground,
+        groundShock: budget.groundShock,
+        craterWork: budget.craterWork,
+        heat: budget.heat,
+        craterRadius: budget.craterRadius,
         scaledDepth: budget.scaledDepth,
         gasMass: mass,
         fragments: count,
@@ -306,7 +325,23 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     this.fragmentCharge = Int32Array.from(owners);
     const rows = this.explosions();
     this.placed.forEach((c, i) =>
-      rows.set([...c.position, c.time, c.energy, c.air, c.ground, c.scaledDepth, c.gasMass, 0], i * EXPLOSION_WORDS),
+      rows.set(
+        [
+          ...c.position,
+          c.time,
+          c.energy,
+          c.air,
+          c.ground,
+          c.scaledDepth,
+          c.gasMass,
+          0,
+          c.groundShock,
+          c.craterWork,
+          c.heat,
+          c.craterRadius,
+        ],
+        i * EXPLOSION_WORDS,
+      ),
     );
     const frag = this.fragmentWords();
     fragments.forEach((row, i) => frag.set(row, i * FRAGMENT_WORDS));
@@ -410,6 +445,10 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     scaledDepth: number;
     gasMass: number;
     detonated: boolean;
+    groundShock: number;
+    craterWork: number;
+    heat: number;
+    craterRadius: number;
   } {
     if (!(Number.isInteger(index) && index >= 0 && index < this.placed.length))
       throw new RangeError(`ExplosionSolver has charges 0 to ${this.placed.length - 1}; got ${index}.`);
@@ -423,6 +462,10 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       scaledDepth: r[7]!,
       gasMass: r[8]!,
       detonated: r[9] === 1,
+      groundShock: r[10]!,
+      craterWork: r[11]!,
+      heat: r[12]!,
+      craterRadius: r[13]!,
     };
   }
 

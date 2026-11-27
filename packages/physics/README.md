@@ -7360,8 +7360,23 @@ the speed a case or plate reaches by Gurney's equations: `cylinder`, `sphere`, `
 
 A buried charge keeps most of its energy in the ground. `scaledDepth(depth, energy)` is depth / E^(1/3) in m J^-1/3.
 `airborneFraction(scaledDepth)` is the share that leaves as an air blast (Ford et al. 2014): 0.90 at the surface,
-under 1 % at the 4e-3 m J^-1/3 that digs the largest crater. `energyBudget(energy, depth)` splits the energy into
-`air` (what the blast solver reads) and `ground` (what the crater and ground shock draw on).
+under 1 % at the 4e-3 m J^-1/3 that digs the largest crater. `energyBudget(energy, depth, ground)` splits the energy
+into `air` (what the blast solver reads) and `ground`, and splits the ground's share three ways:
+
+- `groundShock`: what radiates as seismic waves, `seismicCoupling` (default 0.15) of the ground share. Sonder et al.
+  (2022) estimated airborne plus seismic energy at about 17 % of each blast.
+- `craterWork`: the least work that empties the crater, which is lifting the bowl and throwing it past the rim. The crater
+  is a paraboloid of `craterRadius` (a survey's or the cratering solver's) and `depthRatio` (default 0.5) in host of
+  `density` (default 1800 kg/m^3). Without a radius, Sonder et al.'s crater law `scaledCraterRadius` gives one.
+- `heat`: the rest, which is the cavity's hot gas, crushing and friction.
+
+```ts
+import { energyBudget } from '@margoengine/physics/explosive';
+
+// Fauld's measured crater, about 250 m across in gypsum.
+const split = energyBudget(1.013e13, 90, { craterRadius: 125, density: 2300 });
+console.log(split.air, split.groundShock, split.craterWork, split.heat);
+```
 
 ```ts
 import { energyBudget, EXPLOSIVES, gurneyVelocity, metalSpeed } from '@margoengine/physics/explosive';
@@ -7375,7 +7390,9 @@ console.log(metalSpeed(gurneyVelocity(EXPLOSIVES.tnt), 'cylinder', 2).toFixed(0)
 
 `ExplosionSolver` puts charges into a `PhysicsWorld` as placed events. Each detonates at its `time`. Its row of the
 `explosionsField` (`EXPLOSION_WORDS` f64 words: position, time, energy, air and ground energy, scaled depth, gas mass,
-detonated) is what the blast, crater and plume solvers read. A cased charge at or above the surface throws its `case`
+detonated, then ground shock, crater work, heat and crater radius) is what the blast, crater, seismic and plume solvers
+read. `soil` gives the charges' ground (`GroundOptions`). A charge at depth 0 whose centre is higher above `groundHeight`
+than its own radius is in the air: all of its energy is blast. A cased charge at or above the surface throws its `case`
 as fragments (`fragmentsField`, `FRAGMENT_WORDS` words: position, velocity, mass, state). They launch at Gurney's speed for
 the case to charge mass ratio, with masses drawn from Mott's distribution (N(>m) = N0 exp(-sqrt(m/mu))) and scaled to the
 case mass. They leave in opposite pairs of equal mass, so the launch adds no momentum. They fly under the world's gravity

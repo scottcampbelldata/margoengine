@@ -76,6 +76,12 @@ test('the explosions field reaches a solver that reads it: each charge’s air e
   world.advance(18);
   assert.equal(listener.heard(), solver.charge(0).air + solver.charge(1).air, 'and the buried one at 0.2 s');
   assert.ok(solver.charge(1).air < 0.2 * solver.charge(1).energy, 'the buried charge sends little into the air');
+  // The row splits the ground's share for the crater and seismic solvers; the charge 1 m up is in the air and digs nothing.
+  const buried = solver.charge(1);
+  assert.ok(Math.abs(buried.groundShock + buried.craterWork + buried.heat - buried.ground) < 1e-9 * buried.energy);
+  assert.ok(buried.craterRadius > 0 && buried.craterWork > 0);
+  assert.equal(solver.charge(0).craterRadius, 0);
+  assert.equal(solver.charge(0).air, solver.charge(0).energy);
 });
 
 test('the case fragments carry the case mass, leave with no net momentum at Gurney’s speed, and a buried case stays put', () => {
