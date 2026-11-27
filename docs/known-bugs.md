@@ -2387,7 +2387,7 @@ test.
   root that does not move do not move each other, so the physics is unchanged: the replay scenes' state hashes are the same.
 - **Regression:** the test above (two islands before).
 
-### Open 2026-11-26: check:rust-kernels builds the physics kernels with flags they no longer ship with (KB-RUST-KERNELFLAGS1, scripts)
+### Fixed 2026-11-26: check:rust-kernels built the physics kernels with flags they no longer shipped with (KB-RUST-KERNELFLAGS1, scripts)
 
 - **Repro:** `node --test tests/rust-kernel-tests.test.js`: "every kernel that ships as Wasm is built for wasm32 with the
   shipped flags" fails, `WASM_RUSTFLAGS` (`-C target-feature=+simd128`) against the 3D kernel blueprint's `RUSTFLAGS`,
@@ -2396,8 +2396,11 @@ test.
 - **Cause:** each physics kernel is now built with its own slot's link flags (packages/physics/scripts/build-*-kernel.mjs,
   `rustFlags(slot, shared)`), while scripts/rust-kernel-tests.mjs builds every kernel that ships as Wasm with the one
   `WASM_RUSTFLAGS` of scripts/support/wasm-kernel.mjs, so check:rust-kernels no longer checks the build that ships.
-- **Fix to make:** take each kernel's shipped flags from its build script (the blueprint's `RUSTFLAGS` for the 3D
-  kernel, the 2D kernel's own variant flags) in check:rust-kernels and in the test, owned by the physics kernel work.
+- **Fix (31623dc844):** `packages/physics/scripts/build-kernel.mjs` composes the 3D kernel's `RUSTFLAGS` (and the
+  threaded build's) from `WASM_RUSTFLAGS` and its link arguments, so the shipped code generation is the one
+  check:rust-kernels builds with. The flags' text and the blueprints are unchanged.
+- **Regression:** `tests/rust-kernel-tests.test.js` checks the composition and that the link arguments carry no code
+  generation (9 of 9 pass on 2026-11-27).
 
 ### Fixed 2026-11-25: a box face resting on a block's edge was held at one end at a time and rocked for ever (KB-PHYS-EDGEHOLD1, physics kernel, contacts)
 
