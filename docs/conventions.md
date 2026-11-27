@@ -34,7 +34,7 @@ Rules:
   `scripts/support/math-external.mjs`), so an app
   holds one copy of math, and one `MargoError` class, however many packages it imports (KB-INL1; before 2026-11-26
   post, shadows, taa, creative, dof, tonemap and others kept math under `devDependencies` and each bundled its own copy).
-- The packages on `SHARED_HELPERS` (`scripts/support/math-external.mjs`: controls, environment, shadows) also import
+- The packages on `SHARED_HELPERS` (`scripts/support/math-external.mjs`: controls, environment, gltf, shadows) also import
   `packages/shared/errors.js` and `hypot.js` from core's `@margoengine/core/extension` (`HELPERS_ENTRY`) instead of
   bundling them (KB-INL1 part B, Scott 2026-11-26): the build's `sharedHelpers` plugin turns those imports into the
   external entry, so the app holds one copy, core's. Such a package must declare core, and

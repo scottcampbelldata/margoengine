@@ -1,5 +1,5 @@
 // Accessor reading shared by the loader and its optional entries (glTF 2.0 specification, section 3.6.2).
-import { MargoError } from '@margoengine/math/errors';
+import { margoError } from '@margoengine/core/extension';
 import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 import type { GLTFAccessor, GLTFDocument } from '../../shared/gltf.js';
 
@@ -43,13 +43,13 @@ export function readAccessor(
   // could override them).
   if (a.bufferView === undefined && !a.sparse) {
     if (!accepts(a))
-      throw new MargoError(
+      throw margoError(
         'unsupported',
         'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or use @margoengine/gltf/pbr',
       );
     const count = integer(a.count, 'accessor count', 1);
     if (count > 1_000_000)
-      throw new MargoError(
+      throw margoError(
         'unsupported',
         'glTF accessor holds over one million values, the limit of the light loader; use @margoengine/gltf/pbr',
       );
@@ -58,7 +58,7 @@ export function readAccessor(
   const v = entry(doc.bufferViews, a.bufferView, 'bufferView'),
     buffer = buffers[integer(v.buffer, 'buffer reference')];
   if (!buffer || a.sparse || !accepts(a))
-    throw new MargoError(
+    throw margoError(
       'unsupported',
       'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or use @margoengine/gltf/pbr',
     );
@@ -69,7 +69,7 @@ export function readAccessor(
     length = integer(v.byteLength, 'view length', 1),
     stride = integer(v.byteStride ?? size * components, 'stride', size * components);
   if (count > 1_000_000)
-    throw new MargoError(
+    throw margoError(
       'unsupported',
       'glTF accessor holds over one million values, the limit of the light loader; use @margoengine/gltf/pbr',
     );

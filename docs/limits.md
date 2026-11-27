@@ -8721,6 +8721,15 @@ measures 7,651 B gzip, 1 B over its earlier 7,650 B, because its error texts now
 2026-11-16). The sizes budget rises with it; a split would only move the same strings into another entry. Core plus
 stage stays 24,859 B gzip (61,056 B raw before and after).
 
+### Core plus the glTF root below 30 KiB gzip (2026-11-27)
+
+A full build stops when core plus the `@margoengine/gltf` root reaches 30 KiB (30,720 B) gzip, a gate never raised.
+Core's snapshot rendering and multi-draw (+156 B, 22,369 to 22,525 B) took the pair to 30,848 B. The glTF root now
+takes the shared error helpers from `@margoengine/core/extension` (it is on `SHARED_HELPERS`) and throws coded errors
+with `margoError` instead of bundling math's `MargoError` class: 8,323 to 8,191 B, so the pair is 30,716 B. Errors keep
+their names, codes and messages, and `instanceof MargoError` still matches. `tests/modern-core-budget.test.js` now checks
+the pair, which only a full build checked before.
+
 ## IFC and BIM data (2026-11-16)
 
 - Class inheritance (`@margoengine/ifc/query` `isSubtypeOf`, `subtypesOf`, `supertypesOf` and `findElements` class

@@ -1,7 +1,7 @@
 import { engineRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { Geometry, PbrMaterial, type Engine, type Mesh } from '@margoengine/core/extension';
-import { MargoError } from '@margoengine/math/errors';
+import { margoError } from '@margoengine/core/extension';
 import { splitNodeMatrix } from './node-matrix.js';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
@@ -16,7 +16,7 @@ import { supportedVersion } from './version.js';
 const limit = 64 * 1024 * 1024;
 // A limit only this loader has: `unsupported`, so loadAuto hands the file to gltf/pbr, whose budget is 512 MiB.
 const overLimit = (what: string) =>
-  new MargoError(
+  margoError(
     'unsupported',
     `${what} over the light loader's 64 MiB; use @margoengine/gltf/pbr (512 MiB by default) or loadAuto`,
   );
@@ -107,7 +107,7 @@ function validate(doc: Document, maxNodes: number | undefined, extensions: reado
     doc.skins?.length ||
     doc.animations?.length
   )
-    throw new MargoError(
+    throw margoError(
       'unsupported',
       'Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; use @margoengine/gltf/pbr',
     );
@@ -284,7 +284,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
         Boolean,
       )
     )
-      throw new MargoError(
+      throw margoError(
         'unsupported',
         'Minimal PBR supports opaque constant colors; add @margoengine/gltf/textured for a base colour map or MASK; other maps, emission and transparency require @margoengine/gltf/pbr',
       );
@@ -309,7 +309,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
         p.extensions ||
         Object.keys(p.attributes ?? {}).some((key) => /^(COLOR|JOINTS|WEIGHTS)_/.test(key))
       )
-        throw new MargoError(
+        throw margoError(
           'unsupported',
           'Minimal glTF requires rigid triangles without vertex colors; use @margoengine/gltf/pbr',
         );
@@ -329,7 +329,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       const expanded = normals ? undefined : indices;
       vertices += normals ? positions.length / 3 : indices.length;
       if (vertices > 1_000_000)
-        throw new MargoError(
+        throw margoError(
           'unsupported',
           'glTF exceeds one million vertices, the limit of the light loader; use @margoengine/gltf/pbr, or split it',
         );
@@ -377,7 +377,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
     parents = new Int32Array(nodes.length).fill(-1);
   nodes.forEach((node: GLTFNode, id: number) => {
     if (!node || node.skin !== undefined || node.camera !== undefined || node.extensions)
-      throw new MargoError(
+      throw margoError(
         'unsupported',
         'Unsupported glTF node; add @margoengine/gltf/instancing for EXT_mesh_gpu_instancing or @margoengine/gltf/scene-data for cameras and lights, or use @margoengine/gltf/pbr',
       );
@@ -440,7 +440,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       for (const child of node.children ?? []) stack.push({ id: child, parent: mesh });
     }
     if (!renderable.length && !extensions.some((extension) => extension.allowEmptyScene))
-      throw new MargoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
+      throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
     const release = () => {
       for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
     };
@@ -487,7 +487,7 @@ export function parseGLTF(
   options: GLTFOptions = {},
 ): Model {
   if (options.extensions?.some((extension) => extension.load))
-    throw new MargoError('unsupported', 'This glTF extension loads asynchronously; use parseGLTFAsync or loadGLTF');
+    throw margoError('unsupported', 'This glTF extension loads asynchronously; use parseGLTFAsync or loadGLTF');
   return build(instance, open(input, suppliedBuffers, options), options);
 }
 /** parseGLTF for extensions with asynchronous work, such as `textured`. Aborts with `signal`. */

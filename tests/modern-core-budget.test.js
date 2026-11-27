@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CORE_STAGE_GZIP_LIMIT, checkCoreBudget } from '../scripts/core-budget.js';
-import { measureCoreStage } from '../scripts/measure-size.js';
+import { gzipSync } from 'node:zlib';
+import { resolve } from 'node:path';
+import { bundleBytes, external, measureCoreStage } from '../scripts/measure-size.js';
 test('core + stage gate rejects the ceiling and any excess', async () => {
   checkCoreBudget(19_999);
   checkCoreBudget(CORE_STAGE_GZIP_LIMIT - 1);
@@ -23,4 +25,15 @@ test('core + stage gate rejects the ceiling and any excess', async () => {
       modules.every((path) => !path.replaceAll('\\', '/').includes(`/packages/${name}/`)),
       name + ' entered core + stage',
     );
+});
+
+// build-modern's size records stop a full build at Core + glTF 30 KiB gzip, a gate never raised. A full build is the
+// only other place it ran, so core growth (snapshot and multi-draw, +156 B) passed every test and stopped the build.
+test('core + the glTF root stay below the 30 KiB gzip gate of build-modern', async () => {
+  const gzip = async (name) =>
+    gzipSync(await bundleBytes(resolve(import.meta.dirname, '..', 'packages', name, 'dist', 'index.js'), external))
+      .length;
+  const core = await gzip('core'),
+    gltf = await gzip('gltf');
+  assert.ok(core + gltf < 30 * 1024, `core ${core} B + glTF ${gltf} B gzip is not below ${30 * 1024} B`);
 });

@@ -54,6 +54,7 @@ export const packageExternal = (root, external) =>
 export const SHARED_HELPERS = Object.freeze([
   '@margoengine/controls',
   '@margoengine/environment',
+  '@margoengine/gltf',
   '@margoengine/shadows',
 ]);
 
