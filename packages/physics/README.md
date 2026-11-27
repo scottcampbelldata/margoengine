@@ -352,7 +352,10 @@ Any other provider of `SegmentLoads` can push the links instead.
 
 Contact goes through the rigid solver: fish, divers and hulls push the links aside. `rod.points()` and `rod.frames()`
 read the centre line and each link's turn for drawing. `rod.takeState()` and `rod.restoreState()` keep the wake
-oscillators beside `physics.takeSnapshot()`.
+oscillators beside `physics.takeSnapshot()`. In a `PhysicsWorld`, a rod is stepped by `RigidSolver` with the Physics it
+hangs in: the solver keeps every stateful attachment's words (`physics.statefulAttachments()`) with the kernel's, so a
+world's snapshot, restore and hash carry the wake oscillators, and the shot is the same at any frame rate. Make the rods
+before adding the Physics to the world.
 
 ```ts
 import {Physics} from 'margoengine/physics';

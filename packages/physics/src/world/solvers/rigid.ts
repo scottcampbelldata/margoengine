@@ -24,7 +24,7 @@
 // snapshot restored into a world built with other capacities or another column table is refused before anything is
 // written: the regions' names carry the capacities, and their layout version is a fingerprint of the column table.
 import { MargoError } from '@margoengine/math/errors';
-import type { Physics } from '../../physics.js';
+import type { Physics, PhysicsAttachment } from '../../physics.js';
 
 /** Bits of the kernel's `flags` column (kernel/src/layout.rs): a live row, and the kind bits, 2 for a dynamic body. */
 const ALIVE = 1,
@@ -145,6 +145,15 @@ export class RigidSolver implements Solver<RigidSolverParams> {
   private clock: Region | null = null;
   /** The count the solver last wrote to `clock`: a restore that changed it is put back into the Physics. */
   private written = 0;
+  /**
+   * The Physics's stateful attachments (a rod's wake oscillators, `Physics.statefulAttachments`) and their words, one f64
+   * region after one another, kept as state so a snapshot, a restore and the hash carry them; `kept` is what the solver last
+   * wrote, and a restore that changed the region is put back into the attachments before the next step.
+   */
+  private holders: readonly PhysicsAttachment[] = [];
+  private lengths: number[] = [];
+  private attached: Region | null = null;
+  private kept = new Float64Array(0);
   private capacity = 0;
   private layout = 0;
   /** The forces and torques `importPorts` added for this tick's step, taken off after it (`FORCE_WORDS` a body row). */
@@ -185,6 +194,56 @@ export class RigidSolver implements Solver<RigidSolverParams> {
     this.bodies = host.allocate('bodies', capacity * BODY_WORDS * 4, 'f32', BODIES_LAYOUT);
     this.clock = host.allocate('stepCount', 8, 'f64', 1);
     this.writeClock(physics.stepCount);
+    this.holders = physics.statefulAttachments();
+    this.lengths = this.holders.map((holder) => holder.takeState!().length);
+    const words = this.lengths.reduce((sum, n) => sum + n, 0);
+    this.kept = new Float64Array(words);
+    if (words > 0) {
+      this.attached = host.allocate('attachmentState', words * 8, 'f64', 1);
+      this.writeAttachments();
+    }
+  }
+
+  /** The attachments' words in the world's memory. */
+  private attachmentWords(): Float64Array {
+    return new Float64Array(this.host!.memory.buffer, this.attached!.byteOffset, this.kept.length);
+  }
+
+  /** Copies each stateful attachment's state into the region, and keeps what was written. */
+  private writeAttachments(): void {
+    let at = 0;
+    for (let i = 0; i < this.holders.length; i++) {
+      const state = this.holders[i]!.takeState!();
+      if (state.length !== this.lengths[i])
+        throw new MargoError(
+          'state',
+          `An attachment's state changed length from ${this.lengths[i]} to ${state.length} words; keep takeState() one length from the moment it is attached.`,
+        );
+      this.kept.set(state, at);
+      at += state.length;
+    }
+    if (this.attached) this.attachmentWords().set(this.kept);
+  }
+
+  /** The attachments the world was set up with, still the Physics's; a restore since the last step is put back into them. */
+  private readAttachments(physics: Physics): void {
+    const now = physics.statefulAttachments();
+    if (now.length !== this.holders.length || now.some((holder, i) => holder !== this.holders[i]))
+      throw new MargoError(
+        'state',
+        'A stateful attachment (a rod with water loads) was added to or removed from the Physics after it joined the world; attach them first, then world.add(new RigidSolver(), {physics}).',
+      );
+    if (!this.attached) return;
+    const words = this.attachmentWords();
+    let changed = false;
+    for (let k = 0; k < words.length && !changed; k++) changed = !Object.is(words[k], this.kept[k]);
+    if (!changed) return;
+    let at = 0;
+    for (let i = 0; i < this.holders.length; i++) {
+      this.holders[i]!.restoreState!(words.slice(at, at + this.lengths[i]!));
+      at += this.lengths[i]!;
+    }
+    this.kept.set(words);
   }
 
   private live(): Physics {
@@ -203,8 +262,10 @@ export class RigidSolver implements Solver<RigidSolverParams> {
     // A restore since the last step put another count in the clock: the Physics goes on from it.
     const clock = this.clockWords();
     if (clock[0] !== this.written) physics.stepCount = clock[0]!;
+    this.readAttachments(physics);
     physics.step();
     this.writeClock(physics.stepCount);
+    this.writeAttachments();
     this.letGo();
   }
 
@@ -377,6 +438,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       ranges = kernel.stateRanges(),
       covered = new Set(ranges.map((range) => range.byteOffset)),
       out: Region[] = this.clock ? [this.clock] : [];
+    if (this.attached) out.push(this.attached);
     // The stamp is the one word between the header's two state ranges.
     const [first] = ranges;
     if (first)

@@ -1570,6 +1570,7 @@ class Physics implements EnginePlugin, BodyOwner {
     moved(body: PhysicsBody): void;
     owns(body: PhysicsBody): boolean;
     attach(attachment: PhysicsAttachment): void;
+    statefulAttachments(): readonly PhysicsAttachment[];
     detach(attachment: PhysicsAttachment): boolean;
     on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void;
     addModel(model: ModelLike, options?: ModelBodyOptions): PhysicsBody[];
@@ -1649,6 +1650,8 @@ class Physics implements EnginePlugin, BodyOwner {
 
 interface PhysicsAttachment {
     beforeStep?(dt: number): void;
+    takeState?(): Float64Array;
+    restoreState?(state: Float64Array): unknown;
     afterStep?(dt: number): void;
     afterSync?(): void;
     bodyRemoved?(body: PhysicsBody): void;

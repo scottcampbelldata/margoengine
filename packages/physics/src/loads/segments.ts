@@ -58,6 +58,11 @@ export interface SegmentLoadContext {
 /** Loads on a structure's segments, filled in place before each step (`out[i]` for `segments[i]`). */
 export interface SegmentLoads {
   apply(segments: readonly SegmentState[], context: SegmentLoadContext, out: SegmentLoad[]): void;
+  /**
+   * Sizes the provider's state for a rod of this many segments before its first step, so its state has its full length from
+   * the start (a world that snapshots it sets aside room for it once).
+   */
+  prepare?(segments: number): void;
   /** The provider's own state (the wake oscillators), for a snapshot of the world it loads. */
   takeState?(): Float64Array;
   restoreState?(state: Float64Array): void;
@@ -105,6 +110,10 @@ class Provider implements SegmentLoads {
     this.before = new Float64Array(3 * n);
     // The wake oscillators start at the free van der Pol cycle's amplitude, q = 2, as LoadSolver's members do.
     for (let i = 0; i < n; i++) this.wakes[2 * i] = 2;
+  }
+
+  prepare(segments: number): void {
+    this.size(segments);
   }
 
   apply(segments: readonly SegmentState[], context: SegmentLoadContext, out: SegmentLoad[]): void {

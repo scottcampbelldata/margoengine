@@ -367,6 +367,7 @@ export interface SegmentLoadOptions {
 
 export interface SegmentLoads {
     apply(segments: readonly SegmentState[], context: SegmentLoadContext, out: SegmentLoad[]): void;
+    prepare?(segments: number): void;
     takeState?(): Float64Array;
     restoreState?(state: Float64Array): void;
 }

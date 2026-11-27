@@ -554,6 +554,14 @@ export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'posit
 /** @internal A helper that steps, syncs and is disposed with a world. */
 export interface PhysicsAttachment {
   beforeStep?(dt: number): void;
+  /**
+   * State the attachment carries from step to step outside the kernel (a rod's wake oscillators), as words of a fixed length
+   * from the moment it is attached. With `restoreState`, a world stepping the Physics through `RigidSolver` snapshots, hashes
+   * and restores it with the kernel's state.
+   */
+  takeState?(): Float64Array;
+  /** Puts back what `takeState` gave. */
+  restoreState?(state: Float64Array): unknown;
   /** After the step, its events and `afterstep` listeners included: what an attachment held for the step comes off here. */
   afterStep?(dt: number): void;
   afterSync?(): void;
@@ -1413,6 +1421,19 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
     this.attachments.add(attachment);
   }
+
+  /**
+   * The attachments that carry state of their own (`takeState` and `restoreState`), in the order they were attached:
+   * `RigidSolver` keeps their words with the kernel's in a world's snapshots.
+   */
+  statefulAttachments(): readonly PhysicsAttachment[] {
+    const out: PhysicsAttachment[] = [];
+    for (const attachment of this.attachments)
+      if (typeof attachment.takeState === 'function' && typeof attachment.restoreState === 'function')
+        out.push(attachment);
+    return out;
+  }
+
   /** @internal Unregisters a helper; returns false when it was not attached. */
   detach(attachment: PhysicsAttachment): boolean {
     return this.attachments.delete(attachment);

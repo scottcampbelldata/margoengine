@@ -15307,6 +15307,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a rod in a PhysicsWorld lost its wake state on a seek (KB-PHYS-RODSEEK1, physics)
+
+- **Repro:** `packages/physics/tests/coupling/rod.test.js`, "a seek equals a continuous run": a riser in a current with
+  vortex-shedding loads, stepped by `RigidSolver`, snapshotted, run on, restored and re-run.
+- **Cause:** the rod's water loads keep van der Pol wake oscillators in JavaScript, outside the kernel. `RigidSolver`
+  snapshotted and hashed only the kernel's memory, so a restore put the rod back with the wake of the later time, and the
+  re-run went another way.
+- **Fix:** attachments with `takeState` and `restoreState` are listed by `physics.statefulAttachments()`. `RigidSolver`
+  keeps their words in a world region of its extra state, written after each step and put back into them when a restore
+  changed it. `segmentLoads` sizes its state when the rod is made (`prepare`), so it has one length. A stateful
+  attachment added after the world began is refused with a coded error.
+- **Regression:** the test above, which fails without the region, and the frame-rate check beside it.
+
 ### Open 2026-11-26: `npm run quality` is red on main at 9013114839 in physics entries (SEA-12, K2-09; solver-owned, not touched here)
 
 - **Repro:** `npm run quality` on 9013114839: sizes (the baseline holds the "feat(physics2d) vehicle" history row

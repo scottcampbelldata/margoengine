@@ -227,6 +227,7 @@ export class Rod implements PhysicsAttachment {
       throw invalidRod(
         'Rod loads are a provider with apply(segments, context, out); pass segmentLoads(sea) from @margoengine/physics/loads.',
       );
+    this.loads?.prepare?.(segments);
     this.time = options.time ?? 0;
     if (!Number.isFinite(this.time)) throw invalidRod('Rod time must be a finite number of seconds; pass one, or 0.');
     for (let i = 0; i < segments; i++) {
