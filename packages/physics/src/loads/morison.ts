@@ -161,17 +161,27 @@ export function liftMagnification(amplitude: number, ratio = 40): number {
  * One step `dt` of a cylinder's wake oscillator q (Facchinetti, de Langre and Biolley 2004): q'' + eps w_f (q^2 - 1) q' +
  * w_f^2 q = forcing, eps 0.3, at the shedding's angular frequency `wf`, `forcing` the coupling to the cylinder, A / D times
  * its acceleration across the flow (0 for a cylinder held still). `state` holds q and q' at `2 index` and `2 index + 1`;
- * it is stepped in substeps of at most 0.05 rad of the shedding's phase by semi-implicit Euler, and the new q returned.
+ * it is stepped in substeps of at most 0.05 rad of the oscillator's phase by semi-implicit Euler, and the new q returned.
+ * With `harmonic` 2 it is the in-line wake p of the fluctuating drag (Srinil and Zanganeh 2012, eq. 6): p'' + 2 eps w_f
+ * (p^2 - 1) p' + 4 w_f^2 p = forcing, at twice the shedding frequency, `forcing` Lambda / D times the acceleration along.
  */
-export function wakeStep(state: Float64Array, index: number, wf: number, forcing: number, dt: number): number {
-  const eps = 0.3,
-    steps = Math.max(1, Math.ceil((wf * dt) / 0.05)),
+export function wakeStep(
+  state: Float64Array,
+  index: number,
+  wf: number,
+  forcing: number,
+  dt: number,
+  harmonic: 1 | 2 = 1,
+): number {
+  const eps = 0.3 * harmonic,
+    natural = harmonic * wf,
+    steps = Math.max(1, Math.ceil((natural * dt) / 0.05)),
     h = dt / steps;
   let q = state[2 * index]!,
     dq = state[2 * index + 1]!;
   for (let k = 0; k < steps; k++) {
     // Semi-implicit Euler: the velocity first, then the position with it.
-    dq += h * (-eps * wf * (q * q - 1) * dq - wf * wf * q + forcing);
+    dq += h * (-eps * wf * (q * q - 1) * dq - natural * natural * q + forcing);
     q += h * dq;
   }
   state[2 * index] = q;

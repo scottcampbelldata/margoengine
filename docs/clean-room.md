@@ -17360,3 +17360,31 @@ analysis of coupled mechanical systems", CMAME 190, 2001, https://doi.org/10.101
   count to the other's, so a turning drum never carries it off the arc; for a winch drum slipping under the rope, the side
   the surface comes from is the tight one, T_A = k T_B, so A rises at a = g (k m_B - m_A) / (m_A + k m_B) whatever the drum's
   speed while it slips and whatever the deck's steady speed.
+
+## physics rod vortex-induced vibration in line, and against a towed pipe (2026-11-27)
+
+Files: `packages/physics/src/loads/segments.ts`, `packages/physics/src/loads/morison.ts` (`wakeStep`'s second harmonic),
+`packages/physics/tests/rod-viv.test.js`. No rival engine source and no paper's companion code was read; the measured data
+are numbers read from the paper's figures, no data file.
+
+- N. Srinil and H. Zanganeh, "Modelling of coupled cross-flow/in-line vortex-induced vibrations using double Duffing and
+  van der Pol oscillators", Ocean Engineering 53 (2012) 83-97, https://doi.org/10.1016/j.oceaneng.2012.06.025 (open
+  preprint, https://strathprints.strath.ac.uk/41066/, read). Used: the in-line wake p'' + 2 eps_x w_f (p^2 - 1) p' + 4 w_f^2
+  p = Lambda_x X'' / D (eq. 6, eq. 8), p = 2 C_D / C_D0 with C_D0 = 0.2, eps_x = 0.3, Lambda_x = 12.
+- J. K. Vandiver, "Drag coefficients of long flexible cylinders", Offshore Technology Conference, OTC 4490, 1983 (not
+  read, paywalled); its fit 1 + 1.043 (2 A_rms / D)^0.65 as given in SINTEF's VIVANA theory notes, "Drag coefficient
+  modification", https://sima.sintef.no/docs/5.0/vivana/theory/drag_coefficient_modification.html (documentation, read).
+- X. Fu, S. Fu, Z. Niu, B. Zhao, J. Shen and P. Deng, "A validated fluid-structure interaction simulation model for
+  vortex-induced vibration of a flexible pipe in steady flow", Marine Structures (2025),
+  https://doi.org/10.1016/j.marstruc.2025.103895, open as https://arxiv.org/abs/2502.05748 (v3, read). Used: the
+  uniform-flow pipe of section 3.1 and Table 1, and the measured (red) curves of Figs. 5 and 7, read from the figures' SVG
+  paths with the axes' tick marks: the mean bow, RMS in-line and cross-flow displacement and their mode shapes; and the
+  same figures' CFD and VIVANA curves, for how far the paper's own predictions sit from the measurement. Their companion
+  repository was not read.
+- J. R. Chaplin, "Laboratory measurements of vortex-induced vibrations of a vertical tension riser in a stepped current:
+  notes on the time series files available on the VIV data repository" (University of Southampton, 9 March 2022), read for
+  the riser series' tensions and still-water modal frequencies, for a second check once its data are available.
+- Own derivations: the in-line wake on the segment's acceleration along the relative flow and its force along that flow;
+  the swing for the drag growth measured across the water's own flow (across the relative flow it would count the bow);
+  the growth as a steady load on the water's speed, not a damping, so a light segment stays stable; the lock-in frequency
+  of a bowed cable at its raised tension, T (1 + (8 / 3) (delta / L)^2 / strain) for a parabolic bow delta.

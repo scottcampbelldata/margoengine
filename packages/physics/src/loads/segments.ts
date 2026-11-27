@@ -7,9 +7,15 @@
 // then feels the whole drag and stays stable, where an explicit drag force on it does neither.
 //
 // Each segment's wake oscillator is driven by the segment's own acceleration across the flow (Facchinetti, de Langre and
-// Biolley 2004, eq. 2, A = 12), so a cable free across a flow locks onto its own frequency.
+// Biolley 2004, eq. 2, A = 12), so a cable free across a flow locks onto its own frequency. A second wake oscillator at twice
+// the shedding frequency gives the fluctuating drag along the flow, driven by the segment's acceleration along it (Srinil
+// and Zanganeh 2012, eq. 6, Lambda = 12, C_D0 = 0.2). The drag on the flow relative to the moving segment already raises
+// the mean drag as it swings across; Vandiver's fit of the measured growth, C_D (1 + 1.043 (2 y_rms / D)^0.65) (Vandiver
+// 1983), y_rms the swing's root mean square over the last five shedding periods, can be added on top (`amplify`), which
+// counts that kinematic part twice: on a towed pipe it bowed the pipe 50 % past the measurement, where without it the bow is
+// within 19 % (packages/physics/tests/rod-viv.test.js).
 import type { FlowCell, FlowField, FlowSample } from '@margoengine/math/fields';
-import { atan2, cos, hypot, sin } from '@margoengine/math/pinned';
+import { atan2, cos, hypot, pow, sin } from '@margoengine/math/pinned';
 import { invalidLoad } from './errors.js';
 import { cylinderCoefficients, reynoldsDrag, tangentialDrag, wakeStep } from './morison.js';
 import { SEA_WATER_VISCOSITY, type LoadWater } from './solver.js';
@@ -83,8 +89,15 @@ export interface SegmentLoadOptions {
   readonly drag?: number;
   /** An added mass coefficient in place of DNV's (default none). */
   readonly addedMass?: number;
-  /** Vortex shedding: Strouhal number and fixed-cylinder lift amplitude; `false` for none (default {strouhal 0.2, lift 0.3}). */
-  readonly vortex?: false | { readonly strouhal?: number; readonly lift?: number };
+  /**
+   * Vortex shedding; `false` for none. `strouhal` (default 0.2) sets the shedding frequency; `lift` (default 0.3) is a held
+   * cylinder's lift amplitude across the flow; `drag` (default 0.2) its fluctuating drag amplitude along the flow at twice
+   * the frequency (0 for none); `amplify` (default false) adds Vandiver's growth of the mean drag with the segment's swing
+   * across the flow, a measured fit that includes the growth the drag on the relative flow already gives.
+   */
+  readonly vortex?:
+    | false
+    | { readonly strouhal?: number; readonly lift?: number; readonly drag?: number; readonly amplify?: boolean };
   /** The water's kinematic viscosity, m^2/s (default 1.19e-6). */
   readonly viscosity?: number;
 }
@@ -92,9 +105,15 @@ export interface SegmentLoadOptions {
 /** Facchinetti et al. 2004's coupling of the wake to the cylinder's acceleration, A (eq. 2). */
 const COUPLING = 12;
 
+// A segment's state words: the wake across (q, q'), the wake along (p, p'), its velocity before the step (3), and the mean and
+// mean square deviation of its displacement across the flow (the square -1 until it is first wet).
+const WORDS = 9;
+
 class Provider implements SegmentLoads {
   private wakes = new Float64Array(0);
+  private inLine = new Float64Array(0);
   private before = new Float64Array(0);
+  private swing = new Float64Array(0);
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly u: Vec3 = [0, 0, 0];
   private readonly a: Vec3 = [0, 0, 0];
@@ -107,9 +126,19 @@ class Provider implements SegmentLoads {
   private size(n: number): void {
     if (this.wakes.length === 2 * n) return;
     this.wakes = new Float64Array(2 * n);
+    this.inLine = new Float64Array(2 * n);
     this.before = new Float64Array(3 * n);
+    this.swing = new Float64Array(2 * n);
     // The wake oscillators start at the free van der Pol cycle's amplitude, q = 2, as LoadSolver's members do.
-    for (let i = 0; i < n; i++) this.wakes[2 * i] = 2;
+    for (let i = 0; i < n; i++) this.rest(i);
+  }
+
+  /** Segment `i`'s wakes at rest and its swing unmeasured. */
+  private rest(i: number): void {
+    this.wakes[2 * i] = this.inLine[2 * i] = 2;
+    this.wakes[2 * i + 1] = this.inLine[2 * i + 1] = 0;
+    this.swing[2 * i] = 0;
+    this.swing[2 * i + 1] = -1;
   }
 
   prepare(segments: number): void {
@@ -141,9 +170,8 @@ class Provider implements SegmentLoads {
       load.drag.across = load.drag.along = 0;
       load.addedMass = load.addedInertia = 0;
       if (d0 <= 0 && d1 <= 0) {
-        // Out of the water: the wake rests, and the segment's speed is kept for its acceleration when it next goes in.
-        this.wakes[2 * i] = 2;
-        this.wakes[2 * i + 1] = 0;
+        // Out of the water: the wakes rest, and the segment's speed is kept for its acceleration when it next goes in.
+        this.rest(i);
         this.before.set(s.velocity, 3 * i);
         continue;
       }
@@ -179,6 +207,7 @@ class Provider implements SegmentLoads {
             ? { drag: reynoldsDrag(re, relative), addedMass: 1 }
             : cylinderCoefficients((speedN * period) / D, relative, 0, 1, re),
         cd = options.drag ?? coefficients.drag,
+        amplified = this.amplification(i, s, u, speedN, dt, vortex),
         ca = options.addedMass ?? coefficients.addedMass,
         added = rho * ca * volume;
       // Buoyancy and the pressure gradient that accelerates the water itself (Froude-Krylov, rho V (a - g)), and the added
@@ -203,8 +232,21 @@ class Provider implements SegmentLoads {
       load.drag.at[2] = at[2];
       load.addedMass = added;
       load.addedInertia = (added * wet * wet) / 12;
+      // The mean drag's growth with the swing across the flow: Vandiver's fit is of the mean in-line drag, so the excess is a
+      // steady load along the water's own flow across the segment, on the water's speed, adding no damping (a damping held
+      // explicitly over a step would make a light segment unstable).
+      if (amplified > 1) {
+        const uAlong = u[0] * e[0] + u[1] * e[1] + u[2] * e[2],
+          un: Vec3 = [u[0] - uAlong * e[0], u[1] - uAlong * e[1], u[2] - uAlong * e[2]],
+          flowSpeed = hypot(un[0], un[1], un[2]),
+          extra = 0.5 * rho * cd * (amplified - 1) * D * wet * flowSpeed;
+        force[0] += un[0] * extra;
+        force[1] += un[1] * extra;
+        force[2] += un[2] * extra;
+      }
       // Vortex lift across the flow and the segment: the wake q at 2 pi St U / D, driven by the segment's acceleration
-      // across the flow, the lift 1/2 rho U^2 D (C_L0 / 2) q on the wetted length.
+      // across the flow, the lift 1/2 rho U^2 D (C_L0 / 2) q on the wetted length; and the fluctuating drag along the flow:
+      // the wake p at twice that, driven by the acceleration along, the drag 1/2 rho U^2 D (C_D0 / 2) p.
       if (vortex && speedN > 1e-9) {
         const lift: Vec3 = [
             (e[1] * vrN[2] - e[2] * vrN[1]) / speedN,
@@ -212,14 +254,29 @@ class Provider implements SegmentLoads {
             (e[0] * vrN[1] - e[1] * vrN[0]) / speedN,
           ],
           k = 3 * i,
-          acrossNow = s.velocity[0] * lift[0] + s.velocity[1] * lift[1] + s.velocity[2] * lift[2],
-          acrossBefore = this.before[k]! * lift[0] + this.before[k + 1]! * lift[1] + this.before[k + 2]! * lift[2],
-          omega = (2 * Math.PI * (vortex.strouhal ?? 0.2) * speedN) / D;
-        const q = wakeStep(this.wakes, i, omega, ((COUPLING / D) * (acrossNow - acrossBefore)) / dt, dt),
-          f = 0.5 * rho * D * wet * speedN * speedN * ((vortex.lift ?? 0.3) / 2) * q;
+          change: Vec3 = [
+            s.velocity[0] - this.before[k]!,
+            s.velocity[1] - this.before[k + 1]!,
+            s.velocity[2] - this.before[k + 2]!,
+          ],
+          across = (change[0] * lift[0] + change[1] * lift[1] + change[2] * lift[2]) / dt,
+          omega = (2 * Math.PI * (vortex.strouhal ?? 0.2) * speedN) / D,
+          pressure = 0.5 * rho * D * wet * speedN * speedN;
+        const q = wakeStep(this.wakes, i, omega, (COUPLING / D) * across, dt),
+          f = pressure * ((vortex.lift ?? 0.3) / 2) * q;
         force[0] += lift[0] * f;
         force[1] += lift[1] * f;
         force[2] += lift[2] * f;
+        const fluctuating = vortex.drag ?? 0.2;
+        if (fluctuating > 0) {
+          const flow: Vec3 = [vrN[0] / speedN, vrN[1] / speedN, vrN[2] / speedN],
+            alongFlow = (change[0] * flow[0] + change[1] * flow[1] + change[2] * flow[2]) / dt,
+            p = wakeStep(this.inLine, i, omega, (COUPLING / D) * alongFlow, dt, 2),
+            fd = pressure * (fluctuating / 2) * p;
+          force[0] += flow[0] * fd;
+          force[1] += flow[1] * fd;
+          force[2] += flow[2] * fd;
+        }
       }
       this.before.set(s.velocity, 3 * i);
       load.force[0] = force[0];
@@ -231,23 +288,64 @@ class Provider implements SegmentLoads {
     }
   }
 
+  /**
+   * The mean drag's growth with segment `i`'s swing across the flow, 1 + 1.043 (2 y_rms / D)^0.65 (Vandiver 1983), y_rms
+   * measured as an exponential mean over five shedding periods of the segment's displacement about its mean, across the
+   * water's own flow `u` (not the flow relative to the segment, whose direction turns with the segment's swing and would
+   * count its bow along the flow as swing).
+   */
+  private amplification(
+    i: number,
+    s: SegmentState,
+    u: Vec3,
+    speedN: number,
+    dt: number,
+    vortex: Exclude<SegmentLoadOptions['vortex'], false> | undefined,
+  ): number {
+    if (!vortex || vortex.amplify !== true || !(speedN > 1e-9)) return 1;
+    const e = s.tangent,
+      across: Vec3 = [e[1] * u[2] - e[2] * u[1], e[2] * u[0] - e[0] * u[2], e[0] * u[1] - e[1] * u[0]],
+      size = hypot(across[0], across[1], across[2]);
+    if (!(size > 1e-9)) return 1;
+    const lift: Vec3 = [across[0] / size, across[1] / size, across[2] / size],
+      y = s.position[0] * lift[0] + s.position[1] * lift[1] + s.position[2] * lift[2],
+      k = 2 * i;
+    if (this.swing[k + 1]! < 0) {
+      this.swing[k] = y;
+      this.swing[k + 1] = 0;
+      return 1;
+    }
+    const period = s.diameter / ((vortex.strouhal ?? 0.2) * speedN),
+      alpha = Math.min(1, dt / (5 * period)),
+      deviation = y - this.swing[k]!;
+    this.swing[k]! += alpha * deviation;
+    this.swing[k + 1]! += alpha * (deviation * deviation - this.swing[k + 1]!);
+    const rms = Math.sqrt(this.swing[k + 1]!);
+    return rms > 0 ? 1 + 1.043 * pow((2 * rms) / s.diameter, 0.65) : 1;
+  }
+
   takeState(): Float64Array {
-    const state = new Float64Array(this.wakes.length + this.before.length);
+    const n = this.wakes.length / 2,
+      state = new Float64Array(n * WORDS);
     state.set(this.wakes);
-    state.set(this.before, this.wakes.length);
+    state.set(this.inLine, 2 * n);
+    state.set(this.before, 4 * n);
+    state.set(this.swing, 7 * n);
     return state;
   }
 
   restoreState(state: Float64Array): void {
     if (
       !(state instanceof Float64Array) ||
-      state.length % 5 !== 0 ||
-      (this.wakes.length > 0 && state.length !== (this.wakes.length / 2) * 5)
+      state.length % WORDS !== 0 ||
+      (this.wakes.length > 0 && state.length !== (this.wakes.length / 2) * WORDS)
     )
       throw invalidLoad('A segment loads state is the Float64Array its takeState() gave; pass that one.');
-    const n = state.length / 5;
+    const n = state.length / WORDS;
     this.wakes = state.slice(0, 2 * n);
-    this.before = state.slice(2 * n);
+    this.inLine = state.slice(2 * n, 4 * n);
+    this.before = state.slice(4 * n, 7 * n);
+    this.swing = state.slice(7 * n);
   }
 }
 
@@ -276,9 +374,20 @@ export function segmentLoads(sea: LoadWater, options: SegmentLoadOptions = {}): 
       `Segment loads' period is above 0 s, or Infinity for a steady current (got ${options.period}); pass one.`,
     );
   if (options.vortex !== undefined && options.vortex !== false) {
-    const { strouhal = 0.2, lift = 0.3 } = options.vortex;
-    if (!(strouhal > 0 && Number.isFinite(strouhal) && lift >= 0 && Number.isFinite(lift)))
-      throw invalidLoad("Segment loads' vortex takes a Strouhal number above 0 and a lift of 0 or more; pass them.");
+    const { strouhal = 0.2, lift = 0.3, drag = 0.2 } = options.vortex;
+    if (
+      !(
+        strouhal > 0 &&
+        Number.isFinite(strouhal) &&
+        lift >= 0 &&
+        Number.isFinite(lift) &&
+        drag >= 0 &&
+        Number.isFinite(drag)
+      )
+    )
+      throw invalidLoad(
+        "Segment loads' vortex takes a Strouhal number above 0 and a lift and a drag of 0 or more; pass them.",
+      );
   }
   return new Provider(sea, options);
 }

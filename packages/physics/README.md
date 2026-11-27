@@ -4649,13 +4649,21 @@ before each step. It uses the members' physics: DNV's coefficients by roughness 
 Eames's drag along, and the wake oscillator, here driven by the segment's own acceleration so a free cable locks in. It hands
 each segment:
 - a force and a moment held for the step (buoyancy of the wetted length, the Froude-Krylov force, the added mass's share
-  of the water's acceleration, vortex lift);
+  of the water's acceleration, vortex lift across the flow, and the fluctuating drag along it at twice the shedding
+  frequency from a second wake oscillator, Srinil and Zanganeh's);
 - its added mass;
 - its drag as a damping toward the flow, which the structure solves implicitly.
 
 Options:
 - `period`: the waves' period for KC (default 8), or `Infinity` for a steady current;
-- `roughness`, `drag`, `addedMass`, `vortex` (or `false`), `flows` and `viscosity`.
+- `roughness`, `drag`, `addedMass`, `flows` and `viscosity`;
+- `vortex` (or `false`): `strouhal` (default 0.2), `lift` (a held cylinder's lift amplitude, default 0.3), `drag` (its
+  fluctuating drag amplitude along the flow, default 0.2; 0 for none) and `amplify` (default false: Vandiver's growth of the
+  mean drag with the swing across the flow, on top of the growth the drag on the relative flow already gives).
+
+Measured against a towing-tank pipe (Fu et al. 2025, `tests/rod-viv.test.js`), a rod with these loads vibrates across the
+flow in the measured modes within 31 % of the measured amplitude, and bows within 19 %; its in-line vibration is an order
+short of the measurement (`docs/known-bugs.md`, KB-PHYS-RODVIVIL1).
 
 `takeState()` and `restoreState()` keep its wake oscillators beside a world snapshot. Any structure can call it:
 `loads.apply(segments, {time, dt, gravity}, out)`, each segment `{position, tangent, velocity, angularVelocity, diameter,

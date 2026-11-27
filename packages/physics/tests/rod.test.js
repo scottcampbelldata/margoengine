@@ -213,7 +213,9 @@ test('a taut cable in a cross flow strums at its own frequency through lock-in a
   // lock-in (reduced velocity U / (f_w D) = 2) the cable moves at the shedding frequency, hardly at all; in lock-in (5 and 7)
   // its motion is taken over by its own frequency while f_s runs 40 % past it, and it swings about half its diameter: a
   // cylinder free across a flow at a mass ratio near 1 swings up to about one diameter (Khalak and Williamson 1999), and the
-  // wake oscillator, tuned to forced-cylinder data, about half that.
+  // wake oscillator, tuned to forced-cylinder data, about half that. The mean drag bows it along the flow, more as it swings
+  // (the drag on the flow relative to it grows), which stretches it and raises its tension and its own frequency: lock-in is
+  // judged against the frequency at the bowed cable's tension.
   const L0 = 2,
     radius = 0.005,
     D = 2 * radius,
@@ -236,14 +238,27 @@ test('a taut cable in a cross flow strums at its own frequency through lock-in a
       loads: segmentLoads(water([0, 0, U], rho), { period: Infinity }),
       y: -1,
     });
-    const across = [];
+    const across = [],
+      bow = [];
     for (let i = 0; i < 2400; i++) {
       physics.step(1 / 60);
-      across.push(rod.points()[(rod.segments.length / 2) * 3 + 1] + 1);
+      const p = rod.points(),
+        k = (rod.segments.length / 2) * 3;
+      across.push(p[k + 1] + 1);
+      bow.push(p[k + 2]);
     }
     physics.dispose();
-    const tail = across.slice(1200);
-    return { amplitude: (Math.max(...tail) - Math.min(...tail)) / 2 / D, f: frequency(tail, 60), fs: (0.2 * U) / D };
+    const tail = across.slice(1200),
+      // The mean drag bows the cable along the flow by delta, which stretches it by (8 / 3) (delta / L)^2 for a parabola
+      // and raises its tension by EA times that: its own frequency in still water at that tension.
+      delta = bow.slice(1200).reduce((a, b) => a + b, 0) / 1200,
+      raised = Math.sqrt(1 + ((8 / 3) * (delta / L0) ** 2) / strain);
+    return {
+      amplitude: (Math.max(...tail) - Math.min(...tail)) / 2 / D,
+      f: frequency(tail, 60),
+      fs: (0.2 * U) / D,
+      own: fw * raised,
+    };
   };
   const below = run(2),
     locked = run(5),
@@ -257,7 +272,10 @@ test('a taut cable in a cross flow strums at its own frequency through lock-in a
   );
   assert.ok(below.amplitude < 0.1, `below lock-in it swung ${below.amplitude} D`);
   for (const run of [locked, past]) {
-    assert.ok(Math.abs(run.f - fw) / fw < 0.15, `in lock-in it moved at ${run.f} Hz, its own frequency is ${fw} Hz`);
+    assert.ok(
+      Math.abs(run.f - run.own) / run.own < 0.15,
+      `in lock-in it moved at ${run.f} Hz, its own frequency is ${run.own} Hz`,
+    );
     assert.ok(run.amplitude > 0.3 && run.amplitude < 1.2, `in lock-in it swung ${run.amplitude} D`);
   }
   assert.ok(past.fs > 1.3 * fw, 'the shedding ran well past the cable at Ur 7');

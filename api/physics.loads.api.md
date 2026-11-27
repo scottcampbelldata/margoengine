@@ -372,6 +372,8 @@ export interface SegmentLoadOptions {
     readonly vortex?: false | {
         readonly strouhal?: number;
         readonly lift?: number;
+        readonly drag?: number;
+        readonly amplify?: boolean;
     };
     readonly viscosity?: number;
 }
@@ -567,7 +569,7 @@ export function thrusterEfflux(power: number, diameter: number, density?: number
 
 export function wakeAmplification(kc: number, steady: number): number;
 
-export function wakeStep(state: Float64Array, index: number, wf: number, forcing: number, dt: number): number;
+export function wakeStep(state: Float64Array, index: number, wf: number, forcing: number, dt: number, harmonic?: 1 | 2): number;
 
 export function washOnBed(efflux: number, diameter: number, distance: number, height: number): number;
 

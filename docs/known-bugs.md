@@ -42,6 +42,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/physics/tests/coupling/loads-paddle.test.js` and `loads-wading.test.js` check wet momentum,
   drying rejection and replay.
 
+### Open 2026-11-27: a towed flexible pipe's in-line vortex-induced vibration is an order short of the measurement (KB-PHYS-RODVIVIL1, physics loads)
+
+- **Repro:** `packages/physics/tests/rod-viv.test.js`, the towing-tank pipe of Fu et al. (2025): the rod's in-line RMS is
+  0.028 D at 0.40 m/s and 0.010 D at 1.60 m/s, where the test measured 0.0885 D and 0.175 D. The mode is right at 1.60 m/s
+  (fifth) and the cross-flow amplitude within 31 %.
+- **Cause:** the in-line excitation at twice the shedding frequency comes from the lift turned by the cross-flow swing, the
+  drag's modulation by it, and the in-line wake oscillator of Srinil and Zanganeh (2012, C_D0 0.2, Lambda 12, calibrated on
+  rigid cylinders). Against the in-line drag damping, rho C_D D U per metre (50 N s/m^2 at 1.60 m/s), those give about
+  0.02 D at most; at 1.60 m/s without the in-line wake the rod gives 0.0087 D, with it 0.0101 D, and at a fluctuating drag
+  of 0.6, three times the published one, still 0.033 D. Measured, the fluid feeds the in-line motion (in-line lock-in at twice the cross-flow frequency), which the
+  strip model's wake does not reproduce at its published coefficients. Raising them to fit this one test would be a fit
+  to one pipe; a calibration needs a second data set (the Chaplin et al. 2005 riser data, awaited) to validate against.
+- **Open:** the in-line wake's coupling at a flexible cylinder's high modes, calibrated on one riser data set and checked
+  on another.
+
 ### Open 2026-11-27: a capsule-chain rod under tension over a bollard blows up (KB-PHYS-RODWRAP1, physics kernel)
 
 - **Repro:** a `Rod` of 48 links (radius 5 mm, nylon) draped half a turn over a fixed cylinder of radius 0.2 m, a free
