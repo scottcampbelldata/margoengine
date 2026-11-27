@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21066973,
+  "total": 21070433,
   "history": [
     {
       "date": "2026-10-24",
@@ -14833,6 +14833,12 @@
       "commit": "kb-scenes-prints1",
       "reason": "terrain/deform shades a ground mesh as well as a terrain, lays walking trails (walk) and keeps prints (persist): 5,233 to 7,057 B gzip; scenes/dune-coast treads footprints round the camp and the rail (KB-SCENES-PRINTS1): 6,507 to 6,914 B. One class serves both grounds, sharing the map, its compute steps and the shading; a separate mesh entry would have shipped them twice",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "kb-scenes-scour1",
+      "reason": "new entry @margoengine/terrain/scour (windScour and refinedHeightfieldGeometry, 2,756 B gzip, ceiling 3,012) and scenes/dune-coast shapes its sand with it (KB-SCENES-SCOUR1): 6,914 to 7,362 B, the sheds' footprints, the choice of grass clumps that grow a shadow dune and the scour setting. Both are the scene's own placement code; a split entry would cost a second import for every attach",
+      "grew": 2
     }
   ],
   "items": {
@@ -15988,7 +15994,7 @@
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scene/tags": 2932,
     "@margoengine/scenes": 4642,
-    "@margoengine/scenes/dune-coast": 7170,
+    "@margoengine/scenes/dune-coast": 7618,
     "@margoengine/scenes/fauld-blast": 10004,
     "@margoengine/scenes/fauld-countryside": 8214,
     "@margoengine/scenes/fauld-crater": 8214,
@@ -16252,6 +16258,7 @@
     "@margoengine/terrain/planet-recipes": 3472,
     "@margoengine/terrain/query": 4196,
     "@margoengine/terrain/relief-lighting": 3564,
+    "@margoengine/terrain/scour": 3012,
     "@margoengine/terrain/rock-settings": 2718,
     "@margoengine/terrain/rock-surface": 5056,
     "@margoengine/terrain/rocks": 6844,

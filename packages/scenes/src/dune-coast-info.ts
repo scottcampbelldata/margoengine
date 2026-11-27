@@ -37,6 +37,7 @@ export const duneCoastInfo: SceneInfo = {
     shedWindows: { default: false, about: 'windows in the hangar back wall and the shed ends' },
     occlusion: { default: 1.5, range: [0, 10], unit: 'm', about: 'ambient occlusion reach (GTAO), 0 for none' },
     footprints: { default: 1, range: [0, 1], about: 'depth of the footprints trodden round the camp, 0 for none' },
+    scour: { default: 1, range: [0, 1], about: 'sand the wind has shaped round the sheds and grass, 0 for none' },
     blownSand: { default: 0, range: [0, 1], about: 'sand blowing off the crests and over the dry sand, 0 (none) to 1' },
     quality: { default: 'film', options: ['film', 'preview'], about: 'ground and grass detail' },
     seed: { default: 1903, about: 'seed of hummocks and small dunes' },

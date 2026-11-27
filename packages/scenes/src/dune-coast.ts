@@ -14,6 +14,7 @@ import { weatheredWood } from '@margoengine/materials/presets';
 import { heightfieldGeometry, TerrainColors, TerrainHeightmap } from '@margoengine/terrain';
 import { TerrainDeformation } from '@margoengine/terrain/deform';
 import { duneField, duneHill } from '@margoengine/terrain/dunes';
+import { refinedHeightfieldGeometry, windScour, type ScourPlant, type WindScour } from '@margoengine/terrain/scour';
 import { DAY_PRESETS } from '@margoengine/sky/day-presets';
 import { PresetScene, SCENE_PRESETS } from '@margoengine/sky/scenes';
 import { degrees, sunPath } from '@margoengine/sky/sun';
@@ -109,6 +110,13 @@ export interface DuneCoastSettings {
    * Needs `camp`. They show within 45 m of the camera. Default 1.
    */
   readonly footprints?: number;
+  /**
+   * Sand the wind has shaped round the camp, 0 (none) to 1 (`windScour` of @margoengine/terrain/scour): with `camp`, a
+   * scour moat along the sheds' windward walls and flanks, a deposit horseshoe in front and two tails past them; with
+   * `grass`, shadow dunes in the lee of grass clumps round the camp and the rail. None at wind speeds of 6.6 m/s or
+   * less. The ground mesh is split finer where they lie. Default 1.
+   */
+  readonly scour?: number;
   /** Real ground heights in place of the built landform. */
   readonly heights?: DuneCoastHeights;
   /**
@@ -354,13 +362,52 @@ function landform(s: DuneCoastScene['settings']): (x: number, z: number) => numb
   };
 }
 
+/** The camp's sheds' footprints and ridge heights (`generatePlankShed` of the sizes `attach` builds), metres. */
+const SHEDS = [
+  { center: [-70, 30] as const, size: [13.4, 4.9] as const, height: 3.2 },
+  { center: [-88.5, 30] as const, size: [7.6, 4.9] as const, height: 3.71 },
+];
+
+/**
+ * The wind's work on the sand round the camp and the rail: the sheds' moats and deposits, and a shadow dune behind each
+ * grass clump on the lee edge of a patch (`base` is the ground without them). Undefined with `scour` 0.
+ */
+function drifts(s: DuneCoastScene['settings'], base: (x: number, z: number) => number): WindScour | undefined {
+  if (!(s.scour > 0)) return undefined;
+  const toward = (((s.windFrom + 180) % 360) - 90 + 360) % 360,
+    ax = Math.cos((toward * Math.PI) / 180),
+    az = Math.sin((toward * Math.PI) / 180),
+    cover = coverOf(s, base),
+    noise = new Noise(s.seed + 11),
+    plants: ScourPlant[] = [];
+  // A grid of 2.5 m with each place moved about in its cell.
+  for (let j = 0; j < 56; j++)
+    for (let i = 0; i < 54; i++) {
+      const x = -110 + 2.5 * i + 1.1 * noise.simplex2(i * 7.3, j * 5.1),
+        z = -65 + 2.5 * j + 1.1 * noise.simplex2(i * 3.7 + 40, j * 8.9);
+      // The launch rail's strip was kept clear.
+      if (Math.abs(x) < 4 && z > -23 && z < 4) continue;
+      if (cover(x, z) > 0.45 && cover(x + 1.6 * ax, z + 1.6 * az) < 0.2)
+        plants.push({ center: [x, z], width: 1 + 0.5 * noise.simplex2(i * 11.9 - 3, j * 13.3) });
+    }
+  return windScour({ buildings: s.camp ? SHEDS : [], plants, wind: toward, speed: s.wind });
+}
+
+/** The ground as `attach` builds it: the landform with the wind's work on it. */
+function shaped(s: DuneCoastScene['settings']) {
+  const base = landform(s),
+    wind = drifts(s, base),
+    change = wind ? (x: number, z: number) => s.scour * wind.change(x, z) : undefined;
+  return { base, wind, change, height: change ? (x: number, z: number) => base(x, z) + change(x, z) : base };
+}
+
 /**
  * The ground height function of the scene for `settings`, with no engine: metres above sea level at world (x, z),
  * the same heights `attach` builds. For placing subjects and cameras before or without a GPU.
  * @throws TypeError or RangeError for a bad setting.
  */
 export function ground(settings: DuneCoastSettings = {}): (x: number, z: number) => number {
-  return landform(check(settings));
+  return shaped(check(settings)).height;
 }
 
 /**
@@ -444,7 +491,7 @@ function place(data: GeometryData, x: number, y: number, z: number, yaw = 0): Ge
 export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): DuneCoastScene {
   const s = check(settings),
     film = s.quality === 'film',
-    height = landform(s),
+    { base: bare, wind, change, height } = shaped(s),
     meshes: Mesh[] = [],
     disposers: (() => void)[] = [];
   // Sun for the date and hour, then the sky preset of the weather with that sun.
@@ -477,14 +524,20 @@ export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): 
   });
   disposers.push(() => shadows.dispose());
   // Ground: one mesh over the whole island, sand everywhere (no meadow band), wet near the water line.
-  // One height grid on the ground mesh's vertices feeds the mesh, the grass heights and the grass cover.
+  // One height grid on the ground mesh's vertices feeds the mesh, the grass heights and the grass cover. The wind's
+  // small forms are added on top, on cells split finer; the grass stays on the grid, so fresh sand buries its feet.
   // 1,023 cells: the grass grids hold one texel per vertex, and a TerrainHeightmap holds at most 1,024 a side.
   const cells = film ? 1023 : 511,
-    gridded = sampled(height, cells);
+    gridded = sampled(bare, cells),
+    mesh = { size: GROUND.size, origin: GROUND.origin, resolution: cells };
   const ground = engine
     .createMesh()
     .setGeometry(
-      toGeometry(heightfieldGeometry(gridded, { size: GROUND.size, origin: GROUND.origin, resolution: cells })),
+      toGeometry(
+        wind
+          ? refinedHeightfieldGeometry(gridded, { ...mesh, regions: wind.bounds, subdivide: film ? 5 : 3, add: change })
+          : heightfieldGeometry(gridded, mesh),
+      ),
     )
     .setMaterial(new PbrMaterial({ color: [s.sand[0], s.sand[1], s.sand[2]], roughness: 0.92 }));
   ground.name = 'dune-coast ground';
@@ -625,7 +678,7 @@ export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): 
       // Compass FROM to the direction it blows toward, as BlownSand reads it (0 toward +z, pi/2 toward +x).
       to = ((s.windFrom + 180) * Math.PI) / 180,
       options: BlownSandOptions = {
-        ground: gridded,
+        ground: change ? (x, z) => gridded(x, z) + change(x, z) : gridded,
         wind: { speed: s.wind, direction: Math.atan2(Math.sin(to), -Math.cos(to)), gust: 0.35 },
         mask: (x, z) => smooth(1.2, 2.2, gridded(x, z)) * (1 - cover(x, z)),
         amount: s.blownSand,

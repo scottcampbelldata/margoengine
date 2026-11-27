@@ -5,7 +5,7 @@
 // A model from the asset library can stand in the scene for a check still: asset (its URL, e.g.
 // /asset-library/kitty-hawk/flyer-1903/flyer-1903.glb), at (world x,z; default 0,-4 on the rail), yaw (degrees), lift
 // (metres above the sand), eye and look (camera position and target as x,y,z offsets from the model's ground point;
-// they replace the view), and the Flyer's moving parts: warp (morph weight), elevator and rudder (degrees), prop (radians).
+// they replace the view), cam and aim (a camera anywhere, each x, metres above the sand there, z), and the Flyer's moving parts: warp (morph weight), elevator and rudder (degrees), prop (radians).
 import {Engine} from '/packages/core/dist/index.js';
 import {attach,info} from '/packages/scenes/dist/dune-coast.js';
 import {loadGLTF} from '/packages/gltf/dist/pbr.js';
@@ -25,6 +25,8 @@ if(q.get('early')){scene.advanceTime(2.5);expected+=2.5;for(let i=0;i<3;i++){eng
 await scene.ready;
 scene.view(q.get('view')??'first-flight',Number(q.get('fov')??50));
 const nums=(k,d)=>(q.get(k)??d).split(',').map(Number);
+// cam and aim place the camera anywhere: x, metres above the sand there, z.
+if(q.get('cam')){const above=([x,up,z])=>[x,scene.height(x,z)+up,z];engine.camera.position=above(nums('cam'));engine.camera.target=above(nums('aim'));}
 let asset=null;
 if(q.get('asset')){
   const [ax,az]=nums('at','0,-4'),gy=scene.height(ax,az)+Number(q.get('lift')??0),yaw=Number(q.get('yaw')??0)*Math.PI/180;

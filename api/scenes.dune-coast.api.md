@@ -77,6 +77,7 @@ export interface DuneCoastSettings {
     readonly shedWindows?: boolean;
     readonly occlusion?: number;
     readonly footprints?: number;
+    readonly scour?: number;
     readonly heights?: DuneCoastHeights;
     readonly blownSand?: number;
     readonly quality?: 'film' | 'preview';

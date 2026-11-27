@@ -18763,3 +18763,30 @@ no other engine's source was read.
   speed x (1 + t x d direction / dt), which half an hour into a 20 m/s gale is kilometres a second. The integral of the
   mean velocity is exact for a mean held between `set` calls, and `set(options, at)` rebases it so the integral stays
   continuous across a change.
+
+## terrain wind scour and shadow dunes (KB-SCENES-SCOUR1, 2026-11-27)
+
+`@margoengine/terrain/scour` (`windScour`, `scourScale`, `shadowDuneLength`, `refinedHeightfieldGeometry`); written from
+the papers' text, no companion code and no other engine's source read.
+
+- J. C. R. Hunt, C. J. Abell, J. A. Peterka and H. Woo, "Kinematical studies of the flows around free or
+  surface-mounted obstacles; applying topology to flow visualization", J. Fluid Mech. 86 (1978) 179,
+  https://doi.org/10.1017/S0022112078001068: the horseshoe vortex round a surface-mounted obstacle.
+- Y. Tominaga, T. Okaze and A. Mochida, "Wind tunnel experiment and CFD analysis of sand erosion/deposition due to
+  wind around an obstacle", J. Wind Eng. Ind. Aerodyn. 182 (2018) 262-271,
+  https://doi.org/10.1016/j.jweia.2018.09.008: the considerable erosion near the windward corners of a cube (abstract
+  read).
+- D. W. Poppema, K. M. Wijnberg, J. P. M. Mulder, S. E. Vos and S. J. M. H. Hulscher, "The effect of building geometry
+  on the size of aeolian deposition patterns", Coastal Engineering 168 (2021) 103866,
+  https://doi.org/10.1016/j.coastaleng.2021.103866 (abstract read): B = w^(2/3) h^(1/3); building length matters little.
+- D. W. Poppema, report 2020R-001-WEM-001, University of Twente,
+  https://ris.utwente.nl/ws/portalfiles/portal/168667961/2020R_001_WEM_001_Daan_Poppema.pdf: its review of Thiis and
+  Gjessing 1999 (the upwind horseshoe about 1.6 m before a 2.5 m cube, steep toward the cube) and the deposit areas.
+- P. A. Hesp, "The formation of shadow dunes", Journal of Sedimentary Petrology 51 (1981) 101-112,
+  https://doi.org/10.1306/212F7C1B-2B24-11D7-8648000102C1865D (abstract read): the pyramidal tail, its height set by the
+  width and repose angle; the rule h = (w / 2) tan(slope) read as given in the next paper.
+- P. A. Hesp and T. A. G. Smyth, "Nebkha flow dynamics and shadow dune formation", Geomorphology 282 (2017) 27-38,
+  https://doi.org/10.1016/j.geomorph.2016.12.026 (accepted manuscript https://hira.hope.ac.uk/1824/): shadow dune length against wind speed and nebkha width.
+- Margo's own: the moat's sin^2 profile and depth, the ridges' Gaussian cross profiles and heights, laying an oblique
+  building's horseshoe round its extent along and across the wind, merging shadow dunes by the highest, and the refined
+  heightfield (cells split on the coarse triangles, neighbours fanned from their middle).

@@ -199,3 +199,37 @@ test('no dune grass grows in the camp yard, inside the hangar and the shed', () 
   for (let x = -110; x <= -50; x += 1) outside += cover(x, 45) + cover(x, 15);
   assert.ok(outside > 5, `grass round the camp ${outside}`);
 });
+
+test('the wind shapes the sand round the camp: moats and deposits at the sheds, dunes behind grass, none when calm', () => {
+  assert.equal(info.settings.scour.default, 1);
+  assert.throws(() => attach({}, { scour: 1.5 }), RangeError);
+  const shaped = ground(),
+    plain = ground({ scour: 0 }),
+    half = ground({ scour: 0.5 }),
+    change = (x, z) => shaped(x, z) - plain(x, z);
+  // The north wind blows toward +z: the hangar's windward wall is at z = 27.55, its horseshoe about 2 m in front.
+  const front = Array.from({ length: 80 }, (_, k) => change(-70, 27.5 - k * 0.05));
+  assert.ok(Math.min(...front) < -0.08, `moat ${Math.min(...front)}`);
+  assert.ok(Math.max(...front) > 0.1, `horseshoe ${Math.max(...front)}`);
+  assert.ok(Math.abs(half(-70, 26.8) - plain(-70, 26.8) - 0.5 * change(-70, 26.8)) < 1e-9);
+  // Nothing under or against a shed, so both stand on the ground they stood on.
+  for (const [x, z] of [
+    [-70, 30],
+    [-88.5, 30],
+    [-76.7, 30],
+    [-63.3, 32.45],
+  ])
+    assert.ok(Math.abs(change(x, z)) < 1e-6, `${x}, ${z}: ${change(x, z)}`);
+  // Shadow dunes behind grass round the camp and the rail, none on the rail's cleared strip or far from the camp.
+  let dunes = 0;
+  for (let x = -60; x <= -10; x += 0.5) for (let z = -50; z <= 0; z += 0.5) dunes = Math.max(dunes, change(x, z));
+  assert.ok(dunes > 0.1, `dunes ${dunes}`);
+  for (let z = -19; z <= 0; z += 0.5) for (const x of [-1, 0, 1]) assert.equal(change(x, z), 0);
+  assert.equal(change(300, -300), 0);
+  // Without the camp only the dunes are left; calm air moves nothing.
+  const bare = ground({ camp: false });
+  assert.ok(bare(-70, 25.6) - ground({ camp: false, scour: 0 })(-70, 25.6) >= 0);
+  const calm = ground({ wind: 5 }),
+    still = ground({ wind: 5, scour: 0 });
+  for (let x = -90; x <= -60; x += 0.7) assert.equal(calm(x, 26), still(x, 26));
+});

@@ -5662,6 +5662,20 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **After:** GTAO 0.999 mean, 0.995 least; SSAO 0.823 and 0.797 (its range check still counts the slats a little).
 - **Regression:** `packages/post/test/ssao-silhouette-browser.mjs`, WebGPU and the WebGL2 layer.
 
+### Fixed 2026-11-27: the wind left no mark on the dune coast's sand (KB-SCENES-SCOUR1, terrain and scenes)
+
+- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file>` with a camera
+  round the sheds (`cam` and `aim`): the sand ran level into every wall and no clump of grass had a tail of sand, in an
+  11 m/s wind.
+- **Cause:** no package shaped sand round obstacles, and the ground mesh's 2.15 m cells could not hold a form that small.
+- **Fix:** `@margoengine/terrain/scour` (`windScour`, `refinedHeightfieldGeometry`); the dune coast's `scour` setting
+  (default 1) shapes the ground round the sheds and behind grass clumps near the camp and the rail.
+- **Weak spots:** under the default grey sky the forms read faintly (they read clearly under `weather: 'clear'` with a
+  low sun); only the sheds and grass near the camp carry them, not the rail, the rest of the flat or the big dunes; the
+  grass stays on the coarse grid, so fresh sand buries some blade feet by up to the dune's height; depths and cross
+  profiles are not measured values.
+- **Regression:** `packages/terrain/test/scour.test.js` and `packages/scenes/test/scenes.test.js`.
+
 ### Fixed 2026-11-27: the dune coast's sand carried no footprints (KB-SCENES-PRINTS1, terrain and scenes)
 
 - **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=camp-buildings`: the
@@ -5684,8 +5698,8 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **What differs:** (1) fixed 2026-11-17 (KB-SKY-OVERCAST1): the overcast sky was a 2D cloud sheet with dark holes, an
   orange glow toward the sun and the sun disc showing, with a dark brown band at the horizon, where the photographs show
   an even pale grey deck and a pale haze; (2) fixed 2026-11-16: no grass blade rendered on the hummocks; (3) fixed 2026-11-16: the sand was smooth mottled colour with no ripples or
-  wind streaks; fixed 2026-11-27: footprints trodden round the camp and the rail (`footprints`, KB-SCENES-PRINTS1); wind scour
-  stays open; (4) the sea is flat grey with a white band at the waterline and no breaking lines;
+  wind streaks; fixed 2026-11-27: footprints trodden round the camp and the rail (`footprints`, KB-SCENES-PRINTS1); fixed
+  2026-11-27: wind scour round the sheds and shadow dunes behind grass (`scour`, KB-SCENES-SCOUR1); (4) the sea is flat grey with a white band at the waterline and no breaking lines;
   (5) fixed 2026-11-27 (KB-SCENES-SHEDBOX1): the sheds read as plain boxes at 60 m (no wood texture, no dark interior
   through the open door).
 - **Cause:** (1) at full cover the sheet was still its shape noise (holes), its opacity let the disc and Preetham's

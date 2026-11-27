@@ -80,6 +80,10 @@
       "types": "./dist/settings.d.ts",
       "import": "./dist/settings.js"
     },
+    "./scour": {
+      "types": "./dist/scour.d.ts",
+      "import": "./dist/scour.js"
+    },
     "./dunes": {
       "types": "./dist/dunes.d.ts",
       "import": "./dist/dunes.js"

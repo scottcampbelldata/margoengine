@@ -2359,6 +2359,10 @@
       "types": "./dist/terrain/settings.d.ts",
       "import": "./dist/terrain/settings.js"
     },
+    "./terrain/scour": {
+      "types": "./dist/terrain/scour.d.ts",
+      "import": "./dist/terrain/scour.js"
+    },
     "./terrain/dunes": {
       "types": "./dist/terrain/dunes.d.ts",
       "import": "./dist/terrain/dunes.js"

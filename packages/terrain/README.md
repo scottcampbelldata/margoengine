@@ -1079,6 +1079,69 @@ crests; Werner 1995, "Eolian dunes: computer simulations and attractor interpret
 (https://doi.org/10.1130/0091-7613(1995)023<1107:EDCSAA>2.3.CO;2), ridges against crescents by sand supply; Anderson 1987,
 "A theoretical model for aeolian impact ripples", Sedimentology 34, 943 (https://doi.org/10.1111/j.1365-3091.1987.tb00814.x).
 
+## Wind scour and shadow dunes: `@margoengine/terrain/scour`
+
+`windScour(options)` is the change of ground height that wind leaves on sand round obstacles. `change(x, z)` returns
+metres to add to your ground, and `bounds` the rectangles outside which it is 0:
+
+- round a **building**, a scour moat along the windward wall and flanks (deepest at the windward corners), a deposit
+  horseshoe whose crest stands 0.65 building heights upwind, and two tails past the flanks that run `tail` times
+  B = w^(2/3) h^(1/3) past the leeward wall (w the width across the wind, h the height);
+- behind a **plant** or other small porous obstacle, a pyramidal shadow dune: half the obstacle's width times the side
+  slope high, its length shorter in a stronger wind.
+
+Nothing changes at a building's walls (it stays on the ground it stood on), at or below `threshold`, or far from every
+obstacle. A shed's moat is about 1.4 m wide, finer than most ground cells, so `refinedHeightfieldGeometry` builds the
+ground with the cells that touch `regions` split `subdivide` times a side. The split cells lie on the coarse triangles
+(grass placed on the coarse grid still stands on the mesh) until `add` moves them, and the mesh has no cracks.
+
+```ts
+import {refinedHeightfieldGeometry, windScour} from 'margoengine/terrain/scour';
+const wind = windScour({
+  wind: 90, speed: 11,
+  buildings: [{center: [0, 0], size: [12, 5], height: 3}],
+  plants: [{center: [14, 6], width: 1}],
+});
+const data = refinedHeightfieldGeometry((x, z) => 0.02 * x, {size: [200, 200], resolution: 100, regions: wind.bounds, add: wind.change});
+console.log(wind.change(0, -3.3).toFixed(2), wind.change(0, -4.5).toFixed(2), data.indices.length / 3); // moat, horseshoe, triangles
+```
+
+| `windScour` option | Default | Meaning |
+| --- | --- | --- |
+| `buildings` | none | `{center, size, height, yaw}`: footprint middle (x, z), its x and z extents, ridge height, turn about +y in radians |
+| `plants` | none | `{center, width}`: obstacles that grow a shadow dune |
+| `wind` | 90 | degrees from +x toward +z that the wind blows toward, as `duneField` |
+| `speed` | 11 | wind speed at 10 m, m/s |
+| `threshold` | 6.6 | m/s at or below which nothing changes (0.25 mm sand); the forms are full from 1.3 times it |
+| `scour` | 0.06 | moat depth as a share of the building's height, 0 to 0.075 |
+| `deposit` | 0.07 | horseshoe and tail height as a share of the building's height, 0 to 0.3 |
+| `tail` | 3 | tail length past the leeward wall in units of B, 0.5 to 8 |
+| `slope` | 20 | side slope of a shadow dune, 5 to 32 degrees |
+
+| `refinedHeightfieldGeometry` option | Default | Meaning |
+| --- | --- | --- |
+| `size`, `origin`, `resolution` | as `heightfieldGeometry` | the coarse grid |
+| `regions` | required | `[minX, minZ, maxX, maxZ]` rectangles whose cells are split |
+| `subdivide` | 5 | splits per cell side, 1 to 16 |
+| `add` | none | `(x, z) =>` metres added at every vertex |
+
+`scourScale(width, height)` is B, and `shadowDuneLength(width, speed)` a shadow dune's length. Plain JavaScript with no
+GPU. The papers give where the forms stand, how long they are and the shadow dune's shape; the moat and ridge depths and
+their cross profiles are Margo's choices (the options above). One steady wind direction, no change over time, sand not
+conserved between moat and deposits, and no scour round open structures such as rails or posts (docs/limits.md).
+
+Sources: Hunt, Abell, Peterka and Woo 1978, "Kinematical studies of the flows around free or surface-mounted obstacles",
+J. Fluid Mech. 86, 179 (https://doi.org/10.1017/S0022112078001068), the horseshoe vortex; Tominaga, Okaze and Mochida
+2018, J. Wind Eng. Ind. Aerodyn. 182, 262 (https://doi.org/10.1016/j.jweia.2018.09.008), erosion at the windward
+corners; Poppema, Wijnberg, Mulder, Vos and Hulscher 2021, Coastal Engineering 168, 103866
+(https://doi.org/10.1016/j.coastaleng.2021.103866), the length scale B; the upwind deposit distance of Thiis and Gjessing
+1999 as reported in D. Poppema, University of Twente report 2020R-001-WEM-001
+(https://ris.utwente.nl/ws/portalfiles/portal/168667961/2020R_001_WEM_001_Daan_Poppema.pdf); Hesp 1981, "The formation of
+shadow dunes", J. Sed. Petrology 51, 101 (https://doi.org/10.1306/212F7C1B-2B24-11D7-8648000102C1865D), its height
+rule as given by Hesp and Smyth 2017, "Nebkha flow dynamics and shadow dune formation", Geomorphology 282, 27
+(https://doi.org/10.1016/j.geomorph.2016.12.026; accepted manuscript https://hira.hope.ac.uk/1824/), which gives the
+lengths.
+
 ## Stored height grids: `@margoengine/terrain/height-grid`
 
 `gridHeightField(options)` turns a height grid you already have (a USGS 3DEP or SRTM tile read from a GeoTIFF, a decoded
