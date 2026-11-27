@@ -17121,10 +17121,15 @@ E26 to E40):
   `E35 one-triangle normal mode` cases in
   `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
   int32 arithmetic of that mode is not established.
-- Not probed: constrained multi-parallelogram before 2.2 beyond the retained
-  cases. Seamed meshes were probed by mutation on 2026-11-27 (E63 to E66); what
-  still differs is damaged streams, counted in the next item for old versions,
-  and at 2.2 some truncated refusals, symbol-count refusals and other values.
+- Damaged seamed meshes of version 2.2 (mutation probes of 2026-11-27, after
+  E63 to E66): of the differences left, most are streams the prebuilt decodes
+  and Margo refuses as truncated or in the EdgeBreaker symbol and start-face
+  counts, and a few decode to other values. Reproduce by changing one to three
+  of the first 60 bytes of the seamed meshes in the retained fixtures. Cause:
+  not yet established.
+- Constrained multi-parallelogram before 2.2: only one retained mesh uses it.
+  Mutating it gave no other values (24,756 accepted streams match); some damaged
+  streams are refused by one decoder only.
 - Damaged streams of versions 1.0 to 1.3 (found 2026-11-27 by changing one or
   two bytes of retained streams): some that the prebuilt decodes Margo refuses,
   some decode to other values and a few that it rejects decode. A refusal repro,
@@ -17144,8 +17149,8 @@ E26 to E40):
   `445241434f02020101000000060300030000026f0bff02014001ff000002000603000b03050200160101fe00042c040000f2050000ac07000084000000580300008c0200007c0400005a04000032030000b2050000da050000aa0400006c070000360600001601000052030000640000007804000005010004550100007b0200000d0200004b0200006c020000c4020000aa000000a9000000c90200000903000089000000970200002c01000026059bc8d02220000000e000000020`.
   Cause: not yet established.
 
-Except for these refusals, predictor 6 mode 0 and the deliberate index refusal
-in [limits.md](limits.md), no difference found by these probes is open.
+No valid stream is known to differ apart from historical KD clouds and
+predictor 6 mode 0; the deliberate index refusal is in [limits.md](limits.md).
 
 ### Historical: batch 133 optional landing GPU request (resume 9)
 
