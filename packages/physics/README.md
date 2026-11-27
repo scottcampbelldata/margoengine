@@ -4864,6 +4864,42 @@ world.advance(60 * 30);
 console.log(Math.abs(crate.position[1]) < 0.35, Math.abs(crate.rotation[0]) < 0.01); // true true
 ```
 
+#### Reflect a dispersive wake at a straight quay
+
+`QuayWakeBoundary` reflects a `WakeSolver` disturbance at a rigid vertical face parallel to X with water on +Z. Give
+it the still-water face in metres. `wakeParams` centres the even Z grid on the wall and mirrors the initial state and
+optional callback sources. The wake still advances its finite-depth dispersion. Its paired incident and reflected
+potential gradients cancel at the wall. `sampleWall(wake, x)` reads the evolved face height in metres and velocity in
+metres per second. The Y velocity gives the direction and speed of the waterline motion.
+
+```ts
+import {QuayWakeBoundary} from 'margoengine/physics/loads';
+import {WakeSolver} from 'margoengine/physics/sea';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const wall = new QuayWakeBoundary({wallZ: -10.55});
+const wake = new WakeSolver();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}}).add(wake, wall.wakeParams({
+  cells: [64, 64], cellSize: 0.5, centreX: 90, depth: 9.7, sponge: 6,
+  sources: (t) => t < 1 / 60 ? [{x: 90, z: -7, radius: 0.8, pressure: 0, volume: 0.2}] : [],
+}));
+world.advance(40);
+const atWall = wall.sampleWall(wake, 90);
+console.log(Math.abs(atWall.velocity[2]) < 1e-12); // true
+```
+
+For hull pulses, construct the boundary with `surface: hull.wakeSourceField` and
+`submerged: hull.submergedWakeSource`. Pass `boundary.surfaceSource` and `boundary.submergedSource` to `WakeSolver`.
+Add the hull first, then `world.add(boundary, undefined)`, then the wake. Couple hull, boundary and wake in that
+order in the same cell at the 60 Hz level, followed by rigid if it advances the hull. The two input fields are
+optional. Keep active hull sources on the wet side. Submerged fields can supply up to 8,192 input rows.
+
+This models an impermeable face extended to the bed, locally straight over the propagating wavelengths. The −Z
+half-grid is the mathematical mirror. Keep it under land when displaying the grid. Finite ends, corners, permeable
+faces, breaking and overtopping require their own models. The boundary acts on the wake patch. A separately
+supplied offshore sea spectrum still requires its own reflecting conditions.
+[Rim et al. (2025), §2](https://doi.org/10.1002/eng2.70041).
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.

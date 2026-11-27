@@ -7,6 +7,7 @@ export { FloodBodyDragSolver, type FloodBodyDragBody, type FloodBodyDragParams }
 export * from './flood-paddle.js';
 export * from './flood-wading.js';
 export * from './morison.js';
+export * from './quay-wake.js';
 export * from './quay.js';
 export {
   coupledRadiationProfile,
