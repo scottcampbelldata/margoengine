@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
+import { ANGLE_BACKENDS } from './angle-backends.mjs';
 import { classifyBlend, compressedFailures } from './blend-check.mjs';
 
 const path = '/packages/webgl2-compat/test/features.html';
@@ -27,17 +28,6 @@ try {
 } finally {
   await native.close();
 }
-export const ANGLE_BACKENDS = {
-  win32: [
-    ['d3d11', /Direct3D11/],
-    ['vulkan', /Vulkan/],
-  ],
-  darwin: [['metal', /Metal/]],
-  linux: [
-    ['vulkan', /Vulkan/],
-    ['gl', /OpenGL/],
-  ],
-};
 const backends = ANGLE_BACKENDS[process.platform];
 if (!backends)
   throw new Error(`No ANGLE backends listed for ${process.platform}; add its real backends to ANGLE_BACKENDS`);

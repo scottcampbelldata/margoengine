@@ -562,6 +562,22 @@ how many words or texels one invocation stores) and the reason it is not on a fa
 buffers by `"group:binding"` and changes them in place. Neither is needed to use compute through the device; both are
 there for tools and tests.
 
+Driver workaround (2026-11-26, KB-LOOP-D3D11): ANGLE's Direct3D 11 back end splits a loop header that holds `?:`,
+`&&` or `||` into statements. It rewrites the loop as `for (; s; )` and puts the loop's update and condition before
+each `continue` in its body, a nested loop's `continue` too, so a skipped inner iteration advanced the outer counter (or
+called the outer condition again) and the inner loop went on with it (Chrome 157, RTX A6000; ANGLE Vulkan is right). A
+WGSL `select` becomes `?:`, so `for (var j = select(0u, 1u, c); j < n; j++)` around a loop that continues was enough.
+Such a `for` or `while` is now written with no header when a loop inside it continues: `while (true)`, its condition
+first, and a `for`'s update after its body, which runs inside `do { } while (false)` so a `continue` still reaches the
+update. Any other loop is translated as before.
+
+Driver workaround (2026-11-26, KB-SW2): ANGLE drops no-op clauses from the end of a switch, and Direct3D 11's compiler
+then runs the body of a lone remaining case whatever the selector: `switch (x) { case 1u: { r = 0u; } default: {} }`
+set `r` to 0 for every `x`. An empty default clause is now written first, where it stays; WGSL clauses never fall
+through, so their order does not change what runs. Regression for both: test/d3d11-control-flow-browser.mjs (fifteen
+loop and switch shapes, native WebGPU and the layer on each ANGLE back end against a CPU reference; twelve failed on
+Direct3D 11 before) and test/glsl.test.js (the GLSL of each form).
+
 Driver workaround (2026-11-11, KB5289b): ANGLE's Direct3D 11 back end gives a GLSL function with a sampler parameter
 the wrong texture when an argument of a call to it calls the same function again, directly or inside another function:
 the outer call samples the inner call's texture (Chrome 157, RTX A6000; a renamed copy of the function reads right).

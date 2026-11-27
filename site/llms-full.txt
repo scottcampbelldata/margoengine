@@ -11221,6 +11221,8 @@ The GLSL front end (parser, preprocessor, emitter) moved from `packages/transiti
 
 GLSL ES 3.00 input (2026-11-15, The OpenGL ES Shading Language 3.00.6): `uint` and the bit operators and their compound assignments (a shift amount is converted to the unsigned type of the left operand's width, as WGSL needs), `switch` with `case`/`default` labels folded at parse time (constant integer expressions over literals and constants in scope), cases that fall into the next (each WGSL case holds its own statements and those it falls into, up to one that ends in `break`, `return`, `continue` or `discard`; WGSL cases never fall through), `matCxR` types with GLSL's product shapes and `transpose`, `outerProduct`, `matrixCompMult` and the uniform layout for them, `float[3] a` and unsized `float a[] = float[](...)` declarations, array constructors, `.length()`, array equality and arrays as parameters and results, `texture`, `textureProj`, `textureLod`, `textureProjLod`, `textureGrad`, `textureOffset`, `texelFetch` (rows counted from the bottom under the y flip) and `textureSize`, `inverse` (adjugate over the determinant; a singular matrix is undefined in GLSL and gives non-finite values here), `outerProduct`, `trunc`, `round` and `roundEven` (both round half to even, which GLSL allows for `round`), the hyperbolic functions, `isnan` and `isinf` (decided on the IEEE 754 bit pattern, so a compiler cannot fold them away), `modf`, `floatBitsToInt`, `floatBitsToUint`, `intBitsToFloat`, `uintBitsToFloat`, the 2x16 snorm, unorm and half pack functions, boolean `mix`, the `flat`, `smooth`, `centroid` and `invariant` qualifiers and skipped `layout(...)` qualifiers. A signed integer literal keeps its 32-bit pattern (0xFFFFFFFF and 3000000000 are negative), and one beyond 32 bits is refused. The transition images have one level and are read at their nearest texel, so a lookup's level, bias and gradients select nothing there. Not lowered: samplers other than the two images (no binding exists for them in this entry), integer samplers, shadow samplers, `textureGather`-style ES 3.10 functions and uniform blocks. Each of seven original GLSL ES 3.00 fixtures draws the same pixels, within one level per channel, as the browser's own GLSL compiler over 16 x 16 pixels at three progress values, natively and on the WebGL2 layer (`packages/transitions/test/glsl-es3-fixtures.js`). One fixture's reference takes a `continue` out of its `switch`: ANGLE's Direct3D 11 back end (Chrome 157, RTX A6000) cannot compile a `continue` inside a `switch` and loses the context, so the translated fixture keeps it and the layer avoids it (KB-SW1, below). The transitions/glsl entry measured 19,498 B gzip after this, from 16,519 B (+2,979 B); its ceiling rises from 16,837 to 20,083 B. The bytes are the GLSL ES 3.00 language the shared front end now reads; it is one front end for transitions and shader, and a lazy split of the ES 3.00 parts would need a second fetch on the first translation of any source that uses them. Core + stage is unchanged.
 
+KB-LOOP-D3D11 and KB-SW2 (fixed 2026-11-26): on ANGLE Direct3D 11 (Chrome 157, RTX A6000) a loop whose header holds `?:`, `&&` or `||` (a WGSL `select` is `?:`) ran its update and condition at the `continue` of a loop nested in it, and a switch with one case and an empty default ran that case whatever the selector. The WebGL2 layer now writes such a loop with no header when a loop inside it continues, and an empty default clause first. Regression: `packages/webgl2-compat/test/d3d11-control-flow-browser.mjs` and `test/glsl.test.js`.
+
 KB-SW1 (fixed 2026-11-15): a WGSL `continue` inside a `switch` inside a loop reached ANGLE's Direct3D 11 back end as a GLSL `continue` inside a `switch`, which it fails to compile ("Error compiling dynamic pixel executable", then a lost context). The WebGL2 layer's GLSL now sets a flag and breaks out of the switch, and the loop continues after it; a nested switch hands the flag outwards. Regression: `packages/webgl2-compat/test/glsl.test.js` ("a continue inside a switch leaves the switch by a flag").
 
 Batch 244 job 3: CRT adds `colorBleed` [0,1], default 0, and `chromaticOffset`, `redOffset`, `greenOffset`, `blueOffset`, each a horizontal number or [x,y] source-pixel tuple in [-32,32], default 0. Symmetric offset adds to red and subtracts from blue; independent offsets add on top. Positive offsets select texels to the right/below, so those channel images move left/up. Effective combined offsets may reach 64 source pixels. Color bleed retains source luma and alpha, filters I with normalized 5-tap and Q with 9-tap horizontal binomials, then clips to the premultiplied gamut. Offsets use bilinear sampling with edge-repeat borders; alpha is the maximum selected channel alpha. Tube beam/mask/brightness modulate the processed color; glow still adds the unshifted raw-source 3x3 halo. Both effects default off and preserve all previous CRT pixels, including exact boundaries. This is a selectable composite-video look, not RF encoding, dot crawl, interlacing or a calibrated TV standard. No extra pass or intermediate image; no timing claim.
@@ -15688,6 +15690,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stays flat across and rises toward the sun. One colour, one density and one sun angle are on disk; telling its
   model apart needs MagicaVoxel renders at other densities, colours and sun angles, and a view of the side faces.
 
+### Fixed 2026-11-26: on ANGLE Direct3D 11 a nested loop's `continue` ran the outer loop's update, and a lone case ran whatever the selector (KB-LOOP-D3D11, KB-SW2, webgl2-compat)
+
+- **Repro (before):** `node packages/webgl2-compat/test/d3d11-control-flow-browser.mjs` on Windows (Chrome 157, RTX
+  A6000): native WebGPU and the layer on ANGLE Vulkan give the CPU reference's sums for all fifteen shapes; the layer
+  on ANGLE Direct3D 11 gets twelve wrong (an outer `for` with a `select` in its init, condition or update or an `&&` in
+  its condition, a `while` whose `&&` calls a function, each around a loop that continues; a switch with one case and
+  an empty default, alone or in a loop).
+- **Cause (KB-LOOP-D3D11):** read in the HLSL ANGLE made of the guide's program (`WEBGL_debug_shaders`). ANGLE's
+  Direct3D 11 back end splits a loop header holding `?:`, `&&` or `||` into statements; it rewrote the guide's
+  `for (uint j = guided ? 0u : 1u; j <= count; j++)` as `for (; s; )` and put `j++; s = j <= count;` before every
+  `continue` in the body, the inner face loop's too. A hidden face therefore advanced `j` and the face loop went on
+  with it, so the guide chose a wrong face (KB-VPT-GUIDE-D3D11). The layer's GLSL was a faithful translation, and the
+  `break` was not at fault. The same shape is in `glassCandidates` (`packages/voxel-pathtracer/src/shaders.ts`, its
+  group loop starts at `select(1u, 0u, inGlass)` and its candidate loop continues): with two or more light-sampled
+  glass instances a skipped candidate dropped the next group. `glasslight` reads the same before and after, since each
+  of its scenes has one such instance. It is also in sciviz's AMR ray march (`packages/sciviz/src/amr-shader.ts`, the
+  `visit` loop's `&&` condition around a node walk and a sample loop that continue), where a skipped node or a missing
+  sample advanced `visit` and could end the march early.
+- **Cause (KB-SW2):** found by the same test's switch shape. ANGLE drops no-op clauses from the end of a switch,
+  leaving `switch (x) { case 1: { ... } break; }`, and Direct3D 11's compiler then runs that lone case's body for every
+  selector. A second case, or a default with a statement, is right.
+- **Fix:** the layer's GLSL (`packages/webgl2-compat/src/glsl/emit.ts`) writes a `for` or `while` whose header holds
+  `?:`, `&&` or `||` with no header when a loop inside it continues (`while (true)`, the condition first, a `for`'s
+  update after a `do { } while (false)` body), and writes an empty default clause first. Every other loop and switch
+  is emitted as before. In the layer's WGSL corpus (3,256 modules) the loop shape is in the four recorded variants of
+  the trace kernel's `glassCandidates`, and no switch has one case and an empty default; the guide's program and the
+  AMR shader are not in the corpus. A scan of the 21 source files holding a loop with `continue` finds the shape in
+  those two only.
+- **Regression:** `packages/webgl2-compat/test/d3d11-control-flow-browser.mjs` (in the package's `test:gpu`) and the
+  two KB-LOOP-D3D11 and KB-SW2 tests in `packages/webgl2-compat/test/glsl.test.js`.
+
 ### Fixed 2026-11-26: path guiding was wrong on the WebGL2 layer on ANGLE Direct3D 11 (KB-VPT-GUIDE-D3D11, voxel-pathtracer)
 
 - **Repro (before):** on Windows (Edge 158, RTX A6000), `MARGO_COMPAT=1 node
@@ -15700,8 +15733,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   direction by the face a ray enters through, so those samples got another face's density and far too much weight.
   Found by rewriting one loop at a time: the pdf loop alone changed nothing (807,472.092169678 again), the face loop
   alone gives 10.238534781150044, the number ANGLE Vulkan gives. The same GLSL is right on ANGLE Vulkan and the same
-  WGSL on WebGPU; whether ANGLE's HLSL or Direct3D's compiler drops the `break` was not established (the translated
-  HLSL was not read).
+  WGSL on WebGPU. The translated HLSL, read later, shows ANGLE's loop rewrite at fault, not the `break`: the outer
+  loop's update ran at the face loop's `continue` (KB-LOOP-D3D11, fixed in the layer).
 - **Fix:** the face is picked under a flag (`open`), with no `continue` or `break` in the loop; the random numbers
   and their order are unchanged, so WebGPU and ANGLE Vulkan give the numbers they gave.
 - **Regression:** `tests/guiding-browser.mjs` gains a leg on the layer on ANGLE Direct3D 11 (`--use-angle=d3d11`, on

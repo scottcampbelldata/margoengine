@@ -11093,5 +11093,18 @@ Still missing: the same comparison on Metal and Vulkan drivers (a fused multiply
 Evidence that now exists: `packages/voxel-pathtracer/tests/guiding-browser.mjs` runs its values on WebGPU, on the
 WebGL2 layer on ANGLE Vulkan and, on Windows, on the layer on ANGLE Direct3D 11; the three give the same guided error
 (10.24 against a baseline of 350.05). Before, the Direct3D 11 leg read 807,472: a loop left by `break` after a
-`continue` picked a wrong box face there. Still missing: which of ANGLE's translation or Direct3D's compiler is at
-fault, and a scan of the other packages' shaders for the same loop shape.
+`continue` picked a wrong box face there. The fault is ANGLE's translation (KB-LOOP-D3D11, next section), fixed in
+the layer for every package.
+
+## Loop headers and lone cases on ANGLE Direct3D 11 (KB-LOOP-D3D11, KB-SW2, section 5 evidence, 2026-11-26)
+
+ANGLE's Direct3D 11 back end (Chrome 157, RTX A6000) splits a loop header holding `?:`, `&&` or `||` into statements,
+rewriting the loop as `for (; s; )` with its update and condition put before each `continue` in the body, including a
+nested loop's: the translated HLSL of the guide's program (`WEBGL_debug_shaders`) shows `j++` at the face loop's
+`continue`. It also drops no-op clauses from the end of a switch, and Direct3D 11's compiler then runs a lone remaining
+case for every selector. The layer's GLSL (`packages/webgl2-compat/src/glsl/emit.ts`) writes such a loop with no header
+when a loop inside it continues, and an empty default clause first; nothing else changes. Evidence:
+`packages/webgl2-compat/test/d3d11-control-flow-browser.mjs` (fifteen shapes, native WebGPU and the layer on ANGLE
+Direct3D 11 and Vulkan against a CPU reference; twelve wrong on Direct3D 11 before, none after) and
+`test/glsl.test.js`. The loop shape is in `glassCandidates` of the voxel path tracer and sciviz's AMR ray march. Missing:
+Intel and AMD under Direct3D 11, and a corpus record of the guide's program.

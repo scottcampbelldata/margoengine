@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20738977,
+  "total": 20751193,
   "history": [
     {
       "date": "2026-10-24",
@@ -14287,6 +14287,12 @@
       "commit": "7b1f858e91",
       "reason": "KB-LOOK-TV-PALL1: headless/look lightBounds and erbsDiffuseFraction, T6 limits that follow the light",
       "grew": 1523
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "5252425c88",
+      "reason": "KB-LOOP-D3D11 and KB-SW2: the WebGL2 layer's GLSL writes a loop whose header ANGLE Direct3D 11 splits with no header when a loop inside it continues, and an empty default clause first (headerless, splitsHeader, nestedContinue, noOp in src/glsl/emit.ts). device 127,245 B from 127,003 B, xr 127,044 B from 126,785 B, tiers 126,884 B from 126,606 B min+gzip. The bytes are the emitter itself, which every entry that translates WGSL to GLSL carries; a lazy split would add a fetch before the first shader of every program on the layer.",
+      "grew": 3
     }
   ],
   "items": {
@@ -15972,14 +15978,14 @@
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
-    "@margoengine/webgl2-compat/device": 127003,
+    "@margoengine/webgl2-compat/device": 131063,
     "@margoengine/webgl2-compat/glsl": 46373,
     "@margoengine/webgl2-compat/pick": 5054,
     "@margoengine/webgl2-compat/preview": 3699,
     "@margoengine/webgl2-compat/restore": 1106,
-    "@margoengine/webgl2-compat/tiers": 126606,
+    "@margoengine/webgl2-compat/tiers": 130691,
     "@margoengine/webgl2-compat/wgsl": 27240,
-    "@margoengine/webgl2-compat/xr": 126785,
+    "@margoengine/webgl2-compat/xr": 130856,
     "@margoengine/wfc": 2154,
     "@margoengine/wfc dist/workers/wfc.js": 3601,
     "@margoengine/wfc/assemble": 1721,

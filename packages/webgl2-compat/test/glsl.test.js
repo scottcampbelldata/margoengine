@@ -266,6 +266,42 @@ test('a continue inside a switch leaves the switch by a flag; the loop continues
   );
 });
 
+test('a loop whose header ANGLE splits has no header when a nested loop continues (KB-LOOP-D3D11)', () => {
+  // ANGLE's Direct3D 11 back end splits a loop header holding ?:, && or || into statements and then put the outer
+  // update before a nested loop's continue too. Such a loop is written as while (true) with its condition first and
+  // its update after a do { } while (false) body; test/d3d11-control-flow-browser.mjs checks the sums on the GPU.
+  const inner = 'for (var f = 0u; f < 6u; f++) { if (((u32(p.x) >> f) & 1u) != 0u) { continue; } r += f; }';
+  const split = frag(
+    '',
+    `var r = 0u; for (var j = select(0u, 1u, p.y > 2.0); j < 3u; j++) { ${inner} } return vec4u(r);`,
+  );
+  assert.doesNotMatch(split, /for \([^)]*\?/, 'no for header holds the select');
+  assert.match(
+    split,
+    /while \(true\) \{\s*if \(!\(\(lj_\d+ < 3u\)\)\) break;\s*bool (_t\d+) = false;\s*do \{[\s\S]*\} while \(false\);\s*if \(\1\) break;\s*lj_\d+\+\+;/,
+  );
+  const both = frag('', `var r = 0u; var j = 0u; while (j < 3u && r < 99u) { ${inner} j++; } return vec4u(r);`);
+  assert.match(both, /while \(true\) \{\s*if \(!\(\(\(lj_\d+ < 3u\) && \(lr_\d+ < 99u\)\)\)\) break;/);
+  assert.doesNotMatch(both, /while \(\(/, 'no while header holds the &&');
+  // A plain header, or a split one with no nested continue, keeps its for.
+  const plain = frag('', `var r = 0u; for (var j = 0u; j < 3u; j++) { ${inner} } return vec4u(r);`);
+  assert.match(plain, /for \(uint lj_\d+ = 0u; \(lj_\d+ < 3u\); lj_\d+\+\+\) \{/);
+  const alone = frag(
+    '',
+    'var r = 0u; for (var j = select(0u, 1u, p.y > 2.0); j < 3u; j++) { r += j; } return vec4u(r);',
+  );
+  assert.match(alone, /for \(uint lj_\d+ = \(.*\? 1u : 0u\); \(lj_\d+ < 3u\); lj_\d+\+\+\) \{/);
+});
+
+test('an empty default clause goes first in its switch (KB-SW2)', () => {
+  // ANGLE drops no-op clauses from the end of a switch, and Direct3D 11 then ran a lone remaining case whatever the
+  // selector; first, the empty default stays.
+  const glsl = frag('', 'var r = 7u; switch (u32(p.x)) { case 1u: { r = 0u; } default: {} } return vec4u(r);');
+  assert.match(glsl, /switch \(.*\) \{\s*default: \{\s*\} break;\s*case 1u: \{\s*lr_\d+ = 0u;\s*\} break;\s*\}/);
+  const full = frag('', 'var r = 7u; switch (u32(p.x)) { case 1u: { r = 0u; } default: { r = 2u; } } return vec4u(r);');
+  assert.match(full, /case 1u: \{[^}]*\} break;\s*default: \{/, 'a default that does something keeps its place');
+});
+
 test('pointer lets alias their variable; pointer parameters are inout', () => {
   // Regression (2026-10-28): a `let p = &a[1]` failed to translate ("a memory reference of kind 'address-of'").
   const glsl = frag(

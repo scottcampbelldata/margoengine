@@ -376,6 +376,43 @@ function postfix(code: string): boolean {
   return true;
 }
 
+/**
+ * True when a GLSL loop header (init, condition and update) holds `?:`, `&&` or `||`, which ANGLE's Direct3D 11 back
+ * end splits into statements, rewriting the loop (see `headerless`).
+ */
+function splitsHeader(...parts: string[]): boolean {
+  return parts.some((p) => /\?|&&|\|\|/.test(p));
+}
+
+/** True when `body` does nothing: no statements, or only empty blocks. */
+function noOp(body: readonly IRStmt[]): boolean {
+  return body.every((s) => s.kind === 'block' && noOp(s.body));
+}
+
+/** True when `body` holds a loop with a `continue` of its own, at any depth (see `headerless`). */
+function nestedContinue(body: readonly IRStmt[]): boolean {
+  const holds = (list: readonly IRStmt[] | undefined, inLoop: boolean): boolean =>
+    !!list?.some((s) => {
+      switch (s.kind) {
+        case 'continue':
+          return inLoop;
+        case 'block':
+          return holds(s.body, inLoop);
+        case 'if':
+          return holds(s.then, inLoop) || holds(s.else, inLoop);
+        case 'switch':
+          return s.clauses.some((c) => holds(c.body, inLoop));
+        case 'loop':
+        case 'for':
+        case 'while':
+          return holds(s.body, true);
+        default:
+          return false;
+      }
+    });
+  return holds(body, false);
+}
+
 /** Texture built-ins the layer emits as a generated GLSL function that takes the sampler as a parameter. */
 const SAMPLER_HELPERS = new Set([
   'textureLoad',
@@ -921,7 +958,13 @@ export class StageEmitter {
         const target: { kind: 'switch'; flag?: string; at: number } = { kind: 'switch', at: this.lines.length };
         this.line(`switch (${this.value(s.selector)}) {`);
         this.breakable.push(target);
-        for (const c of s.clauses) {
+        // ANGLE drops no-op clauses from the end of a switch, and Direct3D 11's compiler then runs the body of a lone
+        // remaining case whatever the selector (Chrome 157, RTX A6000; test/d3d11-control-flow-browser.mjs, KB-SW2). An
+        // empty default clause therefore goes first, where nothing drops it; WGSL clauses never fall through, so their
+        // order does not change what runs.
+        const empty = s.clauses.find((c) => c.selectors.includes(null) && noOp(c.body));
+        const clauses = empty ? [empty, ...s.clauses.filter((c) => c !== empty)] : s.clauses;
+        for (const c of clauses) {
           const labels = c.selectors.map((v) =>
             v === null ? 'default:' : `case ${unsigned ? uintLiteral(v) : intLiteral(v)}:`,
           );
@@ -959,24 +1002,36 @@ export class StageEmitter {
         }
         const condition = s.condition ? this.value(s.condition) : '';
         const update = s.update ? this.expressionStatement(s.update) : '';
-        this.line(`for (${init}; ${condition}; ${update}) {`);
-        this.breakable.push({ kind: 'loop' });
-        this.block(s.body);
-        this.breakable.pop();
-        this.line('}');
+        if (splitsHeader(init, condition, update) && nestedContinue(s.body)) {
+          this.line('{');
+          this.depth++;
+          if (init) this.line(`${init};`);
+          this.headerless(condition, s.body, update);
+          this.depth--;
+          this.line('}');
+        } else {
+          this.line(`for (${init}; ${condition}; ${update}) {`);
+          this.breakable.push({ kind: 'loop' });
+          this.block(s.body);
+          this.breakable.pop();
+          this.line('}');
+        }
         if (outer) {
           this.depth--;
           this.line('}');
         }
         return;
       }
-      case 'while':
-        this.line(`while (${this.value(s.condition)}) {`);
+      case 'while': {
+        const condition = this.value(s.condition);
+        if (splitsHeader('', condition, '') && nestedContinue(s.body)) return this.headerless(condition, s.body, '');
+        this.line(`while (${condition}) {`);
         this.breakable.push({ kind: 'loop' });
         this.block(s.body);
         this.breakable.pop();
         this.line('}');
         return;
+      }
       case 'break': {
         const target = this.breakable.at(-1);
         if (target?.kind === 'continuing') this.line(`{ ${target.flag} = true; break; }`);
@@ -994,6 +1049,37 @@ export class StageEmitter {
         this.line(s.value ? `return ${this.value(s.value)};` : 'return;');
         return;
     }
+  }
+
+  /**
+   * A `for` or `while` whose header ANGLE would split, written with none: `while (true)`, its condition as the first
+   * statement, and a `for`'s update after the body, which then runs inside `do { } while (false)` so a `continue`
+   * still reaches the update (as in `loop`). ANGLE's Direct3D 11 back end splits a loop header holding `?:`, `&&` or
+   * `||` into statements, rewriting the loop as `for (; s; )` with its update and condition put before each
+   * `continue` in the body, a nested loop's `continue` too: a skipped inner iteration advanced the outer counter or
+   * called the outer condition again (Chrome 157, RTX A6000; test/d3d11-control-flow-browser.mjs, KB-LOOP-D3D11).
+   */
+  private headerless(condition: string, body: readonly IRStmt[], update: string): void {
+    this.line('while (true) {');
+    this.depth++;
+    if (condition) this.line(`if (!(${condition})) break;`);
+    if (!update) {
+      this.breakable.push({ kind: 'loop' });
+      this.statements(body);
+      this.breakable.pop();
+    } else {
+      const flag = this.temp();
+      this.line(`bool ${flag} = false;`);
+      this.line('do {');
+      this.breakable.push({ kind: 'continuing', flag });
+      this.block(body);
+      this.breakable.pop();
+      this.line('} while (false);');
+      this.line(`if (${flag}) break;`);
+      this.line(`${update};`);
+    }
+    this.depth--;
+    this.line('}');
   }
 
   /** A `continue` here: plain in a loop, a flag and a break inside a switch (see the 'switch' statement). */

@@ -1,0 +1,257 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Loop and switch shapes ANGLE Direct3D 11 got wrong (KB-LOOP-D3D11, KB-SW2)</title>
+</head>
+<body>
+<script type="module">
+// Each variant runs an outer loop around an inner loop that skips with `continue` and leaves with `break`. Only the
+// outer loop's header changes: plain, a select in its init, condition or update, an && in its condition, a while, a
+// loop with continuing, the inner loop as a loop with continuing, and a plain loop between the two. ANGLE's Direct3D 11
+// back end splits a loop header that holds a ?: or && into statements, and it put the outer loop's update before every
+// continue in the body, the inner loop's too (KB-LOOP-D3D11). The last three are switches with one case and an empty
+// default: ANGLE dropped the default and Direct3D 11 then ran the lone case whatever the selector (KB-SW2). Every variant
+// must give the CPU reference's sums.
+import { createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
+
+const SHADER = /* wgsl */ `
+struct U {cap:u32,zero:u32,pad0:u32,pad1:u32}
+@group(0) @binding(0) var<uniform> u:U;
+@group(0) @binding(1) var out:texture_storage_2d<rgba32uint,write>;
+fn skip(i:u32,f:u32)->bool {return ((i>>f)&1u)!=0u;}
+fn plain(i:u32)->u32 {
+ var acc=0u;
+ for(var j=0u;j<3u+u.zero;j++){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+ }
+ return acc;
+}
+fn selectInit(i:u32)->u32 {
+ var acc=0u;
+ for(var j=select(0u,1u,(i&64u)!=0u);j<3u+u.zero;j++){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+ }
+ return acc;
+}
+fn andCondition(i:u32)->u32 {
+ var acc=0u;
+ for(var j=0u;j<3u+u.zero&&acc<1000000u;j++){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+ }
+ return acc;
+}
+fn selectCondition(i:u32)->u32 {
+ var acc=0u;
+ for(var j=0u;j<select(3u,4u,(i&128u)!=0u);j++){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+ }
+ return acc;
+}
+fn selectUpdate(i:u32)->u32 {
+ var acc=0u;
+ for(var j=0u;j<3u+u.zero;j+=select(1u,2u,(i&256u)!=0u)){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+ }
+ return acc;
+}
+fn andWhile(i:u32)->u32 {
+ var acc=0u;var j=0u;
+ while(j<3u+u.zero&&acc<1000000u){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+  j++;
+ }
+ return acc;
+}
+fn withContinuing(i:u32)->u32 {
+ var acc=0u;var j=select(0u,1u,(i&64u)!=0u);
+ loop {
+  if(j>=3u+u.zero){break;}
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+  continuing {j++;}
+ }
+ return acc;
+}
+fn innerLoop(i:u32)->u32 {
+ var acc=0u;
+ for(var j=select(0u,1u,(i&64u)!=0u);j<3u+u.zero;j++){
+  var f=0u;
+  loop {
+   if(f>=6u){break;}
+   if(skip(i,f)){continue;}
+   acc+=f+1u+j*7u;
+   if(acc>u.cap){break;}
+   continuing {f++;}
+  }
+ }
+ return acc;
+}
+fn between(i:u32)->u32 {
+ var acc=0u;
+ for(var j=select(0u,1u,(i&64u)!=0u);j<3u+u.zero;j++){
+  for(var m=0u;m<2u;m++){
+   for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u+m*3u;if(acc>u.cap){break;}}
+  }
+ }
+ return acc;
+}
+var<private> calls:u32;
+fn tick()->bool {calls++;return true;}
+fn callWhile(i:u32)->u32 {
+ var acc=0u;var j=0u;calls=0u;
+ while(j<3u+u.zero&&tick()){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+  j++;
+ }
+ return acc+calls*1000u;
+}
+fn callFor(i:u32)->u32 {
+ var acc=0u;calls=0u;
+ for(var j=0u;j<3u+u.zero&&tick();j++){
+  for(var f=0u;f<6u;f++){if(skip(i,f)){continue;}acc+=f+1u+j*7u;if(acc>u.cap){break;}}
+ }
+ return acc+calls*1000u;
+}
+fn inSwitch(i:u32)->u32 {
+ var acc=0u;
+ for(var j=select(0u,1u,(i&64u)!=0u);j<3u+u.zero;j++){
+  for(var f=0u;f<6u;f++){
+   switch(select(0u,1u,skip(i,f))){case 1u:{continue;}default:{}}
+   acc+=f+1u+j*7u;if(acc>u.cap){break;}
+  }
+ }
+ return acc;
+}
+fn loneCase(i:u32)->u32 {var add=7u;switch(select(0u,1u,skip(i,0u))){case 1u:{add=0u;}default:{}} return add;}
+fn loneCaseLoop(i:u32)->u32 {
+ var acc=0u;
+ for(var f=0u;f<6u;f++){var add=f+1u;switch(select(0u,1u,skip(i,f))){case 1u:{add=0u;}default:{}}acc+=add;if(acc>u.cap){break;}}
+ return acc;
+}
+fn loneCaseContinue(i:u32)->u32 {
+ var acc=0u;
+ for(var f=0u;f<6u;f++){switch(select(0u,1u,skip(i,f))){case 1u:{continue;}default:{}}acc+=f+1u;if(acc>u.cap){break;}}
+ return acc;
+}
+fn variant(k:u32,i:u32)->u32 {
+ if(k==12u){return loneCase(i);}
+ if(k==13u){return loneCaseLoop(i);}
+ if(k==14u){return loneCaseContinue(i);}
+ if(k==9u){return callWhile(i);}
+ if(k==10u){return callFor(i);}
+ if(k==11u){return inSwitch(i);}
+ if(k==0u){return plain(i);}
+ if(k==1u){return selectInit(i);}
+ if(k==2u){return andCondition(i);}
+ if(k==3u){return selectCondition(i);}
+ if(k==4u){return selectUpdate(i);}
+ if(k==5u){return andWhile(i);}
+ if(k==6u){return withContinuing(i);}
+ if(k==7u){return innerLoop(i);}
+ return between(i);
+}
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
+ let i=(id.y&511u)*256u+id.x;let g=id.y>>9u;
+ textureStore(out,id.xy,vec4u(variant(g*3u,i),variant(g*3u+1u,i),variant(g*3u+2u,i),0u));
+}`;
+
+export const NAMES = [
+  'plain',
+  'selectInit',
+  'andCondition',
+  'selectCondition',
+  'selectUpdate',
+  'andWhile',
+  'withContinuing',
+  'innerLoop',
+  'between',
+  'callWhile',
+  'callFor',
+  'inSwitch',
+  'loneCase',
+  'loneCaseLoop',
+  'loneCaseContinue',
+];
+const CAP = 120;
+function expected(k, i) {
+  if (k === 12) return i & 1 ? 0 : 7;
+  if (k === 13 || k === 14) {
+    let acc = 0;
+    for (let f = 0; f < 6; f++) {
+      if ((i >>> f) & 1) continue;
+      acc += f + 1;
+      if (acc > CAP) break;
+    }
+    return acc;
+  }
+  const start = [1, 6, 7, 8, 11].includes(k) && i & 64 ? 1 : 0,
+    end = k === 3 && i & 128 ? 4 : 3,
+    step = k === 4 && i & 256 ? 2 : 1,
+    middle = k === 8 ? 2 : 1;
+  let acc = 0;
+  for (let j = start; j < end; j += step)
+    for (let m = 0; m < middle; m++)
+      for (let f = 0; f < 6; f++) {
+        if ((i >>> f) & 1) continue;
+        acc += f + 1 + j * 7 + m * 3;
+        if (acc > CAP) break;
+      }
+  // callWhile and callFor count their condition's calls: one per pass through the outer loop.
+  return k === 9 || k === 10 ? acc + 3000 : acc;
+}
+
+async function run(device) {
+  const module = device.createShaderModule({ code: SHADER }),
+    pipeline = await device.createComputePipelineAsync({ layout: 'auto', compute: { module, entryPoint: 'main' } }),
+    width = 256,
+    height = 2560,
+    uniform = device.createBuffer({ size: 16, usage: 64 | 8 }),
+    texture = device.createTexture({ size: [width, height], format: 'rgba32uint', usage: 8 | 1 | 4 });
+  device.queue.writeBuffer(uniform, 0, Uint32Array.of(CAP, 0, 0, 0));
+  const group = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: uniform } },
+        { binding: 1, resource: texture.createView() },
+      ],
+    }),
+    e = device.createCommandEncoder(),
+    pass = e.beginComputePass();
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, group);
+  pass.dispatchWorkgroups(width / 8, height / 8);
+  pass.end();
+  const buffer = device.createBuffer({ size: width * height * 16, usage: 1 | 8 });
+  e.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: width * 16 }, [width, height]);
+  device.queue.submit([e.finish()]);
+  await buffer.mapAsync(1);
+  const words = new Uint32Array(buffer.getMappedRange().slice(0));
+  buffer.unmap();
+  const wrong = Object.fromEntries(NAMES.map((n) => [n, 0])),
+    first = {};
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = (y & 511) * 256 + x,
+        g = y >> 9;
+      if (i >= 512 * 256) continue;
+      for (let c = 0; c < 3; c++) {
+        const k = g * 3 + c,
+          want = expected(k, i & 511),
+          got = words[(y * width + x) * 4 + c];
+        if (got !== want) {
+          wrong[NAMES[k]]++;
+          first[NAMES[k]] ??= { i, got, want };
+        }
+      }
+    }
+  return { tier: pipeline.built?.tier ?? null, wrong, first };
+}
+
+window.check = {
+  native: async () => run(await (await navigator.gpu.requestAdapter()).requestDevice()),
+  compat: async () => run(await (await createCompatGPU().requestAdapter()).requestDevice()),
+};
+window.ready = true;
+</script>
+</body>
+</html>

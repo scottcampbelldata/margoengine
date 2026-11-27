@@ -370,6 +370,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stays flat across and rises toward the sun. One colour, one density and one sun angle are on disk; telling its
   model apart needs MagicaVoxel renders at other densities, colours and sun angles, and a view of the side faces.
 
+### Fixed 2026-11-26: on ANGLE Direct3D 11 a nested loop's `continue` ran the outer loop's update, and a lone case ran whatever the selector (KB-LOOP-D3D11, KB-SW2, webgl2-compat)
+
+- **Repro (before):** `node packages/webgl2-compat/test/d3d11-control-flow-browser.mjs` on Windows (Chrome 157, RTX
+  A6000): native WebGPU and the layer on ANGLE Vulkan give the CPU reference's sums for all fifteen shapes; the layer
+  on ANGLE Direct3D 11 gets twelve wrong (an outer `for` with a `select` in its init, condition or update or an `&&` in
+  its condition, a `while` whose `&&` calls a function, each around a loop that continues; a switch with one case and
+  an empty default, alone or in a loop).
+- **Cause (KB-LOOP-D3D11):** read in the HLSL ANGLE made of the guide's program (`WEBGL_debug_shaders`). ANGLE's
+  Direct3D 11 back end splits a loop header holding `?:`, `&&` or `||` into statements; it rewrote the guide's
+  `for (uint j = guided ? 0u : 1u; j <= count; j++)` as `for (; s; )` and put `j++; s = j <= count;` before every
+  `continue` in the body, the inner face loop's too. A hidden face therefore advanced `j` and the face loop went on
+  with it, so the guide chose a wrong face (KB-VPT-GUIDE-D3D11). The layer's GLSL was a faithful translation, and the
+  `break` was not at fault. The same shape is in `glassCandidates` (`packages/voxel-pathtracer/src/shaders.ts`, its
+  group loop starts at `select(1u, 0u, inGlass)` and its candidate loop continues): with two or more light-sampled
+  glass instances a skipped candidate dropped the next group. `glasslight` reads the same before and after, since each
+  of its scenes has one such instance. It is also in sciviz's AMR ray march (`packages/sciviz/src/amr-shader.ts`, the
+  `visit` loop's `&&` condition around a node walk and a sample loop that continue), where a skipped node or a missing
+  sample advanced `visit` and could end the march early.
+- **Cause (KB-SW2):** found by the same test's switch shape. ANGLE drops no-op clauses from the end of a switch,
+  leaving `switch (x) { case 1: { ... } break; }`, and Direct3D 11's compiler then runs that lone case's body for every
+  selector. A second case, or a default with a statement, is right.
+- **Fix:** the layer's GLSL (`packages/webgl2-compat/src/glsl/emit.ts`) writes a `for` or `while` whose header holds
+  `?:`, `&&` or `||` with no header when a loop inside it continues (`while (true)`, the condition first, a `for`'s
+  update after a `do { } while (false)` body), and writes an empty default clause first. Every other loop and switch
+  is emitted as before. In the layer's WGSL corpus (3,256 modules) the loop shape is in the four recorded variants of
+  the trace kernel's `glassCandidates`, and no switch has one case and an empty default; the guide's program and the
+  AMR shader are not in the corpus. A scan of the 21 source files holding a loop with `continue` finds the shape in
+  those two only.
+- **Regression:** `packages/webgl2-compat/test/d3d11-control-flow-browser.mjs` (in the package's `test:gpu`) and the
+  two KB-LOOP-D3D11 and KB-SW2 tests in `packages/webgl2-compat/test/glsl.test.js`.
+
 ### Fixed 2026-11-26: path guiding was wrong on the WebGL2 layer on ANGLE Direct3D 11 (KB-VPT-GUIDE-D3D11, voxel-pathtracer)
 
 - **Repro (before):** on Windows (Edge 158, RTX A6000), `MARGO_COMPAT=1 node
@@ -382,8 +413,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   direction by the face a ray enters through, so those samples got another face's density and far too much weight.
   Found by rewriting one loop at a time: the pdf loop alone changed nothing (807,472.092169678 again), the face loop
   alone gives 10.238534781150044, the number ANGLE Vulkan gives. The same GLSL is right on ANGLE Vulkan and the same
-  WGSL on WebGPU; whether ANGLE's HLSL or Direct3D's compiler drops the `break` was not established (the translated
-  HLSL was not read).
+  WGSL on WebGPU. The translated HLSL, read later, shows ANGLE's loop rewrite at fault, not the `break`: the outer
+  loop's update ran at the face loop's `continue` (KB-LOOP-D3D11, fixed in the layer).
 - **Fix:** the face is picked under a flag (`open`), with no `continue` or `break` in the loop; the random numbers
   and their order are unchanged, so WebGPU and ANGLE Vulkan give the numbers they gave.
 - **Regression:** `tests/guiding-browser.mjs` gains a leg on the layer on ANGLE Direct3D 11 (`--use-angle=d3d11`, on
