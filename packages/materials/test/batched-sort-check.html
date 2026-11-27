@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><title>BatchedMesh item sort and shared geometry</title></head><body style="margin:0">
+<canvas width="128" height="128" style="width:128px;height:128px;display:block"></canvas>
+<script type="module">
+// Real-GPU check of BatchedMesh item sorting and shared geometry; batched-sort-browser.mjs judges the numbers. Three
+// half-transparent quads of one stored geometry overlap at the centre, added nearest first: back-to-front sorting must
+// blend them as three separate meshes do (which the engine sorts), from either side, and 'manual' must not.
+import {Engine} from '/packages/core/dist/index.js';
+import {Material,createMesh,setMaterialSortModes} from '/packages/materials/dist/index.js';
+import {BatchedMesh} from '/packages/materials/dist/batched.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+const canvas=document.querySelector('canvas'),size=128;
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,0,6],target:[0,0,0]}});
+engine.stop();engine.scene.background='#000000';
+const device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const at=(z)=>[1,0,0,0,0,1,0,0,0,0,1,0,0,0,z,1];
+// Seen from +z, z = 1 is nearest. Double sided, so the far side shows them in the other order.
+const colors=[[1,0,0],[0,1,0],[0,0,1]],depths=[1,0,-1];
+const translucent=(c)=>new Material({shading:'basic',color:[...c,0.5],transparent:true,side:'double'});
+const batch=BatchedMesh.attach(engine,translucent([1,1,1]),{maxItems:8,maxVertices:64});
+const plane=batch.addGeometry(planeGeometry(2,2));
+const ids=colors.map((c,i)=>batch.addInstance(plane,{matrix:at(depths[i]),color:c}));
+const meshes=[];
+const centre=async()=>{
+ device.pushErrorScope('validation');engine.render();await device.queue.onSubmittedWorkDone();
+ const validation=(await device.popErrorScope())?.message??null;
+ // Read in the same task as a render, before the canvas is presented.
+ engine.render();const b=await createImageBitmap(canvas),c=new OffscreenCanvas(size,size),x=c.getContext('2d');x.drawImage(b,0,0);
+ const d=x.getImageData(size/2,size/2,1,1).data;return {validation,rgb:[d[0],d[1],d[2]]};
+};
+// The draw order the sort wrote: the item of each triangle's first index, read back from the sorted index buffer.
+async function order(){
+ const sorter=batch.sorter;if(!sorter)return null;
+ const bytes=batch.usage.indices*4,read=device.createBuffer({size:bytes,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST});
+ const e=device.createCommandEncoder();e.copyBufferToBuffer(sorter.sorted,0,read,0,bytes);device.queue.submit([e.finish()]);
+ await read.mapAsync(GPUMapMode.READ);const idx=new Uint32Array(read.getMappedRange().slice(0));read.unmap();read.destroy();
+ const out=[];for(let t=0;t<idx.length;t+=3){const k=batch.itemOf(idx[t]);if(out[out.length-1]!==k)out.push(k);}return out;
+}
+const view=(z)=>{engine.camera.position=[0,0,z];engine.camera.target=[0,0,0];};
+window.check={
+ async sorted(z){view(z);const r=await centre();return {...r,order:await order(),errors:errors.splice(0),mode:batch.order,geometries:batch.geometryUsage};},
+ async manual(z){view(z);batch.sort='manual';const r=await centre();batch.sort='auto';return {...r,order:await order(),errors:errors.splice(0)};},
+ // The same quads as three plain meshes, which the engine sorts back to front by their origins.
+ async reference(z){
+  view(z);batch.setVisible(ids[0],false).setVisible(ids[1],false).setVisible(ids[2],false);
+  for(let i=0;i<3;i++){const m=createMesh(engine,planeGeometry(2,2),translucent(colors[i]));m.root.setPosition([0,0,depths[i]]);meshes.push(m);}
+  const r=await centre();for(const m of meshes.splice(0))m.dispose();for(const id of ids)batch.setVisible(id,true);return {...r,errors:errors.splice(0)};
+ },
+ async opaqueFrontToBack(){setMaterialSortModes(engine,{transparent:'front-to-back'});view(6);const r=await centre();setMaterialSortModes(engine,{transparent:'back-to-front'});return {...r,order:await order(),errors:errors.splice(0)};},
+ async removeGeometry(){batch.removeGeometry(plane);view(6);const r=await centre();return {...r,count:batch.count,errors:errors.splice(0)};},
+};window.ready=true;
+</script></body></html>

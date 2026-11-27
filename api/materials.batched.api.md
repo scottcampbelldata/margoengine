@@ -20,6 +20,7 @@ export class BatchedMesh implements EnginePlugin {
     readonly maxItems: number;
     readonly maxVertices: number;
     readonly maxIndices: number;
+    readonly maxGeometryVertices: number;
     private constructor();
     static attach(engine: EngineKernel, material: Material, options: BatchedMeshOptions): BatchedMesh;
     get count(): number;
@@ -28,7 +29,19 @@ export class BatchedMesh implements EnginePlugin {
         indices: number;
     };
     add(geometry: MeshGeometry, options?: BatchedItemOptions): number;
+    addGeometry(geometry: MeshGeometry): number;
+    addInstance(geometryId: number, options?: BatchedItemOptions): number;
     remove(id: number): void;
+    removeGeometry(geometryId: number): void;
+    hasGeometry(geometryId: number): boolean;
+    getGeometryId(id: number): number;
+    get geometryUsage(): {
+        geometries: number;
+        vertices: number;
+    };
+    get sort(): MaterialSortMode | 'auto';
+    set sort(value: MaterialSortMode | 'auto');
+    get order(): MaterialSortMode;
     has(id: number): boolean;
     setMatrix(id: number, matrix: ArrayLike<number>): this;
     getMatrix(id: number, out?: Float32Array | number[]): Float32Array | number[];
@@ -50,10 +63,14 @@ export interface BatchedMeshOptions {
     maxItems: number;
     maxVertices: number;
     maxIndices?: number;
+    maxGeometryVertices?: number;
     renderOrder?: number;
+    sort?: MaterialSortMode | 'auto';
 }
 
-export const batchShader = "\nstruct Vertex {position:vec4f,normal:vec4f,tangent:vec4f,uv:vec4f,color:vec4f}\nstruct Item {matrix:mat4x4f,tint:vec4f}\n@group(0) @binding(0) var<storage,read> source:array<Vertex>;\n@group(0) @binding(1) var<storage,read_write> output:array<Vertex>;\n@group(0) @binding(2) var<storage,read> items:array<Item>;\n@group(0) @binding(3) var<storage,read> owner:array<u32>;\n@group(0) @binding(4) var<uniform> counts:vec4u;\n@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u) {\n  if(id.x>=counts.x){return;}\n  var v=source[id.x];let k=owner[id.x];\n  if(k==0xffffffffu||items[k].tint.w<0.5){output[id.x]=Vertex(vec4f(0,0,0,1),vec4f(0,0,1,0),vec4f(1,0,0,1),v.uv,v.color);return;}\n  let m=items[k].matrix;\n  let normalMatrix=mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz));\n  let handedness=select(-1.0,1.0,dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))>=0.0);let bent=normalMatrix*v.normal.xyz*handedness;\n  v.position=vec4f((m*vec4f(v.position.xyz,1)).xyz,1);\n  v.normal=vec4f(normalize(select(vec3f(0,1,0),bent,dot(bent,bent)>0.0)),0);\n  v.tangent=vec4f((m*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);\n  v.color=vec4f(v.color.rgb*items[k].tint.rgb,v.color.a);output[id.x]=v;\n}\n";
+export const batchShader: string;
+
+export const batchSortShader: string;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -513,6 +530,8 @@ interface MaterialOptions extends PhysicalOptions {
     stencilZPass?: GPUStencilOperation;
     uvTransform?: MaterialUVTransform;
 }
+
+type MaterialSortMode = 'manual' | 'front-to-back' | 'back-to-front';
 
 type MaterialUVTransform = TextureTransform & {
     center?: readonly [number, number];

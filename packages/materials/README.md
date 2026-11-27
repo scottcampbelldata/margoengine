@@ -2080,8 +2080,21 @@ floats and reruns a compute pass over the used vertices on the next frame (an un
 items' space is reused by later items that fit. `batch.mesh` takes `shadows.add`, `clustered.add`, `ssao.add` and
 picking like any `createMesh` mesh, synchronous `Raycaster` queries and `AssemblyBVH` included (the batch gives them its
 items' pose on the CPU, the compute pass's arithmetic); `batch.itemOf(vertex)` maps a hit vertex back to its item and `batch.bounds(id)`
-gives an item's world box (`batch.boundsInto(out, id)` writes it into your array). Every item is its own copy of its geometry: for many copies of one geometry use
-`createInstancedMesh`. On the RTX A6000, 10,000 distinct boxes cost 36.8 ms of CPU per frame as one mesh each and
+gives an item's world box (`batch.boundsInto(out, id)` writes it into your array).
+
+A geometry many items share is stored once: `batch.addGeometry(geometry)` returns a geometry id and
+`batch.addInstance(geometryId, {matrix, color, visible})` adds an item that draws it (`add` is both in one call, with
+the geometry freed with its item). Every item still draws its own range of posed vertices, so for thousands of copies
+of one geometry `createInstancedMesh` is lighter. `batch.removeGeometry(geometryId)` removes it and its items;
+`hasGeometry`, `getGeometryId(id)` and `geometryUsage` report what is stored, within `maxGeometryVertices` (default
+`maxVertices`).
+
+Items sort inside the one draw by squared camera distance to their box centre, on the GPU (a bitonic sort of item keys,
+then the index buffer rewritten in that order), whenever the camera, an item or the order changes. `sort` (option and
+live property) is `'auto'` by default: the engine's material sort mode for the material (`setMaterialSortModes`), so a
+transparent batch draws back to front and an opaque one in item order unless `opaque: 'front-to-back'` is set. `'manual'`,
+`'front-to-back'` and `'back-to-front'` choose one; `batch.order` is the one in effect. The sort follows the main camera
+(the frame graph's), so other views of one frame see its order. On the RTX A6000, 10,000 distinct boxes cost 36.8 ms of CPU per frame as one mesh each and
 0.13 ms as one batch (`npm run bench -- scaling --cases=shapes`). WebGPU only.
 
 ```ts
@@ -2096,6 +2109,15 @@ const crate = batch.add(boxGeometry(1, 1, 1), { color: '#c08040' });
 const ball = batch.add(sphereGeometry(0.5), { matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.5, 0, 1] });
 batch.setColor(ball, [0.2, 0.6, 1]).setVisible(crate, false);
 batch.remove(crate); // its space is reused by a later item that fits
+
+// One stored geometry for many items, drawn back to front in a transparent batch.
+const glass = BatchedMesh.attach(engine, new Material({ color: [1, 1, 1, 0.4], transparent: true }), {
+  maxItems: 100,
+  maxVertices: 10_000,
+});
+const pane = glass.addGeometry(boxGeometry(1, 1, 0.05));
+for (let i = 0; i < 10; i++) glass.addInstance(pane, { matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, i - 5, 1] });
+console.log(glass.order); // 'back-to-front'
 ```
 
 ## Batched item culling and levels of detail (`@margoengine/materials/batched-lod`)

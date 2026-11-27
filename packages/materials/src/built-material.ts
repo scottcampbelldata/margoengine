@@ -2821,7 +2821,8 @@ interface MaterialDraws {
   reorder(): void;
 }
 const modes = new WeakMap<Engine['frameGraph'], MaterialDraws['sortModes']>();
-function sortSettings(graph: Engine['frameGraph']): MaterialDraws['sortModes'] {
+/** @internal The engine's material sort modes (`setMaterialSortModes`), read live by `BatchedMesh` item sorting. */
+export function sortSettings(graph: Engine['frameGraph']): MaterialDraws['sortModes'] {
   let m = modes.get(graph);
   if (!m) modes.set(graph, (m = { opaque: 'manual', transparent: 'back-to-front' }));
   return m;

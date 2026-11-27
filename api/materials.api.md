@@ -1051,6 +1051,8 @@ export function setMaterialSortModes(engine: EngineKernel, next: MaterialSortMod
 
 export function sheen(options?: SheenOptions, base?: MaterialExtension): MaterialExtension;
 
+export function sortSettings(graph: Engine['frameGraph']): MaterialDraws['sortModes'];
+
 export function specular(options?: SpecularOptions, base?: MaterialExtension): MaterialExtension;
 
 export function tileAnimationFrame(animation: TileAnimation, time: number, start?: TileAnimationStart): number;
@@ -1096,6 +1098,15 @@ type CasterDisplacement =
 
 type DistanceKeys = 'depthPacking' | 'referencePosition' | 'nearDistance' | 'farDistance';
 
+interface Entry {
+    model: PBRModel;
+    materials: Material[];
+    order: number;
+    opaque: boolean;
+    blend: boolean;
+    distance: number;
+}
+
 type EnvKeys = 'envMap' | 'envMapIntensity' | 'envMapRotation' | 'envMapMode' | 'refractionRatio' | 'combine' | 'reflectivity';
 
 type LightKeys = 'emissive' | 'emissiveMap' | 'aoMap' | 'aoMapIntensity';
@@ -1103,6 +1114,16 @@ type LightKeys = 'emissive' | 'emissiveMap' | 'aoMap' | 'aoMapIntensity';
 type LiveColor = number[] & {
     set(value: ColorInput): number[];
 };
+
+interface MaterialDraws {
+    sortModes: {
+        opaque: MaterialSortMode;
+        transparent: MaterialSortMode;
+    };
+    add(entry: Entry): void;
+    delete(entry: Entry): void;
+    reorder(): void;
+}
 
 type MetalKeys = 'roughness' | 'metalness' | 'metalRoughnessMap';
 

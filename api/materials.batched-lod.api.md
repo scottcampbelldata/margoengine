@@ -81,6 +81,7 @@ class BatchedMesh implements EnginePlugin {
     readonly maxItems: number;
     readonly maxVertices: number;
     readonly maxIndices: number;
+    readonly maxGeometryVertices: number;
     private constructor();
     static attach(engine: EngineKernel, material: Material, options: BatchedMeshOptions): BatchedMesh;
     get count(): number;
@@ -89,7 +90,19 @@ class BatchedMesh implements EnginePlugin {
         indices: number;
     };
     add(geometry: MeshGeometry, options?: BatchedItemOptions): number;
+    addGeometry(geometry: MeshGeometry): number;
+    addInstance(geometryId: number, options?: BatchedItemOptions): number;
     remove(id: number): void;
+    removeGeometry(geometryId: number): void;
+    hasGeometry(geometryId: number): boolean;
+    getGeometryId(id: number): number;
+    get geometryUsage(): {
+        geometries: number;
+        vertices: number;
+    };
+    get sort(): MaterialSortMode | 'auto';
+    set sort(value: MaterialSortMode | 'auto');
+    get order(): MaterialSortMode;
     has(id: number): boolean;
     setMatrix(id: number, matrix: ArrayLike<number>): this;
     getMatrix(id: number, out?: Float32Array | number[]): Float32Array | number[];
@@ -111,7 +124,9 @@ interface BatchedMeshOptions {
     maxItems: number;
     maxVertices: number;
     maxIndices?: number;
+    maxGeometryVertices?: number;
     renderOrder?: number;
+    sort?: MaterialSortMode | 'auto';
 }
 
 type BlendSpace = 'display' | 'linear';
@@ -570,6 +585,8 @@ interface MaterialOptions extends PhysicalOptions {
     stencilZPass?: GPUStencilOperation;
     uvTransform?: MaterialUVTransform;
 }
+
+type MaterialSortMode = 'manual' | 'front-to-back' | 'back-to-front';
 
 type MaterialUVTransform = TextureTransform & {
     center?: readonly [number, number];

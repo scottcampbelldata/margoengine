@@ -27,7 +27,7 @@
     "build": "node ../../scripts/build-optional.js materials",
     "test": "npm run build && node --test tests/*.test.js test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs && node packages/materials/test/hair-cards-browser.mjs && node packages/materials/test/borrowed-restore-browser.mjs && node packages/materials/test/dual-source-browser.mjs && node packages/materials/test/curve-flow-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs && node packages/materials/test/hair-cards-browser.mjs && node packages/materials/test/borrowed-restore-browser.mjs && node packages/materials/test/dual-source-browser.mjs && node packages/materials/test/curve-flow-browser.mjs && node packages/materials/test/batched-sort-browser.mjs",
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:cutout-passes": "cd ../.. && node packages/materials/test/cutout-passes-browser.mjs",
     "test:gpu:vertex-inputs": "cd ../.. && node packages/materials/test/vertex-inputs-browser.mjs",

@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { Material } from '../dist/index.js';
-import { BatchedMesh, batchShader } from '../dist/batched.js';
+import { BatchedMesh, batchShader, batchSortShader } from '../dist/batched.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { Raycaster } from '../../bvh/dist/index.js';
 import { posedVertices } from '../../shared/pose-source.js';
@@ -263,4 +263,53 @@ test('an invalid shininess names the rule and the fix', () => {
       error instanceof RangeError &&
       error.message === 'Material shininess must be finite as float32 and >= 0; set a number in that range.',
   );
+});
+
+test('a stored geometry is kept once and read by every instance (addGeometry, addInstance)', async () => {
+  const { engine, context } = await world(),
+    batch = BatchedMesh.attach(engine, new Material(), { maxItems: 4, maxVertices: 16, maxGeometryVertices: 4 });
+  const shape = batch.addGeometry(quad),
+    a = batch.addInstance(shape, { matrix: translate(1, 0, 0) }),
+    b = batch.addInstance(shape, { color: '#00ff00' });
+  assert.deepEqual(batch.geometryUsage, { geometries: 1, vertices: 4 }, 'one stored copy for two items');
+  assert.deepEqual(batch.usage, { vertices: 8, indices: 12 });
+  assert.equal(batch.getGeometryId(b), shape);
+  batch.mesh.prepareDeformation(context);
+  // Both items read store vertices 0 to 3; the store holds the geometry once.
+  assert.deepEqual(Array.from(new Uint32Array(gpuData(batch, 'sourceOf')).subarray(0, 8)), [0, 1, 2, 3, 0, 1, 2, 3]);
+  assert.equal(gpuData(batch, 'source').byteLength, 4 * 80);
+  assert.deepEqual(Array.from(batch.mesh.primitives[0].indices.subarray(0, 12)), [0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7]);
+  assert.throws(() => batch.addGeometry(triangle), /no room to store 3 more geometry vertices/);
+  batch.remove(a);
+  assert.ok(batch.hasGeometry(shape), 'a stored geometry outlives its items');
+  batch.removeGeometry(shape);
+  assert.equal(batch.count, 0, 'and takes its remaining items with it');
+  assert.equal(batch.has(b), false);
+  assert.deepEqual(batch.geometryUsage, { geometries: 0, vertices: 0 }, 'freed space merges back into the tail');
+  assert.throws(() => batch.addInstance(shape), /no geometry/);
+  const own = batch.add(triangle);
+  assert.deepEqual(batch.geometryUsage, { geometries: 1, vertices: 3 });
+  batch.remove(own);
+  assert.deepEqual(batch.geometryUsage, { geometries: 0, vertices: 0 }, 'add frees its own geometry with the item');
+});
+
+test('sort follows the engine material sort modes, is live and refuses unknown orders', async () => {
+  const { engine } = await world(),
+    { setMaterialSortModes } = await import('../dist/index.js'),
+    opaque = BatchedMesh.attach(engine, new Material(), { maxItems: 2, maxVertices: 8 }),
+    clear = BatchedMesh.attach(engine, new Material({ transparent: true }), { maxItems: 2, maxVertices: 8 });
+  assert.equal(opaque.sort, 'auto');
+  assert.deepEqual([opaque.order, clear.order], ['manual', 'back-to-front']);
+  setMaterialSortModes(engine, { opaque: 'front-to-back' });
+  assert.equal(opaque.order, 'front-to-back');
+  clear.sort = 'manual';
+  assert.equal(clear.order, 'manual');
+  assert.throws(() => (clear.sort = 'nearest'), /pass 'auto', 'manual', 'front-to-back' or 'back-to-front'/);
+  assert.throws(() => BatchedMesh.attach(engine, new Material(), { maxItems: 1, maxVertices: 3, sort: 'x' }), TypeError);
+  assert.throws(
+    () => BatchedMesh.attach(engine, new Material(), { maxItems: 1, maxVertices: 3, maxGeometryVertices: 2 }),
+    /maxGeometryVertices/,
+  );
+  assert.match(batchSortShader, /fn network/);
+  assert.match(batchSortShader, /fn scatter/);
 });
