@@ -2,7 +2,8 @@
 // made by union, difference and intersection, and the meshes they name.
 import { LoaderError } from './types.js';
 import { read3MF, type ThreeMFModel, type ThreeMFOptions, type ThreeMFResult } from './threemf.js';
-import type { BinaryInput } from './util.js';
+import { booleanMesh } from './threemf-csg.js';
+import { limits, throwIfAborted, type BinaryInput } from './util.js';
 
 const F = '3MF';
 const OPERATIONS = ['union', 'difference', 'intersection'] as const;
@@ -33,6 +34,12 @@ export interface ThreeMFBooleanShape {
   instances: Float64Array[];
 }
 
+/** Options of {@link parse3MFBoolean}. */
+export interface ThreeMFBooleanOptions extends ThreeMFOptions {
+  /** Evaluate each boolean shape and add its surface to the result. Default true. */
+  evaluate?: boolean;
+}
+
 /** The result of {@link parse3MFBoolean}. */
 export interface ThreeMFBooleanResult extends ThreeMFResult {
   /** Every boolean shape, each after the shapes it reads. */
@@ -44,15 +51,21 @@ const bad = (message: string): never => {
 };
 
 /**
- * Parses a 3MF package with the boolean operations extension. Meshes the build places come as {@link ThreeMFResult}
- * gives them; each boolean shape is returned with its operands' triangles and its placements. The operations are not
- * evaluated: a boolean shape adds no triangles.
+ * Parses a 3MF package with the boolean operations extension. Each boolean shape is evaluated exactly by
+ * `@margoengine/mesh-edit` and its surface joins the result's triangles where the build places it, with the colours of
+ * the surfaces it came from; the shapes are returned beside them with their operands' triangles and placements. A base
+ * that is a displacement mesh or a level set is not evaluated here.
  *
  * @throws LoaderError for what the extension rules out (an unknown operation, a property on a shape, a base that is not
  * a `model` shape or has alternatives, an operand that is not a plain `model` mesh, a shape that reads itself or a later
- * object) and what `parse3MF` throws.
+ * object), an input that is not a closed solid, a base this entry does not evaluate, a built level set, and what
+ * `parse3MF` throws.
  */
-export async function parse3MFBoolean(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFBooleanResult> {
+export async function parse3MFBoolean(
+  input: BinaryInput,
+  options: ThreeMFBooleanOptions = {},
+): Promise<ThreeMFBooleanResult> {
+  const evaluate = options.evaluate !== false;
   const shapes: ThreeMFBooleanShape[] = [],
     listed = new Map<ThreeMFModel, Map<string, ThreeMFBooleanShape>>(),
     /** Objects with a shape of another extension, which no operand may have. */
@@ -61,6 +74,7 @@ export async function parse3MFBoolean(input: BinaryInput, options: ThreeMFOption
   let built = 0;
   const read = await read3MF(input, options, {
     booleans: true,
+    welded: true,
     // A base may be another extension's shape.
     levelSets: true,
     element(model, name, a) {
@@ -72,6 +86,12 @@ export async function parse3MFBoolean(input: BinaryInput, options: ThreeMFOption
       }
     },
     instance(model, object, m, scale) {
+      if (evaluate && object.levelSet)
+        throw new LoaderError(
+          F,
+          'unsupported',
+          `object ${object.id.slice(0, 32)} is a volumetric level set; parse3MFBoolean meshes none (evaluate: false reads the shapes)`,
+        );
       const found = listed.get(model)?.get(object.id);
       if (!found) return;
       found.instances.push(m.map((v) => v * scale));
@@ -106,9 +126,9 @@ export async function parse3MFBoolean(input: BinaryInput, options: ThreeMFOption
               bad(`${what} is not defined before it`);
             if (target!.type !== 'model' || target!.components.length || target!.alternatives.length)
               bad(`${what} must be a model shape without components or alternatives`);
-            if (!isBase && (!target!.mesh || extended.get(owner)?.has(objectId)))
+            if (!isBase && (!target!.mesh || target!.boolean || extended.get(owner)?.has(objectId)))
               bad(`${what} must be a plain triangle mesh`);
-            const mesh = target!.mesh,
+            const mesh = target!.boolean ? undefined : target!.mesh,
               ownerPath = partPath(owner);
             return {
               objectId,
@@ -128,6 +148,21 @@ export async function parse3MFBoolean(input: BinaryInput, options: ThreeMFOption
           };
           own.set(id, shape);
           shapes.push(shape);
+          if (!evaluate) continue;
+          throwIfAborted(options.signal, F);
+          const inputs = [data.base, ...data.operands].map(({ objectId, path, transform }) => {
+            const owner = path ? models.get(path.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase())! : model,
+              target = owner.objects.get(objectId)!;
+            if (extended.get(owner)?.has(objectId) || !target.mesh)
+              throw new LoaderError(
+                F,
+                'unsupported',
+                `${label}: its base ${objectId.slice(0, 32)} is a displacement mesh, a level set or another extension's shape, which parse3MFBoolean does not evaluate (evaluate: false reads the shapes)`,
+              );
+            return { model: owner, object: target, transform };
+          });
+          // Later shapes read this one as a mesh.
+          object.mesh = await booleanMesh(model, id, shape.operation, inputs, limits(options, F).maxTriangles);
         }
       }
     },

@@ -74,7 +74,18 @@ test('boolean steps chain shapes over the node mesh and its operands, which read
 
   await assert.rejects(parse3MF(file), { code: 'unsupported', message: /parse3MFBoolean/ });
   const read = await parse3MFBoolean(file, { units: 'file' });
-  assert.equal(read.indices.length, 0);
+  // (box ∩ clip) ∪ drill ∪ clip spans x from -0.5 to 1.5 over a unit cross-section: a volume of 2.
+  let volume = 0;
+  for (let t = 0; t < read.indices.length; t += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) =>
+      read.positions.subarray(read.indices[t + k] * 3, read.indices[t + k] * 3 + 3),
+    );
+    volume +=
+      (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
+      6;
+  }
+  assert.ok(Math.abs(volume - 2) < 1e-5, `${volume}`);
+  assert.equal((await parse3MFBoolean(file, { evaluate: false })).indices.length, 0);
   assert.deepEqual(
     read.shapes.map((s) => [s.objectId, s.operation, s.base.objectId, s.operands.length, s.instances.length]),
     [

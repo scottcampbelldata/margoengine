@@ -1063,7 +1063,7 @@ console.log(preview.indices.length / 3);
 
 ## 3MF boolean shapes
 
-`parse3MFBoolean` returns each shape with its `operation`, its `base` and `operands` (each with a transform and, for a mesh, its triangles) and the places the build puts it, and refuses what the extension rules out. It does not evaluate the operations.
+`parse3MFBoolean` returns each shape with its `operation`, its `base` and `operands` (each with a transform and, for a mesh, its triangles) and the places the build puts it, and refuses what the extension rules out. Each shape is also evaluated, and its surface joins the result's triangles where the build places it: the exact n-ary boolean of `@margoengine/mesh-edit` applies the operands in order on the base, transforms first, and each face keeps the colour of the surface it came from (none when that surface has no property). Inputs must be closed, outward solids without flat triangles. A base that is a displacement mesh or a level set is not evaluated, and a package that builds a level set is refused (`unsupported`). `evaluate: false` reads the shapes only. Evaluating needs the optional `@margoengine/mesh-edit` peer, loaded only for a package with a shape.
 
 ```ts
 import { export3MF } from 'margoengine/exporters/threemf';
@@ -1077,6 +1077,9 @@ const file = await export3MF(
 );
 const { shapes } = await parse3MFBoolean(file);
 console.log(shapes[0].operation, shapes[0].operands.length);
+// The shapes alone, without evaluating them.
+const structure = await parse3MFBoolean(file, { evaluate: false });
+console.log(structure.indices.length);
 ```
 
 ## 3MF encrypted parts

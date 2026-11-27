@@ -13,6 +13,10 @@ export interface ThreeMFBooleanOperand {
     };
 }
 
+export interface ThreeMFBooleanOptions extends ThreeMFOptions {
+    evaluate?: boolean;
+}
+
 export interface ThreeMFBooleanResult extends ThreeMFResult {
     shapes: ThreeMFBooleanShape[];
 }
@@ -27,7 +31,7 @@ export interface ThreeMFBooleanShape {
     instances: Float64Array[];
 }
 
-export function parse3MFBoolean(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFBooleanResult>;
+export function parse3MFBoolean(input: BinaryInput, options?: ThreeMFBooleanOptions): Promise<ThreeMFBooleanResult>;
 
 // Not exported from this entry, but used by the exports above:
 

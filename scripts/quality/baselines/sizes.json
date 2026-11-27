@@ -15109,6 +15109,12 @@
       "commit": "lane-e",
       "reason": "parse3MFVolumetric evaluates the extension functions (image stacks and every native node but beamlattice) and meshes level sets: loaders/threemf-volumetric 13,980 to 18,748 B gzip; marching cubes, the BVH and the PNG reader stay optional peers behind import(). A separate entry would move the evaluator behind a second import that this entry needs by default.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e",
+      "reason": "parse3MFBoolean evaluates boolean shapes: loaders/threemf-boolean 12,596 to 14,069 B gzip; the exact boolean stays the optional mesh-edit peer behind import(). A separate entry would move the colour and operand code behind a second import that this entry needs by default.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15752,7 +15758,7 @@
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
-    "@margoengine/loaders/threemf-boolean": 12864,
+    "@margoengine/loaders/threemf-boolean": 14492,
     "@margoengine/loaders/threemf-displacement": 16281,
     "@margoengine/loaders/threemf-lattice": 19099,
     "@margoengine/loaders/threemf-materials": 15403,

@@ -1672,7 +1672,7 @@ console.log(`${file.length} bytes`);
 
 ### Boolean shapes
 
-The [3MF Boolean Operations Extension](https://github.com/3MFConsortium/spec_booleans) lets a file ask its reader to unite, subtract or intersect meshes. `objectInfo`'s `boolean` takes a step, `{ operation, operands }`, or a list of steps applied in order: `operation` is `'union'` (default), `'difference'` or `'intersection'`, and each operand is a closed mesh node in the node's frame, written once however often it is named. The node's own mesh is the base and keeps its material; the file requires the extension. It needs a `model` object of the node's own, without slices or alternatives. Margo writes the operations; it does not evaluate them. `parse3MFBoolean` (`@margoengine/loaders/threemf-boolean`) reads them back.
+The [3MF Boolean Operations Extension](https://github.com/3MFConsortium/spec_booleans) lets a file ask its reader to unite, subtract or intersect meshes. `objectInfo`'s `boolean` takes a step, `{ operation, operands }`, or a list of steps applied in order: `operation` is `'union'` (default), `'difference'` or `'intersection'`, and each operand is a closed mesh node in the node's frame, written once however often it is named. The node's own mesh is the base and keeps its material; the file requires the extension. It needs a `model` object of the node's own, without slices or alternatives. The exporter writes the operations, not their result; `parse3MFBoolean` evaluates them. `parse3MFBoolean` (`@margoengine/loaders/threemf-boolean`) reads them back.
 
 ```ts
 import { export3MF } from 'margoengine/exporters/threemf';

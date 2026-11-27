@@ -252,6 +252,7 @@
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
+    "@margoengine/mesh-edit": "^1.0.0",
     "@margoengine/procedural": "^1.0.0"
   },
   "peerDependenciesMeta": {
@@ -265,6 +266,9 @@
       "optional": true
     },
     "@margoengine/materials": {
+      "optional": true
+    },
+    "@margoengine/mesh-edit": {
       "optional": true
     },
     "@margoengine/procedural": {
