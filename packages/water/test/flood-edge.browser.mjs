@@ -77,4 +77,3 @@ try {
 } finally {
   await closeAll([browser.close]);
 }
-

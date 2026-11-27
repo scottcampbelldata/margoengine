@@ -27,7 +27,11 @@ test('the separately bounded Water GPU suites retain all browser cases', () => {
   const files = readdirSync(here)
     .filter((name) => name.endsWith('.browser.mjs'))
     .map((name) => `node test/${name}`);
-  files.push('node test/underwater.browser.mjs --single');
+  files.push(
+    'node test/underwater.browser.mjs --single',
+    'node test/wake-agreement.browser.mjs --lateral-course',
+    'node test/wake-agreement.browser.mjs --panel-hull',
+  );
   assert.deepEqual(batches.flat().sort(), files.sort());
 
   const batchOf = (file) => batches.findIndex((batch) => batch.includes(`node test/${file}.browser.mjs`));
