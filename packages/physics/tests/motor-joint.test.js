@@ -107,8 +107,8 @@ test('a motor joint keeps a body at its offset from an anchor that moves, and it
   assert.ok(Math.abs(relative(a, b).p[1] - 2) < 1e-3, `new offset ${relative(a, b).p}`);
   joint.setMotorCaps(1, 1);
   assert.throws(() => joint.setMotorTarget([0, Number.NaN, 0]));
-  assert.throws(() => joint.setMotorTarget([0, 0, 0], [0, 0, 0, 2]), RangeError);
-  assert.throws(() => joint.setMotorCaps(-1, 1), RangeError);
-  assert.throws(() => physics.addJoint(a, b, { type: 'spherical' }).setMotorTarget([0, 0, 0]), TypeError);
+  assert.throws(() => joint.setMotorTarget([0, 0, 0], [0, 0, 0, 2]), { code: 'unsupported' });
+  assert.throws(() => joint.setMotorCaps(-1, 1), { code: 'unsupported' });
+  assert.throws(() => physics.addJoint(a, b, { type: 'spherical' }).setMotorTarget([0, 0, 0]), { code: 'unsupported' });
   physics.dispose();
 });

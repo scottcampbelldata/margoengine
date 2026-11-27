@@ -39,6 +39,13 @@ export interface DebugRenderOptions {
   pseudoNormals?: boolean;
   /** The three axes of each body at its origin, red x, green y and blue z, `axisLength` metres long (default false; Rapier's `RIGID_BODY_AXES`). */
   axes?: boolean;
+  /**
+   * Each joint's frames and limits (default false): frame A's axes at anchor A (red x, green y, blue z, `jointFrameLength`
+   * metres long), frame B's at anchor B at 0.6 of that, and in the `jointLimit` colour an arc from min to max for each limited
+   * turn, a bar from min to max along each limited slide, a cone's swing rim, and a cross at a rope's or spring's distance stops.
+   * Drawn for the joints `joints` draws.
+   */
+  jointFrames?: boolean;
   /** Colours and sizes, each left out one keeping its default (Rapier's `DebugRenderStyle`). */
   style?: DebugStyle;
 }
@@ -63,6 +70,10 @@ export interface DebugStyle {
   solverContact?: DebugColor;
   pseudoNormal?: DebugColor;
   box?: DebugColor;
+  /** The arcs, bars and rims of joint limits drawn by `jointFrames` (default [1, 0.8, 0.25, 1]). */
+  jointLimit?: DebugColor;
+  /** The length of joint frame A's axes drawn by `jointFrames`, in metres (default 0.25). */
+  jointFrameLength?: number;
   /** The line along each contact normal, in metres. */
   normalLength?: number;
   /** The length of each body axis, in metres. */
@@ -149,6 +160,96 @@ export class DebugLineWriter {
   }
   finish(): DebugLines {
     return { vertices: new Float32Array(this.positions), colors: new Float32Array(this.colors) };
+  }
+}
+
+const LIMIT: Color = [1, 0.8, 0.25, 1],
+  AXIS_COLORS: readonly Color[] = [
+    [1, 0.2, 0.2, 1],
+    [0.2, 1, 0.2, 1],
+    [0.3, 0.4, 1, 1],
+  ],
+  UNIT: readonly V[] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+  ],
+  DOF_NAMES = ['linX', 'linY', 'linZ', 'angX', 'angY', 'angZ'] as const,
+  STEP = Math.PI / 12;
+
+/** A joint's frames at its anchors `a` and `b`, and its limits: arcs for turns, bars for slides, a cone's rim, a distance's stops. */
+function frameLines(out: DebugLineWriter, joint: PhysicsJoint, a: V, b: V, qa: Q, qb: Q, style: DebugStyle): void {
+  const length = style.jointFrameLength ?? 0.25,
+    limit = (style.jointLimit as Color | undefined) ?? LIMIT,
+    tick = 0.1 * length,
+    at = (origin: V, d: V, s: number): V => [origin[0] + d[0] * s, origin[1] + d[1] * s, origin[2] + d[2] * s];
+  if (joint.type === 'rope' || joint.type === 'spring') {
+    // One axis, the line between the anchors: a cross where each stop is.
+    const range = joint.axisLimits('linX');
+    if (!range) return;
+    const gap: V = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+      size = Math.hypot(gap[0], gap[1], gap[2]),
+      line: V = size > 1e-9 ? [gap[0] / size, gap[1] / size, gap[2] / size] : [1, 0, 0];
+    for (const d of range)
+      if (d > 0 && Number.isFinite(d)) {
+        const p = at(a, line, d);
+        for (const e of UNIT) out.segment(at(p, e, -tick), at(p, e, tick), limit);
+      }
+    return;
+  }
+  const fa = multiply(qa, joint.frameA),
+    fb = multiply(qb, joint.frameB),
+    axes = UNIT.map((e) => rotate(fa, e));
+  for (let k = 0; k < 3; k++) {
+    out.segment(a, at(a, axes[k]!, length), AXIS_COLORS[k]!);
+    out.segment(b, at(b, rotate(fb, UNIT[k]!), 0.6 * length), AXIS_COLORS[k]!);
+  }
+  // A turn about axis i by theta takes axis i + 1 to cos(theta) (i + 1) + sin(theta) (i + 2).
+  const radius = 0.8 * length,
+    arc = (i: number, lo: number, hi: number): void => {
+      const span = Math.min(hi - lo, 2 * Math.PI),
+        n = Math.max(1, Math.ceil(span / STEP)),
+        ref = axes[(i + 1) % 3]!,
+        perp = axes[(i + 2) % 3]!,
+        point = (theta: number): V =>
+          at(at(a, ref, radius * Math.cos(theta)), perp, radius * Math.sin(theta));
+      for (let j = 0; j < n; j++) out.segment(point(lo + (span * j) / n), point(lo + (span * (j + 1)) / n), limit);
+      out.segment(a, point(lo), limit);
+      out.segment(a, point(lo + span), limit);
+    };
+  const cone = joint.cone;
+  if (cone) {
+    // The swing's edge: frame A's x turned by the rotation vector (0, y cos phi, z sin phi) of the ellipse.
+    const [y, z] = cone.swing,
+      edge = (phi: number): V => {
+        const ry = y * Math.cos(phi),
+          rz = z * Math.sin(phi),
+          angle = Math.hypot(ry, rz),
+          s = Math.sin(angle / 2) / angle,
+          turned = rotate([0, ry * s, rz * s, Math.cos(angle / 2)], UNIT[0]!);
+        return at(a, rotate(fa, turned), radius);
+      };
+    for (let j = 0; j < 24; j++) {
+      out.segment(edge(j * 2 * STEP), edge((j + 1) * 2 * STEP), limit);
+      if (j % 6 === 0) out.segment(a, edge(j * 2 * STEP), limit);
+    }
+    if (cone.twist) arc(0, cone.twist[0], cone.twist[1]);
+    return;
+  }
+  for (let k = 0; k < 6; k++) {
+    const range = joint.axisLimits(DOF_NAMES[k]!);
+    if (!range) continue;
+    if (k >= 3) {
+      arc(k - 3, range[0], range[1]);
+      continue;
+    }
+    const [lo, hi] = range.map((v) => (Number.isFinite(v) ? v : 0)) as [number, number],
+      side = axes[(k + 1) % 3]!;
+    out.segment(at(a, axes[k]!, lo), at(a, axes[k]!, hi), limit);
+    for (const end of [lo, hi]) {
+      const p = at(a, axes[k]!, end);
+      out.segment(at(p, side, -tick), at(p, side, tick), limit);
+    }
   }
 }
 
@@ -257,6 +358,7 @@ export function debugLines(
       axes = false,
       solverContacts = false,
       pseudoNormals = false,
+      jointFrames = false,
       filter,
     } = options,
     style = options.style ?? {},
@@ -505,6 +607,7 @@ export function debugLines(
       out.segment(a, b, color);
       out.segment(a, bodyPose(joint.bodyA).p, color);
       out.segment(b, bodyPose(joint.bodyB).p, color);
+      if (jointFrames) frameLines(out, joint, a, b, bodyPose(joint.bodyA).q, bodyPose(joint.bodyB).q, style);
     }
   if (contacts)
     for (const manifold of world.contacts()) {

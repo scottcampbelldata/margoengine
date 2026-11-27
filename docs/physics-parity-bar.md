@@ -84,6 +84,15 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
 - **Motors:** velocity and position on each free axis, with max force; break force; enable or disable collision
   between connected bodies.
 - **Reduced-coordinate chains:** multibody chains (Rapier has them) for robot arms and ragdolls.
+- **Today (2026-11-27):** every joint kind of the list is built (fixed, spherical, cone, revolute, prismatic, pin-slot,
+  rope, spring, generic, motor, and `DistanceJoint` with a range), Rapier rows J-01 to J-28 DONE. `setAxisLimits` and
+  `setAxisMotor` now work on every free axis of every joint (ball joints per turn, a spring's least and greatest length,
+  a rope's least length), with `axisLimits` to read them; motors take velocity or position targets and `maxForce`;
+  break limits, `contactsEnabled` and multibody chains were already in. Joint, multibody and mechanism errors are coded
+  `MargoError`s linked to `#physics-joints`. Quick start (9 lines), three.js and Rapier migration note and the
+  `jointFrames` debug view (frame axes, limit arcs and bars, cone rims) are in the physics README "Joints and motors";
+  example page `examples/physics-joints.html` (hinged door, motorised arm, chain). Tests:
+  `packages/physics/tests/joint-axes.test.js`. Speed against the rival's demo waits for the quiet speed phase.
 
 ### P4. DYN-07 Character controller and ragdoll
 
@@ -214,7 +223,7 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 |---|---|---|---|---|---|
 | DYN-01 | 3D rigid body and contact | B Havok; T Rapier/Ammo/Jolt | P1 | CLAIMED, 234/254 Rapier rows | PERFECT |
 | DYN-02 | 2D rigid body | none | Base | CLAIMED | MEETS |
-| DYN-03 | Articulated bodies, joints, motors | B constraints; T rapier joints | P3 | CLAIMED, partial | PERFECT |
+| DYN-03 | Articulated bodies, joints, motors | B constraints; T rapier joints | P3 | LANDED 2026-11-27 (see P3) | PERFECT |
 | DYN-04 | Wheeled vehicles | T rapier vehicle | P5 | CLAIMED, P5 met but speed (quiet phase) | PERFECT |
 | DYN-05 | Rail vehicle dynamics | none | Base | REOPENED | MEETS |
 | DYN-06 | Mass properties, collision geometry | B shapes; T helpers | P2 | CLAIMED, partial | PERFECT |

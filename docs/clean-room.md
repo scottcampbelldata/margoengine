@@ -42,6 +42,22 @@ is written clean room in pure TypeScript over Margo's own `@margoengine/physics`
   contract (docs/physics-framework.md) with hydrostatic gauge pressure rho g (eta - y); the band-edge test of
   `fft-cpu.ts` follows the shader's binary32 wave number so both include the same modes. Margo's own; no engine read.
 
+### Joint axes, the joint debug view and joint errors (DYN-03)
+
+Limits and motors on every free axis of every joint reuse the kernel's joint rows of PK24 below, unchanged: a limit is
+rigid up to its edge and soft past it, a motor a soft row in implicit form (Erin Catto, "Soft Constraints", GDC 2011),
+and a rope's or spring's distance row with a least and a greatest stop is the maximum-distance row of Matthias Müller,
+Miles Macklin, Nuttapong Chentanez, Stefan Jeschke and Tae-Yong Kim, "Detailed Rigid Body Simulation with Extended
+Position Based Dynamics" (SCA 2020, Eq. 25) bounded on both sides. Reduced-coordinate chains are the existing multibody
+(Roy Featherstone, "Rigid Body Dynamics Algorithms", Springer 2008). The debug view's arcs are the turn of a frame axis
+about another (a rotation of axis i + 1 toward i + 2), and a cone's rim the swing ellipse of its rotation vector, as the
+cone row measures it (Dobrowolski 2015, PK24); both own geometry. The three.js migration note names Rapier's JavaScript
+API calls as its public user guide lists them (rapier.rs, "Joints" and "Multibody joints"); no Rapier, three.js, Ammo,
+Bullet, Havok or Babylon source was read.
+[Catto 2011](https://box2d.org/files/ErinCatto_SoftConstraints_GDC2011.pdf),
+[Müller et al. 2020](https://doi.org/10.1111/cgf.14105),
+[Featherstone 2008](https://doi.org/10.1007/978-1-4899-7560-7).
+
 ### Volumetric solids and vertex block descent (SOFT-04)
 
 Anka He Chen, Ziheng Liu, Yin Yang and Cem Yuksel, “Vertex Block Descent” (2024), §3.1–3.3, describes implicit

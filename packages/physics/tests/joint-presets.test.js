@@ -59,8 +59,8 @@ test('a wheel joint hangs on its spring at g over omega squared, and drives and 
   mount.drive(8);
   for (let i = 0; i < 120; i++) physics.step();
   near(wheel.angularVelocity[0], 8, 0.4, 'the drive motor spins the wheel about the axle');
-  assert.throws(() => mount.steer(0.3), RangeError);
-  assert.throws(() => addWheelJoint(physics, chassis, wheel, { frequency: 0 }), RangeError);
+  assert.throws(() => mount.steer(0.3), { code: 'unsupported' });
+  assert.throws(() => addWheelJoint(physics, chassis, wheel, { frequency: 0 }), { code: 'unsupported' });
 });
 
 test('a steerable wheel hangs from a knuckle that turns about the suspension axis', () => {

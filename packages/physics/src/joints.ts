@@ -1,6 +1,6 @@
 // A joint on the own solver: the names of ../joints.ts, written straight into the kernel's joint columns. No `Math`: a value
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
-import { MargoError } from '@margoengine/math/errors';
+import { jointFault, jointInput } from './joint-errors.js';
 import {
   JOINT_BROKEN,
   JOINT_CONE,
@@ -70,7 +70,18 @@ export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
 /** Options for adding a joint between two bodies. */
 export type JointOptions =
   | (JointBase & { type: 'fixed'; frameA?: Quat; frameB?: Quat })
-  | (JointBase & { type: 'spherical' })
+  /**
+   * A ball joint: the anchors meet and every turn is free. `limits` and `motors` bound and drive each turn (`angX`, `angY`,
+   * `angZ`, the parts of frame B's turn in frame A as a rotation vector), measured in the joint's frames `frameA` and `frameB`
+   * (default identity), as a generic joint with its sliding axes locked. A cone joint holds a swing as one angle instead.
+   */
+  | (JointBase & {
+      type: 'spherical';
+      frameA?: Quat;
+      frameB?: Quat;
+      limits?: Readonly<Partial<Record<JointDof, readonly [number, number]>>>;
+      motors?: Readonly<Partial<Record<JointDof, MotorOptions>>>;
+    })
   /**
    * Keeps the anchors at most `length` apart and lets them come closer (a slack rope or chain link). A `motor` is a winch:
    * its `targetVelocity` is the speed the distance between the anchors changes at, so a negative one reels them in.
@@ -87,6 +98,10 @@ export type JointOptions =
       stiffness: number;
       damping?: number;
       model?: 'force' | 'acceleration';
+      /** The least distance between the anchors, a hard stop the spring cannot pull past (default none). */
+      minLength?: number;
+      /** The greatest distance between the anchors, a hard stop the spring cannot stretch past (default none). */
+      maxLength?: number;
     })
   /**
    * A pin that slides in a slot: it slides along `axis` (or frame X) and turns about it, and holds every other motion. Give
@@ -222,18 +237,18 @@ function springForm(motor: MotorOptions): MotorOptions {
   const { frequency, dampingRatio } = motor;
   if (frequency === undefined) {
     if (dampingRatio !== undefined)
-      throw new RangeError('A damping ratio goes with a frequency; pass `frequency` in hertz too.');
+      throw jointInput('A damping ratio goes with a frequency; pass `frequency` in hertz too.');
     return motor;
   }
   if (!(frequency >= 0) || !Number.isFinite(frequency))
-    throw new RangeError(
+    throw jointInput(
       "Motor frequency must be a finite number of at least 0 hertz; pass the spring's natural frequency.",
     );
   const zeta = dampingRatio ?? 1;
   if (!(zeta >= 0) || !Number.isFinite(zeta))
-    throw new RangeError('Motor dampingRatio must be a finite number of at least 0; 1 is critical damping.');
+    throw jointInput('Motor dampingRatio must be a finite number of at least 0; 1 is critical damping.');
   if (motor.model === 'force')
-    throw new RangeError(
+    throw jointInput(
       "A frequency and damping ratio are per kilogram; use model 'acceleration' (the default), or give stiffness and damping.",
     );
   const omega = 6.283185307179586 * frequency;
@@ -242,17 +257,17 @@ function springForm(motor: MotorOptions): MotorOptions {
 
 function checkLimits(min: number, max: number): void {
   if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)
-    throw new RangeError('Joint limits need finite min <= max');
+    throw jointInput('Joint limits need finite min <= max');
 }
 function swingLimits(swing: number | readonly [number, number]): readonly [number, number] {
   const [y, z] = typeof swing === 'number' ? [swing, swing] : swing;
   if (!(y > 0 && z > 0 && Number.isFinite(y) && Number.isFinite(z)))
-    throw new RangeError('A cone needs a swing above 0; pass radians, or [aboutY, aboutZ].');
+    throw jointInput('A cone needs a swing above 0; pass radians, or [aboutY, aboutZ].');
   return [y, z];
 }
 function checkFrame(frame: Quat): void {
   if (frame.length !== 4 || !frame.every(Number.isFinite) || !frame.some((value) => value !== 0))
-    throw new RangeError('Joint frames must be four finite numbers, not all zero; pass a quaternion [x, y, z, w].');
+    throw jointInput('Joint frames must be four finite numbers, not all zero; pass a quaternion [x, y, z, w].');
 }
 
 /** What a joint's rows read as the force on body B: the sign of the solver's impulse on body A. */
@@ -353,7 +368,7 @@ export class PhysicsJoint {
   /**
    * Turns the joint's frame on each body, in place of the ones it was made with: the axis a hinge turns about, the axes a
    * generic joint locks and limits. Turn both together to keep the rest pose; the bodies wake.
-   * @throws RangeError for a frame that is not four finite numbers, not all zero.
+   * @throws MargoError (`unsupported`) for a frame that is not four finite numbers, not all zero.
    */
   setFrames(frameA: Quat, frameB: Quat): this {
     this.live();
@@ -364,7 +379,7 @@ export class PhysicsJoint {
     return this;
   }
   private live(): void {
-    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.removed) throw jointFault('state', 'Joint was removed; create a new one with physics.addJoint.');
   }
   /**
    * False takes the joint out of the solve, and true puts it back; the joint keeps its limits, motors and break limits. The
@@ -424,19 +439,19 @@ export class PhysicsJoint {
    * Swaps the two bodies, anchors and frames, and mirrors every limit, motor target and joint angle, so the joint holds
    * the same pose as before from the other body. A hinge or slider, a ball joint, a fixed joint, a rope, a spring and a
    * generic joint with at most one limited or driven axis flip exactly.
-   * @throws TypeError for a cone, a rotation motor, a joint in a multibody, and a joint with limits or motors on more than one
+   * @throws MargoError (`unsupported`) for a cone, a rotation motor, a joint in a multibody, and a joint with limits or motors on more than one
    *   turning axis, or on a sliding axis together with a free turning axis: those do not mirror axis by axis.
    * @throws MargoError (`state`) for a removed joint.
    */
   flip(): this {
     this.live();
     if (this.owner.holdsMultibody(this))
-      throw new TypeError('A joint of a multibody cannot be flipped; flip the tree by choosing its root.');
+      throw jointInput('A joint of a multibody cannot be flipped; flip the tree by choosing its root.');
     const columns = this.owner.kernel.columns,
       { row } = this,
       flags = columns.jointFlags[row];
     if (flags & (JOINT_CONE | JOINT_DRIVE) || columns.jointCouple[row] !== 0 || columns.jointSoft[row] !== 0)
-      throw new TypeError(
+      throw jointInput(
         'A cone, a rotation motor, coupled axes or a soft joint does not mirror axis by axis; make it again with the bodies swapped.',
       );
     const distance = (flags & JOINT_DISTANCE) !== 0,
@@ -446,11 +461,11 @@ export class PhysicsJoint {
       actedSlides = [0, 1, 2].filter(acted).length;
     if (!distance) {
       if (actedTurns > 0 && lockedTurns < 2)
-        throw new TypeError(
+        throw jointInput(
           'Only one turning axis may be free when a joint flips; lock the other two, or make the joint again with the bodies swapped.',
         );
       if (actedSlides > 0 && lockedTurns < 3)
-        throw new TypeError(
+        throw jointInput(
           'A joint with a limit or motor on a sliding axis flips only with all its turning axes locked.',
         );
     }
@@ -483,10 +498,12 @@ export class PhysicsJoint {
   }
   /** The one axis a hinge or a slider moves on. */
   private unit(): number {
-    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.removed) throw jointFault('state', 'Joint was removed; create a new one with physics.addJoint.');
     if (this.type === 'revolute') return TURN;
     if (this.type === 'prismatic') return SLIDE;
-    throw new TypeError('Limits and motors need a revolute or prismatic joint');
+    throw jointInput(
+      'Limits and motors need a revolute or prismatic joint for setLimits and setMotor; name the axis with setAxisLimits or setAxisMotor on any other joint.',
+    );
   }
   /** Angle (revolute, radians) or translation (prismatic) limits. */
   setLimits(min: number, max: number): this {
@@ -510,8 +527,8 @@ export class PhysicsJoint {
   }
   /** A cone's limits: its swing and, with `twist` given, its twist. With no `twist` the joint twists freely. */
   setCone(swing: number | readonly [number, number], twist?: readonly [number, number]): this {
-    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'cone') throw new TypeError('setCone needs a cone joint');
+    if (this.removed) throw jointFault('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'cone') throw jointInput('setCone needs a cone joint; use setAxisLimits on any other joint.');
     const [y, z] = swingLimits(swing),
       { row } = this,
       columns = this.owner.kernel.columns;
@@ -549,7 +566,7 @@ export class PhysicsJoint {
       columns = this.owner.kernel.columns,
       cap = motor.maxForce ?? Infinity,
       position = motor.targetPosition;
-    if (!(cap >= 0)) throw new RangeError('Motor maxForce must be 0 or more; pass newtons or newton metres.');
+    if (!(cap >= 0)) throw jointInput('Motor maxForce must be 0 or more; pass newtons or newton metres.');
     columns[`jointTarget${axis}`][row] = position ?? 0;
     columns[`jointSpeed${axis}`][row] = motor.targetVelocity ?? 0;
     columns[`jointStiffness${axis}`][row] = position === undefined ? 0 : (motor.stiffness ?? 1);
@@ -561,36 +578,67 @@ export class PhysicsJoint {
     this.wake();
     return this;
   }
-  /** A generic joint's axis by name, one it does not lock. */
+  /** An axis of any joint by name, one it does not lock: a rope's, a spring's and a distance-kind joint's one axis is linX, its distance. */
   private free(dof: JointDof): number {
-    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'generic' && this.type !== 'pinSlot')
-      throw new TypeError(
-        'Axis limits and motors need a generic joint (or a pin-slot joint); use setLimits or setMotor.',
-      );
+    if (this.removed) throw jointFault('state', 'Joint was removed; create a new one with physics.addJoint.');
     const axis = DOFS.indexOf(dof);
-    if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
-    if (this.owner.kernel.columns.jointFlags[this.row] & (JOINT_LOCK << axis))
-      throw new RangeError(`The joint locks ${dof}, so it has no range to limit or drive; leave it out of locked.`);
+    if (axis < 0) throw jointInput(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+    if (this.type === 'cone' || this.type === 'motor')
+      throw jointInput(
+        `A ${this.type} joint has no axis limits or motors of its own; use setCone and setRotationMotor on a cone, setMotorTarget on a motor joint.`,
+      );
+    const flags = this.owner.kernel.columns.jointFlags[this.row];
+    if (flags & JOINT_DISTANCE && axis !== SLIDE)
+      throw jointInput(
+        `A ${this.type} joint moves along the line between its anchors only; name linX, the distance between them.`,
+      );
+    if (flags & (JOINT_LOCK << axis))
+      throw jointInput(`The joint locks ${dof}, so it has no range to limit or drive; leave it out of locked.`);
     return axis;
+  }
+  /**
+   * The limits of one axis as `[min, max]`, in radians or units from frame A to frame B (a rope's or a spring's linX is the
+   * distance between the anchors, from 0), or null for an axis with no limit, a locked axis, or a cone's or motor joint's.
+   */
+  axisLimits(dof: JointDof): [number, number] | null {
+    this.live();
+    const axis = DOFS.indexOf(dof),
+      { row } = this,
+      columns = this.owner.kernel.columns,
+      flags = columns.jointFlags[row];
+    if (axis < 0) throw jointInput(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+    if (
+      this.type === 'cone' ||
+      this.type === 'motor' ||
+      !(flags & (JOINT_LIMIT << axis)) ||
+      flags & (JOINT_LOCK << axis) ||
+      (flags & JOINT_CONE && axis > TWIST)
+    )
+      return null;
+    const min = columns[`jointMin${axis}`][row];
+    return [min === -Infinity && flags & JOINT_DISTANCE ? 0 : min, columns[`jointMax${axis}`][row]];
   }
   /**
    * A spherical joint's spring toward `rotation`, a unit quaternion [x, y, z, w] of `bodyB` in the frame of `bodyA`. The
    * joint's frame on `bodyA` moves onto the target and three motors drive the turn left to 0, so it reads true near half a
    * turn, where the vector part of a rotation no longer tells rotations apart. `targetVelocity` is the target's own spin,
    * rad/s in its frame.
-   * @throws TypeError on any other joint type, RangeError for a rotation that is not a unit quaternion.
+   * @throws MargoError (`unsupported`) on any other joint type, and for a rotation that is not a unit quaternion.
    */
   setRotationMotor(rotation: Quat, motor: RotationMotorOptions = {}): this {
-    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.removed) throw jointFault('state', 'Joint was removed; create a new one with physics.addJoint.');
     if (this.type !== 'spherical' && this.type !== 'cone')
-      throw new TypeError('Rotation motors need a spherical joint or a cone joint; use setMotor on a hinge.');
+      throw jointInput('Rotation motors need a spherical joint or a cone joint; use setMotor on a hinge.');
+    if (this.type === 'spherical' && this.owner.kernel.columns.jointFlags[this.row] & (JOINT_LIMIT * (7 << TURN)))
+      throw jointInput(
+        'A rotation motor moves a ball joint frame A onto its target, which its axis limits measure from; use a cone joint, or axis motors.',
+      );
     const [x, y, z, w] = rotation;
     const squared = x * x + y * y + z * z + w * w;
     if (!(squared > 0.998 && squared < 1.002))
-      throw new RangeError('Rotation motors need a unit quaternion [x, y, z, w]; normalize the rotation.');
+      throw jointInput('Rotation motors need a unit quaternion [x, y, z, w]; normalize the rotation.');
     const cap = motor.maxForce ?? Infinity;
-    if (!(cap >= 0)) throw new RangeError('Motor maxForce must be 0 or more; pass newtons or newton metres.');
+    if (!(cap >= 0)) throw jointInput('Motor maxForce must be 0 or more; pass newtons or newton metres.');
     const { row } = this,
       columns = this.owner.kernel.columns,
       spin = motor.targetVelocity;
@@ -625,11 +673,11 @@ export class PhysicsJoint {
   /**
    * A drag on a hinge or a slider's one free axis: a force or torque of `coefficient` times its speed against it (N s/m or N m s/rad),
    * Rapier's joint damping. It takes the axis's motor, so it replaces a motor set before; `0` takes it off.
-   * @throws RangeError for a coefficient below 0 or not finite; TypeError for any joint but a revolute or a prismatic.
+   * @throws MargoError (`unsupported`) for a coefficient below 0 or not finite, and any joint but a revolute or a prismatic.
    */
   setDamping(coefficient: number): this {
     if (!(coefficient >= 0) || !Number.isFinite(coefficient))
-      throw new RangeError('Joint damping must be a finite number of at least 0; pass N s/m or N m s/rad.');
+      throw jointInput('Joint damping must be a finite number of at least 0; pass N s/m or N m s/rad.');
     const axis = this.unit();
     return coefficient === 0
       ? this.clearMotor()
@@ -638,11 +686,11 @@ export class PhysicsJoint {
   /**
    * Dry friction on a hinge or a slider's one free axis: a force or torque of at most `maxForce` (N or N m) against its motion, which
    * brings it to a stop and holds it there while the load stays under that. Takes the axis's motor like {@link PhysicsJoint.setDamping}; `0` takes it off.
-   * @throws RangeError for a force below 0 or not finite; TypeError for any joint but a revolute or a prismatic.
+   * @throws MargoError (`unsupported`) for a force below 0 or not finite, and any joint but a revolute or a prismatic.
    */
   setFriction(maxForce: number): this {
     if (!(maxForce >= 0) || !Number.isFinite(maxForce))
-      throw new RangeError('Joint friction must be a finite number of at least 0; pass N or N m.');
+      throw jointInput('Joint friction must be a finite number of at least 0; pass N or N m.');
     const axis = this.unit();
     return maxForce === 0
       ? this.clearMotor()
@@ -654,11 +702,11 @@ export class PhysicsJoint {
    * tree's joint-space mass matrix, so it acts while the joint is part of a multibody (`physics.addMultibody`), and
    * `multibody.massMatrix()` counts it. With no `dof` it is the axis of a hinge or a slider, or all three turns of a ball
    * joint; a generic joint names its free axis. Default 0.
-   * @throws RangeError for a value below 0 or not finite; TypeError for a joint or axis with no free motion to load.
+   * @throws MargoError (`unsupported`) for a value below 0 or not finite, and a joint or axis with no free motion to load.
    */
   setArmature(inertia: number, dof?: JointDof): this {
     if (!(inertia >= 0) || !Number.isFinite(inertia))
-      throw new RangeError(
+      throw jointInput(
         'Joint armature must be a finite number of at least 0; pass kg m² for a turn or kg for a slide.',
       );
     const columns = this.owner.kernel.columns as never as Record<string, Float32Array>;
@@ -672,25 +720,25 @@ export class PhysicsJoint {
     return columns[`jointArmature${this.armatureAxes(dof)[0]}`]![this.row]!;
   }
   private armatureAxes(dof?: JointDof): number[] {
-    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.removed) throw jointFault('state', 'Joint was removed; create a new one with physics.addJoint.');
     if (this.type === 'spherical') {
       if (dof === undefined) return [TURN, TURN + 1, TURN + 2];
       const axis = DOFS.indexOf(dof);
-      if (axis < TURN) throw new TypeError(`A ball joint turns only; name angX, angY or angZ (got ${String(dof)}).`);
+      if (axis < TURN) throw jointInput(`A ball joint turns only; name angX, angY or angZ (got ${String(dof)}).`);
       return [axis];
     }
     if (dof === undefined) return [this.unit()];
     return [this.free(dof)];
   }
   private motorJoint(): void {
-    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.removed) throw jointFault('state', 'Joint was removed; create a new one with physics.addJoint.');
     if (this.type !== 'motor')
-      throw new TypeError("Motor targets and caps need a motor joint; add one with type: 'motor'.");
+      throw jointInput("Motor targets and caps need a motor joint; add one with type: 'motor'.");
   }
   /**
    * Where a motor joint drives body B: `linearOffset`, its anchor's place in A's anchor frame, and `angularOffset`, a unit
    * quaternion of B's turn in A's frame (default none). Wakes both bodies.
-   * @throws TypeError on any other joint; RangeError for an offset that is not finite or a rotation that is not a unit quaternion.
+   * @throws MargoError (`unsupported`) on any other joint, and an offset that is not finite or a rotation that is not a unit quaternion.
    */
   setMotorTarget(linearOffset: Vec3, angularOffset: Quat = [0, 0, 0, 1]): this {
     this.motorJoint();
@@ -698,7 +746,7 @@ export class PhysicsJoint {
     const [x, y, z, w] = angularOffset,
       squared = x * x + y * y + z * z + w * w;
     if (!(squared > 0.998 && squared < 1.002))
-      throw new RangeError('A motor joint angularOffset is a unit quaternion [x, y, z, w]; normalize it.');
+      throw jointInput('A motor joint angularOffset is a unit quaternion [x, y, z, w]; normalize it.');
     const columns = this.owner.kernel.columns as never as Record<string, Float32Array>,
       n = 1 / sqrtOf(squared),
       { row } = this;
@@ -722,12 +770,12 @@ export class PhysicsJoint {
   }
   /**
    * A motor joint's caps: the most force (N) and torque (N m) it pulls with, each as a vector, `Infinity` for none.
-   * @throws RangeError for a cap below 0.
+   * @throws MargoError (`unsupported`) for a cap below 0.
    */
   setMotorCaps(maxForce: number, maxTorque: number): this {
     this.motorJoint();
     if (!(maxForce >= 0) || !(maxTorque >= 0))
-      throw new RangeError('Motor joint caps must be 0 or more, or Infinity; pass newtons and newton metres.');
+      throw jointInput('Motor joint caps must be 0 or more, or Infinity; pass newtons and newton metres.');
     const columns = this.owner.kernel.columns as never as Record<string, Float32Array>;
     for (let k = 0; k < 6; k++) columns[`jointCap${k}`]![this.row] = k < 3 ? maxForce : maxTorque;
     this.wake();
@@ -736,7 +784,7 @@ export class PhysicsJoint {
   /**
    * A motor joint's spring: its natural frequency in hertz and damping ratio (1, critical, by default), per kilogram, so
    * a body of any mass follows its target the same way while under the caps.
-   * @throws RangeError for a frequency or ratio below 0 or not finite.
+   * @throws MargoError (`unsupported`) for a frequency or ratio below 0 or not finite.
    */
   setMotorSpring(frequency: number, dampingRatio = 1): this {
     this.motorJoint();
@@ -753,21 +801,40 @@ export class PhysicsJoint {
     this.wake();
     return this;
   }
-  /** Generic joints: keeps one free axis between `min` and `max`, in radians or units, from frame A to frame B. */
+  /**
+   * Keeps one axis the joint does not lock between `min` and `max`, in radians or units from frame A to frame B: any turn of a
+   * ball joint, a hinge's angX, a slider's linX, a generic or pin-slot joint's free axes, and the distance (linX, from 0) of a
+   * rope or a spring. A rotation motor moves a ball joint's frame A, so give a limited ball that turns to a rotation a cone.
+   * @throws MargoError (`unsupported`) for an unknown axis, one the joint locks, `min > max`, or a distance below 0.
+   */
   setAxisLimits(dof: JointDof, min: number, max: number): this {
     const axis = this.free(dof);
     checkLimits(min, max);
     const { row } = this,
-      columns = this.owner.kernel.columns;
-    columns[`jointMin${axis}`][row] = min;
+      columns = this.owner.kernel.columns,
+      distance = (columns.jointFlags[row] & JOINT_DISTANCE) !== 0;
+    if (distance && !(min >= 0))
+      throw jointInput('A distance limit is from 0 up; pass [min, max] in metres with min of 0 or more.');
+    // A distance of 0 is no limit at all, as a rope's: the line between coincident anchors has no direction to push along.
+    columns[`jointMin${axis}`][row] = distance && min === 0 ? -Infinity : min;
     columns[`jointMax${axis}`][row] = max;
     columns.jointFlags[row] |= JOINT_LIMIT << axis;
     this.wake();
     return this;
   }
-  /** Generic joints: a motor on one axis, its target in the same measure as {@link PhysicsJoint.setAxisLimits}. */
+  /**
+   * A motor on one axis the joint does not lock, toward `targetVelocity` or as a spring toward `targetPosition`, capped at
+   * `maxForce`; its target is in the same measure as {@link PhysicsJoint.setAxisLimits}. Works on every joint with a free axis
+   * but a spring, whose distance the spring itself drives.
+   * @throws MargoError (`unsupported`) for an unknown or locked axis, a spring, or a motor that is not finite.
+   */
   setAxisMotor(dof: JointDof, motor: MotorOptions): this {
-    return this.drive(this.free(dof), motor);
+    const axis = this.free(dof);
+    if (this.type === 'spring')
+      throw jointInput(
+        "A spring's distance is driven by the spring itself; set its restLength and stiffness, or use a rope with a motor.",
+      );
+    return this.drive(axis, motor);
   }
   /** Turns the motor off: every axis's, on a spherical or generic joint. */
   clearMotor(): this {
@@ -803,11 +870,11 @@ export class PhysicsJoint {
    * Lets this joint's limits give way past their edge as a spring of `hertz` and damping ratio `damping` (default 1), where the
    * default is a stop as stiff as a contact. A softer limit lets a limb go a little past its range under a load and brings it
    * back, as a ragdoll's limits do. `0` takes the world's contact stiffness again. The limit is still rigid up to its edge.
-   * @throws RangeError unless `hertz` is 0 or above and finite, and `damping` above 0.
+   * @throws MargoError (`unsupported`) unless `hertz` is 0 or above and finite, and `damping` above 0.
    */
   setLimitSoftness(hertz: number, damping = 1): this {
     if (!(hertz >= 0) || !Number.isFinite(hertz) || !(damping > 0) || !Number.isFinite(damping))
-      throw new RangeError(
+      throw jointInput(
         "Limit softness needs a frequency of 0 or more hertz (0 is a contact's stiffness) and a damping ratio above 0.",
       );
     const { columns } = this.owner.kernel;
@@ -827,7 +894,7 @@ export class PhysicsJoint {
    * a heavy one sag alike under a steady load, by its acceleration over (2 pi hertz) squared. A frequency of `0` makes that group
    * rigid again, so `setSoftness(0, 1, {hertz: 2})` is a pin that turns like a spring. A hinge's or a slider's turning locks go soft
    * too, and its free axis stays free. A soft lock takes no break limit (its load is a motor's, not a lock's), and `flip` refuses a soft joint.
-   * @throws RangeError unless each frequency is 0 or above and finite, and each damping ratio above 0.
+   * @throws MargoError (`unsupported`) unless each frequency is 0 or above and finite, and each damping ratio above 0.
    */
   setSoftness(hertz: number, damping = 1, angular?: { hertz?: number; damping?: number }): this {
     this.live();
@@ -838,7 +905,7 @@ export class PhysicsJoint {
       [turnHertz, turnDamping],
     ] as const)
       if (!(f >= 0) || !Number.isFinite(f) || !(z > 0) || !Number.isFinite(z))
-        throw new RangeError(
+        throw jointInput(
           'Joint softness needs a frequency of 0 or more hertz (0 is rigid) and a damping ratio above 0.',
         );
     const { row } = this,
@@ -890,11 +957,11 @@ export class PhysicsJoint {
    * never (the default). The load is what the joint's rows give in a substep over the substep's length, taken at the last
    * substep of a step. A joint that breaks solves nothing from then on, lets its bodies collide, wakes them and raises a
    * `jointbreak` event; {@link PhysicsJoint.repair} puts it back.
-   * @throws RangeError unless each limit is above 0 or `Infinity`.
+   * @throws MargoError (`unsupported`) unless each limit is above 0 or `Infinity`.
    */
   setBreakLimits(force: number, torque: number = Infinity): this {
     if (!(force > 0) || !(torque > 0))
-      throw new RangeError('Break limits must be above 0, or Infinity for never; pass newtons and newton metres.');
+      throw jointInput('Break limits must be above 0, or Infinity for never; pass newtons and newton metres.');
     const { columns } = this.owner.kernel;
     columns.jointBreakForce[this.row] = force === Infinity ? 0 : force;
     columns.jointBreakTorque[this.row] = torque === Infinity ? 0 : torque;
@@ -953,9 +1020,9 @@ export function createJoint(
         ? genericLocks(options.locked ?? []) | (couple?.swing ? JOINT_CONE | (JOINT_LIMIT << SWING) : 0)
         : locks[type];
   if (type === 'spring' && options.model !== undefined && options.model !== 'force' && options.model !== 'acceleration')
-    throw new RangeError(`Spring model must be 'force' or 'acceleration'; got ${String(options.model)}.`);
+    throw jointInput(`Spring model must be 'force' or 'acceleration'; got ${String(options.model)}.`);
   if (locked === undefined)
-    throw new TypeError(
+    throw jointInput(
       `Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring, motor or generic.`,
     );
   checkVec(anchorA, 'anchorA');
@@ -964,29 +1031,34 @@ export function createJoint(
   if (type === 'revolute' || type === 'prismatic') {
     const { axis, limits } = options;
     if ((frameA || frameB) && (!frameA || !frameB || axis))
-      throw new TypeError('A joint takes an axis, or frameA and frameB together; pass one or the other.');
+      throw jointInput('A joint takes an axis, or frameA and frameB together; pass one or the other.');
     if (!frameA) {
       checkVec(axis, 'Joint axis');
-      if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw new RangeError('Joint axis must be nonzero');
+      if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw jointInput('Joint axis must be nonzero');
     }
     if (limits) checkLimits(limits[0], limits[1]);
   }
   if (type === 'rope' && !(options.length > 0 && Number.isFinite(options.length)))
-    throw new RangeError('Rope joint length must be a positive finite number; pass the longest anchor distance.');
+    throw jointInput('Rope joint length must be a positive finite number; pass the longest anchor distance.');
   if (type === 'spring') {
     const { restLength, stiffness, damping = 0 } = options;
     if (!(restLength >= 0) || !Number.isFinite(restLength))
-      throw new RangeError('Spring restLength must be a finite number of at least 0; pass the relaxed distance.');
+      throw jointInput('Spring restLength must be a finite number of at least 0; pass the relaxed distance.');
     if (!(stiffness >= 0 && damping >= 0) || !Number.isFinite(stiffness) || !Number.isFinite(damping))
-      throw new RangeError('Spring stiffness and damping must be finite numbers of at least 0; pass N/m and N*s/m.');
+      throw jointInput('Spring stiffness and damping must be finite numbers of at least 0; pass N/m and N*s/m.');
+    const { minLength = 0, maxLength = Infinity } = options;
+    if (!(minLength >= 0) || !Number.isFinite(minLength) || !(maxLength >= minLength) || Number.isNaN(maxLength))
+      throw jointInput(
+        'Spring minLength and maxLength are distances with 0 <= minLength <= maxLength; pass metres, or leave one out.',
+      );
   }
   if (type === 'cone') {
     const { axis, swing, twist } = options;
     if ((frameA || frameB) && (!frameA || !frameB || axis))
-      throw new TypeError('A joint takes an axis, or frameA and frameB together; pass one or the other.');
+      throw jointInput('A joint takes an axis, or frameA and frameB together; pass one or the other.');
     if (axis) {
       checkVec(axis, 'Joint axis');
-      if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw new RangeError('Joint axis must be nonzero');
+      if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw jointInput('Joint axis must be nonzero');
     }
     swingLimits(swing);
     if (twist) checkLimits(twist[0], twist[1]);
@@ -994,14 +1066,14 @@ export function createJoint(
   if (type === 'pinSlot') {
     const { axis, slideLimits, turnLimits } = options;
     if (!axis && !(frameA && frameB))
-      throw new TypeError(
+      throw jointInput(
         'A pin-slot joint needs an axis, or frameA and frameB together; pass the line it slides and turns on.',
       );
     if (axis && (frameA || frameB))
-      throw new TypeError('A joint takes an axis, or frameA and frameB together; pass one or the other.');
+      throw jointInput('A joint takes an axis, or frameA and frameB together; pass one or the other.');
     if (axis) {
       checkVec(axis, 'Joint axis');
-      if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw new RangeError('Joint axis must be nonzero');
+      if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw jointInput('Joint axis must be nonzero');
     }
     if (slideLimits) checkLimits(slideLimits[0], slideLimits[1]);
     if (turnLimits) checkLimits(turnLimits[0], turnLimits[1]);
@@ -1010,7 +1082,7 @@ export function createJoint(
   if (frameB) checkFrame(frameB);
   if (options.breakForce !== undefined || options.breakTorque !== undefined)
     if (!((options.breakForce ?? Infinity) > 0) || !((options.breakTorque ?? Infinity) > 0))
-      throw new RangeError('Break limits must be above 0, or Infinity for never; pass newtons and newton metres.');
+      throw jointInput('Break limits must be above 0, or Infinity for never; pass newtons and newton metres.');
   const spring = type === 'spring' && options.model === 'acceleration' ? ~(JOINT_MOTOR_FORCE << SLIDE) : -1,
     { kernel } = owner,
     row = kernel.addJoint(bodyA.row, bodyB.row, (locked & spring) | (options.contactsEnabled ? JOINT_CONTACTS : 0)),
@@ -1053,6 +1125,18 @@ export function createJoint(
     columns.jointStiffness0[row] = options.stiffness;
     columns.jointDamping0[row] = options.damping ?? 0;
     columns.jointCap0[row] = Infinity;
+    if (options.minLength !== undefined || options.maxLength !== undefined) {
+      // A least distance of 0 is no stop, as a rope's.
+      columns.jointMin0[row] = options.minLength ? options.minLength : -Infinity;
+      columns.jointMax0[row] = options.maxLength ?? Infinity;
+      columns.jointFlags[row] |= JOINT_LIMIT << SLIDE;
+    }
+  }
+  if (type === 'spherical') {
+    for (const [dof, range] of Object.entries(options.limits ?? {}))
+      if (range) joint.setAxisLimits(dof as JointDof, range[0], range[1]);
+    for (const [dof, motor] of Object.entries(options.motors ?? {}))
+      if (motor) joint.setAxisMotor(dof as JointDof, motor);
   }
   if (type === 'cone') {
     if (options.axis) kernel.setJointAxis(row, options.axis);
@@ -1100,40 +1184,40 @@ function coupling(options: Extract<JointOptions, { type: 'generic' }>): Coupling
   const axes = [...new Set(coupled)].sort((a, b) => DOFS.indexOf(a) - DOFS.indexOf(b));
   for (const dof of axes)
     if (!DOFS.includes(dof))
-      throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+      throw jointInput(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
   const slides = axes.filter((dof) => dof.startsWith('lin')),
     turns = axes.filter((dof) => dof.startsWith('ang'));
   if (slides.length && turns.length)
-    throw new TypeError(
+    throw jointInput(
       'Coupled axes are of one kind: sliding axes together, or angY and angZ together; pass one group.',
     );
   if (axes.length < 2)
-    throw new TypeError('Coupled axes need two or three axes to share a limit; pass linY and linZ, for example.');
+    throw jointInput('Coupled axes need two or three axes to share a limit; pass linY and linZ, for example.');
   if (turns.length && !(turns.length === 2 && turns[0] === 'angY' && turns[1] === 'angZ'))
-    throw new TypeError('Coupled turning axes are angY and angZ, the swing across X; pass both of them.');
+    throw jointInput('Coupled turning axes are angY and angZ, the swing across X; pass both of them.');
   const first = axes[0]!;
   for (const dof of axes) {
     if (locked.includes(dof))
-      throw new RangeError(`The joint locks ${dof}, so it cannot be coupled; leave it out of locked.`);
+      throw jointInput(`The joint locks ${dof}, so it cannot be coupled; leave it out of locked.`);
     if (dof !== first && limits[dof])
-      throw new RangeError(
+      throw jointInput(
         `Coupled axes share one limit; put it on the first of them, limits.${first}, not limits.${dof}.`,
       );
     if (motors[dof])
-      throw new RangeError(`Coupled axes have no motor of their own; drive ${dof} with a joint of its own.`);
+      throw jointInput(`Coupled axes have no motor of their own; drive ${dof} with a joint of its own.`);
   }
   const range = limits[first];
   if (!range)
-    throw new RangeError(`Coupled axes need their limit on the first of them, limits.${first}; pass [min, max].`);
+    throw jointInput(`Coupled axes need their limit on the first of them, limits.${first}; pass [min, max].`);
   checkLimits(range[0], range[1]);
   if (slides.length && range[0] < 0)
-    throw new RangeError(
+    throw jointInput(
       'A coupled sliding limit measures a distance, so its min is 0 or more; pass [min, max] from 0.',
     );
   if (turns.length && range[0] !== 0)
-    throw new RangeError('A coupled swing limit has a min of 0 and a max in radians; pass [0, max].');
+    throw jointInput('A coupled swing limit has a min of 0 and a max in radians; pass [0, max].');
   if (turns.length && !(range[1] > 0))
-    throw new RangeError('A coupled swing limit needs a max above 0; pass [0, max] in radians.');
+    throw jointInput('A coupled swing limit needs a max above 0; pass [0, max] in radians.');
   return {
     slide: slides.reduce((mask, dof) => mask | (1 << DOFS.indexOf(dof)), 0),
     swing: turns.length > 0,
@@ -1147,7 +1231,7 @@ function genericLocks(locked: readonly JointDof[]): number {
   let bits = 0;
   for (const dof of locked) {
     const axis = DOFS.indexOf(dof);
-    if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+    if (axis < 0) throw jointInput(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
     bits |= JOINT_LOCK << axis;
   }
   return bits;

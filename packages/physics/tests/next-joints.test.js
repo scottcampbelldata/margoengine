@@ -204,8 +204,8 @@ test('wrong input says what to pass', () => {
   assert.throws(() => joint.setMotor({}), /need a revolute or prismatic joint/);
   const hinge = physics.addJoint(a, b, { type: 'revolute', axis: [1, 0, 0] });
   assert.throws(() => hinge.setMotor({ maxForce: -1 }), /maxForce must be 0 or more/);
-  assert.throws(() => joint.setAxisLimits('angX', 0, 1), /need a generic joint/);
-  assert.throws(() => joint.setAxisMotor('angX', {}), /need a generic joint/);
+  joint.setAxisLimits('angX', 0, 1); // a ball joint limits and drives each turn (DYN-03)
+  joint.setAxisMotor('angX', {});
   const generic = physics.addJoint(a, b, { type: 'generic', locked: ['linX', 'linY', 'linZ'] });
   assert.throws(() => generic.setAxisLimits('linX', 0, 1), /locks linX, so it has no range/);
   assert.throws(() => generic.setAxisLimits('angW', 0, 1), /Unknown joint axis angW/);
@@ -418,13 +418,13 @@ test('maxForce caps a motor at the torque it names, on a ball joint and on a hin
   }
   const physics = new Physics(null),
     { joint } = ballRod(physics);
-  assert.throws(() => joint.setRotationMotor([0, 0, 0, 2]), { name: 'RangeError', message: /unit quaternion/ });
-  assert.throws(() => joint.setRotationMotor([0, 0, 0, 1], { maxForce: -1 }), { name: 'RangeError' });
+  assert.throws(() => joint.setRotationMotor([0, 0, 0, 2]), { code: 'unsupported', message: /unit quaternion/ });
+  assert.throws(() => joint.setRotationMotor([0, 0, 0, 1], { maxForce: -1 }), { code: 'unsupported' });
   const hinge = physics.addJoint(physics.addBody(null, { colliders: [] }), physics.addBody(null, { colliders: [] }), {
     type: 'revolute',
     axis: [0, 0, 1],
   });
-  assert.throws(() => hinge.setRotationMotor([0, 0, 0, 1]), { name: 'TypeError', message: /spherical joint/ });
+  assert.throws(() => hinge.setRotationMotor([0, 0, 0, 1]), { code: 'unsupported', message: /spherical joint/ });
   physics.dispose();
 });
 

@@ -71,7 +71,7 @@ test('setImplicitMotors and pinJoint refuse what they cannot hold', () => {
     (error) => error.code === 'state' && /sliding axes/.test(error.message),
   );
   const pin = physics.addJoint(post, links[3], { type: 'spherical', anchorB: [0, 1 / 8, 0] });
-  assert.throws(() => tree.pinJoint(pin, true, { stiffness: -1 }), RangeError);
+  assert.throws(() => tree.pinJoint(pin, true, { stiffness: -1 }), { code: 'unsupported' });
   tree.pinJoint(pin, true, { stiffness: 1e5, damping: 10 });
   for (let i = 0; i < 60; i++) physics.step(1 / 60);
   physics.dispose();

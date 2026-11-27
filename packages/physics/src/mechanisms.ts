@@ -4,6 +4,7 @@
 // by default or soft, as the constraint of Catto, "Soft Constraints", GDC 2011 (a frequency and a damping ratio). Baraff,
 // "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996, is the form of a constraint between two bodies' coordinates as
 // one row of the system. They act next to the joints that guide the bodies (a hinge for each gear, a slider for a rack).
+import { jointInput } from './joint-errors.js';
 import { checkVec, rotateVec, type Vec3 } from './math.js';
 import type { PhysicsBody } from './body.js';
 import type { Multibody } from './multibody.js';
@@ -13,7 +14,7 @@ type V = [number, number, number];
 const unit = (a: Vec3, label: string): V => {
   checkVec(a, label);
   const n = Math.hypot(a[0], a[1], a[2]);
-  if (!(n > 0)) throw new RangeError(`${label} must not be zero; pass a vector with a length.`);
+  if (!(n > 0)) throw jointInput(`${label} must not be zero; pass a vector with a length.`);
   return [a[0] / n, a[1] / n, a[2] / n];
 };
 
@@ -47,14 +48,14 @@ abstract class Mechanism implements PhysicsAttachment {
   ) {
     const { frequency = 0, damping = 1, correction = 0.2 } = options;
     if (!(frequency >= 0 && Number.isFinite(frequency)))
-      throw new RangeError('Frequency is 0 (rigid) or a number of hertz; pass options.frequency of 0 or above.');
+      throw jointInput('Frequency is 0 (rigid) or a number of hertz; pass options.frequency of 0 or above.');
     if (!(damping >= 0 && Number.isFinite(damping)))
-      throw new RangeError('Damping ratio is 0 or more; pass options.damping of 0 or above.');
+      throw jointInput('Damping ratio is 0 or more; pass options.damping of 0 or above.');
     if (!(correction >= 0 && correction <= 1))
-      throw new RangeError('Correction is a share from 0 to 1; pass options.correction between them.');
+      throw jointInput('Correction is a share from 0 to 1; pass options.correction between them.');
     const slot = physics.kernel.addCoupling(kind, a.row, b.row);
     if (slot < 0)
-      throw new RangeError(
+      throw jointInput(
         'A mechanism joins two different live bodies, and memory may be out; pass two bodies, or remove one first.',
       );
     this.slot = slot;
@@ -108,7 +109,7 @@ export class GearJoint extends Mechanism {
       axisB = unit(options.axisB ?? [0, 0, 1], 'Axis B'),
       ratio = options.ratio ?? 1;
     if (!Number.isFinite(ratio) || ratio === 0)
-      throw new RangeError('A gear ratio is a nonzero number; pass options.ratio other than 0.');
+      throw jointInput('A gear ratio is a nonzero number; pass options.ratio other than 0.');
     super(physics, GEAR, bodyA, bodyB, options);
     physics.kernel.setCoupling(this.slot, 0, axisA);
     physics.kernel.setCoupling(this.slot, 1, axisB);
@@ -137,7 +138,7 @@ export class RackAndPinionJoint extends Mechanism {
       rackAxis = unit(options.rackAxis ?? [1, 0, 0], 'Rack axis'),
       radius = options.radius ?? 1;
     if (!(radius > 0 && Number.isFinite(radius)))
-      throw new RangeError('Pinion radius is a positive number of metres; pass options.radius above 0.');
+      throw jointInput('Pinion radius is a positive number of metres; pass options.radius above 0.');
     super(physics, RACK_AND_PINION, pinion, rack, options);
     physics.kernel.setCoupling(this.slot, 0, pinionAxis);
     physics.kernel.setCoupling(this.slot, 1, rackAxis);
@@ -174,7 +175,7 @@ export class PulleyJoint extends Mechanism {
     checkVec(anchorA, 'Anchor A');
     checkVec(anchorB, 'Anchor B');
     if (!(ratio > 0 && Number.isFinite(ratio)))
-      throw new RangeError('A pulley ratio is a positive number; pass options.ratio above 0.');
+      throw jointInput('A pulley ratio is a positive number; pass options.ratio above 0.');
     super(physics, PULLEY, bodyA, bodyB, options);
     const k = physics.kernel;
     k.setCoupling(this.slot, 2, anchorA);
@@ -228,9 +229,9 @@ export class DistanceJoint extends Mechanism {
     checkVec(anchorA, 'Anchor A');
     checkVec(anchorB, 'Anchor B');
     if (!(min >= 0 && Number.isFinite(min)))
-      throw new RangeError('Distance min is 0 or more metres; pass options.min of 0 or above.');
+      throw jointInput('Distance min is 0 or more metres; pass options.min of 0 or above.');
     if (!(max >= 0 && Number.isFinite(max)) || (max > 0 && max < min))
-      throw new RangeError('Distance max is 0 (none) or at least min, in metres; pass options.max above options.min.');
+      throw jointInput('Distance max is 0 (none) or at least min, in metres; pass options.max above options.min.');
     super(physics, DISTANCE, bodyA, bodyB, options);
     const k = physics.kernel;
     k.setCoupling(this.slot, 2, anchorA);
@@ -262,13 +263,13 @@ export class PathJoint extends Mechanism {
     const { points, motor } = options,
       anchor: V = options.anchor ? ([...options.anchor] as V) : [0, 0, 0];
     if (!Array.isArray(points) || points.length < (options.closed ? 3 : 2) || points.length > 1048576)
-      throw new RangeError(
+      throw jointInput(
         'A path has 2 points or more (3 when closed), up to 1,048,576; pass options.points with that many.',
       );
     points.forEach((point, i) => checkVec(point, `Path point ${i}`));
     checkVec(anchor, 'Anchor');
     if (motor && !(Number.isFinite(motor.speed) && motor.maxForce >= 0 && Number.isFinite(motor.maxForce)))
-      throw new RangeError(
+      throw jointInput(
         'A path motor has a finite speed and a maxForce of 0 or more; pass options.motor with both.',
       );
     super(physics, PATH, base, follower, options);
@@ -282,7 +283,7 @@ export class PathJoint extends Mechanism {
   /** Drives the follower along the curve at `speed` m/s with at most `maxForce` newtons (0 force lets it go). */
   setMotor(speed: number, maxForce: number): this {
     if (!(Number.isFinite(speed) && maxForce >= 0 && Number.isFinite(maxForce)))
-      throw new RangeError('A path motor has a finite speed and a maxForce of 0 or more; pass both.');
+      throw jointInput('A path motor has a finite speed and a maxForce of 0 or more; pass both.');
     this.physics.kernel.setCoupling(this.slot, 10, [speed, maxForce, 0]);
     return this;
   }
@@ -303,7 +304,7 @@ export class DofCoupling extends Mechanism {
   constructor(physics: Physics, links: readonly [Link, Link], options: DofCouplingOptions = {}) {
     const ratio = options.ratio ?? 1;
     if (!Number.isFinite(ratio) || ratio === 0)
-      throw new RangeError('A coupling ratio is a nonzero number; pass options.ratio other than 0.');
+      throw jointInput('A coupling ratio is a nonzero number; pass options.ratio other than 0.');
     const [first, second] = links;
     super(physics, COORDS, first.body, second.body, options);
     this.parents = [first.parent, second.parent];
@@ -334,7 +335,7 @@ type Link = Multibody['links'][number];
  * plus `ratio` times that of link `linkB` stays what it was, Rapier's multibody DOF couplings. The row is on the two links and their
  * parents, so it holds the joint's own coordinate and not the body's angle, and a link may hang from any other. Hinge links and slider
  * links may be mixed (a hinge turns `ratio` radians for each metre a slider moves).
- * @throws TypeError for a body that is not a hinge or slider link of the tree.
+ * @throws MargoError (`unsupported`) for a body that is not a hinge or slider link of the tree.
  */
 export function coupleDofs(
   physics: Physics,
@@ -346,7 +347,7 @@ export function coupleDofs(
   const find = (body: PhysicsBody): Link => {
     const link = multibody.links.find((candidate) => candidate.body === body);
     if (!link || (link.joint.type !== 'revolute' && link.joint.type !== 'prismatic'))
-      throw new TypeError(
+      throw jointInput(
         'A DOF coupling takes two hinge or slider links of the multibody; pass bodies whose joint to their parent is revolute or prismatic.',
       );
     return link;

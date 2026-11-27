@@ -50,8 +50,8 @@ test('limit softness checks its input, reads back, and 0 returns to a contact st
   );
   joint.setLimitSoftness(0);
   assert.equal(joint.limitSoftness[0], 0);
-  assert.throws(() => joint.setLimitSoftness(-1), RangeError);
-  assert.throws(() => joint.setLimitSoftness(NaN), RangeError);
-  assert.throws(() => joint.setLimitSoftness(3, 0), RangeError);
+  assert.throws(() => joint.setLimitSoftness(-1), { code: 'unsupported' });
+  assert.throws(() => joint.setLimitSoftness(NaN), { code: 'unsupported' });
+  assert.throws(() => joint.setLimitSoftness(3, 0), { code: 'unsupported' });
   physics.dispose();
 });

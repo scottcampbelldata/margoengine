@@ -132,6 +132,6 @@ test('two hinge coordinates of a tree are coupled: q_a + ratio q_b holds, and th
   assert.ok(Math.abs(qa + 2 * qb) < 1e-3, `q_a + 2 q_b stays 0: ${qa} ${qb}`);
   assert.ok(Math.abs(qa) > 0.5, `and the pair really turned: ${qa}`);
   assert.ok(Math.abs(a.position[0]) < 1e-3 && Math.abs(b.position[0] - 3) < 1e-3, 'each link stays on its hinge');
-  assert.throws(() => coupleDofs(physics, multibody, a, root), TypeError);
+  assert.throws(() => coupleDofs(physics, multibody, a, root), { code: 'unsupported' });
   physics.dispose();
 });

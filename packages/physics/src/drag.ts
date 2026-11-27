@@ -3,6 +3,7 @@
 // follow the pointer alike: every step the joint gives the body the impulse that moves the grabbed point toward the target by the
 // implicit spring and damper of the constraint, with the effective mass of the point (the body's mass and its inertia about the
 // grip). Whatever else pushes the body (gravity, contacts) is solved by the world around it.
+import { jointInput } from './joint-errors.js';
 import { conjugateQuaternion, multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
 import type { PhysicsBody } from './body.js';
 import { checkVec, type Vec3 } from './math.js';
@@ -55,15 +56,15 @@ export class DragJoint implements PhysicsAttachment {
     checkVec(point, 'Grab point');
     const { frequency = 5, damping = 0.7, maxForce = Number.POSITIVE_INFINITY } = options;
     if (!(frequency > 0 && Number.isFinite(frequency)))
-      throw new RangeError('Drag frequency is a positive number of hertz; pass options.frequency above 0.');
+      throw jointInput('Drag frequency is a positive number of hertz; pass options.frequency above 0.');
     if (!(damping >= 0 && Number.isFinite(damping)))
-      throw new RangeError('Drag damping ratio is 0 or more; pass options.damping of 0 or above.');
+      throw jointInput('Drag damping ratio is 0 or more; pass options.damping of 0 or above.');
     if (!(maxForce > 0))
-      throw new RangeError(
+      throw jointInput(
         'Drag maxForce is a positive number of newtons; pass options.maxForce above 0 or leave it out.',
       );
     if (body.type !== 'dynamic')
-      throw new RangeError('A drag joint pulls a dynamic body; pass a body made with type dynamic.');
+      throw jointInput('A drag joint pulls a dynamic body; pass a body made with type dynamic.');
     this.omega = 2 * Math.PI * frequency;
     this.ratio = damping;
     this.limit = maxForce;

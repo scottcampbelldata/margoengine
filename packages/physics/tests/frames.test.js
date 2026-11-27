@@ -88,11 +88,11 @@ test('a frame is given with the other and not with an axis', () => {
   const physics = new Physics(null),
     a = physics.addBody(null, { colliders: [] }),
     b = physics.addBody(null, { colliders: [] });
-  assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: IDENTITY }), TypeError);
-  assert.throws(() => physics.addJoint(a, b, { type: 'prismatic', frameB: IDENTITY }), TypeError);
+  assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: IDENTITY }), { code: 'unsupported' });
+  assert.throws(() => physics.addJoint(a, b, { type: 'prismatic', frameB: IDENTITY }), { code: 'unsupported' });
   assert.throws(
     () => physics.addJoint(a, b, { type: 'revolute', axis: [0, 1, 0], frameA: IDENTITY, frameB: IDENTITY }),
-    TypeError,
+    { code: 'unsupported' },
   );
   assert.throws(() => physics.addJoint(a, b, { type: 'revolute' }), TypeError);
   physics.dispose();
@@ -107,7 +107,7 @@ test('a frame is a quaternion', () => {
     [0, 0, 1],
     [0, 0, NaN, 1],
   ])
-    assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: frame, frameB: IDENTITY }), RangeError);
+    assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: frame, frameB: IDENTITY }), { code: 'unsupported' });
   physics.dispose();
 });
 

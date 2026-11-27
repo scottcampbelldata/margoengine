@@ -114,7 +114,7 @@ test('anchors and frames set after creation move the joint: a weight hangs 1 m h
         `frame A reads back ${hinge.frameA}`,
       );
       assert.ok(hinge.frameB.every((v, i) => Math.abs(v - q[i]) < 1e-6));
-      assert.throws(() => hinge.setFrames([0, 0, 0, 0], q), RangeError);
+      assert.throws(() => hinge.setFrames([0, 0, 0, 0], q), { code: 'unsupported' });
     }
     for (let i = 0; i < 30; i++) world.step();
     const y = bar.position[1];
@@ -163,7 +163,7 @@ test('flip swaps the bodies of a hinge and mirrors its limits, and the swing fol
 test('flip refuses a joint it would not mirror exactly, and a removed one', async () => {
   await Physics.load();
   const { physics, joint } = hang({ type: 'cone', swing: 0.5 });
-  assert.throws(() => joint.flip(), TypeError);
+  assert.throws(() => joint.flip(), { code: 'unsupported' });
   const free = hang();
   free.joint.flip();
   assert.equal(free.joint.bodyA, free.weight);

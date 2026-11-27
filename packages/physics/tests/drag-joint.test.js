@@ -51,8 +51,8 @@ test('a drag joint takes the body by a point off its centre and turns it, and le
 test('a drag joint is checked', () => {
   const { physics, body } = grab(1);
   assert.throws(() => new DragJoint(physics, body, [0, 0], {}), RangeError);
-  assert.throws(() => new DragJoint(physics, body, [0, 2, 0], { frequency: 0 }), RangeError);
-  assert.throws(() => new DragJoint(physics, body, [0, 2, 0], { damping: -1 }), RangeError);
+  assert.throws(() => new DragJoint(physics, body, [0, 2, 0], { frequency: 0 }), { code: 'unsupported' });
+  assert.throws(() => new DragJoint(physics, body, [0, 2, 0], { damping: -1 }), { code: 'unsupported' });
   const fixed = physics.addBody(null, { type: 'fixed' });
-  assert.throws(() => new DragJoint(physics, fixed, [0, 0, 0]), RangeError);
+  assert.throws(() => new DragJoint(physics, fixed, [0, 0, 0]), { code: 'unsupported' });
 });

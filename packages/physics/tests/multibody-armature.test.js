@@ -94,7 +94,7 @@ test('augmented mass: damping takes a hinge down by the factor its augmented mas
   const predicted = ratio ** physics.kernel.substeps;
   assert.ok(Math.abs((1 - kept) / (1 - predicted) - 1) < 0.005, `kept ${kept} against ${predicted}`);
   assert.ok(Math.abs(multibody.augmentedMassMatrix(h)[0][0] - multibody.massMatrix()[0][0] - 2 * h) < 1e-6);
-  assert.throws(() => multibody.augmentedMassMatrix(0), RangeError);
+  assert.throws(() => multibody.augmentedMassMatrix(0), { code: 'unsupported' });
   physics.dispose();
 });
 
@@ -143,9 +143,9 @@ test('armature is checked, and a ball joint takes it on all three turns or one',
   );
   ball.setArmature(0.4, 'angY');
   assert.equal(ball.armature('angY'), Math.fround(0.4));
-  assert.throws(() => ball.setArmature(-1), RangeError);
-  assert.throws(() => ball.setArmature(Number.NaN), RangeError);
-  assert.throws(() => ball.setArmature(1, 'linX'), TypeError);
-  assert.throws(() => weld.setArmature(1), TypeError);
+  assert.throws(() => ball.setArmature(-1), { code: 'unsupported' });
+  assert.throws(() => ball.setArmature(Number.NaN), { code: 'unsupported' });
+  assert.throws(() => ball.setArmature(1, 'linX'), { code: 'unsupported' });
+  assert.throws(() => weld.setArmature(1), { code: 'unsupported' });
   physics.dispose();
 });

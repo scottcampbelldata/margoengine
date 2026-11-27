@@ -49,7 +49,7 @@ test('an acceleration-based spring swings light and heavy bodies alike, a force 
     b = world.addBody(null, { position: [0, -1, 0], colliders: { shape: 'sphere', radius: 0.1 } });
   assert.throws(
     () => world.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: 1, model: 'nonsense' }),
-    RangeError,
+    { code: 'unsupported' },
   );
   world.dispose();
 });
@@ -121,7 +121,7 @@ test('a pin-slot joint slides and turns about one axis and holds every other mot
   for (let i = 0; i < 120; i++) physics.step();
   assert.ok(Math.abs(bar.position[0] - 1) < 0.02, `stops at the slot's end: ${bar.position[0]}`);
   // What the slot locks has no range to set.
-  assert.throws(() => joint.setAxisLimits('linY', -1, 1), RangeError);
+  assert.throws(() => joint.setAxisLimits('linY', -1, 1), { code: 'unsupported' });
   physics.dispose();
   // The turn limit is its own: a spin about the axis ends at the range's edge.
   const turning = new Physics(null, { gravity: [0, 0, 0] });
@@ -153,7 +153,7 @@ test('a pin-slot takes its slide and turn motors, and frames in place of an axis
   for (let i = 0; i < 60; i++) physics.step();
   assert.ok(Math.abs(bar.position[2] - 0.5) < 0.05, `slides along z at 0.5 m/s: ${bar.position}`);
   assert.ok(Math.abs(bar.angularVelocity[2] - 2) < 0.1, `turns about z at 2 rad/s: ${bar.angularVelocity}`);
-  assert.throws(() => physics.addJoint(wall, bar, { type: 'pinSlot' }), TypeError);
+  assert.throws(() => physics.addJoint(wall, bar, { type: 'pinSlot' }), { code: 'unsupported' });
   joint.remove();
   physics.dispose();
 });

@@ -67,9 +67,9 @@ test('softness reads back, 0 makes the joint rigid again, and it checks its inpu
   assert.deepEqual(joint.softness, [0, 1]);
   for (let i = 0; i < 240; i++) physics.step();
   near(weight.position[1], -2, 0.001, 'rigid again');
-  assert.throws(() => joint.setSoftness(-1), RangeError);
-  assert.throws(() => joint.setSoftness(2, 0), RangeError);
-  assert.throws(() => joint.setSoftness(Number.NaN), RangeError);
+  assert.throws(() => joint.setSoftness(-1), { code: 'unsupported' });
+  assert.throws(() => joint.setSoftness(2, 0), { code: 'unsupported' });
+  assert.throws(() => joint.setSoftness(Number.NaN), { code: 'unsupported' });
   physics.dispose();
 });
 
@@ -157,8 +157,8 @@ test('a motor takes a frequency and damping ratio, mass independent: the peak of
   const a = physics.addBody(null, { type: 'fixed' });
   const b = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5 } });
   const hinge = physics.addJoint(a, b, { type: 'revolute', axis: [0, 0, 1] });
-  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: 2, model: 'force' }), RangeError);
-  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: -1 }), RangeError);
-  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: 2, dampingRatio: -1 }), RangeError);
+  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: 2, model: 'force' }), { code: 'unsupported' });
+  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: -1 }), { code: 'unsupported' });
+  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: 2, dampingRatio: -1 }), { code: 'unsupported' });
   physics.dispose();
 });

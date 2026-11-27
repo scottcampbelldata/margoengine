@@ -1,7 +1,7 @@
 // A multibody of the own solver: a tree of bodies whose joints the kernel holds in reduced coordinates (kernel/src/multibody.rs).
 // This file builds and removes the tree and writes its columns; reading and setting its coordinates and the inverse
 // kinematics are in next/kinematics.ts.
-import { MargoError } from '@margoengine/math/errors';
+import { jointFault, jointInput } from './joint-errors.js';
 import { augmentedMassMatrix, forwardDynamics, inverseDynamics, inverseOf, jacobian, massMatrix } from './dynamics.js';
 import type { JointOptions } from './joints.js';
 import { JOINT_LOCK, type KernelWorld } from './kernel.js';
@@ -128,7 +128,7 @@ export class Multibody {
   /**
    * Where a body of the tree is for the given coordinates (or where its joints are now), as `{position, rotation}` in the
    * world's frame, without moving any body: Rapier's `forward_kinematics_single_link`.
-   * @throws RangeError for a body that is not in the tree, or coordinates of the wrong number.
+   * @throws MargoError (`unsupported`) for a body that is not in the tree, or coordinates of the wrong number.
    */
   forwardKinematics(
     body: PhysicsBody,
@@ -141,7 +141,7 @@ export class Multibody {
    * The Jacobian of a point of a body (default its origin): six rows, the point's velocity along X, Y, Z then the body's spin about
    * X, Y, Z, each with a column for every coordinate in the order of {@link Multibody.coordinates}; only the joints between the
    * root and the body are nonzero. Rapier's `body_jacobian`.
-   * @throws RangeError for a body that is not in the tree, or coordinates of the wrong number.
+   * @throws MargoError (`unsupported`) for a body that is not in the tree, or coordinates of the wrong number.
    */
   bodyJacobian(body: PhysicsBody, point: Vec3 = [0, 0, 0], coordinates?: readonly number[]): number[][] {
     this.check();
@@ -155,7 +155,7 @@ export class Multibody {
       branch.unshift(at);
       if (at === this.root) return branch;
     }
-    throw new RangeError('This body is not in the multibody; pass its root or one of its links.');
+    throw jointInput('This body is not in the multibody; pass its root or one of its links.');
   }
   /** The speed of each coordinate, in the order of {@link Multibody.coordinates}, in m/s or rad/s. */
   velocities(): number[] {
@@ -166,7 +166,7 @@ export class Multibody {
    * Moves the joint coordinates so that `link` reaches `target` (Rapier's multibody inverse kinematics): a damped least squares
    * step of the Jacobian over the joints between the root and the link (Buss 2004, section 6), repeated, with hinge limits
    * kept. The links are posed by forward kinematics where it ends; give the tree a step to see the result in contacts.
-   * @throws RangeError for a link that is not in this tree, or a target with neither a position nor a rotation.
+   * @throws MargoError (`unsupported`) for a link that is not in this tree, or a target with neither a position nor a rotation.
    */
   inverseKinematics(link: PhysicsBody, target: IkTarget, options: IkOptions = {}): IkResult {
     this.check();
@@ -187,11 +187,11 @@ export class Multibody {
    * `k` (`joint.setDamping`, `setFriction` while under its cap, a `motor` with `model: 'force'`). The kernel takes motors implicitly
    * over each substep, so pass the step over the substeps, `physics.fixedTimestep / physics.kernel.substeps`, to read the matrix
    * a substep solves against.
-   * @throws RangeError for an `h` that is not a finite number above 0.
+   * @throws MargoError (`unsupported`) for an `h` that is not a finite number above 0.
    */
   augmentedMassMatrix(h: number): number[][] {
     this.check();
-    if (!(h > 0) || !Number.isFinite(h)) throw new RangeError(`A step must be finite and above 0 (got ${h} s).`);
+    if (!(h > 0) || !Number.isFinite(h)) throw jointInput(`A step must be finite and above 0 (got ${h} s).`);
     return augmentedMassMatrix(this.owner.kernel, this, h);
   }
   /**
@@ -212,7 +212,7 @@ export class Multibody {
   /**
    * The Jacobian of a point of a link: six rows (the point's velocity along x, y, z, then the link's angular velocity) by
    * `dof` columns, so the point moves at J times `velocities()`. `point` is in the link's own frame (default its origin).
-   * @throws RangeError for a link that is not in this tree.
+   * @throws MargoError (`unsupported`) for a link that is not in this tree.
    */
   jacobian(link: PhysicsBody, point: Vec3 = [0, 0, 0]): number[][] {
     this.check();
@@ -228,7 +228,7 @@ export class Multibody {
     this.check();
     const dof = this.dof;
     if (accelerations && accelerations.length !== dof)
-      throw new RangeError(`Give ${dof} joint accelerations, one for each coordinate.`);
+      throw jointInput(`Give ${dof} joint accelerations, one for each coordinate.`);
     return inverseDynamics(
       this.owner.kernel,
       this,
@@ -243,7 +243,7 @@ export class Multibody {
    */
   forwardDynamics(torques: readonly number[], options: { gravity?: Vec3 } = {}): number[] {
     this.check();
-    if (torques.length !== this.dof) throw new RangeError(`Give ${this.dof} joint torques, one for each coordinate.`);
+    if (torques.length !== this.dof) throw jointInput(`Give ${this.dof} joint torques, one for each coordinate.`);
     return forwardDynamics(
       this.owner.kernel,
       this,
@@ -267,7 +267,7 @@ export class Multibody {
     for (const body of Array.isArray(link) ? (link as readonly PhysicsBody[]) : [link as PhysicsBody]) {
       const found = this.links.find((entry) => entry.body === body);
       if (!found)
-        throw new MargoError(
+        throw jointFault(
           'state',
           'Implicit motors are set on a link of this multibody; pass one of multibody.links[i].body (the root has no joint of its own).',
         );
@@ -291,19 +291,19 @@ export class Multibody {
     const columns = this.owner.kernel.columns,
       inTree = new Set(this.attachedBodies());
     if (!joint?.valid || inTree.has(joint.bodyA) === inTree.has(joint.bodyB))
-      throw new MargoError(
+      throw jointFault(
         'state',
         'A pinned joint joins a body of this multibody to a body outside it; pass such a joint.',
       );
     if ((columns.jointFlags[joint.row] & (JOINT_LOCK * 7)) !== JOINT_LOCK * 7)
-      throw new MargoError(
+      throw jointFault(
         'state',
         'A pinned joint locks all three sliding axes; lock linX, linY and linZ, or pin with a spherical joint.',
       );
     if (give !== undefined) {
       const damping = give.damping ?? 0;
       if (!(give.stiffness > 0) || !Number.isFinite(give.stiffness) || !(damping >= 0) || !Number.isFinite(damping))
-        throw new RangeError(
+        throw jointInput(
           'A pin gives way as a spring; pass a positive finite stiffness in N/m and a damping of 0 or more in N s/m.',
         );
       columns.jointStiffness1[joint.row] = give.stiffness;
@@ -331,13 +331,13 @@ export class Multibody {
   }
   private check(): void {
     if (this.removed)
-      throw new MargoError('state', 'Multibody was removed; build a new one with physics.addMultibody.');
+      throw jointFault('state', 'Multibody was removed; build a new one with physics.addMultibody.');
   }
 }
 
 /**
  * Builds the joints and writes the tree into the kernel's columns, parents before children.
- * @throws RangeError or MargoError for a body already in a tree, a parent that is not in this one, or a joint that is not made of
+ * @throws MargoError (`unsupported`) or MargoError for a body already in a tree, a parent that is not in this one, or a joint that is not made of
  * locks.
  */
 export function buildMultibody(
@@ -348,22 +348,22 @@ export function buildMultibody(
   const { kernel } = owner,
     columns = kernel.columns;
   if (links.length < 1)
-    throw new RangeError('A multibody needs at least one link besides its root; pass the bodies that hang from it.');
+    throw jointInput('A multibody needs at least one link besides its root; pass the bodies that hang from it.');
   const inTree = new Set<PhysicsBody>([root]);
   if (columns.mbRole[root.row] !== 0)
-    throw new MargoError('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
+    throw jointFault('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
   for (const link of links) {
     const parent = link.parent ?? [...inTree].pop()!;
     if (!inTree.has(parent))
-      throw new MargoError(
+      throw jointFault(
         'state',
         'A link hangs from a body already in the tree; list parents before their children.',
       );
-    if (inTree.has(link.body)) throw new MargoError('state', 'A body is in a multibody once; the tree has no loops.');
+    if (inTree.has(link.body)) throw jointFault('state', 'A body is in a multibody once; the tree has no loops.');
     if (columns.mbRole[link.body.row] !== 0)
-      throw new MargoError('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
+      throw jointFault('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
     if (!TYPES.includes(link.joint.type))
-      throw new TypeError(`A multibody joint is ${TYPES.join(', ')}; got ${String(link.joint.type)}.`);
+      throw jointInput(`A multibody joint is ${TYPES.join(', ')}; got ${String(link.joint.type)}.`);
     inTree.add(link.body);
   }
   const built: MultibodyLink[] = [],

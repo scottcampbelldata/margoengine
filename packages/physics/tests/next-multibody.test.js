@@ -232,8 +232,8 @@ test('removing a multibody or a body of one frees the others, and bad trees thro
     () => physics.addMultibody(pivot, [{ body: loose, parent: bodies[1], joint: { type: 'fixed' } }]),
     /already in the tree|belong/,
   );
-  assert.throws(() => physics.addMultibody(pivot, []), RangeError);
-  assert.throws(() => physics.addMultibody(pivot, [{ body: loose, joint: { type: 'rope', length: 1 } }]), TypeError);
+  assert.throws(() => physics.addMultibody(pivot, []), { code: 'unsupported' });
+  assert.throws(() => physics.addMultibody(pivot, [{ body: loose, joint: { type: 'rope', length: 1 } }]), { code: 'unsupported' });
   physics.dispose();
 });
 
@@ -400,8 +400,8 @@ test('a tree that is given its inverse dynamics torques follows the acceleration
   const torques = multibody.inverseDynamics(free);
   near(torques[0], 0, 1e-6, 'the free swing needs no torque, joint 0');
   near(torques[1], 0, 1e-6, 'joint 1');
-  assert.throws(() => multibody.inverseDynamics([1]), RangeError);
-  assert.throws(() => multibody.forwardDynamics([1]), RangeError);
+  assert.throws(() => multibody.inverseDynamics([1]), { code: 'unsupported' });
+  assert.throws(() => multibody.forwardDynamics([1]), { code: 'unsupported' });
 });
 
 test('a slider has the mass matrix and the torques of its closed forms', async () => {

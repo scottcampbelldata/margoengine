@@ -1,6 +1,7 @@
 // Named joints built from the generic joint (a D6 with a lock, a limit and a motor on each of its six axes): a universal joint and a
 // wheel joint. They add nothing to the solver; they choose the locks, limits and motors a mechanism of that name has, so each is
 // solved with the rows of any other joint, in every substep.
+import { jointInput } from './joint-errors.js';
 import type { PhysicsBody } from './body.js';
 import type { PhysicsJoint } from './joints.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
@@ -102,11 +103,11 @@ export function addWheelJoint(
   checkVec(anchor, 'Wheel anchor');
   checkVec(wheelAnchor, 'Wheel hub');
   if (!(frequency > 0 && Number.isFinite(frequency)))
-    throw new RangeError('Suspension frequency is a positive number of hertz; pass options.frequency above 0.');
+    throw jointInput('Suspension frequency is a positive number of hertz; pass options.frequency above 0.');
   if (!(damping >= 0 && Number.isFinite(damping)))
-    throw new RangeError('Suspension damping ratio is 0 or more; pass options.damping of 0 or above.');
+    throw jointInput('Suspension damping ratio is 0 or more; pass options.damping of 0 or above.');
   if (!(travel[0] <= travel[1]))
-    throw new RangeError('Suspension travel is [least, greatest] with the least first; pass travel in order.');
+    throw jointInput('Suspension travel is [least, greatest] with the least first; pass travel in order.');
   let knuckle: PhysicsBody | null = null,
     upper = chassis,
     upperAnchor = anchor;
@@ -144,7 +145,7 @@ export function addWheelJoint(
     drive: (speed) => void joint.setAxisMotor('angX', { targetVelocity: speed, damping: 10, maxForce: maxTorque }),
     coast: () => void joint.setAxisMotor('angX', { targetVelocity: 0, damping: 0 }),
     steer: (angle) => {
-      if (!steerJoint) throw new RangeError('This wheel is not steerable; make it with steerable: true.');
+      if (!steerJoint) throw jointInput('This wheel is not steerable; make it with steerable: true.');
       steerJoint.setAxisMotor('angY', { targetPosition: angle, frequency: 12, dampingRatio: 1 });
     },
   };

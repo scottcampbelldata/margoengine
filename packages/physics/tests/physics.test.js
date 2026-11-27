@@ -1236,13 +1236,13 @@ rtest('maxForce caps a motor at the torque it names, on a ball joint and on a hi
   }
   const physics = create(),
     { joint } = ballRod(physics);
-  assert.throws(() => joint.setRotationMotor([0, 0, 0, 2]), { name: 'RangeError', message: /unit quaternion/ });
-  assert.throws(() => joint.setRotationMotor([0, 0, 0, 1], { maxForce: -1 }), { name: 'RangeError' });
+  assert.throws(() => joint.setRotationMotor([0, 0, 0, 2]), { code: 'unsupported', message: /unit quaternion/ });
+  assert.throws(() => joint.setRotationMotor([0, 0, 0, 1], { maxForce: -1 }), { code: 'unsupported' });
   const hinge = physics.addJoint(physics.addBody(null, { colliders: [] }), physics.addBody(null, { colliders: [] }), {
     type: 'revolute',
     axis: [0, 0, 1],
   });
-  assert.throws(() => hinge.setRotationMotor([0, 0, 0, 1]), { name: 'TypeError', message: /spherical joint/ });
+  assert.throws(() => hinge.setRotationMotor([0, 0, 0, 1]), { code: 'unsupported', message: /spherical joint/ });
   physics.dispose();
 });
 
@@ -1349,10 +1349,10 @@ rtest('generic joint calls are refused where they do not fit, with what to use',
     generic = physics.addJoint(a, b, { type: 'generic' }),
     hinge = physics.addJoint(a, c, { type: 'revolute', axis: [0, 1, 0] });
   assert.throws(() => generic.setLimits(0, 1), /revolute or prismatic/);
-  assert.throws(() => hinge.setAxisLimits('angY', 0, 1), /generic joint/);
-  assert.throws(() => hinge.setAxisMotor('angY', {}), /generic joint/);
+  assert.throws(() => hinge.setAxisLimits('angY', 0, 1), /locks angY/);
+  assert.throws(() => hinge.setAxisMotor('angY', {}), /locks angY/);
   assert.throws(() => generic.setAxisLimits('twist', 0, 1), /Unknown joint axis twist/);
-  assert.throws(() => generic.setAxisLimits('angY', 1, 0), RangeError);
+  assert.throws(() => generic.setAxisLimits('angY', 1, 0), { code: 'unsupported' });
   assert.throws(() => physics.addJoint(a, c, { type: 'generic', locked: ['spin'] }), /Unknown joint axis spin/);
   physics.dispose();
 });

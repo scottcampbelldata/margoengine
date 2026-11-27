@@ -68,9 +68,9 @@ test('a broken joint lets its bodies collide, repair puts it back, and limits ch
   weight.setLinearVelocity([0, 0, 0]);
   for (let i = 0; i < 120; i++) physics.step();
   assert.ok(Math.abs(weight.position[1] + 2) < 0.05, `held again: ${weight.position[1]}`);
-  assert.throws(() => joint.setBreakLimits(0), RangeError);
-  assert.throws(() => joint.setBreakLimits(10, -1), RangeError);
-  assert.throws(() => physics.addJoint(anchor, weight, { type: 'spherical', breakForce: NaN }), RangeError);
+  assert.throws(() => joint.setBreakLimits(0), { code: 'unsupported' });
+  assert.throws(() => joint.setBreakLimits(10, -1), { code: 'unsupported' });
+  assert.throws(() => physics.addJoint(anchor, weight, { type: 'spherical', breakForce: NaN }), { code: 'unsupported' });
   physics.dispose();
 });
 

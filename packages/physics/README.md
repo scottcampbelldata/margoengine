@@ -2453,7 +2453,7 @@ physics.dispose();
 
 ### More of the joint API
 
-A joint reads and sets what it was made with. `userData` (an option, then a property) carries anything you want to find again; `enabled = false` takes a joint out of the solve and `true` puts it back, with its limits and motors as they were; `joint.force` and `joint.torque` are the force and couple, in newtons and newton metres in the world's axes, that the joint applied to `bodyB` in the last step, so a joint that holds a 10 kg weight reads 98.1 N up. `setAnchorA`, `setAnchorB` and `setFrames(frameA, frameB)` move a joint's anchors and turn its frames after creation, and `flip()` swaps its two bodies with their anchors and frames and mirrors the limits, motor targets and angle, so the joint holds the same pose from the other body; it flips a hinge, a slider, a ball, a fixed joint, a rope, a spring and a generic joint with one free turning axis, and refuses what does not mirror axis by axis (a cone, a rotation motor, a joint of a multibody, limits on two turning axes) with a `TypeError` that says so. `physics.getJoints()` and `physics.jointCount` list the world's joints.
+A joint reads and sets what it was made with. `userData` (an option, then a property) carries anything you want to find again; `enabled = false` takes a joint out of the solve and `true` puts it back, with its limits and motors as they were; `joint.force` and `joint.torque` are the force and couple, in newtons and newton metres in the world's axes, that the joint applied to `bodyB` in the last step, so a joint that holds a 10 kg weight reads 98.1 N up. `setAnchorA`, `setAnchorB` and `setFrames(frameA, frameB)` move a joint's anchors and turn its frames after creation, and `flip()` swaps its two bodies with their anchors and frames and mirrors the limits, motor targets and angle, so the joint holds the same pose from the other body; it flips a hinge, a slider, a ball, a fixed joint, a rope, a spring and a generic joint with one free turning axis, and refuses what does not mirror axis by axis (a cone, a rotation motor, a joint of a multibody, limits on two turning axes) with a coded `MargoError` that says so. `physics.getJoints()` and `physics.jointCount` list the world's joints.
 
 Three more kinds. A `spring` takes `model: 'acceleration'`, which makes its stiffness and damping per kilogram, so a light body and a heavy one swing at the same frequency (the default `'force'` is newtons per metre, and a heavy body swings slowly on it). A `rope` takes a `motor`, a winch: its `targetVelocity` is the speed the anchors' distance changes at, so a negative one reels them in, up to the motor's `maxForce`. A `pinSlot` joint slides along one axis and turns about it, and holds the rest; `slideLimits`, `turnLimits`, `slideMotor` and `turnMotor` bound and drive the two.
 
@@ -8182,3 +8182,81 @@ What it does not do (`docs/limits.md`): a concave mesh breaks as its convex hull
 first); damage is an impulse budget per bond, not a stress or energy model; cut faces are flat. See
 [`examples/physics-breakable.html`](../../examples/physics-breakable.html) for a stone pillar, a brick wall and a framed
 glass pane to shoot at, with the debug view.
+
+## Joints and motors
+
+Every joint of the rigid world, with limits and motors on each axis it leaves free. Quick start, a door on a hinge that a
+motor swings open to its stop:
+
+```ts
+import { Physics } from '@margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+const frame = physics.addBody(null, { type: 'fixed', position: [0, 1, 0], colliders: [] });
+const door = physics.addBody(null, { position: [0.5, 1, 0], colliders: { shape: 'box', halfExtents: [0.5, 1, 0.03] } });
+physics.addJoint(frame, door, { type: 'revolute', axis: [0, 1, 0], anchorB: [-0.5, 0, 0], limits: [0, 1.6], motor: { targetVelocity: 1, damping: 20, maxForce: 40 } });
+for (let i = 0; i < 150; i++) physics.step();
+console.log((2 * Math.atan2(door.rotation[1], door.rotation[3])).toFixed(2)); // '1.60': open against its stop
+```
+
+The kinds (`physics.addJoint(bodyA, bodyB, options)`), each measured from its frame on body A (`frameA`, or an `axis`) to
+its frame on body B:
+
+| `type` | Free axes | Limits | Motors |
+| --- | --- | --- | --- |
+| `fixed` | none | none to limit | none |
+| `spherical` (ball and socket) | `angX`, `angY`, `angZ` | `limits: { angY: [min, max] }`, per turn | `motors: { angZ: {...} }`, per turn; `setRotationMotor(q)` toward a rotation |
+| `cone` (shoulder, hip) | the turns, inside a swing cone | `swing` (one angle or an ellipse), `twist` | `setRotationMotor(q)` |
+| `revolute` (hinge) | `angX` | `limits` | `motor` |
+| `prismatic` (slider) | `linX` | `limits` | `motor` |
+| `pinSlot` | `linX`, `angX` | `slideLimits`, `turnLimits` | `slideMotor`, `turnMotor` |
+| `rope` | `linX`, the distance | `length` (the greatest); a least one with `setAxisLimits('linX', min, max)` | `motor`, a winch |
+| `spring` | `linX`, the distance | `minLength`, `maxLength`, hard stops | the spring itself (`restLength`, `stiffness`, `damping`) |
+| `generic` (six axes) | what `locked` leaves | `limits`, per axis; `coupled` axes share one | `motors`, per axis |
+| `motor` | all six, as springs to a pose | caps `maxForce`, `maxTorque` | `linearOffset`, `angularOffset` |
+
+`new DistanceJoint(physics, a, b, { min, max, frequency })` holds two anchors between a least and a greatest distance (see
+"Gear, rack and pinion, pulley, distance range"), and `physics.addMultibody(root, links)` holds a tree of these joints in
+reduced coordinates, exact for robot arms and ragdolls (see "Multibody joints").
+
+On every joint, `joint.setAxisLimits(dof, min, max)` and `joint.setAxisMotor(dof, motor)` limit and drive any axis it does
+not lock (`linX`, `linY`, `linZ`, `angX`, `angY`, `angZ`; a rope's and a spring's one axis is `linX`, the distance from 0),
+and `joint.axisLimits(dof)` reads a limit back (`null` for none). A motor drives toward `targetVelocity`, or as a spring
+toward `targetPosition` (`stiffness` and `damping`, or `frequency` and `dampingRatio`), capped at `maxForce` (N or N m).
+`setLimits` and `setMotor` are the same calls for a joint with one free axis (a hinge, a slider, a rope's winch). A spring
+takes no motor on its distance, which the spring drives, and a ball joint with axis limits takes no rotation motor, which
+would move the frame its limits measure from: a cone holds both. `breakForce` and `breakTorque` break a joint (see
+"Breaking joints"), and `contactsEnabled` (default false) lets the two bodies it holds collide; set it later with
+`joint.contactsEnabled = true`. Bad input throws a `MargoError` (code `unsupported`, or `state` for a removed joint) whose
+message names the fix and links to [margoengine.com/errors#physics-joints](https://margoengine.com/errors#physics-joints).
+
+Debug view: `physics.debugRender({ jointFrames: true })` adds, for each joint, frame A's axes at anchor A (red x, green y,
+blue z, `style.jointFrameLength` metres, default 0.25) and frame B's at anchor B, and in gold (`style.jointLimit`) an arc
+from min to max for each limited turn, a bar for each limited slide, a cone's swing rim, and a cross at each distance stop.
+Draw the lines with `@margoengine/lines`, as the other debug lines.
+
+Coming from three.js and Rapier. The three.js Rapier examples make a joint from a description and a world call, then copy
+each body's pose into its mesh every frame: `world.createImpulseJoint(RAPIER.JointData.revolute(anchor1, anchor2, axis),
+body1, body2, true)`, then `joint.setLimits(min, max)` and `joint.configureMotorVelocity(speed, factor)`, and in the loop
+`mesh.position.copy(body.translation())` and `mesh.quaternion.copy(body.rotation())`. In Margo the joint is one call with
+its limits and motor as options, and a body made with a mesh (`physics.addBody(mesh, options)`) moves it for you. What
+maps across:
+
+| Rapier through three.js | Margo |
+| --- | --- |
+| `JointData.fixed`, `.spherical`, `.revolute`, `.prismatic`, `.rope`, `.spring`, `.generic` | `type: 'fixed'`, `'spherical'`, `'revolute'`, `'prismatic'`, `'rope'`, `'spring'`, `'generic'` |
+| `world.createImpulseJoint(data, body1, body2, true)` | `physics.addJoint(body1, body2, options)` |
+| `world.createMultibodyJoint(...)`, one per link | `physics.addMultibody(root, links)`, the tree at once |
+| `joint.setLimits(min, max)` | `limits: [min, max]` or `joint.setLimits(min, max)`; any axis: `setAxisLimits(dof, min, max)` |
+| `configureMotorVelocity(speed, factor)` | `motor: { targetVelocity: speed, damping: factor }` |
+| `configureMotorPosition(target, stiffness, damping)` | `motor: { targetPosition: target, stiffness, damping }` |
+| a motor's force cap | `maxForce` on the motor |
+| `joint.setContactsEnabled(true)` | `contactsEnabled: true`, or `joint.contactsEnabled = true` |
+| copying `translation()` and `rotation()` into each mesh | `physics.addBody(mesh, options)` moves the mesh |
+| `world.debugRender()` | `physics.debugRender({ jointFrames: true })`, the same `{ vertices, colors }` |
+
+What it does not do (`docs/limits.md`): limits on a ball joint's three turns are on the parts of its rotation vector, which
+match angles about each axis only while one turn is large at a time (a cone holds a swing as one angle); a spring's
+distance has no motor besides the spring. See [`examples/physics-joints.html`](../../examples/physics-joints.html) for a
+hinged door, a motorised arm and a chain, with the debug view.

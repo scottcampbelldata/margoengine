@@ -87,7 +87,7 @@ test('maxForce caps the drive, a target velocity leads a moving target, and clea
   run(free.physics, 60);
   assert.ok(Math.abs(swingOf(free.body.rotation) - settled) < 1e-3, 'coasts once released');
   assert.ok(Math.hypot(...free.body.angularVelocity) < 5, 'and nothing keeps driving it');
-  assert.throws(() => free.joint.setRotationMotor([0, 0, 0, 2], gains), RangeError);
+  assert.throws(() => free.joint.setRotationMotor([0, 0, 0, 2], gains), { code: 'unsupported' });
   for (const w of [free, capped]) w.physics.dispose();
 });
 

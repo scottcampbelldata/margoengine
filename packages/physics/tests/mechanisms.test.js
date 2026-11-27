@@ -102,11 +102,11 @@ test('a pulley rope goes slack when nothing pulls it and the mechanisms are chec
   b.setLinearVelocity([0, 1, 0]);
   for (let i = 0; i < 30; i++) physics.step();
   assert.ok(a.position[1] > 0.3, `rising toward the pulley it goes on: ${a.position[1]}`);
-  assert.throws(() => new GearJoint(physics, a, b, { ratio: 0 }), RangeError);
-  assert.throws(() => new GearJoint(physics, a, b, { axisA: [0, 0, 0] }), RangeError);
-  assert.throws(() => new RackAndPinionJoint(physics, a, b, { radius: -1 }), RangeError);
+  assert.throws(() => new GearJoint(physics, a, b, { ratio: 0 }), { code: 'unsupported' });
+  assert.throws(() => new GearJoint(physics, a, b, { axisA: [0, 0, 0] }), { code: 'unsupported' });
+  assert.throws(() => new RackAndPinionJoint(physics, a, b, { radius: -1 }), { code: 'unsupported' });
   assert.throws(() => new PulleyJoint(physics, a, b, { groundA: [0, 0], groundB: [0, 0, 0] }), RangeError);
-  assert.throws(() => new GearJoint(physics, a, b, { frequency: -1 }), RangeError);
+  assert.throws(() => new GearJoint(physics, a, b, { frequency: -1 }), { code: 'unsupported' });
 });
 
 test('a distance joint with a range holds a body between its least and greatest distance, rigid or soft', async () => {
@@ -127,8 +127,8 @@ test('a distance joint with a range holds a body between its least and greatest 
   const physics = new Physics(null);
   const a = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
   const b = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
-  assert.throws(() => new DistanceJoint(physics, a, b, { min: -1 }), RangeError);
-  assert.throws(() => new DistanceJoint(physics, a, b, { min: 2, max: 1 }), RangeError);
+  assert.throws(() => new DistanceJoint(physics, a, b, { min: -1 }), { code: 'unsupported' });
+  assert.throws(() => new DistanceJoint(physics, a, b, { min: 2, max: 1 }), { code: 'unsupported' });
 });
 
 test('a path joint holds a bead on a curve, lets it swing as a pendulum of the curve and drives it along', async () => {
@@ -166,8 +166,8 @@ test('a path joint holds a bead on a curve, lets it swing as a pendulum of the c
   for (let i = 0; i < 30; i++) rail.step();
   near(car.linearVelocity[0], 1.5, 0.05, 'the motor drives it along the rail');
   track.setMotor(0, 0);
-  assert.throws(() => new PathJoint(rail, base, car, { points: [[0, 0, 0]] }), RangeError);
-  assert.throws(() => track.setMotor(1, -1), RangeError);
+  assert.throws(() => new PathJoint(rail, base, car, { points: [[0, 0, 0]] }), { code: 'unsupported' });
+  assert.throws(() => track.setMotor(1, -1), { code: 'unsupported' });
 });
 
 test('a path of a thousand points closes on itself and a car rides it round', () => {
@@ -182,7 +182,7 @@ test('a path of a thousand points closes on itself and a car rides it round', ()
       const angle = -Math.PI / 2 + (k / 1000) * 2 * Math.PI;
       return [5 * Math.cos(angle), 5 * Math.sin(angle), 0];
     });
-  assert.throws(() => new PathJoint(loop, base, car, { points: points.slice(0, 2), closed: true }), RangeError);
+  assert.throws(() => new PathJoint(loop, base, car, { points: points.slice(0, 2), closed: true }), { code: 'unsupported' });
   new PathJoint(loop, base, car, { points, closed: true, motor: { speed: 3, maxForce: 1000 } });
   let off = 0,
     last = 0,

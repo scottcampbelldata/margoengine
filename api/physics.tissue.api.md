@@ -461,6 +461,7 @@ interface DebugRenderOptions {
     solverContacts?: boolean;
     pseudoNormals?: boolean;
     axes?: boolean;
+    jointFrames?: boolean;
     style?: DebugStyle;
 }
 
@@ -476,6 +477,8 @@ interface DebugStyle {
     solverContact?: DebugColor;
     pseudoNormal?: DebugColor;
     box?: DebugColor;
+    jointLimit?: DebugColor;
+    jointFrameLength?: number;
     normalLength?: number;
     axisLength?: number;
 }
@@ -637,8 +640,13 @@ type JointOptions = (JointBase & {
     type: 'fixed';
     frameA?: Quat;
     frameB?: Quat;
-}) | (JointBase & {
+})
+ | (JointBase & {
     type: 'spherical';
+    frameA?: Quat;
+    frameB?: Quat;
+    limits?: Readonly<Partial<Record<JointDof, readonly [number, number]>>>;
+    motors?: Readonly<Partial<Record<JointDof, MotorOptions>>>;
 })
  | (JointBase & {
     type: 'rope';
@@ -651,6 +659,8 @@ type JointOptions = (JointBase & {
     stiffness: number;
     damping?: number;
     model?: 'force' | 'acceleration';
+    minLength?: number;
+    maxLength?: number;
 })
  | (JointBase & {
     type: 'pinSlot';
@@ -1672,6 +1682,7 @@ class PhysicsJoint {
         twist: [number, number] | null;
     } | null;
     setMotor(motor: MotorOptions): this;
+    axisLimits(dof: JointDof): [number, number] | null;
     setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
     setDamping(coefficient: number): this;
     setFriction(maxForce: number): this;

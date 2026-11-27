@@ -103,8 +103,8 @@ test('a coupling refuses a body that is not a hinge or slider link, and a ratio 
     { body: a, joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [-1, 0, 0] } },
     { body: b, parent: root, joint: { type: 'spherical', anchorB: [-2, 0, 0] } },
   ]);
-  assert.throws(() => coupleDofs(physics, multibody, a, root), TypeError);
-  assert.throws(() => coupleDofs(physics, multibody, a, b), TypeError);
-  assert.throws(() => coupleDofs(physics, multibody, a, a, { ratio: 0 }), RangeError);
+  assert.throws(() => coupleDofs(physics, multibody, a, root), { code: 'unsupported' });
+  assert.throws(() => coupleDofs(physics, multibody, a, b), { code: 'unsupported' });
+  assert.throws(() => coupleDofs(physics, multibody, a, a, { ratio: 0 }), { code: 'unsupported' });
   physics.dispose();
 });
