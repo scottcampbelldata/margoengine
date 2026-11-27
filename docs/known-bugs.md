@@ -96,6 +96,43 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   them is still judged at 180. The rail-line probes read 0.55 and 0.60 percent. Regression:
   `packages/headless/tests/look-clean.test.js` (an 8 sub-frame 180 degree bar passes, one sub-frame and a 90 degree
   bar judged at 180 fail, the probe's own angle applies).
+### Open 2026-11-26: the WebGL2 layer accepts a compute pipeline past maxComputeInvocationsPerWorkgroup at creation (KB-COMPAT-WGSIZE1, webgl2-compat)
+
+- **Repro:** on the layer's device (maxComputeInvocationsPerWorkgroup 256), `createComputePipeline` with
+  `@compute @workgroup_size(512) fn main() {}` returns a pipeline with no validation error; the first dispatch's
+  build throws the planner's RangeError ("has more than 256 invocations") out of the submit.
+- **Cause:** `CompatComputePipeline` (src/device/compute.ts) checks binding counts at creation but not the workgroup
+  size; only the planner (src/compute/analyze.ts `workgroupSizeOf`) checks it, at build. WebGPU makes it a validation
+  error at creation. Packages tune to the device's limit, so none reaches it in use; found with KB-COMPAT-CORPUSRED1.
+
+### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
+
+- **Repro:** at 3d585ad959, after `npm run build -w @margoengine/webgl2-compat`, run
+  `node --test packages/webgl2-compat/test/{compute,corpus,interpret,wgsl-corpus-check}.test.js`: six fail, five with
+  `Unknown function 'subgroupAdd'` (code `wgsl-type`) and one with modules moved from scatter and compute to shared
+  and sciviz; `npm run test:browser -w @margoengine/webgl2-compat` fails on 18 `enable clip_distances;` translations
+  and khronos-gallery's material.
+- **Cause:** four, all brought out by the re-recording. (1) The WGSL checker typed none of the subgroup and quad
+  built-in functions, so compute's 23 subgroup kernels (built only when the device has `subgroups`) died with an
+  uncoded type error before the layer's coded refusal. (2) `writeCorpus` re-derived a module's owner from labels a
+  later recording merged in, so writing the read corpus again moved modules. (3) The corpus checks expected a
+  translation for modules behind `enable subgroups;` and `enable clip_distances;`, extensions the layer does not
+  offer (materials uses clip distances only on `clip-distances`), and for 12 compute kernels sized 512 and 1024 on
+  adapters granting more than WebGPU's default 256 invocations. (4) `glsl-corpus-browser.mjs` linked
+  khronos-gallery's material (module 7ba63815075dd8da, recorded on WebGPU with its base maps apart: 19 layer units)
+  where the device refuses it before linking; on the layer gltf/pbr asks the device first and packs the base maps.
+- **Fix:** the checker types the WGSL subgroup functions (subgroupAdd to quadSwapDiagonal) behind
+  `enable subgroups;`, compute and fragment stages only, with subgroupBroadcast's and quadBroadcast's const lane
+  range, and asks for the enable on a call or a subgroup built-in value without it. `writeCorpus` keeps a settled
+  owner. One corpus rule, in `test/support/corpus-refusals.mjs`, asserted in compute.test.js, glsl-corpus-browser.mjs
+  and corpus-draw-browser.mjs: an unmapped enable is refused with the coded error naming it, counted per name against
+  the recorded counts (compute 23 `subgroups`, GLSL 18 `clip_distances`), the 12 kernels past 256 invocations are
+  refused by the planner and counted, and a pipeline past the texture units is refused as the device refuses it
+  (`unitsRefusal`, the device's own wording) and must belong to a recorded module with its cause. Nothing left the
+  corpus and no check loosened. Regression: `test/wgsl-front-end.test.js` "subgroup built-in functions",
+  `test/corpus.test.js` "re-recording keeps an owner", `test/compute.test.js` corpus tier test. khronos-gallery's
+  full material on the layer: `scripts/compat-units-gpu-check.js --compat` (all 13 maps, image light, both shadow
+  kinds, clustered light, bounce) passes.
 
 ### Fixed 2026-11-26: paddle and wading loads settle with the final wet cells (KB-LOADS-ACTUATORDRY)
 

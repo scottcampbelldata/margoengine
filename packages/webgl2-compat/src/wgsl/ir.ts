@@ -146,7 +146,7 @@ export interface IRFunction extends Span {
   /** IRModule-scope variables and overrides it names directly. */
   readonly uses: ReadonlySet<IRGlobalVar | IROverride>;
   /** Stages its built-ins (derivatives, barriers, implicit-LOD sampling) or `discard` limit it to. */
-  readonly stages: ReadonlySet<'fragment' | 'compute'>;
+  readonly stages: ReadonlySet<'fragment' | 'compute' | 'fragment-compute'>;
 }
 
 /** The resources and memory an entry point reaches through its call graph. */

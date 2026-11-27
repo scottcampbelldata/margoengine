@@ -4,7 +4,15 @@
 // statement rules (loops, switch, continuing, behaviors for missing returns), resources and entry-point interfaces.
 // Produces the typed IR (ir.ts). Uniformity analysis is not done here: the browser's own compiler keeps that check.
 import type * as A from './ast.js';
-import { type BuiltinResult, BUILTIN_NAMES, resolveBuiltin, unify } from './builtins.js';
+import {
+  type BuiltinResult,
+  type BuiltinStage,
+  BUILTIN_NAMES,
+  resolveBuiltin,
+  SUBGROUP_ID_LIMIT,
+  SUBGROUP_NAMES,
+  unify,
+} from './builtins.js';
 import * as K from './constant.js';
 import type { SourceMap, WGSLError } from './errors.js';
 import type {
@@ -67,7 +75,7 @@ type FnState = {
   fn: Mutable<IRFunction> & {
     calls: Set<IRFunction>;
     uses: Set<IRGlobalVar | IROverride>;
-    stages: Set<'fragment' | 'compute'>;
+    stages: Set<BuiltinStage>;
   };
   returnType: A.Expr | undefined;
   loops: number;
@@ -489,6 +497,8 @@ class Checker {
       }
       if (io.builtin) {
         const b = BUILTIN_IO[io.builtin];
+        if (io.builtin.startsWith('subgroup') && !this.enables.has('subgroups'))
+          throw this.fail(`@builtin(${io.builtin}) needs 'enable subgroups;' at the top of the module`, at);
         if (b.stages[stage] !== dir && b.stages[stage] !== 'both')
           throw this.fail(`@builtin(${io.builtin}) is not a ${stage} ${dir === 'in' ? 'input' : 'output'}`, at);
         if (b.type !== 'array' && b.type !== typeName(type))
@@ -852,8 +862,10 @@ class Checker {
   }
 
   private builtinCall(e: A.CallExpr, template?: Type): IRExpr {
-    const name = e.callee.name,
-      raw = e.args.map((a) => this.value(a));
+    const name = e.callee.name;
+    if (SUBGROUP_NAMES.has(name) && !this.enables.has('subgroups'))
+      throw this.fail(`${name} needs 'enable subgroups;' at the top of the module`, e.callee);
+    const raw = e.args.map((a) => this.value(a));
     // A call with a runtime argument, or to a built-in this front end does not fold, is not a constant expression
     // here, so its overload takes concrete types only.
     const runtime = !K.FOLDABLE.has(name) || raw.some((x) => x.value === undefined && x.type.kind !== 'ptr');
@@ -873,6 +885,14 @@ class Checker {
     );
     if (r.stage) this.state?.fn.stages.add(r.stage);
     const span = { start: e.start, end: e.end };
+    // subgroupBroadcast and quadBroadcast: the lane is a const-expression inside the subgroup or quad (WGSL 17.12).
+    const idLimit = SUBGROUP_ID_LIMIT[name];
+    if (idLimit !== undefined) {
+      const id = args[1]?.value;
+      if (typeof id !== 'number') throw this.fail(`${name}'s lane index must be a const-expression`, e.args[1]);
+      if (id < 0 || id >= idLimit)
+        throw this.fail(`${name}'s lane index ${id} is outside 0 to ${idLimit - 1}`, e.args[1]);
+    }
     // extractBits and insertBits: constant offset + count past the bit width is a shader-creation error (WGSL 17.4).
     if (name === 'extractBits' || name === 'insertBits') {
       const k = name === 'extractBits' ? 1 : 2,
@@ -1631,9 +1651,9 @@ class Checker {
       if (seen.has(g)) return;
       seen.add(g);
       for (const s of g.stages)
-        if (s !== stage)
+        if (s === 'fragment-compute' ? stage === 'vertex' : s !== stage)
           throw this.fail(
-            `Entry point '${f.name}' (${stage}) reaches '${g.name}', which uses a ${s}-only built-in or statement`,
+            `Entry point '${f.name}' (${stage}) reaches '${g.name}', which uses a ${s === 'fragment-compute' ? 'fragment- and compute' : s}-only built-in or statement`,
             f.start,
           );
       for (const u of g.uses)

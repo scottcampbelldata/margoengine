@@ -51,6 +51,8 @@ export {
   CompatQueue,
   CPU_WORK_BUDGET,
 } from './device/device.js';
+/** @internal A render pipeline's texture units and the refusal past them, exported for the GLSL corpus check. */
+export { programUnits, unitsRefusal } from './device/render.js';
 /** @internal The layer's external-texture storage, exported for its tests. */
 export { ExternalCopies, SPARE_EXTERNALS } from './device/externals.js';
 export {

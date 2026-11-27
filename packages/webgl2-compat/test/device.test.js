@@ -1314,7 +1314,7 @@ ${Array.from({ length: 5 }, (_, i) => `@group(0) @binding(${i}) var t${i}: textu
     assert.equal(thrown?.code, 'unsupported');
     assert.match(
       thrown.message,
-      /fragment stage takes 5 texture units \(5 texture and sampler pairs, 0 storage data textures; this WebGL2 has 4\)/,
+      /a render pipeline whose fragment stage takes 5 texture units \(5 texture and sampler pairs, 0 storage data textures; this WebGL2 has 4\)/,
     );
     assert.match(thrown.message, /group 0 binding 4.*errors#texture-units/);
     assert.equal(thrown.units.units, 5);

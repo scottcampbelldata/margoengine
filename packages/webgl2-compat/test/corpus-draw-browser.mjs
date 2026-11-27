@@ -9,6 +9,11 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { readCorpus } from './corpus/store.mjs';
+import {
+  assertOverUnits,
+  assertUnmappedCounts,
+  RECORDED_UNMAPPED_ENABLES,
+} from './support/corpus-refusals.mjs';
 import { PARTS, corpusDrawWork, partsOf } from './corpus-draw-parts.mjs';
 
 const parts = partsOf(process.argv.slice(2));
@@ -39,6 +44,11 @@ try {
     );
     if (result.failures.length) console.log(`FAILURES ${result.failures.length}:\n${result.failures.join('\n')}`);
     assert.deepEqual(result.failures, []);
+    console.log(
+      `refused for an unmapped enable: ${JSON.stringify(result.enables)}; refused for texture units: ${result.overUnits.length}`,
+    );
+    assertUnmappedCounts(result.enables, RECORDED_UNMAPPED_ENABLES.draw, 'corpus draws');
+    assertOverUnits(result.overUnits, 'corpus draws');
     assert.ok(result.drawn > 200, `only ${result.drawn} pipelines drawn`);
   }
   if (computes.length) {

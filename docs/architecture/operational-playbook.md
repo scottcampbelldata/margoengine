@@ -2236,6 +2236,18 @@ chosen by `--part` in
 package whose compute kernels take the compiler minutes goes in `OWN_COMPUTE_PART` with its kernel count, one part
 per kernel; a kernel recorded beyond the count fails the test and the run.
 
+## Corpus refusals are asserted, not skipped (2026-11-26, KB-COMPAT-CORPUSRED1)
+
+The WGSL corpus holds what the packages built on real WebGPU devices, some of which the WebGL2 layer does not offer:
+modules behind `enable subgroups;` and `enable clip_distances;` (the packages build them only when the device has the
+feature), compute kernels sized past WebGPU's default 256 invocations, and pipelines recorded with more texture units
+than WebGL2 has (gltf/pbr packs those materials on the layer). `packages/webgl2-compat/test/support/corpus-refusals.mjs`
+holds the one rule the corpus checks assert: each such module is refused with its coded error (the enable named, the
+device's own texture-units wording), counted against a recorded count with its cause, and a count above the recorded
+one fails. The WGSL checker types the subgroup built-in functions behind `enable subgroups;`, so the layer's coded
+refusal is what a page sees, not a type error. Evidence: compute.test.js, glsl-corpus-browser.mjs,
+corpus-draw-browser.mjs; khronos-gallery's material on the layer: scripts/compat-units-gpu-check.js --compat.
+
 ## A new package brings its records (fast gate, 2026-11-16)
 
 `npm run hygiene` (every push) now runs `assertPackageRecordsCurrent` (scripts/support/package-records.mjs): every stated package count matches docs/catalog.json, margoengine.com/sizes.html can be built from entry-sizes.json and basic-scene-network.json (every catalog package measured, both records from one build), THIRD-PARTY-NOTICES.md is what scripts/supply-chain.mjs renders, and every examples/ folder holding TypeScript belongs to a type-check project. Each problem names the command that fixes it. `npm run catalog:build` now restates every package count (restatePackageCount in scripts/support/public-truth.mjs) instead of only the generated lists. Evidence: @margoengine/scenes landed with four pages stating 104 packages, no entry-sizes row, a stale notices file and examples/dune-coast in no project, and only local CI's full root tests failed; tests/package-records.test.js rebuilds that state in a temporary folder and gets the three reports, and the check run on origin/main's files at 3050f3bcc6 reports all of them. The size scan of tests/public-size-claims.test.js now reads meta descriptions and "core plus the high-level stage", which kept the white paper at 24,843 B and 61,059 B after the measured 24,841 B and 61,046 B.

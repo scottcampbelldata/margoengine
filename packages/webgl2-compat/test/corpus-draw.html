@@ -18,7 +18,11 @@ const BLEND = { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha
 window.drawAll = async (records, sources) => {
   const gpu = createCompatGPU();
   const failures = [],
-    waiting = {};
+    waiting = {},
+    // Refusals the corpus rule counts (support/corpus-refusals.mjs): a coded 'enable X;' refusal by name, and a
+    // pipeline past the texture units by its module key.
+    enables = {},
+    overUnits = [];
   let device, modules;
   const fresh = async () => {
     device?.destroy();
@@ -106,15 +110,19 @@ window.drawAll = async (records, sources) => {
       } else drawn++;
     } catch (error) {
       await device.popErrorScope().catch(() => null);
-      const message = String(error?.message ?? error);
-      if (/milestone M[3-6]|has no subgroups/.test(message)) {
+      const message = String(error?.message ?? error),
+        enable = error?.code === 'unsupported' && /'enable (\w+);'.*errors#compatibility-layer/.exec(message);
+      if (enable) enables[enable[1]] = (enables[enable[1]] ?? 0) + 1;
+      else if (error?.code === 'unsupported' && /texture units.*errors#texture-units/.test(message))
+        overUnits.push([rec.fragment?.module ?? rec.vertex.module, `${rec.id}: ${message}`.slice(0, 600)]);
+      else if (/milestone M[3-6]|has no subgroups/.test(message)) {
         const reason = message.replace(/; see .*/, '').replace(/'[^']*'/g, "'...'");
         waiting[reason] = (waiting[reason] ?? 0) + 1;
       } else failures.push(`${rec.id}: ${message}`.slice(0, 1500));
     }
   }
   device.destroy();
-  return { drawn, failures, waiting };
+  return { drawn, failures, waiting, enables, overUnits };
 };
 // Every recorded compute pipeline (milestone M5): planned, translated for its tier and dispatched once (one
 // workgroup) with stand-in resources, so each fragment or scatter program meets ANGLE's draw-time compile and each

@@ -27,8 +27,11 @@ import {
   withElement,
 } from './types.js';
 
-/** The stage a built-in may run in, when it is limited to one. */
-type BuiltinStage = 'fragment' | 'compute';
+/**
+ * The stage a built-in may run in, when it is limited: `fragment`, `compute`, or `fragment-compute` for the subgroup
+ * built-ins, which run in both but not in vertex shaders.
+ */
+export type BuiltinStage = 'fragment' | 'compute' | 'fragment-compute';
 
 /** Result of resolving a built-in call. */
 export interface BuiltinResult {
@@ -164,6 +167,71 @@ const ATOMIC_RMW = [
   'atomicExchange',
 ];
 
+/**
+ * Subgroup built-in functions (WGSL section 17.12 "Subgroup Built-in Functions" and 17.13 "Quad Operations"), all
+ * behind `enable subgroups;` and limited to compute and fragment shaders. Each maps to how its arguments type:
+ * `numeric` any concrete numeric scalar or vector T (returns T), `integer` an i32 or u32 scalar or vector, `bool` one
+ * bool (returns bool), `ballot` one bool (returns vec4<u32>), `none` no arguments (returns bool), `id` T and an i32
+ * or u32 lane that must be a const-expression, `lane` T and an i32 or u32 lane index, `u32` T and a u32 delta or mask.
+ */
+const SUBGROUP: Readonly<Record<string, 'numeric' | 'integer' | 'bool' | 'ballot' | 'none' | 'id' | 'lane' | 'u32'>> =
+  {
+    subgroupAdd: 'numeric',
+    subgroupExclusiveAdd: 'numeric',
+    subgroupInclusiveAdd: 'numeric',
+    subgroupMul: 'numeric',
+    subgroupExclusiveMul: 'numeric',
+    subgroupInclusiveMul: 'numeric',
+    subgroupMin: 'numeric',
+    subgroupMax: 'numeric',
+    subgroupBroadcastFirst: 'numeric',
+    quadSwapX: 'numeric',
+    quadSwapY: 'numeric',
+    quadSwapDiagonal: 'numeric',
+    subgroupAnd: 'integer',
+    subgroupOr: 'integer',
+    subgroupXor: 'integer',
+    subgroupAll: 'bool',
+    subgroupAny: 'bool',
+    subgroupBallot: 'ballot',
+    subgroupElect: 'none',
+    subgroupBroadcast: 'id',
+    quadBroadcast: 'id',
+    subgroupShuffle: 'lane',
+    subgroupShuffleXor: 'u32',
+    subgroupShuffleUp: 'u32',
+    subgroupShuffleDown: 'u32',
+  };
+
+/** Names of the subgroup and quad built-in functions, which need `enable subgroups;`. */
+export const SUBGROUP_NAMES: ReadonlySet<string> = new Set(Object.keys(SUBGROUP));
+
+/** One past the highest lane a const `id` of subgroupBroadcast / quadBroadcast may name (WGSL 17.12, 17.13). */
+export const SUBGROUP_ID_LIMIT: Readonly<Record<string, number>> = { subgroupBroadcast: 128, quadBroadcast: 4 };
+
+function subgroup(name: string, args: readonly Type[]): BuiltinResult | string {
+  const form = SUBGROUP[name],
+    stage: BuiltinStage = 'fragment-compute';
+  const want = form === 'none' ? 0 : form === 'id' || form === 'lane' || form === 'u32' ? 2 : 1;
+  if (args.length !== want) return `${name} takes ${want} argument${want === 1 ? '' : 's'}, got ${args.length}`;
+  if (form === 'none') return { type: BOOL, params: [], stage };
+  if (form === 'bool' || form === 'ballot') {
+    if (args[0].kind !== 'scalar' || args[0].name !== 'bool') return `${name} needs one bool, got ${typeName(args[0])}`;
+    return { type: form === 'ballot' ? vector(4, U32) : BOOL, params: [BOOL], stage };
+  }
+  const t = fitClass(args[0], form === 'integer' ? 'concrete-integer' : 'numeric');
+  if (!t || !shapeOf(t))
+    return `${name} needs ${form === 'integer' ? 'an i32 or u32' : 'a numeric'} scalar or vector, got ${typeName(args[0])}`;
+  if (want === 1) return { type: t, params: [t], stage };
+  const lane = args[1];
+  if (form === 'u32') {
+    if (!isU32Like(lane)) return `${name} needs a u32 as its second argument, got ${typeName(lane)}`;
+    return { type: t, params: [t, U32], stage };
+  }
+  if (!isIntLike(lane)) return `${name} needs an i32 or u32 lane index, got ${typeName(lane)}`;
+  return { type: t, params: [t, concreteInt(lane)], stage };
+}
+
 const resultStructs = new Map<string, StructType>();
 function resultStruct(name: string, members: [string, Type][]): StructType {
   let s = resultStructs.get(name);
@@ -185,6 +253,7 @@ export const BUILTIN_NAMES: ReadonlySet<string> = new Set([
   ...FLOAT1,
   ...DERIVATIVES,
   ...ATOMIC_RMW,
+  ...SUBGROUP_NAMES,
   'abs',
   'all',
   'any',
@@ -536,6 +605,7 @@ export function resolveBuiltin(name: string, args: readonly Type[], template?: T
       return { type: p.store.kind === 'atomic' ? p.store.element : p.store, params: args, stage: 'compute' };
     }
   }
+  if (SUBGROUP_NAMES.has(name)) return subgroup(name, args);
   if (name.startsWith('texture')) return texture(name, args);
   return `'${name}' is not a WGSL built-in function`;
 }

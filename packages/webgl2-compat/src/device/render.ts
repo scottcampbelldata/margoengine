@@ -806,16 +806,17 @@ export function programUnits(glsl: GLSLProgram, limits: Record<string, number>):
   };
   return { vertex, fragment, combined, over: [fragment, vertex, combined].find((s) => s.units > s.limit) };
 }
+/**
+ * What a pipeline whose `over` stage passes its texture units cannot do, as the layer's coded refusal words it (the
+ * device's error and the GLSL corpus check share it).
+ */
+export function unitsRefusal(over: StageUnits): string {
+  const where = over.stage === 'combined' ? 'two stages together take' : `${over.stage} stage takes`;
+  return `a render pipeline whose ${where} ${over.units} texture units (${over.pairs} texture and sampler pairs, ${over.storage} storage data textures; this WebGL2 has ${over.limit}): ${over.bindings.map(([g, b]) => (b < 0 ? `group ${g} storage` : `group ${g} binding ${b}`)).join(', ')}`;
+}
 /** The coded error of a pipeline whose `over` stage passes its texture units (help: errors#texture-units). */
 function unitsError(device: CompatDevice, over: StageUnits): Error {
-  const where = over.stage === 'combined' ? 'its two stages together take' : `its ${over.stage} stage takes`;
-  return Object.assign(
-    device.unsupported(
-      `a render pipeline whose ${where} ${over.units} texture units (${over.pairs} texture and sampler pairs, ${over.storage} storage data textures; this WebGL2 has ${over.limit}): ${over.bindings.map(([g, b]) => (b < 0 ? `group ${g} storage` : `group ${g} binding ${b}`)).join(', ')}`,
-      'texture-units',
-    ),
-    { units: over },
-  );
+  return Object.assign(device.unsupported(unitsRefusal(over), 'texture-units'), { units: over });
 }
 
 /** The entry point of a stage the translation used (the named one, or the stage's only one). */

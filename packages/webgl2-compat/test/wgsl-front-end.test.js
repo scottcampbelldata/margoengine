@@ -566,3 +566,54 @@ test('extractBits and insertBits: a constant offset + count past 32 bits is a sh
     'fn f(x: u32, o: u32) -> u32 { return insertBits(x, x, o, 8u) + extractBits(x, 0u, 32u) + extractBits(x, o, 32u); }',
   );
 });
+
+test('subgroup built-in functions type behind enable subgroups (WGSL 17.12, 17.13; KB-COMPAT-CORPUSRED1)', () => {
+  const E = 'enable subgroups;';
+  const t = (expr, prelude = '') => typeOf(expr, `${E}\n${prelude}`);
+  assert.equal(t('subgroupAdd(1.5)'), 'f32', 'an abstract float takes f32');
+  assert.equal(t('subgroupAdd(2)'), 'i32', 'an abstract int takes i32');
+  assert.equal(t('subgroupInclusiveMul(vec3u(1))'), 'vec3<u32>');
+  assert.equal(t('subgroupExclusiveAdd(vec2f(1))'), 'vec2<f32>');
+  assert.equal(t('subgroupMin(3u)'), 'u32');
+  assert.equal(t('subgroupMax(vec4i(1))'), 'vec4<i32>');
+  assert.equal(t('subgroupAnd(7u)'), 'u32');
+  assert.equal(t('subgroupXor(vec2i(1))'), 'vec2<i32>');
+  assert.equal(t('subgroupAll(true)'), 'bool');
+  assert.equal(t('subgroupBallot(false)'), 'vec4<u32>');
+  assert.equal(t('subgroupElect()'), 'bool');
+  assert.equal(t('subgroupBroadcastFirst(vec3f(1))'), 'vec3<f32>');
+  assert.equal(t('subgroupBroadcast(1.0, 3u)'), 'f32');
+  assert.equal(t('subgroupShuffle(2u, lane)', 'var<private> lane: i32;'), 'u32', 'a runtime lane is fine');
+  assert.equal(t('subgroupShuffleUp(vec2f(1), 1u)'), 'vec2<f32>');
+  assert.equal(t('subgroupShuffleXor(4, 1u)'), 'i32');
+  assert.equal(t('quadBroadcast(1u, 2)'), 'u32');
+  assert.equal(t('quadSwapDiagonal(vec4f(1))'), 'vec4<f32>');
+  // Without the enable: a clear checker error naming the fix (was "Unknown function 'subgroupAdd'").
+  bad('fn f() { let x = subgroupAdd(1.0); }', 'type', 1, 18, /subgroupAdd needs 'enable subgroups;'/);
+  bad(
+    '@compute @workgroup_size(1) fn c(@builtin(subgroup_size) s: u32) {}',
+    'type',
+    undefined,
+    undefined,
+    /@builtin\(subgroup_size\) needs 'enable subgroups;'/,
+  );
+  // Argument rules.
+  bad(`${E}\nfn f() { let x = subgroupAnd(1.0); }`, 'type', 2, undefined, /subgroupAnd needs an i32 or u32/);
+  bad(`${E}\nfn f() { let x = subgroupAdd(true); }`, 'type', 2, undefined, /subgroupAdd needs a numeric/);
+  bad(`${E}\nfn f() { let x = subgroupAll(1); }`, 'type', 2, undefined, /subgroupAll needs one bool/);
+  bad(`${E}\nfn f() { let x = subgroupElect(1); }`, 'type', 2, undefined, /subgroupElect takes 0 arguments/);
+  bad(`${E}\nfn f() { let x = subgroupShuffleDown(1.0, 1i); }`, 'type', 2, undefined, /needs a u32 as its second/);
+  bad(`${E}\nfn f(i: u32) { let x = subgroupBroadcast(1.0, i); }`, 'type', 2, undefined, /must be a const-expression/);
+  bad(`${E}\nfn f() { let x = subgroupBroadcast(1.0, 128u); }`, 'type', 2, undefined, /outside 0 to 127/);
+  bad(`${E}\nfn f() { let x = quadBroadcast(1.0, 4u); }`, 'type', 2, undefined, /outside 0 to 3/);
+  // Compute and fragment shaders only.
+  ok(`${E}\n@compute @workgroup_size(64) fn c() { _ = subgroupElect(); }`);
+  ok(`${E}\nfn g() -> f32 { return subgroupAdd(1.0); }\n@fragment fn f() -> @location(0) vec4f { return vec4f(g()); }`);
+  bad(
+    `${E}\nfn g() -> f32 { return subgroupAdd(1.0); }\n@vertex fn v() -> @builtin(position) vec4f { return vec4f(g()); }`,
+    'type',
+    undefined,
+    undefined,
+    /\(vertex\) reaches 'g', which uses a fragment- and compute-only built-in/,
+  );
+});

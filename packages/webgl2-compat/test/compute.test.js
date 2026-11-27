@@ -6,6 +6,13 @@ import assert from 'node:assert/strict';
 import { planCompute, runComputeOnCPU } from '../dist/compute.js';
 import { checkWGSL } from '../dist/wgsl.js';
 import { readCorpus } from './corpus/store.mjs';
+import {
+  assertEnableRefusal,
+  assertUnmappedCounts,
+  RECORDED_OVER_INVOCATIONS,
+  RECORDED_UNMAPPED_ENABLES,
+  unmappedEnable,
+} from './support/corpus-refusals.mjs';
 
 const tierOf = (source, entryPoint) => planCompute({ source, entryPoint });
 
@@ -82,19 +89,48 @@ test('a store straight before a return inside a loop of unknown length counts on
   assert.match(skipped.reason, /loop of unknown length/);
 });
 
-test('every compute entry point of the corpus gets a tier (none is refused)', () => {
+test('every compute entry point of the corpus gets a tier; only an unmapped enable is refused, coded and named', () => {
   const { modules } = readCorpus();
-  const tiers = { fragment: 0, scatter: 0, cpu: 0 };
+  const tiers = { fragment: 0, scatter: 0, cpu: 0 },
+    refused = {};
+  let overInvocations = 0;
   for (const m of modules) {
     if (!m.entryPoints.compute) continue;
     const module = checkWGSL(m.code);
+    const name = unmappedEnable(module);
+    if (name) {
+      for (const entryPoint of m.entryPoints.compute)
+        assert.throws(
+          () => planCompute({ module, entryPoint }),
+          (error) => (assertEnableRefusal(error, name, `${m.package} ${m.key} ${entryPoint}`), true),
+        );
+      refused[name] = (refused[name] ?? 0) + 1;
+      continue;
+    }
     const constants = Object.assign({}, ...m.pipelines.filter((p) => p.compute).map((p) => p.compute.constants ?? {}));
     for (const entryPoint of m.entryPoints.compute) {
-      const plan = planCompute({ module, entryPoint, constants });
+      let plan;
+      try {
+        plan = planCompute({ module, entryPoint, constants });
+      } catch (error) {
+        // The only other refusal: a kernel compute sized for an adapter granting more than 256 invocations.
+        assert.ok(
+          error instanceof RangeError && /more than 256 invocations; use at most 256 \(WebGPU's limit\)/.test(error.message),
+          `${m.package} ${m.key} ${entryPoint}: ${error}`,
+        );
+        overInvocations++;
+        continue;
+      }
       tiers[plan.tier]++;
     }
   }
   assert.ok(tiers.fragment >= 30 && tiers.scatter >= 250 && tiers.cpu >= 60, JSON.stringify(tiers));
+  assertUnmappedCounts(refused, RECORDED_UNMAPPED_ENABLES.compute, 'compute corpus');
+  assert.ok(
+    overInvocations <= RECORDED_OVER_INVOCATIONS.compute,
+    `${overInvocations} kernels past 256 invocations, more than the recorded ${RECORDED_OVER_INVOCATIONS.compute}`,
+  );
+  assert.ok(refused.subgroups > 0, 'the subgroup kernels reach the planner and are refused, not skipped');
 });
 
 test('CPU tier: f32 arithmetic rounds as an f32 GPU, integers follow WGSL', () => {

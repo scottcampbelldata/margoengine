@@ -60,6 +60,12 @@ export function flagsOf(code) {
  * else `(bundled page)`.
  */
 function owner(module) {
+  // A record read back from the corpus (recordsOf) already carries the owner its first recording settled; a label
+  // merged in by a later recording must not move it, or a re-recording reassigns modules (scatter's prefix kernel
+  // to shared, compute's kernels to sciviz).
+  // A bundled-page owner is no owner, so a later recording with a package still claims it.
+  if (module.package && module.package !== '(bundled page)')
+    return { package: module.package, packages: module.packages ?? [] };
   for (const label of module.labels ?? []) {
     const m = /\/packages\/([a-z0-9-]+)\//.exec(label);
     if (m) return { package: m[1], packages: [...new Set([m[1], ...module.packages])] };

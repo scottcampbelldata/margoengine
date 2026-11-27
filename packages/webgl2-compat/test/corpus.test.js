@@ -119,6 +119,27 @@ test('a recording added to the corpus keeps every module, its pipelines and its 
   }
 });
 
+test('re-recording keeps an owner the corpus settled when a later label names another package (KB-COMPAT-CORPUSRED1)', () => {
+  // scatter created the prefix kernel first; shared's check:wgsl label joined later. Reading the corpus back and
+  // writing it again re-derived the owner from the merged label, moving the module to shared.
+  const dir = mkdtempSync(join(tmpdir(), 'wgsl-corpus-owner-'));
+  try {
+    const code = '@compute @workgroup_size(1) fn main() {}';
+    writeCorpus(
+      [
+        { key: 'a', code, errors: 0, packages: ['scatter', 'shared'] },
+        { key: 'b', code, errors: 0, packages: ['shared'], labels: ['check:wgsl /packages/shared/prefix.js prefix'] },
+      ],
+      { dir },
+    );
+    assert.equal(readCorpus(dir).modules[0].package, 'scatter');
+    writeCorpus(recordsOf(readCorpus(dir)), { dir });
+    assert.equal(readCorpus(dir).modules[0].package, 'scatter', 'a second write keeps the settled owner');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('every stage appears, with pipelines and binding types recorded', () => {
   const stages = new Set(modules.flatMap((m) => Object.keys(m.entryPoints)));
   assert.deepEqual([...stages].sort(), ['compute', 'fragment', 'vertex']);

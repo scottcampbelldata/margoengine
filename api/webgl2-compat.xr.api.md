@@ -939,7 +939,7 @@ interface IRFunction extends Span {
     readonly workgroupSize?: readonly (number | IRExpr)[];
     readonly calls: ReadonlySet<IRFunction>;
     readonly uses: ReadonlySet<IRGlobalVar | IROverride>;
-    readonly stages: ReadonlySet<'fragment' | 'compute'>;
+    readonly stages: ReadonlySet<'fragment' | 'compute' | 'fragment-compute'>;
 }
 
 interface IRGlobalConst extends Span {

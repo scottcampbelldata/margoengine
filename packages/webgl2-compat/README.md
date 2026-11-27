@@ -17,6 +17,10 @@ run (milestone M5): as fragment draws, as point draws, or on the CPU, whichever 
 Packages whose WebGPU route would be slow there take a route of their own (milestone M6, see Package routes below).
 Render shaders that write storage buffers or textures are refused with MargoError code `unsupported`: WebGL2 render
 shaders cannot write them.
+The layer maps one WGSL extension, `enable f16;` (to highp float), and offers no `subgroups` or `clip-distances`
+feature: a module that enables any other is refused with code `unsupported` naming it (`'enable subgroups;'`). Its
+WGSL front end still checks such modules in full, the subgroup built-in functions included, so the refusal is what
+a page sees rather than a type error.
 
 Load it only where WebGPU is missing, with a dynamic import, so browsers with WebGPU never download it:
 

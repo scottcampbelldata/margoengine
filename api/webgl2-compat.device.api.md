@@ -674,7 +674,7 @@ export interface IRFunction extends Span {
     readonly workgroupSize?: readonly (number | IRExpr)[];
     readonly calls: ReadonlySet<IRFunction>;
     readonly uses: ReadonlySet<IRGlobalVar | IROverride>;
-    readonly stages: ReadonlySet<'fragment' | 'compute'>;
+    readonly stages: ReadonlySet<'fragment' | 'compute' | 'fragment-compute'>;
 }
 
 export interface IRGlobalConst extends Span {
@@ -1022,7 +1022,11 @@ export function isCompatDevice(device: unknown): device is CompatDevice;
 
 export function parseWGSL(source: string): ModuleAst;
 
+export function programUnits(glsl: GLSLProgram, limits: Record<string, number>): PipelineUnits;
+
 export function uninstallCompat(): boolean;
+
+export function unitsRefusal(over: StageUnits): string;
 
 export { alignOf as wgslAlignOf };
 function alignOf(t: Type): number;
