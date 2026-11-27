@@ -257,6 +257,11 @@ pub struct World {
     /// host writes).
     pub fc_side: Col<f32>,
     pub faces: usize,
+    // Long range attachments (src/tether.rs): a particle, the pinned particle it is tied to, and the most it may stand from it.
+    pub tt_p: Col<u32>,
+    pub tt_a: Col<u32>,
+    pub tt_len: Col<f32>,
+    pub tethers: usize,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -441,6 +446,7 @@ impl World {
             for e in 0..self.edges {
                 self.solve_edge(e, h);
             }
+            self.solve_tethers();
             self.solve_shape(h);
             self.solve_fem(h);
             if vertex_block {

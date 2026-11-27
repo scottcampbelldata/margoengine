@@ -886,6 +886,22 @@ A woven sheet (`cloth`, `clothTube`, `clothAnisotropic`) is a fabric. By default
 - **Air.** The faces of a body of triangles feel the air (`desc.setAirDrag(on)`, default on): a flat plate's drag, 1/2 rho 1.17 A |u_n| u_n (Hoerner 1965) on the air moving through each face, against `soft.wind` (a velocity, a function of the point and the time, or a flow field; still air when unset), rho the flow field's or the standard atmosphere's at the face's height. A `SailForce` on a cloth supplies its air loads instead, and turns this off for that cloth while it is attached.
 - **Water.** Give the bodies water (`soft.water = {elevation, flow, density}`: its surface's height over (x, z) at a time, its velocity as a flow field such as `SpectralSea`'s `water`, and its density, default 1025) and under its surface each particle takes Morison's loads (Morison, O'Brien, Johnson and Schaaf 1950): the weight of the water it displaces upward (its body's `desc.setDensity(kg/m^3)`; left out, the body displaces nothing), the water's acceleration on it and on the water it carries, that water's inertia, and the drag of the water past it. A rope's segments are cylinders across the flow (drag 1.2, Hoerner 1965; carried water that of their own volume), a cloth's faces plates (1.17) whose sheet carries the water of a disk of its area ((8/3) rho a^3). The carried water is taken implicitly (a particle under water moves with its mass and its water's), so a light cloth in the sea is as stable as in the air. A particle half out of the water takes half; the air leaves a face under the water alone. So a hose or a kelp frond sways with the waves' orbits, a curtain in a flooded cabin hangs heavy, and a weighted net sinks at its drag's speed. Measured: a rope as dense as the water stays put (to 1e-4 m), one twice as dense sinks broadside within 0.5 percent of its cylinder drag's speed, a pendulum in water swings within 0.5 percent of the period its carried water and buoyancy set, a rope as dense as the water rides an oscillating current within 1.3 percent, and a weighted tarp sinks flat within 0.3 percent of its plate drag's speed.
 - **Friction.** Contacts with rigid bodies hold back a slide within Coulomb's bound, solved with the sheet's rows (staggered projections, Kaufman et al. 2008), so a box on a cloth holds below its friction angle and slides above it.
+- **Tethers.** `desc.setTethers(stretch = 1)` ties every free particle to its nearest pin by its shortest distance through the body's structural and shear edges, times `stretch` (1 or more), and pulls a particle that strays outside that sphere back onto it once per pass, after the edges (long range attachments, Kim, Chentanez and Mueller 2012). A particle inside its sphere is left alone, so the tether only cuts the stretch a sheet solved with few passes shows under its own weight and a fast swing: a 2 by 10 m sheet at one pass a step stretches 0.65 percent without tethers and none with them. Ties are found again from the pins and the edges left whole after a tear, a pin change or `body.setTethers(stretch)` (`null` removes them); `body.tetheredParticles` counts them. A particle that no path reaches from a pin (a piece torn free) is not tied.
+
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics, { iterations: 1, substeps: 1 });
+const top = Array.from({ length: 11 }, (_, i) => i * 51);
+const curtain = soft.create(
+  SoftBodyDesc.cloth([0, 10, 0], [0.2, 0, 0], [0, 0, 0.2], 11, 51).setPinnedParticles(top).setTethers(),
+);
+for (let i = 0; i < 120; i++) physics.step();
+console.log(curtain.tetheredParticles); // 550: every free particle tied to the top row
+```
 
 Migration: before this, a woven sheet's particles weighed 1 kg each (Rapier's default), its threads and diagonals were rigid edges that the sweep left stretching under load, and it felt no air. A cloth of 10 cm cells then weighed 100 kg/m^2, eight hundred times cotton, which is why it sagged and draped like a heavy blanket. For the old behaviour, give the body `setParticleMass(1)`, set `material.tensile = null` and `material.shear = null` (rigid threads and diagonals, now solved exactly) and `setAirDrag(false)`; `SoftBodyMaterial.uniform(hertz, damping)` (Rapier's material) does all but the air.
 

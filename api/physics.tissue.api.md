@@ -1958,6 +1958,7 @@ interface Skin {
 }
 
 class SoftBodies implements PhysicsAttachment {
+    tethersDirty: boolean;
     steps: number;
     cellTornByHand: boolean;
     cellDamping: number;
@@ -2104,6 +2105,11 @@ class SoftBody {
     edgeKinds: Uint8Array<ArrayBuffer>;
     edgeShear: Float32Array<ArrayBuffer>;
     airDrag: boolean;
+    tetherStretch: number | null;
+    tetherCount: number;
+    get tethers(): number | null;
+    get tetheredParticles(): number;
+    setTethers(stretch?: number | null): this;
     density: number | null;
     waterRadius: number | null;
     airLoads: number;
@@ -2312,6 +2318,8 @@ class SoftBodyDesc {
     setLinearDamping(damping: number): this;
     setAirDrag(on: boolean): this;
     airDrag: boolean;
+    setTethers(stretch?: number | null): this;
+    tethers: number | null;
     setDensity(density: number): this;
     density: number | null;
     setTranslation(translation: Vec3): this;

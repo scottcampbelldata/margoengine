@@ -63,6 +63,7 @@ interface SoftExports extends WebAssembly.Exports {
   soft_cloth_reserve(triangles: number, contacts: number): number;
   soft_cloth_enable(triangles: number, thickness: number, friction: number): void;
   soft_attach_reserve(attachments: number): void;
+  soft_tether_reserve(tethers: number): void;
   soft_face_reserve(faces: number): void;
   soft_volume_reserve(triangles: number): void;
   soft_volume(body: number): number;
@@ -151,6 +152,8 @@ const INTEGER_COLUMNS = new Set([
   'fc_b',
   'fc_c',
   'fc_row',
+  'tt_p',
+  'tt_a',
 ]);
 const TORN_CELL = 1;
 const INTEGER_CELL_COLUMNS = new Set([
@@ -2094,6 +2097,19 @@ export class SoftBodyDesc {
   }
   /** @internal */ airDrag = true;
   /**
+   * Long range attachments (Kim, Chentanez and Mueller 2012): each free particle is tied to its nearest pinned particle and
+   * may stand no farther from it than `stretch` times its rest distance through the cloth (the shortest path over the edges).
+   * A hanging sheet then cannot sag past its threads however long it is and however few passes the step takes, which iterating
+   * the edges alone only reaches over many passes; slack, folds and swinging stay free. `null` (the default) ties nothing.
+   * Anchors are pinned or kinematic particles; the ties are worked out again when a pin changes or the body tears.
+   * @throws RangeError for a stretch below 1 or not finite.
+   */
+  setTethers(stretch: number | null = 1): this {
+    this.tethers = checkedTethers(stretch);
+    return this;
+  }
+  /** @internal */ tethers: number | null = null;
+  /**
    * The density of the body's material, kg/m^3, for the water it displaces in {@link SoftBodies.water}: each particle
    * displaces its mass over this, so the water holds it up by that volume's weight and its acceleration pushes on it.
    * Left out, the body displaces nothing (a cloth, whose sheet's added mass and drag the water still takes).
@@ -2203,6 +2219,26 @@ export class SoftBody {
   /** @internal A shear edge's spring per unit of shear rigidity (see SoftBodyDesc.edgeShear). */
   edgeShear = new Float32Array(0);
   /** @internal Whether its faces feel the air (SoftBodyDesc.setAirDrag). */ airDrag = true;
+  /** @internal Its long range attachments' allowed stretch, or null for none (SoftBodyDesc.setTethers). */ tetherStretch:
+    | number
+    | null = null;
+  /** @internal How many tethers it holds now. */ tetherCount = 0;
+  /** The stretch its long range attachments allow, or null when it has none ({@link SoftBodyDesc.setTethers}). */
+  get tethers(): number | null {
+    return this.tetherStretch;
+  }
+  /** How many particles are tied to a pin now. */
+  get tetheredParticles(): number {
+    return this.tetherCount;
+  }
+  /** Ties the body's particles to its pins, or with `null` lets them go ({@link SoftBodyDesc.setTethers}). */
+  setTethers(stretch: number | null = 1): this {
+    this.check();
+    this.tetherStretch = checkedTethers(stretch);
+    this.owner.tethersDirty = true;
+    this.wake();
+    return this;
+  }
   /** @internal Its material's density (SoftBodyDesc.setDensity), or null when it displaces no water. */ density:
     | number
     | null = null;
@@ -2400,6 +2436,7 @@ export class SoftBody {
       w[row] = 1 / this.masses[index]!;
       pflags[row] = pflags[row]! & ~(PINNED | TARGETED);
     }
+    if (this.tetherStretch !== null) this.owner.tethersDirty = true;
     return this;
   }
   /**
@@ -2567,6 +2604,7 @@ export class SoftBody {
     if (this.isEdgeTorn(edge)) return this;
     const { eflags } = this.c;
     eflags[this.firstEdge + edge] = eflags[this.firstEdge + edge]! | TORN;
+    if (this.tetherStretch !== null) this.owner.tethersDirty = true;
     return this;
   }
   /** How the body's cells are solved. */
@@ -2979,7 +3017,9 @@ export class SoftBodies implements PhysicsAttachment {
   private readonly listeners = new Set<(event: SoftTearEvent) => void>();
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
-  private capacity = [0, 0, 0, 0, 0, 0, 0];
+  private capacity = [0, 0, 0, 0, 0, 0, 0, 0];
+  /** @internal Whether the long range attachments must be worked out again (a body, a pin or a tear changed the paths). */
+  tethersDirty = false;
   private rowGroups: number[] = [];
   private contactHook: ((contact: SoftContact) => void) | null = null;
   private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
@@ -3155,10 +3195,20 @@ export class SoftBodies implements PhysicsAttachment {
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
     const buffer = this.exports.memory.buffer;
     if (this.view && this.viewBuffer === buffer) return this.view;
-    const [particles, edges, bodies, colliders, attachments, volumeTriangles, faces] = this.capacity,
+    const [particles, edges, bodies, colliders, attachments, volumeTriangles, faces, tethers] = this.capacity,
       view: Columns = {};
     columnNames.forEach((name, id) => {
-      const rows = rowsOf(name, particles!, edges!, bodies!, colliders!, attachments!, volumeTriangles!, faces!),
+      const rows = rowsOf(
+          name,
+          particles!,
+          edges!,
+          bodies!,
+          colliders!,
+          attachments!,
+          volumeTriangles!,
+          faces!,
+          tethers!,
+        ),
         at = this.exports.soft_column(id);
       view[name] = (
         INTEGER_COLUMNS.has(name) ? new Uint32Array(buffer, at, rows) : new Float32Array(buffer, at, rows)
@@ -3234,6 +3284,7 @@ export class SoftBodies implements PhysicsAttachment {
       this.capacity[4]!,
       this.capacity[5]!,
       this.capacity[6]!,
+      this.capacity[7]!,
     ];
     this.view = null;
   }
@@ -3451,6 +3502,8 @@ export class SoftBodies implements PhysicsAttachment {
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
     body.edgeShear = Float32Array.from(desc.edgeShear);
     body.airDrag = desc.airDrag;
+    body.tetherStretch = desc.tethers;
+    if (desc.tethers !== null) this.tethersDirty = true;
     body.density = desc.density;
     body.waterRadius = desc.radius ?? null;
     body.grid = desc.grid && { ...desc.grid };
@@ -4203,6 +4256,7 @@ export class SoftBodies implements PhysicsAttachment {
 
   /** Removes a body and its particles; later bodies keep their order, but their numbers shift down by one. */
   remove(body: SoftBody): void {
+    if (body.tetherStretch !== null || this.bodies.some((b) => b.tetherStretch !== null)) this.tethersDirty = true;
     if (body.removed) return;
     const at = this.bodies.indexOf(body);
     if (at < 0)
@@ -4579,6 +4633,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.exports.soft_fem_implicit_settings(this.femLinearTolerance, this.femMaxLinearIterations, this.femMaxDenseDofs);
     this.findPlanes(dt, rows, bodies);
     this.takeFromProxies();
+    if (this.tethersDirty) this.writeTethers();
     this.exports.soft_fem_step_begin();
     this.exports.soft_begin(dt);
     // The passes of the body that asks for the most are the world's (the passes of a coupled island are the largest asked).
@@ -4687,6 +4742,74 @@ export class SoftBodies implements PhysicsAttachment {
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, live);
     for (const mesh of this.bound) this.moveBound(mesh, live);
     this.updateSleep(dt, live);
+  }
+
+  /**
+   * Works out every body's long range attachments and hands them to the kernel: from all the body's pinned and kinematic
+   * particles at once, Dijkstra's shortest paths over its whole edges (each its rest length) give every free particle its
+   * nearest anchor and its distance through the cloth, and the tie's length is that times the body's stretch. A particle no
+   * path reaches (a piece torn off) is tied to nothing.
+   */
+  private writeTethers(): void {
+    this.tethersDirty = false;
+    let c = this.columns();
+    const ties: number[] = [];
+    for (const body of this.bodies) {
+      body.tetherCount = 0;
+      const stretch = body.tetherStretch;
+      if (stretch === null) continue;
+      const n = body.particles,
+        first = body.firstParticle,
+        start = ties.length,
+        distance = new Float64Array(n).fill(Infinity),
+        anchor = new Int32Array(n).fill(-1),
+        next: number[][] = Array.from({ length: n }, () => []);
+      // Along the structural (and shear) edges only: a bend edge spans two of them and would carry a tie across a tear.
+      for (let e = 0; e < body.structural; e++) {
+        const edge = body.firstEdge + e;
+        if ((c.eflags[edge]! & TORN) !== 0) continue;
+        const a = c.ea[edge]! - first,
+          b = c.eb[edge]! - first,
+          rest = c.rest[edge]!;
+        if (a < 0 || b < 0 || a >= n || b >= n || !(rest > 0)) continue;
+        next[a]!.push(b, rest);
+        next[b]!.push(a, rest);
+      }
+      const heap = new MinHeap();
+      for (let i = 0; i < n; i++)
+        if (c.w[first + i] === 0) {
+          distance[i] = 0;
+          anchor[i] = i;
+          heap.push(0, i);
+        }
+      while (heap.size > 0) {
+        const [d, i] = heap.pop();
+        if (d > distance[i]!) continue;
+        const around = next[i]!;
+        for (let k = 0; k < around.length; k += 2) {
+          const j = around[k]!,
+            far = d + around[k + 1]!;
+          if (far < distance[j]!) {
+            distance[j] = far;
+            anchor[j] = anchor[i]!;
+            heap.push(far, j);
+          }
+        }
+      }
+      for (let i = 0; i < n; i++)
+        if (anchor[i]! >= 0 && anchor[i] !== i) ties.push(first + i, first + anchor[i]!, distance[i]! * stretch);
+      body.tetherCount = (ties.length - start) / 3;
+    }
+    const count = ties.length / 3;
+    this.exports.soft_tether_reserve(count);
+    this.capacity[7] = Math.max(this.capacity[7]!, count);
+    this.view = null;
+    c = this.columns();
+    for (let t = 0; t < count; t++) {
+      c.tt_p[t] = ties[3 * t]!;
+      c.tt_a[t] = ties[3 * t + 1]!;
+      c.tt_len[t] = ties[3 * t + 2]!;
+    }
   }
 
   /**
@@ -5559,6 +5682,7 @@ export class SoftBodies implements PhysicsAttachment {
             freshCells.push(t);
           }
       }
+      if (fresh.length && body.tetherStretch !== null) this.tethersDirty = true;
       if (fresh.length || freshCells.length) this.announce(body, fresh, freshCells, this.splitAfterTear(body));
     }
   }
@@ -5949,11 +6073,13 @@ function rowsOf(
   attachments: number,
   volumeTriangles: number,
   faces: number,
+  tethers: number,
 ): number {
   if (name === 'vtri') return volumeTriangles * 3;
   if (name.startsWith('fc_')) return faces;
   if (/^vb_/.test(name)) return bodies;
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
+  if (/^tt_(p|a|len)$/.test(name)) return tethers;
   if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf|kj|kr)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|elimit|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
@@ -5988,3 +6114,63 @@ function barycentric(a: [Vec3, Vec3, Vec3, Vec3], p: Vec3): number[] {
 
 // Sails and flags in the wind (AERO-02): the vortex-lattice load on a cloth.
 export { SailForce, type SailOptions } from './sail.js';
+
+function checkedTethers(stretch: number | null): number | null {
+  if (stretch === null) return null;
+  if (!(stretch >= 1) || !Number.isFinite(stretch))
+    throw new RangeError(
+      `A tether's stretch is 1 or more: how far past its rest distance through the cloth a particle may go (got ${stretch}); pass 1 for none, or null for no tethers.`,
+    );
+  return stretch;
+}
+
+/** A binary min-heap of (key, value) pairs, for the shortest paths of the tethers. */
+class MinHeap {
+  private keys: number[] = [];
+  private values: number[] = [];
+  get size(): number {
+    return this.keys.length;
+  }
+  push(key: number, value: number): void {
+    const { keys, values } = this;
+    let i = keys.length;
+    keys.push(key);
+    values.push(value);
+    while (i > 0) {
+      const up = (i - 1) >> 1;
+      if (keys[up]! <= key) break;
+      keys[i] = keys[up]!;
+      values[i] = values[up]!;
+      i = up;
+    }
+    keys[i] = key;
+    values[i] = value;
+  }
+  pop(): [number, number] {
+    const { keys, values } = this,
+      top: [number, number] = [keys[0]!, values[0]!],
+      lastKey = keys.pop()!,
+      lastValue = values.pop()!;
+    if (keys.length > 0) {
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1,
+          r = l + 1;
+        let m = i,
+          mk = lastKey;
+        if (l < keys.length && keys[l]! < mk) {
+          m = l;
+          mk = keys[l]!;
+        }
+        if (r < keys.length && keys[r]! < mk) m = r;
+        if (m === i) break;
+        keys[i] = keys[m]!;
+        values[i] = values[m]!;
+        i = m;
+      }
+      keys[i] = lastKey;
+      values[i] = lastValue;
+    }
+    return top;
+  }
+}

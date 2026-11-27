@@ -10370,6 +10370,8 @@ with the native cell state so a world snapshot includes them. Exact derivative, 
 pass. The measured traction fixture covers the withheld finite-strain Treloar data and records the small
 biaxial tension error. Independent large-deformation gelatin and ice evidence is pending.
 
+Cloth tethers (2026-11-27, `soft-kernel/src/tether.rs`, test `tests/soft-tethers.test.js`). Long range attachments (Kim, Chentanez and Mueller 2012): three tether columns (`tt_p`, `tt_a`, `tt_len`) hold each tied particle, its pin and its allowed distance; once per pass of `substep_pre`, after the edges, a particle with weight farther from its pin than that distance is set on the sphere around the pin (one square root, a ratio, three multiplications: the step's pinned operations). The ties are written from TypeScript (Dijkstra over the structural and shear rest lengths) when a body, a pin, a tear or a stretch changes, never each step. Evidence: a 2 by 10 m sheet solved with one pass a step stretches 0.65 percent untied and none tied, a slack rope tied and untied ends bit for bit the same, and a tear or a new pin ties the particles again. Missing: a GPU path (all soft solving is CPU Wasm), speed (build phase).
+
 Volumetric vertex blocks (SOFT-04, `soft-kernel/src/vertex_block.rs`). The deterministic incident-corner list
 is rebuilt from the live tetrahedra, so tears retire their cells from the next solve. Inertia and exact local
 elastic Hessians accumulate in f64 for an LDLᵀ solve. Positions use the existing f32 columns. The mode is saved

@@ -164,6 +164,7 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
       desc.selfContacts = body.selfContacts;
       desc.selfFriction = body.selfFriction;
     }
+    desc.tethers = body.tetherStretch;
     const piece = soft.create(desc),
       after = soft.columns(),
       fem = soft.cellColumns(),
@@ -409,6 +410,7 @@ function splitCells(
       desc.selfContacts = body.selfContacts && desc.triangles.length > 0;
       desc.selfFriction = body.selfFriction;
     }
+    desc.tethers = body.tetherStretch;
     // Edges: each edge of the body goes to the node pair the cells that hold both of its ends use.
     const byParticle = new Map<number, number[]>();
     for (const t of mine)

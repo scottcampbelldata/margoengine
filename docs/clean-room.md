@@ -12305,6 +12305,13 @@ Written clean room from the papers below and Rapier's published Soft-bodies user
 - M. Müller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position Based Dynamics", J. Visual Communication and Image Representation 18(2), 2007.
 - Catenary check: the closed form of a hanging chain, length = 2a sinh(span / 2a), height = a cosh(x / a) (any mechanics text).
 
+### Tethers: long range attachments (`@margoengine/physics/soft`, 2026-11-27)
+
+Written clean room from the paper below: no engine's source and no companion code was read. Each free particle is tied to its nearest pinned particle by the shortest path through the body's structural and shear edges (Dijkstra over the rest lengths, run again after a tear, a pin change or a change of the tether stretch; bend edges are left out, as they span a tear), and once per pass, after the edges, a particle farther from its pin than that geodesic times the stretch is put back on the sphere around the pin. The paper's unilateral projection is kept as written: a particle inside its sphere is not moved, so a slack cloth moves bit for bit as it would untied.
+
+- T.-Y. Kim, N. Chentanez and M. Müller-Fischer, "Long Range Attachments: A Method to Simulate Inextensible Clothing in Computer Games", ACM SIGGRAPH/Eurographics Symposium on Computer Animation, 2012. https://doi.org/10.2312/SCA/SCA12/305-310
+- E. W. Dijkstra, "A note on two problems in connexion with graphs", Numerische Mathematik 1, 1959 (the geodesic distances).
+
 ### Shape matching (`@margoengine/physics/soft`, 2026-11-24)
 
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.

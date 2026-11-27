@@ -24,6 +24,7 @@ static mut WORLD: World = World {
     fc_a: Col::new(), fc_b: Col::new(), fc_c: Col::new(), fc_wa: Col::new(), fc_wb: Col::new(), fc_wc: Col::new(), fc_row: Col::new(),
     fc_nx: Col::new(), fc_ny: Col::new(), fc_nz: Col::new(), fc_px: Col::new(), fc_py: Col::new(), fc_pz: Col::new(), fc_vx: Col::new(),
     fc_vy: Col::new(), fc_vz: Col::new(), fc_f: Col::new(), fc_r: Col::new(), fc_j: Col::new(), fc_k: Col::new(), fc_side: Col::new(), faces: 0,
+    tt_p: Col::new(), tt_a: Col::new(), tt_len: Col::new(), tethers: 0,
 };
 
 #[allow(static_mut_refs)]
@@ -54,6 +55,7 @@ columns! {
     at_p, at_row, at_rx, at_ry, at_rz,
     vtri, vb_on, vb_first, vb_count, vb_target, vb_ambient, vb_omega, vb_zeta, vb_lambda, gs, dom, bsleep, m0x, m0y, m0z, l0x, l0y, l0z, a0x, a0y, a0z, kj, rox, roy, roz,
     fc_a, fc_b, fc_c, fc_wa, fc_wb, fc_wc, fc_row, fc_nx, fc_ny, fc_nz, fc_px, fc_py, fc_pz, fc_vx, fc_vy, fc_vz, fc_f, fc_r, fc_j, fc_k, kr, elimit, bmesh,
+    tt_p, tt_a, tt_len,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -73,6 +75,16 @@ pub extern "C" fn soft_attach_reserve(attachments: u32) {
     let w = world();
     w.reserve_attachments(attachments as usize);
     w.attachments = attachments as usize;
+}
+
+/// Makes room for long range attachments and says how many are in use. Views over the memory are stale after it.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_tether_reserve(tethers: u32) {
+    let w = world();
+    w.tt_p.resize(tethers as usize);
+    w.tt_a.resize(tethers as usize);
+    w.tt_len.resize(tethers as usize);
+    w.tethers = tethers as usize;
 }
 
 /// Makes room for the face contacts of a step and says how many are in use. Views over the memory are stale after it.
