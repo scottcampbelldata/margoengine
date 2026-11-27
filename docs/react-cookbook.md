@@ -241,4 +241,4 @@ export default function Page() {
 No `transpilePackages` is needed: the packages ship compiled ESM and the React entry is marked `'use client'`. The Pages
 Router works the same way, and both routers build with webpack and Turbopack (see `examples/next`, and the bundler
 matrix in `npm run modern:test:bundlers`). Physics comes from `@margoengine/react/physics`, so a page without it never
-pulls in Rapier.
+pulls in the physics kernel.

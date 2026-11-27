@@ -210,7 +210,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <tr><td>Path tracing</td><td>a progressive WebGPU path tracer for voxel models, through the engine camera</td><td>packages/voxel-pathtracer · <a href="./voxel.html">voxel whitepaper</a></td></tr>
 <tr><td>Export</td><td>glTF 2.0 / GLB, STL, OBJ with MTL, PLY, static USDZ and COLLADA 1.4.1</td><td>packages/exporters/README.md</td></tr>
 <tr><td>Frameworks</td><td>React 18 and 19 components, and a Next.js starter</td><td>packages/react · tools/create-margo</td></tr>
-<tr><td>Simulation</td><td>Rapier physics, navigation meshes, ECS, state machines, networking</td><td>package READMEs</td></tr>
+<tr><td>Simulation</td><td>Rigid-body, soft-body and 2D physics (own Rust/Wasm kernels), navigation meshes, ECS, state machines, networking</td><td>package READMEs</td></tr>
 </tbody></table></div>
 <p>Of the feature list this page counts, 153 of 161 rows have a Margo package, 4 are partial and 4 are missing. The API is Margo's own.</p>
 <span class="src">docs/three-parity-matrix.md · bec8b597</span>
@@ -290,7 +290,6 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
   <li><strong>Not yet verified</strong> on Firefox, Safari, macOS, Android or iPhone. Real-GPU results come from Edge and Chrome on Windows 11 (an NVIDIA RTX A6000 desktop, Intel Arc 140V laptops and an AMD Radeon 680M mini PC) and from Chromium on one Ubuntu machine with an Intel UHD GPU, where the voxel, path tracer and root browser suites have not yet run to the end (section 10).</li>
   <li><strong>No editor yet.</strong> Scenes are built in code or imported from files.</li>
   <li><strong>No comparison with other engines yet.</strong> The tool runs the same scenes in other engines, interleaved on one machine, but the quiet-machine runs have not been made. Until they are, we make no speed claim against any other engine.</li>
-  <li><strong>Next.js production builds</strong> need Rapier installed today, because the React package's root reaches it. The React package is being split so they do not.</li>
   <li><strong>Design envelope.</strong> 8,388,608 entities; 100,000 nodes per file by default; 16 textures per shader stage; float32 coordinates without <code>FloatingOrigin</code>. Every limit, with the error it raises and the package that takes you past it, is in <code>docs/limits.md</code>.</li>
 </ul>
 

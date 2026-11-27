@@ -316,7 +316,7 @@ npm run measure:size      # core + stage size check
 - Loaders for glTF/GLB (Draco, Meshopt, KTX2), FBX, USDZ, OBJ, STL, PLY, 3MF, COLLADA, IFC and more.
 - Camera controls with CAD-style mouse presets, a view cube, GPU picking and selection outlines.
 - Skinning, morph targets, blend trees and IK.
-- Physics on Rapier, navmesh, ECS, input and audio.
+- Rigid-body, soft-body and 2D physics on Margo's own Rust/Wasm kernels, navmesh, ECS, input and audio.
 - Terrain, water, sky, procedural scenery, voxels and a progressive voxel path tracer.
 - React 18 and 19 components (`@margoengine/react`).
 - Optional WebGL2 fallback: the compatibility layer runs the site's demos, the small preview draws basic scenes.

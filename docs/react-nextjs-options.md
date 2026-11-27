@@ -47,7 +47,7 @@ package, installed separately, and loaded when its component mounts.
 | `/materials` | `MeshTransmissionMaterial`, `BatchedMesh`, `BatchedItem` | `materials` |
 | `/post`, `/dof`, `/tonemap`, `/taa` | `EffectComposer` with `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `DepthTexture`, `SceneTargets`, `DepthOfField`, `Tonemap`, `TAA` | `post` (+ the effect package) |
 | `/voxel` | `Voxels`, `useBlockTextures` | `voxel` |
-| `/physics` | `Physics`, `RigidBody`, eight collider components, `useJoint`, `usePhysics`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `physics`, Rapier |
+| `/physics` | `Physics`, `RigidBody`, eight collider components, `useJoint`, `usePhysics`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `physics` |
 | `/xr` | `XR`, `Controller`, `useXR` | `xr` |
 
 Nothing in the root reaches an optional package, even through a lazy `import()`; `tests/optional-peer-reach.test.js`
@@ -97,8 +97,8 @@ screen, minimaps, HUDs and render-to-texture. Works on WebGPU and WebGL2.
 **Batching and voxels:** `BatchedMesh`/`BatchedItem` (many geometries in one draw call, in-place updates without React
 renders), `Voxels` with live lighting.
 
-**Physics and XR:** Rapier-backed `Physics`/`RigidBody`/colliders/joints; separate entry so apps without it never load
-Rapier. `XR`, `Controller`, `useXR`.
+**Physics and XR:** `Physics`/`RigidBody`/colliders/joints on Margo's own Rust/Wasm physics kernel; separate entry so apps without it never load
+the physics package. `XR`, `Controller`, `useXR`.
 
 ## 5. Next.js
 
