@@ -33,7 +33,7 @@ export interface WeightedAnyAngleOptions {
   tolerance?: number;
   /**
    * Most arcs one call weighs before it stops raising the bound and answers with what it has; the first search, which
-   * finds the path, always finishes. Default 5,000,000.
+   * finds the path, always finishes. Default 8,000,000.
    */
   maxWork?: number;
 }
@@ -59,7 +59,7 @@ interface Portal {
 /** Lengths below this are not split further, and points this near are one point (mesh units). */
 const ON = 1e-6;
 /** Where on each portal the first search for a path stands, as fractions of it. */
-const SAMPLES = Array.from({ length: 9 }, (_, i) => i / 8);
+const SAMPLES = Array.from({ length: 17 }, (_, i) => i / 16);
 
 /** Squared XZ distance from (x, z) to the segment from (ax, az) to (bx, bz). */
 function gap2(x: number, z: number, ax: number, az: number, bx: number, bz: number): number {
@@ -166,7 +166,10 @@ class Ground {
   }
 }
 
-/** A node of one round: a fixed point (`portal` -1) or the piece from t `low` to t `high` of a portal. */
+/**
+ * A node of one round: a fixed point (`portal` -1) or the piece from t `low` to t `high` of a portal. A piece lies on
+ * two polygons.
+ */
 interface Node {
   portal: number;
   low: number;
@@ -174,6 +177,8 @@ interface Node {
   a: Vec3;
   b: Vec3;
   polygons: number[];
+  /** For each state, what the round before proved a path still costs from here; a part of a piece costs no less. */
+  behind?: readonly [number, number];
 }
 
 const spot = (p: Vec3, polygons: number[]): Node => ({ portal: -1, low: 0, high: 0, a: p, b: p, polygons });
@@ -336,13 +341,25 @@ class Round {
     );
   }
 
+  /** Which state of piece `y` is reached across polygon `p`; a point has the one state. */
+  private side(y: number, p: number): number {
+    const { portal, polygons } = this.nodes[y];
+    return portal >= 0 && polygons[1] === p ? 1 : 0;
+  }
+
+  private weight(p: number): number {
+    return p === this.forbidden ? 1 : this.weights.get(p)!;
+  }
+
   /**
-   * Dijkstra from the start, or with `back` from the end against the arcs. A node has two states, `2 * node` reached
-   * across a polygon and `2 * node + 1` reached along its own portal, which may not go on along it: a path walks one
-   * stretch of a portal straight, and without this a chain of touching pieces would walk any portal for nothing.
-   * States whose cost so far plus `rest` passes `limit()` are left out: no path that cheap goes through them.
-   * `arrive` is called when the end is reached and stops the search by answering true. Unreached states hold
-   * Infinity. Null once the round's `work` passes `cap`.
+   * Dijkstra from the start, or with `back` from the end against the arcs. State `2 * node + s` is a piece reached
+   * across its polygon `s` (a point has state `2 * node`). A least path never takes two legs in a row through one
+   * convex polygon, since the straight leg costs no more, so a piece is left through its other polygon. The one leg
+   * that then stays on a portal, along it, is worth taking only through a polygon cheaper than the one the portal was
+   * reached across (Mitchell and Papadimitriou's travel along an edge); it may start and end in one piece. Without these
+   * two rules a relaxed path slid along touching pieces for nothing. States whose cost so far plus `rest` passes
+   * `limit()` are left out: no path that cheap goes through them. `arrive` is called when the end is reached and stops
+   * the search by answering true. Unreached states hold Infinity. Null once the round's `work` passes `cap`.
    */
   search(
     back: boolean,
@@ -369,10 +386,8 @@ class Round {
       keys[i] = key;
       heap[i] = state;
     };
-    // Forwards, a node already reached across at no more cost does all it could do reached along.
-    const beaten = (state: number) => !back && (state & 1) === 1 && done[state - 1] === 1;
     const offer = (from: number, to: number, cost: number, polygon: number) => {
-      if (done[to] || beaten(to) || !(cost < best[to]) || !(cost + rest(to) <= limit())) return;
+      if (done[to] || !(cost < best[to]) || !(cost + rest(to) <= limit())) return;
       best[to] = cost;
       parent[to] = from;
       through[to] = polygon;
@@ -397,39 +412,40 @@ class Round {
         keys[i] = lastKey;
         heap[i] = last;
       }
-      if (done[state] || key > best[state] || beaten(state)) continue;
+      if (done[state] || key > best[state]) continue;
       done[state] = 1;
       settled[state] = key;
       if (!back && state === 2 && arrive?.(parent, through)) return settled;
       const x = state >> 1,
-        along = state & 1,
-        { portal, polygons } = this.nodes[x];
-      for (const p of polygons) {
+        side = state & 1,
+        { portal, polygons } = this.nodes[x],
+        onPortal = portal >= 0;
+      // A piece is left forwards through the polygon it was not reached across, and was reached backwards across the
+      // one its state names. A point meets every polygon it lies on.
+      const first = onPortal ? (back ? side : 1 - side) : 0,
+        end = onPortal ? first + 1 : polygons.length;
+      for (let k = first; k < end; k++) {
+        const p = polygons[k];
         // A forbidden start polygon may be walked from the start point only.
         if (p === this.forbidden && !back && x !== 0) continue;
-        const weight = p === this.forbidden ? 1 : this.weights.get(p)!;
+        const weight = this.weight(p);
         for (const y of this.members.get(p)!) {
-          if (y === x || (back && p === this.forbidden && y !== 0)) continue;
-          const same = portal >= 0 && this.nodes[y].portal === portal;
-          // Forwards, a state reached along goes nowhere along; backwards, only such a state was reached along.
-          if (same ? along !== (back ? 1 : 0) : back && along === 1) continue;
+          if (back && p === this.forbidden && y !== 0) continue;
+          const other = this.nodes[y],
+            same = onPortal && other.portal === portal;
+          if (!same && y === x) continue;
+          // The state at `y` this arc ends in forwards, or starts from backwards.
+          const at = other.portal < 0 ? 0 : back ? 1 - this.side(y, p) : this.side(y, p);
+          // Along a portal only through a polygon cheaper than the one the portal was reached across.
+          if (same && !(weight < this.weight(back ? other.polygons[at] : polygons[side]))) continue;
           this.work++;
-          const cost = key + weight * this.apart(x, y);
-          if (!back) offer(state, 2 * y + (same ? 1 : 0), cost, p);
-          else {
-            offer(state, 2 * y, cost, p);
-            if (!same) offer(state, 2 * y + 1, cost, p);
-          }
+          offer(state, 2 * y + at, key + weight * this.apart(x, y), p);
         }
       }
-      // An off-mesh link lands across: backwards it is undone from that state alone, for either state of its take-off.
-      if (!back || !along)
-        for (const jump of (back ? this.into : this.out).get(x) ?? []) {
-          this.work++;
-          const y = back ? jump.from : jump.to;
-          offer(state, 2 * y, key + jump.cost, -1);
-          if (back) offer(state, 2 * y + 1, key + jump.cost, -1);
-        }
+      for (const jump of (back ? this.into : this.out).get(x) ?? []) {
+        this.work++;
+        offer(state, 2 * (back ? jump.from : jump.to), key + jump.cost, -1);
+      }
       if (this.work > cap) return null;
     }
     return settled;
@@ -556,7 +572,7 @@ export class WeightedAnyAngleSearch {
    * @throws RangeError for a point that is not finite, a filter or area cost below 1 or a bad option.
    */
   route(start: Vec3, end: Vec3, options: WeightedAnyAngleOptions = {}): WeightedAnyAngleRoute | null {
-    const { filter, tolerance = 0.05, maxWork = 5_000_000 } = options;
+    const { filter, tolerance = 0.05, maxWork = 8_000_000 } = options;
     if (!(tolerance >= 0 && tolerance < Infinity))
       throw new RangeError('tolerance must be a finite number, 0 or more.');
     if (!Number.isInteger(maxWork) || maxWork < 1) throw new RangeError('maxWork must be a positive whole number.');
@@ -626,20 +642,18 @@ export class WeightedAnyAngleSearch {
     const wanted = () => best.cost / (1 + tolerance);
     while (work < maxWork && best.cost - lower > tolerance * lower + 1e-9) {
       const here = round,
-        forward = here.search(false, wanted, (state) => here.ahead[state >> 1], maxWork - work, keep(here, false));
+        // The round before bounds what is left to walk far better than the straight line does.
+        left = (state: number) => {
+          const x = state >> 1;
+          return Math.max(here.ahead[x], here.nodes[x].behind?.[state & 1] ?? 0);
+        },
+        forward = here.search(false, wanted, left, maxWork - work, keep(here, false));
       // Every path left out costs `wanted` or more, and every other costs at least its relaxed path.
       if (forward) lower = Math.max(lower, Math.min(forward[2], wanted()));
       const backward =
         forward &&
         best.cost - lower > tolerance * lower + 1e-9 &&
-        // A state reached along that was beaten by the one reached across costs at least as much to reach: it keeps
-        // that cost here, or the search from the end would lose the paths through it and drop their pieces.
-        here.search(
-          true,
-          wanted,
-          (state) => (state & 1 && forward[state] === Infinity ? forward[state - 1] : forward[state]),
-          maxWork - work,
-        );
+        here.search(true, wanted, (state) => forward[state], maxWork - work);
       work += here.work;
       if (!forward || !backward) break;
       // A piece whose cheapest relaxed path already costs `wanted` has nothing left to prove and goes. The widest of
@@ -656,7 +670,7 @@ export class WeightedAnyAngleSearch {
           for (const p of piece.polygons) if (p !== forbidden) width = Math.max(width, weights.get(p)! * length);
           widest = Math.max(widest, width);
         }
-        halves.push({ piece, width });
+        halves.push({ piece: { ...piece, behind: [backward[2 * i], backward[2 * i + 1]] }, width });
       }
       if (!widest) break;
       pieces = halves.flatMap(({ piece, width }) => {

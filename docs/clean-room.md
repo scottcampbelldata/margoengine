@@ -18361,10 +18361,16 @@ engine's source was read.
   Optimization 20 (2), 1982, https://doi.org/10.1137/0320018: pulls a path tight inside its portals (a convex problem
   with a tridiagonal Hessian).
 - Margo's own: the lower bound from pieces of portals (an arc costs the least distance between two pieces times the
-  polygon's weight, so no real path costs less than its relaxed one); the two states a piece has, so that one portal is
-  walked along only once in a row (without it touching pieces walked any edge for nothing and the bound stalled);
+  polygon's weight, so no real path costs less than its relaxed one). A piece has a state for each side it is reached
+  across and is left through the other: two legs in a row through one convex polygon are never shortest, and the one leg
+  that stays on a portal pays off only through a polygon cheaper than the one just crossed (the travel along edges of
+  Mitchell and Papadimitriou). Without these rules relaxed paths slid along touching pieces and the bound stalled. Also
   dropping every piece whose cheapest relaxed path already costs `cost / (1 + tolerance)`; splitting only the pieces
-  left, widest by weight first.
+  left, widest by weight first; and estimating what is left to walk by what the round before proved from the same piece,
+  which a part of it cannot undercut (a heuristic from a coarser graph, admissible because every finer path maps to a
+  coarser one that costs no more).
+- Looked at for the tighter bound and not built: potentials with a Lipschitz bound on a triangulation (a certified dual
+  bound, but its solver converges slowly from a point source and its gap on bent paths is unmeasured).
 
 ## exporters glTF line and point style extensions (2026-11-27)
 

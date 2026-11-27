@@ -6690,7 +6690,8 @@ generated signals. No listening test, rival comparison or speed claim.
 ## Weighted any-angle navmesh paths (navmesh/weighted-any-angle)
 
 Claim: `WeightedAnyAngleSearch` returns a path over weighted ground with its cost and a lower bound that no path goes
-under; on the seeded test maps the path is within 1 percent of the least cost. The bound is not always close: its limits
+under; on the seeded test maps the path is within 1 percent of the least cost, and on 400 polygon maps the default work
+proves every answer to 5 percent. On larger meshes the bound is not always close: its limits
 row gives the measured gaps.
 Proof: `packages/navmesh/test/weighted-any-angle.test.js` checks both against convex descent (Snell's law strips), a
 dense Steiner graph oracle and the exact search on even ground.

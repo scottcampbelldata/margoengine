@@ -372,6 +372,41 @@ test('a tiled mesh across its seams', () => {
   assert.ok(bent > 5, `bent ${bent}`);
 });
 
+test('on hundreds of polygons the default work proves every answer to 5 percent', () => {
+  // Unit cells in 3 x 3 patches of five weights. Before a piece was left only through its other polygon, the relaxed
+  // paths slid along touching pieces and 18 of 60 such queries stayed unproved, the worst by 72 percent.
+  const next = random(5),
+    size = 20;
+  let found = 0,
+    most = 0;
+  for (let map = 0; map < 2; map++) {
+    const patch = Array.from({ length: 200 }, () => '..bcd'[Math.floor(next() * 5)]),
+      rows = randomMap(next, size, size, 0.15).map((row, z) =>
+        [...row].map((c, x) => (c === '#' ? c : patch[Math.floor(x / 3) + 14 * Math.floor(z / 3)])).join(''),
+      ),
+      mesh = grid(rows),
+      free = rows.flatMap((row, z) => [...row].flatMap((c, x) => (c === '#' ? [] : [[x, z, c]])));
+    free.forEach(([, , c], p) => mesh.setAreaCost(p, WEIGHTS[c]));
+    const search = new WeightedAnyAngleSearch(mesh);
+    for (let query = 0; query < 10; query++) {
+      const pick = () => {
+          const [x, z] = free[Math.floor(next() * free.length)];
+          return [x + 0.05 + next() * 0.9, 0, z + 0.05 + next() * 0.9];
+        },
+        route = search.route(pick(), pick());
+      if (!route) continue;
+      found++;
+      most = Math.max(most, route.work);
+      assert.ok(
+        route.cost <= route.lowerBound * 1.05 + 1e-8,
+        `map ${map} query ${query}: ${route.cost / route.lowerBound}`,
+      );
+    }
+  }
+  assert.ok(found >= 18, `found ${found}`);
+  assert.ok(most < 6_000_000, `work ${most}`);
+});
+
 test('a spent work budget answers with honest bounds, the same work every time, and bad input is refused', () => {
   const mesh = strips([1, 4, 2, 7, 1.5]),
     search = new WeightedAnyAngleSearch(mesh),
