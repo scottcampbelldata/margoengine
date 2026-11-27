@@ -638,7 +638,7 @@ tentacle.setTarget(null);
 console.log(line.points().length, tentacle.valid); // 51 true
 ```
 
-A rope over bollards, pulleys and fairleads is `WrappedRope`: its mass in nodes, and between two nodes a straight span or
+A rope over bollards, pulleys and fairleads is `WrappedRope` (`@margoengine/physics/wrapped-rope`): its mass in nodes, and between two nodes a straight span or
 a wrap over a fixed cylinder that the rope's material slides through (after Sueda, Jones, Levin and Pai's strands, 2011).
 Each wrap holds by static friction while the tensions either side are within the capstan ratio `e^(mu phi)`, `phi` its
 angle, and slides with the high side at that ratio times the low one, so a load over a bollard is held by a fraction of
@@ -646,7 +646,7 @@ its weight, and a winch draws a line in over it. A fixed node is a cleat or a wi
 `holding(i)`, `position(i)` and `velocity(i)` read it. It is a solver of its own, stepped with `step(dt)`.
 
 ```ts
-import {WrappedRope} from 'margoengine/physics/rod';
+import {WrappedRope} from 'margoengine/physics/wrapped-rope';
 
 // A 50 kg load on a line over a bollard of 0.2 m, made fast to a cleat: friction 0.3, half a turn.
 const line = new WrappedRope({
@@ -668,7 +668,7 @@ under it, and each pull on a node is matched on the drum at that point, so the r
 
 ```ts
 import {Physics} from '@margoengine/physics';
-import {WrappedRopeSolver} from '@margoengine/physics/rod';
+import {WrappedRopeSolver} from '@margoengine/physics/wrapped-rope';
 import {PhysicsWorld, RigidSolver} from '@margoengine/physics/world';
 
 await Physics.load();
@@ -688,7 +688,7 @@ const [lifting, paying] = line.tension(0);
 console.log((lifting / paying).toFixed(3), line.holding(0)); // 2.566 false: the drum slips under the line at e^(0.3 pi)
 ```
 
-A mooring line or anchor chain on the seabed is `MooringLine`: lumped masses on segments that take tension only (it goes
+A mooring line or anchor chain on the seabed is `MooringLine` (`@margoengine/physics/mooring`): lumped masses on segments that take tension only (it goes
 slack rather than push), its internal damping while taut, Morison's loads on each segment's own normal and tangent
 (buoyancy of its wetted length, drag across and along, added mass across, `drag` and `addedMass` on `diameter` and its
 material's volume), and a seabed (`seabed: {y, friction, lateralFriction}`) with Coulomb friction along and across the line
@@ -699,7 +699,7 @@ that end), `position(i)` and `velocity(i)`. Checked against the measured top ten
 (Bergdahl et al. 2016, 30 cases, mean error 2.7 %) and the elastic catenary with its grounded length.
 
 ```ts
-import {MooringLine} from '@margoengine/physics/rod';
+import {MooringLine} from '@margoengine/physics/mooring';
 
 // 100 m of 10 kg/m chain from an anchor on the seabed to a fairlead 90 m off and 20 m up, in still sea water.
 const sea = {density: 1025, elevation: () => 30, water: {medium: 'water' as const, cell: [0, 0, 0] as const,

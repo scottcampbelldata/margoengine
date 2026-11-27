@@ -114,6 +114,8 @@ await build({
         underwater: resolve(root, 'src/underwater/index.ts'),
         orbit: resolve(root, 'src/orbit/index.ts'),
         rod: resolve(root, 'src/rod/index.ts'),
+        'wrapped-rope': resolve(root, 'src/wrapped-rope/index.ts'),
+        mooring: resolve(root, 'src/mooring/index.ts'),
         breakable: resolve(root, 'src/breakable/index.ts'),
         'debug-view': resolve(root, 'src/debug-view.ts'),
         'gpu-cloth': resolve(root, 'src/gpu-cloth.ts'),

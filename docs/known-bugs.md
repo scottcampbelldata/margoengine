@@ -573,7 +573,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   draped rope rest, and two plain bugs of that code were found (a fixed root's stale contact list; sliding friction past
   the stop); but the contact set flips between rounds under tension, and the variants either never slide on a slope or
   do not rest. A fix that keeps the contact passes needs the contacts and the tension in one solve.
-- **What to use instead:** a rope over bollards, pulleys or fairleads is `WrappedRope` (`@margoengine/physics/rod`), whose
+- **What to use instead:** a rope over bollards, pulleys or fairleads is `WrappedRope` (`@margoengine/physics/wrapped-rope`), whose
   wraps carry the capstan law exactly (`packages/physics/tests/wrapped-rope.test.js`). The capsule-chain `Rod` stays the
   rope for free spans, contact with moving bodies and bending.
 

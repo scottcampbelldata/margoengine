@@ -3275,6 +3275,14 @@
       "types": "./dist/physics/rod.d.ts",
       "import": "./dist/physics/rod.js"
     },
+    "./physics/wrapped-rope": {
+      "types": "./dist/physics/wrapped-rope.d.ts",
+      "import": "./dist/physics/wrapped-rope.js"
+    },
+    "./physics/mooring": {
+      "types": "./dist/physics/mooring.d.ts",
+      "import": "./dist/physics/mooring.js"
+    },
     "./physics/earth": {
       "types": "./dist/physics/earth.d.ts",
       "import": "./dist/physics/earth.js"

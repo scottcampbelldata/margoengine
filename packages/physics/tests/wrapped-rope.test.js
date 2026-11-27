@@ -3,7 +3,7 @@
 // a = g (m2 - k m1) / (m2 + k m1), k = e^(mu phi), for a massless rope; held while m2 / m1 lies within [1/k, k].
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { WrappedRope } from '../dist/rod.js';
+import { WrappedRope } from '../dist/wrapped-rope.js';
 
 const g = 9.81,
   R = 0.2;

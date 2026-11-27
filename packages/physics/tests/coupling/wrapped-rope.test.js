@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { WrappedRopeSolver } from '../../dist/rod.js';
+import { WrappedRopeSolver } from '../../dist/wrapped-rope.js';
 import { PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 

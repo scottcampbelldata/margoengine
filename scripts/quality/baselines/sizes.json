@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20953697,
+  "total": 20958161,
   "history": [
     {
       "date": "2026-10-24",
@@ -14641,6 +14641,12 @@
       "commit": "09da1e52e",
       "reason": "@margoengine/physics/soft 161,433 to 168,429 B gzip budget (measured 163,523 + 3%) and its lazy soft kernel 107,182 to 111,510 (measured 108,262 + 3%): the soft kernel's cloth vertex blocks (cloth_block.rs: the per-particle Newton block of the springs, the adaptive first guess and strain limiting, with three state columns), on top of the tether and skin rows landed earlier the same day. They are solver passes inside the step's loop, so they live in the soft kernel every cloth loads; a second blueprint would duplicate the step.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "rod-split",
+      "reason": "@margoengine/physics/rod measured 11,878 B gzip over its 9,197 B ceiling: WrappedRope, WrappedRopeSolver and MooringLine had joined Rod in it. Split by what a user imports, not raised: rod keeps Rod (4,499 B, ceiling 4,755), the new @margoengine/physics/wrapped-rope holds the capstan ropes (4,906 B, ceiling 5,162) and @margoengine/physics/mooring the lumped-mass mooring line (3,488 B, ceiling 3,744). A rod no longer carries a mooring line's code, and each feature pays only for itself; the three share no code but the errors and math every physics entry imports.",
+      "grew": 2
     }
   ],
   "items": {
@@ -15504,6 +15510,7 @@
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,
+    "@margoengine/physics/mooring": 3744,
     "@margoengine/physics/orbit": 3880,
     "@margoengine/physics/outdoor-sound": 3746,
     "@margoengine/physics/pack-ice": 4971,
@@ -15511,7 +15518,7 @@
     "@margoengine/physics/pedestrians": 4688,
     "@margoengine/physics/rail": 8752,
     "@margoengine/physics/robots": 5083,
-    "@margoengine/physics/rod": 9197,
+    "@margoengine/physics/rod": 4755,
     "@margoengine/physics/rogue": 7642,
     "@margoengine/physics/room-sound": 5606,
     "@margoengine/physics/runoff": 4125,
@@ -15541,6 +15548,7 @@
     "@margoengine/physics/vortices": 5453,
     "@margoengine/physics/waves": 7804,
     "@margoengine/physics/world": 18156,
+    "@margoengine/physics/wrapped-rope": 5162,
     "@margoengine/physics2d": 24024,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 22280,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

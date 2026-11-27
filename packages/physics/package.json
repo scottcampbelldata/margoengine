@@ -87,6 +87,14 @@
       "types": "./dist/rod/index.d.ts",
       "import": "./dist/rod.js"
     },
+    "./wrapped-rope": {
+      "types": "./dist/wrapped-rope/index.d.ts",
+      "import": "./dist/wrapped-rope.js"
+    },
+    "./mooring": {
+      "types": "./dist/mooring/index.d.ts",
+      "import": "./dist/mooring.js"
+    },
     "./earth": {
       "types": "./dist/earth/index.d.ts",
       "import": "./dist/earth.js"

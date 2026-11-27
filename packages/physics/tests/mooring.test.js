@@ -4,7 +4,7 @@
 // Bergdahl, Palm, Eskilsson and Lindahl (2016).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MooringLine } from '../dist/rod.js';
+import { MooringLine } from '../dist/mooring.js';
 
 const g = 9.81;
 
