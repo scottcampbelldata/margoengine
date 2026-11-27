@@ -2262,10 +2262,23 @@ does; before, only the lazy planner checked the product, at the first dispatch. 
 compute.test.js and the browser corpus compute part hold the recorded oversize kernels to that refusal.
 
 Loops end on any buffer contents (2026-11-27, KB-COMPAT-CORPUSFBO1): a dispatch that never ends resets the GPU, and
-the loss is reported by whatever runs next (KB-COMPAT-LOSSREPORT1, open). The morph weight kernel's key search now
+the loss is reported by whatever runs next (KB-COMPAT-LOSSREPORT1, fixed below). The morph weight kernel's key search now
 bounds `keys-1u` and its midpoint. A recording that replaces a changed kernel names the old module with
 `record-wgsl-corpus.mjs --add --drop=<key>`. Evidence: animation morph-gpu.test.js (CPU tier with a work budget),
 scripts/animation-morph-gpu-tests.js native and forced compatibility, the browser corpus compute part (0 failures).
+
+A GPU reset is the device's loss (2026-11-27, KB-COMPAT-LOSSREPORT1): Chrome answers the synchronous query that waited
+for a reset (LINK_STATUS and COMPILE_STATUS false with empty logs, checkFramebufferStatus 0x8cdd, getError 0) before
+isContextLost() turns true and CONTEXT_LOST_WEBGL is queued, one task later; no synchronous signal exists (measured, RTX
+A6000, ANGLE Direct3D 11). So `CompatDevice` judges every error read from GL in a later task, in one place
+(`reportable`): the uncaptured dispatch, `popErrorScope` (in order, null on a lost device, as WebGPU) and the async
+pipeline rejections (`settlePipeline`). The layer's own helper program that does not link is an `internal` error
+through that path, reported once, instead of a synchronous throw. A real link failure or incomplete framebuffer on a
+live context is still reported. The adapter's capability probes (highp int, fresh clears, inverse trig) read GL status
+on the adapter's own new context and decide only workarounds for it; the preview renderer and `webglPicking` keep
+their contract (`failed` on a lost context). Evidence: lost-report.test.js (fails on the parent), lost-context-browser.mjs,
+compute-browser.mjs, and two real resets: a link and a render pass right after the reset, with isContextLost() still
+false, raised nothing and lost the device.
 
 ## A new package brings its records (fast gate, 2026-11-16)
 

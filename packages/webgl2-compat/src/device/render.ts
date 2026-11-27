@@ -2,7 +2,6 @@
 // 10, 13, 17 and 18; Khronos OpenGL ES 3.0 and WebGL 2.0 specifications). Encoders record closures; submit replays
 // them against a cache of GL state. Rendering is flipped in y so that row 0 of every target is its top, as in WebGPU
 // (the vertex shader negates y and front faces swap), and only the canvas present flips back.
-import { fault } from '../../../shared/errors.js';
 import { stageUnits, translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
 import type { IREntryPoint, IRGlobalVar, IRModule } from '../wgsl/ir.js';
 import type { TextureType } from '../wgsl/types.js';
@@ -3329,18 +3328,18 @@ export class Replayer {
       gl.deleteShader(shader);
     }
     gl.linkProgram(program);
-    // On a lost context nothing links: that is the device's loss (its webglcontextlost event comes in a later task),
-    // never the layer's own program. Every later GL call is a no-op, so the unlinked program is returned, uncached.
-    if (gl.isContextLost()) {
-      this.device.lose('unknown', 'The WebGL2 context was lost');
-      return { program, offset: null, value: null };
-    }
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-      throw fault(
-        'failed',
+    // On a lost context nothing links: that is the device's loss, never the layer's own program. Chrome answers the
+    // link status a GPU reset waited for before isContextLost() turns true (KB-COMPAT-LOSSREPORT1), so a failure is an
+    // internal error, which the device drops when the context is found lost a task later and reports otherwise. The
+    // unlinked program is kept: its draws do nothing, and it is not linked and reported again at every use.
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      this.device.internalError(
         `The compatibility layer's own ${key} program did not link (a bug: report it): ${gl.getProgramInfoLog(program)}`,
-        'compatibility-layer',
       );
+      h = { program, offset: null, value: null };
+      this.helpers.set(key, h);
+      return h;
+    }
     this.device.state.useProgram(program);
     const texture = gl.getUniformLocation(program, 't'),
       second = gl.getUniformLocation(program, 'b');

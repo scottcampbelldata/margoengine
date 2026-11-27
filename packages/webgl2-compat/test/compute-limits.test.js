@@ -21,6 +21,9 @@ const device = () => ({
   limits,
   errors: [],
   loadCompute: async () => {},
+  // A failed async pipeline rejects a task later, on a live context (CompatDevice.settlePipeline).
+  settlePipeline: CompatDevice.prototype.settlePipeline,
+  reportable: () => true,
   validationError(message) {
     this.errors.push(message);
   },

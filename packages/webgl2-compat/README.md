@@ -202,6 +202,11 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   last check, in the next task or when an `out-of-memory` or `internal` scope opens or closes) is reported as
   an `out-of-memory` error, a `GPUOutOfMemoryError` (`CompatOutOfMemoryError`), to its error scope or else as
   `uncapturederror`, as WebGPU reports a failed allocation; any other GL error the layer leaves is an `internal` one.
+  A GPU reset is the device's loss, never an error: Chrome answers the link status or framebuffer status that waited
+  for a reset as failed before the context shows the loss, so an error read from GL is judged a task later. On a context
+  lost by then `device.lost` resolves (`'unknown'`), the error is dropped, open error scopes resolve `null` and an async
+  pipeline resolves, as on a lost WebGPU device; on a live context every error is reported as raised. A pop of a scope
+  that holds an error therefore resolves one task later.
   Work that uses a destroyed buffer, texture or query set is a validation error and makes no GL call (a failed submit
   runs none of its command buffers); `uncapturederror` is a `GPUUncapturedErrorEvent` dispatched in a task of its own,
   and `install()` names the layer's `GPUError` and `GPUUncapturedErrorEvent` with the other interfaces.

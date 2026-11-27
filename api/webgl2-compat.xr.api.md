@@ -353,6 +353,7 @@ class CompatDevice extends EventTarget {
     unsupported(what: string, anchor?: string): Error;
     pushErrorScope(filter: ErrorFilter): void;
     popErrorScope(): Promise<CompatError | null>;
+    settlePipeline<T>(pipeline: T, failure: string | null): Promise<T>;
     validationError(message: string): void;
     internalError(message: string): void;
     allocated(what: string): void;
