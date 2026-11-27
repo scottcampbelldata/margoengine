@@ -206,6 +206,12 @@ export function fauldFireSmoke(
     opacity: 0.35,
   };
 }
+/**
+ * The firelight's key card underground, metres: a white card this far from a fire, facing it, reads 1.0, as the other
+ * states meter their key lamp. The flames' silhouette light left the fire frames 4 to 5 stops under it, nearly black
+ * beside the flames (KB-FAULD-FIREDIM1).
+ */
+export const FIRE_KEY_DISTANCE = 2;
 /** The detonation flash of the blast state, candela (see the blast lamps in `attach`). */
 export const BLAST_FLASH_CD = 1.9e6;
 /**
@@ -612,6 +618,9 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
           width: 0.9 * scale,
           lights: groups,
           depth: () => stack.depthTexture,
+          // The fire and after states are exposed on what the fires light; the blast has its own flash and the yard
+          // its daylight.
+          ...(yard || s.state === 'blast' ? {} : { keyDistance: FIRE_KEY_DISTANCE }),
           // Underground the fire's smoke stops at the roof and runs out under it; in the open yard it climbs.
           ...(yard ? {} : { smoke: { ...fauldFireSmoke(p[0], p[2]), depth: () => stack.depthTexture } }),
         }),

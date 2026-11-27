@@ -219,8 +219,12 @@ test('Flame: a length, an intensity (Byram) or a heat (Heskestad) sizes it, its 
   assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, flicker: 4 }), RangeError);
   assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, tongues: 0.1 }), RangeError);
   // KB-TAA-PARTICLEMASK2: the reactive mask is on, off or left to TAA's demand, nothing else.
-  assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, reactive: 1 }), /reactive must be true or false/);
+  assert.throws(
+    () => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, reactive: 1 }),
+    /reactive must be true or false/,
+  );
   assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, lights: {} }), TypeError);
+  assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 1, keyDistance: 0 }), RangeError);
   // 60 frames of a flame that grows, moves, leans and widens: no buffer or texture.
   const made = h.resources.length;
   for (let f = 0; f < 60; f++) {
@@ -752,9 +756,45 @@ test('Flame over a scene depth and in fog: the depth pass writes the depth and b
   for (const entry of ['fragment', 'glowFragment', 'reactiveFragment'])
     assert.match(code(entry), /var sceneDepth:texture_depth/, entry + ' ends its ray at the scene depth');
   assert.doesNotMatch(code('depthFragment'), /sceneDepth|binding\(11\)/, 'the depth pass samples no depth');
-  assert.match(code('depthFragment'), /let mine=!\(abs\(along-leave\)/, 'it marches from the face the colour pass does');
+  assert.match(
+    code('depthFragment'),
+    /let mine=!\(abs\(along-leave\)/,
+    'it marches from the face the colour pass does',
+  );
   const bound = h.groups.map((g) => g.entries.map((e) => e.binding).join()).sort();
   assert.deepEqual(bound, ['0', '0,5,11,12', '0,5,11,12', '0,5,11,12'], 'the depth pass binds the uniform alone');
   flame.dispose();
   depth.destroy();
+});
+
+// KB-FAULD-FIREDIM1: the light of a large fire follows its displayed brightness, so a tunnel exposed on what the fire
+// lights was nearly black beside it; keyDistance meters the light on a white card.
+test('keyDistance meters the firelight: a white card that far reads 1, the flames unchanged (E = I / d^2, L = E / pi)', () => {
+  const h = optionalGPU(),
+    e = h.engine,
+    clustered = Clustered.attach(e),
+    plain = Flame.attach(e, { position: [0, 0, 0], length: 1.6, footprint: [0.9, 0.5], flicker: 0 }),
+    keyed = Fire.attach(e, {
+      position: [0, 0, 0],
+      flameLength: 1.6,
+      keyDistance: 2,
+      power: 1,
+      lights: clustered,
+      smoke: false,
+    });
+  h.frame();
+  // The card's pre-exposed luminance: the lights' luminous intensity over d^2, over pi.
+  const card = () => keyed.flame.lights.reduce((sum, l) => sum + l.intensity * luma(l.color), 0) / 2 ** 2 / Math.PI,
+    mean = card();
+  assert.ok(mean > 0.5 && mean < 1.5, `the card reads about 1 through the flicker: ${mean}`);
+  keyed.flame.options.flicker = 0;
+  h.frame();
+  near(card(), 1, 1e-6, 'steady flames: exactly 1');
+  assert.equal(keyed.flame.peakRadiance, plain.peakRadiance, 'the flames keep their brightness');
+  keyed.flame.options.lightPower = 3;
+  h.frame();
+  near(card(), 3, 1e-6, 'lightPower on top');
+  assert.throws(() => Fire.attach(e, { position: [0, 0, 0], keyDistance: 2 }), TypeError, 'a hearth has its kit light');
+  keyed.dispose();
+  plain.dispose();
 });

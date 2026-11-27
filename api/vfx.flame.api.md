@@ -61,6 +61,7 @@ export interface FlameOptions extends FlameRampOptions {
     crowns?: number;
     lights?: Clustered | LightGroups;
     lightPower?: number;
+    keyDistance?: number;
     fog?: FogLike | null;
     depth?: () => GPUTexture | undefined;
     reactive?: boolean;

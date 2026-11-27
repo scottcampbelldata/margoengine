@@ -30,6 +30,7 @@ export interface FireOptions {
     position: Vec3;
     hearth?: KitHearth;
     power?: number;
+    keyDistance?: number;
     width?: number;
     axis?: Vec3;
     lights?: Clustered | LightGroups;
@@ -107,6 +108,7 @@ interface FlameOptions extends FlameRampOptions {
     crowns?: number;
     lights?: Clustered | LightGroups;
     lightPower?: number;
+    keyDistance?: number;
     fog?: FogLike | null;
     depth?: () => GPUTexture | undefined;
     reactive?: boolean;

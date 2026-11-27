@@ -31,6 +31,12 @@ export interface FireOptions {
   hearth?: KitHearth;
   /** Scales the firelight's intensity and the flames' and embers' radiance together, 0 or more. Default 1. */
   power?: number;
+  /**
+   * Meters the firelight of a large fire (one with a `flameLength`) on a white card (`FlameOptions.keyDistance`): the
+   * distance, metres, at which a white card facing the flames reads 1 in the pre-exposed frame, times `power`. For a
+   * scene exposed on what the fire lights; the flames stay as bright. Read at attach. Default none.
+   */
+  keyDistance?: number;
   /** Length of the flame line along `axis`, metres, above 0. Default `hearth.light.length` (0.62), or the flame length with `flameLength`. */
   width?: number;
   /** Direction the flames run along (the logs), nonzero. Default [1, 0, 0]. */
@@ -158,6 +164,8 @@ export class Fire implements EnginePlugin {
       power = options.power ?? 1,
       axis = options.axis ?? [1, 0, 0],
       castShadow = options.castShadow ?? true;
+    if (options.keyDistance !== undefined && flameLength === undefined)
+      throw new TypeError('Fire keyDistance meters a large fire; pass a flameLength with it');
     finiteVector(options.position, 3, 'Fire position');
     finiteVector(axis, 3, 'Fire axis');
     if (options.steam) finiteVector(options.steam, 3, 'Fire steam point');
@@ -229,6 +237,7 @@ export class Fire implements EnginePlugin {
         footprint: [width, breadth],
         yaw: Math.atan2(-axis[2], axis[0]),
         lightPower: power,
+        ...(options.keyDistance === undefined ? {} : { keyDistance: options.keyDistance }),
         ...(options.wind ? { wind: options.wind } : {}),
         ...(options.depth ? { depth: options.depth } : {}),
         ...(options.lights ? { lights: options.lights } : {}),

@@ -2220,6 +2220,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   layer. Weak spots left: that layer reads flat black, and two round puffs show at its lower edge. Regression:
   packages/vfx/test/smoke.test.js, packages/vfx/test/smoke-check.mjs, packages/scenes/test/fauld-tunnels.test.js.
 
+### Fixed 2026-11-27: the Fauld fire frames were nearly black beside their flames (KB-FAULD-FIREDIM1, vfx and scenes)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr095.json --stills --out <folder>`: mean 8-bit luma 1.3;
+  fr091 11.5 and fr094 11.4, their walls unlit beside the fires.
+- **Cause:** a large fire's light was its flames' silhouette at their displayed peak (1 in the pre-exposed frame), so it
+  lit a wall at the displayed flame times its solid angle, 4 to 5 stops under the card metering every other state of
+  the store uses. Nothing could raise the light without raising the flames (`Fire` `power` scales both). The smoke,
+  the exposure value and the lamps were not the cause: scaling only the firelight lit the same frames.
+- **Fix:** `keyDistance` on `Flame` and `Fire` meters the light on a white card (intensity pi d^2); the Fauld
+  tunnels' fire and after states use 2 m (`FIRE_KEY_DISTANCE`). Real frames fr091 to fr096: mean luma 19 to 43. Weak
+  spots left: KB-VFX-FIRESHADOW1 and fr096's smoke reading flat black. Regression:
+  packages/vfx/test/flame.test.js.
+
+### Open 2026-11-27: a large fire's light passes through walls (KB-VFX-FIRESHADOW1, vfx)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr095.json --stills --out <folder>`: the aisle round the
+  corner from the fire is lit evenly, the brick wall and the stacks with no shadow of the piers between.
+- **Cause:** `Fire` passes `castShadow` (default true) to its hearth lights only; the volume of a fire with a
+  `flameLength` makes up to four `Flame` lights with no `castShadow`, and `Flame` has no such option.
+- **Owed in vfx:** one shadowed light per large fire (the points share its map or the strongest casts), within
+  `LocalShadows`' slots beside a scene's lamps, with a test and a real frame.
+
 ### Fixed 2026-11-27: a fire's sparks drew white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr091.json --stills --out <folder>`: the embers beside the

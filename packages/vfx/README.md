@@ -1187,7 +1187,10 @@ pixel turns white whatever the rows ask. Give it a `length` in metres, an `inten
 `heskestadFlameLength`). With `lights` (a `LightGroups` or a `Clustered`) it lights the meshes added to that
 `Clustered`, and smoke lit by it, with up to four point lights over its footprint a third of the way up, as bright as
 its silhouette at its peak radiance (`FLAME_LIGHT_FILL`), each flickering with the puffing of the tongues above it.
-To meter a fire as a real emitter, `flameLuminousFlux(heat, kelvin, radiantFraction = FLAME_RADIANT_FRACTION)` gives
+That light is right for a frame exposed on the flames and several stops dark for one exposed on what they light (a
+tunnel, a room at night): `keyDistance: d` (metres; on a `Fire` with a `flameLength` too) meters it so a white card
+`d` metres away, facing the fire, reads 1 (intensity pi d^2), with the flames unchanged (KB-FAULD-FIREDIM1). Flame
+lights cast no shadows (KB-VFX-FIRESHADOW1). To meter a fire as a real emitter, `flameLuminousFlux(heat, kelvin, radiantFraction = FLAME_RADIANT_FRACTION)` gives
 its lumens: the radiated share of its heat release (chi_r about 0.3 for sooty fuels, Tewarson 2016, Koseki 1989) times the
 luminous efficacy of blackbody radiation at its soot temperature (`blackbodyLuminousEfficacy`, Planck's law through the
 photopic curve, about 0.5 lm/W at 1,760 K and 16.5 at CIE illuminant A). `heskestadHeat(length, diameter)` turns

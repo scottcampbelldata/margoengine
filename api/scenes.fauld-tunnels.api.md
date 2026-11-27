@@ -33,6 +33,8 @@ export const FAULD_STATE_EV: Readonly<Record<FauldTunnelState, number>>;
 
 export const FAULD_TUNNEL_STATES: readonly ['working', 'blast', 'fire', 'after', 'flooded', 'sealed', 'yard_day', 'yard_night', 'yard_fire', 'yard_sealed'];
 
+export const FIRE_KEY_DISTANCE = 2;
+
 export type FauldLamp = PointLight | SpotLight;
 
 export interface FauldMark {

@@ -319,6 +319,15 @@ export interface FlameOptions extends FlameRampOptions {
   lights?: Clustered | LightGroups;
   /** Scales the light, 0 or more. Default 1. */
   lightPower?: number;
+  /**
+   * Meters the light on a white card: the distance, metres, above 0, at which a white Lambertian card facing the flame
+   * reads 1 in the pre-exposed frame (luminous intensity pi d^2, from `E = I / d^2` and `L = E / pi`), before
+   * `lightPower` and the flicker. It replaces the silhouette light of {@link FLAME_LIGHT_FILL}, which lights a wall at
+   * the flames' displayed brightness times its solid angle: right for a frame exposed on the flames, several stops dark
+   * for one exposed on what they light (a tunnel, a room at night). The flames' own radiance is unchanged. Default
+   * none: the silhouette light.
+   */
+  keyDistance?: number;
   /** Fog over the flames (`Fog` of `@margoengine/environment` or any `FogLike`). Default none. */
   fog?: FogLike | null;
   /**
@@ -700,6 +709,7 @@ export class Flame implements EnginePlugin {
     rampIn(o.glowRadius ?? GLOW_RADIUS, 'glowRadius', 0.5, 10);
     rampIn(o.yaw ?? 0, 'yaw', -1e3, 1e3);
     rampIn(o.lightPower ?? 1, 'lightPower', 0, 1e6);
+    if (o.keyDistance !== undefined) rampIn(o.keyDistance, 'keyDistance', 0.01, 1e4);
   }
   /** The look values now: the flame rows where `setFlameLook` set them, else the options. */
   private lookOf() {
@@ -923,6 +933,19 @@ export class Flame implements EnginePlugin {
     this.light(L, fp, f, diameter, l.flicker, u[39]!);
   }
   /**
+   * The light's mean intensity, all its points together: the card metering of `keyDistance`, else the silhouette at
+   * peak radiance; times `lightPower`.
+   */
+  private lightTotal(L: number, fp: readonly [number, number], l: ReturnType<Flame['lookOf']>): number {
+    const o = this.options;
+    let total = FLAME_LIGHT_FILL * l.peak * l.radiance * L * (0.5 * (fp[0] + fp[1]) + 0.24 * L);
+    if (o.keyDistance !== undefined) {
+      const [r, g, b] = blackbodyColor(Math.max(1000, Math.min(l.core * 0.8, 3000)));
+      total = (Math.PI * o.keyDistance ** 2) / (0.2126 * r! + 0.7152 * g! + 0.0722 * b!);
+    }
+    return total * (o.lightPower ?? 1);
+  }
+  /**
    * The ground plane and the glow: the slope in the footprint's axes, the glow sources' intensity (the light's total, as
    * {@link FLAME_LIGHT_FILL}, over as many sources as its points), the haze and the glow box around the flame box.
    */
@@ -943,9 +966,7 @@ export class Flame implements EnginePlugin {
       sz = gx * s + gz * c,
       n = Math.min(GLOW_SOURCES, Math.max(1, Math.round(Math.max(fp[0], fp[1]) / L))),
       on = this.current > 0 && l.glow > 0,
-      total = on
-        ? FLAME_LIGHT_FILL * l.peak * l.radiance * l.glow * L * (0.5 * (fp[0] + fp[1]) + 0.24 * L) * (o.lightPower ?? 1)
-        : 0,
+      total = on ? l.glow * this.lightTotal(L, fp, l) : 0,
       colour = blackbodyColor(Math.max(1000, Math.min(l.core * 0.8, 3000))),
       R = (o.glowRadius ?? GLOW_RADIUS) * L,
       lean = Math.max(Math.abs(u[26]!), Math.abs(u[27]!)),
@@ -983,9 +1004,7 @@ export class Flame implements EnginePlugin {
       n = Math.min(4, Math.max(1, Math.round(span / Math.max(L, 1e-3)))),
       on = this.current > 0,
       look = this.lookOf(),
-      total = on
-        ? FLAME_LIGHT_FILL * look.peak * look.radiance * L * (0.5 * (fp[0] + fp[1]) + 0.24 * L) * (o.lightPower ?? 1)
-        : 0,
+      total = on ? this.lightTotal(L, fp, look) : 0,
       c = Math.cos(o.yaw ?? 0),
       s = Math.sin(o.yaw ?? 0),
       colour = blackbodyColor(Math.max(1000, Math.min(look.core * 0.8, 3000)));
