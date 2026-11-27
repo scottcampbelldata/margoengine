@@ -6,6 +6,48 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a fire's burn-out worked out every spent cell's spread again each step (KB-VFX-BURNOUTWORK1, vfx)
+
+- **Repro (before):** timber-valley `fire: 'burnt'` (`burnOut`, smoke-day weather, seed 1910): the aftermath shot's
+  build ran past its time limit, about 11 minutes on the film's 4 m grid. Work counted on the 8 m grid
+  (`.lane/burn/count.mjs 8` in lane B's worktree): 471,341 steps of 0.5 s to the fire going out at 237,470.5 s,
+  760.8 million cell visits, 754.3 million of them (99.1 percent) cells past their flames that only carry the front
+  on to the neighbours it has not reached yet (a slow backing or flanking fire takes days to reach some).
+- **Cause:** each visit worked out the cell's wind, Rothermel behaviour, canopy and crown fire again, though none of
+  their inputs change while the wind, the fuel moistures and the step hold (the fuel map, slopes and stands are fixed
+  when the front is made).
+- **Fix:** the front keeps each carrying cell's travel a step to each neighbour, and whether the front goes on into it
+  as an active crown fire, keyed on the wind, the four moistures, the wind reduction, the foliar moisture, the crown
+  switch and the step; any change works them out again, and a wind field (sampled each step) keeps nothing. A spent
+  cell then only adds the kept steps, the same float sums in the same order as before, so the burn is identical
+  (`packages/vfx/src/fire-front.ts`, `carry`, `carryOn`).
+- **After:** the same 8 m burn-out ends at the same 237,470.5 s after the same 471,341 steps and 760,779,617 cell
+  visits, with 255,310 cells burnt, and works out a cell's spread in full 6,246,622 times instead of 760.8 million (122
+  times fewer; counted as wind samples).
+- **Regression test:** `packages/vfx/test/fire-front-carry.test.js`: a fire with crowns, slope, spotting and two
+  ignitions comes out cell for cell the same with its wind as an array (kept) and as a constant field (nothing kept),
+  as does one whose wind and moisture change mid-run; the kept run samples the wind under a fifth as often (fails
+  without the fix: 18,290,011 samples both ways).
+
+### Corrected 2026-11-27: timber-valley's fire on the film's 4 m grid looked three times slower than on the 8 m grid (KB-VFX-FIREGRID1, vfx and scenes; not a grid or fuel-map defect)
+
+- **Report:** with the scene's fuel, ignitions and smoke-day weather (`FireFront` seed 1910), one day of fire time
+  burnt 3.7 km2 on the film's 4 m grid (fuel map step 8) against 12.1 km2 on the 8 m grid (step 16).
+- **Measured:** the grid is not the cause: the same fuel map (step 16) on the 4 m grid burnt 741,916 cells, 11.87 km2,
+  against 12.08 km2 on the 8 m grid. Nor is the fuel map: steps 8 and 16 give the same fuel areas (FM8 6.3, FM5 4.5,
+  FM10 4.5, FM1 1.3 km2) and differ only on about 1 km2 of patch edges, evenly both ways. Over seeds 1 to 4 on the 8 m
+  grid the day's burnt area is bimodal on either fuel map: about 64,000 cells (4.1 km2) or about 197,000 (12.6 km2);
+  seed 3 gives 196,465 cells on step 8 and 67,286 on step 16, seed 4 about 197,000 on both. The fire either throws a
+  spot across one of the valley's fuel breaks into the next stand or does not (`spotting` 0.02, lognormal flights),
+  and a different grid or fuel map draws a different random sequence from the same seed.
+- **What it means:** a preview on the 8 m grid does not foretell the film's burn, though both are valid outcomes of the
+  same fire. Script: .lane/burn/burn.mjs <cell> <weather> <days> <fuel step> with SEED in lane B's worktree.
+- **Closed as not a bug (2026-11-27):** the same fuel map burns the same on the 4 m and 8 m grids, and the seed decides
+  whether an ember crosses a break. The film (`timber-valley-shot.html`, `quality` film) and the preview
+  (`quality: 'preview'`) both give `FireFront` the scene's `seed` (default 1910), so they share a seed. That alone
+  does not make them burn the same, though: the grid and fuel map change how many draws each step takes from it, which
+  is how one seed burnt 3.7 km2 on one grid and 12.1 km2 on the other above.
+
 ### Fixed 2026-11-27: ambient occlusion drew a fine pattern over distant flat sand (KB-POST-GTAOFAR1, post; was KB-WATER-FARGRID-KH1's sand half)
 
 - **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file> --out=<folder>`

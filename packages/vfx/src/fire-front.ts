@@ -733,6 +733,8 @@ const NEIGHBOURS: readonly (readonly [number, number])[] = (() => {
     }
   return out;
 })();
+/** A kept neighbour the front does not go to (no fuel, a building, off the grid, or too damp): `FireFront.carry`. */
+const CARRY_DONE = -1;
 
 /** The sums of a stretch of front or a building while a step is added up. */
 interface FlameAcc {
@@ -836,6 +838,11 @@ export class FireFront implements EnginePlugin {
   private burning: number[] = [];
   private pending: FireIgnition[] = [];
   private readonly travel = new Map<number, Float32Array>();
+  // Per cell that carries the front, each neighbour's travel a step (NaN until worked out, CARRY_DONE for a way the fire
+  // does not go) and, after them, 1 where the front goes on into it as an active crown fire: a pure function of the
+  // wind, the fuel moistures and the step, so it holds while `carryKey` does (KB-VFX-BURNOUTWORK1).
+  private readonly carry = new Map<number, Float64Array>();
+  private carryKey = '';
   private beds: FuelBed[] = [];
   private bedKey = '';
   private dirty = true;
@@ -1232,6 +1239,8 @@ export class FireFront implements EnginePlugin {
     this.pending = [];
     for (const ig of this.options.ignitions ?? []) this.queue(ig);
     this.travel.clear();
+    this.carry.clear();
+    this.carryKey = '';
     this.segs.clear();
     this.flameAcc.clear();
     // The fuel beds are a cache of the options; a fresh fire builds them on its first step.
@@ -1283,7 +1292,14 @@ export class FireFront implements EnginePlugin {
       wind: [number, number] = [0, 0],
       fm10 = this.fm10!,
       foliar = o.foliarMoisture ?? 1,
-      standOut = { baseHeight: 0, bulkDensity: 0, height: 0 };
+      standOut = { baseHeight: 0, bulkDensity: 0, height: 0 },
+      w = o.wind ?? [0, 0],
+      // A wind field varies over the ground and in time, so nothing is kept under one.
+      key = Array.isArray(w) ? [w[0], w[1], reduction, foliar, o.crown, this.bedKey, dt].join() : '';
+    if (key === '' || key !== this.carryKey) {
+      this.carry.clear();
+      this.carryKey = key;
+    }
     const next: number[] = [];
     this.segs.clear();
     this.flameAcc.clear();
@@ -1301,6 +1317,17 @@ export class FireFront implements EnginePlugin {
         // The intensity stays: a burnt cell keeps the fireline intensity it burned at, which plants left standing read
         // for their scorch and char heights (scatter's plant states) after the front has passed.
         this.dirty = true;
+      }
+      // A cell past its flames only carries the front on to its neighbours, at the rates it had: kept, not worked out
+      // again each step (KB-VFX-BURNOUTWORK1: 99 percent of the cells a burn-out steps).
+      const kept = this.stateOf[i] === BURNING ? undefined : this.carry.get(i);
+      if (kept) {
+        if (this.carryOn(i, x, z, t, kept)) next.push(i);
+        else {
+          this.travel.delete(i);
+          this.carry.delete(i);
+        }
+        continue;
       }
       this.windAt(wx, wz, wind);
       // Rothermel adds the wind and slope factors as vectors; the head runs along the sum.
@@ -1410,6 +1437,8 @@ export class FireFront implements EnginePlugin {
       // Each neighbour is reached when the front's travel from this cell, rate times time over distance, comes to 1.
       let acc = this.travel.get(i);
       if (!acc) this.travel.set(i, (acc = new Float32Array(NEIGHBOURS.length)));
+      let memo = key ? this.carry.get(i) : undefined;
+      if (key && !memo) this.carry.set(i, (memo = new Float64Array(2 * NEIGHBOURS.length).fill(NaN)));
       let open = false;
       for (let k = 0; k < NEIGHBOURS.length; k++) {
         if (acc[k]! >= 1) continue;
@@ -1427,6 +1456,7 @@ export class FireFront implements EnginePlugin {
           this.fuels[this.cellFuel[j]! - 1]!.structure
         ) {
           acc[k] = 2;
+          if (memo) memo[k] = CARRY_DONE;
           continue;
         }
         if (this.stateOf[j] !== UNBURNT) {
@@ -1444,19 +1474,55 @@ export class FireFront implements EnginePlugin {
         if (!(rate > 1e-9)) {
           // Damp to its moisture of extinction: this fire does not spread that way.
           acc[k] = 2;
+          if (memo) memo[k] = CARRY_DONE;
           continue;
         }
-        acc[k] = acc[k]! + (rate * dt) / dist;
-        if (acc[k]! >= 1 && this.light(j, t) && aloft && crown!.type === 'active') this.fed[j] = 1;
+        const step = (rate * dt) / dist,
+          active = aloft && crown!.type === 'active';
+        if (memo) {
+          memo[k] = step;
+          memo[NEIGHBOURS.length + k] = active ? 1 : 0;
+        }
+        acc[k] = acc[k]! + step;
+        if (acc[k]! >= 1 && this.light(j, t) && active) this.fed[j] = 1;
         else open = true;
       }
       if (this.stateOf[i] === BURNING || open) next.push(i);
-      else this.travel.delete(i);
+      else {
+        this.travel.delete(i);
+        this.carry.delete(i);
+      }
     }
     for (const i of this.born) next.push(i);
     this.born.length = 0;
     this.burning = next;
     this.time = t;
+  }
+
+  // The front's travel on from a cell past its flames, by the rates kept in `memo` (`carry`): the same sums, in the same
+  // order, as the full step makes. True while some neighbour is still to be reached.
+  private carryOn(i: number, x: number, z: number, t: number, memo: Float64Array): boolean {
+    const acc = this.travel.get(i)!,
+      n = NEIGHBOURS.length;
+    let open = false;
+    for (let k = 0; k < n; k++) {
+      if (acc[k]! >= 1) continue;
+      const step = memo[k]!;
+      if (step === CARRY_DONE) {
+        acc[k] = 2;
+        continue;
+      }
+      const [dx, dz] = NEIGHBOURS[k]!,
+        j = (z + dz) * this.width + x + dx;
+      if (this.stateOf[j] !== UNBURNT) {
+        acc[k] = 2;
+        continue;
+      }
+      acc[k] = acc[k]! + step;
+      if (acc[k]! >= 1 && this.light(j, t) && memo[n + k] === 1) this.fed[j] = 1;
+      else open = true;
+    }
+    return open;
   }
 
   /** Flame exposure of structure cells near a burning cell: within 1.5 flame lengths they heat up and ignite. */
