@@ -11202,13 +11202,22 @@ A motor joint's six motors solve one axis at a time, each capped alone, and the 
 module workers or, through `loadJPEG2000`, on the calling thread. Compute's ONNX ImageDecoder uses it.
 
 Limits: output up to `maxPixels` (default 2^26, maximum 2^28) and four times as many samples over all components;
-input up to 1 GiB; 65,535 tiles; 2^24 code-blocks; 31 coded bit-planes a code-block (so component precisions near the
-standard's 38 bits are refused); 1,024 palette entries. Over a limit throws `RangeError`. Wasm memory is 32-bit, so a
-picture near the largest limits can fail to allocate (`MargoError` `failed`).
+input up to 1 GiB; 65,535 tiles and 2^20 tile-components (tiles times components); 2^22 code-blocks a tile, each band of
+a precinct counting as four; a work budget of 2^28 plus 64 per input byte for precinct, code-block and progression
+visits (headers can ask for far more of them than their bytes carry); 31 coded bit-planes a code-block (so component
+precisions near the standard's 38 bits are refused); 1,024 palette entries. Over a limit throws `RangeError`. Wasm
+memory is 32-bit, so a picture near the largest limits can fail to allocate (`MargoError` `failed`). `decodeImage` of
+`/image` reads JPEG 2000 to RGBA8 and refuses a file that stops early.
 
 Not read: the HT block coder of Rec. ITU-T T.814 | ISO/IEC 15444-15 and the Part 2 extensions (`unsupported`); JPX
 files beyond their JP2 boxes. ICC profiles are not applied. Subsampled components are resampled to the largest
 component by nearest sample.
+
+Checked against another implementation (2026-11-27): 16 streams written by OpenJPEG 2.5.4 through Pillow 13.0.0
+(`tests/generate-jpeg2000-openjpeg.py`: the five progression orders, tiles, offsets, precincts, quality layers, PLT,
+both wavelets and component counts 1 to 4) decode exactly when lossless and within one 8-bit level when lossy. They
+use no code-block style option, packed packet headers, region of interest or subsampling. Malformed input is fuzzed
+(`tests/jpeg2000-fuzz.test.js`: 10,086 cases a run, and three runs of 154,086 on 2026-11-27 with no trap or hang).
 
 Not yet verified: no ISO/IEC 15444-4 (Rec. ITU-T T.803) conformance codestream or reference output has been run
 against this decoder. The MQ state table (Table C.2), the context tables (Tables D.1 to D.4), the irreversible
@@ -11216,8 +11225,8 @@ reconstruction midpoint, the component transform constants and the sYCC conversi
 are checked only by the crate's own tests, which include a test-side MQ encoder. No conformance claim and no speed
 claim is made until that corpus passes.
 
-Size (Vite library min+gzip, with its lazy asset references): `/jpeg2000` 74,664 B, ceiling 76,904 B;
-`jpeg2000.worker.js` 1,446 B gzip; `jpeg2000.wasm` 129,635 B raw, 51,121 B gzip. Nothing loads unless a file needs the
+Size (Vite library min+gzip, with its lazy asset references): `/jpeg2000` 75,876 B, ceiling 76,904 B; `/image` (which
+reaches it for a JPEG 2000 file) 1,115,573 B, ceiling 1,149,041 B; `jpeg2000.wasm` 132,023 B raw. Nothing loads unless a file needs the
 decoder. Core plus stage is unchanged.
 
 Transparent canvas through TAA, DOF and SceneFade (2026-11-27): by method, on a `TransparentCanvas` TAA's history depth

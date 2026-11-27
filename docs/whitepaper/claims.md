@@ -6768,15 +6768,18 @@ observational accuracy for the look.
 
 Claim: the optional entry reads JPEG 2000 Part 1 JP2 files and raw codestreams to RGBA with one clean-room Rust Wasm
 module, in browsers' and Node's module workers or on the calling thread. Proof: `cargo test` in
-`packages/decoders/jpeg2000-kernel`, `packages/decoders/tests/jpeg2000.test.js` and the JPEG 2000 case of
-`packages/compute/tests/onnx-image.test.js`. Not claimed: conformance (the ISO/IEC 15444-4 corpus has not been run,
+`packages/decoders/jpeg2000-kernel`, `packages/decoders/tests/jpeg2000.test.js` (OpenJPEG-written streams decode to
+its pixels), `packages/decoders/tests/jpeg2000-browser.mjs` (module workers, WebGPU and the WebGL2 layer),
+`packages/decoders/tests/jpeg2000-fuzz.test.js` (malformed input gives a picture or a coded error) and the JPEG 2000
+case of `packages/compute/tests/onnx-image.test.js`. Not claimed: conformance (the ISO/IEC 15444-4 corpus has not been run,
 see [Limits](../limits.md#jpeg-2000-decoding)) and speed.
 
 Transparent canvas (2026-11-27, threejs-parity row 6): TAA, DOF and SceneFade keep valid premultiplied alpha on a
 `TransparentCanvas`. Real GPU (RTX A6000), WebGPU and the WebGL2 layer, correctness runs with no committed result file:
 `packages/taa/test/alpha-browser.mjs`, `packages/dof/tests/gpu/alpha-check.mjs`,
 `packages/post/test/scene-fade-alpha-browser.mjs`, `packages/post/test/alpha-rim-browser.mjs`. `TAAUpscale` and
-`TAAUpscaleVelocity` are covered by the first.
+`TAAUpscaleVelocity` are covered by the first. `packages/post/test/alpha-views-browser.mjs` adds engine views: TAA
+and DOF with two views, with and without Tonemap, and SceneFade over overlapping views.
 
 ## Every storey of a rules building is reached (`@margoengine/procedural/building-rules`, `building-plans`, 2026-11-27)
 

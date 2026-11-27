@@ -6,6 +6,42 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: damaged JPEG 2000 files could trap the decoder or keep it busy for minutes (KB-J2K-HOSTILE1, decoders)
+
+- **Repro:** `node --test packages/decoders/tests/jpeg2000-fuzz.test.js` against the decoder of 45ad3faad: 13 of
+  10,086 inputs trapped the Wasm module or returned an invalid layout, and 3 gave no result within 10 s.
+- **Causes:** the tile count overflowed Wasm's 32-bit `usize`; a JP2 box length near 2^64 overflowed its end; a region
+  of interest shift of 32 or more overflowed the unshift; every mapped or subsampled channel was resampled to the
+  picture whether read or not; a picture without a sample gave an empty result; each tile header held a table of every
+  component; and tile-components, precincts, progression changes and packet visits had no bound a few bytes could not
+  pass. By reading, 31 bit-planes of damaged data could also overflow the 5-3 lifting, the reversible component
+  transform and the level shift.
+- **Fixed:** in `packages/decoders/jpeg2000-kernel`: 64-bit counts and saturating box ends, channels built only when
+  read, sparse per-component tables, wrapping lifting, a per-tile structure budget, a 2^20 tile-component limit, packets
+  bounded by the bytes that can hold them and a per-decode work budget ([Limits](limits.md#jpeg-2000-decoding)).
+  Regression: the fuzz run, `jpeg2000-browser.mjs` and four crate tests.
+
+### Fixed 2026-11-27: TAA variance clipping moved a transparent canvas's colour and alpha apart (KB-TAA-ALPHACLIP1, taa)
+
+- **Repro:** `node packages/post/test/alpha-views-browser.mjs`: `rejection: 'variance'` before Tonemap left a partly
+  covered pixel 3.2 of 255 from the plate's colour times its alpha in a half-width view (2.65 on a full one), against
+  0.9 without TAA.
+- **Cause:** colour was clipped towards the variance box's centre in YCoCg while alpha was clamped on its own, so the two
+  moved by different shares.
+- **Fixed:** the transparent canvas's resolve clips colour and alpha as one point of one box
+  (`packages/taa/src/alpha.ts`); 1.1 of 255 after. Opaque canvases keep their shader. Regression: the same check.
+
+### Open 2026-11-27: one half-view frame under Tonemap read back untone-mapped on the WebGL2 layer (KB-POST-HALFVIEW-ONCE1, post)
+
+- **Repro:** not reproduced. `node packages/post/test/scene-background-browser.mjs --compat` failed once in a full post
+  `test:gpu` chain (RTX A6000, other work loading the CPU): `Tonemap #808080 half view` drew 128 where 116 is right,
+  the value of the frame drawn just before it (no effect, same view, an engine since disposed). 12 reruns of the test
+  and 300 repeats of the two draws, with and without a loaded CPU, all drew 116.
+- **Cause:** not established. The value fits a screenshot of the previous frame as well as a frame Tonemap did not
+  draw; the layer presents at the end of the submit, so a stale compositor frame is the likelier, unproven.
+- **Next:** on the next failure, shoot the canvas again two animation frames later; a right second shot puts it in the
+  shared screenshot harness (`packages/post/test/post-browser.mjs`).
+
 ### Fixed 2026-11-27: volume files drew Beer-Lambert in display space, up to 22 levels off (KB-VOL-TINT-DISPLAY1, gltf)
 
 - **Repro:** `node packages/gltf/scripts/test-screen-transmission-browser.mjs` (and `--compat`), case `slab-default`: one

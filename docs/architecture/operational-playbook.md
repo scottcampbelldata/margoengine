@@ -11439,8 +11439,9 @@ instance is never reused. Core and stage are unchanged.
 Quality evidence: `cargo test` in the crate (marker syntax, tag trees and packet headers, the five progressions, the
 three coding passes against a test-side MQ encoder, both wavelets, JP2 boxes, the Wasm interface, size limits);
 `packages/decoders/tests/jpeg2000.test.js` (Node, calling thread and workers) and
-`packages/compute/tests/onnx-image.test.js`. Missing: the ISO/IEC 15444-4 conformance corpus, a browser worker run and
-a fuzz run. Sources: Rec. ITU-T T.800; Taubman and Marcellin (Kluwer, 2002); Taubman (IEEE TIP 9(7), 2000,
+`packages/compute/tests/onnx-image.test.js`; OpenJPEG-written vectors, a browser worker run on both backends
+(`decoders/tests/jpeg2000-browser.mjs`) and the fuzz run below. `decoders/image` routes the format. Missing: the
+ISO/IEC 15444-4 conformance corpus. Sources: Rec. ITU-T T.800; Taubman and Marcellin (Kluwer, 2002); Taubman (IEEE TIP 9(7), 2000,
 <https://doi.org/10.1109/83.847830>).
 
 Transparent canvas alpha in temporal and lens passes (2026-11-27, KB-ALPHA-TEMPORAL1): every filter on a premultiplied
@@ -11450,5 +11451,15 @@ the reactive history in `historyDepth.g`. DOF (`dof/src/alpha.ts`) patches the g
 the lens and half-resolution patches. SceneFade lerps with a blend constant. Pipelines follow the canvas mark of
 `shared/straight-display.js`; opaque shaders are unchanged. Evidence (section 5): `taa/test/alpha-browser.mjs`,
 `dof/tests/gpu/alpha-check.mjs`, `post/test/scene-fade-alpha-browser.mjs` and `alpha-rim-browser.mjs` on WebGPU and the
-WebGL2 layer, RTX A6000, TAAUpscale included. Missing: water's composites (KB-WATER-ALPHARIM1) and engine views on a
-transparent canvas.
+WebGL2 layer, RTX A6000, TAAUpscale included. Engine views (`post/test/alpha-views-browser.mjs`, both backends): TAA
+and DOF in two views and SceneFade over overlapping views keep the alpha; it found variance clipping moving colour and
+alpha apart, now clipped as one 4D point (KB-TAA-ALPHACLIP1; Salvi 2016; Karis 2014). Missing: water's composites
+(KB-WATER-ALPHARIM1) and XR on a transparent canvas.
+
+JPEG 2000 hostile input (2026-11-27, KB-J2K-HOSTILE1): headers can ask for far more memory and work than their bytes
+carry, so the kernel bounds tile-components (2^20), structures per tile (2^22), packets by header bytes and visits by a
+per-decode budget; coefficient arithmetic wraps. Evidence: `decoders/tests/jpeg2000-fuzz.test.js` drives the shipped
+Wasm in a worker with a 10 s watch per case (structure-aware mutation of OpenJPEG streams; Manes et al., "The Art,
+Science, and Engineering of Fuzzing", IEEE TSE 2019, https://arxiv.org/abs/1812.00140; Pham et al., "Smart Greybox
+Fuzzing", IEEE TSE 2019, https://arxiv.org/abs/1811.09447). Missing: the ISO/IEC 15444-4 corpus, coverage-guided
+fuzzing, and streams using code-block style options from an outside encoder.
