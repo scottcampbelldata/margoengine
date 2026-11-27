@@ -1327,6 +1327,10 @@
       "types": "./dist/loaders/threemf-displacement.d.ts",
       "import": "./dist/loaders/threemf-displacement.js"
     },
+    "./loaders/threemf-secure": {
+      "types": "./dist/loaders/threemf-secure.d.ts",
+      "import": "./dist/loaders/threemf-secure.js"
+    },
     "./loaders/threemf-volumetric": {
       "types": "./dist/loaders/threemf-volumetric.d.ts",
       "import": "./dist/loaders/threemf-volumetric.js"

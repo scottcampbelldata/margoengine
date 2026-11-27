@@ -217,6 +217,10 @@
       "types": "./dist/threemf-displacement.d.ts",
       "import": "./dist/threemf-displacement.js"
     },
+    "./threemf-secure": {
+      "types": "./dist/threemf-secure.d.ts",
+      "import": "./dist/threemf-secure.js"
+    },
     "./threemf-volumetric": {
       "types": "./dist/threemf-volumetric.d.ts",
       "import": "./dist/threemf-volumetric.js"

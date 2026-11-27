@@ -17,6 +17,7 @@ export interface Export3MFOptions extends SceneOptions {
     objectInfo?: (node: Mesh | ExportNode) => ThreeMFObjectInfo | undefined;
     itemPartNumber?: string;
     production?: boolean | Export3MFProduction;
+    secureContent?: ThreeMFSecureContent;
     compress?: boolean;
     onMeshCheck?: (report: ThreeMFMeshReport) => void;
     signal?: AbortSignal;
@@ -25,6 +26,14 @@ export interface Export3MFOptions extends SceneOptions {
 export interface Export3MFProduction {
     separateParts?: boolean;
     uuid?: (element: ThreeMFElement) => string;
+}
+
+export interface ThreeMFAccessRight {
+    consumer: number;
+    wrappingAlgorithm: string;
+    mgfAlgorithm?: string;
+    digestMethod?: string;
+    wrappedKey: Uint8Array;
 }
 
 export interface ThreeMFAlternative {
@@ -56,6 +65,12 @@ export interface ThreeMFConstituent {
     color: string;
 }
 
+export interface ThreeMFConsumer {
+    id: string;
+    keyId?: string;
+    publicKey?: string;
+}
+
 export interface ThreeMFCustomMetadata {
     namespace: string;
     name: string;
@@ -79,6 +94,16 @@ export interface ThreeMFElement {
     element: 'build' | 'item' | 'object' | 'component' | 'alternative';
     name?: string;
     index: number;
+}
+
+export interface ThreeMFEncryptedPart {
+    group: number;
+    data: Uint8Array;
+    algorithm?: string;
+    compression?: 'none' | 'deflate';
+    iv?: Uint8Array;
+    tag?: Uint8Array;
+    aad?: Uint8Array;
 }
 
 export interface ThreeMFField {
@@ -110,6 +135,11 @@ export interface ThreeMFImplicitFunction {
     nodes: readonly ThreeMFNode[];
     outputs: Readonly<Record<string, string>>;
     name?: string;
+}
+
+export interface ThreeMFKeyGroup {
+    keyUUID?: string;
+    access?: readonly ThreeMFAccessRight[];
 }
 
 export interface ThreeMFLattice {
@@ -204,6 +234,16 @@ export interface ThreeMFObjectInfo {
 export type ThreeMFObjectType = (typeof TYPES)[number];
 
 export type ThreeMFRatios = readonly number[];
+
+export interface ThreeMFSecureContent {
+    uuid?: string;
+    consumers?: readonly ThreeMFConsumer[];
+    groups: readonly ThreeMFKeyGroup[];
+    encrypt: (part: {
+        path: string;
+        data: Uint8Array;
+    }) => ThreeMFEncryptedPart | undefined | Promise<ThreeMFEncryptedPart | undefined>;
+}
 
 export interface ThreeMFSliceLayer {
     top: number;

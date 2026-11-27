@@ -1688,6 +1688,37 @@ const file = await export3MF(
 console.log(`${file.length} bytes`);
 ```
 
+### Encrypted parts
+
+The [3MF Secure Content Extension](https://github.com/3MFConsortium/spec_securecontent) encrypts parts of a package for named consumers. The `secureContent` option writes its unencrypted structure: `encrypt` is called with the plain bytes of each model part of its own, slice part, texture and thumbnail, and returns the `data` you encrypted with the `group` it belongs to and its `iv`, `tag` and `aad` (`algorithm` defaults to AES-256-GCM's URI, `compression` to `'none'`), or nothing. `consumers` and each group's `access` (with the `wrappedKey` you wrapped) go into the key store; the writer adds the cipher file header, the relationships and the required extension. Margo encrypts nothing and handles no key. The root model is never encrypted, so give `production: { separateParts: true }` to protect meshes. `parse3MFKeystore` (`@margoengine/loaders/threemf-secure`) reads the structure back.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
+};
+// AES-256-GCM through Web Crypto; wrapping the content key for each consumer is yours too.
+const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+const file = await export3MF(
+  { nodes: [{ name: 'Part', geometry }] },
+  {
+    production: { separateParts: true },
+    secureContent: {
+      groups: [{}],
+      async encrypt({ data }) {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new Uint8Array(data)));
+        // Web Crypto appends the 16-byte tag.
+        return { group: 0, data: sealed.slice(0, -16), tag: sealed.slice(-16), iv };
+      },
+    },
+  },
+);
+console.log(`${file.length} bytes`);
+```
+
 ## Collision and UV animation per engine
 
 Name nodes with the `-col`, `-convcol`, `-colonly` and `-convcolonly` suffixes and author `materialAnimations` once; each

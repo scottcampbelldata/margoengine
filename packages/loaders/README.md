@@ -1071,6 +1071,30 @@ const { shapes } = await parse3MFBoolean(file);
 console.log(shapes[0].operation, shapes[0].operands.length);
 ```
 
+## 3MF encrypted parts
+
+`parse3MFKeystore` returns a package's secure content key store (consumers, key groups, wrapped keys, and each encrypted part with its parameters and bytes), or `undefined` without one. It decrypts nothing; `parse3MF` refuses a part that is encrypted.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import { parse3MFKeystore } from 'margoengine/loaders/threemf-secure';
+
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
+};
+const file = await export3MF(
+  { nodes: [{ name: 'Part', geometry }] },
+  {
+    production: { separateParts: true },
+    // Stand-in bytes: encrypt `data` here.
+    secureContent: { groups: [{}], encrypt: ({ data }) => ({ group: 0, data }) },
+  },
+);
+const store = await parse3MFKeystore(file);
+console.log(store?.groups[0].resources.map((r) => r.path));
+```
+
 ## 3MF textures and colour groups
 
 `parse3MFMaterials` from `@margoengine/loaders/threemf-materials` reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup` coordinates, `compositematerials`, `multiproperties` and the display properties (metallic, specular and translucent). The plain `parse3MF` stays as small as it was.

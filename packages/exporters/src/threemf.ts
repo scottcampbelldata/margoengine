@@ -24,6 +24,15 @@ import {
   type ExportWarning,
 } from './scene.js';
 import type { FieldContext, ThreeMFDisplacement, ThreeMFLevelSet, ThreeMFVolume } from './threemf-fields.js';
+import type { ThreeMFSecureContent } from './threemf-secure.js';
+
+export type {
+  ThreeMFAccessRight,
+  ThreeMFConsumer,
+  ThreeMFEncryptedPart,
+  ThreeMFKeyGroup,
+  ThreeMFSecureContent,
+} from './threemf-secure.js';
 
 export type {
   ThreeMFDisplacement,
@@ -447,6 +456,13 @@ export interface Export3MFOptions extends SceneOptions {
    * {@link Export3MFProduction} asks for. Default `false`.
    */
   production?: boolean | Export3MFProduction;
+  /**
+   * Writes the unencrypted structure of the secure content extension: the parts that `encrypt` returns are replaced by
+   * its bytes, listed in a key store with the wrapped keys you give, and the file requires the extension. Margo
+   * encrypts nothing and handles no key. Encrypted model parts need `production: { separateParts: true }`. Default
+   * none.
+   */
+  secureContent?: ThreeMFSecureContent;
   /** Deflates the package's parts; `false` stores them. Default `true`. */
   compress?: boolean;
   /** Called once for each mesh written with how it closes. Nothing is repaired. */
@@ -1122,6 +1138,7 @@ export async function export3MF(
     onMeshCheck,
     objectInfo,
     production = false,
+    secureContent,
     signal,
   } = options;
   if (typeof production !== 'boolean' && (typeof production !== 'object' || production === null))
@@ -2174,7 +2191,8 @@ export async function export3MF(
       (lattices.has('b2') ? ` xmlns:b2="${BALLS}"` : '') +
       (sliced.size ? ` xmlns:s="${SLICE}"` : '') +
       declared.namespaces +
-      (booleans ? ' xmlns:bo="http://schemas.3mf.io/3dmanufacturing/booleanoperations/2023/07"' : ''),
+      (booleans ? ' xmlns:bo="http://schemas.3mf.io/3dmanufacturing/booleanoperations/2023/07"' : '') +
+      (secureContent ? ' xmlns:sc="http://schemas.microsoft.com/3dmanufacturing/securecontent/2019/04"' : ''),
     // A package whose model parts refer to others must require the production extension (its chapter 1), and one with
     // beam lattices theirs (beam lattice extension chapter 1).
     // A file whose mesh is too coarse without its layers requires the slice extension (its chapter 2).
@@ -2184,6 +2202,7 @@ export async function export3MF(
       ...(sliced.has('lowres') ? ['s'] : []),
       ...declared.required,
       ...(booleans ? ['bo'] : []),
+      ...(secureContent ? ['sc'] : []),
     ],
     required = extensions.length ? ` requiredextensions="${extensions.join(' ')}"` : '',
     modelOf = (head: string, body: string, own: readonly string[], items: string): string =>
@@ -2223,40 +2242,45 @@ export async function export3MF(
           : []),
       ];
     });
-  return encodeZIP(
-    [
-      {
-        name: '[Content_Types].xml',
-        data: encoder.encode(
-          '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-            '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>' +
-            (preview
-              ? `<Default Extension="${preview}" ContentType="image/${preview === 'png' ? 'png' : 'jpeg'}"/>`
-              : '') +
-            files.map(({ name }) => `<Override PartName="/${name}" ContentType="${TEXTURE_PART}"/>`).join('') +
-            fieldFiles.map(({ name }) => `<Override PartName="/${name}" ContentType="image/png"/>`).join('') +
-            '</Types>\n',
-        ),
-      },
-      {
-        name: '_rels/.rels',
-        data: relationships([
-          ['3D/3dmodel.model', `${RELATIONSHIP}3dmodel`],
-          ...pictures.map(({ name }) => [name, THUMBNAIL] as const),
-        ]),
-      },
-      { name: '3D/3dmodel.model', data: encoder.encode(model) },
-      ...(rootRelations.length ? [{ name: '3D/_rels/3dmodel.model.rels', data: relationships(rootRelations) }] : []),
-      ...parts,
-      ...layerParts.map(({ part, resources: own }) => ({
-        name: part,
-        data: encoder.encode(modelOf(namespaces, '', own, '<build/>')),
-      })),
-      ...files,
-      ...fieldFiles,
-      ...pictures,
-    ],
-    { signal, compress },
-  );
+  const entries: { name: string; data: Uint8Array }[] = [
+    {
+      name: '[Content_Types].xml',
+      data: encoder.encode(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+          '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+          '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>' +
+          (preview
+            ? `<Default Extension="${preview}" ContentType="image/${preview === 'png' ? 'png' : 'jpeg'}"/>`
+            : '') +
+          files.map(({ name }) => `<Override PartName="/${name}" ContentType="${TEXTURE_PART}"/>`).join('') +
+          fieldFiles.map(({ name }) => `<Override PartName="/${name}" ContentType="image/png"/>`).join('') +
+          '</Types>\n',
+      ),
+    },
+    {
+      name: '_rels/.rels',
+      data: relationships([
+        ['3D/3dmodel.model', `${RELATIONSHIP}3dmodel`],
+        ...pictures.map(({ name }) => [name, THUMBNAIL] as const),
+      ]),
+    },
+    { name: '3D/3dmodel.model', data: encoder.encode(model) },
+    ...(rootRelations.length ? [{ name: '3D/_rels/3dmodel.model.rels', data: relationships(rootRelations) }] : []),
+    ...parts,
+    ...layerParts.map(({ part, resources: own }) => ({
+      name: part,
+      data: encoder.encode(modelOf(namespaces, '', own, '<build/>')),
+    })),
+    ...files,
+    ...fieldFiles,
+    ...pictures,
+  ];
+  if (secureContent)
+    // Loaded only for a file that asks for the extension.
+    await (await import('./threemf-secure.js')).secureParts(entries, secureContent, {
+      escaped,
+      uuid: randomUUID,
+      signal,
+    });
+  return encodeZIP(entries, { signal, compress });
 }

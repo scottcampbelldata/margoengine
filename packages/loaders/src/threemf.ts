@@ -484,7 +484,15 @@ export async function read3MF(
     throwIfAborted(options.signal, F);
     const entry = byPath.get(normalizePath(path));
     if (!entry) throw new LoaderError(F, 'syntax', `package part "${path.slice(0, 128)}" is missing`);
-    return readZipEntry(bytes, entry, options);
+    const data = await readZipEntry(bytes, entry, options);
+    // The secure content extension's cipher files start `%3McF`.
+    if (data[0] === 0x25 && data[1] === 0x33 && data[2] === 0x4d && data[3] === 0x63 && data[4] === 0x46)
+      throw new LoaderError(
+        F,
+        'unsupported',
+        `package part "${path.slice(0, 128)}" is encrypted; parse3MFKeystore from @margoengine/loaders/threemf-secure reads its key data, and decrypting it is the caller's`,
+      );
+    return data;
   };
   let rootPath = '3D/3dmodel.model';
   if (byPath.has('_rels/.rels')) {

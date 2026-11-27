@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21318777,
+  "total": 21330151,
   "history": [
     {
       "date": "2026-10-24",
@@ -15073,6 +15073,18 @@
       "commit": "6002757cef",
       "reason": "3MF boolean operations: measured {\"@margoengine/loaders/threemf-boolean\":12489} (before: exporters/threemf 42752, volumetric 14055, displacement 12936 B gzip). The reader holds the boolean elements in the shared 3MF reader, so every entry that reads it grows; the new optional entry loaders/threemf-boolean validates and returns the shapes. Core/stage untouched.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "073cb76d59",
+      "reason": "3MF secure content structure: measured {\"@margoengine/exporters/threemf\":44612,\"@margoengine/loaders/threemf-secure\":8677}. New optional entry loaders/threemf-secure reads the key store and cipher headers (it does not load the 3MF model reader); the exporters writer of the structure loads by import() only for secureContent. Core/stage untouched.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "073cb76d59",
+      "reason": "3MF boolean operations and secure content in the shared 3MF reader (boolean elements and the encrypted-part refusal): measured {\"@margoengine/loaders/threemf-materials\":14954} (materials before: 14711 B gzip). Core/stage untouched.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15471,7 +15483,7 @@
     "@margoengine/exporters/sparse": 26469,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 44035,
+    "@margoengine/exporters/threemf": 45951,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,
@@ -15719,8 +15731,9 @@
     "@margoengine/loaders/threemf-boolean": 12864,
     "@margoengine/loaders/threemf-displacement": 13325,
     "@margoengine/loaders/threemf-lattice": 19099,
-    "@margoengine/loaders/threemf-materials": 14883,
+    "@margoengine/loaders/threemf-materials": 15403,
     "@margoengine/loaders/threemf-mesh": 4316,
+    "@margoengine/loaders/threemf-secure": 8938,
     "@margoengine/loaders/threemf-volumetric": 14477,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,
