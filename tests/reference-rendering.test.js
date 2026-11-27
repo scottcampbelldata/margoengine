@@ -249,7 +249,9 @@ test('path-traced floats keep their row order, byte order and fixed display tran
 for (const [family, primitives, absolute, square, max] of [
   // Re-recorded 2026-11-27 (KB-REF-TRANS-VIEWER1, the manager's ruling after Scott's KB6016b rule): KB6016c's GGX D
   // text changes the compiled shader's float32 rounding, and two values on an 8-bit edge move one level each.
-  ['transmission', 22, 1590949, 66569297, 254],
+  // Re-recorded lower 2026-11-27 (KB4000 step 4): files with KHR_materials_transmission and no volume load with the
+  // screen-transmission pass by default (1590949 -> 1407924 against the sample viewer).
+  ['transmission', 22, 1407924, 54667134, 252],
   ['volume', 23, 1471401, 22496007, 110],
 ])
   test(`${family} preserves the full sample and exact viewer and path-transport budgets`, () => {

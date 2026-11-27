@@ -2212,7 +2212,7 @@ node scripts/reference-rendering/proof.mjs --case=volume --compat
 
 Each command preserves 72 PNGs and proof.json in a unique external directory,
 validates every original budget, actual AMD adapter and identical decoded RGBA
-bytes. The full volume ceiling is 13,834,286 on NVIDIA since 2026-11-27 (13,794,699 from 2026-11-11, 13,792,000 before; KB-REF-VOL-FULL1 in docs/limits.md). Native WebGL2 refusal is
+bytes. The full volume ceiling is 13,834,286 on NVIDIA since 2026-11-27 (13,794,699 from 2026-11-11, 13,792,000 before; KB-REF-VOL-FULL1 in docs/limits.md). The transmission budgets (NVIDIA) are viewer/full/direct 1,407,924 / 3,992,253 / 2,388,408 native and 1,408,047 / 3,992,260 / 2,388,419 compatibility since 2026-11-27 (were 1,590,949 / 4,164,104 / 2,632,781): TransmissionTest has KHR_materials_transmission and no KHR_materials_volume, so it now loads with the screen-transmission pass by default (KB4000 step 4) and refracts the scene instead of tinting the background. Volume files stay on the tint. Native WebGL2 refusal is
 covered by run.mjs. Run gltf/pbr's native-volume GPU test for twenty exact slab
 readbacks on each backend, and its unit tests for transformed/instanced shader
 math and exact absent normal-map fallbacks. No benchmark is part of this proof.

@@ -27,28 +27,28 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 4164104,
-        "square": 225989712,
-        "max": 254,
-        "mae": 5.294932047526042,
-        "rmse": 16.951719051724332,
+        "absolute": 3992253,
+        "square": 212080403,
+        "max": 252,
+        "mae": 5.076412200927734,
+        "rmse": 16.421759278639506,
         "foreground": 67219,
-        "foregroundAbsolute": 4164104,
-        "foregroundMae": 20.64943939461561,
-        "changed": 65071
+        "foregroundAbsolute": 3992253,
+        "foregroundMae": 19.797244826611525,
+        "changed": 65068
       },
       "compat": {
         "metrics": {
           "pixels": 262144,
-          "absolute": 4164101,
-          "square": 225989199,
-          "max": 254,
-          "mae": 5.294928232828776,
-          "rmse": 16.951699811386508,
+          "absolute": 3992260,
+          "square": 212079254,
+          "max": 252,
+          "mae": 5.0764211018880205,
+          "rmse": 16.421714794032017,
           "foreground": 67219,
-          "foregroundAbsolute": 4164101,
-          "foregroundMae": 20.649424517869452,
-          "changed": 65071
+          "foregroundAbsolute": 3992260,
+          "foregroundMae": 19.797279539019225,
+          "changed": 65068
         }
       }
     },
@@ -73,28 +73,28 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 2632781,
-        "square": 102874717,
-        "max": 254,
-        "mae": 3.347754160563151,
-        "rmse": 11.437305942132902,
-        "foreground": 67195,
-        "foregroundAbsolute": 2632781,
-        "foregroundMae": 13.060401319542624,
-        "changed": 63973
+        "absolute": 2388408,
+        "square": 84827432,
+        "max": 252,
+        "mae": 3.037017822265625,
+        "rmse": 10.385742998623813,
+        "foreground": 67196,
+        "foregroundAbsolute": 2388408,
+        "foregroundMae": 11.847967140901243,
+        "changed": 63901
       },
       "compat": {
         "metrics": {
           "pixels": 262144,
-          "absolute": 2632778,
-          "square": 102874114,
-          "max": 254,
-          "mae": 3.3477503458658853,
-          "rmse": 11.437272422207936,
-          "foreground": 67195,
-          "foregroundAbsolute": 2632778,
-          "foregroundMae": 13.060386437482947,
-          "changed": 63973
+          "absolute": 2388419,
+          "square": 84828585,
+          "max": 252,
+          "mae": 3.037031809488932,
+          "rmse": 10.385813581457127,
+          "foreground": 67196,
+          "foregroundAbsolute": 2388419,
+          "foregroundMae": 11.848021707641328,
+          "changed": 63901
         }
       }
     }

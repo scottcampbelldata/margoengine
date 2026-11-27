@@ -1,3 +1,7 @@
+### Section 5 evidence: transmission proof through the default screen-transmission pass (2026-11-27)
+
+`loadGLTF` and the parse, worker and progressive loaders attach `screenTransmission` (`@margoengine/gltf/transmission`) to a file with KHR_materials_transmission and no KHR_materials_volume. The batch-160 TransmissionTest proof (`node scripts/reference-rendering/proof.mjs --case=transmission`, and `--compat` for the WebGL2 layer) measures viewer/full/direct 1,407,924 / 3,992,253 / 2,388,408 native and 1,408,047 / 3,992,260 / 2,388,419 compatibility (RTX A6000, Edge 158), down from 1,590,949 / 4,164,104 / 2,632,781 on the tint; the budgets in docs/whitepaper/results/batch-160-transmission*.json are pinned at these figures. Missing: volume files stay on the tint until the pass beats it against Cycles (KB4000 in docs/known-bugs.md); AMD receipts predate the change.
+
 ### Section 5 evidence: quality gates list the whole tree past 1 MiB (2026-11-27)
 
 The tracked file list passed 1 MiB (1,048,627 B), the default output buffer of `execFileSync` and `spawnSync`, so

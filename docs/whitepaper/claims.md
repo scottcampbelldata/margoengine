@@ -3286,7 +3286,7 @@ native 1,512,739 / 13,741,199 / 1,746,854; compatibility 1,512,128 / 13,741,752 
 1,747,921. Every unchanged square/max/foreground gate also passes.
 Durable proof paths, report hashes, decoded RGBA hashes and all metrics are in
 results/batch-160-amd-transmission.json and batch-160-amd-volume.json (relative
-to docs/whitepaper). The full volume ceiling was 13,792,000 until 2026-11-11, 13,794,699 until 2026-11-27 (re-recorded on NVIDIA after the height-correlated Smith G) and is 13,834,286 since: the native tint reads thicknessTexture (212d482e00, KB-REF-VOL-FULL1 in docs/limits.md; direct -63,179 and viewer -21,089 with it). The AMD figures above predate both.
+to docs/whitepaper). The full volume ceiling was 13,792,000 until 2026-11-11, 13,794,699 until 2026-11-27 (re-recorded on NVIDIA after the height-correlated Smith G) and is 13,834,286 since: the native tint reads thicknessTexture (212d482e00, KB-REF-VOL-FULL1 in docs/limits.md; direct -63,179 and viewer -21,089 with it). The AMD figures above predate both. The transmission budgets (NVIDIA) are viewer/full/direct 1,407,924 / 3,992,253 / 2,388,408 native and 1,408,047 / 3,992,260 / 2,388,419 compatibility since 2026-11-27 (were 1,590,949 / 4,164,104 / 2,632,781): TransmissionTest has KHR_materials_transmission and no KHR_materials_volume, so it now loads with the screen-transmission pass by default (KB4000 step 4) and refracts the scene instead of tinting the background. Volume files stay on the tint.
 The analytic GPU test passes twenty exact slab pixels on each backend; all 47
 gltf/materials runtime README examples pass with zero exceptions.
 The complete changed-package CPU run passes 783 tests with zero failures/skips.

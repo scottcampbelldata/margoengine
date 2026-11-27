@@ -3632,8 +3632,8 @@ not promise exact f32 weights; the native regression oracle uses unfiltered load
 
 
 Batch 160 job 4 retains complete 512 x 512 TransmissionTest (22 primitives)
-and AttenuationTest (23 primitives), all pixels and original viewer/Cycles
-full/direct integer budgets. Native volume estimates a homogeneous refracted
+and AttenuationTest (23 primitives), all pixels and viewer/Cycles
+full/direct integer budgets. The transmission budgets (NVIDIA) are viewer/full/direct 1,407,924 / 3,992,253 / 2,388,408 native and 1,408,047 / 3,992,260 / 2,388,419 compatibility since 2026-11-27 (were 1,590,949 / 4,164,104 / 2,632,781): TransmissionTest has KHR_materials_transmission and no KHR_materials_volume, so it now loads with the screen-transmission pass by default (KB4000 step 4) and refracts the scene instead of tinting the background. Volume files stay on the tint. Native volume estimates a homogeneous refracted
 slab in mesh space with world-space Beer attenuation, including transforms and
 instancing, scaled per texel by a thickness map's green channel (KB4000, 2026-11-26). It does not trace mesh
 boundaries or reproduce
