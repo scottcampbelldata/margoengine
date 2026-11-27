@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21041756,
+  "total": 21043453,
   "history": [
     {
       "date": "2026-10-24",
@@ -14768,6 +14768,12 @@
       "date": "2026-11-27",
       "commit": "sea-04-mean-hull-exchange",
       "reason": "Physics/loads grows from 63177 to 65111 B gzip and its ceiling from 63248 to 67065 B for the optional mean hull with impermeable geometry, six-axis prescribed normal motion and reciprocal pressure. The finite wake has a single owner for the accepted bulk state and Green work. Splitting off another public entry would pass the same geometry and accepted bulk between two solver owners. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "kb-scenes-shedbox1",
+      "reason": "KB-SCENES-SHEDBOX1: @margoengine/procedural/sheds to 3862 B gzip (ceiling 2691 to 4118) for the board map, board UVs, the interior and floor parts and the daylight factor, which belong to the shed they texture and light; @margoengine/scenes/dune-coast to 6486 B (6475 to 6742) and its textured boards through @margoengine/materials (which loads gltf's PBR model), as every other scene loads the packages it draws with. Core and stage are unchanged.",
+      "grew": 5
     }
   ],
   "items": {
@@ -15771,7 +15777,7 @@
     "@margoengine/procedural/noise": 2314,
     "@margoengine/procedural/poisson": 1525,
     "@margoengine/procedural/sdf": 2112,
-    "@margoengine/procedural/sheds": 2691,
+    "@margoengine/procedural/sheds": 4118,
     "@margoengine/procedural/standin": 673,
     "@margoengine/procedural/textures": 5296,
     "@margoengine/procedural/textures-pbr": 5704,
@@ -15921,7 +15927,7 @@
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scene/tags": 2932,
     "@margoengine/scenes": 4642,
-    "@margoengine/scenes/dune-coast": 6475,
+    "@margoengine/scenes/dune-coast": 6742,
     "@margoengine/scenes/fauld-blast": 10004,
     "@margoengine/scenes/fauld-countryside": 8214,
     "@margoengine/scenes/fauld-crater": 8214,
@@ -16634,6 +16640,9 @@
     "leak @margoengine/scatter/imposter -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/scatter/imposter -> @margoengine/lod": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/geometry": 1,
+    "leak @margoengine/scenes/dune-coast -> @margoengine/gltf/extended-materials": 1,
+    "leak @margoengine/scenes/dune-coast -> @margoengine/gltf/pbr-model": 1,
+    "leak @margoengine/scenes/dune-coast -> @margoengine/materials": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/post/gtao": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/scatter": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/shadows": 1,

@@ -8,7 +8,8 @@
 import { PbrMaterial, type EngineKernel, type Mesh, type Vec3 } from '@margoengine/core';
 import { applyMatrix4, toGeometry, type GeometryData } from '@margoengine/geometry';
 import { Noise } from '@margoengine/procedural/noise';
-import { generateLaunchRail, generatePlankShed } from '@margoengine/procedural/sheds';
+import { generateLaunchRail, generatePlankShed, shedBoardMap } from '@margoengine/procedural/sheds';
+import { createMesh, Material, Texture } from '@margoengine/materials';
 import { weatheredWood } from '@margoengine/materials/presets';
 import { heightfieldGeometry, TerrainColors, TerrainHeightmap } from '@margoengine/terrain';
 import { duneField, duneHill } from '@margoengine/terrain/dunes';
@@ -596,24 +597,49 @@ export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): 
   // The camp: the 1903 hangar (44 by 16 ft, horizontal boards, awning doors) and the 1901 shed (25 by 16 ft, vertical
   // boards, steeper roof) side by side 70 m west of the rail; the rail runs north from (0, 0) into the wind.
   if (s.camp) {
-    const wood = new PbrMaterial({
-        color: [s.boards[0], s.boards[1], s.boards[2]],
-        roughness: weatheredWood.roughness,
-        metalness: weatheredWood.metalness,
-      }),
-      roofing = new PbrMaterial({
-        color: [s.roof[0], s.roof[1], s.roof[2]],
-        roughness: weatheredWood.roughness,
-        metalness: weatheredWood.metalness,
-      }),
-      board = (part: string) => (part === 'trim' ? dark : part === 'roof' ? roofing : wood),
-      dark = new PbrMaterial({ color: [0.2, 0.17, 0.13], roughness: 0.9 }),
-      metal = new PbrMaterial({ color: [0.35, 0.34, 0.33], roughness: 0.6, metalness: 0.8 }),
-      add = (data: GeometryData, material: PbrMaterial, name: string) => {
-        const mesh = engine.createMesh().setGeometry(toGeometry(data)).setMaterial(material);
-        mesh.name = name;
-        meshes.push(mesh);
-        shadows.add(mesh, { static: true });
+    // Weathered boards (KB-SCENES-SHEDBOX1): one map of sixteen boards per colour, grain along each.
+    const textured = (source: ConstructorParameters<typeof Texture>[0], options: object) => {
+        const texture = new Texture(source, options);
+        disposers.push(() => texture.dispose());
+        return texture;
+      },
+      boarded = (color: readonly number[], seed: number) =>
+        textured(shedBoardMap({ color: [color[0]!, color[1]!, color[2]!], variation: s.shedWeathering, seed }), {
+          colorSpace: 'srgb',
+          wrapS: 'repeat',
+          wrapT: 'repeat',
+          anisotropy: 8,
+        }),
+      timber = (map: Texture, daylight?: Texture) =>
+        new Material({
+          color: [1, 1, 1],
+          map,
+          roughness: weatheredWood.roughness,
+          metalness: weatheredWood.metalness,
+          ...(daylight ? { aoMap: daylight } : {}),
+        }),
+      walls = boarded(s.boards, 1),
+      wood = timber(walls),
+      roofing = timber(boarded(s.roof, 2)),
+      dark = timber(boarded([0.2, 0.17, 0.13], 3)),
+      metal = new Material({ color: [0.35, 0.34, 0.33], roughness: 0.6, metalness: 0.8 }),
+      // A shed's inner faces take only the daylight its openings let in (its average daylight factor, as occlusion).
+      materials = (daylight: number) => {
+        const level = Math.max(1, Math.round(255 * daylight)),
+          lit = textured({ data: new Uint8Array([level, level, level, 255]), width: 1, height: 1 }, {});
+        return {
+          siding: wood,
+          roof: roofing,
+          trim: dark,
+          faces: timber(walls, lit),
+          floor: new Material({ color: [s.sand[0], s.sand[1], s.sand[2]], roughness: 0.92, aoMap: lit }),
+        };
+      },
+      add = (data: GeometryData, material: Material, name: string) => {
+        const model = createMesh(engine, data, material);
+        model.root.name = name;
+        disposers.push(() => model.dispose());
+        shadows.add(model, { static: true });
       };
     const windows = (wall: 'back' | 'left', at: number[]) =>
         s.shedWindows
@@ -650,10 +676,15 @@ export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): 
       hz = 30,
       sx = -88.5,
       gy = (x: number, z: number) => height(x, z) - 0.05;
-    for (const [part, data] of Object.entries(hangar.parts))
-      add(place(data, hx, gy(hx, hz), hz, Math.PI), board(part), `hangar ${part}`);
-    for (const [part, data] of Object.entries(shed.parts))
-      add(place(data, sx, gy(sx, hz), hz, Math.PI), board(part), `shed ${part}`);
+    for (const [name, built, x] of [
+      ['hangar', hangar, hx],
+      ['shed', shed, sx],
+    ] as const) {
+      const of = materials(built.inside.daylight),
+        { faces, floor } = built.inside;
+      for (const [part, data] of Object.entries({ ...built.parts, faces, floor }))
+        add(place(data, x, gy(x, hz), hz, Math.PI), of[part as keyof typeof of], `${name} ${part}`);
+    }
     const rail = generateLaunchRail({ ground: (x) => height(0, -x) });
     // The rail's +x runs north (-z): turn it a quarter turn.
     add(place(rail.parts.wood, 0, 0, 0, Math.PI / 2), wood, 'rail');

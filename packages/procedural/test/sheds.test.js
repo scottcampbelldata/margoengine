@@ -3,7 +3,7 @@
 // follows the ground.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateLaunchRail, generatePlankShed } from '@margoengine/procedural/sheds';
+import { generateLaunchRail, generatePlankShed, shedBoardMap } from '@margoengine/procedural/sheds';
 
 function bounds(data) {
   const lo = [Infinity, Infinity, Infinity],
@@ -69,6 +69,71 @@ test('vertical siding and the same seed give the same shed', () => {
     b = generatePlankShed({ siding: 'vertical', length: 7.6, pitch: 30, seed: 4 });
   assert.deepEqual(a.parts.siding.positions, b.parts.siding.positions);
   assert.ok(finite(a.parts.siding));
+});
+
+// KB-SCENES-SHEDBOX1: the sheds read as plain boxes: every board face took the whole of a texture (no grain, no tone of
+// its own) and the inside took the open sky's light like the outside.
+test('board UVs run with the grain, a column of the board map to a board', () => {
+  const { positions: p, normals: n, uvs } = generatePlankShed({ openings: [], weathering: 0 }).parts.siding;
+  // A quad of the front wall's outer face: 13 m of horizontal board, 0.15 m wide.
+  let checked = 0;
+  for (let v = 0; v + 3 < uvs.length / 2; v += 4) {
+    if (n[3 * v + 2] < 0.9) continue;
+    const x = [0, 1, 2, 3].map((k) => p[3 * (v + k)]),
+      u = [0, 1, 2, 3].map((k) => uvs[2 * (v + k)]),
+      along = [0, 1, 2, 3].map((k) => uvs[2 * (v + k) + 1]),
+      span = (list) => Math.max(...list) - Math.min(...list);
+    if (span(x) < 1) continue; // an end face of a side wall's board
+    assert.ok(Math.abs(span(u) - 1 / 16) < 1e-4, `one column across: ${span(u)}`);
+    assert.ok(Math.abs(span(along) - span(x) / 2) < 1e-4, 'one repeat to 2 m along');
+    checked++;
+  }
+  assert.ok(checked > 10, `${checked} long boards`);
+});
+
+test('the faces turned inside are a part of their own, lit by the daylight factor of the openings', () => {
+  const closed = generatePlankShed({ openings: [{ wall: 'front', width: 2, height: 1.8, leaf: 'closed' }] }),
+    open = generatePlankShed({ openings: [{ wall: 'front', width: 2, height: 1.8, leaf: 'none' }] }),
+    awning = generatePlankShed({ openings: [{ wall: 'front', width: 2, height: 1.8, leaf: 'awning' }] }),
+    inside = bounds(open.inside.faces),
+    outside = bounds(open.parts.siding);
+  assert.ok(inside.hi[2] < outside.hi[2] && inside.lo[2] > outside.lo[2], 'the inner faces are inside the walls');
+  assert.ok(bounds(open.inside.floor).hi[1] < 0.1, 'a floor at the foot');
+  // Crisp and Littlefair 1984 by hand: 2 by 1.8 m at 90 degrees into the 13.4 by 4.9 by 2.4 m hangar, R 0.25.
+  const rise = 2.45 * Math.tan((18 * Math.PI) / 180),
+    area = 13.4 * 4.9 + 2 * 13.4 * Math.hypot(2.45, rise) + 2 * 18.3 * 2.4 + 4.9 * rise;
+  assert.ok(
+    Math.abs(open.inside.daylight - (3.6 * 90) / (area * (1 - 0.0625)) / 100) < 1e-12,
+    `${open.inside.daylight}`,
+  );
+  assert.equal(closed.inside.daylight, 0);
+  const shaded = awning.inside.daylight;
+  assert.ok(shaded > 0 && shaded < open.inside.daylight / 4, 'the awning shades the opening');
+});
+
+test('the board map: sixteen boards of their own tones around the asked mean, deterministic and repeating', () => {
+  const color = [0.26, 0.2, 0.15],
+    map = shedBoardMap({ color, seed: 3 }),
+    decode = (b) => (b / 255 <= 0.04045 ? b / 255 / 12.92 : ((b / 255 + 0.055) / 1.055) ** 2.4),
+    column = (c, k = 0) => {
+      let sum = 0;
+      for (let y = 0; y < 512; y++)
+        for (let x = c * 16 + 1; x < c * 16 + 15; x++) sum += decode(map.data[(y * 256 + x) * 4 + k]);
+      return sum / (512 * 14);
+    };
+  assert.deepEqual([map.width, map.height, map.data.length], [256, 512, 256 * 512 * 4]);
+  for (let k = 0; k < 3; k++) {
+    let sum = 0;
+    for (let i = k; i < map.data.length; i += 4) sum += decode(map.data[i]);
+    assert.ok(Math.abs(sum / (256 * 512) - color[k]) < 0.005, `mean ${sum / (256 * 512)} of ${color[k]}`);
+  }
+  const tones = Array.from({ length: 16 }, (_, c) => column(c));
+  assert.ok(Math.max(...tones) / Math.min(...tones) > 1.15, 'boards differ');
+  assert.deepEqual(shedBoardMap({ color, seed: 3 }).data, map.data);
+  const plain = shedBoardMap({ color, variation: 0 });
+  assert.equal(new Set(plain.data.filter((_, i) => i % 4 === 0)).size, 1, 'variation 0 is one flat colour');
+  assert.throws(() => shedBoardMap({ variation: 2 }), RangeError);
+  assert.throws(() => shedBoardMap({ color: [2, 0, 0] }), RangeError);
 });
 
 test('the launch rail is 60 ft of timber on edge, capped with metal, lying on the ground', () => {

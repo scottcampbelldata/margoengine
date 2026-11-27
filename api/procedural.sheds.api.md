@@ -28,6 +28,13 @@ export interface PlankShed {
         readonly trim: GeometryData;
     };
     readonly ridge: number;
+    readonly inside: PlankShedInside;
+}
+
+export interface PlankShedInside {
+    readonly faces: GeometryData;
+    readonly floor: GeometryData;
+    readonly daylight: number;
 }
 
 export interface PlankShedOptions {
@@ -43,6 +50,18 @@ export interface PlankShedOptions {
     readonly seed?: number;
 }
 
+export interface ShedBoardMap {
+    readonly data: Uint8Array;
+    readonly width: number;
+    readonly height: number;
+}
+
+export interface ShedBoardMapOptions {
+    readonly color?: readonly [number, number, number];
+    readonly variation?: number;
+    readonly seed?: number;
+}
+
 export interface ShedOpening {
     readonly wall: 'front' | 'back' | 'left' | 'right';
     readonly at?: number;
@@ -55,4 +74,6 @@ export interface ShedOpening {
 export function generateLaunchRail(options?: LaunchRailOptions): LaunchRail;
 
 export function generatePlankShed(options?: PlankShedOptions): PlankShed;
+
+export function shedBoardMap(options?: ShedBoardMapOptions): ShedBoardMap;
 ```

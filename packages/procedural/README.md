@@ -927,15 +927,23 @@ textures", Graphics Interface 2000 (bricks and tiles).
 `generatePlankShed(options?)` builds a board-built gabled shed: horizontal lapped boards (clapboard) or vertical
 boards on the walls, door and window openings that cut the boards they cross, door leaves (`closed`, `open` on a
 side hinge, or `awning`, hinged at the top and propped up 75 degrees), two board roof slopes with an overhang, fascia
-and a ridge board, and corner boards. It returns `{parts: {siding, roof, trim}, ridge}`, one `GeometryData` per
-material with UVs, tangents and unit normals; the origin is on the ground at the middle of the floor and the ridge
+and a ridge board, and corner boards. It returns `{parts: {siding, roof, trim}, ridge,
+inside: {faces, floor, daylight}}`, one `GeometryData` per material with UVs, tangents and unit normals.
+`inside.faces` holds the faces turned into the shed (the insides of the walls and closed leaves, the roof's underside)
+and `inside.floor` a thin floor; `inside.daylight` is the average daylight factor inside (0 to 1, Crisp and Littlefair 1984), to scale their ambient light by (an `aoMap` of that value),
+so an open door reads dark. The UVs run with the grain, one column of `shedBoardMap` to a board and one repeat to 2 m:
+`shedBoardMap({color, variation, seed})` returns sixteen weathered boards (own tones, silvering, grain, knots, dirt in
+the joints; their mean is `color`) as 256 by 512 sRGB RGBA8 data. Render the parts and the inside (the walls' inner faces
+are only in `inside.faces`); the origin is on the ground at the middle of the floor and the ridge
 runs along x. The default is the Wright brothers' 1903 hangar at Kill Devil Hills: 13.4 by 4.9 m (44 by 16 ft), low
 roof, a wide awning door on the front. `generateLaunchRail(options?)` lays a straight timber rail along +x, timbers on
 edge capped with a thin metal strip, following `ground(x)`: the default is their 60 ft rail of 2 by 4s in four
 lengths. Both are seeded (`seed`, `weathering` 0 to 1 for small tilts, uneven ends and gaps).
 
 ```ts
-import {generateLaunchRail, generatePlankShed} from 'margoengine/procedural/sheds';
+import {generateLaunchRail, generatePlankShed, shedBoardMap} from 'margoengine/procedural/sheds';
+const boards = shedBoardMap({color: [0.26, 0.2, 0.15], seed: 2}); // new Texture(boards, {colorSpace: 'srgb', wrapS: 'repeat', wrapT: 'repeat'})
+console.log(boards.width, boards.height); // 256 512
 const hangar = generatePlankShed(); // the 1903 hangar
 const shed = generatePlankShed({length: 7.6, pitch: 30, siding: 'vertical', openings: [
   {wall: 'front', at: -1.6, width: 0.9, height: 1.95, leaf: 'closed'},
@@ -956,12 +964,17 @@ console.log(hangar.ridge.toFixed(2), shed.parts.siding.indices.length > 0, rail.
 | `weathering` | 0.5 | 0 to 1 | small tilts, uneven ends and gaps |
 | `seed` | 1 | integer | the same seed gives the same boards |
 
+`shedBoardMap` options: `color` (linear RGB, default [0.258, 0.205, 0.147]), `variation` 0 to 1 (0.5; 0 is one flat
+colour), `seed` (1).
+
 Rail options: `length` 1 to 60 m (18.3), `sections` 1 to 12 (4), `timber` width and height in metres ([0.038, 0.089],
 a dressed 2 by 4 on edge), `strip` (true), `ground(x)` (flat 0), `seed`. A wrong type throws a `TypeError`, a
 value out of range or an opening that does not fit its wall a `RangeError` naming what to pass.
 
 Sources: US Forest Products Laboratory 2010, *Wood Handbook: Wood as an Engineering Material*, FPL-GTR-190
 (https://www.fpl.fs.usda.gov/documnts/fplgtr/fpl_gtr190.pdf), lap siding widths and laps and dressed lumber sizes;
+Crisp and Littlefair 1984, "Average daylight factor prediction", CIBSE National Lighting Conference (after Lynes 1979,
+https://doi.org/10.1177/14771535790110020101), the daylight factor inside;
 Library of Congress Wright Brothers negatives LC-W86-15 and LC-W86-21 (public domain,
 https://www.loc.gov/pictures/collection/wri/), the 1903 camp buildings and the launching track; McFarland (ed.) 1953,
 *The Papers of Wilbur and Orville Wright* (McGraw-Hill), the hangar's size and the rail.

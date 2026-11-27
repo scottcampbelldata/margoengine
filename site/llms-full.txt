@@ -21303,7 +21303,8 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   orange glow toward the sun and the sun disc showing, with a dark brown band at the horizon, where the photographs show
   an even pale grey deck and a pale haze; (2) fixed 2026-11-16: no grass blade rendered on the hummocks; (3) fixed 2026-11-16: the sand was smooth mottled colour with no ripples or
   wind streaks (footprints and scour stay open); (4) the sea is flat grey with a white band at the waterline and no breaking lines;
-  (5) the sheds read as plain boxes at 60 m (no wood texture, no dark interior through the open door).
+  (5) fixed 2026-11-27 (KB-SCENES-SHEDBOX1): the sheds read as plain boxes at 60 m (no wood texture, no dark interior
+  through the open door).
 - **Cause:** (1) at full cover the sheet was still its shape noise (holes), its opacity let the disc and Preetham's
   aureole through and past 40 km of haze it returned the clear sky; fixed in packages/sky (the overcast deck from 80
   percent cover, `clouds.depth`, the engine sun fading with it), tests packages/sky/test/overcast.test.js and
@@ -21314,7 +21315,11 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   dune-coast-still.mjs; (3) terrain had no sand detail layer; TerrainColors `sandSurface`
   (ripples, streaks, slope sorting, on by default) now draws one, test packages/terrain/test/sand.browser.mjs and
   colors.test.js; (4) KB-WATER-SURF1, fixed 2026-11-16 (the short swash, KB-WATER-SWASH1, fixed 2026-11-18);
-  (5) the wood material has no texture. Each is fixed in its owning package with a regression test.
+  (5) the wood material had no texture, every board face took a whole texture's UVs and the inside took the open sky's
+  light; `@margoengine/procedural/sheds` now gives boards UVs along their grain and a board map (`shedBoardMap`), the
+  inner faces and floor as parts of their own and the openings' average daylight factor (Crisp and Littlefair 1984),
+  and the scene textures them and scales their ambient light, tests packages/procedural/test/sheds.test.js and
+  dune-coast-still.mjs. Each is fixed in its owning package with a regression test.
 
 ### Fixed 2026-11-18: the WebGL2 layer allocated kilobytes of JavaScript heap every frame (KB-COMPAT-FRAMEALLOC1, webgl2-compat, culling, shadows, compute)
 
