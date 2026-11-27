@@ -12678,6 +12678,43 @@ Proof: `packages/physics/tests/world.test.js`.
   read (arXiv v1): the wake's angle of largest amplitude is Kelvin's asin(1/3) for Froude numbers up to
   sqrt(3 / (4 pi)) = 0.49 and narrows above it (their eqs. 3a, 3b and 4). The test of the Kelvin wedge runs at 0.37.
 
+#### SEA-04 finite screen and circular cylinder
+
+The production finite wake is checked against the Penney–Price thin-screen solution in the
+two-Fresnel-term form of Takayama and Kamiyama, and the MacCamy–Fuchs cylinder solution.
+The screen test compares complex elevation on both sides and launches a separate incident-only
+packet. The cylinder fixture uses the outgoing Hankel modes with coefficients
+`-J′ₙ(ka)/H′ₙ(ka)`. The spatial probes are fixed between grids and the open-water controls
+use the same input and sample times. No parameters come from the reference elevations.
+[Penney and Price, 1952](https://doi.org/10.1098/rsta.1952.0003)
+[Takayama and Kamiyama, 1977](https://www.pari.go.jp/en/1977/09/1977090160301.html)
+[MacCamy and Fuchs, 1954](https://usace.contentdm.oclc.org/digital/api/collection/p266001coll1/id/7401/download)
+
+#### SEA-04 uniform current, capillary restoring force and weak viscosity
+
+Each mode has vertical potential gradient `K = k tanh(k D)`, restoring coefficient
+`G = g + sigma k² / rho` and intrinsic frequency `sqrt(K G)`. Scott's 1981 tank study gives
+this dispersion relation and reports separately measured wavelengths, period, depth and
+surface tension. The uniform flow shifts the frequency by `k dot U`, following the
+intrinsic-frequency treatment of Bretherton and Garrett. The small-viscosity surface terms
+in Dias, Dyachenko and Zakharov give equal diagonal damping `2 nu k²` in height and potential.
+The specified viscosity applies those surface terms over finite depth, with a slip bed.
+[Scott, 1981](https://doi.org/10.1017/S0022112081002024)
+[Bretherton and Garrett, 1968](https://doi.org/10.1017/S0022112068002181)
+[Dias, Dyachenko and Zakharov, 2008](https://arxiv.org/abs/0704.3352)
+
+The optional step holds pressure fixed in the world over the tick. It integrates the pressure
+impulse exactly in each eigenbranch using the continuous limit of `(exp(z) - 1) / z`, where
+`z = dt (-2 nu k² - i (k dot U ± sqrt(K G)))`. The zero mode keeps the separate displaced
+volume ledger. The samples report the potential's velocity perturbation. Horizontal advection
+omits each unresolved even-grid Nyquist derivative to preserve real Fourier symmetry.
+`sea-wake-modes.test.js` covers resonant held pressure by independent Simpson integration,
+oblique wave phase and attenuation, and exact rerun and seek. At the seven measured
+100–200 ms periods that Scott groups together, the separately predicted wavelengths give
+1.30% relative RMS versus 22.36% for gravity alone. The wavelength precision was 0.4%.
+Scott reports faster observed propagation in these short-period tests, possibly from tank drift.
+No measured wavelength was used to choose the model inputs.
+
 ### The sea's surface and water (`@margoengine/physics/sea`, 2026-11-25, SEA-02)
 
 `packages/physics/src/sea/surface.ts` is written from:

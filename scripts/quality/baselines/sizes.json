@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21032396,
+  "total": 21033919,
   "history": [
     {
       "date": "2026-10-24",
@@ -14742,6 +14742,11 @@
       "commit": "e9d3c881cd",
       "reason": "@margoengine/vfx/smoke 3933 to 4343 B gzip (ceiling 4189 to 4599): KB-VFX-ROOFDOTS1, the gallery option (two wall obstacle boxes, the jet's direction mask and speed at the walls, births as wide as the layer and the option's checks). A second entry would have to copy the roof layer's node graph or rewrite the column's curves from outside",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-04-capillary-current-viscosity",
+      "reason": "@margoengine/physics/sea grows from 7859 to 9129 B gzip and its ceiling from 7880 to 9403 B. The optional modal step retains exact held-pressure forcing under uniform current, surface tension and viscosity. It uses the same source, water velocity and replay state as WakeSolver. Moving the modal step to a separate entry would still require loading and wiring it before the synchronous world setup. Core and stage are unchanged."
     }
   ],
   "items": {
@@ -15622,7 +15627,7 @@
     "@margoengine/physics/room-sound": 5606,
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
-    "@margoengine/physics/sea": 7880,
+    "@margoengine/physics/sea": 9403,
     "@margoengine/physics/seakeeping": 43883,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,

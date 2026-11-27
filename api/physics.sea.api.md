@@ -51,6 +51,9 @@ export interface WakeParams {
     cellSize?: number;
     centre?: readonly [number, number];
     depth?: number;
+    current?: readonly [number, number];
+    surfaceTension?: number;
+    kinematicViscosity?: number;
     density?: number;
     sponge?: number;
     rate?: RateLevel;

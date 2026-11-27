@@ -3543,6 +3543,31 @@ const [u] = wake.velocityAt(1, -0.5, 0); // the water half a metre down
 console.log(Math.abs(u + 0.1 * k * Math.sin(k) * Math.exp(-0.5 * k)) < 0.002); // true: -A k sin(k x) e^(k y)
 ```
 
+The optional `current` shifts propagation by the uniform horizontal flow in m/s. The wake samples
+wave velocity relative to that background, so a `SpectralSea` can still own the mean flow. Set
+`surfaceTension` in N/m for small waves and `kinematicViscosity` in m²/s for leading-order surface
+decay. Omit all three for the original gravity-only model.
+
+```ts
+import { WakeSolver } from 'margoengine/physics/sea';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const wake = new WakeSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wake, {
+  cells: [64, 32],
+  cellSize: 0.002,
+  depth: 0.04,
+  density: 998,
+  sponge: 0,
+  current: [0.08, 0],
+  surfaceTension: 0.073,
+  kinematicViscosity: 1e-6,
+  sources: (t) => t < 1 / 60 ? [{ x: 0, z: 0, radius: 0.005, pressure: 20, volume: 0 }] : [],
+});
+world.advance(12);
+console.log(Number.isFinite(wake.sample(0.02, 0).height));
+```
+
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
 
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.

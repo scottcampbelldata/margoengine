@@ -46,6 +46,7 @@ import type {
 } from '../world/solver.js';
 import { rateOf } from '../world/solver.js';
 import { regionWords } from '../world/memory.js';
+import { WakeModeStep } from './wake-modes.js';
 
 const PI = 3.141592653589793;
 const ORIGIN: Cell = [0, 0, 0];
@@ -81,6 +82,12 @@ export interface WakeParams {
   centre?: readonly [number, number];
   /** Still-water depth, m (default Infinity: deep water). */
   depth?: number;
+  /** Uniform horizontal current [x, z], m/s (default [0, 0]). The sample reports the wave's velocity perturbation. */
+  current?: readonly [number, number];
+  /** Surface tension, N/m (default 0). For clean room-temperature fresh water use about 0.073 N/m. */
+  surfaceTension?: number;
+  /** Kinematic viscosity, m²/s (default 0). Applies leading-order surface wave decay, without bottom friction. */
+  kinematicViscosity?: number;
   /** Density of the water, kg/m^3 (default 1025, sea water). */
   density?: number;
   /** Cells of the absorbing border on every side (default 16). */
@@ -144,6 +151,8 @@ export class WakeSolver implements Solver<WakeParams> {
   private sOver!: Float64Array;
   private sTimes!: Float64Array;
   private stepDt = 0;
+  private modeStep?: WakeModeStep;
+  private surfaceRise?: Region;
   private damp!: Float64Array;
   private press!: Float64Array;
   private patchGrid!: WakeSourceGrid;
@@ -196,6 +205,9 @@ export class WakeSolver implements Solver<WakeParams> {
       cellSize = 1,
       centre = [0, 0],
       depth = Infinity,
+      current = [0, 0],
+      surfaceTension = 0,
+      kinematicViscosity = 0,
       density = 1025,
       sponge = 16,
       rate = 0,
@@ -216,6 +228,12 @@ export class WakeSolver implements Solver<WakeParams> {
       if (!(value > 0)) throw new MargoError('state', `A wake's ${name} is above 0 (got ${value}); pass one.`);
     if (!(Number.isFinite(cellSize) && Number.isFinite(density)))
       throw new MargoError('state', 'A wake needs a finite cell size and density; pass them.');
+    if (!(current?.length === 2 && Number.isFinite(current[0]) && Number.isFinite(current[1])))
+      throw new MargoError('state', 'Pass a finite wake current [x, z] in m/s, or omit it for still water.');
+    if (!(surfaceTension >= 0 && Number.isFinite(surfaceTension)))
+      throw new MargoError('state', 'Set wake surfaceTension to a finite non-negative value in N/m.');
+    if (!(kinematicViscosity >= 0 && Number.isFinite(kinematicViscosity)))
+      throw new MargoError('state', 'Set wake kinematicViscosity to a finite non-negative value in m²/s.');
     if (!(centre?.length === 2 && Number.isFinite(centre[0]) && Number.isFinite(centre[1])))
       throw new MargoError('state', 'A wake grid needs a finite centre [x, z]; pass one.');
     if (!(Number.isInteger(sponge) && sponge >= 0 && 2 * sponge < Math.min(cells[0], cells[1])))
@@ -264,9 +282,24 @@ export class WakeSolver implements Solver<WakeParams> {
           e = k * depth > 20 || !(depth < Infinity) ? 0 : exp(-2 * k * depth);
         this.kk[i + half * j] = (k * (1 - e)) / (1 + e);
       }
-    this.c = new Float64Array(half * this.nz);
-    this.sOver = new Float64Array(half * this.nz);
-    this.sTimes = new Float64Array(half * this.nz);
+    if (current[0] || current[1] || surfaceTension || kinematicViscosity) {
+      this.modeStep = new WakeModeStep(
+        this.kk,
+        cells,
+        cellSize,
+        this.g,
+        density,
+        surfaceTension,
+        kinematicViscosity,
+        current,
+      );
+      this.factors(1 / rateOf(this.level));
+      if (!waterBelow) this.surfaceRise = host.allocate(`${this.id}:rise`, n * 8, 'f64', WAKE_LAYOUT);
+    } else {
+      this.c = new Float64Array(half * this.nz);
+      this.sOver = new Float64Array(half * this.nz);
+      this.sTimes = new Float64Array(half * this.nz);
+    }
     // The border's damping a second: a smooth ramp, 0 inside, rising to 3 s^-1 at the edge.
     this.damp = new Float64Array(n);
     for (let j = 0; j < this.nz; j++)
@@ -300,8 +333,24 @@ export class WakeSolver implements Solver<WakeParams> {
       for (let d = cellSize / 2; d < deepest; d *= 2) this.belowDepths.push(d);
       if (depth < Infinity) this.belowDepths.push(depth);
       this.below = host.allocate(`${this.id}:below`, this.belowDepths.length * 3 * n * 8, 'f64', WAKE_LAYOUT);
-      this.layers();
     }
+    this.updateWaterVelocity();
+  }
+
+  /** Retain the potential's vertical velocity for the configured wave model or its full depth layers. */
+  private updateWaterVelocity(): void {
+    if (this.below) this.layers();
+    if (!this.surfaceRise) return;
+    const memory = this.host.memory;
+    const phi = regionWords(memory, this.potential) as Float64Array;
+    const rise = regionWords(memory, this.surfaceRise) as Float64Array;
+    const spectrum = this.spectra[0];
+    this.fft.forward(phi, spectrum);
+    for (let m = 0; m < this.kk.length; m++) {
+      spectrum[2 * m]! *= this.kk[m]!;
+      spectrum[2 * m + 1]! *= this.kk[m]!;
+    }
+    this.fft.inverse(spectrum, rise);
   }
 
   /**
@@ -410,6 +459,11 @@ export class WakeSolver implements Solver<WakeParams> {
   /** The per-mode factors of a step of `dt` s, made once for each new dt. */
   private factors(dt: number): void {
     if (dt === this.stepDt) return;
+    if (this.modeStep) {
+      this.modeStep.prepare(dt);
+      this.stepDt = dt;
+      return;
+    }
     for (let m = 0; m < this.kk.length; m++) {
       const omega = Math.sqrt(this.g * this.kk[m]!),
         phase = omega * dt;
@@ -428,18 +482,15 @@ export class WakeSolver implements Solver<WakeParams> {
       previous = regionWords(memory, this.previous) as Float64Array,
       { nx, nz, press } = this,
       t = (context.tick + 0.5) / rateOf(context.level);
+    this.factors(dt);
     previous.set(h);
     press.fill(0);
     // Sources at the step's middle: each a raised-cosine patch of its pressure, and its volume spread over the same patch.
     for (const source of this.sources?.(t) ?? []) this.stamp(source, h);
     const sourcePort = this.sourceField && context.inputs.get(this.sourceField.name);
     if (sourcePort) this.stampField(sourcePort, context.cell, h);
-    this.factors(dt);
     const [H, P, F] = this.spectra,
-      fft = this.fft,
-      K = this.kk,
-      g = this.g,
-      level = 1 / (this.rho * g);
+      fft = this.fft;
     fft.forward(h, H);
     if (this.submergedSource) {
       const port = context.inputs.get(this.submergedSource.field.name);
@@ -447,6 +498,21 @@ export class WakeSolver implements Solver<WakeParams> {
     }
     fft.forward(phi, F);
     fft.forward(press, P);
+    if (this.modeStep) this.modeStep.advance(H, F, P);
+    else this.advanceGravityModes(H, F, P);
+    fft.inverse(H, h);
+    fft.inverse(F, phi);
+    for (let i = 0; i < nx * nz; i++) {
+      const keep = this.damp[i]! > 0 ? exp(-this.damp[i]! * dt) : 1;
+      h[i]! *= keep;
+      phi[i]! *= keep;
+    }
+    this.updateWaterVelocity();
+  }
+
+  private advanceGravityModes(H: Float64Array, F: Float64Array, P: Float64Array): void {
+    const K = this.kk;
+    const level = 1 / (this.rho * this.g);
     for (let m = 0; m < K.length; m++) {
       const re = 2 * m,
         im = re + 1;
@@ -468,14 +534,6 @@ export class WakeSolver implements Solver<WakeParams> {
         F[part] = pot * c - (lift * st) / k;
       }
     }
-    fft.inverse(H, h);
-    fft.inverse(F, phi);
-    for (let i = 0; i < nx * nz; i++) {
-      const keep = this.damp[i]! > 0 ? exp(-this.damp[i]! * dt) : 1;
-      h[i]! *= keep;
-      phi[i]! *= keep;
-    }
-    if (this.below) this.layers();
   }
 
   private stampField(port: Port, cell: Cell, height: Float64Array): void {
@@ -576,7 +634,14 @@ export class WakeSolver implements Solver<WakeParams> {
     s.slope[1] = (this.heightAt(h, x, z + dx) - this.heightAt(h, x, z - dx)) / (2 * dx);
     s.velocity[0] = blend((a, b) => ddx(phi, a, b));
     s.velocity[2] = blend((a, b) => ddz(phi, a, b));
-    s.velocity[1] = this.stepDt > 0 ? (s.height - this.heightAt(previous, x, z)) / this.stepDt : 0;
+    if (this.surfaceRise) {
+      s.velocity[1] = this.heightAt(regionWords(memory, this.surfaceRise) as Float64Array, x, z);
+    } else if (this.modeStep && this.below) {
+      const layers = regionWords(memory, this.below) as Float64Array;
+      s.velocity[1] = this.heightAt(layers.subarray(nx * nz), x, z);
+    } else {
+      s.velocity[1] = this.stepDt > 0 ? (s.height - this.heightAt(previous, x, z)) / this.stepDt : 0;
+    }
     return s;
   }
 
@@ -617,6 +682,7 @@ export class WakeSolver implements Solver<WakeParams> {
   }
 
   extraState(): readonly Region[] {
-    return this.below ? [this.previous, this.below] : [this.previous];
+    const velocity = this.below ?? this.surfaceRise;
+    return velocity ? [this.previous, velocity] : [this.previous];
   }
 }
