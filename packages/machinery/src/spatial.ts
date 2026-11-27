@@ -7,6 +7,7 @@ import { machineryMemory } from './runtime.js';
 import { holeAnchor, snapFeature, vertexAnchor, edgeAnchor } from './metrology.js';
 import { worldAnchor, type Anchor } from './anchors.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { posedVertices } from '../../shared/pose-source.js';
 /** A raycast hit: the mesh, its triangle index, the distance along the ray and the world-space point. */
 export interface RayHit {
   node: Mesh;
@@ -14,33 +15,75 @@ export interface RayHit {
   distance: number;
   point: Vec3;
 }
-/** The triangles of one distinct geometry: packed vertices with their `stride` (6 for core meshes, 20 for PBR primitives) and indices. */
+/**
+ * The triangles of one distinct geometry: packed vertices with their `stride` (6 for core meshes, 20 for PBR primitives)
+ * and indices. A primitive deformed on the GPU gives the CPU pose its deformer evaluates (packages/shared/pose-source.js)
+ * with that pose's `revision`, which changes whenever the pose is rewritten in place.
+ */
 interface TriangleRecord {
   vertices: Float32Array;
   indices: Uint32Array;
   stride: 6 | 20;
+  revision?: number;
 }
 function records(node: Mesh): TriangleRecord[] {
   const triangles = meshTriangles(node);
   if (!triangles) return [];
   if (triangles.kind === 'core')
     return [{ vertices: triangles.geometry.vertices, indices: triangles.geometry.indices, stride: 6 }];
-  if (triangles.source.primitives.some((primitive) => primitive.deformed))
-    throw new MargoError(
-      'unsupported',
-      'Deformed PBR mesh requires async Raycaster.intersectModel(model); AssemblyBVH accepts static triangles only.',
-    );
-  return triangles.source.primitives.map((primitive) => ({
-    vertices: primitive.vertices,
-    indices: primitive.indices,
-    stride: 20,
-  }));
+  return triangles.source.primitives.map((primitive) => {
+    if (!primitive.deformed) return { vertices: primitive.vertices, indices: primitive.indices, stride: 20 };
+    // The pose that is drawn (an Animation's skin or morph, a BatchedMesh's items), never the bind pose.
+    const pose = posedVertices(primitive);
+    if (!pose)
+      throw new MargoError(
+        'unsupported',
+        'This mesh is deformed on the GPU by a deformer that has no CPU pose, so AssemblyBVH cannot hold its triangles; await Raycaster.intersectModel(model) for its current pose.',
+      );
+    return { vertices: pose.vertices, indices: primitive.indices, stride: 20, revision: pose.revision };
+  });
+}
+/** Copies `record`'s triangles into the Wasm memory at `at` and builds their BVH there; returns their local box. */
+function buildShape(memory: Awaited<ReturnType<typeof machineryMemory>>, at: number, record: TriangleRecord): number[] {
+  const count = record.indices.length / 3,
+    triangles = new Float32Array(memory.buffer, at, count * 9),
+    v = record.vertices,
+    f = record.indices,
+    min = [Infinity, Infinity, Infinity],
+    max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < f.length; i++) {
+    const p = f[i] * record.stride;
+    for (let axis = 0; axis < 3; axis++) {
+      const value = v[p + axis];
+      triangles[i * 3 + axis] = value;
+      min[axis] = Math.min(min[axis], value);
+      max[axis] = Math.max(max[axis], value);
+    }
+  }
+  if (!memory.api.bvh_build(at, count))
+    throw new RangeError('BVH coordinates must be finite; fix the NaN or Infinity in the geometry or node transform.');
+  return [...min, ...max];
+}
+/** Writes node `n`'s local bounding sphere (centre, radius) into `bounds` from the local boxes of its shapes. */
+function shapeSphere(bounds: Float64Array, n: number, parts: readonly number[], boxes: readonly number[][]): void {
+  if (!parts.length) return;
+  const low = [Infinity, Infinity, Infinity],
+    high = [-Infinity, -Infinity, -Infinity];
+  for (const id of parts)
+    for (let a = 0; a < 3; a++) {
+      low[a] = Math.min(low[a], boxes[id][a]);
+      high[a] = Math.max(high[a], boxes[id][a + 3]);
+    }
+  for (let a = 0; a < 3; a++) bounds[n * 4 + a] = (low[a] + high[a]) / 2;
+  bounds[n * 4 + 3] = Math.hypot(...high.map((v, a) => (v - low[a]) / 2));
 }
 
 /**
  * Two-level picking for assemblies: one local-space Wasm triangle BVH per distinct geometry, shared by all its instances, under a per-part
  * bounding-sphere pass over world transforms. `rebuild()` is O(parts) and memory follows distinct triangles, so assemblies with millions of
  * instanced triangles fit. Create it with `await AssemblyBVH.create(nodes)`, call `rebuild()` after parts move, then `raycast(origin, direction)`.
+ * A part deformed on the GPU (an Animation, a BatchedMesh) is held at the CPU pose its deformer gives. A new pose is a
+ * move: `rebuild()` builds that geometry's BVH again, and a raycast or snap before it throws 'state'.
  */
 export class AssemblyBVH {
   private disposed = false;
@@ -61,6 +104,8 @@ export class AssemblyBVH {
     total: number,
     private readonly sources: readonly TriangleRecord[][],
     bounds: Float64Array,
+    private readonly unique: readonly TriangleRecord[],
+    private readonly boxes: number[][],
   ) {
     const n = nodes.length;
     this.triangles = new Float32Array(memory.buffer, memory.ptr, total * 26);
@@ -80,14 +125,11 @@ export class AssemblyBVH {
       }),
       unique: TriangleRecord[] = [],
       shape: number[][] = [],
-      bounds = new Float64Array(list.length * 4),
-      localBounds: number[][] = [];
+      bounds = new Float64Array(list.length * 4);
     const identities = new Map<Float32Array, number[]>();
     let total = 0;
     for (let n = 0; n < list.length; n++) {
-      const parts: number[] = [],
-        low = [Infinity, Infinity, Infinity],
-        high = [-Infinity, -Infinity, -Infinity];
+      const parts: number[] = [];
       for (const record of sources[n]) {
         const candidates = identities.get(record.vertices) ?? [];
         let id = candidates.find((id) => unique[id].indices === record.indices && unique[id].stride === record.stride);
@@ -97,56 +139,32 @@ export class AssemblyBVH {
           candidates.push(id);
           identities.set(record.vertices, candidates);
           total += record.indices.length / 3;
-          const min = [Infinity, Infinity, Infinity],
-            max = [-Infinity, -Infinity, -Infinity];
-          for (const index of record.indices)
-            for (let axis = 0; axis < 3; axis++) {
-              const v = record.vertices[index * record.stride + axis];
-              min[axis] = Math.min(min[axis], v);
-              max[axis] = Math.max(max[axis], v);
-            }
-          localBounds.push([...min, ...max]);
         }
         parts.push(id);
-        const b = localBounds[id];
-        for (let a = 0; a < 3; a++) {
-          low[a] = Math.min(low[a], b[a]);
-          high[a] = Math.max(high[a], b[a + 3]);
-        }
       }
       shape.push(parts);
-      if (parts.length) {
-        for (let a = 0; a < 3; a++) bounds[n * 4 + a] = (low[a] + high[a]) / 2;
-        bounds[n * 4 + 3] = Math.hypot(...high.map((v, a) => (v - low[a]) / 2));
-      }
     }
     if (!total || total > 1_000_000) throw new RangeError('BVH requires 1..1000000 triangles');
     const memory = await machineryMemory(total * 104 + 16),
-      shapes: { ptr: number; count: number }[] = [];
+      shapes: { ptr: number; count: number }[] = [],
+      boxes: number[][] = [];
     let at = memory.ptr;
     for (const geometry of unique) {
-      const count = geometry.indices.length / 3,
-        triangles = new Float32Array(memory.buffer, at, count * 9),
-        v = geometry.vertices,
-        f = geometry.indices;
-      for (let i = 0; i < f.length; i++) {
-        const p = f[i] * geometry.stride;
-        triangles[i * 3] = v[p];
-        triangles[i * 3 + 1] = v[p + 1];
-        triangles[i * 3 + 2] = v[p + 2];
-      }
-      if (!memory.api.bvh_build(at, count))
-        throw new RangeError(
-          'BVH coordinates must be finite; fix the NaN or Infinity in the geometry or node transform.',
-        );
+      const count = geometry.indices.length / 3;
+      boxes.push(buildShape(memory, at, geometry));
       shapes.push({ ptr: at, count });
       at += count * 104;
     }
-    const index = new AssemblyBVH(list, shapes, memory, shape, total, sources, bounds);
+    for (let n = 0; n < list.length; n++) shapeSphere(bounds, n, shape[n], boxes);
+    const index = new AssemblyBVH(list, shapes, memory, shape, total, sources, bounds, unique, boxes);
     index.rebuild();
     return index;
   }
-  private checkSource(index: number): void {
+  /**
+   * Throws 'state' when node `index`'s geometry is not the one the BVH was built from, and returns its current records:
+   * a posed record whose `revision` differs from its shape's has moved since the last rebuild.
+   */
+  private checkSource(index: number): TriangleRecord[] {
     const node = this.nodes[index];
     node.check();
     const current = records(node),
@@ -161,15 +179,37 @@ export class AssemblyBVH {
       )
     )
       throw new MargoError('state', 'Geometry changed since the BVH was built; create a new AssemblyBVH.');
+    return current;
+  }
+  /** checkSource, and 'state' when a part's pose changed since the last rebuild: a query never tests an old pose. */
+  private checkPose(index: number): void {
+    const parts = this.shape[index];
+    if (this.checkSource(index).some((value, at) => value.revision !== this.unique[parts[at]].revision))
+      throw new MargoError('state', 'BVH is stale; call rebuild() before raycasting.');
   }
   rebuild(): void {
     if (this.disposed) throw new MargoError('disposed', 'BVH is disposed; create a new AssemblyBVH.');
     this.valid = false;
-    const s = this.spheres;
+    const s = this.spheres,
+      moved = new Set<number>();
+    // A posed part whose pose changed: its shape's BVH is built again in place (the same triangles at new positions).
+    for (let n = 0; n < this.nodes.length; n++) {
+      const current = this.checkSource(n);
+      for (let at = 0; at < current.length; at++) {
+        const id = this.shape[n][at],
+          record = this.unique[id];
+        if (current[at].revision === record.revision || moved.has(id)) continue;
+        this.boxes[id] = buildShape(this.memory, this.shapes[id].ptr, record);
+        record.revision = current[at].revision;
+        moved.add(id);
+      }
+    }
+    if (moved.size)
+      for (let n = 0; n < this.nodes.length; n++)
+        if (this.shape[n].some((id) => moved.has(id))) shapeSphere(this.bounds, n, this.shape[n], this.boxes);
     for (let n = 0; n < this.nodes.length; n++) {
       const node = this.nodes[n],
         runtime = meshRuntime(node);
-      this.checkSource(n);
       s[n * 4 + 3] = -1;
       if (!this.shape[n].length) continue;
       if (hiddenInTree(runtime.engine.store, runtime.id)) continue;
@@ -243,7 +283,7 @@ export class AssemblyBVH {
     let candidates = 0;
     // ponytail: linear sphere pass, about 0.5 ms per ray at 100k parts; add a top-level BVH over spheres if hover picking needs more.
     for (let n = 0; n < this.nodes.length; n++) {
-      this.checkSource(n);
+      this.checkPose(n);
       const r = s[n * 4 + 3];
       if (r < 0) continue;
       const cx = s[n * 4] - ox,
@@ -293,7 +333,7 @@ export class AssemblyBVH {
     }
     if (node < 0) return null;
     const hit = this.nodes[node];
-    this.checkSource(node);
+    this.checkPose(node);
     return { node: hit, triangle, distance: best, point: [ox + ux * best, oy + uy * best, oz + uz * best] };
   }
   /**
@@ -321,7 +361,7 @@ export class AssemblyBVH {
         'Snap needs a live hit from this BVH, kind vertex, edge or centerline, and a maxDistance of 0 or more; pass a hit from raycast().',
       );
     const nodeIndex = this.nodes.indexOf(hit.node);
-    this.checkSource(nodeIndex);
+    this.checkPose(nodeIndex);
     let face = hit.triangle,
       geometry: TriangleRecord | undefined;
     for (const part of this.sources[nodeIndex]) {

@@ -1990,7 +1990,8 @@ shadow cascade, however many items it holds. Each item has its own matrix, colou
 and visibility. Items are copied into shared vertex and index ranges once; moving, tinting or hiding one uploads 20
 floats and reruns a compute pass over the used vertices on the next frame (an unchanged batch costs nothing). Removed
 items' space is reused by later items that fit. `batch.mesh` takes `shadows.add`, `clustered.add`, `ssao.add` and
-picking like any `createMesh` mesh; `batch.itemOf(vertex)` maps a hit vertex back to its item and `batch.bounds(id)`
+picking like any `createMesh` mesh, synchronous `Raycaster` queries and `AssemblyBVH` included (the batch gives them its
+items' pose on the CPU, the compute pass's arithmetic); `batch.itemOf(vertex)` maps a hit vertex back to its item and `batch.bounds(id)`
 gives an item's world box (`batch.boundsInto(out, id)` writes it into your array). Every item is its own copy of its geometry: for many copies of one geometry use
 `createInstancedMesh`. On the RTX A6000, 10,000 distinct boxes cost 36.8 ms of CPU per frame as one mesh each and
 0.13 ms as one batch (`npm run bench -- scaling --cases=shapes`). WebGPU only.

@@ -1224,7 +1224,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Owed:** the player's weights on the CPU on demand (its shader is `sampleTrackInto` term for term), handed to the
   CPU pose, and the last sampled weights kept at `remove`.
 
-### Open 2026-11-26: a synchronous raycast refuses a BatchedMesh, and AssemblyBVH refuses every deformed mesh (KB-BVH-SYNCPOSE-BATCHED1, materials, machinery)
+### Fixed 2026-11-27: a synchronous raycast refused a BatchedMesh, and AssemblyBVH refused every deformed mesh (KB-BVH-SYNCPOSE-BATCHED1, materials, machinery)
 
 - **Repro:** `BatchedMesh.attach(engine, material, {...})`, add an item, then `raycaster.intersectObjects(engine, [batch.mesh])`:
   MargoError `unsupported`. And `AssemblyBVH` of `@margoengine/machinery` over any mesh under GPU deformation, an
@@ -1232,8 +1232,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `BatchedMesh` places its items in a compute pass and registers no CPU pose
   (`packages/shared/pose-source.js`), though its item matrices and source vertices are on the CPU. `AssemblyBVH` reads
   `primitive.vertices` itself and refuses when `deformed` is set; it does not ask for the CPU pose.
-- **Owed:** a pose source in `BatchedMesh` (each item's vertices through its matrix, hidden items collapsed as the
-  pass does) and `AssemblyBVH` reading `posedVertices`, each with its test.
+- **Fix:** `BatchedMesh` registers a CPU pose source while its compute pass writes the primitive
+  (`packages/materials/src/batched.ts`): `batchShader`'s arithmetic term for term (position through the item matrix,
+  normal through its cofactor columns times the handedness, tangent w flipped on a mirror, colour times the tint, hidden
+  and free slots collapsed to the origin), evaluated on demand once per change into one array. `AssemblyBVH` reads
+  `posedVertices` for a deformed primitive and refuses only a deformer with no CPU pose; a new pose revision is a move:
+  `rebuild()` builds that geometry's BVH again in place and refits the part spheres, and a raycast or snap before it
+  throws 'state' (`packages/machinery/src/spatial.ts`).
+- **Regression:** `packages/materials/tests/batched.test.js` (a synchronous raycast hits items where their matrices
+  draw them, misses moved, hidden and removed items; the pose of a mirrored, stretched, tinted item term for term) and
+  `packages/machinery/test/runtime.test.js` (an AssemblyBVH holds a deformed part at its pose, throws 'state' on a new
+  pose and hits it after `rebuild()`); all three fail on the parent.
+- **Not covered:** the pose against the GPU's own output was not read back on a device (the pass is unchanged, and the
+  CPU twin is in float64 rounded to float32, as `Animation`'s is).
 
 ### Fixed 2026-11-26: the waterline of a flowing sea on a beach drew a sawtooth (KB-WATER-SHORESAW1, water)
 
