@@ -75,14 +75,14 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
-- **SEA-12 — RESOLVED in `8329f46c3d`.** `PhysicsWorld.shiftOrigin` validates and moves both retained mirrors
+- **SEA-12 — RESOLVED in `13b6c14dd0`.** `PhysicsWorld.shiftOrigin` validates and moves both retained mirrors
   with the solver cells, preserving ticks, rates and payloads. `SolverHost.cell` exposes the live cell between steps.
   `world.test.js` keeps the staggered reader's separation at 1.5 m. The coupled swimmer and shallow water replay
   the shifted state in `loads-swim-actuators.test.js`.
-- **SEA-12 — RESOLVED in `8329f46c3d`.** `RigidSolver` publishes effective per-axis mobility alongside the
+- **SEA-12 — RESOLVED in `13b6c14dd0`.** `RigidSolver` publishes effective per-axis mobility alongside the
   existing `bodies` layout. `world-rigid-solver.test.js` compares the new values with an impulse in each axis
   and held torque. KB-LOADS-INITIALCOM covers the rotated body's eccentric centre before the first step.
-- **SEA-12 — RESOLVED in `8329f46c3d`.** The registry reserves accumulator sums at first publication.
+- **SEA-12 — RESOLVED in `13b6c14dd0`.** The registry reserves accumulator sums at first publication.
   `world-frame-zero-accumulator.test.js` covers `bodyForces` and `bodyImpulses`. The Flood browser test
   replays frame zero with live buoyancy on WebGPU and WebGL2.
 

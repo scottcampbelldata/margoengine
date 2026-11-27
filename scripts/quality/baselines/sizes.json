@@ -14356,7 +14356,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "8329f46c3d",
+      "commit": "13b6c14dd0",
       "grew": 4,
       "reason": "@margoengine/physics/world: 16826 → 17627 B gzip, ceiling 17331 → 18156. @margoengine/physics/loads: 42369 → 42849 B gzip, ceiling 42795 → 44135. @margoengine/physics: 915808 → 918308 B gzip, ceiling 916741 → 945858. @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)): 93554 → 95899 B gzip, ceiling 95086 → 98776. The previous receipts predate the current main's winding-number mesh mass changes. SEA-12 retains origin metadata and accumulator shapes where the world owns them, and publishes effective response alongside the rigid state. The measured lazy kernel is 822307 B against the 847035 B ceiling. Splitting world logic into a new entry would add a required import to every coupled scene."
     }
