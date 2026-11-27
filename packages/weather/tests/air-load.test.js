@@ -38,7 +38,7 @@ import {
   sunTransmittance,
   visibility,
 } from '../dist/index.js';
-import { WeatherDrive } from '../dist/drive.js';
+import { WeatherDrive, driveSettings } from '../dist/drive.js';
 import { Eruption } from '../dist/eruption.js';
 import { WEATHER_LOOKS, WEATHER_SETTINGS, applyWeatherSettings, weatherStateOf } from '../dist/settings.js';
 
@@ -741,4 +741,35 @@ test("the drive writes its haze's reflectance on each front's smoke with the air
   plain.radiantPower = 0;
   drive.update(0);
   assert.equal(front.airReflectance, undefined, 'no light, no reflectance');
+});
+
+// KB-WEATHER-FIRESIGHT1: the drive wrote `fireSight` = 2 / extinction, "the sky fog's 2 / density", but an 'exp2' sky
+// fog takes extinction / sqrt(3) (timber valley: a 1,142 m sight against its fog's 1,978 m fire track), so a low ray
+// stopped the lit layer short of the haze's own light. The sight is now 2 / the density the sky fog has, any falloff.
+test("the fires' sight is the sky fog's own 2 / density, for 'exp2' and 'exp' alike", () => {
+  for (const falloff of [undefined, 'exp2', 'exp']) {
+    const sky = {
+        name: 'sky',
+        options: { lighting: { intensity: 2 }, fog: falloff ? { falloff } : {} },
+        sun: new Float32Array([0, -0.4, 0.9]),
+        airControls: true,
+      },
+      front = {
+        options: {},
+        smokeEmission: 0,
+        radiantPower: 5e9,
+        segments: () => [{ x: 0, y: 40, z: 0, heat: 1e9 }],
+      },
+      machine = new WeatherMachine('clear', { seed: 8 }),
+      engine = engineOf(sky),
+      drive = WeatherDrive.attach(engine, { weather: machine, advance: false, fires: [front], smokeFromFire: false });
+    drive.setup(engine);
+    applyWeatherSettings(machine, { smoke: 0.6 });
+    drive.update(0);
+    const fog = sky.options.fog,
+      a = sky.options.atmosphere,
+      s = driveSettings(machine.state);
+    assert.ok(Math.abs(fog.density - Math.min(1, falloff === 'exp' ? s.extinction : s.squaredDensity)) < 1e-12);
+    assert.ok(Math.abs(a.fireSight - 2 / fog.density) <= 1e-9 * a.fireSight, `${falloff}: ${a.fireSight}`);
+  }
 });

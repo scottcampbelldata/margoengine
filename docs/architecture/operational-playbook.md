@@ -10451,7 +10451,9 @@ isotropic view factors (1 + n_y) / 2 and (1 - n_y) / 2 (Liu and Jordan 1963; Mea
 `hazeReflectance`), each mean kept. The lit uniform grows from 96 to 128 bytes (`air`, `airBack`; the ground albedo in
 `ambient.w`). Evidence: `features-check.mjs` `checkLit` on an RTX A6000, WebGPU and `MARGO_COMPAT=1`, 1x and 4x, every
 third pixel within 1.13/255 of the CPU split; `lit-check.mjs` unchanged on both; timber-valley ridge-smoke early flat
-7.60 to 2.45 percent. Missing: self-shadowing inside a column, per-puff noise, timing.
+7.60 to 2.45 percent. Missing: self-shadowing inside a column, per-puff noise, timing. The same day the drive's
+`atmosphere.fireSight` became 2 / the sky fog's own density (KB-WEATHER-FIRESIGHT1), matching the fog's fire track
+under an `'exp2'` fog.
 
 ## Overcast deck on the sky cloud sheet (KB-SKY-OVERCAST1, section 5 evidence, 2026-11-17)
 

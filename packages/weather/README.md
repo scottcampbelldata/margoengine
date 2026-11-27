@@ -1220,7 +1220,7 @@ console.log(red < green && green < blue, green.toFixed(2));
   `fireLayerLight(power, spread, distance)` is the light of an isotropic source's upward half on a plane 1 km up,
   P h / (4 pi (h^2 + s^2 + r^2)^1.5) as a share of the noon sun (the cosine law over the squared distance, Modest,
   "Radiative Heat Transfer", 2013), whose mean over the box's disc is `fireHazeLight`. The drive writes the sky's
-  `atmosphere.fireSpots` (that light times `hazeReflectance(state)`), `atmosphere.fireSight` (2 / extinction) and
+  `atmosphere.fireSpots` (that light times `hazeReflectance(state)`), `atmosphere.fireSight` (2 / the sky fog's density, or 2 / extinction with no fog) and
   `fog.fireSpots` (that light in the haze's own colour). They are cleared as the other values are.
 
 ```js

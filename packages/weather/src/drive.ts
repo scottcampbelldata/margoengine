@@ -817,7 +817,16 @@ export class WeatherDrive {
           spots,
         );
       }
-      this.dimSun(skyTarget, state, fireLight, spots, s.extinction);
+      // The sky fog's own density sets how far a low ray sees the lit layer (KB-WEATHER-FIRESIGHT1): an 'exp2' fog
+      // takes extinction / sqrt(3), so 2 / extinction stopped the layer short of the haze's own track.
+      const skyFog = sky.fog?.density;
+      this.dimSun(
+        skyTarget,
+        state,
+        fireLight,
+        spots,
+        typeof skyFog === 'number' && skyFog > 0 ? skyFog : s.extinction,
+      );
     }
     const grounds =
       o.grounds !== undefined
@@ -1162,7 +1171,7 @@ export class WeatherDrive {
     state: WeatherState,
     fire?: readonly number[],
     spots: readonly Spot[] = [],
-    extinction = 0,
+    density = 0,
   ): void {
     const o = sky.options,
       loaded = state.smoke > 0 || state.ash > 0 || state.spray > 0;
@@ -1183,8 +1192,9 @@ export class WeatherDrive {
         reach,
       })),
     );
-    // A low ray sees the lit layer as far across as the haze's light comes from (the sky fog's 2 / density).
-    this.writeSight(atm, loaded && spots.length && extinction > 0 ? Math.min(1e6, 2 / extinction) : undefined);
+    // A low ray sees the lit layer as far across as the haze's light comes from: the sky fog's 2 / density, the length
+    // of its own fire track (`fog.ts`), or 2 / extinction with no fog.
+    this.writeSight(atm, loaded && spots.length && density > 0 ? Math.min(1e6, 2 / density) : undefined);
     if (heldFromWeather(atm, 'sunColor')) return;
     const record = this.sunColors.get(atm);
     if (loaded) {

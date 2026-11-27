@@ -122,6 +122,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `node packages/vfx/test/features-check.mjs` (every third pixel of the ball against the split, at the defaults and at
   given values, 1x and 4x MSAA, WebGPU and `MARGO_COMPAT=1`).
 
+### Fixed 2026-11-27: the fires' layer glow stopped short of the haze's own light under an exp2 sky fog (KB-WEATHER-FIRESIGHT1, weather)
+
+- **Repro:** timber valley under smoke: `WeatherDrive` wrote `atmosphere.fireSight` 1,142 m while the sky fog's own
+  fire track (`fog.ts`, 2 / density) ran 1,978 m.
+- **Cause:** the drive wrote `2 / extinction` for "the sky fog's 2 / density", but it gives an `'exp2'` sky fog (the
+  default falloff) the density `extinction / sqrt(3)`, so the two differed by sqrt(3); only an `'exp'` fog matched.
+- **Fix:** the sight is `2 /` the density the sky fog has (`packages/weather/src/drive.ts`), or `2 / extinction` with
+  no fog.
+- **Regression:** `packages/weather/tests/air-load.test.js` ("the fires' sight is the sky fog's own 2 / density").
+
 ### Fixed 2026-11-27: booleans refused a solid holding a triangle with no area (KB-BOOL-FLAT1, mesh-edit)
 
 - **Repro:** `batchBooleanMeshes` on a closed box with one edge split on one side and closed by a triangle whose
