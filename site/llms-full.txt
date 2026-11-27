@@ -15977,14 +15977,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   albedo, the wave's smooth normal and a 0.95 cover, so dense foam had one radiance (0.72 L under a uniform sky of
   radiance L); and the sky term was added only while `whitecaps` was above 0, so other foam had the scene's ambient alone.
 - **Fix:** foam is a multiple-scattering bubble layer lit from above (foamLight): the sky's cosine-weighted radiance
-  lights every kind of foam; its reflectance is a two-stream layer over dark water, up to 0.84 to 0.87 for a deep layer
-  (Kokhanovsky 2004, Frouin et al. 1996) and greyer where thin, toward measured whitecaps (Whitlock et al. 1982, Koepke
-  1984, Dierssen 2019); the bore's lumps turn its normal, hollows see less sky, the sun wraps round the lumps, and the
-  relief fades where a pixel covers a lump. Dense foam is opaque (cover 1).
+  lights every kind of foam; dense foam reflects 0.84 to 0.87, a deep layer's value (Kokhanovsky 2004, Frouin et al.
+  1996), and sparse foam is a thinner two-stream layer under its cover over the dark water, toward measured whitecaps
+  (Whitlock et al. 1982, Koepke 1984, Dierssen 2019); the bore's lumps turn its normal for the sky and the sun, hollows
+  see less sky, and the relief fades where a pixel covers a lump. Dense foam is opaque (cover 1).
 - **Regression:** `packages/water/test/whitewater-light.browser.mjs` (WebGPU and the WebGL2 layer), from straight
   above under a uniform grey HDR sky with no sun or ambient: dense whitecap foam's brightest twentieth was 0.725 L with a
-  variation of 0.003, now 0.84 L (at most 0.845 L) with 0.096; surf foam with no whitecaps was 0 against water at 0.0006,
-  now 0.34 with a variation of 0.10.
+  variation of 0.003, now 0.86 L with 0.061; surf foam with no whitecaps was 0 against water at 0.0006, now 0.36
+  with a variation of 0.064. whitecaps.browser.mjs keeps its caps crisp and soft-edged (30.6% and 40.1%, parent 31.0%
+  and 40.4%) and whitecap-coverage its counts.
 - **Judged:** a fresh s18 still: the near roller shows bright lumps and grey hollows and reads as foam over the smooth
   reflection. Left: the lumps are drifting noise, not advected with the roller; the water's sky (the clear Bruneton map
   under the scene's volumetric deck) is bluer than the overcast seen above it, which tints foam and reflection alike.

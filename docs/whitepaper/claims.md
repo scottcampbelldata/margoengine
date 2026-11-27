@@ -5949,6 +5949,12 @@ shader swings the breaker index along each crest in short-crested sections and g
 differ only in shader module text; every other call and argument is the same. packages/water/test/surf-crests.browser.mjs
 holds the claim. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
+Proof capture (2026-11-26, KB-WATER-WHITEWATERLIGHT1): the water-ssr --current proof advances to 09adac4901, whose surface
+shader lights foam as a bubble layer (foamLight: sky light for every kind of foam, a two-stream layer reflectance, lumps
+and hollows, a wrapped sun). The call logs differ only in shader module text; every other call and argument is the
+same. packages/water/test/whitewater-light.browser.mjs holds the claim. Reproduce with
+`node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.

@@ -11,7 +11,7 @@ import { refs, versions, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
 // The current stories include the wind-wave filtering and sky reflection shader changes.
-const { ref, pin } = refs('6c20076d', '49f3e971', '3424ada843');
+const { ref, pin } = refs('6c20076d', '49f3e971', '09adac4901');
 await coreAt(pin); // water imports core's extension entry: in a pinned run, core as it was at the pin
 const { baseline, candidate } = await versions('water', ref, undefined, pin);
 
