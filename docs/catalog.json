@@ -1380,6 +1380,7 @@
       "grassWind",
       "hailSettings",
       "hazeLight",
+      "hazeReflectance",
       "isPresetName",
       "rainRate",
       "resolveState",

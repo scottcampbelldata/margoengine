@@ -107,8 +107,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   Over 60 ticks the free rigid hull lost 451.938 J while the wake gained 226.089 J with feedback enabled.
 - **Cause:** The triangle pressure uses the local surface rise through depth. The projected volume uses a
   finite-depth modal transfer and normalized grid support. The pressure return is not the adjoint of that
-  source. The prescribed work meter and its live energy regression account for the source kick. Free hull
-  reaction and original-shot verification remain open.
+  source. The prescribed work meter and the opt-in guided surge coupling match the kick in their tested
+  ranges. The conventional arbitrary-motion return pressure and original-shot verification remain open.
 
 ### Open 2026-11-27: First Wake’s authored stern sweeps into the quay (KB-LOADS-FIRSTWAKEQUAY, First Wake)
 

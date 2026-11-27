@@ -10514,6 +10514,15 @@ The granular-flow entry is 5,965 B gzip under a 6,221 B ceiling. The plain SIMD 
 
 The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and Stage gain zero bytes.
 
+### Matched hull wake work (SEA-12)
+
+`SurgeWakeCoupling` adds the projected wake reaction to a free hull with only one horizontal translation
+  unlocked. Run it at 60 Hz in calm, constant-depth water on an upright fixed-draft mesh with no other
+  surge loads. Use an ambient-only sea for other hull hydrodynamics. The receiving wake is periodic and
+  reads only this source, with no sponge. The entire source footprint must stay inside the grid. The
+  impulse pairs with the same submerged volume operator in the wake. A stationary hull can take energy
+  from existing waves. A freely turning, heaving or rolling hull requires its own matched modes.
+
 ### Prescribed hull wake work (SEA-12)
 
 `PrescribedWakeWork` accounts for a single receiving wake’s submerged volume source at 60 Hz. Grid size, depth,
@@ -10521,7 +10530,7 @@ The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and
   Excludes separate pressure and height forcing, downstream sponge loss and other rigid or actuator work.
   Set `mirrored` only on a symmetric straight-quay grid with mirrored state and forcing. The ledger uses one
   forward transform per occupied depth band and one inverse transform on an active tick. The loads entry
-  measures 46,812 B gzip.
+  measures 49,181 B gzip with both wake work paths.
 
 ### Straight quay reflection and spray (SEA-12)
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20827087,
+  "total": 20829527,
   "history": [
     {
       "date": "2026-10-24",
@@ -14425,6 +14425,12 @@
       "commit": "SEA-12 prescribed hull work",
       "grew": 1,
       "reason": "@margoengine/physics/loads 44,592 to 46,812 B gzip. The prescribed wake loads meter reuses the projected volume operator to account for actuator work, including at a symmetric quay. Coupled applications already import loads and the wake. A separate entry would add another import for the same source. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "SEA-12 matched hull wake work",
+      "grew": 1,
+      "reason": "@margoengine/physics/loads 44,592 to 49,181 B gzip. The optional entry includes the shared depth projection, prescribed wake-work ledger and matched free-surge impulse for body and water. Both paths use the same source geometry as the coupled wake. A split would add another import for deployments that already load the hydrodynamic package. Core and stage are unchanged."
     }
   ],
   "items": {
@@ -15281,7 +15287,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 48217,
+    "@margoengine/physics/loads": 50657,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,

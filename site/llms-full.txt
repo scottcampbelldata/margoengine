@@ -15158,6 +15158,24 @@ The granular-flow entry is 5,965 B gzip under a 6,221 B ceiling. The plain SIMD 
 
 The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and Stage gain zero bytes.
 
+### Matched hull wake work (SEA-12)
+
+`SurgeWakeCoupling` adds the projected wake reaction to a free hull with only one horizontal translation
+  unlocked. Run it at 60 Hz in calm, constant-depth water on an upright fixed-draft mesh with no other
+  surge loads. Use an ambient-only sea for other hull hydrodynamics. The receiving wake is periodic and
+  reads only this source, with no sponge. The entire source footprint must stay inside the grid. The
+  impulse pairs with the same submerged volume operator in the wake. A stationary hull can take energy
+  from existing waves. A freely turning, heaving or rolling hull requires its own matched modes.
+
+### Prescribed hull wake work (SEA-12)
+
+`PrescribedWakeWork` accounts for a single receiving wake’s submerged volume source at 60 Hz. Grid size, depth,
+  density and pose cell match WakeSolver. Add the source before the meter and the receiving wake after it.
+  Excludes separate pressure and height forcing, downstream sponge loss and other rigid or actuator work.
+  Set `mirrored` only on a symmetric straight-quay grid with mirrored state and forcing. The ledger uses one
+  forward transform per occupied depth band and one inverse transform on an active tick. The loads entry
+  measures 49,181 B gzip with both wake work paths.
+
 ### Straight quay reflection and spray (SEA-12)
 
 `QuayWakeBoundary` mirrors both hull source layouts about a vertical wall parallel to X. The +Z half is wet.
@@ -15512,6 +15530,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/physics/tests/world.test.js` checks both mirrors and atomic rejection of a retained-cell
   overflow. `packages/physics/tests/coupling/loads-swim-actuators.test.js` checks paired water and body impulses
   against the unshifted swimmer and verifies exact replay.
+
+### Open 2026-11-27: the ordinary hull wake pressure and projected volume do different work (KB-LOADS-WAKEWORK, physics loads)
+
+- **Repro:** In a periodic 48 × 32 finite-depth wake, drive a 2 × 1 × 1 m box (draft 0.5 m) at 1.25 m/s.
+  Over 60 ticks the free rigid hull lost 451.938 J while the wake gained 226.089 J with feedback enabled.
+- **Cause:** The triangle pressure uses the local surface rise through depth. The projected volume uses a
+  finite-depth modal transfer and normalized grid support. The pressure return is not the adjoint of that
+  source. The prescribed work meter and the opt-in guided surge coupling match the kick in their tested
+  ranges. The conventional arbitrary-motion return pressure and original-shot verification remain open.
 
 ### Open 2026-11-27: First Wake’s authored stern sweeps into the quay (KB-LOADS-FIRSTWAKEQUAY, First Wake)
 

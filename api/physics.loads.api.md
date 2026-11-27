@@ -306,6 +306,29 @@ export interface MemberLoad {
     lift: number;
 }
 
+export class PrescribedWakeWork implements Solver<undefined> {
+    readonly id: string;
+    constructor(options: PrescribedWakeWorkOptions, id?: string);
+    wakeParams(options?: Pick<WakeParams, 'initial' | 'sponge' | 'waterBelow'>): WakeParams;
+    work(): {
+        step: number;
+        total: number;
+    };
+    describe(): SolverDescription;
+    init(host: SolverHost): void;
+    step({ inputs, tick, cell }: StepContext): void;
+    exportPorts(): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface PrescribedWakeWorkOptions {
+    readonly source: SubmergedWakeSource;
+    readonly grid: WakeGrid;
+    readonly mirrored?: boolean;
+}
+
 export interface QuayPoint {
     position: [number, number];
     height: number;
@@ -424,6 +447,35 @@ export interface SegmentState {
     readonly angularVelocity: readonly [number, number, number];
     readonly diameter: number;
     readonly length: number;
+}
+
+export class SurgeWakeCoupling implements Solver<undefined> {
+    readonly id: string;
+    readonly submergedSource: SubmergedWakeSource;
+    constructor(options: SurgeWakeOptions, id?: string);
+    wakeParams({ initial, waterBelow }?: Pick<WakeParams, 'initial' | 'waterBelow'>): WakeParams;
+    describe(): SolverDescription;
+    init(host: SolverHost): void;
+    step(context: StepContext, dt: number): void;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface SurgeWakeOptions {
+    readonly row: number;
+    readonly mesh: HullMesh;
+    readonly waterline: number;
+    readonly depths: readonly number[];
+    readonly depth: number;
+    readonly density?: number;
+    readonly cells: readonly [number, number];
+    readonly cellSize: number;
+    readonly centre?: readonly [number, number];
+    readonly axis?: 'x' | 'z';
+    readonly stations?: number;
+    readonly minimumRadius?: number;
 }
 
 export interface SwayOptions {
@@ -761,6 +813,8 @@ type Vector = readonly [number, number, number];
 type Vector = readonly [number, number, number];
 
 type Vector = readonly [number, number, number];
+
+type WakeGrid = Readonly<Required<Pick<WakeParams, 'cells' | 'cellSize' | 'centre' | 'depth' | 'density'>>>;
 
 interface WakeParams {
     cells?: readonly [number, number];

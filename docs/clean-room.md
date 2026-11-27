@@ -17612,6 +17612,12 @@ impermeable quay the image domain has equal energy on either side, so the wet do
 The test separately reads the live potential and computes its energy with the finite-depth modes k tanh(kD).
 [Zakharov](https://zakharov75.itp.ac.ru/static/local/zve75/zakharov/1968/1968-03-art3A10.10072FBF00913182.pdf)
 
+For free surge, take the transpose of the same displacement operator in the wave-energy pairing. Acting on
+the hull with an opposite impulse evaluated at the midpoint exactly balances the rigid kinetic energy
+for that same step. Bao, Donev, Griffith, McQueen and Peskin (2017), §2, provide the discrete adjoint
+principle for reciprocal fluid–body work. Cooper (1987) derives the preservation of quadratic invariants
+by implicit midpoint. [Bao et al.](https://arxiv.org/abs/1701.07169) · [Cooper](https://doi.org/10.1093/imanum/7.1.1)
+
 ### SEA-12 wake reflection at a straight quay
 
 Un-Ryong Rim, Jun-Bom Ko, Chol-Jun Han and Fuad-Mahfud Assidiq, *An Exact Neumann-to-Dirichlet (NtD) Boundary
