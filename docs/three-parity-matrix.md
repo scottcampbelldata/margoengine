@@ -1,7 +1,7 @@
 # Reading the three.js parity counts
 
 Date: 2026-11-24. The table in [threejs-parity.md](threejs-parity.md) was rewritten by feature group on 2026-10-31 and
-recounted on 2026-11-26: **195 features, 189 COVERED, 3 PARTIAL, 0 MISSING**, plus 3 NOT PLANNED by decision. The earlier table
+recounted on 2026-11-27: **195 features, 189 COVERED, 4 PARTIAL, 0 MISSING**, plus 2 NOT PLANNED by decision. The earlier table
 counted 161 rows (153 / 4 / 4); its coarse rows hid gaps that now have rows of their own. The rows and the
 [to-do table](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
@@ -25,7 +25,7 @@ accepted limits: the layer's base is 70,274 B gzip (limit
 The ten MISSING rows of 2026-11-07 (rendering in a worker, rendering into cube mips, array layers and 3D slices,
 compute writing textures, object-space normal maps, your own mip levels, KTX2 arrays and cubes, shadows from alpha
 cut-outs, environment blending and ground projection, screen-space subsurface blur, soft particles) are built, each in
-its owning package with tests named on its row. Four NOT PLANNED rows were built as well and are COVERED now: GLSL into
+its owning package with tests named on its row. Five NOT PLANNED rows were built as well and are COVERED now: SVG output of a scene (`@margoengine/sciviz/scene-svg`), GLSL into
 node code (`@margoengine/shader/glsl`), stereo, anaglyph and parallax-barrier output (`@margoengine/cameras/stereo`),
 the long-tail model loaders, and VDB, Lottie and MaterialX (`@margoengine/loaders`). XR controller and hand models are
 COVERED by `@margoengine/xr/models`.

@@ -148,7 +148,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `tests/modern-extension-suite.test.js` ("the plan runs every GPU check file, and each one left
   out says why").
 
-### Open 2026-11-27: build:packages fails on main, core plus glTF is over 30 KiB (KB-BUILD-COREGLTF30K)
+### Fixed 2026-11-27: build:packages failed on main, core plus glTF was over 30 KiB (KB-BUILD-COREGLTF30K)
 
 - **Repro.** `npm run build:packages` on 829b78dab4: every package builds, then `sizeRecords` in
   `scripts/build-modern.js` stops with `Core + glTF exceed 30 KiB gzip` (core 22,525 B + gltf 8,323 B = 30,848 B,
@@ -157,8 +157,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   +46 B), raised the core-only and core + stage limits but left this third limit, which had 28 B to spare. The glTF
   figure here bundles the `@margoengine/math` helpers the root imports, so it reads higher than its entry size record
   (7,442 B).
-- **Needs a maintainer decision:** raise this limit as the other two were raised, or take 128 B out of core or the glTF
-  root.
+- **Fix (c0241a90f9).** The limit is not raised. The glTF root carried a second copy of `packages/shared/errors.js`
+  and math's `MargoError`, which core already ships; it now imports them from `@margoengine/core/extension`
+  (SHARED_HELPERS). glTF root 8,323 to 8,191 B gzip, core plus glTF 30,716 B against 30,720 B; core unchanged.
+  `npm run build:packages` passes on 076e7e2cc5.
+- **Regression test:** `tests/modern-core-budget.test.js` ("core + the glTF root stay below the 30 KiB gzip gate of
+  build-modern"), which fails at 30,848 B.
 
 ### Fixed 2026-11-27: checks downloaded files nobody asked for (KB-CHECK-FETCH1; scripts, decoders, loaders, biomes)
 
@@ -2841,7 +2845,10 @@ regression test.
   **Cause:** `packages/physics/src/aero.ts` builds panels from the world-axis bounding box as if it were a body-frame
   box.
 - **AERO-03, stalled panels count profile drag twice.** **Cause:** `packages/physics/src/flight.ts` adds section
-  profile drag on top of the stalled-panel normal force.
+  profile drag on top of the stalled-panel normal force. **Fixed 2026-11-26 (4b4f1329ea):** profile drag covers only
+  the attached part of a panel; a fully separated plate or flapping panel carries the normal force alone. Regression:
+  "profile drag is absent from fully separated plate and flapping panels" and "profile drag covers only the attached
+  area of a wing in spatially varying flow" in `packages/physics/tests/flight.test.js`.
 - **ATMO-01, two wind-direction conventions in one package.** **Cause:** `weather/src/boundary-layer.ts` reads
   direction 0 as +x while `weather/src/wind.ts` reads it as +Z.
 - **ATMO-01, gusts repeat with height.** **Repro:** sample the boundary-layer gust at 4 m and 260 m. **Cause:** the
@@ -14803,9 +14810,13 @@ Release exception: 4x MSAA blending not repeatable on NVIDIA and Intel (driver).
 
 ### plugin scene owner (physics)
 
-**Status:** open, deferred (Scott: ignore for now): plugin scene owner, physics hold.
+**Status:** closed (fixed 2026-11-24, KB6254b). bff1018180 removed `packages/physics/src/next/physics.ts`: the own
+kernel became the root solver, and its `dispose` (packages/physics/src/physics.ts) removes the plugin from
+`engine.sceneOf(this)`. The same commit dropped the row from the OPEN list of scripts/support/plugin-scene-owner.mjs,
+which is now empty, so the check fails any one-argument `engine.removePlugin` again. Regression:
+tests/plugin-scene-owner.test.js.
 
-Open, physics on hold (list 5 batch I1). The Rapier wrapper, packages/physics/src/physics.ts, was fixed on 2026-11-15
+Was open, physics on hold (list 5 batch I1). The Rapier wrapper, packages/physics/src/physics.ts, was fixed on 2026-11-15
 (KB-OWN-BLEND2), and physics2d and ragdoll the same day (KB-OWN-PHYS-SCENE). Left: the held solver
 packages/physics/src/next/physics.ts. Repro: `scene.use(world)` for a world from it in a second scene; make another
 scene active; dispose it. The plugin stays registered in its own scene and a plugin of the same name in the active
@@ -19897,7 +19908,14 @@ solver (KB-PHYS-LEDGER1), and a voxel debris piece on a block's edge rocked with
 web seeds gain nothing with either solver; web seed 23, which spiked through joint 19 with the block solver before
 a4a479f17, stays in its bounds.
 
-## Open: a time-zero coupled snapshot predates its accumulator sum region (BIO-01)
+## Fixed 2026-11-26: a time-zero coupled snapshot predates its accumulator sum region (BIO-01)
+
+Fixed by 13b6c14dd0 (KB-LOADS-FRAMEZERO): the field registry reserves a field's sum region when its first contributor
+publishes, so the layout a tick-zero snapshot records is the one restore finds. Checked on 076e7e2cc5 with the repro
+below (`PlantSway` and `PlantRigidSolver` with the impact of the regression test, snapshot at tick 0, advance 22,
+restore): the restore succeeds, the hash matches the snapshot's and the replay matches the first run. Regression:
+`packages/physics/tests/world-frame-zero-accumulator.test.js`. The framework request in physics-work-queue.md also
+asks for reservation at setup, which is not needed for this repro.
 
 Add `PlantSway` and `PlantRigidSolver` to a `PhysicsWorld`, snapshot before the first `advance()`, advance
 one frame and restore that snapshot. Restore rejects the unequal region count. The field registry allocates the
