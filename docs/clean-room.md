@@ -6896,6 +6896,22 @@ stream both accept (10,243).
 | --- | --- | --- |
 | E62 unreached vertices | A vertex that no attribute traversal reaches takes entry zero, both for its output value and where a predictor looks it up. | Lowered header counts, versions 1.1 to 2.2. |
 
+### Batch 133 E63 to E66: attribute decoder header and predictor bytes (2026-11-27)
+
+Method: as E26 to E40, public calls of the opaque full decoder only, and of the
+opaque glTF build for E66 and the 2.2 cases; neither source was read. On
+retained seamed meshes of versions 1.0 to 2.2 every value of each decoder
+header, predictor and transform byte was tried, and values with equal complete
+output were grouped. Seam bytes were then mutated (about 70,000 accepted
+streams match).
+
+| # | Rule | Probe |
+| --- | --- | --- |
+| E63 decoder header | A connectivity id with its high bit set means the plain connectivity, like 255. Any nonzero decoder type means per corner. A per-corner decoder with the degree traversal is rejected. | All 256 values of each byte. |
+| E64 transforms | Transform bytes -1, 0, 1, 2 and 3 exist and others reject. Normals use 2 and 3, other values 1; any other pairing leaves the attribute without prediction or prediction data (E40 is one case). | All 256 values. |
+| E65 methods | An unknown method is the difference predictor, as is every method but the geometric one on normals. The geometric predictor on other values is rejected. | All 256 values. |
+| E66 glTF predictor 3 | From version 2.0 the glTF build reads predictor 3 as the difference predictor (the full build rejects it). | The 2.2 cases of the fixture. |
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

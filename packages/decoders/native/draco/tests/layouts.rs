@@ -158,3 +158,43 @@ fn unreached_vertices_match_black_box_outputs() {
     let counts = check(include_bytes!("fixtures/unreached.bin"));
     assert_eq!(counts, (122, 122, 0, 0));
 }
+
+#[test]
+fn decoder_header_and_predictor_bytes_match_black_box_outputs() {
+    let counts = check(include_bytes!("fixtures/headers.bin"));
+    assert_eq!(counts, (365, 122, 243, 0));
+}
+
+// E66: the opaque glTF build reads predictor 3 of a current stream as the
+// difference predictor.
+#[test]
+fn gltf_flavor_reads_current_predictor_3_as_difference() {
+    let data = include_bytes!("fixtures/headers.bin");
+    let input = |wanted: &str| {
+        let mut at = 0;
+        for _ in 0..num(data, &mut at) {
+            let name = blob(data, &mut at);
+            let input = blob(data, &mut at);
+            if name == wanted.as_bytes() {
+                return input;
+            }
+            if num(data, &mut at) == 1 {
+                num(data, &mut at);
+                blob(data, &mut at);
+                blob(data, &mut at);
+            }
+        }
+        panic!("{wanted} is not in the fixture")
+    };
+    let three = input("E65 seed 9 predictor at 68 method 3");
+    let zero = input("E65 seed 9 predictor at 68 method 0");
+    assert_eq!(decode(three, Limits::default()), Err(Error::Unsupported));
+    let values = |bytes| {
+        let g = margoengine_draco::decode_gltf(bytes, Limits::default()).unwrap();
+        (
+            g.indices,
+            g.attributes.into_iter().map(|a| a.data).collect::<Vec<_>>(),
+        )
+    };
+    assert_eq!(values(three), values(zero));
+}

@@ -38,35 +38,45 @@ impl Integer {
         // E20: the shipped glTF build accepts multi-parallelogram framing but
         // reconstructs it with difference prediction. Its full build uses the
         // actual multi predictor. Keep this entry-specific behavior explicit.
-        let method = if gltf_compat && method == 2 {
+        // E66: from 2.0 the glTF build lacks the historical predictor 3 too.
+        let method = if gltf_compat && (method == 2 || (method == 3 && c.version >= 0x200)) {
             0
         } else {
             method
         };
         let transform = if method != -2 { c.byte()? } else { 0 };
-        // E40: a normal attribute with the wrap transform has no prediction
-        // and no prediction data; its values are the signed symbols.
-        let method = if normal && transform == 1 { -2 } else { method };
+        // E64: transform bytes -1 to 3 exist; any other rejects the stream.
+        if method != -2 && !matches!(transform, 0..=3 | 255) {
+            return Err(Error::Unsupported);
+        }
+        // E40/E64: a transform the attribute cannot use (normals take 2 and 3,
+        // other values 1) leaves it without prediction or prediction data; its
+        // values are the signed symbols.
+        let usable = if normal {
+            matches!(transform, 2 | 3)
+        } else {
+            transform == 1
+        };
+        // E65: an unknown method, and for normals every method but the
+        // geometric one, is the difference prediction.
+        let method = match method {
+            -2 => -2,
+            _ if !usable => -2,
+            6 => 6,
+            1..=5 if !normal => method,
+            _ => 0,
+        };
+        let transform = if method == -2 { 0 } else { transform };
         // E23: predictor 3 is the historical texture-coordinate predictor;
         // the opaque decoder accepts it only in streams before version 2.0.
-        if ![-2, 0, 1, 2, 4, 5, 6].contains(&method) && !(method == 3 && c.version < 0x200) {
+        if method == 3 && c.version >= 0x200 {
             return Err(Error::Unsupported);
         }
-        if method != -2 && transform != 1 && transform != 2 && transform != 3 {
-            return Err(Error::Unsupported);
-        }
-        if (transform == 2 || transform == 3 || method == 3 || method == 5 || method == 6)
-            && components != 2
-        {
+        if (method == 3 || method == 5 || method == 6) && components != 2 {
             return Err(Error::Invalid);
         }
-        if (method == 1 || method == 2 || method == 3 || method == 4 || method == 5)
-            && transform != 1
-        {
-            return Err(Error::Unsupported);
-        }
-        // E36: predictor 6 also accepts the older normal transform.
-        if method == 6 && transform != 3 && transform != 2 {
+        // The geometric normal predictor serves normals only (E36).
+        if method == 6 && !normal {
             return Err(Error::Unsupported);
         }
         if c.version < 0x200 {

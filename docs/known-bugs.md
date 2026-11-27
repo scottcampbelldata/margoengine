@@ -17072,6 +17072,20 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/unreached.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder differed on decoder header and predictor bytes (batch 133, E63 to E66)
+
+- **Repro:** on damaged seamed meshes `@margoengine/decoders/draco-native`
+  refused streams the prebuilt decodes (a connectivity id of 128 to 254, a
+  decoder type of 2 or more, an unknown prediction method, a transform the
+  attribute cannot use) and accepted a per-corner decoder with the degree
+  traversal, which the prebuilt rejects.
+- **Cause:** `native/draco/src/sequential.rs` and `integer.rs` allowed only
+  the values a valid file holds, and not the same ones.
+- **Fix:** the observed rules
+  ([E63 to E66](clean-room.md#batch-133-e63-to-e66-attribute-decoder-header-and-predictor-bytes-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/headers.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -17107,9 +17121,10 @@ E26 to E40):
   `E35 one-triangle normal mode` cases in
   `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
   int32 arithmetic of that mode is not established.
-- Not probed: position-reading predictors on attribute decoders with seams that
-  split vertices, and constrained multi-parallelogram before 2.2 beyond the
-  retained cases.
+- Not probed: constrained multi-parallelogram before 2.2 beyond the retained
+  cases. Seamed meshes were probed by mutation on 2026-11-27 (E63 to E66); what
+  still differs is damaged streams, counted in the next item for old versions,
+  and at 2.2 some truncated refusals, symbol-count refusals and other values.
 - Damaged streams of versions 1.0 to 1.3 (found 2026-11-27 by changing one or
   two bytes of retained streams): some that the prebuilt decodes Margo refuses,
   some decode to other values and a few that it rejects decode. A refusal repro,

@@ -385,15 +385,15 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     let mut group_info = budget.vector(groups, crate::traversal::Group::default())?;
     if topology.is_some() {
         for group in &mut group_info {
-            group.data_id = c.byte()?;
-            group.corner = match c.byte()? {
-                0 => false,
-                1 => true,
-                _ => return Err(Error::Invalid),
-            };
+            // E63: every id with its high bit set names the plain
+            // connectivity, and any nonzero decoder type means per corner.
+            let id = c.byte()?;
+            group.data_id = if id >= 128 { 255 } else { id };
+            group.corner = c.byte()? != 0;
             group.degree = match if c.version < 0x102 { 0 } else { c.byte()? } {
                 0 => false,
-                1 => true,
+                // E63: a per-corner decoder has the depth-first order only.
+                1 if !group.corner => true,
                 _ => return Err(Error::Invalid),
             };
         }
