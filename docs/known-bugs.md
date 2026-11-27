@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: the native volume tint is up to 20 levels off Beer-Lambert on a display target (KB-VOL-TINT-DISPLAY1, gltf)
+
+- **Repro:** `node packages/gltf/scripts/test-screen-transmission-browser.mjs` (and `--compat`), cases `slab-*`: one
+  unit-scale slab, IOR 1, roughness 0, specular 0, KHR_materials_volume thicknessFactor 1, attenuationColor
+  0.1/0.5/0.9, attenuationDistance 1, over a grey backdrop of 230. The spec's T = c^(d/D) through the same display
+  transform gives 59,165,220; the tint draws 79,168,219 (red 20 levels high, 1x and 4x, WebGPU and the WebGL2 layer, RTX
+  A6000). The screen-transmission pass draws 59,165,220 exactly (worst 0 levels), and that case is gated.
+- **Cause:** the tint is a multiply blend in the beauty pass: the display-encoded backdrop times the encoded
+  transmittance (encode(0.1) = 0.35, 230 x 0.35 = 80). That equals encode(L x T) only for a pure power curve; PBR
+  Neutral's black offset takes most of a small minimum channel, so the product is too bright where T is small.
+- **Fix needs:** the light behind in linear terms, which a fixed-function multiply on an encoded target cannot read.
+  The pass already does it (a decoded scene copy); the tint keeps the error until volume files move to the pass or the
+  tint draws on an HDR target. Note: the volume proof's Cycles rows prefer this brighter tint over the exact pass inside
+  the blocks (KB4000), so the tint's lead there is partly this error.
+
 ### Fixed 2026-11-27: DOF, TAA and SceneFade lost the alpha of a transparent canvas (KB-ALPHA-TEMPORAL1, dof, taa, post)
 
 - **Repro:** on a `TransparentCanvas`, TAA wrote alpha 1 (an opaque black page behind the scene); DOF kept the sharp pixel's alpha under blurred colour and encoded premultiplied colour for display; SceneFade drew the snapshot's colour with the fade weight as alpha, so empty pixels darkened to half-opaque black.
@@ -16847,7 +16862,7 @@ cases of test-screen-transmission-browser.mjs. Still open: volume files stay on 
 moved nearer the viewer (1,450,312 -> 1,289,588) but away from Cycles (direct 1,744,201 -> 1,981,171, full 13,834,286
 -> 13,886,432): red inside the cubes is 0 to 3 where Cycles keeps 19 to 33, because the pass takes thicknessFactor as
 the path length while Cycles crosses the real volume. Next: a back-face depth prepass for the real per-pixel length,
-thicknessFactor only where no closed back face exists; switch volume files once both Cycles rows beat the tint.
+thicknessFactor only where no closed back face exists; switch volume files once both Cycles rows beat the tint. Step 5 (2026-11-27): the pass's Beer-Lambert is exact: one slab of known volume (the `slab-pass` case of test-screen-transmission-browser.mjs) draws c^(d/D) through the display transform with 0 levels of error, native and --compat, 1x and 4x, so no attenuation is applied twice, in the wrong space or per unit instead of per distance, and the scene copy carries no tint. Inside AttenuationTest's blocks the pass and the Khronos sample viewer both draw red 0 to 3: T = 0.1 at thickness 1 puts red, the minimum channel, where PBR Neutral's black offset (x - 6.25 x^2 below 0.08) takes nearly all of it. Cycles' 19 to 51 is light the thickness model has no path for (internal reflection and paths through less volume), and the tint's 18 is partly its own display-space error (KB-VOL-TINT-DISPLAY1). The back-face depth phase measured worse than the tint on every row (d_V: viewer 1,404,963, full 13,945,255, direct 2,116,738 against 1,450,312 / 13,834,286 / 1,744,201), so volume files stay on the tint; not landed.
 
 ### Fixed 2026-11-27: the transmission proof's viewer row was 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
 

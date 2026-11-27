@@ -5,6 +5,8 @@ import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { runSuite } from '../../../scripts/support/shutdown.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { pbrNeutral } from '../../shared/display.js';
+import { pbrNeutralInverse } from '../../shared/display-inverse.js';
 const context = await openBrowser({ startPath: '/packages/gltf/test/screen-transmission.html', port: 'free' });
 await runSuite(
   async () => {
@@ -43,14 +45,10 @@ await runSuite(
       for (let y = 32; y < 96; y++) for (let x = 0; x < 8; x++) open.push(picture.data[(y * 128 + x) * 4]);
       row.openValues = seen(open);
       row.spread = Math.sqrt(red.reduce((a, v) => a + (v - mean) ** 2, 0) / red.length);
-      frames[`${row.name}:${row.antialias}`] = { row, red };
+      frames[`${row.name}:${row.antialias}`] = { row, red, data: picture.data };
     }
     const levels = Math.floor(Math.log2(128)) + 1;
     const report = { hardware: context.hardware, levels, rows };
-    writeFileSync(
-      `test-results/kb4000-screen-transmission${context.hardware.compat ? '-compat' : ''}.json`,
-      JSON.stringify(report, null, 2) + '\n',
-    );
     for (const antialias of [false, true]) {
       const at = (name) => frames[`${name}:${antialias}`];
       const sharp = at('pass-rough0'),
@@ -113,6 +111,38 @@ await runSuite(
         `the default pass writes depth: the front glass hides the red (${antialias})`,
       );
     }
+    // KHR_materials_volume through one slab (thickness 1, attenuationColor 0.1/0.5/0.9 at distance 1, IOR 1): each
+    // pixel is the backdrop's scene light times T = c^(d/D), shown through the same display transform.
+    const decode = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
+      encode = (v) => Math.round(255 * (v < 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055));
+    const T = [0.1, 0.5, 0.9];
+    for (const antialias of [false, true]) {
+      const behind = frames[`slab-none:${antialias}`].data;
+      for (const name of ['slab-pass', 'slab-tint']) {
+        const got = frames[`${name}:${antialias}`].data;
+        let worst = 0,
+          at;
+        for (let y = 32; y < 96; y++)
+          for (let x = 32; x < 96; x++) {
+            const o = (y * 128 + x) * 4;
+            const light = pbrNeutralInverse([0, 1, 2].map((c) => decode(behind[o + c] / 255)));
+            const want = pbrNeutral(light.map((v, c) => v * T[c])).map(encode);
+            for (let c = 0; c < 3; c++) {
+              const d = Math.abs(got[o + c] - want[c]);
+              if (d > worst) [worst, at] = [d, { x, y, c, got: [...got.subarray(o, o + 3)], want, behind: [...behind.subarray(o, o + 3)] }];
+            }
+          }
+        report[`${name}:${antialias}`] = { worst, at };
+        // The tint multiplies the encoded backdrop by the encoded transmittance, up to 20 levels off on this slab
+        // (KB-VOL-TINT-DISPLAY1 in docs/known-bugs.md): measured into the report, gated once fixed.
+        if (name === 'slab-pass')
+          assert.ok(worst <= 1, `the pass is Beer-Lambert through one slab (worst ${worst} levels, ${antialias})`);
+      }
+    }
+    writeFileSync(
+      `test-results/kb4000-screen-transmission${context.hardware.compat ? '-compat' : ''}.json`,
+      JSON.stringify(report, null, 2) + '\n',
+    );
     console.log('screen transmission:', rows.length, 'frames passed', context.hardware.compat ? '(compat)' : '');
   },
   () => context.close(),

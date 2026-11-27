@@ -18,6 +18,13 @@ const glass=(roughness,ior,x=0,width=0.8)=>instancedGLTF([{t:[x,0,0.5],s:[width,
  pbrMetallicRoughness:{metallicFactor:0,roughnessFactor:roughness,baseColorFactor:[1,1,1,1]},
  extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_specular:{specularFactor:0},KHR_materials_ior:{ior}},
 }});
+// One slab of known volume over the whole view, unit scale: KHR_materials_volume says T = attenuationColor^(d/attenuationDistance).
+const SLAB={thicknessFactor:1,attenuationColor:[0.1,0.5,0.9],attenuationDistance:1};
+const slab=()=>instancedGLTF([{t:[0,0,0.5],s:[1,1,1]}],{instanced:false,material:{
+ pbrMetallicRoughness:{metallicFactor:0,roughnessFactor:0,baseColorFactor:[1,1,1,1]},
+ extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_specular:{specularFactor:0},KHR_materials_ior:{ior:1},KHR_materials_volume:SLAB},
+}});
+window.SLAB=SLAB;
 // KB4000 step 3: two glass quads in one model, white in front (z 0.5) and red behind (z 0.2); `nearFirst` sets the draw order.
 const stack=(nearFirst)=>{
  const near={t:[0,0,0.5],s:[0.8,0.8,1]},far={t:[0,0,0.2],s:[0.8,0.8,1]};
@@ -51,6 +58,10 @@ window.screenTransmission=async()=>{
   {name:'default-stack-far-first',stack:true,nearFirst:false,load:'async'},
   // A caller's Transmission.add replaces the default pass: one pass, one copy chain, no second draw.
   {name:'default-then-explicit',roughness:0.6,ior:1.5,load:'async',pass:true},
+  // Beer-Lambert through one slab: the pass and the tint against the backdrop alone.
+  {name:'slab-none',none:true},
+  {name:'slab-pass',slab:true,pass:true},
+  {name:'slab-tint',slab:true,pass:false},
  ];
  for(const antialias of [false,true])for(const k of cases){
   const canvas=document.body.appendChild(document.createElement('canvas'));
@@ -60,7 +71,7 @@ window.screenTransmission=async()=>{
    engine.scene.background='#ffffff';engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([0,0,0,0]);
    const b=background();
    models.push(parseGLTF(engine,b.doc,b.buffers,[checker],{materials:extendedMaterials}));
-   for(const g of k.stack?[stack(k.nearFirst)]:k.two?[glass(k.roughness,k.ior,-0.22,0.4),glass(k.roughness,k.ior,0.22,0.4)]:[glass(k.roughness,k.ior)])
+   for(const g of k.none?[]:k.slab?[slab()]:k.stack?[stack(k.nearFirst)]:k.two?[glass(k.roughness,k.ior,-0.22,0.4),glass(k.roughness,k.ior,0.22,0.4)]:[glass(k.roughness,k.ior)])
     models.push(k.load==='async'?await parseGLTFAsync(engine,g.doc,g.buffers,[],{decoders:k.decoders??{}})
      :parseGLTF(engine,g.doc,g.buffers,[],k.load==='sync'?{materials:extendedMaterials,transmission:screenTransmission}:{materials:extendedMaterials}));
    let transmission;
