@@ -81,7 +81,8 @@ const premultipliedShader = /* @__PURE__ */ shader.replace(
   'return textureLoad(previous,q,0);',
 );
 
-/** Briefly blends a captured, already-visible scene over its upgraded effects.
+/** Briefly blends a captured, already-visible scene over its upgraded effects, on the canvas only: views drawn into a
+ * `target` texture are left as they are.
  * Attach before the base render, capture immediately after it, then warm before
  * installing effects. Start only after their first GPU frame has completed.
  * @throws RangeError when `duration` is not 0-1000 ms.
@@ -230,7 +231,9 @@ export class SceneFade implements EnginePlugin {
     });
   }
   private draw(c: Extract<PassContext, { backend: 'webgpu' }>): void {
-    if (!this.pipeline || this.disposed) return;
+    // The fade belongs to the canvas it captured: a view drawn into a target texture has its own format and picture. The
+    // test comes before the uniform write, which would otherwise carry the target's size to the canvas's pass.
+    if (!this.pipeline || this.disposed || c.view?.target) return;
     const t =
       this.started === undefined ? 0 : this.duration ? Math.min(1, (this.clock() - this.started) / this.duration) : 1;
     const weight = 1 - t * t * (3 - 2 * t);

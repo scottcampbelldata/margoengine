@@ -2233,7 +2233,8 @@ smooth 180 ms opacity uniform. Attach before rendering the base scene, call
 `capture()` immediately after that render, then `await warm()` before attaching
 the remaining effects. After their GPU work completes, call `start()`, await
 `finished`, and dispose the fade. Pass duration `0` for reduced motion. The fade reads `performance.now` by default; `SceneFade.attach(engine, duration, clock)` takes a milliseconds clock so a film frame fades by simulation time, not by how fast the machine renders (KB-FILM-CLOCK1). The
-temporary texture and uniform are released on disposal or device restoration.
+temporary texture and uniform are released on disposal or device restoration. The fade draws on the canvas's views
+only: a view with a `target` texture keeps the pixels it has without a fade.
 
 `Bloom` is Margo's one bloom (creative `PostProcessing` has none; put Bloom before it in a `PostStack`).
 `Bloom.attach(engine, {strength: 0.8, threshold: 1, exposure: 0})` captures linear HDR,
