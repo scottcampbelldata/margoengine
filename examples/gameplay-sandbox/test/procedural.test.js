@@ -131,7 +131,7 @@ test('settlement uploads baked AO and calibrated materials, registers shadows an
     if (buffer.size % 80 === 0 && scatter.batches.some((b) => b.vertices * 80 === buffer.size)) {
       for (let i = 19; i < values.length; i += 20) colors.push(values[i]);
     }
-    if (buffer.size === 128) materials.push(Array.from(values.subarray(16, 24)));
+    if (buffer.size === 144) materials.push(Array.from(values.subarray(16, 24)));
   }
   assert.ok(colors.every((ao) => ao >= 0.19 && ao <= 1));
   assert.ok(colors.some((ao) => ao < 0.3));
