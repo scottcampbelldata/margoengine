@@ -6283,6 +6283,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Saved profiles (`@margoengine/ragdoll/profile`, 2026-11-06) | By method: bones bind by node name, so a renamed rig needs its profile edited. Limits are measured from the pose the ragdoll is built in, so a profile fits only that pose; the humanoid preset reads a T or A pose and its hinges and ranges are wrong for any other. One cone per joint is narrower than a real shoulder or hip in some directions and wider in others. Mass shares are one published adult male table, de Leva 1996. A hinge is a knee or an elbow only: spines, shoulders and ankles are cones. Proved on Knight.glb, with Mixamo names only as stand-in names on the same rig. |
 | Character-ragdoll bridge (`@margoengine/ragdoll/character`, 2026-11-27) | By method: the capsule takes one collision group of the 16 (default 14, or the highest the ragdoll leaves free), so a ragdoll that fills all 16 is refused. A knockdown hands the fall the velocities the hit boxes had at the last step, so a character that stopped walking a step before is hit standing still. Recovery puts the capsule on the first fixed surface under the hips (a raycast of 100 m), and with no get-up clip blends the bones back where they lie. The bridge keeps no state in a physics snapshot: a restore needs the bridge in the state it had then. |
 | Shared physics debug view (`@margoengine/physics/debug-view`, 2026-11-27) | Enforced: a positive `width`, a live world attached to the engine. By method: everything is drawn as one segment line of `@margoengine/lines`, which needs WebGPU: on the WebGL2 compatibility layer `attach` rejects with Lines' coded `webgpu` error, so pass a `sink` and draw `collect()`'s buffers yourself (one `gl.drawArrays(gl.LINES, ...)`). Lines are rebuilt each frame on the CPU from every source, so a large world costs a buffer copy a frame; no speed figure yet (speed phase). Shapes other than spheres, boxes, capsules, cylinders and cones draw as the box around them, as `physics.debugRender` does. |
+| Character walk and jump (`CharacterController.walk`, `jump`, 2026-11-27) | Enforced: a positive finite jump speed, three finite numbers for a velocity, six for a state. By method: gravity is the world's, taken along `up` only (a gravity across `up` is left out); the walk velocity is followed in the air as on the ground (full air control, as Rapier's controller and the three.js example leave it), so ease it yourself for less; a jump is allowed only when the last move ended grounded (no grace time after leaving a ledge). Landing and a ceiling zero the speed along `up`; a platform rising under a jump adds its speed to the take-off step only. The controller's state is not in `physics.takeSnapshot()`: take `takeState()` with it. |
 | Balance (`@margoengine/ragdoll/balance`, 2026-11-06) | By method: it stands on joint torques alone by default, every one a pair inside the body with the ankle held to what the sole answers; `carry` is an outside force, off unless set. It adds inertia to feet and shins (0.012 of the whole mass times the leg's length squared) brings the character's island to 8 solver passes at the least, and gives a hull foot a flat sole of four corners while it balances. Its torques are forces through the whole step, so a world set above 8 only helps: over 24 roundings at 8, 10 and 16 passes no figure steps late or falls, and no hips drift 0.0020 m. A stance knee takes its torque from the balance with a spring beside it that has no damper and grows with how far the knee is off its bend, full at 0.15 rad, so `motors.setStrength` does not reach it. It stands and steps at the heading it was added at: no turning or walking. Flat ground only, at the height of the feet; no stairs or slopes. `motors.hit` weakens a limb's motor, not the balance torques, which follow the global `strength` only. Measured over 24 hull roundings each at 8 passes: all seven figures settle with no step after the first second, at 0.0006 m/s at most. Worst drift of the hips over five seconds: Knight.glb 0.0009 m, Barbarian 0.0004, Ranger 0.0006, Rogue 0.0010, Mage 0.0003, Seed-san 0.0019, RiggedFigure 0.0005; no foot slides more than 0.0012 m. On 96 other roundings at 8 passes one Seed-san foot slid 0.0020 m and 8 of the 672 figure runs shook a bone over 0.005 m/s; at 10, 16 and 20 passes none did (known-bugs.md, "A standing figure can shake"). Pushes of 1.5 m/s in four directions over 32 roundings on Knight.glb: 125 of 128 pass the push test's reading and none fall; the old assist passed 122 and fell in none, holding about half the weight from outside. The other three are still stepping six seconds after the push and stand still by fourteen. Those 128 pushes at 8 / 10 / 16 passes, failing the reading / falling within four seconds: Knight 3/0, 1/0, 7/0; Rogue 1/0, 4/0, 2/0; Ranger 7/0, 8/0, 8/0; Mage 21/0, 25/0, 13/0; Barbarian 29/9, 36/14, 43/30; RiggedFigure 96/95, 92/88, 96/96; Seed-san 113/108, 121/120, 128/128. Falls in 128 pushes at 8 passes at 0.5 / 1 / 1.5 m/s: Knight, Ranger, Rogue and Mage 0 / 0 / 0, Barbarian 0 / 8 / 9, RiggedFigure 60 / 63 / 95, Seed-san 69 / 93 / 108, so only the first four stay up at 1.5 m/s and RiggedFigure and Seed-san do not reliably take 0.5 (known-bugs.md, "A push throws"). Not measured: speed, including the cost of the added passes. |
 | Uneven bone scales in ragdolls (`@margoengine/ragdoll`, 2026-11-06) | Enforced: zero and mirrored bones are refused. By method: any positive scale is taken. Bodies are rigid and sized in world units when the ragdoll is built, so a scale animated afterwards does not resize them. A bone's own uneven scale costs nothing: a fall with a stretched spine matches the same rig built unstretched to under 1 mm. A bone turned under an uneven scale above it is skewed, so the bones drawn below it stretch as it turns, as in IK, while the bodies keep their joint distance; the pose holds exactly where the bone went limp and drifts from its body as it turns away. A hull fitted to a skewed bone takes the scales of the bone's axes and not the skew. Proved on Seed-san's own scales (`hair_E`, 0.9995, 1, 0.9986); scales as large as 0.1, 3, 40 only on a stand-in rig. |
 | Swept collision (`@margoengine/kinematics-constraints/swept`, 2026-11-06) | By method: colliders hold still during a check, so a moving obstacle needs its own stepping. The path checked is the shortest arc per bone for a chain, and the shortest arc about the hull's origin for a hull; if your animation plays another path, this one is certified, not yours. A contact is any gap at or below `minClearance` plus `tolerance` (1e-4), and a motion that starts there stops at time 0, so keep `minClearance` below the gap the pose was solved with. A gap of `d` and a speed bound of `s` give a step of `d / s`, so a motion that grazes a surface for a long way takes many steps: past the budget of 4,096 poses it ends `exhausted`, which is not clear; raise `maxSteps` or `tolerance`. |
@@ -15143,19 +15144,32 @@ The granular-flow entry is 5,965 B gzip under a 6,221 B ceiling. The plain SIMD 
 
 The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and Stage gain zero bytes.
 
+### Straight quay reflection and spray (SEA-12)
+
+`QuayWakeBoundary` mirrors both hull source layouts about a vertical wall parallel to X. The +Z half is wet.
+The grid has an even number of Z rows and shares a 60 Hz staggered group and world cell with the source.
+The reflected boundary is fixed and perfectly reflecting in constant depth. Keep the hull and source rows on
+the wet side and use the model away from wall ends and corners. WaterWake clips the image in its fragment
+draw while retaining the resolved grid for the seam slopes and queries. The visual spray uses a rising crest
+crossing and its local velocity. Finite-quay diffraction, nonlinear breaking, discharged volume and droplet
+statistics remain outside this binding. The optional compiled entries measure 44,592 B gzip for Physics
+loads and 2,172 B for Water wake.
+
 ### Ship motion on the wake grid
 
 `HullSolver` with the wake option publishes two five-word f64 records per reference waterplane station. The stamp uses one longitudinal midpoint and two transverse Gauss samples for a centreline-symmetric waterplane. Volume comes from small heave, pitch and roll about the reference draft. A wholly dry or submerged hull emits no waterplane flux. The model uses a signed surface-volume source. Its finite-depth wave propagation is handled by `WakeSolver`, and the hull's reaction still comes from its seakeeping solver. The projection has no three-dimensional radiation calibration or matched energy exchange with the wake grid.
 
-With `submergedAdvance`, each depth band uses an equivalent contiguous lateral interval preserving the section area and first lateral moment. This covers eccentric and asymmetric sections. Disconnected spans are represented by one interval. Two Gauss points on each signed span difference give at most four nodes per station face and band. The bands use the reference upright draft and move with the hull’s horizontal pose. The option supports at most eight bands, 16,384 fixed rows per port and 1,048,576 grid cells. Each active band adds one forward FFT and no extra inverse transform. A nonzero source must reach the wake grid. Use a domain including the hull’s trajectory and source radius greater than half the grid cell diagonal to cover cell corners.
+With `submergedAdvance`, each depth band uses an equivalent contiguous lateral interval preserving the section area and first lateral moment. This covers eccentric and asymmetric sections. Disconnected spans are represented by one interval. Two Gauss points on each signed span difference give at most four nodes per station face and band. The bands use the reference upright draft and move with the hull’s horizontal pose. The option supports at most eight bands, 16,384 fixed rows per port and 1,048,576 grid cells. Each active band adds one forward FFT and no extra inverse transform. A nonzero source must reach the wake grid. With full stencil support, each radial tap is distributed to the four adjacent grid centres by bilinear area weights. This preserves the signed volume and its horizontal first moments through subcell motion. A patch clipped by the grid edge retains its volume if it reaches a grid centre. Include the hull’s trajectory and source footprint in the grid to preserve its moments.
 
-The finite-depth transfer is the band average of cosh(k(y+D))/cosh(kD) for y measured up from still water. At k=0 it transmits the full volume. This is the no-flux-bed harmonic Green transfer underlying the Havelock source’s deep-water exponential factor in Eq. 4 of Tuck, Scullen and Lazauskas, *Ship-wave patterns in the spirit of Michell* (2000). WakeSolver advances the resulting surface with the linear potential equations in Tessendorf, *Simulating Ocean Water* (1999–2004), Eqs. 20–21 and 51–52. Tests check depth transfer at fixed wavelengths on three grids, net flux and first moments of an eccentric hull, and frame-zero replay on both arena layouts. The model describes linear waves and has no reflected quay boundary or matched body–wake work ledger. Resolve the desired waveform and independent measured amplitudes before use as a physical reference. [Tuck, Scullen and Lazauskas](https://www.scullen.com.au/DSc/Publications/tuck_scullen_lazauskas_00e.pdf) · [Tessendorf](https://jtessen.people.clemson.edu/reports/papers_files/coursenotes2004.pdf)
+The finite-depth transfer is the band average of cosh(k(y+D))/cosh(kD) for y measured up from still water. At k=0 it transmits the full volume. This is the no-flux-bed harmonic Green transfer underlying the Havelock source’s deep-water exponential factor in Eq. 4 of Tuck, Scullen and Lazauskas, *Ship-wave patterns in the spirit of Michell* (2000). WakeSolver advances the resulting surface with the linear potential equations in Tessendorf, *Simulating Ocean Water* (1999–2004), Eqs. 20–21 and 51–52. Tests check depth transfer at fixed wavelengths on three grids, net flux and first moments of an eccentric hull, and frame-zero replay on both arena layouts. The projected source describes linear waves. A straight quay can impose a separate reflecting boundary. The body–wake work ledger remains open. Resolve the desired waveform and independent measured amplitudes before use as a physical reference. [Tuck, Scullen and Lazauskas](https://www.scullen.com.au/DSc/Publications/tuck_scullen_lazauskas_00e.pdf) · [Tessendorf](https://jtessen.people.clemson.edu/reports/papers_files/coursenotes2004.pdf)
 
-The original First Wake course with a closed solver hull proxy ran continuously for 4,005 steps on the 240 × 64 grid at 1.2 m per cell. At film time 67 s the signed elevation extrema were +0.5362 and −0.4332 m. At 71 s they were +0.3340 and −0.5219 m. The legacy transfer on the same grid gave +3.1298 and −2.7170 m at 67 s, and +2.4895 and −3.1574 m at 71 s. At 71 s the projection used 560 nonzero rows and seven forward transforms. The grid cannot resolve the roughly 1.44 m transverse wavelength at 1.50 m/s. The render mesh is unsuitable for a closed solver volume and no hull-line uncertainty is available for the proxy. These CPU results describe the signed response on that grid. The film physics comparison still needs a fixed-domain refinement with at least 9 cells per target wavelength, a qualified hull geometry and its reflective boundary.
+The original First Wake course with a closed solver hull proxy at 46d930c1a5 ran continuously for 4,005 steps on the 240 × 64 grid at 1.2 m per cell. At film time 67 s the signed elevation extrema were +0.5362 and −0.4332 m. At 71 s they were +0.3340 and −0.5219 m. The legacy transfer on the same grid gave +3.1298 and −2.7170 m at 67 s, and +2.4895 and −3.1574 m at 71 s. At 71 s the projection used 560 nonzero rows and seven forward transforms. The grid cannot resolve the roughly 1.44 m transverse wavelength at 1.50 m/s. The render mesh is unsuitable for a closed solver volume and no hull-line uncertainty is available for the proxy. These CPU results describe the signed response on that grid. The film physics comparison still needs a fixed-domain refinement with at least 9 cells per target wavelength, a qualified hull geometry and its reflective boundary.
 
 The independent fixed bare KRISO container-ship (KCS) signed wave cut at 1.09864 m cross-track gave 15.55 and 15.10 mm RMS error after five and eight approach lengths across 469 measured stations, with 0.4695 mm reported experimental uncertainty. At eight lengths the predicted elevation RMS was 25.70 mm against 15.32 mm measured and the signed correlation was 0.847. No amplitude scaling, clock shift or use of measured elevations in solver inputs was permitted. The forecast used 0.25 m physical cells on a 200 × 16 m domain at depth 7 m, 96 stations and a closed section loft sampled every 0.025 m vertically from the published hull offsets. The 3.09 m transverse wavelength has about 12 cells. This was one spatial resolution with absorbing edges and an assumed startup history. The original ramp, shape-loft error, grid convergence, reflected waves and three-dimensional near-hull interaction remain unresolved. The comparison falls outside the measured uncertainty. [NMRI KCS case and raw measurements](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/a1-1/index.html) · [Kim, Van and Kim, *Measurement of flows around modern commercial ship models*, 2001](https://doi.org/10.1007/s003480100332)
 
-The optional sea entry grows from 6,405 to 7,624 B gzip with a 7,880 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
+At 0.25 m per cell the original stencil gave 14.88 and 14.85 mm of profile RMS error at 14 approach lengths and 60 or 120 Hz. Refining the mesh from 0.025 to 0.0125 m vertically and 96 to 192 stations changed the reconstructed displacement from 1.6412 to 1.6449 m³, closer to the published 1.6490 m³. At eight approach lengths and 60 Hz, this mesh, eight instead of four transfer bands, and a 4 m instead of 2 m numerical sponge gave 15.34, 15.38, and 15.11 mm respectively. The subcell stencil reduced the 60 Hz error from 15.10 to 13.86 mm at eight lengths and from 14.88 to 13.60 mm at 14 lengths. Aft of x/L = 0.75 the corrected signed profile reaches 34.60 mm RMS where the measured profile gives 17.90 mm, with correlation 0.987. This residual persists with fixed physical inputs and no fitting. The linear source does not enforce impermeability of the disturbed flow at the hull. The experiment reports an unsteady wet transom flow that is outside this source model. [NMRI model particulars](https://www.nmri.go.jp/archives/institutes/fluid_performance_evaluation/cfd_rd/cfdws15/kcs_gc.html) · [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
+
+The optional sea entry is 7,817 B gzip with a 7,880 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
 
 ## Node versions for test and tool scripts (scripts/support/node-compat.mjs, 2026-11-26)
 
@@ -15453,6 +15467,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   overflow. `packages/physics/tests/coupling/loads-swim-actuators.test.js` checks paired water and body impulses
   against the unshifted swimmer and verifies exact replay.
 
+### Open 2026-11-27: First Wake’s authored stern sweeps into the quay (KB-LOADS-FIRSTWAKEQUAY, First Wake)
+
+- **Repro:** In the archived First Wake scene, transform the Survey ship’s GLB positions by the scale and
+  waterline offset in `main.js` and the pose in `timeline.js`. At vessel time 8.42 s an underwater vertex at
+  x = −22.585 m reaches z = −16.347 m. The quay’s actual wet face there is z = −10.55 m.
+- **Cause:** The ship’s heading follows the tangent of the early sideways departure. It rotates the long stern
+  through the wall before the centre has enough clearance. A slower sideways departure clears the wall in a
+  geometry diagnostic. Production playback still needs the corrected track and a resolved reflected wake.
+
 ### Fixed 2026-11-26: film seek from frame zero lost the accumulator layout (KB-LOADS-FRAMEZERO)
 
 - **Repro:** Snapshot a world with buoyancy and a pending 5 N·s rigid impulse before it advances. The first step
@@ -15524,15 +15547,35 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   call). The browser corpus compute part asserts and counts both refusals. Regression:
   `packages/webgl2-compat/test/compute-limits.test.js`.
 
-### Open 2026-11-27: the browser corpus compute part fails on a recorded kernel that varies by run (KB-COMPAT-CORPUSFBO1, webgl2-compat)
+### Fixed 2026-11-27: a recorded animation kernel never ended on zero-filled buffers and reset the GPU in the browser corpus compute part (KB-COMPAT-CORPUSFBO1, animation)
 
-- **Repro:** `npm run test:browser:compute -w @margoengine/webgl2-compat` (Chrome, RTX A6000), two runs of one build
-  of the layer. First run: `sky 8bd2180e7c0c8ef7 main` "The compatibility layer's own masked::texelFetch(t, p, 0)
-  program did not link" (empty driver log) and `compute 8c376d839a33176a main` "The render pass attachments do not
-  form a complete WebGL2 framebuffer (status 0x8cdd) GL error 1282". Second run: only `sky 8bd2180e7c0c8ef7 main`,
-  with the framebuffer message and GL error 0; the other kernel passed. The runs differ only in when the page made a
-  fresh device (the first recreated it after each oversize kernel).
-- **Cause:** not yet established. The failures move with the device's history.
+- **Repro:** `npm run test:browser:compute -w @margoengine/webgl2-compat` (Chrome, ANGLE Direct3D 11, RTX A6000)
+  failed on the record after `animation 8b858be2e0a8c694 main`: `sky 8bd2180e7c0c8ef7 main` (its helper program "did
+  not link", or an incomplete framebuffer 0x8cdd), and in some runs `compute 8c376d839a33176a main` too. The fewest
+  records that failed: those two animation and sky records through `window.dispatchAll` of `test/corpus-draw.html`.
+- **Cause:** the page dispatches every kernel with zero-filled stand-in buffers. `morphWeightShader`
+  (`packages/animation/src/morph-gpu.ts`) binary-searched a track's keys from `track.keys-1u`: with 0 keys it wrapped
+  to 4294967295, the midpoint `(lo+hi+1u)/2u` wrapped to 0 and the loop never ended. A `readPixels` after the dispatch
+  blocked 5,547 ms (the Windows GPU watchdog) and the reset landed in the next record's report. With 1 key the same
+  dispatch finished in 1 ms. The engine's own inputs always have at least one key.
+- **Fix:** the search starts at `max(track.keys,1u)-1u` and takes its midpoint as `lo+(hi-lo+1u)/2u`, so it ends on
+  any buffer contents, with the same result for every valid track. The corpus holds the new source in place of the old
+  one: `record-wgsl-corpus.mjs --add --drop=8b858be2e0a8c694` (the new flag refuses a module the corpus does not hold
+  or one a suite still creates). The corpus compute part passes: 1144 pipelines dispatched, none failed. Regression:
+  `packages/animation/tests/morph-gpu.test.js` "ends on any buffer contents",
+  `packages/webgl2-compat/test/corpus.test.js` "a recording drops only".
+
+### Open 2026-11-27: after a GPU reset the WebGL2 layer reports the loss as its own link failure or an incomplete framebuffer (KB-COMPAT-LOSSREPORT1, webgl2-compat)
+
+- **Repro:** as KB-COMPAT-CORPUSFBO1: after the hanging dispatch, the next CPU-tier storage texture upload throws
+  "The compatibility layer's own masked::texelFetch(t, p, 0) program did not link (a bug: report it)" with an empty
+  log, or reports the validation error "The render pass attachments do not form a complete WebGL2 framebuffer (status
+  0x8cdd)", before `device.lost` resolves.
+- **Cause:** Chrome learns of the reset in the synchronous query that waited for it (`getProgramParameter`,
+  `checkFramebufferStatus`) but sets `isContextLost()` and fires `webglcontextlost` in a later task (measured: link
+  failed at 5,788 ms, `isContextLost()` false right after, the event at 5,790 ms). `CompatRenderer.helper` checks
+  `isContextLost()` before reading the link status, and `makeFramebuffer` reports any incomplete status at once, so
+  both report a loss as a layer bug or a validation error. WebGPU surfaces no errors once a device is lost.
 
 ### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
 
@@ -15707,7 +15750,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   attachment added after the world began is refused with a coded error.
 - **Regression:** the test above, which fails without the region, and the frame-rate check beside it.
 
-### Open 2026-11-27: six package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
+### Fixed 2026-11-27: GPU picking hit a one-sided material on instances seen from its culled side (KB-PICK-MIRRORROWS1, selection)
+
+- **Repro:** `node scripts/material-back-side-gpu-check.js` (WebGPU and `MARGO_COMPAT=1`, RTX A6000 and Intel Arc
+  140V): every instanced pick row read `[true,true]` where `[false,false]` is wanted, at 4x and 1x ("front instances
+  back automatic gpu" and the explicit and back-instance rows); the drawn picture of the same rows was right.
+- **Cause:** d31534edc1 (KB-PICK-INSTMOVE1) drew instanced primitives through `PickingPrimitives` and picked one with
+  any mirrored row (the fixture's second row has x scale -1) from both sides, on the reading that the colour pass then
+  draws it unculled. The colour pass does draw it with no pipeline culling, but its shader tests each face against
+  the row's handedness (gltf/pbr `model.ts`, `face`), so a front-only or back-only material stays one-sided on every
+  row; picking took the whole set as double-sided.
+- **Fix:** the instanced pick shader carries each row's handedness (the sign of its matrix determinant, a flat
+  varying) into its face test with the node's, and the `side` of such a primitive is no longer turned to double. One
+  shader serves picking and the selection mask, so both follow.
+- **Regression:** `scripts/material-back-side-gpu-check.js` (840 checks, 0 failures on both back ends; 8 failed
+  before); `packages/selection` CPU tests and `instanced-move`, `picking`, `models` and `hit-details` browser checks
+  pass.
+
+### Open 2026-11-27: five package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
 
 - **Repro:** `npm run build:packages` on c886aef6c, Intel Arc 140V (Windows, Edge 158), each under
   `node scripts/run-with-timeout.mjs --max=4 --`. Each fails the same way with `packages/shared/clear-color.js` put back
@@ -15717,13 +15777,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   - `node packages/biomes/tests/browser-check.mjs`: `requestDevice` fails with DXGI_ERROR_DEVICE_REMOVED, then
     "[Device] is lost" (the parent run); past the 4-minute limit on main.
   - `node packages/oit/test/gpu/real-check.mjs`: "[Invalid CommandBuffer] is invalid due to a previous error".
-  - `node scripts/material-back-side-gpu-check.js`: the 4x instanced back-side rows read `[true,true]` where
-    `[false,false]` is wanted ("4x front instances back automatic gpu", and the explicit and back-instance rows).
   - `node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position along the view: 3 bytes over 2,
     worst 7".
   - `node packages/sky/test/features-check.mjs sleet astro hillaire`: "sleet off by more than one half-float step".
-- **Cause:** not established for any of the six; each is owed to its package (core lighting, biomes, oit, materials,
-  post, sky), found and fixed with its own regression.
+- **Cause:** not established for any of the five; each is owed to its package (core lighting, biomes, oit, post,
+  sky), found and fixed with its own regression. The sixth, the material back-side check, is KB-PICK-MIRRORROWS1
+  above (fixed). On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.
 
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 
@@ -17105,7 +17164,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   once over all its rows through the shadow casters' `instancedDepth` transform after the material's vertex move (the
   same order as the shadow passes), with a flat row so row k writes the primitive's first ID + k (the `margoRow` a
   row-reading material plugin already names). Picking reserves one ID run per instanced primitive and decodes the
-  instance from it; a primitive with mirrored rows is picked from both sides, as the colour pass draws it unculled.
+  instance from it; a primitive with mirrored rows was picked from both sides (wrong for one-sided materials, see
+  KB-PICK-MIRRORROWS1: each row's faces now follow its own handedness).
   Hit details read the instance's world matrix for the normal.
 - **Regression:** `packages/selection/test/instanced-move.browser.mjs` (both back ends: the drawn places hit instances
   0 and 1, the unmoved places miss); `packages/materials/test/instance-attributes-browser.mjs` now asserts
@@ -40379,6 +40439,10 @@ engine.start(); // each frame's delta drives the accumulator
 
 ## Character controller quick start
 
+A kinematic capsule that walks, climbs slopes up to 45 degrees and slides off steeper ones, steps up 0.3 m ledges, snaps
+down stairs, rides what it stands on, pushes crates and jumps. `walk(velocity)` takes a speed in m/s and adds the world's
+gravity and the jump itself, once per fixed step:
+
 ```ts
 import { Physics } from '@margoengine/physics';
 await Physics.load();
@@ -40386,11 +40450,10 @@ const physics = new Physics(null);
 physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
 const body = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0.9, 0], colliders: { shape: 'capsule', halfHeight: 0.5, radius: 0.3 } });
 const controller = physics.createCharacterController(body, { applyImpulsesToDynamicBodies: true, characterMass: 70 });
-const step = controller.move([0.08, -0.16, 0]);
-console.log(step.grounded, controller.debugRender().vertices.length);
+physics.on('beforestep', () => controller.walk([1.5, 0, 0]));
+for (let i = 0; i < 120; i++) physics.step();
+console.log(controller.grounded, controller.jump(5), body.position);
 ```
-
-## Debug view (`@margoengine/physics/debug-view`)
 
 [README continues: https://margoengine.com/llms/packages/physics.md]
 

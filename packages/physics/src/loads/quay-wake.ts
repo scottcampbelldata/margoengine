@@ -13,7 +13,15 @@ import {
   type WakeSolver,
 } from '../sea/wake.js';
 import { regionWords } from '../world/memory.js';
-import type { FieldDescriptor, Port, Region, Solver, SolverDescription, SolverHost, StepContext } from '../world/solver.js';
+import type {
+  FieldDescriptor,
+  Port,
+  Region,
+  Solver,
+  SolverDescription,
+  SolverHost,
+  StepContext,
+} from '../world/solver.js';
 import { invalidLoad } from './errors.js';
 
 /** The vertical quay is parallel to X and has water on its +Z side. */
@@ -55,7 +63,10 @@ export class QuayWakeBoundary implements Solver<undefined> {
   private readonly regions: Region[] = [];
   private host!: SolverHost;
 
-  constructor(options: QuayWakeOptions, readonly id = 'quayWake') {
+  constructor(
+    options: QuayWakeOptions,
+    readonly id = 'quayWake',
+  ) {
     if (!Number.isFinite(options?.wallZ)) throw invalidLoad('Set the straight quay face to a finite Z in metres.');
     this.wallZ = options.wallZ;
     const pairs: SourcePair[] = [];
@@ -74,7 +85,14 @@ export class QuayWakeBoundary implements Solver<undefined> {
       return image;
     };
     if (options.surface)
-      this.surfaceSource = bind(options.surface, 'seaSource', 'surface', WAKE_SOURCE_WORDS, WAKE_SOURCE_LAYOUT, Infinity);
+      this.surfaceSource = bind(
+        options.surface,
+        'seaSource',
+        'surface',
+        WAKE_SOURCE_WORDS,
+        WAKE_SOURCE_LAYOUT,
+        Infinity,
+      );
     if (options.submerged) {
       const field = bind(
         options.submerged.field,
@@ -100,7 +118,8 @@ export class QuayWakeBoundary implements Solver<undefined> {
       cells,
       centre: [centreX, wall],
       initial: initial && ((x, z) => initial(x, wall + Math.abs(z - wall))),
-      sources: sources && ((time) => sources(time).flatMap((source) => [source, { ...source, z: this.reflectedZ(source.z) }])),
+      sources:
+        sources && ((time) => sources(time).flatMap((source) => [source, { ...source, z: this.reflectedZ(source.z) }])),
     };
   }
 
@@ -135,7 +154,11 @@ export class QuayWakeBoundary implements Solver<undefined> {
       const port = this.sourcePort(inputs.get(pair.input.name), pair);
       const { region } = port;
       const output = this.regions[i]!;
-      if (2 * region.byteLength !== output.byteLength || port.tick !== tick || cell.some((v, axis) => v !== port.cell[axis]))
+      if (
+        2 * region.byteLength !== output.byteLength ||
+        port.tick !== tick ||
+        cell.some((v, axis) => v !== port.cell[axis])
+      )
         throw invalidLoad('Step the fixed-size hull, quay and wake in that order at 60 Hz in the same cell.');
       const input = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
       for (let at = 0; at < input.length; at += pair.words)

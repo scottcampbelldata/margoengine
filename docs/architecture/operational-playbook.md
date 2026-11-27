@@ -171,6 +171,14 @@ ink earlier removed the shader anchor used by Shadows and caused the frame to fa
 pass order and verifies that ink wraps the shadow term. The browser fixture draws a board with both packages
 attached. The core shader and exported APIs stay unchanged.
 
+### Section 5 evidence: quay reflection and visible overtopping (SEA-12, 2026-11-27)
+
+A mirrored finite-depth potential keeps flow on the wet side of a straight impermeable quay. The loads tests
+check the incident and reflected complex phase, pressure and displaced volume from a real hull, and rejection
+before either output changes. Water’s browser test checks the same solved wet surface on WebGPU and WebGL2,
+with a 2.47×10⁻⁸ m maximum draw error. It clips the mirrored region in the fragment pass, retains the slopes,
+and issues visual spray only for a rising crest above the sill. Both backends replay to hash `9a02347ea18709e6`.
+
 ### Section 5 evidence: ship wakes at harbor speed (2026-11-21)
 
 At 1.5 m/s the 68 m test hull's analytic crest is about 0.23 m aft of the stem. The CPU and WGSL profiles broaden the

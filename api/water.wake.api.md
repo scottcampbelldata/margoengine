@@ -19,6 +19,7 @@ export class WaterWake implements EnginePlugin {
 export interface WaterWakeOptions {
     surface: Water;
     wake: WaterWakeSource;
+    minWetZ?: number;
 }
 
 export interface WaterWakeSource {
@@ -29,6 +30,17 @@ export interface WaterWakeSource {
     };
     heights(): ArrayLike<number>;
 }
+
+export interface WaterWallSample {
+    readonly height: number;
+    readonly velocity: Vec3;
+}
+
+export function wallOvertoppingSpawn(previous: WaterWallSample, current: WaterWallSample, crest: Vec3): {
+    position: Vec3;
+    velocity: Vec3;
+    fraction: number;
+} | undefined;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -47,6 +59,8 @@ interface TerrainHeights {
     readonly width: number;
     readonly height: number;
 }
+
+type Vec3 = readonly [number, number, number];
 
 class Water implements EnginePlugin {
     readonly options: WaterOptions;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20792201,
+  "total": 20794744,
   "history": [
     {
       "date": "2026-10-24",
@@ -14401,6 +14401,12 @@
       "commit": "5e5975484",
       "reason": "DYN-07: new optional entries @margoengine/physics/debug-view (1,709 B gzip; loads @margoengine/lines only when attached) and @margoengine/ragdoll/character (7,210 B, the character bridge with its get-up and motor helpers); @margoengine/ragdoll grows 7,630 to 8,892 B for Ragdoll.debugRender (bone shapes, swing cones and hinge arcs); a separate debug entry would need the ragdoll's private bone state exposed. The other grown rows are not DYN-07's: rod, terramechanics, modal-sound, vegetation, clustered, physics2d (and its base), sky/weather, vfx/base and webgl2-compat base record growth already on main from other lanes' landings, measured unchanged here after the rebase onto 6cf3c7fcd, so the gate is green for the next lane; their owners' reasons are in their own commits.",
       "grew": 13
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "SEA-12 straight quay",
+      "grew": 2,
+      "reason": "@margoengine/physics/loads 43,472 to 44,592 B gzip and @margoengine/water/wake 1,680 to 2,172 B. The optional entries reuse their existing hull port and draw path for the reflected boundary, wet-side clip and crest-triggered spray. A split would require extra coupled imports for users of the same wall. Core, stage and the physics root are unchanged."
     }
   ],
   "items": {
@@ -15257,7 +15263,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 44135,
+    "@margoengine/physics/loads": 45930,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,
@@ -16061,7 +16067,7 @@
     "@margoengine/water/ships": 11259,
     "@margoengine/water/splash": 5893,
     "@margoengine/water/underwater": 9344,
-    "@margoengine/water/wake": 1680,
+    "@margoengine/water/wake": 2428,
     "@margoengine/weather": 8762,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/avalanche": 7451,

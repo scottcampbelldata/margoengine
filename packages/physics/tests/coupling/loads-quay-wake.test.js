@@ -32,18 +32,27 @@ test('a rigid quay reflects the oblique finite-depth mode in phase with equal en
   const omega = Math.sqrt(g * K);
   const phase = 0.9;
   const prog = (x, z, time, normal) => kx * (x - centreX) + normal * (z - wallZ) + phase - omega * time;
-  world.add(wake, boundary.wakeParams({
-    cells, cellSize, centreX, depth, density: rho, sponge: 0, waterBelow: true,
-    initial(x, z) {
-      assert.ok(z >= wallZ, 'the initial surface is only defined on the wet side');
-      const incident = prog(x, z, 0, -kn);
-      const reflected = prog(x, z, 0, kn);
-      return [
-        a * (Math.cos(incident) + Math.cos(reflected)),
-        ((a * g) / omega) * (Math.sin(incident) + Math.sin(reflected)),
-      ];
-    },
-  }));
+  world.add(
+    wake,
+    boundary.wakeParams({
+      cells,
+      cellSize,
+      centreX,
+      depth,
+      density: rho,
+      sponge: 0,
+      waterBelow: true,
+      initial(x, z) {
+        assert.ok(z >= wallZ, 'the initial surface is only defined on the wet side');
+        const incident = prog(x, z, 0, -kn);
+        const reflected = prog(x, z, 0, kn);
+        return [
+          a * (Math.cos(incident) + Math.cos(reflected)),
+          ((a * g) / omega) * (Math.sin(incident) + Math.sin(reflected)),
+        ];
+      },
+    }),
+  );
   let checkpoint;
   let phaseError = 0;
   let energyError = 0;
@@ -56,7 +65,10 @@ test('a rigid quay reflects the oblique finite-depth mode in phase with equal en
     const heights = wake.heights();
     const [_, potentialRegion] = wake.stateRegions();
     const potential = regionWords(world.memory, potentialRegion);
-    const mode = [[0, 0], [0, 0]];
+    const mode = [
+      [0, 0],
+      [0, 0],
+    ];
     let energy = 0;
     for (let j = 0; j < cells[1]; j++) {
       const dz = (j + 0.5 - cells[1] / 2) * cellSize;
@@ -64,7 +76,10 @@ test('a rigid quay reflects the oblique finite-depth mode in phase with equal en
         const dx = (i + 0.5 - cells[0] / 2) * cellSize;
         const at = i + cells[0] * j;
         const h = heights[at];
-        for (const [m, sign] of [[0, -1], [1, 1]]) {
+        for (const [m, sign] of [
+          [0, -1],
+          [1, 1],
+        ]) {
           const angle = kx * dx + sign * kn * dz;
           mode[m][0] += h * Math.cos(angle);
           mode[m][1] -= h * Math.sin(angle);
@@ -74,11 +89,13 @@ test('a rigid quay reflects the oblique finite-depth mode in phase with equal en
     }
     for (const [re, im] of mode) {
       const factor = 2 / heights.length;
-      phaseError = Math.max(phaseError,
-        Math.hypot(factor * re - a * Math.cos(phase - omega * time), factor * im - a * Math.sin(phase - omega * time)));
+      phaseError = Math.max(
+        phaseError,
+        Math.hypot(factor * re - a * Math.cos(phase - omega * time), factor * im - a * Math.sin(phase - omega * time)),
+      );
     }
     // Two equal progressive modes, each rho g a^2/2 per unit horizontal water area.
-    const expectedEnergy = rho * g * a ** 2 * heights.length / 2;
+    const expectedEnergy = (rho * g * a ** 2 * heights.length) / 2;
     energyError = Math.max(energyError, Math.abs(energy / expectedEnergy - 1));
     const wall = boundary.sampleWall(wake, x);
     const expectedFace = (time) => 2 * a * Math.cos(0.5 * kn * cellSize) * Math.cos(prog(x, wallZ, time, 0));
@@ -98,14 +115,76 @@ test('a rigid quay reflects the oblique finite-depth mode in phase with equal en
   world.advance(48);
   assert.equal(world.hash(), hash);
   assert.deepEqual(boundary.sampleWall(wake, x), wall);
-  t.diagnostic(`Complex amplitude error ${phaseError} m, relative energy error ${energyError}, normal speed ${normalError} m/s.`);
+  t.diagnostic(
+    `Complex amplitude error ${phaseError} m, relative energy error ${energyError}, normal speed ${normalError} m/s.`,
+  );
 });
 
 const mesh = {
-  vertices: Float64Array.of(-1, -0.5, -0.5, 1, -0.5, -0.5, 1, 0.5, -0.5, -1, 0.5, -0.5,
-    -1, -0.5, 0.5, 1, -0.5, 0.5, 1, 0.5, 0.5, -1, 0.5, 0.5),
-  indices: Uint32Array.of(0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
-    3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5),
+  vertices: Float64Array.of(
+    -1,
+    -0.5,
+    -0.5,
+    1,
+    -0.5,
+    -0.5,
+    1,
+    0.5,
+    -0.5,
+    -1,
+    0.5,
+    -0.5,
+    -1,
+    -0.5,
+    0.5,
+    1,
+    -0.5,
+    0.5,
+    1,
+    0.5,
+    0.5,
+    -1,
+    0.5,
+    0.5,
+  ),
+  indices: Uint32Array.of(
+    0,
+    2,
+    1,
+    0,
+    3,
+    2,
+    4,
+    5,
+    6,
+    4,
+    6,
+    7,
+    0,
+    1,
+    5,
+    0,
+    5,
+    4,
+    3,
+    7,
+    6,
+    3,
+    6,
+    2,
+    0,
+    4,
+    7,
+    0,
+    7,
+    3,
+    1,
+    2,
+    6,
+    1,
+    6,
+    5,
+  ),
 };
 
 function drivenHull(reflected) {
@@ -124,7 +203,13 @@ function drivenHull(reflected) {
   world.add(new RigidSolver(), { physics }).add(hull, {
     hulls: [{ row: body.row, mesh }],
     sea: { density: rho, elevation: () => 0 },
-    rollDamping: false, radiation: false, drag: false, drift: false, diffraction: false, slamming: false, greenWater: false,
+    rollDamping: false,
+    radiation: false,
+    drag: false,
+    drift: false,
+    diffraction: false,
+    slamming: false,
+    greenWater: false,
   });
   if (reflected) world.add(boundary, undefined);
   world
@@ -153,7 +238,10 @@ test('the live hull routes both pressure/volume fields through the quay without 
       for (let i = 0; i < cells[0]; i++) {
         const at = j * cells[0] + i;
         const mirror = (cells[1] - 1 - j) * cells[0] + i;
-        assert.ok(Math.abs(wet[at] - open[at] - open[mirror]) < 5e-13, `image-source residual at tick ${tick}, cell ${at}`);
+        assert.ok(
+          Math.abs(wet[at] - open[at] - open[mirror]) < 5e-13,
+          `image-source residual at tick ${tick}, cell ${at}`,
+        );
         incidentVolume += open[at] * cellSize ** 2;
         if (j >= cells[1] / 2) wetVolume += wet[at] * cellSize ** 2;
       }
@@ -181,7 +269,11 @@ test('an image setup rejects an odd Z grid and a source inside the quay', () => 
   const boundary = new QuayWakeBoundary({ wallZ });
   assert.throws(() => boundary.wakeParams({ cells: [32, 15] }), /even number.+#hydrodynamic-loads/);
   const params = boundary.wakeParams({
-    cells, cellSize, centreX, depth, sponge: 0,
+    cells,
+    cellSize,
+    centreX,
+    depth,
+    sponge: 0,
     sources: () => [{ x: centreX, z: wallZ - 1, radius: 1, pressure: 0, volume: 0.01 }],
   });
   const world = makeWorld().add(new WakeSolver(), params);
@@ -205,15 +297,23 @@ test('the boundary validates both hull inputs before changing either image port'
     mutate(copy);
     return { ...port, region: { ...region, memory, byteOffset: 0 } };
   }
-  const surfaceChanged = change(surface, (words) => { words[4] *= 2; });
+  const surfaceChanged = change(surface, (words) => {
+    words[4] *= 2;
+  });
   const land = change(submerged, (words) => {
     const i = words.findIndex((value, at) => at % 5 === 4 && value !== 0);
     assert.ok(i >= 0, 'the real hull has an active submerged source');
     words[i - 3] = wallZ - 0.01;
   });
   const context = (port) => ({
-    level: 0, tick: surface.tick, seed: 0, cell: surface.cell,
-    inputs: new Map([[surface.field, surfaceChanged], [submerged.field, port]]),
+    level: 0,
+    tick: surface.tick,
+    seed: 0,
+    cell: surface.cell,
+    inputs: new Map([
+      [surface.field, surfaceChanged],
+      [submerged.field, port],
+    ]),
   });
   for (const [refused, repair] of [
     [land, /seaward of the quay face.+#hydrodynamic-loads/],
