@@ -1023,6 +1023,9 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
   43.84 and 39.94 mm measured. Depth bands give 9.52 and 9.28 mm. Wetted-side through-flow remains open.
 - Item 4 in part. `9d36eb9d75` and `sea04-cauchy-poisson.test.js` verify the finite-depth release ring against
   a Hankel integral, with 1.20e−8 maximum normalized error and exact replay.
+  `3cf936a831` and `sea04-havelock.test.js` check moving pressure amplitude at five
+  absolute gauges. Worst open-water error is 98.44 µm within a 149.40 µm spatial and
+  integration bound. The direct periodic reference and replay also pass.
 - Item 6. `9d36eb9d75` and `sea-wake-breaking.test.js` check the fixed onset ratio against independently
   observed crest cases. `coupling/sea04-foam.test.js` checks the live wake-to-foam and spray read, held
   multi-rate deposition and exact replay. The read is diagnostic and does not simulate overturning.
