@@ -111,8 +111,15 @@ export function opacityEntries(
 ): GPUBindGroupEntry[];
 /** A caster shader that leaves vertex alpha out of its cut-out (a primitive with `vertexAlpha: false`). */
 export function solidVertexDepth(code: string): string;
-/** A caster shader that discards what uniform `name`'s planes cut away, bound at `binding` of group 0. */
-export function clippedDepth(code: string, binding: number, name: string, hardware?: boolean): string;
+/** A caster shader that discards what uniform `name`'s planes cut away, bound at `binding` of `group` (default 0); its vertex stage writes `o.clip=<camera>*...` (default `f.camera`). */
+export function clippedDepth(
+  code: string,
+  binding: number,
+  name: string,
+  hardware?: boolean,
+  group?: number,
+  camera?: string,
+): string;
 /** A cleared depth-only pass descriptor; set `depthStencilAttachment.view` before each use. */
 export function depthPassDescriptor(): GPURenderPassDescriptor & {
   depthStencilAttachment: GPURenderPassDepthStencilAttachment;

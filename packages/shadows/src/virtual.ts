@@ -23,6 +23,7 @@ import { CasterGroups, isCasterGroup } from '../../shared/shadow-group.js';
 import { invert } from '../../shared/math.js';
 import {
   casterPipeline,
+  clippedDepth,
   casterRuntime,
   displacementGroup,
   drawCaster,
@@ -806,7 +807,8 @@ export class VirtualShadows implements EnginePlugin {
         this.sphere(d, p);
         this.receivers.push(d);
       }
-      if (moving) d.still = false;
+      // A material's clipping planes are live on the GPU: its pages redraw every frame, as Shadows' do.
+      if (moving || (r.cast && p.clip)) d.still = false;
       if (r.cast && !r.static) d.watched = true;
       if (r.cast && !d.casts) {
         d.casts = true;
@@ -841,7 +843,9 @@ export class VirtualShadows implements EnginePlugin {
     if (!records) this.draws.set(p.node, (records = new Map()));
     const identity = p.primitive ?? p.index;
     let record = records.get(identity);
-    if (staleCaster(record, p, pipeline, p.displacement) || record.section !== section?.buffer) {
+    // The scene's section planes win over a material's (as in Shadows); either binds at 3.
+    const planes = section ?? p.clip;
+    if (staleCaster(record, p, pipeline, p.displacement) || record.section !== planes?.buffer) {
       if (record) for (const b of (record as Draw).uniforms) b.destroy();
       record = {
         p,
@@ -852,7 +856,7 @@ export class VirtualShadows implements EnginePlugin {
         pipeline,
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
-        section: section?.buffer,
+        section: planes?.buffer,
         displacement: p.displacement,
         displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), p.displacement),
         opacity: p.opacity,
@@ -882,7 +886,9 @@ export class VirtualShadows implements EnginePlugin {
       displacement = p.displacement,
       transform = p.alphaTransform,
       opacity = p.opacity,
-      animation = p.animation;
+      animation = p.animation,
+      material = !section && !!p.clip,
+      hardware = material && p.clipHardware === true;
     if (inst && p.stride !== 80) throw new RangeError('Instanced shadow casters need 80-byte vertices');
     if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
@@ -901,7 +907,9 @@ export class VirtualShadows implements EnginePlugin {
           (displacement ? 16 : 0) +
           (opacity ? 32 : 0) +
           (solid ? 64 : 0) +
-          (animation ? 128 : 0));
+          (animation ? 128 : 0) +
+          (material ? 1024 : 0) +
+          (hardware ? 2048 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
@@ -916,7 +924,7 @@ export class VirtualShadows implements EnginePlugin {
           .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
           .replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;o.position=world.xyz;');
         code = sectionShader(code, 0, 3, 'section');
-      }
+      } else if (material) code = clippedDepth(code, 3, 'materialClip', hardware);
       const module = this.device!.createShaderModule({ code });
       pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
@@ -939,7 +947,7 @@ export class VirtualShadows implements EnginePlugin {
           { binding: 0, resource: { buffer } },
           { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
           { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
-          ...(section ? [{ binding: 3, resource: section }] : []),
+          ...((section ?? p.clip) ? [{ binding: 3, resource: (section ?? p.clip)! }] : []),
           ...(p.opacity ? opacityEntries(p.opacity) : []),
           ...(p.animation ? animationEntries(p.animation) : []),
         ],

@@ -319,6 +319,8 @@ interface LocalShadowPrimitive {
         readonly sampler: GPUSampler;
     };
     vertexAlpha?: boolean;
+    clip?: GPUBufferBinding;
+    clipHardware?: boolean;
     hashed?: (code: string) => string;
 }
 

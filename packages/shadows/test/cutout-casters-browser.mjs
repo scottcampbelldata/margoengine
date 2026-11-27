@@ -65,6 +65,8 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
     alphaOnly: { solid: true, cut: false },
     vertexOff: { solid: true, cut: true },
     vertexOn: { solid: false, cut: false },
+    clipped: { solid: true, cut: false },
+    clipOff: { solid: true, cut: true },
   };
   try {
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -102,6 +104,9 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
       await run('directional', 'vertexOff', true);
       await run('spot', 'alphaMap', true);
       await run('integratedPoint', 'alphaMap', true);
+      await run('point', 'clipped', true);
+      await run('integratedSpot', 'clipped', true);
+      await run('virtual', 'clipped', true);
       // Live edits redraw the cached map: no test casts the whole quad, the test again cuts it, a new map moves the cut.
       {
         const points = passes.directional,

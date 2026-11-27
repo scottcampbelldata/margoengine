@@ -2189,8 +2189,10 @@ toon, normal, matcap, depth, distance, `WgslMaterial` and `@margoengine/shader` 
 beauty, G-buffer and SSAO passes and, with `clipShadows` (default true), in `@margoengine/shadows` directional shadow
 maps. Planes are normalised on assignment and reading returns copies; assign a new list to change them (live). A
 clipped caster redraws its shadow every frame. `@margoengine/lines` and `@margoengine/points` materials take the same
-option, with up to 6 planes. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's section planes (the `section` binding) still clip everything; with both, the scene's planes clip the shadows. Clustered
-point-light shadows and GPU picking ignore material planes.
+option, with up to 6 planes. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's section planes (the `section` binding) still clip everything; with both, the scene's planes clip the shadows. With
+`clipShadows` the planes also cut `VirtualShadows` pages and `@margoengine/clustered` point and spot light shadows
+(`LocalShadows` and a `Clustered` with `shadows`), and GPU picking (`@margoengine/selection`) misses what they cut away
+(`packages/shadows/test/cutout-casters-browser.mjs`, `packages/materials/test/cutout-passes-browser.mjs`).
 
 On a device with the optional `clip-distances` feature the planes cut in the rasterizer, before the fragment stage: there
 is no `discard`, so a clipped surface keeps early depth, and multisampling smooths the cut. Ask for it at creation with

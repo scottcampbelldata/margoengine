@@ -13,6 +13,7 @@ import {
   nodeRecords,
   depthPassDescriptor,
   displacementGroup,
+  clippedDepth,
   opacityDepth,
   opacityEntries,
   animatedDepth,
@@ -124,6 +125,14 @@ export interface LocalShadowPrimitive {
    * `alphaHash()` (its record's `castHashed`, shared/alpha-hash.js `hashedDepth`), so only an app that imports
    * `alphaHash` carries the hash WGSL. Default none.
    */
+  /**
+   * Planes that clip this caster (materials `clippingPlanes` with `clipShadows`): a uniform of up to 16 world planes in
+   * the `materialClip` layout (shared/section.js). The shadow keeps only what the colour pass draws. Such a caster
+   * redraws every frame, as the planes are live on the GPU.
+   */
+  clip?: GPUBufferBinding;
+  /** True when `clip` may cut in the rasterizer: a union of planes on a device with 'clip-distances'. */
+  clipHardware?: boolean;
   hashed?: (code: string) => string;
 }
 /**
@@ -165,6 +174,7 @@ interface Draw {
   displacement?: LocalShadowPrimitive['displacement'];
   opacity?: LocalShadowPrimitive['opacity'];
   animation?: LocalShadowPrimitive['animation'];
+  clip?: GPUBuffer;
   displaced?: GPUBindGroup;
 }
 const emptyPrimitives: readonly LocalShadowPrimitive[] = [];
@@ -628,6 +638,8 @@ export class LocalShadowMaps {
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped local shadow casters need PBR vertices');
     const animation = p.animation;
     if (animation && p.stride !== 80) throw new RangeError('UV-animated local shadow casters need PBR vertices');
+    const clip = p.clip,
+      hardware = !!clip && p.clipHardware === true;
     if (
       transform !== undefined &&
       (!(transform instanceof Float32Array) ||
@@ -659,7 +671,9 @@ export class LocalShadowMaps {
           (displacement ? 8 : 0) +
           (opacity ? 16 : 0) +
           (solid ? 32 : 0) +
-          (animation ? 64 : 0));
+          (animation ? 64 : 0) +
+          (clip ? 1024 : 0) +
+          (hardware ? 2048 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const depth = depthShader(p.stride === 80, !!transform),
@@ -673,14 +687,17 @@ export class LocalShadowMaps {
         cut = solid ? solidVertexDepth(placed) : placed,
         lit = opacity ? opacityDepth(cut, 0) : cut,
         moved = animation ? animatedDepth(lit, 0) : lit,
-        module = this.device!.createShaderModule({ code: hashed ? hashed(moved) : moved });
+        cast = hashed ? hashed(moved) : moved,
+        module = this.device!.createShaderModule({
+          code: clip ? clippedDepth(cast, 3, 'materialClip', hardware, 0, 'localDepth.camera') : cast,
+        });
       pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }
     const identity = p.primitive ?? p.index,
       records = nodeRecords(this.draws, p.node);
     let record = records.get(identity);
-    if (staleCaster(record, p, pipeline, displacement)) {
+    if (staleCaster(record, p, pipeline, displacement) || record.clip !== clip?.buffer) {
       if (record) this.destroyDraw(record);
       records.delete(identity);
       record = {
@@ -694,6 +711,7 @@ export class LocalShadowMaps {
         displacement,
         opacity,
         animation,
+        clip: clip?.buffer,
         displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
@@ -713,6 +731,7 @@ export class LocalShadowMaps {
               { binding: 0, resource: { buffer: uniform } },
               { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
               { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
+              ...(clip ? [{ binding: 3, resource: clip }] : []),
               ...(opacity ? opacityEntries(opacity) : []),
               ...(animation ? animationEntries(animation) : []),
             ],
@@ -799,8 +818,8 @@ struct LocalDepthFrame {camera:mat4x4f,model:mat4x4f,alpha:vec4f${transformed ? 
 @group(0) @binding(1) var localAlphaMap:texture_2d<f32>;
 @group(0) @binding(2) var localAlphaSampler:sampler;
 struct LocalDepthIn {@location(0) position:${pbr ? 'vec4f' : 'vec3f'},${pbr ? '@location(3) uv:vec4f,@location(4) color:vec4f' : ''}}
-struct LocalDepthOut {@builtin(position) @invariant clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
-@vertex fn vertex(i:LocalDepthIn)->LocalDepthOut {var o:LocalDepthOut;o.clip=localDepth.camera*localDepth.model*vec4f(i.position.xyz,1);${pbr ? 'o.uv=select(i.uv.xy,i.uv.zw,localDepth.alpha.z>0.5);o.alpha=i.color.a;' : 'o.uv=vec2f(0);o.alpha=1;'}${transformed ? 'let sourceUV=o.uv;o.uv=vec2f(dot(localDepth.alphaUV0.xy,sourceUV)+localDepth.alphaUV0.z,dot(localDepth.alphaUV1.xy,sourceUV)+localDepth.alphaUV1.z);' : ''}return o;}
-@fragment fn fragment(i:LocalDepthOut){if(textureSampleLevel(localAlphaMap,localAlphaSampler,i.uv,0).a*localDepth.alpha.x*i.alpha<localDepth.alpha.y){discard;}}
+struct Out {@builtin(position) @invariant clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+@vertex fn vertex(i:LocalDepthIn)->Out {var o:Out;o.clip=localDepth.camera*localDepth.model*vec4f(i.position.xyz,1);${pbr ? 'o.uv=select(i.uv.xy,i.uv.zw,localDepth.alpha.z>0.5);o.alpha=i.color.a;' : 'o.uv=vec2f(0);o.alpha=1;'}${transformed ? 'let sourceUV=o.uv;o.uv=vec2f(dot(localDepth.alphaUV0.xy,sourceUV)+localDepth.alphaUV0.z,dot(localDepth.alphaUV1.xy,sourceUV)+localDepth.alphaUV1.z);' : ''}return o;}
+@fragment fn fragment(i:Out){if(textureSampleLevel(localAlphaMap,localAlphaSampler,i.uv,0).a*localDepth.alpha.x*i.alpha<localDepth.alpha.y){discard;}}
 `;
 }

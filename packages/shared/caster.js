@@ -103,21 +103,25 @@ export function opacityDepth(code, group) {
 }
 
 /**
- * A caster shader whose fragment discards what uniform `name`'s planes cut away, bound at `binding` of group 0. The vertex
- * stage must place `o.clip=f.camera*...` and the output struct be `Out`, with location 2 free. Apply it last. `hardware`
- * cuts by `clipDistances` instead, for a union of planes on a device with the feature.
+ * A caster shader whose fragment discards what uniform `name`'s planes cut away, bound at `binding` of `group` (default
+ * 0). The vertex stage must place `o.clip=<camera>*...` (`camera` default `f.camera`) and the output struct be `Out`,
+ * with location 2 free. Apply it last. `hardware` cuts by `clipDistances` instead, for a union of planes on a device
+ * with the feature.
  */
-export const clippedDepth = (code, binding, name, hardware = false) =>
-  hardware
-    ? clipDistances(clipDeclaration(0, binding, name) + code.replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;'), name, 'world.xyz')
+export function clippedDepth(code, binding, name, hardware = false, group = 0, camera = 'f.camera') {
+  const at = new RegExp(`o\\.clip=${camera.replaceAll('.', '\\.')}\\*([^;]+);`);
+  if (!at.test(code)) throw new TypeError(`Clipped caster shaders need o.clip=${camera}*...; use a caster depth shader`);
+  return hardware
+    ? clipDistances(clipDeclaration(group, binding, name) + code.replace(at, `let world=$1;o.clip=${camera}*world;`), name, 'world.xyz')
     : sectionShader(
         code
           .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
-          .replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;o.position=world.xyz;'),
-        0,
+          .replace(at, `let world=$1;o.clip=${camera}*world;o.position=world.xyz;`),
+        group,
         binding,
         name,
       );
+}
 
 /** The bind group entries of a caster's `opacity`, from binding `first` (see `opacityCode`). */
 export const opacityEntries = (opacity, first = 4) => [

@@ -41,6 +41,10 @@ const casters={
   vertexOff:()=>new PbrMaterial({alphaTest:0.5,vertexColors:false}),
   vertexOn:()=>new PbrMaterial({alphaTest:0.5}),
   // Hashed alpha at a uniform 0.3 and 0.7 (cutoff 0.5): the shadow keeps that share of its texels, not none or all.
+  // A material clipping plane keeping x <= -2 (the solid half): every shadow keeps only what the colour pass draws.
+  clipped:()=>new PbrMaterial({clippingPlanes:[[-1,0,0,-2]]}),
+  // The same plane with clipShadows false: the whole quad casts.
+  clipOff:()=>new PbrMaterial({clippingPlanes:[[-1,0,0,-2]],clipShadows:false}),
   hashed30:()=>new PbrMaterial({color:[1,1,1,0.3],features:[alphaHash()]}),
   hashed70:()=>new PbrMaterial({color:[1,1,1,0.7],features:[alphaHash()]}),
 };
