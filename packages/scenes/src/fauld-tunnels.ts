@@ -166,6 +166,23 @@ export const FAULD_STATE_EV: Readonly<Record<FauldTunnelState, number>> = {
  */
 export const TUNGSTEN_2700: Vec3 = [1.98, 0.786, 0.188];
 const TUNGSTEN = TUNGSTEN_2700;
+/**
+ * The roof over a place of the store, metres (the floor at y = 0), measured on the models: the old roadway's rock
+ * (tn_shell, x past 118: 3.16 to 3.48 m, 3.2 over its fire) and the crown of the vaults' sheeted arch (tn_sheet,
+ * 3.39 m).
+ * @example fauldRoofHeight(125); // 3.2
+ */
+export function fauldRoofHeight(x: number): number {
+  return x > 118 ? 3.2 : 3.39;
+}
+/**
+ * The smoke column of a fire underground at `x` metres: it stops at the roof and runs out under it
+ * (`Smoke`'s `ceiling`), dark, as bitumen and munitions packing burn sooty.
+ * @example fauldFireSmoke(125).ceiling; // 3.2
+ */
+export function fauldFireSmoke(x: number): { ceiling: number; color: [number, number, number]; opacity: number } {
+  return { ceiling: fauldRoofHeight(x), color: [0.08, 0.075, 0.07], opacity: 0.35 };
+}
 /** The detonation flash of the blast state, candela (see the blast lamps in `attach`). */
 export const BLAST_FLASH_CD = 1.9e6;
 /**
@@ -572,6 +589,8 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
           width: 0.9 * scale,
           lights: groups,
           depth: () => stack.depthTexture,
+          // Underground the fire's smoke stops at the roof and runs out under it; in the open yard it climbs.
+          ...(yard ? {} : { smoke: { ...fauldFireSmoke(x), depth: () => stack.depthTexture } }),
         }),
       );
     else if (yard)

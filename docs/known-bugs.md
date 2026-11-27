@@ -2206,6 +2206,43 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   uniforms and WGSL) and `packages/sky/test/features-check.mjs look` (GPU, WebGPU and WebGL2: the falloff, the sight,
   two spots adding, the haze's mean along the ray).
 
+### Open 2026-11-27: a smoke layer under a roof reads as separate puffs far from its fire (KB-VFX-ROOFDOTS1, vfx)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr096.json --stills --out <folder>`: dark round puffs show
+  one by one in the haze over the casings.
+- **Cause:** the layer under a `ceiling` runs out radially with puffs of one size, so they thin as 1 / distance and no
+  longer overlap; walls hide the part that runs into them instead of turning it along the tunnel.
+- **Owed in vfx:** a layer that fills a gallery (two walls turn the jet along it) with puffs that widen as they thin.
+
+### Open 2026-11-27: a fire's sparks draw white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr091.json --stills --out <folder>`: the embers beside the
+  flames are white streaks while the flames are orange.
+- **Cause:** not yet traced; the likely one is that the hearth kit's ember radiance, set for a scene at its own
+  exposure, is far over the pre-exposed frame's white, so every channel clips.
+- **Owed in vfx:** embers whose radiance follows the flame's peak, with a test and a real frame.
+
+### Fixed 2026-11-27: smoke indoors climbed through the roof and veiled its own fire (KB-VFX-SMOKEROOF1, vfx and scenes)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr091.json --stills --out <folder>`: no flame showed, the
+  tunnel beyond the rubble was black and pale flat ovals stood beside it. With the fire's smoke off the flames showed.
+- **Cause:** `Smoke` had no roof. A fire under 3.2 m of tunnel ran its 60 s open-sky plume: puffs climbed tens of
+  metres, grew tens of metres wide, and their billboards, depth tested at their centres, hung over the whole view; the
+  lamps lit patches of them. The column over a lit `Fire` was also lit twice, by the fire's own lights and by its
+  `glow`, referred to a daylight sun.
+- **Fix:** `SmokeOptions.ceiling` (the column stops at the roof and spreads under it, Alpert 1972); a lit `Fire`'s
+  column defaults `glow` to 0; the Fauld tunnels give each fire's smoke its roof (`fauldFireSmoke`). Real frame: the
+  flames and sparks show and the pale ovals are gone; the shot stays dark. Regression: packages/vfx/test/smoke.test.js,
+  packages/vfx/test/fire.test.js, packages/vfx/test/smoke-check.mjs, packages/scenes/test/fauld-tunnels.test.js.
+
+### Fixed 2026-11-27: nodes reading a particle's age could not attach beside over-life curves (KB-VFX-NODESLIFE1, vfx)
+
+- **Repro:** a `VFX` with `overLife` and a `nodes` graph reading `age`: attach threw "VFX over-life needs its simulation
+  shader".
+- **Cause:** `nodes` rewrites the kernel's slot load to read the particle's cold half, and `overLife` looked for the old
+  statement word for word.
+- **Fix:** `overLife` anchors on the load whatever it reads. Regression: packages/vfx/test/nodes.test.js.
+
 ### Open 2026-11-27: a smoke column over a fire at night reads blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=aerial-west --query=hour=22 --out=<folder>`: the

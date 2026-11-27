@@ -26,6 +26,15 @@ try {
       `ok smoke rise ${r.U} m/s: ${r.count} puffs, step ${(r.worstStep * 100).toFixed(3)}%, law ${(r.worstLaw * 100).toFixed(2)}%, lean ${r.worstLean.toFixed(3)} deg`,
     );
   }
+  const roof = await page.evaluate(() => window.check.roof());
+  assert.deepEqual(roof.errors, [], 'GPU errors under a roof');
+  assert.ok(roof.count >= 90 && roof.settled >= 50, `puffs under the roof: ${JSON.stringify(roof)}`);
+  assert.ok(roof.over <= 0.01, `a puff passed the roof: ${JSON.stringify(roof)}`);
+  assert.ok(roof.under <= 0.5 * roof.layer, `a settled puff left its layer: ${JSON.stringify(roof)}`);
+  assert.ok(roof.far >= 3, `the layer did not run out under the roof: ${JSON.stringify(roof)}`);
+  console.log(
+    `ok smoke roof: ${roof.count} puffs, ${roof.over.toFixed(4)} m over, ${roof.under.toFixed(3)} m off the layer, out to ${roof.far.toFixed(1)} m`,
+  );
   const repeat = await page.evaluate(() => window.check.repeat());
   assert.equal(repeat.differing, 0, `two runs differ: ${JSON.stringify(repeat)}`);
   console.log(`ok smoke repeat: ${repeat.floats} floats the same`);

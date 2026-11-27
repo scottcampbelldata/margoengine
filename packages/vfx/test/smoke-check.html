@@ -47,6 +47,21 @@ async function column(U){
  e.dispose();
  return {U,count,worstStep,worstLaw,worstLean,errors:errs};
 }
+async function roof(){
+ const {e,errs}=await scene(),ceiling=5,r=0.5;
+ const smoke=Smoke.attach(e,{position:[0,1,0],ceiling,heat:3e5,radius:r,lifetime:L,rate:10,prewarm:false});
+ for(let f=0;f<frames;f++)await step(e,dt);
+ const p=await read(e,smoke.effect.gpuState.particles),layer=smoke.column(L).radius;
+ let count=0,over=0,under=0,far=0,settled=0;
+ for(let i=0;i<smoke.capacity;i++){
+  const life=p[i*8+3];if(!(life>0&&life<L))continue;count++;
+  const x=p[i*8],y=p[i*8+1],z=p[i*8+2],half=p[i*8+7]/2,age=L-life;
+  over=Math.max(over,y+half-ceiling);
+  if(age>4){settled++;under=Math.max(under,Math.abs(y-(ceiling-layer)));far=Math.max(far,Math.hypot(x,z));}
+ }
+ e.dispose();
+ return {count,settled,over,under,far,layer,errors:errs};
+}
 async function bytes(){
  const {e}=await scene();
  const smoke=Smoke.attach(e,{position:[0,0,0],lifetime:10,rate:20,wind:[3,1]});
@@ -63,6 +78,7 @@ async function picture(set,none=false){
 }
 window.check={
  async rise(){const out=[];for(const U of [0,2,5,15])out.push(await column(U));return out;},
+ roof,
  async repeat(){const a=await bytes(),b=await bytes();let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i]&&!(a[i]!==a[i]&&b[i]!==b[i]))n++;return {differing:n,floats:a.length};},
  async live(){
   const {e,errs}=await scene(),made={pipelines:0,buffers:0,textures:0};

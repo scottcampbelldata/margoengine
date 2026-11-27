@@ -204,13 +204,36 @@ test('fauld-tunnels: every hand lamp stands on the floor in a tn_handlamp fittin
     for (const lamp of d.lamps) {
       if (!lamp.extra?.aim || lamp.run === 'yard_lamp' || lamp.run === 'bulbs_cradle') continue;
       n++;
-      assert.ok(Math.abs(lamp.at[2] - (m.HANDLAMP_STAND[0] - m.HANDLAMP_STAND[2])) < 1e-9, `${state} ${lamp.run} lens height ${lamp.at[2]}`);
+      assert.ok(
+        Math.abs(lamp.at[2] - (m.HANDLAMP_STAND[0] - m.HANDLAMP_STAND[2])) < 1e-9,
+        `${state} ${lamp.run} lens height ${lamp.at[2]}`,
+      );
       const w = m.toWorld(...lamp.at);
       assert.ok(
-        fittings.some((f) => Math.hypot(f[12] - w[0], f[14] - w[2]) < 0.05 && Math.abs(f[13] - m.HANDLAMP_STAND[0]) < 1e-9),
+        fittings.some(
+          (f) => Math.hypot(f[12] - w[0], f[14] - w[2]) < 0.05 && Math.abs(f[13] - m.HANDLAMP_STAND[0]) < 1e-9,
+        ),
         `${state} ${lamp.run}: no fitting under the lamp`,
       );
     }
   }
   assert.ok(n >= 10, `hand lamps checked: ${n}`);
+});
+
+// KB-VFX-SMOKEROOF1: the fire state's smoke climbed through the rock and veiled the flames in pale ovals.
+test('fauld-tunnels: smoke underground stops at the roof, over every fire of the fire state', () => {
+  assert.equal(m.fauldRoofHeight(125), 3.2);
+  assert.equal(m.fauldRoofHeight(60), 3.39);
+  const fx = m.dressState('fire').fx.filter((f) => f[1] === 'fire'),
+    burning = [
+      ...fx.map((f) => [f[2], f[4], f[5]]),
+      ...m.stateLights('fire').fires.map((f) => [f.at[0], f.at[2], f.scale]),
+    ];
+  assert.ok(burning.length >= 3);
+  for (const [x, z, scale] of burning) {
+    const smoke = m.fauldFireSmoke(x);
+    assert.equal(smoke.ceiling, m.fauldRoofHeight(x));
+    assert.ok(z + Math.min(3, 1.6 * scale) < smoke.ceiling, 'every flame stands under its roof');
+    assert.ok(Math.max(...smoke.color) < 0.1, 'sooty smoke');
+  }
 });

@@ -10,6 +10,10 @@
 //   (eq. 4.22); in a wind U the bent-over plume's "2/3 law" rise 1.6 F^(1/3) U^(-1) x^(2/3) (eq. 4.31), whose
 //   characteristic radius is gamma z with gamma about 0.5 (eq. 4.23); in stable air of stability s = (g / T) dtheta/dz
 //   the final rise 5.0 F^(1/4) s^(-3/8) in calm air (eq. 4.25) and 2.9 (F / (U s))^(1/3) in a wind (eq. 5.7).
+// - R. L. Alpert, "Calculation of response time of ceiling-mounted fire detectors", Fire Technology 8(3), 181-195,
+//   1972, https://doi.org/10.1007/BF02590543: where a fire's plume meets a flat ceiling H metres over it, it turns into
+//   a jet that runs out under the ceiling at 0.96 (Q / H)^(1/3) m/s within r / H 0.15 of the axis and
+//   0.195 Q^(1/3) H^(1/2) / r^(5/6) beyond (Q the fire's heat release, kW).
 //
 // The column's rise at age t is the lower of the calm plume (MTT, from a virtual origin z0 = r0 / ((6/5) alpha) below
 // a source of radius r0) and the bent-over plume (Briggs, x = U t, from the virtual origin where gamma z = r0), capped
@@ -29,6 +33,7 @@ import {
   type FogLike,
   type VFXLightSource,
   type VFXLit,
+  type VFXNodes,
   type VFXOptions,
   type VFXTexture,
   type VFXWind,
@@ -39,6 +44,7 @@ import { lit } from '@margoengine/vfx/lit';
 import { overLife } from '@margoengine/vfx/over-life';
 import { nodes } from '@margoengine/vfx/nodes';
 import { schedule } from '@margoengine/vfx/schedule';
+import { obstacles } from '@margoengine/vfx/obstacles';
 import { textureFeature } from '@margoengine/vfx/texture';
 
 type Vec3 = readonly [number, number, number];
@@ -61,6 +67,15 @@ export const STABLE_WIND_RISE = 2.9;
 const GRAVITY = 9.81,
   AIR_DENSITY = 1.225,
   AIR_HEAT = 1005;
+/** Half the size of the box that stands for the roof, metres: past any distance a puff travels in its life. */
+const ROOF_HALF = 1e5;
+/**
+ * The stiffness, 1/s^2, that holds a puff at its layer's height under a roof: a hot layer is buoyant and stably
+ * stratified, so a puff stirred out of it returns. With the drag of 4 a second the return is critically damped.
+ */
+const LAYER_STIFFNESS = (STILL_AIR_DRAG * STILL_AIR_DRAG) / 4;
+/** Seconds over which the roof's forces come on after a puff arrives. */
+const ARRIVE_RAMP = 0.5;
 /** Samples of the speed and size curves over a puff's life (the most `overLife` takes). */
 const SAMPLES = 32;
 /** Seconds a new puff takes to show fully: smoke leaves the flames already dense (KB-VFX-SMOKEROPE1: the old ramp was a fifth of the life, 12 s of a 60 s life). */
@@ -194,6 +209,86 @@ export function plumeRise(
   return p;
 }
 
+/**
+ * The speed of the jet a fire's plume turns into under a flat ceiling, m/s (Alpert 1972): 0.96 (Q / H)^(1/3) within
+ * r / H 0.15 of the plume's axis, 0.195 Q^(1/3) H^(1/2) / r^(5/6) beyond.
+ * @param heat The fire's heat release, watts, 0 or more.
+ * @param height The ceiling's height over the fire, metres, above 0.
+ * @param distance Horizontal distance from the plume's axis, metres, 0 or more. Default `height`.
+ * @example ceilingJetSpeed(1e6, 3); // about 1.35 m/s, 3 m out under a ceiling 3 m over a 1 MW fire
+ */
+export function ceilingJetSpeed(heat: number, height: number, distance = height): number {
+  if (!(heat >= 0 && Number.isFinite(heat)))
+    throw new RangeError('Smoke heat must be a finite number of watts, 0 or more');
+  if (!(height > 0 && Number.isFinite(height)))
+    throw new RangeError('Smoke ceiling height must be a finite number of metres above 0');
+  if (!(distance >= 0 && Number.isFinite(distance)))
+    throw new RangeError('Smoke ceiling distance must be a finite number of metres, 0 or more');
+  const q = heat / 1000;
+  return distance <= 0.15 * height
+    ? 0.96 * Math.cbrt(q / height)
+    : (0.195 * Math.cbrt(q) * Math.sqrt(height)) / distance ** (5 / 6);
+}
+
+/**
+ * Where a column under a roof stops rising, `headroom` metres over its source: the rise at which the plume, widening by
+ * (6/5) alpha a metre from the source radius, has its top at the roof, and that radius, the smoke layer's.
+ */
+function underRoof(headroom: number, radius: number): { rise: number; radius: number } {
+  const spread = 1.2 * PLUME_ENTRAINMENT,
+    rise = Math.max(0, (headroom - radius) / (1 + spread));
+  return { rise, radius: radius + spread * rise };
+}
+
+/** The roof as an obstacle and the node constants of the layer under it, all rewritten in place each frame. */
+interface Roof {
+  readonly box: { kind: 'box'; center: [number, number, number]; halfSize: [number, number, number] };
+  /** Minus the layer's centre over the source. */
+  readonly from: [number, number, number];
+  /** Minus the age at which a puff arrives in the layer, seconds. */
+  readonly arrive: { op: 'const'; value: number };
+  /** The jet's acceleration against the still-air drag, on x and z. */
+  readonly push: [number, number, number];
+}
+
+/**
+ * The layer under a roof as node operators after the still-air drag's four: a gate from 0 to 1 as a puff's age passes
+ * its arrival, times the jet's push outward from the plume's axis, the drag on the rise speed and the buoyancy that
+ * holds the puff at the layer's height.
+ */
+const layerNodes = (roof: Roof): VFXNodes['graph'] => [
+  // 4..6: the puff from the layer's centre over the source
+  { op: 'attribute', value: 'position' },
+  { op: 'const', value: roof.from },
+  { op: 'add', inputs: [4, 5] },
+  // 7..15: the gate, the age past the arrival in ramps, held to 0..1
+  { op: 'attribute', value: 'age' },
+  roof.arrive,
+  { op: 'add', inputs: [7, 8] },
+  { op: 'const', value: 1 / ARRIVE_RAMP },
+  { op: 'mul', inputs: [9, 10] },
+  { op: 'const', value: 0 },
+  { op: 'max', inputs: [11, 12] },
+  { op: 'const', value: 1 },
+  { op: 'min', inputs: [13, 14] },
+  // 16..20: outward from the axis
+  { op: 'const', value: [1, 0, 1] },
+  { op: 'mul', inputs: [6, 16] },
+  { op: 'normalize', inputs: [17] },
+  { op: 'const', value: roof.push },
+  { op: 'mul', inputs: [18, 19] },
+  // 21..26: with the drag on the rise speed and the return to the layer
+  { op: 'const', value: [0, -STILL_AIR_DRAG, 0] },
+  { op: 'mul', inputs: [0, 21] },
+  { op: 'add', inputs: [20, 22] },
+  { op: 'const', value: [0, -LAYER_STIFFNESS, 0] },
+  { op: 'mul', inputs: [6, 24] },
+  { op: 'add', inputs: [23, 25] },
+  // 27, 28: through the gate
+  { op: 'mul', inputs: [26, 15] },
+  { op: 'force', inputs: [27] },
+];
+
 /** Where the smoke comes from: a `Fire` of `@margoengine/vfx/fire` (its flames' position and wind). */
 export interface SmokeSource {
   /** Hearth flames. */
@@ -207,7 +302,8 @@ const flameOf = (fire: SmokeSource | undefined): { position?: Vec3; wind?: VFXWi
 
 /**
  * `Smoke.attach` settings. `position` or `fire` is required. Read every frame (change a field and the next frame shows
- * it) except `lifetime`, `prewarm`, `texture`, `lights`, `shadows` and `depth`, which are read at attach.
+ * it) except `lifetime`, `prewarm`, `texture`, `lights`, `shadows` and `depth`, which are read at attach, as is
+ * whether there is a `ceiling` (its height is read every frame).
  */
 export interface SmokeOptions {
   /** The source, world units (the top of the fire). Default: the fire's flames' position. */
@@ -228,6 +324,14 @@ export interface SmokeOptions {
    * Briggs' final rise and spreads there. Default 0 (neutral air, no ceiling).
    */
   stability?: number;
+  /**
+   * The world height of a flat roof over the source, metres: a room, a tunnel, a deck. The column stops where its top
+   * meets the roof, widens no further, and runs out under it in every direction at Alpert's ceiling jet speed
+   * ({@link ceilingJetSpeed} of the whole heat release, `heat` over 0.7), staying under the roof. A source at or over
+   * the roof spreads under it at once. Default none: open sky (without it a column indoors climbs through the roof,
+   * and its old puffs, metres wide, hide what is under it).
+   */
+  ceiling?: number;
   /**
    * The wind, `[x, z]` m/s or `{sample(x, y, z, t)}` (a `WindField` fits): the column bends over by Briggs' law and
    * leans atan(U / w). Default none, and then a `WeatherDrive` in the scene writes the weather's wind; a wind given
@@ -316,7 +420,7 @@ export class Smoke implements EnginePlugin {
   private readonly speed: number[] = new Array(SAMPLES).fill(1);
   private readonly size: number[] = new Array(SAMPLES).fill(1);
   private readonly point: PlumePoint = { rise: 0, speed: 0, radius: 0, bent: false, level: false };
-  private readonly key = [NaN, NaN, NaN, NaN, NaN];
+  private readonly key = [NaN, NaN, NaN, NaN, NaN, NaN];
   private readonly velocity: [number, number, number] = [0, 0, 0];
   private readonly extent: [number, number, number] = [0, 0, 0];
   private readonly rgba: [number, number, number, number] = [0, 0, 0, 0];
@@ -325,12 +429,23 @@ export class Smoke implements EnginePlugin {
   /** The still-air drag on the puffs' horizontal velocity, per second, as a node constant: 0 while a wind applies. */
   private readonly still: [number, number, number] = [-STILL_AIR_DRAG, 0, -STILL_AIR_DRAG];
   private readonly lit: VFXLit;
+  /** Undefined under open sky. */
+  private readonly roof: Roof | undefined;
   private readonly glowAt: [number, number, number] = [0, 0, 0];
   private constructor(engine: EngineKernel, options: SmokeOptions) {
     const fire = options.fire;
     if (fire && !fire.particles?.flames && !fire.flame?.options)
       throw new TypeError('Invalid Smoke fire; pass a Fire from @margoengine/vfx/fire');
     this.options = options;
+    this.roof =
+      options.ceiling === undefined
+        ? undefined
+        : {
+            box: { kind: 'box', center: [0, 0, 0], halfSize: [ROOF_HALF, ROOF_HALF, ROOF_HALF] },
+            from: [0, 0, 0],
+            arrive: { op: 'const', value: 0 },
+            push: [0, 0, 0],
+          };
     this.lifetime = unit(options.lifetime ?? 60, 'lifetime', 0, 3600, true);
     if (options.prewarm !== undefined && typeof options.prewarm !== 'boolean')
       throw new TypeError('Smoke prewarm must be true or false');
@@ -367,18 +482,30 @@ export class Smoke implements EnginePlugin {
       ...((options.prewarm ?? true)
         ? { schedule: { prewarm: this.lifetime, step: Math.max(0.1, this.lifetime / 600) } }
         : {}),
+      // A roof stops a puff dead (no bounce) and the jet under it carries it out.
+      ...(this.roof ? { obstacles: [this.roof.box], bounce: 0 } : {}),
       nodes: {
         graph: [
           { op: 'attribute', value: 'velocity' },
           { op: 'const', value: this.still },
           { op: 'mul', inputs: [0, 1] },
           { op: 'force', inputs: [2] },
+          ...(this.roof ? layerNodes(this.roof) : []),
         ],
       },
     };
     this.ownWind = options.wind;
     this.calm(vfx.wind ?? flameOf(fire)?.wind);
-    this.effect = VFX.attach(engine, vfx, { curves, soft, lit, overLife, schedule, texture: textureFeature, nodes });
+    this.effect = VFX.attach(engine, vfx, {
+      curves,
+      soft,
+      lit,
+      overLife,
+      schedule,
+      texture: textureFeature,
+      nodes,
+      ...(this.roof ? { obstacles } : {}),
+    });
   }
   /** Turns the still-air drag on when no wind moves the puffs (none, [0, 0], or a field that is calm here now). */
   private calm(wind: VFXWind | undefined): void {
@@ -412,6 +539,9 @@ export class Smoke implements EnginePlugin {
     buoyancyFlux(this.heat(), o.airTemperature);
     const radius = unit(this.radius(), 'radius', 0, 10000, true);
     unit(o.stability ?? 0, 'stability', 0, 1);
+    if (this.roof) this.placeRoof(this.roof, radius);
+    else if (o.ceiling !== undefined)
+      throw new TypeError('Smoke ceiling is chosen at attach; attach the smoke with a ceiling to move it later');
     unit(o.rate ?? 20, 'rate', 0, 100000, true);
     unit(o.turbulence ?? 0.4, 'turbulence', 0, 1000);
     const opacity = unit(o.opacity ?? 0.5, 'opacity', 0, 1),
@@ -434,6 +564,27 @@ export class Smoke implements EnginePlugin {
     if (o.noon === undefined) delete this.lit.noon;
     else this.lit.noon = unit(o.noon, 'noon', 0, 1e7, true);
   }
+  /** Puts the roof's box and the jet under it where this frame's source, radius, heat and ceiling put them. */
+  private placeRoof(roof: Roof, radius: number): void {
+    const ceiling = this.options.ceiling;
+    if (typeof ceiling !== 'number' || !Number.isFinite(ceiling))
+      throw new RangeError(`Smoke ceiling is ${ceiling}; pass the roof's world height, a finite number of metres`);
+    const headroom = ceiling - this.at[1],
+      layer = underRoof(headroom, radius),
+      a = PLUME_ENTRAINMENT,
+      W = Math.cbrt((25 * buoyancyFlux(this.heat(), this.options.airTemperature)) / (48 * a * a)),
+      z0 = radius / (1.2 * a);
+    roof.box.center[0] = this.at[0];
+    roof.box.center[1] = ceiling + ROOF_HALF;
+    roof.box.center[2] = this.at[2];
+    roof.from[0] = -this.at[0];
+    roof.from[1] = -(ceiling - layer.radius);
+    roof.from[2] = -this.at[2];
+    // The age at which the calm plume has risen to the layer (plumeRise turned round); a fire that is out never does.
+    roof.arrive.value = W > 0 ? -(((z0 + layer.rise) ** (4 / 3) - z0 ** (4 / 3)) * 3) / (4 * W) : -3600;
+    // The jet's speed a ceiling height out; against the horizontal drag the push over that drag is its speed.
+    roof.push[0] = roof.push[2] = STILL_AIR_DRAG * ceilingJetSpeed(this.heat() / 0.7, Math.max(headroom, radius));
+  }
   /** The wind the column follows this frame: its own, else what the fire or the weather wrote on the puffs. */
   private wind(): number {
     const own = this.options.wind ?? this.effect?.options.wind ?? flameOf(this.options.fire)?.wind;
@@ -446,9 +597,18 @@ export class Smoke implements EnginePlugin {
       radius = this.radius(),
       wind = this.wind(),
       stability = o.stability ?? 0,
+      headroom = o.ceiling === undefined ? Infinity : o.ceiling - this.at[1],
       key = this.key;
-    if (key[0] === flux && key[1] === wind && key[2] === radius && key[3] === stability && key[4] === this.lifetime)
+    if (
+      key[0] === flux &&
+      key[1] === wind &&
+      key[2] === radius &&
+      key[3] === stability &&
+      key[4] === this.lifetime &&
+      key[5] === headroom
+    )
       return;
+    key[5] = headroom;
     key[0] = flux;
     key[1] = wind;
     key[2] = radius;
@@ -459,22 +619,33 @@ export class Smoke implements EnginePlugin {
     const p = this.point,
       w0 = plumeRise(0, flux, 0, radius, 0, p).speed;
     this.velocity[1] = w0;
+    const roof = headroom === Infinity ? undefined : underRoof(headroom, radius);
     for (let k = 0; k < SAMPLES; k++) {
       plumeRise((k / (SAMPLES - 1)) * this.lifetime, flux, wind, radius, stability, p);
-      this.speed[k] = w0 > 0 ? Math.min(1000, p.speed / w0) : 0;
-      this.size[k] = Math.min(1000, p.radius / radius);
+      // From the roof on the speed curve holds still: its changes add to a puff's velocity, and one that went on
+      // slowing would pull the puffs the roof stopped back down.
+      const stopped = roof !== undefined && k > 0 && p.rise >= roof.rise;
+      this.speed[k] = stopped ? this.speed[k - 1]! : w0 > 0 ? Math.min(1000, p.speed / w0) : 0;
+      this.size[k] = Math.min(1000, (roof ? Math.min(p.radius, roof.radius) : p.radius) / radius);
     }
   }
-  /** The column now: rise, speed and radius at a puff age of `seconds` for the wind it follows this frame. */
+  /**
+   * The column now: rise, speed and radius at a puff age of `seconds` for the wind it follows this frame. Under a
+   * `ceiling` the rise and radius stop at the roof (`level`, with no rise speed).
+   */
   column(seconds: number): PlumePoint {
-    const o = this.options;
-    return plumeRise(
-      seconds,
-      buoyancyFlux(this.heat(), o.airTemperature),
-      this.wind(),
-      this.radius(),
-      o.stability ?? 0,
-    );
+    const o = this.options,
+      p = plumeRise(seconds, buoyancyFlux(this.heat(), o.airTemperature), this.wind(), this.radius(), o.stability ?? 0);
+    if (o.ceiling !== undefined) {
+      const roof = underRoof(o.ceiling - this.at[1], this.radius());
+      if (p.rise >= roof.rise) {
+        p.rise = roof.rise;
+        p.speed = 0;
+        p.level = true;
+      }
+      p.radius = Math.min(p.radius, roof.radius);
+    }
+    return p;
   }
   setup(engine: Engine): void {
     this.engine = engine;

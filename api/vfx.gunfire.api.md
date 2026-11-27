@@ -610,6 +610,7 @@ interface SmokeOptions {
     radius?: number;
     airTemperature?: number;
     stability?: number;
+    ceiling?: number;
     wind?: VFXWind;
     lifetime?: number;
     rate?: number;

@@ -1109,6 +1109,25 @@ console.log(Object.keys(SMOKE_LOOKS).join(', ')); // campfire, houseFire, wildfi
   So the column over a fire is orange underneath and fades to grey as it climbs, at night with no other light;
   `glow: 0` turns it off. A new puff is opaque within `SMOKE_FADE_IN` (1 s) whatever its lifetime
   (`smokeAlphaCurve`; it was a fifth of the life, 12 s of a minute).
+- Indoors and underground, give the column its roof: `ceiling` is the world height of a flat roof over the source
+  (default none, open sky; whether there is one is read at attach, its height every frame). The puffs stop where the
+  column's top meets it, widen no further, and run out under it at the speed of the ceiling jet
+  (`ceilingJetSpeed`, Alpert 1972: 0.96 (Q / H)^(1/3) m/s by the axis, 0.195 Q^(1/3) H^(1/2) / r^(5/6) beyond; the
+  layer takes the speed a ceiling height out), held at their height as a buoyant layer. `smoke.column(t)` gives the
+  stopped rise and radius. Without it a column in a tunnel climbs through the rock and its old puffs, tens of metres
+  wide, hide the fire (KB-VFX-SMOKEROOF1). The layer runs out in every direction (walls only hide it), and far along it
+  the puffs read one by one (KB-VFX-ROOFDOTS1). Measured on an RTX A6000, WebGPU and the WebGL2 layer
+  (`smoke-check.mjs`): no puff over the roof by more than 4 mm.
+
+  ```ts
+  import {Smoke, ceilingJetSpeed} from 'margoengine/vfx/smoke';
+  import {Engine} from 'margoengine/core';
+
+  const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+  const smoke = Smoke.attach(engine, {position: [0, 1.6, 0], ceiling: 3.2, heat: 2e5, radius: 0.4});
+  console.log(smoke.column(30).rise.toFixed(2)); // 1.08
+  console.log(ceilingJetSpeed(1e6, 3).toFixed(2)); // 1.35
+  ```
 
   ```ts
   import {Smoke} from 'margoengine/vfx/smoke';
@@ -1223,7 +1242,9 @@ console.log(Math.round(flameLuminousFlux(1e6, 1760))); // about 150,000 lm from 
   the hearth's 0.25 m. A `Smoke` column (`fire.smoke`) stands on the
   flame tips with the fire's convective heat: Heskestad's length turned back into a heat release, 70% convected
   (Heskestad 1983; Drysdale 2011 ch. 4), as wide as the flames and lit by the fire's `lights`. `smoke: {...}` gives it
-  options of its own, `smoke: false` none. It is on by default with `flameLength` and off for the hearth's own flames.
+  options of its own (a `ceiling` indoors), `smoke: false` none. It is on by default with `flameLength` and off for
+  the hearth's own flames. With `lights` those lights, the fire's own among them, light the column and its `glow`
+  defaults to 0.
 - A flame volume is drawn just before the particle effects, smoke and cloud puffs (order 5.95), then writes its depth
   where its transmittance falls below a half (5.96): a puff or ember behind the flames is hidden by them, one in front
   draws over them (flame-check `order`: a dark column in front of an 8 m flame leaves 254 of its 2,583 flame pixels, one

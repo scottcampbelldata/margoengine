@@ -107,6 +107,14 @@ export function dressState(state: FauldTunnelState): {
     fx: readonly FxRow[];
 };
 
+export function fauldFireSmoke(x: number): {
+    ceiling: number;
+    color: [number, number, number];
+    opacity: number;
+};
+
+export function fauldRoofHeight(x: number): number;
+
 export { fauldTunnelsInfo as info };
 const fauldTunnelsInfo: SceneInfo;
 

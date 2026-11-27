@@ -14,6 +14,8 @@ export interface VFXOverLife {
 }
 /** The draw stages' binding of the curves uniform. */
 const SPIN_BINDING = 27;
+/** The kernel's load of a particle slot, with or without its cold half. */
+const SLOT_LOAD = /var p=Particle\(particles\[at\],particles\[at\+1\],[^;]*\);/;
 const once = (code: string, from: string, to: string): string => {
   if (code.split(from).length !== 2)
     throw new MargoError('unsupported', 'VFX over-life needs its simulation shader; update the lifetime edits');
@@ -68,11 +70,10 @@ export const overLife: VFXExtension<VFXOverLife> = {
     // The slot's stored life and birth velocity are read once, before this slot stores anything: a kernel that reads a
     // buffer back after storing to it runs on the WebGL2 layer's CPU tier, 95 s over the embers of one FireFront
     // (KB-VFX-EMBERCPU1). The locals follow the stores below, so the values are the ones the read-back gave.
-    code = once(
-      code,
-      'var p=Particle(particles[at],particles[at+1],vec4f(0),vec4f(0));',
-      'var p=Particle(particles[at],particles[at+1],vec4f(0),vec4f(0));var coldLife=particles[cold+1].z;var birthNow=lifeBirth[i];',
-    );
+    // `nodes` loads the particle's cold half in the same statement when its graph reads it, before or after this
+    // patch, so the locals follow the statement whatever it loads (KB-VFX-NODESLIFE1).
+    const load = SLOT_LOAD.exec(code)?.[0] ?? '';
+    code = once(code, load, load + 'var coldLife=particles[cold+1].z;var birthNow=lifeBirth[i];');
     if (code.includes('var<uniform> space:Space;'))
       code = once(
         code,

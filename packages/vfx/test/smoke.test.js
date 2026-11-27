@@ -16,6 +16,7 @@ import {
   RADIANT_FRACTION,
   SMOKE_FADE_IN,
   smokeAlphaCurve,
+  ceilingJetSpeed,
 } from '../dist/smoke.js';
 import { evaluateNodes } from '../dist/nodes.js';
 import { optionalGPU as harness } from '../../../tests/support/optional-gpu.js';
@@ -453,4 +454,74 @@ test("KB-VFX-FRONTSMOKE-LOOK1: a smoke look reaches a fire front's columns, made
   assert.equal(own.smokeColumns[0].options.radius, 5);
   assert.deepEqual(own.smokeColumns[0].options.color, [...SMOKE_LOOKS.wildfire.color]);
   own.dispose();
+});
+
+// KB-VFX-SMOKEROOF1: under a roof the column climbed on through it, its old puffs tens of metres wide hanging over the
+// fire and hiding the flame in a Fauld tunnel.
+test('a ceiling stops the column at the roof and spreads it there (Alpert 1972)', () => {
+  const h = optionalGPU(),
+    smoke = Smoke.attach(h.engine, { position: [4, 1, -2], ceiling: 3.2, heat: 2e5, radius: 0.4, prewarm: false });
+  h.frame();
+  // The top meets the roof: rise + radius = headroom with the radius growing 1.2 alpha a metre.
+  const spread = 1.2 * PLUME_ENTRAINMENT,
+    rise = (2.2 - 0.4) / (1 + spread),
+    layer = 0.4 + spread * rise,
+    far = smoke.column(60);
+  near(far.rise, rise, 1e-12, 'rise');
+  near(far.radius, layer, 1e-12, 'radius');
+  near(far.rise + far.radius, 2.2, 1e-12, 'the top at the roof');
+  assert.deepEqual([far.speed, far.level], [0, true]);
+  const o = smoke.effect.options,
+    { size, speed } = o.overLife;
+  near(Math.max(...size) * 0.4, layer, 1e-12, 'no puff grows past the layer');
+  assert.ok(
+    speed.every((v) => v === 1),
+    'the speed curve holds still from the roof on, so it pulls no puff down',
+  );
+  const [box] = o.obstacles;
+  near(box.center[1] - box.halfSize[1], 3.2, 1e-9, 'the roof box starts at the ceiling');
+  assert.equal(o.bounce, 0);
+  // The layer's node forces, on a puff by the roof 3 m out along +x.
+  const at = (age, y, vy = 0) =>
+      evaluateNodes(o.nodes.graph, {
+        position: [7, y, -2],
+        velocity: [0, vy, 0],
+        size: 1,
+        color: [1, 1, 1],
+        life: 30,
+        age,
+      }),
+    centre = 3.2 - layer,
+    push = 4 * ceilingJetSpeed(2e5 / 0.7, 2.2);
+  assert.deepEqual(at(0, 1.5, 3), [0, 0, 0], 'a rising puff is left alone');
+  const held = at(30, centre);
+  near(held[0], push, 1e-9, 'pushed outward at the jet speed times the drag');
+  near(held[1] + 1, 1, 1e-9, 'at the layer height nothing lifts or drops it');
+  assert.ok(at(30, centre - 0.5)[1] > 0, 'a puff under the layer rises back');
+  assert.ok(at(30, centre, -1)[1] > 0, 'and its fall is damped');
+  // The roof is read each frame.
+  smoke.options.ceiling = 4;
+  h.frame();
+  near(o.obstacles[0].center[1] - o.obstacles[0].halfSize[1], 4, 1e-9, 'moved roof');
+  near(smoke.column(60).rise + smoke.column(60).radius, 3, 1e-12, 'new headroom');
+  smoke.options.ceiling = NaN;
+  assert.throws(() => h.frame(), RangeError);
+  smoke.dispose();
+  const open = Smoke.attach(h.engine, { position: [0, 0, 0], prewarm: false });
+  assert.equal(open.effect.options.obstacles, undefined, 'open sky: no roof');
+  open.options.ceiling = 3;
+  assert.throws(() => h.frame(), TypeError, 'a roof is chosen at attach');
+  open.dispose();
+});
+
+test('ceiling jet speed: 0.96 (Q/H)^(1/3) by the axis, 0.195 Q^(1/3) H^(1/2) / r^(5/6) out (Alpert 1972)', () => {
+  near(ceilingJetSpeed(1e6, 3, 0), 0.96 * Math.cbrt(1000 / 3), 1e-12, 'axis');
+  near(ceilingJetSpeed(1e6, 3), (0.195 * 10 * Math.sqrt(3)) / 3 ** (5 / 6), 1e-12, 'a height out');
+  near(ceilingJetSpeed(1e6, 3, 6), (0.195 * 10 * Math.sqrt(3)) / 6 ** (5 / 6), 1e-12, 'six metres out');
+  for (const bad of [
+    [-1, 3],
+    [1e6, 0],
+    [1e6, 3, -1],
+  ])
+    assert.throws(() => ceilingJetSpeed(...bad), RangeError);
 });

@@ -70,7 +70,8 @@ export interface FireOptions {
    * A smoke column over the flames (`Smoke` of `@margoengine/vfx/smoke`, as `fire.smoke`): true stands one on the flame
    * tips with the fire's convective heat (Heskestad's flame length turned back into a heat release, 70% of it
    * convective; Heskestad 1983, Drysdale 2011 ch. 4) over the flames' width, lit by the fire's `lights`; an object
-   * gives it options of its own (colour, opacity, rate, lifetime, ...); false makes none. Read at attach. Default true
+   * gives it options of its own (colour, opacity, rate, lifetime, a `ceiling` indoors, ...); false makes none. With
+   * `lights` the fire's own lights light the column and its `glow` defaults to 0. Read at attach. Default true
    * with `flameLength` (a large fire always smokes), false for the hearth's own flames (a wood hearth's thin smoke is
    * its `steam`).
    */
@@ -240,7 +241,10 @@ export class Fire implements EnginePlugin {
         heat = 0.7 * 1000 * Math.pow(Math.max(L + 1.02 * D, 0) / 0.235, 2.5);
       this.smoke = Smoke.attach(engine, {
         radius: D / 2,
-        ...(clustered ? { lights: clustered } : {}),
+        // The fire's own lights are in that list and light the column, so the column's glow, the same fire's light
+        // again and referred to a daylight sun, is off: in a lamp-lit tunnel it drew the puffs by the flames as pale
+        // discs (KB-VFX-SMOKEROOF1). With no lights the glow is what lights it.
+        ...(clustered ? { lights: clustered, glow: 0 } : {}),
         ...(typeof smoke === 'object' ? smoke : {}),
         fire: this,
         position: [x, y + L, z],

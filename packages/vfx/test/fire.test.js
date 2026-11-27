@@ -292,3 +292,19 @@ test('Fire.attach: the wind leans the flames, embers and steam, and setWind chan
   const calm = Fire.attach(e, { position: [1, 0.3, 0], lights: groups });
   assert.equal(calm.particles.flames.options.wind, undefined, 'no wind option, no wind force');
 });
+
+// KB-VFX-SMOKEROOF1: the column over a fire that lights its smoke took that light twice, once from the fire's own lights
+// and once from the glow, referred to a daylight sun: pale discs by the flames in a lamp-lit tunnel.
+test("a lit fire's column takes no second light from its glow; an unlit one keeps it", async (t) => {
+  const { e, groups } = await scene(t);
+  const lit = Fire.attach(e, { position: [0, 0, 0], flameLength: 2, lights: groups }),
+    unlit = Fire.attach(e, { position: [5, 0, 0], flameLength: 2 }),
+    own = Fire.attach(e, { position: [9, 0, 0], flameLength: 2, lights: groups, smoke: { glow: 1, ceiling: 4 } });
+  assert.equal(lit.smoke.options.glow, 0);
+  assert.equal(lit.smoke.effect.options.lit.glow, undefined);
+  assert.equal(unlit.smoke.options.glow, undefined);
+  assert.ok(unlit.smoke.effect.options.lit.glow.power > 0);
+  assert.equal(own.smoke.options.glow, 1, 'a glow asked for wins');
+  assert.equal(own.smoke.options.ceiling, 4, 'the column takes its roof');
+  for (const fire of [lit, unlit, own]) fire.dispose();
+});

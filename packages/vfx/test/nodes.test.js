@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VFX } from '../dist/index.js';
 import { VFX as Base } from '../dist/base.js';
-import { evaluateNodes, MAX_NODES, MAX_NODE_CONSTS } from '../dist/nodes.js';
+import { evaluateNodes, nodes, MAX_NODES, MAX_NODE_CONSTS } from '../dist/nodes.js';
+import { overLife } from '../dist/over-life.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const attach = (options, features) => {
@@ -263,5 +264,23 @@ test('nodes rejects a finite double that is not a finite f32', () => {
     () => h.frame(),
     (error) => error instanceof RangeError && link.test(error.message),
   );
+  effect.dispose();
+});
+
+// KB-VFX-NODESLIFE1: a graph reading age (or colour or life) rewrites the kernel's slot load, which over-life then
+// could not find: an effect with both stopped at attach with "VFX over-life needs its simulation shader".
+test('nodes that read the particle age attach together with over-life curves', () => {
+  const graph = [
+    { op: 'attribute', value: 'age' },
+    { op: 'attribute', value: 'velocity' },
+    { op: 'mul', inputs: [1, 0] },
+    { op: 'force', inputs: [2] },
+  ];
+  const options = { capacity: 4, nodes: { graph }, overLife: { speed: [1, 0] } };
+  const { h, effect } = attach(options, { nodes, overLife });
+  h.frame();
+  const simulation = h.pipelines.map(codeOf).find((code) => code.includes('fn update('));
+  assert.ok(simulation.includes('particles[cold],particles[cold+1]);'), 'nodes load the cold half');
+  assert.ok(simulation.includes('var birthNow=lifeBirth[i];'), 'over-life keeps its locals');
   effect.dispose();
 });

@@ -56,6 +56,7 @@ export interface SmokeOptions {
     radius?: number;
     airTemperature?: number;
     stability?: number;
+    ceiling?: number;
     wind?: VFXWind;
     lifetime?: number;
     rate?: number;
@@ -88,6 +89,8 @@ export const TWO_THIRDS_LAW = 1.6;
 export function airStability(lapse: number, airTemperature?: number): number;
 
 export function buoyancyFlux(heat: number, airTemperature?: number): number;
+
+export function ceilingJetSpeed(heat: number, height: number, distance?: number): number;
 
 export function plumeRise(seconds: number, flux: number, wind: number, radius: number, stability?: number, out?: PlumePoint): PlumePoint;
 
