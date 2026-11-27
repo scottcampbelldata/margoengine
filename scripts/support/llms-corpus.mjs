@@ -141,7 +141,11 @@ export function collectCorpus(root = resolve(import.meta.dirname, '..', '..')) {
   let trackedDocs = null;
   try {
     trackedDocs = new Set(
-      execFileSync('git', ['ls-files', '--', 'docs/**/*.md', 'docs/*.md'], { cwd: root, encoding: 'utf8' })
+      execFileSync('git', ['ls-files', '--', 'docs/**/*.md', 'docs/*.md'], {
+        maxBuffer: 2 ** 28,
+        cwd: root,
+        encoding: 'utf8',
+      })
         .split(/\r?\n/)
         .filter(Boolean),
     );

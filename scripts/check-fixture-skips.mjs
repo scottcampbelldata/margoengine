@@ -94,6 +94,7 @@ export function fixtureSkips(source, file = 'test.js') {
 /** Audits tracked test and proof programs, apart from the explicit held work above. */
 export function checkFixtureSkips(root = resolve(import.meta.dirname, '..')) {
   const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {
+    maxBuffer: 2 ** 28,
     cwd: root,
     encoding: 'utf8',
     timeout: 30_000,

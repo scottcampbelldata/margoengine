@@ -76,7 +76,10 @@ async function run() {
       options = { cwd: root, encoding: 'utf8' };
     return renderedInputChanges(
       execFileSync('git', ['diff', '--name-only', '--no-renames', '-z', 'HEAD', '--', ...paths], options),
-      execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z', '--', ...paths], options),
+      execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z', '--', ...paths], {
+        ...options,
+        maxBuffer: 2 ** 28,
+      }),
     );
   }
   const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);

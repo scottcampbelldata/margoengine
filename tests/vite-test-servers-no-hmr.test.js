@@ -8,7 +8,11 @@ import test from 'node:test';
 // socket on purpose (it counts full reloads) and is outside packages/, so this sweep never reaches it.
 test('every package script that starts a Vite server turns HMR off', () => {
   const root = new URL('..', import.meta.url);
-  const files = execFileSync('git', ['ls-files', 'packages/*.js', 'packages/*.mjs'], { cwd: root, encoding: 'utf8' })
+  const files = execFileSync('git', ['ls-files', 'packages/*.js', 'packages/*.mjs'], {
+    maxBuffer: 2 ** 28,
+    cwd: root,
+    encoding: 'utf8',
+  })
     .split('\n')
     .filter(Boolean);
   const bad = [];

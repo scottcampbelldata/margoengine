@@ -280,7 +280,7 @@ export async function main() {
       // the check run before a commit tests what is about to be committed.
       if (resolve(String(source)) === root) {
         const listed = (...a) =>
-          execFileSync('git', ['ls-files', '-z', ...a], { cwd: root, encoding: 'utf8' })
+          execFileSync('git', ['ls-files', '-z', ...a], { maxBuffer: 2 ** 28, cwd: root, encoding: 'utf8' })
             .split('\0')
             .filter(Boolean);
         const changed = [...new Set([...listed('-m'), ...listed('-o', '--exclude-standard')])].filter((f) =>

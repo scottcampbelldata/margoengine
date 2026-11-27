@@ -32,11 +32,14 @@ test('compatChunk takes the chunk that exports the name, whichever the listing n
 
 test('no test picks a compat-*.js chunk by listing order or holds every one of a build', () => {
   const files = execFileSync('git', ['ls-files', '-z', 'packages/*/test/**', 'packages/*/tests/**', 'tests/**'], {
+      maxBuffer: 2 ** 28,
       cwd: root,
       encoding: 'utf8',
     })
       .split('\0')
-      .filter((f) => /\.(m?js|html)$/.test(f) && f !== 'tests/support/compat-chunk.js' && f !== 'tests/compat-chunk.test.js'),
+      .filter(
+        (f) => /\.(m?js|html)$/.test(f) && f !== 'tests/support/compat-chunk.js' && f !== 'tests/compat-chunk.test.js',
+      ),
     found = [];
   for (const file of files) {
     const text = readFileSync(join(root, file), 'utf8');
@@ -45,7 +48,8 @@ test('no test picks a compat-*.js chunk by listing order or holds every one of a
     for (const m of text.matchAll(/\/\^compat-/g))
       if (!text.slice(m.index, m.index + 200).includes('import\\\\('))
         found.push(`${file}: picks a compat-*.js by its name; use compatChunk or compatChunkFile`);
-    if (/dist\/compat-\*\.js/.test(text)) found.push(`${file}: a glob over every compat-*.js; name the route chunk (compatChunkFile)`);
+    if (/dist\/compat-\*\.js/.test(text))
+      found.push(`${file}: a glob over every compat-*.js; name the route chunk (compatChunkFile)`);
   }
   assert.deepEqual(found, []);
 });

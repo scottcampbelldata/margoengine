@@ -90,7 +90,9 @@ export function checkApp(appRoot = app) {
     if (builtAt(name) !== head)
       problems.push(`@margoengine/${name} is not built from engine HEAD; run npm run engine:sync`);
   // Nothing engine-related is committed in an app.
-  const tracked = execFileSync('git', ['-C', appRoot, 'ls-files'], { encoding: 'utf8' }).split('\n');
+  const tracked = execFileSync('git', ['-C', appRoot, 'ls-files'], { maxBuffer: 2 ** 28, encoding: 'utf8' }).split(
+    '\n',
+  );
   for (const path of tracked)
     if (
       /^(?:vendor\/margo[^/]*|\.engine)\//i.test(path) ||

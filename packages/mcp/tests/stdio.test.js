@@ -14,7 +14,7 @@ const bin = new URL('../bin/margoengine-mcp.js', import.meta.url);
 // npm makes a bin executable when it installs, so a mode of 644 in git shows the file as modified on every macOS and Linux checkout.
 test('the bin is executable in git', () => {
   const file = fileURLToPath(bin),
-    entry = execFileSync('git', ['ls-files', '--stage', '--', file], { encoding: 'utf8' });
+    entry = execFileSync('git', ['ls-files', '--stage', '--', file], { maxBuffer: 2 ** 28, encoding: 'utf8' });
   assert.match(entry, /^100755 /);
 });
 

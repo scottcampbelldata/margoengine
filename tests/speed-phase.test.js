@@ -46,6 +46,7 @@ test('the release inventory names every retained timing assertion and executable
   }
   for (const suite of suites) assert.ok(Number.isFinite(suite.limitMinutes) && suite.limitMinutes > 0, suite.id);
   const sources = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+    maxBuffer: 2 ** 28,
     encoding: 'utf8',
     timeout: 10000,
   }).split('\n');

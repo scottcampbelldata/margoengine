@@ -7,7 +7,9 @@ import { readFileSync } from 'node:fs';
 
 test('every Vite dev server a script under scripts/ starts runs with no file watcher', () => {
   const root = new URL('../', import.meta.url),
-    files = execFileSync('git', ['ls-files', 'scripts'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/),
+    files = execFileSync('git', ['ls-files', 'scripts'], { maxBuffer: 2 ** 28, cwd: root, encoding: 'utf8' }).split(
+      /\r?\n/,
+    ),
     bad = files.filter((file) => {
       if (!/\.m?js$/.test(file)) return false;
       const text = readFileSync(new URL(file, root), 'utf8');

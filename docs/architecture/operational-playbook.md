@@ -1,3 +1,11 @@
+### Section 5 evidence: quality gates list the whole tree past 1 MiB (2026-11-27)
+
+The tracked file list passed 1 MiB (1,048,627 B), the default output buffer of `execFileSync` and `spawnSync`, so
+`node scripts/quality-gate.mjs` (all gates), `scripts/hygiene.js` and `scripts/check-fixture-skips.mjs` failed with
+ENOBUFS before checking anything (KB-GIT-LISTBUF1). Every `git ls-files` call in scripts and tests now states
+`maxBuffer: 2 ** 28`, and `tests/git-list-buffer.test.js` fails on any call without one. Evidence: the sizes gate runs
+to its report again on main.
+
 ### Section 5 evidence: dual-source blending of transmission, WebGPU and the WebGL2 layer (2026-11-27)
 
 With the `dual-source-blending` feature (requested through `EngineOptions.features`, no core change) gltf/pbr draws a

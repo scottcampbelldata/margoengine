@@ -115,7 +115,11 @@ const excludes = biomeConfig.files.includes.filter((p) => p.startsWith('!')).map
 const tops = new Set(biomeConfig.files.includes.filter((p) => !p.startsWith('!')).map((p) => p.split('/')[0]));
 const excluded = (file) =>
   excludes.some((p) => (p.startsWith('**/') ? file.split('/').includes(p.slice(3)) : file === p));
-const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
+const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {
+  maxBuffer: 2 ** 28,
+  cwd: root,
+  encoding: 'utf8',
+})
   .split('\n')
   .filter((f) => code.test(f) && tops.has(f.split('/')[0]) && !excluded(f) && existsSync(join(root, f)));
 
@@ -351,7 +355,11 @@ if (!quick) {
   }
 
   // --- Gate 9: unused files and exports (import graph over every repo source file, parsed with oxc).
-  const all = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
+  const all = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {
+    maxBuffer: 2 ** 28,
+    cwd: root,
+    encoding: 'utf8',
+  })
     .split('\n')
     .filter((f) => code.test(f) && !f.endsWith('.d.ts') && !f.includes('/vendor/') && existsSync(join(root, f)));
   const known = new Set(all);

@@ -351,7 +351,9 @@ export function rewriteMarkdown(text) {
 function files(paths) {
   const listed = paths.length
     ? paths
-    : execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+    : execFileSync('git', ['ls-files', '-z'], { maxBuffer: 2 ** 28, encoding: 'utf8' })
+        .split('\0')
+        .filter(Boolean);
   return listed
     .map((file) => file.replace(/\\/g, '/'))
     .filter((file) => (CODE.has(extname(file)) || extname(file) === '.md') && !SKIP.some((re) => re.test(file)));

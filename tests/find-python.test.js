@@ -43,7 +43,11 @@ test('no test or check spawns a hard-coded python command', async () => {
   const { execFileSync } = await import('node:child_process'),
     { readFileSync } = await import('node:fs'),
     root = join(import.meta.dirname, '..'),
-    files = execFileSync('git', ['ls-files', '*.js', '*.mjs', '*.ts'], { cwd: root, encoding: 'utf8' })
+    files = execFileSync('git', ['ls-files', '*.js', '*.mjs', '*.ts'], {
+      maxBuffer: 2 ** 28,
+      cwd: root,
+      encoding: 'utf8',
+    })
       .split('\n')
       .filter((file) => file && !file.includes('node_modules/')),
     bare = /(?:spawn|spawnSync|execFile|execFileSync)\(\s*['"`]python['"`]|\?\?\s*['"`]python['"`]\s*,/,

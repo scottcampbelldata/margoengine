@@ -962,6 +962,7 @@ export function staleBlueprints(root = repository, entries = BLUEPRINTS) {
 export function unlistedCrates(root = repository) {
   const listed = new Set([...BLUEPRINTS.map((entry) => entry.crate), ...NOT_SHIPPED]);
   const out = spawnSync('git', ['ls-files', '-z', '--', 'packages/*Cargo.toml'], {
+    maxBuffer: 2 ** 28,
     cwd: root,
     encoding: 'utf8',
     timeout: 30_000,

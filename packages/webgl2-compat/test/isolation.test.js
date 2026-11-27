@@ -67,6 +67,7 @@ test('dependency edges ignore import examples in comments and diagnostic strings
 
 test('no other package imports the compatibility layer', () => {
   const files = execFileSync('git', ['ls-files', 'packages/*/src/**', 'packages/shared/**'], {
+    maxBuffer: 2 ** 28,
     cwd: root,
     encoding: 'utf8',
   })
@@ -82,7 +83,11 @@ test('no other package imports the compatibility layer', () => {
 });
 
 test('only the umbrella depends on it', () => {
-  const out = execFileSync('git', ['ls-files', 'packages/*/package.json'], { cwd: root, encoding: 'utf8' });
+  const out = execFileSync('git', ['ls-files', 'packages/*/package.json'], {
+    maxBuffer: 2 ** 28,
+    cwd: root,
+    encoding: 'utf8',
+  });
   for (const file of out.split('\n').filter(Boolean)) {
     const m = JSON.parse(readFileSync(join(root, file), 'utf8'));
     if (m.name === NAME || m.name === 'margoengine') continue;

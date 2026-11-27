@@ -65,7 +65,7 @@ export function hostMath(text) {
 }
 
 function tracked(...patterns) {
-  return execFileSync('git', ['ls-files', '-z', '--', ...patterns], { cwd: root, encoding: 'utf8' })
+  return execFileSync('git', ['ls-files', '-z', '--', ...patterns], { maxBuffer: 2 ** 28, cwd: root, encoding: 'utf8' })
     .split('\0')
     .filter(Boolean);
 }

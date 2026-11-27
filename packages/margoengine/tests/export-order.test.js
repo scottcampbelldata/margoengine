@@ -9,6 +9,7 @@ test('every published umbrella alias source is in the Git index, including newly
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
   const tracked = new Set(
     execFileSync('git', ['ls-files', '-z', '--', 'packages/margoengine/src'], {
+      maxBuffer: 2 ** 28,
       cwd: fileURLToPath(new URL('../../../', import.meta.url)),
       encoding: 'utf8',
       windowsHide: true,

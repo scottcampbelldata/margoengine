@@ -15,7 +15,7 @@ import { test } from 'node:test';
 const root = resolve(import.meta.dirname, '..');
 const self = 'tests/typescript-api-transport.test.js';
 // Files in git's index (committed or staged); a lane's untracked scratch is not the repository.
-const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
+const tracked = execFileSync('git', ['ls-files'], { maxBuffer: 2 ** 28, cwd: root, encoding: 'utf8' })
   .split('\n')
   .filter((file) => /\.(?:[cm]?js|[cm]?ts|tsx|jsx)$/.test(file) && file !== self && existsSync(join(root, file)));
 const read = (file) => readFileSync(join(root, file), 'utf8');

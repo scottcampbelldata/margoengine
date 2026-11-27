@@ -14,7 +14,7 @@ const root = join(import.meta.dirname, '..'),
   script = 'examples/package-benchmarks/post-effects-gpu.mjs',
   source = readFileSync(join(root, script), 'utf8');
 const tracked = (path) =>
-  execFileSync('git', ['ls-files', '--', path], { cwd: root, encoding: 'utf8' }).trim() === path;
+  execFileSync('git', ['ls-files', '--', path], { maxBuffer: 2 ** 28, cwd: root, encoding: 'utf8' }).trim() === path;
 const ignored = (path) => {
   try {
     execFileSync('git', ['check-ignore', '-q', '--no-index', '--', path], { cwd: root });

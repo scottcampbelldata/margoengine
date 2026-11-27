@@ -12,6 +12,7 @@ const root = resolve(import.meta.dirname, '..');
 
 test('no file URL is used through .pathname as a path', () => {
   const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard', '*.js', '*.mjs', '*.ts'], {
+    maxBuffer: 2 ** 28,
     cwd: root,
     encoding: 'utf8',
   })
