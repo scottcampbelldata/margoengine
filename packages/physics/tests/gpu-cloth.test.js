@@ -8,6 +8,7 @@ import { GPUCloth, clothStateHash, MAX_GPU_CLOTH_COLLIDERS } from '../dist/gpu-c
 import { SoftBodyDesc } from '../dist/soft.js';
 
 await Physics.load();
+await GPUCloth.load();
 
 const G = 9.81;
 const DT = 1 / 60 / 30; // the default substep
@@ -309,4 +310,25 @@ test('bad input is a coded MargoError naming the fix', () => {
   coded(() => cloth.setup({ backend: 'webgl2' }), /WebGPU/);
   cloth.dispose();
   coded(() => cloth.step(), /dispose/);
+});
+
+test('the CPU route counts its work exactly: substeps, particle updates, edge solves and collider tests (Rust kernel)', () => {
+  // A 3 by 3 cloth with no pins over the ground, one step of the default 30 substeps: every particle integrates and meets the
+  // one collider each substep, and each edge is solved once a substep: 12 structural, 8 cell diagonals and 6 bend edges.
+  const cloth = new GPUCloth(SoftBodyDesc.cloth([0, 1, 0], [0.1, 0, 0], [0, 0, 0.1], 3, 3), {
+    colliders: [{ shape: 'plane' }],
+  });
+  assert.equal(cloth.colliders.length, 1, 'the colliders option adds them');
+  cloth.step();
+  assert.deepEqual(cloth.stats.work, { substeps: 30, particles: 9 * 30, edges: (12 + 8 + 6) * 30, colliderTests: 9 * 30 });
+  // A pinned particle is neither integrated nor tested, and an edge between two pins is not solved.
+  cloth.pin(0).pin(1);
+  cloth.step();
+  assert.deepEqual(cloth.stats.work, {
+    substeps: 60,
+    particles: 270 + 7 * 30,
+    edges: 780 + (26 - 1) * 30,
+    colliderTests: 270 + 7 * 30,
+  });
+  coded(() => new GPUCloth(SoftBodyDesc.cloth([0, 1, 0], [0.1, 0, 0], [0, 0, 0.1], 3, 3), { colliders: {} }));
 });

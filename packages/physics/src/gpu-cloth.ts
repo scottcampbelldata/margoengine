@@ -37,8 +37,6 @@ import {
   pinPoint,
   resolveClothParams,
   rotate,
-  stepClothCPU,
-  writeClothSurface,
   type ClothFrame,
   type ClothPin,
   type ClothTopology,
@@ -50,6 +48,7 @@ import {
   type GPUClothStats,
 } from './gpu-cloth-sim.js';
 import type { SoftBodyDesc } from './soft.js';
+import { ClothKernel, loadClothKernel, type ClothWork } from './cloth/kernel.js';
 
 export {
   ClothCollider,
@@ -77,6 +76,8 @@ export interface GPUClothCreateOptions extends GPUClothOptions {
   physics?: { readonly gravity: Vec3 } | null;
   /** Texture coordinates, two a particle (default: the grid of a `cloth` or `clothAnisotropic`, else the rest shape laid flat). */
   uvs?: ArrayLike<number>;
+  /** Colliders to add at once, as {@link GPUCloth.addCollider} takes them (default none). */
+  colliders?: readonly GPUClothColliderDesc[];
 }
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -172,6 +173,8 @@ export class GPUCloth implements EnginePlugin {
   private disposed = false;
   private needsUpload = true;
   private reading: Promise<void> | null = null;
+  /** The Rust kernel of the CPU routes (also the rest shape's surface on every route). */
+  private readonly kernel: ClothKernel;
 
   /**
    * A cloth from `desc`, stepped on the CPU until it is attached (`engine.use(cloth)` or {@link GPUCloth.attach}).
@@ -180,7 +183,8 @@ export class GPUCloth implements EnginePlugin {
    */
   constructor(desc: SoftBodyDesc, options: GPUClothCreateOptions = {}) {
     if (!options || typeof options !== 'object') throw clothError('GPUCloth options must be an object.');
-    const { physics = null, uvs, ...live } = options;
+    const { physics = null, uvs, colliders = [], ...live } = options;
+    if (!Array.isArray(colliders)) throw clothError('GPUCloth colliders must be an array of collider descriptions.');
     if (physics !== null && !Array.isArray((physics as { gravity?: unknown }).gravity))
       throw clothError('GPUCloth physics must be a Physics world of @margoengine/physics.');
     this.topology = buildClothTopology(desc, uvs);
@@ -202,9 +206,25 @@ export class GPUCloth implements EnginePlugin {
     for (const i of (desc as unknown as { pinned?: Set<number> }).pinned ?? [])
       if (i < N) this.pinAt(i, [t.rest[i * 3]!, t.rest[i * 3 + 1]!, t.rest[i * 3 + 2]!], null);
     this.vertices = new Float32Array(N * GPU_CLOTH_VERTEX_FLOATS);
+    this.kernel = new ClothKernel(t);
     // Normals and draw vertices of the rest shape, so the first step's drag and the first frame have them.
-    writeClothSurface(this.mirror.subarray(0, N * 4), this.mirror.subarray(12 * N), this.vertices, t);
-    this.stats = { backend: 'cpu', steps: 0, colors: t.colors.length, count: N };
+    this.kernel.surface(this.mirror.subarray(0, 12 * N), this.mirror.subarray(12 * N), this.vertices, true);
+    this.stats = {
+      backend: 'cpu',
+      steps: 0,
+      colors: t.colors.length,
+      count: N,
+      work: { substeps: 0, particles: 0, edges: 0, colliderTests: 0 },
+    };
+    for (const c of colliders) this.addCollider(c);
+  }
+
+  /**
+   * Loads the CPU route's kernel (`cloth-kernel.wasm`, Rust with SIMD) once; call it before the first `new GPUCloth`, as
+   * `await Physics.load()` before a world. Later calls return at once.
+   */
+  static async load(signal?: AbortSignal): Promise<void> {
+    await loadClothKernel(signal);
   }
 
   /** Creates a cloth and attaches it to `engine`. Attach it after the `Physics` whose bodies carry its pins or colliders. */
@@ -344,14 +364,18 @@ export class GPUCloth implements EnginePlugin {
 
   private runCPU(frame: ClothFrame, steps: number): void {
     const N = this.count;
-    stepClothCPU(
+    const work: ClothWork = this.kernel.step(
       this.mirror.subarray(0, 12 * N),
       this.mirror.subarray(12 * N),
       this.vertices,
-      this.topology,
       frame,
       frame.tethers ? this.tetherTable() : undefined,
     );
+    const total = this.stats.work;
+    total.substeps += work.substeps;
+    total.particles += work.particles;
+    total.edges += work.edges;
+    total.colliderTests += work.colliderTests;
     this.stats.steps += steps;
     this.revision++;
   }
@@ -463,7 +487,7 @@ export class GPUCloth implements EnginePlugin {
     this.time = snapshot.time;
     this.pending = 0;
     // The draw vertices of the restored shape; the snapshot's own normals stay (a copy takes the recomputed ones).
-    writeClothSurface(this.mirror.subarray(0, N * 4), this.mirror.slice(12 * N), this.vertices, this.topology);
+    this.kernel.surface(this.mirror.subarray(0, 12 * N), this.mirror.slice(12 * N), this.vertices, false);
     this.revision++;
     this.needsUpload = true;
   }

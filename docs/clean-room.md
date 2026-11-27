@@ -18229,7 +18229,9 @@ looked at as running examples and documentation, for what they offer, not how th
 - Margo's own: the velocity kept as state (not (x - previous) / dt), so float32 positions far from the origin keep
   small accelerations; pins and colliders moved from their last pose to this one by each substep's share of the frame,
   with friction relative to the collider surface's own motion; the CPU twin runs the GPU's passes in the GPU's order so
-  the WebGL2 layer and Node give the same cloth; gusts as products of sines (no spectrum).
+  the WebGL2 layer and Node give the same cloth (since 2026-11-27 a Rust kernel, `packages/physics/cloth-kernel`, whose sin and
+  cos reduce the argument by pi / 2 in two parts, W. J. Cody and W. Waite, Software Manual for the Elementary Functions,
+  Prentice-Hall 1980, then sum the Taylor series on [-pi/4, pi/4]); gusts as products of sines (no spectrum).
 - Checked against: XPBD statics of a particle on two compliant edges (bisection of the force balance, within the float32
   floor ulp alpha / (w dt^2)), a falling sheet's terminal speed sqrt(rho_A g / (rho Cd / 2)) to 1e-5, Coulomb's
   friction angle and g (sin - mu cos) sliding on a 20 degree slope to 0.2 percent, rest at the thickness on a sphere,

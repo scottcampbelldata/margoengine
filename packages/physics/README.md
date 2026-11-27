@@ -1156,9 +1156,9 @@ import {drawGPUCloth} from 'margoengine/gltf/soft-mesh';
 import {GPUCloth} from 'margoengine/physics/gpu-cloth';
 import {SoftBodyDesc} from 'margoengine/physics/soft';
 
+await GPUCloth.load();
 const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 2, 4], target: [0, 0.6, 0]}});
-const cloth = GPUCloth.attach(engine, SoftBodyDesc.cloth([-1, 2, -1], [0.04, 0, 0], [0, 0, 0.04], 51, 51), {wind: [2, 0, 0]});
-cloth.addCollider({shape: 'sphere', radius: 0.6, position: [0, 0.8, 0]});
+const cloth = GPUCloth.attach(engine, SoftBodyDesc.cloth([-1, 2, -1], [0.04, 0, 0], [0, 0, 0.04], 51, 51), {wind: [2, 0, 0], colliders: [{shape: 'sphere', radius: 0.6, position: [0, 0.8, 0]}]});
 drawGPUCloth(engine, cloth);
 engine.start();
 ```
@@ -1174,6 +1174,7 @@ import {GPUCloth} from 'margoengine/physics/gpu-cloth';
 import {FABRICS, SoftBodyDesc} from 'margoengine/physics/soft';
 
 await Physics.load();
+await GPUCloth.load();
 const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [1, 2, 5], target: [1, 2, 0]}});
 const physics = new Physics(engine);
 const pole = physics.addBody(null, {type: 'kinematicPosition', position: [0, 1.5, 0], colliders: {shape: 'capsule', halfHeight: 1.5, radius: 0.03}});
@@ -1190,17 +1191,18 @@ engine.start();
 - **A step.** Each fixed step (`timestep`, default 1/60 s) is `substeps` substeps (default 30), each a few compute passes: the particles' normals (for the drag), integrate (gravity, the wind's drag through each face, damping), pins, the edges one colour at a time (compliant distance constraints of XPBD, Macklin, Mueller and Chentanez 2016, solved once a substep in small steps, Macklin et al. 2019), tethers and colliders; after each step a surface pass writes the normals, tangents and draw vertices. No atomics: every thread writes only its own particle or its edge's two (the edges are coloured so no two of a colour share a particle), so a run repeats to the bit on one GPU and driver, and `snapshot()` / `restore()` repeat it from any step. The velocity is state of its own, so float32 positions far from the origin keep small accelerations.
 - **Stiffness.** `stretchCompliance` (structural edges), `shearCompliance` (a cell's diagonals) and `bendCompliance` (the bend edges two along), in m/N: 0 is inextensible (the default for stretch and shear), and the bend default is the CPU cloth's 10 Hz bend edges on the mean particle mass. Tethers (`tethers`, default on) keep every free particle within its rest distance along the cloth, times 1 + `tetherSlack` (default 0.01), of its nearest pin (long range attachments, Kim, Chentanez and Mueller 2012), so a pinned cloth does not stretch under its own swing; they also cap an elastic `stretchCompliance` there, so turn them off for a cloth meant to stretch from its pins.
 - **Pins.** `pin(i, point?)` holds a particle at a point (setting it again moves it over the next step), `attach(i, body, point?)` ties it to a rigid body, read after the physics step every frame, `unpin(i)` lets go; the description's `setPinnedParticles` are pins at their rest points. A tie is one way: the body does not feel the cloth (the CPU cloth's `attachParticle` is two way).
-- **Colliders.** `addCollider({shape, ...})` (up to 32) takes a `sphere` (`radius`), a `capsule` (`radius`, `halfHeight`, along its local y), a `box` (`halfExtents`), a `plane` (`normal`, default up) or an `sdf` (any mesh as a signed distance field: a `MeshSDF` of `margoengine/bvh/sdf` passes as it is), each at `position` and `rotation`, in the world or on a `body`; `friction` (default the cloth's 0.4) is Coulomb's, held in position (Macklin et al. 2014). A moving collider is swept: each substep meets it where it is by then, and friction follows its surface's motion. The returned collider's `position` and `rotation` can be set each frame (a pointer's sphere), and `remove()` takes it away. The cloth keeps `thickness` from every collider (default the description's particle radius, else half its shortest edge).
+- **Colliders.** `addCollider({shape, ...})`, or `colliders: [...]` at construction (up to 32), takes a `sphere` (`radius`), a `capsule` (`radius`, `halfHeight`, along its local y), a `box` (`halfExtents`), a `plane` (`normal`, default up) or an `sdf` (any mesh as a signed distance field: a `MeshSDF` of `margoengine/bvh/sdf` passes as it is), each at `position` and `rotation`, in the world or on a `body`; `friction` (default the cloth's 0.4) is Coulomb's, held in position (Macklin et al. 2014). A moving collider is swept: each substep meets it where it is by then, and friction follows its surface's motion. The returned collider's `position` and `rotation` can be set each frame (a pointer's sphere), and `remove()` takes it away. The cloth keeps `thickness` from every collider (default the description's particle radius, else half its shortest edge).
 - **Air.** `wind` (a velocity, or a function of the cloth's time) with `turbulence` (0 to 1, default 0.25: smooth gusts along and across it), `airDensity` (1.2) and `drag` (1.17): a flat plate's normal force on the air through each face, which carries both its drag and its lift.
 - **Drawing.** `drawGPUCloth(engine, cloth, {material, images})` of `margoengine/gltf/soft-mesh` draws it as a PBR mesh (shadows, picking and the PBR model API included) from the cloth's own `vertexBuffer`; attach it after the cloth. Texture coordinates come from the grid (or `uvs` at construction).
 - **Reading it.** `await cloth.readPositions()` reads the particles back; `positions()` gives the last read (exact on the CPU routes); `debugRender(options)` gives `{vertices, colors}` (edges by strain, `bendEdges`, `pins`, `colliders`, `normals`, `wind`) and plugs into `PhysicsDebugView.add(cloth)`; on the GPU it reads back once a frame, a frame or two behind the picture. `stats` gives the `backend`, `steps`, edge `colors` and `count`.
-- **Routes.** On WebGPU it steps on the GPU. On the WebGL2 compatibility layer, and before it is attached (in Node or a worker), its CPU twin runs the same passes in the same order; `stats.backend` says which. The twin matches the GPU within 1e-6 m after a step.
+- **Routes.** `await GPUCloth.load()` once first (it compiles the CPU route's kernel, as `Physics.load()` does the world's). On WebGPU it steps on the GPU. On the WebGL2 compatibility layer, and before it is attached (in Node or a worker), the same passes run in the same order in a Rust kernel with SIMD (`cloth-kernel.wasm`, loaded from the package's URL); `stats.backend` says which, and `stats.work` counts what the CPU routes did (substeps, particle updates, edge solves, particle-collider tests). The CPU route matches the GPU within 1e-6 m after a step.
 - **Errors.** Bad input is a `MargoError` (`unsupported`, `state` for a pin or collider on a removed body, `disposed`) naming the fix, linked to [margoengine.com/errors#gpu-cloth](https://margoengine.com/errors#gpu-cloth).
 
 | Option (default) | Meaning |
 | --- | --- |
 | `physics` (none) | The world whose gravity the cloth takes; set at construction. |
 | `uvs` (the grid) | Texture coordinates, two a particle; set at construction. |
+| `colliders` (none) | Colliders to add at once, as `addCollider` takes them; set at construction. |
 | `gravity` (the world's, else [0, -9.81, 0]) | m/s^2, times the description's gravity scale. |
 | `wind` ([0, 0, 0]) | m/s, or `(time) => [x, y, z]`, read once a frame. |
 | `turbulence` (0.25) | Gusts, 0 to 1. |

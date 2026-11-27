@@ -343,6 +343,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/cloth-kernel.wasm',
+    label: 'cloth-kernel.wasm',
+    kind: 'Rust SIMD cloth step, the CPU route of the GPU cloth',
+    measure: 'file',
+    when: 'GPUCloth.load() from the optional /gpu-cloth entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/rail-kernel.wasm',
     label: 'rail-kernel.wasm',
     kind: 'Rust SIMD tensioned contact-wire propagation',

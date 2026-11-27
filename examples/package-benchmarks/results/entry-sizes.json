@@ -19362,6 +19362,11 @@
       "raw": 1558039,
       "gzip": 574912,
       "brotli": 424250
+    },
+    "packages/physics/dist/cloth-kernel.wasm": {
+      "raw": 10941,
+      "gzip": 5054,
+      "brotli": 4493
     }
   },
   "splits": {

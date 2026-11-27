@@ -133,6 +133,13 @@ export const BLUEPRINTS = [
     args: ['shared', 'dfsph'],
   },
   {
+    name: 'cloth-kernel',
+    crate: 'packages/physics/cloth-kernel',
+    blueprint: 'packages/physics/src/cloth/cloth-kernel.wasm',
+    script: 'packages/physics/scripts/build-cloth-kernel.mjs',
+    args: ['plain'],
+  },
+  {
     name: 'rail-kernel',
     crate: 'packages/physics/rail-kernel',
     blueprint: 'packages/physics/src/rail/rail-kernel.wasm',

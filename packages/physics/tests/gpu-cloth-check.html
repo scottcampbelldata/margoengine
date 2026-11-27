@@ -32,6 +32,7 @@ window.check = async () => {
   c.width = W;
   c.height = H;
   document.body.append(c);
+  await GPUCloth.load();
   const engine = await Engine.create(c, { backend: 'webgpu', camera: { position: [0, 3.4, 2.4], target: [0, 0.7, 0], near: 0.05, far: 50 } });
   engine.stop();
   engine.scene.background = '#0a101a';

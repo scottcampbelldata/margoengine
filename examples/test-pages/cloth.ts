@@ -48,6 +48,7 @@ async function start() {
   const solid = (geometry: Geometry, position: V3, color: string) =>
     engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({ color, roughness: 0.7 })).setPosition(position);
   await Physics.load();
+  await GPUCloth.load();
   const physics = new Physics(engine);
 
   solid(box(12, 0.2, 8), [0, -0.1, 0], '#6f7468');
