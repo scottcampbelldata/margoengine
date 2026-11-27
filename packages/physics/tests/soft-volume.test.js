@@ -281,3 +281,71 @@ test('volume refuses a mesh it cannot use with a coded error naming the fix', as
   // A mesh whose seams are farther apart than the weld stays open.
   coded(() => SoftBodyDesc.volume(sphere, { weld: 0 }), /closed mesh|face inward/);
 });
+
+/** The volume of a closed triangle mesh below y = 0, by the divergence theorem with the field (0, y, 0) over each face's
+ * part below the plane (clipped), the waterplane adding nothing: the test's own measure, apart from the solver's. */
+const volumeBelow = (p, tri) => {
+  let V = 0;
+  for (let t = 0; t < tri.length; t += 3) {
+    const poly = [0, 1, 2].map((k) => [p[tri[t + k] * 3], p[tri[t + k] * 3 + 1], p[tri[t + k] * 3 + 2]]),
+      out = [];
+    for (let i = 0; i < 3; i++) {
+      const a = poly[i],
+        b = poly[(i + 1) % 3];
+      if (a[1] <= 0) out.push(a);
+      if (a[1] <= 0 !== b[1] <= 0) {
+        const s = a[1] / (a[1] - b[1]);
+        out.push(a.map((v, j) => v + s * (b[j] - v)));
+      }
+    }
+    for (let i = 1; i + 1 < out.length; i++) {
+      const [a, b, c] = [out[0], out[i], out[i + 1]],
+        u = b.map((v, j) => v - a[j]),
+        w = c.map((v, j) => v - a[j]);
+      V += (((a[1] + b[1] + c[1]) / 3) * (u[2] * w[0] - u[0] * w[2])) / 2;
+    }
+  }
+  return V;
+};
+
+test('in water a soft volume floats where Archimedes says: the water it displaces weighs what it does', async () => {
+  // The exact balance at rest: rho_w V_below = M, whatever the ball's shape as it settles. The bound: what is left of its
+  // heave after 8 s (its centre's acceleration a, from its last three steps) moves the balance by |a| / g, plus 1e-4 for
+  // float32 positions. Before this a closed body was buoyed particle by particle, by the share of its surface under
+  // water, which for a sphere is its wetted area (h / 2R), not its submerged volume (h^2 (3R - h) / 4R^3).
+  for (const density of [300, 700, 500]) {
+    const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+    const soft = await SoftBodies.attach(physics);
+    soft.water = { density: 1025 };
+    const ball = soft.create(
+      SoftBodyDesc.volume(sphereGeometry(0.3, 24, 16), { density }).setTranslation([0, 0.1, 0]).setLinearDamping(3),
+    );
+    const heights = [];
+    for (let i = 0; i < 480; i++) {
+      physics.step();
+      heights.push(ball.centerOfMass()[1]);
+    }
+    const [a, b, c] = heights.slice(-3),
+      accel = Math.abs(a - 2 * b + c) * 3600,
+      balance = (1025 * volumeBelow(ball.particlePositions(), ball.triangles())) / ball.mass();
+    near(balance, 1, accel / 9.81 + 1e-4, `density ${density}: rho_w V_below / M`);
+    near(ball.displacedVolume(), volumeBelow(ball.particlePositions(), ball.triangles()), 1e-4, 'displacedVolume');
+  }
+});
+
+test('a soft volume in a wind takes the push of the air on its windward side (ATMO to SOFT, one way)', async () => {
+  // A ball held in a steady 10 m/s wind takes C_D 0.525 of the dynamic pressure on its cross-section (the windward-face
+  // model of KB-SOFT-CLOSEDDRAG1): F = 0.5 rho C_D pi R^2 v^2, against what its first step from rest moves its centre,
+  // F dt^2 / M (semi-implicit Euler).
+  const physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: 1 / 60 });
+  const soft = await SoftBodies.attach(physics);
+  soft.wind = [10, 0, 0];
+  // Heavy enough (200 kg/m^3) that the step's implicit drag, which keeps a light face from passing the wind, takes under 0.5%.
+  const ball = soft.create(SoftBodyDesc.volume(sphereGeometry(0.5, 32, 24), { density: 200 }));
+  const start = ball.centerOfMass()[0];
+  physics.step();
+  const moved = ball.centerOfMass()[0] - start,
+    force = (moved * ball.mass()) / (1 / 60) ** 2,
+    expected = 0.5 * 1.225 * 0.525 * Math.PI * 0.25 * 100;
+  near(force, expected, 0.03 * expected, 'the wind force on the ball (32 x 24 facets: 2%; the implicit step and float32: 1%)');
+});

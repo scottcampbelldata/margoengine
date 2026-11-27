@@ -2603,6 +2603,7 @@ export class SoftBody {
     null;
   /** @internal How many `SailForce`s supply its air loads: while any does, the default drag leaves it alone. */ airLoads = 0;
   /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
+  /** @internal The water a closed body displaced at its last step in `SoftBodies.water`, m^3. */ displaced = 0;
   /** @internal */ surfaceRest = 0;
   /** @internal */ canSleepFlag = true;
   /** @internal */ asleep = false;
@@ -2862,6 +2863,15 @@ export class SoftBody {
     tz[row] = position[2];
     pflags[row] = pflags[row]! | TARGETED;
     return this;
+  }
+  /**
+   * The water a closed body displaced at its last step in `SoftBodies.water`, in cubic metres: the volume its surface
+   * encloses below the waterline, as the water's pressure on it measures it (0 out of the water, or for a body that holds
+   * no volume).
+   */
+  displacedVolume(): number {
+    this.check();
+    return this.displaced;
   }
   /** The volume the body's closed triangle surface encloses now, in cubic metres (0 for a body that holds no volume). */
   surfaceVolume(): number {
@@ -3467,7 +3477,11 @@ export class SoftBodies implements PhysicsAttachment {
    * density, `SoftBodyDesc.setDensity`) upward, the water's acceleration on it and on the water it carries, that water's
    * inertia, and the drag of the water past it: a rope's segments as cylinders across the flow (C_D 1.2, Hoerner 1965;
    * added mass that of their cross-section, C_a 1), a cloth's faces as plates (C_N 1.17) with the added mass of a disk of
-   * the sheet's area ((8/3) rho a^3, Lamb's), shared by area. A particle half out of the water takes half.
+   * the sheet's area ((8/3) rho a^3, Lamb's), shared by area. A particle half out of the water takes half. A body that
+   * holds a volume or a gas is buoyed instead by the water's hydrostatic pressure on each face below the waterline (clipped
+   * where the face crosses it), which sums to the weight of the water its surface displaces whatever its shape, carries a
+   * sphere's added mass (half the displaced water) and takes drag on its upstream faces only (C 1.05); its displaced volume
+   * is `body.displacedVolume()`.
    */
   water: {
     readonly elevation?: (x: number, z: number, t: number) => number;
@@ -5869,10 +5883,13 @@ export class SoftBodies implements PhysicsAttachment {
       added = new Float64Array(n),
       share = new Float64Array(n),
       volume = new Float64Array(n);
+    // A closed body is buoyed by the water's pressure on its surface (below), not by its particles' share of its volume: the
+    // surface's particles under the water are its wetted area, not its submerged volume.
+    const closed = body.volumeOn;
     for (let i = 0; i < n; i++) {
       const row = first + i;
       share[i] = this.submerged(c.x[row]!, c.y[row]!, c.z[row]!, radius, time);
-      volume[i] = body.density ? body.masses[i]! / body.density : 0;
+      volume[i] = body.density && !closed ? body.masses[i]! / body.density : 0;
     }
     // A segment's volume: each end's shared among the segments that meet there (so a rope's end segments are whole).
     const degree = new Float64Array(n);
@@ -5908,7 +5925,7 @@ export class SoftBodies implements PhysicsAttachment {
       }
       const a = Math.sqrt(total / Math.PI),
         disk = (8 / 3) * rho * a * a * a;
-      for (let i = 0; i < n; i++) added[i] = total > 0 ? (disk * area[i]!) / total : 0;
+      if (!closed) for (let i = 0; i < n; i++) added[i] = total > 0 ? (disk * area[i]!) / total : 0;
     } else {
       const { ea, eb } = c;
       for (let e = 0; e < body.structural; e++) {
@@ -5925,6 +5942,50 @@ export class SoftBodies implements PhysicsAttachment {
         added[pb - first]! += (MORISON_ADDED * rho * section) / 2;
       }
     }
+    // A closed body: the water's hydrostatic pressure, rho |g| times the depth under the surface above each point, on every
+    // face below the waterline, the face clipped where it crosses it. Summed over a closed surface in still water this is
+    // the weight of the water the body displaces (Archimedes, by the divergence theorem), exact for the faceted surface
+    // whatever its shape; on waves it is the Froude-Krylov load of the undisturbed surface above each corner. The water it
+    // carries is that of a sphere, half its submerged volume (potential flow, Lamb 1932, section 92), shared by mass.
+    const pressure = closed ? new Float64Array(3 * n) : null;
+    if (pressure) {
+      const gmag = Math.hypot(g[0], g[1], g[2]) * scale,
+        depth = new Float64Array(n);
+      for (let i = 0; i < n; i++) {
+        const row = first + i;
+        depth[i] = (water.elevation?.(c.x[row]!, c.z[row]!, time) ?? 0) - c.y[row]!;
+      }
+      for (let t = 0; t < list.length; t += 3) {
+        const k = [list[t]!, list[t + 1]!, list[t + 2]!] as const,
+          p = k.map((i) => [c.x[first + i]!, c.y[first + i]!, c.z[first + i]!] as Vec3),
+          ux = p[1]![0] - p[0]![0],
+          uy = p[1]![1] - p[0]![1],
+          uz = p[1]![2] - p[0]![2],
+          vx = p[2]![0] - p[0]![0],
+          vy = p[2]![1] - p[0]![1],
+          vz = p[2]![2] - p[0]![2],
+          // Twice the area along the outward normal.
+          nx = uy * vz - uz * vy,
+          ny = uz * vx - ux * vz,
+          nz = ux * vy - uy * vx,
+          // The face's mean depth over its wetted part, as a share of its whole area: the pressure's integral over the face
+          // is rho |g| wet A along -n, and the area vector is half the cross product.
+          wet = wettedDepth(depth[k[0]]!, depth[k[1]]!, depth[k[2]]!);
+        if (!(wet > 0)) continue;
+        const f = rho * gmag * wet * 0.5;
+        for (const i of k) {
+          pressure[3 * i] = pressure[3 * i]! - (f * nx) / 3;
+          pressure[3 * i + 1] = pressure[3 * i + 1]! - (f * ny) / 3;
+          pressure[3 * i + 2] = pressure[3 * i + 2]! - (f * nz) / 3;
+        }
+      }
+      let lift = 0;
+      for (let i = 0; i < n; i++) lift += pressure[3 * i + 1]!;
+      const displaced = gmag > 0 ? lift / (rho * gmag) : 0,
+        total = body.mass();
+      for (let i = 0; i < n; i++) added[i] = total > 0 ? (0.5 * rho * Math.max(0, displaced) * body.masses[i]!) / total : 0;
+      body.displaced = Math.max(0, displaced);
+    }
     // Per particle: buoyancy, the water's acceleration on it and its water, and the water's inertia.
     const h = dt / 2;
     for (let i = 0; i < n; i++) {
@@ -5932,9 +5993,27 @@ export class SoftBodies implements PhysicsAttachment {
         m = body.masses[i]!,
         s = share[i]!;
       if (c.w[row] === 0) continue;
-      const ma = s * added[i]!,
+      const ma = (closed ? 1 : s) * added[i]!,
         mass = m + ma;
       c.w[row] = 1 / mass;
+      if (pressure) {
+        const accel = this.waterAccel;
+        accel[3 * row] = (pressure[3 * i]! / mass) + ((m * scale) / mass - scale) * g[0];
+        accel[3 * row + 1] = (pressure[3 * i + 1]! / mass) + ((m * scale) / mass - scale) * g[1];
+        accel[3 * row + 2] = (pressure[3 * i + 2]! / mass) + ((m * scale) / mass - scale) * g[2];
+        if (!(s > 0)) continue;
+        // The water's own acceleration on what the body displaces and carries.
+        const x = c.x[row]!,
+          y = c.y[row]!,
+          z = c.z[row]!,
+          before = this.waterVelocity(x, y, z, time - h),
+          after = this.waterVelocity(x, y, z, time + h),
+          push = (rho * (body.displaced * m) / Math.max(1e-30, body.mass()) + ma) / mass;
+        accel[3 * row] = accel[3 * row]! + (push * (after[0] - before[0])) / dt;
+        accel[3 * row + 1] = accel[3 * row + 1]! + (push * (after[1] - before[1])) / dt;
+        accel[3 * row + 2] = accel[3 * row + 2]! + (push * (after[2] - before[2])) / dt;
+        continue;
+      }
       if (!(s > 0)) continue;
       const V = s * volume[i]!,
         x = c.x[row]!,
@@ -5985,7 +6064,9 @@ export class SoftBodies implements PhysicsAttachment {
             ((c.vy[a]! + c.vy[b]! + c.vy[d]!) / 3 - flow[1]) * nn[1] +
             ((c.vz[a]! + c.vz[b]! + c.vz[d]!) / 3 - flow[2]) * nn[2];
         if (un === 0) continue;
-        const k = 0.5 * rho * PLATE_DRAG * (twice / 2) * under * w,
+        // A closed body's faces take the water on their upstream side only, as in the air (KB-SOFT-CLOSEDDRAG1).
+        if (closed && un < 0) continue;
+        const k = 0.5 * rho * (closed ? CLOSED_DRAG : PLATE_DRAG) * (twice / 2) * under * w,
           impulse = (quadratic(k, un) - un) / w / 3;
         for (const row of [a, b, d]) {
           const wr = c.w[row]!;
@@ -6897,6 +6978,26 @@ function checkedAero(aero: SoftAerodynamics): AeroLaw {
 }
 
 /** A face's normal-force coefficient over the sine of the angle the air meets it: finite edge-on, so it can damp. */
+/**
+ * The integral of max(d, 0) over a triangle, divided by its area, for d linear over it with corner values a, b, c: the mean
+ * depth of its wetted part over the whole face. The positive part of a linear function over a triangle is the triangle the
+ * zero line cuts off at the corners where it is positive, so with corners sorted a >= b >= c it is (a + b + c) / 3 when
+ * c >= 0, a^3 / (3 (a - b)(a - c)) when only a is positive, and (a + b + c) / 3 - c^3 / (3 (c - a)(c - b)) when only c
+ * is negative.
+ */
+function wettedDepth(d0: number, d1: number, d2: number): number {
+  let a = d0,
+    b = d1,
+    c = d2;
+  if (a < b) [a, b] = [b, a];
+  if (b < c) [b, c] = [c, b];
+  if (a < b) [a, b] = [b, a];
+  if (c >= 0) return (a + b + c) / 3;
+  if (a <= 0) return 0;
+  if (b <= 0) return (a * a * a) / (3 * (a - b) * (a - c));
+  return (a + b + c) / 3 - (c * c * c) / (3 * (c - a) * (c - b));
+}
+
 function plateNormalPerSine(law: AeroLaw, sine: number): number {
   if (sine < law.stallSine) return law.slope * Math.sqrt(1 - sine * sine) + law.vortexLift * sine;
   return law.drag / (0.56 + 0.44 * sine);

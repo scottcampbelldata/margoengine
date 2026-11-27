@@ -1848,6 +1848,9 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   one to a rigid body; `setMass`, `setVolumeFactor` (inflate or deflate), `setGravityScale`, `setAirDrag` (default on:
   a closed body takes the air's pressure on its windward faces, a sphere's drag coefficient 0.525 against the 0.47
   measured, Achenbach 1972) and the rest.
+- **Water and wind.** In `soft.water` a soft volume floats where Archimedes says: the water's hydrostatic pressure on its
+  faces below the waterline lifts it by the weight of the water it displaces (`ball.displacedVolume()`), it carries a
+  sphere's added mass and takes drag on its upstream faces. `soft.wind` pushes it on its windward side.
 - **Debug view.** `PhysicsDebugView.add(ball)` (`@margoengine/physics/debug-view`) draws its edges coloured by strain
   (green at rest, red stretched, blue squeezed), a tick at each contact, and a cross at its centre of mass, white at its
   rest volume and redder as it swells, bluer as it is squeezed (full colour 20% off). `ball.debugRender(options)` gives

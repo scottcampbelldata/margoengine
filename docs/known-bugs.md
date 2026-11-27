@@ -6,6 +6,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a closed soft body floated by its wetted area, not its displaced volume (KB-SOFT-CLOSEDBUOY1, physics soft)
+
+- **Repro:** `soft.water = {density: 1025}` and a `SoftBodyDesc.volume` ball of density 300: each particle under the water
+  took the buoyancy of its share of the body's volume, so the lift followed the share of the surface under water (h / 2R
+  for a sphere at draft h) where Archimedes asks for the submerged volume (h^2 (3R - h) / 4R^3); the ball floated at the
+  wrong draft for every density but half the water's, and carried a flat disk's added mass.
+- **Cause:** `SoftBodies.waterLoads` modelled every body as particles (a rope's segments, a cloth's faces); a closed body's
+  particles are only its surface.
+- **Fix:** a body that holds a volume or a gas takes the water's hydrostatic pressure on each face below the waterline,
+  clipped where it crosses it (`wettedDepth`), which sums to the displaced water's weight for any shape; a sphere's added
+  mass (half the displaced water); drag on upstream faces only. `body.displacedVolume()` reports it. Regression:
+  `packages/physics/tests/soft-volume.test.js` ("in water a soft volume floats where Archimedes says"), held by the
+  test's own clip of the mesh to |a| / g + 1e-4 at densities 300, 500 and 700.
+
 ### Open 2026-11-27: a soft body's damped springs lose momentum to float32 rounding (KB-SOFT-F32MOMENTUM1, physics soft)
 
 - **Repro:** with no gravity and no air drag, `SoftBodyDesc.volume(sphereGeometry(0.4, 16, 12), {density: 100})` at

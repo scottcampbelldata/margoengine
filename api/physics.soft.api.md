@@ -394,6 +394,7 @@ export class SoftBody {
     waterRadius: number | null;
     airLoads: number;
     volumeOn: boolean;
+    displaced: number;
     surfaceRest: number;
     canSleepFlag: boolean;
     asleep: boolean;
@@ -433,6 +434,7 @@ export class SoftBody {
     detachParticle(index: number, body?: PhysicsBody): boolean;
     isParticlePinned(index: number): boolean;
     setParticleKinematicTarget(index: number, position: Vec3): this;
+    displacedVolume(): number;
     surfaceVolume(): number;
     setVolumeFactor(factor: number | null): this;
     setGasPressure(options: SoftGasPressure): this;
