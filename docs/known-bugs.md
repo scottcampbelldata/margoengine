@@ -33,29 +33,60 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** not established. One of four samples missing at a vertex of a sliver fan is the likely reading; the
   tessellated side faces and the Float32 rounding of the boolean result are the two places to look.
 
-### Open 2026-11-27: in an AR session a post effect makes solid meshes see-through (KB-XR-AREFFECTS1, xr, shared)
+### Fixed 2026-11-27: in an AR session a post effect made solid meshes see-through (KB-XR-AREFFECTS1, shared, materials)
 
-- **Repro:** the stand-in XR page `packages/webgl2-compat/test/xr.html` with `createXREngine`, an `immersive-ar`
-  session and `Tonemap.attach(engine)`, reading both eyes (RTX A6000, WebGPU and the WebGL2 layer, the same on a
-  transparent and an opaque canvas). Engine at 1 sample (`exactSize`): with no effect 8,239 of the left eye's 8,700
-  covered pixels have alpha 255; with Tonemap, PostStack or DOF none has, and their alpha is the brightest colour
-  channel (80 to 241), so the real world shows through. FXAA and TAA leave only 681 and about 900 at 255. At 4 samples
-  (`antialias: true`) with no effect 7,927 pixels have alpha 255, with Tonemap, PostStack or DOF 6,791: 1,137 pixels of
-  alpha 241 are still see-through.
-- **Cause:** the AR blit (`packages/xr/src/eyes.ts`) takes alpha from the eye's depth coverage, or the brightest channel
-  where no depth was written. At 1 sample, by reading, a capturing effect draws into its own depth and
-  `SceneTarget.restore` (`packages/shared/msaa.js`) returns without copying it to the eye's, which the blit and the
-  compositor's depth layer then find empty. At 4 samples the copy runs and the cause of the remaining pixels is not
-  established.
-- **Fix needs:** the scene depth copied back at 1 sample too (a shared change: every `SceneTarget` user), the 4-sample
-  remainder found, and an eye-alpha check with an effect on both backends.
+- **Repro:** `node packages/xr/tests/ar-effects.browser.mjs` (stand-in headset, engine route, WebGPU and the WebGL2
+  layer, RTX A6000). Before the fix, at 1 sample every one of 7,284 solid pixels of the left eye was see-through under
+  Tonemap and DOF, 6,383 under the shared scene-depth capture (`acquireDepth`: water, html, contact lights), and 6,085 to
+  6,383 under `StencilBuffer` at 1 and 4 samples on a device without `depth32float-stencil8`.
+- **Cause:** the AR blit takes alpha from the eye's depth coverage, and three passes drew the scene into a depth of
+  their own without giving it back: `SceneTarget` at 1 sample (`packages/shared/msaa.js`), `acquireDepth` at 1 sample
+  (`packages/shared/gpu.js`) and `StencilBuffer` at every sample count (`packages/materials/src/stencil-buffer.ts`).
+  The compositor's depth layer, filled from the eye's depth, was empty with them too, in VR as well.
+- **Fixed:** each copies its depth into the attachment it replaced: `SceneTarget` in its final resolve (or restore), as
+  at 4 samples, and only where both have one size (upscaling captures draw smaller); the other two through `DepthCopy`.
+  Later desktop passes now depth-test against the scene at 1 sample too. One more full-screen depth pass a frame per
+  such capture at 1 sample. Regression: the same check.
+- **Sources:** WebXR Augmented Reality Module, W3C, section 2.4 "XR Compositor Behaviors" (an alpha-blend display
+  composites the layer over the real world by its alpha), https://www.w3.org/TR/webxr-ar-module-1/ ; WebXR Layers
+  API, W3C, section 3.5 "XRProjectionLayer" (the compositor may use the depth attachment, which is expected to represent
+  the rendered scene), https://www.w3.org/TR/webxrlayers-1/ ; WebXR Depth Sensing, W3C (the occlusion pass that reads
+  the same eye depth), https://www.w3.org/TR/webxr-depth-sensing-1/ .
+- The 1,137 pixels of alpha 241 first seen at 4 samples were not a depth bug: the page's line wrote no depth
+  (KB-XR-ARNODEPTH1).
 
-### Open 2026-11-27: on the WebGL2 layer at 4 samples AR eye edges differ from WebGPU (KB-XR-AR4XCOMPAT1, xr, webgl2-compat)
+### Open 2026-11-27: in AR, content that writes no depth is only as opaque as its brightest channel (KB-XR-ARNODEPTH1, xr)
 
-- **Repro:** the same page, `antialias: true`, no effect: the left eye differs from the WebGPU eye by more than 2 in 512
-  bytes (largest 191) and has 8,208 pixels of alpha 255 against 7,927. At 1 sample the two are identical.
-- **Cause:** not established. The layer reads the samples of a 4x texture from a resolved copy (KB-TAA-COMPATEDGE1), so
-  the blit's per-sample coverage is the likely difference.
+- **Repro:** the page of `packages/xr/tests/ar-effects.browser.mjs` with the line's default `depthWrite: false`: under
+  Tonemap its green pixels have alpha 241 of 255 (1,137 of them at 4 samples). A black line there has alpha 0.
+- **Cause:** the AR blit (`packages/xr/src/eyes.ts`) has no coverage for such a pixel: the eye's colour alpha does not
+  survive every post effect, so it takes depth coverage, or the brightest channel where no depth was written.
+- **Workaround:** `depthWrite: true` on a `Line` makes it opaque.
+
+### Fixed 2026-11-27: SSAO and DOF lost passes drawn after the scene, lines among them (KB-POST-LATEDRAW1, post, dof)
+
+- **Repro:** `node packages/post/test/late-draw-browser.mjs` (and with `MARGO_COMPAT=1`). Before the fix a `Lines` pass
+  at its default order 20 drew nothing under SSAO at 4 samples; under DOF it was lost at 4 samples when `Lines` attached
+  after DOF, and a pass at order 29 was lost at 1 and 4 samples.
+- **Cause:** SSAO made the capture's final resolve in its extraction (order 10), and DOF computed its blur at 20 and 21:
+  later draws landed in the multisampled capture after its last resolve, or outside DOF's blur, though the contract is
+  "post-processing resolves at 30".
+- **Fixed:** SSAO makes the final resolve in its composite (30); DOF's blur passes run at 29.8 and 29.9. Regression: the
+  same check, over every capturing effect, both attach orders, orders 20 and 29.
+
+### Fixed 2026-11-27: on the WebGL2 layer at 4 samples AR eye edges differed from WebGPU (KB-XR-AR4XCOMPAT1, xr)
+
+- **Repro:** `node packages/xr/tests/ar-effects.browser.mjs`: with no effect the layer's left eye differed from WebGPU's
+  by more than 2 in 512 bytes (largest 191).
+- **Cause:** the layer cannot read one sample of a 4x texture (GLSL ES 3.00 has no multisample samplers), so each of the
+  AR blit's four depth loads returned the resolved depth and coverage read 0 or 4 of 4.
+- **Sources:** OpenGL ES 3.0.6, Khronos, section 4.1 "Per-Fragment Operations",
+  https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf ; GLSL ES 3.10, Khronos (adds `sampler2DMS`),
+  https://registry.khronos.org/OpenGL/specs/es/3.1/GLSL_ES_Specification_3.10.pdf .
+- **Fixed:** on the layer at 4 samples the blit counts coverage with a depth-tested pass into a 4x `r8unorm` target,
+  whose resolve is the share of drawn samples (depth tests run per sample there). Regression: the same check compares
+  the two backends' eyes (0 bytes differ by more than 2 after; largest difference 0). A capturing effect's depth copy still reads the resolved depth there, so under an effect the
+  layer's edges stay all or nothing ([Limits](limits.md#xr-ar-edges-on-the-webgl2-layer)).
 
 ### Fixed 2026-11-27: SceneFade also drew into offscreen target views (KB-FADE-TARGETVIEW1, post)
 

@@ -2386,8 +2386,16 @@ post check that reads one frame after another also reads the canvas in the rende
 XR on a transparent canvas, stand-in `navigator.xr` only (2026-11-27, RTX A6000): at 1 sample, with TransparentCanvas
 attached, `immersive-ar` and `immersive-vr` eyes of WebGPU and the WebGL2 layer matched (Bloom within 1) for no effect,
 Tonemap, PostStack, Bloom, FXAA, TAA and DOF; no eye held colour above its alpha; empty AR pixels were 0,0,0,0 except
-under Bloom's glow; VR eyes were opaque. Open: KB-XR-AREFFECTS1 and KB-XR-AR4XCOMPAT1. Not covered: a headset, a
+under Bloom's glow; VR eyes were opaque. KB-XR-AREFFECTS1 and KB-XR-AR4XCOMPAT1, found there, are fixed above. Not covered: a headset, a
 browser compositor, additive displays and composition layers.
+
+A pass that redirects the scene's depth gives it back (2026-11-27, KB-XR-AREFFECTS1): `SceneTarget` in its final
+resolve or restore at 1 and 4 samples, only between equal sizes, and `DepthCopy` for depth-only redirects
+(`acquireDepth` at 1 sample, `StencilBuffer`). An XR eye's depth is its AR coverage and the compositor's depth layer.
+A capture owner makes its final resolve at order 29.8 or later, so every draw below 30 reaches the picture
+(KB-POST-LATEDRAW1, `late-draw-browser.mjs`). On the WebGL2 layer a 4x sample load returns the resolved texel; the AR
+blit counts coverage by depth testing instead (KB-XR-AR4XCOMPAT1). Evidence, stand-in headset on an RTX A6000, both
+backends: `ar-effects.browser.mjs`. Missing: a headset, an AR device, a browser compositor.
 
 A GPU reset is the device's loss (2026-11-27, KB-COMPAT-LOSSREPORT1): Chrome answers the synchronous query that waited
 for a reset (LINK_STATUS and COMPILE_STATUS false with empty logs, checkFramebufferStatus 0x8cdd, getError 0) before

@@ -1421,6 +1421,14 @@ in `packages/cad/test/cad-limits.test.js`).
 | Moving sources of a far mesh (`HierarchicalLOD.update`, `follow`) | A cell keeps its meshes and centre. A rebuild merges the whole cell again, and simplifies it with a `ratio` below 1. | Far meshes stay plain meshes, so nothing is paid per frame for what stands still beyond comparing matrices. | `follow` runs a frame behind the sources and only for cells on their far mesh; a cell coming into range shows its old far mesh for one frame. | `update()` when you know something moved. |
 | Selection outlines on imposters (`LODSystem.drawSelectionMask`, `SelectionMaskSource`) | An object counts as selected through its anchor or a level; a part of a model level does not. | The mask redraws only selected imposters, from a buffer of their own, with the imposter's own shader, so the outline sits on the imposter's pixels. | The mask pass runs the full imposter fragment shader for the selected objects. | Select the anchor or the model. |
 
+## XR AR edges on the WebGL2 layer
+
+By method (2026-11-27, stand-in headset only, no AR device): at 4 samples a capturing effect copies its depth back to the
+eye one sample at a time, which the WebGL2 layer answers with the resolved depth (GLSL ES 3.00 has no multisample
+samplers), so under an effect an AR edge pixel's coverage there is 0 or 1, where WebGPU keeps quarters; the colour's
+brightest channel still gives a partly covered pixel partial alpha where coverage is 0. With no effect the two match.
+Content that writes no depth is as opaque as its brightest channel on both (KB-XR-ARNODEPTH1).
+
 ## Geometry
 
 | Limit | Starts at | Why | What you see | Escape hatch |
