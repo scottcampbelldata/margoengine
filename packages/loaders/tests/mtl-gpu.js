@@ -18,8 +18,14 @@ engine.camera.project = (out) => {
 engine.onError = (error) => errors.push(String(error));
 engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
 
-async function draw() {
-  const loaded = await loadOBJ(engine, new URL('./fixtures/mtl-gpu/quad.obj', import.meta.url));
+let shown;
+async function draw(name = 'quad', cubed = false) {
+  shown?.dispose();
+  const loaded = await loadOBJ(engine, new URL(`./fixtures/mtl-gpu/${name}.obj`, import.meta.url)),
+    set = loaded.materials.materials;
+  shown = loaded;
+  // The second material's cube reflection, drawn on the same quad.
+  if (cubed) set.get('checker').envMap = set.get('cubed').envMap;
   engine.render();
   await engine.gpu.queue.onSubmittedWorkDone();
   engine.render();

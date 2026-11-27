@@ -69,7 +69,9 @@ export interface MTLMaterial {
   illum?: number;
   /**
    * Texture maps by statement, in a null-prototype object: `map_Kd`, `map_Ka`, `map_Ks`, `map_Ke`, `map_Ns`, `map_d`,
-   * `bump` (also written `map_Bump`), `disp`, `decal`, `refl`, and any other `map_*` as written.
+   * `bump` (also written `map_Bump`), `disp`, `decal`, `refl`, and any other `map_*` as written. A cube reflection's
+   * `refl -type cube_top` (and `cube_bottom`, `_front`, `_back`, `_left`, `_right`) statements are each kept as
+   * `refl_cube_top` and so on, beside `refl`, which holds the last `refl` statement.
    */
   maps: Record<string, MTLMap>;
   /** Statements this reader does not interpret (`Ni`, `Tf`, `Pr`, spectral colors, unknown map options, ...). */
@@ -199,6 +201,9 @@ const MAPS: Record<string, string> = {
   refl: 'refl',
 };
 
+/** The faces a cube reflection map names with `refl -type`. */
+const CUBE_FACES = ['cube_right', 'cube_left', 'cube_top', 'cube_bottom', 'cube_back', 'cube_front'];
+
 /** Parses a map statement's options and file name; null when it uses an option outside the MTL specification. */
 function parseMap(tokens: string[], line: number, from: string): MTLMap | null {
   const options: MTLMapOptions = {},
@@ -302,8 +307,11 @@ export function parseMTL(input: BinaryInput | string, options: MTLParseOptions =
       default: {
         const name = Object.hasOwn(MAPS, key) ? MAPS[key] : key.startsWith('map_') ? keyword : undefined,
           map = name ? parseMap(tokens, line, from) : null;
-        if (name && map) material.maps[name] = map;
-        else material.extras.push({ keyword, value: rest, line });
+        if (name && map) {
+          material.maps[name] = map;
+          const face = map.options.type?.toLowerCase();
+          if (name === 'refl' && face && CUBE_FACES.includes(face)) material.maps[`refl_${face}`] = map;
+        } else material.extras.push({ keyword, value: rest, line });
       }
     }
   });

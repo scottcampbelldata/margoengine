@@ -1,0 +1,16 @@
+newmtl checker
+Kd 1 1 1
+map_Kd checker.png
+Ks 0.5 0.5 0.5
+Ns 40
+illum 2
+map_Ks -s 2 2 checker.png
+disp -mm 0 0.05 -s 2 2 checker.png
+refl -type sphere checker.png
+newmtl cubed
+refl -type cube_right checker.png
+refl -type cube_left checker.png
+refl -type cube_top checker.png
+refl -type cube_bottom checker.png
+refl -type cube_back checker.png
+refl -type cube_front checker.png

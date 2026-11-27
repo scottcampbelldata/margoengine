@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21079958,
+  "total": 21080737,
   "history": [
     {
       "date": "2026-10-24",
@@ -14857,6 +14857,12 @@
       "commit": "draco-drc",
       "reason": "DRACOExporter parity: encodeDraco writes bare mesh and point cloud streams; exporters/draco to 98,566 B gzip measured: the encoder Wasm grows 161,503 to 171,045 B (sequential and KD-tree point cloud writers) plus the input checks; the writers share the attribute coders, so a second Wasm module would ship them twice",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "mtl-maps",
+      "reason": "MTLLoader parity: createMTLMaterials applies Ks, map_Ks, disp and refl; loaders/mtl to 10,492 B gzip measured (the new slots, the specular rule and the cube map assembly in the one entry that builds materials)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15486,7 +15492,7 @@
     "@margoengine/loaders/mmcif": 3430,
     "@margoengine/loaders/mmd": 7083,
     "@margoengine/loaders/mocap": 4445,
-    "@margoengine/loaders/mtl": 10028,
+    "@margoengine/loaders/mtl": 10807,
     "@margoengine/loaders/nrrd": 7006,
     "@margoengine/loaders/nurbs": 2763,
     "@margoengine/loaders/off": 2992,

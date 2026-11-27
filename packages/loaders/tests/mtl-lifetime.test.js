@@ -25,6 +25,9 @@ class Texture {
 let count = 0;
 mock.module('@margoengine/materials', {
   namedExports: {
+    CubeTexture: class CubeTexture {
+      dispose() {}
+    },
     Material,
     Texture,
     loadTexture: async () => {

@@ -54,6 +54,7 @@ function createMesh(engine, geometry, materials, options) {
 }
 mock.module('@margoengine/materials', {
   namedExports: {
+    CubeTexture: class CubeTexture extends Texture {},
     Material,
     Texture,
     createMesh,

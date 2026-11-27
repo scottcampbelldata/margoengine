@@ -1,5 +1,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import {
+  CubeTexture,
   Material,
   type MaterialMesh,
   type MaterialOptions,
@@ -16,6 +17,7 @@ import { captureScene } from '../../shared/scene-scope.js';
 import {
   DEFAULT_MAX_MATERIAL_BYTES,
   type LoadedOBJ,
+  type MTLMap,
   type MTLMapOptions,
   type MTLMaterial,
   type OBJMaterialLimits,
@@ -79,11 +81,15 @@ export interface MTLMaterialSet {
 const F = 'MTL';
 
 /** Map statements with a material slot; every other map key is reported as unused. */
-const SLOTTED_MAPS = new Set(['map_Kd', 'map_Ke', 'map_d', 'bump']);
+const SLOTTED_MAPS = new Set(['map_Kd', 'map_Ke', 'map_d', 'bump', 'map_Ks', 'disp', 'refl']);
+/** Cube reflection faces in cube layer order +X, -X, +Y, -Y, +Z, -Z: front is -Z, the way a camera looks. */
+const FACES = ['cube_right', 'cube_left', 'cube_top', 'cube_bottom', 'cube_back', 'cube_front'];
+/** The specularColor that makes a dielectric's F0 (0.04 at the default index of refraction 1.5) equal to 1. */
+const F0_ONE = 25;
 /** PBR-extension statements read from `extras` (compared in lower case); other extras are reported as unused. */
 const READ_EXTRAS = new Set(['norm', 'pr', 'pm']);
 
-type Slot = 'map' | 'alphaMap' | 'emissiveMap' | 'bumpMap' | 'normalMap';
+type Slot = 'map' | 'alphaMap' | 'emissiveMap' | 'bumpMap' | 'normalMap' | 'specularColorMap' | 'displacementMap';
 interface MapUse {
   slot: Slot;
   path: string;
@@ -172,8 +178,17 @@ function materialOptions(m: MTLMaterial, doubleSided: boolean): MaterialOptions 
   else options.roughness = roughnessFromNs(m.Ns);
   const pm = extraNumber(m, 'pm');
   options.metalness = Number.isFinite(pm) ? clamp01(pm) : 0;
+  if (isPBR(m)) return options;
+  // Ks is the specular reflectance: KHR_materials_specular holds it as F0 (illum 1 and a black Ks have no highlight).
+  if (m.illum === 1 || m.Ks?.every((c) => !(c > 0))) options.specularIntensity = 0;
+  else if (m.Ks || m.maps?.map_Ks)
+    options.specularColor = (m.Ks ? linear3(m.Ks) : [1, 1, 1]).map((c) => c * F0_ONE) as [number, number, number];
   return options;
 }
+
+/** A material with the PBR extension's `Pr` or `Pm`: its `Ks` is the fallback for Phong readers. */
+const isPBR = (m: MTLMaterial): boolean =>
+  Number.isFinite(extraNumber(m, 'pr')) || Number.isFinite(extraNumber(m, 'pm'));
 
 /** The maps a material uses, in slot (and load) order: map, alphaMap, emissiveMap, bump or normal, norm. */
 function mapUses(m: MTLMaterial, bump: 'height' | 'normal'): MapUse[] {
@@ -188,7 +203,9 @@ function mapUses(m: MTLMaterial, bump: 'height' | 'normal'): MapUse[] {
   };
   add('map', maps.map_Kd, 'srgb');
   add('alphaMap', maps.map_d, 'linear');
+  add('displacementMap', maps.disp, 'linear');
   if (m.illum === 0) return uses;
+  if (m.illum !== 1 && !isPBR(m)) add('specularColorMap', maps.map_Ks, 'srgb');
   add('emissiveMap', maps.map_Ke, 'srgb');
   add(bump === 'normal' ? 'normalMap' : 'bumpMap', maps.bump, 'linear');
   const norm = extra(m, 'norm');
@@ -199,17 +216,35 @@ function mapUses(m: MTLMaterial, bump: 'height' | 'normal'): MapUse[] {
   return uses;
 }
 
+/**
+ * The reflection map of a material: six cube faces in layer order, one latitude-longitude (`-type sphere`, the
+ * default) image, or a warning. MTL calls the second a map on the inside of an infinitely large sphere.
+ */
+function reflection(m: MTLMaterial): { maps: MTLMap[] } | { warning: string } | undefined {
+  const maps = m.maps ?? {};
+  if (m.illum === 0 || !maps.refl) return undefined;
+  const faces = FACES.map((face) => maps[`refl_${face}`]);
+  if (faces.every(Boolean)) return { maps: faces };
+  const type = maps.refl.options?.type?.toLowerCase() ?? 'sphere';
+  if (type === 'sphere') return { maps: [maps.refl] };
+  if (!FACES.includes(type)) return { warning: `refl -type ${type} is not sphere or a cube face; it is not used` };
+  const missing = FACES.filter((face) => !maps[`refl_${face}`]);
+  return { warning: `refl cube map lacks ${missing.join(', ')}; it is not used` };
+}
+
 /** What a material says that Margo materials cannot show, as warnings. */
 function unusedWarnings(m: MTLMaterial): string[] {
   const out: string[] = [];
   for (const key of Object.keys(m.maps ?? {}))
-    if (!SLOTTED_MAPS.has(key)) out.push(`${key} has no Margo material slot; it is not used`);
+    if (!SLOTTED_MAPS.has(key) && !key.startsWith('refl_'))
+      out.push(`${key} has no Margo material slot; it is not used`);
+  const channel = m.maps?.disp?.options?.imfchan;
+  if (channel && channel !== 'r') out.push(`disp -imfchan ${channel}: Margo displaces by the red channel`);
   for (const s of m.extras ?? [])
     if (!READ_EXTRAS.has(s.keyword.toLowerCase()))
       out.push(`${s.keyword} has no Margo material equivalent; it is not used`);
   if (m.Ka) out.push('Ka (ambient colour) has no Margo material equivalent; it is not used');
-  if (m.Ks && m.Ks.some((c) => c > 0) && m.illum !== 0)
-    out.push('Ks (specular colour) only sets whether there is a highlight; roughness comes from Ns');
+  if (isPBR(m) && m.maps?.map_Ks) out.push('map_Ks is the Phong fallback of a Pr/Pm material; it is not used');
   return out;
 }
 
@@ -218,9 +253,14 @@ function unusedWarnings(m: MTLMaterial): string[] {
  * metallic-roughness: `Kd` is the base colour (sRGB in the file, linear in the material), `d` (else 1 - `Tr`) the
  * opacity, `Ke` the emission (a peak above 1 moves into `emissiveIntensity`), and roughness comes from the Phong
  * exponent `Ns` as (2 / (Ns + 2))^(1/4) (Walter et al. 2007's Blinn-Phong to Beckmann match with glTF's
- * alpha = roughness^2). The PBR extension's `Pr`, `Pm` and `norm` are read when present. `illum 0` is unlit.
- * `map_Kd`, `map_d`, `map_Ke`, `bump` and `norm` load as textures, each (file, colour space, wrap) once; their `-o`
- * and `-s` become the slot's UV transform and `-clamp on` a clamped wrap. A map that fails to load is a warning.
+ * alpha = roughness^2). `Ks` (and `map_Ks`, times it) is the specular reflectance at normal incidence, held as
+ * KHR_materials_specular's `specularColor` and `specularColorMap`; `illum 1` and a black `Ks` have no highlight. The
+ * PBR extension's `Pr`, `Pm` and `norm` are read when present, and a material with `Pr` or `Pm` leaves `Ks` out.
+ * `illum 0` is unlit. `disp` displaces vertices along their normals (`-mm base gain`: bias and scale). `refl` becomes
+ * the material's `envMap`: `-type sphere` a latitude-longitude image, or six `-type cube_*` faces (front is -Z).
+ * `map_Kd`, `map_d`, `map_Ke`, `map_Ks`, `disp`, `refl`, `bump` and `norm` load as textures, each (file, colour
+ * space, wrap) once; their `-o` and `-s` become the slot's UV transform and `-clamp on` a clamped wrap. A map that
+ * fails to load is a warning. `Ka` has no equivalent (ambient light shades the base colour) and is a warning.
  * Rejects with `TypeError` / `RangeError` for bad arguments and with a `LoaderError` (code `'aborted'`) when
  * `signal` aborts; whatever was built is disposed first.
  */
@@ -287,7 +327,8 @@ export async function createMTLMaterials(
 
   // One request per (colour space, wrap, URL), in first-use order.
   const requests = new Map<string, { promise: Promise<Texture | undefined>; texture?: Texture }>(),
-    assignments: { material: Material; slot: Slot; key: string }[] = [];
+    assignments: { material: Material; slot: Slot; key: string }[] = [],
+    reflections: { material: Material; keys: string[] }[] = [];
   const request = (url: string, colorSpace: 'srgb' | 'linear', wrap: 'clamp' | 'repeat'): string => {
     const key = `${colorSpace} ${wrap} ${url}`;
     if (requests.has(key)) return key;
@@ -328,10 +369,19 @@ export async function createMTLMaterials(
         if (url === undefined) continue;
         assignments.push({ material, slot: use.slot, key: request(url, use.colorSpace, wrap) });
         if (use.slot === 'bumpMap' && Number.isFinite(use.options.bm)) material.bumpScale = use.options.bm as number;
+        if (use.slot === 'displacementMap' && use.options.mm?.every(Number.isFinite))
+          [material.displacementBias, material.displacementScale] = use.options.mm;
         const [ou = 0, ov = 0] = use.options.o ?? [],
           [su = 1, sv = 1] = use.options.s ?? [];
         if (ou !== 0 || ov !== 0 || su !== 1 || sv !== 1)
           material.setUVTransform({ offset: [ou, ov], scale: [su, sv] }, use.slot);
+      }
+      const refl = reflection(m);
+      if (refl && 'warning' in refl) warn(refl.warning);
+      else if (refl) {
+        const urls = refl.maps.map((map) => urlOf(map.path));
+        if (urls.every((url) => url !== undefined))
+          reflections.push({ material, keys: urls.map((url) => request(url as string, 'srgb', 'clamp')) });
       }
     }
     const all = Promise.all([...requests.values()].map((r) => r.promise));
@@ -351,7 +401,34 @@ export async function createMTLMaterials(
       const texture = requests.get(key)?.texture;
       if (texture) material[slot] = texture;
     }
-    set.textures = [...requests.values()].flatMap((r) => (r.texture ? [r.texture] : []));
+    // One cube map per distinct set of files.
+    const cubes = new Map<string, CubeTexture | undefined>();
+    for (const { material, keys } of reflections) {
+      const sources = keys.map((key) => requests.get(key)?.texture),
+        id = keys.join('\n');
+      if (!sources.every((texture) => texture !== undefined)) continue;
+      if (!cubes.has(id)) {
+        try {
+          const cube =
+            sources.length === 1
+              ? new CubeTexture(sources[0] as Texture)
+              : new CubeTexture((sources as Texture[]).map((texture) => texture.source) as never, {
+                  colorSpace: 'srgb',
+                });
+          cubes.set(id, cube);
+          arrived.push(cube);
+        } catch (error) {
+          warn(`refl map could not become a cube map (${(error as Error).message}); it is left out`);
+          cubes.set(id, undefined);
+        }
+      }
+      const cube = cubes.get(id);
+      if (cube) material.envMap = cube;
+    }
+    set.textures = [
+      ...[...requests.values()].flatMap((r) => (r.texture ? [r.texture] : [])),
+      ...[...cubes.values()].flatMap((cube) => (cube ? [cube] : [])),
+    ];
     return set;
   } catch (error) {
     set.dispose();

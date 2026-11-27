@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Material, Texture } from '@margoengine/materials';
+import { CubeTexture, Material, Texture } from '@margoengine/materials';
 import { SRGBToLinear } from '@margoengine/math/color';
 import { LoaderError, parseMTL, parseOBJ } from '../dist/index.js';
 import { createMTLMaterials, loadOBJ, prepareOBJMesh } from '../dist/mtl.js';
@@ -99,12 +99,15 @@ test('createMTLMaterials: colours, opacity, roughness from Ns, PBR extension, il
       ['alpha.png', 'linear', 'repeat'],
       ['tex/bump.png', 'linear', 'repeat'],
       ['tex/normal.png', 'linear', 'repeat'],
+      ['sky.png', 'srgb', 'clamp'],
       ['glow.png', 'srgb', 'clamp'],
       ['missing.png', 'srgb', 'repeat'],
     ],
   );
-  assert.equal(set.textures.length, 5);
-  for (const pattern of [/missing\.png could not be loaded/, /refl has no Margo/, /Ka/, /Ks/])
+  // Six loaded files and the cube map made from sky.png.
+  assert.equal(set.textures.length, 7);
+  assert.ok(shiny.envMap instanceof CubeTexture);
+  for (const pattern of [/missing\.png could not be loaded/, /Ka/])
     assert.ok(
       set.warnings.some((w) => pattern.test(w)),
       `warning ${pattern}`,
@@ -142,6 +145,105 @@ test('createMTLMaterials: bump as normal map, doubleSided, abort, and argument e
   );
   // No maps: no base URL is needed.
   assert.equal((await createMTLMaterials(parseMTL('newmtl a\nKd 1 1 1\n'))).materials.size, 1);
+});
+
+const SPECULAR = `newmtl glossy
+Ks 0.5 0.25 1
+Ns 200
+map_Ks -s 3 3 spec.png
+disp -mm -0.5 2 height.png
+newmtl mapOnly
+map_Ks spec.png
+disp height.png
+newmtl black
+Ks 0 0 0
+map_Ks spec.png
+newmtl matte
+illum 1
+Ks 1 1 1
+map_Ks spec.png
+disp -imfchan g height.png
+newmtl exported
+Pr 0.4
+Ks 0.5 0.5 0.5
+map_Ks fallback.png
+newmtl plain
+Kd 1 1 1
+newmtl box
+refl -type cube_front f.png
+refl -type cube_back b.png
+refl -type cube_right r.png
+refl -type cube_left l.png
+refl -type cube_top t.png
+refl -type cube_bottom d.png
+newmtl again
+refl -type cube_right r.png
+refl -type cube_left l.png
+refl -type cube_top t.png
+refl -type cube_bottom d.png
+refl -type cube_back b.png
+refl -type cube_front f.png
+newmtl half
+refl -type cube_top t.png
+newmtl odd
+refl -type cylinder c.png
+newmtl dark
+illum 0
+refl -type sphere s.png
+`;
+
+test('Ks and map_Ks become the specular reflectance, disp the displacement, refl the environment map', async () => {
+  const parsed = parseMTL(SPECULAR),
+    box = parsed.find((m) => m.name === 'box');
+  assert.equal(box.maps.refl.file, 'd.png', 'refl keeps the last statement');
+  assert.equal(box.maps.refl_cube_front.file, 'f.png');
+  const { requests, load } = recorder(),
+    // Cube faces must be square images of one size.
+    set = await createMTLMaterials(parsed, { baseUrl: 'https://example.com/a.mtl', loadTexture: load }),
+    m = Object.fromEntries(set.materials);
+  // F0 = linear Ks: KHR_materials_specular's colour times the dielectric F0 of 0.04.
+  [0.5, 0.25, 1].forEach((c, i) => close(m.glossy.specularColor[i] * 0.04, SRGBToLinear(c), `Ks ${i}`));
+  close(m.glossy.roughness, (2 / 202) ** 0.25, 'roughness still from Ns');
+  assert.equal(m.glossy.specularIntensity, 1);
+  assert.ok(m.glossy.specularColorMap instanceof Texture);
+  assert.deepEqual([m.glossy.displacementBias, m.glossy.displacementScale], [-0.5, 2], '-mm base gain');
+  assert.ok(m.glossy.displacementMap instanceof Texture);
+  // A map without Ks is the reflectance itself.
+  assert.deepEqual([...m.mapOnly.specularColor], [25, 25, 25]);
+  assert.deepEqual([m.mapOnly.displacementBias, m.mapOnly.displacementScale], [0, 1]);
+  assert.equal(m.black.specularIntensity, 0);
+  assert.equal(m.matte.specularIntensity, 0);
+  assert.equal(m.matte.specularColorMap, null);
+  assert.ok(m.matte.displacementMap instanceof Texture);
+  assert.deepEqual([[...m.exported.specularColor], m.exported.specularColorMap], [[1, 1, 1], null]);
+  assert.deepEqual([[...m.plain.specularColor], m.plain.specularIntensity, m.plain.envMap], [[1, 1, 1], 1, null]);
+  // One cube map for the two materials that name the same faces, in whatever order.
+  assert.ok(m.box.envMap instanceof CubeTexture);
+  assert.equal(m.again.envMap, m.box.envMap);
+  assert.deepEqual(
+    m.box.envMap.source.faces.map((face) => face),
+    ['r', 'l', 't', 'd', 'b', 'f'].map(
+      (name) => set.textures[requests.findIndex((q) => q.url.endsWith(`/${name}.png`))].source,
+    ),
+    '+X, -X, +Y, -Y, +Z, -Z',
+  );
+  assert.deepEqual([m.half.envMap, m.odd.envMap, m.dark.envMap], [null, null, null]);
+  const unasked = ['c.png', 's.png', 'fallback.png'].map((file) => `https://example.com/${file}`);
+  assert.ok(requests.every((q) => !unasked.includes(q.url)));
+  assert.equal(requests.find((q) => q.url.endsWith('spec.png')).colorSpace, 'srgb');
+  assert.equal(requests.find((q) => q.url.endsWith('height.png')).colorSpace, 'linear');
+  for (const pattern of [
+    /refl cube map lacks cube_right, cube_left, cube_bottom, cube_back, cube_front/,
+    /refl -type cylinder/,
+    /disp -imfchan g/,
+    /map_Ks is the Phong fallback/,
+  ])
+    assert.ok(
+      set.warnings.some((w) => pattern.test(w)),
+      `warning ${pattern}: ${set.warnings.join('; ')}`,
+    );
+  assert.ok(!set.warnings.some((w) => /map_Ks has no|disp has no|refl has no|Ks \(/.test(w)));
+  set.dispose();
 });
 
 const OBJ = `mtllib mats/lib.mtl

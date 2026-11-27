@@ -40,6 +40,15 @@ try {
     for (const c of high) assert.ok(px[c] > 120, `${name} channel ${c} is bright (${px})`);
     for (const c of low) assert.ok(px[c] < 60, `${name} channel ${c} is dark (${px})`);
   }
+  // map_Ks, disp and a refl map of either kind compile and draw together.
+  for (const cubed of [false, true]) {
+    const maps = await page.evaluate((cube) => window.check.draw('quad-maps', cube), cubed);
+    assert.deepEqual(maps.warnings, []);
+    const frame = await decodePNG(await page.locator('#a').screenshot()),
+      centre = Array.from(frame.data.slice((32 * frame.width + 32) * 4, (32 * frame.width + 32) * 4 + 3));
+    console.log(`maps ${cubed ? 'cube' : 'sphere'}${compat ? ' (compat)' : ''}: rgb ${centre.join(',')}`);
+    assert.ok(Math.max(...centre) > 60, `the quad with every map is drawn (${centre})`);
+  }
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);
 } finally {
