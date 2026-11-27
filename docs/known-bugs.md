@@ -18643,6 +18643,16 @@ instead of 1 on roughness-0 spheres); it writes |n x m|^2 + a2 (n.m)^2 now and t
 Regression: tests/smith-shaders.test.js (no separable product left), tests/reference-environment.test.js (the script's
 D text, the accepted budgets, the split-model row no looser than the KB3563 record).
 
+### Not reproduced 2026-11-27: materials wireframe exact hashes on the WebGL2 layer (KB5563a, materials)
+
+- **Report (bug sweep, 2026-11-11):** three exact-hash failures at 1x on the compatibility layer, mirrored/reference and
+  live-toggle frames differing; cause not found.
+- **Repro attempt (lane A, 2026-11-27, origin/main 4021c6f384, RTX A6000, ANGLE Direct3D 11):**
+  `node scripts/material-wireframe-gpu-check.js`, 3 runs on WebGPU and 3 with `MARGO_COMPAT=1`, alternating, with six
+  busy CPU loops running for the whole time: 6 of 6 pass, `failures` empty in every report. Every comparison is still
+  exact. The entry stays here until a failing run is caught; a failure gets its frames from
+  `test-results/material-wireframe`.
+
 ### Open: the CUDA decomposition references are not bit-reproducible, so `--capture-decomposition` refuses a rerun
 
 Repro: `node scripts/reference-rendering/environment.mjs --capture-decomposition` with the committed script: the
