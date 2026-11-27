@@ -1380,6 +1380,7 @@ class SoftBodyDesc {
     massGiven: boolean;
     skin: Skin | null;
     solver: SoftSolver;
+    sourceMesh: SoftSourceMesh | null;
     constructor(positions: ArrayLike<number> | readonly Vec3[]);
     get particleCount(): number;
     static rope(start: Vec3, end: Vec3, particles: number, { bending }?: {
@@ -1399,6 +1400,7 @@ class SoftBodyDesc {
     static sphere(center: Vec3, radius: number, options?: number | {
         detail?: number;
     }): SoftBodyDesc;
+    static volume(mesh: SoftVolumeMesh, options?: SoftVolumeOptions): SoftBodyDesc;
     setVolumeFactor(factor: number | null): this;
     setGasPressure(options: SoftGasPressure): this;
     setTensionOnly(edges?: boolean | readonly number[]): this;
@@ -1526,12 +1528,38 @@ interface SoftSoftness {
 
 type SoftSolver = 'constraints' | 'fem' | 'vertex-block' | 'projective';
 
+interface SoftSourceMesh {
+    readonly particles: Uint32Array;
+    readonly indices: Uint32Array;
+    readonly uvs: Float32Array | null;
+}
+
 interface SoftTensileSeam {
     readonly cell: number;
     readonly triangle: Triangle;
     readonly openingStrain: number;
     readonly slidingStrain?: number;
     readonly tearingStrain?: number;
+}
+
+type SoftVolumeMesh = {
+    readonly vertices: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+    readonly stride?: number;
+} | {
+    readonly positions: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+    readonly uvs?: ArrayLike<number>;
+};
+
+interface SoftVolumeOptions {
+    readonly weld?: number;
+    readonly stiffness?: number;
+    readonly damping?: number;
+    readonly density?: number;
+    readonly radius?: number;
+    readonly pressure?: number;
+    readonly ambientPressure?: number;
 }
 
 type Triangle = readonly [Vec3, Vec3, Vec3];
