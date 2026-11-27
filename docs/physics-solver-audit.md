@@ -1277,6 +1277,19 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   shallow-water wall's propagation speed is 9.75 m/s, versus 2.07–4.59 m/s for the authored wave bands.
   A prognostic dispersive quay boundary and its impact-to-spray transfer remain open.
 
+  The subcell source correction in `1f14d905fe` reduces the frozen KRISO KCS eight-length signed RMS error
+  from 15.10 to 13.86 mm at 60 Hz and 0.25 m spacing. The test in `sea-wake.test.js` checks volume and signed
+  Fourier modes for a moving patch against exact area weights. The aft part of the measured cut still has 17.90 mm
+  profile RMS against 34.60 mm predicted. Neither the source weights nor the tank inputs were fitted to that cut.
+
+  Transforming the 215,465 vertices of the archived render hull with its authored scale and pose confirms that
+  the underwater surface passes through the actual main quay face from about 4.25 to 16.67 s of vessel time.
+  A point is 5.80 m behind the face at x = −22.585 m and vessel time 8.42 s. This is within the main quay span
+  and is independent of the closed hull proxy. A diagnostic departure eased out over vessel time 7.65–55.65 s
+  had at least 1.02 m clearance to the wet face in the sampled geometry and returned to the authored path before
+  the reviewed shot. The diagnostic changes the earlier ship motion. The archived shot has yet to be corrected
+  and rendered with a resolved reflective wake.
+
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.

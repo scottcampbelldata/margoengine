@@ -17562,3 +17562,18 @@ paper's companion code was read.
   ragdoll is limp and moved under the body before control returns).
 - Own: the capsule and the ragdoll's hit boxes are put in disjoint collision groups so the walk never meets its own hit
   boxes; the slope angle is acos(n . up) of the ground the last move ended on.
+
+### SEA-12 wake reflection at a straight quay
+
+Un-Ryong Rim, Jun-Bom Ko, Chol-Jun Han and Fuad-Mahfud Assidiq, *An Exact Neumann-to-Dirichlet (NtD) Boundary
+Condition for Three-Dimensional Wave Motion Over Piecewise Smooth Topographies Near a Vertical Breakwater*
+(2025), §2, equations 1–3. The mirror pair in the incident potential gives zero normal gradient at the vertical
+face. SEA-12 uses the same even continuation for its hull pressure and displaced-volume inputs on a symmetric
+WakeSolver grid. The analytic regression checks an oblique finite-depth mode, and the coupled regression checks
+real hull pressure and source fields, wet-side volume and snapshot replay. [Rim et al.](https://doi.org/10.1002/eng2.70041)
+
+Van der Meer et al., *EurOtop Manual on Wave Overtopping of Sea Defences and Related Structures* (2018), chapter 7,
+treat crest level and vertical-wall wave conditions separately from the transport over that crest. The Water
+binding uses consecutive solver samples to locate a rising crest crossing and interpolate the liquid velocity.
+The VFX particles visualize that crossing. An overtopping discharge, a wave-impact breakup or a measured droplet
+size distribution is outside this Water binding. [EurOtop](https://www.overtopping-manual.com/assets/downloads/EurOtop_II_2018_Final_version.pdf)

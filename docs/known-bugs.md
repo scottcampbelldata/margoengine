@@ -69,6 +69,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   overflow. `packages/physics/tests/coupling/loads-swim-actuators.test.js` checks paired water and body impulses
   against the unshifted swimmer and verifies exact replay.
 
+### Open 2026-11-27: First Wake’s authored stern sweeps into the quay (KB-LOADS-FIRSTWAKEQUAY, First Wake)
+
+- **Repro:** In the archived First Wake scene, transform the Survey ship’s GLB positions by the scale and
+  waterline offset in `main.js` and the pose in `timeline.js`. At vessel time 8.42 s an underwater vertex at
+  x = −22.585 m reaches z = −16.347 m. The quay’s actual wet face there is z = −10.55 m.
+- **Cause:** The ship’s heading follows the tangent of the early sideways departure. It rotates the long stern
+  through the wall before the centre has enough clearance. A slower sideways departure clears the wall in a
+  geometry diagnostic. Production playback still needs the corrected track and a resolved reflected wake.
+
 ### Fixed 2026-11-26: film seek from frame zero lost the accumulator layout (KB-LOADS-FRAMEZERO)
 
 - **Repro:** Snapshot a world with buoyancy and a pending 5 N·s rigid impulse before it advances. The first step
