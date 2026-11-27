@@ -79,7 +79,7 @@ struct Hail {
  light:vec4f, radiance:vec4f, ambient:vec4f, splash:vec4f,
 }
 @group(0) @binding(0) var<uniform> h:Hail;
-struct Out {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32,@location(2) across:vec3f,@location(3) view:vec3f}
+struct Out {@builtin(position) position:vec4f,@location(0) @interpolate(perspective,centroid) uv:vec2f,@location(1) @interpolate(perspective,centroid) alpha:f32,@location(2) across:vec3f,@location(3) view:vec3f}
 fn pcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let x=((s>>((s>>28u)+4u))^s)*277803737u;return (x>>22u)^x;}
 fn rnd(i:u32,cycle:u32,k:u32)->f32 {return f32(pcg(pcg(i*4u+k+bitcast<u32>(h.params.y))^(cycle*2654435761u))>>8u)*5.9604645e-8;}
 const corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));
@@ -191,7 +191,7 @@ const shaderTail = /* wgsl */ `
  return o;
 }
 @fragment fn fragment(i:Out)->@location(0) vec4f {
- let a=i.alpha*h.colour.w*(1.0-i.uv.x*i.uv.x);
+ let a=i.alpha*h.colour.w*max(0.0,1.0-i.uv.x*i.uv.x);
  var shade=vec3f(1.0+h.extra.z*6.0);
  if(h.extra.w>0.5){
   // Lit: the ball's normal from the place across the streak; Lambert diffuse from the sun plus the ambient light, so the

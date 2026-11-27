@@ -1,3 +1,10 @@
+### Section 5 evidence: precipitation streaks at 4x take centroid-sampled varyings (2026-11-27)
+
+`packages/sky/test/features-check.mjs sleet` requires no pixel below 0 in the rain, snow and sleet frames of Bloom's
+HDR capture (KB-SKY-STREAKCENTROID1): 7 at 4x before on the RTX A6000 and AMD RDNA2, 0 after on both and the WebGL2
+layer. Overlay quads whose opacity is a polynomial of an interpolated coordinate need centroid sampling under MSAA.
+Missing: AMD still exceeds the sleet check's one-step budget (KB-GPU-PRECHECKS1).
+
 ### Section 5 evidence: orthographic SSAO blur with the eye inside the part (2026-11-27)
 
 `scripts/ssao-gpu-check.js` reads back SSAO's blurred occlusion for an orthographic eye far off and one inside the part

@@ -1614,6 +1614,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/gltf/scripts/test-native-volume.mjs` and `packages/oit/test/gpu/blending-check.mjs` pass. gltf/pbr is
   91,150 B gzip.
 
+### Fixed 2026-11-27: rain and hail streaks drew negative light at 4x (KB-SKY-STREAKCENTROID1, sky and weather)
+
+- **Repro (before):** `node packages/sky/test/sleet-check.html` through `features-check.mjs sleet`, reading Bloom's HDR
+  capture: 7 pixels of the rain frame at 4x below 0 (to -0.0305), on the RTX A6000 and AMD RDNA2 alike; none at 1x. On
+  AMD one of them was the check's "worst" 0.1 (the relative step of a channel near 0).
+- **Cause:** the rain streak's opacity is `(1 - uv.x^2) mix(0.15, 1, uv.y)` and hail's `1 - uv.x^2`, with `uv` from
+  the quad's corners. At 4x a pixel is shaded when any sample is covered, at its centre, which can lie outside the
+  streak, so `uv` extrapolated past 1 and the opacity went negative; straight alpha blending then pushed the frame below
+  its own value, under 0 on dark ground.
+- **Fix:** the varyings of the rain and snow overlay (`packages/sky/src/weather.ts`) and of hail
+  (`packages/weather/src/hail.ts`) use centroid sampling (`@interpolate(perspective, centroid)`, WGSL; `centroid` on
+  the WebGL2 layer), which keeps them at a covered point of the primitive, and the opacity terms clamp at 0 for
+  rounding.
+- **Regression:** `sleet-check.html` counts pixels below 0 in every frame and `features-check.mjs sleet` requires none
+  (7 before, 0 after on the RTX A6000, AMD and `MARGO_COMPAT=1`). Its "drew elsewhere" count now takes a pixel sleet
+  moves by one half-float step where neither kind alone moved the resolved mean (1 on AMD, 2 on the RTX A6000 after) into
+  the one-step budget with the others, as for rain and snow pixels.
+
 ### Fixed 2026-11-27: orthographic SSAO blurred differently with the eye inside the part (KB-SSAO-ORTHOBLUR1, post)
 
 - **Repro (before):** `MARGO_GPU=amd node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position
@@ -1664,6 +1682,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
     On AMD RDNA2 the same assertion read 96 bytes over 2, worst 5: the blur's plane prediction skipped negative
     orthographic depths, fixed 2026-11-27 (KB-SSAO-ORTHOBLUR1 below); the Arc still waits for a rerun.
   - `node packages/sky/test/features-check.mjs sleet astro hillaire`: "sleet off by more than one half-float step".
+    Reproduced on AMD RDNA2 (worst 0.1): the worst pixel was a rain pixel below 0, which the relative step measure
+    blows up near 0. Rain and hail went below 0 at 4x on every GPU (7 pixels here, the RTX A6000 too), fixed 2026-11-27
+    (KB-SKY-STREAKCENTROID1 below). After it AMD still fails the check's one-step budget at 4x: 131 one-step pixels
+    against 1 % of 9,055 (90), 127 of them rain pixels a faint flake tips in sleet; the RTX A6000 reads 64 of 13,129.
+    Open: whether a flake in front of a streak should count as a mismatch at all (it is visible there and not over the
+    bare frame), or why AMD draws 40 % more of them; the budget is not raised.
 - **Cause:** not established for any of the four; each is owed to its package (core lighting, biomes, post, sky),
   found and fixed with its own regression. Two more were fixed: the material back-side check (KB-PICK-MIRRORROWS1)
   and the OIT real-file check (KB-OIT-BLENDTHICK1), both above. On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.

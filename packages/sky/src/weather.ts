@@ -547,7 +547,7 @@ struct Weather {
  camera:mat4x4f, eye:vec4f, volume:vec4f, drift:vec4f, colour:vec4f, screen:vec4f, params:vec4f, extra:vec4f, lens:vec4f,
 }
 @group(0) @binding(0) var<uniform> w:Weather;
-struct Out {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32,@location(2) sweep:f32}
+struct Out {@builtin(position) position:vec4f,@location(0) @interpolate(perspective,centroid) uv:vec2f,@location(1) @interpolate(perspective,centroid) alpha:f32,@location(2) @interpolate(perspective,centroid) sweep:f32}
 fn pcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let x=((s>>((s>>28u)+4u))^s)*277803737u;return (x>>22u)^x;}
 fn rnd(i:u32,k:u32)->f32 {return f32(pcg(i*4u+k+bitcast<u32>(w.params.z))>>8u)*5.9604645e-8;}
 fn flakeSize(ii:u32)->f32 {
@@ -642,7 +642,7 @@ fn flake(uv:vec2f,sweep:f32)->f32 {
 @fragment fn fragment(i:Out)->@location(0) vec4f {
  var a=i.alpha*w.colour.w;
  if(w.params.x>0.5){a*=flake(i.uv,i.sweep);}
- else{a*=(1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,i.uv.y);}
+ else{a*=max(0.0,1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,clamp(i.uv.y,0.0,1.0));}
  return vec4f(w.colour.rgb*(1.0+w.params.w*6.0),a);
 }`;
 // `reactive`: the same particles' coverage for TAA's mask, by shape alone (not the faint opacity), so a streak's core
@@ -651,7 +651,7 @@ const reactiveEntry = `
 @fragment fn reactive(i:Out)->@location(0) vec4f {
  var a=i.alpha;
  if(w.params.x>0.5){a*=flake(i.uv,i.sweep);}
- else{a*=(1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,i.uv.y);}
+ else{a*=max(0.0,1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,clamp(i.uv.y,0.0,1.0));}
  return vec4f(min(1.0,a*1.5),0,0,1);
 }`;
 // The mask keeps the largest coverage of the particles over a pixel.

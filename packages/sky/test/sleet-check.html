@@ -39,14 +39,18 @@ window.check={samples:sceneSamples,
   // Where only the rain alone changed the frame, sleet must equal it (worst: the largest relative step where it does
   // not); where only the snow did, likewise; where neither did, sleet must leave the frame as it was.
   const differs=(a,b,p)=>a[p]!==b[p]||a[p+1]!==b[p+1]||a[p+2]!==b[p+2];
-  const out={rainOnly:0,snowOnly:0,both:0,rainMismatch:0,snowMismatch:0,extra:0,worst:0};
+  const out={rainOnly:0,snowOnly:0,both:0,rainMismatch:0,snowMismatch:0,extra:0,faint:0,worst:0,negative:0};
   const step=(a,b,p)=>{let w=0;for(let k=0;k<3;k++)w=Math.max(w,Math.abs(a[p+k]-b[p+k])/Math.max(Math.abs(b[p+k]),6.1e-5));return w;};
   for(let p=0;p<bare.length;p+=4){
    const r=differs(rain,bare,p),s=differs(snow,bare,p);
    if(r&&s)out.both++;
    else if(r){out.rainOnly++;if(differs(sleet,rain,p)){out.rainMismatch++;out.worst=Math.max(out.worst,step(sleet,rain,p));}}
    else if(s){out.snowOnly++;if(differs(sleet,snow,p)){out.snowMismatch++;out.worst=Math.max(out.worst,step(sleet,snow,p));}}
-   else if(differs(sleet,bare,p))out.extra++;
+   // At 4x a pixel each kind alone moves by less than a half-float step in the resolved mean can tip by one step when
+   // both draw there; more than that is a particle neither kind draws.
+   else if(differs(sleet,bare,p)){if(step(sleet,bare,p)<=2**-10)out.faint++;else out.extra++;}
+   // Particles add light over the frame: no channel of any frame may fall below 0 (KB-SKY-STREAKCENTROID1).
+   for(const f of [rain,snow,sleet])if(Math.min(f[p],f[p+1],f[p+2])<0){out.negative++;break;}
   }
   (window.shots??={}).sleet={bare,sleet,rain,snow};
   const error=await device.popErrorScope();

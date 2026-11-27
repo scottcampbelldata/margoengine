@@ -555,12 +555,15 @@ const checks = {
     // (2^-10 relative, the 10-bit mantissa of the HDR target): no pixel may differ by more, and few by that.
     assert.ok(r.worst <= 2 ** -10, `sleet off by more than one half-float step: ${JSON.stringify(r)}`);
     assert.ok(
-      r.rainMismatch + r.snowMismatch <= 0.01 * (r.rainOnly + r.snowOnly),
+      r.rainMismatch + r.snowMismatch + r.faint <= 0.01 * (r.rainOnly + r.snowOnly),
       `too many steps: ${JSON.stringify(r)}`,
     );
     assert.equal(r.extra, 0, `sleet drew elsewhere: ${JSON.stringify(r)}`);
+    // Before KB-SKY-STREAKCENTROID1, 7 pixels at 4x went below 0: a streak's uv, interpolated at a pixel centre outside
+    // the streak, gave it a negative alpha.
+    assert.equal(r.negative, 0, `the precipitation drove the frame below 0: ${JSON.stringify(r)}`);
     console.log(
-      `ok sleet ${samples}x: ${r.rainOnly} rain and ${r.snowOnly} snow pixels match each kind alone (${r.rainMismatch + r.snowMismatch} by one half-float step)`,
+      `ok sleet ${samples}x: ${r.rainOnly} rain and ${r.snowOnly} snow pixels match each kind alone (${r.rainMismatch + r.snowMismatch + r.faint} by one half-float step)`,
     );
     return r;
   },
