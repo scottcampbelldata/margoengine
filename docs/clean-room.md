@@ -18051,6 +18051,15 @@ same polynomial supplies the normal velocity query and the projection.
 The layered mixed-aperture regression checks local volume balance, work
 and replay. The uniform carrier test holds vertical resolution fixed.
 
+The largest eigenvalue of the weighted nearest-face graph on either
+axis is at most four. The eighth-order polynomial multiplies this graph
+by at most `r = 1 + 4/12 + 16/90 + 64/560`. Each nearest-face graph is at most
+twice its diagonal as a quadratic form, so the complete operator is
+bounded by `2r M`, where `M` is the block-diagonal column preconditioner.
+The two-sided Jacobi correction is positive when its weight is below
+`1/r`. The eighth-order grid uses one half. The coarser corrections still
+use their nearest-face graph. [Jinchao Xu and Ludmil Zikatanov, *Algebraic multigrid methods*, 2017, equations 4.3–4.6](https://doi.org/10.1017/S0962492917000083)
+
 ### SEA-12 finite quay wake
 
 Craig and Sulem, *Numerical Simulation of Gravity Waves* (1993), express the gravity-wave variables as

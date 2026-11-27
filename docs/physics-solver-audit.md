@@ -1462,6 +1462,14 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   these isolated dispersion comparisons. The original shot still requires convergence of its depth
   response and diffraction.
 
+  The eighth-order layer encountered a convergence refusal on the initial potential derived from
+  the archived hull sources. Its stronger horizontal stencil needs a lower weight in the
+  symmetric column relaxation. With the weight corrected, the high-frequency masked-grid regression
+  in `coupling/loads-quay-eighth-smoother.test.js` takes 25 and 26 iterations on the even and odd
+  grids. The old weight took 469 and 724, and hit the convergence limit in the layered-aperture
+  case. That case takes 49 iterations with a worst local flux residual of 3.76×10⁻¹² m³/s across
+  the three cases. The linear solver tolerance and iteration limit are unchanged.
+
   The Galerkin assembly now reuses the fine-cell labels and stores coarse edges in bounded pages.
   This removes two dense integer buffers, about 420 MiB at 55 million fine cells, and the separate
   full-size copies of coarse edges. `coupling/loads-quay-hierarchy-memory.test.js` checks original edge
@@ -1533,6 +1541,13 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   3.47×10⁻¹¹. Both original shutter pairs were captured, all saved frame hashes verified and the
   4005→4006 snapshot replay matched exactly. The two shutter height pairs differ from the pre-fix
   run by at most 5.23×10⁻¹³ m. The 4 m grid establishes the mass, work and replay baseline.
+  At the original 67.005208/67.015625 s and 71.005208/71.015625 s exposures, both renderers read
+  the corrected 4 m state with the original cameras and assets. GPU surface displacement agrees
+  with the saved solver values within 1.55×10⁻⁶ m. Against a matched readback of the pre-fix
+  point-source state, three of the four renders are pixel-identical. The last differs in four
+  pixels by one 8-bit code. Over the two windows at 370 wall sites, the largest sampled heights
+  are 0.19635 m and 0.23479 m. The lowest crest clearances are 1.78586 m and 1.74736 m, and
+  neither renderer emits spray. These are results for the corrected 4 m point-source baseline.
   Fine spatial convergence and the original-shot acceptance remain open.
 
   The 4 m full-history diagnostic used the same archived shutters and quay structure as the 8 m run,
