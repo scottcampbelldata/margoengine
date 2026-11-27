@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20859737,
+  "total": 20861278,
   "history": [
     {
       "date": "2026-10-24",
@@ -14484,6 +14484,12 @@
       "commit": "pending",
       "reason": "physics/ship 35,261 ceiling to its new size 35,274 (+13 B): KCS's fitted rudder roll lever and roll decay, so it heels as MARIN and KRISO measured. Two constants of one ship model; nothing to split. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "84c630c2ad",
+      "reason": "@margoengine/vfx 39065 to 39167 B gzip (ceiling 39137 to 40343), @margoengine/vfx/fire-front 9796 to 9879 B (ceiling 9841 to 10176): KB-VFX-GLOWUNITS1 refers a fire's glow on its smoke to the scene's noon sun (VFXLit.noon, its check and uniform scale in the root's lit feature; Smoke and FireFront noon, the front's setter writing every column). Without it a fire is invisible in a scene lit in lux and pi/5 too dim at sun 5. No waste: WGSL comments are stripped and the code is the option, its range check and its forwarding. A split would put a 100 B option behind an import() every lit effect needs. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15995,7 +16001,7 @@
     "@margoengine/usdz/skel": 4372,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13900,
-    "@margoengine/vfx": 39137,
+    "@margoengine/vfx": 40343,
     "@margoengine/vfx/base": 14674,
     "@margoengine/vfx/blown-sand": 11393,
     "@margoengine/vfx/clouds": 8867,
@@ -16006,7 +16012,7 @@
     "@margoengine/vfx/events": 2601,
     "@margoengine/vfx/fields": 2079,
     "@margoengine/vfx/fire": 2208,
-    "@margoengine/vfx/fire-front": 9841,
+    "@margoengine/vfx/fire-front": 10176,
     "@margoengine/vfx/flame": 13074,
     "@margoengine/vfx/flipbook": 1167,
     "@margoengine/vfx/flocking": 17160,
