@@ -516,8 +516,10 @@ test('FireFront with an engine: a fixed pool of flame volumes sits on the hottes
   const made = h.resources.length;
   let moved = 0,
     previous = [];
+  // The engine steps a fire it runs, so advanceTime between its frames as well would step it twice and throw
+  // (KB-SCENES-TVCLOCK1): each frame steps it 2.1 s, the 2 s advanceTime plus the harness's 0.1 s frame it had before.
+  h.context.delta = 2.1;
   for (let step = 0; step < 90; step++) {
-    front.advanceTime(2);
     h.frame();
     const now = front.flameVolumes.map((f) => f.options.position[0]);
     if (previous.length && now.some((x, i) => Math.abs(x - previous[i]) > 1e-9)) moved++;
@@ -552,7 +554,7 @@ test('FireFront with an engine: a fixed pool of flame volumes sits on the hottes
       .filter((f) => f.kind === 'front')
       .slice(0, 3),
   ].map((f) => f.key);
-  front.advanceTime(1);
+  h.context.delta = 1.1;
   h.frame();
   const keysAfter = front
     .flames()
