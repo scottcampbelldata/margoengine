@@ -20,7 +20,12 @@ async function instance(shared) {
   assert.equal(wasm.exports.__data_end.value, 0);
   assert.ok(mark.every((word) => word === 0x63));
   wasm.exports.__stack_pointer.value = START;
-  return { memory, hold: wasm.exports.loads_hold, holdCoupled: wasm.exports.loads_hold_coupled };
+  return {
+    memory,
+    hold: wasm.exports.loads_hold,
+    holdCoupled: wasm.exports.loads_hold_coupled,
+    holdCoupledMobility: wasm.exports.loads_hold_coupled_mobility,
+  };
 }
 
 // The scalar Loads algorithm before batching, retaining the original parenthesization and rounded stores.
@@ -226,4 +231,31 @@ test('a singular six-axis system reports the row without publishing a partial wr
   assert.equal(holdCoupled(START, 1, forces, 1, 0), 1);
   assert.deepEqual(output, new Float64Array(WRENCH).fill(12));
   assert.equal(holdCoupled(START, 1, START + 32 * 8, 1, 0), -1, 'the cross block must not overlap the output');
+});
+
+test('the coupled kernel uses the selected rigid row and checks the mobility region before writing', async () => {
+  const { memory, holdCoupledMobility } = await instance(false);
+  const forces = START + COUPLED * 8;
+  const mobility = forces + 2 * WRENCH * 8;
+  const input = new Float64Array(memory.buffer, START, COUPLED).fill(0);
+  const output = new Float64Array(memory.buffer, forces, 2 * WRENCH).fill(0);
+  const response = new Float32Array(memory.buffer, mobility, 18).fill(0);
+  const block = [2, 2, 0, 2, 2, 0, 0, 0, 0];
+  input.set([1, 8, 12, 7, 0, 6, 9, 0]);
+  for (const at of [8, 17, 32]) input.set(block, at);
+  input[26] = 0.5;
+  response.set([0, 0.125, 0.125], 0);
+  response.set([0.125, 0, 0.125], 9);
+  for (const bad of [mobility + 2, forces, memory.buffer.byteLength - 36]) {
+    assert.equal(holdCoupledMobility(START, 1, forces, 2, 0, bad), -1);
+    assert.ok(output.every((word) => word === 0));
+  }
+  response[9] = NaN;
+  assert.equal(holdCoupledMobility(START, 1, forces, 2, 0, mobility), 1, 'an invalid selected row is refused');
+  assert.ok(output.every((word) => word === 0));
+  response[9] = 0.125;
+  assert.equal(holdCoupledMobility(START, 1, forces, 2, 0, mobility), 0);
+  // (I + 2 u uᵀ D) [8,3,0,2,5,0] = [12,7,0,6,9,0].
+  const expected = [0, 0, 0, 0, 0, 0, 8, 3, 0, 2, 5, 0];
+  for (const [i, word] of output.entries()) assert.ok(Math.abs(word - expected[i]) < 1e-14);
 });

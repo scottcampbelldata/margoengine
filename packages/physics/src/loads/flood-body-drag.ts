@@ -13,10 +13,19 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, bodyRowsOf, IMPULSE_WORDS } from '../world/solvers/rigid.js';
+import {
+  BODIES_FIELD,
+  BODY_IMPULSES_FIELD,
+  BODY_MOBILITY_FIELD,
+  BODY_MOBILITY_WORDS,
+  BODY_WORDS,
+  bodyRowsOf,
+  IMPULSE_WORDS,
+} from '../world/solvers/rigid.js';
 import { invalidLoad } from './errors.js';
 import { floodBlockageExchange, type FloodBlockageBody } from './flood-blockage.js';
 import { FloodDragGrid, type FloodDragGridParams, type PeriodicDragAxes } from './flood-drag-grid.js';
+import { rigidMobilityWords } from './rigid-mobility.js';
 
 type Vec3 = readonly [number, number, number];
 type Projection = 'box' | 'ellipsoid';
@@ -120,6 +129,7 @@ export function solveFloodProfile(
     readonly forcing?: Float64Array;
     readonly bottom?: Float64Array;
     readonly periodic?: PeriodicDragAxes;
+    readonly mobility?: Float32Array | undefined;
   },
 ) {
   const { centre, halfHeight, area, projection, dragCoefficient } = profile;
@@ -135,18 +145,23 @@ export function solveFloodProfile(
     throw invalidLoad('Choose a rigid profile with finite positive vertical support.');
   const sample = grid.sample(water, forcing, profileCentre, height, dt, bottom, periodic);
   if (!sample) return undefined;
+  const mobility = input.mobility;
+  const mobilityAt = profile.row * BODY_MOBILITY_WORDS;
+  const inertiaWords = mobility ?? rigid;
+  const inertiaAt = mobility ? mobilityAt + 3 : at + 17;
   const body: FloodBlockageBody = {
     centre: bodyCentre,
     velocity: point3(rigid, at + 10),
     angularVelocity: point3(rigid, at + 13),
     inverseMass: rigid[at + 16]!,
+    ...(mobility ? { effectiveInverseMass: point3(mobility, mobilityAt) } : {}),
     inverseInertia: [
-      rigid[at + 17]!,
-      rigid[at + 18]!,
-      rigid[at + 19]!,
-      rigid[at + 20]!,
-      rigid[at + 21]!,
-      rigid[at + 22]!,
+      inertiaWords[inertiaAt]!,
+      inertiaWords[inertiaAt + 1]!,
+      inertiaWords[inertiaAt + 2]!,
+      inertiaWords[inertiaAt + 3]!,
+      inertiaWords[inertiaAt + 4]!,
+      inertiaWords[inertiaAt + 5]!,
     ],
   };
   const exchange = floodBlockageExchange({
@@ -204,7 +219,10 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
   private forcingWork = new Float64Array(0);
   private impulseWork = new Float64Array(0);
 
-  constructor(readonly id = 'floodBodyDrag') {}
+  constructor(
+    readonly id = 'floodBodyDrag',
+    private readonly options: { readonly readMobility?: boolean } = {},
+  ) {}
 
   describe(): SolverDescription {
     return {
@@ -213,6 +231,9 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
       stableRate: () => this.rate,
       fields: [
         { field: BODIES_FIELD, access: 'read' },
+        ...(this.options.readMobility === false
+          ? []
+          : [{ field: BODY_MOBILITY_FIELD, access: 'read' as const, optional: true }]),
         { field: SURFACE_WATER_FIELD, access: 'read' },
         { field: BODY_IMPULSES_FIELD, access: 'accumulate' },
         { field: SURFACE_WATER_FORCING_FIELD, access: 'accumulate' },
@@ -259,6 +280,13 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
     )
       throw invalidLoad('Match the live rigid port and rate. Run flood drag before the rigid solver.');
     const rigid = regionWords(host.memory, region) as Float32Array;
+    const mobility = rigidMobilityWords(
+      host.memory,
+      inputs.get(BODY_MOBILITY_FIELD.name),
+      bodyPort.tick,
+      bodyPort.cell,
+      rigid.length / BODY_WORDS,
+    );
     const { water, cell: waterCell } = grid.read(host, inputs.get(SURFACE_WATER_FIELD.name), tick - 1);
     if (!cell.every((value, axis) => value === waterCell[axis]))
       throw invalidLoad('Place the flood drag solver in the same origin cell as its shallow-water grid.');
@@ -271,6 +299,7 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
         waterCell,
         dt,
         forcing: forcingWork,
+        mobility,
       });
       if (!result) continue;
       const [jx, , jz] = result.exchange.bodyImpulse;

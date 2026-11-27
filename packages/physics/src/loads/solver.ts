@@ -8,8 +8,8 @@
 //   points, its drag and added mass coefficients from its roughness and Keulegan-Carpenter number (DNV-RP-C205), the
 //   tangential drag of Eames, and optionally its vortex shedding by Facchinetti's wake oscillator, the lift 1/4 rho U^2 D
 //   C_L0 q across the flow; a member on no body is fixed (a pile) and its load is reported.
-// The added mass is held implicitly, as the hull solver holds its own: F_held = M (M + A)^-1 (F + W) - W, its translational
-// part, so a body far lighter than the water it moves stays stable. The water's velocity and acceleration come from the sea
+// The added mass is held implicitly: (I + A D)(F_held + W) = F + W, with dry mobility D and added inertia A, so a body
+// far lighter than the water it moves stays stable. The water's velocity and acceleration come from the sea
 // (a `SeaSurface`'s `water`) plus any other flows (a ship's race, a river), the acceleration by a centred difference of the
 // pure sample in time.
 //
@@ -29,7 +29,15 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
+import {
+  BODIES_FIELD,
+  BODY_FORCES_FIELD,
+  BODY_MOBILITY_FIELD,
+  BODY_MOBILITY_WORDS,
+  BODY_WORDS,
+  bodyRowsOf,
+  FORCE_WORDS,
+} from '../world/solvers/rigid.js';
 import { boxSurface, ellipsoidHydrostatics, meshHydrostatics } from './buoyancy.js';
 import { type CapsuleDimensions, capsuleHydrostatics, capsuleInertiaAxes, capsuleVolume } from './capsule.js';
 import {
@@ -58,6 +66,7 @@ import { cylinderCoefficients, tangentialDrag, wakeStep } from './morison.js';
 import { memberOrbit } from './oscillatory.js';
 import { type LocatedWater, localFlow, localSea } from './origin.js';
 import { prepareCoupledRadiationProfile, type LoadCoupledRadiationProfile } from './radiation-coupled-profile.js';
+import { rigidMobilityWords } from './rigid-mobility.js';
 import {
   type LoadRadiationMode,
   type LoadRadiationResonance,
@@ -192,22 +201,30 @@ export interface MemberLoad {
   lift: number;
 }
 
+/** Options for reading a rigid body's mobility. */
+export interface LoadSolverOptions {
+  /** Read effective mobility when the rigid solver publishes it (default true). Disable for snapshots from before this read was added. */
+  readonly readMobility?: boolean;
+}
+
 /** The water's loads on bodies and members. `id` is `'loads'` by default. */
 export class LoadSolver implements Solver<LoadParams> {
   /** Create a solver that holds body wrenches in one optional Rust/SIMD batch. */
   static async load({
     id = 'loads',
     signal,
-  }: {
+    readMobility,
+  }: LoadSolverOptions & {
     readonly id?: string;
     readonly signal?: AbortSignal;
   } = {}): Promise<LoadSolver> {
-    const solver = new LoadSolver(id);
+    const solver = new LoadSolver(id, { readMobility });
     solver.builds = await loadLoadsBuilds(signal);
     return solver;
   }
 
   private readonly id: string;
+  private readonly readMobility: boolean;
   private host!: SolverHost;
   private level: RateLevel = 0;
   private g = 9.81;
@@ -234,8 +251,9 @@ export class LoadSolver implements Solver<LoadParams> {
   private readonly hydrostatic: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
   private readonly pressure: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
 
-  constructor(id = 'loads') {
+  constructor(id = 'loads', { readMobility = true }: LoadSolverOptions = {}) {
     this.id = id;
+    this.readMobility = readMobility;
   }
 
   /** Counts from the last step. Native workspace size remains fixed for the world's row capacity. */
@@ -252,6 +270,7 @@ export class LoadSolver implements Solver<LoadParams> {
       id: this.id,
       fields: [
         { field: BODIES_FIELD, access: 'read' },
+        ...(this.readMobility ? [{ field: BODY_MOBILITY_FIELD, access: 'read' as const, optional: true }] : []),
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
       ],
       rate: this.level,
@@ -565,6 +584,16 @@ export class LoadSolver implements Solver<LoadParams> {
           port.region.byteLength / 4,
         )
       : undefined;
+    const mobility =
+      port && bodies && this.readMobility
+        ? rigidMobilityWords(
+            this.host.memory,
+            context.inputs.get(BODY_MOBILITY_FIELD.name),
+            port.tick,
+            port.cell,
+            bodies.length / BODY_WORDS,
+          )
+        : undefined;
     for (const b of this.bodies) {
       if (!bodies) break;
       const at = b.spec.row * BODY_WORDS;
@@ -574,8 +603,9 @@ export class LoadSolver implements Solver<LoadParams> {
     this.members.forEach((m, index) => this.loadMember(m, index, bodies, t, dt, rho, wakes, wakeMotion));
     this.heldBodies = this.rows.size;
     this.batchCalls = 0;
-    if (this.native && bodies && this.heldBodies > 0) this.holdNative(bodies, this.native);
-    else this.hold(out, bodies);
+    if (this.native && bodies && this.heldBodies > 0 && (!mobility || mobility.buffer === this.host.memory.buffer))
+      this.holdNative(bodies, this.native, mobility);
+    else this.hold(out, bodies, mobility);
     if (history) history[0] = 1;
   }
 
@@ -803,14 +833,17 @@ export class LoadSolver implements Solver<LoadParams> {
   }
 
   /** Writes each dry-body wrench that produces the acceleration of the body and its carried water. */
-  private hold(out: Float64Array, bodies: Float32Array | undefined): void {
+  private hold(out: Float64Array, bodies: Float32Array | undefined, mobility: Float32Array | undefined): void {
     for (const [row, r] of this.rows) {
       const m = r.mass,
         W: Vec3 = [0, -m * this.g, 0],
         F = add(r.force, W),
-        at = row * FORCE_WORDS;
+        at = row * FORCE_WORDS,
+        free = freeTranslation(mobility, row),
+        angular = mobility ?? bodies,
+        inertia = mobility ? row * BODY_MOBILITY_WORDS + 3 : row * BODY_WORDS + 17;
       if (r.coupled && bodies) {
-        const held = holdCoupledRadiation(r.coupled, r.added, r.rotational, 1 / m, bodies, row * BODY_WORDS + 17, [
+        const held = holdCoupledRadiation(r.coupled, r.added, r.rotational, scale(free, 1 / m), angular!, inertia, [
           ...F,
           ...r.torque,
         ]);
@@ -820,14 +853,13 @@ export class LoadSolver implements Solver<LoadParams> {
         }
         continue;
       }
-      const a = r.added,
-        M = [m + a[0]!, a[1]!, a[2]!, a[3]!, m + a[4]!, a[5]!, a[6]!, a[7]!, m + a[8]!],
-        inverse = invert3(M),
+      const M = projectTranslation(r.added, free);
+      for (let k = 0; k < 3; k++) M[4 * k]! += m;
+      const inverse = invert3(M),
         held: Vec3 = [0, 0, 0];
       for (let k = 0; k < 3; k++)
         held[k] = m * (inverse[3 * k]! * F[0] + inverse[3 * k + 1]! * F[1] + inverse[3 * k + 2]! * F[2]);
-      const torque =
-        r.rotational && bodies ? holdTorque(r.torque, r.rotational, bodies, row * BODY_WORDS + 17) : r.torque;
+      const torque = r.rotational && angular ? holdTorque(r.torque, r.rotational, angular, inertia) : r.torque;
       for (let k = 0; k < 3; k++) {
         out[at + k]! += held[k]! - W[k]!;
         out[at + 3 + k]! += torque[k]!;
@@ -836,7 +868,11 @@ export class LoadSolver implements Solver<LoadParams> {
     this.rows.clear();
   }
 
-  private holdNative(bodies: Float32Array, { kernel, scratch }: { kernel: LoadsKernel; scratch: Region }): void {
+  private holdNative(
+    bodies: Float32Array,
+    { kernel, scratch }: { kernel: LoadsKernel; scratch: Region },
+    mobility: Float32Array | undefined,
+  ): void {
     const words = regionWords(this.host.memory, scratch) as Float64Array;
     // Keep ordinary 32-word rows at the front and coupled rows at the end of one arena region.
     let regular = 0;
@@ -860,12 +896,13 @@ export class LoadSolver implements Solver<LoadParams> {
             words[at + LOADS_KERNEL_WORDS + axis] = matrix[6 * i + j + 3]!;
           }
       } else {
-        words.set(load.added, at + 8);
+        words.set(mobility ? projectTranslation(load.added, freeTranslation(mobility, row)) : load.added, at + 8);
         if (load.rotational) words.set(load.rotational, at + 17);
         else words.fill(0, at + 17, at + 26);
       }
-      const inertia = row * BODY_WORDS + 17;
-      for (let axis = 0; axis < 6; axis++) words[at + 26 + axis] = bodies[inertia + axis]!;
+      const angular = mobility ?? bodies;
+      const inertia = mobility ? row * BODY_MOBILITY_WORDS + 3 : row * BODY_WORDS + 17;
+      for (let axis = 0; axis < 6; axis++) words[at + 26 + axis] = angular[inertia + axis]!;
     }
     const forceRows = this.forces.byteLength / (FORCE_WORDS * 8);
     const run = (hold: LoadsKernel['loads_hold'], from: number, count: number): void => {
@@ -878,7 +915,11 @@ export class LoadSolver implements Solver<LoadParams> {
       this.batchCalls++;
     };
     run(kernel.loads_hold, 0, regular / LOADS_KERNEL_WORDS);
-    run(kernel.loads_hold_coupled, coupled, (words.length - coupled) / LOADS_KERNEL_COUPLED_WORDS);
+    const holdCoupled = mobility
+      ? (input: number, count: number, output: number, capacity: number, gravity: number) =>
+          kernel.loads_hold_coupled_mobility(input, count, output, capacity, gravity, mobility.byteOffset)
+      : kernel.loads_hold_coupled;
+    run(holdCoupled, coupled, (words.length - coupled) / LOADS_KERNEL_COUPLED_WORDS);
     this.rows.clear();
   }
 
@@ -1126,9 +1167,35 @@ function addRadiationWrench(loads: BodyLoads, direction: Vec3, angular: boolean,
     addInertiaAxis(angular ? (loads.rotational ??= new Float64Array(9)) : loads.added, direction, inertia);
 }
 
+function freeTranslation(mobility: Float32Array | undefined, row: number): Vec3 {
+  if (!mobility) return [1, 1, 1];
+  const at = row * BODY_MOBILITY_WORDS;
+  const x = mobility[at]!,
+    y = mobility[at + 1]!,
+    z = mobility[at + 2]!;
+  if (![x, y, z].every((value) => Number.isFinite(value) && value >= 0))
+    throw invalidLoad('Publish finite nonnegative linear inverse masses in the matching rigid mobility port.');
+  return [Number(x > 0), Number(y > 0), Number(z > 0)];
+}
+
+function projectTranslation(added: Float64Array, free: Vec3): number[] {
+  // Scale columns of A by the dry mobility. A locked row can still carry the hydrodynamic reaction.
+  const [x, y, z] = free;
+  return [
+    added[0]! * x,
+    added[1]! * y,
+    added[2]! * z,
+    added[3]! * x,
+    added[4]! * y,
+    added[5]! * z,
+    added[6]! * x,
+    added[7]! * y,
+    added[8]! * z,
+  ];
+}
+
 function holdTorque(torque: Vec3, added: Float64Array, bodies: Float32Array, at: number): Vec3 {
-  // Solve (identity + A * dry mobility) * held = torque. Inverse inertia comes
-  // from BODIES, including singular mobility when the rigid body is axis-locked.
+  // Solve (identity + A * dry mobility) * held = torque.
   const xx = bodies[at]!;
   const xy = bodies[at + 1]!;
   const xz = bodies[at + 2]!;

@@ -40,7 +40,9 @@ function setup(
     locked = false,
     extra,
     rotation = [0, 0, 0, 1],
+    motionLocks = false,
     loads = new LoadSolver(),
+    publishMobility = true,
     shared = false,
     mixed = false,
   } = {},
@@ -51,12 +53,18 @@ function setup(
   const body = physics.addBody(null, {
     position: [1, -4, 2],
     rotation,
-    linearVelocity,
-    angularVelocity: locked ? [0, 0, 0] : angularVelocity,
+    linearVelocity: motionLocks ? [linearVelocity[0], 0, linearVelocity[2]] : linearVelocity,
+    angularVelocity: locked ? [0, 0, 0] : motionLocks ? [0, angularVelocity[1], angularVelocity[2]] : angularVelocity,
+    enabledTranslations: [true, !motionLocks, true],
+    enabledRotations: [!motionLocks, true, true],
     colliders: {
       shape: 'sphere',
       radius,
-      massProperties: { mass, principalInertia: Array(3).fill(locked ? 0 : inertia), centerOfMass: centre },
+      massProperties: {
+        mass,
+        principalInertia: motionLocks ? [2, 3, 5] : Array(3).fill(locked ? 0 : inertia),
+        centerOfMass: centre,
+      },
     },
     canSleep: false,
   });
@@ -84,7 +92,7 @@ function setup(
     },
   };
   simulation
-    .add(new RigidSolver(), { physics })
+    .add(new RigidSolver('rigid', { publishMobility }), { physics })
     .add(loads, {
       sea,
       bodies: [
@@ -149,6 +157,121 @@ function rotatedVector(quaternion, vector) {
   const scale = scalar ** 2 - dot(imaginary, imaginary);
   return vector.map((value, i) => scale * value + radial * imaginary[i] + 2 * scalar * cross[i]);
 }
+
+test('SEA-12 ordinary added mass keeps locked-axis reaction and uses only free translational acceleration', async () => {
+  const gravity = [0, 0, 0];
+  const rotation = [0, 0, Math.sin(Math.PI / 8), Math.cos(Math.PI / 8)];
+  const waterAcceleration = [2, 0.5, 0];
+  const coefficient = 0.3;
+  const displacedMass = density * ((4 * Math.PI * radius ** 3) / 3);
+  const sea = {
+    density,
+    elevation: () => 0,
+    water: {
+      medium: 'water',
+      cell: [0, 0, 0],
+      sample(_x, _y, _z, t, out) {
+        for (let i = 0; i < 3; i++) out.velocity[i] = waterAcceleration[i] * t;
+        out.density = density;
+        return out;
+      },
+    },
+  };
+  const run = (loads, publishMobility) => {
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+    using physics = new Physics(null, { arena: world.arena, gravity, fixedTimestep: dt });
+    const rigidMass = 8;
+    const body = physics.addBody(null, {
+      position: [0, -4, 0],
+      rotation,
+      enabledTranslations: [true, false, true],
+      colliders: { shape: 'sphere', radius, mass: rigidMass },
+    });
+    const axis = rotatedVector(body.rotation, [1, 0, 0]);
+    const added = coefficient * displacedMass;
+    const incident = dot(axis, waterAcceleration);
+    const rhs = waterAcceleration.map((a, i) => displacedMass * a + added * axis[i] * incident);
+    const netX = rhs[0] / (1 + (added * axis[0] ** 2) / rigidMass);
+    const expected = [netX, rhs[1] - (added * axis[1] * axis[0] * netX) / rigidMass, 0, 0, 0, 0];
+    world.add(new RigidSolver('rigid', { publishMobility }), { physics }).add(loads, {
+      sea,
+      bodies: [{ row: body.row, shape: { sphere: radius }, drag: 0, spinDrag: 0, addedMass: [coefficient, 0, 0] }],
+    });
+    world.advance(1);
+    const { region } = loads.exportPorts(0)[0];
+    const wrench = [
+      ...regionWords(world.memory, region).subarray(body.row * FORCE_WORDS, (body.row + 1) * FORCE_WORDS),
+    ];
+    if (publishMobility) {
+      compareWrenches(wrench, expected);
+      assert.ok(Math.abs(wrench[1]) > 1, 'the lock still receives the transverse fluid reaction');
+      compareWrenches(twist(body), [(dt * netX) / rigidMass, 0, 0, 0, 0, 0]);
+    }
+    assert.equal(body.linearVelocity[1], 0);
+    return wrench;
+  };
+  const ts = run(new LoadSolver(), true);
+  assert.deepEqual(run(await LoadSolver.load(), true), ts);
+  const legacy = run(new LoadSolver(), false);
+  assert.deepEqual(run(await LoadSolver.load({ readMobility: false }), false), legacy);
+  assert.ok(Math.abs(legacy[0] - ts[0]) > 1, 'the all-free legacy receipt resolves a physically different force');
+});
+
+test('SEA-12 coupled radiation retains locked reactions and matches their constrained response through restore', async () => {
+  const infinite = 3.2;
+  const matrix = direction.flatMap((a) => direction.map((b) => infinite * a * b));
+  const rotation = [Math.sin(Math.PI / 8), 0, 0, Math.cos(Math.PI / 8)];
+  const options = { rotation, motionLocks: true };
+  const coupled = profile(matrix);
+  const reference = setup(coupled, options);
+  using _referencePhysics = reference.physics;
+  const plain = setup(coupled, { ...options, loads: await LoadSolver.load() });
+  using _plainPhysics = plain.physics;
+  await Physics.load({ threads: true });
+  const shared = setup(coupled, { ...options, loads: await LoadSolver.load(), shared: true });
+  using _sharedPhysics = shared.physics;
+  const body = reference.body;
+  const quaternion = body.rotation;
+  const mode = [...rotatedVector(quaternion, direction.slice(0, 3)), ...rotatedVector(quaternion, direction.slice(3))];
+  const angular = body.effectiveWorldInverseInertia.map(Math.fround);
+  assert.ok(Math.abs(angular[5]) > 0.05, 'the two free angular axes are coupled by the rotated dry inertia');
+  const mobility = (wrench) => [
+    wrench[0] / mass,
+    0,
+    wrench[2] / mass,
+    dot(angular.slice(0, 3), wrench.slice(3)),
+    dot(angular.slice(3, 6), wrench.slice(3)),
+    dot(angular.slice(6, 9), wrench.slice(3)),
+  ];
+  const initial = twist(body);
+  const exposureSquared = 2;
+  const response = 1 / (1 + decayRate * dt + frequency ** 2 * dt ** 2);
+  const denominator = 1 + exposureSquared * (infinite + strength * response * dt ** 2) * dot(mode, mobility(mode));
+  const magnitude = (-exposureSquared * strength * response * dt * dot(mode, initial)) / denominator;
+  const expected = mode.map((d) => d * magnitude);
+  const expectedDelta = mobility(expected).map((a) => dt * a);
+  assert.ok(Math.abs(expected[1]) > 0.01 && Math.abs(expected[3]) > 0.01);
+  for (const scene of [reference, plain, shared]) {
+    const zero = scene.simulation.takeSnapshot();
+    scene.simulation.advance(1);
+    assert.deepEqual(scene.wrench(), reference.wrench());
+    compareWrenches(scene.wrench(), expected);
+    const actual = twist(scene.body);
+    compareWrenches(
+      actual,
+      initial.map((speed, i) => speed + expectedDelta[i]),
+    );
+    assert.equal(actual[1], 0);
+    assert.equal(actual[3], 0);
+    scene.simulation.advance(16);
+    const hash = scene.simulation.hash();
+    scene.simulation.restoreSnapshot(zero.bytes);
+    scene.simulation.advance(16);
+    assert.equal(scene.simulation.hash(), hash);
+    scene.simulation.restoreSnapshot(zero.bytes);
+    scene.simulation.advance(1);
+  }
+});
 
 test('SEA-12 changing exposure and body orientation preserves discrete modal work and restores every bit', () => {
   // The short completely dry interval must decouple the mode while allowing its existing state to decay.

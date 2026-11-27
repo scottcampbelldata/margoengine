@@ -7,6 +7,7 @@ use core::arch::wasm32::{f64x2, f64x2_extract_lane, f64x2_mul, memory_size, unre
 const INPUT_WORDS: usize = 32;
 const COUPLED_WORDS: usize = INPUT_WORDS + 9;
 const OUTPUT_WORDS: usize = 6;
+const MOBILITY_WORDS: usize = 9;
 
 #[panic_handler]
 fn trap(_: &core::panic::PanicInfo<'_>) -> ! {
@@ -119,13 +120,13 @@ fn hold(input: &[f64; INPUT_WORDS], gravity: f64) -> [f64; OUTPUT_WORDS] {
 
 /// Forms (I + A M_dry^-1) in wrench space. The last nine input words are
 /// the translation-to-rotation block of the symmetric added inertia A.
-fn hold_coupled(input: &[f64; COUPLED_WORDS], gravity: f64) -> [f64; OUTPUT_WORDS] {
+fn hold_coupled(input: &[f64; COUPLED_WORDS], gravity: f64, axes: [bool; 3]) -> [f64; OUTPUT_WORDS] {
     let [xx, xy, xz, yy, yz, zz] = [
         input[26], input[27], input[28], input[29], input[30], input[31],
     ];
     let angular_mobility = [[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]];
     let mass = input[1];
-    let inverse_mass = 1.0 / mass;
+    let inverse_mass = axes.map(|free| if free { 1.0 / mass } else { 0.0 });
     let weight = -mass * gravity;
     let mut system = [[0.0; 7]; 6];
     for (row, equation) in system.iter_mut().enumerate() {
@@ -141,7 +142,7 @@ fn hold_coupled(input: &[f64; COUPLED_WORDS], gravity: f64) -> [f64; OUTPUT_WORD
         for col in 0..3 {
             let linear_diagonal = if row == col { 1.0 } else { 0.0 };
             let angular_diagonal = if row == col + 3 { 1.0 } else { 0.0 };
-            equation[col] = linear_diagonal + linear[col] * inverse_mass;
+            equation[col] = linear_diagonal + linear[col] * inverse_mass[col];
             equation[col + 3] = angular_element(angular_diagonal, angular, angular_mobility[col]);
         }
         equation[6] = input[2 + row] + if row == 1 { weight } else { 0.0 };
@@ -189,11 +190,11 @@ fn solve_coupled(mut system: [[f64; 7]; 6]) -> [f64; 6] {
     solution
 }
 
-fn region_end(address: u32, rows: u32, words: usize, arena_bytes: u64) -> Option<u64> {
+fn region_end(address: u32, rows: u32, words: usize, word_bytes: u64, arena_bytes: u64) -> Option<u64> {
     let address = u64::from(address);
-    let byte_len = u64::from(rows) * words as u64 * 8;
+    let byte_len = u64::from(rows) * words as u64 * word_bytes;
     let end = address + byte_len;
-    (address > 0 && address % 8 == 0 && byte_len <= isize::MAX as u64 && end <= arena_bytes)
+    (address > 0 && address % word_bytes == 0 && byte_len <= isize::MAX as u64 && end <= arena_bytes)
         .then_some(end)
 }
 
@@ -207,7 +208,7 @@ pub unsafe extern "C" fn loads_hold(
     force_rows: u32,
     gravity: f64,
 ) -> i32 {
-    hold_rows(scratch, count, force_region, force_rows, gravity, hold)
+    hold_rows(scratch, count, force_region, force_rows, gravity, None, |input, gravity, _| hold(input, gravity))
 }
 
 /// Adds held wrenches with all six motions coupled. The input has the legacy
@@ -226,8 +227,23 @@ pub unsafe extern "C" fn loads_hold_coupled(
         force_region,
         force_rows,
         gravity,
+        None,
         hold_coupled,
     )
+}
+
+/// Uses the linear free axes from the layout-1 f32 rigid mobility port. The packed input still holds
+/// 41 words, with the six projected angular entries already copied into the dry inertia slots.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn loads_hold_coupled_mobility(
+    scratch: u32,
+    count: u32,
+    force_region: u32,
+    force_rows: u32,
+    gravity: f64,
+    mobility: u32,
+) -> i32 {
+    hold_rows(scratch, count, force_region, force_rows, gravity, Some(mobility), hold_coupled)
 }
 
 fn hold_rows<const WORDS: usize>(
@@ -236,7 +252,8 @@ fn hold_rows<const WORDS: usize>(
     force_region: u32,
     force_rows: u32,
     gravity: f64,
-    solve: impl Fn(&[f64; WORDS], f64) -> [f64; OUTPUT_WORDS],
+    mobility: Option<u32>,
+    solve: impl Fn(&[f64; WORDS], f64, [bool; 3]) -> [f64; OUTPUT_WORDS],
 ) -> i32 {
     if !(gravity.is_finite() && gravity >= 0.0) || count > force_rows {
         return -1;
@@ -245,15 +262,26 @@ fn hold_rows<const WORDS: usize>(
         return 0;
     }
     let arena_bytes = memory_size::<0>() as u64 * 65_536;
-    let Some(input_end) = region_end(scratch, count, WORDS, arena_bytes) else {
+    let Some(input_end) = region_end(scratch, count, WORDS, 8, arena_bytes) else {
         return -1;
     };
-    let Some(output_end) = region_end(force_region, force_rows, OUTPUT_WORDS, arena_bytes) else {
+    let Some(output_end) = region_end(force_region, force_rows, OUTPUT_WORDS, 8, arena_bytes) else {
         return -1;
     };
     if u64::from(scratch) < output_end && u64::from(force_region) < input_end {
         return -1;
     }
+    let mobility = if let Some(address) = mobility {
+        let Some(end) = region_end(address, force_rows, MOBILITY_WORDS, 4, arena_bytes) else {
+            return -1;
+        };
+        if u64::from(address) < output_end && u64::from(force_region) < end {
+            return -1;
+        }
+        Some(address as *const [f32; MOBILITY_WORDS])
+    } else {
+        None
+    };
 
     let input_ptr = scratch as *const [f64; WORDS];
     let output_ptr = force_region as *mut [f64; OUTPUT_WORDS];
@@ -268,7 +296,17 @@ fn hold_rows<const WORDS: usize>(
         {
             return index as i32 + 1;
         }
-        let wrench = solve(input, gravity);
+        let axes = if let Some(mobility) = mobility {
+            let response = unsafe { &*mobility.add(row as usize) };
+            let linear = [response[0], response[1], response[2]];
+            if linear.iter().any(|value| !value.is_finite() || *value < 0.0) {
+                return index as i32 + 1;
+            }
+            linear.map(|value| value > 0.0)
+        } else {
+            [true; 3]
+        };
+        let wrench = solve(input, gravity, axes);
         let output = unsafe { &mut *output_ptr.add(row as usize) };
         let next = [
             output[0] + wrench[0],

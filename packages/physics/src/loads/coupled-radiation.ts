@@ -182,7 +182,7 @@ export function holdCoupledRadiation(
   coupled: Float64Array,
   added: Float64Array,
   rotational: Float64Array | undefined,
-  inverseMass: number,
+  inverseMass: readonly [number, number, number],
   bodies: Float32Array,
   inertia: number,
   wrench: number[],
@@ -198,7 +198,7 @@ export function holdCoupledRadiation(
   const system = new Float64Array(36);
   for (let row = 0; row < 6; row++) {
     for (let col = 0; col < 3; col++) {
-      system[6 * row + col] = (row === col ? 1 : 0) + coupled[6 * row + col]! * inverseMass;
+      system[6 * row + col] = (row === col ? 1 : 0) + coupled[6 * row + col]! * inverseMass[col]!;
       let angular = row === col + 3 ? 1 : 0;
       for (let k = 0; k < 3; k++) angular += coupled[6 * row + k + 3]! * mobility[3 * k + col]!;
       system[6 * row + col + 3] = angular;

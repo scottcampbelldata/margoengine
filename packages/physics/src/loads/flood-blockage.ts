@@ -20,6 +20,8 @@ export interface FloodBlockageBody {
   readonly velocity: Vec3;
   readonly angularVelocity: Vec3;
   readonly inverseMass: number;
+  /** World-axis inverse mass including locked translations. Defaults to the scalar mass on every axis. */
+  readonly effectiveInverseMass?: Vec3;
   /** Rigid body port order xx, xy, xz, yy, yz, zz. */
   readonly inverseInertia: Symmetric3;
 }
@@ -78,6 +80,7 @@ function dot(a: Vec3, b: Vec3): number {
  */
 export function floodBlockageExchange(input: FloodBlockageInput): FloodBlockageExchange {
   const { cells, body, cellArea, density, interval, dragCoefficient, wetArea, elevation } = input;
+  const inverseMass = body.effectiveInverseMass ?? [body.inverseMass, body.inverseMass, body.inverseMass];
   if (
     !finitePositive(cellArea) ||
     !finitePositive(density) ||
@@ -86,6 +89,7 @@ export function floodBlockageExchange(input: FloodBlockageInput): FloodBlockageE
     (typeof wetArea !== 'function' && !finiteNonnegative(wetArea)) ||
     !Number.isFinite(elevation) ||
     !finiteNonnegative(body.inverseMass) ||
+    !inverseMass.every(finiteNonnegative) ||
     ![...body.centre, ...body.velocity, ...body.angularVelocity, ...body.inverseInertia].every(Number.isFinite)
   )
     throw invalid('Invalid flood drag parameters; use finite SI quantities, positive cell area, density and interval.');
@@ -138,16 +142,17 @@ export function floodBlockageExchange(input: FloodBlockageInput): FloodBlockageE
   const torqueZ: Vec3 = [ry, -rx, 0];
   const invTorqueX = inverseTimes(body.inverseInertia, torqueX);
   const invTorqueZ = inverseTimes(body.inverseInertia, torqueZ);
-  const mass = body.inverseMass + inverseWaterMass;
   const rotationX = dot(torqueX, invTorqueX);
   const rotationZ = dot(torqueZ, invTorqueZ);
-  const kxx = mass + rotationX;
+  const massX = inverseMass[0] + inverseWaterMass;
+  const massZ = inverseMass[2] + inverseWaterMass;
+  const kxx = massX + rotationX;
   const kxz = dot(torqueX, invTorqueZ);
-  const kzz = mass + rotationZ;
+  const kzz = massZ + rotationZ;
   const drag = 0.5 * density * dragCoefficient * area * interval;
   if (
-    ![speed, mass, kxx, kxz, kzz, drag].every(Number.isFinite) ||
-    !(mass > 0 && rotationX >= 0 && rotationZ >= 0 && kzz - (kxz / kxx) * kxz > 0)
+    ![speed, kxx, kxz, kzz, drag].every(Number.isFinite) ||
+    !(massX > 0 && massZ > 0 && rotationX >= 0 && rotationZ >= 0 && kzz - (kxz / kxx) * kxz > 0)
   )
     throw invalid(
       'Invalid flood drag mass metric; use positive water mass and a positive semidefinite inverse inertia.',

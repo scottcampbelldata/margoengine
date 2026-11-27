@@ -362,6 +362,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
           ? [
               { field: this.projectedDrag.fields.request, access: 'read' as const },
               { field: this.projectedDrag.fields.receipt, access: 'write' as const },
+              ...this.projectedDrag.mobilityFields,
             ]
           : []),
         ...(this.floodLoads?.fields ?? []),

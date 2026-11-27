@@ -3,6 +3,7 @@ import { regionWords } from '../world/memory.js';
 import {
   type Cell,
   type FieldDescriptor,
+  type FieldUse,
   isRateLevel,
   type Port,
   type RateLevel,
@@ -11,7 +12,14 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, bodyRowsOf, IMPULSE_WORDS } from '../world/solvers/rigid.js';
+import {
+  BODIES_FIELD,
+  BODY_IMPULSES_FIELD,
+  BODY_MOBILITY_FIELD,
+  BODY_WORDS,
+  bodyRowsOf,
+  IMPULSE_WORDS,
+} from '../world/solvers/rigid.js';
 import { invalidLoad } from './errors.js';
 import {
   type FloodBodyDragBody,
@@ -20,12 +28,15 @@ import {
   solveFloodProfile,
 } from './flood-body-drag.js';
 import { FloodDragGrid, type PeriodicDragAxes } from './flood-drag-grid.js';
+import { rigidMobilityWords } from './rigid-mobility.js';
 
 /** Fixed-origin, same-rate participants for a projected drag exchange. */
 export interface ProjectedFloodDragOptions {
   readonly id?: string;
   readonly rigidId?: string;
   readonly rate?: RateLevel;
+  /** Read the rigid body's axis locks (default true). Disable to restore a matching legacy scene checkpoint. */
+  readonly readMobility?: boolean;
   readonly signal?: AbortSignal;
 }
 
@@ -49,6 +60,7 @@ function sameCell(a: Cell, b: Cell): boolean {
 /** Hydro owns this state; requests are fixed-layout snapshots, with one writer. */
 export class ProjectedFloodDragWater {
   readonly fields: ProjectedFloodDragCoupling['fields'];
+  readonly mobilityFields: readonly FieldUse[];
   private host!: SolverHost;
   private grid!: FloodDragGrid;
   private periodic!: PeriodicDragAxes;
@@ -60,7 +72,9 @@ export class ProjectedFloodDragWater {
     waterId: string,
     private readonly profiles: readonly FloodDragProfile[],
     readonly rate: RateLevel,
+    readMobility: boolean,
   ) {
+    this.mobilityFields = readMobility ? [{ field: BODY_MOBILITY_FIELD, access: 'read', optional: true }] : [];
     this.fields = {
       request: {
         name: `${waterId}.projectedDragRequest`,
@@ -98,7 +112,7 @@ export class ProjectedFloodDragWater {
     this.waterWork = new Float64Array(this.grid.count * 3);
   }
 
-  request({ cell, inputs, level, tick }: StepContext): Float32Array {
+  request({ cell, inputs, level, tick }: StepContext): { body: Float32Array; mobility: Float32Array | undefined } {
     const port = inputs.get(this.fields.request.name);
     if (
       !port ||
@@ -110,22 +124,37 @@ export class ProjectedFloodDragWater {
       port.region.byteLength !== this.profiles.length * BODY_WORDS * 4
     )
       throw invalidLoad('Run the projected drag request before water at the same rate and in the same origin cell.');
-    return regionWords(this.host.memory, port.region) as Float32Array;
+    return {
+      body: regionWords(this.host.memory, port.region) as Float32Array,
+      mobility: rigidMobilityWords(
+        this.host.memory,
+        inputs.get(BODY_MOBILITY_FIELD.name),
+        tick - 1,
+        cell,
+        this.receiptWork.length / IMPULSE_WORDS,
+      ),
+    };
   }
 
-  settle(request: Float32Array, water: Float64Array, bottom: Float64Array, dt: number): void {
+  settle(
+    request: ReturnType<ProjectedFloodDragWater['request']>,
+    water: Float64Array,
+    bottom: Float64Array,
+    dt: number,
+  ): void {
     const { waterWork, receiptWork, grid, profiles } = this;
     waterWork.set(water);
     receiptWork.fill(0);
     const densityArea = grid.density * grid.cellArea;
     const cell = this.host.cell;
     for (const [record, profile] of profiles.entries()) {
-      const result = solveFloodProfile(grid, profile, request, record * BODY_WORDS, cell, {
+      const result = solveFloodProfile(grid, profile, request.body, record * BODY_WORDS, cell, {
         water: waterWork,
         waterCell: cell,
         dt,
         bottom,
         periodic: this.periodic,
+        mobility: request.mobility,
       });
       if (!result) continue;
       const { exchange, sample, bodyCentre } = result;
@@ -178,7 +207,7 @@ export function projectedFloodDragCoupling(
     throw invalidLoad('Choose a common projected drag, shallow-water and rigid rate from 0 to 7.');
   const waterId = options.id ?? 'water';
   const rigidId = options.rigidId ?? 'rigid';
-  const endpoint = new ProjectedFloodDragWater(waterId, profiles, rate);
+  const endpoint = new ProjectedFloodDragWater(waterId, profiles, rate, options.readMobility ?? true);
   const { request: requestField, receipt: receiptField } = endpoint.fields;
   const requestId = `${waterId}.projectedDrag`;
   const relayId = `${waterId}.projectedDragRelay`;

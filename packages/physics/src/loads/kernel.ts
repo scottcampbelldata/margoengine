@@ -21,6 +21,15 @@ export interface LoadsKernel {
   loads_hold(scratch: number, count: number, forceRegion: number, forceRows: number, gravity: number): number;
   /** The same receipt and return codes for six-axis coupled radiation rows. */
   loads_hold_coupled(scratch: number, count: number, forceRegion: number, forceRows: number, gravity: number): number;
+  /** Coupled rows with linear axes selected by the layout-1 f32 rigid mobility port. */
+  loads_hold_coupled_mobility(
+    scratch: number,
+    count: number,
+    forceRegion: number,
+    forceRows: number,
+    gravity: number,
+    mobility: number,
+  ): number;
 }
 
 export async function loadLoadsBuilds(signal?: AbortSignal): Promise<LoadsBuilds> {
@@ -79,7 +88,8 @@ export function bindLoadsKernel(host: SolverHost, builds: LoadsBuilds): LoadsKer
   if (
     !(exports.__stack_pointer instanceof WebAssembly.Global) ||
     typeof exports.loads_hold !== 'function' ||
-    typeof exports.loads_hold_coupled !== 'function'
+    typeof exports.loads_hold_coupled !== 'function' ||
+    typeof exports.loads_hold_coupled_mobility !== 'function'
   )
     throw new MargoError('failed', 'The loads kernel ABI is invalid; rebuild the optional Wasm assets.');
   exports.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;

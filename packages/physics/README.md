@@ -3968,6 +3968,8 @@ horizontal impulse and corresponding moment to rigid on the same tick. Fully dry
 The exchange changes horizontal discharge and leaves volume to the water solver.
 On periodic sides the profile samples both sides of the seam and uses local periodic images for its
 moment arms. A one-cell periodic axis contributes one fluid mass.
+The drag solve reads the rigid mobility from the same pose. A locked axis contributes zero mobility while
+its support still receives the reaction. `readMobility` defaults to true.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -4509,6 +4511,12 @@ Use `await LoadSolver.load({id, signal})` for the optional Rust SIMD wrench batc
 world's plain or shared memory. It batches the ordinary 32-word rows and six-axis 41-word rows
 separately, with one call for each active layout. The synchronous constructor uses the TypeScript
 reference. `workCounts()` reports held bodies, native calls and reserved scratch bytes.
+`LoadSolver` and the SIMD batches use the same projected dry mobility `D` when holding added-mass and
+rotational loads. They solve `(I + A D) held = wrench`, where `A` is water inertia. A locked body axis
+can carry reaction force or torque while its corresponding acceleration stays zero.
+For a checkpoint from before this field was added, set `readMobility: false` on
+`new LoadSolver('loads', {readMobility: false})` or `LoadSolver.load({readMobility: false})` along with
+`publishMobility: false` on the rigid solver. Set the same option on the drag adapters used by that checkpoint.
 
 `radiationProfile(mesh, {mass, density, centre})` computes coefficients at the hull's still-water draft.
 Its default reference is deep-water strip theory. Select `panels: {frequencies, depth}` for the native
@@ -4575,7 +4583,10 @@ For a compact rigid body or hull in a flood, `FloodBodyDragSolver` returns horiz
 with equal and opposite impulse. Give each rigid row a measured frontal area or three principal areas
 and a vertical half-extent. A three-axis profile follows the body's rotation. Set `drag: 0` on its
 `LoadSolver` body or `drag: false` on `HullSolver` to apply form drag once. Use the same grid and rate for
-water and drag, and run drag before water and rigid. The exchange cells must remain wet throughout the step. Locks and joints carry external support reactions.
+water and drag, and run drag before water and rigid. The exchange cells must remain wet throughout the step.
+The drag solve includes rigid axis locks by default through the optional `bodyMobility` field. Axis locks and joints
+carry external support reactions. Use `new FloodBodyDragSolver('floodBodyDrag', {readMobility: false})` for the previous
+checkpoint layout.
 
 ```ts
 import {Physics} from 'margoengine/physics';

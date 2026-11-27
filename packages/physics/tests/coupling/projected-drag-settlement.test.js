@@ -99,6 +99,47 @@ test('post-water drag matches the closed quadratic impulse and eccentric moment'
   near(initialEnergy - finalEnergy, impulse * (speed - 0.5 * mobility * impulse), energyRoundoff);
 });
 
+test('post-water drag resolves the water impulse against a support on locked rigid axes', async () => {
+  await Physics.load();
+  using physics = new Physics(null, { fixedTimestep: DT, gravity: CELL });
+  const body = bodyOf(physics, { x: 0.25 });
+  body.enabledTranslations = [false, true, true];
+  body.enabledRotations = [true, true, false];
+  const depth = 0.75;
+  const speed = 1.25;
+  const centre = [0, 0.125, 0];
+  const area = 0.2;
+  const dragCoefficient = 0.8;
+  const coupling = await ShallowWaterSolver.withProjectedBodyDrag([
+    { row: body.row, centre, halfHeight: 0.1, area, dragCoefficient },
+  ]);
+  const world = makeWorld(coupling, physics, {
+    bed: bedOf(1),
+    depth,
+    velocity: () => [speed, 0],
+    density: DENSITY,
+    roughness: 0,
+    sides: PERIODIC,
+  });
+  const initial = world.takeSnapshot();
+  world.advance(1);
+  const fluidMass = DENSITY * depth;
+  const gain = 0.5 * DENSITY * dragCoefficient * area * DT;
+  // The support adds neither translational nor angular mobility along the two driven axes.
+  const slip = (2 * speed) / (1 + Math.sqrt(1 + (4 * gain * speed) / fluidMass));
+  const impulse = gain * slip ** 2;
+  const [jx, , , , , tz] = receipt(world, coupling, body, 0);
+  near(jx, impulse, 256 * Number.EPSILON * fluidMass);
+  near(tz, -centre[1] * impulse, 256 * Number.EPSILON * fluidMass);
+  assert.deepEqual(body.linearVelocity, [0, 0, 0]);
+  assert.deepEqual(body.angularVelocity, [0, 0, 0]);
+  near(coupling.water.sample(0, 0).velocity[0], slip, 64 * Number.EPSILON * speed);
+  const hash = world.hash();
+  world.restoreSnapshot(initial.bytes);
+  world.advance(1);
+  assert.equal(world.hash(), hash);
+});
+
 test('post-water drag uses the f64 wet state when the published f32 rounds below the threshold', async () => {
   await Physics.load();
   using physics = new Physics(null, { fixedTimestep: DT, gravity: CELL });

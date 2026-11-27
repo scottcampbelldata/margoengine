@@ -58,6 +58,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `bodyMobility` port publishes this response without changing the existing `bodies` layout.
 - **Regression:** `packages/physics/tests/world-rigid-solver.test.js` compares published response with all six impulse
   directions and held torque using a rotated rigid body and a frame-zero restore.
+- **Load consumers:** `packages/physics/tests/loads-coupled-radiation.test.js` checks zero mobility on locked
+  axes and the retained reaction for ordinary and coupled held wrenches in TypeScript and both Wasm variants.
+  `packages/physics/tests/coupling/projected-drag-settlement.test.js` checks the accepted horizontal Flood impulse
+  and its moment against the exact water response at a supported body, with replay.
 
 ### Fixed 2026-11-26: a supersampled edge pixel half plants and half lit ground was in both masks (KB-LOOK-MASKTIE1, shot tool)
 

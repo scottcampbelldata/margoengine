@@ -1258,6 +1258,17 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   The advancing source concentrates submerged flux at the surface centreline. Qualification of its depth and
   width treatment and the production wall interaction remain open.
 
+  A continuous diagnostic projected the same advancing source from its submerged depth and width over the same
+  1.2 m grid. At 71 s it measured +0.329 m crest and −0.523 m trough over 4,005 ticks. The maximum volume
+  projection residual was 2.86×10⁻¹⁴ m³ per step. This isolates the forcing error. The grid does not resolve
+  the 1.435 m steady transverse wavelength at that time. Independent amplitude, energy exchange, resolved
+  production reflection and splash still need qualification.
+
+  Intersecting the archived quay mesh at still water gives the main wall at z = −10.55 m and the east return
+  at x = 200.4 m. The old diagnostic used the above-water lip at z = −9.93 m. At 9.7 m depth the existing
+  shallow-water wall's propagation speed is 9.75 m/s, versus 2.07–4.59 m/s for the authored wave bands.
+  A prognostic dispersive quay boundary and its impact-to-spray transfer remain open.
+
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.
