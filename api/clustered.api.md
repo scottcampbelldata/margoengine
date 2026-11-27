@@ -155,6 +155,7 @@ export interface ClusteredSamplingHooks {
     bounce?: {
         declarations(group: number): string;
     };
+    softMaps?: boolean;
 }
 
 export interface ClusteredShadow {
@@ -273,5 +274,5 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     readonly shapeShadow?: string;
 }, area?: {
     declarations(group: number, shadow?: string): string;
-}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic, contact, sized, bounce }?: ClusteredSamplingHooks): string;
+}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic, contact, sized, bounce, softMaps }?: ClusteredSamplingHooks): string;
 ```
