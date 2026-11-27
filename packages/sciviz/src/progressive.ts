@@ -60,9 +60,12 @@ export class ProgressiveRendering implements EnginePlugin {
     this.#options = policy.options;
     this.#figure = figure;
     this.#state = policy.next(true);
-    if (figure.engine.hasPlugin(this.name))
-      throw fault('state', 'An engine already has progressive rendering; dispose its controller first', 'sciviz');
-    inSceneOf(figure.engine, figure.renderer, () => figure.renderer.engine.use(this));
+    // The check and the attach both run in the scene the figure's renderer lives in, not the active one.
+    inSceneOf(figure.engine, figure.renderer, () => {
+      if (figure.renderer.engine.hasPlugin(this.name))
+        throw fault('state', 'An engine already has progressive rendering; dispose its controller first', 'sciviz');
+      figure.renderer.engine.use(this);
+    });
     figure.renderer.add(this.#lifetime);
   }
   /** Most recently rendered view's settings; the snapshot is immutable to callers. */
@@ -263,7 +266,10 @@ struct Pixel { @location(0) colour:vec4f, @builtin(frag_depth) depth:f32 }
     this.#disposed = true;
     this.onDeviceRestored();
     this.#figure.renderer.remove(this.#lifetime);
-    this.#engine?.removePlugin(this.name);
+    // Leave the scene the controller joined, not whichever scene is active now; once its scene has removed it there
+    // is nothing left to remove.
+    const scene = this.#engine?.sceneOf(this);
+    if (scene) this.#engine?.removePlugin(this.name, scene);
     this.#engine = undefined;
   }
   /** Same as dispose(), for using. */

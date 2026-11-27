@@ -19,6 +19,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `tests/lcg-generators.test.js` checks each file that holds the multiplier for both faults. The page filed with a
   browser vendor in `docs/upstream-reports/KB1042f` stays as filed.
 
+### Fixed 2026-11-27: sciviz progressive rendering and glTF wide strokes left the active scene's plugin, not their own (plugin scene owner (sciviz), KB-OWN-STROKES1; sciviz, gltf)
+
+- **Repro:** a figure whose renderer is in a second scene, `new ProgressiveRendering(figure)`, the default scene active:
+  the constructor's duplicate check looked at the active scene, and `dispose()` removed a `sciviz-progressive` plugin
+  from the active scene and left its own registered. A glTF model with wide points or lines loaded into a second
+  scene: its `gltf-lines` and `gltf-points` plugins stayed in that scene after the last model was disposed, because
+  the dispose compared and removed them in the active scene. `SciRenderer.dispose` removed `sciviz:<n>` from the
+  active scene when its own scene had already taken it out. `npm run hygiene` (scripts/support/plugin-scene-owner.mjs)
+  found packages/gltf/src/strokes.ts on main, and listed the two sciviz calls as open.
+- **Cause:** one-argument `engine.removePlugin(name)`, `engine.hasPlugin(name)` and `engine.plugins` act on the active
+  scene (packages/sciviz/src/progressive.ts, packages/sciviz/src/render.ts, packages/gltf/src/strokes.ts).
+- **Fix:** each removes through `engine.sceneOf(plugin)` and removes nothing once it is no longer attached; the
+  progressive check runs inside `inSceneOf` with the attach. The check's OPEN list is empty; its self-test of the
+  OPEN rules uses a throwaway repository.
+- **Regression:** packages/sciviz/tests/scene-owner.test.js "progressive rendering joins, checks and leaves the scene
+  its figure is in, not the active one", packages/gltf/test/strokes.test.js "a model loaded into a second scene takes
+  its plugins out of that scene, whichever scene is active" (both fail on the old source) and
+  tests/plugin-scene-owner.test.js "the two sciviz sites are fixed".
+
 ### Fixed 2026-11-27: the points pixel size check was in no GPU chain (KB-POINTS-GPUPLAN1)
 
 - **Repro.** `node --test tests/modern-extension-suite.test.js tests/parallel-check.test.js` on a829b78da's parents:
@@ -14660,15 +14679,6 @@ scene is removed instead. Cause: its dispose calls `engine.removePlugin(this.nam
 the active scene. Fix when physics reopens: `engine.sceneOf(this)?.removePlugin(this.name)`. The hygiene check
 scripts/support/plugin-scene-owner.mjs lets exactly this call through by file and call text in its OPEN list; drop
 the row with its fix.
-
-### plugin scene owner (sciviz)
-
-**Status:** open (owner: sciviz).
-
-Open, sciviz held out of list 5 (workstation owns it). Same cause and repro as above in two sites the check found:
-packages/sciviz/src/progressive.ts (`ProgressiveRendering.dispose`) and packages/sciviz/src/render.ts. (axes, media-tiles
-and pointcloud were fixed on main by 69eb1e69f.) The OPEN list in scripts/support/plugin-scene-owner.mjs names these two
-calls; drop each row with its fix.
 
 ### check:owners browser leaf: "Failed to fetch dynamically imported module" for the fixture (2026-11-12, open)
 

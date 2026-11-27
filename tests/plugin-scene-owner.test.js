@@ -1,8 +1,10 @@
 // A plugin leaves the scene it was attached to, never the active one: the class check behind `npm run hygiene`
 // (scripts/support/plugin-scene-owner.mjs) and the sites it found (docs/integration-fixtures.md, "Scene owner").
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { OPEN, engineRemovals, pluginSceneOwnerFindings } from '../scripts/support/plugin-scene-owner.mjs';
 
@@ -57,29 +59,46 @@ test('no package source removes a plugin from the active scene instead of its ow
   assert.deepEqual(pluginSceneOwnerFindings(root), []);
 });
 
+test('the two sciviz sites are fixed: listing them again reports them gone', () => {
+  const sites = [
+    { file: 'packages/sciviz/src/progressive.ts', call: 'this.#engine?.removePlugin(this.name)', bug: 'fixed' },
+    { file: 'packages/sciviz/src/render.ts', call: 'engine?.removePlugin(this.name)', bug: 'fixed' },
+  ];
+  assert.deepEqual(
+    pluginSceneOwnerFindings(root, sites),
+    sites.map((s) => `${s.file}: listed open site "${s.call}" is gone; drop it from OPEN`),
+  );
+});
+
 test('open sites pass only by file and exact call; a listed site that is gone fails', () => {
-  const site = OPEN[0];
-  // The same call text in another file, or another call in a listed file, is a finding.
-  const moved = [{ ...site, file: 'packages/physics/src/other.ts' }, ...OPEN.slice(1)];
-  const findings = pluginSceneOwnerFindings(root, moved);
-  assert.ok(
-    findings.some((f) => f.startsWith(`${site.file}:`) && f.endsWith(site.call)),
-    findings.join('\n'),
-  );
-  assert.ok(
-    findings.some((f) => f.includes('packages/physics/src/other.ts: listed open site')),
-    findings.join('\n'),
-  );
-  const stale = [...OPEN, { file: site.file, call: 'engine.removePlugin(gone)', bug: site.bug }];
-  assert.deepEqual(pluginSceneOwnerFindings(root, stale), [
-    `${site.file}: listed open site "engine.removePlugin(gone)" is gone; drop it from OPEN`,
-  ]);
+  // A throwaway repository with one open site, so the OPEN mechanism stays tested once the real list is empty.
+  const tree = mkdtempSync(join(tmpdir(), 'scene-owner-'));
+  try {
+    mkdirSync(join(tree, 'packages/demo/src'), { recursive: true });
+    writeFileSync(join(tree, 'packages/demo/src/a.ts'), ['export function f(engine) {', '  engine.removePlugin(name);', '}', ''].join(String.fromCharCode(10)));
+    const git = (...args) => execFileSync('git', args, { cwd: tree, timeout: 30_000 });
+    git('init', '-q');
+    git('add', '.');
+    const site = { file: 'packages/demo/src/a.ts', call: 'engine.removePlugin(name)', bug: 'demo' };
+    assert.deepEqual(pluginSceneOwnerFindings(tree, [site]), []);
+    // The same call text in another file, or another call in a listed file, is a finding.
+    const findings = pluginSceneOwnerFindings(tree, [{ ...site, file: 'packages/demo/src/b.ts' }]);
+    assert.deepEqual(findings, [
+      'packages/demo/src/a.ts:2: engine.removePlugin(name)',
+      'packages/demo/src/b.ts: listed open site "engine.removePlugin(name)" is gone; drop it from OPEN',
+    ]);
+    const stale = [site, { ...site, call: 'engine.removePlugin(gone)' }];
+    assert.deepEqual(pluginSceneOwnerFindings(tree, stale), [
+      'packages/demo/src/a.ts: listed open site "engine.removePlugin(gone)" is gone; drop it from OPEN',
+    ]);
+  } finally {
+    rmSync(tree, { recursive: true, force: true });
+  }
 });
 
 test('hygiene runs the check and every open site cites its known-bugs entry', () => {
   assert.match(readFileSync(resolve(root, 'scripts/hygiene.js'), 'utf8'), /assertPluginsLeaveOwnScene\(root\);/);
   const bugs = readFileSync(resolve(root, 'docs/known-bugs.md'), 'utf8');
-  assert.ok(OPEN.length > 0);
   for (const { file, call, bug } of OPEN) {
     assert.match(
       file,
@@ -119,6 +138,7 @@ const FIXED = {
   tilemap: ['iso', 'objects', 'renderer'],
   toon: ['hatch', 'index', 'models'],
   vfx: ['base'],
+  sciviz: ['progressive', 'render'],
   'voxel-pathtracer': ['tracer'],
   voxel: ['render', 'stream'],
   weather: ['drive', 'hail', 'scene-patch'],

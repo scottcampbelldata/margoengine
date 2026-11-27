@@ -8,6 +8,7 @@ import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorde
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { parseGLTF, parseGLTFAsync } from '../dist/pbr.js';
 import { wideStrokes } from '../dist/strokes.js';
+import { sceneScope } from '../../shared/scene-scope.js';
 
 /** A GLB whose one node holds: a 4 px strip, a world-unit line list with _WIDTH, Bentley points, a plain loop and a triangle. */
 function strokesGLB({ skinned = false } = {}) {
@@ -185,6 +186,17 @@ test('parseGLTF draws wide with decoders.strokes passed, and two models share th
   assert.equal(instance.plugins.get('gltf-lines').lines.size, 2, "the other model's lines stay");
   b.dispose();
   assert.equal(instance.plugins.has('gltf-lines'), false);
+});
+
+test('a model loaded into a second scene takes its plugins out of that scene, whichever scene is active', async () => {
+  const instance = await engine(),
+    other = instance.createScene('other'),
+    model = await sceneScope(instance, other).run(() => parseGLTFAsync(instance, strokesGLB()));
+  assert.equal(other.plugins.has('gltf-lines'), true, 'the plugins joined the model scene');
+  assert.equal(instance.plugins.has('gltf-lines'), false, 'and not the active one');
+  model.dispose();
+  assert.equal(other.plugins.has('gltf-lines'), false, 'the last model gone takes the lines plugin from its scene');
+  assert.equal(other.plugins.has('gltf-points'), false);
 });
 
 test('a width that is not a positive number with known units is not read', async () => {

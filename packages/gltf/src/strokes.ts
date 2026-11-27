@@ -119,8 +119,9 @@ export const wideStrokes: GLTFStrokeReader = {
         for (const { owner, item } of made.splice(0)) {
           owner.remove(item);
           const left = owner as unknown as { lines?: ReadonlySet<unknown>; pointClouds?: ReadonlySet<unknown> };
-          if (!(left.lines ?? left.pointClouds)?.size && engine.plugins.get(owner.name) === (owner as never))
-            engine.removePlugin(owner.name);
+          // The plugin leaves the scene it joined, not whichever scene is active now.
+          const home = engine.sceneOf(owner as never);
+          if (!(left.lines ?? left.pointClouds)?.size && home) home.removePlugin(owner.name);
         }
       };
     try {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { inSceneOf } from '../src/scene-owner.ts';
 import { VolumeDepthCapture } from '../src/volume-depth.ts';
+import { ProgressiveRendering } from '../dist/progressive.js';
 
 // An engine with two scenes: `use(plugin, scene)` runs setup with that scene active, as core does.
 function sceneEngine() {
@@ -14,6 +15,7 @@ function sceneEngine() {
       gpu: {},
       owners: new Map(),
       sceneOf: (plugin) => engine.owners.get(plugin),
+      hasPlugin: (name) => engine.active.plugins.has(name),
       use(plugin, scene = engine.active) {
         const outer = engine.active;
         engine.active = scene;
@@ -88,4 +90,27 @@ test('a depth capture is made per scene and taken out of its scene once no layer
   } finally {
     globalThis.GPUTextureUsage = usage;
   }
+});
+
+test('progressive rendering joins, checks and leaves the scene its figure is in, not the active one', () => {
+  const { engine, own, other } = sceneEngine();
+  const renderer = { name: 'sciviz:0', device: {}, samplingScale: 1, engine, setup() {}, add() {}, remove() {} };
+  engine.use(renderer, other);
+  // A same-name controller in the active scene neither blocks the figure's own nor is torn down by its dispose.
+  const bystander = {
+    name: 'sciviz-progressive',
+    disposed: false,
+    setup() {},
+    dispose() {
+      this.disposed = true;
+    },
+  };
+  engine.use(bystander, own);
+  const controller = new ProgressiveRendering({ engine, renderer });
+  assert.equal(engine.sceneOf(controller), other, 'the controller joined the figure scene');
+  assert.throws(() => new ProgressiveRendering({ engine, renderer }), { code: 'state' }, 'a second one there throws');
+  controller.dispose();
+  assert.ok(!other.plugins.has('sciviz-progressive'), 'dispose took it out of its own scene');
+  assert.equal(own.plugins.get('sciviz-progressive'), bystander, 'the active scene keeps its controller');
+  assert.equal(bystander.disposed, false);
 });

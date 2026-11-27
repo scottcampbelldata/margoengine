@@ -67,6 +67,8 @@ test('controller is an optional engine plugin with disposable ownership and no g
       p.setup(this);
       p.registerPasses({ add: (pass) => passes.push(pass) });
     },
+    // One scene, as on an engine without extra scenes: the controller is in it while it is attached.
+    sceneOf: (p) => (p === plugin ? {} : undefined),
     removePlugin() {
       plugin?.dispose();
       plugin = undefined;
@@ -124,6 +126,7 @@ test('a view no longer drawn releases its reduced target at the next frame, like
       p.setup(this);
       p.registerPasses({ add: (pass) => passes.push(pass) });
     },
+    sceneOf: (p) => (p === plugin ? {} : undefined),
     removePlugin() {
       plugin = undefined;
     },

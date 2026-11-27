@@ -17,12 +17,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 
-const SCIVIZ = 'docs/known-bugs.md, "plugin scene owner (sciviz)": sciviz is held out of list 5';
 /** Every open site the check lets through, each by file, exact call text and the known-bugs entry. */
-export const OPEN = [
-  { file: 'packages/sciviz/src/progressive.ts', call: 'this.#engine?.removePlugin(this.name)', bug: SCIVIZ },
-  { file: 'packages/sciviz/src/render.ts', call: 'engine?.removePlugin(this.name)', bug: SCIVIZ },
-];
+export const OPEN = [];
 const ENGINE = /^(?:engine|runtime|kernel)$/i;
 const ON_PURPOSE = /\/\/\s*scene-owner: active scene on purpose, \S/;
 

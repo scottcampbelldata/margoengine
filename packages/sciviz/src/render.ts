@@ -337,10 +337,10 @@ export class SciRenderer implements EnginePlugin {
     this.#engine = undefined;
     if (engine && this.#depthCapture) VolumeDepthCapture.release(engine, this.#depthCapture);
     this.#depthCapture = undefined;
-    // Leave the scene the renderer joined, not whichever scene is active now (none, once the scene is disposing it).
+    // Leave the scene the renderer joined, not whichever scene is active now. Once its scene has removed it (the
+    // scene is disposing it) there is nothing left to remove.
     const scene = engine?.sceneOf(this);
     if (scene) engine?.removePlugin(this.name, scene);
-    else engine?.removePlugin(this.name);
   }
 
   /** Same as `dispose()`, for `using`. */
