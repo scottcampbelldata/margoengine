@@ -18072,6 +18072,37 @@ the fine matrix between those two corrections. The finite projection
 itself still applies the original eighth-order operator.
 [James Bramble, Joseph Pasciak and Jinchao Xu, *Parallel multilevel preconditioners*, 1990](https://doi.org/10.1090/S0025-5718-1990-1023042-6)
 
+### SEA-12 outgoing discrete quay boundary
+
+The independent harmonic verification matches the uniform exterior to the
+eighth-order interior graph. Separate its layer/Robin operator in depth
+and its closed-wall cosine modes across the channel. For each generalized
+eigenvalue `lambda`, the normal recurrence has
+`L = 2 - r - 1/r` and `P(L) = -dx² lambda`, where
+`P(L) = L + L²/12 + L³/90 + L⁴/560`. Keep the four outward factors
+`r`, selecting the propagating phase by the `exp(-i omega t)` convention
+and the evanescent ones by `|r| < 1`. Four inner columns determine the
+four ghost columns by modal continuation. The discrete power in a
+propagating mode is proportional to the derivative of its normal symbol.
+This supplies the reciprocity weights independently of the solve.
+
+[Porter and Evans, *Complementary approximations to wave scattering by
+vertical barriers*, 1995, §2](https://doi.org/10.1017/S0022112095002849)
+supply the finite-depth propagating and evanescent separation.
+[Un-Ryong Rim, *Wave diffraction by floating bodies in water of finite
+depth using an exact DtN boundary condition*, 2021](https://doi.org/10.1016/j.oceaneng.2021.109711)
+uses exterior elimination for finite-depth waves.
+[Senganal Thirunavukkarasu and Murthy Guddati, *Absorbing boundary conditions
+for time harmonic wave propagation in discretized domains*, 2011](https://doi.org/10.1016/j.cma.2011.04.021)
+explain why the continuation must match the discrete interior.
+
+The [verification script](../packages/physics/scripts/measure-finite-quay-outgoing.py)
+tests the empty channel, a finite-ended curtain with an open underside,
+the sealed underside, a moved radiation boundary and two reversible
+incident modes. It is an offline harmonic diagnostic with fixed lateral
+walls, using NumPy and SciPy. The engine time step still uses its existing
+perimeter sponge.
+
 ### SEA-12 finite quay wake
 
 Craig and Sulem, *Numerical Simulation of Gravity Waves* (1993), express the gravity-wave variables as

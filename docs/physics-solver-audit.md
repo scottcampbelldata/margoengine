@@ -1535,7 +1535,13 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   projection and from 111.74 million to 72.05 million for the submerged impulse.
   The method removes an eight-byte scratch word per volume slot, or 1.08 GiB at the full
   145-million-slot grid. Iterations can rise as each iteration becomes cheaper.
-  Projection tolerance and the accepted aperture geometry stay the same.
+  Projection tolerance and the accepted aperture geometry stay the same. The archived 0.15 m
+  passage uses 50,599 fine matrix products instead of 95,241 across 210 ticks. At 0.075 m the
+  final 30 ticks use 8,906 instead of 18,786 from the same tick-180 checkpoint. The largest
+  gauge difference is 4.57×10⁻¹³ m. Both replays remain exact. On the original 145-million-slot
+  grid, setup held 15.62 GB of typed arrays. The twelve-minute preflight logged 32 fine matrix
+  products before stopping during the first projection. This direct volume solve still
+  cannot supply the full fine trajectory.
 
   A separate 7.2 × 4.2 m local passage used the same archived hull-source spectrum on 0.15 m
   and 0.075 m cells, with the same 34 depth layers and 210 fourth-order 60 Hz ticks on
@@ -1546,6 +1552,20 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   The coarse and fine perimeter sponges take 37.7% and 36.2% of the initial wave energy.
   This verifies the local passage at the fixed crop and leaves full-domain radiation and
   the original-shot acceptance open.
+
+  The independent [outgoing-boundary control](../packages/physics/scripts/measure-finite-quay-outgoing.py)
+  solves the same eighth-order normal graph in a 3D waveguide with a finite-ended curtain. It
+  returns all empty-channel power, moves 48.26% of the incident aperture power into other
+  propagating orders, and closes total power within 4.0×10⁻¹⁵. Extending both ports changes
+  accepted scattering coefficients by less than 5.0×10⁻¹⁴. Reversing the incident and outgoing
+  orders matches the flux-weighted coefficients within 1.8×10⁻¹⁴.
+
+  In a separate normal transect of the archived quay, 49 incident modes reconstruct the frozen
+  local source packet without a sponge. Moving the two ports changes the four traces by less than
+  7.7×10⁻¹³ relative. Refining 0.15→0.075→0.0375 m reduces the reflected waveform difference
+  from 3.76% to 1.70% and the wall-face difference from 1.91% to 0.82%. The transect holds geometry
+  uniform along the tangent. The missing finite-end scattering and full time history still
+  govern original-shot acceptance.
 
   The opt-in fourth-order time step in `coupling/loads-finite-quay.test.js` checks held pressure, the single
   volume kick, the finite-domain absorber and failure before publication. The free-hull regression transfers
