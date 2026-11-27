@@ -1455,6 +1455,8 @@ console.log(`${file.length} bytes`);
 | `thumbnail` | none | PNG or JPEG bytes, written as the package thumbnail. A CMYK JPEG is refused |
 | `displayProperties` | `true` | Writes how each material looks: metallic, specular or translucent display properties (below) |
 | `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `'components'` writes one object made of components that share meshes. `false` writes a build item for each node |
+| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber }` (below) |
+| `itemPartNumber` | none | The `partnumber` of the one build item of a scene written as one object. With `assembly: false`, give each node's through `objectInfo` |
 | `compress` | `true` | Deflates the package's parts. `false` stores them |
 | `onMeshCheck` | none | Called for each mesh written with `{ name, openEdges, nonManifoldEdges, flippedEdges, insideOut }` |
 | `signal` | none | Stops the archive step |
@@ -1484,6 +1486,36 @@ console.log(`${file.length} bytes`);
 ```
 
 The package follows the 3MF Consortium's [Core Specification 1.4.0](https://github.com/3MFConsortium/spec_core) and [Materials and Properties Extension 1.2.1](https://github.com/3MFConsortium/spec_materials), on a ZIP of DEFLATE entries ([RFC 1951](https://www.rfc-editor.org/rfc/rfc1951)). The mesh check counts the solid conditions of core section 4.1; M. Attene, M. Campen and L. Kobbelt, "Polygon Mesh Repairing: An Application Perspective", ACM Computing Surveys 45(2), 2013, [doi:10.1145/2431211.2431214](https://doi.org/10.1145/2431211.2431214), surveys these defects and their repair. A model with parts floating over the bed needs supports on, as on any slicer: with nothing on the first layer PrusaSlicer stops at "no extrusions in the first layer".
+
+### Object types and part numbers
+
+`objectInfo` says what each node's object is to the printer (core specification chapter 4): `type` is `'model'` (default) or `'solidsupport'`, which must be closed solids; `'support'` or `'surface'`, which may be open; or `'other'`, which is never printed and so is written among the resources with no build item. `partNumber` is the object's `partnumber`, which editors keep as they change the file, and `itemPartNumber` names the node's own build item.
+
+With `assembly: true`, nodes of one type and part number share one mesh. Where they differ, the assembly is one object of components with a mesh for each type and part number, still one build item, which is also how the format asks support to be referenced: beside the model it supports. Slicers may read each component as an object of its own (see above). Support written as a build item of its own, or in an assembly with no model, is written as given, with an `onWarning`. A consumer may ignore support or replace it with its own. `parse3MF` reads the values back as each group's `objectType`, `partNumber` and `itemPartNumber`. Windows 11's 3MF reader reports the part numbers, and the support types of separate build items; it reports the components of an object of components as models, and has no surface type.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import type { ExportNode } from 'margoengine/exporters';
+
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  normals: new Float32Array(12),
+  indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3],
+};
+const nodes: ExportNode[] = [
+  { name: 'Bracket', geometry },
+  { name: 'Prop', geometry, translation: [0.06, 0, 0] },
+];
+
+const file = await export3MF(
+  { nodes },
+  {
+    itemPartNumber: 'KIT-7',
+    objectInfo: (node) => (node.name === 'Prop' ? { type: 'support' } : { partNumber: 'BR-100' }),
+  },
+);
+console.log(`${file.length} bytes`);
+```
 
 ## Collision and UV animation per engine
 

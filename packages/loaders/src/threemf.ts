@@ -51,6 +51,7 @@ interface ObjectData {
   id: string;
   name?: string;
   type: string;
+  partNumber?: string;
   pid?: string;
   pindex?: number;
   mesh?: MeshData;
@@ -61,7 +62,7 @@ interface Model {
   objects: Map<string, ObjectData>;
   properties: Map<string, Color[]>;
   propertyIds: string[];
-  items: { objectId: string; path?: string; transform: Float64Array }[];
+  items: { objectId: string; path?: string; transform: Float64Array; partNumber?: string }[];
   metadata: Record<string, string>;
 }
 
@@ -201,6 +202,7 @@ function parseModel(
               id: a.id,
               name: a.name,
               type: a.type ?? 'model',
+              partNumber: a.partnumber,
               pid: a.pid,
               pindex: a.pindex === undefined ? undefined : index(a.pindex, 'pindex'),
               components: [],
@@ -261,7 +263,12 @@ function parseModel(
           }
           case 'item':
             if (!a.objectid) throw new LoaderError(F, 'syntax', '<item> without objectid');
-            model.items.push({ objectId: a.objectid, path: a['p:path'], transform: parseTransform(a.transform) });
+            model.items.push({
+              objectId: a.objectid,
+              path: a['p:path'],
+              transform: parseTransform(a.transform),
+              partNumber: a.partnumber,
+            });
             break;
           default:
             extension?.open?.(model, name, a);
@@ -424,6 +431,8 @@ export async function read3MF(
     indices = uints(),
     colors = vertexColors ? floats() : undefined,
     groups: LoadedGroup[] = [];
+  /** The part number of the build item being emitted. */
+  let itemPartNumber: string | undefined;
   const emitMesh = (model: Model, o: ObjectData, mesh: MeshData, m: Float64Array): void => {
     const vertexCount = mesh.vertices.length / 3,
       triangleCount = mesh.triangles.length / 3;
@@ -490,6 +499,9 @@ export async function read3MF(
       }
       const group: LoadedGroup = { start, count: indices.length - start, objectId: o.id };
       if (o.name) group.name = o.name;
+      if (o.type !== 'model') group.objectType = o.type;
+      if (o.partNumber !== undefined) group.partNumber = o.partNumber;
+      if (itemPartNumber !== undefined) group.itemPartNumber = itemPartNumber;
       if (bucket.color) group.color = [...bucket.color];
       extension?.group(group, model, o, mesh, bucket.triangles[0]);
       groups.push(group);
@@ -508,6 +520,8 @@ export async function read3MF(
       throw new LoaderError(F, 'syntax', `object ${id.slice(0, 32)} references itself through its components`);
     if (o.mesh && o.components.length)
       throw new LoaderError(F, 'syntax', `object ${id.slice(0, 32)} has both a mesh and components`);
+    // Core 3MF: an `other` mesh is never output, however it is reached; the type of an object of components is ignored.
+    if (o.mesh && o.type === 'other') return;
     visiting.add(o);
     extension?.instance?.(owner, o, m, scale, depth);
     if (o.mesh) emitMesh(owner, o, o.mesh, m);
@@ -516,8 +530,7 @@ export async function read3MF(
     visiting.delete(o);
   };
   for (const item of root.items) {
-    const [, o] = object(root, item.objectId, item.path);
-    if (o.type === 'other') continue;
+    itemPartNumber = item.partNumber;
     emit(root, item.objectId, item.path, item.transform, 0);
   }
   if (!indices.length && !extension?.hasGeometry?.())

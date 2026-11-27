@@ -98,6 +98,9 @@ interface LoadedGroup {
     count: number;
     name?: string;
     objectId?: string;
+    objectType?: string;
+    partNumber?: string;
+    itemPartNumber?: string;
     color?: [number, number, number, number];
     properties?: Record<string, number | number[]>;
 }
@@ -118,6 +121,7 @@ interface Model {
         objectId: string;
         path?: string;
         transform: Float64Array;
+        partNumber?: string;
     }[];
     metadata: Record<string, string>;
 }
@@ -126,6 +130,7 @@ interface ObjectData {
     id: string;
     name?: string;
     type: string;
+    partNumber?: string;
     pid?: string;
     pindex?: number;
     mesh?: MeshData;

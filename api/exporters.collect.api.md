@@ -26,6 +26,7 @@ export interface CameraData {
 
 export interface Drawable {
     name?: string;
+    source?: Mesh | ExportNode;
     geometry: Geo;
     material?: Mat;
     world: Float64Array;

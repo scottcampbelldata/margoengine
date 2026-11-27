@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21157498,
+  "total": 21158664,
   "history": [
     {
       "date": "2026-10-24",
@@ -15007,6 +15007,12 @@
       "commit": "point-style-export",
       "reason": "gltf/strokes 1,983 to 2,451 B gzip measured: it reads the line and point style extras back (4e6ae63863 and the point cloud half of Limits row 15); the entry is already the lazy reader that only a file with wide points or lines loads, so a further split would add a request to those files for a few hundred bytes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf-objects",
+      "reason": "3MF object types and part numbers: exporters/threemf 30266 to 31398 B (objectInfo and itemPartNumber, a mesh for each type and part number under an object of components, the checks of the values and of the format's rules for other and support). The writer is the one function of the format; a second entry would write the file twice. loaders/threemf-materials 13808 to 13872 B, threemf-mesh 4060 to 4070 B and threemf-lattice 17948 to 18009 B (the reader's part numbers and types) stay within budget.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15404,7 +15410,7 @@
     "@margoengine/exporters/sparse": 26469,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 31174,
+    "@margoengine/exporters/threemf": 32340,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,

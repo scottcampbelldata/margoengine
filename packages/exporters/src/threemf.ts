@@ -2,6 +2,7 @@
 // slicers prefer over STL, because it holds units, colours and one object placed many times. Printers need closed meshes,
 // so vertices that share a position are written once whatever else differs between them.
 // https://github.com/3MFConsortium/spec_core and https://github.com/3MFConsortium/spec_materials
+import type { Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { encodeZIP } from './archive.js';
 import { sceneOfGLB } from './glb-scene.js';
@@ -14,6 +15,7 @@ import {
   normalizeMaterial,
   num,
   type Drawable,
+  type ExportNode,
   type ExportSource,
   type Geo,
   type Mat,
@@ -34,6 +36,25 @@ const UNITS = {
 
 /** A length unit of a 3MF file. */
 export type ThreeMFUnit = keyof typeof UNITS;
+
+const TYPES = ['model', 'solidsupport', 'support', 'surface', 'other'] as const;
+
+/**
+ * What an object is to the printer (core specification chapter 4 and section 4.1). `model` and `solidsupport` are solids
+ * and must be closed; `support`, `surface` and `other` may be open. A consumer may replace or ignore support. `other`
+ * is never printed: the format forbids the build to reference it.
+ */
+export type ThreeMFObjectType = (typeof TYPES)[number];
+
+/** What one node's object says. */
+export interface ThreeMFObjectInfo {
+  /** The object's `type`. Default `'model'`. */
+  type?: ThreeMFObjectType;
+  /** The object's `partnumber`, which editors keep as they change the file. Default none. */
+  partNumber?: string;
+  /** The `partnumber` of the node's own build item, an identifier of that item. Default none. */
+  itemPartNumber?: string;
+}
 
 /** One vendor `<metadata>` entry under its own XML namespace, as the core specification asks of names it does not define. */
 export interface ThreeMFCustomMetadata {
@@ -118,6 +139,19 @@ export interface Export3MFOptions extends SceneOptions {
    * overlap collide. Default `true`.
    */
   assembly?: boolean | 'components';
+  /**
+   * Called once for each node drawn, with the data node or engine mesh (for GLB bytes, a data node with the GLB node's
+   * name), for its object's type and part numbers. With `assembly: true`, nodes of one type and part number share one
+   * mesh; where nodes differ, the assembly is one object of components, a mesh for each type and part number, as the
+   * format asks of support: referenced from an object of components beside the model it supports. An `other` object is
+   * written among the resources and left out of the build. Default: every object a `model` without a part number.
+   */
+  objectInfo?: (node: Mesh | ExportNode) => ThreeMFObjectInfo | undefined;
+  /**
+   * The `partnumber` of the one build item of a scene written as one object (a single node, or `assembly` `true` or
+   * `'components'`). With `assembly: false`, give each node's through `objectInfo`. Default none.
+   */
+  itemPartNumber?: string;
   /** Deflates the package's parts; `false` stores them. Default `true`. */
   compress?: boolean;
   /** Called once for each mesh written with how it closes. Nothing is repaired. */
@@ -126,8 +160,11 @@ export interface Export3MFOptions extends SceneOptions {
   signal?: AbortSignal;
 }
 
+/** XML text: tabs and line ends are references too, as an attribute value turns bare ones into spaces (XML 1.0 3.3.3). */
 const escaped = (text: string): string =>
-  text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
+  text
+    .replace(/[&<>"'\t\n\r]/g, (c) => `&#${c.charCodeAt(0)};`)
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
 
 const byte = (linear: number): number => {
   const v = Math.min(1, Math.max(0, linear)),
@@ -569,6 +606,13 @@ function lookOf(material: Mat, warn: (message: string) => void): Look {
   return { kind: 'specular', color };
 }
 
+/** A part number as given, refusing what is not text. */
+function partText(value: unknown, name: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !value) throw new TypeError(`3MF ${name} must be a string that is not empty`);
+  return value;
+}
+
 /** The 3 x 4 matrix of a build item, rows of a row-vector transform as 3MF lists them, with the translation in file units. */
 function itemTransform(placed: readonly number[], scale: number): string {
   const column = (at: number): number[] => placed.slice(at, at + 3);
@@ -584,7 +628,7 @@ function itemTransform(placed: readonly number[], scale: number): string {
  * base colour and from vertex colours; the base colour texture is written as a materials-extension texture (`texture2d` and `texture2dgroup`, with its texture transform and wrap) where the geometry has the UV set it uses; a base colour factor or vertex colours that are not white are a colour group multiplied with it (`multiproperties`), their alpha left out. Metalness, roughness and a metallic-roughness map on the same coordinates
  * are written as display properties, as are specular and transmissive materials (`displayProperties`); the format has no
  * normal, emissive or occlusion map. A node's primitives are one
- * mesh. Vertices are welded by position, but a slicer still needs
+ * mesh. `objectInfo` gives a node's object type (a support, a surface) and part numbers. Vertices are welded by position, but a slicer still needs
  * a closed mesh to print: an open one is written as it is.
  *
  * @example
@@ -595,9 +639,10 @@ function itemTransform(placed: readonly number[], scale: number): string {
  * const file = await export3MF(source, { unit: 'millimeter', title: 'Bracket' });
  * ```
  *
- * @throws RangeError for an unknown `unit`, `upAxis` or `assembly`, a bad metadata name, a CMYK thumbnail, a scene with
+ * @throws RangeError for an unknown `unit`, `upAxis`, `assembly` or object type, an item part number with no one item to
+ * take it, a bad metadata name, a CMYK thumbnail, a scene with
  * no triangles to print or a position outside Float32 range in this unit; MargoError `'unsupported'` for a node scaled to 0 on an axis (a solid to print needs a volume).
- * @throws TypeError for bytes that are not a GLB or that need decompressing; what the scene collector throws for a bad source;
+ * @throws TypeError for a part number that is not text, bytes that are not a GLB or that need decompressing; what the scene collector throws for a bad source;
  * the signal's reason on an abort.
  */
 export async function export3MF(
@@ -614,13 +659,17 @@ export async function export3MF(
     assembly = true,
     compress = true,
     onMeshCheck,
+    objectInfo,
     signal,
   } = options;
   if (!Object.hasOwn(UNITS, unit)) throw new RangeError(`3MF unit must be one of ${Object.keys(UNITS).join(', ')}`);
   if (upAxis !== 'y' && upAxis !== 'z') throw new RangeError("3MF upAxis must be 'y' or 'z'");
   if (typeof assembly !== 'boolean' && assembly !== 'components')
     throw new RangeError("3MF assembly must be true, false or 'components'");
-  const described = metadataXml(title, metadata),
+  if (objectInfo !== undefined && typeof objectInfo !== 'function')
+    throw new TypeError('3MF objectInfo must be a function');
+  const itemNumber = partText(options.itemPartNumber, 'itemPartNumber'),
+    described = metadataXml(title, metadata),
     preview = thumbnail === undefined ? undefined : thumbnailType(thumbnail);
   signal?.throwIfAborted();
   const scale = 1 / UNITS[unit],
@@ -647,7 +696,10 @@ export async function export3MF(
     files: { name: string; data: Uint8Array }[] = [],
     build: string[] = [],
     components: string[] = [],
-    merged: { vertices: string[]; faces: string[]; base?: Base; name?: string } = { vertices: [], faces: [] },
+    /** With `assembly: true`, one mesh for each object type and part number. */
+    merged = new Map<string, Merged>(),
+    /** The object types the build references, for the format's rule about support. */
+    printed: { type: ThreeMFObjectType; alone: boolean }[] = [],
     shared = new Map<string, number>(),
     seen = new Map<object, number>(),
     numbered = (value: object): number => {
@@ -655,12 +707,27 @@ export async function export3MF(
       if (at === undefined) seen.set(value, (at = seen.size));
       return at;
     };
+  /** One mesh of a merged assembly. */
+  interface Merged {
+    type: ThreeMFObjectType;
+    partNumber?: string;
+    vertices: string[];
+    faces: string[];
+    base: Base;
+    name?: string;
+  }
   for (const item of items) {
     const parts = nodes.get(item.world);
     if (parts) parts.push(item);
     else nodes.set(item.world, [item]);
   }
-  const together = assembly === true && nodes.size > 1;
+  const together = assembly === true && nodes.size > 1,
+    /** Each node gets a build item of its own, unless the scene is written as one object. */
+    ownItems = nodes.size === 1 || assembly === false;
+  if (itemNumber !== undefined && assembly === false && nodes.size > 1)
+    throw new RangeError(
+      '3MF itemPartNumber names one build item; with assembly false, give each node its own in objectInfo',
+    );
   const warn = (message: string): void => onWarning({ code: 'unsupported', node: null, message });
   const look = (material: Mat): Look => {
     let found = looks.get(material);
@@ -914,13 +981,53 @@ export async function export3MF(
     }
   };
   const named = (name: string | undefined): string => (name ? ` name="${escaped(name)}"` : '');
-  const object = (vertices: string[], faces: string[], base: Base, name: string | undefined): number => {
+  const numberedPart = (partNumber: string | undefined, name = 'partnumber'): string =>
+    partNumber === undefined ? '' : ` ${name}="${escaped(partNumber)}"`;
+  const object = (
+    vertices: string[],
+    faces: string[],
+    base: Base,
+    name: string | undefined,
+    { type = 'model', partNumber }: ThreeMFObjectInfo,
+  ): number => {
     const at = id++;
     objects.push(
-      `<object id="${at}" type="model" pid="${base.group}" pindex="${base.index}"${named(name)}>` +
+      `<object id="${at}" type="${type}" pid="${base.group}" pindex="${base.index}"${named(name)}${numberedPart(partNumber)}>` +
         `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles></mesh></object>`,
     );
     return at;
+  };
+  /** An object of components, which takes no property of its own (core specification chapter 4). */
+  const assemblyOf = (parts: readonly string[]): number => {
+    const at = id++;
+    objects.push(
+      `<object id="${at}" type="model"${named(title === undefined ? undefined : String(title))}><components>${parts.join('')}</components></object>`,
+    );
+    return at;
+  };
+  const item = (objectId: number, partNumber: string | undefined, transform = ''): void => {
+    build.push(`<item objectid="${objectId}"${transform}${numberedPart(partNumber)}/>`);
+  };
+  /** What `objectInfo` says of a node, checked. */
+  const infoOf = (source: Mesh | ExportNode): ThreeMFObjectInfo & { type: ThreeMFObjectType } => {
+    const given = objectInfo?.(source) ?? {},
+      type = given.type ?? 'model',
+      info = {
+        type,
+        partNumber: partText(given.partNumber, 'partNumber'),
+        itemPartNumber: partText(given.itemPartNumber, 'itemPartNumber'),
+      };
+    if (!TYPES.includes(type)) throw new RangeError(`3MF object type must be one of ${TYPES.join(', ')}`);
+    if (info.itemPartNumber !== undefined) {
+      if (type === 'other')
+        throw new RangeError('3MF keeps an other object out of the build, so it has no build item for itemPartNumber');
+      if (!ownItems)
+        throw new RangeError(
+          '3MF writes this scene as one build item; give its itemPartNumber in the options, or use assembly: false',
+        );
+      if (itemNumber !== undefined) throw new RangeError('3MF itemPartNumber is given twice for one build item');
+    }
+    return info;
   };
   const check = (welded: Welded, name: string | undefined): void =>
     onMeshCheck?.(
@@ -941,7 +1048,8 @@ export async function export3MF(
         'unsupported',
         '3MF holds solids to print, and a node scaled to 0 on an axis has no volume; give it a nonzero scale or leave it out',
       );
-    const keys: string[] = [],
+    const info = infoOf(drawn[0].source!),
+      keys: string[] = [],
       parts = drawn.map((item): Part => {
         const { geometry } = item,
           material = item.material ?? fallback,
@@ -968,13 +1076,17 @@ export async function export3MF(
     if (together) {
       const welded = weldParts(parts, mirrored);
       if (!welded.length) return;
-      if (!merged.base)
-        Object.assign(merged, { base: welded[0].part.base, name: title === undefined ? name : String(title) });
+      const kind = JSON.stringify([info.type, info.partNumber]);
+      let into = merged.get(kind);
+      if (!into) {
+        const { type, partNumber } = info;
+        merged.set(kind, (into = { type, partNumber, vertices: [], faces: [], base: welded[0].part.base, name }));
+      }
       check(welded, name);
-      append(welded, merged.vertices, merged.faces, merged.base!);
+      append(welded, into.vertices, into.faces, into.base);
       return;
     }
-    const key = `${mirrored} ${keys.join('|')}`;
+    const key = `${mirrored} ${JSON.stringify([info.type, info.partNumber])} ${keys.join('|')}`;
     let at = shared.get(key);
     if (at === undefined) {
       const welded = weldParts(parts, mirrored);
@@ -984,27 +1096,41 @@ export async function export3MF(
         { base } = welded[0].part;
       check(welded, name);
       append(welded, vertices, faces, base);
-      shared.set(key, (at = object(vertices, faces, base, name)));
+      shared.set(key, (at = object(vertices, faces, base, name, info)));
     }
-    const placement = `objectid="${at}" transform="${itemTransform(upright(world, zUp), scale)}"`;
-    if (assembly === 'components' && nodes.size > 1) components.push(`<component ${placement}/>`);
-    else build.push(`<item ${placement}/>`);
+    if (info.type === 'other') return;
+    const transform = ` transform="${itemTransform(upright(world, zUp), scale)}"`;
+    printed.push({ type: info.type, alone: ownItems });
+    if (!ownItems && assembly === 'components') components.push(`<component objectid="${at}"${transform}/>`);
+    else item(at, info.itemPartNumber ?? itemNumber, transform);
   };
   for (const drawn of nodes.values()) {
     signal?.throwIfAborted();
     placed(drawn);
   }
-  if (merged.faces.length)
-    build.push(`<item objectid="${object(merged.vertices, merged.faces, merged.base!, merged.name)}"/>`);
-  if (components.length) {
-    const at = id++;
-    // An object of components takes no property of its own (core specification section 4.2).
-    objects.push(
-      `<object id="${at}" type="model"${named(title === undefined ? undefined : String(title))}><components>${components.join('')}</components></object>`,
-    );
-    build.push(`<item objectid="${at}"/>`);
+  if (merged.size) {
+    const referenced = [...merged.values()].filter(({ type }) => type !== 'other'),
+      alone = referenced.length === 1,
+      ids: string[] = [];
+    for (const { vertices, faces, base, name, type, partNumber } of merged.values()) {
+      // The one mesh of an assembly takes the title; meshes under components keep their first node's name.
+      const own = alone && type !== 'other' && title !== undefined ? String(title) : name,
+        at = object(vertices, faces, base, own, { type, partNumber });
+      if (type === 'other') continue;
+      printed.push({ type, alone });
+      ids.push(`<component objectid="${at}"/>`);
+      if (alone) item(at, itemNumber);
+    }
+    if (ids.length > 1) item(assemblyOf(ids), itemNumber);
   }
-  if (!build.length) throw new RangeError('3MF requires at least one mesh with triangles');
+  if (components.length) item(assemblyOf(components), itemNumber);
+  if (!build.length)
+    throw new RangeError('3MF requires at least one mesh with triangles in an object other than other');
+  const supports = (type: ThreeMFObjectType): boolean => type === 'support' || type === 'solidsupport';
+  if (printed.some(({ type, alone }) => supports(type) && (alone || !printed.some((p) => p.type === 'model'))))
+    warn(
+      '3MF asks that support be referenced only from an object of components beside the model it supports (core specification section 4.1); this support is not, as the scene is written as separate items or holds no model with it',
+    );
   // Each base material group after the display properties it names.
   const baseXml = [...bases]
     .map(([kind, { id: group, entries }]) => {

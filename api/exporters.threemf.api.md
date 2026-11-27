@@ -14,6 +14,8 @@ export interface Export3MFOptions extends SceneOptions {
     thumbnail?: Uint8Array;
     displayProperties?: boolean;
     assembly?: boolean | 'components';
+    objectInfo?: (node: Mesh | ExportNode) => ThreeMFObjectInfo | undefined;
+    itemPartNumber?: string;
     compress?: boolean;
     onMeshCheck?: (report: ThreeMFMeshReport) => void;
     signal?: AbortSignal;
@@ -45,6 +47,14 @@ export interface ThreeMFMetadata {
     application?: string;
     custom?: readonly ThreeMFCustomMetadata[];
 }
+
+export interface ThreeMFObjectInfo {
+    type?: ThreeMFObjectType;
+    partNumber?: string;
+    itemPartNumber?: string;
+}
+
+export type ThreeMFObjectType = (typeof TYPES)[number];
 
 export type ThreeMFUnit = keyof typeof UNITS;
 
@@ -261,6 +271,8 @@ interface SkinData {
     skeleton?: ExportNode;
     extras?: Extras;
 }
+
+const TYPES: readonly ['model', 'solidsupport', 'support', 'surface', 'other'];
 
 interface TextureData {
     image: Uint8Array;

@@ -51,6 +51,9 @@ interface LoadedGroup {
     count: number;
     name?: string;
     objectId?: string;
+    objectType?: string;
+    partNumber?: string;
+    itemPartNumber?: string;
     color?: [number, number, number, number];
     properties?: Record<string, number | number[]>;
 }

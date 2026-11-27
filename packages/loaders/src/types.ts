@@ -8,6 +8,12 @@ export interface LoadedGroup {
   name?: string;
   /** Source object id (3MF). */
   objectId?: string;
+  /** The object's `type` when it is not `model`: `solidsupport`, `support` or `surface` (3MF). */
+  objectType?: string;
+  /** The `partnumber` of the mesh object (3MF). */
+  partNumber?: string;
+  /** The `partnumber` of the build item that placed it (3MF). */
+  itemPartNumber?: string;
   /** Uniform sRGB color in [0,1], `[r, g, b, a]`, when the file gives this group one color. */
   color?: [number, number, number, number];
   /** Raw source face properties, including scalar values and owned lists (PLY/OFF). */

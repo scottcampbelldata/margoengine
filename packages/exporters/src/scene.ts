@@ -2292,6 +2292,8 @@ export function polylines(indices: Uint32Array): number[][] {
 /** @internal A drawable with its world transform, in depth-first order. */
 export interface Drawable {
   name?: string;
+  /** The data node or engine mesh it came from. */
+  source?: Mesh | ExportNode;
   geometry: Geo;
   material?: Mat;
   world: Float64Array;
@@ -2313,12 +2315,19 @@ export function drawables(nodes: Node[], lines = false): Drawable[] {
       for (const primitive of node.primitives)
         out.push({
           name: node.name,
+          source: node.source,
           geometry: shape(node, primitive.geometry),
           material: primitive.material,
           world: node.world,
         });
     else if (node.geometry)
-      out.push({ name: node.name, geometry: shape(node, node.geometry), material: node.material, world: node.world });
+      out.push({
+        name: node.name,
+        source: node.source,
+        geometry: shape(node, node.geometry),
+        material: node.material,
+        world: node.world,
+      });
     if (lines)
       for (const part of node.lines ?? [])
         out.push({ name: node.name, geometry: shape(node, part.geometry), material: part.material, world: node.world });
