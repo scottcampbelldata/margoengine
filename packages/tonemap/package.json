@@ -54,6 +54,10 @@
       "types": "./dist/3dl.d.ts",
       "import": "./dist/3dl.js"
     },
+    "./lut-image": {
+      "types": "./dist/lut-image.d.ts",
+      "import": "./dist/lut-image.js"
+    },
     "./enhance": {
       "types": "./dist/enhance.d.ts",
       "import": "./dist/enhance.js"

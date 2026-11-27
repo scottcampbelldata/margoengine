@@ -22,8 +22,9 @@ import { decodeFailed } from './errors.js';
 import { corrupt, scanTIFF } from './tiff-ifd.js';
 
 /**
- * A decoded image, top row first: RGBA8 bytes for integer samples (16-bit samples scale to 0-255) or RGBA 32-bit floats
- * for float samples, `width * height * 4` values. Both are `@margoengine/materials` `DataImage`s.
+ * A decoded image, top row first: RGBA8 bytes for integer samples (wider samples scale to 0-255 unless `keep16Bit`) or
+ * RGBA 32-bit floats for float samples and `keep16Bit`, `width * height * 4` values. Both are
+ * `@margoengine/materials` `DataImage`s.
  */
 export type DecodedTIFF =
   | { width: number; height: number; format: 'rgba8unorm'; data: Uint8Array }
@@ -39,6 +40,14 @@ export interface TIFFOptions {
    * without its codec throws a MargoError `failed` naming loadTIFFCodecs.
    */
   codecs?: TIFFCodecs;
+  /**
+   * Keeps integer samples wider than 8 bits (16-bit grey, RGB, CMYK and palette images, and 9 to 16-bit lossless or
+   * 12-bit JPEG ones): `parseTIFF` then returns `rgba32float` with each stored value divided by its maximum (65535 at
+   * 16 bits), which holds every code exactly. Values stay as encoded (no transfer curve is applied), so a height or
+   * data map reads back as `value * 65535`. Default false: such images scale to `rgba8unorm`. 8-bit and narrower
+   * images stay `rgba8unorm` either way. `openTIFF` always keeps stored samples.
+   */
+  keep16Bit?: boolean;
 }
 
 /** The TIFF compressions whose decoders load on demand, each a synchronous decoder of one whole strip or tile. */
@@ -521,7 +530,8 @@ function jpegStream(tables: number[] | undefined, raw: Uint8Array): Uint8Array {
 
 /**
  * Decodes the first image of a TIFF file, top row first. Grey, palette, CMYK, YCbCr and CIE L*a*b* images expand to
- * RGBA; integer samples become RGBA8, float samples RGBA 32-bit floats.
+ * RGBA; integer samples become RGBA8 (RGBA 32-bit floats above 8 bits with `keep16Bit`), float samples RGBA 32-bit
+ * floats.
  *
  * @throws TypeError when `bytes` is not a Uint8Array.
  * @throws RangeError when the image is larger than `maxPixels`.
@@ -530,7 +540,7 @@ function jpegStream(tables: number[] | undefined, raw: Uint8Array): Uint8Array {
  * arithmetic or hierarchical JPEG, old-style JPEG without JPEGInterchangeFormat), or LZMA, Zstandard or WebP without
  * its decoder in `codecs`.
  * @example
- * const image = parseTIFF(bytes, { codecs: await loadTIFFCodecs(bytes) });
+ * const image = parseTIFF(bytes, { keep16Bit: true, codecs: await loadTIFFCodecs(bytes) });
  */
 export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): DecodedTIFF {
   if (!(bytes instanceof Uint8Array)) throw new TypeError('parseTIFF needs the TIFF file as a Uint8Array');
@@ -777,10 +787,13 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
       }
     }
   }
-  const out = float ? new Float32Array(width * height * 4) : new Uint8Array(width * height * 4),
+  // The output holds floats for float samples and for wider integer ones the caller keeps; its full white is `white`.
+  const wide = float || (options.keep16Bit === true && bits > 8),
+    white = wide ? 1 : 255,
+    out = wide ? new Float32Array(width * height * 4) : new Uint8Array(width * height * 4),
     map = tags.get(320),
     paletteSize = 2 ** bits,
-    scale = float ? 1 : 255 / max,
+    scale = float ? 1 : white / max,
     // Section 20 and 21: coding ranges, and the luma coefficients. A YCbCr file without ReferenceBlackWhite gets the
     // values that need no expansion ([0, 255, 128, 255, 128, 255]; the generic default is wrong for YCbCr, the spec says).
     reference = tags.get(532)?.length === 6 ? tags.get(532)! : [0, 255, 128, 255, 128, 255],
@@ -796,8 +809,9 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
   for (let p = 0; p < width * height; p++) {
     const s = p * spp,
       o = p * 4,
-      a = alpha ? samples[s + base] * scale : float ? 1 : 255;
-    if (photometric === 3) for (let c = 0; c < 3; c++) rgb[c] = map![samples[s] + c * paletteSize] / 257;
+      a = alpha ? samples[s + base] * scale : white;
+    // ColorMap entries are 16 bits whatever the index width (TIFF 6.0, Section 5).
+    if (photometric === 3) for (let c = 0; c < 3; c++) rgb[c] = (map![samples[s] + c * paletteSize] * white) / 65535;
     else if (photometric === 5) {
       // Section 16: ink coverage, 0% to 100% between the DotRange values (default 0 and 2^bits - 1).
       const ink = (c: number) => {
@@ -807,7 +821,7 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
         return high > low ? Math.min(Math.max((samples[s + c] - low) / (high - low), 0), 1) : 0;
       };
       const k = 1 - ink(3);
-      for (let c = 0; c < 3; c++) rgb[c] = 255 * (1 - ink(c)) * k;
+      for (let c = 0; c < 3; c++) rgb[c] = white * (1 - ink(c)) * k;
     } else if (photometric === 6) {
       const y = ((samples[s] - reference[0]) * 255) / (reference[1] - reference[0]),
         cb = ((samples[s + 1] - reference[2]) * 127) / (reference[3] - reference[2]),
@@ -831,12 +845,13 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
       }
     for (let c = 0; c < 3; c++) {
       let v = rgb[c];
-      if (alpha && extra === 1) v = a ? (v * (float ? 1 : 255)) / a : 0;
-      out[o + c] = float ? v : Math.min(255, Math.max(0, Math.round(v)));
+      if (alpha && extra === 1) v = a ? (v * white) / a : 0;
+      // Float samples pass as stored; an integer file's colour stays within full white, premultiplied ones included.
+      out[o + c] = float ? v : Math.min(white, Math.max(0, wide ? v : Math.round(v)));
     }
-    out[o + 3] = float ? a : Math.round(a);
+    out[o + 3] = wide ? a : Math.round(a);
   }
-  return float
+  return wide
     ? { width, height, format: 'rgba32float', data: out as Float32Array }
     : { width, height, format: 'rgba8unorm', data: out as Uint8Array };
 }

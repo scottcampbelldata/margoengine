@@ -41,6 +41,7 @@ export interface TIFFFile {
 export interface TIFFOptions {
     maxPixels?: number;
     codecs?: TIFFCodecs;
+    keep16Bit?: boolean;
 }
 
 export interface TIFFPage {

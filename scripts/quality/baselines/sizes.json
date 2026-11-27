@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21080737,
+  "total": 21082387,
   "history": [
     {
       "date": "2026-10-24",
@@ -14863,6 +14863,12 @@
       "commit": "mtl-maps",
       "reason": "MTLLoader parity: createMTLMaterials applies Ks, map_Ks, disp and refl; loaders/mtl to 10,492 B gzip measured (the new slots, the specular rule and the cube map assembly in the one entry that builds materials)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "texture-loaders",
+      "reason": "Texture loader parity: parseKTX applies KTXorientation; decoders/ktx to 3,381 B gzip measured (the key/value reader, row and column mirroring and the lossless BC1 to BC5 block rewrite, in the one entry that reads KTX 1; a split would cost a second request for a few hundred bytes). New entry tonemap/lut-image, 608 B",
+      "grew": 2
     }
   ],
   "items": {
@@ -15157,7 +15163,7 @@
     "@margoengine/decoders/image": 1068811,
     "@margoengine/decoders/jpeg": 5234,
     "@margoengine/decoders/jxl": 902154,
-    "@margoengine/decoders/ktx": 2851,
+    "@margoengine/decoders/ktx": 3637,
     "@margoengine/decoders/ktx2-gpu": 14795,
     "@margoengine/decoders/ktx2-hdr": 378245,
     "@margoengine/decoders/ktx2-hdr6": 44540,
@@ -16339,6 +16345,7 @@
     "@margoengine/tonemap/grade": 2682,
     "@margoengine/tonemap/hue": 3414,
     "@margoengine/tonemap/local": 2386,
+    "@margoengine/tonemap/lut-image": 864,
     "@margoengine/tonemap/settings": 4763,
     "@margoengine/toon": 2411,
     "@margoengine/toon/hatch": 2261,

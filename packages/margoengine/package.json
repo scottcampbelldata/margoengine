@@ -5759,6 +5759,10 @@
       "types": "./dist/tonemap/3dl.d.ts",
       "import": "./dist/tonemap/3dl.js"
     },
+    "./tonemap/lut-image": {
+      "types": "./dist/tonemap/lut-image.d.ts",
+      "import": "./dist/tonemap/lut-image.js"
+    },
     "./tonemap/enhance": {
       "types": "./dist/tonemap/enhance.d.ts",
       "import": "./dist/tonemap/enhance.js"

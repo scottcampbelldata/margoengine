@@ -6,13 +6,27 @@ import type { DecodedImage } from './image.js';
 /**
  * The first layer of level 0 of a texture file as RGBA8: a missing green or blue is 0, a missing alpha is 255. Signed
  * formats map -1..1 to 0..255, as a normal map stored in an unsigned image does, so a missing channel is 128. Float
- * formats hold linear light, so they clamp to 0..1 and are sRGB encoded.
+ * formats hold linear light, so they clamp to 0..1 and are sRGB encoded. A file with `flipX` or `flipY` comes out
+ * mirrored back, top row first.
  *
  * ETC2 and EAC blocks are decoded on the CPU as well (`etc2-rgb8unorm` to `eac-rg11snorm`, with or without `-srgb`).
  *
  * @throws MargoError `unsupported` for ASTC blocks, which are not decoded on the CPU.
  */
 export async function textureFileToRGBA(file: TextureFile): Promise<DecodedImage> {
+  const image = await storedRGBA(file),
+    { width, height, data } = image;
+  if (!file.flipX && !file.flipY) return image;
+  const out = new Uint8Array(data.length);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const from = (file.flipY ? height - 1 - y : y) * width + (file.flipX ? width - 1 - x : x);
+      out.set(data.subarray(from * 4, from * 4 + 4), (y * width + x) * 4);
+    }
+  return { ...image, data: out };
+}
+
+async function storedRGBA(file: TextureFile): Promise<DecodedImage> {
   const { width, height, data: all } = file.mipmaps[0],
     format = file.format as string,
     count = width * height,

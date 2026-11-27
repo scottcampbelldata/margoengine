@@ -15,6 +15,8 @@ export interface TextureFile {
     transcoded?: string;
     srgb: boolean;
     hasAlpha: boolean;
+    flipX?: boolean;
+    flipY?: boolean;
 }
 
 export interface TextureFileLevel {

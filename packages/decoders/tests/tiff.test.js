@@ -746,3 +746,93 @@ test('TIFF half floats and the binary16 encoder need no built-in float16, and ma
   const written = tiff({ ...shape, width: 2, height: 1, samples: [-1.5, 65504] });
   assert.deepEqual([...openTIFF(written).read(0).samples], [-1.5, 65504]);
 });
+
+test('TIFF keep16Bit returns every 16-bit code as an exact float; the default stays RGBA8', () => {
+  const width = 256,
+    height = 256,
+    // Every 16-bit code once, so a path that rounds any of them to 8 bits fails.
+    codes = Array.from({ length: width * height }, (_, i) => i);
+  for (const little of [true, false])
+    for (const [compression, predictor] of [
+      [1, 1],
+      [5, 2],
+    ]) {
+      const bytes = tiff({
+          little,
+          width,
+          height,
+          spp: 1,
+          bits: 16,
+          photometric: 1,
+          compression,
+          predictor,
+          samples: codes,
+        }),
+        kept = parseTIFF(bytes, { keep16Bit: true });
+      assert.equal(kept.format, 'rgba32float');
+      assert.ok(kept.data instanceof Float32Array);
+      assert.ok(codes.every((v, p) => Math.round(kept.data[p * 4] * 65535) === v && kept.data[p * 4 + 3] === 1));
+      assert.equal(parseTIFF(bytes).format, 'rgba8unorm');
+    }
+  // WhiteIsZero inverts; RGB with an associated alpha divides it out and stays within 1.
+  assert.deepEqual(
+    [
+      ...parseTIFF(
+        tiff({
+          width: 2,
+          height: 1,
+          spp: 1,
+          bits: 16,
+          photometric: 0,
+          samples: [0, 65535],
+        }),
+        { keep16Bit: true },
+      ).data,
+    ],
+    [1, 1, 1, 1, 0, 0, 0, 1],
+  );
+  const premultiplied = parseTIFF(
+    tiff({
+      width: 2,
+      height: 1,
+      spp: 4,
+      bits: 16,
+      photometric: 2,
+      extra: 1,
+      samples: [1000, 500, 60000, 2000, 7, 7, 7, 0],
+    }),
+    { keep16Bit: true },
+  ).data;
+  assert.deepEqual([...premultiplied], [...Float32Array.of(0.5, 0.25, 1, 2000 / 65535, 0, 0, 0, 0)]);
+  // An 8-bit index into the 16-bit ColorMap stays 8-bit; a 16-bit CMYK image keeps its precision.
+  const colorMap = [...new Array(256).fill(257), ...new Array(256).fill(0), ...new Array(256).fill(65535)];
+  assert.equal(
+    parseTIFF(
+      tiff({
+        width: 1,
+        height: 1,
+        spp: 1,
+        bits: 8,
+        photometric: 3,
+        colorMap,
+        samples: [0],
+      }),
+      { keep16Bit: true },
+    ).format,
+    'rgba8unorm',
+  );
+  const cmyk = parseTIFF(
+    tiff({
+      width: 1,
+      height: 1,
+      spp: 4,
+      bits: 16,
+      photometric: 5,
+      samples: [1, 0, 65535, 0],
+    }),
+    {
+      keep16Bit: true,
+    },
+  ).data;
+  assert.deepEqual([...cmyk], [...Float32Array.of(1 - 1 / 65535, 1, 0, 1)]);
+});

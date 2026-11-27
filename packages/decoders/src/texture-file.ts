@@ -6,8 +6,8 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
 /**
  * One mip level of a {@link TextureFile}: every layer back to back (cube faces in WebGPU layer order +X, -X, +Y, -Y,
- * +Z, -Z; a cube array repeats that per cube), each layer's rows (or rows of 4x4 blocks) packed tight, top row first
- * as stored in the file.
+ * +Z, -Z; a cube array repeats that per cube), each layer's rows (or rows of 4x4 blocks) packed tight, in the file's
+ * order (`parseKTX` turns them to top row first by the file's `KTXorientation`; see {@link TextureFile.flipY}).
  */
 export interface TextureFileLevel {
   data: Uint8Array;
@@ -41,6 +41,16 @@ export interface TextureFile {
   transcoded?: string;
   srgb: boolean;
   hasAlpha: boolean;
+  /**
+   * True when a KTX 1 file stores its columns right to left (`S=l`) in a block format that `parseKTX` cannot mirror:
+   * sample it with U mirrored. Absent otherwise.
+   */
+  flipX?: boolean;
+  /**
+   * True when a KTX 1 file stores its rows bottom to top (`T=u`) in a block format that `parseKTX` cannot mirror:
+   * sample it with V mirrored. Absent otherwise. `textureFileToRGBA` applies both flags.
+   */
+  flipY?: boolean;
 }
 
 /** Options for {@link uploadTexture}. */

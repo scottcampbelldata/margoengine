@@ -4,6 +4,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseKTX } from '../dist/ktx.js';
+import { decodeBC } from '../dist/bc.js';
+import { textureFileToRGBA } from '../dist/image.js';
 import { failed, image, ktx, rejects, sequence } from './support/texture-encoders.js';
 
 const BC = 'texture-compression-bc',
@@ -432,5 +434,147 @@ test('KTX refuses malformed and unsupported files with named errors', () => {
         ktx({ internal: 0x8058, width: 2, height: 1, faces: 6, rowBytes: (w) => w * 4, images: [[sequence(8)]] }),
       ),
     /not square/,
+  );
+});
+
+/** A key/value block holding one KTXorientation entry. */
+const oriented = (value) => {
+  const body = [...Buffer.from(`KTXorientation\0${value}\0`)],
+    padding = new Array((4 - (body.length % 4)) % 4).fill(0);
+  return [body.length, 0, 0, 0, ...body, ...padding];
+};
+/** `data` (rows of `width` texels of `texel` bytes) mirrored the asked ways, one texel at a time. */
+const mirrored = (data, width, texel, x, y) => {
+  const row = width * texel,
+    height = data.length / row,
+    out = new Uint8Array(data.length);
+  for (let j = 0; j < height; j++)
+    for (let i = 0; i < width; i++) {
+      const from = (y ? height - 1 - j : j) * row + (x ? width - 1 - i : i) * texel;
+      out.set(data.subarray(from, from + texel), j * row + i * texel);
+    }
+  return out;
+};
+
+test('KTX applies KTXorientation to uncompressed texels at every mip and layer, and can keep the stored order', () => {
+  // 3 x 5 RGB8 (padded file rows, expanded to RGBA8) with its mips, two array layers.
+  const sizes = [
+      [3, 5],
+      [1, 2],
+    ],
+    images = sizes.map(([w, h], level) => [sequence(w * h * 3, level), sequence(w * h * 3, 50 + level)]),
+    file = (value) =>
+      ktx({
+        internal: 0x8051,
+        width: 3,
+        height: 5,
+        array: 2,
+        rowBytes: (w) => w * 3,
+        images,
+        keyValue: oriented(value),
+      }),
+    stored = parseKTX(file('S=r,T=d'));
+  for (const [value, x, y] of [
+    ['S=r,T=u', false, true],
+    ['S=l,T=d', true, false],
+    ['S=l,T=u', true, true],
+  ]) {
+    const turned = parseKTX(file(value));
+    assert.deepEqual([turned.flipX, turned.flipY], [undefined, undefined], value);
+    sizes.forEach(([w, h], level) => {
+      const bytes = w * h * 4;
+      for (let layer = 0; layer < 2; layer++)
+        assert.deepEqual(
+          turned.mipmaps[level].data.subarray(layer * bytes, (layer + 1) * bytes),
+          mirrored(stored.mipmaps[level].data.subarray(layer * bytes, (layer + 1) * bytes), w, 4, x, y),
+          `${value} level ${level} layer ${layer}`,
+        );
+    });
+    assert.deepEqual(parseKTX(file(value), { applyOrientation: false }).mipmaps, stored.mipmaps);
+  }
+});
+
+test('KTX turns BC1 to BC5 blocks upside down without loss, checked against the BC decoder', () => {
+  for (const [internal, format, , , bytes] of COMPRESSED.filter(([, f]) => /^bc[1-5]-/.test(f)))
+    for (const height of [8, 3]) {
+      const levels = [];
+      for (let w = 8, h = height, level = 0; ; w >>= 1, h >>= 1, level++) {
+        const size = [Math.max(1, w), Math.max(1, h)];
+        levels.push([...size, sequence(Math.ceil(size[0] / 4) * Math.ceil(size[1] / 4) * bytes, 13 * level + height)]);
+        if (size[0] === 1 && size[1] === 1) break;
+      }
+      const file = ktx({
+          internal,
+          width: 8,
+          height,
+          compressed: true,
+          rowBytes: (w) => Math.ceil(w / 4) * bytes,
+          images: levels.map((l) => [l[2]]),
+          keyValue: oriented('S=r,T=u'),
+        }),
+        turned = parseKTX(file);
+      assert.equal(turned.flipY, undefined, `${format} ${height}`);
+      levels.forEach(([w, h, blocks], level) =>
+        assert.deepEqual(
+          decodeBC(format, turned.mipmaps[level].data, w, h).data,
+          mirrored(decodeBC(format, blocks, w, h).data, w, 4, false, true),
+          `${format} ${w}x${h}`,
+        ),
+      );
+    }
+});
+
+test('KTX flags the orientation it cannot rewrite, textureFileToRGBA applies it, and cube faces stay put', async () => {
+  const bc = (internal, width, height, bytes, value, images) =>
+    ktx({
+      internal,
+      width,
+      height,
+      compressed: true,
+      rowBytes: (w) => Math.ceil(w / 4) * bytes,
+      images,
+      keyValue: oriented(value),
+    });
+  // BC7 cannot be mirrored without decoding; a 12-row BC1 chain has a 6-row mip whose blocks would shift; S=l too.
+  const bc7 = sequence(32, 5),
+    seven = parseKTX(bc(0x8e8c, 4, 8, 16, 'S=r,T=u', [[bc7]]));
+  assert.deepEqual([seven.flipY, seven.flipX, seven.mipmaps[0].data], [true, undefined, bc7]);
+  const chain = [[sequence(24)], [sequence(16, 3)]],
+    uneven = parseKTX(bc(0x83f1, 4, 12, 8, 'S=r,T=u', chain));
+  assert.deepEqual([uneven.flipY, uneven.mipmaps[1].data], [true, chain[1][0]]);
+  const sideways = parseKTX(bc(0x83f1, 8, 4, 8, 'S=l,T=d', [[sequence(16)]]));
+  assert.deepEqual([sideways.flipX, sideways.flipY, sideways.mipmaps[0].data], [true, undefined, sequence(16)]);
+  for (const file of [uneven, sideways]) {
+    const plain = decodeBC(file.format, file.mipmaps[0].data, file.width, file.height).data;
+    assert.deepEqual((await textureFileToRGBA(file)).data, mirrored(plain, file.width, 4, !!file.flipX, !!file.flipY));
+  }
+  const faces = Array.from({ length: 6 }, (_, i) => sequence(16, i * 20)),
+    cube = parseKTX(
+      ktx({
+        internal: 0x8058,
+        width: 2,
+        height: 2,
+        faces: 6,
+        rowBytes: (w) => w * 4,
+        images: [faces],
+        keyValue: oriented('S=r,T=u'),
+      }),
+    );
+  assert.deepEqual([cube.flipY, cube.mipmaps[0].data.subarray(0, 16)], [undefined, faces[0]]);
+  const broken = oriented('S=r,T=u');
+  broken[0] = 200;
+  failed(
+    () =>
+      parseKTX(
+        ktx({
+          internal: 0x8058,
+          width: 1,
+          height: 1,
+          rowBytes: (w) => w * 4,
+          images: [[sequence(4)]],
+          keyValue: broken,
+        }),
+      ),
+    /key\/value entry runs past/,
   );
 });

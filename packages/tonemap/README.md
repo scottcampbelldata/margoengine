@@ -189,6 +189,29 @@ tonemap.setLUT(parse3dl(look)); // or the text of a .3dl file from Flame, Lustre
 stage.dispose();
 ```
 
+### LUT pictures (strip PNGs)
+
+`@margoengine/tonemap/lut-image` reads a 3D LUT saved as a picture, the lookup texture games and colour tools export:
+`parseLUTImage(image, options)` takes decoded pixels (a `decodePNG` result or `ImageData`) and returns the same
+`CubeLUT`. A horizontal strip is N² x N pixels (1024 x 32, 256 x 16) with blue slice b in the b-th tile from the left;
+a vertical strip is N x N² with it in the b-th tile from the top; in every tile red runs left to right and green top to
+bottom (`flipGreen: true`, default false, for strips saved bottom row first). N is 2 to 65. Pixels may be 8-bit, 16-bit
+(`decodePNG` with `bitDepth: 16`) or 0..1 floats, 3 or 4 per pixel; alpha is ignored and the domain is 0..1. Keep the
+strip lossless, and decode it without colour management. Square HALD or tiled-grid pictures are not strips and throw.
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+import {parseLUTImage} from 'margoengine/tonemap/lut-image';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+// A 16 x 256 vertical strip of the identity LUT; a file would go through decodePNG from margoengine/decoders/png.
+const data = new Uint8Array(16 * 256 * 4).fill(255);
+for (let i = 0; i < 16 ** 3; i++) data.set([(i % 16) * 17, ((i >> 4) % 16) * 17, (i >> 8) * 17], i * 4);
+const tonemap = Tonemap.attach(stage.engine);
+tonemap.setLUT(parseLUTImage({width: 16, height: 256, data}));
+stage.dispose();
+```
+
 `setLUT` accepts that object, raw `.cube` text or `null` and snapshots the size, samples and domains for restoration.
 Replacement checks the device's 3D texture limit; failed validation or upload preserves the previous LUT. A
 `rgba32float` 3D GPU texture uses eight explicit texture loads and trilinear interpolation, requiring no optional

@@ -309,7 +309,7 @@ Four small synchronous readers, each its own entry and each written from its pub
   types 1, 2, 3 and their RLE forms 9, 10, 11; 8-, 15-, 16-, 24- and 32-bit pixels; colour maps of 15 to 32 bits;
   any origin corner; alpha from the descriptor bits, with a TGA 2.0 extension area's "no alpha" honoured and
   premultiplied alpha divided out.
-- `parseTIFF(bytes, {maxPixels?, codecs?})` reads the first image: little- or big-endian, strips or tiles,
+- `parseTIFF(bytes, {maxPixels?, codecs?, keep16Bit?})` reads the first image: little- or big-endian, strips or tiles,
   uncompressed, LZW (with Predictor 2 at 8 and 16 bits), PackBits, Deflate, LZMA, Zstandard and WebP (lossless and
   lossy, 8-bit RGB or RGBA; these three through `codecs`, see `loadTIFFCodecs` below) as libtiff writes them, CCITT
   bilevel coding (Modified Huffman, Group 3 one- and two-dimensional with or without byte-aligned EOLs, Group 4, the
@@ -320,7 +320,11 @@ Four small synchronous readers, each its own entry and each written from its pub
   without ReferenceBlackWhite reads as JFIF) and CIE or ICC L*a*b* at 8 bits (D65 white, to sRGB), chunky or planar,
   with an associated or unassociated alpha extra sample. CMYK converts without a colour profile, as R = (1 - C)(1 -
   K). Integer images come out as `{width, height, format: 'rgba8unorm', data: Uint8Array}` (16-bit samples scale to
-  0-255), 16, 32 and 64-bit float images (16-bit is the OpenEXR half) as `{format: 'rgba32float', data:
+  0-255). With `keep16Bit: true` (default false), integer samples wider than 8 bits come out as `{format:
+  'rgba32float', data: Float32Array}` instead, each stored value divided by 65535 (or its own maximum), exact and with
+  no transfer curve applied, so a 16-bit heightmap keeps all its levels. A materials `Texture` filters 32-bit floats
+  only on a device with `float32-filterable`; where it lacks that, give the `Texture` data as
+  `{...image, format: 'rgba16float'}`, which keeps about 11 bits. 16, 32 and 64-bit float images (16-bit is the OpenEXR half) as `{format: 'rgba32float', data:
   Float32Array}`, with or without the floating point predictor (Predictor 3, Adobe Photoshop TIFF Technical Note 3,
   2005), as GIS and Photoshop heightmaps use it. Signed samples, 24-bit floats, inks other than CMYK, ITU L*a*b*,
   arithmetic and hierarchical JPEG are refused, and so is LERC (Compression 34887), which has no public bitstream
@@ -336,15 +340,21 @@ Four small synchronous readers, each its own entry and each written from its pub
   three without `bytes`); pass the result as `codecs`. Without it (default none) a page in one of those codes throws
   `MargoError` `failed` naming `loadTIFFCodecs`, so a reader of the other codes never pays for them. The FBX
   importer's worker decodes embedded TIFF textures without them.
-- `parseDDS(bytes)` and `parseKTX(bytes)` return a `TextureFile`: `{width, height, layers, dimension, mipmaps, format,
+- `parseDDS(bytes)` and `parseKTX(bytes, {applyOrientation?})` return a `TextureFile`: `{width, height, layers, dimension, mipmaps, format,
   feature?, target, srgb, hasAlpha}` with every mip level, each level holding all its layers (cube faces in WebGPU
   order +X, -X, +Y, -Y, +Z, -Z) back to back. Block-compressed data passes through untouched: BC1 to BC7 (sRGB, BC4 and
   BC5 signed, BC6H signed and unsigned) from either file, and ETC1, ETC2, EAC and every ASTC block size from KTX.
   `feature` names the device feature such a format needs. DDS BGRA8, BGRX8, 565, 5551, 4444, 24-bit, luminance and
   alpha-only pixels, and KTX RGB8, become `rgba8unorm`; RGBA8, R8, RG8, 16- and 32-bit float and the packed
   10-bit and shared-exponent formats pass through. 2D textures, cube maps and arrays of either; volume and 1D textures
-  are refused. KTX padding rules (row, cube and mip) are followed, big-endian files are swapped, and key/value data
-  is skipped, so `KTXorientation` is not applied and rows come out as stored.
+  are refused. KTX padding rules (row, cube and mip) are followed and big-endian files are swapped.
+- A KTX file's `KTXorientation` is applied (`applyOrientation: false` keeps the stored order; default true): `T=u`
+  (bottom row first) and `S=l` images of 2D and array textures come out top row first, left column first, at every
+  mip level. Uncompressed texels move; BC1 to BC5 blocks are rewritten without loss when every mip height is a
+  multiple of 4 or under 4. Where a block format cannot be mirrored without decoding it (BC6H, BC7, ETC, EAC, ASTC,
+  compressed `S=l`, or an unaligned BC mip), the data stays as stored and the result has `flipY` or `flipX`: sample
+  with that coordinate mirrored (`textureFileToRGBA` already does). Cube faces are never moved. Other key/value data
+  is skipped.
   KTX `COMPRESSED_RGB_S3TC_DXT1` and KTX2 `VK_FORMAT_BC1_RGB_UNORM_BLOCK` (and their sRGB forms) have no alpha, so
   `hasAlpha` is false: WebGPU samples a three-colour block's black texel with alpha 0, which an opaque material must
   ignore.
@@ -367,7 +377,7 @@ const ddsBytes = new Uint8Array(await (await fetch('/texture.dds')).arrayBuffer(
 
 const decal = parseTGA(tgaBytes); // {width, height, data: RGBA8}
 const codecs = await loadTIFFCodecs(tiffBytes); // loads LZMA, Zstandard or WebP only if the file uses them
-const heightMap = parseTIFF(tiffBytes, {codecs}); // rgba8unorm or rgba32float
+const heightMap = parseTIFF(tiffBytes, {codecs, keep16Bit: true}); // rgba8unorm, or rgba32float above 8 bits
 const pages = openTIFF(tiffBytes, {codecs}); // every page, stored samples at full precision
 const elevation = pages.read(pages.length - 1).samples; // e.g. a Zstandard float GeoTIFF band
 const sky = parseDDS(ddsBytes); // e.g. a BC6H cube map

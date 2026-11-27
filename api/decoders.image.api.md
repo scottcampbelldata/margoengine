@@ -45,6 +45,8 @@ interface TextureFile {
     transcoded?: string;
     srgb: boolean;
     hasAlpha: boolean;
+    flipX?: boolean;
+    flipY?: boolean;
 }
 
 interface TextureFileLevel {
