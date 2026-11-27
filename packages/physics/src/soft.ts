@@ -2604,6 +2604,8 @@ export class SoftBody {
     if (this.isEdgeTorn(edge)) return this;
     const { eflags } = this.c;
     eflags[this.firstEdge + edge] = eflags[this.firstEdge + edge]! | TORN;
+    // Announced, and split by the world's splitOnTear, at the end of the next step, as a tear the step finds is.
+    this.owner.cellTornByHand = true;
     if (this.tetherStretch !== null) this.owner.tethersDirty = true;
     return this;
   }
@@ -3039,7 +3041,7 @@ export class SoftBodies implements PhysicsAttachment {
   private clusterTotal = 0;
   private memberTotal = 0;
   private cellsTornSeen = 0;
-  /** @internal A cell was torn by a call, so the next step reports it. */
+  /** @internal A cell or an edge was torn by a call, so the next step reports it. */
   cellTornByHand = false;
   private disposed = false;
   /**
