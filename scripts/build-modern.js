@@ -24,7 +24,7 @@ import { acquireBuildLock } from './support/build-lock.mjs';
 import { removeStalePackageOutputs } from './support/stale-packages.mjs';
 import { DIST_DIR_ENV, STAGING_DIR, stagingDir, swapDist, tsconfigFor } from './support/dist-dir.mjs';
 import { missingPackageTargets } from './package-export-targets.mjs';
-import { withMathExternal } from './support/math-external.mjs';
+import { sharedHelpers, withMathExternal } from './support/math-external.mjs';
 import { SIZES_FILE, sizeReport, wantsFullSizes } from './support/size-report.mjs';
 // One package build at a time in this checkout: two at once would swap their output into the same dist folders (KB-RM4).
 // Released when the process exits, whatever the outcome. Each package is built into packages/<name>/dist-next and moved
@@ -142,6 +142,8 @@ async function buildPackage(name, output) {
     configFile: false,
     // Match optional-package builds: emitted assets travel with their installed module.
     base: './',
+    // A package on SHARED_HELPERS imports @margoengine/math/helpers instead of copying the shared helpers (KB-INL1).
+    plugins: [sharedHelpers(manifest)],
     publicDir: false,
     logLevel: 'warn',
     build: {

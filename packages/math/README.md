@@ -252,6 +252,17 @@ import {exp, hypot, pow, sin} from '@margoengine/math/pinned';
 console.log(exp(0), pow(2, 10), hypot(3, 4), Math.abs(sin(Math.PI / 6) - 0.5) < 1e-15); // 1 1024 5 true
 ```
 
+`@margoengine/math/helpers` holds the small helpers that packages otherwise bundle from the repository's shared code, so an app that loads several of them holds each once: `margoError(code, message)` (an `Error` named `MargoError` with `code`, which `instanceof MargoError` matches), `fault(code, message, anchor?)`, `typeError(message, anchor)` and `rangeError(message, anchor)` (the same with a link to the entry on margoengine.com/errors), and `hypot(count, a, b, c?, d?)`, `Math.hypot` of the first `count` (2 to 4) values by V8's own steps without allocating, with `hypotOf(count)` reading its terms from `hypotTerms[0..3]` and writing the result to `hypotTerms[4]`. This `hypot` is not the pinned one above: it gives V8's bits, the pinned one the same bits everywhere. Controls, environment and shadows import this entry (`SHARED_HELPERS` in `scripts/support/math-external.mjs`); core and the stage keep their own copy, because math depends on core.
+
+```ts
+import {fault, hypot, hypotOf, hypotTerms} from '@margoengine/math/helpers';
+
+hypotTerms[0] = 6;
+hypotTerms[1] = 8;
+hypotOf(2);
+console.log(hypot(2, 3, 4), hypotTerms[4], fault('state', 'Not ready').code); // 5 10 state
+```
+
 `@margoengine/math/fft` is the engine's FFT (K17 of the physics framework), the same bits on every engine and in the physics kernels' Rust: `new Fft(n)` plans complex transforms of any length whose prime factors are 2, 3 and 5 (mixed-radix Stockham, its twiddles from the pinned `sin` and `cos`), and `fft.transform(data, inverse?, offset?, stride?)` transforms `n` interleaved `[re, im]` values in place (the inverse divides by `n`); `new Fft3(nx, ny, nz)` transforms a grid stored x fastest along each axis in turn; `new RealFft2(nx, ny)` takes a real field to its half spectrum (`(nx / 2 + 1) * ny` complex values) and back, for spectra such as an ocean's or a turbulence box's. `packages/physics/kernel-common/tests/fft-vectors.txt` pins the TypeScript and the Rust to the same bits.
 
 ```ts

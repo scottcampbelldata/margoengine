@@ -4,7 +4,14 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { declaresMath, mathExternal, withMathExternal } from '../scripts/support/math-external.mjs';
+import { pathToFileURL } from 'node:url';
+import {
+  declaresMath,
+  mathExternal,
+  SHARED_HELPERS,
+  sharedHelpers,
+  withMathExternal,
+} from '../scripts/support/math-external.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 // The class as every build emits it, minified or not: a subclass of Error that names itself MargoError.
@@ -98,4 +105,80 @@ test('every package that imports @margoengine/math declares it', () => {
     if (imports(source) && !declaresMath(JSON.parse(readFileSync(manifest, 'utf8')))) undeclared.push(name);
   }
   assert.deepEqual(undeclared, [], 'these packages import @margoengine/math without declaring it');
+});
+
+// KB-INL1 part B: the packages on SHARED_HELPERS import the shared error and hypot helpers from
+// @margoengine/math/helpers instead of bundling a copy. The copies as the builds emit them, minified or not:
+const HELPER_COPIES = {
+  margoError: /Object\.assign\(\s*(?:new\s+)?Error\([^()]*\)\s*,\s*\{\s*name:\s*[`"']MargoError[`"']/,
+  linked: /; see https:\/\/margoengine\.com\/errors#\$\{/,
+  hypot: /Math\.sqrt\(\s*\w+\[4\]\s*\)\s*\*\s*\w+/,
+};
+const HELPER_NAMES = ['fault', 'hypot', 'hypotOf', 'hypotTerms', 'margoError', 'rangeError', 'typeError'];
+
+test('the helper-copy detectors find each copy as Vite emits it, minified and not', () => {
+  assert.match('var e=(e,t)=>Object.assign(Error(t),{name:`MargoError`,code:e})', HELPER_COPIES.margoError);
+  assert.match(
+    "const margoError = (code, message) => Object.assign(new Error(message), { name: 'MargoError', code });",
+    HELPER_COPIES.margoError,
+  );
+  assert.match('t=(e,t)=>`${e}; see https://margoengine.com/errors#${t}`', HELPER_COPIES.linked);
+  assert.match('n[4]=n[4],n[4]=Math.sqrt(n[4])*t', HELPER_COPIES.hypot);
+  assert.match('terms[4] = Math.sqrt(terms[4]) * max;', HELPER_COPIES.hypot);
+  assert.doesNotMatch("import { fault as e, hypot as t } from '@margoengine/math/helpers';", HELPER_COPIES.margoError);
+  for (const re of Object.values(HELPER_COPIES))
+    assert.doesNotMatch("import{rangeError as e}from'@margoengine/math/helpers'", re);
+});
+
+test('sharedHelpers redirects packages/shared/errors.js and hypot.js only for a listed package that declares math', () => {
+  const importer = join(root, 'packages/shadows/src/index.ts').replaceAll('\\', '/'),
+    math = { dependencies: { '@margoengine/math': '^1.0.0' } },
+    on = sharedHelpers({ name: '@margoengine/shadows', ...math });
+  assert.deepEqual(on.resolveId('../../shared/hypot.js', importer), {
+    id: '@margoengine/math/helpers',
+    external: true,
+  });
+  assert.deepEqual(on.resolveId('../../shared/errors.js', importer), {
+    id: '@margoengine/math/helpers',
+    external: true,
+  });
+  assert.equal(on.resolveId('../../shared/finite.js', importer), null);
+  assert.equal(on.resolveId('@margoengine/core', importer), null);
+  assert.equal(sharedHelpers({ name: '@margoengine/shadows' }).resolveId('../../shared/hypot.js', importer), null);
+  assert.equal(sharedHelpers({ name: '@margoengine/sky', ...math }).resolveId('../../shared/hypot.js', importer), null);
+});
+
+test('@margoengine/math/helpers exports exactly the shared helpers', async () => {
+  const entry = join(root, 'packages/math/dist/helpers.js');
+  assert.ok(existsSync(entry), 'run npm run build:packages first');
+  assert.deepEqual(Object.keys(await import(pathToFileURL(entry).href)).sort(), HELPER_NAMES);
+});
+
+test('the SHARED_HELPERS packages ship no copy of the shared helpers and import only names the entry has', () => {
+  const copies = [],
+    unknown = [];
+  let importing = 0;
+  for (const name of SHARED_HELPERS) {
+    const dist = join(root, 'packages', name.slice('@margoengine/'.length), 'dist');
+    assert.ok(existsSync(dist), `${dist} missing: run npm run build:packages first`);
+    for (const file of shipped(dist)) {
+      const text = readFileSync(file, 'utf8'),
+        at = file.slice(root.length + 1).replaceAll('\\', '/');
+      for (const [kind, re] of Object.entries(HELPER_COPIES)) if (re.test(text)) copies.push(`${at}: ${kind}`);
+      for (const [, list] of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']@margoengine\/math\/helpers["']/g)) {
+        importing++;
+        for (const part of list.split(',')) {
+          const imported = part.trim().split(/\s+as\s+/)[0];
+          if (imported && !HELPER_NAMES.includes(imported)) unknown.push(`${at}: ${imported}`);
+        }
+      }
+    }
+  }
+  assert.ok(importing >= 3, `only ${importing} imports of @margoengine/math/helpers: the redirect did not run`);
+  assert.deepEqual(
+    copies,
+    [],
+    'these dist files bundle a shared helper instead of importing @margoengine/math/helpers',
+  );
+  assert.deepEqual(unknown, [], 'these dist files import a name @margoengine/math/helpers does not export');
 });

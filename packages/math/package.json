@@ -191,6 +191,10 @@
     "./clock": {
       "types": "./dist/clock.d.ts",
       "import": "./dist/clock.js"
+    },
+    "./helpers": {
+      "types": "./dist/helpers.d.ts",
+      "import": "./dist/helpers.js"
     }
   },
   "files": [

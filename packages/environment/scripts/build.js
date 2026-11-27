@@ -9,12 +9,14 @@ import { copyLegal } from '../../../scripts/package-legal.js';
 import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
 import { restoreWorkerUrls } from '../../../scripts/build-workers.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
+import { sharedHelpers } from '../../../scripts/support/math-external.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 // build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
 const dist = distDir(root);
 await copyLegal(root);
+const environmentManifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 // One self-contained build per entry, so the optional entries share no chunk with (and never change) the root; the
 // image decoders alone are one file every entry imports (dist/loaders.js), which re-exports each decoder from its own
 // file (dist/hdr.js, exr.js, ultrahdr.js, parse-image.js, load.js) so none is bundled twice. dist/load.js is
@@ -56,6 +58,8 @@ for (const [entry, emptyOutDir] of [
   await build({
     root,
     configFile: false,
+    // Every entry but the module worker imports the shared error helpers from @margoengine/math/helpers (KB-INL1).
+    plugins: entry === 'exr-codecs-worker' ? [] : [sharedHelpers(environmentManifest)],
     publicDir: false,
     logLevel: 'warn',
     build: {

@@ -9,7 +9,7 @@ import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
-import { packageExternal } from '../../../scripts/support/math-external.mjs';
+import { packageExternal, sharedHelpers } from '../../../scripts/support/math-external.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -27,6 +27,8 @@ const entry = Object.fromEntries(
 await build({
   root,
   configFile: false,
+  // The shared error and hypot helpers come from @margoengine/math/helpers, not a copy (KB-INL1).
+  plugins: [sharedHelpers(manifest)],
   publicDir: false,
   logLevel: 'warn',
   build: {

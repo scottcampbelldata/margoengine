@@ -2891,6 +2891,10 @@
       "types": "./dist/math/clock.d.ts",
       "import": "./dist/math/clock.js"
     },
+    "./math/helpers": {
+      "types": "./dist/math/helpers.d.ts",
+      "import": "./dist/math/helpers.js"
+    },
     "./mcp": {
       "types": "./dist/mcp.d.ts",
       "import": "./dist/mcp.js"
