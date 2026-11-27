@@ -83,11 +83,12 @@ function measureSections(
       // The segment where the plane x = const crosses the triangle, in the triangle's turn (so the cut runs round the hull's
       // section one way, and Green's theorem gives its area).
       const p = [indices[k]!, indices[k + 1]!, indices[k + 2]!].map((i) => [
-          vertices[3 * i]!,
-          vertices[3 * i + 1]!,
-          vertices[3 * i + 2]!,
-        ]),
-        ends: [number, number][] = [];
+        vertices[3 * i]!,
+        vertices[3 * i + 1]!,
+        vertices[3 * i + 2]!,
+      ]);
+      let negativeToPositive: [number, number] | undefined,
+        positiveToNegative: [number, number] | undefined;
       for (let e = 0; e < 3; e++) {
         const a = p[e]!,
           b = p[(e + 1) % 3]!,
@@ -95,11 +96,15 @@ function measureSections(
           db = b[0]! - x;
         if ((da < 0 && db >= 0) || (da >= 0 && db < 0)) {
           const t = da / (da - db);
-          ends.push([a[1]! + t * (b[1]! - a[1]!), a[2]! + t * (b[2]! - a[2]!)]);
+          const crossing: [number, number] = [a[1]! + t * (b[1]! - a[1]!), a[2]! + t * (b[2]! - a[2]!)];
+          if (da < 0) negativeToPositive = crossing;
+          else positiveToNegative = crossing;
         }
       }
-      if (ends.length !== 2) continue;
-      let [[y0, z0], [y1, z1]] = ends as [[number, number], [number, number]];
+      // Orient the cut by the direction of each crossing, independently of the triangle's starting corner.
+      if (!negativeToPositive || !positiveToNegative) continue;
+      let [y0, z0] = negativeToPositive,
+        [y1, z1] = positiveToNegative;
       // Keep the part under the waterline.
       if (y0 > waterline && y1 > waterline) continue;
       if (y0 > waterline || y1 > waterline) {

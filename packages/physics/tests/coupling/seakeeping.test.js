@@ -14,6 +14,7 @@ import {
   HULL_BREACH_WORDS,
   HULL_BREACHES_FIELD,
   HullSolver,
+  hullSections,
   heaveSection,
   heaveAddedMassInfinite,
   lateralSection,
@@ -2679,13 +2680,35 @@ test('HullSolver with cloth: a curtain in a barge that lists as it floods hangs 
   assert.ok(lean < 0.05, `the curtain hangs ${lean} degrees from plumb`);
 });
 
+function rotateHullTriangles(mesh, offset) {
+  const { vertices, indices } = mesh;
+  const rotated = new Uint32Array(indices.length);
+  for (let i = 0; i < indices.length; i += 3) {
+    const shift = (i / 3 + offset) % 3;
+    for (let j = 0; j < 3; j++) rotated[i + j] = indices[i + ((j + shift) % 3)];
+  }
+  return { vertices, indices: rotated };
+}
+
+test('hull strips integrate the same closed section regardless of each triangle’s starting corner', () => {
+  const mesh = boxMesh([2, 1, 1.5], [0, 0.1, 0.75]);
+  for (const variant of [mesh, ...[0, 1, 2].map((offset) => rotateHullTriangles(mesh, offset))]) {
+    for (const section of hullSections(variant, 0.25, 9)) {
+      nearWake(section.breadth, 1.5);
+      nearWake(section.draft, 0.65);
+      nearWake(section.area, 1.5 * 0.65);
+      nearWake(section.centroid, 0.65 / 2);
+    }
+  }
+});
+
 test('submerged HullSolver wake preserves an eccentric waterplane, fixed work and a real frame-zero replay', async () => {
   await Physics.load({ threads: true });
   for (const shared of [false, true]) {
     const sim = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
     using physics = new Physics(null, { arena: sim.arena, fixedTimestep: 1 / 60, substeps: 1 });
     const density = 1024;
-    const mesh = boxMesh([2, 1, 1], [0, 0, 0.25]);
+    const mesh = rotateHullTriangles(boxMesh([2, 1, 1], [0, 0, 0.25]), shared ? 1 : 0);
     const body = physics.addBody(null, {
       linearVelocity: [1.5, 0, 0],
       enabledTranslations: [true, false, false],
