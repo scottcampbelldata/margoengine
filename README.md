@@ -1,14 +1,24 @@
-# Margo Engine
+<p align="center">
+  <a href="https://margoengine.com/examples/">
+    <img src="site/images/orrery.jpg" alt="Orrery: a brass clockwork of the planets under a glass dome, rendered live by Margo Engine" width="720">
+  </a>
+</p>
 
-A small WebGPU engine for the web, with a Rust/Wasm core.
+<h1 align="center">Margo Engine</h1>
 
-![A textured crate and a ball with shadows on a checkered floor, rendered by Margo Engine](docs/images/quickstart.webp)
+<p align="center">Margo Engine is an open source WebGPU engine for games and 3D on the web, with about 100 packages.</p>
 
-[Live examples](https://margoengine.com/)
+<p align="center">
+  <a href="https://www.npmjs.com/package/margoengine"><img src="https://img.shields.io/npm/v/margoengine?label=npm" alt="npm"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License Apache-2.0"></a>
+  <a href="https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml"><img src="https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg" alt="tests"></a>
+</p>
+
+<p align="center"><a href="https://margoengine.com/examples/"><strong>Live examples</strong></a></p>
 
 ## Quick start
 
-You need Node.js 22.12 or newer, and current Chrome or Edge. The packages are on npm at 0.1.0. `npm create margo` runs the [create-margo](tools/create-margo/README.md) package.
+Node.js 22.12 or newer, and current Chrome or Edge. Three commands:
 
 ```sh
 npm create margo@latest my-app
@@ -17,57 +27,57 @@ npm install
 npm run dev
 ```
 
-Open the address Vite prints, usually <http://localhost:5173>. You should see a gold knot, a jade sphere and a white box on a dark stand, turning slowly. Drag to orbit, scroll to zoom.
+Open the address Vite prints (usually <http://localhost:5173>). You should see a gold knot, a jade sphere and a white box, turning slowly. Drag to orbit. Scroll to zoom.
 
-If the browser has no WebGPU, the page says so and links to the browsers that run Margo. The picture above is a scene from this repository, with a floor, a crate and a ball.
+`npm create margo@latest my-app -- --template game` starts a small game instead. If the browser has no WebGPU, the page says so and links to the browsers that run Margo.
 
-`npm create margo@latest my-app -- --template game` starts a small game instead of the studio scene.
+## What you can build
 
-Or, in an empty folder, install the games package:
+<table>
+  <tr>
+    <td align="center"><a href="https://margoengine.com/demos/orrery/"><img src="site/images/orrery.jpg" alt="Orrery" width="220"><br>Orrery</a></td>
+    <td align="center"><a href="https://margoengine.com/demos/storm-light/"><img src="site/images/storm-light.jpg" alt="Storm Light" width="220"><br>Storm Light</a></td>
+    <td align="center"><a href="https://margoengine.com/demos/earth/"><img src="site/images/earth.jpg" alt="Earth" width="220"><br>Earth</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://margoengine.com/demos/flight-helmet.html"><img src="site/images/flight-helmet.jpg" alt="Flight helmet" width="220"><br>Flight helmet</a></td>
+    <td align="center"><a href="https://margoengine.com/demos/windy-meadow.html"><img src="site/images/windy-meadow.jpg" alt="Windy meadow" width="220"><br>Windy meadow</a></td>
+    <td align="center"><a href="https://margoengine.com/gameplay-sandbox/"><img src="site/images/gameplay-sandbox.jpg" alt="Gameplay sandbox" width="220"><br>Gameplay sandbox</a></td>
+  </tr>
+</table>
 
-```sh
-npm install @margoengine/games vite
-```
+## Packages
 
-Save this as `index.html`:
+Ten places to start. The full list is [below](#all-packages).
 
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Margo</title>
-    <style>html, body, #scene { margin: 0; height: 100%; }</style>
-  </head>
-  <body>
-    <div id="scene"></div>
-    <script type="module" src="/main.ts"></script>
-  </body>
-</html>
-```
+| Package | One line |
+| --- | --- |
+| [`margoengine`](packages/margoengine/README.md) | The whole engine in one install. `createStage` is exported here. |
+| [`create-margo`](tools/create-margo/README.md) | `npm create margo@latest` writes a Vite, React or Next app. |
+| [`@margoengine/games`](https://www.npmjs.com/package/@margoengine/games) | A game in one package: stage, physics, input, animation. |
+| [`@margoengine/core`](packages/core/README.md) | The WebGPU renderer and the Wasm transform kernel. |
+| [`@margoengine/gltf`](packages/gltf/README.md) | glTF and GLB, including PBR. |
+| [`@margoengine/physics`](packages/physics/README.md) | Rigid bodies, joints, vehicles and a character controller. |
+| [`@margoengine/shadows`](packages/shadows/README.md) | Shadow maps you attach to the meshes that cast them. |
+| [`@margoengine/react`](packages/react/README.md) | React 18 and 19 components. |
+| [`@margoengine/sky`](packages/sky/README.md) | Sun, atmosphere and time of day. |
+| [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | Runs the real renderer on WebGL2 when you import it. |
 
-Save this as `main.ts`:
+`@margoengine/games` is published. It has no folder in this repository yet, so the link goes to npm.
 
-```ts
-import { createStage } from '@margoengine/games';
+## Status
 
-const stage = await createStage('#scene');
-stage.box({ color: '#84d6bd' });
-```
+**Works today.** The packages are on npm at 0.1.0. `npm create margo` starts a studio scene, a game, a point cloud, a React app or a Next app. WebGPU draws glTF, PBR materials, shadows, image lighting and post effects. The game starter runs physics, a walking character and crates you can knock over. The pictures above are live demos.
 
-Then run `npx vite` and open the address it prints. You should see a jade box. Drag to orbit, scroll to zoom. `createStage`, `Shadows`, `OrbitControls`, `Input` and `Tween` are root exports of `@margoengine/games`. Physics is `import { Physics } from '@margoengine/games/physics'`. Textured glTF is `import { loadGLTF } from '@margoengine/games/gltf/pbr'`. `import { createStage } from 'margoengine'` is the same function after `npm install margoengine`. `@margoengine/core` does not export `createStage`.
+**Experimental.** Many solvers are only partly built. Rigid bodies, joints, vehicles and the character controller are in the game starter. Cloth, sailing, thin films and the sea-keeping work are still being proved, one check at a time. The create-margo starters ask for Chrome or Edge when WebGPU is missing. The full `margoengine` install can load a WebGL2 layer. Firefox, Safari and phones are only partly checked. There is no editor yet.
 
-[![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+Scott Campbell directs the work. AI agents build and test the engine.
 
-**[Build something in 5 minutes: a textured, lit scene with shadows and picking](#build-something-in-5-minutes)** ·
-[Start here: guides by goal](docs/start-here.md) · [Demos](#demos) ·
-[Coming from three.js](docs/from-threejs.md) ·
-[Coming from Babylon.js](docs/from-babylon.md) ·
-[Coming from PlayCanvas](docs/from-playcanvas.md)
+## Docs
 
-The core and the stage together are 24,910 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
-(glTF, shadows, physics, post effects) is a separate package you import only if you use it.
+[Start here](docs/start-here.md) · [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [License](LICENSE)
+
+The rest of this file is for people working in the repository: a clone, the install routes, browser notes and every package.
 
 ## Build something in 5 minutes
 
@@ -394,6 +404,8 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 ## Size
 
+The core and the stage together are 24,910 bytes gzip, Wasm kernel and WebGPU backend included. Everything else (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
+
 | Bundle | gzip | raw |
 | --- | --- | --- |
 | core + stage (`import { createStage } from 'margoengine'`) | 24,910 B | 61,246 B |
@@ -429,7 +441,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 [site/llms.txt](site/llms.txt) (an index) or [site/llms-full.txt](site/llms-full.txt) (all the docs in one file), or run
 the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
-## Packages
+## All packages
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
@@ -607,14 +619,14 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 ## Roadmap
 
-- Publish 1.0.0 to npm.
+- The packages are on npm at 0.1.0. The 1.0.0 release is still ahead.
 - The WebGL2 compatibility layer is an optional package that WebGPU users never load ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)); the voxel path tracer refuses it. `@margoengine/webgl2-compat/preview` is the small preview; in the React Canvas, `loadFallback` loads it and `fallbackContent` replaces the plain message.
 - Automated runs in more places: Android, iPhone, macOS Safari, and more of the suites in Firefox and on Apple silicon.
 - Published benchmark comparisons with their method and raw results.
 
 ## How the engine is built
 
-AI agents write the code. Scott Campbell sets the rules in [AGENTS.md](AGENTS.md). A core change, or a change that removes or renames an export of a locked package, waits for his yes.
+Scott Campbell directs the work. AI agents build and test the engine. The rules are in [AGENTS.md](AGENTS.md). A core change, or a change that removes or renames an export of a locked package, waits for his yes.
 
 Every GPU check runs on our own machines, on real GPUs: NVIDIA RTX A6000, Intel Arc 140V, AMD Radeon 680M, and Apple silicon. Hosted runners have no GPU, so the workflows under `.github/workflows` are the CPU checks. The GPU checks run on those four machines.
 

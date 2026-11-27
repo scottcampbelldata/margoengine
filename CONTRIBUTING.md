@@ -1,6 +1,17 @@
 # Contributing
 
-Thanks for taking a look. Bug reports, fixes, docs and new examples are all welcome.
+Bug reports, fixes, docs and new examples are welcome. Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+```sh
+git clone https://github.com/scottcampbelldata/margoengine.git
+cd margoengine
+git lfs install
+git lfs pull
+npm ci
+npm test
+```
+
+Node.js 24.18 or newer for the tests in this repository. Node 22.12 or newer is enough to use the published packages. One change per pull request, with a test. The detail is below.
 
 ## Setup
 
