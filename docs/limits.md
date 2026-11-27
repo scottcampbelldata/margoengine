@@ -10616,6 +10616,14 @@ seeks by restoring its start state and replaying. Device or terrain replacement 
 Supported on both renderers. Real-time readback throughput is unmeasured. The optional Flood entry
 grew from 14,457 to 17,057 B gzip. Water, Core and Stage roots gain zero bytes.
 
+Capsule buoyancy uses the local Y axis and a water plane at the body's horizontal centre. A
+positive radius and nonnegative cylindrical half-height define the submerged solid. The solver
+integrates whole disks analytically and uses tangent-split Gauss–Legendre quadrature for partial
+disks. It applies the result at the volume centroid. Drag uses the circular and stadium projections.
+The added-inertia model uses a second-moment-equivalent ellipsoid. Spatially varying incident
+pressure requires a closed mesh. The Loads entry grew from 40,318 to 41,548 B gzip. Physics,
+core and stage roots gain zero bytes.
+
 ### Seakeeping encounter-scaled taper loads
 
 The incident-wave velocity and the longitudinal added-mass gradient use the same encounter scaling. The finite-memory continuation applies inside the first tabulated band. Tank qualification of the forward-motion amplitudes and near-stationary three-dimensional flow remain open. The seakeeping entry moved from 33,399 to 33,432 B gzip under its 33,698 B ceiling. Core and Stage gain zero bytes.

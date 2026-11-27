@@ -258,6 +258,11 @@ export type LoadShape = {
 } | {
     readonly box: readonly [number, number, number];
 } | {
+    readonly capsule: {
+        readonly radius: number;
+        readonly halfHeight: number;
+    };
+} | {
     readonly mesh: {
         readonly vertices: ArrayLike<number>;
         readonly indices: ArrayLike<number>;

@@ -14,6 +14,7 @@ export const demoPages = [
   'minimap',
   'hud-preview',
   'batched-mesh',
+  'buoyancy',
   'clipping-planes',
   'scene-targets',
   'depth-texture',

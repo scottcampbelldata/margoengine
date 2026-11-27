@@ -31,6 +31,7 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { boxSurface, ellipsoidHydrostatics, meshHydrostatics } from './buoyancy.js';
+import { type CapsuleDimensions, capsuleHydrostatics, capsuleInertiaAxes, capsuleVolume } from './capsule.js';
 import {
   compactDragArea,
   compactDragGeometry,
@@ -77,11 +78,12 @@ export const SEA_WATER_VISCOSITY = 1.19e-6;
 /** The water a {@link LoadSolver} loads bodies in: its surface's height, its flow and its density. */
 export type LoadWater = Pick<SeaSurface, 'elevation' | 'water' | 'density'>;
 
-/** A compact body's shape in its frame: an ellipsoid (semi-axes, m), a sphere (radius), a box (half extents) or a mesh. */
+/** A compact body's shape in its frame, in metres. A capsule's straight section runs along local Y. */
 export type LoadShape =
   | { readonly ellipsoid: readonly [number, number, number] }
   | { readonly sphere: number }
   | { readonly box: readonly [number, number, number] }
+  | { readonly capsule: { readonly radius: number; readonly halfHeight: number } }
   | { readonly mesh: { readonly vertices: ArrayLike<number>; readonly indices: ArrayLike<number> } };
 
 /** A compact body in the water. */
@@ -170,6 +172,7 @@ interface BodyRuntime {
   readonly sphere: boolean;
   /** A box's exact half extents, also used for its vertical support. */
   readonly box: Vec3 | undefined;
+  readonly capsule: CapsuleDimensions | undefined;
   /** Body-local pressure integration surface relative to the geometric centre. */
   readonly mesh: HullMesh | undefined;
 }
@@ -410,7 +413,7 @@ export class LoadSolver implements Solver<LoadParams> {
   ): BodyRuntime {
     const shape = spec.shape;
     if (!shape || typeof shape !== 'object')
-      throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box} or {mesh}.');
+      throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box}, {capsule} or {mesh}.');
     let axes: Vec3,
       frame: [Vec3, Vec3, Vec3] = [
         [1, 0, 0],
@@ -420,6 +423,7 @@ export class LoadSolver implements Solver<LoadParams> {
       centre: Vec3 = spec.centre ? [spec.centre[0], spec.centre[1], spec.centre[2]] : [0, 0, 0],
       volume: number | undefined,
       mesh: HullMesh | undefined,
+      capsule: CapsuleDimensions | undefined,
       box: Vec3 | undefined;
     if (!centre.every(Number.isFinite))
       throw invalidLoad('Invalid hydrodynamic shape centre; pass three finite coordinates in metres.');
@@ -436,6 +440,21 @@ export class LoadSolver implements Solver<LoadParams> {
       axes = box.map((a) => a * Math.sqrt(5 / 3)) as Vec3;
       volume = 8 * box[0] * box[1] * box[2];
       mesh = boxSurface(box);
+    } else if ('capsule' in shape) {
+      const dimensions = shape.capsule;
+      if (
+        !dimensions ||
+        !Number.isFinite(dimensions.radius) ||
+        dimensions.radius <= 0 ||
+        !Number.isFinite(dimensions.halfHeight) ||
+        dimensions.halfHeight < 0 ||
+        !Number.isFinite(dimensions.radius + dimensions.halfHeight)
+      )
+        throw invalidLoad('Invalid hydrodynamic capsule; pass a positive radius and nonnegative halfHeight in metres.');
+      const { radius, halfHeight } = dimensions;
+      capsule = { radius, halfHeight };
+      axes = capsuleInertiaAxes(radius, halfHeight);
+      volume = capsuleVolume(radius, halfHeight);
     } else if ('mesh' in shape) {
       const e = equivalentEllipsoid(shape.mesh);
       axes = e.axes;
@@ -446,7 +465,7 @@ export class LoadSolver implements Solver<LoadParams> {
         vertices: Float64Array.from(shape.mesh.vertices, (v, i) => v - e.centre[i % 3]!),
         indices: Uint32Array.from(shape.mesh.indices),
       };
-    } else throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box} or {mesh}.');
+    } else throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box}, {capsule} or {mesh}.');
     if (!axes.every((a) => a > 0 && Number.isFinite(a)))
       throw invalidLoad('Invalid hydrodynamic shape size; pass three positive finite dimensions or a positive radius.');
     volume ??= (4 / 3) * Math.PI * axes[0] * axes[1] * axes[2];
@@ -469,7 +488,7 @@ export class LoadSolver implements Solver<LoadParams> {
       );
     if (!validDrag(spec.spinDrag ?? 1) || !validDrag(spec.windage ?? 1))
       throw invalidLoad('Invalid wind or spin drag; supply finite nonnegative windage and spinDrag values.');
-    const sphere = Math.max(...axes) < 1.05 * Math.min(...axes),
+    const sphere = capsule ? capsule.halfHeight === 0 : Math.max(...axes) < 1.05 * Math.min(...axes),
       addedMass = (
         coupledRadiation ? [0, 0, 0] : spec.addedMass ? [...spec.addedMass] : ellipsoidAddedMass(axes)
       ) as Vec3;
@@ -484,7 +503,7 @@ export class LoadSolver implements Solver<LoadParams> {
       !addedInertia.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient))
     )
       throw invalidLoad('Invalid rotational added inertia; give three finite nonnegative m² values or use ellipsoid.');
-    const dragGeometry = compactDragGeometry(volume, axes, frame, mesh, box);
+    const dragGeometry = compactDragGeometry(volume, axes, frame, mesh, box, capsule);
     return {
       spec,
       axes,
@@ -499,6 +518,7 @@ export class LoadSolver implements Solver<LoadParams> {
       dragGeometry,
       sphere,
       box,
+      capsule,
       mesh,
     };
   }
@@ -626,7 +646,9 @@ export class LoadSolver implements Solver<LoadParams> {
       torque = [densityGravity * this.hydrostatic.torque[0], 0, densityGravity * this.hydrostatic.torque[2]];
     } else {
       const offset: Vec3 = [0, 0, 0];
-      submerged = b.volume * ellipsoidHydrostatics(b.axes, axesWorld, half, depth, offset);
+      submerged = b.capsule
+        ? capsuleHydrostatics(b.capsule, axesWorld[1], depth, b.volume, offset)
+        : b.volume * ellipsoidHydrostatics(b.axes, axesWorld, half, depth, offset);
       const buoyancyArm = add(sub(centre, cm), offset);
       torque = cross(buoyancyArm, [0, densityGravity * submerged, 0]);
     }

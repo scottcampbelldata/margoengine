@@ -4198,14 +4198,43 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
 
 ### Loads in the water (`@margoengine/physics/loads`)
 
-`LoadSolver` holds rigid bodies in the water through `bodyForces` with the water's loads (SEA-12): divers, debris, buoys, hoses, piles and dolphins. Couple it before the rigid solver: `world.couple(['loads', 'rigid'], 'staggered')`.
+`LoadSolver` holds rigid bodies in the water through `bodyForces` with the water's loads (SEA-12): divers, debris, buoys, hoses, piles and dolphins. The default `loads` and `rigid` solvers are ordered automatically. If you rename or compose the solvers, put loads before rigid in a staggered group with `world.couple([loadId, rigidId], 'staggered')`.
 
-- **Compact bodies** (`bodies: [{row, shape}]`): a shape is `{sphere}`, `{ellipsoid}`, `{box}` or `{mesh}`. A mesh needs a closed surface with outward-wound triangles and may split vertices at coincident seams. Each body takes:
-  - buoyancy at the displaced volume's centroid, which produces a righting moment. The local sea height sets the horizontal cut. Boxes and meshes integrate pressure on clipped triangles. Spheres and ellipsoids use their exact cap. The Froude–Krylov force uses the water's acceleration;
+#### Float a rigid body
+
+Add LoadSolver once to a world with the default RigidSolver, giving each body's row and wetted shape.
+Use a SEA-02 SpectralSea or the live SEA-04 nearshore surface for the water input. This still spectrum
+makes the sphere's initial buoyant rise easy to check.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { LoadSolver } from '@margoengine/physics/loads';
+import { SpectralSea } from '@margoengine/physics/sea';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+await Physics.load(); const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const body = physics.addBody(null, { position: [0, -0.35, 0], colliders: { shape: 'sphere', radius: 0.3, mass: 60 } });
+const sea = new SpectralSea({ waves: { frequencies: Float64Array.of(0.8, 1), directions: Float64Array.of(0, Math.PI), energy: new Float64Array(4), depth: 10, density: 1000 } });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics });
+world.add(new LoadSolver(), { sea, bodies: [{ row: body.row, shape: { sphere: 0.3 } }] }).advance(1); console.log(body.linearVelocity[1] > 0); physics[Symbol.dispose](); // true
+```
+
+The interactive example shows the sphere rise and a heeled box right itself. Use the time slider to replay either motion. [Open the buoyancy demo](https://margoengine.com/demos/buoyancy.html)
+
+#### Migrate buoyancy from a water demo or a physics plugin
+
+Register a box or capsule with the dimensions of its rigid collider. For a hull, register the
+closed triangulated wetted surface as a mesh. LoadSolver uses displaced volume and its centroid
+for the righting torque and computes viscous spin drag separately from translational form drag.
+[Buoyancy migration guide](../../docs/physics-buoyancy-migration.md)
+
+#### Load options
+
+- **Compact bodies** (`bodies: [{row, shape}]`): a shape is `{sphere}`, `{ellipsoid}`, `{box}`, `{capsule: {radius, halfHeight}}` or `{mesh}`. A capsule is centred at the body's local origin by default. Its straight section runs along local Y, with the hemisphere centres at `±halfHeight`. Both dimensions are in metres and `halfHeight: 0` gives a sphere. A mesh needs a closed surface with outward-wound triangles and may split vertices at coincident seams. Each body takes:
+  - buoyancy at the displaced volume's centroid, which produces a righting moment. The local sea height sets the horizontal cut. Boxes and meshes integrate pressure on clipped triangles. Spheres and ellipsoids use their exact cap. A capsule clips circular sections at the water plane, integrates their area and first moment, and uses bounded Gauss–Legendre quadrature on partially wetted intervals. The Froude–Krylov force uses the water's acceleration;
   - `pressureModel: 'surface'` reads incident gauge pressure from `sea.pressure` for a box or closed mesh and integrates its wrench over the actual clipped waterline. The default `'compact'` uses the local plane and point acceleration. Additional `flows` still contribute their own acceleration;
   - added mass per axis from Lamb's ellipsoid integrals, held implicitly so light bodies stay stable;
   - rotational added inertia with `addedInertia: 'ellipsoid'` or three measured m² per displaced kg values along the shape axes. The default is zero. `radiation` supplies passive Cummins modes as `{axis, strength, decayTime}`. A mode contributes `strength * exp(-t / decayTime)` to the radiation kernel. `radiationResonances` supplies band-pass modes as `{axis, strength, frequency, decayRate}`. Axes 0–2 are translation and 3–5 are rotation. Both lists default to empty. Use the same fixed world rate throughout the load group and coefficients for the body and draft;
-  - drag on the actual principal projections, from Morrison's sphere correlation or the Hölzer–Sommerfeld shape law, with optional `drag` coefficients;
+  - drag on the actual principal projections, from Morrison's sphere correlation or the Hölzer–Sommerfeld shape law, with optional `drag` coefficients. A capsule uses its circular and stadium projections for drag and its second-moment-equivalent ellipsoid for default added mass and optional rotational added inertia;
   - independent rotational viscous torque. `spinDrag` scales it, default 1;
   - windage at the area centroid of the emerged silhouette. `windage` overrides the shape- and Reynolds-dependent coefficient.
 - **Members** (`members: [{from, to, diameter, row?}]`): Morison's equation over the clipped wetted length. Set `period` to the dominant harmonic in seconds (default 8) or `Infinity` for steady water. The default `coefficients: 'dnv'` uses the peak orbital speed with DNV and White for roughness (`roughness`, default 5e-5 m) and Reynolds effects. `coefficients: 'sarpkaya-1976'` uses a smooth cylinder (roughness 0) and measured in-line coefficients over the laboratory range. A member takes Eames's tangential drag, and with `vortex: {strouhal, lift}` sheds vortices through Facchinetti's wake oscillator, its lift swinging at St U / D. A member on no `row` is fixed, a pile, and `memberLoad(i)` reports what it takes.
@@ -4213,6 +4242,10 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
 
 The sea, current and wind can use separate origin cells. Set `cellSize` to the PhysicsWorld cell length
 if it differs from the default of 4096 m. World-fixed members use the LoadSolver's origin cell.
+
+The capsule section moments follow the circular segment formulas in Gere, *Mechanics of Materials*, 6th ed., appendix D
+([2004](https://ndl.ethernet.edu.et/bitstream/123456789/55906/1/128.pdf)). The integration uses the
+[NIST Digital Library of Mathematical Functions, §3.5(v)](https://dlmf.nist.gov/3.5.v) Gauss–Legendre rule.
 
 Set `vortexCoupling: 'body-acceleration'` on a circular member attached to a dynamic rigid row
 in a nearly uniform steady current. The wake follows the member midpoint's transverse acceleration,

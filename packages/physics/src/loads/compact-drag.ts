@@ -1,6 +1,7 @@
 import type { FlowSample } from '@margoengine/math/fields';
 import { cos, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import type { HullMesh, Quat, Vec3 } from '../seakeeping/wetted.js';
+import { type CapsuleDimensions, GAUSS_16 } from './capsule.js';
 import { meshProjectedArea, projectedAboveWater, type EmergedSilhouette } from './compact-silhouette.js';
 import { invalidLoad } from './errors.js';
 import { sphereDrag } from './morison.js';
@@ -12,6 +13,7 @@ export interface CompactDragGeometry {
   readonly axes: Vec3;
   readonly mesh: HullMesh | undefined;
   readonly box: boolean;
+  readonly capsule: CapsuleDimensions | undefined;
   readonly diameter: number;
   readonly areas: Vec3;
   readonly surfaceArea: number;
@@ -39,27 +41,15 @@ function meshArea({ vertices, indices }: HullMesh): number {
   return area;
 }
 
-// Positive nodes and weights of the 16-point Gauss–Legendre rule on [-1, 1].
-const GAUSS: readonly (readonly [number, number])[] = [
-  [0.09501250983763744, 0.1894506104550685],
-  [0.2816035507792589, 0.1826034150449236],
-  [0.4580167776572274, 0.1691565193950025],
-  [0.6178762444026438, 0.1495959888165767],
-  [0.755404408355003, 0.1246289712555339],
-  [0.8656312023878318, 0.0951585116824928],
-  [0.9445750230732326, 0.06225352393864789],
-  [0.9894009349916499, 0.02715245941175409],
-];
-
 function ellipsoidArea([a, b, c]: Vec3): number {
   if (a === b && b === c) return 4 * Math.PI * a * a;
   // Transform the unit sphere's area by the norm of the ellipsoid map's cofactor times its normal.
   // Cosine latitude is even, and the longitude integrand is symmetric on each quadrant.
   let area = 0;
   const span = Math.PI / 2;
-  for (const [height, heightWeight] of GAUSS) {
+  for (const [height, heightWeight] of GAUSS_16) {
     const radius = Math.sqrt(1 - height * height);
-    for (const [node, weight] of GAUSS) {
+    for (const [node, weight] of GAUSS_16) {
       const first = (span * (1 - node)) / 2,
         second = (span * (1 + node)) / 2;
       const integrand = (angle: number) =>
@@ -70,13 +60,14 @@ function ellipsoidArea([a, b, c]: Vec3): number {
   return 4 * span * area;
 }
 
-/** Prepare fixed areas and resistance coefficients for a sphere, ellipsoid, box or closed hull. */
+/** Prepare fixed areas and resistance coefficients for a compact shape or closed hull. */
 export function compactDragGeometry(
   volume: number,
   axes: Vec3,
   frame: Frame,
   mesh?: HullMesh,
   box?: Vec3,
+  capsule?: CapsuleDimensions,
 ): CompactDragGeometry {
   const diameter = pow(volume * (6 / Math.PI), 1 / 3);
   const [a, b, c] = axes;
@@ -90,9 +81,17 @@ export function compactDragGeometry(
       meshProjectedArea(mesh, frame[1], frame[2]),
       meshProjectedArea(mesh, frame[2], frame[0]),
     ];
+  } else if (capsule) {
+    const end = Math.PI * capsule.radius * capsule.radius;
+    const broadside = end + 4 * capsule.halfHeight * capsule.radius;
+    areas = [broadside, end, broadside];
   }
   const equivalentArea = (Math.PI * diameter * diameter) / 4;
-  const surfaceArea = mesh ? meshArea(mesh) : ellipsoidArea(axes);
+  const surfaceArea = capsule
+    ? 4 * Math.PI * capsule.radius * (capsule.radius + capsule.halfHeight)
+    : mesh
+      ? meshArea(mesh)
+      : ellipsoidArea(axes);
   const sphericity = Math.min(1, (4 * equivalentArea) / surfaceArea);
   const pressureCoefficient = 0.42 * pow(10, 0.4 * pow(-ln(sphericity) / Math.LN10, 0.2));
   // Jeffery (1922), eq. 36, https://doi.org/10.1098/rspa.1922.0078. The existing Lamb integrals
@@ -111,6 +110,7 @@ export function compactDragGeometry(
     axes,
     mesh,
     box: box !== undefined,
+    capsule,
     diameter,
     areas,
     surfaceArea,
@@ -130,7 +130,16 @@ export function emergedSilhouette(
   level: number,
   direction: Vec3,
 ): EmergedSilhouette {
-  return projectedAboveWater(geometry.axes, frameWorld, rotation, geometry.mesh, geometry.box, level, direction);
+  return projectedAboveWater(
+    geometry.axes,
+    frameWorld,
+    rotation,
+    geometry.mesh,
+    geometry.box,
+    level,
+    direction,
+    geometry.capsule,
+  );
 }
 
 /** Effective Cd×reference area, m². An override is measured against the true supplied projection. */

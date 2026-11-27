@@ -224,6 +224,52 @@ function world(sea, bodies, members = [], extra = {}, gravity = [0, -9.81, 0], c
   return { physics, bodies: made, loads, world: w };
 }
 
+test('SEA-12 a live pitched capsule holds its submerged volume and torque through the rigid port', () => {
+  const radius = 0.35;
+  const halfHeight = 0.8;
+  const gravity = 9.81;
+  const sea = still();
+  const area = Math.PI * radius ** 2;
+  const cap = (2 * Math.PI * radius ** 3) / 3;
+  const wet = area * halfHeight + cap;
+  const rise = 0.8;
+  const across = 0.6;
+  const skew = across / rise;
+  const second = (Math.PI * radius ** 4) / 4;
+  const axialMoment = -cap * (halfHeight + (3 * radius) / 8) + (skew ** 2 * second - area * halfHeight ** 2) / 2;
+  const lateralMoment = across * axialMoment + rise * skew * second;
+  const shape = { capsule: { radius, halfHeight } };
+  const angle = Math.atan2(across, rise);
+  const capsule = {
+    position: [0, 0, 0],
+    rotation: [0, 0, -Math.sin(angle / 2), Math.cos(angle / 2)],
+    collider: { shape: 'capsule', radius, halfHeight, mass: sea.density * wet },
+    load: { shape, drag: 0, addedMass: [0, 0, 0] },
+  };
+  const simulation = world(sea, [capsule], [], {}, [0, -gravity, 0]);
+  simulation.world.advance(1);
+  const row = regionWords(simulation.world.arena.memory, simulation.loads.exportPorts(0)[0].region);
+  const at = simulation.bodies[0].row * FORCE_WORDS;
+  assert.ok(near(row[at + 1], sea.density * gravity * wet, 2e-6));
+  assert.ok(near(row[at + 5], sea.density * gravity * lateralMoment, 2e-6));
+  assert.ok(row[at + 5] < 0);
+  simulation.physics[Symbol.dispose]();
+
+  for (const dimensions of [
+    { radius, halfHeight: -1 },
+    { radius: true, halfHeight },
+    { radius, halfHeight: false },
+  ])
+    assert.throws(
+      () => {
+        const invalid = world(sea, [{ ...capsule, load: { shape: { capsule: dimensions } } }]);
+        invalid.world.advance(1);
+        invalid.physics[Symbol.dispose]();
+      },
+      { code: 'unsupported', message: /positive radius and nonnegative halfHeight/ },
+    );
+});
+
 test('SEA-12 a heeled box and triangle mesh return the exact displaced volume and righting moment', () => {
   const [length, height, beam] = [3, 1, 1.8];
   const draft = 0.3;

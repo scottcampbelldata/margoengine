@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rigid-body buoyancy · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>
+    .views { height: min(62vh, 580px); }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0; }
+    .controls label { display: flex; gap: 8px; align-items: center; }
+    button { padding: 6px 12px; cursor: pointer; }
+    output { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <h1>Rigid-body buoyancy</h1>
+  <p>A submerged sphere rises while a heeled box rights itself. Both bodies read the same water surface.</p>
+  <div class="views">
+    <canvas id="viewport" aria-label="A buoyancy test tank with a sphere and a floating box"></canvas>
+  </div>
+  <div class="controls">
+    <button id="play" type="button" disabled>Pause</button>
+    <button id="reset" type="button" disabled>Reset</button>
+    <label for="time">Time <input id="time" type="range" min="0" max="480" value="0" disabled></label>
+    <output id="elapsed" for="time">0.00 s</output>
+  </div>
+  <p><output id="measurement">Sphere centre and box heel appear when the scene is ready.</output></p>
+  <p id="status" data-webgpu-status role="status">Starting the buoyancy scene…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./buoyancy.ts'));
+  </script>
+</body>
+</html>

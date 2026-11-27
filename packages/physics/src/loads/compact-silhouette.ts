@@ -2,6 +2,7 @@ import { hypot } from '@margoengine/math/pinned';
 import { rotateVec } from '../math.js';
 import type { HullMesh, Quat, Vec3 } from '../seakeeping/wetted.js';
 import { atan2 } from '../space/angles.js';
+import { type CapsuleDimensions, capsuleSilhouette } from './capsule.js';
 
 type Point = readonly [number, number]; // Horizontal coordinate in the projection plane, then height.
 type Moments = [number, number, number]; // Area, horizontal first moment, vertical first moment.
@@ -239,6 +240,7 @@ export function projectedAboveWater(
   box: boolean,
   level: number,
   direction: Vec3,
+  capsule?: CapsuleDimensions,
 ): EmergedSilhouette {
   const length = hypot(direction[0], direction[2]);
   const right: Vec3 = length > 0 ? [-direction[2] / length, 0, direction[0] / length] : [0, 0, 1];
@@ -248,6 +250,13 @@ export function projectedAboveWater(
     emerged: [area, u, y],
   } = mesh
     ? meshProjectionMoments(mesh, rotation, right, [0, 1, 0], level, box)
-    : ellipseSegment(axes, frameWorld, right, level);
+    : capsule
+      ? capsuleSilhouette(
+          capsule.radius,
+          capsule.halfHeight * dot(frameWorld[1], right),
+          capsule.halfHeight * frameWorld[1][1],
+          level,
+        )
+      : ellipseSegment(axes, frameWorld, right, level);
   return { area, fullArea, offset: area > 0 ? [(right[0] * u) / area, y / area, (right[2] * u) / area] : [0, 0, 0] };
 }
