@@ -46,6 +46,7 @@ if (kind === 'models') {
 } else {
   const material = new PbrMaterial({ color: '#5588aa' });
   if (kind === 'dynamic') plugin = BoxDynamicInstances.attach(a, { geometry: shape, material, capacity: count });
+  await plugin?.ready;
   for (const e of [a, b])
     for (let i = 0; i < count; i++) {
       if (e === a && kind === 'dynamic') {
@@ -56,6 +57,7 @@ if (kind === 'models') {
       mesh.setPosition(at(i).slice(12, 15));
     }
   if (kind === 'meshes') plugin = BoxCulledMeshes.attach(a, { occlusion: true });
+  await plugin?.ready;
 }
 const draw = async () => {
   a.render({ culling: false });

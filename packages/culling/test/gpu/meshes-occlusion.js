@@ -47,6 +47,7 @@ async function setup() {
   b = await Engine.create(document.getElementById('b'), { camera, capacity: 4096 });
   for (const e of [a, b]) e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
   culled = CulledMeshes.attach(a, { occlusion: true });
+  await culled.ready;
   plain = fill(a);
   const other = fill(b);
   steps[3][1] = () => {

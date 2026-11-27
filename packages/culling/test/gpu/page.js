@@ -50,6 +50,7 @@ async function setup(withShadows) {
   b = await Engine.create(document.getElementById('b'), { camera, capacity: 2048 });
   for (const e of [a, b]) e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
   crowd = DynamicInstances.attach(a, { geometry, material: white, capacity: count + 64 });
+  await crowd.ready;
   for (let i = 0; i < count; i++) meshes.push(add(i, i % 4, 0));
   settle();
   for (let i = 0; i < count; i++) {
@@ -194,12 +195,8 @@ async function bulk() {
   // The WebGL2 layer draws these lists through the CPU route (compat.js, README "Moving objects"), which loads by import()
   // after attach; until it has, a frame runs the kernel on the layer's CPU tier, where the fallback alone (wait 0) counts
   // every earlier block again, 782 x 781 / 2 blocks, past the tier's work budget, so nothing it wrote lands. The case
-  // starts once both routes are in, as an application's frames run after the first.
-  if (globalThis.__margoCompat)
-    for (let tries = 0; !lists.every((list) => list['route']); tries++) {
-      if (tries === 300) throw new Error('the WebGL2 route of DynamicInstances did not load');
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
+  // starts once both routes are in (ready), as an application's frames run after the first.
+  await Promise.all(lists.map((list) => list.ready));
   for (const list of lists) {
     for (let r = 0; r < n; r++)
       list.addInstance([

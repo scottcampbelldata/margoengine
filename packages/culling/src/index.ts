@@ -7,7 +7,7 @@ import { computeShader } from './shaders.js';
 import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
 import { OccluderList, type OccluderInput } from './occluders.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import { unitLight } from '../../shared/unit-light.js';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
@@ -100,6 +100,7 @@ export class CulledInstances implements EnginePlugin {
   private readonly frame = new Float32Array(32);
   // The WebGL2 layer's route (./compat.js): frustum tests and compaction on the CPU, kept records uploaded.
   private route?: ReturnType<typeof import('./compat.js').instancesRoute>;
+  private routeReady: Promise<void> = Promise.resolve();
   protected buffers: Record<string, GPUBuffer> = {};
   protected geometryBuffers = new Map<Geometry, { vertex: GPUBuffer; index: GPUBuffer }>();
   private compute?: {
@@ -322,7 +323,8 @@ export class CulledInstances implements EnginePlugin {
     this.low = this.hiddenLow = Infinity;
     this.high = this.hiddenHigh = 0;
     const records = this.buffers.records;
-    loadCompatRoute(d, () => import('./compat.js'))?.then(({ instancesRoute }) => {
+    const route = loadCompatRoute(d, () => import('./compat.js'));
+    route?.then(({ instancesRoute }) => {
       if (this.buffers.records === records)
         this.route = instancesRoute(
           {
@@ -337,6 +339,24 @@ export class CulledInstances implements EnginePlugin {
           B,
         );
     });
+    // After the handler above: by then the route draws every frame.
+    this.routeReady = routeSettled(route);
+  }
+  /**
+   * Settles once every frame culls as it will from then on. On the WebGL2 compatibility layer CulledInstances loads its CPU
+   * route (a dynamic import) when it attaches, and frames before it has loaded run the WebGPU kernels on the layer.
+   * Resolved at once on WebGPU. Read it after attaching, and await it before a frame that must be exact: a film frame,
+   * a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const culled = CulledInstances.attach(engine, batches);
+   * await culled.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({

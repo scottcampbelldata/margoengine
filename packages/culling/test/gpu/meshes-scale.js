@@ -30,6 +30,7 @@ async function setup() {
   b = await Engine.create(document.getElementById('b'), options);
   for (const e of [a, b]) e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
   culled = CulledMeshes.attach(a);
+  await culled.ready;
   const start = performance.now();
   fill(a);
   fill(b);

@@ -101,6 +101,7 @@ class CulledInstances implements EnginePlugin {
     removeOccluder(source: OccluderInput): this;
     readCounts(): Promise<number[]>;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     protected show(i: number, word: number): void;
     protected index(batch: number, index: number): number;
@@ -208,6 +209,7 @@ class DynamicInstances implements EnginePlugin {
     getVisibleAt(index: number): boolean;
     update(from?: number, to?: number): this;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     prepareShadow({ context }: {
         context: {

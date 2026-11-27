@@ -61,12 +61,14 @@ if (kind === 'models') {
     plugin = sort;
   } else if (kind === 'dynamic') {
     plugin = DynamicInstances.attach(a, { geometry, material, capacity: count });
+    await plugin.ready;
     for (let i = 0; i < count; i++) plugin.addInstance(at(i));
     sort = FrontToBack.attach(a);
   } else {
     for (let i = 0; i < count; i++)
       a.createMesh().setGeometry(geometry).setMaterial(material).setPosition(at(i).slice(12, 15));
     plugin = CulledMeshes.attach(a, { occlusion: true });
+    await plugin.ready;
     sort = FrontToBack.attach(a);
   }
 }

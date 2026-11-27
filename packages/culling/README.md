@@ -591,6 +591,22 @@ bounds and their batch/slot indices, but upload no vertex/index buffers and emit
 no geometry draw commands, including depth and part-shadow passes. Refill by
 replacing geometry through the entry's existing update/reconstruction contract.
 
+## Exact first frames on the WebGL2 layer
+
+`ready` on `CulledMeshes`, `CulledInstances` and `DynamicInstances` is a promise that settles once every frame culls as
+it will from then on. On the WebGL2 compatibility layer each one fetches its CPU route (`import()`) when it attaches,
+and until it arrives frames run the WebGPU kernels on the layer. On WebGPU it is already settled. Await it before a
+frame that must be exact, such as a film frame or a pixel comparison:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {CulledMeshes} from 'margoengine/culling';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const culled = CulledMeshes.attach(engine);
+await culled.ready;
+engine.render({culling: false});
+```
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

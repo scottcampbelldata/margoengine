@@ -62,17 +62,15 @@ async function run({ n, mode, frames }) {
     e.render({ culling: false });
     await e.gpu.queue.onSubmittedWorkDone();
   };
-  // Pipelines and the layer's compatibility route load lazily: draw over animation frames until every pipeline is
-  // compiled and, on the WebGL2 layer, CulledMeshes has its route (meshes.ts `route`, set when ./compat.js arrives).
+  // On the WebGL2 layer CulledMeshes loads its route lazily (ready settles once it is in place); pipelines compile
+  // lazily too: draw over animation frames until every one is compiled.
+  if (culled instanceof CulledMeshes) await culled.ready;
   await waitForPipelines(
     async () => {
       await frame();
       await new Promise(requestAnimationFrame);
     },
-    {
-      ready: () => !(culled instanceof CulledMeshes) || !globalThis.__margoCompat || culled.route !== undefined,
-      describe: () => `mode ${mode}, compat route ${culled?.route ? 'loaded' : 'missing'}`,
-    },
+    { describe: () => `mode ${mode}` },
   );
   const stalls0 = e.gpu.stalls ?? 0,
     tiers0 = { ...(e.gpu.dispatches ?? {}) };

@@ -79,6 +79,7 @@ class CulledMeshes implements EnginePlugin {
     static attach(engine: EngineKernel, options?: CulledMeshesOptions): CulledMeshes;
     constructor({ minRadius, occlusion, occluderSize }?: CulledMeshesOptions);
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     readCounts(): Promise<Map<Geometry, number>>;
     onDeviceRestored(engine: Engine): void;
@@ -151,6 +152,7 @@ class DynamicInstances implements EnginePlugin {
     getVisibleAt(index: number): boolean;
     update(from?: number, to?: number): this;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     prepareShadow({ context }: {
         context: {

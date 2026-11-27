@@ -11,7 +11,7 @@ import type {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { CullShape } from './shape.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -253,6 +253,7 @@ export class DynamicInstances implements EnginePlugin {
   private batch?: Batch;
   private readonly redirect: { instances: GPUBuffer; args: GPUBuffer } = {} as never;
   private route?: ReturnType<typeof import('./compat.js').dynamicRoute>;
+  private routeReady: Promise<void> = Promise.resolve();
 
   /** Same as `engine.use(new DynamicInstances(options))`; returns the plugin. */
   static attach(engine: EngineKernel, options: DynamicInstancesOptions): DynamicInstances {
@@ -465,9 +466,28 @@ export class DynamicInstances implements EnginePlugin {
     engine.retain(this.own);
     this.engine = engine;
     this.device = d;
-    loadCompatRoute(d, () => import('./compat.js'))?.then(({ dynamicRoute }) => {
+    const route = loadCompatRoute(d, () => import('./compat.js'));
+    route?.then(({ dynamicRoute }) => {
       if (this.device === d) this.route = dynamicRoute(this.capacity);
     });
+    // After the handler above: by then the route draws every frame.
+    this.routeReady = routeSettled(route);
+  }
+  /**
+   * Settles once every frame culls as it will from then on. On the WebGL2 compatibility layer DynamicInstances loads its CPU
+   * route (a dynamic import) when it attaches, and frames before it has loaded run the WebGPU kernels on the layer.
+   * Resolved at once on WebGPU. Read it after attaching, and await it before a frame that must be exact: a film frame,
+   * a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const culled = DynamicInstances.attach(engine, { geometry, material, capacity: 1024 });
+   * await culled.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
   }
   registerPasses(graph: FrameGraph): void {
     // Before every core draw of the batch (main pass, replays) and before shadow passes, which read `world`.
@@ -847,10 +867,11 @@ export class DynamicInstances implements EnginePlugin {
     this.release();
     this.engine = engine;
     this.device = engine.gpu ?? undefined;
-    if (this.device)
-      loadCompatRoute(this.device, () => import('./compat.js'))?.then(({ dynamicRoute }) => {
-        if (this.device === engine.gpu) this.route = dynamicRoute(this.capacity);
-      });
+    const route = this.device ? loadCompatRoute(this.device, () => import('./compat.js')) : undefined;
+    route?.then(({ dynamicRoute }) => {
+      if (this.device === engine.gpu) this.route = dynamicRoute(this.capacity);
+    });
+    this.routeReady = routeSettled(route);
   }
   dispose(): void {
     if (this.disposed) return;

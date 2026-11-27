@@ -48,6 +48,7 @@ async function setup() {
   plainParts = CulledParts.attach(b, batches());
   cascadeRows = CascadeInstances.attach(c, { geometry: cube, material: color, capacity: count });
   plainRows = DynamicInstances.attach(d, { geometry: cube, material: color, capacity: count });
+  await plainRows.ready;
   for (let n = 0; n < count; n++) {
     const m = matrix(spot(n));
     for (const rows of [cascadeRows, plainRows]) rows.addInstance(m);

@@ -2,7 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import { scoped } from '../../shared/error-scope.js';
 import type { CullShape } from './shape.js';
 import { viewSize } from '../../shared/view-rect.js';
@@ -125,6 +125,7 @@ export class CulledMeshes implements EnginePlugin {
   private readonly words = new Uint32Array(this.uniform);
   // The WebGL2 layer's route (./compat.js): the same test on the CPU, kept records uploaded.
   private route?: ReturnType<typeof import('./compat.js').meshesRoute>;
+  private routeReady: Promise<void> = Promise.resolve();
 
   /** Same as `engine.use(new CulledMeshes(options))`; returns the plugin. */
   static attach(engine: EngineKernel, options?: CulledMeshesOptions): CulledMeshes {
@@ -155,9 +156,28 @@ export class CulledMeshes implements EnginePlugin {
       );
     this.engine = engine;
     const d = (this.device = engine.gpu);
-    loadCompatRoute(d, () => import('./compat.js'))?.then(({ meshesRoute }) => {
+    const route = loadCompatRoute(d, () => import('./compat.js'));
+    route?.then(({ meshesRoute }) => {
       if (this.device === d) this.route = meshesRoute();
     });
+    // After the handler above: by then the route draws every frame.
+    this.routeReady = routeSettled(route);
+  }
+  /**
+   * Settles once every frame culls as it will from then on. On the WebGL2 compatibility layer CulledMeshes loads its CPU
+   * route (a dynamic import) when it attaches, and frames before it has loaded run the WebGPU kernels on the layer.
+   * Resolved at once on WebGPU. Read it after attaching, and await it before a frame that must be exact: a film frame,
+   * a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const culled = CulledMeshes.attach(engine);
+   * await culled.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
   }
   registerPasses(graph: FrameGraph): void {
     // First in the frame, so every core draw of these batches (main pass and replays) sees this frame's culled lists.

@@ -44,6 +44,7 @@ export class CulledInstances implements EnginePlugin {
     removeOccluder(source: OccluderInput): this;
     readCounts(): Promise<number[]>;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     protected show(i: number, word: number): void;
     protected index(batch: number, index: number): number;
@@ -79,6 +80,7 @@ export class CulledMeshes implements EnginePlugin {
     static attach(engine: EngineKernel, options?: CulledMeshesOptions): CulledMeshes;
     constructor({ minRadius, occlusion, occluderSize }?: CulledMeshesOptions);
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     readCounts(): Promise<Map<Geometry, number>>;
     onDeviceRestored(engine: Engine): void;

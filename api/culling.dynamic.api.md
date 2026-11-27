@@ -36,6 +36,7 @@ export class DynamicInstances implements EnginePlugin {
     getVisibleAt(index: number): boolean;
     update(from?: number, to?: number): this;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     prepareShadow({ context }: {
         context: {
