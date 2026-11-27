@@ -817,8 +817,11 @@ pub const MAX_COLLIDERS: u32 = 1 << 22;
 pub const COUPLING_WORDS: u32 = (core::mem::size_of::<crate::couplings::Coupling>() / 4) as u32;
 
 /// Words of JOINT_SCRATCH a joint takes: 64 for its rows and measures, then doubles, 36 of inverse, 36 of link, 6 of right side,
-/// 6 of what the pushing pass gave, 4 more, and 18 for a multibody link's implicit springs (multibody.rs, G_AT, V_AT, W_AT).
-pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4 + 18);
+/// 6 of what the pushing pass gave, 4 more, and 18 for a multibody link's implicit springs (multibody.rs, G_AT, V_AT, W_AT),
+/// then from JOINT_TAUT 12 words, the inverse inertia its rows turn each of its two bodies by (joints.rs, `taut_inertia`),
+/// and 4 for what its sliding locks carried through the substep before.
+pub const JOINT_WORDS: u32 = JOINT_TAUT + 16;
+pub const JOINT_TAUT: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4 + 18);
 /// Most joints one world holds.
 pub const MAX_JOINTS: u32 = 1 << 22;
 /// Pairs the broad phase can hold; its table then fills 2^30 slots and its points 2^31 rows.

@@ -323,7 +323,7 @@ impl World {
             self.integrate_velocities(h);
             tick(self, 10, inner);
             self.hold_multibodies();
-            self.refresh_joints();
+            self.refresh_joints(h, true);
             self.note_approach();
             self.warm_start();
             self.warm_start_joints();
@@ -362,7 +362,7 @@ impl World {
             self.track_couplings(h);
             self.fk_multibodies(h);
             self.tally_drift(h);
-            self.refresh_joints();
+            self.refresh_joints(h, false);
             tick(self, 10, inner);
             // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
             // what it leaves is speed no force gave (a pyramid of 14 rows or more rocks for good). An island with e extra

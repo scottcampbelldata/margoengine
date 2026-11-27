@@ -76,12 +76,44 @@
 // which is implicit Euler of the spring (Catto 2011), stable at any stiffness. In the acceleration model k and c are
 // taken per unit of effective mass, so a motor moves a light limb and a heavy one alike.
 //
+// A lock's rows are read from the poses a substep begins at, and so is the arm its pull turns a body by. A body pulled
+// outward along an arm r by a force F is turned back across that arm with the stiffness F . r: a light link of a taut chain,
+// pulled at both ends by the tension T, is a spring of 2 T r on its inertia I, and held as rows hold it, explicitly, it
+// stands only while sqrt(2 T r / I) h stays under 2. A chain of fifty 1 kg balls laid out level and swung taut by a 1000 kg
+// end carries 3 M g, 29 kN, at the bottom of its swing: 1,700 rad/s against the 960 a substep of 1 / 480 s holds, and it read
+// 1,148 m long within 20 s (KB2161). That stiffness is the geometric stiffness of Tournier et al. 2015, the change of
+// J^T lambda with the poses: for a lock of all three sliding axes [lambda]x [r]x on each body's turning and nothing else
+// (their Eq 22), read with the forces of the step before. They put h^2 of it into the mass of a backward Euler step,
+// (M - h^2 K) v+ = M v + h f + J^T mu (their Eq 21), which damps every turn a force does not follow, a swing among them:
+// measured here, a bob's period at 90 degrees came out 3.1 percent short and the double pendulum of tests/joints.rs lost
+// 11 J where its bar is 0.098 J (Andrews, Teichmann and Kry 2017 report that loss of the term too). A joint's own passes
+// already turn a force with its body to second order, the two stages of RATTLE above, so all the stiffness has to temper is
+// the change of speed the rows give inside a substep. It is taken as Zhang and Skeel 1997 take a stiff force's gradient
+// into leapfrog, (M + beta h^2 V'') a = -V' (in Tao and Owhadi 2016, Eq 18), into the mass on both sides: the joints' rows
+// turn a body by (I + TAUT h^2 G)^-1 where they turned it by I^-1 (`taut_inertia`), TAUT their beta, and nothing else
+// changes. G is the part of the term that restores, F . r across each arm that is pulled outward: its diagonal in the arm's
+// own frame, and all of it when the pull runs along the arm. Pushed inward it lowers the stiffness, and that part is left
+// out, as Tournier et al. note a positive definite matrix may be kept.
+//
+// The step is then leapfrog on a heavier link, with nothing damped. Their bound is beta >= 1/4 for any stiffness: at TAUT 1,
+// h^2 k / (I + h^2 k) stays under 1 where 4 is the limit. What it costs is frequency: a turn against the pull that a substep
+// resolves is slowed by (h omega)^2 / 2 of itself, 1.4e-5 for the bob of tests/joints.rs, whose period moved by 1e-5, and
+// one it does not resolve rings at a sixth of the substep rate instead of faster. The pull is what each lock carried
+// through the whole substep before, read once a substep: before the relaxing pass the memory holds a part only, a seventh
+// on that chain past its turn, as a swing's centripetal pull is the relaxing pass's to give, and the stiffness read from
+// that part let the relaxing pass ring the chain apart (538 m).
+//
+// What it does not do is ring anything down. A chain that goes slack at the top of its swing and snaps taut keeps the turning
+// the snap gave its links, 130 rad/s on that chain, and its joints then open by the turn of a link within a substep,
+// r (h w)^2 / 2: 4 mm there, and the line reads 13 mm long, where the first swing holds 1e-4 of the length. Sliding joints,
+// ropes and the locks of the turning axes carry no such term yet.
+//
 // Measures follow Muller et al. 2020: a hinge's axes are kept aligned by a1 x a2 (their Eq 20), its angle read with a target
 // or limit along that axis (Eq 21, Algorithm 3). That form holds near half a turn, where the vector part of a quaternion
 // no longer tells rotations apart.
 use crate::layout::*;
 use crate::math::*;
-use crate::solver::{Moving, Soft};
+use crate::solver::{Moving, Soft, Sym};
 use crate::world::{NONE, World};
 
 const AXES: [V3; 3] = [v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0), v3(0.0, 0.0, 1.0)];
@@ -97,6 +129,9 @@ const DEPENDENT: f64 = f32::EPSILON as f64;
 /// The most a push turns a body in one substep where nothing cancels, in radians: Buss and Kim 2005's gamma max. See the head
 /// of this file for why it is not theirs.
 const TURN: f32 = 0.2;
+/// How much of h^2 times a taut lock's turning stiffness joins the inertia its rows turn a body by: Zhang and Skeel 1997's
+/// beta. Any share from 1/4 holds any tension; 1 is all of Tournier et al. 2015's term. See the head of this file.
+const TAUT: f64 = 1.0;
 
 /// What a pass over the joints is for. See the head of this file.
 #[derive(Clone, Copy, PartialEq)]
@@ -835,6 +870,113 @@ impl World {
     pub(crate) fn doubles(&self, row: usize) -> *mut f64 {
         unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + 64) as *mut f64 }
     }
+    /// Where a joint's scratch keeps the inverse inertia its rows turn each of its two bodies by this substep.
+    #[inline(always)]
+    fn taut(&self, row: usize) -> *mut [Sym; 2] {
+        unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + JOINT_TAUT as usize) as *mut [Sym; 2] }
+    }
+    /// Where a joint's scratch keeps what its three sliding rows carried through the substep before, along frame A's axes.
+    #[inline(always)]
+    fn pull(&self, row: usize) -> *mut V3 {
+        unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + JOINT_TAUT as usize + 12) as *mut V3 }
+    }
+    /// A joint's two bodies as its rows move them: each turns by what `refresh_joints` made of its inertia (`taut_inertia`).
+    #[inline(always)]
+    fn ends(&self, row: usize) -> (Moving, Moving) {
+        let (mut a, mut b) = (self.moving(self.uu(JOINT_A, row) as usize), self.moving(self.uu(JOINT_B, row) as usize));
+        [a.inertia, b.inertia] = unsafe { *self.taut(row) };
+        (a, b)
+    }
+
+    /// The inverse inertia this substep's joints turn `body` by: its `own` with the pull of its taut locks in it. See the head
+    /// of this file. A lock of all three sliding axes that gave the body the impulse P at the arm r through the substep
+    /// before, P . r over zero, is a spring of F . r across that arm with F = P / h, and TAUT h^2 of it joins the inertia:
+    /// D = TAUT h P . r (1 - r r^T / r . r), summed over the body's joints. The inverse is (1 + W D)^-1 W with W the body's own
+    /// inverse inertia, which also serves a body with locked axes, whose W has no inverse; 1 + W D has the eigenvalues of
+    /// 1 + W^1/2 D W^1/2, none under 1.
+    fn taut_inertia(&self, body: usize, own: Sym, h: f32) -> Sym {
+        if own.xx == 0.0 && own.yy == 0.0 && own.zz == 0.0 {
+            return own;
+        }
+        // A link of a multibody that holds is turned by its tree: what the rows give it is projected onto the tree's joint
+        // space in the metric of the links' own masses (multibody.rs), so the rows must give it by those too. Given by a
+        // heavier inertia, a hinge under a torque came out 3e-4 fast against tau / (I + a), and a branch between ends of
+        // 1000 kg left the numbers.
+        let role = self.uu(MB_ROLE, body);
+        if role != 0 && self.uu(MB_HELD, if role == 1 { body } else { self.uu(MB_ROOT, body) as usize }) != 0 {
+            return own;
+        }
+        // What the pulls add, over TAUT h: xx, xy, xz, yy, yz, zz.
+        let mut g = [0.0f64; 6];
+        let mut at = self.uu(FIRST_JOINT, body);
+        while at != NONE {
+            let row = at as usize;
+            let a = self.uu(JOINT_A, row) as usize;
+            let on_a = a == body;
+            at = self.uu(if on_a { JOINT_NEXT_A } else { JOINT_NEXT_B }, row);
+            // Only a lock of all three sliding axes: its force may point any way, so only its arm turns with a body
+            // (Tournier et al. 2015, Eq 22). A slider's force turns with body A as well, a rope's with the line of its anchors.
+            let flags = self.uu(JOINT_FLAGS, row);
+            if flags & (JOINT_ALIVE | JOINT_IDLE | JOINT_DISTANCE | JOINT_LOCK * 7) != JOINT_ALIVE | JOINT_LOCK * 7 || self.uu(JOINT_COUPLE, row) & 7 != 0 {
+                continue;
+            }
+            let carried = unsafe { *self.pull(row) };
+            if carried.x == 0.0 && carried.y == 0.0 && carried.z == 0.0 {
+                continue;
+            }
+            // The rows gave body B this impulse along frame A's axes, and body A its opposite.
+            let rotation_a = self.pose_rotation(a);
+            let given = rotation_a.mul(self.q(JOINT_FRAME_A_X, row)).rotate(carried);
+            let (arm, pull) = if on_a {
+                (rotation_a.rotate(self.v(JOINT_ANCHOR_A_X, row).sub(self.v(LOCAL_CENTER_X, body))), given.scale(-1.0))
+            } else {
+                (self.pose_rotation(body).rotate(self.v(JOINT_ANCHOR_B_X, row).sub(self.v(LOCAL_CENTER_X, body))), given)
+            };
+            let (x, y, z) = (arm.x as f64, arm.y as f64, arm.z as f64);
+            let along = pull.x as f64 * x + pull.y as f64 * y + pull.z as f64 * z;
+            let reach = x * x + y * y + z * z;
+            // Pushed inward a lock lowers the stiffness, which is no inertia to add: a strut is left to buckle as it did.
+            if !(along > 0.0 && reach > 0.0) {
+                continue;
+            }
+            let k = along / reach;
+            g[0] += along - k * x * x;
+            g[1] -= k * x * y;
+            g[2] -= k * x * z;
+            g[3] += along - k * y * y;
+            g[4] -= k * y * z;
+            g[5] += along - k * z * z;
+        }
+        if g[0] == 0.0 && g[3] == 0.0 && g[5] == 0.0 {
+            return own;
+        }
+        let s = TAUT * h as f64;
+        let d = [[s * g[0], s * g[1], s * g[2]], [s * g[1], s * g[3], s * g[4]], [s * g[2], s * g[4], s * g[5]]];
+        let w = [[own.xx as f64, own.xy as f64, own.xz as f64], [own.xy as f64, own.yy as f64, own.yz as f64], [own.xz as f64, own.yz as f64, own.zz as f64]];
+        let mut b = [[0.0f64; 3]; 3];
+        for i in 0..3 {
+            for j in 0..3 {
+                b[i][j] = w[i][0] * d[0][j] + w[i][1] * d[1][j] + w[i][2] * d[2][j] + if i == j { 1.0 } else { 0.0 };
+            }
+        }
+        // (1 + W D)^-1 by cofactors: its determinant is 1 or more.
+        let c = [
+            [b[1][1] * b[2][2] - b[1][2] * b[2][1], b[0][2] * b[2][1] - b[0][1] * b[2][2], b[0][1] * b[1][2] - b[0][2] * b[1][1]],
+            [b[1][2] * b[2][0] - b[1][0] * b[2][2], b[0][0] * b[2][2] - b[0][2] * b[2][0], b[0][2] * b[1][0] - b[0][0] * b[1][2]],
+            [b[1][0] * b[2][1] - b[1][1] * b[2][0], b[0][1] * b[2][0] - b[0][0] * b[2][1], b[0][0] * b[1][1] - b[0][1] * b[1][0]],
+        ];
+        let scale = 1.0 / (b[0][0] * c[0][0] + b[0][1] * c[1][0] + b[0][2] * c[2][0]);
+        let t = |i: usize, j: usize| scale * (c[i][0] * w[0][j] + c[i][1] * w[1][j] + c[i][2] * w[2][j]);
+        // Symmetric but for rounding: the mean of each pair is.
+        Sym {
+            xx: t(0, 0) as f32,
+            xy: (0.5 * (t(0, 1) + t(1, 0))) as f32,
+            xz: (0.5 * (t(0, 2) + t(2, 0))) as f32,
+            yy: t(1, 1) as f32,
+            yz: (0.5 * (t(1, 2) + t(2, 1))) as f32,
+            zz: t(2, 2) as f32,
+        }
+    }
 
     /// What each of a joint's axes measures from where its bodies are now: offsets along frame A's axes, then frame B's turn in
     /// frame A as a rotation vector along them (a hinge's angle on its axis).
@@ -973,8 +1115,16 @@ impl World {
     /// locks of a chain exactly in one sweep. Gauss-Seidel moves a load only one joint a pass, so a light chain under a heavy
     /// end would stretch for seconds before it held. See the head of this file for how the factors are made.
     #[inline(never)]
-    pub fn refresh_joints(&mut self) {
+    pub fn refresh_joints(&mut self, h: f32, fresh: bool) {
         let (from, solving) = self.window.joints;
+        if fresh {
+            // What each lock carried through the whole substep before, for `taut_inertia`: the memory as the relaxing pass left
+            // it. Before that pass it holds a part only, as a swing's centripetal pull is the relaxing pass's to give.
+            for i in from..solving {
+                let row = self.uu(SOLVE_JOINTS, i) as usize;
+                unsafe { *self.pull(row) = self.v(JOINT_IMPULSE_0, row) };
+            }
+        }
         let mut handed = Handed { pivots: [[0.0; 6]; 6], taken: 0, carry: [[0.0; 6]; 6], carried: 0 };
         let mut tolerance = DEPENDENT;
         for i in from..solving {
@@ -992,7 +1142,10 @@ impl World {
             let view = self.joint_view(row);
             unsafe { *(self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize) as *mut View) = view };
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
-            let (body_a, body_b) = (self.moving(a), self.moving(b));
+            // The joint's rows turn each body by its inertia with its taut locks' pull in it, here and in every pass.
+            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            (body_a.inertia, body_b.inertia) = (self.taut_inertia(a, body_a.inertia, h), self.taut_inertia(b, body_b.inertia, h));
+            unsafe { *self.taut(row) = [body_a.inertia, body_b.inertia] };
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
             let doubles = self.doubles(row);
             let flags = self.uu(JOINT_FLAGS, row);
@@ -1155,7 +1308,7 @@ impl World {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let view = self.view(row);
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
-            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            let (mut body_a, mut body_b) = self.ends(row);
             for k in 0..6 {
                 let carried = self.s(JOINT_IMPULSE_0 + k, row);
                 if carried != 0.0 {
@@ -1205,7 +1358,7 @@ impl World {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let view = self.view(row);
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
-            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            let (mut body_a, mut body_b) = self.ends(row);
             // A rotation drive's motors push along the target's axes, not along the rows the joint's own limits use.
             let (mut rows, mut at) = (view.rows, view.at);
             if column == JOINT_MOTOR_0 && self.uu(JOINT_FLAGS, row) & JOINT_DRIVE != 0 {
@@ -1278,7 +1431,7 @@ impl World {
     fn soft_rows(&mut self, row: usize, flags: u32, h: f32, stiffness: Soft, most: f32, pass: Pass) {
         let view = self.view(row);
         let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
-        let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+        let (mut body_a, mut body_b) = self.ends(row);
         if pass != Pass::Relax {
             let (mut rows, mut at) = (view.rows, view.at);
             if flags & JOINT_DRIVE != 0 {
@@ -1416,7 +1569,7 @@ impl World {
             let view = self.view(row);
             let doubles = self.doubles(row);
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
-            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            let (mut body_a, mut body_b) = self.ends(row);
             for r in 0..m {
                 let k = axes[r];
                 let p = unsafe { *doubles.add(RIGHT + r) } as f32 * share;
@@ -1435,7 +1588,7 @@ impl World {
         let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
         let view = self.view(row);
         let doubles = self.doubles(row);
-        let (mut body_a, mut body_b) = (self.moving(self.uu(JOINT_A, row) as usize), self.moving(self.uu(JOINT_B, row) as usize));
+        let (mut body_a, mut body_b) = self.ends(row);
         let still = v3(0.0, 0.0, 0.0);
         (body_a.linear, body_a.angular, body_b.linear, body_b.angular) = (still, still, still, still);
         for r in 0..m {

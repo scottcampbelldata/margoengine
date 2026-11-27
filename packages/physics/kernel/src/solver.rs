@@ -93,14 +93,15 @@ pub fn soft(hertz: f32, zeta: f32, h: f32) -> Soft {
 }
 
 /// A symmetric 3 by 3 matrix: the world inverse inertia, with any locked axes zeroed in its rows and columns.
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Sym {
-    xx: f32,
-    xy: f32,
-    xz: f32,
-    yy: f32,
-    yz: f32,
-    zz: f32,
+    pub(crate) xx: f32,
+    pub(crate) xy: f32,
+    pub(crate) xz: f32,
+    pub(crate) yy: f32,
+    pub(crate) yz: f32,
+    pub(crate) zz: f32,
 }
 
 impl Sym {

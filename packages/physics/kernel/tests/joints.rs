@@ -231,6 +231,74 @@ fn a_chain_of_fifty_holds_a_thousand_to_one_end_mass() {
     assert!(opened < 1e-4 * full, "a joint opened by {opened} m in the swing");
 }
 
+/// A chain laid out level from a fixed end and let fall (KB2161): 50 balls of 1 kg and radius 0.05 m, a sphere's inertia, 0.1 m
+/// apart on spherical joints, the last one `ratio` times as heavy, for `steps` steps, with a kick of 3 m/s across the swing
+/// after step 600. Returns the most the line from the first anchor through the centres outgrew its 4.95 m, and the widest any
+/// joint opened. A bent chain reads short, so only each joint's own gap shows a joint that opens.
+fn level_chain(ratio: f32, steps: u32) -> (f32, f32) {
+    let links = 50u32;
+    let (mass, radius) = (1.0f32, 0.05f32);
+    let mut w = world(64);
+    let top = anchor(&mut w);
+    place(&mut w, top, v3(0.0, 20.0, 0.0));
+    let (mut bodies, mut joints) = (vec![], vec![]);
+    let mut before = top;
+    for i in 1..=links {
+        let m = if i == links { ratio * mass } else { mass };
+        let body = point(&mut w, v3(2.0 * radius * i as f32, 20.0, 0.0), m, 0.4 * m * radius * radius);
+        joints.push(spherical(&mut w, before, body, v3(radius, 0.0, 0.0), v3(-radius, 0.0, 0.0)));
+        before = body;
+        bodies.push(body);
+    }
+    let full = 2.0 * radius * links as f32 - radius;
+    let (mut worst, mut opened) = (0.0f32, 0.0f32);
+    for step in 1..=steps {
+        if step == 601 {
+            let end = *bodies.last().unwrap() as usize;
+            w.set_v(LINEAR_X, end, w.v(LINEAR_X, end).add(v3(0.0, 0.0, 3.0)));
+        }
+        w.step(DT);
+        let (mut sum, mut last) = (0.0f64, v3(radius, 20.0, 0.0));
+        for &body in &bodies {
+            let at = w.v(POSITION_X, body as usize);
+            let step = at.sub(last);
+            sum += (step.dot(step) as f64).sqrt();
+            last = at;
+        }
+        worst = worst.max(sum as f32 - full);
+        opened = opened.max(worst_gap(&w, &joints));
+    }
+    println!("level chain {ratio}:1, {steps} steps: outgrew its {full} m by {worst:.3e} m, widest joint {opened:.3e} m");
+    (worst, opened)
+}
+
+#[test]
+fn a_chain_laid_out_level_holds_its_first_swing_under_a_heavy_end() {
+    // Level, the chain is slack until the end mass swings it taut, and the pull then turns its light links faster than a
+    // substep holds unless the locks' turning stiffness is in the inertia they turn by (KB2161): at 1000:1 the line outgrew
+    // its length by 1e-4 at step 32 and by 20 m at step 160, where the end comes level again on the far side.
+    let full = 4.95f32;
+    for ratio in [1000.0f32, 100.0, 10.0] {
+        let (worst, opened) = level_chain(ratio, 160);
+        assert!(worst < 1e-4 * full, "{ratio}:1 outgrew its length by {worst} m");
+        assert!(opened < 1e-4 * full, "{ratio}:1: a joint opened by {opened} m");
+    }
+}
+
+#[test]
+fn a_chain_laid_out_level_stays_a_chain_as_it_snaps_taut() {
+    // Past its first swing the chain goes slack at each turn and snaps taut on the way down, twice a swing for 20 s, the
+    // second half with a kick across the swing. It read 1,148 m long before the turning stiffness, and 538 m with that
+    // stiffness read from what the locks carry before the relaxing pass, a seventh of their pull. What is left, 13 mm and
+    // 4 mm at a joint, is the turn of a link within a substep after a snap (docs/known-bugs.md, KB2161). A snap is
+    // chaotic: the same chain with colliders, or at 4 to 16 substeps, reads 10 to 94 mm, so the bar is the fifth of its
+    // length that parts every run that holds (under 0.1 m) from every run that does not (9 m and more).
+    let full = 4.95f32;
+    let (worst, opened) = level_chain(1000.0, 1200);
+    assert!(worst < 0.2 * full, "outgrew its length by {worst} m");
+    assert!(opened < 0.2 * full, "a joint opened by {opened} m");
+}
+
 #[test]
 fn a_hinge_motor_reaches_its_target_and_stops_at_its_limit() {
     let mut w = world(4);

@@ -514,7 +514,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 
 Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wakes, spray, wind, rain) and the rigid core. Do not start these.
 
-KB2161 (docs/known-bugs.md, "A chain laid out level under a 1000:1 end mass stretches once it is taut") is taken by Claude (workstation, branch `claude/kb2161-chain-61b47e`) on Scott's order, 2026-11-27: the geometric stiffness of the joint locks in the kernel's path solve (`packages/physics/kernel/src/joints.rs` and what it calls), nothing else of DYN-01 or DYN-03.
+KB2161 (docs/known-bugs.md, "A chain laid out level under a 1000:1 end mass stretches once it is taut"): the stretch landed 2026-11-27 (Claude, workstation, on Scott's order), the geometric stiffness of the joint locks in the inertia the kernel's joint rows turn a body by (`taut_inertia`, `packages/physics/kernel/src/joints.rs`). What is left of it, a joint that opens after the chain snaps taut, is open in docs/known-bugs.md and is no longer claimed.
 
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |

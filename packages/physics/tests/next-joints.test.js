@@ -478,3 +478,51 @@ test('rope and spring joints refuse what they cannot be', () => {
   );
   physics.dispose();
 });
+
+test('a chain laid out level holds its first swing under a heavy end', () => {
+  // KB2161: 50 balls of 1 kg on spherical joints 0.1 m apart, the last `ratio` times as heavy, level from a fixed end and let
+  // fall. The pull of the end mass turned the light links faster than a substep holds: at 1000:1 the line through the
+  // centres outgrew its 4.95 m by 1e-4 at step 32. The locks' turning stiffness is now in the inertia they turn a link by.
+  // To step 160 the end swings down and up level again on the far side. A bent chain reads short, so each joint has the bar.
+  const radius = 0.05,
+    links = 50,
+    full = 2 * radius * links - radius,
+    unit = 1 / ((4 / 3) * Math.PI * radius ** 3);
+  for (const ratio of [1000, 100, 10]) {
+    const physics = new Physics(null),
+      top = physics.addBody(null, { type: 'fixed', position: [0, 20, 0], colliders: [] }),
+      bodies = [];
+    let before = top;
+    for (let i = 1; i <= links; i++) {
+      const body = physics.addBody(null, {
+        position: [2 * radius * i, 20, 0],
+        canSleep: false,
+        colliders: { shape: 'sphere', radius, density: unit * (i === links ? ratio : 1) },
+      });
+      physics.addJoint(before, body, { type: 'spherical', anchorA: [radius, 0, 0], anchorB: [-radius, 0, 0] });
+      bodies.push(body);
+      before = body;
+    }
+    let outgrew = 0,
+      opened = 0;
+    for (let step = 0; step < 160; step++) {
+      physics.step();
+      let sum = 0,
+        last = [radius, 20, 0],
+        held = [radius, 20, 0];
+      for (const body of bodies) {
+        const at = [...body.position],
+          near = rotate(body.rotation, [-radius, 0, 0]),
+          far = rotate(body.rotation, [radius, 0, 0]);
+        sum += distance(at, last);
+        opened = Math.max(opened, distance([at[0] + near[0], at[1] + near[1], at[2] + near[2]], held));
+        last = at;
+        held = [at[0] + far[0], at[1] + far[1], at[2] + far[2]];
+      }
+      outgrew = Math.max(outgrew, sum - full);
+    }
+    assert.ok(outgrew < 1e-4 * full, `${ratio}:1 outgrew its ${full} m by ${outgrew} m`);
+    assert.ok(opened < 1e-4 * full, `${ratio}:1: a joint opened by ${opened} m`);
+    physics.dispose();
+  }
+});

@@ -74,7 +74,7 @@ fn step(w: &mut World, dt: f32, clock: &mut Clock) {
         w.window.substep = substep;
         w.integrate_velocities(h);
         clock.lap(6);
-        w.refresh_joints();
+        w.refresh_joints(h, true);
         clock.lap(7);
         w.warm_start();
         clock.lap(8);
@@ -96,7 +96,7 @@ fn step(w: &mut World, dt: f32, clock: &mut Clock) {
         w.integrate_poses(h, substep, substeps);
         w.tally_drift(h);
         clock.lap(11);
-        w.refresh_joints();
+        w.refresh_joints(h, false);
         clock.lap(7);
         let relaxes = all.max(1);
         for pass in 1..=relaxes {

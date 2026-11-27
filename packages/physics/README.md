@@ -2677,7 +2677,7 @@ joint.clearMotor();
 physics.dispose();
 ```
 
-Locks along a chain are solved exactly, so a chain of 50 hung straight holds a 1000 to 1 end mass to under 1e-5 of its length, at rest and swung at 3 m/s. A chain laid out level and let fall does not: the end mass swings it so taut that its light links turn faster than a substep can follow, and they stretch it from the second half second on (`docs/known-bugs.md`). A branch or a closed loop settles pass by pass, so it holds under its own weight and gives way a little under a far heavier body: the numbers are in `docs/limits.md`.
+Locks along a chain are solved exactly, so a chain of 50 hung straight holds a 1000 to 1 end mass to under 1e-5 of its length, at rest and swung at 3 m/s. A chain laid out level and let fall holds 1e-4 of its length through its first swing under a 1000 to 1 end mass too: the pull of a taut joint across its arm is part of the inertia it turns a light link by, so no pull turns a link faster than a substep can follow. Past that swing the chain goes slack at each turn and snaps taut, and a joint then opens by millimetres (4 mm within 20 s; under 1 mm as a multibody), as nothing damps the turning a snap leaves (`docs/known-bugs.md`). A branch or a closed loop settles pass by pass, so it holds under its own weight and gives way a little under a far heavier body: the numbers are in `docs/limits.md`.
 
 Each step is 8 substeps of 2 solver passes by default (`physics.substeps`, `physics.iterations`). `friction` defaults to 0.5, `restitution` to 0, and each combine rule to `average`; when two colliders ask for different rules the pair takes the higher, `max`, `multiply`, `min`, `average`. `collider.setFriction` and `collider.setRestitution` take effect at the next step.
 
