@@ -109,8 +109,8 @@ of (a disocclusion) is still rejected. A thin post's edge alternates 0.18 sRGB l
 against 3.26 before (`test/stability-browser.mjs`, WebGPU, RTX A6000; KB-TAA-EDGE1). Sources: B. Karis, "High Quality
 Temporal Supersampling", SIGGRAPH 2014 (closest-depth motion); D. Nehab et al., "Accelerating Real-Time Shading with
 Reverse Reprojection Caching", Graphics Hardware 2007; AMD FidelityFX Super Resolution 2 documentation, 2022 (depth and
-motion dilation). On the WebGL2 layer at 4x the edge still alternates with a fast camera (KB-TAA-COMPATEDGE2 in
-docs/known-bugs.md).
+motion dilation). On the WebGL2 layer at 4x the edge reads 0.175 (KB-TAA-COMPATEDGE2: 2.89 before mixed pixels took
+their nearest surface, below).
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -395,8 +395,11 @@ is `rgba16float` there (`rg16float` on WebGPU, 4 more bytes a sample), its `w` i
 sample and 0 elsewhere, and the camera pass writes the 1x targets itself. The layer reads the mean of a pixel's four
 samples, so the resolve divides that mean by its coverage and a silhouette pixel takes the object's whole motion instead
 of a mix with the camera's (KB-TAA-COMPATEDGE1; before, 25 of 10,812 pixels of a moving box kept 0.4 to 0.5 of its
-motion). Where two moving surfaces share a pixel, their motions mix by coverage; WebGPU takes the nearest sample's. A
-`TAAVelocityPass` writes `@location(0)` as `vec4f(velocity, 0, 1)`, as `RawShaders` and `ScatterVelocity` do.
+motion). The layer cannot read single samples, so where surfaces of clearly different depths share a pixel (1.6 times
+apart or more) the pixel takes the motion and depth of the nearest unmixed surface beside it, as WebGPU's nearest sample
+does (KB-TAA-COMPATEDGE2); closer surfaces mix by coverage. A `TAAVelocityPass` writes `@location(0)` as
+`vec4f(velocity, z, 1)`, `z` being log2 of the expected depth where that is above 0 and 0 elsewhere, as `RawShaders` and
+`ScatterVelocity` do; 0 throughout only weakens the mixed-pixel test.
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
 

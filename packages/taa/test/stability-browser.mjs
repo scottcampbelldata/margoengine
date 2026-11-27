@@ -6,8 +6,9 @@
 // with the Halton jitter (KB-OF2 in docs/limits.md, "TAAUpscale temporal stability").
 // TAA at full size is measured on the same path (KB-TAA-EDGE1): before its resolve took the motion of the nearest surface
 // in the 3x3 neighbourhood, each pixel's own motion and per-tap depth test dropped history at the silhouette on
-// alternate frames, 3.26 levels fast and 2.92 slow on WebGPU (RTX A6000). On the WebGL2 layer at 4x the post edge still
-// alternates (KB-TAA-COMPATEDGE2 in docs/known-bugs.md), so the bound is asserted on WebGPU only there.
+// alternate frames, 3.26 levels fast and 2.92 slow on WebGPU (RTX A6000). On the WebGL2 layer at 4x the motion resolve
+// sees only the mean of a pixel's samples, and a silhouette pixel read as a surface between the post and the wall gave
+// its false motion to its neighbour: 2.89 fast and 0.335 slow (KB-TAA-COMPATEDGE2). Asserted on both backends.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
@@ -192,15 +193,14 @@ try {
     fast.edge <= 2 * slow.edge,
     `a fast camera alternates ${fast.edge.toFixed(3)} levels against ${slow.edge.toFixed(3)} for a slow one`,
   );
-  if (!compatRun())
-    for (const [name, run] of [
-      ['fast', plainFast],
-      ['slow', plainSlow],
-    ])
-      assert.ok(
-        run.edge <= EDGE_BOUND,
-        `TAA: the post edge alternates ${run.edge.toFixed(3)} levels with a ${name} camera (bound ${EDGE_BOUND})`,
-      );
+  for (const [name, run] of [
+    ['fast', plainFast],
+    ['slow', plainSlow],
+  ])
+    assert.ok(
+      run.edge <= EDGE_BOUND,
+      `TAA: the post edge alternates ${run.edge.toFixed(3)} levels with a ${name} camera (bound ${EDGE_BOUND})`,
+    );
   // The footprint test keeps history at silhouettes and still drops it where the wall is uncovered.
   assert.ok(plainGhost.body > 50, `TAA: the box is drawn: ${plainGhost.body}`);
   assert.ok(

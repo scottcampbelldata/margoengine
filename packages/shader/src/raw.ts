@@ -257,7 +257,7 @@ fn margoVelocity(position:vec3f,before:vec3f)->MargoVelocity {return MargoVeloci
 const velocityFragment = `
 struct MargoMotion { @location(0) velocity:vec4f, @location(1) depth:f32 }
 @fragment fn margoVelocityFragment(i:MargoVelocity)->MargoMotion {var o:MargoMotion;o.velocity=vec4f(0,0,0,1);o.depth=-1;
-  if(i.previous.w>0&&margoBefore.valid>0){o.velocity=vec4f(i.clip.xy/camera.resolution-(i.previous.xy/i.previous.w*vec2f(0.5,-0.5)+0.5),0,1);o.depth=i.previous.z/i.previous.w;}return o;}
+  if(i.previous.w>0&&margoBefore.valid>0){let margoDepth=i.previous.z/i.previous.w;o.velocity=vec4f(i.clip.xy/camera.resolution-(i.previous.xy/i.previous.w*vec2f(0.5,-0.5)+0.5),select(0.0,log2(margoDepth),margoDepth>0),1);o.depth=margoDepth;}return o;}
 `;
 // The pick pass reads no part of the caller's fragment stage: a mesh's ID covers its whole shape.
 const pickFragment = '@fragment fn margoPick()->@location(0) u32 {return mesh.pickId;}\n';

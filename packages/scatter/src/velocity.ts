@@ -62,7 +62,7 @@ struct Output {@builtin(position) @invariant clip:vec4f,@location(0) current:vec
 struct Motion {@location(0) velocity:vec4f,@location(1) depth:f32}
 @fragment fn fragment(i:Output)->Motion {
  ${cover ? 'if(scatterCoverage(i.cover)<=i.cover.w){discard;}' : ''}var o:Motion;o.velocity=vec4f(0,0,0,1);o.depth=-1.0;
- if(i.previous.w>0.0){o.velocity=vec4f((i.current.xy/i.current.w-i.previous.xy/i.previous.w)*vec2f(0.5,-0.5),0,1);o.depth=i.previous.z/i.previous.w;}
+ if(i.previous.w>0.0){let e=i.previous.z/i.previous.w;o.velocity=vec4f((i.current.xy/i.current.w-i.previous.xy/i.previous.w)*vec2f(0.5,-0.5),select(0.0,log2(e),e>0.0),1);o.depth=e;}
  return o;
 }
 `;

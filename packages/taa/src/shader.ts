@@ -9,10 +9,11 @@ const frame = `struct Temporal {current:mat4x4f,previous:mat4x4f,inverse:mat4x4f
 export const fullscreen = `struct Fullscreen {@builtin(position) clip:vec4f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Fullscreen {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Fullscreen;o.clip=vec4f(p[i],0,1);return o;}`;
 // `velocity.w` is 1, the coverage channel of an rgba16float object target (TAA's KB-TAA-COMPATEDGE1 route on the
-// WebGL2 layer); an rg16float target drops it.
+// WebGL2 layer), and `velocity.z` is log2 of the expected depth (0 without one), so that route's resolve can tell a pixel
+// whose samples mix surfaces (mixedGap); an rg16float target drops both.
 const motion = `struct Motion {@location(0) velocity:vec4f,@location(1) depth:f32}
 fn motion(current:vec2f,previous:vec4f)->Motion {var o:Motion;o.velocity=vec4f(0,0,0,1);o.depth=-1;
-  if(previous.w>0){o.velocity=vec4f(current-(previous.xy/previous.w*vec2f(0.5,-0.5)+0.5),0,1);o.depth=previous.z/previous.w;}return o;}`;
+  if(previous.w>0){let e=previous.z/previous.w;o.velocity=vec4f(current-(previous.xy/previous.w*vec2f(0.5,-0.5)+0.5),select(0.0,log2(e),e>0),1);o.depth=e;}return o;}`;
 // The sky (depth 0, the reversed-Z far plane) moves with the camera's turn like any pixel and keeps history (depth 0)
 // from sky alone, so what is drawn over it with no depth of its own (volumetric clouds, stars, weather) is averaged
 // too; a surface's history there has a greater depth and is still rejected. Before 2026-11-13 the sky had none.
@@ -32,6 +33,40 @@ export const cameraVelocity =
 // drives the mean below 0 for every depth up to 1 (one of four: (-4 + 3) / 4), so that pixel rejects history as it did before
 // 2026-11-13. The value is a power of two, so the mean of four equal samples is exact. WebGPU picks the nearest sample.
 export const skySample = -4;
+// The WebGL2 layer's 4x motion resolve sees only the mean of a pixel's object samples. Where two surfaces meet in one
+// pixel that mean is a surface that is not there (a post 4 m away over a wall at 44 m read as one at 12 m, with a motion
+// between the two), and as the nearest candidate of its 3x3 it gave its false motion to the wall pixel beside it, so the
+// edge alternated 2.89 sRGB levels with a fast camera where WebGPU, which picks the nearest sample, alternates 0.18
+// (KB-TAA-COMPATEDGE2). The object samples also carry log2 of their expected depth: by Jensen's inequality log2 of the
+// mean depth exceeds the mean of log2 depth only where the depths differ, by about var(ln d) / (2 ln 2) for a narrow
+// spread. Above this gap the pixel takes the motion and expected depth of the nearest unmixed surface of its 3x3 that
+// is nearer than its mean (closest-depth dilation, as the resolve's own: Karis 2014; the dilation stage of AMD FSR 2),
+// which is what WebGPU's nearest sample gives it; with none it is no candidate (expected depth -1). 1/32 detects any mix of depths 1.6 times apart or more (half and half: 0.039; a quarter: 0.032), while a
+// plane's own spread inside a pixel stays far below it, and float16 rounding of log2 values up to 32 in size (each sample
+// and the mean, half a step of 1/64 at most) stays under half of it. Surfaces closer than that mix their motions by
+// coverage as before. A drawer that writes 0 in `z` only weakens the test: 0 is at least log2 of any depth up to 1.
+export const mixedGap = 1 / 32;
+// One pixel of the coverage route's 4x object targets: its motion, its expected depth (-2 where no object covers it) and
+// 1 where its samples mix surfaces.
+export const mixedSurface = `fn surface(q:vec2i)->vec4f {let m=textureLoad(velocity,q,0);if(m.w<=0){return vec4f(0,0,-2,0);}let e=textureLoad(expected,q,0).r/m.w;
+ return vec4f(m.xy/m.w,e,select(0.0,1.0,e>0&&log2(e)-m.z/m.w>${mixedGap}));}`;
+// The depth TAA's history keeps on that route: the scene's, and for a mixed pixel that of the neighbour whose surface its
+// motion took (TAA's motion resolve, same rule), since the layer's one-sample depth there may be the far surface's.
+export const nearestDepth =
+  fullscreen +
+  `
+@group(0) @binding(0) var velocity:texture_multisampled_2d<f32>;
+@group(0) @binding(1) var expected:texture_multisampled_2d<f32>;
+@group(0) @binding(2) var depth:texture_depth_2d;
+${mixedSurface}
+@fragment fn fragment(i:Fullscreen)->@builtin(frag_depth) f32 {let p=vec2i(i.clip.xy);var d=textureLoad(depth,p,0);let s=surface(p);
+ if(s.w>0){var near=s.z;let last=vec2i(textureDimensions(velocity))-1;for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+  let q=clamp(p+vec2i(x,y),vec2i(0),last);let n=surface(q);if(n.w==0&&n.z>near&&n.z<=1){near=n.z;d=textureLoad(depth,q,0);}}}}return d;}`;
+export const nearestCopy =
+  fullscreen +
+  `
+@group(0) @binding(2) var depth:texture_depth_2d;
+@fragment fn fragment(i:Fullscreen)->@builtin(frag_depth) f32 {return textureLoad(depth,vec2i(i.clip.xy),0);}`;
 export const multisampledCameraVelocity = /* @__PURE__ */ cameraVelocity.replace(
   'if(d==0){o.depth=0;}',
   `if(d==0){o.depth=${skySample};}`,
@@ -51,12 +86,18 @@ export function instancedVelocity(code: string): string {
       'struct MargoInstance {@location(5) m0:vec4f,@location(6) m1:vec4f,@location(7) m2:vec4f,@location(8) m3:vec4f,@location(9) tint:vec4f,@location(10) uvt:vec4f,@location(11) p0:vec4f,@location(12) p1:vec4f,@location(13) p2:vec4f,@location(14) p3:vec4f}\n@vertex fn vertex(i:Input,k:MargoInstance,',
     ],
     ['let world=f.model*p;', 'let world=(f.model*mat4x4f(k.m0,k.m1,k.m2,k.m3))*p;'],
-    ['o.previous=camera.previous*f.previousModel*old;', 'o.previous=camera.previous*(f.previousModel*mat4x4f(k.p0,k.p1,k.p2,k.p3))*old;'],
+    [
+      'o.previous=camera.previous*f.previousModel*old;',
+      'o.previous=camera.previous*(f.previousModel*mat4x4f(k.p0,k.p1,k.p2,k.p3))*old;',
+    ],
     ['o.uv=i.uv;o.alpha=i.color.a;', 'o.uv=i.uv;o.uv=o.uv*k.uvt.xyxy+k.uvt.zwzw;o.alpha=i.color.a*k.tint.a;'],
   ];
   for (const [from, to] of edits) {
     if (!code.includes(from))
-      throw new MargoError('state', 'TAA instanced velocity patch target missing; use matching @margoengine/taa sources');
+      throw new MargoError(
+        'state',
+        'TAA instanced velocity patch target missing; use matching @margoengine/taa sources',
+      );
     code = code.replace(from, to);
   }
   return code;

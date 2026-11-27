@@ -78,22 +78,33 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   "A Survey of Temporal Antialiasing Techniques", Computer Graphics Forum 39(2), 2020 (such tests fail at depth edges
   under subpixel motion).
 - **After:** 0.179 fast and 0.225 slow on WebGPU; a box crossing the wall leaves 0 red pixels behind it (4,139 drawn).
-  On the WebGL2 layer at 4x: 2.89 and 0.335 (see KB-TAA-COMPATEDGE2); with `antialias: false` the layer reads the same
-  as WebGPU, 0.275 and 0.147 on both.
+  On the WebGL2 layer at 4x: 2.89 and 0.335 until KB-TAA-COMPATEDGE2 was fixed (0.175 and 0.231 since); with
+  `antialias: false` the layer reads the same as WebGPU, 0.275 and 0.147 on both.
 - **Regression:** `packages/taa/test/stability-browser.mjs` asserts TAA's edge alternation at most 0.25 fast and slow on
   WebGPU (fails before: 3.26 and 2.92) and no trail behind the box on both backends.
 
-### Open 2026-11-27: on the WebGL2 layer at 4x a TAA silhouette still alternates with a fast camera (KB-TAA-COMPATEDGE2, taa, webgl2-compat)
+### Fixed 2026-11-27: on the WebGL2 layer at 4x a TAA silhouette alternated with a fast camera (KB-TAA-COMPATEDGE2, taa, webgl2-compat)
 
 - **Repro:** `MARGO_COMPAT=1 node packages/taa/test/stability-browser.mjs` (RTX A6000, ANGLE Direct3D 11): TAA's post
-  edge alternates 2.89 sRGB levels with the fast camera and 0.335 with the slow one (bound 0.25; WebGPU 0.179 and
-  0.225). Not asserted on this layer until fixed.
-- **Cause, narrowed:** the 4x route. The same scene at `antialias: false` reads 0.275 and 0.147 on the layer, the same
-  as on WebGPU at 1x. Ruled out on the 4x layer route: the candidate choice (selecting by the current depth or by the
-  expected depth gives 2.89 to 2.93) and the footprint test (accepting every footprint gives 2.62 fast and raises slow to
-  1.14). Left: the layer reads every sample of a 4x texture from its resolved copy, so the motion resolve takes the mean
-  of four samples (KB-TAA-COMPATEDGE1), where two static surfaces in one pixel mix their motions by coverage, and the
-  one-sample depth resolve feeds the camera pass. Next: read back the 4x motion at the post's edge on both routes.
+  edge alternated 2.89 sRGB levels with the fast camera and 0.335 with the slow one (bound 0.25; WebGPU 0.179 and
+  0.225); at `antialias: false` the layer read 0.275 and 0.147, as WebGPU does.
+- **Cause:** read back at the post's edge (row 240): GLSL ES 3.00 has no `sampler2DMS`, so the layer's motion resolve
+  sees only the mean of a pixel's four object samples (KB-TAA-COMPATEDGE1). A pixel the post 4 m away half covers over
+  the wall at 44 m read as one surface of expected depth 0.0077 (post 0.0253, wall 0.0022) moving 3.36 px (post 0.44,
+  wall 4.28), a surface that is not there. The resolve's closest-depth choice (KB-TAA-EDGE1) then gave that false motion
+  to the wall pixel beside it. Second, the layer's depth resolve is one sample (a blit), so TAA's history kept the wall's
+  depth at pixels where WebGPU's nearest sample keeps the post's: WebGPU with its depth resolve forced to sample 0 reads
+  0.39 fast.
+- **Fixed:** object velocity shaders (TAA's, `RawShaders`, `ScatterVelocity`) write log2 of the expected depth in the 4x
+  target's spare `z`. By Jensen's inequality log2 of the mean depth exceeds the mean of log2 depth only where the
+  samples' depths differ; above a gap of 1/32 (any mix of depths 1.6 times apart or more, far above a plane's own spread
+  and float16 rounding) the motion resolve gives the pixel the motion and expected depth of the nearest unmixed surface
+  of its 3x3 that is nearer than its mean, and a new 1x depth32float target gives TAA's history that surface's depth:
+  what WebGPU's nearest sample gives. Only the layer's 4x route draws the extra pass (one fullscreen depth write);
+  WebGPU's calls change only in the shader text. Sources: Karis 2014 and AMD FSR 2's depth and motion dilation (as
+  KB-TAA-EDGE1). After: 0.175 fast and 0.231 slow on the layer (WebGPU 0.179 and 0.225, unchanged).
+- **Regression:** `packages/taa/test/stability-browser.mjs` now asserts the 0.25 bound on the WebGL2 layer as well
+  (fails before: 2.89). Left: surfaces closer than 1.6 times in depth still mix their motions by coverage there.
 
 ### Fixed 2026-11-27: TAA variance clipping moved a transparent canvas's colour and alpha apart (KB-TAA-ALPHACLIP1, taa)
 

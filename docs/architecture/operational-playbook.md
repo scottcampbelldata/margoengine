@@ -3215,6 +3215,8 @@ on. TAAUpscale already reprojected with unjittered matrices. Evidence: `packages
 
 **TAA motion coverage on the WebGL2 layer (2026-11-27, KB-TAA-COMPATEDGE1).** GLSL ES 3.00 has no `sampler2DMS`, so the layer reads every sample of a 4x texture from its blit-resolved copy and TAA's motion resolve saw the mean of a pixel's four samples: at a silhouette, object samples mixed with the camera pass's broadcast value and the box's motion came out halved. At 4x on the layer only (`compatTier`), the camera pass now writes the 1x targets itself, object velocity draws write `vec4f(velocity, 0, 1)` into cleared rgba16float 4x targets (4 more bytes a sample), and the resolve writes mean / coverage where coverage is above 0, keeping the camera's value elsewhere. WebGPU keeps rg16float and its nearest-sample pick. Evidence: `packages/taa/test/instance-velocity-browser.mjs --compat` (11,013 of 11,013 moving pixels; 10,787 of 10,812 before) and `far-velocity-browser.mjs` (every box pixel within 0.6 to 1.4 times the median, WebGPU and the layer). Missing: two moving surfaces in one pixel mix by coverage on the layer; no test measures that case.
 
+**Mixed silhouette pixels on the WebGL2 layer (2026-11-27, KB-TAA-COMPATEDGE2).** The coverage route's mean of a pixel whose samples hold two surfaces is a surface between them, and TAA's closest-depth choice handed it to the neighbour; the layer's one-sample depth resolve also gave history the far surface's depth. Object velocity shaders now write log2 of the expected depth in the 4x target's `z`; where log2 of the mean depth exceeds the mean log2 by more than 1/32 (Jensen's inequality: depths 1.6 times apart or more) the pixel takes the motion, expected depth and current depth of the nearest unmixed surface of its 3x3, as WebGPU's nearest sample does, the depth through one fullscreen depth32float pass on that route only. Evidence: `packages/taa/test/stability-browser.mjs --compat`, 2.89 to 0.175 fast and 0.335 to 0.231 slow (WebGPU 0.179 and 0.225), now asserted on both. Missing: surfaces closer than 1.6 times in depth still mix by coverage; measured on ANGLE Direct3D 11 only.
+
 **Motion vectors without the resolve (2026-11-05).** TAA's `velocityOnly` leaves out jitter, capture, history and resolve, so `MotionBlur`
 no longer pays for them, and the blur runs inside the `PostStack`. It reads the depth and scene target another plugin made, so a
 4x MSAA frame with no `PostStack` throws `state`. Evidence: `packages/taa/test/velocity-only-browser.mjs`, RTX A6000 only.
@@ -11543,8 +11545,8 @@ surface in the 3x3 neighbourhood (closest-depth motion, Karis 2014; FSR2's dilat
 lies inside the depth range of the 3x3 history footprint (TAAUpscale's test; Nehab et al. 2007), where it took each
 pixel's own motion and tested each tap. Evidence (section 5): `taa/test/stability-browser.mjs`, a thin post round an
 orbiting camera, edge alternation 3.26 to 0.179 sRGB levels fast and 2.92 to 0.225 slow on WebGPU (RTX A6000), bound
-0.25, no trail behind a box crossing the wall on both backends. Missing: the WebGL2 layer at 4x reads 2.89 and 0.335
-(KB-TAA-COMPATEDGE2, open; at 1 sample it matches WebGPU).
+0.25, no trail behind a box crossing the wall on both backends. The WebGL2 layer at 4x read 2.89 and 0.335 until
+KB-TAA-COMPATEDGE2 (0.175 and 0.231 since, asserted).
 
 JPEG 2000 hostile input (2026-11-27, KB-J2K-HOSTILE1): headers can ask for far more memory and work than their bytes
 carry, so the kernel bounds tile-components (2^20), structures per tile (2^22), packets by header bytes and visits by a

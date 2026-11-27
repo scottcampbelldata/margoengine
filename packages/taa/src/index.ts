@@ -21,6 +21,10 @@ import {
   cameraVelocity,
   multisampledCameraVelocity,
   skySample,
+  mixedGap,
+  mixedSurface,
+  nearestCopy as nearestCopyShader,
+  nearestDepth as nearestDepthShader,
   objectVelocity,
   snapshot,
   resolve,
@@ -167,9 +171,10 @@ export interface TAAVelocity {
 /**
  * TAA's object velocity pass as handed to a {@link TAAVelocityPass}: draw with `targets`, `depthStencil` and `samples`,
  * reading `camera` (this frame's jittered view-projection, last frame's in the target, then the target's size and 1 when
- * there is history). One pass per view, each with its own `key`. Write `@location(0)` as `vec4f(velocity, 0, 1)`: at 4x
- * MSAA on the WebGL2 layer `targets[0]` is rgba16float and `w` is the pixel's coverage (KB-TAA-COMPATEDGE1); an
- * rg16float target drops `zw`.
+ * there is history). One pass per view, each with its own `key`. Write `@location(0)` as `vec4f(velocity, z, 1)` with `z`
+ * log2 of the expected depth where it is above 0, else 0: at 4x MSAA on the WebGL2 layer `targets[0]` is rgba16float,
+ * `w` is the pixel's coverage (KB-TAA-COMPATEDGE1) and `z` tells a pixel that mixes surfaces (KB-TAA-COMPATEDGE2; 0
+ * everywhere only weakens that test); an rg16float target drops `zw`.
  */
 export interface TAAVelocityFrame {
   readonly context: Extract<PassContext, { backend: 'webgpu' }>;
@@ -325,6 +330,14 @@ export class TAA implements EnginePlugin {
   private motionResolve?: GPURenderPipeline;
   private motionGroup?: GPUBindGroup;
   private motionDepth?: GPUTextureView;
+  /**
+   * With coverage (KB-TAA-COMPATEDGE2): the depth TAA's history keeps, the layer's one-sample scene depth where a pixel's
+   * object samples mix surfaces replaced by the depth of the nearest surface its motion took, as WebGPU's nearest sample
+   * gives. `nearestPipelines[0]` copies the scene depth on a frame with no object draw, `[1]` corrects it.
+   */
+  private nearestPipelines: GPURenderPipeline[] = [];
+  private nearestGroups: GPUBindGroup[] = [];
+  private nearestView?: GPUTextureView;
   /**
    * 4x MSAA on the WebGL2 layer (KB-TAA-COMPATEDGE1): the layer reads a 4x texture's samples from its resolved copy, so
    * the motion resolve sees their mean. The camera pass then writes the 1x targets itself and object draws write a
@@ -730,6 +743,9 @@ export class TAA implements EnginePlugin {
     this.velocityView = this.velocityTarget.createView();
     this.expectedView = this.expected.createView();
     this.motionViews = [];
+    this.nearestPipelines = [];
+    this.nearestGroups = [];
+    this.nearestView = undefined;
     this.motionResolve = undefined;
     this.motionGroup = undefined;
     this.motionDepth = undefined;
@@ -757,9 +773,10 @@ export class TAA implements EnginePlugin {
         this.textures.push(t);
         this.motionViews.push(t.createView());
       }
-      // With coverage the 4x targets hold only object samples (velocity, 0, 1) over a cleared 0, so their mean is
-      // c x (object, 0, 1) for coverage c; a pixel no object covers keeps what the camera pass wrote (`discard`). That
-      // is exact for one moving surface per pixel; where two meet, their motions mix by coverage.
+      // With coverage the 4x targets hold only object samples (velocity, log2 depth, 1) over a cleared 0, so their mean
+      // is c x (object, log2 depth, 1) for coverage c; a pixel no object covers keeps what the camera pass wrote
+      // (`discard`). That is exact for one moving surface per pixel; a pixel whose samples hold surfaces of clearly
+      // different depths is no candidate for the resolve's nearest surface (mixedGap, KB-TAA-COMPATEDGE2).
       const module = c.device.createShaderModule({
         code: this.coverage
           ? fullscreen +
@@ -767,8 +784,11 @@ export class TAA implements EnginePlugin {
 @group(0) @binding(0) var velocity:texture_multisampled_2d<f32>;
 @group(0) @binding(1) var expected:texture_multisampled_2d<f32>;
 struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
-@fragment fn fragment(i:Fullscreen)->Motion {let p=vec2i(i.clip.xy);let m=textureLoad(velocity,p,0);if(m.w<=0){discard;}
- var o:Motion;o.velocity=m.xy/m.w;o.depth=textureLoad(expected,p,0).r/m.w;return o;}`
+${mixedSurface}
+@fragment fn fragment(i:Fullscreen)->Motion {let p=vec2i(i.clip.xy);let s=surface(p);if(s.z==-2){discard;}
+ var o:Motion;o.velocity=s.xy;o.depth=s.z;
+ if(s.w>0){o.depth=-1;var near=s.z;let last=vec2i(textureDimensions(velocity))-1;for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+  let n=surface(clamp(p+vec2i(x,y),vec2i(0),last));if(n.w==0&&n.z>near&&n.z<=1){near=n.z;o.velocity=n.xy;o.depth=n.z;}}}}return o;}`
           : fullscreen +
             `
 @group(0) @binding(0) var velocity:texture_multisampled_2d<f32>;
@@ -784,6 +804,24 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         vertex: { module, entryPoint: 'vertex' },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rg16float' }, { format: 'r32float' }] },
       });
+      if (this.coverage && !only) {
+        const target = c.device.createTexture({
+          size: [c.width, c.height],
+          format: 'depth32float',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        });
+        this.textures.push(target);
+        this.nearestView = target.createView();
+        this.nearestPipelines = [nearestCopyShader, nearestDepthShader].map((code) => {
+          const module = c.device.createShaderModule({ code });
+          return c.device.createRenderPipeline({
+            layout: 'auto',
+            vertex: { module, entryPoint: 'vertex' },
+            fragment: { module, entryPoint: 'fragment', targets: [] },
+            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'always' },
+          });
+        });
+      }
     }
     if (!only) {
       const step = this.options.present;
@@ -873,6 +911,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           entries: resources.flatMap((resource, binding) => (resource ? [{ binding, resource }] : [])),
         });
       this.cameraGroup = group(this.cameraPipeline!, [{ buffer: this.uniform! }, this.sampledDepth]);
+      this.nearestGroups = this.nearestPipelines.map((p, i) =>
+        group(p, i ? [...this.motionViews, this.sampledDepth] : [undefined, undefined, this.sampledDepth]),
+      );
       if (!this.options.velocityOnly)
         this.resolveGroups = [0, 1].map((i) =>
           group(this.resolvePipeline!, [
@@ -880,7 +921,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
             this.colorView!,
             this.velocityView!,
             this.expectedView!,
-            this.sampledDepth!,
+            this.nearestView ?? this.sampledDepth!,
             this.histories[i].createView(),
             this.historyDepths[i].createView(),
             this.histories[1 - i].createView(),
@@ -978,6 +1019,22 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       });
       pass.setPipeline(this.motionResolve!);
       pass.setBindGroup(0, this.motionGroup!);
+      pass.draw(3);
+      pass.end();
+    }
+    if (this.nearestView) {
+      const pass = c.encoder.beginRenderPass({
+          colorAttachments: [],
+          depthStencilAttachment: {
+            view: this.nearestView,
+            depthLoadOp: 'clear',
+            depthClearValue: 0,
+            depthStoreOp: 'store',
+          },
+        }),
+        corrected = +drew;
+      pass.setPipeline(this.nearestPipelines[corrected]);
+      pass.setBindGroup(0, this.nearestGroups[corrected]);
       pass.draw(3);
       pass.end();
     }
@@ -1507,6 +1564,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.activeView = undefined;
     this.captureReady = false;
     this.motionViews = [];
+    this.nearestPipelines = [];
+    this.nearestGroups = [];
+    this.nearestView = undefined;
     this.motionResolve = undefined;
     this.motionGroup = undefined;
     this.motionDepth = undefined;
