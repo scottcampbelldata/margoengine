@@ -32,6 +32,9 @@ try {
     const d = engine.gpu;
     d.pushErrorScope('validation');
     engine.lighting.direction.set([0.3, 1, 0.2, 2]);
+    // The backdrop the waterline check's bar was measured on: core's clear colour as a linear capture held it before
+    // KB-CLEAR-DEFAULT1 (0.018, 0.023, 0.035), named here so the check does not follow core's default (KB-CLEAR-CHECKS1).
+    engine.scene.background = '#242a35';
     const marker = engine
       .createMesh()
       .setGeometry(box(3, 3, 3))

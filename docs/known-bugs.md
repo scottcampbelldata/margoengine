@@ -137,6 +137,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `Math.abs(want)`.
 - **Regression:** the five checks above, which pass on main with the fix (and the contact check on WebGPU too) and
   fail without it.
+- **Also (2026-11-27, water):** `packages/water/test/underwater.browser.mjs` failed the same way: "waterline
+  intersection misses subpixel wet coverage: 0.00074". The row its waterline crosses is mostly core's clear colour,
+  which the HDR capture now holds as 0.00139 red where it held 0.018, so the same coverage moved the pixel 13 times less.
+  The check sets the same `'#242a35'` background; no bar changed. It passes on WebGPU and the WebGL2 layer.
 
 ### Open 2026-11-26: an `-srgb` view target without `viewFormats` fails with a raw validation error (KB-VIEW-SRGB-ERROR1, core)
 
