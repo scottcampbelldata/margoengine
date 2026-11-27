@@ -3,7 +3,11 @@
 // white to the least light the 8-bit display shows as 255, and its WGSL twin must use the same white.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { neutralInverseShader, neutralWhite, pbrNeutral, pbrNeutralInverse } from '../packages/shared/display.js';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
+import { pbrNeutral } from '../packages/shared/display.js';
+import { neutralInverseShader, neutralWhite, pbrNeutralInverse } from '../packages/shared/display-inverse.js';
+import { bundleBytes } from '../scripts/measure-size.js';
 
 const encode = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055);
 const top = 1 - (0.24 * 0.24) / (neutralWhite - 0.56);
@@ -43,4 +47,17 @@ test('display white reads as the least light the display shows as 255', () => {
 test('the WGSL twin uses the same display white', () => {
   const constant = Number(/let top=([\d.e-]+);/.exec(neutralInverseShader)[1]);
   assert.ok(Math.abs(constant - top) < 1e-12, `${constant} vs ${top}`);
+});
+
+// KB-SIZE-DISPLAYINV1: the inverse lived in display.js, and its constants, computed at load, stayed in every bundle that
+// imported anything from that module (+51 B gzip in each sky cloud entry, which never reads a display target).
+test('a bundle that uses the forward display curve carries nothing of the inverse', async (t) => {
+  const dir = mkdtempSync(resolve(import.meta.dirname, '.display-bundle-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const entry = join(dir, 'entry.js'),
+    target = relative(dir, resolve(import.meta.dirname, '../packages/shared/display.js')).split(sep).join('/');
+  writeFileSync(entry, `export { displayShader } from '${target}';`);
+  const code = String(await bundleBytes(entry, () => false));
+  assert.match(code, /fn toDisplay/);
+  assert.doesNotMatch(code, /254\.5|pbrNeutralInverse|\.0576/);
 });

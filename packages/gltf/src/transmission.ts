@@ -14,7 +14,7 @@ import {
 import type { PBRModel, PBRTransmission } from './model.js';
 import { sceneTarget } from '../../shared/msaa.js';
 import { linearHdr } from '../../shared/hdr-format.js';
-import { neutralInverseShader } from '../../shared/display.js';
+import { neutralInverseShader } from '../../shared/display-inverse.js';
 import { nativeGlass } from '../../materials/src/native-glass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';

@@ -617,7 +617,7 @@ It needs no post effect. It reads the view's scene capture: an HDR `PostStack` t
 one (an LDR `PostStack`, or the native glass capture gltf/pbr keeps for glass on the canvas) through the inverse of the
 display transform, Khronos PBR Neutral then sRGB, so the copy holds scene light either way and clear IOR 1 glass shows
 exactly what is behind it. Display white reads as the least light that shows as white (`neutralWhite` in
-`shared/display.js`, about 13.5), so rough glass over a clipped white background blurs it brighter than an HDR capture
+`shared/display-inverse.js`, about 13.5), so rough glass over a clipped white background blurs it brighter than an HDR capture
 would. A view with no capture (an environment probe face, a `createRenderer` pass) keeps the tinted blend.
 
 `Transmission.attach(engine, {depthWrite: true})` draws OPAQUE and MASK glass as a surface: unblended, writing depth,

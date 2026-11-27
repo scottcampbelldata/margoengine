@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { transmission, Transmission } from '../dist/transmission.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
-import { neutralInverseShader, pbrNeutral, pbrNeutralInverse } from '../../shared/display.js';
+import { pbrNeutral } from '../../shared/display.js';
+import { neutralInverseShader, pbrNeutralInverse } from '../../shared/display-inverse.js';
 import { wgslModule } from './support/wgsl-subset.js';
 
 const W = 200,

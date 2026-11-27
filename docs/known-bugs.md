@@ -3970,6 +3970,12 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   again. It ends with its host, closed or not (Node starts each child in a job that kills it on close). The real close
   test then passed 20 of 20 beside four CPU hogs (3.1 min, 100% CPU). Regression: tests/killer.test.js.
 
+### Fixed 2026-11-27: every importer of the display module carried the inverse display curve (KB-SIZE-DISPLAYINV1, shared, bundle size)
+
+- **Repro:** `tests/display-neutral-inverse.test.js`, "a bundle that uses the forward display curve carries nothing of the inverse": bundle `export { displayShader } from 'packages/shared/display.js'`; the output held `((254.5/255+.055)/1.055)**2.4` and the white constant. In the sky cloud entries this was +51 B (volumetric-clouds base 11,262 to 11,313 B gzip) and +54 B (compat-clouds base 23,870 to 23,924), both over their ceilings.
+- **Cause:** 6ef3c82192 put the inverse (KB4000) into `shared/display.js`. Its constants are computed when the module loads and its WGSL is a template literal holding one of them, which the bundler does not drop from a module another export is used from.
+- **Fixed:** the inverse is in `shared/display-inverse.js`, imported only by `gltf/transmission`. Regression: the test above.
+
 ### Fixed 2026-11-25: SSAO and GTAO occluded one-pixel tips of a lone face's silhouette (KB-SSAO-SILHOUETTE1, post, normal reconstruction)
 
 - **Repro:** `packages/post/test/ssao-silhouette-browser.mjs`: a box facing the camera with nothing near it, turned about the view axis in 12 steps, should read occlusion 1 everywhere. On WebGPU 4 silhouette pixels read down to 0.78 at 2 of the turns; on the WebGL2 layer, whose 4x sample positions leave more one-pixel tips, 1 to 3 pixels read down to 0.72 at 10 of them. Found as the 2.3 of 255 left on the WebGL2 layer by the KB-POST-ALPHARIM1 check.
