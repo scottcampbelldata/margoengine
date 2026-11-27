@@ -238,6 +238,11 @@ console.log(drilled.mesh.faces.length, drilled.nonManifoldEdges, drilled.faceMap
 - Output faces keep their source face IDs where free and interpolate UVs; `sources` maps each output face to its
   input face and `faceMap.a` / `faceMap.b` list each input face's pieces. Pieces of one source face that form a convex
   face again are merged back.
+- Triangles with no area are removed from the inputs first, by all three booleans: corners in one point become one
+  vertex, and a triangle with its corners in a line (a cap) goes by splitting the face across its longest edge at the
+  middle corner (Botsch and Kobbelt, "A robust procedure to eliminate degenerate faces from triangle meshes", VMV
+  2001, https://www.graphics.rwth-aachen.de/publication/188/). A removed face lists no pieces in `faceMap`. Polygons
+  of four or more corners with no area are still refused.
 
 ### Limits: tolerance, not exact arithmetic
 

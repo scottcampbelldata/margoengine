@@ -1,5 +1,6 @@
 import { MargoError, type MutableVec2, type MutableVec3 } from '@margoengine/math';
 import { assertOptions } from './edit-support.js';
+import { withoutFlatTriangles } from './flat-triangles.js';
 import { assertPolygonMesh, collectPolygonEdges, polygonAreaVector, polygonGeometryError } from './polygon.js';
 import { loopFaces } from './polygon-split.js';
 import type { PolygonFace, PolygonMesh } from './types.js';
@@ -292,7 +293,7 @@ export function assertSolid(mesh: PolygonMesh, label: string): void {
     );
 }
 
-function polygonsOf(mesh: PolygonMesh, input: 0 | 1): Poly[] {
+function polygonsOf(mesh: PolygonMesh, input: 0 | 1, origin?: ReadonlyMap<string, string>): Poly[] {
   return mesh.faces.map((face) => {
     const points = face.vertices.map((v) => [...mesh.vertices[v]]),
       area = polygonAreaVector(points as MutableVec3[]),
@@ -305,7 +306,7 @@ function polygonsOf(mesh: PolygonMesh, input: 0 | 1): Poly[] {
       uv: face.uv.map((uv) => [...uv]),
       plane: { n, w: n[0] * c[0] + n[1] * c[1] + n[2] * c[2] },
       input,
-      face: face.id,
+      face: origin?.get(face.id) ?? face.id,
     };
   });
 }
@@ -313,7 +314,9 @@ function polygonsOf(mesh: PolygonMesh, input: 0 | 1): Poly[] {
 /**
  * Boolean of two closed solids: `union` (in either), `difference` (in `a`, not in `b`) or `intersection` (in
  * both). Both inputs must be closed, consistently wound and outward facing; they may overlap, touch, share coplanar
- * faces, nest or be apart. Built on solid BSP trees (Thibault and Naylor, 1987): faces are clipped against the other
+ * faces, nest or be apart. Triangles with no area are removed from the inputs first (a collinear one by splitting the
+ * face across its longest edge), so a source face of an output may be listed under the neighbor it was split from and
+ * a removed face under none. Built on solid BSP trees (Thibault and Naylor, 1987): faces are clipped against the other
  * solid's planes in floating point with a plane tolerance (see `tolerance`), each split point is computed from the
  * same edge end on both sides so neighbors agree, then vertices are welded, T-junctions are closed and slivers with no
  * area are dropped. The result is checked to be closed (every half-edge has its twin) before it is returned. Shapes
@@ -335,8 +338,10 @@ export function booleanMeshes(
   if (operation !== 'union' && operation !== 'difference' && operation !== 'intersection')
     throw new TypeError("Boolean operation must be 'union', 'difference' or 'intersection'; choose one.");
   assertOptions(options, 'Boolean');
-  assertSolid(a, 'a');
-  assertSolid(b, 'b');
+  const solidA = withoutFlatTriangles(a),
+    solidB = withoutFlatTriangles(b);
+  assertSolid(solidA.mesh, 'a');
+  assertSolid(solidB.mesh, 'b');
   if (options.createId !== undefined && typeof options.createId !== 'function')
     throw new TypeError('Boolean createId must be a function; supply a generator or omit it.');
   if (options.signal !== undefined && !(options.signal instanceof AbortSignal))
@@ -356,8 +361,8 @@ export function booleanMeshes(
   const splitter = new Splitter(tolerance),
     A = new Node(splitter, tick),
     B = new Node(splitter, tick);
-  A.build(polygonsOf(a, 0));
-  B.build(polygonsOf(b, 1));
+  A.build(polygonsOf(solidA.mesh, 0, solidA.origin));
+  B.build(polygonsOf(solidB.mesh, 1, solidB.origin));
   if (operation === 'union') {
     A.clipTo(B);
     B.clipTo(A);

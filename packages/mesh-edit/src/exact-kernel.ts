@@ -14,6 +14,7 @@ import {
   mergeGroup,
 } from './boolean.js';
 import { assertOptions } from './edit-support.js';
+import { type Flattened, withoutFlatTriangles } from './flat-triangles.js';
 import { indexOfLeast } from './least.js';
 import { assertPolygonMesh, dominantAxis, faceGeometryError, newellNormal } from './polygon.js';
 import { convexLoopPieces } from './polygon-split.js';
@@ -916,6 +917,7 @@ function clipTrees(space: Space, A: Tree, B: Tree, operation: MeshBooleanOperati
  * costs the faces near it. Inputs must be closed, consistently wound and outward facing. Separate shells of one input
  * that overlap are joined first, and `sources` and `faceMap` still name the input's faces; a single surface that crosses
  * itself is refused. Output faces keep source IDs and interpolate UVs as `booleanMeshes` does.
+ * Triangles with no area are removed from the inputs first, as `booleanMeshes` removes them.
  * @throws TypeError for an input that is not a closed, outward, consistently wound mesh, or bad options; MargoError
  * `failed` when a single surface of an input crosses itself; the signal's reason when aborted.
  */
@@ -928,24 +930,27 @@ export function booleanMeshesExact(
   if (operation !== 'union' && operation !== 'difference' && operation !== 'intersection')
     throw new TypeError("Boolean operation must be 'union', 'difference' or 'intersection'; choose one.");
   assertOptions(options, 'Exact boolean');
-  assertSolid(a, 'a');
-  assertSolid(b, 'b');
+  const flatA = withoutFlatTriangles(a),
+    flatB = withoutFlatTriangles(b);
+  assertSolid(flatA.mesh, 'a');
+  assertSolid(flatB.mesh, 'b');
   if (options.createId !== undefined && typeof options.createId !== 'function')
     throw new TypeError('Exact boolean createId must be a function; supply a generator or omit it.');
   if (options.signal !== undefined && !(options.signal instanceof AbortSignal))
     throw new TypeError('Exact boolean signal must be an AbortSignal; pass controller.signal or omit it.');
   options.signal?.throwIfAborted();
-  const left = joinShells(a, options),
-    right = joinShells(b, options),
+  const left = joinShells(flatA.mesh, options),
+    right = joinShells(flatB.mesh, options),
     result = exactBoolean(left.mesh, right.mesh, operation, options);
-  if (!left.origin && !right.origin) return result;
+  if (!left.origin && !right.origin && !flatA.origin && !flatB.origin) return result;
   const faceMap = {
       a: Object.fromEntries(a.faces.map((face) => [face.id, [] as string[]])),
       b: Object.fromEntries(b.faces.map((face) => [face.id, [] as string[]])),
     },
     sources: Record<string, MeshBooleanFaceSource> = {};
   for (const [id, { input, face }] of Object.entries(result.sources)) {
-    const named = (input === 'a' ? left : right).origin?.get(face) ?? face;
+    const joined = (input === 'a' ? left : right).origin?.get(face) ?? face,
+      named = (input === 'a' ? flatA : flatB).origin?.get(joined) ?? joined;
     sources[id] = { input, face: named };
     faceMap[input][named].push(id);
   }
@@ -1183,10 +1188,14 @@ export function batchExactKernel(
     throw new TypeError('Batch createId must be a function; supply a unique ID generator.');
   options.signal?.throwIfAborted();
   let total = 0;
-  for (const mesh of meshes) {
+  const solids: Flattened[] = [];
+  for (const input of meshes) {
     // Empty solids participate in the set algebra, while malformed empty meshes still reject.
+    const solid = input?.faces?.length ? withoutFlatTriangles(input) : { mesh: input },
+      mesh = solid.mesh;
     if (mesh?.faces?.length) assertSolid(mesh, 'batch');
     else assertPolygonMesh(mesh);
+    solids.push(solid);
     total += mesh.vertices.length + mesh.faces.length;
     if (total > 400000)
       throw new RangeError('Batch inputs exceed 400000 vertices plus faces; split the input collection.');
@@ -1194,11 +1203,11 @@ export function batchExactKernel(
   const faceMap = meshes.map((mesh) => Object.fromEntries(mesh.faces.map((face) => [face.id, [] as string[]]))),
     work = { exactSpaces: meshes.length ? 1 : 0, materializations: 0, treeBuilds: 0 },
     sourceOf = new Map<string, MeshBatchFaceSource>(),
-    tagged = meshes.map((mesh, input) => ({
+    tagged = solids.map(({ mesh, origin }, input) => ({
       vertices: mesh.vertices,
       faces: mesh.faces.map((face) => {
         const id = `${input}:${face.id}`;
-        sourceOf.set(id, { input, face: face.id });
+        sourceOf.set(id, { input, face: origin?.get(face.id) ?? face.id });
         return { ...face, id };
       }),
     })),
