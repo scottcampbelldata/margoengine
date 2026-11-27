@@ -18065,6 +18065,13 @@ The two-sided Jacobi correction is positive when its weight is below
 `1/r`. The eighth-order grid uses one half. The coarser corrections still
 use their nearest-face graph. [Jinchao Xu and Ludmil Zikatanov, *Algebraic multigrid methods*, 2017, equations 4.3–4.6](https://doi.org/10.1017/S0962492917000083)
 
+For large eighth-order volumes, the preconditioner adds the positive
+column inverse and the symmetric Galerkin correction by acting on the
+same residual. The sum stays positive definite and does not evaluate
+the fine matrix between those two corrections. The finite projection
+itself still applies the original eighth-order operator.
+[James Bramble, Joseph Pasciak and Jinchao Xu, *Parallel multilevel preconditioners*, 1990](https://doi.org/10.1090/S0025-5718-1990-1023042-6)
+
 ### SEA-12 finite quay wake
 
 Craig and Sulem, *Numerical Simulation of Gravity Waves* (1993), express the gravity-wave variables as

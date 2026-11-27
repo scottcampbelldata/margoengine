@@ -1528,6 +1528,15 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   The ten-minute preflight stopped during its first nonzero harmonic projection.
   The probe used a localized trace from the archived incident spectrum on the full mask.
 
+  The larger eighth-order solves now add the symmetric column and Galerkin corrections.
+  `coupling/loads-quay-additive.test.js` checks identical operators at both aperture grid
+  spacings and at a high-frequency masked control above the selection size. At 0.075 m,
+  total fine and coarse face visits fall from 104.36 million to 66.01 million for the Robin
+  projection and from 111.74 million to 72.05 million for the submerged impulse.
+  The method removes an eight-byte scratch word per volume slot, or 1.08 GiB at the full
+  145-million-slot grid. Iterations can rise as each iteration becomes cheaper.
+  Projection tolerance and the accepted aperture geometry stay the same.
+
   A separate 7.2 × 4.2 m local passage used the same archived hull-source spectrum on 0.15 m
   and 0.075 m cells, with the same 34 depth layers and 210 fourth-order 60 Hz ticks on
   `8a9103610a`. The four area-averaged traces use identical 0.30 × 0.30 m footprints and fixed

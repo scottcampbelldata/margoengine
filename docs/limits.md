@@ -10722,10 +10722,13 @@ The default 60 Hz midpoint solves a Robin surface condition with preconditioned 
 wave evolution under held pressure. The source kick and forward sponge remain outside the stages. The
 option adds one f64 per surface cell in scratch and reuses the source buffers to publish the full step
 atomically. It retains pressure as the full-tick potential difference. The optional loads entry measures
-63,056 B gzip. Grids with
+63,109 B gzip. Grids with
 at least 2,048 volume cells can use a Galerkin coarse correction. The aggregates follow connected faces in
 each horizontal layer. Protected curtain faces remain distinct on both sides so their lower openings keep
 the original sum of conductances. Smaller grids use the same block-column solve directly.
+Eighth-order grids with at least 32,768 volume slots add the column and coarse corrections
+independently. This skips two fine matrix products per iteration and one f64 scratch word
+per volume slot. The geometry, linear residual target and iteration limit stay the same.
 When at least half the volume is solid, the hot projection and fine-grid interpolation passes visit
 an ordered list of wet cells. The list adds four bytes per wet cell. Published depth and source
 arrays retain the rectangular layout.
