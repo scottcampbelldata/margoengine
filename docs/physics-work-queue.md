@@ -81,12 +81,10 @@ there, add a line below with the solver ID and what is needed, and build against
   first tick after a one-cell rebase. Reproduce with a same-rate staggered group and compare original, shifted
   and restored runs while retaining both field mirrors. Expose a live local cell to the solver host so a
   retained water flow can report its current cell before its own step.
-- **SEA-12** needs `RigidSolver` to publish the transformed centre of mass on its initial `bodies` receipt
-  and provide effective per-axis mobility for constrained rigid bodies. An off-centre collider or body mass
-  update currently publishes the body origin as its centre until a rigid step refreshes the pose. The scalar
-  linear inverse mass and reported world inverse inertia also omit the enabled-axes flags. Test the initial
-  receipt on a rotated body with an eccentric centre and compare the effective mobility to one known impulse
-  per axis. Retain the existing body layout for current consumers.
+- **SEA-12** needs `RigidSolver` to provide effective per-axis mobility for constrained rigid bodies. The scalar
+  linear inverse mass and reported world inverse inertia omit the enabled-axes flags. Compare effective mobility
+  to one known impulse per axis. Retain the existing body layout for current consumers. The native mass update
+  now publishes a rotated body's eccentric centre before the first step, covered by KB-LOADS-INITIALCOM.
 - **SEA-12** also needs the setup-time accumulator allocation in the BIO-01 request below. A real
   `HullSolver` and `RigidSolver` world starts with 368 snapshot regions and gains the `bodyForces` sum
   on its first advance. Restoring the initial snapshot then sees 369 regions. Include `bodyForces`

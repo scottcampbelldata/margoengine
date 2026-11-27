@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20710589,
+  "total": 20736300,
   "history": [
     {
       "date": "2026-10-24",
@@ -14269,6 +14269,12 @@
       "commit": "bb82cd307",
       "reason": "physics/ship 18,570 ceiling to its new size: the Wageningen B-series polynomials (86 terms and the Reynolds correction) and their MMG fit. One feature of the ship entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c78be3a4cf",
+      "grew": 1,
+      "reason": "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table) 821,878 to 822,364 B gzip and ceiling 821324 to 847035. The pre-existing cap was already below the rebased parent. The SEA-12 centre-of-mass refresh writes the world pose alongside the mass columns in the existing native kernel so the first coupled buoyancy step uses the correct arm. A separate module would need another request and access to the same packed mass and pose columns."
     }
   ],
   "items": {
@@ -15091,7 +15097,7 @@
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 916741,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 95086,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 821324,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 847035,
     "@margoengine/physics/accretion": 5366,
     "@margoengine/physics/aeolian": 5256,
     "@margoengine/physics/ageing": 4384,

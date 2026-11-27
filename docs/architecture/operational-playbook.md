@@ -579,6 +579,14 @@ texels. The CPU applies the opposite impulse after the readback and advances the
 locked motion and bit-identical paired seek after an abort. The GPU pair covers horizontal drag.
 The CPU Hydro bridge supplies pressure blockage.
 
+The native rigid kernel refreshes the world centre of mass when it recomputes local mass properties.
+The first `bodies` port therefore carries the transformed centre before the rigid solver advances.
+`packages/physics/tests/loads.test.js` verifies the centre and the hydrostatic wrench after both a
+mass override and a collider translation on a rotated body. The Physics entry grows from 915,298
+to 915,808 B gzip, under its 916,741 B ceiling. The packaged lazy kernel grows from 821,878 to
+822,364 B gzip. The centre update lives with the mass columns and runs when their inputs change.
+[Lynch and Park, Modern Robotics, section 3.3.1](https://modernrobotics.northwestern.edu/nu-gm-book-resource/3-3-1-homogeneous-transformation-matrices/)
+
 ### Section 5 evidence: the flood's film clock and the sea, WebGPU and the WebGL2 layer (water/flood push 4, 2026-11-17)
 
 The clock: the flood runs in ticks of 1 / 120 s of m steps each. Inputs are a log of snapshots (sources, walls with their

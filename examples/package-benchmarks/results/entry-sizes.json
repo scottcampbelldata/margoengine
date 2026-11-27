@@ -14904,8 +14904,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1383109,
-        "gzip": 893919
+        "raw": 1413300,
+        "gzip": 915808
       },
       "./decomposition": {
         "raw": 26434,
@@ -15084,8 +15084,8 @@
         "gzip": 14217
       },
       "./loads": {
-        "raw": 111342,
-        "gzip": 41548
+        "raw": 111366,
+        "gzip": 41555
       },
       "./surge": {
         "raw": 9446,
@@ -19472,13 +19472,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 295478,
-        "gzip": 93308
+        "raw": 296321,
+        "gzip": 93554
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 1087630,
-        "gzip": 800888,
+        "raw": 1116978,
+        "gzip": 822364,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

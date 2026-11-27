@@ -187,6 +187,8 @@ impl World {
         let invert = |value: f32| if value > 0.0 { 1.0 / value } else { 0.0 };
         self.set_s(INVERSE_MASS, at, invert(total));
         self.set_v(LOCAL_CENTER_X, at, center);
+        let world_center = self.v(POSITION_X, at).add(self.q(ROTATION_X, at).rotate(center));
+        self.set_v(CENTER_X, at, world_center);
         self.set_v(INERTIA_X, at, moments);
         self.set_v(INVERSE_INERTIA_X, at, v3(invert(moments.x), invert(moments.y), invert(moments.z)));
         self.set_q(INERTIA_FRAME_X, at, frame);

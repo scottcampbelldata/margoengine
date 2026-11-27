@@ -30,7 +30,15 @@ import {
   wakeAmplification,
   washOnBed,
 } from '../dist/loads.js';
-import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../dist/world.js';
+import {
+  BODIES_FIELD,
+  BODY_WORDS,
+  FORCE_WORDS,
+  PhysicsWorld,
+  regionWords,
+  RigidSolver,
+  worldMemory,
+} from '../dist/world.js';
 
 await Physics.load();
 const near = (a, b, t) => Math.abs(a / b - 1) <= t;
@@ -223,6 +231,42 @@ function world(sea, bodies, members = [], extra = {}, gravity = [0, -9.81, 0], c
       .couple(['loads', 'rigid'], 'staggered');
   return { physics, bodies: made, loads, world: w };
 }
+
+test('SEA-12 first-frame buoyancy acts about the rotated centre of mass after mass or collider edits', () => {
+  const radius = 0.25;
+  const offset = 0.375;
+  const gravity = 9.81;
+  const sea = still();
+  const buoyancy = sea.density * gravity * ((4 * Math.PI * radius ** 3) / 3);
+  for (const editCentre of [
+    (body) => body.setMassProperties({ centerOfMass: [offset, 0, 0] }),
+    (body) => body.colliders[0].setTranslationWrtParent([offset, 0, 0]),
+  ]) {
+    const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -gravity, 0] });
+    try {
+      const body = physics.addBody(null, {
+        position: [5, -2, 3],
+        rotation: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+        colliders: { shape: 'sphere', radius, mass: 10 },
+      });
+      editCentre(body);
+      const loads = new LoadSolver();
+      const simulation = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -gravity, 0] })
+        .add(new RigidSolver(), { physics })
+        .add(loads, { sea, bodies: [{ row: body.row, shape: { sphere: radius }, addedMass: [0, 0, 0], drag: 0 }] })
+        .couple(['loads', 'rigid'], 'staggered');
+      const initial = regionWords(simulation.arena.memory, simulation.fields.port(BODIES_FIELD.name).region);
+      assert.equal(initial[body.row * BODY_WORDS + 9], 3 - offset);
+      simulation.advance(1);
+      const wrench = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+      const at = body.row * FORCE_WORDS;
+      assert.ok(near(wrench[at + 1], buoyancy, 2e-6), 'fully submerged sphere displacement');
+      assert.ok(near(wrench[at + 3], -buoyancy * offset, 2e-6), 'buoyancy torque about the rotated centre');
+    } finally {
+      physics[Symbol.dispose]();
+    }
+  }
+});
 
 test('SEA-12 a live pitched capsule holds its submerged volume and torque through the rigid port', () => {
   const radius = 0.35;

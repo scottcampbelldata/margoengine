@@ -33,6 +33,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   or kinematic body keeps C as it was.
 - **Regression:** the test above, at 2 kg and 50 g.
 
+### Fixed 2026-11-26: SEA-12 first-frame buoyancy uses the updated centre of mass (KB-LOADS-INITIALCOM)
+
+- **Repro:** Turn a submerged sphere's body 90° about Y and move its local mass centre 0.375 m along X through
+  `setMassProperties` or a collider translation. The initial rigid port still reports the origin, so the first
+  buoyant step loses the expected torque from the 0.375 m arm.
+- **Cause and fix:** Native `update_mass` updated the body-local centre and left the world centre unchanged until
+  the solver ran. The mass update now stores both centres, using the body's current rotation and origin.
+  `packages/physics/tests/loads.test.js` checks the first published centre and the independent buoyancy torque for
+  both edits. [Lynch and Park, Modern Robotics, section 3.3.1](https://modernrobotics.northwestern.edu/nu-gm-book-resource/3-3-1-homogeneous-transformation-matrices/)
+
 ### Fixed 2026-11-27: a rod in a PhysicsWorld lost its wake state on a seek (KB-PHYS-RODSEEK1, physics)
 
 - **Repro:** `packages/physics/tests/coupling/rod.test.js`, "a seek equals a continuous run": a riser in a current with
