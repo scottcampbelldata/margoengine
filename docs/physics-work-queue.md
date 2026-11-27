@@ -75,20 +75,16 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
-- **SEA-12** needs consistent live port frames after `PhysicsWorld.shiftOrigin`. Shift both retained field
-  mirrors with the solver cells after range-checking all of them. Preserve the mirrors’ ticks, rates and region
-  bytes. A mixed-tick swimmer and water bridge currently reads a 1.5 m separation as −4,094.5 m on the
-  first tick after a one-cell rebase. Reproduce with a same-rate staggered group and compare original, shifted
-  and restored runs while retaining both field mirrors. Expose a live local cell to the solver host so a
-  retained water flow can report its current cell before its own step.
-- **SEA-12** needs `RigidSolver` to provide effective per-axis mobility for constrained rigid bodies. The scalar
-  linear inverse mass and reported world inverse inertia omit the enabled-axes flags. Compare effective mobility
-  to one known impulse per axis. Retain the existing body layout for current consumers. The native mass update
-  now publishes a rotated body's eccentric centre before the first step, covered by KB-LOADS-INITIALCOM.
-- **SEA-12** also needs the setup-time accumulator allocation in the BIO-01 request below. A real
-  `HullSolver` and `RigidSolver` world starts with 368 snapshot regions and gains the `bodyForces` sum
-  on its first advance. Restoring the initial snapshot then sees 369 regions. Include `bodyForces`
-  in the frame-zero restore regression so coupled film seek can start from tick zero.
+- **SEA-12 — RESOLVED in `8329f46c3d`.** `PhysicsWorld.shiftOrigin` validates and moves both retained mirrors
+  with the solver cells, preserving ticks, rates and payloads. `SolverHost.cell` exposes the live cell between steps.
+  `world.test.js` keeps the staggered reader's separation at 1.5 m. The coupled swimmer and shallow water replay
+  the shifted state in `loads-swim-actuators.test.js`.
+- **SEA-12 — RESOLVED in `8329f46c3d`.** `RigidSolver` publishes effective per-axis mobility alongside the
+  existing `bodies` layout. `world-rigid-solver.test.js` compares the new values with an impulse in each axis
+  and held torque. KB-LOADS-INITIALCOM covers the rotated body's eccentric centre before the first step.
+- **SEA-12 — RESOLVED in `8329f46c3d`.** The registry reserves accumulator sums at first publication.
+  `world-frame-zero-accumulator.test.js` covers `bodyForces` and `bodyImpulses`. The Flood browser test
+  replays frame zero with live buoyancy on WebGPU and WebGL2.
 
 - **FLUID-01:** Connect SEA-04 and general HYDRO-01 cells to the optional DFSPH layout-1 parcel requests and
   receipts. The real HYDRO-01 wet-cell test settles signed depth and both horizontal momentum components in

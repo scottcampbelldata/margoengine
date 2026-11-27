@@ -1232,8 +1232,15 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   The continuous First Wake diagnostic ran from vessel time zero on an extended 1.2 m wake grid.
   It rendered the original camera and assets at 67 s and 71 s on WebGPU, with 3,765 and 4,005
   solver ticks. At 71 s the solved heave differed by 0.216 m from the disabled-wake control.
-  Sharp wake crests reached 3.16 m, versus 0.96 m in the shorter, narrower-domain diagnostic.
-  The source of that amplitude difference and production wall interaction remain open.
+  The 3.16 m absolute peak was a trough. Signed replays on the same domain show a +2.49 m crest and −3.16 m
+  trough at 71 s, and +3.13 m and −2.72 m at 67 s. Turning off feedback from wake to hull leaves the high
+  waves. Turning off forward displacement leaves only centimetre-scale waves at the strongest earlier time.
+  The advancing source concentrates submerged flux at the surface centreline. Qualification of its depth and
+  width treatment and the production wall interaction remain open.
+
+  Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
+  Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
+  editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.
 
 **Commit and test receipts on public main**
 
@@ -1249,7 +1256,7 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
 | 8. Reciprocal neighbours | `c8af3a4312`, `coupling/loads-hull-projected-drag.test.js`, `coupling/loads-reciprocal.test.js`, `coupling/loads-swim-actuators.test.js`, `coupling/loads-paddle.test.js` and `coupling/loads-wading.test.js` check return impulse. `16800c8b12`, `coupling/moving-cylinder-blockage.test.js` checks accepted pressure, closing cells and seam replay. `1a6c425709`, `water/test/loads-quay.browser.mjs` checks the quay component. `51254088d7`, `projected-drag-settlement.test.js` checks accepted wet/dry impulses and `shallow-surface.browser.mjs` draws the single physical state on both renderers. `d973c1ce1e`, `coupling/projected-drag-settlement.test.js` checks 50 periodic seam crossings, conserved mass and momentum and replay. `5da4190576`, `water/test/flood-rigid-drag.browser.mjs` checks the standalone Flood's accepted drag and paired replay on both renderers. `7ea413ac19`, `coupling/loads-wake-float.test.js` checks live SEA-04 wake-to-float buoyancy against a finite-depth mode and the analytic sphere cap across 42 ticks, with bit-exact replay. `124baff110`, `coupling/loads-paddle.test.js` and `coupling/loads-wading.test.js` check settled wet and drying impulses, a shared cell and replay. |
 | 9. Drag and wind geometry | `1a6c425709`, `loads-compact-drag.test.js` and `loads.test.js` check projected area and centroid, drag against held-out cube measurements, and separate spin damping. `c8af3a4312`, `loads.test.js` checks dissipative stiff drag. `51254088d7`, `loads-member-viv.test.js` checks rigid wake frequency against independent force data and the wet lift moment. `6b1828acaa`, `loads-capsule.test.js` checks capsule projections and clipped windage centroids. |
 | 10. Coded errors | `4195a70985`, `loads.test.js` checks actionable mesh and shape errors. `c8af3a4312`, `coupling/moving-cylinder-blockage.test.js` checks the public factory repair. `16800c8b12`, `loads-coupled-radiation.test.js` checks incompatible profile inputs. |
-| 11. Native work and origin cells | `1a6c425709`, `loads.test.js` checks independent static origin cells, one SIMD batch and replay. `16800c8b12`, `loads-kernel.test.js` and `loads-coupled-radiation.test.js` check both layouts and memory variants. Live origin shifts require the field-registry repair requested in the work queue. |
+| 11. Native work and origin cells | `1a6c425709`, `loads.test.js` checks independent static origin cells, one SIMD batch and replay. `16800c8b12`, `loads-kernel.test.js` and `loads-coupled-radiation.test.js` check both layouts and memory variants. `8329f46c3d`, `world.test.js` and `coupling/loads-swim-actuators.test.js` verify both retained mirrors, atomic rebasing and production water–body replay. |
 
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20770995,
+  "total": 20805967,
   "history": [
     {
       "date": "2026-10-24",
@@ -14353,6 +14353,12 @@
       "commit": "a7a422029",
       "reason": "physics/ship 34,420 ceiling to its new size: the B4-70's measured four-quadrant table (31 Fourier terms each for thrust and torque) and its evaluation. Measured data in place of an idealisation; a separate entry would split one propeller model. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "8329f46c3d",
+      "grew": 4,
+      "reason": "@margoengine/physics/world: 16826 → 17627 B gzip, ceiling 17331 → 18156. @margoengine/physics/loads: 42369 → 42849 B gzip, ceiling 42795 → 44135. @margoengine/physics: 915808 → 918308 B gzip, ceiling 916741 → 945858. @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)): 93554 → 95899 B gzip, ceiling 95086 → 98776. The previous receipts predate the current main's winding-number mesh mass changes. SEA-12 retains origin metadata and accumulator shapes where the world owns them, and publishes effective response alongside the rigid state. The measured lazy kernel is 822307 B against the 847035 B ceiling. Splitting world logic into a new entry would add a required import to every coupled scene."
     }
   ],
   "items": {
@@ -15173,8 +15179,8 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 916741,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 95086,
+    "@margoengine/physics": 945858,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 98776,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 847035,
     "@margoengine/physics/accretion": 5366,
     "@margoengine/physics/aeolian": 5256,
@@ -15206,7 +15212,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 42795,
+    "@margoengine/physics/loads": 44135,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 8785,
@@ -15246,7 +15252,7 @@
     "@margoengine/physics/viscoplastic": 5154,
     "@margoengine/physics/vortices": 5464,
     "@margoengine/physics/waves": 7804,
-    "@margoengine/physics/world": 17331,
+    "@margoengine/physics/world": 18156,
     "@margoengine/physics2d": 22561,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 20901,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

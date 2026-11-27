@@ -44,6 +44,10 @@ export const BODY_FORCES_FIELD: FieldDescriptor;
 
 export const BODY_IMPULSES_FIELD: FieldDescriptor;
 
+export const BODY_MOBILITY_FIELD: FieldDescriptor;
+
+export const BODY_MOBILITY_WORDS = 9;
+
 export const BODY_WORDS = 25;
 
 export const BYTES: Readonly<Record<ElementType, number>>;
@@ -126,6 +130,7 @@ export class FieldRegistry {
     constructor(arena: Arena);
     declare(solver: string, uses: readonly FieldUse[]): void;
     remove(solver: string): void;
+    shiftOrigin(delta: Cell): void;
     field(name: string): RegisteredField | undefined;
     list(): RegisteredField[];
     port(name: string): Port | undefined;
@@ -255,7 +260,7 @@ export interface RegisteredField {
 
 export class RigidSolver implements Solver<RigidSolverParams> {
     readonly id: string;
-    constructor(id?: string);
+    constructor(id?: string, options?: RigidSolverOptions);
     describe(): SolverDescription;
     init(host: SolverHost, params: RigidSolverParams): void;
     step(_context: StepContext, dt: number): void;
@@ -263,6 +268,10 @@ export class RigidSolver implements Solver<RigidSolverParams> {
     importPorts(_tick: number): void;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+}
+
+export interface RigidSolverOptions {
+    readonly publishMobility?: boolean;
 }
 
 export interface RigidSolverParams {
@@ -320,6 +329,7 @@ export interface SolverDescription {
 
 export interface SolverHost {
     readonly memory: WebAssembly.Memory;
+    readonly cell: Cell;
     readonly gravity: readonly [number, number, number];
     allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
     resize(region: Region, byteLength: number): Region;
