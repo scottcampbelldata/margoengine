@@ -1227,6 +1227,9 @@ and 60 fps runs, a seek and a device restore all reach the same state bit for bi
 - Seeking a flood backwards is not supported: make a fresh one and replay, as `seek` does.
 - Change notes (push 4; water is in watch mode, so the API check warned and did not block): `Flood.revision` is gone (a restore replays the log instead), `Flood.owed(dt, steps)` became `Flood.owedTicks(done, limit)`, `Flood.writeUniform(data, k)` takes the tick it writes for (it took a time and wrote one uniform per frame), and `FloodBoundary` gains `'sea'`.
 
+A flood's `wall` and `open` edges retain the solved surface elevation up to the map boundary. Only `sea` edges
+blend into the offshore surface. The renderer and WaveQuery use the same boundary rule.
+
 ### The sea, tsunamis, wind and rain
 
 Mark a map side `'sea'` (`boundary: {west: 'sea'}`) and it becomes an open boundary after Flather (1976), in its nonlinear

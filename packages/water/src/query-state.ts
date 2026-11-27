@@ -45,6 +45,8 @@ export interface WaterSolver {
   readonly fluxes: readonly GPUTexture[];
   readonly connected: GPUBuffer;
   readonly current: number;
+  /** West, east, south and north bits for the edges connected to a rendered sea. Default: all sides. */
+  readonly seaBlendEdges?: number;
   step(encoder: GPUCommandEncoder): void;
   dispose(): void;
 }

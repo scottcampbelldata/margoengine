@@ -1563,6 +1563,15 @@ class FloodSolver implements WaterSolver {
       throw error;
     }
   }
+  get seaBlendEdges(): number {
+    const edges = this.flood.options.boundary;
+    return (
+      Number(edges?.west === 'sea') |
+      (Number(edges?.east === 'sea') << 1) |
+      (Number(edges?.south === 'sea') << 2) |
+      (Number(edges?.north === 'sea') << 3)
+    );
+  }
   get steps(): number {
     return this.ticks * this.m;
   }

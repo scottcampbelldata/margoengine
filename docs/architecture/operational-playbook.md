@@ -1,3 +1,15 @@
+### Section 5 evidence: finite flood geometry at inland boundaries (2026-11-27)
+
+The Water shader uses Flood's sea-edge mask when blending the solved field into the ocean. A lake behind a wall or
+draining out of an open inland edge retains the finite-volume elevation through the boundary. WaveQuery evaluates
+the shared mesh function. The focused regression `packages/water/test/flood-edge.browser.mjs` compares the captured
+draw mesh with the solver at each edge and checks that a mixed map retains its west-sea transition.
+
+The hydrostatic height follows the bed plus depth in Emmanuel Audusse, François Bouchut, Marie-Odile Bristeau,
+Rupert Klein and Benoît Perthame's [well-balanced finite-volume scheme](https://perso.math.u-pem.fr/bouchut.francois/publications/hydroproj_published.pdf)
+(2004). Wet/dry reconstruction remains as described in Scott C. Medeiros and Scott C. Hagen's
+[review of wetting and drying algorithms](https://doi.org/10.1002/fld.3668) (2013).
+
 ### Section 5 evidence: core's own clear colour is linear light in a linear capture (2026-11-26)
 
 GPU maths and both backends (KB-CLEAR-DEFAULT1): with no `background` set, core's clear colour (display 0.018, 0.023,

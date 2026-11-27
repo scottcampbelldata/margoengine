@@ -155,6 +155,7 @@ const FAR_AT = 144;
 // block may hold on WebGL2 (GL_MAX_UNIFORM_BLOCK_SIZE is at least 16,384 bytes) and hold every bin of the wave solver's
 // default 34 x 24 spectrum.
 const SEA_AT = FAR_AT + FAR_FLOATS;
+const SEA_BLEND_AT = SEA_AT + 1;
 /** The most waves a {@link WaterSea} may give Water to draw. */
 export const WATER_SEA_WAVES = 896;
 export { WATER_FLOW_TICKS_PER_FRAME };
@@ -382,7 +383,10 @@ const FOAM_OPEN=0.95;
 fn inCoast(xz:vec2f)->bool {let uv=(xz-frame.coast.xy)/frame.coast.zw;return frame.flow.w>0.5&&all(uv>=vec2f(0))&&all(uv<=vec2f(1));}
 // Match offshore displacement, normals and optics across the finite simulation boundary.
 fn coastBlend(xz:vec2f)->vec3f {
- let edges=vec4f(xz-frame.coast.xy,frame.coast.xy+frame.coast.zw-xz);let distance=min(min(edges.x,edges.y),min(edges.z,edges.w));
+ let distances=vec4f(xz-frame.coast.xy,frame.coast.xy+frame.coast.zw-xz);
+ let mask=vec4u(u32(frame.sea.y))&vec4u(1u,2u,4u,8u);
+ let edges=select(vec4f(1e20),distances,mask!=vec4u(0u));
+ let distance=min(min(edges.x,edges.y),min(edges.z,edges.w));
  let width=min(max(4.0,4.0*max(frame.flow.y,frame.flow.z)),min(frame.coast.z,frame.coast.w)*0.25);let t=clamp(distance/width,0.0,1.0);let slope=6.0*t*(1.0-t)/width;
  var gradient=vec2f(0);if(distance==edges.x){gradient.x=slope;}else if(distance==edges.y){gradient.y=slope;}else if(distance==edges.z){gradient.x=-slope;}else{gradient.y=-slope;}
  return vec3f(gradient,t*t*(3.0-2.0*t));
@@ -2201,6 +2205,7 @@ export class Water implements EnginePlugin {
       }
       this.values[100] = Math.min(Math.max(c.delta, 0), 1 / 15) / 3;
     }
+    this.values[SEA_BLEND_AT] = this.coastal?.seaBlendEdges ?? 15;
     writeSkySampling(source, this.values, 119, 127, 0);
     // Up to the sea's last row: the header row always (a count of 0 without a sea), the rows only as many as it gave.
     c.device.queue.writeBuffer(
