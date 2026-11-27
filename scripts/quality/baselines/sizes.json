@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20886154,
+  "total": 20886184,
   "history": [
     {
       "date": "2026-10-24",
@@ -14531,6 +14531,12 @@
       "commit": "DXF leaders",
       "reason": "@margoengine/loaders 79,569 to 82,641 B gzip, ceiling 81070 to 85121 B: parseDXF draws LEADER and MULTILEADER (leader lines and splines, arrows and arrow blocks, dimension styles and overrides, text and block content), which it counted in skipped. A split entry, as for hatches, would leave the callouts of a drawing out unless the caller passed a reader. Core and stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "errors",
+      "reason": "FIRE-05: coded input errors (+30 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15371,7 +15377,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 11378,
+    "@margoengine/physics/explosive": 11408,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

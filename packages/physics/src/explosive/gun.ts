@@ -22,6 +22,7 @@
 // gunpowder", Phil. Trans. R. Soc. 165, 1875 (through that article); C. Corner, "Theory of the Interior Ballistics of
 // Guns", 1950, for the lumped model's shape (known through its standard restatements, not read); J. D. Anderson, "Modern
 // Compressible Flow", for the choked nozzle.
+import { invalidExplosive } from './errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { pow } from '@margoengine/math/pinned';
 
@@ -69,7 +70,7 @@ export const PROPELLANTS = {
  * The pressure of a propellant burnt in a closed vessel, Pa, by the Noble-Abel law p = lambda Delta / (1 - eta Delta), with
  * `loading` the density of loading Delta, kg of propellant per m^3 of vessel (Noble and Abel's gravimetric density times
  * 1000).
- * @throws RangeError for a loading at or past the covolume's limit 1 / eta.
+ * @throws MargoError (`unsupported`) for a loading at or past the covolume's limit 1 / eta.
  */
 export function closedVesselPressure(propellant: Propellant, loading: number): number {
   const lambda = positive(propellant.force, 'Propellant force', 'Give R T0 in J/kg.');
@@ -160,7 +161,7 @@ export interface Firing {
 export const HISTORY_WORDS = 5;
 
 const fail = (message: string): never => {
-  throw new RangeError(message);
+  throw invalidExplosive(message);
 };
 
 function positive(value: unknown, what: string, fix: string): number {
@@ -179,7 +180,7 @@ const sqrt = (v: number) => pow(v, 0.5);
 
 /**
  * Fire a gun: the shot's travel down the bore and the gas's blowdown after it.
- * @throws RangeError for a load that does not fit or a value that is not finite; MargoError ('state') for a charge too weak
+ * @throws MargoError (`unsupported`) for a load that does not fit or a value that is not finite; MargoError ('state') for a charge too weak
  * to move the shot, or a propellant with no burning rate.
  */
 export function fireGun(options: GunOptions): Firing {

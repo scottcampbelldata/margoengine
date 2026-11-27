@@ -58,7 +58,7 @@ export const entries = [
     messages: [],
     cause:
       'An `FFTOcean` option or setter (`setWind`, `setChoppiness`, `setFoamThreshold`, `setColor`, `setDebug`) or a height query (`FFTOcean.sample`, `Water.sample`) got a value it cannot use: a resolution that is not a power of two from 16 to 512, more than four cascades or overlapping wavelength bands, a wind speed outside 0.1..100 m/s, a zero or non-finite wind direction, a fetch outside 1..1e7 m, a choppiness outside 0..5, a colour channel outside 0..1, an unknown debug mode, more than 16 debug points, non-finite query coordinates or a time below 0. The message names the value and its range.',
-    fix: 'Pass finite SI values inside the range the message gives: for example `ocean.setWind({speed: 12, direction: [1, 0]})`, `ocean.setChoppiness(1)`, `ocean.setDebug({mode: \'jacobian\'})` and `ocean.sample(x, z)` with world metres.',
+    fix: "Pass finite SI values inside the range the message gives: for example `ocean.setWind({speed: 12, direction: [1, 0]})`, `ocean.setChoppiness(1)`, `ocean.setDebug({mode: 'jacobian'})` and `ocean.sample(x, z)` with world metres.",
   },
   {
     id: 'ripples',
@@ -67,7 +67,16 @@ export const entries = [
     messages: [],
     cause:
       'A `Ripples` option, obstacle, tracked body, ray or event got a value it cannot use: a size outside 1..10000 m, a resolution that is not a whole number from 16 to 512, a speed outside 0.01..100 m/s, a grid that would need more than 512 stable substeps, an obstacle kind other than sphere, cylinder, box or wall, more than 32 obstacles, a radius smaller than one cell, a strength outside -100..100 m, a body without a finite `position`, a zero ray direction, or an unknown debug mode. The message names the value and its range.',
-    fix: 'Pass finite values inside the range the message gives: a `Water` surface, `size` and `resolution` that keep a cell above `speed / 7680 / 0.45` metres, obstacles as `{kind: \'cylinder\', center: [x, z], radius}`, bodies as `{position: [x, y, z]}`, and a radius of at least `size / resolution` metres.',
+    fix: "Pass finite values inside the range the message gives: a `Water` surface, `size` and `resolution` that keep a cell above `speed / 7680 / 0.45` metres, obstacles as `{kind: 'cylinder', center: [x, z], radius}`, bodies as `{position: [x, y, z]}`, and a radius of at least `size / resolution` metres.",
+  },
+  {
+    id: 'explosives',
+    title: '@margoengine/physics/explosive inputs',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A charge, case, gun, propellant, ground, hull plate or hit target got a value it cannot use: a mass, energy, depth or time that is not finite, a Gurney metal to charge ratio outside 0.2 to 10, an odd fragment count, a charge that does not fit its chamber, a gamma outside 1 to 2, a gun or plate on a body the solver was not made to couple (`carriers`, `hullPlates`), breakables without `physics`, or an index out of range.',
+    fix: 'Pass finite SI values in the range the message gives: masses in kilograms, energies in joules, depths and positions in metres, M/C from 0.2 to 10, an even fragment count, a chamber larger than the charge, and make the solver with `{carriers: true}` for guns and hits on bodies and `{hullPlates: true}` for hull plates. The error names the input and the change to make.',
   },
   {
     id: 'rods',

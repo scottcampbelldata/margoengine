@@ -7,6 +7,9 @@ import { EXPLOSION_WORDS, ExplosionSolver, FRAGMENT_WORDS, gurneyVelocity, metal
 import { PhysicsWorld } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
+/** A coded input error of the explosive entry: code `unsupported` and the help link. */
+const coded = (error) => error?.code === 'unsupported' && error.message.includes('margoengine.com/errors#explosives');
+
 const charges = [
   { position: [0, 1, 0], time: 0.05, mass: 10, case: { mass: 20, fragments: 64 } },
   { position: [30, 0, 0], time: 0.2, mass: 1000, depth: 4 },
@@ -151,7 +154,7 @@ test('with no drag a fragment flies the closed-form arc, and with drag it lands 
 
 test('bad charges are refused with the fix', () => {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-  assert.throws(() => world.add(new ExplosionSolver('a'), { charges: [] }), TypeError);
+  assert.throws(() => world.add(new ExplosionSolver('a'), { charges: [] }), coded);
   assert.throws(() => world.add(new ExplosionSolver('b'), { charges: [{ position: [0, 0, 0] }] }), /mass .* or energy/);
   assert.throws(
     () => world.add(new ExplosionSolver('c'), { charges: [{ position: [0, 0, 0], mass: 1, case: { mass: 100 } }] }),
@@ -162,6 +165,6 @@ test('bad charges are refused with the fix', () => {
       world.add(new ExplosionSolver('d'), {
         charges: [{ position: [0, 0, 0], mass: 1, case: { mass: 1, fragments: 3 } }],
       }),
-    RangeError,
+    coded,
   );
 });

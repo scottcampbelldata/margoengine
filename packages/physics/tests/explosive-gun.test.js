@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { closedVesselPressure, fireGun, HISTORY_WORDS, PROPELLANTS } from '../dist/explosive.js';
 
+/** A coded input error of the explosive entry: code `unsupported` and the help link. */
+const coded = (error) => error?.code === 'unsupported' && error.message.includes('margoengine.com/errors#explosives');
+
 const TON = 15.444e6; // a long ton per square inch, Pa
 const IN = 0.0254,
   LB = 0.45359237,
@@ -100,6 +103,6 @@ test('a gun that cannot fire is refused with the fix', () => {
   assert.throws(() => fireGun({ ...sixInch, propellant: PROPELLANTS.pebblePowder }), /no burning rate/);
   assert.throws(() => fireGun({ ...sixInch, propellant: { ...PROPELLANTS.cordite, gamma: 3 } }), /gamma/);
   assert.throws(() => fireGun({ ...sixInch, startPressure: 1e12 }), /never reaches the start pressure/);
-  assert.throws(() => fireGun({ ...sixInch, bore: -1 }), RangeError);
+  assert.throws(() => fireGun({ ...sixInch, bore: -1 }), coded);
   assert.throws(() => fireGun({ ...sixInch, form: 9 }), /Form coefficient/);
 });

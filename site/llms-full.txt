@@ -17480,6 +17480,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   bases brighten by up to 45, 33, 27 levels (noon 5 against the old pi). The ridge and fire-line views frame no column,
   so they are unchanged bit for bit. Weak spot left: KB-VFX-COLUMNAMBIENT1.
 
+### Open 2026-11-27: the firelit smoke pall at night glows evenly (KB-SKY-PALLFALLOFF1, sky and weather)
+
+- **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=ridge,fire-line --query=hour=22 --out=<folder>`:
+  the sky dome and the haze over the valley are one orange, so the ridge does not stand out against the sky; a firelit
+  pall is brightest over the fire front and falls off with distance and height.
+- **Cause:** `WeatherDrive` gives the sky layer and the sky fog one colour each (`fireHazeLight`, the box mean over
+  `smokeWidth`) everywhere.
+- **Tried, not landed:** a point source softened by the fires' heat-weighted spread (a plane lit by P h / (4 pi (h^2 +
+  s^2 + r^2)^1.5)) on both the sky (`atmosphere.fireLight`) and the fog (the exact line integral). Sky only left the
+  ridge brighter than the sky; sky and fog leave the fire-line view nearly black (mean 12.5, the check wants over 15),
+  because this scene burns in two clusters about 3 km apart and one softened point between them gives each far less
+  than the even value (0.087 of the noon sun at its centre against 0.285 even).
+- **Owed:** several sources (the fire front's segments clustered into a few spots, the sky and fog summing them), so
+  light near each front matches the even value and falls off between and beyond them, judged on the real frames.
+
 ### Open 2026-11-27: a smoke column over a fire at night reads blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=aerial-west --query=hour=22 --out=<folder>`: the

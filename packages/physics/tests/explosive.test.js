@@ -17,6 +17,9 @@ import {
   tntEquivalent,
 } from '../dist/explosive.js';
 
+/** A coded input error of the explosive entry: code `unsupported` and the help link. */
+const coded = (error) => error?.code === 'unsupported' && error.message.includes('margoengine.com/errors#explosives');
+
 const close = (actual, expected, relative, what) =>
   assert.ok(Math.abs(actual - expected) <= relative * Math.abs(expected), `${what}: ${actual} against ${expected}`);
 
@@ -58,13 +61,13 @@ test("the Gurney velocity from the heat of detonation is within Kennedy's 10 % o
 test('a charge releases its mass times its heat of detonation, and TNT equivalence is at 4.184 MJ/kg', () => {
   assert.equal(chargeEnergy(10, EXPLOSIVES.rdx), 10 * 1.51 * 4.184e6);
   assert.equal(tntEquivalent(TNT_JOULES_PER_KG * 3), 3);
-  assert.throws(() => chargeEnergy(0), RangeError);
-  assert.throws(() => chargeEnergy(-1), RangeError);
-  assert.throws(() => tntEquivalent(Number.NaN), RangeError);
+  assert.throws(() => chargeEnergy(0), coded);
+  assert.throws(() => chargeEnergy(-1), coded);
+  assert.throws(() => tntEquivalent(Number.NaN), coded);
   assert.throws(() => metalSpeed(2400, 'cylinder', 0.1), /0\.2 to 10/);
-  assert.throws(() => metalSpeed(2400, 'cylinder', 11), RangeError);
-  assert.throws(() => metalSpeed(2400, 'cone', 1), TypeError);
-  assert.throws(() => scaledDepth(-1, 1e6), RangeError);
+  assert.throws(() => metalSpeed(2400, 'cylinder', 11), coded);
+  assert.throws(() => metalSpeed(2400, 'cone', 1), coded);
+  assert.throws(() => scaledDepth(-1, 1e6), coded);
 });
 
 test("the air share falls with scaled depth from 0.90 at the surface, and Sonder et al.'s 23 measured blasts lie in its band", () => {
@@ -131,7 +134,7 @@ test("the crater law has Sonder et al.'s shape: r0 at the surface, its largest r
   for (let d = 0; d < 1.2e-2; d += 1e-4)
     assert.ok(scaledCraterRadius(d) <= law.maxRadius * (1 + 1e-12), `no larger than the largest at ${d}`);
   assert.ok(scaledCraterRadius(8e-3) < scaledCraterRadius(5e-3));
-  assert.throws(() => scaledCraterRadius(-1), RangeError);
+  assert.throws(() => scaledCraterRadius(-1), coded);
   assert.throws(() => scaledCraterRadius(1e-3, { ...law, surfaceRadius: 1 }), /surfaceRadius/);
 });
 
@@ -148,8 +151,8 @@ test('every joule of a buried charge is in the air, the ground shock, the crater
   assert.equal(air.air, air.energy);
   assert.equal(air.craterWork + air.groundShock + air.heat + air.craterRadius, 0);
   assert.throws(() => energyBudget(1e6, 1, { seismicCoupling: 2 }), /0 to 1/);
-  assert.throws(() => energyBudget(1e6, 1, { density: 0 }), RangeError);
-  assert.throws(() => energyBudget(1e6, 1, { craterRadius: -1 }), RangeError);
+  assert.throws(() => energyBudget(1e6, 1, { density: 0 }), coded);
+  assert.throws(() => energyBudget(1e6, 1, { craterRadius: -1 }), coded);
 });
 
 test("Sonder et al.'s blasts: the model's seismic share lies in their measured elastic band of 10 to 17 % of each blast", () => {

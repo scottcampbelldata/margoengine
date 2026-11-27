@@ -11,6 +11,7 @@
 // it; quadratic air drag on a sphere of the fragment's mass and density, integrated exactly over a step for the drag alone.
 //
 // State: the fragments' positions, velocities, masses and flight states, and each charge's detonated flag.
+import { invalidExplosive } from './errors.js';
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, ln, pow, sin } from '@margoengine/math/pinned';
@@ -252,10 +253,10 @@ function rotate(q: ArrayLike<number>, v: Vec3): Vec3 {
 
 function vec(value: unknown, what: string, unit = false): Vec3 {
   if (!Array.isArray(value) || value.length !== 3 || !value.every((v) => typeof v === 'number' && Number.isFinite(v)))
-    throw new RangeError(`${what} must be three finite numbers; got ${String(value)}.`);
+    throw invalidExplosive(`${what} must be three finite numbers; got ${String(value)}.`);
   if (!unit) return [value[0], value[1], value[2]];
   const n = hypot(value[0], value[1], value[2]);
-  if (!(n > 0)) throw new RangeError(`${what} must not be zero; give the bore's direction.`);
+  if (!(n > 0)) throw invalidExplosive(`${what} must not be zero; give the bore's direction.`);
   return [value[0] / n, value[1] / n, value[2] / n];
 }
 
@@ -277,7 +278,7 @@ interface Placed {
 
 function finite(value: unknown, what: string, fix: string, positive = false): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || (positive ? value <= 0 : value < 0))
-    throw new RangeError(
+    throw invalidExplosive(
       `${what} must be a finite number${positive ? ' above 0' : ' of 0 or more'}; got ${String(value)}. ${fix}`,
     );
   return value;
@@ -406,17 +407,17 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     const charges = params?.charges ?? [];
     const guns = params?.guns ?? [];
     if (!Array.isArray(charges) || !Array.isArray(guns) || charges.length + guns.length === 0)
-      throw new TypeError(
+      throw invalidExplosive(
         'An ExplosionSolver needs charges or guns: world.add(solver, {charges: [{position, mass}]}) or {guns: [...]}.',
       );
     const ground = params.groundHeight ?? 0;
     if (!Number.isFinite(ground))
-      throw new RangeError(`Ground height must be a finite number of metres; got ${ground}.`);
+      throw invalidExplosive(`Ground height must be a finite number of metres; got ${ground}.`);
     this.ground = ground;
     const soil = params.soil ?? {};
     const seed = params.seed ?? 0;
     if (!(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff))
-      throw new RangeError(`Seed must be a whole number from 0 to 2^32 - 1; got ${seed}.`);
+      throw invalidExplosive(`Seed must be a whole number from 0 to 2^32 - 1; got ${seed}.`);
     const random = new RandomStream(seed, solverNumber(this.id));
     const fragments: number[][] = [];
     const drags: number[] = [];
@@ -426,11 +427,11 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       const at = `Charge ${index}`;
       const p = charge.position;
       if (!Array.isArray(p) || p.length !== 3 || !p.every((v) => Number.isFinite(v)))
-        throw new RangeError(`${at} position must be three finite numbers in metres; got ${String(p)}.`);
+        throw invalidExplosive(`${at} position must be three finite numbers in metres; got ${String(p)}.`);
       const time = finite(charge.time ?? 0, `${at} time`, 'Give the detonation time in seconds of world time.');
       const explosive = charge.explosive ?? EXPLOSIVES.tnt;
       if ((charge.mass === undefined) === (charge.energy === undefined))
-        throw new TypeError(`${at} needs either mass (kg of explosive) or energy (J); give one of them.`);
+        throw invalidExplosive(`${at} needs either mass (kg of explosive) or energy (J); give one of them.`);
       const mass =
         charge.mass !== undefined
           ? finite(charge.mass, `${at} mass`, 'Give the explosive mass in kilograms.', true)
@@ -451,10 +452,10 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         const caseMass = finite(c.mass, `${at} case mass`, 'Give it in kilograms.', true);
         count = c.fragments ?? 200;
         if (!(Number.isInteger(count) && count >= 2 && count % 2 === 0))
-          throw new RangeError(`${at} case fragments must be an even whole number of 2 or more; got ${count}.`);
+          throw invalidExplosive(`${at} case fragments must be an even whole number of 2 or more; got ${count}.`);
         const geometry: GurneyGeometry = c.geometry ?? 'cylinder';
         if (geometry !== 'cylinder' && geometry !== 'sphere')
-          throw new TypeError(`${at} case geometry is cylinder or sphere; got ${String(geometry)}.`);
+          throw invalidExplosive(`${at} case geometry is cylinder or sphere; got ${String(geometry)}.`);
         const speed = metalSpeed(gurneyVelocity(explosive), geometry, caseMass / mass);
         const density = finite(c.density ?? 7850, `${at} fragment density`, 'Give it in kg/m^3.', true);
         const cd = finite(c.dragCoefficient ?? 1, `${at} drag coefficient`, 'Pass a number such as 1.');
@@ -462,7 +463,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         const axis = c.axis ?? [0, 1, 0];
         const an = hypot(axis[0], axis[1], axis[2]);
         if (!(an > 0) || !Number.isFinite(an))
-          throw new RangeError(`${at} case axis must be a finite vector that is not zero.`);
+          throw invalidExplosive(`${at} case axis must be a finite vector that is not zero.`);
         const ax: Vec3 = [axis[0] / an, axis[1] / an, axis[2] / an];
         // Two unit vectors across the axis.
         const helper: Vec3 = Math.abs(ax[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
@@ -553,7 +554,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
             `${at} is on body ${mount.body}; make the solver with new ExplosionSolver(id, {carriers: true}) so the recoil reaches it.`,
           );
         if (!(Number.isInteger(mount.body) && mount.body >= 0 && mount.body < rows))
-          throw new RangeError(`${at} body must be a rigid body row from 0 to ${rows - 1}; got ${mount.body}.`);
+          throw invalidExplosive(`${at} body must be a rigid body row from 0 to ${rows - 1}; got ${mount.body}.`);
         body = mount.body;
       }
       const { time: _t, body: _b, breech, axis, shotDrag, ...options } = mount;
@@ -573,7 +574,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     this.physics = params.physics ?? null;
     if (params.breakables !== undefined) {
       if (typeof params.breakables?.applyImpact !== 'function')
-        throw new TypeError('breakables must have applyImpact(point, impulse), as a BreakableWorld does.');
+        throw invalidExplosive('breakables must have applyImpact(point, impulse), as a BreakableWorld does.');
       if (!this.physics) throw new MargoError('state', 'Breakables take hits found by ray casts; pass physics too.');
       this.breakables = params.breakables;
     }
@@ -591,7 +592,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     this.plates = plates.map((plate, k) => {
       const at = `Plate ${k}`;
       if (!(Number.isInteger(plate.body) && plate.body >= 0 && plate.body < rows))
-        throw new RangeError(`${at} body must be a rigid body row from 0 to ${rows - 1}; got ${plate.body}.`);
+        throw invalidExplosive(`${at} body must be a rigid body row from 0 to ${rows - 1}; got ${plate.body}.`);
       return {
         body: plate.body,
         centre: vec(plate.centre, `${at} centre`),
@@ -1045,7 +1046,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     return { flying: this.flyingNow, fragmentSteps: this.steps, gunSteps: this.gunSteps, hits: this.hitCount };
   }
 
-  /** Charge `index` as the `explosions` field publishes it. @throws RangeError for an index out of range. */
+  /** Charge `index` as the `explosions` field publishes it. @throws MargoError (`unsupported`) for an index out of range. */
   charge(index: number): {
     position: Vec3;
     time: number;
@@ -1061,7 +1062,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     craterRadius: number;
   } {
     if (!(Number.isInteger(index) && index >= 0 && index < this.placed.length))
-      throw new RangeError(`ExplosionSolver has charges 0 to ${this.placed.length - 1}; got ${index}.`);
+      throw invalidExplosive(`ExplosionSolver has charges 0 to ${this.placed.length - 1}; got ${index}.`);
     const r = this.explosions().subarray(index * EXPLOSION_WORDS, (index + 1) * EXPLOSION_WORDS);
     return {
       position: [r[0]!, r[1]!, r[2]!],
@@ -1081,11 +1082,11 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
 
   /**
    * Gun `index`: whether it has fired, when, when its shot left the muzzle, and its backward momentum so far (kg m/s, the
-   * impulse its gas has given its carrier or mounting). @throws RangeError for an index out of range.
+   * impulse its gas has given its carrier or mounting). @throws MargoError (`unsupported`) for an index out of range.
    */
   gun(index: number): { fired: boolean; time: number; muzzleTime: number; recoilMomentum: number } {
     if (!(Number.isInteger(index) && index >= 0 && index < this.guns.length))
-      throw new RangeError(`ExplosionSolver has guns 0 to ${this.guns.length - 1}; got ${index}.`);
+      throw invalidExplosive(`ExplosionSolver has guns 0 to ${this.guns.length - 1}; got ${index}.`);
     const w = this.gunWords(),
       o = index * GUN_WORDS;
     return {
@@ -1099,11 +1100,11 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
   /**
    * Gun `index`'s muzzle blast as the `explosions` field publishes it (its row follows the charges'): where and when the
    * shot left, the gas's energy and mass then, and whether that time has come. Before the gun fires its time is Infinity.
-   * @throws RangeError for an index out of range.
+   * @throws MargoError (`unsupported`) for an index out of range.
    */
   muzzleBlast(index: number): { position: Vec3; time: number; energy: number; gasMass: number; detonated: boolean } {
     if (!(Number.isInteger(index) && index >= 0 && index < this.guns.length))
-      throw new RangeError(`ExplosionSolver has guns 0 to ${this.guns.length - 1}; got ${index}.`);
+      throw invalidExplosive(`ExplosionSolver has guns 0 to ${this.guns.length - 1}; got ${index}.`);
     const o = (this.placed.length + index) * EXPLOSION_WORDS;
     const r = this.explosions().subarray(o, o + EXPLOSION_WORDS);
     return { position: [r[0]!, r[1]!, r[2]!], time: r[3]!, energy: r[4]!, gasMass: r[8]!, detonated: r[9] === 1 };
@@ -1117,7 +1118,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
   /** Hull plate `index`'s damage row (crush layout): work, impulse into the plate, seal loss 0 to 1 and hits. */
   plate(index: number): { work: number; impulse: number; sealLoss: number; hits: number } {
     if (!(Number.isInteger(index) && index >= 0 && index < this.plates.length))
-      throw new RangeError(`ExplosionSolver has plates 0 to ${this.plates.length - 1}; got ${index}.`);
+      throw invalidExplosive(`ExplosionSolver has plates 0 to ${this.plates.length - 1}; got ${index}.`);
     const d = this.words(this.damageRegion!),
       o = index * CRUSH_WORDS;
     return { work: d[o + 1]!, impulse: d[o + 4]!, sealLoss: d[o + 6]!, hits: d[o + 7]! };

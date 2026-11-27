@@ -18,6 +18,7 @@
 //   seismic energy together about 17 % of a blast, which sets the default seismic coupling.
 // - The crater work is the least mechanical work that empties a crater of the given size (lift and a throw past the rim at
 //   the best angle, elementary ballistics), a lower bound that needs no ejecta law.
+import { invalidExplosive } from './errors.js';
 import { exp, pow } from '@margoengine/math/pinned';
 
 /** Joules in a kilogram of TNT by the convention every TNT equivalent uses (1 kcal/g). */
@@ -51,7 +52,7 @@ export const GURNEY_FRACTION = 0.7;
 
 function finitePositive(value: number, what: string, fix: string): number {
   if (!(Number.isFinite(value) && value > 0))
-    throw new RangeError(`${what} must be a finite number above 0; got ${value}. ${fix}`);
+    throw invalidExplosive(`${what} must be a finite number above 0; got ${value}. ${fix}`);
   return value;
 }
 
@@ -83,7 +84,7 @@ export type GurneyGeometry = 'cylinder' | 'sphere' | 'flatSandwich' | 'openFaced
  * The speed metal reaches when the charge under it detonates, m/s, by Gurney's equations (Kennedy 1970, Fig. 3):
  * `metalToCharge` is M/C, the metal mass over the charge mass, and `tamperToCharge` N/C the tamper's for an asymmetric
  * sandwich. Nominally 10 % uncertain; the fragments of a case that breaks early go up to 10 % slower.
- * @throws RangeError for an M/C outside 0.2 to 10, where the method no longer holds (Kennedy Table 1).
+ * @throws MargoError (`unsupported`) for an M/C outside 0.2 to 10, where the method no longer holds (Kennedy Table 1).
  */
 export function metalSpeed(
   gurney: number,
@@ -94,7 +95,7 @@ export function metalSpeed(
   finitePositive(gurney, 'Gurney velocity', 'Give it in m/s.');
   const m = metalToCharge;
   if (!(Number.isFinite(m) && m >= 0.2 && m <= 10))
-    throw new RangeError(
+    throw invalidExplosive(
       `Gurney's method holds for a metal to charge ratio of 0.2 to 10; got ${m}. Pass M/C inside it.`,
     );
   let inverse: number;
@@ -116,13 +117,13 @@ export function metalSpeed(
     case 'asymmetricSandwich': {
       const n = tamperToCharge;
       if (!(Number.isFinite(n) && n >= 0))
-        throw new RangeError(`Tamper to charge ratio must be 0 or more; got ${n}. Pass N/C.`);
+        throw invalidExplosive(`Tamper to charge ratio must be 0 or more; got ${n}. Pass N/C.`);
       const a = (1 + 2 * m) / (1 + 2 * n);
       inverse = (1 + a * a * a) / (3 * (1 + a)) + n * a * a + m;
       break;
     }
     default:
-      throw new TypeError(
+      throw invalidExplosive(
         `Unknown Gurney geometry "${geometry as string}"; use cylinder, sphere, flatSandwich, openFacedSandwich or asymmetricSandwich.`,
       );
   }
@@ -132,7 +133,7 @@ export function metalSpeed(
 /** Scaled depth d / E^(1/3), m J^-1/3, of a charge `depth` metres under the surface releasing `energy` joules. */
 export function scaledDepth(depth: number, energy: number): number {
   if (!(Number.isFinite(depth) && depth >= 0))
-    throw new RangeError(`Charge depth must be 0 or more metres; got ${depth}. Pass the depth of its centre.`);
+    throw invalidExplosive(`Charge depth must be 0 or more metres; got ${depth}. Pass the depth of its centre.`);
   return depth / pow(finitePositive(energy, 'Explosion energy', 'Give it in joules.'), 1 / 3);
 }
 
@@ -148,7 +149,7 @@ export const AIR_DEPTH_SCALE = 1.2e-3;
  */
 export function airborneFraction(scaled: number): number {
   if (!(Number.isFinite(scaled) && scaled >= 0))
-    throw new RangeError(`Scaled depth must be 0 or more; got ${scaled}. Pass depth / E^(1/3).`);
+    throw invalidExplosive(`Scaled depth must be 0 or more; got ${scaled}. Pass depth / E^(1/3).`);
   const x = scaled / AIR_DEPTH_SCALE;
   const g = exp(-x) / pow(1 + exp(-10 * x), 0.1);
   return pow(g, 1.5);
@@ -180,7 +181,7 @@ export const SONDER_CRATER_LAW: CraterLaw = {
 /** The scaled crater radius, m J^-1/3, of a charge at scaled depth `scaled` (m J^-1/3) by Sonder et al.'s law. */
 export function scaledCraterRadius(scaled: number, law: CraterLaw = SONDER_CRATER_LAW): number {
   if (!(Number.isFinite(scaled) && scaled >= 0))
-    throw new RangeError(`Scaled depth must be 0 or more; got ${scaled}. Pass depth / E^(1/3).`);
+    throw invalidExplosive(`Scaled depth must be 0 or more; got ${scaled}. Pass depth / E^(1/3).`);
   const { optimalDepth: o, maxRadius: m, surfaceRadius: s, decay: b } = law;
   for (const [value, what] of [
     [o, 'optimalDepth'],
@@ -189,7 +190,7 @@ export function scaledCraterRadius(scaled: number, law: CraterLaw = SONDER_CRATE
   ] as const)
     finitePositive(value, `Crater law ${what}`, 'Use SONDER_CRATER_LAW or constants fitted to your host.');
   if (!(Number.isFinite(s) && s >= 0 && s <= m))
-    throw new RangeError(`Crater law surfaceRadius must be from 0 to maxRadius; got ${s}. Fit it to your host.`);
+    throw invalidExplosive(`Crater law surfaceRadius must be from 0 to maxRadius; got ${s}. Fit it to your host.`);
   if (scaled <= o) {
     const t = scaled / o - 1;
     return m - (m - s) * t * t;
@@ -269,14 +270,14 @@ export function energyBudget(
   const g = finitePositive(options.gravity ?? 9.81, 'Gravity', 'Give its magnitude in m/s^2.');
   const coupling = options.seismicCoupling ?? 0.15;
   if (!(Number.isFinite(coupling) && coupling >= 0 && coupling <= 1))
-    throw new RangeError(`Seismic coupling must be from 0 to 1; got ${coupling}. Pass a share such as 0.15.`);
+    throw invalidExplosive(`Seismic coupling must be from 0 to 1; got ${coupling}. Pass a share such as 0.15.`);
   const ratio = finitePositive(options.depthRatio ?? 0.5, 'Crater depth ratio', 'Pass depth over radius, such as 0.5.');
   let radius = 0;
   if (!aboveGround) {
     if (options.craterRadius !== undefined) {
       radius = options.craterRadius;
       if (!(Number.isFinite(radius) && radius >= 0))
-        throw new RangeError(`Crater radius must be 0 or more metres; got ${radius}.`);
+        throw invalidExplosive(`Crater radius must be 0 or more metres; got ${radius}.`);
     } else radius = scaledCraterRadius(d, options.law) * pow(energy, 1 / 3);
   }
   const groundShock = ground * coupling;
