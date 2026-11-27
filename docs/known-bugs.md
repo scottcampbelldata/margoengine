@@ -122,6 +122,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `material.size` as it is and cannot know the target's ratio from the cloud.
 - **Next:** decide one pixel unit for `PointsPlugin` (CSS pixels, as lines) or have the exporter divide by the plugin's
   `pixelScale` for the canvas at export; either changes drawn sizes on high-DPI screens, so it needs the points owner.
+- **Scope (read 2026-11-27):** one unit has to reach every reader of a pixel size: `writeCloudUniform` and its default
+  scale (`packages/points/src/plugin.ts`), `SurfelPoints.writeCloud` (`surfels.ts`, which ignores `pixelScale`, so
+  sciviz's scale does not reach surfels either), the sprite vertex shader's pixel offset (`shaders.ts`, `params.z`),
+  `@margoengine/bvh` point and sprite picking (`bvh/src/points.ts` takes `size` as drawing-buffer pixels), and the
+  override in `gltf/src/strokes.ts`, which a CSS-pixel default makes redundant.
 
 ### Fixed 2026-11-27: tests picked a build's compat-*.js chunk by listing order (KB-COMPAT-CHUNKPICK1, scatter, shadows tests)
 
