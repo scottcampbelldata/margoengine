@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20889047,
+  "total": 20889363,
   "history": [
     {
       "date": "2026-10-24",
@@ -14542,6 +14542,12 @@
       "date": "2026-11-27",
       "commit": "ef75a8f8cb",
       "reason": "SEA-12 Galerkin coarse correction, connected wet boundary geometry and time-centred hull pressure move optional physics/loads from 56771 to 59551 B gzip and its ceiling from 58475 to 61338 B. They share the finite quay operator and the retained wake state. Separate entries would still need the same solver and would add a public setup boundary. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "film",
+      "reason": "FIRE-05: film direction (+316 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15382,7 +15388,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 11408,
+    "@margoengine/physics/explosive": 11724,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

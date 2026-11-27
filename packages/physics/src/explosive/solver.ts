@@ -80,6 +80,20 @@ export interface ChargeCase {
   readonly dragCoefficient?: number;
 }
 
+/**
+ * Film direction of a charge's case fragments: not physics, but a director's choice, deterministic like the rest. `aim` and
+ * `spread` send every fragment into a cone, so the debris goes where the shot needs it. The fragments then leave one by one
+ * rather than in opposite pairs, so the launch carries momentum. `speedScale` scales their launch speed.
+ */
+export interface ChargeFilm {
+  /** The cone's axis (default none: the case's own geometry sets the directions). */
+  readonly aim?: Vec3;
+  /** The cone's half angle, radians, above 0 up to pi (default pi / 6 when `aim` is given). */
+  readonly spread?: number;
+  /** A factor on the launch speed, above 0 (default 1). */
+  readonly speedScale?: number;
+}
+
 /** One charge, placed in the world. */
 export interface ChargeOptions {
   /** Where its centre is, metres, in the solver's cell. */
@@ -95,6 +109,8 @@ export interface ChargeOptions {
   readonly depth?: number;
   /** Its case: fragments for a charge at or above the surface. */
   readonly case?: ChargeCase;
+  /** Art direction for the shot (see {@link ChargeFilm}); leave it out for the physical launch. */
+  readonly film?: ChargeFilm;
 }
 
 /** A gun placed in the world, on a rigid body (a carrier: a ship, a carriage) or fixed. */
@@ -249,6 +265,19 @@ function rotate(q: ArrayLike<number>, v: Vec3): Vec3 {
     ty = 2 * (z * v[0] - x * v[2]),
     tz = 2 * (x * v[1] - y * v[0]);
   return [v[0] + w * tx + (y * tz - z * ty), v[1] + w * ty + (z * tx - x * tz), v[2] + w * tz + (x * ty - y * tx)];
+}
+
+/** Two unit vectors across the unit vector `n`, making a right-handed basis with it. */
+function basis(n: Vec3): [Vec3, Vec3] {
+  const helper: Vec3 = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  let u: Vec3 = [
+    n[1] * helper[2] - n[2] * helper[1],
+    n[2] * helper[0] - n[0] * helper[2],
+    n[0] * helper[1] - n[1] * helper[0],
+  ];
+  const l = hypot(u[0], u[1], u[2]);
+  u = [u[0] / l, u[1] / l, u[2] / l];
+  return [u, [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]]];
 }
 
 function vec(value: unknown, what: string, unit = false): Vec3 {
@@ -456,7 +485,16 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         const geometry: GurneyGeometry = c.geometry ?? 'cylinder';
         if (geometry !== 'cylinder' && geometry !== 'sphere')
           throw invalidExplosive(`${at} case geometry is cylinder or sphere; got ${String(geometry)}.`);
-        const speed = metalSpeed(gurneyVelocity(explosive), geometry, caseMass / mass);
+        const film = charge.film ?? {};
+        const scale = finite(film.speedScale ?? 1, `${at} film speedScale`, 'Pass a factor above 0, such as 1.', true);
+        const speed = metalSpeed(gurneyVelocity(explosive), geometry, caseMass / mass) * scale;
+        const aim = film.aim === undefined ? null : vec(film.aim, `${at} film aim`, true);
+        const spread = film.spread ?? Math.PI / 6;
+        if (!(Number.isFinite(spread) && spread > 0 && spread <= Math.PI))
+          throw invalidExplosive(`${at} film spread must be above 0 and up to pi radians; got ${spread}.`);
+        // A basis across the aim, for the cone.
+        const across = aim ? basis(aim) : null;
+        const lowest = cos(spread);
         const density = finite(c.density ?? 7850, `${at} fragment density`, 'Give it in kg/m^3.', true);
         const cd = finite(c.dragCoefficient ?? 1, `${at} drag coefficient`, 'Pass a number such as 1.');
         drag = cd;
@@ -510,16 +548,21 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
           const radius = pow((3 * m) / (4 * Math.PI * density), 1 / 3);
           const k2 = (AIR_DENSITY * cd * Math.PI * radius * radius) / (2 * m);
           for (const sign of [1, -1]) {
-            fragments.push([
-              p[0],
-              p[1],
-              p[2],
-              sign * speed * dir[0],
-              sign * speed * dir[1],
-              sign * speed * dir[2],
-              m,
-              WAITING,
-            ]);
+            let d: Vec3 = [sign * dir[0], sign * dir[1], sign * dir[2]];
+            if (aim && across) {
+              // Uniform over the cone's cap: cos(theta) uniform from cos(spread) to 1, the azimuth uniform.
+              const slot = owners.length + 2 * k + (sign > 0 ? 0 : 1);
+              const z = 1 - random.uniform(2, slot, index) * (1 - lowest);
+              const phi = 2 * Math.PI * random.uniform(3, slot, index);
+              const r = pow(Math.max(0, 1 - z * z), 0.5);
+              const [a, b] = across;
+              d = [
+                r * cos(phi) * a[0] + r * sin(phi) * b[0] + z * aim[0],
+                r * cos(phi) * a[1] + r * sin(phi) * b[1] + z * aim[1],
+                r * cos(phi) * a[2] + r * sin(phi) * b[2] + z * aim[2],
+              ];
+            }
+            fragments.push([p[0], p[1], p[2], speed * d[0], speed * d[1], speed * d[2], m, WAITING]);
             drags.push(k2);
             diameters.push(2 * radius);
             owners.push(index);

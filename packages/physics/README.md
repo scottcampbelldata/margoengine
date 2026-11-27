@@ -7546,7 +7546,10 @@ as fragments (`fragmentsField`, `FRAGMENT_WORDS` words: position, velocity, mass
 the case to charge mass ratio, with masses drawn from Mott's distribution (N(>m) = N0 exp(-sqrt(m/mu))) and scaled to the
 case mass. They leave in opposite pairs of equal mass, so the launch adds no momentum. They fly under the world's gravity
 and quadratic air drag (`dragCoefficient`, default 1, on a sphere of the fragment's mass and `density`) until they reach
-`groundHeight`, or on the terrain bed. `seed` breaks the same cases another way; `counts` gives the fragments in flight,
+`groundHeight`, or on the terrain bed. A charge's `film` is art direction, not physics: `aim` and `spread` (default
+pi / 6) send its case fragments into a cone, and `speedScale` (default 1) scales their launch speed. The masses stay
+Mott's, but aimed fragments leave one by one rather than in opposite pairs, so the launch carries momentum. `seed` breaks
+the same cases another way; `counts` gives the fragments in flight,
 the fragment steps taken and the guns' integration steps. A buried charge (`depth` above 0) keeps its case in the ground.
 
 `await ExplosionSolver.load(options)` flies the fragments in the explosive kernel, a Rust crate compiled to Wasm with SIMD.

@@ -168,3 +168,40 @@ test('bad charges are refused with the fix', () => {
     coded,
   );
 });
+
+test('film direction: aim and spread put every fragment in the cone, speedScale scales the launch, and both are seeded', () => {
+  const launch = (film, seed = 0) => {
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] });
+    const solver = new ExplosionSolver();
+    world.add(solver, { seed, charges: [{ position: [0, 1, 0], mass: 10, case: { mass: 20, fragments: 400 }, film }] });
+    return solver.fragments();
+  };
+  const physical = launch(undefined);
+  const aimed = launch({ aim: [0, 2, 0], spread: 0.3, speedScale: 0.5 });
+  const speed = Math.hypot(physical[3], physical[4], physical[5]);
+  let inside = 0;
+  for (let i = 0; i < aimed.length; i += FRAGMENT_WORDS) {
+    const v = [aimed[i + 3], aimed[i + 4], aimed[i + 5]];
+    const s = Math.hypot(...v);
+    assert.ok(Math.abs(s - 0.5 * speed) < 1e-9 * speed, `speed ${s}`);
+    // Inside the 0.3 rad cone round +y, and spread over it rather than piled on the axis.
+    assert.ok(v[1] / s >= Math.cos(0.3) - 1e-12, `angle ${Math.acos(v[1] / s)}`);
+    if (v[1] / s < Math.cos(0.15)) inside++;
+  }
+  assert.ok(inside > 400 * 0.6, `${inside} of 400 in the outer ring (its share of the cap is 0.75)`);
+  // The masses are the physical ones; another seed scatters them another way; the same seed gives the same bits.
+  for (let i = 6; i < aimed.length; i += FRAGMENT_WORDS) assert.equal(aimed[i], physical[i]);
+  assert.notDeepEqual(launch({ aim: [0, 1, 0] }, 1), launch({ aim: [0, 1, 0] }, 2));
+  assert.deepEqual(launch({ aim: [0, 1, 0] }, 3), launch({ aim: [0, 1, 0] }, 3));
+  const refused = (film) =>
+    assert.throws(
+      () =>
+        new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new ExplosionSolver(), {
+          charges: [{ position: [0, 1, 0], mass: 1, case: { mass: 2 }, film }],
+        }),
+      coded,
+    );
+  refused({ aim: [0, 0, 0] });
+  refused({ aim: [0, 1, 0], spread: 4 });
+  refused({ speedScale: 0 });
+});

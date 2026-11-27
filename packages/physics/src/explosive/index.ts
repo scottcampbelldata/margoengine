@@ -22,6 +22,7 @@ export {
 } from './charge.js';
 export {
   type ChargeCase,
+  type ChargeFilm,
   type ChargeOptions,
   EXPLOSION_LAYOUT,
   EXPLOSION_WORDS,

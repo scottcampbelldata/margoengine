@@ -18,6 +18,12 @@ export interface ChargeCase {
     readonly dragCoefficient?: number;
 }
 
+export interface ChargeFilm {
+    readonly aim?: Vec3;
+    readonly spread?: number;
+    readonly speedScale?: number;
+}
+
 export interface ChargeOptions {
     readonly position: Vec3;
     readonly time?: number;
@@ -26,6 +32,7 @@ export interface ChargeOptions {
     readonly explosive?: Explosive;
     readonly depth?: number;
     readonly case?: ChargeCase;
+    readonly film?: ChargeFilm;
 }
 
 export interface CraterLaw {
