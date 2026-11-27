@@ -16,6 +16,14 @@ export const entries = [
     fix: 'Use finite SI inputs. Supply a water field and positive density, a closed outward-wound mesh or positive shape dimensions, and valid rigid rows. Omit the force capacity to use the world capacity. The error names the rejected input and the change to make.',
   },
   {
+    id: 'rods',
+    title: '@margoengine/physics/rod inputs',
+    kind: 'family',
+    messages: [],
+    cause: 'A rod, rope, cable or chain received a centre line, option, buffer or state it cannot use.',
+    fix: 'Pass a live Physics world, a centre line of two or more distinct points (or start and end), 2 to 4096 segments, positive finite sizes and stiffnesses in SI units, a loads provider from segmentLoads, buffers of the documented length, and only a state this rod took. The error names the input and the change to make.',
+  },
+  {
     id: 'body-driver',
     title: '@margoengine/input/body: webcam hands and body to a skeleton',
     kind: 'family',

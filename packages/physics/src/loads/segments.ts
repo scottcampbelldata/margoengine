@@ -248,7 +248,7 @@ class Provider implements SegmentLoads {
  * Morison's inertia with DNV's added mass, drag across and Eames's drag along as a damping toward the flow, and vortex lift
  * from a wake oscillator per segment driven by its own motion.
  * @param sea The water: a `SeaSurface` (a SpectralSea) or any `{elevation(x, z, t), water, density}`.
- * @throws TypeError for water without a surface and a flow; RangeError for an option out of range.
+ * @throws MargoError (code `unsupported`) for water without a surface and a flow, or an option out of range, naming the fix.
  */
 export function segmentLoads(sea: LoadWater, options: SegmentLoadOptions = {}): SegmentLoads {
   if (!sea || typeof sea.elevation !== 'function' || typeof sea.water?.sample !== 'function')

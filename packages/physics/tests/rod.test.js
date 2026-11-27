@@ -431,11 +431,20 @@ test('a body swimming into a stand of tentacles pushes them aside through contac
 
 test('a rod refuses a centre line it cannot make and options out of range, naming the fix', () => {
   const physics = new Physics(null);
-  assert.throws(() => new Rod(physics, { points: [[0, 0, 0]] }), /centre line/);
-  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], segments: 1 }), /from 2 to 4096/);
-  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], radius: -1 }), /radius/);
-  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [0, 0, 0] }), /length/);
-  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], loads: {} }), /segmentLoads/);
+  // Each is a coded MargoError naming the input and its fix, with the help link.
+  const refused = (message) => ({ name: 'MargoError', code: 'unsupported', message: new RegExp(`${message}.+#rods`) });
+  assert.throws(() => new Rod(physics, { points: [[0, 0, 0]] }), refused('centre line'));
+  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], segments: 1 }), refused('from 2 to 4096'));
+  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], radius: -1 }), refused('radius'));
+  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [0, 0, 0] }), refused('length'));
+  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], loads: {} }), refused('segmentLoads'));
+  assert.throws(() => new Rod(null, { start: [0, 0, 0], end: [1, 0, 0] }), refused('live Physics world'));
+  assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], time: Number.NaN }), refused('time'));
+  const probe = new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], segments: 4 });
+  assert.throws(() => probe.points(new Float32Array(3)), refused('points buffer'));
+  assert.throws(() => probe.frames(new Float32Array(3)), refused('frames buffer'));
+  assert.throws(() => probe.release('middle'), refused('rod end'));
+  probe.remove();
   assert.throws(() => segmentLoads(water([0, 0, 0]), { drag: -1 }), /drag/);
   assert.throws(() => segmentLoads(water([0, 0, 0]), { period: 0 }), /period/);
   assert.throws(() => segmentLoads({ density: 1000 }), {

@@ -130,11 +130,16 @@ function resample(points: readonly Vec3[], n: number): V[] {
   return out;
 }
 
+/** A rod input that cannot be used: code `unsupported`, the message naming the input and its fix, and the help link. */
+function invalidRod(message: string): MargoError {
+  return new MargoError('unsupported', `${message} See https://margoengine.com/errors#rods`);
+}
+
 /** A positive finite number or the default. */
 function positive(value: number | undefined, fallback: number, label: string, unit: string): number {
   if (value === undefined) return fallback;
   if (!(value > 0) || !Number.isFinite(value))
-    throw new RangeError(`Rod ${label} must be a positive finite number of ${unit}.`);
+    throw invalidRod(`Rod ${label} must be a positive finite number of ${unit}.`);
   return value;
 }
 
@@ -188,14 +193,14 @@ export class Rod implements PhysicsAttachment {
     options: RodOptions,
   ) {
     if (typeof owner?.addBody !== 'function' || owner.isDisposed)
-      throw new TypeError('A rod needs a live Physics world: new Rod(physics, {points}).');
+      throw invalidRod('A rod needs a live Physics world: new Rod(physics, {points}).');
     const line = options?.points ?? (options?.start && options.end ? [options.start, options.end] : undefined);
     if (!line || line.length < 2)
-      throw new RangeError('A rod needs its centre line: pass points (two or more) or start and end.');
+      throw invalidRod('A rod needs its centre line: pass points (two or more) or start and end.');
     line.forEach((p, i) => checkVec(p, `Rod point ${i}`));
     const segments = options.segments ?? 24;
     if (!Number.isInteger(segments) || segments < 2 || segments > 4096)
-      throw new RangeError('Rod segments must be an integer from 2 to 4096; a rod bends between its links.');
+      throw invalidRod('Rod segments must be an integer from 2 to 4096; a rod bends between its links.');
     const radius = positive(options.radius, 0.01, 'radius', 'metres'),
       density = positive(options.density, 1140, 'density', 'kg/m^3'),
       young = positive(options.youngModulus, 3e9, 'youngModulus', 'pascals'),
@@ -209,22 +214,21 @@ export class Rod implements PhysicsAttachment {
           ? Infinity
           : positive(options.axialStiffness, young * area, 'axialStiffness', 'N'),
       damping = options.damping ?? 0.005;
-    if (!(damping >= 0) || !Number.isFinite(damping)) throw new RangeError('Rod damping must be 0 or more seconds.');
+    if (!(damping >= 0) || !Number.isFinite(damping)) throw invalidRod('Rod damping must be 0 or more seconds.');
     const nodes = resample(line, segments),
       l = length(sub(nodes[1], nodes[0]));
-    if (!(l > 0)) throw new RangeError('Rod points must not all be the same; pass a centre line with a length.');
+    if (!(l > 0)) throw invalidRod('Rod points must not all be the same; pass a centre line with a length.');
     this.segmentLength = l;
     this.radius = radius;
     this.damping = damping;
     this.stiffness = { bend, twist, axial };
     this.loads = options.loads;
     if (this.loads !== undefined && typeof this.loads?.apply !== 'function')
-      throw new TypeError(
+      throw invalidRod(
         'Rod loads are a provider with apply(segments, context, out); pass segmentLoads(sea) from @margoengine/physics/loads.',
       );
     this.time = options.time ?? 0;
-    if (!Number.isFinite(this.time))
-      throw new RangeError('Rod time must be a finite number of seconds; pass one, or 0.');
+    if (!Number.isFinite(this.time)) throw invalidRod('Rod time must be a finite number of seconds; pass one, or 0.');
     for (let i = 0; i < segments; i++) {
       this.states.push({
         position: [0, 0, 0],
@@ -397,7 +401,7 @@ export class Rod implements PhysicsAttachment {
    */
   release(end: RodEnd): this {
     this.check();
-    if (end !== 'start' && end !== 'end') throw new TypeError(`A rod end is 'start' or 'end'; got ${String(end)}.`);
+    if (end !== 'start' && end !== 'end') throw invalidRod(`A rod end is 'start' or 'end'; got ${String(end)}.`);
     const held = this.ends[end];
     if (end === 'start' && held.anchor && held.anchor === this.root)
       throw new MargoError(
@@ -428,7 +432,7 @@ export class Rod implements PhysicsAttachment {
   points(out: Float32Array = new Float32Array((this.segments.length + 1) * 3)): Float32Array {
     this.check();
     if (out.length < (this.segments.length + 1) * 3)
-      throw new RangeError('Rod points buffer is too short; pass a Float32Array of (segments + 1) * 3 numbers.');
+      throw invalidRod('Rod points buffer is too short; pass a Float32Array of (segments + 1) * 3 numbers.');
     const half = this.segmentLength / 2;
     for (let i = 0; i < this.segments.length; i++) {
       const body = this.segments[i],
@@ -453,7 +457,7 @@ export class Rod implements PhysicsAttachment {
   frames(out: Float32Array = new Float32Array(this.segments.length * 4)): Float32Array {
     this.check();
     if (out.length < this.segments.length * 4)
-      throw new RangeError('Rod frames buffer is too short; pass a Float32Array of segments * 4 numbers.');
+      throw invalidRod('Rod frames buffer is too short; pass a Float32Array of segments * 4 numbers.');
     this.segments.forEach((body, i) => out.set(body.rotation, i * 4));
     return out;
   }
@@ -544,10 +548,10 @@ export class Rod implements PhysicsAttachment {
   restoreState(state: Float64Array): this {
     this.check();
     if (!(state instanceof Float64Array))
-      throw new RangeError("A rod state is the Float64Array this rod's takeState() gave; pass that one.");
+      throw invalidRod("A rod state is the Float64Array this rod's takeState() gave; pass that one.");
     if (this.loads?.restoreState) this.loads.restoreState(state);
     else if (state.length !== 0)
-      throw new RangeError("A rod state is the Float64Array this rod's takeState() gave; pass that one.");
+      throw invalidRod("A rod state is the Float64Array this rod's takeState() gave; pass that one.");
     return this;
   }
 
