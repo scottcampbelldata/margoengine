@@ -1087,9 +1087,16 @@ handrail with balusters, the floor above open over it and a guard round the well
 Residential Code R311.7 (36 in wide, risers at most 7 3/4 in, treads at least 10 in, 6 ft 8 in of headroom) and R312
 (a guard of at least 36 in with openings under a 4 in sphere), or Japan's Building Standard Law Enforcement Order
 art. 23 (concrete public buildings 0.9 or 1.2 m wide with risers of 0.18 m at most; wooden houses 0.78 m wide with
-0.21 m), the going set by Blondel's rule. It stands in one room on every floor, clear of doorways and outer doors, and
-clear of the windows where the plan allows (else it passes one, as a stair window does). `stairs` is empty when no room
-can hold one (narrow or very divided plans).
+0.21 m), the going set by Blondel's rule. It stands in one room on every floor, with a way past it, clear of doorways
+and outer doors, and clear of the windows where the plan allows (else it passes one, as a stair window does). A
+partition that would run into an outer door stops 1.2 m short of it, leaving an entry.
+
+Every storey is reached. Where no room holds the stair, partitions come down to make a stair hall. A plan too small for
+that gets a `spiral` stair (IRC spiral stairways: 26 in wide, treads at least 6 3/4 in at 12 in from the narrow edge,
+risers at most 9 1/2 in; in Japan art. 23, measured 30 cm from the narrow end), and one too small for a spiral a fixed
+`ladder` through hatches (US 29 CFR 1910.23: 16 in between the rails, rungs at most 14 in apart, rails 42 in above the
+floor). Each entry of `stairs` gives its `kind`, footprint, and the `foot` and `head` points where a walker steps on
+and off.
 
 With `fixtures`, a home's ground floor (a shop block's first floor) has a kitchen at the back (a fitted counter with
 sink, hob and a refrigerator in the 2011 house; a cast iron range with its flue, a legged sink and an ice box in 1910)
@@ -1209,9 +1216,13 @@ where their planes cross (45 degrees in plan between equal pitches), walls open 
 main roof is cut open behind each dormer, and nothing hidden is left to draw. A dormer is left out where a wing or the
 tower already covers that part of the slope, or where the roof is too low for one.
 
+Every storey is reached on foot. The main block's stair serves the floors it shares; a tower that climbs higher is a
+stair tower, entered from the main block, with the whole stack of its flights inside it; a wing given by hand that has
+floors the main block lacks, or stands apart from it, gets its own stair (a wing's own `stairs` option overrides
+this). Where every ground floor door is inside another block, the tower or a wing gets a door.
+
 It returns `{parts, palette, blocks, top, openings, dormers, rooms, furniture, doorways, stairs, roofHeight(x, z),
-insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding` (the stairs are the main block's; a
-wing has its own only when given by hand with `stairs: true`); `roofHeight` is the upper envelope of
+insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding`; `roofHeight` is the upper envelope of
 the blocks' roofs. `BUILDING_PLAN_SETTINGS` and `buildingPlanOptionsFromSettings` in
 `@margoengine/procedural/building-settings` are its slider rows.
 

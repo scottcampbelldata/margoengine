@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21263073,
+  "total": 21271841,
   "history": [
     {
       "date": "2026-10-24",
@@ -15055,6 +15055,12 @@
       "commit": "a918f9e7a",
       "reason": "TAAUpscale transparent canvas alpha (KB-ALPHA-TEMPORAL1): measured taa/upscale 9,123 to 10,052 B and taa/upscale-velocity 23,588 to 24,348 B (it holds upscale). The bytes are the resolve, Lanczos and present patches that carry alpha; a lazy split would draw wrong alpha until it loaded.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "building-reach",
+      "reason": "KB-PROC-NOSTAIR1 and KB-PROC-PLANREACH1: every storey of rules buildings and joined plans is reached (stair halls, spiral and ladder stairs, tower and wing stairs, joins that open on every floor): procedural/building-rules 17,904 to 20,313 B gzip measured, building-plans 22,260 to 25,876, city 33,677 from 31,190 (it builds with the rules). The fallbacks run inside the synchronous generators, so a split entry would leave a house with unreachable storeys until a second import.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16043,12 +16049,12 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 22928,
-    "@margoengine/procedural/building-rules": 18442,
+    "@margoengine/procedural/building-plans": 26653,
+    "@margoengine/procedural/building-rules": 20923,
     "@margoengine/procedural/building-settings": 5862,
     "@margoengine/procedural/buildings": 1758,
     "@margoengine/procedural/caves": 1677,
-    "@margoengine/procedural/city": 32126,
+    "@margoengine/procedural/city": 34688,
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,

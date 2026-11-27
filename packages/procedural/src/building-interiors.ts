@@ -13,8 +13,12 @@
 //   headroom 6 ft 8 in, handrail 34 to 38 in), R312 (guard at least 36 in, openings under a 4 in sphere) and R307.1
 //   (15 in from a water closet's centre line to a side obstruction, 21 in clear in front of a fixture).
 // - Japan: Building Standard Law Enforcement Order art. 23 (a dwelling's stair at least 75 cm wide, riser at most
-//   23 cm, tread at least 15 cm; the house here keeps the usual 21 cm and 23 cm). Tatami of the Edo-ma size, about
-//   0.88 by 1.76 m, laid so no four corners meet.
+//   23 cm, tread at least 15 cm; the house here keeps the usual 21 cm and 23 cm; a winding stair's tread is measured
+//   30 cm from its narrow end). Tatami of the Edo-ma size, about 0.88 by 1.76 m, laid so no four corners meet.
+// - Spiral stairs: International Residential Code 2021, spiral stairways (26 in wide, tread at least 6 3/4 in at 12 in
+//   from the narrow edge, riser at most 9 1/2 in, headroom 6 ft 6 in).
+// - Fixed ladders: US 29 CFR 1910.23 (rungs 10 to 14 in apart, at least 16 in wide, 7 in clear behind, side rails
+//   42 in above the landing).
 import type {
   BuildingDoorway,
   BuildingFurniture,
@@ -58,7 +62,35 @@ interface InteriorOptions {
   readonly softFurnishings: boolean;
   readonly detail: 'far' | 'mid' | 'near';
 }
+/**
+ * Floor rectangles (building-local) the stair keeps out of: building-plans.ts sets it on a block's options when
+ * another block's stair or rooms stand there. With `required`, a stair is still built where nothing else is free.
+ */
+export const STAIR_AVOID: unique symbol = Symbol('stairAvoid');
+export interface StairAvoid {
+  readonly rects: readonly { x0: number; x1: number; z0: number; z1: number }[];
+  readonly required: boolean;
+  /** Where given, the stair's feet and heads stand in here: a tower's side that opens into the main block. */
+  readonly from?: { x0: number; x1: number; z0: number; z1: number };
+}
+/**
+ * On a built building: how many of the `interior` part's first triangles are the outer walls' inside faces, which
+ * building-plans.ts cuts as walls where another block joins.
+ */
+export const WALL_LINING: unique symbol = Symbol('wallLining');
+/**
+ * On a built building: each window's curtains and rod as runs of two parts' triangles, with the window's middle on the
+ * wall (local), so building-plans.ts can take them down with a window another block covers.
+ */
+export const CURTAINS: unique symbol = Symbol('curtains');
+export interface CurtainRun {
+  readonly part: 'fabric' | 'metalwork';
+  readonly from: number;
+  readonly to: number;
+  readonly window: V3;
+}
 export interface Interior {
+  curtains: CurtainRun[];
   rooms: BuildingRoom[];
   furniture: BuildingFurniture[];
   doorways: BuildingDoorway[];
@@ -195,63 +227,168 @@ function planRect(p: Place, u0: number, u1: number, v0: number, v1: number): Rec
   };
 }
 interface Flight {
-  /** Risers a flight. */
+  /** Risers a flight (a dog-leg's two flights have this many each). */
   count: number;
   rise: number;
+  /** Going: at the walking line of a spiral, 0 for a ladder. */
   tread: number;
+  /** A spiral flight's turn from one tread to the next, rad. */
+  angle: number;
 }
-interface StairPlan {
+interface StairShape {
   kind: BuildingStair['kind'];
-  place: Place;
   /** Plan length and breadth of the stair itself. */
   length: number;
   breadth: number;
+  /** Floor kept clear before the stair (u below 0) and past its far end. */
+  before: number;
+  after: number;
   rule: StairRule;
   flights: Flight[];
   /** Plan length of the sloped run. */
   run: number;
 }
+interface StairPlan extends StairShape {
+  place: Place;
+}
 
-/**
- * A stair shaft that fits every storey: a dog-leg (two flights and a half landing, so storeys stack) or, between two
- * floors only, one straight flight. The footprint and its approach lie in one room on every floor, clear of doorway
- * approaches and 1.2 m off outer doors, and 0.3 m off windows where a room allows that. Undefined when no room holds
- * one.
- */
-function planStair(rule: StairRule, floors: number[], layout: Floor[]): StairPlan | undefined {
-  const heights = floors.slice(1).map((f, k) => f - floors[k]),
+const storeyHeights = (floors: number[]) => floors.slice(1).map((f, k) => f - floors[k]);
+const approachOf = (width: number) => Math.max(0.8, width);
+
+/** A dog-leg (two flights and a half landing, so storeys stack) or, between two floors only, one straight flight. */
+function framedShapes(rule: StairRule, floors: number[]): StairShape[] {
+  const heights = storeyHeights(floors),
     w = rule.width,
-    approach = Math.max(0.8, w),
-    going = (rise: number) => Math.min(0.32, Math.max(rule.minTread, 0.63 - 2 * rise));
-  const shapes: StairPlan['kind'][] = heights.length === 1 ? ['dog-leg', 'straight'] : ['dog-leg'];
-  // Rooms to try: the most divided floor first (its rooms are the smallest), back rows first, then right to left.
-  const order = layout
-    .map((f, k) => ({ f, k }))
-    .sort((a, b) => b.f.rooms.length - a.f.rooms.length || b.k - a.k)
-    .flatMap(({ f }) =>
-      f.rooms
-        .map((r, i) => ({ r, at: f.at[i] }))
-        .sort((a, b) => a.at.row - b.at.row || b.at.column - a.at.column)
-        .map((e) => e.r),
-    );
-  // Clear of the windows where the plan allows it, else passing one, as a stair window does.
-  for (const [byWindow, kind] of [0.3, -1].flatMap((gap) => shapes.map((kind) => [gap, kind] as const))) {
+    approach = approachOf(w),
+    going = (rise: number) => Math.min(0.32, Math.max(rule.minTread, 0.63 - 2 * rise)),
+    kinds: StairShape['kind'][] = heights.length === 1 ? ['dog-leg', 'straight'] : ['dog-leg'];
+  return kinds.map((kind) => {
     const dog = kind === 'dog-leg',
       counts = heights.map((h) => {
         const n = Math.ceil(h / ((dog ? 2 : 1) * rule.maxRise) - 1e-9);
         return { n, rise: h / ((dog ? 2 : 1) * n) };
       }),
-      run = Math.max(...counts.map((c) => (c.n - 1) * going(c.rise))),
-      flights = counts.map((c) => ({
-        count: c.n,
-        rise: c.rise,
-        tread: run / (c.n - 1),
-      })),
-      length = dog ? run + w : run,
-      breadth = dog ? 2 * w + WELL_GAP : w,
-      u0 = -approach,
-      u1 = dog ? length : length + approach;
-    for (const room of order)
+      run = Math.max(...counts.map((c) => (c.n - 1) * going(c.rise)));
+    return {
+      kind,
+      length: dog ? run + w : run,
+      breadth: dog ? 2 * w + WELL_GAP : w,
+      before: approach,
+      after: dog ? 0 : approach,
+      rule,
+      flights: counts.map((c) => ({ count: c.n, rise: c.rise, tread: run / (c.n - 1), angle: 0 })),
+      run,
+    };
+  });
+}
+
+/** A spiral flight's last quarter turn is the landing at the floor above, so every flight starts and ends alike. */
+const SPIRAL_LANDING = Math.PI / 2;
+
+/**
+ * A spiral stair in a square shaft, for plans a framed stair does not fit. Each flight turns whole turns less the
+ * landing quarter, and as many turns as leave headroom between them.
+ */
+function spiralShapes(style: BuildingStyle, framed: StairRule, floors: number[]): StairShape[] {
+  const heights = storeyHeights(floors),
+    japan = style.startsWith('japan'),
+    concrete = style === 'japan-2011-concrete',
+    // Where the tread is measured from the narrow edge, the widest walking line and the code's tread and riser.
+    walk = japan ? 0.3 : 0.305,
+    walkMax = japan ? Infinity : 0.622,
+    minTread = concrete ? 0.24 : japan ? 0.15 : 0.1715,
+    codeRise = concrete ? 0.2 : japan ? 0.23 : 0.241,
+    // 2.02 m of the lowest storey stays above a step's rise, so mixed storeys keep headroom too.
+    maxRise = Math.min(concrete ? 0.18 : japan ? 0.21 : 0.22, Math.max(0.17, Math.min(...heights) - 2.02)),
+    width = japan ? framed.width : 0.7,
+    rule: StairRule = { ...framed, maxRise, minTread, width, solid: concrete };
+  let radius = walk + 0.05;
+  const flights = heights.map((h) => {
+    const turns = Math.max(1, Math.floor(((1.5 * h) / 2.2 + 0.5) / 2)),
+      turn = 2 * Math.PI * turns - SPIRAL_LANDING;
+    let count = Math.ceil(h / maxRise - 1e-9);
+    if ((minTread * (count - 1)) / turn > walkMax) count = Math.floor((turn * walkMax) / minTread) + 1;
+    const angle = turn / (count - 1);
+    radius = Math.max(radius, minTread / angle);
+    return { count, rise: h / count, tread: 0, angle };
+  });
+  // A storey whose one turn cannot hold its steps within both the riser and the walking line gets no spiral.
+  if (flights.some((f) => f.rise > codeRise)) return [];
+  for (const f of flights) f.tread = radius * f.angle;
+  const outer = radius - walk + width;
+  return [approachOf(width), 0.6].map((before) => ({
+    kind: 'spiral' as const,
+    length: 2 * outer,
+    breadth: 2 * outer,
+    before,
+    after: 0,
+    rule,
+    flights,
+    run: radius,
+  }));
+}
+
+/** A ladder through a hatch: 16 in between the rails, rungs at most 0.3 m apart, 0.55 m of hatch. */
+const HATCH = { length: 0.55, width: 0.46, clear: 0.41 } as const;
+/** The last resort, for a building too small for any stair. Over two storeys the hatches take turns side by side. */
+function ladderShapes(framed: StairRule, floors: number[]): StairShape[] {
+  const flights = storeyHeights(floors).map((h) => {
+    const count = Math.ceil(h / 0.3 - 1e-9);
+    return { count, rise: h / count, tread: 0, angle: 0 };
+  });
+  return [0.6, 0.4].map((before) => ({
+    kind: 'ladder' as const,
+    length: HATCH.length,
+    breadth: HATCH.width * Math.min(2, flights.length),
+    before,
+    after: 0,
+    rule: { ...framed, width: HATCH.clear },
+    flights,
+    run: 0,
+  }));
+}
+
+/** How a stair may stand: clear of outer doors by `door`, of windows by `window`, and off every doorway's approach. */
+type Clearance = readonly [door: number, window: number, doorways: boolean];
+// Clear of the windows where the plan allows it, else passing one, as a stair window does.
+const CLEAR: Clearance[] = [
+  [1.2, 0.3, true],
+  [1.2, -1, true],
+];
+const TIGHT: Clearance[] = [...CLEAR, [0.6, -1, true], [-1, -1, true], [-1, -1, false]];
+
+/** Whether a stair spans a room from wall to wall and leaves floor on both sides of it, `pass` wide or more. */
+function divides(room: Rect, body: Rect, pass: number) {
+  const low = [body.x0 - room.x0, body.z0 - room.z0],
+    high = [room.x1 - body.x1, room.z1 - body.z1];
+  return [0, 1].some((a) => low[a] < pass && high[a] < pass && low[1 - a] >= pass - 1e-9 && high[1 - a] >= pass - 1e-9);
+}
+
+type KeepOut = Pick<StairAvoid, 'rects' | 'from'>;
+/** Whether every flight's foot and head stand within `from`. */
+const entered = (plan: StairPlan, from?: StairAvoid['from']) =>
+  !from ||
+  plan.flights.every((_, k) =>
+    flightEnds(plan, k).every(([x, z]) => x > from.x0 && x < from.x1 && z > from.z0 && z < from.z1),
+  );
+
+/**
+ * The first place for one of the shapes that fits every storey: the footprint and its approach lie in one room on every
+ * floor, with a way past, as `clearances` allow. `rooms` are tried in turn. Undefined when none of them holds one.
+ */
+function planStair(
+  shapes: StairShape[],
+  rooms: Rect[],
+  layout: Floor[],
+  clearances: Clearance[],
+  keepOut: KeepOut,
+): StairPlan | undefined {
+  for (const [[byDoor, byWindow, doorways], shape] of clearances.flatMap((c) => shapes.map((s) => [c, s] as const))) {
+    const { length, breadth } = shape,
+      pass = shape.kind === 'ladder' ? 0.4 : 0.55,
+      u0 = -shape.before,
+      u1 = length + shape.after;
+    for (const room of rooms)
       for (const u of [
         [1, 0],
         [-1, 0],
@@ -273,15 +410,87 @@ function planStair(rule: StairRule, floors: number[], layout: Floor[]): StairPla
               const place: Place = { o: [dx, dz], u, v },
                 whole = planRect(place, u0, u1, 0, breadth),
                 body = planRect(place, 0, length, 0, breadth);
-              const clear = layout.every(
-                (f) =>
-                  f.rooms.some((r) => within(whole, r)) &&
-                  !f.doors.some((d) => overlaps(body, doorZone(d))) &&
-                  !f.openings.some((s) => gapTo(body, s) < (s.door ? 1.2 : byWindow)),
-              );
-              if (clear) return { kind, place, length, breadth, rule, flights, run };
+              const clear =
+                !keepOut.rects.some((r) => overlaps(whole, r)) &&
+                entered({ ...shape, place }, keepOut.from) &&
+                layout.every(
+                  (f) =>
+                    f.rooms.some((r) => within(whole, r) && !divides(r, body, pass)) &&
+                    !(doorways && f.doors.some((d) => overlaps(body, doorZone(d)))) &&
+                    !f.openings.some((s) => gapTo(body, s) < (s.door ? byDoor : byWindow)),
+                );
+              if (clear) return { ...shape, place };
             }
         }
+  }
+  return undefined;
+}
+
+/** The most divided floor's rooms first (they are the smallest), back rows first, then right to left. */
+const roomOrder = (layout: Floor[]) =>
+  layout
+    .map((f, k) => ({ f, k }))
+    .sort((a, b) => b.f.rooms.length - a.f.rooms.length || b.k - a.k)
+    .flatMap(({ f }) =>
+      f.rooms
+        .map((r, i) => ({ r, at: f.at[i] }))
+        .sort((a, b) => a.at.row - b.at.row || b.at.column - a.at.column)
+        .map((e) => e.r),
+    );
+
+/** A block of grid cells taken as one room, the partitions inside it left out: a stair hall. */
+interface Hall {
+  i0: number;
+  i1: number;
+  r0: number;
+  r1: number;
+}
+/** Every hall of two or more cells, up to five columns wide: the smallest first, back rows first, right to left. */
+function halls(columns: number, rows: number): Hall[] {
+  const out: Hall[] = [];
+  for (let wide = 1; wide <= Math.min(5, columns); wide++)
+    for (let deep = 1; deep <= rows; deep++)
+      if (wide * deep > 1)
+        for (let r0 = 0; r0 + deep <= rows; r0++)
+          for (let i0 = columns - wide; i0 >= 0; i0--) out.push({ i0, i1: i0 + wide - 1, r0, r1: r0 + deep - 1 });
+  const cells = (h: Hall) => (h.i1 - h.i0 + 1) * (h.r1 - h.r0 + 1);
+  return out.sort((a, b) => cells(a) - cells(b) || a.r0 - b.r0 || b.i0 - a.i0);
+}
+
+/**
+ * A stair that reaches every floor: a framed stair in a room, else in a stair hall made by taking partitions down, else
+ * a spiral the same two ways, else a ladder. `plan(hall)` builds the floors with that hall. Undefined only when
+ * `keepOut` leaves no room for any.
+ */
+function placeStair(
+  style: BuildingStyle,
+  rule: StairRule,
+  floors: number[],
+  columns: number,
+  rows: number,
+  plan: (hall?: Hall) => Floor[],
+  keepOut: KeepOut,
+): { stair: StairPlan; hall?: Hall } | undefined {
+  const base = plan(),
+    order = roomOrder(base);
+  const sets: [StairShape[], Clearance[]][] = [
+    [framedShapes(rule, floors), CLEAR],
+    [spiralShapes(style, rule, floors), CLEAR],
+    [ladderShapes(rule, floors), TIGHT],
+  ];
+  for (const [shapes, clearances] of sets) {
+    const stair = planStair(shapes, order, base, clearances, keepOut);
+    if (stair) return { stair };
+    for (const hall of halls(columns, rows)) {
+      const layout = plan(hall),
+        // The hall is the one room these floors have that the plain plan lacks.
+        made = layout.flatMap((f, k) =>
+          f.rooms.filter((r) => !base[k].rooms.some((q) => within(r, q) && within(q, r))),
+        );
+      if (!made.length) continue;
+      const found = planStair(shapes, made.slice(0, 1), layout, clearances, keepOut);
+      if (found) return { stair: found, hall };
+    }
   }
   return undefined;
 }
@@ -313,6 +522,144 @@ function railing(
   for (let i = 1; i < n; i++) post(i / n, 0.012);
 }
 
+/** The floor area flight `k` takes: the whole stair, or a ladder's own hatch. */
+function flightRect(plan: StairPlan, k: number): Rect {
+  if (plan.kind !== 'ladder') return planRect(plan.place, 0, plan.length, 0, plan.breadth);
+  const v = plan.flights.length > 1 ? (k % 2) * HATCH.width : 0;
+  return planRect(plan.place, 0, plan.length, v, v + HATCH.width);
+}
+/** Where a person steps on at the floor flight `k` starts from, and off at the floor above. */
+function flightEnds(plan: StairPlan, k: number): [[number, number], [number, number]] {
+  const { place, rule, kind } = plan,
+    back = -Math.min(0.4, plan.before / 2),
+    at = (u: number, v: number) => planPoint(place, u, v);
+  if (kind === 'ladder') {
+    const v = (plan.flights.length > 1 ? (k % 2) * HATCH.width : 0) + HATCH.width / 2;
+    return [at(back, v), at(back, v)];
+  }
+  if (kind === 'spiral') return [at(back, plan.breadth / 2), at(back, plan.breadth / 2)];
+  const w = rule.width;
+  if (kind === 'straight') return [at(back, w / 2), at(plan.length - back, w / 2)];
+  return [at(back, w / 2), at(back, 1.5 * w + WELL_GAP)];
+}
+
+/** An edge against a wall of the room around the stair needs no guard. */
+function guardEdges(rails: MeshBuilder, edges: [V3, V3][], floor: Floor, body: Rect, height: number, fine: boolean) {
+  const room = floor.rooms.find((r) => within(body, r))!,
+    walled = (a: V3, b: V3) =>
+      (['x0', 'x1'] as const).some((s) => Math.abs(a[0] - room[s]) < 0.06 && Math.abs(b[0] - room[s]) < 0.06) ||
+      (['z0', 'z1'] as const).some((s) => Math.abs(a[2] - room[s]) < 0.06 && Math.abs(b[2] - room[s]) < 0.06);
+  for (const [a, b] of edges) if (!walled(a, b)) railing(rails, a, b, height, fine);
+}
+
+/** Treads winding round a post, a handrail round the outside and a landing quarter at each floor above. */
+function buildSpiral(
+  wood: MeshBuilder,
+  rails: MeshBuilder,
+  plan: StairPlan,
+  floors: number[],
+  layout: Floor[],
+  fine: boolean,
+) {
+  const { place, rule, breadth } = plan,
+    outer = breadth / 2,
+    pole = Math.max(0.05, outer - rule.width),
+    at = (u: number, v: number, y: number): V3 => {
+      const [x, z] = planPoint(place, u, v);
+      return [x, y, z];
+    },
+    // The turn starts toward the approach (u below the centre) and runs toward v = 0.
+    around = (r: number, a: number, y: number) => at(outer - r * Math.cos(a), outer - r * Math.sin(a), y);
+  const top = floors[floors.length - 1];
+  wood.slab(
+    Array.from({ length: 8 }, (_, i) => around(pole, (i * Math.PI) / 4, top + rule.guard)),
+    top + rule.guard - floors[0],
+    [0, 1, 0],
+  );
+  plan.flights.forEach((f, k) => {
+    const base = floors[k],
+      edge = outer - 0.005;
+    for (let i = 1; i < f.count; i++) {
+      const a = (i - 1) * f.angle,
+        b = i * f.angle,
+        y = base + i * f.rise;
+      wood.slab(
+        [
+          around(pole * 0.9, a, y),
+          around(edge, a, y),
+          around(edge, (a + b) / 2, y),
+          around(edge, b, y),
+          around(pole * 0.9, b, y),
+        ],
+        0.035,
+        [0, 1, 0],
+      );
+      // A board under the front edge leaves openings under the 4 in sphere.
+      const drop = f.rise - 0.035 - 0.095;
+      if (drop > 0) {
+        const mid = y - 0.035 - drop / 2;
+        wood.beam(around(pole, a + 0.02, mid), around(edge - 0.01, a + 0.02, mid), 0.02, drop);
+      }
+      const r = outer - 0.04,
+        high = (t: number) => base + f.rise * (1 + t / f.angle) + rule.handrail;
+      rails.beam(around(r, a, high(a)), around(r, b, high(b)), 0.05, 0.045);
+      const n = fine ? Math.max(1, Math.ceil((r * f.angle) / 0.11)) : 1;
+      for (let j = 0; j < n; j++) {
+        const t = a + ((j + 0.5) * f.angle) / n,
+          [x, , z] = around(r, t, 0);
+        box(rails, x - 0.012, x + 0.012, y, high(t), z - 0.012, z + 0.012);
+      }
+    }
+    // The landing at the floor above: the corner quarter between the last step and the next flight's first.
+    const r = planRect(place, 0, outer, outer, breadth);
+    box(wood, r.x0, r.x1, floors[k + 1] - 0.06, floors[k + 1], r.z0, r.z1);
+  });
+  const body = flightRect(plan, 0);
+  for (let k = 1; k < floors.length; k++) {
+    const y = floors[k],
+      edges: [V3, V3][] = [
+        [at(breadth, 0, y), at(breadth, breadth, y)],
+        [at(0, 0, y), at(breadth, 0, y)],
+        [at(0, breadth, y), at(breadth, breadth, y)],
+        [at(0, 0, y), at(0, outer, y)],
+      ];
+    // At the top no flight leaves the landing, so its open side is guarded too.
+    if (k === floors.length - 1) edges.push([at(0, outer, y), at(outer - pole, outer, y)]);
+    guardEdges(rails, edges, layout[k], body, rule.guard, fine);
+  }
+}
+
+/** Two rails and rungs against the back of a hatch, the rails 42 in above the floor they reach, guards round it. */
+function buildLadder(metal: MeshBuilder, plan: StairPlan, floors: number[], layout: Floor[], fine: boolean) {
+  const { place, rule } = plan,
+    at = (u: number, v: number, y: number): V3 => {
+      const [x, z] = planPoint(place, u, v);
+      return [x, y, z];
+    };
+  plan.flights.forEach((f, k) => {
+    const base = floors[k],
+      top = floors[k + 1],
+      v0 = plan.flights.length > 1 ? (k % 2) * HATCH.width : 0,
+      v1 = v0 + HATCH.width,
+      u = HATCH.length - 0.18,
+      side = (HATCH.width - HATCH.clear) / 2;
+    for (const v of [v0 + side / 2, v1 - side / 2]) {
+      const [x, , z] = at(u, v, 0);
+      box(metal, x - side / 2, x + side / 2, base, top + 1.07, z - side / 2, z + side / 2);
+    }
+    for (let j = 1; j <= f.count; j++) {
+      const y = base + j * f.rise - 0.0125;
+      metal.beam(at(u, v0 + side, y), at(u, v1 - side, y), 0.025, 0.025);
+    }
+    const edges: [V3, V3][] = [
+      [at(HATCH.length, v0, top), at(HATCH.length, v1, top)],
+      [at(0, v0, top), at(HATCH.length, v0, top)],
+      [at(0, v1, top), at(HATCH.length, v1, top)],
+    ];
+    guardEdges(metal, edges, layout[k + 1], flightRect(plan, k), rule.guard, fine);
+  });
+}
+
 function buildStair(
   parts: Parts,
   plan: StairPlan,
@@ -320,12 +667,15 @@ function buildStair(
   layout: Floor[],
   detail: InteriorOptions['detail'],
 ) {
-  const body = planRect(plan.place, 0, plan.length, 0, plan.breadth);
   const { place, rule, run, length, breadth, kind } = plan,
     w = rule.width,
     wood = parts.stairs,
     rails = rule.solid ? parts.metalwork : parts.stairs,
-    fine = detail !== 'far',
+    fine = detail !== 'far';
+  if (kind === 'spiral') return buildSpiral(wood, rails, plan, floors, layout, fine);
+  // A ladder is in the stairs part, so a building that has one has stairs there.
+  if (kind === 'ladder') return buildLadder(wood, plan, floors, layout, fine);
+  const body = planRect(plan.place, 0, plan.length, 0, plan.breadth),
     p = (u: number, v: number, y: number): V3 => {
       const [x, z] = planPoint(place, u, v);
       return [x, y, z];
@@ -391,12 +741,7 @@ function buildStair(
       edges.push([p(length, 0, y), p(length, breadth, y)]);
       if (top) edges.push([p(0, 0, y), p(0, w, y)]);
     } else edges.push([p(0, 0, y), p(0, breadth, y)]);
-    // An edge against a wall needs no guard.
-    const room = layout[k].rooms.find((r) => within(body, r))!,
-      walled = (a: V3, b: V3) =>
-        (['x0', 'x1'] as const).some((s) => Math.abs(a[0] - room[s]) < 0.06 && Math.abs(b[0] - room[s]) < 0.06) ||
-        (['z0', 'z1'] as const).some((s) => Math.abs(a[2] - room[s]) < 0.06 && Math.abs(b[2] - room[s]) < 0.06);
-    for (const [a, b] of edges) if (!walled(a, b)) railing(rails, a, b, rule.guard, fine);
+    guardEdges(rails, edges, layout[k], body, rule.guard, fine);
   }
 }
 
@@ -444,8 +789,9 @@ export function buildInterior(
   floors: number[],
   eaves: number,
   pitched: boolean,
+  avoid?: StairAvoid,
 ): Interior {
-  const out: Interior = { rooms: [], furniture: [], doorways: [], stairs: [] };
+  const out: Interior = { curtains: [], rooms: [], furniture: [], doorways: [], stairs: [] };
   const W = o.width,
     D = o.depth,
     th = o.wall,
@@ -488,91 +834,168 @@ export function buildInterior(
     if (h.side === 1) return on('x', x1, D / 2 - h.a1, D / 2 - h.a0);
     return on('x', x0, -D / 2 + h.a0, -D / 2 + h.a1);
   };
-  // The plan of every floor: partitions on bay lines, doorways through them.
-  const walls: [number, number, number, number, number, number][] = [];
-  const layout: Floor[] =
-    o.interior !== 'rooms'
-      ? []
-      : floors.map((fy, k) => {
-          const cy = ceilingOf(k),
-            open = use === 'store' || (k === 0 && o.storefront),
-            n = open ? 1 : Math.max(1, Math.round((x1 - x0) / ROOM_WIDTH[japan ? 'japan' : 'western'])),
-            xs = [x0];
-          for (let j = 1; j < n; j++) {
-            // A partition on a bay line where one is close, so none stands behind a window.
-            const even = x0 + (j * (x1 - x0)) / n,
-              snap = -W / 2 + bw * Math.round((even + W / 2) / bw);
-            xs.push(Math.abs(snap - even) < 0.6 && snap - xs[xs.length - 1] > 2.4 && x1 - snap > 2.4 ? snap : even);
-          }
-          xs.push(x1);
-          const zs = !open && z1 - z0 > 6 ? [z0, z1 - 0.55 * (z1 - z0), z1] : [z0, z1],
-            doors: BuildingDoorway[] = [];
-          for (let j = 1; j < xs.length - 1; j++)
-            for (let r = 0; r + 1 < zs.length; r++) {
-              const za = zs[r] + (r > 0 ? pt / 2 : 0),
-                zb = zs[r + 1] - (r + 1 < zs.length - 1 ? pt / 2 : 0),
-                d0 = za + 0.3,
-                d1 = d0 + dw,
-                x = xs[j];
-              if (d1 > zb - 0.1) {
-                walls.push([x - pt / 2, x + pt / 2, fy, cy, za, zb]);
-                continue;
-              }
-              walls.push([x - pt / 2, x + pt / 2, fy, cy, za, d0]);
-              walls.push([x - pt / 2, x + pt / 2, fy, cy, d1, zb]);
-              walls.push([x - pt / 2, x + pt / 2, fy + dh, cy, d0, d1]);
-              doors.push({
-                floor: k,
-                centre: [x, fy + dh / 2, (d0 + d1) / 2],
-                width: dw,
-                height: dh,
-                normal: 'x',
-              });
-            }
-          if (zs.length === 3)
-            for (let i = 0; i + 1 < xs.length; i++) {
-              const xa = xs[i] + (i > 0 ? pt / 2 : 0),
-                xb = xs[i + 1] - (i + 1 < xs.length - 1 ? pt / 2 : 0),
-                c = (xa + xb) / 2,
-                z = zs[1];
-              walls.push([xa, c - dw / 2, fy, cy, z - pt / 2, z + pt / 2]);
-              walls.push([c + dw / 2, xb, fy, cy, z - pt / 2, z + pt / 2]);
-              walls.push([c - dw / 2, c + dw / 2, fy + dh, cy, z - pt / 2, z + pt / 2]);
-              doors.push({
-                floor: k,
-                centre: [c, fy + dh / 2, z],
-                width: dw,
-                height: dh,
-                normal: 'z',
-              });
-            }
-          const floor: Floor = {
-            rooms: [],
-            at: [],
-            doors,
-            openings: holes.filter((h) => h.floor === k).map(span),
-            uses: [],
-            keep: [],
-          };
-          for (let i = 0; i + 1 < xs.length; i++)
-            for (let r = 0; r + 1 < zs.length; r++) {
-              floor.rooms.push({
-                x0: xs[i] + (i > 0 ? pt / 2 : 0),
-                x1: xs[i + 1] - (i + 1 < xs.length - 1 ? pt / 2 : 0),
-                z0: zs[r] + (r > 0 ? pt / 2 : 0),
-                z1: zs[r + 1] - (r + 1 < zs.length - 1 ? pt / 2 : 0),
-              });
-              floor.at.push({ column: i, row: r });
-            }
-          return floor;
+  // The plan of every floor: partitions on bay lines, doorways through them. A hall takes some partitions down.
+  const open = (k: number) => use === 'store' || (k === 0 && o.storefront),
+    count = Math.max(1, Math.round((x1 - x0) / ROOM_WIDTH[japan ? 'japan' : 'western'])),
+    // Partition lines across `lo` to `hi`: one within 1.2 m of the wall of a block this one joins moves to the nearer
+    // clear side, else is left out.
+    clearOfJoins = (lines: number[], axis: Opening['axis'], lo: number, hi: number) => {
+      const spans = (avoid?.rects ?? [])
+          .flatMap((r) => (axis === 'z' ? [r.x0, r.x1] : [r.z0, r.z1]))
+          .map((t) => [t - 1.2, t + 1.2]),
+        near = (t: number) => spans.find(([a, b]) => t > a + 1e-9 && t < b - 1e-9),
+        out = [lo];
+      for (const line of lines) {
+        const join = near(line),
+          at = join
+            ? [...join]
+                .sort((a, b) => Math.abs(a - line) - Math.abs(b - line))
+                .find((t) => !near(t) && t - out[out.length - 1] > 1.2 && hi - t > 1.2)
+            : line;
+        if (at !== undefined && (!join || at > out[out.length - 1])) out.push(at);
+      }
+      out.push(hi);
+      return out;
+    };
+  const even: number[] = [x0];
+  for (let j = 1; j < count; j++) {
+    // A partition on a bay line where one is close, so none stands behind a window.
+    const at = x0 + (j * (x1 - x0)) / count,
+      snap = -W / 2 + bw * Math.round((at + W / 2) / bw);
+    even.push(Math.abs(snap - at) < 0.6 && snap - even[j - 1] > 2.4 && x1 - snap > 2.4 ? snap : at);
+  }
+  const columnLines = clearOfJoins(even.slice(1), 'z', x0, x1),
+    columns = columnLines.length - 1,
+    rowLines = clearOfJoins(z1 - z0 > 6 ? [z1 - 0.55 * (z1 - z0)] : [], 'x', z0, z1);
+  type Wall = [number, number, number, number, number, number];
+  const floorPlan = (fy: number, k: number, walls: Wall[], hall?: Hall): Floor => {
+    const cy = ceilingOf(k),
+      xs = open(k) ? [x0, x1] : columnLines,
+      zs = open(k) ? [z0, z1] : rowLines,
+      merge = open(k) ? undefined : hall,
+      doors: BuildingDoorway[] = [],
+      // Whether the partition left of column `j` in row `r`, or behind the front row in column `i`, stands.
+      across = (j: number, r: number) => !(merge && j > merge.i0 && j <= merge.i1 && r >= merge.r0 && r <= merge.r1),
+      along = (i: number) => !(merge && merge.r1 > merge.r0 && i >= merge.i0 && i <= merge.i1);
+    const openings = holes.filter((h) => h.floor === k).map(span),
+      // A partition that would run into an outer door stops 1.2 m short of that wall, leaving an entry.
+      intoDoor = (axis: Opening['axis'], plane: number, line: number) =>
+        openings.some(
+          (s) =>
+            s.door &&
+            s.axis === axis &&
+            Math.abs(s.plane - plane) < 1e-6 &&
+            line > s.lo - pt / 2 - 0.05 &&
+            line < s.hi + pt / 2 + 0.05,
+        ),
+      entry = (x: number, z: number, width: number, normal: 'x' | 'z') =>
+        doors.push({ floor: k, centre: [x, fy + dh / 2, z], width, height: dh, normal });
+    for (let j = 1; j < xs.length - 1; j++)
+      for (let r = 0; r + 1 < zs.length; r++) {
+        if (!across(j, r)) continue;
+        const x = xs[j];
+        let za = zs[r] + (r > 0 ? pt / 2 : 0),
+          zb = zs[r + 1] - (r + 1 < zs.length - 1 ? pt / 2 : 0);
+        if (r === 0 && intoDoor('z', z0, x)) {
+          entry(x, za + Math.min(1.2, zb - za) / 2, Math.min(1.2, zb - za), 'x');
+          za += 1.2;
+        }
+        if (r === zs.length - 2 && intoDoor('z', z1, x) && zb > za) {
+          entry(x, zb - Math.min(1.2, zb - za) / 2, Math.min(1.2, zb - za), 'x');
+          zb -= 1.2;
+        }
+        // Too short for a door and its jambs: no partition, so no room is shut off.
+        if (zb - za < dw + 0.1) continue;
+        const d0 = za + Math.min(0.3, (zb - za - dw) / 2),
+          d1 = d0 + dw;
+        walls.push([x - pt / 2, x + pt / 2, fy, cy, za, d0]);
+        walls.push([x - pt / 2, x + pt / 2, fy, cy, d1, zb]);
+        walls.push([x - pt / 2, x + pt / 2, fy + dh, cy, d0, d1]);
+        doors.push({
+          floor: k,
+          centre: [x, fy + dh / 2, (d0 + d1) / 2],
+          width: dw,
+          height: dh,
+          normal: 'x',
         });
-  const rule = stairRule(o.style, (x1 - x0) * (z1 - z0)),
-    plan = o.interior === 'rooms' && o.stairs && floors.length > 1 ? planStair(rule, floors, layout) : undefined,
-    well = plan && planRect(plan.place, 0, plan.length, 0, plan.breadth);
+      }
+    if (zs.length === 3) {
+      const z = zs[1];
+      for (let i = 0; i + 1 < xs.length; i++) {
+        if (!along(i)) continue;
+        let xa = xs[i] + (i > 0 ? pt / 2 : 0),
+          xb = xs[i + 1] - (i + 1 < xs.length - 1 ? pt / 2 : 0);
+        if (i === 0 && intoDoor('x', x0, z)) {
+          entry(xa + Math.min(1.2, xb - xa) / 2, z, Math.min(1.2, xb - xa), 'z');
+          xa += 1.2;
+        }
+        if (i === xs.length - 2 && intoDoor('x', x1, z) && xb > xa) {
+          entry(xb - Math.min(1.2, xb - xa) / 2, z, Math.min(1.2, xb - xa), 'z');
+          xb -= 1.2;
+        }
+        // Too short for a door and its jambs: no partition.
+        if (xb - xa < dw + 0.1) continue;
+        const c = (xa + xb) / 2;
+        walls.push([xa, c - dw / 2, fy, cy, z - pt / 2, z + pt / 2]);
+        walls.push([c + dw / 2, xb, fy, cy, z - pt / 2, z + pt / 2]);
+        walls.push([c - dw / 2, c + dw / 2, fy + dh, cy, z - pt / 2, z + pt / 2]);
+        doors.push({
+          floor: k,
+          centre: [c, fy + dh / 2, z],
+          width: dw,
+          height: dh,
+          normal: 'z',
+        });
+      }
+      // The post where partitions meet: each stops half a wall short of the crossing.
+      for (let j = 1; j < xs.length - 1; j++)
+        if (across(j, 0) || across(j, 1) || along(j - 1) || along(j))
+          walls.push([xs[j] - pt / 2, xs[j] + pt / 2, fy, cy, z - pt / 2, z + pt / 2]);
+    }
+    const floor: Floor = {
+      rooms: [],
+      at: [],
+      doors,
+      openings,
+      uses: [],
+      keep: [],
+    };
+    for (let i = 0; i + 1 < xs.length; i++)
+      for (let r = 0; r + 1 < zs.length; r++) {
+        let i1 = i,
+          r1 = r;
+        if (merge && i >= merge.i0 && i <= merge.i1 && r >= merge.r0 && r <= merge.r1) {
+          if (i > merge.i0 || r > merge.r0) continue;
+          i1 = merge.i1;
+          r1 = merge.r1;
+        }
+        floor.rooms.push({
+          x0: xs[i] + (i > 0 ? pt / 2 : 0),
+          x1: xs[i1 + 1] - (i1 + 1 < xs.length - 1 ? pt / 2 : 0),
+          z0: zs[r] + (r > 0 ? pt / 2 : 0),
+          z1: zs[r1 + 1] - (r1 + 1 < zs.length - 1 ? pt / 2 : 0),
+        });
+        floor.at.push({ column: i, row: r });
+      }
+    return floor;
+  };
+  const planFloors = (walls: Wall[], hall?: Hall) =>
+    o.interior !== 'rooms' ? [] : floors.map((fy, k) => floorPlan(fy, k, walls, hall));
+  const rule = stairRule(o.style, (x1 - x0) * (z1 - z0));
+  let chosen: ReturnType<typeof placeStair>;
+  if (o.interior === 'rooms' && o.stairs && floors.length > 1) {
+    const find = (keepOut: KeepOut) =>
+      placeStair(o.style, rule, floors, columns, rowLines.length - 1, (hall) => planFloors([], hall), keepOut);
+    chosen = find(avoid ?? { rects: [] }) ?? (avoid?.required ? find({ rects: [] }) : undefined);
+  }
+  const walls: Wall[] = [],
+    layout = planFloors(walls, chosen?.hall),
+    plan = chosen?.stair,
+    /** The opening in floor `k`, over the flight that arrives there. */
+    well = (k: number) => (plan && k > 0 && k < floors.length ? flightRect(plan, k - 1) : undefined);
   // The floors above the first are open over the stair.
   levels.forEach((fy, k) => {
-    for (const r of without(all, k > 0 && k < floors.length ? well : undefined))
-      box(m, r.x0, r.x1, fy - SLAB, fy, r.z0, r.z1);
+    for (const r of without(all, well(k))) box(m, r.x0, r.x1, fy - SLAB, fy, r.z0, r.z1);
   });
   if (o.interior === 'none') return out;
   if (o.interior === 'cells') {
@@ -602,28 +1025,25 @@ export function buildInterior(
   assignUses(o, layout, use, plan);
   if (plan) {
     buildStair(parts, plan, floors, layout, o.detail);
-    const approach = Math.max(0.8, plan.rule.width),
-      whole = planRect(
-        plan.place,
-        -approach,
-        plan.kind === 'dog-leg' ? plan.length : plan.length + approach,
-        0,
-        plan.breadth,
-      );
+    const whole = planRect(plan.place, -plan.before, plan.length + plan.after, 0, plan.breadth);
     for (const f of layout) f.keep.push(whole);
-    plan.flights.forEach((flight, k) =>
+    plan.flights.forEach((flight, k) => {
+      const body = flightRect(plan, k),
+        [foot, head] = flightEnds(plan, k);
       out.stairs.push({
         floor: k,
         kind: plan.kind,
-        min: [well!.x0, well!.z0],
-        max: [well!.x1, well!.z1],
+        min: [body.x0, body.z0],
+        max: [body.x1, body.z1],
+        foot,
+        head,
         risers: flight.count * (plan.kind === 'dog-leg' ? 2 : 1),
         rise: flight.rise,
         tread: flight.tread,
         width: plan.rule.width,
         guard: plan.rule.guard,
-      }),
-    );
+      });
+    });
   }
   const f = parts.furniture,
     china = parts.fixtures,
@@ -922,7 +1342,7 @@ export function buildInterior(
       };
       /** A floor covering from `y0` to `y1` over the floor, open over the stair well. */
       const covering = (b: MeshBuilder, r: Rect, y0: number, y1: number) => {
-        for (const q of without(r, k > 0 ? well : undefined)) box(b, q.x0, q.x1, fy + y0, fy + y1, q.z0, q.z1);
+        for (const q of without(r, well(k))) box(b, q.x0, q.x1, fy + y0, fy + y1, q.z0, q.z1);
       };
       /** Tatami over the whole floor: mats of two squares in staggered rows, each edged along its long sides. */
       const tatami = () => {
@@ -969,7 +1389,9 @@ export function buildInterior(
             bottom = h.kind === 'balcony-door' ? fy + 0.03 : Math.max(fy + 0.03, h.y0 - 0.15),
             point = (a: number, y: number, off: number): V3 =>
               s.axis === 'z' ? [a, y, s.plane + sign * off] : [s.plane + sign * off, y, a],
-            normal: V3 = s.axis === 'z' ? [0, 0, sign] : [sign, 0, 0];
+            normal: V3 = s.axis === 'z' ? [0, 0, sign] : [sign, 0, 0],
+            rod = metal.triangles,
+            drape = cloth.triangles;
           metal.beam(point(lo, top, 0.07), point(hi, top, 0.07), 0.02, 0.02);
           for (const [from, to] of [
             [lo, lo + width],
@@ -990,6 +1412,9 @@ export function buildInterior(
               );
             }
           }
+          const window = point(middle, (h.y0 + h.y1) / 2, 0);
+          out.curtains.push({ part: 'metalwork', from: rod, to: metal.triangles, window });
+          out.curtains.push({ part: 'fabric', from: drape, to: cloth.triangles, window });
         }
       };
       const dwelling = roomUse === 'living' || roomUse === 'bedroom';

@@ -31,7 +31,16 @@
 //   insurance maps' storey and material notes.
 import type { GeometryData } from '@margoengine/geometry/utils';
 import { MeshBuilder, add, clip, cross, dot, lerp, random, scale, sub, unit, type V3 } from './mesh-builder.js';
-import { buildInterior, type Hole, type Side } from './building-interiors.js';
+import {
+  buildInterior,
+  type Hole,
+  type Side,
+  STAIR_AVOID,
+  WALL_LINING,
+  CURTAINS,
+  type CurtainRun,
+  type StairAvoid,
+} from './building-interiors.js';
 
 /** The style sets. Each is a full set of defaults; any option given overrides it. */
 export type BuildingStyle =
@@ -261,19 +270,24 @@ export interface BuildingRoom {
 export type BuildingRoomUse = 'living' | 'kitchen' | 'bathroom' | 'bedroom' | 'office' | 'toilet' | 'shop' | 'store';
 /**
  * The stair from one storey to the next: its footprint on the floor (the well open in the floor above), local metres.
- * `dog-leg` is two flights and a half landing; `straight` one flight.
+ * `dog-leg` is two flights and a half landing; `straight` one flight; `spiral` steps round a post, in a plan too small
+ * for those; `ladder` a fixed ladder through a hatch, in a plan too small for any stair.
  */
 export interface BuildingStair {
   /** The storey it starts on. */
   readonly floor: number;
-  readonly kind: 'dog-leg' | 'straight';
+  readonly kind: 'dog-leg' | 'straight' | 'spiral' | 'ladder';
   readonly min: readonly [number, number];
   readonly max: readonly [number, number];
-  /** Risers from floor to floor. */
+  /** Where a person steps on, on this storey (local `[x, z]`, just clear of the footprint). */
+  readonly foot: readonly [number, number];
+  /** Where they step off, on the storey above. */
+  readonly head: readonly [number, number];
+  /** Risers from floor to floor (a ladder's rungs). */
   readonly risers: number;
   readonly rise: number;
   readonly tread: number;
-  /** Clear width of a flight. */
+  /** Clear width of a flight (between a ladder's rails). */
   readonly width: number;
   /** Height of the guard round the well above. */
   readonly guard: number;
@@ -964,8 +978,19 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     }
   }
 
+  // Only the walls have put faces in the interior part so far.
+  const lining = parts.interior.triangles;
   if (flat) parts.roof.box([0, eaves - 0.1, 0], [W / 2 - th, 0.1, D / 2 - th]);
-  const inside = buildInterior(parts, o, sides, holes, floors, eaves, !flat);
+  const { curtains, ...inside } = buildInterior(
+    parts,
+    o,
+    sides,
+    holes,
+    floors,
+    eaves,
+    !flat,
+    (options as { [STAIR_AVOID]?: StairAvoid })[STAIR_AVOID],
+  );
   // Base: the foundation from below the ground to the floor, slightly proud of the walls: a ring under the walls and,
   // inside it, a fill that stops under the ground floor's slab, so no face of it shares the floor's plane.
   const ix = W / 2 - th,
@@ -1078,7 +1103,9 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
   const c = Math.cos(o.yaw),
     sn = Math.sin(o.yaw),
     world = (x: number, z: number): [number, number] => [origin[0] + x * c + z * sn, origin[2] - x * sn + z * c];
-  return {
+  const built: Building & { [WALL_LINING]: number; [CURTAINS]: CurtainRun[] } = {
+    [WALL_LINING]: lining,
+    [CURTAINS]: curtains,
     parts: out,
     palette: paletteOf(o.style),
     options: o,
@@ -1096,6 +1123,7 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     railings,
     ...inside,
   };
+  return built;
 }
 
 type At = (s: Side, a: number, y: number, off?: number) => V3;

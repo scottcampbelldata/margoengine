@@ -173,9 +173,11 @@ interface BuildingRuleOptions {
 
 interface BuildingStair {
     readonly floor: number;
-    readonly kind: 'dog-leg' | 'straight';
+    readonly kind: 'dog-leg' | 'straight' | 'spiral' | 'ladder';
     readonly min: readonly [number, number];
     readonly max: readonly [number, number];
+    readonly foot: readonly [number, number];
+    readonly head: readonly [number, number];
     readonly risers: number;
     readonly rise: number;
     readonly tread: number;

@@ -18,6 +18,7 @@ try {
     const { toGeometry } = await import('/packages/geometry/dist/utils.js');
     const { generateBuilding, BUILDING_STYLES } = await import('/packages/procedural/dist/building-rules.js');
     const H = await import('/packages/procedural/dist/harbour.js');
+    const { generateBuildingPlan } = await import('/packages/procedural/dist/building-plans.js');
     const canvas = document.createElement('canvas');
     canvas.width = 960;
     canvas.height = 540;
@@ -186,6 +187,28 @@ try {
           [at[0] + target.x, room.level + 0.8, at[2] + target.z],
         ]);
       }
+    }
+    // The stairs of plans too small for a dog-leg (a spiral, then a ladder) and a stair tower's join, cut open over the
+    // first floor.
+    for (const [make, options] of [
+      [generateBuilding, { style: 'western-1910-house', width: 3.2, depth: 3.6 }],
+      [generateBuilding, { style: 'japan-2011-house', width: 3, depth: 3, wall: 0.7 }],
+      [generateBuildingPlan, { style: 'western-1910-house', plan: 'L', tower: 'front-left', towerSize: 4 }],
+    ]) {
+      const at = [cuts.length * 40, 0, -600];
+      const b = make({ ...options, origin: at, detail: 'near' });
+      // The ground floor, up to the second floor's guards.
+      const lo = Math.min(...b.rooms.map((r) => r.level)) - 0.01;
+      for (const name of [...indoor, ...(b.blocks ? ['walls'] : [])]) {
+        if (!b.parts[name]) continue;
+        const g = slice(b.parts[name], lo - (name === 'interior' ? 0.2 : 0), lo + (b.blocks ? 2.4 : 4));
+        if (g.indices.length) add(g, b.palette[name]);
+      }
+      const r = b.blocks ? 14 : 5.5;
+      cuts.push([
+        [at[0] + r * 0.25, lo + r, at[2] + r * 0.75],
+        [at[0], lo + 1, at[2]],
+      ]);
     }
     const views = [
       [

@@ -6775,3 +6775,11 @@ Transparent canvas (2026-11-27, threejs-parity row 6): TAA, DOF and SceneFade ke
 `packages/taa/test/alpha-browser.mjs`, `packages/dof/tests/gpu/alpha-check.mjs`,
 `packages/post/test/scene-fade-alpha-browser.mjs`, `packages/post/test/alpha-rim-browser.mjs`. `TAAUpscale` and
 `TAAUpscaleVelocity` are covered by the first.
+
+## Every storey of a rules building is reached (`@margoengine/procedural/building-rules`, `building-plans`, 2026-11-27)
+
+Claim: a furnished multi-storey building from the rules has a stair, stair hall, spiral or ladder to every storey, and
+joined plans open into each other on every floor. Proof: `packages/procedural/test/building-reach.test.js` walks 1,500
+random buildings and 500 random plans, and `packages/procedural/test/buildings-browser.mjs` draws cutaways on WebGPU
+and the WebGL2 layer. Not claimed: compliance with a building code as a whole (the figures kept are each stair's own),
+or wings whose floor levels differ from the main block's.

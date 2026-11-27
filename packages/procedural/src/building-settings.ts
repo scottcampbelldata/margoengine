@@ -271,7 +271,7 @@ export const BUILDING_PLAN_SETTINGS: readonly BuildingSetting[] = [
   n('dormerWidth', 'dormers', 1.8, 1.2, 4, 0.05, 'm', 'Dormer outer width.'),
   c('dormerSides', 'dormers', ['front', 'both'], 'Dormers on the front slope only, or both long slopes.'),
   c('tower', 'tower', ['none', 'front-left', 'front-right', 'back-left', 'back-right'], 'A corner tower.'),
-  n('towerSize', 'tower', 3.6, 2.5, 12, 0.05, 'm', 'Tower footprint side.'),
+  n('towerSize', 'tower', 3.6, 3, 12, 0.05, 'm', 'Tower footprint side.'),
   n('towerStoreys', 'tower', 1, 0, 6, 1, '', 'Storeys the tower rises above the main block.'),
   n('towerPitch', 'tower', 50, 20, 70, 0.5, 'deg', 'Tower roof pitch (a pyramid on its square).'),
 ];

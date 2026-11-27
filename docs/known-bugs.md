@@ -3996,6 +3996,24 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   again. It ends with its host, closed or not (Node starts each child in a job that kills it on close). The real close
   test then passed 20 of 20 beside four CPU hogs (3.1 min, 100% CPU). Regression: tests/killer.test.js.
 
+### Fixed 2026-11-27: one in ten rules buildings had no stair, so storeys could not be reached (KB-PROC-NOSTAIR1, procedural, buildings)
+
+- **Repro:** `generateBuilding({style: 'western-1910-brick', width: 13, depth: 6.9})` returned an empty `stairs`; 42 of 400 random plans of the multi-storey styles did. `packages/procedural/test/building-reach.test.js` walks every storey.
+- **Cause:** a stair was placed only inside a room the partition grid happened to make, with no fallback. The same walk found that partitions stopped short of their crossings (a see-through square of wall thickness), a partition too short for a doorway was built solid and shut its room off, and a partition could run into an outer door.
+- **Fixed:** a stair hall is made by taking partitions down, else a spiral, else a fixed ladder; a stair never divides a room; crossings have a post; too short a partition is left out; a partition stops 1.2 m short of an outer door.
+
+### Fixed 2026-11-27: joined building plans left wing and tower storeys cut off (KB-PROC-PLANREACH1, procedural, building plans)
+
+- **Repro:** the walk over 500 random plans in `packages/procedural/test/building-reach.test.js` (before the fix most failed): the default L plan's wing was walled off from the main block, upper floors had a slot at each join, a tower's extra storeys had no stair, and a tower over the only front door left no way in.
+- **Cause:** the inside face of each wall counted as indoor geometry, which only earlier blocks cut, so the main block's stayed across every join; floors were cut back to the other block's outer walls; wings and towers were always built without stairs; curtains of windows cut away stayed hanging.
+- **Fixed:** inside faces are cut where the other block has a room, floors where it has a room and with no margin; towers and wings with floors the main block lacks get stairs that keep out of one another; partitions keep 1.2 m off joins; a door is added where none is left; curtains come down with their windows.
+
+### Fixed 2026-11-27: a tower side under 3 m passed the plan's check and then threw about a building width (KB-PROC-TOWERSIZE1, procedural, building plans)
+
+- **Repro:** `generateBuildingPlan({tower: 'front-left', towerSize: 2.5})`: RangeError "Invalid building width".
+- **Cause:** `towerSize` allowed 2.5 m, under the 3 m least width of the block it builds.
+- **Fixed:** `towerSize` is 3 to 12 m, refused by its own name. Regression: `packages/procedural/test/building-reach.test.js`.
+
 ### Fixed 2026-11-27: every rules building's ground floor flickered between floor and foundation (KB-PROC-FLOORFIGHT1, procedural, buildings)
 
 - **Repro:** `packages/procedural/test/building-interiors.test.js`, "the foundation never shares the plane of the ground floor"; seen from inside in `packages/procedural/test/buildings-browser.mjs` as a sawtooth of two colours across the floor.
