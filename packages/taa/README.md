@@ -62,8 +62,10 @@ channel, 0 to 1, takes that share of the history weight away (1 keeps none); dra
 before TAA resolves at frame-graph order 40 (particles draw at 6, splats at 3). Any 2D float or unorm format and any size
 works (it is read scaled to the view); return undefined for a frame with nothing reactive. TAA keeps each frame's mask in
 the alpha of its history, so the pixels an effect has just left drop their history too and the trail goes, not only the
-smear on the effect itself. Masks another package publishes for the frame, such as Water's `reactiveTexture`, are read
-with no option and combined with `reactive` by their maximum, so a scene with water and TAA wires nothing. With no mask
+smear on the effect itself. Masks another package publishes for the frame, such as Water's `reactiveTexture`, the rain and
+snow of `Weather` and the billboards of every `VFX` effect, are read with no option and combined with `reactive` by
+their maximum, so a scene with water, weather or particles and TAA wires nothing. Weather and VFX draw theirs only
+while TAA reads masks. With no mask
 given or published TAA compiles the same resolve as before; the first frame with one compiles the masked resolve, which
 stays. The texture may change from frame to frame. A reactive pixel shows that frame's own jittered sample, so its
 edges alias until history builds again.

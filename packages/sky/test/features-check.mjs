@@ -38,7 +38,8 @@ const checks = {
     assert.equal(r.afterFlash, 0, 'the frame returns to dry after the flash');
     // Rain over the sky under TAA (2026-11-13: once the sky kept history for the volumetric clouds, TAA averaged the
     // streaks over it away): the mean brightness the streaks add over the dark sky, in sRGB levels, with the weather's
-    // reactive mask read by TAA and without it. Without the mask's fix both are the plain one.
+    // reactive mask that TAA reads by itself (no wiring, KB-TAA-PARTICLEMASK1) and with the mask off. Without the fix
+    // both are the plain one.
     await page.evaluate(() => window.taaRain.frames(40));
     assert.deepEqual(await page.evaluate(() => window.taaRain.masks()), { plainTaa: false, maskedTaa: true });
     const streaks = {};

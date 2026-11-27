@@ -8707,6 +8707,16 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   `Weather` `reactive: true` draws the particles' coverage into `reactiveMask`, which Storm Light hands TAA as
   `reactive`. Regression: the `weather` case of `packages/sky/test/features-check.mjs` (streaks over the sky under
   TAA 2.30 levels with the mask, 0.87 without, at 4x; WebGPU and the WebGL2 layer).
+- **Weather's and VFX's particles reached TAA's reactive mask only by hand (sky, vfx; KB-TAA-PARTICLEMASK1).** Repro: a
+  plain stage with `Weather` (or a fast `VFX` spray) and `TAA.attach(engine)`: the streaks average into the sky, as
+  above, unless the scene sets `reactive: true` and hands `weather.reactiveMask` to TAA; VFX drew no mask at all.
+  Cause: Water published its mask on the pass context (`packages/shared/reactive-mask.js`), Weather and VFX did not.
+  Fix: TAA's read of the registry counts as demand; Weather draws and publishes its mask while TAA reads, and VFX draws
+  its billboards' alpha into one shared r8unorm particle mask (`reactiveTarget`) the same way. Storm Light, Cabin
+  Hearth and Whiteout Pass lose their wiring. Regression: the `weather` case of `packages/sky/test/features-check.mjs`
+  (now two plain `TAA.attach(e)` rigs: streaks 1.59 levels with the default, 0.76 with `reactive: false`, at 4x),
+  `packages/vfx/test/reactive-check.mjs` (a spray keeps 86% of its no-TAA brightness against 48%; WebGPU and the WebGL2
+  layer), and `packages/taa/test/reactive-mask.test.js` (the demand signal and the shared target).
 - **Local lights lit froxel fog undimmed by the fog on their path (environment).** Repro: Storm Light tour view t2
   (`view=10,34,26,-6,30,-4&beam=2.5`): 5.9% of the right sky at 255 along the beam. Cause: `localLight` in
   `volumetric.ts` left out the transmittance from the light to the sample. Fix: exp(-extinction x distance) with the

@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX reactive mask check</title><style>body{margin:0}canvas{display:inline-block;width:256px;height:192px}</style></head><body><canvas id="masked" width="256" height="192"></canvas><canvas id="plain" width="256" height="192"></canvas><canvas id="raw" width="256" height="192"></canvas>
+<script type="module">
+// KB-TAA-PARTICLEMASK1: VFX's moving billboards reach TAA's reactive mask with no scene code. Two alike engines over a
+// dark, empty background (nothing drawn, so TAA keeps its history), each a plain TAA.attach(engine) with nothing wired,
+// each with the same sparse, fast spray of white particles, and a third engine without TAA as the reference. One effect keeps its default, so it draws its coverage into the
+// frame's shared reactive mask and TAA reads it by itself; the other turns the mask off (reactive: false). Without the
+// mask TAA averages each moving particle into the dark history it has no motion vector for; with it the particles stay
+// as bright as drawn. Driven by reactive-check.mjs, which screenshots both canvases.
+import {Engine} from '/packages/core/dist/index.js';
+import {VFX} from '/packages/vfx/dist/base.js';
+import {TAA} from '/packages/taa/dist/index.js';
+const errors=[];
+const spray={capacity:6000,initialCount:0,rate:200,position:[-4,1,0],velocity:[24,0,0],spread:3,gravity:[0,0,0],color:[1,1,1,1],size:0.16,lifetime:[0.6,0.9]};
+async function rig(id,reactive,taa=true){
+ const engine=await Engine.create(document.getElementById(id),{backend:'webgpu',camera:{position:[0,1,7],target:[0,1,0],near:0.1,far:100},onError:e=>errors.push(String(e?.message??e))});
+ engine.stop();engine.scene.background='#050608';
+ engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ if(taa)TAA.attach(engine);
+ const vfx=new VFX(reactive?spray:{...spray,reactive:false});engine.use(vfx);
+ return {engine,vfx};
+}
+const rigs={masked:await rig('masked',true),plain:await rig('plain',false),raw:await rig('raw',true,false)};
+window.check={
+ async frames(n){
+  for(let i=0;i<n;i++)for(const r of Object.values(rigs))r.engine.render({delta:1/60});
+  for(const r of Object.values(rigs))await r.engine.gpu.queue.onSubmittedWorkDone();
+ },
+ errors:()=>errors.slice(),
+};
+window.ready=true;
+</script></body></html>

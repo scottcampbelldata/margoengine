@@ -9,7 +9,12 @@ import assert from 'node:assert/strict';
 import { TAA } from '../dist/index.js';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { wgsl } from '../../core/src/shaders.ts';
-import { publishReactiveMask, reactiveMasks } from '../../shared/reactive-mask.js';
+import {
+  publishReactiveMask,
+  reactiveMasks,
+  reactiveMaskWanted,
+  reactiveTarget,
+} from '../../shared/reactive-mask.js';
 
 function rig(options) {
   const gpu = mockGPU(),
@@ -125,4 +130,44 @@ test("several masks in one frame are combined by their maximum, the option's inc
     'no combine pass for a single mask',
   );
   r.taa.dispose();
+});
+
+// KB-TAA-PARTICLEMASK1: Weather's and VFX's particle masks cost a pass of their own, so they draw only while something
+// reads masks. TAA's read is that signal; the browser proofs are packages/sky/test/features-check.mjs (weather) and
+// packages/vfx/test/reactive-check.mjs, a plain TAA.attach(engine) with nothing wired.
+test('a mask is wanted from the frame after a read, for every view of that frame, until reads stop', () => {
+  const c = { encoder: {}, view: {} },
+    owner = {};
+  assert.equal(reactiveMaskWanted(c, owner), false, 'nothing reads masks yet');
+  reactiveMasks(c);
+  assert.equal(reactiveMaskWanted(c, owner), false, 'this frame was decided before the read');
+  c.encoder = {};
+  assert.equal(reactiveMaskWanted(c, owner), true, 'the next frame draws its mask');
+  reactiveMasks(c);
+  c.view = {};
+  assert.equal(reactiveMaskWanted(c, owner), true, 'a second view of the frame gets the same answer');
+  reactiveMasks(c);
+  c.encoder = {};
+  assert.equal(reactiveMaskWanted(c, owner), true, 'reads go on');
+  c.encoder = {};
+  assert.equal(reactiveMaskWanted(c, owner), false, 'no read in the last frame: the reader is gone');
+  assert.equal(reactiveMaskWanted(c, {}), true, 'each owner keeps its own count of the reads it saw');
+});
+
+test('the shared particle target is cleared by the first draw of a view, loaded after, and published', () => {
+  const gpu = mockGPU(),
+    c = { device: gpu.device, encoder: {}, view: {}, width: 320, height: 180, descriptor: { multisample: { count: 4 } } };
+  const first = reactiveTarget(c),
+    second = reactiveTarget(c);
+  assert.equal(first.loadOp, 'clear');
+  assert.equal(second.loadOp, 'load', 'a second effect in the same view keeps the coverage of the first');
+  assert.ok(first.resolveTarget, 'a multisampled frame resolves into the mask');
+  const [mask] = reactiveMasks(c);
+  assert.equal(mask.format, 'r8unorm');
+  assert.equal(mask.sampleCount, 1);
+  c.view = {};
+  assert.equal(reactiveTarget(c).loadOp, 'clear', 'a new view starts from 0');
+  c.width = 640;
+  reactiveTarget(c);
+  assert.equal(mask.destroyed, true, 'a resize replaces the old mask');
 });

@@ -186,6 +186,30 @@ const steam = VFX.attach(engine, {
 Measured on an RTX A6000 (Edge, 1280x720, one million particles on screen, 40 frames a batch, 9 alternating batches,
 simulate + draw + the floor depth pass): see the table below.
 
+### Under TAA
+
+Particles have no motion vectors, so TAA would average a fast particle into the history behind it. While TAA runs, each
+effect also draws its billboards' coverage (their alpha, depth tested like the particles) into the frame's shared
+reactive mask (one r8unorm texture for every effect and `Weather`), which TAA reads by itself: there is nothing to wire.
+`reactive` (default: on while TAA or another reader of reactive masks runs, off otherwise; `true` always, `false`
+never) may change every frame. The mask costs one more draw of the visible billboards a frame and one r8unorm texture
+of the drawing size (plus a multisampled twin with MSAA) shared by all effects; without TAA there is no extra work.
+Ribbons, mesh particles and the `Flame` volume do not write it yet.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+import {VFX} from 'margoengine/vfx';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+TAA.attach(engine);
+// Sparks thrown sideways stay crisp under TAA: their mask reaches it with no option.
+engine.use(new VFX({rate: 200, position: [-4, 1, 0], velocity: [24, 0, 0], color: [1, 0.8, 0.5, 1], size: 0.16}));
+```
+
+Measured on an RTX A6000 (`test/reactive-check.mjs`, 256x192, a sparse spray at 24 m/s over a dark sky): the spray keeps
+86% of its brightness without TAA (0.89 sRGB levels of lift against 1.03) with the mask, and 48% (0.49) with
+`reactive: false`; the same on the WebGL2 layer.
+
 ### GPU cost
 
 Each billboard is one triangle around the soft disc (half the primitives and 3/4 of the vertex work of a quad), and
@@ -1016,7 +1040,8 @@ console.log(fire.lights.length); // 2
   disposing the scene disposes it.
 - `fire.lights` holds the steady points, `fire.particles` the `flames`, `embers` and `steam` effects. `fire.dispose()`
   stops the flicker, removes the fire's group (or empties a `Clustered` it owned) and disposes the particles.
-- Not yet: TAA's reactive mask for the flames (the shared mask registry is a later vfx and taa job) and a light
+- The embers and steam write TAA's reactive mask by themselves (Under TAA, above). Not yet: the mask for the `Flame`
+  volume and a light
   source size for highlights on metal (later clustered and materials jobs). Smoke over the fire: `Smoke` (below);
   soot on the walls: `@margoengine/materials/soot`.
 

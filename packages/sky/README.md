@@ -1453,7 +1453,7 @@ Options are read every frame from `weather.options`; change them live. `intensit
 | `flakeSizes` | `[2, 10]` | the flake sizes drawn, largest dimension in mm, 0.5 to 30, smallest first |
 | `color`, `brightness`, `opacity` | pale grey-blue (rain) or white (snow), 1, 0.35 (rain) or 0.8 (snow) | linear RGB, its scale, one particle's alpha |
 | `exposure` | 0 | seconds the shutter stays open, 0 to 1: each snow flake is drawn as the capsule it sweeps over that time, shaded as the time average of the moving flake (its light kept, the ends tapered), so a gale streaks it and summed sub-frames join into one even streak (1/120 is a 180 degree shutter at 60 fps; when sub-frames are summed, give each its share). Rain keeps its fixed streak |
-| `reactive` | false | also draw the particles' coverage into `weather.reactiveMask` (r8unorm) for TAA's `reactive` |
+| `reactive` | on while TAA runs | draw the particles' coverage into `weather.reactiveMask` (r8unorm), which TAA reads by itself; `true` every frame, `false` never |
 | `lens` | `{focalDistance: 10, aperture: 2.8, filmGauge: 36}` | the lens the snow is seen through, named as `@margoengine/dof` names it: a flake off the focal plane draws as its blur disc, its light spread over it; `false` keeps every flake sharp. Rain keeps its streaks sharp |
 | `nearFade` | `[0.4, 2]` | metres from the camera over which particles fade in; the first is never nearer than the camera's near plane |
 | `lightning` | none | storms, below |
@@ -1461,9 +1461,10 @@ Options are read every frame from `weather.options`; change them live. `intensit
 Particle colour is a fixed linear RGB, so scale `brightness` with the light of the scene (above, `1 - sky.nightFactor`).
 A streak smaller than a pixel dims instead of sparkling, and a flake smaller than a pixel is drawn a pixel wide with its
 alpha scaled by its true area over the pixel's, so it keeps its light without being drawn larger than it is. Under TAA that keeps the sky's history (volumetric
-clouds), set `reactive: true` and `TAA.attach(engine, {reactive: () => weather.reactiveMask})`: each frame the streaks
-and flakes are drawn, depth tested, into the mask, so TAA takes little history where they are and they stay crisp
-instead of averaging into the sky (the `weather` case of `features-check.mjs` measures it under TAA). Rain falls at 9 m/s;
+clouds) nothing needs wiring: while TAA runs, each frame the streaks and flakes are drawn, depth tested, into the mask
+and published for the frame, so TAA takes little history where they are and they stay crisp instead of averaging into
+the sky (the `weather` case of `features-check.mjs` measures it under a plain `TAA.attach(engine)`). Without TAA no mask
+is drawn. Rain falls at 9 m/s;
 each snow flake falls at the measured speed of its own size, with a gentle sway.
 
 Snow seen through a lens (`lens`): a flake `d` metres out, with the lens focused `S` metres out, blurs to the thin

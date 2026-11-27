@@ -62,6 +62,7 @@ const keys: Record<keyof VFXOptions, true> = {
   wrap: true,
   sort: true,
   softness: true,
+  reactive: true,
   depth: true,
   texture: true,
   curves: true,

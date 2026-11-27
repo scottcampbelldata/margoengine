@@ -75,10 +75,9 @@ paceEngine(engine);
 const bloom = new Bloom({ strength: 0.18, threshold: 1.4, radius: 0.85 }),
   tonemap = new Tonemap({ curve: 'agx', exposure: 0, contrast: 1.1 }),
   stack = PostStack.attach(engine, [bloom, tonemap]);
-// The rain's streaks are drawn into a reactive mask (the Weather below): TAA keeps the sky's history, which averages the
-// cloud deck's march, but takes little where a streak is, so the rain over the sky stays crisp.
-const rain: { weather?: Weather } = {};
-TAA.attach(engine, { depth: () => stack.depthTexture, reactive: () => rain.weather?.reactiveMask });
+// The rain's streaks reach TAA by themselves (the Weather below publishes their reactive mask): TAA keeps the sky's
+// history, which averages the cloud deck's march, but takes little where a streak is, so the rain stays crisp.
+TAA.attach(engine, { depth: () => stack.depthTexture });
 
 // The least night sky light on anything: the moonlit deck itself lights the scene and shows in the sea (the volumetric
 // clouds lay it over the sky's reflection map and scene light), so the floor only keeps the darkest gaps from black.
@@ -257,9 +256,7 @@ const weather = Weather.attach(engine, {
     seed: 7,
     hold: heldFlash,
   },
-  reactive: true,
 });
-rain.weather = weather;
 // `lightning.link` lights the cloud deck from inside, the storm air under it (the fog) and the scene (a light group of the
 // stroke's light) by plugin name. LightningBolt draws the branching channel and gives the light its shape: lights along
 // the channel in place of one point light 700 m up.

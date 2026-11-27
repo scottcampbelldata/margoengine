@@ -133,6 +133,19 @@ export const multisampled = (billboard: string) =>
 }
 fn shade(i:Out)->vec4f {`,
   );
+/**
+ * A finished billboard shader with a `reactive` entry beside its fragment: the particle's coverage (its alpha) in red,
+ * for the frame's reactive mask that TAA reads (KB-TAA-PARTICLEMASK1).
+ */
+export const reactiveBillboard = (billboard: string): string => {
+  const from = '@fragment fn fragment(i:Out)->@location(0) vec4f {';
+  if (billboard.split(from).length !== 2)
+    throw new MargoError('unsupported', 'VFX reactive masks need the billboard shader they were written for');
+  return (
+    billboard.replace(from, 'fn margoParticle(i:Out)->vec4f {') +
+    '\n@fragment fn reactive(i:Out)->@location(0) vec4f {return vec4f(clamp(margoParticle(i).a,0.0,1.0),0,0,1);}\n'
+  );
+};
 const transparentEdits: Array<[string, string]> = [
   ['@location(0) uv:vec2f,', '@location(0) uv:vec2f,@location(3) margoDepth:f32,'],
   [

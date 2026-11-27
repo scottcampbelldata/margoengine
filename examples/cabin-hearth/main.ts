@@ -146,8 +146,8 @@ paceEngine(engine);
 const bloom = new Bloom({ ...kit.bloom }),
   tonemap = new Tonemap({ ...kit.tonemap }),
   stack = PostStack.attach(engine, [bloom, tonemap]);
-const falling: { weather?: Weather } = {};
-TAA.attach(engine, { depth: () => stack.depthTexture, reactive: () => falling.weather?.reactiveMask });
+// The snow's reactive mask reaches TAA by itself (Weather publishes it while TAA runs).
+TAA.attach(engine, { depth: () => stack.depthTexture });
 
 const sky = Sky.attach(engine, structuredClone(kit.sky) as typeof kit.sky, { preetham, night, reflection, lighting });
 // The moonlit snow lights the cabin from below: the eaves, the sills and the logs' undersides that face the snow.
@@ -405,7 +405,6 @@ const weather = Weather.attach(engine, {
   intensity: on('snow') ? kit.precipitation.intensity : 0,
   particles: tier === 'phone' ? kit.precipitation.particles! / 3 : kit.precipitation.particles,
 });
-falling.weather = weather;
 PrecipitationCover.attach(engine, new WeatherFX({ weather, occluders: [...roof, chimney], splashes: 0, lensDrops: 0 }));
 const snow = on('cover') ? Snow.attach(engine, { ...kit.cover }) : undefined;
 

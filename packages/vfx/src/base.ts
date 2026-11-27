@@ -13,10 +13,18 @@ import { MargoError } from '@margoengine/math/errors';
 import type { FilmClock } from '@margoengine/math/clock';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
-import { simulationShader, billboardShader, multisampled, foggedBillboard, transparentBillboard } from './shader.js';
+import {
+  simulationShader,
+  billboardShader,
+  multisampled,
+  foggedBillboard,
+  transparentBillboard,
+  reactiveBillboard,
+} from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
+import { reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 import { surfacePass, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
 declare const GPUBufferUsage: {
@@ -49,6 +57,9 @@ const defaultPosition: Vec3 = [0, 1, 0],
  * `texture`) may change between frames; validation runs before GPU commands and throws RangeError when a value is out
  * of range.
  */
+// The reactive mask keeps the largest coverage of the particles over a pixel.
+const maxBlend: GPUBlendComponent = { operation: 'max', srcFactor: 'one', dstFactor: 'one' };
+
 export interface VFXOptions {
   /**
    * Particle slots, an integer 1-16,776,960 (64 bytes each). Fixed at construction. Default 1,000,000 (or the quality
@@ -118,6 +129,13 @@ export interface VFXOptions {
    * feature and `depth`; changeable between frames. Default 0 (off: no extra shader code, bindings or per-frame work).
    */
   softness?: number;
+  /**
+   * Draw the billboards' coverage (their alpha, depth tested like the particles) into the frame's shared reactive mask,
+   * which TAA reads with no option, so moving particles stay crisp instead of smearing into a history they have no
+   * motion vectors for. Default: on while TAA (or another reader of reactive masks) runs, off otherwise; `true` draws
+   * it every frame, `false` never. Changeable between frames.
+   */
+  reactive?: boolean;
   /**
    * Scene depth for `softness`: a function returning a sampleable depth texture (reversed Z: 1 at the near plane, 0 where
    * nothing is drawn; 1 sample or the scene's sample count) the size of the drawing buffer, or undefined before it
@@ -708,6 +726,11 @@ export class VFX implements EnginePlugin {
     colorAttachments: [this.attachment],
     depthStencilAttachment: this.depthAttachment,
   };
+  private readonly reactiveAttachments: GPURenderPassColorAttachment[] = [];
+  private readonly reactivePass: GPURenderPassDescriptor = {
+    colorAttachments: this.reactiveAttachments,
+    depthStencilAttachment: this.depthAttachment,
+  };
   private renderFormat = '';
   private renderDepth = '';
   private renderKey = '';
@@ -854,6 +877,8 @@ export class VFX implements EnginePlugin {
       (o.wrap && !o.emissionExtent?.every((v) => v > 0))
     )
       throw new RangeError('VFX sort and wrap must be booleans; wrap needs emissionExtent above 0.');
+    if (o.reactive !== undefined && typeof o.reactive !== 'boolean')
+      throw new TypeError('VFX reactive must be true or false; pass a boolean');
     if (o.softness !== undefined && (!Number.isFinite(Math.fround(o.softness)) || o.softness < 0))
       throw new RangeError('VFX softness must be a world distance of 0 or more; pass e.g. 0.5, or 0 to turn it off.');
     if (o.depth !== undefined && typeof o.depth !== 'function')
@@ -1371,7 +1396,7 @@ export class VFX implements EnginePlugin {
     pass.end();
   }
   /** The pipeline and group 0 of a draw into the frame, or with `hook` into its pass. */
-  private prepare(c: Context, hook?: SurfaceTransparency): [GPURenderPipeline, GPUBindGroup] {
+  private prepare(c: Context, hook?: SurfaceTransparency, reactive = false): [GPURenderPipeline, GPUBindGroup] {
     if (this.renderFormat !== c.format || this.renderDepth !== c.descriptor.depthStencil!.format) {
       this.renderFormat = c.format;
       this.renderDepth = c.descriptor.depthStencil!.format;
@@ -1404,38 +1429,45 @@ export class VFX implements EnginePlugin {
       c.descriptor.multisample?.count +
       (fog ? ':fog' : '') +
       (samples ? ':soft' + samples : '') +
-      (declarations ?? '');
+      (declarations ?? '') +
+      (reactive ? ':reactive' : '');
     for (const r of this.runtimes) if (r.key) key += r.key(slot);
     let pipeline = this.renders.get(key);
     if (!pipeline) {
       const lit = samples ? this.features.soft!.patch(this.billboard, samples) : this.billboard,
         fogged = fog ? foggedBillboard(lit) : lit,
         billboard = this.route ? this.route.billboard(fogged) : fogged;
-      let code = declarations
-        ? transparentBillboard(billboard, declarations)
-        : (c.descriptor.multisample?.count ?? 1) > 1
-          ? multisampled(billboard)
-          : billboard;
+      // The reactive mask's draw needs no sample mask: its coverage is the most over a pixel, not a blend.
+      let code = reactive
+        ? billboard
+        : declarations
+          ? transparentBillboard(billboard, declarations)
+          : (c.descriptor.multisample?.count ?? 1) > 1
+            ? multisampled(billboard)
+            : billboard;
       for (const r of this.runtimes) if (r.shade) code = r.shade(code, slot);
+      if (reactive) code = reactiveBillboard(code);
       const module = c.device.createShaderModule({ code });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
-          entryPoint: hook ? 'transparent' : 'fragment',
+          entryPoint: reactive ? 'reactive' : hook ? 'transparent' : 'fragment',
           ...(hook?.blends ? { constants: { margoKind: 0 } } : {}),
-          targets: hook
-            ? [...hook.targets]
-            : [
-                {
-                  format: c.format,
-                  blend: {
-                    color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+          targets: reactive
+            ? [{ format: 'r8unorm', blend: { color: maxBlend, alpha: maxBlend } }]
+            : hook
+              ? [...hook.targets]
+              : [
+                  {
+                    format: c.format,
+                    blend: {
+                      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                    },
                   },
-                },
-              ],
+                ],
         },
         multisample: c.descriptor.multisample,
         depthStencil: {
@@ -1470,7 +1502,10 @@ export class VFX implements EnginePlugin {
   }
   private draw(c: Context): void {
     // An order-independent pass takes the billboards only; added features' own draws (meshes, ribbons) stay here.
-    if (!this.transparency.hook && !this.runtimes.some((r) => r.hides?.())) this.billboards(c);
+    if (!this.runtimes.some((r) => r.hides?.()))
+      if (!this.transparency.hook) this.billboards(c);
+      // The order-independent pass draws the colour; the reactive mask is this pass's either way.
+      else if (this.visible) this.drawReactive(c);
     for (const r of this.runtimes) r.draw?.(c);
   }
   private billboards(c: Context): void {
@@ -1479,6 +1514,27 @@ export class VFX implements EnginePlugin {
     this.depthAttachment.view = c.depth;
     this.depthAttachment.stencilReadOnly = c.descriptor.depthStencil!.format.includes('stencil') ? true : undefined;
     const pass = c.encoder.beginRenderPass(this.presentation);
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, group);
+    for (const r of this.runtimes) r.bind?.(pass, pipeline, 1);
+    applyView(pass, c);
+    if (this.route) pass.draw(3, this.capacity);
+    else pass.drawIndirect(this.visible!, 0);
+    pass.end();
+    this.engine!.stats.drawCalls++;
+    this.drawReactive(c);
+  }
+  /**
+   * The billboards' coverage into the frame's shared reactive mask, which TAA reads by itself (KB-TAA-PARTICLEMASK1):
+   * while TAA reads masks, or always with `reactive: true`.
+   */
+  private drawReactive(c: Context): void {
+    if (!(this.options.reactive ?? reactiveMaskWanted(c, this))) return;
+    const [pipeline, group] = this.prepare(c, undefined, true);
+    this.reactiveAttachments[0] = reactiveTarget(c);
+    this.depthAttachment.view = c.depth;
+    this.depthAttachment.stencilReadOnly = c.descriptor.depthStencil!.format.includes('stencil') ? true : undefined;
+    const pass = c.encoder.beginRenderPass(this.reactivePass);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
     for (const r of this.runtimes) r.bind?.(pass, pipeline, 1);

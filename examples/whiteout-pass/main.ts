@@ -94,8 +94,8 @@ const storm = (value: number) => {
 const bloom = new Bloom({ ...kit.bloom }),
   tonemap = new Tonemap({ ...kit.tonemap }),
   stack = PostStack.attach(engine, [bloom, tonemap]);
-const falling: { weather?: Weather } = {};
-TAA.attach(engine, { depth: () => stack.depthTexture, reactive: () => falling.weather?.reactiveMask });
+// The snow's reactive mask reaches TAA by itself (Weather publishes it while TAA runs).
+TAA.attach(engine, { depth: () => stack.depthTexture });
 
 const sky = Sky.attach(engine, structuredClone(kit.sky) as typeof kit.sky, { preetham, night, reflection, lighting });
 const shadows = Shadows.attach(engine, { resolution: tier === 'phone' ? 1024 : 2048, distance: 50, lightSize: 0.03 });
@@ -272,12 +272,10 @@ const weather = Weather.attach(engine, {
   ...kit.precipitation,
   intensity: on('snow') ? kit.precipitation.intensity : 0,
   particles: tier === 'phone' ? 16000 : kit.precipitation.particles,
-  reactive: true,
   // A camera's shutter: each flake is swept over this many seconds, so the gale streaks it. 1/120 s is a 180 degree
   // shutter at 60 fps; a shot summing sub-frames gives each one its share (`exposure=` in the URL).
   exposure: Number(params.get('exposure') ?? 1 / 120),
 });
-falling.weather = weather;
 if (on('snow')) drive.options.precipitation = weather;
 PrecipitationCover.attach(
   engine,

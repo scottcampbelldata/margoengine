@@ -243,6 +243,13 @@ all of it with the mask against 0.34 without
 (packages/water/test/near-detail.browser.mjs, RTX A6000, WebGPU and the
 WebGL2 layer). See the
 [clean-room research](../clean-room.md#gravity-capillary-detail-and-the-seas-reactive-mask-2026-11-26-kb-water-neardetail1-kb-water-taasmear1).
+Weather's rain and snow and VFX's billboards reach the same registry with no
+scene code (KB-TAA-PARTICLEMASK1): TAA's read counts as demand, so their mask
+draws run only while TAA does; VFX effects share one r8unorm particle mask.
+Evidence: `packages/sky/test/features-check.mjs` weather and
+`packages/vfx/test/reactive-check.mjs` (86% against 48% of the no-TAA
+brightness), RTX A6000, WebGPU and the WebGL2 layer. Ribbons, mesh particles,
+`Flame`, splats and blended glTF still write no mask.
 
 ### Section 5 evidence: grazing refraction onto a shallow bed (2026-11-26)
 The texel reprojection above diverges on a bed seen at a grazing angle, and

@@ -181,6 +181,7 @@ interface VFXOptions {
     wrap?: boolean;
     sort?: boolean;
     softness?: number;
+    reactive?: boolean;
     depth?: () => GPUTexture | undefined;
     texture?: VFXTexture;
     curves?: VFXCurves;

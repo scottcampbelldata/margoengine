@@ -14,6 +14,7 @@ import { cloudLayerFor, type MutableCloudLayer } from './cloud-types.js';
 import { ParticleOverlay } from '../../shared/particle-overlay.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
+import { publishReactiveMask, reactiveMaskWanted } from '../../shared/reactive-mask.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -283,8 +284,10 @@ export interface WeatherOptions {
   opacity?: number;
   /**
    * Also draw each frame's streak and flake coverage (0 to 1, depth tested like the particles) into an r8unorm mask,
-   * {@link Weather.reactiveMask}, for TAA's `reactive` option: TAA then keeps little history where the particles are,
-   * so they stay crisp over a sky whose history it keeps (volumetric clouds) instead of being averaged away. Default false.
+   * {@link Weather.reactiveMask}, published to the frame for TAA, which reads it with no option: TAA then keeps little
+   * history where the particles are, so they stay crisp over a sky whose history it keeps (volumetric clouds) instead
+   * of being averaged away. Default: on while TAA (or another reader of reactive masks) runs, off otherwise; `true`
+   * draws it every frame, `false` never.
    */
   reactive?: boolean;
   /**
@@ -958,8 +961,8 @@ export class Weather implements EnginePlugin {
   }
 
   /**
-   * With `options.reactive`: this frame's particle coverage, an r8unorm texture of the whole frame, for TAA's `reactive`
-   * (`TAA.attach(engine, {reactive: () => weather.reactiveMask})`). Undefined on a frame that drew no particles.
+   * This frame's particle coverage, an r8unorm texture of the whole frame, drawn while TAA runs (or with
+   * `options.reactive`). TAA reads it by itself; it is here for other readers. Undefined on a frame that drew no mask.
    */
   get reactiveMask(): GPUTexture | undefined {
     return this.maskDrawn ? this.mask : undefined;
@@ -1556,7 +1559,9 @@ export class Weather implements EnginePlugin {
     v[41] = fall;
     v[42] = wind[1];
     v[43] = snow ? size.span : Math.max(1, (tall / 540) * 1.2);
-    const cover = this.occlusion;
+    // The mask is drawn while TAA reads masks, so a scene wires nothing (KB-TAA-PARTICLEMASK1).
+    const masked = o.reactive ?? reactiveMaskWanted(c, this),
+      cover = this.occlusion;
     if (cover?.buffer && cover.view) {
       const e = this.coverEntries;
       if (!e || (e[0].resource as GPUBufferBinding).buffer !== cover.buffer || e[1].resource !== cover.view)
@@ -1566,10 +1571,10 @@ export class Weather implements EnginePlugin {
         ];
       const code = cover.shader(shader);
       overlay.draw(c, code, uniform, v as Float32Array<ArrayBuffer>, count, this.coverEntries);
-      if (o.reactive) this.drawMask(c, code, uniform, count, this.coverEntries);
+      if (masked) this.drawMask(c, code, uniform, count, this.coverEntries);
     } else {
       overlay.draw(c, shader, uniform, v as Float32Array<ArrayBuffer>, count);
-      if (o.reactive) this.drawMask(c, shader, uniform, count);
+      if (masked) this.drawMask(c, shader, uniform, count);
     }
   }
 
@@ -1650,6 +1655,8 @@ export class Weather implements EnginePlugin {
     pass.draw(6, count);
     pass.end();
     this.maskDrawn = true;
+    // TAA reads the mask from the pass context by itself (KB-TAA-PARTICLEMASK1).
+    publishReactiveMask(c, this.mask!);
   }
 
   private drawFlash(c: WeatherPassContext): void {
