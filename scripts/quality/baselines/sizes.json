@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20890297,
+  "total": 20891135,
   "history": [
     {
       "date": "2026-10-24",
@@ -14553,6 +14553,12 @@
       "date": "2026-11-27",
       "commit": "ae3ef07e43",
       "reason": "SEA-12 connected finite wake and dry-cell clipping move optional water/wake from 2172 to 3264 B gzip and its ceiling from 2428 to 3362 B. The receiver and straight wake share the WaterWake binding. A separate entry would duplicate the attachment and buffer uploads. Core and Stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "threads",
+      "reason": "FIRE-05: kernel threads (+838 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15393,7 +15399,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 11724,
+    "@margoengine/physics/explosive": 12562,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

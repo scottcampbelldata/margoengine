@@ -44,6 +44,7 @@ await build({
       entry: {
         index: resolve(root, 'src/index.ts'),
         'kernel-thread': resolve(root, 'src/kernel-thread.ts'),
+        'explosive-thread': resolve(root, 'src/explosive/thread.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
         tissue: resolve(root, 'src/tissue.ts'),

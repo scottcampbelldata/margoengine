@@ -7554,7 +7554,10 @@ the fragment steps taken and the guns' integration steps. A buried charge (`dept
 
 `await ExplosionSolver.load(options)` flies the fragments in the explosive kernel, a Rust crate compiled to Wasm with SIMD.
 It gives the same bits as the TypeScript path (`new ExplosionSolver(id, options)`, and `flyFragments`, its twin), with the
-same work counts. `terrain` (a `BedShape`) lands the fragments on the world's `bed` field, which a `TerrainBed` of that
+same work counts. `ExplosionSolver.load({ threads })` flies them on that many threads, 1 to 64, over a shared world
+memory (`worldMemory(true)`). Each worker has its own instance of the kernel and flies a fixed partition of the fragments;
+the main thread flies the last. Any thread count gives the same bits, and `counts.threadSteps` shows each thread's
+fragment steps. `endThreads()`, or `using`, stops the workers. `terrain` (a `BedShape`) lands the fragments on the world's `bed` field, which a `TerrainBed` of that
 shape publishes, at the elevation `BedSurface.sample` gives.
 
 ```ts
