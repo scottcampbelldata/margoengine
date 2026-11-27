@@ -1015,6 +1015,13 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
 7. Move FFTs to Wasm SIMD and record work counts.
 
 **Upgrade in progress.**
+- Item 1. `75ee9d9129` and `coupling/sea04-diffraction.test.js` check the Penney–Price tip and
+  MacCamy–Fuchs cylinder with the production finite wake. Refined normalized complex RMS is 0.05144
+  and 0.08465, respectively. An incident-only packet forms its own diffracted wave, and restore replays
+  the screen exactly. These are analytic comparisons. The independent tank acceptance is separate.
+- Item 5 in part. `75ee9d9129` and `sea-wake-modes.test.js` check uniform Doppler propagation, exact held
+  pressure, capillary dispersion and weak viscous decay. Seven independent tank wavelengths give
+  1.30% RMS against 22.36% for gravity alone. Their published wavelength precision is 0.4%.
 - Items 5 and 6 in part. `96f97c0344` converts WakeSolver input and port errors to coded errors
   with a fix and documents `wakeHeight`. `sea-wake.test.js` checks grid, initial state and source errors.
 - The existing `coupling/loads-quay-wake.test.js` checks the straight-wall standing mode and the hull-driven

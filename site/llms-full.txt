@@ -9341,7 +9341,9 @@ prediction mode of streams before 2.2, normals outside the stored octahedron,
 and normal prediction that would overflow int64 ([repros](known-bugs.md#open-batch-133-optional-decoder-replacement-gaps)).
 The glTF flavor shares these rules and was not compared with the glTF prebuilt
 on them. The Wasm went from 142,749 to 145,234 bytes (54,149 to 54,979 B
-gzip -9).
+gzip -9). Since 2026-11-27 (E41) it no longer refuses normals outside the stored
+octahedron: their vectors match the full prebuilt bit for bit, and the Wasm is
+145,164 bytes.
 
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes
@@ -15504,6 +15506,17 @@ uses connected bilinear weights and the same wet-side derivative as the finite p
 Dry fragments clip in the draw. WaveQuery intersections use the underlying displaced triangles. The
 optional Water wake entry measures 3,264 B gzip.
 
+### Dispersive wake options (SEA-04)
+
+A uniform horizontal current advects the local linear modes. Spatial current gradients,
+shear and refraction across current fronts need a variable-coefficient solve. Surface tension
+adds gravity–capillary dispersion. The supplied viscosity damps both surface height and
+potential with the leading-order clean-surface rate. Bottom boundary-layer damping, contamination,
+nonlinear capillary interaction and overdamped viscous modes are outside this model.
+The Scott tank comparison covers the independently measured 100–200 ms waves. Relative
+wavelength RMS is 1.30%, compared with 22.36% for the gravity-only control. The observations'
+reported wavelength precision is 0.4%, so the comparison retains a measurable discrepancy.
+
 ### Ship motion on the wake grid
 
 `HullSolver` with the wake option publishes two five-word f64 records per reference waterplane station. The stamp uses one longitudinal midpoint and two transverse Gauss samples for a centreline-symmetric waterplane. Volume comes from small heave, pitch and roll about the reference draft. A wholly dry or submerged hull emits no waterplane flux. The model uses a signed surface-volume source. Its finite-depth wave propagation is handled by `WakeSolver`, and the hull's reaction still comes from its seakeeping solver. The projection has no three-dimensional radiation calibration or matched energy exchange with the wake grid.
@@ -15524,7 +15537,7 @@ The independent fixed bare KRISO container-ship (KCS) signed wave cut at 1.09864
 
 At 0.25 m per cell the original stencil gave 14.88 and 14.85 mm of profile RMS error at 14 approach lengths and 60 or 120 Hz. Refining the mesh from 0.025 to 0.0125 m vertically and 96 to 192 stations changed the reconstructed displacement from 1.6412 to 1.6449 m³, closer to the published 1.6490 m³. At eight approach lengths and 60 Hz, this mesh, eight instead of four transfer bands, and a 4 m instead of 2 m numerical sponge gave 15.34, 15.38, and 15.11 mm respectively. The subcell stencil reduced the 60 Hz error from 15.10 to 13.86 mm at eight lengths and from 14.88 to 13.60 mm at 14 lengths. Aft of x/L = 0.75 the corrected signed profile reaches 34.60 mm RMS where the measured profile gives 17.90 mm, with correlation 0.987. This residual persists with fixed physical inputs and no fitting. The linear source does not enforce impermeability of the disturbed flow at the hull. The experiment reports an unsteady wet transom flow that is outside this source model. [NMRI model particulars](https://www.nmri.go.jp/archives/institutes/fluid_performance_evaluation/cfd_rd/cfdws15/kcs_gc.html) · [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
 
-The optional sea entry is 7,859 B gzip with a 7,880 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
+The optional sea entry is 9,129 B gzip with a 9,403 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
 
 ## Node versions for test and tool scripts (scripts/support/node-compat.mjs, 2026-11-26)
 
@@ -15612,6 +15625,10 @@ Fin jets use the tangent plane of the terrain triangle under the source. This pr
 ### Bow tunnel discharge for bed wash (SEA-15)
 
 The optional `Ship.thrusterOutlet` samples a straight submerged round jet. It omits quay and bed reflection, crossflow bending, and travel time after a change in command. The configured diameter and outlet position determine a Gaussian profile whose centreline was 12.7% high against the independent laboratory fit at 20 diameters. Configuring any outlet adds 64 bytes of live state per ship slot. The scoped ship entry grows from 13,770 B to 14,217 B gzip within its 14,951 B ceiling.
+
+## Point and sprite pixel sizes are CSS pixels (2026-11-27)
+
+`size`, `minPixelSize`, `maxPixelSize` and pixel sprite sizes of `@margoengine/points` (`PointsPlugin`, `SurfelPlugin`, and so `PointPicking` and `PointRaycaster`) and a pixel `size` of `DeformedPoints` are CSS pixels, as `@margoengine/lines` widths and the glTF `pointSize` extras are: each covers the drawn target's width over the canvas's CSS width, in target pixels. A canvas without a CSS width (offscreen, or hidden during a `@margoengine/exporters` capture) counts 1. Until 2026-11-27 these were target pixels, so on a canvas backed above 1 pixel per CSS pixel marks now draw larger by that ratio, the default 1 and 256 clamps included. A view drawn into a texture takes the texture's width over the canvas's CSS width, as lines do. `edlRadius` and `OctreeCloud`'s `minNodePixels` stay pixels of the drawn target. Proof: `packages/points/tests/pixel-density-browser.mjs` (20 CSS pixel marks at 1 and 2 pixels per CSS pixel, WebGPU and the WebGL2 layer).
 
 ## Points on a deforming mesh (animation/deformed-points, 2026-11-26)
 
@@ -15889,7 +15906,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/exporters/tests/plugin-lines-points.test.js` (round trip), and `npm run test:gpu:strokes` in packages/gltf
   (widths measured in the frame on WebGPU and the WebGL2 layer).
 
-### Open 2026-11-27: a point cloud's pixel size is written as CSS pixels but drawn in target pixels (KB-POINTS-CSSPX1, points, exporters)
+### Fixed 2026-11-27: a point cloud's pixel size is written as CSS pixels but drawn in target pixels (KB-POINTS-CSSPX1, points, bvh, animation, gltf)
 
 - **Repro:** on a canvas drawn at device pixel ratio 2, a `PointCloud` with `size: 4` (pixels) covers 4 target pixels, 2
   CSS pixels. `exportGLB` writes `pointSize: 4, pointSizeUnits: 'pixels'`, which the exporters README and
@@ -15897,13 +15914,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `PointsPlugin` sizes pixel points in pixels of the drawn target unless an owner sets `pixelScale` (sciviz
   sets CSS pixels), while `@margoengine/lines` widths and the glTF extras convention are CSS pixels. The exporter reads
   `material.size` as it is and cannot know the target's ratio from the cloud.
-- **Next:** decide one pixel unit for `PointsPlugin` (CSS pixels, as lines) or have the exporter divide by the plugin's
-  `pixelScale` for the canvas at export; either changes drawn sizes on high-DPI screens, so it needs the points owner.
-- **Scope (read 2026-11-27):** one unit has to reach every reader of a pixel size: `writeCloudUniform` and its default
-  scale (`packages/points/src/plugin.ts`), `SurfelPoints.writeCloud` (`surfels.ts`, which ignores `pixelScale`, so
-  sciviz's scale does not reach surfels either), the sprite vertex shader's pixel offset (`shaders.ts`, `params.z`),
-  `@margoengine/bvh` point and sprite picking (`bvh/src/points.ts` takes `size` as drawing-buffer pixels), and the
-  override in `gltf/src/strokes.ts`, which a CSS-pixel default makes redundant.
+  `DeformedPoints` also sized in view pixels, `SurfelPlugin` and pixel sprites ignored any scale, and
+  `@margoengine/bvh` picking took `size` as drawing-buffer pixels.
+- **Fix:** CSS pixels everywhere a point or sprite pixel size is read: the plugin's and surfels' default scale is the
+  target's width over the canvas's CSS width (the `@margoengine/lines` formula), the sprite shader multiplies its pixel
+  offset by it, `PointRaycaster` scales sizes and clamps, `DeformedPoints` scales its size, and the glTF stroke reader's
+  own override is gone. Drawn sizes grow on canvases backed above 1 pixel per CSS pixel (docs/limits.md).
+  Regression: `packages/points/tests/pixel-scale.test.js`, `packages/bvh/tests/points.test.js`,
+  `packages/animation/tests/deformed-points.test.js` and `packages/points/tests/pixel-density-browser.mjs` (WebGPU and
+  the WebGL2 layer, with a reloaded GLB).
 
 ### Fixed 2026-11-27: tests picked a build's compat-*.js chunk by listing order (KB-COMPAT-CHUNKPICK1, scatter, shadows tests)
 
@@ -18031,14 +18050,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   statement word for word.
 - **Fix:** `overLife` anchors on the load whatever it reads. Regression: packages/vfx/test/nodes.test.js.
 
-### Open 2026-11-27: a smoke column over a fire at night reads blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx)
+### Fixed 2026-11-27: a smoke column over a fire at night read blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx, weather)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=aerial-west --query=hour=22 --out=<folder>`: the
-  columns are lit orange only near their source point and read as dark blue-black shapes against the orange pall above.
-- **Cause:** a column's puffs take the glow of one point at its base (falling as 1 / d^2 over the km the column climbs)
-  and the engine's moonlit ambient; the firelit haze round them, and the rest of the burning front, give them no light.
-- **Owed in vfx:** the puffs' ambient from the air they sit in (the drive's firelit haze light) or the front as a line
-  of sources, with a test and a real frame.
+  columns were lit orange only near their source point and read as dark blue-black shapes against the orange pall above.
+- **Cause:** a column's puffs took the glow of one point at its base (falling as 1 / d^2 over the km the column climbs)
+  and the engine's moonlit ambient; the firelit pall round them, and the rest of the burning front, gave them no light.
+- **Fix:** `VFXLit.air` (vfx): the light of the air round the particles as shares of the noon sun, which adds
+  `air * noon / pi` to the ambient (light of that share from every side shows a ball E / pi). `SmokeOptions.air` and
+  `FireFront.air` carry it to the columns, and `WeatherDrive` writes on each front its fires' light on the pall over it
+  (the spots of `fireLayerLight` at the front's heat-weighted centre plus the even `fireHazeLight`). Real frame
+  (aerial-west at 22:00, 640 x 360, RTX A6000): the column's mean 8-bit colour 2.4, 3.1, 7.6 before, 58.0, 32.1, 7.6
+  after, against the pall's 82.7, 53.5, 21.1: a warm column a little darker than the lit pall, not a blue-black hole.
+- **Also:** `timber-valley-still.mjs` added `--query` to its own fixed comparisons, so `--query=hour=22` made the day
+  still a night one and the run stopped on "the night sky is dark and blue" (day and night read 53.6 / 101.2 alike).
+  Only the views asked for take `--query` now.
+- **Regression:** `packages/vfx/test/lit.test.js` (the air term in any scene units), `packages/vfx/test/smoke.test.js`
+  (a column and a front carry it), `packages/weather/tests/air-load.test.js` (the drive writes the pall's light).
 
 ### Fixed 2026-11-26: the smoke haze over a burning valley took no light from the fire (KB-WEATHER-FIREHAZE1, weather and vfx)
 
@@ -32580,6 +32608,19 @@ HTML and needs no GPU; an unnecessary GPU wrapper first expired
 before test startup. Its failure is retained separately. No competing
 teardown fix or busy-machine exemption was applied in this lane.
 
+### Fixed 2026-11-27: optional Draco decoder refused normals outside the stored octahedron (batch 133, E41)
+
+- **Repro:** `445241434f020200000000010000000101010903000003fe0001090902` through
+  `@margoengine/decoders/draco-native`: `Invalid`, where the full prebuilt returns
+  a unit vector.
+- **Cause:** `unit` in `packages/decoders/native/draco/src/normal.rs` refused
+  values outside the quantization range, and its unfolding rounded differently
+  from the prebuilt on values far outside it.
+- **Fix:** the refusal is gone and the negative hemisphere moves by the overshoot
+  ([E41](clean-room.md#batch-133-e41-normals-outside-the-stored-octahedron-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/octahedron.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -32630,10 +32671,6 @@ E26 to E40):
   `E35 one-triangle normal mode` cases in
   `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
   int32 arithmetic of that mode is not established.
-- Normals outside the stored octahedron (unpredicted or wrapped symbols beyond
-  the quantization width, or a transform maximum wider than it): the prebuilt
-  returns a vector, Margo answers `Invalid`. Repro:
-  `445241434f020200000000010000000101010903000003fe0001090902`.
 - Predictor 6 with coordinates near the int32 limits, or unsigned 32-bit
   positions before 2.0 near theirs: the prebuilt decodes, Margo answers
   `Overflow` where a 64-bit step would overflow.
@@ -37875,9 +37912,9 @@ canvas.addEventListener('click', event => {
 - **Point budget and level of detail.** The points inside each block are shuffled once with a seeded PRNG, so the first `k` slots of a block are an even random sample of it. Visible blocks share `pointBudget` in proportion to their projected screen area, and blocks that need less than their share give the rest to the others. Each block then draws a prefix of its slots: one `draw(4, k, 0, firstSlot)` call per visible block. This is the progressive subsampling Potree uses, without its octree files.
 - **GPU data.** Positions (f32 xyz), packed RGBA8 colors, optional f32 sizes and the shuffled slot order live in storage buffers; the vertex shader expands each point into a quad (a 4-vertex triangle strip per instance). The arrays stay in your order, so `updatePositions`, `updateColors` and `updateSizes` call `writeBuffer` on exactly the changed byte range. Position updates also grow the affected blocks' bounds.
 - **Frame uploads.** Points and sprites share a 144-byte camera uniform. Consecutive views with identical uniform bytes reuse the last upload; camera, viewport, format or projection changes upload again. Device restoration always uploads to the new buffer. This removes one queue write per unchanged view; timing is pending the quiet rerun.
-- **Shapes and shading.** Square points cover exactly `size x size` pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-32 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors `edlRadius` pixels away (Boucheny's eye-dome lighting; background neighbors count as 0).
+- **Shapes and shading.** Square points cover exactly `size x size` CSS pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-32 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors `edlRadius` pixels away (Boucheny's eye-dome lighting; background neighbors count as 0).
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
-- **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that
+- **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with
 
 [README continues: https://margoengine.com/llms/packages/points.md]
 
