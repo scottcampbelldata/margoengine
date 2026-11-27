@@ -214,6 +214,79 @@ console.log(plain.searched, jump.searched); // 27208 6
 
 - Both run on the calling thread and allocate a few arrays of the grid's size per call.
 
+### Replanning as the map changes
+
+`margoengine/tilemap/replan` keeps a search to one goal alive, for a unit that finds walls on its way or a map the
+player edits. Change `grid.cost`, tell `update` which cells changed and ask for the path again: the cost is the one a
+fresh `findPath` would give, and only the cells the change can matter to are expanded. It is D* Lite (Koenig and
+Likhachev, "D* Lite", AAAI 2002, https://cdn.aaai.org/AAAI/2002/AAAI02-072.pdf, the optimized version).
+
+```js
+import { findPath } from 'margoengine/tilemap/path';
+import { PathReplanner } from 'margoengine/tilemap/replan';
+const width = 200, height = 200;
+const cost = new Float64Array(width * height).fill(1);
+for (let y = 11; y < height; y++) cost[y * width + 100] = Infinity; // a wall with a gap at the top
+const grid = { width, height, cost };
+const plan = new PathReplanner(grid, [190, 190]);
+const first = plan.findPath([10, 190]);
+console.log(first.cost.toFixed(2), first.searched); // 435.73 27046
+const [x, y] = first.cells[5]; // a wall appears ahead of the unit
+cost[y * width + x] = Infinity;
+const next = plan.update([[x, y]]).findPath(first.cells[4]);
+console.log(next.searched, findPath(grid, first.cells[4], [190, 190]).searched); // 92 27207
+```
+
+| Piece | What it does |
+| --- | --- |
+| `new PathReplanner(grid, goal, {diagonal, maxCells, minCost})` | A replanner for one goal over a `CostGrid`, square or hexagonal. `maxCells` (1,000,000) limits one call, and the next call carries on. `minCost` (default the lowest cost at the start) is the lowest cost a cell will ever have; a change below it starts the search afresh |
+| `update(cells)` | Names every cell whose cost changed since the last call, as `[x, y]` pairs |
+| `findPath(start)` | `{cells, cost, searched, scanned}` from `start` to the goal, or null; `searched` counts the cells this call expanded |
+
+- The first call costs about what A* costs. Later calls are cheap when the changes are near the unit; a change near the
+  goal that touches most cells' distances can cost more than a fresh search.
+- It holds about 40 bytes a cell for as long as it lives. One goal each: use `flowField` for many units to one place on
+  a map that does not change.
+
+### Long paths on large maps
+
+`margoengine/tilemap/hpa` cuts the grid into clusters and searches a small graph of the steps between them, then fills
+in only the clusters the path crosses. Build it once and ask it many times. It follows HPA* (Botea, Mueller and
+Schaeffer, "Near Optimal Hierarchical Path-Finding", Journal of Game Development 1(1), 2004,
+https://webdocs.cs.ualberta.ca/~mmueller/ps/hpastar.pdf), with its own choice of transitions, which gives a bound.
+
+```js
+import { findPath } from 'margoengine/tilemap/path';
+import { PathHierarchy } from 'margoengine/tilemap/hpa';
+const width = 200, height = 200;
+const cost = new Float64Array(width * height).fill(1);
+for (let y = 11; y < height; y++) cost[y * width + 100] = Infinity;
+const grid = { width, height, cost };
+const graph = new PathHierarchy(grid); // clusters of 16, detour 3
+const full = findPath(grid, [10, 190], [190, 190]);
+const path = graph.findPath([10, 190], [190, 190]);
+console.log(path.cost.toFixed(2), path.searched, full.searched); // 435.73 4503 27208
+cost[5 * width + 100] = Infinity; // a change rebuilds the clusters around it
+graph.update([[100, 5]]);
+console.log(graph.findPath([10, 190], [190, 190]) !== null); // true
+```
+
+| Piece | What it does |
+| --- | --- |
+| `new PathHierarchy(grid, {diagonal, maxCells, cluster, detour})` | The graph of a `CostGrid`, square or hexagonal. `cluster` (16) is a cluster's side; `detour` (3) is how many steps a border crossing may lie from a transition, 0 for every crossing |
+| `findPath(start, goal, {smooth})` | `{cells, cost, searched, scanned}` or null. `smooth` (true) searches the path again in short stretches and keeps what is cheaper |
+| `update(cells)` | Names every changed cell; the clusters around them are rebuilt before the next query |
+| `nodes` | The graph's nodes as cells, for drawing it and judging its size |
+
+- A path is found whenever one exists.
+- The cost is exactly the cheapest with `detour: 0`. Otherwise it is above the cheapest by at most
+  `(2 * detour + 1) * L * highest` for each cluster border a cheapest path crosses, where `highest` is the dearest open
+  cell and `L` is sqrt(2) with corner steps, 1 without them and on hexagonal and staggered maps. Typical paths are far
+  closer: 200 long queries on a 256 x 256 map with one cell in five walled cost 0.6% more in total than the cheapest
+  (the worst 3.5% more) and expanded 438,469 cells and nodes against A*'s 964,285.
+- Building searches each cluster once from each of its nodes, so it costs more than one query; a larger `detour` makes
+  fewer nodes (on that map 9,382 at 0, 4,022 at 3).
+
 ## Field of view and fog of war
 
 `margoengine/tilemap/fov` works out which cells a viewer sees by shadowcasting, and `FogOfWar` keeps what is seen now

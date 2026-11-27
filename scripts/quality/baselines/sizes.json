@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21057012,
+  "total": 21064306,
   "history": [
     {
       "date": "2026-10-24",
@@ -14821,6 +14821,12 @@
       "commit": "kb-fauld-smokeblack1",
       "reason": "scenes/fauld-tunnels: every smoke column is added to the volumetric fog, so it draws with the lit air in front of it (KB-FAULD-SMOKEBLACK1, flat black shapes in the fire frames); 13,477 to 13,498 B gzip, the entry having stood 12 B under its ceiling of 13,489. A split would move one line of the place out of the entry that builds it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "tilemap-replan-hpa",
+      "reason": "new entries @margoengine/tilemap/replan (D* Lite replanning, 2,560 B gzip, ceiling 2,816) and /hpa (hierarchical paths, 4,222 B, ceiling 4,478). The grid helpers moved to a module the three search entries share (tilemap/path 3,273 -> 3,279 B). Inside path they would have put both searches in every app that asks for one path. Core and stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16267,11 +16273,13 @@
     "@margoengine/tilemap/autotile": 2087,
     "@margoengine/tilemap/fov": 1843,
     "@margoengine/tilemap/hex": 2287,
+    "@margoengine/tilemap/hpa": 4478,
     "@margoengine/tilemap/iso": 6963,
     "@margoengine/tilemap/ldtk": 3070,
     "@margoengine/tilemap/objects": 7723,
     "@margoengine/tilemap/path": 3529,
     "@margoengine/tilemap/plane": 8167,
+    "@margoengine/tilemap/replan": 2816,
     "@margoengine/tilemap/tiled": 7482,
     "@margoengine/tiles": 16680,
     "@margoengine/tiles/fade": 2015,

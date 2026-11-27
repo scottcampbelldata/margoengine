@@ -3831,6 +3831,14 @@
       "types": "./dist/tilemap/path.d.ts",
       "import": "./dist/tilemap/path.js"
     },
+    "./tilemap/hpa": {
+      "types": "./dist/tilemap/hpa.d.ts",
+      "import": "./dist/tilemap/hpa.js"
+    },
+    "./tilemap/replan": {
+      "types": "./dist/tilemap/replan.d.ts",
+      "import": "./dist/tilemap/replan.js"
+    },
     "./tilemap/fov": {
       "types": "./dist/tilemap/fov.d.ts",
       "import": "./dist/tilemap/fov.js"

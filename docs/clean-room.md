@@ -18731,6 +18731,22 @@ No paper's companion code and no other engine's source was read.
   read in full; W. J. Stronge and D. Shu, "The domino effect: successive destabilization by cooperative neighbours",
   Proc. R. Soc. Lond. A 418 (1988) 155-163, cited there for the limit speed set by inter-domino friction (not read).
 
+## tilemap replanning and hierarchical paths (2026-11-27)
+
+`@margoengine/tilemap/replan` and `/hpa`; written from the two papers' text, no companion code and no other engine's
+source read.
+
+- S. Koenig and M. Likhachev, "D* Lite", AAAI 2002, pages 476-483, https://cdn.aaai.org/AAAI/2002/AAAI02-072.pdf: the
+  optimized version (figure 4). Margo's addition: the stop test allows a billionth above the start's key, because
+  floating-point sums of one distance differ in their last bits.
+- A. Botea, M. Mueller and J. Schaeffer, "Near Optimal Hierarchical Path-Finding", Journal of Game Development 1(1),
+  2004, https://webdocs.cs.ualberta.ca/~mmueller/ps/hpastar.pdf: clusters, transitions, intra-cluster distances,
+  inserting start and goal, refinement and smoothing. Margo's own: transitions chosen so that every crossing step lies
+  within `detour` hops of one (which gives the cost bound), and smoothing by searching overlapping stretches again.
+- Also surveyed: N. Sturtevant and M. Buro, "Partial pathfinding using map abstraction and refinement", AAAI 2005
+  (clique abstraction, refined as the unit walks; not used, as it returns partial paths); X. Sun, S. Koenig and W.
+  Yeoh, "Generalized Adaptive A*", AAMAS 2008 (simpler, reported behind D* Lite for a unit finding walls).
+
 ## weather wind field advected by the mean wind (KB-LOOK-TV-SHIMMER2, 2026-11-27)
 
 `WindField.sample`, `drift`, `set(options, at)` and `resetDrift` in `@margoengine/weather`; no paper's companion code and

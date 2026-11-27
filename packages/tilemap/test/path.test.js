@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { hexDistance } from '../dist/hex.js';
 import { createTileLayer } from '../dist/index.js';
 import { findPath, flowField, followFlow, tileCosts } from '../dist/path.js';
+import { random } from './grid-fixtures.js';
 
 const grid = (width, height, cost = () => 1) => ({
   width,
@@ -69,9 +70,8 @@ test('costs: a swamp column of cost 5 is passed by its one open cell', () => {
 });
 
 test('flow fields agree with a plain relaxation and with A* from every cell', () => {
-  let seed = 7;
-  const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
-  const g = grid(9, 7, () => (random() < 0.15 ? Infinity : 1 + Math.floor(random() * 4)));
+  const next = random(7);
+  const g = grid(9, 7, () => (next() < 0.15 ? Infinity : 1 + Math.floor(next() * 4)));
   g.cost[3 * 9 + 4] = 1;
   for (const diagonal of ['never', 'always', 'no-corners']) {
     const field = flowField(g, [[4, 3]], { diagonal });
@@ -122,6 +122,13 @@ test('flow fields agree with a plain relaxation and with A* from every cell', ()
   ]);
   assert.deepEqual([...two.distance], [0, 1, 2, 3, 2, 1, 0]);
   assert.deepEqual(followFlow(two, 3, 0).at(-1), [0, 0], 'a tie goes to the goal reached first');
+});
+
+test('the test grids come from a generator that does not fall into a short cycle', () => {
+  const next = random(7),
+    seen = new Set();
+  for (let i = 0; i < 100_000; i++) seen.add(next());
+  assert.equal(seen.size, 100_000);
 });
 
 test('hexagonal maps step to the six cells sharing an edge', () => {
@@ -181,7 +188,6 @@ test('tileCosts reads solid and cost properties; the highest layer cost wins; ga
 
 // Jump point search: on grids of one cost with no corner cutting it finds paths as cheap as plain A*'s, legal step by
 // step, visiting fewer cells; elsewhere it is plain A*.
-const random = (seed) => () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
 const legal = (g, cells) => {
   for (let i = 1; i < cells.length; i++) {
     const [ax, ay] = cells[i - 1],

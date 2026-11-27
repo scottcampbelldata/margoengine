@@ -50,6 +50,14 @@
       "types": "./dist/path.d.ts",
       "import": "./dist/path.js"
     },
+    "./hpa": {
+      "types": "./dist/hpa.d.ts",
+      "import": "./dist/hpa.js"
+    },
+    "./replan": {
+      "types": "./dist/replan.d.ts",
+      "import": "./dist/replan.js"
+    },
     "./fov": {
       "types": "./dist/fov.d.ts",
       "import": "./dist/fov.js"
