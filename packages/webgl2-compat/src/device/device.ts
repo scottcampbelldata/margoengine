@@ -516,7 +516,45 @@ export class CompatDevice extends EventTarget {
     if (top && top.filter !== 'validation') this.checkAllocations(false);
     const scope = this.scopes.pop();
     if (!scope) return Promise.reject(new DOMException('No error scope to pop', 'OperationError'));
-    return Promise.resolve(scope.error);
+    // An error is judged in a later task (see reportable): a lost device's scopes resolve null, as WebGPU's do. Each pop
+    // resolves after the one before it, as WebGPU resolves them in order.
+    const error = scope.error;
+    if (!error && !this.popping) return Promise.resolve(null);
+    const popped = (this.popping ?? new Promise<void>((resolve) => setTimeout(resolve, 0))).then(() =>
+      error && this.reportable() ? error : null,
+    );
+    const settled = (this.popping = popped.then(() => {
+      if (this.popping === settled) this.popping = null;
+    }));
+    return popped;
+  }
+  /** The last pop of a scope that held an error, until it resolves (see popErrorScope). */
+  private popping: Promise<void> | null = null;
+  /**
+   * Whether an error read from GL can still be reported, asked in a task after the call that read it, never inside it.
+   * Chrome answers the synchronous query that waited for a GPU reset as a lost context answers it (LINK_STATUS and
+   * COMPILE_STATUS false with empty logs, checkFramebufferStatus FRAMEBUFFER_UNSUPPORTED, getError NO_ERROR) but sets
+   * isContextLost() and queues CONTEXT_LOST_WEBGL only for a later task (measured on an RTX A6000, ANGLE Direct3D 11:
+   * a readPixels waited 5.4 s for the reset, a link right after it failed with isContextLost() false, and one task
+   * later the context was lost; KB-COMPAT-LOSSREPORT1). So a link failure or an incomplete framebuffer on a context
+   * found lost by then is the loss: the device is lost, and the error is dropped, as a lost WebGPU device raises none.
+   * On a live context every error is reported as raised.
+   */
+  private reportable(): boolean {
+    if (!this.destroyed && this.gl.isContextLost()) this.lose('unknown', 'The WebGL2 context was lost');
+    return !this.destroyed;
+  }
+  /**
+   * @internal Rejects with `failure` (a GPUPipelineError) a task after the call that found it, unless the device is lost
+   * by then (see reportable): an async pipeline on a lost device resolves, and draws with it do nothing (WebGPU).
+   */
+  settlePipeline<T>(pipeline: T, failure: string | null): Promise<T> {
+    if (!failure) return Promise.resolve(pipeline);
+    return new Promise<void>((resolve) => setTimeout(resolve, 0)).then(() => {
+      if (this.reportable())
+        throw Object.assign(new DOMException(failure, 'GPUPipelineError'), { reason: 'validation' });
+      return pipeline;
+    });
   }
   /** Reports a validation error to the innermost validation scope, else as `uncapturederror`. */
   validationError(message: string): void {
@@ -567,11 +605,9 @@ export class CompatDevice extends EventTarget {
   }
   private report(filter: ErrorFilter, error: CompatError, now = false): void {
     // On a lost context every link fails and every framebuffer is incomplete: that is the device's loss (its
-    // webglcontextlost event comes in a later task), and a lost device raises no errors, as WebGPU's does.
-    if (this.gl.isContextLost()) {
-      this.lose('unknown', 'The WebGL2 context was lost');
-      return;
-    }
+    // webglcontextlost event comes in a later task), and a lost device raises no errors, as WebGPU's does. A loss the
+    // context does not show yet is judged when the error is delivered (see reportable).
+    if (!this.reportable()) return;
     // An allocation made before the call that raised this error reports first.
     this.checkAllocations(false);
     for (let i = this.scopes.length - 1; i >= 0; i--)
@@ -582,7 +618,7 @@ export class CompatDevice extends EventTarget {
     // As WebGPU does, in a task of its own, never inside the call that failed, and not once the device is gone: so a
     // failed allocation's error, raised first, reaches listeners before the errors of later calls that used the object.
     const dispatch = () => {
-      if (this.destroyed) return;
+      if (!this.reportable()) return;
       const event = new CompatUncapturedErrorEvent('uncapturederror', { cancelable: true, error });
       this.dispatchEvent(event);
       this.onuncapturederror?.(event);
@@ -815,14 +851,8 @@ export class CompatDevice extends EventTarget {
     } catch (error) {
       return Promise.reject(error);
     }
-    return pipeline.whenLinked().then(() => {
-      // A lost device raises no errors (WebGPU): the pipeline resolves, and draws with it do nothing.
-      if (pipeline.failure && !this.destroyed)
-        throw Object.assign(new DOMException(pipeline.failure, 'GPUPipelineError'), {
-          reason: 'validation',
-        });
-      return pipeline;
-    });
+    // A lost device raises no errors (WebGPU): the pipeline resolves, and draws with it do nothing.
+    return pipeline.whenLinked().then(() => this.settlePipeline(pipeline, pipeline.failure));
   }
   /**
    * Loads the compute runtime (the compute entry) once. A render-only page never calls this, so it never downloads
@@ -876,11 +906,7 @@ export class CompatDevice extends EventTarget {
     return this.loadCompute().then(async () => {
       const pipeline = new CompatComputePipeline(this, descriptor);
       await pipeline.readyAsync();
-      if (pipeline.failure)
-        throw Object.assign(new DOMException(pipeline.failure, 'GPUPipelineError'), {
-          reason: 'validation',
-        });
-      return pipeline;
+      return this.settlePipeline(pipeline, pipeline.failure);
     });
   }
   createCommandEncoder(descriptor: GPUCommandEncoderDescriptor = NO_DESCRIPTOR): CompatCommandEncoder {
