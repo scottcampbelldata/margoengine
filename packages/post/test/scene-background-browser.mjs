@@ -8,7 +8,10 @@
 // drew 181 where 116 is right. With no background set, core's own clear colour (display 0.018, 0.023, 0.035) takes the
 // same path: 5,6,9 with no effect, and under an effect its decoded values tone-mapped, the pixel a background of
 // #050609 draws there. Before KB-CLEAR-DEFAULT1 it was written to the capture undecoded and drew 7,20,38 under Tonemap.
-// Every case is drawn before the check fails, so one run lists all that are wrong.
+// Every case is drawn before the check fails, so one run lists all that are wrong. Each frame is also read from the
+// canvas in the task that drew it, and its device must still be live: a screenshot that differs from that read is the
+// browser's, a read that is wrong too is the engine's or the layer's, and a lost device leaves the frame before it on
+// the page (KB-POST-HALFVIEW-ONCE1).
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
@@ -42,6 +45,10 @@ await postBrowser(
         Bloom: (engine) => Bloom.attach(engine),
         PostStack: (engine) => PostStack.attach(engine, [new Tonemap()]),
       };
+      const read = new OffscreenCanvas(320, 240).getContext('2d', {
+        willReadFrequently: true,
+      });
+      read.globalCompositeOperation = 'copy';
       window.t = {
         // One frame of `effect` over `colour`, as the scene's background or (`by` 'ColorBackground') that plugin's.
         async draw(effect, colour, by, mesh, half) {
@@ -58,32 +65,47 @@ await postBrowser(
               .setGeometry(box(1, 1, 1))
               .setMaterial(new PbrMaterial({ color: '#e0a050' }));
           attach[effect](engine);
+          let lost = '';
+          engine.gpu.lost.then((info) => (lost = `lost (${info.reason}: ${info.message})`));
           engine.render({
             delta: 1 / 60,
             views: half ? [{ camera: engine.camera, viewport: [0, 0, 0.5, 1] }] : undefined,
           });
+          // In the render's own task, where the canvas holds the frame just drawn (W3C WebGPU, canvas rendering).
+          read.drawImage(engine.canvas, 0, 0);
+          const canvas = [...read.getImageData(8, 8, 1, 1).data.subarray(0, 3)];
           await engine.gpu.queue.onSubmittedWorkDone();
           this.engine = engine;
+          return { canvas, lost };
         },
         dispose() {
           this.engine.dispose();
         },
       };
     });
+    const wrong = [];
     const pixel = async (effect, colour, by, mesh, half) => {
-      await page.evaluate(([e, c, b, m, h]) => window.t.draw(e, c, b, m, h), [effect, colour, by, mesh, half]);
+      const drawn = await page.evaluate(
+        ([e, c, b, m, h]) => window.t.draw(e, c, b, m, h),
+        [effect, colour, by, mesh, half],
+      );
       const image = await shot();
       await page.evaluate(() => window.t.dispose());
       // A corner pixel, away from the mesh.
-      const i = (8 * image.width + 8) * 4;
-      return [...image.data.subarray(i, i + 3)];
+      const i = (8 * image.width + 8) * 4,
+        shown = [...image.data.subarray(i, i + 3)];
+      if (drawn.lost || drawn.canvas.some((v, k) => Math.abs(v - shown[k]) > 1)) {
+        const label = `frame of ${effect} ${colour ?? 'unset'} by ${by}${mesh ? ' beside a mesh' : ''}${half ? ' in a half view' : ''}`;
+        console.log(`WRONG ${label}: screenshot ${shown}, canvas ${drawn.canvas}, device ${drawn.lost || 'live'}`);
+        wrong.push(label);
+      }
+      return shown;
     };
-    const wrong = [],
-      check = (actual, expected, label, tolerance) => {
-        const ok = actual.every((v, k) => Math.abs(v - expected[k]) <= tolerance);
-        console.log(`${ok ? 'ok' : 'WRONG'} ${label}: drew ${actual}, expected ${expected}`);
-        if (!ok) wrong.push(label);
-      };
+    const check = (actual, expected, label, tolerance) => {
+      const ok = actual.every((v, k) => Math.abs(v - expected[k]) <= tolerance);
+      console.log(`${ok ? 'ok' : 'WRONG'} ${label}: drew ${actual}, expected ${expected}`);
+      if (!ok) wrong.push(label);
+    };
     for (const scene of ['empty scene', 'beside a mesh', 'half view']) {
       const mesh = scene === 'beside a mesh',
         half = scene === 'half view';
