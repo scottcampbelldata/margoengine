@@ -30,11 +30,25 @@ export const jp2Opening = () => [
   ),
 ];
 
-/** A greyscale JP2 file around a codestream; `boxes` are further boxes of the header box. */
-export function jp2(stream, width, height, boxes = []) {
+/** The enumerated greyscale colour specification box. */
+const greyColour = () => box('colr', [1, 0, 0, ...be(17, 4)]);
+
+/** A greyscale ICC profile whose curve is a power of `gamma` (ICC.1: the header, one `kTRC` tag of `curveType`). */
+export function greyProfile(gamma) {
+  const profile = new Array(128).fill(0);
+  profile.splice(16, 4, ...[...'GRAY'].map((c) => c.charCodeAt(0)));
+  const curve = [...[...'curv'].map((c) => c.charCodeAt(0)), 0, 0, 0, 0, ...be(1, 4), ...be(gamma * 256, 2)];
+  return [...profile, ...be(1, 4), ...[...'kTRC'].map((c) => c.charCodeAt(0)), ...be(144, 4), ...be(14, 4), ...curve];
+}
+
+/**
+ * A greyscale JP2 file around a codestream; `boxes` are further boxes of the header box and `colour` its colour
+ * specification box.
+ */
+export function jp2(stream, width, height, boxes = [], colour = greyColour()) {
   const header = [
     ...box('ihdr', [...be(height, 4), ...be(width, 4), 0, 1, 7, 7, 0, 0]),
-    ...box('colr', [1, 0, 0, ...be(17, 4)]),
+    ...colour,
     ...boxes,
   ];
   return Uint8Array.from([...jp2Opening(), ...box('jp2h', header), ...box('jp2c', [...stream])]);

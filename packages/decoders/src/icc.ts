@@ -107,25 +107,32 @@ function srgbEncoding(): Uint8Array {
   if (encodeTable) return encodeTable;
   encodeTable = new Uint8Array(ENCODE_STEPS + 1);
   for (let i = 0; i <= ENCODE_STEPS; i++) {
-    const linear = i / ENCODE_STEPS;
-    encodeTable[i] = Math.round(
-      255 * (linear <= 0.0031308 ? 12.92 * linear : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055),
-    );
+    encodeTable[i] = Math.round(255 * encodeLinear(i / ENCODE_STEPS));
   }
   return encodeTable;
 }
 
+const encodeLinear = (linear: number): number =>
+  linear <= 0.0031308 ? 12.92 * linear : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055;
+
 /**
- * Converts straight RGBA samples of 16 bits, encoded in `profile`, to sRGB RGBA8, relative colorimetric as Safari and
- * LittleCMS do it for a matrix profile. Colours outside sRGB clip. Alpha is carried over.
+ * Converts straight RGBA samples of 16 bits, encoded in `profile`, to sRGB RGBA of `depth` bits (8 by default),
+ * relative colorimetric as Safari and LittleCMS do it for a matrix profile. Colours outside sRGB clip. Alpha is carried
+ * over.
  */
-export function profileToSRGB(samples: Uint16Array, profile: ICCProfile): Uint8Array {
-  const out = new Uint8Array(samples.length),
-    encode = srgbEncoding(),
+export function profileToSRGB(samples: Uint16Array, profile: ICCProfile, depth?: 8): Uint8Array;
+export function profileToSRGB(samples: Uint16Array, profile: ICCProfile, depth: 8 | 16): Uint8Array | Uint16Array;
+export function profileToSRGB(samples: Uint16Array, profile: ICCProfile, depth: 8 | 16 = 8): Uint8Array | Uint16Array {
+  const out = depth === 8 ? new Uint8Array(samples.length) : new Uint16Array(samples.length),
+    // The table serves 8 bits; the finer steps of 16 take the formula.
+    encode = depth === 8 ? srgbEncoding() : undefined,
     levels = profile.curves.map((curve) => Float64Array.from({ length: 65536 }, (_, i) => curve(i / 65535))),
     [red, green = red, blue = red] = levels,
     m = profile.matrix ? multiply(FROM_D50, profile.matrix) : [1, 0, 0, 0, 1, 0, 0, 0, 1],
-    level = (linear: number) => encode[Math.round(Math.min(Math.max(linear, 0), 1) * ENCODE_STEPS)];
+    clip = (linear: number) => Math.min(Math.max(linear, 0), 1),
+    level = encode
+      ? (linear: number) => encode[Math.round(clip(linear) * ENCODE_STEPS)]
+      : (linear: number) => Math.round(65535 * encodeLinear(clip(linear)));
   for (let at = 0; at < samples.length; at += 4) {
     const r = red[samples[at]],
       g = green[samples[at + 1]],
@@ -133,7 +140,7 @@ export function profileToSRGB(samples: Uint16Array, profile: ICCProfile): Uint8A
     out[at] = level(m[0] * r + m[1] * g + m[2] * b);
     out[at + 1] = level(m[3] * r + m[4] * g + m[5] * b);
     out[at + 2] = level(m[6] * r + m[7] * g + m[8] * b);
-    out[at + 3] = Math.round(samples[at + 3] / 257);
+    out[at + 3] = depth === 8 ? Math.round(samples[at + 3] / 257) : samples[at + 3];
   }
   return out;
 }

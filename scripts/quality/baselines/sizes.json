@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21424697,
+  "total": 21427386,
   "history": [
     {
       "date": "2026-10-24",
@@ -15127,6 +15127,12 @@
       "commit": "sea12-floating",
       "reason": "@margoengine/physics/loads 61,617 to 65,325 B gzip (measured on the same tree), ceiling 63,248 to 67,285 B: SEA-12 floating(physics, bodies), the one call that floats a body from its own colliders (hull faces, closed meshes, cylinder and cone prisms, compound parts), LoadSolver.bodyLoad and debugRender (waterline, submerged edges, centre of buoyancy, load arrows), and buoyancy taken at the energy-neutral pose (KB-LOADS-HEAVEGAIN1). Every floating scene imports LoadSolver with it; a separate entry would add a second import to the quick start for about 1 KB saved in scenes that list shapes by hand. Core and Stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "jpeg2000-conformance",
+      "reason": "decoders/jpeg2000 75,876 to 77,274 B gzip measured: the restricted ICC method of JP2 files (the package's ICC reader joins the entry and its worker, so file5, file7 and file8 of T.803 come out in their own colours) and the 0xFF30 to 0xFF3F markers. A lazy chunk for the profile reader would need a second request and an async step inside the synchronous reader of loadJPEG2000.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15420,7 +15426,7 @@
     "@margoengine/decoders/geotiff": 1690,
     "@margoengine/decoders/image": 1149041,
     "@margoengine/decoders/jpeg": 5234,
-    "@margoengine/decoders/jpeg2000": 76904,
+    "@margoengine/decoders/jpeg2000": 79593,
     "@margoengine/decoders/jxl": 902154,
     "@margoengine/decoders/ktx": 3637,
     "@margoengine/decoders/ktx2-gpu": 14795,

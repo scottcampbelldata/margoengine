@@ -11532,8 +11532,13 @@ Quality evidence: `cargo test` in the crate (marker syntax, tag trees and packet
 three coding passes against a test-side MQ encoder, both wavelets, JP2 boxes, the Wasm interface, size limits);
 `packages/decoders/tests/jpeg2000.test.js` (Node, calling thread and workers) and
 `packages/compute/tests/onnx-image.test.js`; OpenJPEG-written vectors, a browser worker run on both backends
-(`decoders/tests/jpeg2000-browser.mjs`) and the fuzz run below. `decoders/image` routes the format. Missing: the
-ISO/IEC 15444-4 conformance corpus. Sources: Rec. ITU-T T.800; Taubman and Marcellin (Kluwer, 2002); Taubman (IEEE TIP 9(7), 2000,
+(`decoders/tests/jpeg2000-browser.mjs`) and the fuzz run below. `decoders/image` routes the format. Conformance:
+`decoders/tests/jpeg2000-conformance.mjs <folder>` runs the T.803 (11/2002) decoder tests from a hand-downloaded set
+kept outside the repository (the crate's `t803` example for the 78 reference components, the shipped Wasm for the nine
+JP2 files), all passing 2026-11-27. It is not part of CI, which has no copy of the set; rerun it after a crate or
+`jpeg2000-codec.ts` change. A JP2 restricted ICC profile is converted on the host by `decoders/src/icc.ts`: the Wasm
+returns 16-bit samples and where the profile lies. Missing: the sets of the 2021 and 2024 editions. Sources: Rec.
+ITU-T T.800 and T.803; Taubman and Marcellin (Kluwer, 2002); Taubman (IEEE TIP 9(7), 2000,
 <https://doi.org/10.1109/83.847830>).
 
 Transparent canvas alpha in temporal and lens passes (2026-11-27, KB-ALPHA-TEMPORAL1): every filter on a premultiplied

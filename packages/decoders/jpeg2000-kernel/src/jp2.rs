@@ -28,6 +28,8 @@ pub struct Palette {
 pub struct Jp2 {
     pub codestream: Range<usize>,
     pub colour: Colour,
+    /// Where in the file the restricted ICC profile of [`Colour::Icc`] lies; empty otherwise.
+    pub profile: Range<usize>,
     pub palette: Option<Palette>,
     /// Component mapping (I.5.3.5): per channel the component, 0 direct or 1 through a palette column, the column.
     pub mapping: Vec<(u16, u8, u8)>,
@@ -90,7 +92,14 @@ pub fn parse(data: &[u8]) -> Result<Jp2> {
     if top.get(1).map(|b| &b.0) != Some(b"ftyp") {
         return Err(Error::Invalid);
     }
-    let mut jp2 = Jp2 { codestream: 0..0, colour: Colour::Unknown, palette: None, mapping: Vec::new(), channels: Vec::new() };
+    let mut jp2 = Jp2 {
+        codestream: 0..0,
+        colour: Colour::Unknown,
+        profile: 0..0,
+        palette: None,
+        mapping: Vec::new(),
+        channels: Vec::new(),
+    };
     let mut header = false;
     let mut colour_seen = false;
     for (kind, range) in &top {
@@ -105,20 +114,28 @@ pub fn parse(data: &[u8]) -> Result<Jp2> {
                                 return Err(Error::Invalid);
                             }
                         }
-                        // The first colour specification governs (I.5.3.3); later ones are alternatives.
-                        b"colr" if !colour_seen => {
-                            colour_seen = true;
-                            jp2.colour = match be(d, 0, 1)? {
-                                1 => match be(d, 3, 4)? {
+                        // The first colour specification of a method Part 1 defines governs (I.5.3.3): a reader
+                        // ignores a box of any other method, and later boxes are alternatives.
+                        b"colr" if !colour_seen => match be(d, 0, 1)? {
+                            1 => {
+                                colour_seen = true;
+                                jp2.colour = match be(d, 3, 4)? {
                                     16 => Colour::Srgb,
                                     17 => Colour::Grey,
                                     18 => Colour::Sycc,
                                     _ => Colour::Unknown,
-                                },
-                                2 => Colour::Icc,
-                                _ => Colour::Unknown,
-                            };
-                        }
+                                };
+                            }
+                            2 => {
+                                colour_seen = true;
+                                if d.len() <= 3 {
+                                    return Err(Error::Invalid);
+                                }
+                                jp2.colour = Colour::Icc;
+                                jp2.profile = r.start + 3..r.end;
+                            }
+                            _ => {}
+                        },
                         b"pclr" => {
                             let entries = be(d, 0, 2)? as usize;
                             let columns = be(d, 2, 1)? as usize;
@@ -386,6 +403,20 @@ mod tests {
         assert_eq!(parse(&bad).unwrap_err(), Error::Invalid);
         let pal = bx(b"pclr", &[0, 1, 1, 7, 9]);
         assert_eq!(parse(&file(&[pal], &[0xff, 0x4f])).unwrap_err(), Error::Invalid);
+    }
+
+    #[test]
+    fn the_first_method_part_1_defines_names_the_colour() {
+        // A box of another method is ignored, so the enumerated box after it governs.
+        let other = bx(b"colr", &[3, 0, 0, 1, 2, 3]);
+        let grey = bx(b"colr", &[1, 0, 0, 0, 0, 0, 17]);
+        let j = parse(&file(&[other, grey.clone()], &[0xff, 0x4f])).unwrap();
+        assert_eq!((j.colour, j.profile.len()), (Colour::Grey, 0));
+        // A restricted ICC box governs, and the file's bytes at `profile` are the profile.
+        let f = file(&[bx(b"colr", &[2, 0, 0, 7, 8, 9]), grey.clone()], &[0xff, 0x4f]);
+        let j = parse(&f).unwrap();
+        assert_eq!((j.colour, &f[j.profile.clone()]), (Colour::Icc, &[7, 8, 9][..]));
+        assert_eq!(parse(&file(&[bx(b"colr", &[2, 0, 0])], &[0xff, 0x4f])).unwrap_err(), Error::Invalid);
     }
 
     #[test]

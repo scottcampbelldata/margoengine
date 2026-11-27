@@ -17,11 +17,14 @@ pub struct Options {
     pub max_samples: u64,
     /// The most pixels (the widest component times the tallest, after `reduce`) the picture may hold.
     pub max_pixels: u64,
+    /// Undo the codestream's component transform (Annex G). Off gives the coded components, as a Class 0 decoder of
+    /// T.803 does.
+    pub component_transform: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { reduce: 0, layers: 0, max_samples: 1 << 28, max_pixels: 1 << 26 }
+        Options { reduce: 0, layers: 0, max_samples: 1 << 28, max_pixels: 1 << 26, component_transform: true }
     }
 }
 
@@ -156,7 +159,7 @@ fn decode_tile(cs: &Codestream, t: usize, opts: &Options, work: &mut Work) -> Re
     for (c, tc) in comps.iter().enumerate() {
         samples.push(component(cs, t, c, tc, opts.reduce)?);
     }
-    if global.mct && comps.len() >= 3 {
+    if opts.component_transform && global.mct && comps.len() >= 3 {
         let same = |a: &TileComponent, b: &TileComponent| a.dx == b.dx && a.dy == b.dy;
         if !same(&comps[0], &comps[1]) || !same(&comps[0], &comps[2]) {
             return Err(Error::Invalid);

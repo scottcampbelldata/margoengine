@@ -1,7 +1,9 @@
-// The host side of the Wasm interface in jpeg2000-kernel/src/wasm.rs: six little-endian words (length, error code, width,
-// height, depth, truncated flag), then the RGBA samples.
+// The host side of the Wasm interface in jpeg2000-kernel/src/wasm.rs: eight little-endian words (length, error code,
+// width, height, depth, truncated flag, ICC profile offset and length in the input), then the RGBA samples. The samples
+// of a file with a restricted ICC profile (Rec. ITU-T T.800 I.3.2 and J.8) come at 16 bits and become sRGB here.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { guard } from './errors.js';
+import { profileToSRGB, readICCProfile } from './icc.js';
 import type { JPEG2000DecodeOptions, JPEG2000Image } from './jpeg2000.js';
 
 export interface JPEG2000Module {
@@ -26,7 +28,7 @@ export interface JPEG2000Settings {
   maxPixels: number;
 }
 
-const HEADER = 24;
+const HEADER = 32;
 const MAX_INPUT = 2 ** 30;
 
 export function jpeg2000Settings(options: Omit<JPEG2000DecodeOptions, 'signal' | 'transfer'>): JPEG2000Settings {
@@ -88,23 +90,24 @@ export function decodeJPEG2000Module(
       ) >>> 0,
   );
   const header = new DataView(module.memory.buffer, output, HEADER),
-    [length, code, width, height, depth, truncated] = Array.from({ length: 6 }, (_, i) =>
+    [length, code, width, height, depth, truncated, profileAt, profileLength] = Array.from({ length: 8 }, (_, i) =>
       header.getUint32(i * 4, true),
     );
   try {
     if (code) throw failure(code);
     const samples = width * height * 4;
-    if (depth !== settings.depth || !samples || length !== HEADER + samples * (depth / 8))
+    if (depth !== (profileLength ? 16 : settings.depth) || !samples || length !== HEADER + samples * (depth / 8))
       throw fault('failed', 'JPEG 2000 decoder returned an invalid result layout');
     // A copy of the samples: it starts at offset 0 whatever the result's address, and outlives the instance.
     const raw = new Uint8Array(module.memory.buffer, output + HEADER, length - HEADER).slice();
-    return {
-      width,
-      height,
-      depth: settings.depth,
-      data: depth === 16 ? new Uint16Array(raw.buffer) : raw,
-      truncated: truncated !== 0,
-    };
+    let data: Uint8Array | Uint16Array = depth === 16 ? new Uint16Array(raw.buffer) : raw;
+    if (profileLength) {
+      const profile = readICCProfile(bytes.subarray(profileAt, profileAt + profileLength));
+      // A profile built on lookup tables alone is outside the restricted method: its samples are kept as coded.
+      if (profile) data = profileToSRGB(data as Uint16Array, profile, settings.depth);
+      else if (settings.depth === 8) data = Uint8Array.from(data, (v) => Math.round(v / 257));
+    }
+    return { width, height, depth: settings.depth, data, truncated: truncated !== 0 };
   } finally {
     module.jpeg2000_free(pointer, bytes.length);
     module.jpeg2000_free(output, length);

@@ -6,6 +6,25 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a JPEG 2000 stream with a marker of 0xFF30 to 0xFF3F was refused as cut (KB-J2K-BAREMARKER1, decoders)
+
+- **Repro:** `decodeJPEG2000` on test codestream `p0_02.j2k` of Rec. ITU-T T.803, which holds the marker 0xFF30 in its
+  main header, threw `failed` ("ends inside a header it needs").
+- **Cause:** every marker of a header was read with a length field; those sixteen markers stand alone (T.800 A.1).
+- **Fixed:** they are stepped over (`jpeg2000-kernel/src/codestream.rs`). Regression: `cargo test` there,
+  `markers_without_a_segment_are_stepped_over`; `packages/decoders/tests/jpeg2000-conformance.mjs`.
+
+### Fixed 2026-11-27: a JP2 file with an ICC profile decoded with the wrong colours (KB-J2K-ICC1, decoders)
+
+- **Repro:** `file5.jp2`, `file7.jp2` and `file8.jp2` of Rec. ITU-T T.803 differed from their sRGB references by up to
+  126, 96 and 19 levels of 255. A colour box of a method Part 1 does not define also hid the box after it.
+- **Cause:** the restricted ICC method (T.800 I.3.2, J.8) was recorded and never applied, and the first colour box was
+  taken whatever its method.
+- **Fixed:** the profile goes through the package's ICC reader to sRGB at 8 or 16 bits (`src/jpeg2000-codec.ts`,
+  `src/icc.ts`), and a box of another method is ignored (I.5.3.3). Differences are now at most 2. Regression:
+  `packages/decoders/tests/jpeg2000.test.js` "a JP2 file with a restricted ICC profile decodes to sRGB" and
+  `cargo test`, `the_first_method_part_1_defines_names_the_colour`.
+
 ### Fixed 2026-11-27: booleans refused a solid holding a triangle with no area (KB-BOOL-FLAT1, mesh-edit)
 
 - **Repro:** `batchBooleanMeshes` on a closed box with one edge split on one side and closed by a triangle whose

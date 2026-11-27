@@ -2,6 +2,15 @@
 
 ### JPEG 2000 Part 1 decoder (decoders/jpeg2000-kernel, 2026-11-27)
 
+Conformance and ICC (2026-11-27): the tables and constants first written from memory (Table C.2, Tables D.1 to D.4
+and D.7, Table F.4, Equations E-6, E-8, G-6 to G-14) were checked against the text of Rec. ITU-T T.800 (11/2015) and
+agree. The decoder tests, their procedure and tolerances are those of Rec. ITU-T T.803 (11/2002) | ISO/IEC 15444-4,
+"JPEG 2000 image coding system: Conformance testing", <https://www.itu.int/rec/T-REC-T.803-200211-S>; its
+codestreams and reference outputs are data, run and never committed. They showed that the markers 0xFF30 to 0xFF3F of
+A.1, which carry no segment, were read as segments, and that the restricted ICC method (I.3.2 and J.8, ICC.1) was not
+applied: the profile now goes through the package's own ICC reader (`src/icc.ts`). A reader also ignores a colour
+specification box of a method Part 1 does not define (I.5.3.3). No other decoder's source or output was used.
+
 `packages/decoders/jpeg2000-kernel` is a Margo-authored Rust crate, built in pieces: the codestream syntax of Annex A
 (SIZ, COD, COC, QCD, QCC, RGN, POC, PPM, PPT, SOT and SOD; the tile-part rules; the precedence of tile COC over tile
 COD over main COC over main COD, and the same for QCC and QCD), and the canvas geometry of Annex B (tiles,

@@ -516,6 +516,11 @@ fn extension_marker(marker: u16) -> bool {
     (0xff70..=0xff7f).contains(&marker)
 }
 
+/// True for 0xFF30 to 0xFF3F, markers that stand alone, with no length or parameters (A.1).
+fn bare_marker(marker: u16) -> bool {
+    (0xff30..=0xff3f).contains(&marker)
+}
+
 /// Parses a codestream (starting at SOC) into its headers and tile-part data ranges.
 pub fn parse(data: &[u8]) -> Result<Codestream<'_>> {
     let mut r = Reader { data, at: 0 };
@@ -547,6 +552,9 @@ pub fn parse(data: &[u8]) -> Result<Codestream<'_>> {
         }
         if marker < 0xff00 {
             return Err(Error::Invalid);
+        }
+        if bare_marker(marker) {
+            continue;
         }
         let body = segment(&mut r)?;
         if !header_segment(marker, body, &mut main, components, true)? {
@@ -622,6 +630,9 @@ pub fn parse(data: &[u8]) -> Result<Codestream<'_>> {
             }
             if marker < 0xff00 {
                 return Err(Error::Invalid);
+            }
+            if bare_marker(marker) {
+                continue;
             }
             let body = match segment(&mut r) {
                 Ok(b) if r.at <= stop => b,
@@ -794,6 +805,27 @@ pub(crate) mod tests {
         let q = cs.quant(0, 0);
         assert_eq!((q.style, q.guard, q.steps.len()), (Quantization::None, 2, 4));
         assert_eq!(q.step(3, 1, 1).unwrap(), (10, 0));
+    }
+
+    /// 0xFF30 to 0xFF3F are markers with no length or parameters (A.1): test codestream p0_02 of T.803 holds one.
+    #[test]
+    fn markers_without_a_segment_are_stepped_over() {
+        let mut w = Writer(Vec::new());
+        w.marker(SOC)
+            .segment(SIZ, &siz(8, 8, 8, 8, &[(8, false, 1, 1)]))
+            .marker(0xff30)
+            .segment(COD, &cod(0, 1, 0, 0, true, None))
+            .segment(QCD, &[0x40, 8 << 3])
+            .marker(0xff3f);
+        let at = w.0.len();
+        w.segment(SOT, &[0; 8]).marker(0xff30).segment(COM, &[0, 1]).marker(0xff35).marker(SOD);
+        w.0.extend_from_slice(&[7, 9]);
+        let length = (w.0.len() - at) as u32;
+        w.0[at + 6..at + 10].copy_from_slice(&length.to_be_bytes());
+        w.marker(EOC);
+        let cs = parse(&w.0).unwrap();
+        assert!(!cs.truncated);
+        assert_eq!(&w.0[cs.tiles[0].parts[0].data.clone()], &[7, 9]);
     }
 
     #[test]

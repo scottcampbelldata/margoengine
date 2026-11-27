@@ -10,7 +10,7 @@ import { JPEG2000Decoder, decodeJPEG2000, loadJPEG2000 } from '../dist/jpeg2000.
 import { decodeImage, imageFormat } from '../dist/image.js';
 import { decodePNG } from '../dist/png.js';
 import { vectors } from './support/jpeg2000-fuzz.js';
-import { codestream, jp2 } from './support/jpeg2000-streams.js';
+import { be, box, codestream, greyProfile, jp2 } from './support/jpeg2000-streams.js';
 
 const grey = (pixels, sample, opaque) => Array.from({ length: pixels }, () => [sample, sample, sample, opaque]).flat();
 const linked = (code, anchor, pattern) => (error) => {
@@ -37,6 +37,24 @@ test('a codestream and a JP2 file decode to RGBA at 8 and 16 bits, full size and
   padded.set(stream, 5);
   assert.deepEqual(read(padded.subarray(5, 5 + stream.length)), image);
   assert.deepEqual(read(jp2(stream, 13, 9)), image);
+});
+
+test('a JP2 file with a restricted ICC profile decodes to sRGB', async () => {
+  const read = await loadJPEG2000();
+  const file = (profile) => jp2(codestream(3, 2), 3, 2, [], box('colr', [2, 0, 0, ...profile]));
+  // A curve of gamma 1: the coded 128 of 255 is linear light, which sRGB encodes by 1.055 x^(1 / 2.4) - 0.055.
+  const encoded = 1.055 * ((128 * 257) / 65535) ** (1 / 2.4) - 0.055;
+  const narrow = read(file(greyProfile(1)));
+  assert.deepEqual([narrow.depth, narrow.data instanceof Uint8Array], [8, true]);
+  assert.deepEqual([...narrow.data], grey(6, Math.round(255 * encoded), 255));
+  const wide = read(file(greyProfile(1)), { depth: 16 });
+  assert.ok(wide.data instanceof Uint16Array);
+  assert.deepEqual([...wide.data], grey(6, Math.round(65535 * encoded), 65535));
+  // A profile outside the restricted method (no curve this reader knows) keeps the samples as coded.
+  const unread = greyProfile(1);
+  unread.splice(132, 4, ...be(0, 4));
+  assert.deepEqual([...read(file(unread)).data], grey(6, 128, 255));
+  assert.deepEqual([...read(file(unread), { depth: 16 }).data], grey(6, 128 * 257, 65535));
 });
 
 test('a cut stream gives its picture and says so', async () => {

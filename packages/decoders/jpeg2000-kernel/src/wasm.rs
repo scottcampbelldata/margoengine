@@ -1,10 +1,12 @@
-//! The Wasm interface: one input buffer in, one owned result out. A result is six little-endian 32-bit words (its length
-//! in bytes, an error code, width, height, depth and the truncated flag) followed, when the code is 0, by width x height
-//! RGBA samples of depth / 8 bytes each. The error codes are `Error::code`.
+//! The Wasm interface: one input buffer in, one owned result out. A result is eight little-endian 32-bit words (its
+//! length in bytes, an error code, width, height, depth, the truncated flag, and where in the input the ICC profile of
+//! the samples lies and its length, 0 without one) followed, when the code is 0, by width x height RGBA samples of
+//! depth / 8 bytes each. With a profile the depth is 16. The error codes are `Error::code`.
 use crate::{Error, Result, decode, jp2};
+use std::ops::Range;
 
 /// The bytes before a result's samples.
-const HEADER: usize = 24;
+const HEADER: usize = 32;
 /// The largest input accepted.
 const MAX_INPUT: usize = 1 << 30;
 
@@ -53,8 +55,11 @@ pub unsafe extern "C" fn jpeg2000_decode(
     Box::into_raw(out.into_boxed_slice()) as *mut u8
 }
 
-/// The picture and whether its stream was cut short.
-fn run(input: &[u8], reduce: u32, layers: u32, depth: u32, max_pixels: u32) -> Result<(jp2::Rgba, bool)> {
+/// A decoded picture, whether its stream was cut short, and where the input holds the ICC profile of its samples (an
+/// empty range without one).
+type Outcome = (jp2::Rgba, bool, Range<usize>);
+
+fn run(input: &[u8], reduce: u32, layers: u32, depth: u32, max_pixels: u32) -> Result<Outcome> {
     if depth != 8 && depth != 16 {
         return Err(Error::Invalid);
     }
@@ -69,16 +74,24 @@ fn run(input: &[u8], reduce: u32, layers: u32, depth: u32, max_pixels: u32) -> R
         // RGBA's four samples for every pixel allowed.
         max_samples: max_pixels as u64 * 4,
         max_pixels: max_pixels as u64,
+        component_transform: true,
     };
     let image = decode::decode(stream, &opts)?;
-    Ok((jp2::rgba(&image, file.as_ref(), depth)?, image.truncated))
+    // The host converts a profile's samples to sRGB, from 16 bits whatever depth it was asked for.
+    let profile = file.as_ref().map_or(0..0, |f| f.profile.clone());
+    let depth = if profile.is_empty() { depth } else { 16 };
+    Ok((jp2::rgba(&image, file.as_ref(), depth)?, image.truncated, profile))
 }
 
 /// A decode's outcome as the bytes the caller reads.
-fn result(outcome: Result<(jp2::Rgba, bool)>) -> Vec<u8> {
-    let (words, samples): ([u32; 5], &[u16]) = match &outcome {
-        Ok((rgba, truncated)) => ([0, rgba.width, rgba.height, rgba.depth, u32::from(*truncated)], &rgba.data),
-        Err(error) => ([error.code(), 0, 0, 0, 0], &[]),
+fn result(outcome: Result<Outcome>) -> Vec<u8> {
+    let (words, samples): ([u32; 7], &[u16]) = match &outcome {
+        Ok((rgba, truncated, profile)) => {
+            let cut = u32::from(*truncated);
+            let (at, length) = (profile.start as u32, profile.len() as u32);
+            ([0, rgba.width, rgba.height, rgba.depth, cut, at, length], &rgba.data)
+        }
+        Err(error) => ([error.code(), 0, 0, 0, 0, 0, 0], &[]),
     };
     let wide = words[3] == 16;
     let length = HEADER + samples.len() * if wide { 2 } else { 1 };
@@ -140,10 +153,10 @@ mod tests {
     #[test]
     fn a_picture_comes_back_at_each_depth() {
         let out = call(&grey(), 0, 8, 6);
-        assert_eq!(words(&out), vec![48, 0, 3, 2, 8, 0]);
+        assert_eq!(words(&out), vec![56, 0, 3, 2, 8, 0, 0, 0]);
         assert_eq!(out[HEADER..], [128, 128, 128, 255].repeat(6));
         let out = call(&grey(), 0, 16, 6);
-        assert_eq!(words(&out), vec![72, 0, 3, 2, 16, 0]);
+        assert_eq!(words(&out), vec![80, 0, 3, 2, 16, 0, 0, 0]);
         // 128 of 255 spread over 16 bits.
         assert_eq!(out[HEADER..HEADER + 8], [0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0xff, 0xff]);
     }
@@ -163,6 +176,27 @@ mod tests {
         file.extend(bx(b"jp2h", &header));
         file.extend(bx(b"jp2c", &grey()));
         assert_eq!(call(&file, 0, 8, 6), call(&grey(), 0, 8, 6));
+    }
+
+    #[test]
+    fn a_profile_is_named_and_its_samples_come_at_16_bits() {
+        let bx = |kind: &[u8; 4], body: &[u8]| {
+            let mut b = ((body.len() + 8) as u32).to_be_bytes().to_vec();
+            b.extend_from_slice(kind);
+            b.extend_from_slice(body);
+            b
+        };
+        let mut file = bx(b"jP  ", &[0x0d, 0x0a, 0x87, 0x0a]);
+        file.extend(bx(b"ftyp", b"jp2 \0\0\0\0jp2 "));
+        let mut header = bx(b"ihdr", &[0, 0, 0, 2, 0, 0, 0, 3, 0, 1, 7, 7, 0, 0]);
+        header.extend(bx(b"colr", &[2, 0, 0, 5, 6, 7, 8]));
+        file.extend(bx(b"jp2h", &header));
+        file.extend(bx(b"jp2c", &grey()));
+        let out = call(&file, 0, 8, 6);
+        let w = words(&out);
+        assert_eq!((w[4], w[7]), (16, 4));
+        assert_eq!(&file[w[6] as usize..(w[6] + w[7]) as usize], &[5, 6, 7, 8]);
+        assert_eq!(out[HEADER..HEADER + 2], [0x80, 0x80]);
     }
 
     #[test]

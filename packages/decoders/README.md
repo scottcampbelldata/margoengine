@@ -288,12 +288,12 @@ Decoded: every progression order and progression order change, tiles and tile-pa
 every code-block style, the reversible 5-3 and irreversible 9-7 wavelets, both component transforms, region-of-interest
 Maxshift, subsampled components (resampled to the largest, nearest sample), and the JP2 palette, component mapping,
 channel definition (straight or premultiplied opacity) and greyscale, sRGB or sYCC colour boxes. A raw codestream is
-read by component count: 1 grey, 2 grey and opacity, 3 RGB, 4 RGB and opacity. ICC profiles are not applied. A file
-that stops early gives the picture its packets hold, with `truncated: true`.
+read by component count: 1 grey, 2 grey and opacity, 3 RGB, 4 RGB and opacity. A JP2 file with a restricted ICC
+profile comes out as sRGB. A file that stops early gives the picture its packets hold, with `truncated: true`.
 
 Errors: `MargoError` `failed` for a damaged or cut header, `unsupported` for coding outside Part 1 (the HT block coder
 of Part 15, Part 2 extensions), `RangeError` over a limit; each message links to its help.
-[Limits](../../docs/limits.md#jpeg-2000-decoding) records what is still to be verified.
+The conformance tests of Rec. ITU-T T.803 (11/2002) pass; [Limits](../../docs/limits.md#jpeg-2000-decoding) records the scope.
 
 Written from Rec. ITU-T T.800 | ISO/IEC 15444-1; D. S. Taubman and M. W. Marcellin, "JPEG2000: Image Compression
 Fundamentals, Standards and Practice" (Kluwer, 2002); and D. Taubman, "High performance scalable image compression

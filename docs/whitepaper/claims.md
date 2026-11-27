@@ -6782,8 +6782,14 @@ module, in browsers' and Node's module workers or on the calling thread. Proof: 
 `packages/decoders/jpeg2000-kernel`, `packages/decoders/tests/jpeg2000.test.js` (OpenJPEG-written streams decode to
 its pixels), `packages/decoders/tests/jpeg2000-browser.mjs` (module workers, WebGPU and the WebGL2 layer),
 `packages/decoders/tests/jpeg2000-fuzz.test.js` (malformed input gives a picture or a coded error) and the JPEG 2000
-case of `packages/compute/tests/onnx-image.test.js`. Not claimed: conformance (the ISO/IEC 15444-4 corpus has not been run,
-see [Limits](../limits.md#jpeg-2000-decoding)) and speed.
+case of `packages/compute/tests/onnx-image.test.js`. Not claimed: speed.
+
+Claim: the decoder passes the decoder tests of Rec. ITU-T T.803 (11/2002) | ISO/IEC 15444-4: 78 of 78 reference
+components (Classes 0 and 1, Profiles 0 and 1) within their bounds on the native build of the crate, and 9 of 9 JP2
+files through the shipped Wasm. Proof and how to reproduce: `packages/decoders/tests/jpeg2000-conformance.mjs`, with
+`T-REC-T.803-200211.zip` (52,773,880 B, SHA-256 673c583710f63e541488ddf6c29667b3447815f5ef826707985ed720a1deb94d)
+from itu.int. The set is not in the repository. Not claimed: certification, or the sets of the 2021 and 2024 editions
+([Limits](../limits.md#jpeg-2000-decoding)).
 
 Transparent canvas (2026-11-27, threejs-parity row 6): TAA, DOF and SceneFade keep valid premultiplied alpha on a
 `TransparentCanvas`. Real GPU (RTX A6000), WebGPU and the WebGL2 layer, correctness runs with no committed result file:

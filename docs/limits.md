@@ -11222,8 +11222,9 @@ memory is 32-bit, so a picture near the largest limits can fail to allocate (`Ma
 `/image` reads JPEG 2000 to RGBA8 and refuses a file that stops early.
 
 Not read: the HT block coder of Rec. ITU-T T.814 | ISO/IEC 15444-15 and the Part 2 extensions (`unsupported`); JPX
-files beyond their JP2 boxes. ICC profiles are not applied. Subsampled components are resampled to the largest
-component by nearest sample.
+files beyond their JP2 boxes. A restricted ICC profile (matrix and curve RGB, or curve grey) is applied, giving sRGB;
+a profile built on lookup tables alone is not, and its samples come out as coded. Subsampled components are resampled
+to the largest component by nearest sample.
 
 Checked against another implementation (2026-11-27): 16 streams written by OpenJPEG 2.5.4 through Pillow 13.0.0
 (`tests/generate-jpeg2000-openjpeg.py`: the five progression orders, tiles, offsets, precincts, quality layers, PLT,
@@ -11231,14 +11232,15 @@ both wavelets and component counts 1 to 4) decode exactly when lossless and with
 use no code-block style option, packed packet headers, region of interest or subsampling. Malformed input is fuzzed
 (`tests/jpeg2000-fuzz.test.js`: 10,086 cases a run, and three runs of 154,086 on 2026-11-27 with no trap or hang).
 
-Not yet verified: no ISO/IEC 15444-4 (Rec. ITU-T T.803) conformance codestream or reference output has been run
-against this decoder. The MQ state table (Table C.2), the context tables (Tables D.1 to D.4), the irreversible
-reconstruction midpoint, the component transform constants and the sYCC conversion were written from the standard and
-are checked only by the crate's own tests, which include a test-side MQ encoder. No conformance claim and no speed
-claim is made until that corpus passes.
+Conformance (2026-11-27, `tests/jpeg2000-conformance.mjs`): the decoder tests of Rec. ITU-T T.803 (11/2002) |
+ISO/IEC 15444-4 pass, all 78 reference components of Classes 0 and 1 for Profiles 0 and 1 within their peak and mean
+squared error (Tables C.1, C.4, C.6, C.7), run by the crate's native `t803` example, and all nine JP2 files within a
+peak of 2 against their sRGB references (Table G.1 allows 4), run through the shipped Wasm. The set is downloaded by
+hand and never in the repository. Not covered: the test sets of the later editions of T.803 (2021 and 2024), which ITU
+serves separately; no certification and no speed claim is made.
 
-Size (Vite library min+gzip, with its lazy asset references): `/jpeg2000` 75,876 B, ceiling 76,904 B; `/image` (which
-reaches it for a JPEG 2000 file) 1,115,573 B, ceiling 1,149,041 B; `jpeg2000.wasm` 132,023 B raw. Nothing loads unless a file needs the
+Size (Vite library min+gzip, with its lazy asset references): `/jpeg2000` 77,274 B, ceiling 79,593 B; `/image` (which
+reaches it for a JPEG 2000 file) 1,115,762 B, ceiling 1,149,041 B; `jpeg2000.wasm` 132,372 B raw. Nothing loads unless a file needs the
 decoder. Core plus stage is unchanged.
 
 Transparent canvas through TAA, DOF and SceneFade (2026-11-27): by method, on a `TransparentCanvas` TAA's history depth
