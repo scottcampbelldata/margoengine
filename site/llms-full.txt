@@ -25259,6 +25259,14 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   the same day). It is a speed item now, deferred by the build phase: the quiet rerun on the mini PC decides whether the
   corpus timeout holds there. The 21 problems it reports are the file's own (two sheets' tolerant edges and vertices,
   16 and 1); the four of the entry below were false and are gone.
+- **Measured again 2026-11-27 (lane C, origin/main 2331aa6115, workstation, diagnostic):** read 1.8 s, `checkBody` of
+  the 96 bodies 46 to 54 s, 17 problems, no hang. A CPU profile of body 62 (523 faces, 15 s) puts 11.4 s in the shells'
+  enclosed volumes and the rest in the crossing search; over the whole file the volumes alone take 47.6 s: 168,346,336
+  integrand evaluations from 1,822,502 inner integrals (256 evaluations each on a spline face, 16 Gauss pieces of 16
+  nodes) at 2,039,824 loop nodes. The cost is even across faces (about 25 ms on each small spline face of body 62),
+  with no loop that fails to end, no face integrated twice and no inner integral repeated, so it is speed only and
+  stays deferred by the build phase (private work list speed-phase.md). The same-output cut left for the speed phase is
+  in how the volume is integrated, not in what checkBody tests; the corpus timeout is not raised.
 
 ### Fixed 2026-11-15: the body check took a vertex's tolerance along the whole edge, and a sliver face held everything but itself (brep)
 
