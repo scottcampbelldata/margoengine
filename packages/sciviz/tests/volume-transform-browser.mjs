@@ -15,6 +15,7 @@ for (const compat of [false, true]) {
   try {
     const result = await browser.page.evaluate(async () => {
       const { Figure } = await import('/packages/sciviz/dist/index.js');
+      const { GpuPicking } = await import('/packages/sciviz/dist/pick-gpu.js');
       const n = 24,
         m = n - 1;
       // Different along every axis and either way along it.
@@ -66,10 +67,14 @@ for (const compat of [false, true]) {
         c.drawImage(bitmap, 0, 0);
         const pixels = c.getImageData(0, 0, bitmap.width, bitmap.height).data;
         const bounds = [...layer.bounds];
+        // Off the centre column, where a mirrored position reported unmirrored would differ.
+        const picking = new GpuPicking(figure),
+          hit = await picking.pick(74, 100);
+        picking.dispose();
         bitmap.close();
         figure.dispose();
         canvas.remove();
-        return { pixels, bounds };
+        return { pixels, bounds, picked: hit && [hit.x, hit.y, hit.z] };
       };
       // Mean absolute channel difference.
       const apart = (a, b) => a.reduce((sum, v, i) => sum + Math.abs(v - b[i]), 0) / a.length;
@@ -83,6 +88,8 @@ for (const compat of [false, true]) {
             error: apart(placed.pixels, wanted.pixels),
             control: apart(unmoved.pixels, wanted.pixels),
             bounds: placed.bounds,
+            picked: placed.picked,
+            wantedPick: wanted.picked,
           };
         }
       let refused = false;
@@ -103,7 +110,15 @@ for (const compat of [false, true]) {
     });
     console.log(JSON.stringify({ compat, ...result }));
     assert.deepEqual(errors, []);
-    for (const [name, { error, control, bounds }] of Object.entries(result.out)) {
+    for (const [name, { error, control, bounds, picked, wantedPick }] of Object.entries(result.out)) {
+      // GPU picking reports the placed data position: the same point the moved samples give under that pixel.
+      if (name.endsWith('outside')) {
+        assert.ok(picked && wantedPick, `${name}: the pixel picks the volume`);
+        assert.ok(
+          wantedPick.every((v, i) => Math.abs(v - picked[i]) < 0.05),
+          `${name}: picked ${picked}, the moved samples pick ${wantedPick}`,
+        );
+      }
       assert.deepEqual(bounds, [0, 23, 0, 23, 0, 23], name);
       assert.ok(control > 2, `${name}: the move must show (${control})`);
       assert.ok(error < 0.5, `${name}: the transform differs from the moved samples by ${error}`);
