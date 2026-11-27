@@ -771,6 +771,75 @@ test('uniform arrays and structs refuse what WGSL cannot lay out, and name the f
   assert.throws(() => h.frame(), /uniform s\.a needs 2 finite numbers/);
 });
 
+test('struct uniforms nest structs, arrays and arrays of structs at the WGSL uniform layout', () => {
+  const m = new RawShaderMaterial({
+    vertexShader: shader,
+    uniforms: {
+      s: {
+        struct: {
+          gain: 'f32',
+          inner: { struct: { lift: 'f32', tint: 'vec3f' } },
+          rows: { type: 'vec4f', count: 2 },
+          parts: { count: 2, struct: { c: 'vec3f' } },
+        },
+        value: {
+          gain: 0.5,
+          inner: { lift: 9, tint: [1, 0, 0] },
+          rows: [9, 9, 9, 9, 0, 0.25, 0, 0],
+          parts: [{ c: [9, 9, 9] }, { c: [0, 0, 0.5] }],
+        },
+      },
+      after: { value: 0.25 },
+      list: { count: 2, struct: { deep: { struct: { v: 'vec2f' } }, w: 'f32' }, value: [
+        { deep: { v: [1, 2] }, w: 3 },
+        { deep: { v: [4, 5] }, w: 6 },
+      ] },
+    },
+  });
+  assert.deepEqual(
+    m.members.map((x) => [x.name, x.type, x.offset, x.stride]),
+    [
+      ['s', 'Raw_s', 0, 112],
+      ['after', 'f32', 112, undefined],
+      ['list', 'Raw_list', 128, 32],
+    ],
+  );
+  assert.equal(m.size, 192);
+  const code = m.code('vertex');
+  for (const line of [
+    'struct Raw0_inner {\n  @align(16) lift:f32,\n  tint:vec3f,\n}',
+    'struct Raw1_parts {\n  @align(16) c:vec3f,\n}',
+    'struct Raw_s {\n  @align(16) gain:f32,\n  inner:Raw0_inner,\n  rows:array<vec4f,2>,\n  parts:array<Raw1_parts,2>,\n}',
+    'struct Raw3_deep {\n  @align(16) v:vec2f,\n}',
+    'struct Raw_list {\n  @align(16) deep:Raw3_deep,\n  w:f32,\n}',
+    '  list:array<Raw_list,2>,',
+  ])
+    assert.ok(code.includes(line), line);
+  const h = harness(),
+    raw = RawShaders.attach(h.engine);
+  raw.add(new RawMesh({ material: m, attributes: quad() }));
+  const log = h.gpu.record(() => h.frame()),
+    id = named(log, 'buffer').find((c) => c[2].label === 'shader:raw:uniforms')[1],
+    f = floats(named(log, 'writeBuffer').find((c) => c[1] === id)[3]);
+  assert.equal(f[0], 0.5);
+  assert.equal(f[4], 9, 'a nested struct starts 16 bytes in');
+  assert.deepEqual(f.slice(8, 11), [1, 0, 0], 'its vec3f sits at its own 16');
+  assert.deepEqual(f.slice(16, 20), [0, 0.25, 0, 0], 'numbers in a row fill an array field');
+  assert.deepEqual(f.slice(24, 27), [0, 0, 0.5], 'an array of structs field steps by the struct size');
+  assert.equal(f[28], 0.25, 'the next member follows the struct');
+  assert.deepEqual([...f.slice(32, 34), f[36], ...f.slice(40, 42), f[44]], [1, 2, 3, 4, 5, 6], 'nested in an array of structs');
+  m.uniforms.s.value = { ...m.uniforms.s.value, inner: { lift: 1, tint: [1, 2] } };
+  assert.throws(() => h.frame(), /uniform s\.inner\.tint needs 3 finite numbers/);
+  m.uniforms.s.value = { ...m.uniforms.s.value, inner: { lift: 1, tint: [1, 2, 3] }, parts: [{ c: [1, 2, 3] }] };
+  assert.throws(() => h.frame(), /uniform s\.parts needs 2 elements/);
+  const make = (struct) => () => new RawShaderMaterial({ vertexShader: shader, uniforms: { a: { struct, value: {} } } });
+  assert.throws(make({ b: { type: 'vec2f', count: 2 } }), /field b: elements of a uniform array sit 16 bytes apart/);
+  assert.throws(make({ b: { type: 'vec4f', count: 0 } }), /field b count must be a positive integer/);
+  assert.throws(make({ b: {} }), /field b needs \{struct\} for a nested struct/);
+  assert.throws(make({ b: { struct: {} } }), /field b struct needs at least one field/);
+  assert.throws(make({ b: { struct: { c: 'vec9f' } } }), /field b field c needs a type/);
+});
+
 test('storage buffers are declared after the textures and bound live; read_write stays out of the vertex stage', () => {
   const h = harness(),
     raw = RawShaders.attach(h.engine),

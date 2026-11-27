@@ -80,6 +80,7 @@ try {
   await shows('uniformColours', [1, 0, 0]);
   await shows('uniformStruct', [0.5, 0.25, 0]);
   await shows('uniformStructList', [0.5, 0, 0.25]);
+  await shows('uniformNested', [0.5, 0.25, 0.75]);
   await shows('uniformLive', [0, 0, 1]);
   await shows('storageRead', [0, 1, 0]);
   await shows('storageVertex', [0, 1, 0]);

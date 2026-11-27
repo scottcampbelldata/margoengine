@@ -76,12 +76,6 @@ interface Expression {
     args: Expression[];
 }
 
-interface Field {
-    name: string;
-    type: RawUniformType;
-    offset: number;
-}
-
 interface FunctionDeclaration {
     name: string;
     type: string;
@@ -275,7 +269,7 @@ interface Member {
     offset: number;
     count?: number;
     stride?: number;
-    fields?: Field[];
+    fields?: Member[];
 }
 
 interface MeshGpu {
@@ -450,6 +444,7 @@ class RawShaderMaterial<U extends {
     onError?: (error: Error) => void;
     error?: Error;
     readonly members: readonly Member[];
+    readonly structs: readonly RawStruct[];
     readonly size: number;
     readonly gpu: Map<GPUDevice, MaterialGpu>;
     revision: number;
@@ -558,6 +553,11 @@ interface RawStorage {
     readonly access?: 'read' | 'read_write';
 }
 
+interface RawStruct {
+    type: string;
+    fields: Member[];
+}
+
 interface RawTexture {
     texture: RawTextureInput | null;
     sampler?: GPUSamplerDescriptor;
@@ -570,10 +570,20 @@ type RawTextureInput = RawTextureSource | ((device: GPUDevice) => GPUTexture | G
 type RawTextureSource = GPUTexture | GPUTextureView | BindableTexture;
 
 interface RawUniform {
-    value: RawUniformValue | readonly RawUniformValue[] | Readonly<Record<string, RawUniformValue>> | readonly Readonly<Record<string, RawUniformValue>>[];
+    value: RawUniformValue | readonly RawUniformValue[] | RawUniformStructValue | readonly RawUniformStructValue[];
     readonly type?: RawUniformType;
     readonly count?: number;
-    readonly struct?: Readonly<Record<string, RawUniformType>>;
+    readonly struct?: Readonly<Record<string, RawUniformType | RawUniformField>>;
+}
+
+interface RawUniformField {
+    readonly type?: RawUniformType;
+    readonly count?: number;
+    readonly struct?: Readonly<Record<string, RawUniformType | RawUniformField>>;
+}
+
+interface RawUniformStructValue {
+    readonly [field: string]: RawUniformValue | RawUniformStructValue | readonly RawUniformValue[] | readonly RawUniformStructValue[];
 }
 
 type RawUniformType = RawAttributeType | 'mat3x3f' | 'mat4x4f';

@@ -153,6 +153,7 @@ export class RawShaderMaterial<U extends {
     onError?: (error: Error) => void;
     error?: Error;
     readonly members: readonly Member[];
+    readonly structs: readonly RawStruct[];
     readonly size: number;
     readonly gpu: Map<GPUDevice, MaterialGpu>;
     revision: number;
@@ -273,10 +274,20 @@ export type RawTextureInput = RawTextureSource | ((device: GPUDevice) => GPUText
 export type RawTextureSource = GPUTexture | GPUTextureView | BindableTexture;
 
 export interface RawUniform {
-    value: RawUniformValue | readonly RawUniformValue[] | Readonly<Record<string, RawUniformValue>> | readonly Readonly<Record<string, RawUniformValue>>[];
+    value: RawUniformValue | readonly RawUniformValue[] | RawUniformStructValue | readonly RawUniformStructValue[];
     readonly type?: RawUniformType;
     readonly count?: number;
-    readonly struct?: Readonly<Record<string, RawUniformType>>;
+    readonly struct?: Readonly<Record<string, RawUniformType | RawUniformField>>;
+}
+
+export interface RawUniformField {
+    readonly type?: RawUniformType;
+    readonly count?: number;
+    readonly struct?: Readonly<Record<string, RawUniformType | RawUniformField>>;
+}
+
+export interface RawUniformStructValue {
+    readonly [field: string]: RawUniformValue | RawUniformStructValue | readonly RawUniformValue[] | readonly RawUniformStructValue[];
 }
 
 export type RawUniformType = RawAttributeType | 'mat3x3f' | 'mat4x4f';
@@ -293,12 +304,6 @@ interface BoundBuffers {
     slots: (GPUBuffer | undefined)[];
     index?: GPUBuffer;
     format?: GPUIndexFormat;
-}
-
-interface Field {
-    name: string;
-    type: RawUniformType;
-    offset: number;
 }
 
 interface HeldBuffer {
@@ -332,7 +337,7 @@ interface Member {
     offset: number;
     count?: number;
     stride?: number;
-    fields?: Field[];
+    fields?: Member[];
 }
 
 interface MeshGpu {
@@ -357,4 +362,9 @@ type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity';
 type RawPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface RawStruct {
+    type: string;
+    fields: Member[];
+}
 ```

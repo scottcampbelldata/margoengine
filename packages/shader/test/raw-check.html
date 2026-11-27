@@ -44,6 +44,8 @@ const scenarios={
   uniformStruct:s=>solid(s,{vertexShader:paint('uniforms.light.color*uniforms.light.gain+vec3f(0,uniforms.after,0)'),uniforms:{before:{value:9},light:{struct:{color:'vec3f',gain:'f32'},value:{color:[1,0,0],gain:0.5}},after:{value:0.25}}}),
   // The second element, past a mat3x3f and a tight f32: its column 1, then a field after the matrix.
   uniformStructList:s=>solid(s,{vertexShader:paint('uniforms.items[1].basis[1]*uniforms.items[1].gain+vec3f(0,0,uniforms.items[1].tail.y)'),uniforms:{items:{count:2,struct:{gain:'f32',basis:'mat3x3f',tail:'vec2f'},value:[{gain:9,basis:[1,1,1,1,1,1,1,1,1],tail:[9,9]},{gain:0.5,basis:[0,0,0,1,0,0,0,0,0],tail:[0,0.25]}]}}}),
+  // Nested struct, array and array-of-struct fields: each read lands at the WGSL uniform layout's offset.
+  uniformNested:s=>solid(s,{vertexShader:paint('uniforms.s.inner.tint*uniforms.s.gain+uniforms.s.rows[1].xyz+uniforms.s.parts[1].c+vec3f(0,0,uniforms.after)'),uniforms:{s:{struct:{gain:'f32',inner:{struct:{lift:'f32',tint:'vec3f'}},rows:{type:'vec4f',count:2},parts:{count:2,struct:{c:'vec3f'}}},value:{gain:0.5,inner:{lift:9,tint:[1,0,0]},rows:[[9,9,9,9],[0,0.25,0,0]],parts:[{c:[9,9,9]},{c:[0,0,0.5]}]}},after:{value:0.25}}}),
   uniformLive:async s=>{const m=solid(s,{vertexShader:paint('uniforms.colors[0]'),uniforms:{colors:{type:'vec3f',count:1,value:[1,0,0]}}});await s.draw();m.material.uniforms.colors.value=[0,0,1];},
   storageRead:s=>{const data=storage(new Float32Array([1,0,0,1,0,1,0,1]),'vec4f');solid(s,{vertexShader:paint('data[1].rgb'),storage:{data}});},
   storageVertex:s=>{const shift=storage(new Float32Array([-50,0,0,0]),'vec4f');solid(s,{vertexShader:`struct Out {@builtin(position) clip:vec4f}

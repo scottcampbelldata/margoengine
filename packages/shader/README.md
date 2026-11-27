@@ -899,7 +899,10 @@ material.transparent = true;                      // render state is live too (a
 - **Arrays and structs.** `count` makes a uniform array, `struct` a uniform struct, and both together an array of structs.
   An array's value is a list of elements or all their numbers in a row. Elements of a uniform array sit 16 bytes apart, so
   the element is a vec3, a vec4, a matrix or a struct; a list of `f32` or `vec2f` belongs in a storage buffer, and the
-  material says so when it refuses one. A struct field is a plain uniform type, not an array or another struct.
+  material says so when it refuses one. A struct field is a plain uniform type, a nested struct (`{struct: {...}}`, read as
+  `uniforms.light.falloff.near`) or an array (`{type, count}` or `{count, struct}`), nested as deep as you like; each
+  sits at its WGSL uniform layout offset, every generated struct aligned to 16 bytes:
+  `{struct: {gain: 'f32', inner: {struct: {tint: 'vec3f'}}, rows: {type: 'vec4f', count: 2}}, value: {gain: 1, inner: {tint: [1, 0, 0]}, rows: [[0, 0, 0, 1], [0, 0, 0, 1]]}}`.
 - **Storage buffers and bind groups.** `storage: {name: buffer}` declares `<name>:array<type>`. Pass a `storage()` node as
   it is, so a compute pass fills what the mesh draws, or `{buffer, type, access}` with your own GPUBuffer (or a function of
   the device, which also serves device restoration; a plain buffer is lost with its device, so the material binds a zeroed

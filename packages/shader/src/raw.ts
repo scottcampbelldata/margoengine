@@ -46,6 +46,23 @@ export interface RawAttribute {
 }
 /** One value of a {@link RawUniform}: a number, a colour string or the numbers of a vector or matrix. */
 export type RawUniformValue = number | string | ArrayLike<number>;
+/** The value of a struct uniform: one entry per field, a nested struct's an object and an array field's a list. */
+export interface RawUniformStructValue {
+  readonly [field: string]:
+    | RawUniformValue
+    | RawUniformStructValue
+    | readonly RawUniformValue[]
+    | readonly RawUniformStructValue[];
+}
+/**
+ * A struct field that is not a plain type: `struct` nests another struct, `count` makes an array of `type` (16 bytes
+ * apart, as a uniform array) or of the nested struct.
+ */
+export interface RawUniformField {
+  readonly type?: RawUniformType;
+  readonly count?: number;
+  readonly struct?: Readonly<Record<string, RawUniformType | RawUniformField>>;
+}
 /**
  * A live uniform: assign `material.uniforms.name.value` any time. A number is an f32 (or the scalar of
  * `type`), 2/3/4/9/16 numbers a vecNf/mat3x3f/mat4x4f, and `'#rrggbb'`/`0xrrggbb` with a vec3f type an sRGB colour
@@ -57,16 +74,19 @@ export interface RawUniform {
   value:
     | RawUniformValue
     | readonly RawUniformValue[]
-    | Readonly<Record<string, RawUniformValue>>
-    | readonly Readonly<Record<string, RawUniformValue>>[];
+    | RawUniformStructValue
+    | readonly RawUniformStructValue[];
   readonly type?: RawUniformType;
   /**
    * Elements of an `array<type, count>`, read as `uniforms.<name>[i]`. A uniform array's stride is a multiple of 16 bytes, so
    * the element is a vec3, a vec4, a matrix or a struct; a storage buffer holds tighter arrays.
    */
   readonly count?: number;
-  /** Field names and types of a struct, read as `uniforms.<name>.<field>`. A field is not itself an array or a struct. */
-  readonly struct?: Readonly<Record<string, RawUniformType>>;
+  /**
+   * Field names and types of a struct, read as `uniforms.<name>.<field>`. A field is a plain type, or a
+   * {@link RawUniformField}: a nested struct (`uniforms.<name>.<field>.<inner>`) or an array (`uniforms.<name>.<field>[i]`).
+   */
+  readonly struct?: Readonly<Record<string, RawUniformType | RawUniformField>>;
 }
 /**
  * A storage buffer a raw shader reads, declared `<name>:array<type>`. A `storage()` node of `@margoengine/shader` fits as it
@@ -245,11 +265,7 @@ const pickFragment = '@fragment fn margoPick()->@location(0) u32 {return mesh.pi
 const PICK_ID = 112,
   OBJECT_BYTES = 128;
 
-interface Field {
-  name: string;
-  type: RawUniformType;
-  offset: number;
-}
+/** A uniform block member or a struct field. */
 interface Member {
   name: string;
   /** A uniform type, or the generated struct's name. */
@@ -258,7 +274,67 @@ interface Member {
   /** Elements of an array, and the bytes from one to the next (a struct's size when it is not an array). */
   count?: number;
   stride?: number;
-  fields?: Field[];
+  fields?: Member[];
+}
+/** A generated struct of the prelude. */
+interface RawStruct {
+  type: string;
+  fields: Member[];
+}
+/**
+ * Lays out a struct by the WGSL rules for the uniform address space (W3C WGSL, Memory Layout): each field at its
+ * alignment, a nested struct or array at 16, every struct aligned to 16 (an `@align(16)` first field) and its size
+ * rounded to 16, so it is a legal member and array element whatever its fields. Nested structs are pushed to `out` as
+ * `Raw<k>_<field>`, which no `Raw_<uniform>` can equal. Returns the fields and the struct's size.
+ */
+function layoutStruct(
+  label: string,
+  struct: Readonly<Record<string, RawUniformType | RawUniformField>>,
+  out: RawStruct[],
+): { fields: Member[]; size: number } {
+  if (!struct || typeof struct !== 'object') throw new TypeError(`${label} struct must be an object of field types`);
+  const fields: Member[] = [];
+  let at = 0;
+  for (const [field, spec] of Object.entries(struct)) {
+    identifier(field, `${label} field`);
+    const where = `${label} field ${field}`;
+    if (typeof spec === 'string' || !spec || typeof spec !== 'object') {
+      if (!uniformType(spec as string))
+        throw new TypeError(
+          `${where} needs a type from 'f32' to 'vec4f', their i32/u32 variants, 'mat3x3f' or 'mat4x4f', or {struct} or {type, count}`,
+        );
+      const offset = roundUp(at, alignOf(spec as string));
+      fields.push({ name: field, type: spec as string, offset });
+      at = offset + bytesOf(spec as string);
+      continue;
+    }
+    const { count } = spec;
+    if (count !== undefined && (!Number.isInteger(count) || count < 1))
+      throw new RangeError(`${where} count must be a positive integer`);
+    const offset = roundUp(at, 16);
+    if (spec.struct) {
+      const inner = layoutStruct(where, spec.struct, out),
+        type = `Raw${out.length}_${field}`;
+      out.push({ type, fields: inner.fields });
+      fields.push({ name: field, type, offset, count, stride: inner.size, fields: inner.fields });
+      at = offset + inner.size * (count ?? 1);
+      continue;
+    }
+    const element = spec.type;
+    if (count === undefined || !element || !uniformType(element))
+      throw new TypeError(
+        `${where} needs {struct} for a nested struct, or {type, count} with type 'f32' to 'vec4f', i32/u32 variants, 'mat3x3f' or 'mat4x4f' for an array`,
+      );
+    const stride = roundUp(bytesOf(element), alignOf(element));
+    if (stride % 16)
+      throw new TypeError(
+        `${where}: elements of a uniform array sit 16 bytes apart, so ${element} does not fit; use vec3, vec4, a matrix or a struct, or put it in a storage buffer`,
+      );
+    fields.push({ name: field, type: element, offset, count, stride });
+    at = offset + stride * count;
+  }
+  if (!fields.length) throw new TypeError(`${label} struct needs at least one field`);
+  return { fields, size: roundUp(at, 16) };
 }
 /** Which pipeline of a material: the colour pass, a shadow cascade, SSAO's G-buffer or a pick. */
 type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity';
@@ -494,6 +570,8 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
   error?: Error;
   /** @internal Uniform block members with byte offsets; `size` is the block size in bytes. */
   readonly members: readonly Member[];
+  /** @internal The generated structs, nested ones first. */
+  readonly structs: readonly RawStruct[];
   /** @internal */ readonly size: number;
   /** @internal */ readonly gpu = new Map<GPUDevice, MaterialGpu>();
   /** @internal Bumped when the shader code changes. */ revision = 0;
@@ -534,7 +612,8 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
         'RawShaderMaterial groups must be at most two functions of the device, for @group(2) and @group(3)',
       );
     this.setCode(options.vertexShader, options.fragmentShader);
-    const members: Member[] = [];
+    const members: Member[] = [],
+      structs: RawStruct[] = [];
     let end = 0;
     const uniforms: Record<string, RawUniform> = {};
     this.uniforms = uniforms as unknown as Record<string, U>;
@@ -546,22 +625,9 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
       if (count !== undefined && (!Number.isInteger(count) || count < 1))
         throw new RangeError(`RawShaderMaterial uniform ${name} count must be a positive integer`);
       if (u.struct) {
-        const fields: Field[] = [];
-        let at = 0;
-        for (const [field, fieldType] of Object.entries(u.struct)) {
-          identifier(field, `RawShaderMaterial uniform ${name} field`);
-          if (!uniformType(fieldType))
-            throw new TypeError(
-              `RawShaderMaterial uniform ${name} field ${field} needs a type from 'f32' to 'vec4f', their i32/u32 variants, 'mat3x3f' or 'mat4x4f'`,
-            );
-          const offset = roundUp(at, alignOf(fieldType));
-          fields.push({ name: field, type: fieldType, offset });
-          at = offset + bytesOf(fieldType);
-        }
-        if (!fields.length) throw new TypeError(`RawShaderMaterial uniform ${name} struct needs at least one field`);
-        // Every struct is aligned to 16 bytes, so it is a legal uniform member and array element whatever its fields.
-        const stride = roundUp(at, 16),
+        const { fields, size: stride } = layoutStruct(`RawShaderMaterial uniform ${name}`, u.struct, structs),
           offset = roundUp(end, 16);
+        structs.push({ type: 'Raw_' + name, fields });
         members.push({ name, type: 'Raw_' + name, offset, count, stride, fields });
         end = offset + stride * (count ?? 1);
         uniforms[name] = u;
@@ -604,6 +670,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
       uniforms[name] = u.type ? u : Object.assign(u, { type });
     }
     this.members = members;
+    this.structs = structs;
     this.size = members.length ? Math.ceil(end / 16) * 16 : 0;
     this.bytes = new Uint8Array(this.size);
     this.data = new DataView(this.bytes.buffer);
@@ -694,11 +761,10 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
       out.push(
         `struct Attributes {\n${attributes.map((a, i) => `  @location(${i}) ${a.name}:${a.type},`).join('\n')}\n}`,
       );
-    for (const m of this.members)
-      if (m.fields)
-        out.push(
-          `struct ${m.type} {\n${m.fields.map((f, i) => `  ${i ? '' : '@align(16) '}${f.name}:${f.type},`).join('\n')}\n}`,
-        );
+    for (const t of this.structs)
+      out.push(
+        `struct ${t.type} {\n${t.fields.map((f, i) => `  ${i ? '' : '@align(16) '}${f.name}:${f.count === undefined ? f.type : `array<${f.type},${f.count}>`},`).join('\n')}\n}`,
+      );
     // Every stage of a material with a velocity entry declares what that entry reads; unused, it binds nothing.
     if (this.velocityName) out.push(velocityPrelude);
     if (this.members.length)
@@ -853,27 +919,30 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     return this.uniformChanges;
   }
   private write(m: Member): void {
-    const v = (this.uniforms[m.name] as RawUniform | undefined)?.value;
-    if (m.count === undefined && !m.fields) return this.put(m.type, m.offset, v, m.name);
+    this.store(m, m.offset, (this.uniforms[m.name] as RawUniform | undefined)?.value, m.name);
+  }
+  /** Writes `v` for member or field `m` at byte `at`: a plain value, an array of them, or struct fields, nested too. */
+  private store(m: Member, at: number, v: unknown, name: string): void {
+    if (m.count === undefined && !m.fields) return this.put(m.type, at, v, name);
+    if (m.count === undefined) return this.fields(m, at, v, name);
     const size = components(m.type),
       list = v as ArrayLike<unknown>,
-      flat = m.count !== undefined && !m.fields && typeof list?.[0] === 'number',
-      count = m.count ?? 1,
-      length = m.count === undefined ? 1 : flat ? list.length / size : list?.length;
-    if (length !== count)
+      flat = !m.fields && typeof list?.[0] === 'number',
+      length = flat ? list.length / size : list?.length;
+    if (length !== m.count)
       throw new RangeError(
-        `RawShaderMaterial ${this.name} uniform ${m.name} needs ${count} element${count > 1 ? 's' : ''}; assign a matching value`,
+        `RawShaderMaterial ${this.name} uniform ${name} needs ${m.count} element${m.count > 1 ? 's' : ''}; assign a matching value`,
       );
-    for (let i = 0; i < count; i++) {
-      const item =
-          m.count === undefined ? v : flat ? Array.prototype.slice.call(list, i * size, (i + 1) * size) : list[i],
-        at = m.offset + i * m.stride!,
-        name = m.count === undefined ? m.name : `${m.name}[${i}]`;
-      if (!m.fields) this.put(m.type, at, item, name);
-      else
-        for (const f of m.fields)
-          this.put(f.type, at + f.offset, (item as Record<string, unknown>)?.[f.name], `${name}.${f.name}`);
+    for (let i = 0; i < m.count; i++) {
+      const item = flat ? Array.prototype.slice.call(list, i * size, (i + 1) * size) : list[i],
+        where = at + i * m.stride!;
+      if (m.fields) this.fields(m, where, item, `${name}[${i}]`);
+      else this.put(m.type, where, item, `${name}[${i}]`);
     }
+  }
+  private fields(m: Member, at: number, v: unknown, name: string): void {
+    for (const f of m.fields!)
+      this.store(f, at + f.offset, (v as Record<string, unknown> | undefined)?.[f.name], `${name}.${f.name}`);
   }
   private put(type: string, offset: number, v: unknown, name: string): void {
     const n = components(type),
