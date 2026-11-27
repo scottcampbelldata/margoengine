@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/taa",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Optional temporal anti-aliasing with motion vectors and YCoCg history clamping.",
   "keywords": [
     "margoengine",
@@ -53,9 +53,9 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   }
 }

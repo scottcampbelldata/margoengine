@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/tiles",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf/pbr.",
   "keywords": [
     "margoengine",
@@ -88,15 +88,15 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/points": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/splats": "^1.0.0",
-    "@margoengine/bvh": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/points": "^0.1.0",
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/splats": "^0.1.0",
+    "@margoengine/bvh": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {

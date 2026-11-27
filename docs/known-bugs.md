@@ -5932,12 +5932,12 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Repro:** `PartInstancer.attach(engine)` and `engine.render({ views })` with a view whose viewport or scissor is not
   the whole target: the packed parts drew across the whole target, over neighbouring views. Found by the cad
   owner/lifetime fixture on a real device ("no pixel writes outside either view scissor").
-- **Cause:** the pack's own pass (packages/cad/src/pack.ts) set a viewport and scissor only when the draw call passed
+- **Cause:** the pack's own pass (packages/cad-import/src/pack.ts) set a viewport and scissor only when the draw call passed
   them; core's draw falls back to the view's rectangles, the pack draw did not.
 - **Fix:** the pack draw resolves its rectangles exactly as core's draw does (the call's own, else the view's viewport
   and scissor).
-- **Regression:** packages/cad/test/pack.test.js, "the pack draw keeps to the view it is drawn in..." (fails on the old
-  source); packages/cad/test/owner-lifetime.fixture.js on WebGPU and the WebGL2 layer.
+- **Regression:** packages/cad-import/test/pack.test.js, "the pack draw keeps to the view it is drawn in..." (fails on the old
+  source); packages/cad-import/test/owner-lifetime.fixture.js on WebGPU and the WebGL2 layer.
 
 ### Fixed 2026-11-15: loadCAD and parseCADAsync built their model in the scene active when they finished, and a disposed PartInstancer stayed registered (KB-OWN-CAD1, KB-OWN-CAD2, cad)
 
@@ -5950,9 +5950,9 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   its scene (KB-OWN-CAD2).
 - **Fix:** loadCAD and parseCADAsync capture the calling scene before their first await (`captureScene`) and make every
   mesh in it; `PartInstancer.dispose` removes the plugin from `engine.sceneOf(this)` once and is safe to call twice.
-- **Regression:** packages/cad/test/pack.test.js, "loadCAD builds its model in the scene it was called for...",
+- **Regression:** packages/cad-import/test/pack.test.js, "loadCAD builds its model in the scene it was called for...",
   "parseCADAsync builds the parts its worker sends in the scene it was called for" and "disposing a PartInstancer takes
-  it out of its scene..." (all fail on the old source); packages/cad/test/owner-lifetime.fixture.js.
+  it out of its scene..." (all fail on the old source); packages/cad-import/test/owner-lifetime.fixture.js.
 
 ### Fixed 2026-11-15: a destroyed WebGL2-layer device kept its context-loss listener on the canvas (KB-OWN-COMPAT1, webgl2-compat)
 

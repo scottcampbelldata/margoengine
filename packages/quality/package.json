@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/quality",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom.",
   "keywords": [
     "margoengine",
@@ -64,7 +64,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js quality",

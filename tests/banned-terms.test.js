@@ -21,7 +21,7 @@ test('the repo name, with or without hyphens, is reported', () => {
   assert.equal(hitsInLine(repo.replaceAll('-', '')).length > 0, true);
 });
 
-// Scott, 2026-11-13: the kernel and the CAD import package are public again (packages/brep, packages/cad), so their
+// Scott, 2026-11-13: the kernel and the CAD import package are public again (packages/brep, packages/cad-import), so their
 // names, paths, formats and API pass; the kernel repository's name, the importer's third-party kernel, the package
 // that stays out and the removed stage entry and section class are still reported.
 test('the public kernel and CAD import names pass', () => {

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/mcp",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a snippet against the real package types. Plain stdio JSON-RPC, no dependencies.",
   "keywords": [
     "margoengine",
@@ -23,12 +23,12 @@
   "type": "module",
   "sideEffects": false,
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/inspector": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/materials": "^1.0.0",
-    "@margoengine/environment": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/inspector": "^0.1.0",
+    "@margoengine/loaders": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/materials": "^0.1.0",
+    "@margoengine/environment": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {

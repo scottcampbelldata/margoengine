@@ -1,1 +1,9 @@
-{"extends":"../gltf/tsconfig.json","compilerOptions":{"outDir":"dist","rootDir":"src"},"include":["src"]}
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "strict": true, "noImplicitOverride": true, "noFallthroughCasesInSwitch": true,
+    "declaration": true, "outDir": "dist", "rootDir": "src",
+    "types": [], "lib": ["ES2022", "DOM"], "skipLibCheck": true
+  },
+  "include": ["src"]
+}

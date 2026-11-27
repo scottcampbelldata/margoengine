@@ -1,7 +1,7 @@
 # Margo B-rep kernel: our own CAD reader (design)
 
 Status, 2026-11-13: public engine package `@margoengine/brep` (Apache-2.0), the only CAD kernel the engine uses.
-`@margoengine/cad` reads STEP, IGES, ACIS SAT, Parasolid XT and JT through it in a worker; no third-party CAD code or
+`@margoengine/cad-import` reads STEP, IGES, ACIS SAT, Parasolid XT and JT through it in a worker; no third-party CAD code or
 WebAssembly importer is left. Clean room: written only from the published standards (ISO 10303-21 file syntax, ISO
 10303-42 geometry and topology, the AP203/AP214/AP242 schemas, IGES 5.3, the published SAT, XT and JT format
 references) and textbook geometry (NURBS evaluation, constrained Delaunay triangulation). No source of another CAD
@@ -47,7 +47,7 @@ Some files also carry AP242 tessellated geometry (2,296 `COMPLEX_TRIANGULATED_SU
    poles and apexes handled), a constrained Delaunay triangulation of the trimmed domain, interior points added until
    every triangle meets the deflection, normals from the exact surface (flipped by `same_sense`). Planes need no
    interior points. Work is split by face across workers.
-5. **Integration.** `parseCADAsync` and `loadCAD` in `@margoengine/cad` read every B-rep format through the
+5. **Integration.** `parseCADAsync` and `loadCAD` in `@margoengine/cad-import` read every B-rep format through the
    kernel in a worker: each placed body is meshed once, every placement is a transform on that mesh, and a body with
    several face colours becomes one mesh per colour.
 6. **More formats.** IGES 5.3, ACIS SAT, Parasolid XT and JT (ISO 14306) are converted to STEP entities and read and

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/splats",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.",
   "keywords": [
     "margoengine",
@@ -96,12 +96,12 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "devDependencies": {
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/decoders": "^0.1.0"
   }
 }

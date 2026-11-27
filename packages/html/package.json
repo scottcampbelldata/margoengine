@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/html",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "World-space DOM anchors, CSS3D placement and scene-depth occlusion.",
   "keywords": [
     "margoengine",
@@ -52,10 +52,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/labels": "^1.0.0"
+    "@margoengine/labels": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js html",

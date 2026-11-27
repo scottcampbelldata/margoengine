@@ -1,4 +1,4 @@
-// A model a stage feature entry imported (addGLTF in @margoengine/stage, addCAD in @margoengine/cad), wrapped as the
+// A model a stage feature entry imported (addGLTF in @margoengine/stage, addCAD in @margoengine/cad-import), wrapped as the
 // stage's LoadedModel: its world bounds, its raw GPU buffers, and the load options and placing both entries share.
 import { meshTriangles } from './mesh-source.js';
 import { fault, typeError } from './errors.js';

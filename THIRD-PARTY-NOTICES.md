@@ -3,19 +3,19 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 111 published packages (108 in `packages/`
+assets the site and examples use. It covers all 115 published packages (112 in `packages/`
 plus `create-margo`, `margo-convert` and `margo-convert-cad`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-97 of 111 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+100 of 115 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
-| `react` | 19.3.0 | MIT | optional peer | @margoengine/game, @margoengine/kit-react, @margoengine/machinery, @margoengine/react, @margoengine/ui, margoengine | React component bindings for the stage |
+| `react` | 19.3.0 | MIT | optional peer | @margoengine/game, @margoengine/games, @margoengine/kit-react, @margoengine/machinery, @margoengine/react, @margoengine/ui, margoengine | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/kit-react, @margoengine/react, margoengine | React DOM root and portal rendering for scene and HTML components |
 | `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | @margoengine/kit-react | React DOM scheduling dependency |
 | `web-ifc` | 0.0.78 | MPL-2.0 | optional peer | @margoengine/ifc, margoengine | IFC (BIM) parser; the app installs and initializes it, the package only reads its output |
@@ -27,7 +27,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 | Package | Component | Licence | Shipped files | Modified | Notices in the tarball |
 | --- | --- | --- | --- | --- | --- |
-| @margoengine/brep, @margoengine/cad | JT Data Format data structures and operators (Siemens JT File Format Reference, ISO 14306) | Siemens JT Data Format Reference Intellectual Property License Terms; patents royalty-free under the Siemens JT Data Format Reference Patent Clarification Notice | brep: dist/jt/*.js (the JT reader); cad: dist/workers/cad-runtime.js, which bundles it | not applicable: no third-party code, the format is read as the reference describes it | NOTICE |
+| @margoengine/brep, @margoengine/cad-import | JT Data Format data structures and operators (Siemens JT File Format Reference, ISO 14306) | Siemens JT Data Format Reference Intellectual Property License Terms; patents royalty-free under the Siemens JT Data Format Reference Patent Clarification Notice | brep: dist/jt/*.js (the JT reader); cad: dist/workers/cad-runtime.js, which bundles it | not applicable: no third-party code, the format is read as the reference describes it | NOTICE |
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | Draco 3D full decoder (Google) | Apache-2.0 | dist/draco-full/draco_decoder.wasm, dist/draco-full/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | jxl-oxide JPEG XL decoder (Wonwoo Choi) | MIT OR Apache-2.0 | dist/jxl/jxl_oxide_wasm_bg.wasm, dist/jxl/jxl_oxide_wasm.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
@@ -60,7 +60,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     `jxl_oxide_wasm_bg.wasm` (sha256 `3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69`) and
     `jxl_oxide_wasm.js` (`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7`). The crates inside it are named in
     `dist/THIRD-PARTY-NOTICE.md`.
-- **Siemens JT notice (`@margoengine/brep`, `@margoengine/cad`).** The JT reader in `packages/brep/src/jt` reads the
+- **Siemens JT notice (`@margoengine/brep`, `@margoengine/cad-import`).** The JT reader in `packages/brep/src/jt` reads the
   format as described in the Siemens JT File Format Reference and ISO 14306 (`docs/jt-licensing.md`). Both packages'
   tracked `NOTICE` files ship in their tarballs with the reference licence terms, the royalty-free patent notice and the
   trademark note, and every JT reader source file carries the same notice in its header.
@@ -91,7 +91,8 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/brep` | none | JT Data Format data structures and operators (Siemens) | LICENSE, NOTICE, NOTICE |
 | `@margoengine/bvh` | none | none | LICENSE, NOTICE |
 | `@margoengine/cache` | none | none | LICENSE, NOTICE |
-| `@margoengine/cad` | none | JT Data Format data structures and operators (Siemens) | LICENSE, NOTICE, NOTICE |
+| `@margoengine/cad` | none | none | LICENSE, NOTICE |
+| `@margoengine/cad-import` | none | JT Data Format data structures and operators (Siemens) | LICENSE, NOTICE, NOTICE |
 | `@margoengine/cameras` | none | none | LICENSE, NOTICE |
 | `@margoengine/cinematic` | none | none | LICENSE, NOTICE |
 | `@margoengine/clustered` | none | none | LICENSE, NOTICE |
@@ -109,6 +110,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/fbx` | none | none | LICENSE, NOTICE |
 | `@margoengine/fsm` | none | none | LICENSE, NOTICE |
 | `@margoengine/game` | react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
+| `@margoengine/games` | react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/geometry` | none | none | LICENSE, NOTICE |
 | `@margoengine/gltf` | none | none | LICENSE, NOTICE |
 | `@margoengine/headless` | none | none | LICENSE, NOTICE |
@@ -154,6 +156,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/scatter` | none | none | LICENSE, NOTICE |
 | `@margoengine/scene` | none | none | LICENSE, NOTICE |
 | `@margoengine/scenes` | none | none | LICENSE, NOTICE |
+| `@margoengine/science` | none | none | LICENSE, NOTICE |
 | `@margoengine/sciviz` | none | Standard colour-map tables: viridis, magma, inferno, plasma (CC0-1.0) | LICENSE, NOTICE, NOTICE.md |
 | `@margoengine/selection` | none | none | LICENSE, NOTICE |
 | `@margoengine/shader` | none | none | LICENSE, NOTICE |
@@ -185,6 +188,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/voxel-pathtracer` | none | none | LICENSE, NOTICE |
 | `@margoengine/water` | none | none | LICENSE, NOTICE |
 | `@margoengine/weather` | none | none | LICENSE, NOTICE |
+| `@margoengine/web` | none | none | LICENSE, NOTICE |
 | `@margoengine/webgl2-compat` | none | none | LICENSE, NOTICE |
 | `@margoengine/wfc` | none | none | LICENSE, NOTICE |
 | `@margoengine/worker` | none | none | LICENSE, NOTICE |

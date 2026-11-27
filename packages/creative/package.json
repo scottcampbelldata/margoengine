@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/creative",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.",
   "keywords": [
     "margoengine",
@@ -103,10 +103,10 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/post": "^1.0.0",
-    "@margoengine/sky": "^1.0.0",
-    "@margoengine/scatter": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/post": "^0.1.0",
+    "@margoengine/sky": "^0.1.0",
+    "@margoengine/scatter": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/post": {
@@ -120,7 +120,7 @@
     }
   },
   "dependencies": {
-    "@margoengine/vfx": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/vfx": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   }
 }

@@ -101,7 +101,7 @@ export async function prepare() {
       core: ['@margoengine/core'],
       stage: ['@margoengine/stage'],
       ...Object.fromEntries(Object.keys(KIT_MEMBERS).map((kit) => [kit, [`@margoengine/${kit}`]])),
-      together: ['@margoengine/game', '@margoengine/kit-web', '@margoengine/kit-viz'],
+      together: ['@margoengine/games', '@margoengine/web', '@margoengine/science', '@margoengine/cad'],
       all: ['margoengine'],
     };
     for (const [name, install] of Object.entries(cases)) {

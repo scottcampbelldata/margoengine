@@ -32,7 +32,7 @@ Camera `position`, `target` and `up` are tuple values and remain assignable.
 
 Camera controls are not in core: `CADCameraControls` is in `@margoengine/stage` (since 2026-11-07), and `@margoengine/controls` has orbit, map, fly and the rest.
 
-Package name: `@margoengine/core`, version `1.0.0`. Build from source or install a local tarball until the package is published.
+Package name: `@margoengine/core`, version `0.1.0`. Build from source or install a local tarball until the package is published.
 
 ```ts
 import { Camera, Engine, box, PbrMaterial } from 'margoengine/core';

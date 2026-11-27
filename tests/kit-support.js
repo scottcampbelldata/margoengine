@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { KITS, KIT_MEMBERS, KIT_ROOT } from '../scripts/umbrella.mjs';
+import { CAD_ROOT, KITS, KIT_MEMBERS, KIT_ROOT, KIT_SHIMS, SHIM_ROOT } from '../scripts/umbrella.mjs';
 import { importsOf, packageOf } from '../scripts/publish-rehearsal.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -10,7 +10,11 @@ const json = (path) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
 
 export async function checkKit(name, entry) {
   const manifest = json(`packages/${name}/package.json`);
-  assert.deepEqual(Object.keys(manifest.dependencies).sort(), KIT_MEMBERS[name].map((s) => `@margoengine/${s}`).sort());
+  const shim = KIT_SHIMS[name];
+  assert.deepEqual(
+    Object.keys(manifest.dependencies).sort(),
+    shim ? [`@margoengine/${shim}`] : KIT_MEMBERS[name].map((s) => `@margoengine/${s}`).sort(),
+  );
   for (const [subpath, target] of Object.entries(manifest.exports)) {
     const path = `packages/${name}/${target.import.slice(2)}`;
     for (const specifier of importsOf(readFileSync(new URL(path, root), 'utf8'))) {
@@ -27,8 +31,10 @@ export async function checkKit(name, entry) {
     assert.equal(typeof entry.Canvas, 'function');
     assert.equal('Voxel' in entry, false, 'the web root must not advertise a renderer outside its installed profile');
     assert.equal('XR' in entry, false);
+    assert.equal(manifest.deprecated.includes('Retired'), true);
   } else {
-    for (const [source, names] of KITS[KIT_ROOT[name]].from) {
+    const from = name === 'cad' ? CAD_ROOT : KITS[KIT_ROOT[name] ?? SHIM_ROOT[name]].from;
+    for (const [source, names] of from) {
       const original = await import(source);
       for (const binding of names) assert.equal(entry[binding], original[binding], binding);
     }

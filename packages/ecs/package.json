@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/ecs",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Typed-array packed sparse-set entity component storage.",
   "keywords": [
     "margoengine",
@@ -88,8 +88,8 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/scene": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/scene": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/scene": {
@@ -97,7 +97,7 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js ecs",

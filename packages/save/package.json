@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/save",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Save and load: versioned scene and world documents with stable ids, prefabs with overrides, migrations, all-or-nothing loading and storage adapters.",
   "keywords": [
     "margoengine",
@@ -81,11 +81,11 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/materials": "^1.0.0",
-    "@margoengine/shader": "^1.0.0"
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/materials": "^0.1.0",
+    "@margoengine/shader": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animation": {
@@ -105,11 +105,11 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "devDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/ecs": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/ecs": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js save",

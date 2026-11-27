@@ -10,7 +10,7 @@ For grass on terrain, use the [scatter heightmap and density-map example](../sca
 Scatter also provides [interaction and trampling](../scatter/README.md#interaction-and-trampling-margoenginescatterinteract)
 and [streamed grass chunks with three LOD meshes](../scatter/README.md#tile-input-storage).
 
-Package name: `@margoengine/creative`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/creative`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/creative@1.0.0

@@ -29,7 +29,7 @@ export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale
   destroy(): void;
 }
 
-// The bounds, the wrapper and the load helpers are shared with @margoengine/cad's addCAD
+// The bounds, the wrapper and the load helpers are shared with @margoengine/cad-import's addCAD
 // (packages/shared/stage-model.js; placeModel in ./feature.ts).
 export { worldBounds } from '../../shared/stage-model.js';
 

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/usdz",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR.",
   "keywords": [
     "margoengine",
@@ -87,15 +87,15 @@
     "test:gpu:usdz": "cd ../.. && npm run modern:test:usdz && npm run modern:test:usdz:browser"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/lines": "^1.0.0",
-    "@margoengine/points": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/lines": "^0.1.0",
+    "@margoengine/points": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/loaders": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   },
   "publishConfig": {
     "access": "public"

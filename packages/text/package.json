@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/text",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU.",
   "keywords": [
     "margoengine",
@@ -82,11 +82,11 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/loaders": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   }
 }

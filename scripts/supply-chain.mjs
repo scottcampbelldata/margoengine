@@ -51,7 +51,7 @@ const WHY = {
  */
 export const BUNDLED = [
   {
-    package: '@margoengine/brep, @margoengine/cad',
+    package: '@margoengine/brep, @margoengine/cad-import',
     component: 'JT Data Format data structures and operators (Siemens JT File Format Reference, ISO 14306)',
     licence:
       'Siemens JT Data Format Reference Intellectual Property License Terms; patents royalty-free under the Siemens JT Data Format Reference Patent Clarification Notice',
@@ -737,7 +737,7 @@ ${table(
     \`jxl_oxide_wasm_bg.wasm\` (sha256 \`3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69\`) and
     \`jxl_oxide_wasm.js\` (\`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7\`). The crates inside it are named in
     \`dist/THIRD-PARTY-NOTICE.md\`.
-- **Siemens JT notice (\`@margoengine/brep\`, \`@margoengine/cad\`).** The JT reader in \`packages/brep/src/jt\` reads the
+- **Siemens JT notice (\`@margoengine/brep\`, \`@margoengine/cad-import\`).** The JT reader in \`packages/brep/src/jt\` reads the
   format as described in the Siemens JT File Format Reference and ISO 14306 (\`docs/jt-licensing.md\`). Both packages'
   tracked \`NOTICE\` files ship in their tarballs with the reference licence terms, the royalty-free patent notice and the
   trademark note, and every JT reader source file carries the same notice in its header.

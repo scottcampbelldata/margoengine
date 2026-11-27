@@ -15028,5 +15028,23 @@
     "reason": "Borrowed GPU objects rule 2: the mask also takes a (device) => GPUTexture form, made once per device; every existing GPUTexture caller still compiles (KB-RESTORE-BORROWED1)",
     "date": "2026-11-20",
     "approved": "Scott 2026-11-20: \"I said widen our keep it do what's best practices\" (left widen or keep to the agent; widened per rule 2)"
+  },
+  {
+    "entry": "@margoengine/core",
+    "symbol": "CORE_VERSION",
+    "change": "signature",
+    "was": "227d5ca8",
+    "reason": "The shared release version is 0.1.0 before the first npm publish. CORE_VERSION has to match the core manifest, and nothing is on npm at 1.0.0.",
+    "date": "2026-11-27",
+    "approved": "Scott 2026-11-27"
+  },
+  {
+    "entry": "@margoengine/core/extension",
+    "symbol": "CORE_VERSION",
+    "change": "signature",
+    "was": "227d5ca8",
+    "reason": "The shared release version is 0.1.0 before the first npm publish. CORE_VERSION has to match the core manifest, and nothing is on npm at 1.0.0.",
+    "date": "2026-11-27",
+    "approved": "Scott 2026-11-27"
   }
 ]

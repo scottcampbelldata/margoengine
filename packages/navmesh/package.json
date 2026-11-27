@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/navmesh",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy), debug draw (./debug), voxel worlds (./voxel) and flying agents (./volume).",
   "keywords": [
     "margoengine",
@@ -92,9 +92,9 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/lines": "^1.0.0",
-    "@margoengine/voxel": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/lines": "^0.1.0",
+    "@margoengine/voxel": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/lines": {
@@ -105,7 +105,7 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js navmesh && node scripts/copy-raster.mjs",

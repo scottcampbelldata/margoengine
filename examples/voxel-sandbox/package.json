@@ -30,18 +30,18 @@
     "bench": "node bench.mjs"
   },
   "dependencies": {
-    "@margoengine/clustered": "^1.0.0",
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/culling": "^1.0.0",
-    "@margoengine/labels": "^1.0.0",
-    "@margoengine/lines": "^1.0.0",
-    "@margoengine/post": "^1.0.0",
-    "@margoengine/procedural": "^1.0.0",
-    "@margoengine/quality": "^1.0.0",
-    "@margoengine/shadows": "^1.0.0",
-    "@margoengine/sky": "^1.0.0",
-    "@margoengine/voxel": "^1.0.0",
-    "@margoengine/voxel-net": "^1.0.0",
-    "@margoengine/voxel-pathtracer": "^1.0.0"
+    "@margoengine/clustered": "^0.1.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/culling": "^0.1.0",
+    "@margoengine/labels": "^0.1.0",
+    "@margoengine/lines": "^0.1.0",
+    "@margoengine/post": "^0.1.0",
+    "@margoengine/procedural": "^0.1.0",
+    "@margoengine/quality": "^0.1.0",
+    "@margoengine/shadows": "^0.1.0",
+    "@margoengine/sky": "^0.1.0",
+    "@margoengine/voxel": "^0.1.0",
+    "@margoengine/voxel-net": "^0.1.0",
+    "@margoengine/voxel-pathtracer": "^0.1.0"
   }
 }

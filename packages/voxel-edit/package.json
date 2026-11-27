@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/voxel-edit",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Editing voxel models for editors and tools: dense and sparse grids, modeling operations, brushes and selections, picking, export meshing, .vox scene editing and frame animation.",
   "keywords": [
     "margoengine",
@@ -117,10 +117,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/voxel": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0"
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/voxel": "^0.1.0",
+    "@margoengine/loaders": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-edit",

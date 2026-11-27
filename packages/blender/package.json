@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/blender",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.",
   "keywords": [
     "margoengine",
@@ -82,11 +82,11 @@
     "test:browser:lightmap-scene": "node tests/lightmap-scene.browser.mjs && node tests/lightmap-scene.browser.mjs --compat"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/exporters": "^1.0.0",
-    "@margoengine/lightmap": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/exporters": "^0.1.0",
+    "@margoengine/lightmap": "^0.1.0"
   },
   "publishConfig": {
     "access": "public"

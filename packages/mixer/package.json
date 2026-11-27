@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/mixer",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Audio mixing and effects: buses with gain, mute, solo, sends and ducking; equaliser, filter, compressor, limiter, delay and reverb on Web Audio; positional emitters; deterministic offline rendering.",
   "keywords": [
     "margoengine",
@@ -85,7 +85,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js mixer",

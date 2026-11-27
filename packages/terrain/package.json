@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/terrain",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Geometry clipmaps and triplanar terrain layers.",
   "keywords": [
     "margoengine",
@@ -24,9 +24,17 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/procedural": "^1.0.0"
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/procedural": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/procedural": {
+      "optional": true
+    }
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js terrain",
@@ -136,8 +144,5 @@
   "files": [
     "dist",
     "NOTICE"
-  ],
-  "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
-  }
+  ]
 }

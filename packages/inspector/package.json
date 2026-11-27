@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/inspector",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.",
   "keywords": [
     "margoengine",
@@ -100,20 +100,20 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/lines": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/stats": "^1.0.0",
-    "@margoengine/controls": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/clustered": "^1.0.0",
-    "@margoengine/scene": "^1.0.0",
-    "@margoengine/video": "^1.0.0",
-    "@margoengine/exporters": "^1.0.0"
+    "@margoengine/lines": "^0.1.0",
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/stats": "^0.1.0",
+    "@margoengine/controls": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/clustered": "^0.1.0",
+    "@margoengine/scene": "^0.1.0",
+    "@margoengine/video": "^0.1.0",
+    "@margoengine/exporters": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animation": {

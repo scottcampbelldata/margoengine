@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const repository = fileURLToPath(new URL('..', import.meta.url));
 
 /** Packages that keep their own tracked NOTICE: the root NOTICE's lines on top, then their own notices. */
-export const OWN_NOTICE = new Set(['brep', 'cad']);
+export const OWN_NOTICE = new Set(['brep', 'cad-import']);
 
 /**
  * Copy the repository's LICENSE (Apache-2.0) and NOTICE into a package folder, so its tarball ships both. A package

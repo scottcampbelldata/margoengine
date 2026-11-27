@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/kinematics-constraints",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance.",
   "keywords": [
     "margoengine",
@@ -65,8 +65,8 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0"
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {

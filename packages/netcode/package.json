@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/netcode",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests.",
   "keywords": [
     "margoengine",
@@ -129,7 +129,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js netcode",

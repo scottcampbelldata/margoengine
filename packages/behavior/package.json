@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/behavior",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, perception (./perception), environment queries (./eqs), a goal planner (./goap), smart objects (./smart-objects), flow fields (./flowfield), a task network planner (./htn), and context steering (./context).",
   "keywords": [
     "margoengine",
@@ -94,11 +94,11 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "devDependencies": {
-    "@margoengine/ecs": "^1.0.0",
-    "@margoengine/navmesh": "^1.0.0"
+    "@margoengine/ecs": "^0.1.0",
+    "@margoengine/navmesh": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js behavior",

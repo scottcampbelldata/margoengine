@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/toon",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Stepped diffuse shading and inverted-hull outlines.",
   "keywords": [
     "margoengine",
@@ -56,12 +56,12 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/creative": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/creative": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {

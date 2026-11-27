@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/biomes",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Biome maps from a heightmap and a few climate settings: integer fixed-point climate fields, biome classification with smooth ecotones, presets, terrain ground weights and editor hooks, byte-identical on every platform.",
   "keywords": [
     "margoengine",
@@ -184,12 +184,12 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/physics": "^1.0.0",
-    "@margoengine/terrain": "^1.0.0",
-    "@margoengine/scatter": "^1.0.0",
-    "@margoengine/procedural": "^1.0.0",
-    "@margoengine/water": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/physics": "^0.1.0",
+    "@margoengine/terrain": "^0.1.0",
+    "@margoengine/scatter": "^0.1.0",
+    "@margoengine/procedural": "^0.1.0",
+    "@margoengine/water": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
@@ -212,7 +212,7 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {

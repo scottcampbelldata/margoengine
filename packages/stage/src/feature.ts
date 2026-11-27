@@ -44,5 +44,5 @@ export async function attachPlugin<T extends EnginePlugin, M>(
   return stage.use(create(await optionalPackage(name, load, stage.signal)));
 }
 
-// Shared with @margoengine/cad's addCAD (packages/shared/stage-model.js).
+// Shared with @margoengine/cad-import's addCAD (packages/shared/stage-model.js).
 export { loadTarget, placeModel } from '../../shared/stage-model.js';

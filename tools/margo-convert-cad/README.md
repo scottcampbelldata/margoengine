@@ -2,7 +2,7 @@
 
 Offline CAD to GLB conversion for [Margo Engine](https://margoengine.com): STEP (`.step`, `.stp`), IGES (`.iges`,
 `.igs`), ACIS SAT (`.sat`), Parasolid XT (`.x_t`, `.x_b`, `.xmt_txt`) and JT go through Margo's own B-rep kernel,
-`@margoengine/brep` (the same kernel `loadCAD` from `@margoengine/cad` runs in its worker), and come out as binary glTF
+`@margoengine/brep` (the same kernel `loadCAD` from `@margoengine/cad-import` runs in its worker), and come out as binary glTF
 2.0 in metres. Tessellate once at build time and ship the GLB, so the page loads no CAD reader at all.
 
 ```sh

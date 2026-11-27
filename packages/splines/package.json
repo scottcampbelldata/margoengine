@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/splines",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing.",
   "keywords": [
     "margoengine",
@@ -68,7 +68,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js splines",

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/gltf",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "glTF 2.0 for Margo Engine: a light static loader at the root, metallic-roughness PBR rendering at @margoengine/gltf/pbr.",
   "keywords": [
     "margoengine",
@@ -170,17 +170,17 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/clustered": "^1.0.0",
-    "@margoengine/environment": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/physics": "^1.0.0",
-    "@margoengine/splats": "^1.0.0",
-    "@margoengine/audio": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/clustered": "^0.1.0",
+    "@margoengine/environment": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/physics": "^0.1.0",
+    "@margoengine/splats": "^0.1.0",
+    "@margoengine/audio": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/clustered": {
@@ -203,11 +203,11 @@
     }
   },
   "devDependencies": {
-    "@margoengine/clustered": "^1.0.0",
-    "@margoengine/environment": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/physics": "^1.0.0",
-    "@margoengine/splats": "^1.0.0",
-    "@margoengine/audio": "^1.0.0"
+    "@margoengine/clustered": "^0.1.0",
+    "@margoengine/environment": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/physics": "^0.1.0",
+    "@margoengine/splats": "^0.1.0",
+    "@margoengine/audio": "^0.1.0"
   }
 }

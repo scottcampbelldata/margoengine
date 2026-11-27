@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/loaders",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, NURBS, LAS, OpenVDB, MaterialX, Lottie, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
   "keywords": [
     "margoengine",
@@ -222,10 +222,10 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/materials": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/materials": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/decoders": {
@@ -239,8 +239,8 @@
     }
   },
   "dependencies": {
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/points": "^1.0.0"
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/points": "^0.1.0"
   }
 }

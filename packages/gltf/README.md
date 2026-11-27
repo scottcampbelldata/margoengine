@@ -7,7 +7,7 @@ geometry), and [`@margoengine/gltf/pbr`](#pbr-rendering-margoenginegltfpbr) is f
 its own entries for workers, streaming, instancing, lights, physics, behaviour graphs and more. Each entry loads only what
 it imports, so a page with the light loader pays nothing for PBR.
 
-Package name: `@margoengine/gltf`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/gltf`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/gltf@1.0.0

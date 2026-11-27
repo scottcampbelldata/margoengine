@@ -25,16 +25,16 @@
     "build": "tsc -p tsconfig.json && vite build --manifest"
   },
   "dependencies": {
-    "margoengine": "^1.0.0",
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/react": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/creative": "^1.0.0",
-    "@margoengine/sky": "^1.0.0",
+    "margoengine": "^0.1.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/react": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/creative": "^0.1.0",
+    "@margoengine/sky": "^0.1.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@margoengine/post": "^1.0.0",
-    "@margoengine/webgl2-compat": "^1.0.0"
+    "@margoengine/post": "^0.1.0",
+    "@margoengine/webgl2-compat": "^0.1.0"
   },
   "devDependencies": {
     "vite": "^8.3.4"

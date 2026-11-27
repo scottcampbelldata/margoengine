@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/procedural",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.",
   "keywords": [
     "margoengine",
@@ -152,11 +152,11 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs && node scripts/copy-dungeon.mjs && node scripts/copy-trees.mjs && node scripts/copy-sdf.mjs && node scripts/copy-buildings.mjs && node scripts/copy-caves.mjs",

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/brep",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Margo's own CAD kernel: STEP (ISO 10303-21), IGES 5.3, ACIS SAT, Parasolid XT and JT (ISO 14306) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation.",
   "keywords": [
     "margoengine",
@@ -47,6 +47,6 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   }
 }

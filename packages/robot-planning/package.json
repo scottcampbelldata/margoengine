@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/robot-planning",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Robot arms on kinematics-constraints: a joint tree with collision shapes, swept motion checks, a joint-limit IK solver, sampling planners, URDF loading and a WebGPU clearance batch.",
   "keywords": [
     "margoengine",
@@ -60,9 +60,9 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/kinematics-constraints": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0"
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/kinematics-constraints": "^0.1.0",
+    "@margoengine/loaders": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/geometry": {

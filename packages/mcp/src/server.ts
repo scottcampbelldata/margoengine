@@ -5,7 +5,7 @@ import { errorCode, helpLink } from './errors.js';
 export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'] as const;
 
 /** The package version, reported to clients in `serverInfo`. */
-export const VERSION = '1.0.0';
+export const VERSION = '0.1.0';
 
 /** A JSON value. */
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };

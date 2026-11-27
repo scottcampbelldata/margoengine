@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/compute",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, neural networks, graph algorithms, and WGSL kernels bound by name.",
   "keywords": [
     "margoengine",
@@ -114,7 +114,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/points",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU.",
   "keywords": [
     "margoengine",
@@ -87,10 +87,10 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   }
 }

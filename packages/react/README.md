@@ -19,7 +19,7 @@ shadowed scene with click-to-select, follow the [React first scene guide](../../
 
 ## Install
 
-Package name: `@margoengine/react`, version `1.0.0`. **It is not on npm yet**, so `npm install @margoengine/react` does
+Package name: `@margoengine/react`, version `0.1.0`. **It is not on npm yet**, so `npm install @margoengine/react` does
 not work today. Two routes do. Both start from a clone of the repository (see [Install](../../README.md#install) in the
 main README for Git LFS and Node.js: 22.12+ to use the package, 24.18+ to build it from the repository).
 

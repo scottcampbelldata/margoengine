@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/audio",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine.",
   "keywords": [
     "margoengine",
@@ -108,10 +108,10 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/mixer": "^1.0.0",
-    "@margoengine/compute": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/mixer": "^0.1.0",
+    "@margoengine/compute": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {

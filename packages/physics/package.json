@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/physics",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Rigid-body physics for Margo Engine on its own Rust kernel: fixed-step engine plugin with interpolation, colliders, joints, queries, events, a character controller, vehicles and ropes.",
   "keywords": [
     "margoengine",
@@ -332,9 +332,9 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   }
 }

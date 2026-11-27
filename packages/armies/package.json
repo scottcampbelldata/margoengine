@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/armies",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Armies of hundreds: soldiers and riders drawn at every distance (instanced skinning near, a vertex animation of a simplified mesh far, culled and budgeted), following navmesh formations, keeping step, riding horses on the saddle the horse crowd draws; any person source plugs in.",
   "keywords": [
     "margoengine",
@@ -62,15 +62,15 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/horses": "^1.0.0",
-    "@margoengine/lod": "^1.0.0"
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/horses": "^0.1.0",
+    "@margoengine/lod": "^0.1.0"
   },
   "devDependencies": {
-    "@margoengine/navmesh": "^1.0.0"
+    "@margoengine/navmesh": "^0.1.0"
   }
 }

@@ -11,7 +11,7 @@ npm run dev:examples
 # http://127.0.0.1:5173/examples/cad-viewer/
 ```
 
-The viewer is `main.ts`. It uses `addCAD` from `@margoengine/cad/stage` (STEP and IGES through `@margoengine/brep` in a
+The viewer is `main.ts`. It uses `addCAD` from `@margoengine/cad-import/stage` (STEP and IGES through `@margoengine/brep` in a
 worker, in metres), `cadControls` and the mouse profiles from `@margoengine/controls`, and `Dimensions`,
 `SectionPlanes` and `snapFeature` from `@margoengine/machinery`. In an app, the same names come from one install,
 `margoengine`, as subpaths (`margoengine/cad/stage`, `margoengine/machinery/dimensions`).

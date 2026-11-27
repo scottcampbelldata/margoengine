@@ -12,14 +12,14 @@ npm create margo@latest my-game -- --template game
 | Template | Starts |
 | --- | --- |
 | `web` (default) | A lit scene with image-based lighting, orbit controls, the stats overlay and measured quality tiers |
-| `game` | A small physics game: roll a ball into crates, with shadows (`@margoengine/game`) |
-| `viz` | 200,000 points, a grid and an HTML label (`@margoengine/kit-viz`) |
+| `game` | A small physics game: roll a ball into crates, with shadows (`@margoengine/games`) |
+| `viz` | 200,000 points, a grid and an HTML label (`@margoengine/science`) |
 | `react` | React + Vite: JSX components from `@margoengine/kit-react` |
 | `next` | Next.js app router with `@margoengine/kit-react` |
 
-Each template depends on one domain kit, never the full `margoengine`: `@margoengine/kit-web`, `@margoengine/game`,
-`@margoengine/kit-viz`, or `@margoengine/kit-react` (with React) for `react` and `next`. It asks no questions and refuses to
-write into a non-empty directory. No dependencies of its own. It works once 1.0.0 is published to npm.
+Each template depends on one domain bundle, never the full `margoengine`: `@margoengine/web`, `@margoengine/games`,
+`@margoengine/science`, or the retired `@margoengine/kit-react` (with React) for `react` and `next`. It asks no questions and refuses to
+write into a non-empty directory. No dependencies of its own. It works once 0.1.0 is published to npm.
 
 Tests: `node --test tests/create-margo.test.js` from the repository root (scaffolds every template, type-checks and
 builds it against the local packages); `node tools/create-margo/test/browser-check.mjs` renders the default one in a

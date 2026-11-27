@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { Geometry } from '@margoengine/core';
 import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { parseGLTF } from '@margoengine/gltf';
-import { loadCAD } from '@margoengine/cad';
+import { loadCAD } from '@margoengine/cad-import';
 import { model as brep } from '@margoengine/brep';
 import { featureEdges } from '@margoengine/machinery/edges';
 import { convert, formatOf } from '../tools/margo-convert-cad/convert.js';
@@ -23,7 +23,7 @@ import { headless, headlessModels } from './support/pbr-snapshot.js';
 const root = resolve(import.meta.dirname, '..'),
   require = createRequire(join(root, 'package.json'));
 const files = {
-  assembly: 'packages/cad/test/fixtures/bracket-assembly.step',
+  assembly: 'packages/cad-import/test/fixtures/bracket-assembly.step',
   cubeIges: 'packages/brep/tests/fixtures/iges/cube.igs',
 };
 const read = (name) => new Uint8Array(readFileSync(join(root, files[name])));

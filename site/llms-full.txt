@@ -387,18 +387,22 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-108 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
+112 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
-### Start here (7)
+### Start here (11)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/stage`](packages/stage/README.md) | The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine. |
 | [`@margoengine/core`](packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package. |
-| [`@margoengine/game`](packages/game/README.md) | Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects |
-| [`@margoengine/kit-web`](packages/kit-web/README.md) | Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
-| [`@margoengine/kit-viz`](packages/kit-viz/README.md) | Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
-| [`@margoengine/kit-react`](packages/kit-react/README.md) | Install profile. React and Next.js web apps |
+| [`@margoengine/games`](packages/games/README.md) | Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects |
+| [`@margoengine/web`](packages/web/README.md) | Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
+| [`@margoengine/science`](packages/science/README.md) | Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
+| [`@margoengine/cad`](packages/cad/README.md) | Install profile. CAD models: the shared scene packages, the B-rep kernel, and STEP and JT import |
+| [`@margoengine/game`](packages/game/README.md) | Forwards to @margoengine/games. Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects |
+| [`@margoengine/kit-web`](packages/kit-web/README.md) | Forwards to @margoengine/web. Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
+| [`@margoengine/kit-viz`](packages/kit-viz/README.md) | Forwards to @margoengine/science. Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
+| [`@margoengine/kit-react`](packages/kit-react/README.md) | Install profile. React and Next.js web apps. Retired: install @margoengine/web and @margoengine/react. |
 | [`margoengine`](packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 
 ### Setup and diagnostics (6)
@@ -422,7 +426,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/fbx`](packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data. |
-| [`@margoengine/cad`](packages/cad/README.md) | CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a worker, and the stage addCAD helper. |
+| [`@margoengine/cad-import`](packages/cad-import/README.md) | CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a worker, and the stage addCAD helper. |
 | [`@margoengine/brep`](packages/brep/README.md) | Margo's own CAD kernel: STEP (ISO 10303-21), IGES 5.3, ACIS SAT, Parasolid XT and JT (ISO 14306) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation. |
 | [`@margoengine/ifc`](packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
@@ -1311,7 +1315,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,340 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,346 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -1434,22 +1438,25 @@ repository builds and never the unrelated registry placeholder.
 | --- | --- |
 | `npm install @margoengine/core` | Rendering and transforms, no other engine package |
 | `npm install @margoengine/stage` | The stage facade plus core, nothing else required |
-| `npm install @margoengine/game` | Game systems, rendering, input, animation, worlds, audio and navigation |
-| `npm install @margoengine/kit-web` | Product viewers and interactive web scenes |
-| `npm install @margoengine/kit-viz` | Scientific figures, compute, spatial data, terrain, points and lines |
-| `npm install @margoengine/kit-react react react-dom` | The web profile with React bindings and sky, also used by Next.js |
+| `npm install @margoengine/games` | Game systems, rendering, input, animation, worlds, audio and navigation |
+| `npm install @margoengine/web` | Product viewers and interactive web scenes |
+| `npm install @margoengine/science` | Scientific figures, compute, spatial data, terrain, points and lines |
+| `npm install @margoengine/cad` | The shared scene packages, the B-rep kernel, and STEP and JT import |
+| `npm install @margoengine/react react react-dom` | React bindings. Optional, and not part of a bundle. Pair it with `@margoengine/web` |
 | `npm install margoengine` | Every engine package |
 
 A kit is a small package of typed re-exports, with a dependency on each member it exposes. It contains no copied
 engine implementation. Its root provides common names; its subpaths expose every entry of its members. Existing
 `margoengine/game`, `margoengine/web` and `margoengine/viz` imports remain supported by the full install.
-Installing a kit never installs `margoengine`. Physics development remains on hold; the game kit exposes the
-already-built physics package without changing it.
+`@margoengine/game`, `@margoengine/kit-web` and `@margoengine/kit-viz` still install: each forwards to the new bundle.
+`@margoengine/kit-react` is retired. React, WebXR, the voxel path tracer and the Blender assets package stay optional
+add-ons, in no bundle. The inspector and the MCP server are dev tools, also in no bundle.
+Installing a kit never installs `margoengine`. The games bundle exposes the already-built physics package.
 
 With a `<canvas id="viewport"></canvas>` in the page, a web profile starts a scene directly:
 
 ```ts
-import {createStage} from '@margoengine/kit-web';
+import {createStage} from '@margoengine/web';
 
 const stage = await createStage('#viewport');
 stage.box({color: '#84d6bd'});
@@ -1460,8 +1467,8 @@ stage.box({color: '#84d6bd'});
 With a `<div id="viewport" style="height:400px"></div>` in the page, a crate falls onto a floor and casts a shadow:
 
 ```ts
-import {createStage, Shadows} from '@margoengine/game';
-import {Physics} from '@margoengine/game/physics';
+import {createStage, Shadows} from '@margoengine/games';
+import {Physics} from '@margoengine/games/physics';
 
 await Physics.load(); // compiles the physics solver, once per page
 const stage = await createStage('#viewport', {camera: {position: [6, 4, 8], target: [0, 1, 0]}});
@@ -1479,7 +1486,7 @@ window.addEventListener('pagehide', () => stage.dispose(), {once: true});
 
 For a complete app, `npm create margo@latest my-app -- --template web`, then `cd my-app`, `npm install` and
 `npm run dev`. Choose `game`, `viz`, `react` or `next` for the other starters. Each template declares one domain
-profile; React and Next use `@margoengine/kit-react`. The full engine is never a template dependency.
+profile; React and Next still use the retired `@margoengine/kit-react`. The full engine is never a template dependency.
 `scripts/template-install-check.mjs` runs this actual create command through the private packed registry, installs
 and builds all five templates, and checks their exact engine dependency closures. Its separate
 `scripts/template-browser-check.mjs` proves a first frame from each production build, including Next's server.
@@ -1489,13 +1496,13 @@ To add a capability outside a profile, install its package at the same release v
 Optional third-party peers, including React, remain app choices and are never silently installed by a kit. The
 3D solver, Margo's own kernel, comes with `@margoengine/physics`; it has no peer.
 
-Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/kit-web/gltf/pbr'` (or
-`@margoengine/game/gltf/pbr`). The loader is installed with the profile, but a page importing only the root emits
+Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/web/gltf/pbr'` (or
+`@margoengine/games/gltf/pbr`). The loader is installed with the profile, but a page importing only the root emits
 no Draco or Basis files. Bundlers discover decoder assets before tree-shaking, so the root deliberately keeps the
 loader entry separate. A model app keeps the full glTF/compression support of the existing loader. No loader,
 core or stage implementation changed.
 
-Physics works the same way: `import {Physics, PhysicsBody, CharacterController} from '@margoengine/game/physics'`
+Physics works the same way: `import {Physics, PhysicsBody, CharacterController} from '@margoengine/games/physics'`
 (or `margoengine/physics` in the full install). `@margoengine/physics` carries its kernel as a lazy chunk of its JavaScript. The game kit root does not re-export the
 physics names, so a game that imports only the root does not load it, and neither root nor physics entry emits a Wasm
 file (`packages/game/tests/physics-entry.test.js`). Before
@@ -1599,17 +1606,21 @@ The packed-install CPU check is part of local CI's verify. Each kit README holds
 Generated from `scripts/umbrella.mjs` (`node scripts/umbrella.mjs` rewrites this section).
 
 <!-- kits:start -->
-### Install profile `@margoengine/game`
+### Install profile `@margoengine/games`
 
-`stage`, `core`, `animation`, `animator`, `materials`, `geometry`, `shadows`, `clustered`, `environment`, `sky`, `controls`, `input`, `physics`, `navmesh`, `audio`, `vfx`, `text`, `tween`, `post`, `tonemap`, `ecs`, `fsm`, `netcode`, `behavior`, `save`, `cutscene`, `cinematic`, `cameras`, `terrain`, `water`, `weather`, `biomes`, `creative`, `procedural`, `wfc`, `road`, `splines`, `tilemap`, `sprites`, `pixel`, `lighting2d`, `ui`, `rigging`, `ragdoll`, `mixer`, `transitions`, `toon`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `gltf`, `decoders`, `loaders`, `bvh`, `selection`, `quality`, `stats`, `studio`, `lightmap`, `shader`, `compute`. Every exported subpath of each member is available as `@margoengine/game/<member>[/<entry>]`.
+`stage`, `core`, `animation`, `animator`, `materials`, `geometry`, `shadows`, `clustered`, `environment`, `sky`, `controls`, `input`, `physics`, `navmesh`, `audio`, `vfx`, `text`, `tween`, `post`, `tonemap`, `ecs`, `fsm`, `netcode`, `behavior`, `save`, `cutscene`, `cinematic`, `cameras`, `terrain`, `water`, `weather`, `biomes`, `creative`, `procedural`, `wfc`, `road`, `splines`, `tilemap`, `sprites`, `pixel`, `lighting2d`, `ui`, `rigging`, `ragdoll`, `mixer`, `transitions`, `toon`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `gltf`, `decoders`, `loaders`, `bvh`, `selection`, `quality`, `stats`, `studio`, `lightmap`, `shader`, `compute`. Every exported subpath of each member is available as `@margoengine/games/<member>[/<entry>]`.
 
-### Install profile `@margoengine/kit-web`
+### Install profile `@margoengine/web`
 
-`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `studio`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`. Every exported subpath of each member is available as `@margoengine/kit-web/<member>[/<entry>]`.
+`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `studio`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`. Every exported subpath of each member is available as `@margoengine/web/<member>[/<entry>]`.
 
-### Install profile `@margoengine/kit-viz`
+### Install profile `@margoengine/science`
 
-`stage`, `core`, `points`, `sciviz`, `compute`, `lines`, `splats`, `terrain`, `text`, `labels`, `html`, `controls`, `cameras`, `environment`, `tween`, `stats`, `post`, `tonemap`, `geometry`, `materials`, `loaders`, `exporters`, `gltf`, `decoders`, `selection`, `viewcube`, `bvh`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `tiles`, `splines`. Every exported subpath of each member is available as `@margoengine/kit-viz/<member>[/<entry>]`.
+`stage`, `core`, `points`, `sciviz`, `compute`, `lines`, `splats`, `terrain`, `text`, `labels`, `html`, `controls`, `cameras`, `environment`, `tween`, `stats`, `post`, `tonemap`, `geometry`, `materials`, `loaders`, `exporters`, `gltf`, `decoders`, `selection`, `viewcube`, `bvh`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `tiles`, `splines`. Every exported subpath of each member is available as `@margoengine/science/<member>[/<entry>]`.
+
+### Install profile `@margoengine/cad`
+
+`stage`, `core`, `environment`, `controls`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `decoders`, `loaders`, `selection`, `cameras`, `stats`, `text`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `brep`, `cad-import`. Every exported subpath of each member is available as `@margoengine/cad/<member>[/<entry>]`.
 
 ### Install profile `@margoengine/kit-react`
 
@@ -4911,7 +4922,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   hands, hit test, AR, performance) need an immersive session with `XRGPUBinding` layers and are covered by their own
   tests on recording sessions. XR draws on a device of its own; the CPU model, which has no WebGPU, hands out an inert one.
 - cad's B-rep formats (STEP, IGES, JT) need the kernel's Wasm in its worker and are left to
-  `packages/cad/test/cad-brep-worker.test.js`; `parseCADAsync` is an entry only where the runtime has workers (the browser
+  `packages/cad-import/test/cad-brep-worker.test.js`; `parseCADAsync` is an entry only where the runtime has workers (the browser
   leaf), and `addCAD` is covered by the stage fixture.
 - `TAAUpscale` draws one full-canvas view and throws on the harness's two views by design; its scene detach is
   covered by `packages/taa/test/scene-owner.test.js`.
@@ -5650,13 +5661,13 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## CAD import and the B-rep kernel (2026-11-13)
 
-`@margoengine/cad` reads STL and OBJ on the page and STEP, IGES, ACIS SAT, Parasolid XT and JT through
+`@margoengine/cad-import` reads STL and OBJ on the page and STEP, IGES, ACIS SAT, Parasolid XT and JT through
 `@margoengine/brep` in a worker. Each cap fails with a `RangeError` that names it and the way past it (regression tests
-in `packages/cad/test/cad-limits.test.js`).
+in `packages/cad-import/test/cad-limits.test.js`).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| CAD file size | Enforced: 64 MiB per file ([cad-parser.ts](../packages/cad/src/cad-parser.ts)) | Bounds the worker's memory for untrusted files | `RangeError: CAD exceeds 64 MiB (...); tessellate it offline with @margoengine/brep, export it as GLB with @margoengine/exporters and load it with @margoengine/gltf/pbr` (STL and OBJ: `export it as GLB`) | A GLB through `@margoengine/gltf/pbr`, which has no CAD cap |
+| CAD file size | Enforced: 64 MiB per file ([cad-parser.ts](../packages/cad-import/src/cad-parser.ts)) | Bounds the worker's memory for untrusted files | `RangeError: CAD exceeds 64 MiB (...); tessellate it offline with @margoengine/brep, export it as GLB with @margoengine/exporters and load it with @margoengine/gltf/pbr` (STL and OBJ: `export it as GLB`) | A GLB through `@margoengine/gltf/pbr`, which has no CAD cap |
 | Vertices per geometry, distinct triangle indices | Enforced: 1,000,000 vertices, 3,000,000 indices | One geometry's buffers stay within what every backend draws in one call | The same `RangeError` form, naming the cap | As above |
 | Meshes per file | Enforced: `maxParts`, default 100,000 ([limits.js](../packages/shared/limits.js)) | Every mesh becomes a core entity | `Too many CAD parts (...; raise the maxParts option)` | `maxParts`, up to core's 8,388,608 entities |
 | Worker time | Enforced: `timeoutMs`, default 120,000 ms | A file the kernel cannot finish does not hold a worker for ever | `RangeError: CAD import did not finish within 120000 ms (raise the timeoutMs option)`; the worker is terminated | `timeoutMs` |
@@ -21128,12 +21139,12 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Repro:** `PartInstancer.attach(engine)` and `engine.render({ views })` with a view whose viewport or scissor is not
   the whole target: the packed parts drew across the whole target, over neighbouring views. Found by the cad
   owner/lifetime fixture on a real device ("no pixel writes outside either view scissor").
-- **Cause:** the pack's own pass (packages/cad/src/pack.ts) set a viewport and scissor only when the draw call passed
+- **Cause:** the pack's own pass (packages/cad-import/src/pack.ts) set a viewport and scissor only when the draw call passed
   them; core's draw falls back to the view's rectangles, the pack draw did not.
 - **Fix:** the pack draw resolves its rectangles exactly as core's draw does (the call's own, else the view's viewport
   and scissor).
-- **Regression:** packages/cad/test/pack.test.js, "the pack draw keeps to the view it is drawn in..." (fails on the old
-  source); packages/cad/test/owner-lifetime.fixture.js on WebGPU and the WebGL2 layer.
+- **Regression:** packages/cad-import/test/pack.test.js, "the pack draw keeps to the view it is drawn in..." (fails on the old
+  source); packages/cad-import/test/owner-lifetime.fixture.js on WebGPU and the WebGL2 layer.
 
 ### Fixed 2026-11-15: loadCAD and parseCADAsync built their model in the scene active when they finished, and a disposed PartInstancer stayed registered (KB-OWN-CAD1, KB-OWN-CAD2, cad)
 
@@ -21146,9 +21157,9 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   its scene (KB-OWN-CAD2).
 - **Fix:** loadCAD and parseCADAsync capture the calling scene before their first await (`captureScene`) and make every
   mesh in it; `PartInstancer.dispose` removes the plugin from `engine.sceneOf(this)` once and is safe to call twice.
-- **Regression:** packages/cad/test/pack.test.js, "loadCAD builds its model in the scene it was called for...",
+- **Regression:** packages/cad-import/test/pack.test.js, "loadCAD builds its model in the scene it was called for...",
   "parseCADAsync builds the parts its worker sends in the scene it was called for" and "disposing a PartInstancer takes
-  it out of its scene..." (all fail on the old source); packages/cad/test/owner-lifetime.fixture.js.
+  it out of its scene..." (all fail on the old source); packages/cad-import/test/owner-lifetime.fixture.js.
 
 ### Fixed 2026-11-15: a destroyed WebGL2-layer device kept its context-loss listener on the canvas (KB-OWN-COMPAT1, webgl2-compat)
 
@@ -33479,9 +33490,9 @@ Static scenes cost little per frame: the kernel recomputes only entities whose p
 
 [README continues: https://margoengine.com/llms/packages/core.md]
 
-=== @margoengine/game (packages/game/README.md) ===
+=== @margoengine/games (packages/games/README.md) ===
 
-# @margoengine/game
+# @margoengine/games
 
 Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects.
 
@@ -33491,6 +33502,126 @@ All packages release together at one version. Optional third-party peers remain 
 
 See the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,
 model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page:
+
+```ts
+import {createStage, Shadows, OrbitControls, Input, Tween} from '@margoengine/games';
+
+const stage = await createStage('#viewport', {controls: false});
+const shadows = Shadows.attach(stage.engine, {resolution: 2048});
+const ground = stage.box({size: [10, 0.2, 10], color: '#c8c8c8'});
+const player = stage.box({position: [0, 1, 0], color: '#84d6bd'});
+shadows.add(ground);
+shadows.add(player);
+const controls = new OrbitControls(stage.engine.camera, stage.engine.canvas as HTMLCanvasElement);
+const input = new Input({jump: [{type: 'key', code: 'Space'}]});
+const tween = new Tween();
+const height = {y: 1};
+stage.onTick((delta) => {
+  input.update();
+  if (input.state('jump').pressed) tween.to(height, 'y', 3, {duration: 0.4});
+  tween.update(delta);
+  player.position.y = height.y;
+  controls.update(delta);
+});
+```
+
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/games/gltf/pbr'`.
+Physics is one too: `import {Physics} from '@margoengine/games/physics'`. A game without it ships no solver Wasm.
+
+=== @margoengine/web (packages/web/README.md) ===
+
+# @margoengine/web
+
+Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top.
+
+It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
+The root contains common exports; member subpaths expose the complete installed member APIs.
+All packages release together at one version. Optional third-party peers remain app choices.
+
+See the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,
+model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page:
+
+```ts
+import {createStage, Environment, OrbitControls, Shadows, Tonemap} from '@margoengine/web';
+
+const stage = await createStage('#viewport', {controls: false});
+const shadows = Shadows.attach(stage.engine, {resolution: 2048});
+const tonemap = Tonemap.attach(stage.engine, {curve: 'neutral', exposure: 0});
+const floor = stage.box({size: [6, 0.1, 6], color: '#d8d8d8'});
+const product = stage.sphere({radius: 0.8, position: [0, 0.9, 0], color: '#c0792b', roughness: 0.3});
+shadows.add(floor);
+shadows.add(product);
+const controls = new OrbitControls(stage.engine.camera, stage.engine.canvas as HTMLCanvasElement);
+stage.onTick((delta) => controls.update(delta));
+console.log(typeof Environment, tonemap.options.curve);
+```
+
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/web/gltf/pbr'`.
+
+=== @margoengine/science (packages/science/README.md) ===
+
+# @margoengine/science
+
+Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text.
+
+It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
+The root contains common exports; member subpaths expose the complete installed member APIs.
+All packages release together at one version. Optional third-party peers remain app choices.
+
+See the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,
+model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page:
+
+```ts
+import {createStage, PointsPlugin, PointCloud, OrbitControls, colormap} from '@margoengine/science';
+
+const stage = await createStage('#viewport', {controls: false});
+const points = PointsPlugin.attach(stage.engine);
+const positions = new Float32Array(30_000).map(() => Math.random() * 10);
+const colors = new Float32Array(30_000).fill(1);
+points.add(new PointCloud({positions, colors, material: {size: 2, shape: 'round'}}));
+const controls = new OrbitControls(stage.engine.camera, stage.engine.canvas as HTMLCanvasElement);
+stage.onTick((delta) => controls.update(delta));
+console.log(typeof colormap);
+```
+
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/science/gltf/pbr'`.
+
+=== @margoengine/cad (packages/cad/README.md) ===
+
+# @margoengine/cad
+
+Install profile. CAD models: the shared scene packages, the B-rep kernel, and STEP and JT import.
+
+It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
+The root contains common exports; member subpaths expose the complete installed member APIs.
+All packages release together at one version. Optional third-party peers remain app choices.
+
+See the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,
+model-loading entries and measured package counts.
+
+With a `<div id="viewport" style="height:400px"></div>` in the page:
+
+```ts
+import {createStage, loadCAD} from '@margoengine/cad';
+
+const stage = await createStage('#viewport');
+const model = await loadCAD(stage.engine, '/bracket.step');
+console.log(model.meshes.length);
+```
+
+A STEP file is a separate import from the same package: `loadCAD(stage.engine, url)`.
+
+=== @margoengine/game (packages/game/README.md) ===
+
+# @margoengine/game
+
+This name forwards to [`@margoengine/games`](https://margoengine.com/llms/docs/guides/kits.md). Install `@margoengine/games` for new work. Existing imports of `@margoengine/game` keep working: every subpath re-exports the same modules.
 
 With a `<div id="viewport" style="height:400px"></div>` in the page:
 
@@ -33516,21 +33647,11 @@ stage.onTick((delta) => {
 });
 ```
 
-Model loading is a separate import: `import {loadGLTF} from '@margoengine/game/gltf/pbr'`.
-Physics is one too: `import {Physics} from '@margoengine/game/physics'`. A game without it ships no solver Wasm.
-
 === @margoengine/kit-web (packages/kit-web/README.md) ===
 
 # @margoengine/kit-web
 
-Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top.
-
-It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
-The root contains common exports; member subpaths expose the complete installed member APIs.
-All packages release together at one version. Optional third-party peers remain app choices.
-
-See the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,
-model-loading entries and measured package counts.
+This name forwards to [`@margoengine/web`](https://margoengine.com/llms/docs/guides/kits.md). Install `@margoengine/web` for new work. Existing imports of `@margoengine/kit-web` keep working: every subpath re-exports the same modules.
 
 With a `<div id="viewport" style="height:400px"></div>` in the page:
 
@@ -33549,20 +33670,11 @@ stage.onTick((delta) => controls.update(delta));
 console.log(typeof Environment, tonemap.options.curve);
 ```
 
-Model loading is a separate import: `import {loadGLTF} from '@margoengine/kit-web/gltf/pbr'`.
-
 === @margoengine/kit-viz (packages/kit-viz/README.md) ===
 
 # @margoengine/kit-viz
 
-Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text.
-
-It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
-The root contains common exports; member subpaths expose the complete installed member APIs.
-All packages release together at one version. Optional third-party peers remain app choices.
-
-See the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,
-model-loading entries and measured package counts.
+This name forwards to [`@margoengine/science`](https://margoengine.com/llms/docs/guides/kits.md). Install `@margoengine/science` for new work. Existing imports of `@margoengine/kit-viz` keep working: every subpath re-exports the same modules.
 
 With a `<div id="viewport" style="height:400px"></div>` in the page:
 
@@ -33579,13 +33691,13 @@ stage.onTick((delta) => controls.update(delta));
 console.log(typeof colormap);
 ```
 
-Model loading is a separate import: `import {loadGLTF} from '@margoengine/kit-viz/gltf/pbr'`.
-
 === @margoengine/kit-react (packages/kit-react/README.md) ===
 
 # @margoengine/kit-react
 
-Install profile. The web profile with React bindings and sky.
+This profile is retired. New apps install `@margoengine/web` and `@margoengine/react`. The package remains so existing imports keep working.
+
+Install profile. React and Next.js web apps. Retired: install @margoengine/web and @margoengine/react..
 
 It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
 The root contains common exports; member subpaths expose the complete installed member APIs.
@@ -34137,7 +34249,7 @@ geometry), and [`@margoengine/gltf/pbr`](#pbr-rendering-margoenginegltfpbr) is f
 its own entries for workers, streaming, instancing, lights, physics, behaviour graphs and more. Each entry loads only what
 it imports, so a page with the light loader pays nothing for PBR.
 
-Package name: `@margoengine/gltf`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/gltf`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/gltf@1.0.0
@@ -34505,9 +34617,9 @@ same vertices and indices.
 
 [README continues: https://margoengine.com/llms/packages/exporters.md]
 
-=== @margoengine/cad (packages/cad/README.md) ===
+=== @margoengine/cad-import (packages/cad-import/README.md) ===
 
-# @margoengine/cad
+# @margoengine/cad-import
 
 CAD import for Margo Engine: STL and OBJ, and the B-rep formats STEP (AP203, AP214, AP242), IGES 5.3, ACIS SAT,
 Parasolid XT (.x_t, .x_b) and JT (ISO 14306), read and meshed by Margo's own kernel, `@margoengine/brep`, in a
@@ -34515,7 +34627,7 @@ worker. No third-party CAD code: the kernel is TypeScript written from the publi
 
 ```ts
 import { Engine } from '@margoengine/core';
-import { loadCAD } from '@margoengine/cad';
+import { loadCAD } from '@margoengine/cad-import';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
 const model = await loadCAD(engine, '/bracket.step', { signal: AbortSignal.timeout(30_000) });
@@ -34566,7 +34678,7 @@ result shape; what changes for code written against the earlier importer:
 
 ## PartInstancer and deduplicateParts
 
-[README continues: https://margoengine.com/llms/packages/cad.md]
+[README continues: https://margoengine.com/llms/packages/cad-import.md]
 
 === @margoengine/brep (packages/brep/README.md) ===
 
@@ -34574,7 +34686,7 @@ result shape; what changes for code written against the earlier importer:
 
 Margo's own CAD kernel, written from the published standards (ISO 10303-21 for the file, ISO 10303-41/42/43 and the
 AP203, AP214 and AP242 schemas for the data) with no third-party CAD code. It is the only CAD kernel the
-engine uses (`@margoengine/cad` reads every B-rep format through it; `docs/brep-kernel.md` tells how it was built in
+engine uses (`@margoengine/cad-import` reads every B-rep format through it; `docs/brep-kernel.md` tells how it was built in
 stages): it reads a STEP file's structure (stage 1), evaluates its exact geometry (stage 2) and tessellates it, one discretization per edge shared by both faces (stage 3) and a constrained Delaunay triangulation per
 face (stage 4).
 
@@ -37638,7 +37750,7 @@ For grass on terrain, use the [scatter heightmap and density-map example](../sca
 Scatter also provides [interaction and trampling](../scatter/README.md#interaction-and-trampling-margoenginescatterinteract)
 and [streamed grass chunks with three LOD meshes](../scatter/README.md#tile-input-storage).
 
-Package name: `@margoengine/creative`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/creative`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/creative@1.0.0
@@ -38036,7 +38148,7 @@ Import `margoengine/kinematics-constraints` from the `margoengine` package, or `
 
 Standalone capsule, sphere and convex hull avoidance for IK targets and two-bone chains. The package projects targets out of proxy volumes, checks elbow and link clearance, and searches a shoulder swivel angle through a caller-supplied IK evaluator. It has no engine, renderer, physics, or Wasm dependency. ESM exports and declarations are tree-shakable; core, stage, animation, and the existing IK kernels remain unchanged.
 
-Version `1.0.0` is source-only and has not been published to npm. From the repository root:
+Version `0.1.0` is source-only and has not been published to npm. From the repository root:
 
 ```sh
 npm ci
@@ -38079,7 +38191,7 @@ Import `margoengine/robot-planning` from the `margoengine` package, or `@margoen
 
 Robot arms on [`@margoengine/kinematics-constraints`](../kinematics-constraints/README.md): a tree of revolute, prismatic, continuous, fixed and mimic joints with capsule and convex hull collision shapes, a swept check of a whole joint-space motion, inverse kinematics that keeps every joint in range and every link clear, sampling planners (RRT-Connect and a reusable roadmap), a URDF reader, and a WebGPU batch that measures the clearance of thousands of poses at once. Obstacles are the volumes of kinematics-constraints: spheres, capsules, convex hulls, and from its `/sdf` entry meshes and baked distance fields. No renderer, physics or Wasm is needed.
 
-Version `1.0.0` is source-only and has not been published to npm. From the repository root:
+Version `0.1.0` is source-only and has not been published to npm. From the repository root:
 
 ```sh
 npm ci
@@ -40084,7 +40196,7 @@ Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/
 
 Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, stencil sections, assembly BVH picking and metrology for Margo Engine.
 
-Package name: `@margoengine/machinery`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/machinery`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0
@@ -40111,7 +40223,7 @@ engine.onFrame((_, delta) => {
 engine.start();
 ```
 
-CAD import (`loadCAD`, `parseCADAsync`, `parseCAD`, `deduplicateParts`, `PartInstancer`) lives in `@margoengine/cad`; see its README. STEP, IGES, SAT, XT and JT go through Margo's own B-rep kernel there.
+CAD import (`loadCAD`, `parseCADAsync`, `parseCAD`, `deduplicateParts`, `PartInstancer`) lives in `@margoengine/cad-import`; see its README. STEP, IGES, SAT, XT and JT go through Margo's own B-rep kernel there.
 
 Import individual systems from these subpaths to keep unrelated code out of direct browser imports and lazy-loaded modules. Each entry includes its associated TypeScript types. Existing imports from `@margoengine/machinery` remain supported and use the same classes and functions.
 
@@ -40716,7 +40828,7 @@ shadowed scene with click-to-select, follow the [React first scene guide](../../
 
 ## Install
 
-Package name: `@margoengine/react`, version `1.0.0`. **It is not on npm yet**, so `npm install @margoengine/react` does
+Package name: `@margoengine/react`, version `0.1.0`. **It is not on npm yet**, so `npm install @margoengine/react` does
 not work today. Two routes do. Both start from a clone of the repository (see [Install](../../README.md#install) in the
 main README for Git LFS and Node.js: 22.12+ to use the package, 24.18+ to build it from the repository).
 

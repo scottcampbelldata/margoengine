@@ -11,7 +11,7 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@margoengine/kit-react": "^1.0.0"
+    "@margoengine/kit-react": "^0.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

@@ -17,7 +17,7 @@ export interface Batch {
     claimed?: boolean;
 }
 
-export const CORE_VERSION = "1.0.0";
+export const CORE_VERSION = "0.1.0";
 
 export class Camera {
     fov: number;

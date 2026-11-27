@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/labels",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "HTML labels and CSS 3D objects positioned over a Margo Engine canvas.",
   "keywords": [
     "margoengine",
@@ -65,10 +65,10 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/text": "^1.0.0"
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/text": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   }
 }

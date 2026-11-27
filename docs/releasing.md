@@ -28,9 +28,12 @@ owns.
   requires each package's `repository.url` to be this GitHub repository (`scripts/supply-chain.mjs` checks it), and npm
   accepts provenance only from a public repository: while this repository is private, the workflow's publish step
   fails at its first package. Make the repository public first, or decide to drop `--provenance` for that release.
-- One-time GitHub setup (maintainer): an `npm-publish` environment with the maintainer as required reviewer and `main` as the only
-  allowed branch; the repository variable `NPM_PUBLISH_ENABLED=true` when a release is due (the workflow does nothing
-  without it); private vulnerability reporting enabled (Settings, Security), which SECURITY.md points to.
+- One-time GitHub setup (maintainer): an `npm-publish` environment with a required reviewer. A push of a `v*` tag
+  starts this workflow and waits for that reviewer before any publish step runs. `workflow_dispatch` from `main` is
+  still a dry run unless the dry-run box is cleared, and it waits on the same environment. The repository variable
+  `NPM_PUBLISH_ENABLED=true` must be set or the workflow does nothing. Do not add a token secret for the tag path.
+  Trusted publishing stays the auth method. Private vulnerability reporting stays enabled (Settings, Security), which
+  SECURITY.md points to.
 
 ## Before a release
 
@@ -47,7 +50,7 @@ owns.
    (`npm view <name> time.modified repository.url`) and record anything worrying in the release notes.
 6. `npm run check:merge` passes, then `npm run publish:dry-run` and read the file lists.
 7. `npm run publish:rehearsal` (part of `publish:dry-run` and of the workflow) proves the release without making it. It
-   packs all 108 packages and the two npm tools and audits each tarball: every file the manifest names is shipped, LICENSE, NOTICE and README
+   packs all 112 packages and the two npm tools and audits each tarball: every file the manifest names is shipped, LICENSE, NOTICE and README
    are present, no test or private file, install script or local dependency spec, no maintainer path or email, every
    import declared. It then serves them from a stand-in registry on 127.0.0.1 that refuses every write, and in a clean
    temp project with an empty cache runs `npm install margoengine`, imports every entry in Node, type-checks every entry
@@ -55,12 +58,13 @@ owns.
 
 ## Publishing
 
-Run the `Publish` workflow from `main` with the version and `dry_run` checked; read the log; then run it again
-unchecked. Order inside the workflow:
+Push a `v*` tag, or run the `Publish` workflow from `main` with the version and `dry_run` checked; read the log; then
+run it again unchecked. A tag publish is not a dry run. It still waits for the `npm-publish` reviewer. Order inside
+the workflow:
 
 1. Leaf workspace packages under `packages/`, in dependency order, including core and stage.
-2. `@margoengine/game`, `@margoengine/kit-web`, `@margoengine/kit-viz` and `@margoengine/kit-react`, after their members.
-3. `margoengine`, the install-everything option. scripts/publish-order.mjs derives this order from the workspace dependency graph; the workflow publishes one tarball at a time in that order. The four profiles are included automatically;
+2. `@margoengine/games`, `@margoengine/web`, `@margoengine/science`, `@margoengine/cad` and the retired `@margoengine/kit-react`, after their members. `@margoengine/game`, `@margoengine/kit-web` and `@margoengine/kit-viz` publish after the bundle they forward to.
+3. `margoengine`, the install-everything option. scripts/publish-order.mjs derives this order from the workspace dependency graph; the workflow publishes one tarball at a time in that order. The profiles are included automatically;
    do not expose create-margo until all names at the shared version are available. The registry may be temporarily
    incomplete during publication, so the release announcement follows the last successful publish.
 4. `margo-convert` (depends on the `@margoengine` packages).

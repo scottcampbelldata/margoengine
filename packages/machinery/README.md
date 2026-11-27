@@ -4,7 +4,7 @@ Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/
 
 Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, stencil sections, assembly BVH picking and metrology for Margo Engine.
 
-Package name: `@margoengine/machinery`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/machinery`, version `0.1.0`. Build from source or install a local tarball until the renamed package is published.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0
@@ -31,7 +31,7 @@ engine.onFrame((_, delta) => {
 engine.start();
 ```
 
-CAD import (`loadCAD`, `parseCADAsync`, `parseCAD`, `deduplicateParts`, `PartInstancer`) lives in `@margoengine/cad`; see its README. STEP, IGES, SAT, XT and JT go through Margo's own B-rep kernel there.
+CAD import (`loadCAD`, `parseCADAsync`, `parseCAD`, `deduplicateParts`, `PartInstancer`) lives in `@margoengine/cad-import`; see its README. STEP, IGES, SAT, XT and JT go through Margo's own B-rep kernel there.
 
 Import individual systems from these subpaths to keep unrelated code out of direct browser imports and lazy-loaded modules. Each entry includes its associated TypeScript types. Existing imports from `@margoengine/machinery` remain supported and use the same classes and functions.
 

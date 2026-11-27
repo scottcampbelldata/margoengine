@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/scatter",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Seeded instancing, distance-based LOD and procedural wind.",
   "keywords": [
     "margoengine",
@@ -100,12 +100,12 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/lod": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/culling": "^1.0.0",
-    "@margoengine/mesh-edit": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/lod": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/culling": "^0.1.0",
+    "@margoengine/mesh-edit": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/lod": {
@@ -125,7 +125,7 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "test:settings:browser": "cd ../.. && node packages/scatter/test/settings.browser.mjs && node packages/scatter/test/settings.browser.mjs --compat",

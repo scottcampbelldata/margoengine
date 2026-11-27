@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/materials",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Optional glTF PBR material lobes, transmission, volume, parallax occlusion, triplanar and subsurface scattering, and typed node graphs through an isolated extension slot.",
   "keywords": [
     "margoengine",
@@ -162,12 +162,12 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/environment": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/environment": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/environment": {

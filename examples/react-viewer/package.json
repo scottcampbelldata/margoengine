@@ -26,13 +26,13 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/react": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/environment": "^1.0.0",
-    "@margoengine/controls": "^1.0.0",
-    "@margoengine/shadows": "^1.0.0",
-    "margoengine": "^1.0.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/react": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/environment": "^0.1.0",
+    "@margoengine/controls": "^0.1.0",
+    "@margoengine/shadows": "^0.1.0",
+    "margoengine": "^0.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   }

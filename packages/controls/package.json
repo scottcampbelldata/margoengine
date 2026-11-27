@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/controls",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.",
   "keywords": [
     "margoengine",
@@ -124,12 +124,12 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/tween": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/tween": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/tween": {

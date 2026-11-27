@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/stage",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine.",
   "keywords": [
     "margoengine",
@@ -93,23 +93,23 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/creative": "^1.0.0",
-    "@margoengine/sky": "^1.0.0",
-    "@margoengine/environment": "^1.0.0",
-    "@margoengine/shadows": "^1.0.0",
-    "@margoengine/xr": "^1.0.0",
-    "@margoengine/studio": "^1.0.0",
-    "@margoengine/tonemap": "^1.0.0",
-    "@margoengine/physics": "^1.0.0",
-    "@margoengine/save": "^1.0.0",
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/clustered": "^1.0.0",
-    "@margoengine/labels": "^1.0.0",
-    "@margoengine/selection": "^1.0.0"
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/creative": "^0.1.0",
+    "@margoengine/sky": "^0.1.0",
+    "@margoengine/environment": "^0.1.0",
+    "@margoengine/shadows": "^0.1.0",
+    "@margoengine/xr": "^0.1.0",
+    "@margoengine/studio": "^0.1.0",
+    "@margoengine/tonemap": "^0.1.0",
+    "@margoengine/physics": "^0.1.0",
+    "@margoengine/save": "^0.1.0",
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/clustered": "^0.1.0",
+    "@margoengine/labels": "^0.1.0",
+    "@margoengine/selection": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animation": {

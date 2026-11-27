@@ -27,8 +27,8 @@
     "start": "next start --hostname 127.0.0.1"
   },
   "dependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/react": "^1.0.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/react": "^0.1.0",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"

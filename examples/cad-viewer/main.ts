@@ -1,7 +1,7 @@
 import { Raycaster } from '@margoengine/bvh';
 import { createStage, type LoadedModel } from 'margoengine';
 import { addGLTF } from '@margoengine/stage/gltf';
-import { addCAD } from '@margoengine/cad/stage';
+import { addCAD } from '@margoengine/cad-import/stage';
 import { cadControls } from '@margoengine/controls/orbit';
 import { SOLIDWORKS } from '@margoengine/controls/profiles';
 import { Dimensions, type Anchor } from '@margoengine/machinery/dimensions';

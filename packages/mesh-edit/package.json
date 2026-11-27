@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/mesh-edit",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup.",
   "keywords": [
     "margoengine",
@@ -89,13 +89,13 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0"
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {

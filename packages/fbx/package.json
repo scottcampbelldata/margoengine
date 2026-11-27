@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/fbx",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline.",
   "keywords": [
     "margoengine",
@@ -84,18 +84,18 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/exporters": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/decoders": "^0.1.0",
+    "@margoengine/exporters": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/loaders": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   },
   "devDependencies": {
-    "@margoengine/animation": "^1.0.0"
+    "@margoengine/animation": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js fbx",

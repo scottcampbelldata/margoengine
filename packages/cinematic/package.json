@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/cinematic",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake.",
   "keywords": [
     "margoengine",
@@ -72,11 +72,11 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/splines": "^1.0.0"
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/splines": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js cinematic",
@@ -85,7 +85,7 @@
     "test:gpu": "cd ../.. && node packages/cinematic/test/browser-check.mjs && node packages/cinematic/test/physical-lens-browser.mjs && node packages/cinematic/test/ortho-browser.mjs"
   },
   "devDependencies": {
-    "@margoengine/cameras": "^1.0.0",
-    "@margoengine/dof": "^1.0.0"
+    "@margoengine/cameras": "^0.1.0",
+    "@margoengine/dof": "^0.1.0"
   }
 }

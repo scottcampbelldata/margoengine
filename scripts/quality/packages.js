@@ -10,7 +10,11 @@ export const slash = (p) => p.replaceAll('\\', '/');
 
 /** Tracked and untracked (not ignored) repo files, '/'-separated. */
 export function repoFiles(root) {
-  return execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
+  return execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
     .split('\n')
     .filter((f) => f && existsSync(join(root, f)));
 }

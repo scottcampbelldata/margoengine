@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/webgl2-compat",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "WebGL2 compatibility for browsers without WebGPU: install() runs the real renderer with a WebGPU-shaped device, WGSL translation and tiered compute. Optional /preview, /pick, /restore and /auto entries preserve the smaller preview on lower-tier WebGL2; /xr supports WebXR.",
   "keywords": [
     "margoengine",
@@ -102,9 +102,9 @@
     "test:gpu:snorm": "cd ../.. && node packages/webgl2-compat/test/snorm-storage-browser.mjs"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   }
 }

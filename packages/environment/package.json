@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/environment",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU.",
   "keywords": [
     "margoengine",
@@ -24,7 +24,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "test:gpu:drainage-fog": "cd ../.. && node packages/environment/tests/drainage-fog.browser.mjs && node packages/environment/tests/drainage-fog.browser.mjs --compat",
@@ -161,6 +161,6 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   }
 }

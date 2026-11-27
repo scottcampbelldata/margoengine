@@ -33,7 +33,19 @@ const siteExamples = {
 };
 // Package layers: the catalog and the sizes page list packages in this order.
 const layers = {
-  'Start here': ['stage', 'core', 'game', 'kit-web', 'kit-viz', 'kit-react', 'margoengine'],
+  'Start here': [
+    'stage',
+    'core',
+    'games',
+    'web',
+    'science',
+    'cad',
+    'game',
+    'kit-web',
+    'kit-viz',
+    'kit-react',
+    'margoengine',
+  ],
   'Setup and diagnostics': ['math', 'quality', 'webgl2-compat', 'worker', 'stats', 'inspector'],
   'Loading and formats': [
     'gltf',
@@ -42,7 +54,7 @@ const layers = {
     'fbx',
     'usdz',
     'exporters',
-    'cad',
+    'cad-import',
     'brep',
     'ifc',
     'blender',

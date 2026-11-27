@@ -42,6 +42,8 @@ jobs:
           node-version: '24.18.0'
           cache: npm
       - run: npm ci
+      - name: Bundle dependency closures stay inside their allowed packages
+        run: npm run check:bundles
       - name: Build packages and check the core + stage size budget
         run: npm run build:packages
       # After the build: a package's tsconfig resolves @margoengine/* through the built dist/*.d.ts (scripts/typecheck.js).

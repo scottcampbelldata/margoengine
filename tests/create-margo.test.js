@@ -84,9 +84,9 @@ test('create-margo scaffolds the template and refuses a non-empty directory', (t
 
 // The app each template scaffolds, its engine imports, and what its build must contain.
 const templates = {
-  web: { main: 'src/main.ts', imports: "from '@margoengine/kit-web/environment'" },
-  game: { main: 'src/main.ts', imports: "from '@margoengine/game'" },
-  viz: { main: 'src/main.ts', imports: "from '@margoengine/kit-viz'" },
+  web: { main: 'src/main.ts', imports: "from '@margoengine/web/environment'" },
+  game: { main: 'src/main.ts', imports: "from '@margoengine/games'" },
+  viz: { main: 'src/main.ts', imports: "from '@margoengine/science'" },
   react: { main: 'src/scene.tsx', imports: "from '@margoengine/kit-react'" },
 };
 
@@ -100,7 +100,14 @@ for (const [template, { main, imports }] of Object.entries(templates))
       manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
     assert.deepEqual(
       Object.keys(manifest.dependencies).filter((name) => name.includes('margoengine')),
-      [`@margoengine/${template === 'game' ? 'game' : `kit-${template}`}`],
+      [
+        {
+          web: '@margoengine/web',
+          game: '@margoengine/games',
+          viz: '@margoengine/science',
+          react: '@margoengine/kit-react',
+        }[template],
+      ],
       'one engine dependency',
     );
     assert.ok(readFileSync(join(app, main), 'utf8').includes(imports), imports);

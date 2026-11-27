@@ -4,7 +4,7 @@ Import `margoengine/kinematics-constraints` from the `margoengine` package, or `
 
 Standalone capsule, sphere and convex hull avoidance for IK targets and two-bone chains. The package projects targets out of proxy volumes, checks elbow and link clearance, and searches a shoulder swivel angle through a caller-supplied IK evaluator. It has no engine, renderer, physics, or Wasm dependency. ESM exports and declarations are tree-shakable; core, stage, animation, and the existing IK kernels remain unchanged.
 
-Version `1.0.0` is source-only and has not been published to npm. From the repository root:
+Version `0.1.0` is source-only and has not been published to npm. From the repository root:
 
 ```sh
 npm ci

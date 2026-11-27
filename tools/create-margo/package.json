@@ -1,6 +1,6 @@
 {
   "name": "create-margo",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Start a Margo Engine app: npm create margo@latest my-app (templates: web, game, viz, react, next)",
   "keywords": [
     "margoengine",

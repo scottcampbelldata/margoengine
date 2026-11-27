@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/decoders",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine.",
   "keywords": [
     "margoengine",
@@ -21,7 +21,7 @@
   "author": "Scott Campbell",
   "type": "module",
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "publishConfig": {
     "access": "public"

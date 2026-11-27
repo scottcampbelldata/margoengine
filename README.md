@@ -381,18 +381,22 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-108 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
+112 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
-### Start here (7)
+### Start here (11)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/stage`](packages/stage/README.md) | The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine. |
 | [`@margoengine/core`](packages/core/README.md) | WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl2-compat package. |
-| [`@margoengine/game`](packages/game/README.md) | Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects |
-| [`@margoengine/kit-web`](packages/kit-web/README.md) | Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
-| [`@margoengine/kit-viz`](packages/kit-viz/README.md) | Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
-| [`@margoengine/kit-react`](packages/kit-react/README.md) | Install profile. React and Next.js web apps |
+| [`@margoengine/games`](packages/games/README.md) | Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects |
+| [`@margoengine/web`](packages/web/README.md) | Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
+| [`@margoengine/science`](packages/science/README.md) | Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
+| [`@margoengine/cad`](packages/cad/README.md) | Install profile. CAD models: the shared scene packages, the B-rep kernel, and STEP and JT import |
+| [`@margoengine/game`](packages/game/README.md) | Forwards to @margoengine/games. Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects |
+| [`@margoengine/kit-web`](packages/kit-web/README.md) | Forwards to @margoengine/web. Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top |
+| [`@margoengine/kit-viz`](packages/kit-viz/README.md) | Forwards to @margoengine/science. Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text |
+| [`@margoengine/kit-react`](packages/kit-react/README.md) | Install profile. React and Next.js web apps. Retired: install @margoengine/web and @margoengine/react. |
 | [`margoengine`](packages/margoengine/README.md) | Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react). |
 
 ### Setup and diagnostics (6)
@@ -416,7 +420,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/fbx`](packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data. |
-| [`@margoengine/cad`](packages/cad/README.md) | CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a worker, and the stage addCAD helper. |
+| [`@margoengine/cad-import`](packages/cad-import/README.md) | CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a worker, and the stage addCAD helper. |
 | [`@margoengine/brep`](packages/brep/README.md) | Margo's own CAD kernel: STEP (ISO 10303-21), IGES 5.3, ACIS SAT, Parasolid XT and JT (ISO 14306) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation. |
 | [`@margoengine/ifc`](packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |

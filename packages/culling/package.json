@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/culling",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame.",
   "keywords": [
     "margoengine",
@@ -80,10 +80,10 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js culling",

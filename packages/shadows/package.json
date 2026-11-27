@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/shadows",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Four-cascade cached directional shadows with PCSS.",
   "keywords": [
     "margoengine",
@@ -96,11 +96,11 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/core": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/cache",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback.",
   "keywords": [
     "margoengine",

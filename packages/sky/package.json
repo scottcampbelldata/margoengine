@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/sky",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning), with a moonlit night sky, day presets, preset scenes, scene kits, the Milky Way, aurora and a textured moon.",
   "keywords": [
     "margoengine",
@@ -173,12 +173,12 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/post": "^1.0.0",
-    "@margoengine/tonemap": "^1.0.0"
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/post": "^0.1.0",
+    "@margoengine/tonemap": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sky",

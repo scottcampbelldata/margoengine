@@ -273,7 +273,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   hands, hit test, AR, performance) need an immersive session with `XRGPUBinding` layers and are covered by their own
   tests on recording sessions. XR draws on a device of its own; the CPU model, which has no WebGPU, hands out an inert one.
 - cad's B-rep formats (STEP, IGES, JT) need the kernel's Wasm in its worker and are left to
-  `packages/cad/test/cad-brep-worker.test.js`; `parseCADAsync` is an entry only where the runtime has workers (the browser
+  `packages/cad-import/test/cad-brep-worker.test.js`; `parseCADAsync` is an entry only where the runtime has workers (the browser
   leaf), and `addCAD` is covered by the stage fixture.
 - `TAAUpscale` draws one full-canvas view and throws on the harness's two views by design; its scene detach is
   covered by `packages/taa/test/scene-owner.test.js`.
@@ -1012,13 +1012,13 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## CAD import and the B-rep kernel (2026-11-13)
 
-`@margoengine/cad` reads STL and OBJ on the page and STEP, IGES, ACIS SAT, Parasolid XT and JT through
+`@margoengine/cad-import` reads STL and OBJ on the page and STEP, IGES, ACIS SAT, Parasolid XT and JT through
 `@margoengine/brep` in a worker. Each cap fails with a `RangeError` that names it and the way past it (regression tests
-in `packages/cad/test/cad-limits.test.js`).
+in `packages/cad-import/test/cad-limits.test.js`).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| CAD file size | Enforced: 64 MiB per file ([cad-parser.ts](../packages/cad/src/cad-parser.ts)) | Bounds the worker's memory for untrusted files | `RangeError: CAD exceeds 64 MiB (...); tessellate it offline with @margoengine/brep, export it as GLB with @margoengine/exporters and load it with @margoengine/gltf/pbr` (STL and OBJ: `export it as GLB`) | A GLB through `@margoengine/gltf/pbr`, which has no CAD cap |
+| CAD file size | Enforced: 64 MiB per file ([cad-parser.ts](../packages/cad-import/src/cad-parser.ts)) | Bounds the worker's memory for untrusted files | `RangeError: CAD exceeds 64 MiB (...); tessellate it offline with @margoengine/brep, export it as GLB with @margoengine/exporters and load it with @margoengine/gltf/pbr` (STL and OBJ: `export it as GLB`) | A GLB through `@margoengine/gltf/pbr`, which has no CAD cap |
 | Vertices per geometry, distinct triangle indices | Enforced: 1,000,000 vertices, 3,000,000 indices | One geometry's buffers stay within what every backend draws in one call | The same `RangeError` form, naming the cap | As above |
 | Meshes per file | Enforced: `maxParts`, default 100,000 ([limits.js](../packages/shared/limits.js)) | Every mesh becomes a core entity | `Too many CAD parts (...; raise the maxParts option)` | `maxParts`, up to core's 8,388,608 entities |
 | Worker time | Enforced: `timeoutMs`, default 120,000 ms | A file the kernel cannot finish does not hold a worker for ever | `RangeError: CAD import did not finish within 120000 ms (raise the timeoutMs option)`; the worker is terminated | `timeoutMs` |

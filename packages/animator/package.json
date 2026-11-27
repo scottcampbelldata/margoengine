@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/animator",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints.",
   "keywords": [
     "margoengine",
@@ -89,13 +89,13 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/splines": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/splines": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/splines": {

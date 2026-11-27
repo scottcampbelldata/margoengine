@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/rigging",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh.",
   "keywords": [
     "margoengine",
@@ -127,18 +127,18 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/physics": "^1.0.0"
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/physics": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/animator": "^1.0.0",
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/kinematics-constraints": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/animator": "^0.1.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/kinematics-constraints": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/decoders": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animator": {

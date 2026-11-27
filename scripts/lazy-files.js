@@ -1109,12 +1109,12 @@ export const LAZY_FILES = [
   },
   // CAD import: one worker per B-rep import, the B-rep kernel bundled in it.
   {
-    package: '@margoengine/cad',
-    file: 'packages/cad/dist/workers/cad-runtime.js',
+    package: '@margoengine/cad-import',
+    file: 'packages/cad-import/dist/workers/cad-runtime.js',
     label: 'workers/cad-runtime.js',
     kind: 'Worker',
     measure: 'file',
-    when: 'Each `loadCAD()` / `parseCADAsync()` of a STEP, IGES, SAT, XT or JT file, or of STL and OBJ (`@margoengine/cad`, also `addCAD(stage, url)` from `@margoengine/cad/stage`) where `Worker` exists',
+    when: 'Each `loadCAD()` / `parseCADAsync()` of a STEP, IGES, SAT, XT or JT file, or of STL and OBJ (`@margoengine/cad-import`, also `addCAD(stage, url)` from `@margoengine/cad-import/stage`) where `Worker` exists',
   },
   {
     package: '@margoengine/fbx',

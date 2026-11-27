@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/machinery",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Kinematics, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine.",
   "keywords": [
     "margoengine",
@@ -100,8 +100,8 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/react": "^1.0.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/react": "^0.1.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
@@ -113,10 +113,10 @@
     }
   },
   "dependencies": {
-    "@margoengine/cad": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/lines": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/text": "^1.0.0"
+    "@margoengine/cad-import": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/lines": "^0.1.0",
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/text": "^0.1.0"
   }
 }

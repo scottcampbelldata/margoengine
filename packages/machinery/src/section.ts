@@ -13,7 +13,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { declaration } from './section-uniform.js';
-import { capsAsSolid } from '@margoengine/cad/closed';
+import { capsAsSolid } from '@margoengine/cad-import/closed';
 import { displayShader } from '../../shared/display.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { linearHdr } from '../../shared/hdr-format.js';

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/humans",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "People in one call: addPerson dresses a loaded character with skin, eyes and strand hair by material name, an Animator with clip cross-fades, dual quaternion skinning, shadows and natural hand poses; a period cast kit of measured bodies and code-built garments with measured cloth optics, fitted and skinned to any loaded rig in one call.",
   "keywords": [
     "margoengine",
@@ -56,17 +56,17 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/animator": "^1.0.0",
-    "@margoengine/materials": "^1.0.0",
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/rigging": "^1.0.0"
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/animator": "^0.1.0",
+    "@margoengine/materials": "^0.1.0",
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/rigging": "^0.1.0"
   },
   "devDependencies": {
-    "@margoengine/navmesh": "^1.0.0"
+    "@margoengine/navmesh": "^0.1.0"
   }
 }

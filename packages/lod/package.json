@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/lod",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas.",
   "keywords": [
     "margoengine",
@@ -60,12 +60,12 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/materials": "^1.0.0",
-    "@margoengine/mesh-edit": "^1.0.0"
+    "@margoengine/animation": "^0.1.0",
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/materials": "^0.1.0",
+    "@margoengine/mesh-edit": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animation": {
@@ -82,7 +82,7 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js lod",

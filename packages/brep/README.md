@@ -2,7 +2,7 @@
 
 Margo's own CAD kernel, written from the published standards (ISO 10303-21 for the file, ISO 10303-41/42/43 and the
 AP203, AP214 and AP242 schemas for the data) with no third-party CAD code. It is the only CAD kernel the
-engine uses (`@margoengine/cad` reads every B-rep format through it; `docs/brep-kernel.md` tells how it was built in
+engine uses (`@margoengine/cad-import` reads every B-rep format through it; `docs/brep-kernel.md` tells how it was built in
 stages): it reads a STEP file's structure (stage 1), evaluates its exact geometry (stage 2) and tessellates it, one discretization per edge shared by both faces (stage 3) and a constrained Delaunay triangulation per
 face (stage 4).
 

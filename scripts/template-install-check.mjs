@@ -85,9 +85,9 @@ const env = {
 const report = { version, cases: [] };
 try {
   for (const [name, kit] of Object.entries({
-    web: 'kit-web',
-    game: 'game',
-    viz: 'kit-viz',
+    web: 'web',
+    game: 'games',
+    viz: 'science',
     react: 'kit-react',
     next: 'kit-react',
   })) {

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/ragdoll",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation.",
   "keywords": [
     "margoengine",
@@ -58,13 +58,13 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/animator": "^1.0.0",
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/physics": "^1.0.0",
-    "@margoengine/rigging": "^1.0.0"
+    "@margoengine/animator": "^0.1.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/physics": "^0.1.0",
+    "@margoengine/rigging": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animator": {

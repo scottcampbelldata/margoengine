@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/voxel-net",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests.",
   "keywords": [
     "margoengine",
@@ -89,9 +89,9 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/netcode": "^1.0.0",
-    "@margoengine/voxel": "^1.0.0"
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/netcode": "^0.1.0",
+    "@margoengine/voxel": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-net",

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/road",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Arc-length spline road surfaces, raised curbs and tiled UVs.",
   "keywords": [
     "margoengine",
@@ -80,16 +80,16 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/splines": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/bvh": "^1.0.0",
-    "@margoengine/post": "^1.0.0",
-    "@margoengine/compute": "^1.0.0"
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/splines": "^0.1.0",
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/bvh": "^0.1.0",
+    "@margoengine/post": "^0.1.0",
+    "@margoengine/compute": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/physics": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/physics": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/physics": {

@@ -1,7 +1,7 @@
 import { fault } from '../../shared/errors.js';
 
 /** Exact core version. The build checks this against the package manifest. */
-export const CORE_VERSION = '1.0.0';
+export const CORE_VERSION = '0.1.0';
 
 /** A package's build requirement and the core module it actually resolved. */
 export interface CoreRequirement {

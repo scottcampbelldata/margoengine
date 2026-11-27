@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/bvh",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine.",
   "keywords": [
     "margoengine",
@@ -95,7 +95,7 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
@@ -103,6 +103,6 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   }
 }

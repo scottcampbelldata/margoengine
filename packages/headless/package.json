@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/headless",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Render without a browser page: a stand-in canvas for core, GPU globals from the WebGPU binding you pass in, and readback to RGBA pixels or PNG bytes.",
   "keywords": [
     "margoengine",
@@ -86,11 +86,11 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/stage": "^1.0.0",
-    "@margoengine/environment": "^1.0.0",
-    "@margoengine/exporters": "^1.0.0",
-    "@margoengine/post": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/stage": "^0.1.0",
+    "@margoengine/environment": "^0.1.0",
+    "@margoengine/exporters": "^0.1.0",
+    "@margoengine/post": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js headless",
@@ -117,6 +117,6 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   }
 }

@@ -42,7 +42,7 @@ test('packed core rejects two install paths and stale package builds before any 
     const [a, b] = modules;
     const canvas = { width: 16, height: 16 };
     using engine = new a.Engine(canvas, await a.TransformStore.create(16), { backend: 'webgl2', dispose() {} });
-    const version = a.CORE_VERSION ?? '1.0.0';
+    const version = a.CORE_VERSION ?? '0.1.0';
     const ownSource =
       engine.coreRequirement?.runtime.source ??
       pathToFileURL(join(scratch, 'scoped/node_modules/@margoengine/core/dist/version.js')).href;

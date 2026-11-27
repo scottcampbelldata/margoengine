@@ -1,6 +1,8 @@
 # @margoengine/kit-react
 
-Install profile. The web profile with React bindings and sky.
+This profile is retired. New apps install `@margoengine/web` and `@margoengine/react`. The package remains so existing imports keep working.
+
+Install profile. React and Next.js web apps. Retired: install @margoengine/web and @margoengine/react..
 
 It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
 The root contains common exports; member subpaths expose the complete installed member APIs.

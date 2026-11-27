@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/tilemap",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax), a chunked renderer at exact pixels, auto-tiling and the Tiled and LDtk importers.",
   "keywords": [
     "margoengine",
@@ -72,11 +72,11 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/loaders": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/loaders": "^0.1.0",
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js tilemap",

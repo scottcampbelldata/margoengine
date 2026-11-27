@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/shader",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes, with a visual node editor.",
   "keywords": [
     "margoengine",
@@ -121,10 +121,10 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/materials": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/post": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/materials": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/post": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/post": {
@@ -132,7 +132,7 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js shader",

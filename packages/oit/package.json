@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/oit",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Order-independent transparency for gltf/pbr BLEND primitives and materials transparent meshes: weighted blending, moment-based blending, or exact per-pixel layer lists, with no popping between overlapping transparent parts.",
   "keywords": [
     "margoengine",
@@ -64,12 +64,12 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf": "^1.0.0",
-    "@margoengine/materials": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/gltf": "^0.1.0",
+    "@margoengine/materials": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js oit",

@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/fsm",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Hierarchical state machines with history, delayed transitions, parallel regions, JSON documents, snapshots and traces.",
   "keywords": [
     "margoengine",
@@ -68,10 +68,10 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js fsm",

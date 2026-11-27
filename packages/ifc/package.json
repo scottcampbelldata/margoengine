@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/ifc",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.",
   "keywords": [
     "margoengine",
@@ -75,12 +75,12 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0",
-    "@margoengine/materials": "^1.0.0",
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/loaders": "^0.1.0",
+    "@margoengine/materials": "^0.1.0",
     "web-ifc": "^0.0.78",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/lines": "^1.0.0"
+    "@margoengine/geometry": "^0.1.0",
+    "@margoengine/lines": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "web-ifc": {

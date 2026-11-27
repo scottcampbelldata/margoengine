@@ -9,19 +9,24 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version being published (must equal every package.json, e.g. 1.0.0)'
+        description: 'Version being published (must equal every package.json, e.g. 0.1.0)'
         required: true
       dry_run:
         description: 'Dry run (pack and check, publish nothing)'
         type: boolean
         default: true
+  push:
+    tags:
+      - 'v*'
 permissions: {}
 concurrency:
   group: npm-publish
   cancel-in-progress: false
 jobs:
   publish:
-    if: vars.NPM_PUBLISH_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    # A v* tag waits on the npm-publish environment, which must have a required reviewer.
+    # workflow_dispatch stays on main and still defaults to a dry run.
+    if: vars.NPM_PUBLISH_ENABLED == 'true' && (github.event_name == 'push' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -39,10 +44,11 @@ jobs:
         run: npm install --global npm@11 && npm --version
       - name: Install exactly the lockfile (fails on drift or an integrity mismatch)
         run: npm ci
-      - name: Versions match the input, and the changelog has this version
+      - name: Versions match the tag or the input, and the changelog has this version
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
         run: |
+          case "$VERSION" in v*) VERSION="${VERSION#v}" ;; esac
           test "$(node -p "require('./packages/core/package.json').version")" = "$VERSION"
           grep -qF "## $VERSION" CHANGELOG.md
       - name: Audit runtime dependencies and registry signatures
@@ -62,7 +68,7 @@ jobs:
         run: if [ -n "$TOKEN" ]; then npm config set //registry.npmjs.org/:_authToken "$TOKEN"; fi
       - name: Publish @margoengine packages and margoengine, then margo-convert, margo-convert-cad, then create-margo
         env:
-          DRY: ${{ inputs.dry_run && '--dry-run' || '' }}
+          DRY: ${{ github.event_name == 'push' && '' || (inputs.dry_run && '--dry-run' || '') }}
         run: |
           mkdir -p test-results
           node scripts/publish-order.mjs > test-results/publish-order.txt

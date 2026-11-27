@@ -5,7 +5,7 @@ dist-next/
 packages/*/LICENSE
 packages/*/NOTICE
 !packages/brep/NOTICE
-!packages/cad/NOTICE
+!packages/cad-import/NOTICE
 test-results/
 *.log
 packages/*/target/

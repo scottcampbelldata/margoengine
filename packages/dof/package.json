@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/dof",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Optional two-pass WebGPU depth of field with circular bokeh.",
   "keywords": [
     "margoengine",
@@ -44,10 +44,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^0.1.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-postfx.js dof",

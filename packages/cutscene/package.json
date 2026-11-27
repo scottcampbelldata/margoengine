@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/cutscene",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual camera shots with blends, rendering to a video file, a take recorder, dialogue with lip sync, and particle and activation tracks, and a timeline editor panel.",
   "keywords": [
     "margoengine",
@@ -88,8 +88,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/tween": "^1.0.0"
+    "@margoengine/math": "^0.1.0",
+    "@margoengine/tween": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js cutscene",
@@ -98,11 +98,11 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0",
-    "@margoengine/headless": "^1.0.0",
-    "@margoengine/input": "^1.0.0",
-    "@margoengine/inspector": "^1.0.0",
-    "@margoengine/ui": "^1.0.0"
+    "@margoengine/core": "^0.1.0",
+    "@margoengine/headless": "^0.1.0",
+    "@margoengine/input": "^0.1.0",
+    "@margoengine/inspector": "^0.1.0",
+    "@margoengine/ui": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {

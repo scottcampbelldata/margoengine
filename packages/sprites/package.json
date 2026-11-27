@@ -1,6 +1,6 @@
 {
   "name": "@margoengine/sprites",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target, camera-facing billboards in 3D and bone-driven 2D skeletal meshes.",
   "keywords": [
     "margoengine",
@@ -81,7 +81,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sprites",

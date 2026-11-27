@@ -1,7 +1,40 @@
 // USDZ with motion: a clip's node transforms as time samples and its skins as UsdSkel, so a character plays in AR Quick Look.
 // USD has one timeline, so one clip goes in a file. Tracks are sampled at a fixed rate, which is how USD stores them anyway:
 // it holds values at time codes and blends between them.
-import { sampleTrackInto, type Interpolation } from '@margoengine/animation/sampling';
+import type { Interpolation } from '@margoengine/animation/sampling';
+
+/** Loaded on the first animated export. A scene with no clips never asks for it. */
+let sampleTrackInto:
+  | ((
+      times: Float32Array,
+      values: Float32Array,
+      width: number,
+      time: number,
+      interpolation: Interpolation,
+      quaternion?: boolean,
+      out?: Float32Array,
+    ) => Float32Array)
+  | undefined;
+
+async function loadAnimationSampler(): Promise<void> {
+  if (sampleTrackInto) return;
+  const sampling = await import('@margoengine/animation/sampling');
+  sampleTrackInto = sampling.sampleTrackInto;
+}
+
+function sampleInto(
+  times: Float32Array,
+  values: Float32Array,
+  width: number,
+  time: number,
+  interpolation: Interpolation,
+  normalize: boolean,
+  out: Float32Array,
+): Float32Array {
+  if (!sampleTrackInto)
+    throw new Error('Install @margoengine/animation before writing an animated USDZ file.');
+  return sampleTrackInto(times, values, width, time, interpolation, normalize, out);
+}
 import { composeMatrix, invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { multiplyQuaternions } from '@margoengine/math/quat';
 import { splitGLB } from './glb.js';
@@ -178,7 +211,7 @@ class Poses {
   part(node: Node, key: 't' | 'r' | 's'): Float32Array | number[] {
     const track = this.tracks.get(node)?.[key];
     if (!track) return node[key];
-    return sampleTrackInto(
+    return sampleInto(
       track.times,
       track.values,
       WIDTHS[key],
@@ -304,7 +337,7 @@ function weightsOf(node: Node, count: number, track: Track | undefined, fps: num
   }
   return (frame) => {
     if (!track) return Array.from({ length: count }, (_, k) => node.morphWeights?.[k] ?? 0);
-    sampleTrackInto(track.times, track.values, count, frame / fps, track.interpolation, false, out);
+    sampleInto(track.times, track.values, count, frame / fps, track.interpolation, false, out);
     return Array.from(out);
   };
 }
@@ -716,6 +749,7 @@ export async function exportAnimatedUSDZ(
   if (typeof width !== 'number' || !(width > 0) || !Number.isFinite(width))
     throw new RangeError('lineWidth must be a positive finite number of scene units');
   signal?.throwIfAborted();
+  await loadAnimationSampler();
   const read = source instanceof Uint8Array ? await readScene(source, signal) : { scene: source, skipped: [] },
     { scene } = read,
     skipped: AnimatedUSDZSkip[] = read.skipped.map(({ kind, index }) => ({ kind, target: index })),
