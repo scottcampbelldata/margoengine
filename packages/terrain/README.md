@@ -591,7 +591,8 @@ stream.onChange((change) => console.log(change));      // bands uploaded, or the
 
 - The window moves a whole tile when the camera is more than 0.75 of a tile from its centre, so ground at least
   `(window / 2 - 0.75) * tileSize` from the camera on each axis is always in it; the terrain draws nothing past the
-  window, as past any heightmap. Tiles leaving it have their loads aborted (`signal`).
+  window, as past any heightmap, unless `far` adds a coarser ring there (below). Tiles leaving it have their loads
+  aborted (`signal`).
 - No hitches: the kept texels scroll by two GPU texture copies through a scratch texture (no CPU upload), exposed
   tiles show `fill` (default 0) until they load, and loaded tiles go in as bands of rows within `budget` texels a frame
   (default 65,536), the nearest tile first, with `concurrency` loads in flight (default 4). This is the incremental
@@ -633,6 +634,79 @@ once. Normals and tint (2026-11-27, RTX A6000): the same stops with a streamed n
 heights' own normals and a red tint on every other tile; the CPU copies hold exactly the mosaic's texels and the
 picture equals a plain `Terrain` given both whole, which a stream dropping either fails by 112 and 92 of 255. Cost
 not timed.
+
+### Past the window: `@margoengine/terrain/far`
+
+`terrainFar(options)` draws coarser ground past the stream's window, out to the horizon you give it. It is a second
+window of tiles, each `scale` times as wide (default 4) with as many samples, loaded by its own `load`, and the
+terrain's heights blend from the near tiles into the far ones with distance from the camera. Pass it as `far`:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {terrainFar} from 'margoengine/terrain/far';
+import {TerrainStream} from 'margoengine/terrain/stream';
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {far: 20_000}});
+// Level "near": 256 m tiles at 1 m. Level "far": 2,048 m tiles at 8 m, from the same server.
+const tiles = (level: string) => async (x: number, z: number, signal: AbortSignal) => {
+  const response = await fetch(`/tiles/${level}/${x}/${z}.f32`, {signal});
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`tile ${level} ${x},${z}: HTTP ${response.status}`);
+  return {heights: new Float32Array(await response.arrayBuffer())};
+};
+const far = terrainFar({scale: 8, load: tiles('far')});
+const stream = TerrainStream.attach(engine, {
+  tileSize: 256, tileTexels: 256, window: 4, heightScale: 1, load: tiles('near'), far,
+  layers: [0, 1, 2, 3].map(() => ({height: [-1e4, 1e4] as [number, number], slope: [0, 1] as [number, number], scale: 0.1})),
+  colors(device) {
+    const texture = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture}, new Uint8Array(16).fill(140), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return texture;
+  },
+});
+engine.start();
+await stream.ready();                    // both windows are in
+console.log(far.detail, far.reach);      // 190 m of fine ground, 2544 m in all, each way from the camera
+console.log(far.heightAt(900, -400));    // the height drawn there, near, far or between
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `load` | required | Loads far tile (x, z), which starts at the stream's `origin + [x, z] * scale * tileSize`; same tile shape as the near `load`. |
+| `scale` | 4 | Far tile width in near tiles, 2 to 64. |
+| `tileTexels` | the stream's | Samples per far tile side, 4 to 1,024. |
+| `window` | the stream's | Far tiles per window side, even, 2 to 16. |
+| `blend` | half a tile | World distance of the transition from near to far heights (at most half the near reach by default). |
+| `fade` | 0.5 | Seconds a near tile takes to fade in over the far ground once uploaded. |
+
+- Where each level shows, on each axis from the camera: the near heights alone up to `far.detail` =
+  `(window / 2 - 0.75) * tileSize - 2 * tileSize / tileTexels - blend` (190 m above), the mix over the next `blend`
+  metres, the far heights from there to `far.reach`, and nothing past it. Both edges are squares that move with the
+  camera, not with the tiles, so nothing steps when a window moves; set the camera's `far` to see the whole ring.
+- No cracks and no popping. The blend is part of the height function every vertex reads, so there are not two meshes to
+  join: no seam, skirt or stitching. A near window gains and loses tiles only where the ground is already all far, and
+  a far window only past `reach`. This is the transition region of a geometry clipmap (Losasso and Hoppe, "Geometry
+  Clipmaps", SIGGRAPH 2004, https://hhoppe.com/geomclipmap.pdf; Asirvatham and Hoppe, GPU Gems 2 chapter 2, 2005)
+  with two data levels; the mesh rings morph into each other as before (Strugar, CDLOD, Journal of Graphics Tools
+  14(4), 2009, https://doi.org/10.1080/2151237X.2009.10129287).
+- A near tile that is late, failed or without data (`null`) shows the far ground, ramped into its neighbours over half
+  a tile or less, and fades in when it arrives. So fine data may cover only part of a world the far data covers whole.
+- Far tiles carry what near tiles do: `weights` blend with the heights, as do `tint` and `normals` when streamed.
+  Loads share `concurrency` and uploads share `budget`, the far ring first. `ready()` waits for both windows,
+  `retry()` restarts both, and `far.tiles` has the far window's CPU copies, `origin`, `tile` and `onChange`.
+- Mesh: `levels` defaults to enough rings to reach `far.reach` (12 at most; raise `cellSize` for a longer view).
+  Colour, shadows, occlusion, screen-space reflections and `captureSurfaceHeight` all draw the blended ground.
+  `TerrainQuery` over `stream.heights` matches it within `far.detail` over loaded tiles; `far.heightAt(x, z)`
+  gives the drawn height anywhere. A far ring serves one stream at a time.
+- Memory and cost: the far window takes what the near one does for its own size, plus one float per near tile; the
+  vertex shader reads up to 4 per-tile weights and the far heights in the blend and the far zone. Not timed.
+
+Checked on a real GPU by `test/far.browser.mjs` (RTX A6000, WebGPU and the WebGL2 compatibility layer, 2026-11-27),
+with far heights set 40 m under the near ones so the blend shows: the drawn surface read back at every near sample
+equals `far.heightAt` within 0.01 m (3.1e-5 m on WebGPU) when settled, around a missing and a failed tile, mid-fade and
+after window moves; over a 360 m flight with eight window moves and tiles arriving late no point's height changed by
+more than 1.34 m in a 1 m step (2.95 m allowed by the blend and the fade; a hard switch jumps 40 m), also under a
+floating origin 100 km out; painted weights, tint and normals pass from the near tiles' to the far ones', ground is
+drawn up to `reach` and not past it, and shadows and SSR draw it with no validation error, and a runtime virtual texture baked over it draws the same ground.
 
 ## Sculpt and paint brushes: `@margoengine/terrain/sculpt`
 

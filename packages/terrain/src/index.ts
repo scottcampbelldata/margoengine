@@ -77,6 +77,20 @@ export interface TerrainTextures {
    * (`@margoengine/terrain/holes`) makes and edits one. Without it the shaders and bindings are unchanged. Default: none.
    */
   holes?: GPUTexture;
+  /** More data the terrain's shaders read, such as a stream's far ring (`TerrainStreamOptions.far`). Default: none. */
+  source?: TerrainSource;
+}
+/**
+ * Data added to every terrain shader (colour, capture, shadow, occluder and surface-height passes alike), in bind group
+ * 0 after the terrain's own bindings. `@margoengine/terrain/far` makes one for a streamed terrain.
+ */
+export interface TerrainSource {
+  /** The layout entries, bound from `binding` on. */
+  entries(binding: number): GPUBindGroupLayoutEntry[];
+  /** The resources of those entries, in binding order. */
+  resources(): GPUBindingResource[];
+  /** Returns `code`, a terrain shader, reading the data bound from `binding` on. */
+  shader(code: string, binding: number): string;
 }
 /** A splat rule: where layer i's texture shows. Rules blend smoothly around their bounds; layer 0 is the fallback. */
 export interface TerrainLayer {
@@ -462,6 +476,7 @@ export class Terrain implements EnginePlugin {
       fragment = GPUShaderStage.FRAGMENT;
     this.layout = this.device.createBindGroupLayout({
       entries: [
+        ...(t.source?.entries(this.sourceBinding()) ?? []),
         { binding: 0, visibility: vertex | fragment, buffer: { type: 'uniform' } },
         { binding: 1, visibility: vertex | fragment, texture: { sampleType: 'unfilterable-float' } },
         { binding: 2, visibility: vertex | fragment, texture: { sampleType: 'unfilterable-float' } },
@@ -484,6 +499,7 @@ export class Terrain implements EnginePlugin {
       ...(weights ? weights.map((w) => w.createView()) : []),
       ...(tint ? [tint.createView()] : []),
       ...(t.holes ? [t.holes.createView()] : []),
+      ...(t.source?.resources() ?? []),
     ];
     const group = (buffer: GPUBuffer) =>
       this.device!.createBindGroup({
@@ -725,13 +741,21 @@ export class Terrain implements EnginePlugin {
         : terrainFragment(surface));
     return this.clip(this.options.floatingOrigin ? originShader(code) : code);
   }
-  /** With `TerrainTextures.holes`: declares the mask after the weights and tint and adds its test to the edge test. */
+  /**
+   * With `TerrainTextures.holes`: declares the mask after the weights and tint and adds its test to the edge test. With
+   * `TerrainTextures.source`: its shader additions, after the mask's binding.
+   */
   private clip(code: string): string {
     const t = this.textures;
-    if (!t?.holes) return code;
-    const binding = 6 + (t.weights?.length ?? 0) + (t.tint ? 1 : 0);
-    return `@group(0) @binding(${binding}) var terrainHoles:texture_2d<f32>;
+    if (t?.holes)
+      code = `@group(0) @binding(${this.sourceBinding() - 1}) var terrainHoles:texture_2d<f32>;
 ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
+    return t?.source ? t.source.shader(code, this.sourceBinding()) : code;
+  }
+  /** The first group-0 binding after the weights, tint and holes: where a `source` binds. */
+  private sourceBinding(): number {
+    const t = this.textures!;
+    return 6 + (t.weights?.length ?? 0) + (t.tint ? 1 : 0) + (t.holes ? 1 : 0);
   }
   /** Whether any layer sets `bump` or `macro`; without, the shader and rules are what they were before both. */
   private surface(): boolean {
@@ -838,10 +862,13 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
           'unsupported',
           'Terrain capture needs the terrain fragment entry point once; a lighting effect changed it',
         );
+      // The entry's own edge test, with the source's change to it (the lit stage already has the rest).
+      const edge = terrainOutside + (this.textures?.holes ? terrainHole : ''),
+        source = this.textures?.source;
       code =
         declarations +
         lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
-        `\n@fragment fn capture(i:Output)->MargoSSR {${terrainOutside}${this.textures?.holes ? terrainHole : ''}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
+        `\n@fragment fn capture(i:Output)->MargoSSR {${source ? source.shader(edge, this.sourceBinding()) : edge}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
       if (this.captureCode.size >= 16) this.captureCode.clear();
       this.captureCode.set(cacheKey, code);
     }

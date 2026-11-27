@@ -340,6 +340,31 @@ await runSuite(
         badState: badState.startsWith('Invalid terrain stream tile'),
         badTries,
       };
+      // A diagonal window move with one load at a time starts with an exposed tile nearest the camera: the move's own
+      // frame once ordered them from a point a tile past it, and the far corner tile loaded first.
+      const asked = [],
+        ordered = TerrainStream.attach(reference.engine, {
+          ...common,
+          tileSize,
+          tileTexels: 4,
+          window: 4,
+          concurrency: 1,
+          colors,
+          async load(x, z) {
+            asked.push([x, z]);
+            return { heights: new Float32Array(16) };
+          },
+        });
+      look(reference.engine, 2, 2);
+      await settle(ordered);
+      const home = [...ordered.tile];
+      asked.length = 0;
+      look(reference.engine, home[0] + 2.8, home[1] + 2.8);
+      // The first frame moves the window; `ready` asked after it waits for the exposed tiles.
+      reference.engine.render({ delta: 1 / 60 });
+      await settle(ordered);
+      const moved = { tile: [...ordered.tile], home, first: asked[0], asked: asked.length };
+      ordered.dispose();
       const errors = [await streamed.engine.gpu.popErrorScope(), await reference.engine.gpu.popErrorScope()]
         .filter(Boolean)
         .map((e) => e.message);
@@ -347,7 +372,7 @@ await runSuite(
       stream.dispose();
       streamed.engine.dispose();
       reference.engine.dispose();
-      return { out, worstFrame, budget, loads, abortedOnMoves, disposed, retries, errors };
+      return { out, worstFrame, budget, loads, abortedOnMoves, disposed, retries, moved, errors };
     });
     assert.deepEqual(result.errors, []);
     for (const stop of result.out) {
@@ -378,6 +403,16 @@ await runSuite(
     assert.equal(r.nothingLeft, 0, 'nothing failed is left to retry');
     assert.ok(r.badState, 'a tile of the wrong shape fails');
     assert.deepEqual(r.badTries, [1, 1, 1, 1], 'and is not retried');
+    const m = result.moved;
+    assert.deepEqual(m.tile, [m.home[0] + 1, m.home[1] + 1], 'the window moved a tile along both axes');
+    assert.equal(m.asked, 7, 'the seven exposed tiles load');
+    assert.ok(
+      [
+        [4, 2],
+        [2, 4],
+      ].some(([i, j]) => m.first[0] === m.home[0] + i && m.first[1] === m.home[1] + j),
+      `the first exposed tile loaded is one nearest the camera: ${m.first} from window ${m.home}`,
+    );
     await writeFile('test-results/terrain-stream.json', JSON.stringify({ hardware, result }, null, 1));
     console.log(
       'ok terrain stream:',

@@ -700,6 +700,12 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     device.queue.writeBuffer(this.#frame!, 0, this.#frameValues as Float32Array<ArrayBuffer>);
     if (this.#pipelineSource !== source.layout) {
       let code = splitTerrainColor(source.code) + bake;
+      // A streamed normal map with a far ring: the bake's normal blends to the far map as the surface's does.
+      if (source.code.includes('fn terrainFarNormalAt('))
+        code = code.replace(
+          'let s=textureLoad(normalMap,min(vec2i(uv*vec2f(d)),d-vec2i(1)),0).xyz*2.0-1.0;',
+          'let s=terrainFarNormalAt(xz,textureLoad(normalMap,min(vec2i(uv*vec2f(d)),d-vec2i(1)),0).xyz*2.0-1.0);',
+        );
       if (floating)
         code = code
           .replace('pad:vec2f}', 'pad:vec2f,anchor:vec2i}')

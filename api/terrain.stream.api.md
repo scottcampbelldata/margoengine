@@ -14,6 +14,7 @@ export class TerrainStream implements EnginePlugin {
     readonly weights: readonly Uint8Array[];
     readonly normals?: Uint8Array;
     readonly tint?: Uint8Array;
+    readonly far?: TerrainTiles;
     disposed: boolean;
     private constructor();
     static attach(engine: EngineKernel, options: TerrainStreamOptions): TerrainStream;
@@ -25,7 +26,7 @@ export class TerrainStream implements EnginePlugin {
     onChange(callback: (change: TerrainStreamChange) => void): () => void;
     ready(signal?: AbortSignal): Promise<void>;
     setup(engine: Engine): void;
-    onPreUpdate(): void;
+    onPreUpdate(delta?: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -37,6 +38,27 @@ export interface TerrainStreamChange {
     readonly width: number;
     readonly depth: number;
 }
+
+export interface TerrainStreamFar {
+    readonly load: TerrainStreamLoad;
+    plan(near: {
+        tileSize: number;
+        tileTexels: number;
+        window: number;
+    }): {
+        tileSize: number;
+        tileTexels: number;
+        window: number;
+        reach: number;
+    };
+    bind(near: TerrainStreamWindow, far: TerrainStreamWindow, terrain: Pick<TerrainOptions, 'heightScale' | 'heightOffset'>): {
+        source(device: GPUDevice): TerrainSource;
+        update(delta: number, x: number, z: number): boolean;
+        dispose(): void;
+    };
+}
+
+export type TerrainStreamLoad = (x: number, z: number, signal: AbortSignal) => Promise<TerrainStreamTile | null | undefined>;
 
 export interface TerrainStreamOptions extends Omit<TerrainOptions, 'textures' | 'origin' | 'size'> {
     readonly tileSize: number;
@@ -54,6 +76,7 @@ export interface TerrainStreamOptions extends Omit<TerrainOptions, 'textures' | 
     readonly retryDelay?: number;
     readonly normals?: boolean;
     readonly tint?: boolean;
+    readonly far?: TerrainStreamFar;
 }
 
 export interface TerrainStreamTile {
@@ -61,6 +84,29 @@ export interface TerrainStreamTile {
     readonly weights?: readonly Uint8Array[];
     readonly normals?: Uint8Array;
     readonly tint?: Uint8Array;
+}
+
+export interface TerrainStreamWindow extends TerrainTiles {
+    holds(x: number, z: number): boolean;
+    readonly textures: {
+        readonly height: GPUTexture;
+        readonly weights: readonly GPUTexture[];
+        readonly normals?: GPUTexture;
+        readonly tint?: GPUTexture;
+    };
+}
+
+export interface TerrainTiles {
+    readonly columns: number;
+    readonly heights: Float32Array;
+    readonly weights: readonly Uint8Array[];
+    readonly normals?: Uint8Array;
+    readonly tint?: Uint8Array;
+    readonly origin: readonly [number, number];
+    readonly tile: readonly [number, number];
+    readonly version: number;
+    resident(x: number, z: number): boolean;
+    onChange(callback: (change: TerrainStreamChange) => void): () => void;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -159,6 +205,12 @@ type TerrainPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface TerrainSource {
+    entries(binding: number): GPUBindGroupLayoutEntry[];
+    resources(): GPUBindingResource[];
+    shader(code: string, binding: number): string;
+}
+
 interface TerrainTextures {
     heightmap: GPUTexture;
     normalmap?: GPUTexture;
@@ -166,5 +218,6 @@ interface TerrainTextures {
     weights?: readonly GPUTexture[];
     tint?: GPUTexture;
     holes?: GPUTexture;
+    source?: TerrainSource;
 }
 ```

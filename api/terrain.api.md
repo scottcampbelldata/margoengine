@@ -169,6 +169,12 @@ export interface TerrainOrigin {
     onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
 }
 
+export interface TerrainSource {
+    entries(binding: number): GPUBindGroupLayoutEntry[];
+    resources(): GPUBindingResource[];
+    shader(code: string, binding: number): string;
+}
+
 export interface TerrainTextures {
     heightmap: GPUTexture;
     normalmap?: GPUTexture;
@@ -176,6 +182,7 @@ export interface TerrainTextures {
     weights?: readonly GPUTexture[];
     tint?: GPUTexture;
     holes?: GPUTexture;
+    source?: TerrainSource;
 }
 
 export function clipmapGrid(resolution: number): {

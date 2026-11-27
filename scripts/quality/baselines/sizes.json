@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21048504,
+  "total": 21053188,
   "history": [
     {
       "date": "2026-10-24",
@@ -14797,6 +14797,12 @@
       "commit": "473b839d15",
       "reason": "core feature snapshot rendering (Scott 2026-11-27, Yes to all): new entry @margoengine/culling/snapshot (SnapshotRendering, the per-view recording key that tells core when to record again); core + stage 24,989 -> 25,099 B gzip. Also records the timber-valley -> vfx/fire-front static load (the shot page's fire front, KB-SCENES-TVCLOCK1), which the earlier landing left unrecorded. vfx/fire-front 10,176 -> 10,494 B budget: the double-step guard of KB-SCENES-TVCLOCK1 (a670538b44), unrecorded there",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "terrain-far-ring",
+      "reason": "new entry @margoengine/terrain/far, a coarser ring of ground past a streamed terrain (a second tile window and a continuous height blend): 3,542 B gzip, ceiling 3,798. terrain/stream 14,823 -> 15,683 (ceiling 15,268 -> 16,154): its window of tiles moved to a class both levels use (with the far plumbing, about 780 B), the rest is the root, which grew 17,619 -> 17,701 for the shader source seam (rvt 6,941 -> 6,981). A far ring kept inside stream would have put its shader in every streaming app; a separate far terrain mesh would have needed stitching and a second pass. Core and stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16203,6 +16209,7 @@
     "@margoengine/terrain/deform": 5488,
     "@margoengine/terrain/displace": 4701,
     "@margoengine/terrain/dunes": 2250,
+    "@margoengine/terrain/far": 3798,
     "@margoengine/terrain/ground-change": 16379,
     "@margoengine/terrain/ground-change-settings": 2159,
     "@margoengine/terrain/height-grid": 1641,
@@ -16220,7 +16227,7 @@
     "@margoengine/terrain/rvt": 7126,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/settings": 2711,
-    "@margoengine/terrain/stream": 15268,
+    "@margoengine/terrain/stream": 16154,
     "@margoengine/terrain/wet-ground": 3443,
     "@margoengine/text": 16729,
     "@margoengine/text/animate": 11627,

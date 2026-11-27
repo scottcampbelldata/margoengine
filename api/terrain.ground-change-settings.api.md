@@ -376,6 +376,12 @@ type TerrainPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface TerrainSource {
+    entries(binding: number): GPUBindGroupLayoutEntry[];
+    resources(): GPUBindingResource[];
+    shader(code: string, binding: number): string;
+}
+
 interface TerrainTextures {
     heightmap: GPUTexture;
     normalmap?: GPUTexture;
@@ -383,6 +389,7 @@ interface TerrainTextures {
     weights?: readonly GPUTexture[];
     tint?: GPUTexture;
     holes?: GPUTexture;
+    source?: TerrainSource;
 }
 
 interface Timed {

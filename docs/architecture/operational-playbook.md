@@ -1835,6 +1835,17 @@ The test init script wraps requestAdapter and installs counters after its promis
 
 The optional points plugin compares the 144 uniform bytes most recently queued to its shared frame buffer. An unchanged view queues no write; changed views and restored buffers retain the original payload. CPU work-count and byte/command regressions plus forced-upload GPU pixel comparison are documented in [the work-count record](../whitepaper/bp-163-workcounts.md). No core/stage changes or timing evidence.
 
+## Terrain far ring (section 5 supplement, 2026-11-27)
+
+`@margoengine/terrain/far` blends a streamed terrain's heights into a coarser tile window inside the terrain's own
+`height` function (a `TerrainSource` seam in the root: extra group-0 bindings and replacements of named shader lines,
+which throw if a line no longer matches), so every pass reads one continuous surface. Evidence:
+packages/terrain/test/far.browser.mjs on WebGPU and the WebGL2 compatibility layer reads the drawn surface back against
+the CPU mirror `heightAt`, bounds the per-frame height change across window moves and late loads (the no-pop proof),
+and covers weights, tint, normals, shadows, SSR and the virtual texture under validation scopes.
+packages/terrain/test/stream.browser.mjs covers the window code both levels share (stream-window.ts), including the
+load order on a window move. One GPU (RTX A6000); no timing evidence. No core or stage change.
+
 ## Batch 187: opaque visibility in global lightmap bakes (section 5 supplement)
 
 Area shadow segments and quad/path bounce rays test both sides of opaque quads. A back hit terminates a diffuse
