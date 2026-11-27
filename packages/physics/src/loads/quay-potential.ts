@@ -48,17 +48,32 @@ function fluxCorrection(
 // Write L = Dᵀ W D, with D the nearest-face difference and W the opening.
 // The eighth-order symbol is L + L²/12 + L³/90 + L⁴/560 on a uniform layer.
 // Apply the polynomial on faces so that a closed face never carries flux.
-function eighthOrderFlux(
-  u: Float64Array,
-  faces: Float64Array,
-  i: number,
-  stride: number,
-  inverseThickness: number,
-): number {
+function eighthOrderFlux(u: Float64Array, faces: Float64Array, i: number, stride: number, thickness: number): number {
   const left = i - stride,
     right = i + stride,
     farLeft = left - stride,
     farRight = right + stride;
+  const aperture = faces[i]!;
+  if (
+    aperture === thickness &&
+    faces[left] === aperture &&
+    faces[right] === aperture &&
+    faces[farLeft] === aperture &&
+    faces[farRight] === aperture &&
+    faces[farLeft - stride] === aperture &&
+    faces[farRight + stride] === aperture
+  ) {
+    // Expand the same polynomial into four differences across the face
+    // when all seven links have full conductance. Keep the graph form at walls.
+    return (
+      aperture *
+      ((205 / 144) * (u[i]! - u[right]!) -
+        (127 / 720) * (u[left]! - u[farRight]!) +
+        (17 / 720) * (u[farLeft]! - u[farRight + stride]!) -
+        (1 / 560) * (u[farLeft - stride]! - u[farRight + 2 * stride]!))
+    );
+  }
+  const inverseThickness = 1 / thickness;
   const leftOpen = (faces[left] ?? 0) * inverseThickness,
     centreOpen = faces[i]! * inverseThickness,
     rightOpen = (faces[right] ?? 0) * inverseThickness;
@@ -181,10 +196,10 @@ export class QuayPotential {
     for (let y = 0; y < layers; y++) {
       const thickness = depths[y + 1]! - depths[y]!;
       if (this.horizontalCorrection) {
-        const scale = (this.eighthOrder ? 1 : 1 / 12) / thickness;
-        if (!(scale > 0 && Number.isFinite(scale)))
+        const inverse = (this.eighthOrder ? 1 : 1 / 12) / thickness;
+        if (!(inverse > 0 && Number.isFinite(inverse)))
           throw invalidLoad('Use finite layer thicknesses for high-order horizontal flux.');
-        this.horizontalCorrection[y] = scale;
+        this.horizontalCorrection[y] = this.eighthOrder ? thickness : inverse;
       }
       const vertical = y + 1 < layers ? (2 * this.cellArea) / (depths[y + 2]! - depths[y]!) : 0;
       if (!Number.isFinite(vertical) || (y === 0 && !Number.isFinite(this.cellArea / this.topDistance)))

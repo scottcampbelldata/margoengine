@@ -18048,6 +18048,11 @@ Starting from `W D u`, apply `I + A/12 + A²/90 + A³/560` with
 operator is positive semidefinite because `L` is and every polynomial
 coefficient is positive. A closed face keeps zero flux in each pass. The
 same polynomial supplies the normal velocity query and the projection.
+On a row of seven fully open faces, four cell-pair differences with
+weights `205/144, −127/720, 17/720, −1/560` evaluate the same polynomial.
+A fractional or closed face in that row uses the aperture-weighted
+polynomial. The flux regression compares both routes with separate
+successive applications of the weighted face operator.
 The layered mixed-aperture regression checks local volume balance, work
 and replay. The uniform carrier test holds vertical resolution fixed.
 

@@ -124,3 +124,25 @@ for (const horizontalOrder of [4, 8]) {
     assert.equal(world.hash(), hash);
   });
 }
+
+test('the eighth-order interior stencil matches the face polynomial on either side of a cut', () => {
+  const cells = [21, 1],
+    cellSize = 0.15,
+    depths = [0, 0.7],
+    thickness = depths[1],
+    size = cells[0];
+  const openX = Float64Array.from({ length: size }, (_, i) => (i === 13 ? 0 : i === 16 ? 0.4 : 1));
+  const bulk = Float64Array.from({ length: size }, (_, i) => Math.sin(i * 1.3) + Math.cos(i * 0.7));
+  const control = new QuayPotential({ cells, cellSize, depths, openX, horizontalOrder: 8 });
+  let term = Float64Array.from(openX, (opening, i) => (i + 1 < size ? opening * (bulk[i + 1] - bulk[i]) : 0));
+  const expected = term.slice();
+  for (const weight of [1 / 12, 1 / 90, 1 / 560]) {
+    term = Float64Array.from(term, (value, i) =>
+      i + 1 < size ? openX[i] * (2 * value - (term[i - 1] ?? 0) - term[i + 1]) : 0,
+    );
+    for (let i = 0; i < size; i++) expected[i] += weight * term[i];
+  }
+  for (let i = 0; i < size; i++) {
+    assert.ok(Math.abs(control.faceFlux('x', i, bulk) - thickness * expected[i]) < 8e-16);
+  }
+});

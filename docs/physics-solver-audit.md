@@ -1470,6 +1470,13 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   case. That case takes 49 iterations with a worst local flux residual of 3.76×10⁻¹² m³/s across
   the three cases. The linear solver tolerance and iteration limit are unchanged.
 
+  In a run of seven fully open faces the eighth-order flux now uses four cell-pair differences
+  and zero staged face corrections, down from nine. The aperture-weighted route remains at
+  fractional or closed faces. The 7.2 × 4.2 m local aperture case can use the compact stencil
+  on 51,944 of 66,008 horizontal faces at 0.15 m and 240,592 of 268,720 at 0.075 m. The flux
+  regression compares both routes against independent successive applications of the face
+  polynomial to within 8×10⁻¹⁶ for its test field.
+
   The Galerkin assembly now reuses the fine-cell labels and stores coarse edges in bounded pages.
   This removes two dense integer buffers, about 420 MiB at 55 million fine cells, and the separate
   full-size copies of coarse edges. `coupling/loads-quay-hierarchy-memory.test.js` checks original edge
