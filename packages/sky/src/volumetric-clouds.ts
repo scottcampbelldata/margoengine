@@ -107,7 +107,10 @@ export interface VolumetricCloudOptions {
   hurricane?: HurricaneOptions | Hurricane;
   /** Fraction of the sky the layer covers, 0 to 1. Default 0.5 (or the `weather`'s); 0 draws nothing. */
   coverage?: number;
-  /** Cloud base above the ground, 100 to 20,000. Default 1500 (or the `weather`'s). */
+  /**
+   * Cloud base in metres above world y = 0, 100 to 20,000. Default 1500 (or the `weather`'s). Over ground that stands
+   * high above y = 0, add its height, or the layer cuts the hills.
+   */
   bottom?: number;
   /** Cloud tops, above `bottom`, at most 20,000. Default 4000 (or the `weather`'s). */
   top?: number;

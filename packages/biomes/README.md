@@ -241,6 +241,11 @@ const levels = materialPixels('winter-pasture', { color: [0.31, 0.37, 0.2], imag
 console.log(levels.length, levels[0][1]); // 11 94
 ```
 
+The view's water is the sea of `SEA` where an edge of the world stands at or below sea level: two ocean swell trains,
+out to the horizon. On a landlocked world, or when `water` gives a `wind`, it raises the waves of a wind instead (a
+light air of 2 m/s over 100 m by default) and stops at the world's edge, so `applyWaterSettings(view.water, ...)` and a
+water look apply to it.
+
 ## Wet ground and plants after a flood: `BiomeView`'s `wetness`
 
 `BiomeView.attach(engine, world, { wetness: { record, velocity, origin, size } })` draws the biome wet where a flood has

@@ -90,6 +90,16 @@ test('sky: the family reaches the Sky and natural gives back a sky that never ha
   assert.equal(r.natural, r.plain, 'byte-identical to a fresh Sky');
 });
 
+test('sky: a family keeps the cloud layer the scene placed (KB-SKY-CLOUDBLOB1)', () => {
+  const placed = { type: 'cumulus', coverage: 0.2, bottom: 3370, top: 4870 };
+  for (const name of ['animatedFeature', 'natural']) {
+    const sky = new Sky(),
+      clouds = { options: { ...placed } };
+    applyLookFamily(name, { sky: { sky, clouds } });
+    for (const [key, value] of Object.entries(placed)) assert.equal(clouds.options[key], value, `${name}: ${key}`);
+  }
+});
+
 test('water: the family reaches the Water and natural gives back the uniform bytes of a fresh Water', () => {
   const harnesses = new Map();
   const make = () => {

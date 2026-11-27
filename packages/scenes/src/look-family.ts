@@ -52,12 +52,15 @@ const FAMILY_NAMES: readonly string[] = LOOK_FAMILIES;
 // The sky rows and options that place the sun: the scene's, never a family's.
 const TIME_ROWS = ['hours', 'timeScale', 'sun.mode', 'sun.azimuth', 'sun.elevation'] as const,
   TIME_KEYS = ['hours', 'timeScale', 'sunDirection'] as const;
+// The cloud layer a scene placed: its type, cover and heights are weather and ground, never a family's.
+const CLOUD_KEYS = ['type', 'coverage', 'bottom', 'top', 'density'] as const;
 
 /**
  * Applies the look family `name` to every part of the scene in `targets`: each part gets that family's entry of its own
  * package's LOOKS table (`natural` is every row at its default, so the part draws as it does with no settings), through
  * that package's apply function. A part left out is left alone. The sky keeps the scene's time of day: its clock
- * (`hours`, `timeScale`) and sun direction stay as the scene set them, so a family never moves the sun. The weather part writes the family's state onto the
+ * (`hours`, `timeScale`) and sun direction stay as the scene set them, so a family never moves the sun, and the
+ * `clouds` keep the layer's `type`, `coverage`, `bottom`, `top` and `density`. The weather part writes the family's state onto the
  * weather target, so give it only when nothing else (a recorded storm, a drive) owns the weather.
  * @throws RangeError for a family not in {@link LOOK_FAMILIES}; whatever an apply function throws for a part that cannot
  * take the family's values (a post look that turns GTAO on needs a GTAO in `post`).
@@ -76,7 +79,12 @@ export function applyLookFamily(name: LookFamilyName, targets: LookFamilyTargets
       kept = TIME_KEYS.map((key) => [key, o[key]] as const),
       values = { ...pick<Record<string, unknown>>(SKY_LOOKS) };
     for (const row of TIME_ROWS) delete values[row];
+    const c = targets.sky.clouds?.options as Record<string, unknown> | undefined,
+      // A row the family itself sets is the family's; every other keeps what the scene gave (KB-SKY-CLOUDBLOB1).
+      layer = c ? CLOUD_KEYS.filter((key) => !(`volumetric.${key}` in values) && c[key] !== undefined) : [],
+      placed = layer.map((key) => [key, c![key]] as const);
     applySkySettings(targets.sky, values as never);
+    for (const [key, value] of placed) c![key] = value;
     for (const [key, value] of kept)
       if (value === undefined) delete o[key];
       else o[key] = Array.isArray(value) ? [...value] : value;

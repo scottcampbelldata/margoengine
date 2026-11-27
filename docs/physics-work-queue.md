@@ -362,6 +362,14 @@ outside SEA-02.
 `packages/water/src/index.ts`, a file the SEA-01 and SEA-13 rows list. Recorded as KB-WATER-CODED1 in
 `docs/known-bugs.md`; not changed by lane B.
 
+### SEA-13: a seek cannot rebuild the FFT sea's older foam (GAP-FILM-FOAM, logged by gap lane B, 2026-11-27)
+
+The foam of the FFT ocean (`packages/water/src/fft.ts`, a SEA-13 file) is GPU history with a lifetime of 4 s by
+default, so a film that seeks to a cut starts with no foam, and a warm-up of P seconds leaves e^(-P/lifetime) of the
+older foam out. Wanted from the SEA-13 owner: exact foam at the cut time (a warm-up run from the closed-form waves
+inside the engine). Bound until then: mean foam within 5 percent after a warm-up of three lifetimes. Not changed by
+lane B.
+
 ## Scope: solvers only (Scott, 2026-11-26)
 
 The physics engine is the whole job. It is built in two stages:

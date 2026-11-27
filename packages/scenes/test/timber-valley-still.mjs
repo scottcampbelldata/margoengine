@@ -11,6 +11,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
+import { WATER_LOOKS } from '@margoengine/water/settings';
 const arg = (name, fallback) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const w = Number(arg('w', 640)),
@@ -65,6 +66,23 @@ const spread = (img) => {
   return { mean: sum / n, sd: Math.sqrt(Math.max(0, sq / n - (sum / n) ** 2)) };
 };
 try {
+  // KB-BIOMES-RIVERSTEP1: from the creek bank, far from where the camera stood at attach, the water fills the channel
+  // ahead: blue over red in the lower middle of the frame, where lost ground detail left brown flat floor.
+  const quiet = await still('creek', 'fire=none&weather=calm&hour=13&quality=preview'),
+    bank = quiet.img;
+  // KB-SKY-CLOUDBLOB1: the cumulus stand clear over the highest ground. KB-BIOMES-LOOKFAMILY1: the scene's default
+  // look reaches the creek's water.
+  assert.ok(quiet.r.cloudBase > quiet.r.peak + 500, `clouds from ${quiet.r.cloudBase}, ground to ${quiet.r.peak}`);
+  assert.deepEqual(quiet.r.waterColor, [...WATER_LOOKS.animatedFeature.color]);
+  let red = 0,
+    blue = 0;
+  for (let y = Math.floor(bank.height * 0.75); y < Math.floor(bank.height * 0.95); y++)
+    for (let x = Math.floor(bank.width * 0.3); x < Math.floor(bank.width * 0.5); x++) {
+      red += bank.data[(y * bank.width + x) * 4];
+      blue += bank.data[(y * bank.width + x) * 4 + 2];
+    }
+  console.log('creek ahead, blue over red', (blue / red).toFixed(2));
+  assert.ok(blue > 1.3 * red, `the creek's water lies ahead of its bank: blue ${blue} against red ${red}`);
   for (const view of views) {
     const { r, png, img } = await still(view, extra);
     if (out) await writeFile(join(out, `${view}.png`), png);

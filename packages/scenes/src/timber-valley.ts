@@ -149,6 +149,11 @@ export interface TimberValleyScene extends Disposable {
 export const info = timberValleyInfo;
 
 const SIZE = 4096;
+// Fair cumulus over the valley, metres above its floor: bases at the lifting condensation level of a dry August
+// afternoon, about 125 m for each degree of dew-point spread (Lawrence 2005, Bull. Am. Meteorol. Soc. 86, 225-233),
+// 2.5 km at 30 C and 30 percent humidity, and 1.5 km of cloud over that.
+const CLOUD_BASE = 2500;
+const CLOUD_DEPTH = 1500;
 const ORIGIN: [number, number] = [-SIZE / 2, -SIZE / 2];
 
 /** Fills defaults and checks every setting. @throws TypeError, RangeError. */
@@ -346,17 +351,34 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
       casterMargin: 300,
     });
     disposers.push(() => shadows.dispose());
+    // The family's ground materials are read when the view is built (KB-BIOMES-LOOKFAMILY1).
+    const ground: NonNullable<Parameters<typeof applyLookFamily>[1]['biomes']> = {};
+    applyLookFamily(s.look, { biomes: ground });
     const view = await BiomeView.attach(engine, w, {
+      ...ground,
       sky: preset.sky,
       shadows,
       water: { rivers: 'auto' },
+      // The views span the valley, so the fine ground rings follow the camera. Left where the camera stood at attach,
+      // a view a kilometre off drew 32 m cells that lost the creek's channel, and its water showed as stray slabs
+      // (KB-BIOMES-RIVERSTEP1).
+      clipmap: { anchor: 'camera' },
       exclusions: plan.town.exclusions,
       radius: film ? 2000 : 1000,
       ...(s.meshes ? { meshes: s.meshes } : {}),
       ...(settings.signal ? { signal: settings.signal } : {}),
     });
     disposers.push(() => view.dispose());
-    const clouds = VolumetricClouds.attach(engine, { sky: preset.sky as never, type: 'cumulus', coverage: 0.2 });
+    // The layer's heights are metres over world y = 0, the sea here, so they stand on the valley's floor: left to the
+    // type's 1,000 m base, the cloud cut the ridges and showed as flat white blobs on the slopes (KB-SKY-CLOUDBLOB1).
+    const floor = rockiesValleyWorld.relief!.base!,
+      clouds = VolumetricClouds.attach(engine, {
+        sky: preset.sky as never,
+        type: 'cumulus',
+        coverage: 0.2,
+        bottom: floor + CLOUD_BASE,
+        top: floor + CLOUD_BASE + CLOUD_DEPTH,
+      });
     disposers.push(() => clouds.dispose());
     // Fuel: the forest's own fuel models, cleared on the rail, the creek, the streets and the lots (the lots burn as
     // structures).
@@ -393,6 +415,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
     const look = (name: LookFamilyName) =>
       applyLookFamily(name, {
         sky: { sky: preset.sky, clouds, tonemap: preset.tonemap },
+        ...(view.water ? { water: view.water } : {}),
         ...(fireFront ? { fire: fireFront as never, smoke: fireFront } : {}),
       });
     look(s.look);

@@ -106,12 +106,12 @@ export interface BiomeViewOptions {
    */
   readonly shadows?: BiomeShadows;
   /**
-   * The sea: a `@margoengine/water` surface at the world's `climate.seaLevel`, covering the whole world and out to
-   * the horizon, loaded with import() only when drawn. The terrain hides it under land, so its shore
-   * follows the coast, with the water's shoreline foam. `'auto'` draws it when the world's heights reach below sea
-   * level; an object draws it with those `Water` settings over the sea defaults (`SEA`; pass
-   * `depth: () => bloom.depthTexture` when Bloom, SSAO or DOF owns the scene depth). Rivers and lakes stay dry unless the
-   * settings ask for them (`rivers`, `lakes`). Default `'auto'`.
+   * The sea: a `@margoengine/water` surface at the world's `climate.seaLevel`, covering the whole world and, when an
+   * edge of the world stands at or below sea level, out to the horizon, loaded with import() only when drawn. The
+   * terrain hides it under land, so its shore follows the coast, with the water's shoreline foam. `'auto'` draws it
+   * when the world's heights reach below sea level; an object draws it with those `Water` settings over the sea
+   * defaults (`SEA`; pass `depth: () => bloom.depthTexture` when Bloom, SSAO or DOF owns the scene depth). Rivers and
+   * lakes stay dry unless the settings ask for them (`rivers`, `lakes`). Default `'auto'`.
    */
   readonly water?: boolean | 'auto' | BiomeWaterSettings;
   /**
@@ -254,6 +254,8 @@ export interface BiomeSky {
  * The sea a view draws unless its `water` settings say otherwise: a 512-cell grid (8 m cells on a 4 km world, so the
  * swell does not alias flat), two ocean swell trains of 48 m and 27 m (0.9 m and 0.44 m high, a moderate swell whose
  * crests break into foam), a 6 m band of shoreline foam and a sea-blue body. `Water`'s own defaults suit a pond of 100 m.
+ * A world whose edges all stand over the sea, and a view given a `wind`, take these without the swell trains, under that
+ * wind (a light air of 2 m/s over 100 m on a landlocked world), so the water's wind settings and looks apply to it.
  */
 export const SEA: Readonly<Required<Pick<WaterOptions, 'segments' | 'waves' | 'foamDistance' | 'color'>>> =
   Object.freeze({
@@ -265,6 +267,10 @@ export const SEA: Readonly<Required<Pick<WaterOptions, 'segments' | 'waves' | 'f
     foamDistance: 6,
     color: [0.02, 0.24, 0.34] as const,
   });
+
+// The wind over a landlocked world's rivers and lakes: a light air (Beaufort 2) over the 100 m a pool of a creek
+// stretches, small ripples.
+const INLAND_WIND = Object.freeze({ speed: 2, fetch: 100 });
 
 /** `Water` settings a view passes on (`@margoengine/water`); the view sets the size, the height and the horizon. */
 export type BiomeWaterSettings = Omit<
@@ -393,6 +399,13 @@ export function groundMaterials(biomes: readonly BiomeDefinition[]): string[] {
   const keys: string[] = [];
   for (const b of biomes) for (const g of b.ground) if (!keys.includes(g.material)) keys.push(g.material);
   return keys;
+}
+
+/** Whether every height on the edge of a `w` by `d` grid stands over the sea. */
+function edgesOverSea(h: Float32Array, w: number, d: number, sea: number): boolean {
+  for (let u = 0; u < w; u++) if (h[u] <= sea || h[(d - 1) * w + u] <= sea) return false;
+  for (let v = 0; v < d; v++) if (h[v * w] <= sea || h[v * w + w - 1] <= sea) return false;
+  return true;
 }
 
 /** Throws the RangeError a view gives for more ground materials than the terrain draws. */
@@ -1406,17 +1419,26 @@ export class BiomeView implements Disposable {
         view.#paint = still?.paintRiverbed;
         // Paint the ground under the rivers and lakes now that their surface is known.
         if (river && view.materials.includes('riverbed')) view.#upload(0, 0, view.#width, view.#depth);
+        // The sea reaches past the world's edge only where an edge stands at or below it. A landlocked world's water,
+        // and water given a wind, raises the waves of a wind instead of the ocean swell: fixed trains drown a creek, and
+        // Water then takes no wind, so a look family's water could not reach it (KB-BIOMES-LOOKFAMILY1).
+        const inland = edgesOverSea(view.#heights, view.#width, view.#depth, sea),
+          { waves: swell, ...body } = SEA,
+          surface =
+            inland || waterSettings.wind !== undefined ? { ...body, wind: INLAND_WIND } : { ...body, waves: swell };
         if (!view.#disposed)
           view.#water = held.run(() =>
             Water.attach(engine, {
-              ...SEA,
+              ...surface,
               ...(sky ? { reflection: () => sky.reflectionTexture, lights: sky.lights } : {}),
               ...waterSettings,
               ...river?.options,
               ...(flow && river?.lines.length ? { still: false } : {}),
               size: [side(x0, x1), side(z0, z1)],
               height: sea,
-              horizon: true,
+              // A sea horizon only where the sea leaves the world: past a landlocked world's edge it drew a flat blue
+              // plane at sea level beyond the far ground (KB-BIOMES-WORLDEDGE1).
+              horizon: !inland,
             }),
           );
         if (flow && river?.lines.length && view.#water && !view.#disposed) {
@@ -2007,10 +2029,7 @@ export class BiomeView implements Disposable {
       w = this.#width,
       d = this.#depth,
       h = this.#heights;
-    if (choice === 'auto') {
-      for (let u = 0; u < w; u++) if (h[u] <= sea || h[(d - 1) * w + u] <= sea) return undefined;
-      for (let v = 0; v < d; v++) if (h[v * w] <= sea || h[v * w + w - 1] <= sea) return undefined;
-    }
+    if (choice === 'auto' && !edgesOverSea(h, w, d, sea)) return undefined;
     const far = horizonHeights({ bounds: world.bounds, heights: h, width: w, depth: d, seed: world.seed }),
       rock = this.materials.indexOf('rock'),
       arrays = this.#weights.length,

@@ -193,7 +193,9 @@ bloom and tone curve of a `PresetScene` with the sun where it was for the date a
 part and dries the fire's dead fuel from the weather's humidity and temperature, the fuel map of the forest
 (`fuelMap`, Anderson's models 8 and 10 under timber, 1, 2 and 5 in the openings, none on the rail, the creek and the
 streets) and a `FireFront` on it with the town lots as structures. The look family (`look`, default `animatedFeature`)
-is written through each package's settings. The handle gives `height`, `anchors`, `views` and `view(name, fov)`,
+is written through each package's settings (the sky and clouds, the ground materials, the creek's water and the fire).
+The cumulus stand 2.5 to 4 km over the valley floor, and the terrain's fine rings follow the camera, so a view
+anywhere along the valley keeps the creek's channel. The handle gives `height`, `anchors`, `views` and `view(name, fov)`,
 `shots` (eight, from the catalogue) and `tracks` (a camera track per shot for `shotFilesFromScene` of `tools/shot`),
 `targets`, `layout`, `applyLook(name)`, `applySettings({weather, sky, fire})` for per-shot rows, `advanceTime(seconds)`
 (fire and sky), `settle()` (the forest tiles around the camera), the `parts` and `dispose()`.

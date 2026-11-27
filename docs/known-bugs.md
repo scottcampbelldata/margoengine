@@ -6,6 +6,88 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: timber-valley's cumulus showed as flat white blobs on the mountain slopes (KB-SKY-CLOUDBLOB1; scenes, sky docs)
+
+- **Repro:** timber-valley under cover 0.2 to 0.3, from the valley floor toward the ridges: a smooth white patch lies
+  against the slopes below the ridge line, with no shape or shading.
+- **Cause:** a cloud layer's `bottom` and `top` are metres over world y = 0 (the option's text said "above the
+  ground"). The scene left them to the cumulus type's 1,000 to 2,500 m on a floor 870 m up with ridges to about 1,900 m,
+  so the layer ran through the mountains and only its thin foot showed over the floor.
+- **Fix:** the scene passes `bottom` and `top` 2.5 and 4 km over the valley's floor (the lifting condensation level of
+  a dry August afternoon, Lawrence 2005), and the `VolumetricCloudOptions.bottom` text says what it is measured from.
+  The same views now show rounded cumulus with shaded bases over the ridges (RTX A6000, WebGPU).
+- **And:** applying a look family then deleted those heights and the cloud type, since the sky's apply writes every
+  row it is not given back to its default; `applyLookFamily` now keeps the layer's `type`, `coverage`, `bottom`, `top`
+  and `density` (`packages/scenes/test/look-family-parts.test.js`).
+- **Regression test:** `node packages/scenes/test/timber-valley-still.mjs` (the cloud base stands over the highest
+  ground).
+
+### Fixed 2026-11-27: timber-valley's animated-feature look could not reach its ground or its creek (KB-BIOMES-LOOKFAMILY1; biomes, scenes)
+
+- **Repro:** the scene's default `look: 'animatedFeature'` changed the sky and fire only, and giving the family the
+  view's water threw "Water settings windSpeed, windDirection and fetch need a Water made without options.waves".
+- **Cause:** a `BiomeView` built every water, a creek included, with the ocean's two fixed swell trains (`SEA`), and a
+  `Water` with fixed trains takes no wind, so no water look with a wind could be applied to it; a `wind` the caller gave
+  was ignored for the same reason. The ground materials already had their target (`applyLookFamily`'s `biomes`), and
+  the scene passed neither.
+- **Fix:** on a landlocked world, or with a `wind`, the view's water takes `SEA` without the swell, under that wind (2
+  m/s over 100 m by default); a world the sea reaches keeps the swell. The scene passes the family to the ground and the
+  water. No new option.
+- **Regression tests:** `packages/biomes/tests/view-sea-horizon.test.js` (the family applies to a landlocked view's
+  water; threw before) and `node packages/scenes/test/timber-valley-still.mjs` (the creek's water takes the family's
+  colour).
+
+### Fixed 2026-11-27: timber-valley's creek showed as stray slabs of water on a flat floor from views along the valley (KB-BIOMES-RIVERSTEP1, near half; scenes)
+
+- **Repro:** `@margoengine/scenes/timber-valley`, view `creek` after attaching with the camera near the world's centre:
+  no channel in the ground, and one flat slab of water lying on the floor some way off (blue over red 0.39 in the water
+  ahead of the bank).
+- **Cause:** since 9176e5cdd4 a `BiomeView` anchors its clipmap rings where the camera stood at attach. The scene's
+  views lie up to 2 km from there, so the creek (14 m wide) drew on 32 m cells that missed its channel; the water showed
+  only where a vertex happened to fall in it.
+- **Fix:** the scene passes `clipmap: { anchor: 'camera' }`, so the fine rings follow the camera
+  (`packages/scenes/src/timber-valley.ts`). The creek now reads as one channel with its banks (blue over red 2.73,
+  RTX A6000, WebGPU).
+- **Regression test:** `node packages/scenes/test/timber-valley-still.mjs` (the creek bank assertion; 0.39 before,
+  bound 1.3).
+- **Still open:** the far half, below.
+
+### Open 2026-11-27: seen from far off, a narrow creek breaks into separate patches of water (KB-BIOMES-RIVERSTEP1, far half; terrain, water, biomes)
+
+- **Repro:** the `aerial-west` view of timber-valley: past a few hundred metres the creek is a row of separate blue
+  patches, then only the riverbed paint.
+- **Cause:** a clipmap ring's cells grow with distance (16 and 32 m from about 500 m) past the channel's 14 m width. The
+  ring takes the ground at its vertices only, so the water, 0.3 m under the banks, shows where a vertex falls in the
+  channel and is covered elsewhere. A fix has to either keep the channel's low ground in the coarse rings or let the
+  water pass the coarse ground's error in the depth test; both are design work.
+
+### Fixed 2026-11-27: past a landlocked world's edge the view showed a flat blue plane (KB-BIOMES-WORLDEDGE1; biomes)
+
+- **Repro:** timber-valley from 2,200 m, looking past the edge: a flat blue band lies between the far mountains and the
+  sky. Seen first (2026-11-17) from the `fire-line` view, before the view drew any far ground.
+- **Cause:** two. Nothing drew ground past the edge (fixed earlier by `BiomeView`'s `horizon` far ground); and a view
+  with rivers always gave its water the sea's horizon, at sea level, which showed past the end of the far ground.
+- **Fix:** the water reaches to the horizon only where an edge of the world stands at or below sea level
+  (`packages/biomes/src/view.ts`).
+- **Regression test:** `packages/biomes/tests/view-sea-horizon.test.js` (a landlocked valley's water has no horizon, a
+  coast's has).
+- **Weak spot left:** the far ground takes each corner's materials from the nearest edge texel, so it draws long
+  smeared streaks running outward from the edge (KB-BIOMES-HORIZONSTREAK1).
+
+### Open 2026-11-27: the far ground past a world's edge draws long streaks (KB-BIOMES-HORIZONSTREAK1, biomes)
+
+- **Repro:** timber-valley, camera at (-1500, 1400, 0) looking at (-3200, 900, 300): bands of material and light run
+  straight outward from the world's edge to the horizon.
+- **Cause:** `BiomeView`'s horizon terrain copies each far corner's weights from the nearest edge texel
+  (`#horizonTerrain`), so one edge texel's material runs the whole 12 km.
+
+### Open 2026-11-27: volumetric clouds draw full white through a smoke pall (KB-SKY-PALLCLOUD1, sky)
+
+- **Repro:** timber-valley `weather=smoke&date=1910-08-22&hour=10`, view `aftermath`: a cumulus low on the left is the
+  brightest thing in the frame, white against the orange pall; `VolumetricClouds.dispose()` removes it.
+- **Cause (not traced past this):** the day sky takes the smoke layer through `atmosphere.sunColor` and
+  `scatteredLight`; the volumetric clouds are not dimmed or veiled by it.
+
 ### Fixed 2026-11-27: a voxel-pathtracer unit test failed on a loaded machine; the viewport ignored the fixed band budget (KB-VPT-BANDS-LOAD1, voxel-pathtracer)
 
 - **Repro (before):** `packages/voxel-pathtracer` unit suite (`node --test tests/*.test.js`) 15 times while 28 CPU
@@ -40,8 +122,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   orange-grey sky with the ridges visible (RTX A6000, WebGPU, 960 x 540).
 - **Regression test:** `packages/scenes/test/timber-valley.test.js` (the smoke day is daylight; fails on 0.6).
 - **Still open on this view:** the distant haze is much darker than the sky behind it (KB-SKY-PALLHAZE1), dark beaded
-  trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and the horizon past the world edge is a white
-  wedge (KB-BIOMES-WORLDEDGE1).
+  trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and a cloud low on the left draws white through
+  the pall (KB-SKY-PALLCLOUD1).
 
 ### Open 2026-11-27: under a smoke load the ground haze is far darker than the sky behind it (KB-SKY-PALLHAZE1, weather and sky)
 
@@ -59,7 +141,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 - **Repro:** `packages/scenes/test/timber-valley-still.html?view=aftermath&weather=smoke&fire=burnt&date=1910-08-22&hour=10&w=960&h=540`
   (film quality, 60 frames): wavy strings of dark soft blobs fill the upper left, near the camera. Not seen at
-  `quality=preview` with 30 frames. Cause not traced.
+  `quality=preview` with 30 frames.
+- **Looked at:** after the scene's `settle(86400)` for `fire: 'burnt'`, all 12 smoke columns still carried 2 to 66 MW,
+  so the fire had not burned out in a day and the "burned" valley still burns; the columns sit 700 m and more from
+  the camera. Which effect draws the strings is not traced.
 
 ### Fixed 2026-11-27: SnapshotRendering's stats lost a recording dropped before the next frame (KB-CULL-SNAPSTATS1, culling)
 
