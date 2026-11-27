@@ -13,6 +13,23 @@ interface Graph {
 
 export const QUAY_SWEEP = 2 / 3;
 const DIRECT_LIMIT = 128;
+const MAX_EDGE_PAGE = 8192;
+
+interface CoarseEdges {
+  readonly from: Int32Array;
+  readonly to: Int32Array;
+  readonly weights: Float64Array;
+  readonly barriers: Uint8Array;
+}
+
+function edgePage(size: number): CoarseEdges {
+  return {
+    from: new Int32Array(size),
+    to: new Int32Array(size),
+    weights: new Float64Array(size),
+    barriers: new Uint8Array(size),
+  };
+}
 
 /** Pair cells from the ends, leaving an odd central strip symmetric. */
 function coarsenAxis(cells: number): Uint32Array {
@@ -34,10 +51,7 @@ class CoarseGraph implements Graph {
     readonly nz: number,
     readonly coordinates: Int32Array,
     readonly ground: Uint32Array,
-    readonly from: Int32Array,
-    readonly to: Int32Array,
-    readonly weights: Float64Array,
-    readonly barriers: Uint8Array,
+    readonly edgePages: readonly CoarseEdges[],
   ) {
     this.size = coordinates.length;
   }
@@ -51,15 +65,15 @@ class CoarseGraph implements Graph {
   }
 
   faces(visit: Visit): void {
-    for (let i = 0; i < this.from.length; i++)
-      visit(this.from[i]!, this.to[i]!, this.weights[i]!, this.barriers[i] !== 0);
+    for (const { from, to, weights, barriers } of this.edgePages)
+      for (let i = 0; i < from.length; i++) visit(from[i]!, to[i]!, weights[i]!, barriers[i] !== 0);
   }
 }
 
 // Galerkin aggregation follows Vaněk, Mandel and Brezina (1996), doi:10.1007/BF02238511.
 // Keeping the depth bands and protected face endpoints separate preserves a submerged aperture.
 /** P is constant on each wet component in a 2×2 horizontal block at one depth. */
-function contract(fine: Graph): { graph: CoarseGraph; labels: Int32Array } {
+function aggregate(fine: Graph) {
   const xBins = coarsenAxis(fine.nx),
     zBins = coarsenAxis(fine.nz);
   const nx = xBins[fine.nx - 1]! + 1,
@@ -69,12 +83,14 @@ function contract(fine: Graph): { graph: CoarseGraph; labels: Int32Array } {
     n = fine.size;
   const bins = new Int32Array(n).fill(-1);
   const parent = new Int32Array(n).fill(-1);
+  function bin(key: number): number {
+    const square = key % plane;
+    return xBins[square % fine.nx]! + nx * zBins[Math.floor(square / fine.nx)]! + coarsePlane * Math.floor(key / plane);
+  }
   for (let i = 0; i < n; i++) {
     const key = fine.coordinate(i);
     if (key < 0) continue;
-    const square = key % plane;
-    bins[i] =
-      xBins[square % fine.nx]! + nx * zBins[Math.floor(square / fine.nx)]! + coarsePlane * Math.floor(key / plane);
+    bins[i] = bin(key);
     parent[i] = i;
   }
   function root(i: number): number {
@@ -87,68 +103,83 @@ function contract(fine: Graph): { graph: CoarseGraph; labels: Int32Array } {
   fine.faces((a, b, weight, protectedFace) => {
     if (!protectedFace && weight > 0 && bins[a] === bins[b]) parent[root(a)] = root(b);
   });
+  // Flatten before reusing the two dense work arrays. Each row can now read its
+  // final root without following a pointer through a row already relabelled.
+  for (let i = 0; i < n; i++) if (parent[i] !== -1) parent[i] = root(i);
   const split = new Uint8Array(n);
   fine.faces((a, b, _, protectedFace) => {
-    if (protectedFace && root(a) === root(b)) split[root(a)] = 1;
+    if (protectedFace && parent[a] === parent[b]) split[parent[a]!] = 1;
   });
 
-  const coordinates: number[] = [];
-  const ground: number[] = [];
-  const labels = new Int32Array(n).fill(-1);
-  const representatives = new Int32Array(n).fill(-1);
+  const representatives = bins.fill(-1);
+  let size = 0;
   for (let i = 0; i < n; i++) {
-    if (parent[i] === -1) continue;
-    const representative = root(i);
+    const representative = parent[i]!;
+    if (representative === -1) continue;
     const member = split[representative] ? i : representative;
-    if (representatives[member] === -1) {
-      representatives[member] = coordinates.length;
-      coordinates.push(bins[i]!);
-      ground.push(0);
-    }
-    const coarse = representatives[member]!;
-    labels[i] = coarse;
+    if (representatives[member] === -1) representatives[member] = size++;
+    parent[i] = representatives[member]!;
+  }
+  const labels = parent;
+  const coordinates = new Int32Array(size).fill(-1);
+  const ground = new Uint32Array(size);
+  for (let i = 0; i < n; i++) {
+    const coarse = labels[i]!;
+    if (coarse < 0) continue;
+    if (coordinates[coarse] === -1) coordinates[coarse] = bin(fine.coordinate(i));
     ground[coarse]! += fine.anchors(i);
   }
+  return { nx, nz, coordinates, ground, labels };
+}
 
-  // Sum Galerkin edges in their original order. The small adjacency lists avoid
-  // representing an edge by a floating-point product of two potentially large IDs.
-  const head = new Int32Array(coordinates.length).fill(-1),
-    from: number[] = [],
-    to: number[] = [],
-    next: number[] = [],
-    weights: number[] = [],
-    barriers: number[] = [];
+function contract(fine: Graph): { graph: CoarseGraph; labels: Int32Array } {
+  const { nx, nz, coordinates, ground, labels } = aggregate(fine);
+  const head = new Int32Array(coordinates.length).fill(-1);
+  const pageSize = Math.min(MAX_EDGE_PAGE, Math.max(16, coordinates.length));
+  const pages: CoarseEdges[] = [];
+  const links: Int32Array[] = [];
+  let size = 0;
+  // Visit and sum Galerkin edges in original face order. Pages avoid growing and
+  // then copying a large array for each attribute. Only the links are temporary.
   fine.faces((left, right, weight, protectedFace) => {
     const a = Math.min(labels[left]!, labels[right]!),
       b = Math.max(labels[left]!, labels[right]!);
     if (a === b) return;
     let edge = head[a]!;
-    while (edge !== -1 && to[edge] !== b) edge = next[edge]!;
-    if (edge === -1) {
-      edge = from.length;
-      next.push(head[a]!);
-      head[a] = edge;
-      from.push(a);
-      to.push(b);
-      weights.push(0);
-      barriers.push(0);
+    let page = Math.floor(edge / pageSize);
+    let slot = edge % pageSize;
+    while (edge !== -1 && pages[page]!.to[slot] !== b) {
+      edge = links[page]![slot]!;
+      page = Math.floor(edge / pageSize);
+      slot = edge % pageSize;
     }
-    weights[edge]! += weight;
-    if (protectedFace) barriers[edge] = 1;
+    if (edge === -1) {
+      page = Math.floor(size / pageSize);
+      slot = size % pageSize;
+      if (slot === 0) {
+        pages.push(edgePage(pageSize));
+        links.push(new Int32Array(pageSize));
+      }
+      links[page]![slot] = head[a]!;
+      head[a] = size++;
+      pages[page]!.from[slot] = a;
+      pages[page]!.to[slot] = b;
+    }
+    const { weights, barriers } = pages[page]!;
+    weights[slot]! += weight;
+    if (protectedFace) barriers[slot] = 1;
   });
-  return {
-    graph: new CoarseGraph(
-      nx,
-      nz,
-      Int32Array.from(coordinates),
-      Uint32Array.from(ground),
-      Int32Array.from(from),
-      Int32Array.from(to),
-      Float64Array.from(weights),
-      Uint8Array.from(barriers),
-    ),
-    labels,
-  };
+  const tail = size % pageSize;
+  if (tail) {
+    const { from, to, weights, barriers } = pages.at(-1)!;
+    pages[pages.length - 1] = {
+      from: from.slice(0, tail),
+      to: to.slice(0, tail),
+      weights: weights.slice(0, tail),
+      barriers: barriers.slice(0, tail),
+    };
+  }
+  return { graph: new CoarseGraph(nx, nz, coordinates, ground, pages), labels };
 }
 
 function requirePivot(pivot: number): void {
