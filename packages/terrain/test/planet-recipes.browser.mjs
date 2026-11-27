@@ -3,7 +3,8 @@
 //   MARGO_COMPAT=1 node scripts/run-with-timeout.mjs -- node packages/terrain/test/planet-recipes.browser.mjs
 // `PlanetTerrain` draws every `planetPreset` (moon, mars, asteroid, ice) from orbit and from 3 km up (5% of the radius on the asteroid), 320 x 240 exact
 // pixels: ground fills the view, the surface is lit with real relief (a deviation over 2 in the luminance), no validation
-// error, and a second engine draws the same bytes (the picture is deterministic).
+// error, and a second engine draws the same bytes (the picture is deterministic). A rayed crater then checks
+// `PlanetTerrain`'s `brightness`.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -41,6 +42,33 @@ await runSuite(
         assert.equal(a.hash, b.hash, `${name} ${view} deterministic`);
       }
     }
+    // PlanetTerrain's brightness: nothing changes at 0, rays lighten only some ground, -1 turns the ground black.
+    const shot = async (shade) => {
+      const out = await page.evaluate((x) => window.planet.rays(x), { shade });
+      assert.equal(out.error, null);
+      return out.pixels;
+    };
+    const plain = await shot(),
+      zero = await shot(0),
+      rays = await shot('rays'),
+      black = await shot(-1);
+    assert.deepEqual(zero, plain);
+    let ground = 0,
+      lighter = 0,
+      darker = 0,
+      lit = 0;
+    for (let i = 0; i < plain.length; i += 4) {
+      if (plain[i] > 200 && plain[i + 1] < 60 && plain[i + 2] > 200) continue;
+      ground++;
+      const change = rays[i] + rays[i + 1] + rays[i + 2] - plain[i] - plain[i + 1] - plain[i + 2];
+      if (change > 15) lighter++;
+      if (change < -6) darker++;
+      lit = Math.max(lit, black[i], black[i + 1], black[i + 2]);
+    }
+    console.log(`rays: ${JSON.stringify({ ground, lighter, darker, lit })}`);
+    assert.ok(lighter > 100 && lighter < ground / 2, `rays lighten ${lighter} of ${ground}`);
+    assert.equal(darker, 0);
+    assert.equal(lit, 0);
     assert.deepEqual(pageErrors, []);
     console.log('ok planet recipes');
   },

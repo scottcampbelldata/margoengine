@@ -6751,3 +6751,11 @@ Claim: a `Line`'s join, cap, miter limit, dashes, `onTop`, `antialias`, depth, c
 `LineBatch`'s square ends, `onTop` and `antialias`, survive `exportGLB` and `parseGLTFAsync`, and a second `exportModel`;
 lines in `colorMode` `'set'` or `'add'` export the colours they draw. Other viewers ignore the `extras` keys. Proof:
 `packages/exporters/tests/plugin-lines-points.test.js`.
+### Terrain complex craters, rays and secondary chains (2026-11-27)
+
+`terrain/planet-recipes` shapes craters past the transition diameter with flat floors, central peaks and wall terraces
+(Pike 1977's size laws as quoted in later work), and places young craters with ray systems (Elliott et al. 2018) and
+secondary chains (Singer et al. 2020). Proof: packages/terrain/test/planet-complex-craters.test.js (laws within 2%,
+benches, no step at the transition, ray count and reach, chains on the rays) and test/planet-recipes.browser.mjs (the
+brightness input on both backends). Authored shapes and what is not modelled are in ../limits.md. No claim of
+observational accuracy for the look.

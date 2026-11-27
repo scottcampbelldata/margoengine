@@ -11415,3 +11415,9 @@ Intel and AMD under Direct3D 11, and a corpus record of the guide's program.
 - Missing: veils for blended meshes and particles; SSGI and SSR composites under blended coverage are not measured;
   the pale pixels left are as frequent on blade-depth pixels as elsewhere (the pixel-scale variation of the hashed
   occluders), not yet bounded on a second GPU.
+
+### Section 5 evidence: planet brightness input (2026-11-27)
+
+`PlanetTerrain`'s `brightness` uses the spare fourth byte of the snorm8x4 normal, so the vertex stride stays 20 bytes.
+Evidence: `packages/terrain/test/planet-recipes.browser.mjs` on WebGPU and webgl2-compat (RTX A6000): brightness 0 draws
+the same bytes as none, rays only lighten, -1 draws black ground, no validation error. Missing: other hardware tiers.

@@ -147,6 +147,7 @@ interface PlanetTerrainOptions {
     radius?: number;
     center?: ArrayLike<number>;
     height?: PlanetHeight;
+    brightness?: PlanetHeight;
     relief?: number;
     seed?: number;
     seaLevel?: number | false;

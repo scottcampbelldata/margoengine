@@ -2,13 +2,14 @@
 // Clean room, from: Musgrave, Kolb and Mace 1989, "The Synthesis and Rendering of Eroded Fractal Terrains", SIGGRAPH
 // (ridged multifractal: 1 - |noise|, squared, each octave weighted by the one before); Perlin and Hoffert 1989,
 // "Hypertexture", SIGGRAPH, and Quilez, "Domain warping" (noise displaced by noise); craters: see planet-craters.ts.
-// Preset numbers are authored looks (documented in docs/limits.md), not fits to measured data.
+// Preset numbers are authored looks (documented in docs/limits.md), not fits to measured data; so are the Mars and ice
+// diameters (7,000 and 3,000 m) at which their craters turn complex.
 import type { PlanetHeight } from './planet.js';
 import { valueNoise } from './noise3.js';
 import { craterField } from './planet-craters.js';
 
 export { craterField } from './planet-craters.js';
-export type { CraterField, CraterFieldOptions, PlanetCrater } from './planet-craters.js';
+export type { CraterField, CraterFieldOptions, PlanetCrater, RayedCrater } from './planet-craters.js';
 
 const finite = (v: number, lo: number) => Number.isFinite(v) && v >= lo;
 
@@ -175,6 +176,26 @@ export function planetPresetRadius(name: PlanetPresetName): number {
   return body.radius;
 }
 
+const moonCraters = (radius: number, seed: number) =>
+  craterField({ radius, density: 3000, dMin: radius / 40000, dMax: radius / 6, rayed: 6, seed });
+
+/**
+ * The crater rays that go with `planetPreset` of the same name and options, for `PlanetTerrain`'s `brightness`: 0 to 1.
+ * The Moon has 6 rayed craters; the other presets have none and give 0 everywhere.
+ * @throws RangeError on an invalid name, radius or seed.
+ */
+export function planetPresetBrightness(
+  name: PlanetPresetName,
+  options: { radius?: number; seed?: number } = {},
+): PlanetHeight {
+  const bodyRadius = planetPresetRadius(name),
+    radius = options.radius ?? bodyRadius,
+    seed = options.seed ?? 1;
+  if (!(Number.isFinite(radius) && radius > 0) || !Number.isInteger(seed))
+    throw new RangeError('Invalid planetPresetBrightness options; pass radius above 0 and an integer seed');
+  return name === 'moon' ? moonCraters(radius, seed).brightness : () => 0;
+}
+
 /**
  * A ready ground: `'moon'` (old cratered highlands), `'mars'` (fewer, softer craters on ridged uplands), `'asteroid'`
  * (crowded craters on a lumpy body) or `'ice'` (shallow craters and warped ridges). `radius` defaults to the body's own;
@@ -192,19 +213,33 @@ export function planetPreset(name: PlanetPresetName, options: { radius?: number;
     ridges = (relief: number, octaves: number) => ridgeNoise({ radius, relief: relief * k, octaves, seed: seed + 5 });
   switch (name) {
     case 'moon':
-      return combine([
-        ridges(1500, 5),
-        craterField({ radius, density: 3000, dMin: radius / 40000, dMax: radius / 6, seed }),
-      ]);
+      return combine([ridges(1500, 5), moonCraters(radius, seed)]);
     case 'mars':
       return combine([
         ridges(3000, 6),
-        craterField({ radius, density: 400, dMin: radius / 20000, dMax: radius / 8, depthRatio: 0.15, seed }),
+        craterField({
+          radius,
+          density: 400,
+          dMin: radius / 20000,
+          dMax: radius / 8,
+          depthRatio: 0.15,
+          transition: 7000,
+          seed,
+        }),
       ]);
     case 'asteroid':
       return combine([
         ridges(150, 4),
-        craterField({ radius, density: 3e6, dMin: radius / 200, dMax: radius / 2, blend: 0.3, seed }),
+        // Gravity this weak leaves craters simple.
+        craterField({
+          radius,
+          density: 3e6,
+          dMin: radius / 200,
+          dMax: radius / 2,
+          blend: 0.3,
+          transition: Infinity,
+          seed,
+        }),
       ]);
     case 'ice':
       return combine([
@@ -216,6 +251,7 @@ export function planetPreset(name: PlanetPresetName, options: { radius?: number;
           dMax: radius / 10,
           depthRatio: 0.08,
           rimRatio: 0.02,
+          transition: 3000,
           seed,
         }),
       ]);

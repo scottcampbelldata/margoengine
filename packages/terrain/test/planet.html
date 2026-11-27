@@ -112,6 +112,21 @@ window.planet = {
     s.canvas.remove();
     return out;
   },
+  // One rayed crater facing the camera. `shade` picks the brightness: 'rays' (the field's), a number, or none.
+  async rays({ shade }) {
+    const { craterField } = await import('/packages/terrain/dist/planet-recipes.js');
+    const radius = 1737400,
+      field = craterField({ radius, density: 0, rayed: [{ x: 0.15, y: 0.1, z: 1, diameter: 100000 }] }),
+      brightness = shade === 'rays' ? field.brightness : typeof shade === 'number' ? () => shade : undefined,
+      s = await make({ eye: [0, 0, 2.4 * radius], target: [0, 0, 0], radius, height: field, brightness, relief: 4000, seaLevel: false });
+    await waitForPipelines(() => frame(s), { ready: () => s.planet.stats.built === 0 });
+    const error = await s.engine.gpu.popErrorScope(),
+      out = { pixels: Array.from(s.pixels), error: error?.message ?? null };
+    s.planet.dispose();
+    s.engine.dispose();
+    s.canvas.remove();
+    return out;
+  },
   async flight() {
     const up = norm([0.3, 0.5, 0.8]),
       s = await make({ eye: up.map((v) => v * 3 * R), target: [0, 0, 0], origin: true }),

@@ -54,6 +54,11 @@ export interface PlanetTerrainOptions {
   center?: ArrayLike<number>;
   /** Ground height. Default `planetNoise({radius, relief, seed})`. */
   height?: PlanetHeight;
+  /**
+   * Brightness of the ground at each vertex, such as a crater field's rays: 0 leaves the colour alone, up to 1 turns it
+   * to bright fresh rock, down to -1 darkens it to black; values past either end are clipped. Default none.
+   */
+  brightness?: PlanetHeight;
   /** Height range of the default ground and of the colours, in metres above 0. Default 8,000. */
   relief?: number;
   /** Seed of the default ground, an integer. Default 1. */
@@ -215,9 +220,9 @@ function patchIndices(n: number): Uint16Array {
 const shader = /* wgsl */ `${displayShader}
 struct Planet {viewProj:mat4x4f,center:vec4f,light:vec4f,radiance:vec4f,params:vec4f}
 @group(0) @binding(0) var<uniform> planet:Planet;
-struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) height:f32}
+struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) height:f32,@location(3) shade:f32}
 @vertex fn vertex(@location(0) local:vec3f,@location(1) normal:vec4f,@location(2) height:f32,@location(3) offset:vec3f)->Output {
-  var o:Output;let p=offset+local;o.position=p;o.clip=planet.viewProj*vec4f(p,1);o.normal=normal.xyz;o.height=height;return o;
+  var o:Output;let p=offset+local;o.position=p;o.clip=planet.viewProj*vec4f(p,1);o.normal=normal.xyz;o.height=height;o.shade=normal.w;return o;
 }
 @fragment fn fragment(i:Output)->@location(0) vec4f {
   let up=normalize(i.position-planet.center.xyz);var n=normalize(i.normal);let relief=max(planet.params.z,1.0);let sea=planet.params.x;
@@ -228,6 +233,7 @@ struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@locati
     base=mix(base,vec3f(0.38,0.33,0.22),smoothstep(0.15,0.45,t));
     base=mix(base,vec3f(0.33,0.31,0.29),max(smoothstep(0.3,0.5,slope),smoothstep(0.45,0.65,t)));
     base=mix(base,vec3f(0.85,0.87,0.9),smoothstep(0.68,0.75,t)*(1-smoothstep(0.35,0.55,slope)));
+    base=mix(base,vec3f(0.74,0.72,0.69),max(i.shade,0.0))*(1+min(i.shade,0.0));
   }
   let nl=clamp(dot(n,planet.light.xyz),0.0,1.0);
   let linear=base/3.14159265*nl*planet.radiance.xyz*planet.light.w+base*planet.radiance.w;
@@ -258,6 +264,8 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
   readonly stats: PlanetStats = { drawn: 0, built: 0, resident: 0, level: 0 };
   readonly #clock: () => number;
   readonly #height: PlanetHeight;
+  readonly #brightness?: PlanetHeight;
+  readonly #shade: Int8Array;
   readonly #center = new Float64Array(3);
   readonly #shift = new Float64Array(3);
   readonly #roots: Node[] = [];
@@ -351,6 +359,8 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
       throw new RangeError('Invalid maxPatches; pass an integer 6 to 16384');
     if (options.height !== undefined && typeof options.height !== 'function')
       throw new TypeError('Invalid height; pass a function');
+    if (options.brightness !== undefined && typeof options.brightness !== 'function')
+      throw new TypeError('Invalid brightness; pass a function');
     if (origin !== undefined && (typeof origin.onRebase !== 'function' || origin.origin?.length !== 3))
       throw new TypeError('Invalid origin; pass a FloatingOrigin');
     this.radius = radius;
@@ -364,6 +374,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     this.#clock = clock;
     this.maxPatches = maxPatches;
     this.#height = options.height ?? planetNoise({ radius, relief, seed });
+    this.#brightness = options.brightness;
     this.#center.set([center[0], center[1], center[2]]);
     if (origin) {
       this.#shift.set([origin.origin[0], origin.origin[1], origin.origin[2]]);
@@ -373,6 +384,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     this.#vertices = grid * grid + 4 * grid;
     this.#indices = patchIndices(resolution);
     this.#samples = new Float64Array((grid + 2) * (grid + 2) * 3);
+    this.#shade = new Int8Array((grid + 2) * (grid + 2));
     this.#heights = new Float64Array((grid + 2) * (grid + 2));
     this.#data = new ArrayBuffer(this.#vertices * STRIDE);
     this.#offsets = new Float32Array(maxPatches * 4);
@@ -486,6 +498,12 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
         if (i >= 0 && j >= 0 && i < grid && j < grid) {
           if (h < min) min = h;
           if (h > max) max = h;
+          if (this.#brightness) {
+            const bright = this.#brightness(dir[0], dir[1], dir[2], node.spacing);
+            if (!Number.isFinite(bright))
+              throw new RangeError('PlanetTerrain brightness returned a value that is not finite; return -1 to 1');
+            this.#shade[k] = Math.round(Math.max(-1, Math.min(1, bright)) * 127);
+          }
         }
       }
     const mid = ((n / 2 + 1) * side + n / 2 + 1) * 3,
@@ -527,7 +545,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
       i8[v * STRIDE + 12] = Math.round((nx / nl) * 127);
       i8[v * STRIDE + 13] = Math.round((ny / nl) * 127);
       i8[v * STRIDE + 14] = Math.round((nz / nl) * 127);
-      i8[v * STRIDE + 15] = 0;
+      i8[v * STRIDE + 15] = this.#shade[k]!;
     };
     const at = (i: number, j: number) => (j + 1) * side + i + 1;
     for (let j = 0; j < grid; j++) for (let i = 0; i < grid; i++) put(j * grid + i, at(i, j), 0);

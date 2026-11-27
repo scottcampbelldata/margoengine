@@ -1935,16 +1935,30 @@ goes straight into `PlanetTerrain`'s `height` and composes with `planetNoise`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {PlanetTerrain} from 'margoengine/terrain/planet';
-import {planetPreset, planetPresetRadius} from 'margoengine/terrain/planet-recipes';
+import {planetPreset, planetPresetBrightness, planetPresetRadius} from 'margoengine/terrain/planet-recipes';
 const radius = planetPresetRadius('moon'); // 1,737,400 m
 const engine = await Engine.create(document.querySelector('canvas')!, {
   camera: {position: [0, 0, 3 * radius], target: [0, 0, 0], near: 1, far: 1e9},
 });
-PlanetTerrain.attach(engine, {radius, height: planetPreset('moon', {radius}), relief: 4000, seaLevel: false});
+const height = planetPreset('moon', {radius}),
+  brightness = planetPresetBrightness('moon', {radius}); // its crater rays
+PlanetTerrain.attach(engine, {radius, height, brightness, relief: 4000, seaLevel: false});
 engine.render({delta: 0});
 ```
 
-- `craterField({radius, density | count, dMin, dMax, exponent, seed, depthRatio, rimRatio, maxDepth, floor, ejecta, blend})`:
+Place a young crater yourself and its rays and secondary chains come with it:
+
+```ts
+import {craterField} from 'margoengine/terrain/planet-recipes';
+const craters = craterField({
+  radius: 1737400,
+  rayed: [{x: 0.6, y: -0.7, z: 0.4, diameter: 85000}],
+});
+craters(0.6, -0.7, 0.4, 0); // metres at the central peak, below the undisturbed ground
+craters.brightness(0.6, -0.7, 0.4, 0); // 1: fresh bright ground
+```
+
+- `craterField({radius, density | count, dMin, dMax, exponent, seed, depthRatio, rimRatio, maxDepth, floor, ejecta, blend, transition, peaks, terraces, rayed, rayedSize})`:
   craters are Poisson placed, uniformly over the sphere, with diameters from a power law (cumulative exponent 2 by
   default, Neukum et al. 2001) between `dMin` (default `radius / 20,000`) and `dMax` (`radius / 4`). `density` counts
   craters of `dMin` or more per million square kilometres (default 1,000), or give `count` for the whole planet. Depth,
@@ -1956,6 +1970,18 @@ engine.render({delta: 0});
   The result also has `craters(x, y, z, detail)`, the list of craters that reach a point (centre, diameter, age), for decals
   or labels. A sample reads the 27 lattice cells around it for each octave of diameter; craters under twice `detail`
   are skipped. A density that puts over 256 craters in one cell throws a `RangeError` that says to raise `dMin`.
+- Complex craters: past `transition` (default 10,583 m, the Moon's; `Infinity` for none) a crater is shallower for its
+  size, with rim crest to floor `1.044 D^0.301` and rim `0.236 D^0.399` (km, Pike 1977, continuous with the simple laws),
+  a flat floor `0.187 D^1.249` wide from 20 km, a central peak `0.032 D^0.900` high from 27 km (`peaks` scales it,
+  default 1) and terraces on its wall from about 15 km, the outermost about `0.09 D^0.87` wide (Pearce and Melosh 1986;
+  `terraces` 0 to 1, default 1). Another body's `transition` rescales these lunar laws about it.
+- Rays: `rayed` (default 0) adds young craters, a count of up to 64 sized within `rayedSize`
+  (`[radius / 60, radius / 16]`) or your own `{x, y, z, diameter}` list. Each has 8 to 14 rays of median length
+  `6.59 Rp^1.27` km (Elliott et al. 2018) and chains of secondary craters along them from 1.3 diameters past the rim, the
+  largest 5 percent of the primary and smaller with range (Singer et al. 2020). The result's `rayed` lists them and
+  `brightness(x, y, z, detail)` is 0 to 1; give it to `PlanetTerrain`'s `brightness`.
+- `PlanetTerrain.attach(engine, {brightness})`: per vertex, 0 leaves the ground's colour, up to 1 turns it to bright
+  fresh rock, down to -1 darkens it to black. Default none.
 - `ridgeNoise({radius, relief, octaves, gain, frequency, seed})`: ridged multifractal noise between 0 and `relief`
   (Musgrave et al. 1989); defaults 8,000 m, 6 octaves, gain 2, 2 cycles around the planet.
 - `domainWarp(height, {radius, amplitude, frequency, levels, seed})`: reads `height` at positions shifted by noise,
@@ -1964,9 +1990,13 @@ engine.render({delta: 0});
 - `combine(heights, {mode, smooth})`: `'add'` (default), `'max'` or `'smoothMax'` (rounded joins, `smooth` 100 m).
 - `planetPreset('moon' | 'mars' | 'asteroid' | 'ice', {radius, seed})` and `planetPresetRadius(name)`: authored looks
   (numbers in [limits](../../docs/limits.md)), made for the body's own radius; pass the same `radius` to `PlanetTerrain`.
+  The Moon's has 6 rayed craters; `planetPresetBrightness(name, {radius, seed})` gives their brightness (0 everywhere
+  for the other presets).
   The preset is shaded by `PlanetTerrain` with its height colours, so set `relief` to suit and `seaLevel: false`.
 
-Checked in `test/planet-recipes.test.js` (an isolated crater's depth and rim over diameter against the Pike ratios and its
+Complex craters, rays and secondaries are checked in `test/planet-complex-craters.test.js` (depth, rim, floor and peak
+against the laws within 2%, benches on the wall, no step across the transition, ray count and reach, chains on the rays).
+The simple craters are checked in `test/planet-recipes.test.js` (an isolated crater's depth and rim over diameter against the Pike ratios and its
 ejecta against McGetchin within 2%, a flat floor within 1e-6, diameters against the power law with a
 Kolmogorov-Smirnov statistic under 0.02, determinism, pruning by detail, bounded reads, validation) and on both GPU backends by
 `test/planet-recipes.browser.mjs` (every preset drawn on `PlanetTerrain`, deterministic, no validation error).

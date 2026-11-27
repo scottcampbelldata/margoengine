@@ -10,6 +10,8 @@ export interface CombineOptions {
 
 export interface CraterField extends PlanetHeight {
     craters(x: number, y: number, z: number, detail?: number): PlanetCrater[];
+    readonly rayed: readonly RayedCrater[];
+    readonly brightness: PlanetHeight;
 }
 
 export interface CraterFieldOptions {
@@ -24,6 +26,11 @@ export interface CraterFieldOptions {
     rimRatio?: number;
     maxDepth?: number;
     floor?: number;
+    transition?: number;
+    peaks?: number;
+    terraces?: number;
+    rayed?: number | readonly RayedCrater[];
+    rayedSize?: readonly [number, number];
     ejecta?: boolean;
     blend?: number;
 }
@@ -46,6 +53,13 @@ export interface PlanetCrater {
 
 export type PlanetPresetName = 'moon' | 'mars' | 'asteroid' | 'ice';
 
+export interface RayedCrater {
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+    readonly diameter: number;
+}
+
 export interface RidgeNoiseOptions {
     radius?: number;
     relief?: number;
@@ -62,6 +76,11 @@ export function craterField(options?: CraterFieldOptions): CraterField;
 export function domainWarp(base: PlanetHeight, options?: DomainWarpOptions): PlanetHeight;
 
 export function planetPreset(name: PlanetPresetName, options?: {
+    radius?: number;
+    seed?: number;
+}): PlanetHeight;
+
+export function planetPresetBrightness(name: PlanetPresetName, options?: {
     radius?: number;
     seed?: number;
 }): PlanetHeight;

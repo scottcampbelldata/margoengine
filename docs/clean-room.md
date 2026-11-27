@@ -18920,3 +18920,25 @@ from public specifications. No rival source file was opened, read or copied.
 - T. Porter and T. Duff, *Compositing Digital Images*, SIGGRAPH (1984), https://doi.org/10.1145/800031.808606 .
 - J. A. Cottam, A. Lumsdaine and P. Wang, *Overplotting: Unified Solutions under Abstract Rendering*, IEEE Big Data
   (2013), pp. 9-16.
+
+## terrain complex craters, rays and secondary chains (2026-11-27)
+
+Written from published results only; no other engine or library source was read. Pike's and Pearce and Melosh's laws were
+read as quoted in later work and search summaries, not in the papers themselves.
+
+- R. J. Pike, *Size-dependence in the shape of fresh impact craters on the moon*, in Impact and Explosion Cratering
+  (1977), pp. 489-509, abstract https://ntrs.nasa.gov/citations/19780060140 ; and *Apparent depth/apparent diameter
+  relation for lunar craters* (1977), https://ntrs.nasa.gov/citations/19780057837 .
+- G. S. Collins, H. J. Melosh and R. A. Marcus, *Earth Impact Effects Program*, Meteoritics & Planetary Science 40
+  (2005), 817-840, http://impact.ese.ic.ac.uk/static/effects.pdf (depth measured from the rim crest).
+- D. M. H. Baker et al., *The transition from complex craters to multi-ring basins on the Moon*, JGR Planets 117 (2012),
+  https://doi.org/10.1029/2011JE004021 .
+- W. Hale and J. W. Head, *Central peaks in lunar craters: morphology and morphometry*, Proc. Lunar Planet. Sci. Conf.
+  10 (1979), https://ntrs.nasa.gov/citations/19800039542 .
+- S. J. Pearce and H. J. Melosh, *Terrace width variations in complex lunar craters*, Geophysical Research Letters 13
+  (1986), 1419-1422, https://doi.org/10.1029/GL013i013p01419 .
+- J. R. Elliott, Y. H. Huang, D. A. Minton and A. M. Freed, *The length of lunar crater rays explained using secondary
+  crater scaling*, Icarus 312 (2018), 231-246, https://doi.org/10.1016/j.icarus.2018.04.015 .
+- K. N. Singer, B. L. Jolliff and W. B. McKinnon, *Lunar secondary craters and estimated ejecta block sizes reveal a
+  scale-dependent fragmentation trend*, JGR Planets 125 (2020), https://arxiv.org/abs/2008.10132 .
+

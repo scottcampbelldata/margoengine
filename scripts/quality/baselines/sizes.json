@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21154109,
+  "total": 21157095,
   "history": [
     {
       "date": "2026-10-24",
@@ -14995,6 +14995,12 @@
       "commit": "92993352b2",
       "reason": "KB4000 step 2, the scene-copy transmission pass reads display targets: gltf/transmission 4,122 to 4,860 B gzip (+738: the inverse PBR Neutral display transform and sRGB decode at level 0, the display copy pipeline, takes() and the native glass source lookup), gltf/pbr-model 71,692 to 71,877 B (+185: per-view routing through PBRTransmission.takes, the capture request for hooked glass on a display target, the native glass resolved() source). Measured on built entries of 92993352b2 and of the change; both exceed their ceilings (4,378 and 71,859), so the ceilings take measured + headroom. The bytes are the feature: transmission on the canvas without an HDR PostStack, exact through clear glass; gltf/transmission is lazy, and a split of pbr-model's routing would cost a second chunk on every glass load.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "planet-complex-craters",
+      "reason": "terrain: complex craters, rays and secondary chains in craterField (planet-recipes 3226 to 5848 B, budget 6104 B) and a brightness input on PlanetTerrain (planet 7512 to 7636 B, budget 7892 B). The rays are an option of the same field and cut the same ground in age order; a separate entry would need a second field type and its own merging of ejecta. Core plus stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16413,8 +16419,8 @@
     "@margoengine/terrain/imagery": 6506,
     "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/overlays": 4061,
-    "@margoengine/terrain/planet": 7538,
-    "@margoengine/terrain/planet-recipes": 3472,
+    "@margoengine/terrain/planet": 7892,
+    "@margoengine/terrain/planet-recipes": 6104,
     "@margoengine/terrain/query": 4196,
     "@margoengine/terrain/relief-lighting": 3564,
     "@margoengine/terrain/rock-settings": 2718,

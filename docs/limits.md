@@ -8355,7 +8355,17 @@ full detail and 3.8 us at a coarse patch against 1.0 us for `planetNoise`, so a 
 reach a default sample on average (one at most in 100,000 samples). Placement is a jittered 3D lattice, not the equal-area
 cube-sphere cells of the plan: no face seams, 27 cells instead of 9. Diameters pass a Kolmogorov-Smirnov test under 0.02 and the
 crater count matches the density within 5% (24,627 craters on a 10 km test body).
-Not built: central peaks and terraces of complex craters (Pike 1977's complex-crater laws), rays, secondary crater chains.
+Built 2026-11-27: complex craters, rays and secondary crater chains, 3,226 B to 5,848 B min+gzip for the entry
+(the planet entry 7,512 B to 7,636 B for its brightness input). The complex size laws (Pike 1977: depth, rim, floor, peak
+height), the terrace width (Pearce and Melosh 1986), ray length and count (Elliott et al. 2018) and secondary sizes
+(Singer et al. 2020) were read in secondary sources or search summaries where the paper itself was not open: Pike 1977
+and Pearce and Melosh 1986 were not read. Authored, not measured: the ramps between onset diameters, the peak's width
+and outline, four terraces with their benches, wander and gaps, the fade of peaks from 140 to 200 km, the spread and
+shape of rays, chain spacing, a secondary's half depth and 1.25 stretch, and the Mars (7,000 m) and ice (3,000 m)
+transitions. Not modelled: peak rings and multi-ring basins above about 175 km (they stay flat-floored with no peak),
+oblique impacts (rays are symmetric about the great circle fan), secondaries below 1 km primaries, and fresh-ejecta
+colour other than one brightness. Rays are placed per sample against every rayed crater, so their cost grows with the
+count (at most 64). A floor is still bounded by `maxDepth` below the ground.
 
 Steady-frame work counts (Scott's 60+ fps rule, 2026-11-10). Planet recipes: the render path is untouched, so draws, buffer writes, bind groups and allocations per frame are unchanged; heights run only when a patch is built (at least one patch a frame, about 6 ms of the 16.7 ms frame with the moon preset, the rest spread by `budget`). A miss against a 2 ms patch target is listed in the speed phase list.
 Water caustics after the range fix (commit c741c965a4): per frame one more compute pass (3 instead of 2: weights, 512 chunk sums, scale) and one more bind group; no buffer write and no allocation added (the weights buffer, 2 * segments^2 * 4 B, 128 KiB at the default and 2 MiB at 512 segments, and a 2 KiB partials buffer are created once); draws unchanged (one per depth slice plus the projection). Default size 0.52 ms native GPU timestamps; the WebGL2 layer 19 to 23 ms wall (water alone 12 ms), within 60 fps on the A6000, mid laptop iGPU not measured here.
