@@ -6,6 +6,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open (below Margo) 2026-11-27: an AMD Radeon's native WebGPU gets a helper function's derivative wrong when only a per-pixel branch uses it (KB-AMD-HELPERDERIV1, driver; browser)
+
+- **Repro:** Edge 158, AMD Radeon integrated graphics of a Ryzen 9 9950X (driver 32.0.21042.62), Windows 11, native
+  WebGPU: `MARGO_GPU=amd node packages/webgl2-compat/test/features-browser.mjs`, case `derivativeBranch.helper`. A
+  fragment computes `d = slope(r)` (a function returning `vec2f(dpdx(r), dpdy(r))`) in uniform control flow, then uses
+  `d.x` only inside `if (esc) { loop that sums d.x; return }`. For `r = 0.5 x^2 + 1.5 y^2` native returns d.x = -r (-0.5,
+  -3.5, -10.5, -21.5 along the first row) where the differences are 1, 3, 5 and 7: the neighbour reads as 0. The same
+  derivatives written in the entry point are right, and an RTX A6000 is right in every form.
+- **Cause:** below Margo: WGSL defines a derivative taken in uniform control flow wherever it is used (W3C, "WebGPU
+  Shading Language", "Derivatives" and "Uniformity"); on this GPU the compiled shader reads it as if taken inside the
+  branch. The browser's WGSL translation or the AMD compiler is the owner; which of the two was not isolated.
+- **Margo:** the WebGL2 layer returns the exact differences on both GPUs (it keeps such values in uniform control
+  flow, the entry of 2026-11-15). `features-browser.mjs` now holds the layer to the exact values
+  (`test/derivative-check.mjs`) and reports what native does. A shader of your own that must run right natively on this
+  GPU should take the derivative in the entry point, or use its value outside the branch too.
+
 ### Fixed 2026-11-27: a remote voice was silent in Chromium (KB-NETCODE-VOICESILENT1, netcode)
 
 - **Repro (before):** two pages joined by `PeerMesh` and `MediaSession` in Edge 158, A with `startVoice()`: B got the

@@ -20,9 +20,12 @@
 // sampled by the pass it is attached to read-only, and 3D texture slices drawn beside a depth attachment (ANGLE's
 // Direct3D 11 back end drops such draws; the layer draws them in a 2D stand-in), and derivatives used only inside a
 // later per-pixel branch (ANGLE Direct3D 11 moved them into it and read 0; the layer pins them into its outputs).
+// In that last case the layer must return the exact differences (derivative-check.mjs) on every GPU, and native is
+// reported, since an AMD driver's native answer is wrong for the helper-function form (KB-AMD-HELPERDERIV1).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { classifyBlend, compressedFailures } from './blend-check.mjs';
+import { derivativeExpected } from './derivative-check.mjs';
 
 const context = await openBrowser({
   startPath: '/packages/webgl2-compat/test/features.html',
@@ -197,6 +200,20 @@ try {
       );
       const nearest = values.filter((v, i) => native.result.halves[i] === nearestHalf(v)).length;
       lines.push(`${name}: the layer stores native's half of each value (native: ${nearest} of 32 the nearest)`);
+    } else if (name === 'derivativeBranch') {
+      const exact = derivativeExpected(),
+        { sample, bias, ...polynomial } = compat.result;
+      assert.deepEqual(differences(exact, polynomial), [], `${name}: the layer's derivatives are not the differences`);
+      // The two texture cases have no closed form here: the layer reads what native reads.
+      assert.deepEqual(
+        differences({ sample: native.result.sample, bias: native.result.bias }, { sample, bias }),
+        [],
+        `${name}: compat differs from native`,
+      );
+      const wrong = Object.keys(exact).filter((k) => differences(exact[k], native.result[k]).length);
+      lines.push(
+        `${name}: the layer returns the exact differences and native's samples; native ${wrong.length ? `is wrong in ${wrong.join(', ')}` : 'agrees'}`,
+      );
     } else {
       const diff = differences(native.result, compat.result);
       assert.deepEqual(diff, [], `${name}: compat differs from native`);
