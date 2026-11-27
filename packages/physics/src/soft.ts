@@ -2251,6 +2251,8 @@ export class SoftBody {
   /** @internal */ triangleList = new Uint32Array(0);
   /** @internal The fixed body that holds this body's surface collider, once it has one. */
   surface: PhysicsBody | null = null;
+  /** @internal The settings its surface collider was made with, to make it again on a snapshot's restore. */
+  surfaceSettings: Omit<ColliderSettings, 'offset' | 'rotation'> | null = null;
   /** @internal Whether shape matching holds this body. */ matched = false;
   /** @internal Which thread each structural edge is (see SoftBodyDesc.edgeKinds); empty for a body that is not a woven sheet. */
   edgeKinds = new Uint8Array(0);
@@ -4443,6 +4445,93 @@ export class SoftBodies implements PhysicsAttachment {
     (fem.bd_min_piece as unknown as Uint32Array)[body.handle] = body.material.minPiece;
   }
 
+  /**
+   * The whole soft world as one copy, for {@link SoftBodies.restoreSnapshot}: every body (its particles, edges, cells,
+   * clusters, tears, pins, targets, skin and tethers, and its settings), the attachments to rigid bodies, and the kernel's
+   * memory as it stands between steps, so stepping on from a restore gives the same bits as the first time. A cloth can be
+   * scrubbed back and a shot resumed mid-way. It holds the soft kernel's memory, so it is as large as that (a few megabytes for
+   * thousands of particles). The world's settings (`wind`, `water`, `substeps`, `iterations`, `splitOnTear`, the contact
+   * hook and tear listeners) are yours and are not in it. Take the rigid world's with `physics.takeSnapshot()` beside it.
+   */
+  takeSnapshot(): SoftSnapshot {
+    if (this.disposed)
+      throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
+    const world: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(this)) if (!SNAPSHOT_SKIP.has(key)) world[key] = copyState(value);
+    const bodies = [...this.bodies];
+    return {
+      bytes: new Uint8Array(this.exports.memory.buffer).slice(),
+      bodies,
+      state: {
+        world,
+        bodies: bodies.map((body) => {
+          const own: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(body)) if (key !== 'owner') own[key] = copyState(value);
+          return own;
+        }),
+      },
+    };
+  }
+
+  /**
+   * Puts the soft world back as {@link SoftBodies.takeSnapshot} found it, across bodies made, removed, torn or split since:
+   * the bodies of the snapshot are the bodies again (the same `SoftBody` objects, a removed one valid again), and a body made
+   * since is removed. A body's surface collider that was removed since is made again with the settings it was made with; a
+   * cluster's rigid proxy that was removed is made again when next asked for; an attachment to a rigid body that is gone is
+   * dropped; a drawing (`drawSoftBody`) of a body removed since is not brought back, so draw it again.
+   * @throws MargoError (`state`) for a snapshot of another soft world or a disposed one.
+   */
+  restoreSnapshot(snapshot: SoftSnapshot): this {
+    if (this.disposed)
+      throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
+    if (snapshot.bodies.some((body) => (body as unknown as { owner: SoftBodies }).owner !== this))
+      throw new MargoError(
+        'state',
+        'That snapshot is of another soft world; restore it with the SoftBodies that took it.',
+      );
+    const keep = new Set(snapshot.bodies);
+    // Bodies made since: their rigid companions go, as remove() takes them.
+    for (const body of this.bodies)
+      if (!keep.has(body)) {
+        for (const info of body.clusterInfo) if (info.proxy?.valid) this.physics.removeBody(info.proxy);
+        for (const mesh of this.bound.filter((m) => m.soft === body)) mesh.host.remove();
+        body.surface?.remove();
+        body.surface = null;
+        body.removed = true;
+      }
+    // The kernel's memory: grown back to the snapshot's size if it was smaller, then written over.
+    const memory = this.exports.memory,
+      pages = snapshot.bytes.byteLength / 65536 - memory.buffer.byteLength / 65536;
+    if (pages > 0) memory.grow(pages);
+    new Uint8Array(memory.buffer).set(snapshot.bytes);
+    new Uint8Array(memory.buffer, snapshot.bytes.byteLength).fill(0);
+    for (const [key, value] of Object.entries(snapshot.state.world))
+      (this as Record<string, unknown>)[key] = copyState(value);
+    snapshot.bodies.forEach((body, k) => {
+      const surface = body.surface,
+        settings = body.surfaceSettings;
+      for (const [key, value] of Object.entries(snapshot.state.bodies[k]!))
+        (body as unknown as Record<string, unknown>)[key] = copyState(value);
+      for (const info of body.clusterInfo) if (info.proxy && !info.proxy.valid) info.proxy = null;
+      const was = body.surface;
+      if (was && !was.valid) {
+        body.surface = null;
+        this.createSurfaceCollider(body, body.surfaceSettings ?? settings ?? {});
+      } else if (!was && surface?.valid) {
+        // A surface made since the snapshot goes with it.
+        surface.remove();
+      }
+    });
+    // Drawings are the user's: those of the bodies made since went with them above, the rest stay.
+    this.bound = this.bound.filter((m) => keep.has(m.soft) && m.host.valid);
+    this.attachments = this.attachments.filter((a) => a.body.valid);
+    this.view = null;
+    this.viewBuffer = null;
+    this.cellView = null;
+    this.cellViewBuffer = null;
+    return this;
+  }
+
   /** Removes a body and its particles; later bodies keep their order, but their numbers shift down by one. */
   remove(body: SoftBody): void {
     if (body.tetherStretch !== null || this.bodies.some((b) => b.tetherStretch !== null)) this.tethersDirty = true;
@@ -5772,6 +5861,7 @@ export class SoftBodies implements PhysicsAttachment {
       },
     });
     body.surface = host;
+    body.surfaceSettings = { ...settings };
     return host.colliders[0]!;
   }
 
@@ -6466,6 +6556,60 @@ function checkedAero(aero: SoftAerodynamics): AeroLaw {
 function plateNormalPerSine(law: AeroLaw, sine: number): number {
   if (sine < law.stallSine) return law.slope * Math.sqrt(1 - sine * sine) + law.vortexLift * sine;
   return law.drag / (0.56 + 0.44 * sine);
+}
+
+/** A soft world as {@link SoftBodies.takeSnapshot} took it. */
+export interface SoftSnapshot {
+  /** The soft kernel's memory. */
+  readonly bytes: Uint8Array;
+  /** The bodies it held, in order. */
+  readonly bodies: readonly SoftBody[];
+  /** @internal The world's and each body's own state, copied. */
+  readonly state: { readonly world: Record<string, unknown>; readonly bodies: readonly Record<string, unknown>[] };
+}
+
+/** What a soft world's snapshot leaves out: the kernel, its views, and the settings and listeners that are the user's. */
+const SNAPSHOT_SKIP = new Set([
+  'exports',
+  'physics',
+  'listeners',
+  'view',
+  'viewBuffer',
+  'cellView',
+  'cellViewBuffer',
+  'disposed',
+  'contactHook',
+  'wind',
+  'water',
+  'substeps',
+  'iterations',
+  'splitOnTear',
+  'cellDamping',
+  'femLinearTolerance',
+  'femMaxLinearIterations',
+  'femMaxDenseDofs',
+  'airSample',
+  'bound',
+]);
+
+/**
+ * A copy of a piece of state for a snapshot: numbers and typed arrays by value, arrays, maps, sets and plain objects copied
+ * through, a value with a `clone()` (a material) cloned; anything else (a body, a rigid body, a function) by reference.
+ */
+function copyState(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (ArrayBuffer.isView(value)) return (value as unknown as { slice(): unknown }).slice();
+  if (Array.isArray(value)) return value.map(copyState);
+  if (value instanceof Map) return new Map([...value].map(([k, v]) => [k, copyState(v)]));
+  if (value instanceof Set) return new Set([...value].map(copyState));
+  const proto = Object.getPrototypeOf(value);
+  if (proto === Object.prototype || proto === null) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = copyState(v);
+    return out;
+  }
+  if (typeof (value as { clone?: unknown }).clone === 'function') return (value as { clone(): unknown }).clone();
+  return value;
 }
 
 /** One skin limit a particle, from one number or a list, each 0 or more (Infinity: no limit). */

@@ -12337,6 +12337,13 @@ Written clean room from the papers below; no engine's source and no companion co
 - Energies 8(4), 2438, 2015, table 1, which tabulates Torres and Mueller's angle of the most lift and K_p for aspect ratios 0.5, 0.75 and 1 from their figures 6 and 10. https://www.mdpi.com/1996-1073/8/4/2438
 - F. Keckeisen, S. Kimmerle et al., "Modelling Effects of Wind Fields in Cloth Animations", WSCG 2004 (wind on cloth triangles).
 
+### Soft-world snapshots (`@margoengine/physics/soft`, 2026-11-27)
+
+Written clean room; no engine's source was read. A soft world runs in its own Wasm instance, so its whole state is its linear memory (the kernel's columns, counts and allocator) plus the JavaScript state of the world and its bodies; a snapshot copies both, and a restore writes the memory back (grown to size first) and puts the same body objects back, retiring any made since. The rigid world's snapshot carries its clock so time-driven loads replay. Determinism between steps is what makes this a replay rather than an approximation, as in rollback netcode.
+
+- G. Fiedler, "Deterministic Lockstep", Gaffer On Games, 2014. https://gafferongames.com/post/deterministic_lockstep/
+- T. Cannon, GGPO rollback networking SDK, documentation (save, load and advance of the whole game state). https://www.ggpo.net/
+
 ### Shape matching (`@margoengine/physics/soft`, 2026-11-24)
 
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.

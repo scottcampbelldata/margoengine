@@ -58,8 +58,13 @@ export function physicsGame<Input, S extends { readonly bytes: Uint8Array }>(
     );
   if (!schema.names.includes(input))
     throw new RangeError(`The schema has no struct "${input}"; pass the name of its input struct.`);
-  // The snapshot as taken, for its lists of rows: the world's bodies, colliders and joints, which a restore checks.
-  const template = world.takeSnapshot(),
+  // The snapshot as taken, for its lists of rows: the world's bodies, colliders and joints, which a restore checks. The
+  // world's clock is left out: a rollback restores the bodies, and the frame count is the session's.
+  const {
+      stepCount: _clock,
+      accumulator: _left,
+      ...template
+    } = world.takeSnapshot() as S & { stepCount?: number; accumulator?: number },
     size = template.bytes.byteLength,
     checked = (bytes: Uint8Array): Uint8Array => {
       if (!(bytes instanceof Uint8Array) || bytes.byteLength !== size)
@@ -100,7 +105,7 @@ export function physicsGame<Input, S extends { readonly bytes: Uint8Array }>(
     tickMs: 1000 / tickRate,
     initial: () => template.bytes.slice(),
     step(state, inputs, tick) {
-      world.restoreSnapshot({ ...template, bytes: checked(state) });
+      world.restoreSnapshot({ ...template, bytes: checked(state) } as unknown as S);
       apply(inputs, tick);
       world.step();
       state.set(world.takeSnapshot().bytes);

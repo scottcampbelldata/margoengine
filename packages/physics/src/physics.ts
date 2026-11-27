@@ -315,6 +315,9 @@ export interface PhysicsSnapshot {
   readonly bodies: readonly (readonly [number, number])[];
   readonly colliders: readonly (readonly [number, number])[];
   readonly joints: readonly number[];
+  /** The world's clock: fixed steps taken, and the time left over in the accumulator (restored when present). */
+  readonly stepCount?: number;
+  readonly accumulator?: number;
 }
 
 /** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
@@ -2455,8 +2458,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   /**
    * The whole world as one copy, for {@link Physics.restoreSnapshot} (Rapier's `takeSnapshot`): every body, collider, joint,
    * contact, warm start and sleep timer, so stepping on from a restore gives the same bits as the first time. It holds the
-   * kernel's rows, not the JavaScript objects: the handles, `userData`, meshes, controllers and listeners you hold stay what
-   * they are, and a restore needs the same bodies, colliders and joints to exist as when the snapshot was taken.
+   * kernel's rows and the world's clock (`stepCount` and the accumulator), not the JavaScript objects: the handles, `userData`,
+   * meshes, controllers and listeners you hold stay what they are, and a restore needs the same bodies, colliders and joints
+   * to exist as when the snapshot was taken. Soft bodies have their own (`SoftBodies.takeSnapshot`).
    */
   takeSnapshot(): PhysicsSnapshot {
     this.live();
@@ -2466,6 +2470,8 @@ export class Physics implements EnginePlugin, BodyOwner {
       bodies: [...this.bodies].map((body) => [body.row, c.generation[body.row]!] as const),
       colliders: [...this.byRow.keys()].map((row) => [row, c.colliderGeneration[row]!] as const),
       joints: [...this.joints].map((joint) => joint.row),
+      stepCount: this.stepCount,
+      accumulator: this.accumulator,
     };
   }
   /**
@@ -2497,6 +2503,9 @@ export class Physics implements EnginePlugin, BodyOwner {
         'The world has other bodies, colliders or joints than the snapshot: restore it before adding or removing any, or take a new snapshot.',
       );
     this.kernel.restore(snapshot.bytes);
+    // The clock goes back too, so a wind or a tide that reads the world's time blows as it did.
+    if (snapshot.stepCount !== undefined) this.stepCount = snapshot.stepCount;
+    if (snapshot.accumulator !== undefined) this.accumulator = snapshot.accumulator;
     for (const body of this.bodies) this.meshes.mark(body);
     this.retired.clear();
     return this;

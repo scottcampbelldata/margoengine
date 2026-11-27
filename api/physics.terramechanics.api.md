@@ -2020,6 +2020,8 @@ interface PhysicsSnapshot {
     readonly bodies: readonly (readonly [number, number])[];
     readonly colliders: readonly (readonly [number, number])[];
     readonly joints: readonly number[];
+    readonly stepCount?: number;
+    readonly accumulator?: number;
 }
 
 type Point = readonly [number, number, number];

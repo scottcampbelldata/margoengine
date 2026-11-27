@@ -895,6 +895,27 @@ console.log(physics.alpha, drawn.length);
 - **Surface collider.** `soft.createSurfaceCollider(body, {friction})` gives a body made from triangles (`trimesh`, `cloth`, `clothTube`) a deformable triangle-mesh collider that follows its particles each step with each vertex's speed, so every rigid shape, convex hulls and meshes included, rests on cloth and is dragged by its friction; particles meet every shape directly through the kernel's swept particle probe. It is removed with the body.
 - **Drawing.** `drawSoftBody(engine, body, {material, images, uvs})` from `margoengine/gltf/soft-mesh` draws a cloth or any body with triangles as a PBR mesh that follows it every frame, normals and tangents recomputed and texture coordinates from `body.grid` (`{nu, nv, wrap}` for a body built by `cloth`, `clothAnisotropic` or `clothTube`, null otherwise); see the gltf README.
 - **World.** `soft.create`, `soft.remove`, `soft.list()`, `soft.onTear(listener)`, `soft.hash()` (equal across two runs that did the same), `soft.substeps` (default 8) and `soft.iterations` (default 2), `soft.dispose()`.
+- **Snapshots.** `soft.takeSnapshot()` copies the whole soft world (every body with its particles, edges, cells, clusters, tears, pins, targets, skin, tethers and settings, the attachments to rigid bodies, and the soft kernel's memory) and `soft.restoreSnapshot(snapshot)` puts it back, so stepping on gives the same bits as the first time: a cloth can be scrubbed back and a shot resumed mid-way. It restores across bodies made, removed, torn or split since: the snapshot's bodies are the bodies again (the same `SoftBody` objects, a removed one valid again) and a body made since is removed. A surface collider removed since is made again with its settings; a drawing of a body removed since is not, so draw it again. The world's settings (`wind`, `water`, `substeps`, `iterations`, `splitOnTear`, hooks and listeners) are yours and stay as they are. Take the rigid world's beside it; `physics.takeSnapshot()` also carries the world's clock (`stepCount` and the accumulator), so a wind that reads the time blows as it did.
+
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics);
+soft.wind = (point, time) => [6 + 4 * Math.sin(2 * time), 0, 0];
+soft.create(SoftBodyDesc.cloth([0, 3, 0], [0, -0.2, 0], [0, 0, 0.2], 10, 8).setPinnedParticles([0, 7]));
+for (let i = 0; i < 60; i++) physics.step();
+const rigid = physics.takeSnapshot();
+const cloth = soft.takeSnapshot();
+for (let i = 0; i < 60; i++) physics.step();
+const end = soft.hash();
+physics.restoreSnapshot(rigid);
+soft.restoreSnapshot(cloth); // back to step 60
+for (let i = 0; i < 60; i++) physics.step();
+console.log(soft.hash() === end); // true
+```
 
 ### Cloth: woven fabric as measured
 
@@ -2604,7 +2625,7 @@ physics.dispose();
 
 ### Snapshots
 
-`physics.takeSnapshot()` copies the whole world (every body, collider, joint, contact, warm start and sleep timer) and `physics.restoreSnapshot(snapshot)` puts it back, as Rapier's `takeSnapshot`, so stepping on gives the same bits as the first time. The snapshot holds the kernel's rows, not your objects: handles, `userData`, meshes, controllers and listeners stay as they are, and a restore needs the same bodies, colliders and joints to exist, or it throws and changes nothing.
+`physics.takeSnapshot()` copies the whole world (every body, collider, joint, contact, warm start and sleep timer, and its clock: `stepCount` and the accumulator) and `physics.restoreSnapshot(snapshot)` puts it back, as Rapier's `takeSnapshot`, so stepping on gives the same bits as the first time. The snapshot holds the kernel's rows, not your objects: handles, `userData`, meshes, controllers and listeners stay as they are, and a restore needs the same bodies, colliders and joints to exist, or it throws and changes nothing.
 
 ```js
 import {Physics} from 'margoengine/physics';

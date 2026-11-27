@@ -1761,6 +1761,8 @@ interface PhysicsSnapshot {
     readonly bodies: readonly (readonly [number, number])[];
     readonly colliders: readonly (readonly [number, number])[];
     readonly joints: readonly number[];
+    readonly stepCount?: number;
+    readonly accumulator?: number;
 }
 
 interface PointProjection {
@@ -2041,6 +2043,8 @@ class SoftBodies implements PhysicsAttachment {
     restoreCrackBand(first: number, history: Float32Array, start?: number, count?: number): void;
     cellFiber({ cellRange }: SoftBody): SoftFiber | null;
     writeMaterial(body: SoftBody): void;
+    takeSnapshot(): SoftSnapshot;
+    restoreSnapshot(snapshot: SoftSnapshot): this;
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
     afterStep(_dt: number): void;
@@ -2118,6 +2122,7 @@ class SoftBody {
     tornSeen: Set<number>;
     triangleList: Uint32Array<ArrayBuffer>;
     surface: PhysicsBody | null;
+    surfaceSettings: Omit<ColliderSettings, 'offset' | 'rotation'> | null;
     matched: boolean;
     edgeKinds: Uint8Array<ArrayBuffer>;
     edgeShear: Float32Array<ArrayBuffer>;
@@ -2461,6 +2466,15 @@ interface SoftRubberCurve {
     readonly lockingStretch: number;
     readonly transverseFraction?: number;
     readonly invariantSpread?: number;
+}
+
+interface SoftSnapshot {
+    readonly bytes: Uint8Array;
+    readonly bodies: readonly SoftBody[];
+    readonly state: {
+        readonly world: Record<string, unknown>;
+        readonly bodies: readonly Record<string, unknown>[];
+    };
 }
 
 interface SoftSoftness {
