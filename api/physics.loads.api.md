@@ -34,6 +34,11 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     };
     heights(): Float64Array;
     wet(x: number, z: number): boolean;
+    surfaceMask(): Uint8Array;
+    get density(): number;
+    elevation(x: number, z: number): number;
+    pressure(x: number, y: number, z: number): number;
+    seaSurface(): SeaSurface;
     work(): {
         joules: number;
         displacedVolume: number;
@@ -58,6 +63,7 @@ export interface FiniteQuayWakeParams extends QuayPotentialGrid {
         readonly cells: number;
         readonly rate: number;
     };
+    readonly pressureAtDepth?: boolean;
 }
 
 export interface FloodBlockageBody {

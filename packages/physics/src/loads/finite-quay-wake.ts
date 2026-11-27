@@ -1,3 +1,4 @@
+import type { SeaSurface, SeaSurfaceSample } from '@margoengine/math/fields';
 import { cos, exp } from '@margoengine/math/pinned';
 import {
   SUBMERGED_WAKE_LAYOUT,
@@ -30,6 +31,8 @@ export interface FiniteQuayWakeParams extends QuayPotentialGrid {
   readonly initial?: (x: number, z: number) => readonly [number, number];
   /** Optional perimeter elevation absorber. `rate` is the maximum decay in s⁻¹. */
   readonly sponge?: { readonly cells: number; readonly rate: number };
+  /** Retain the time-centred Bernoulli pressure throughout the water volume. Default false. */
+  readonly pressureAtDepth?: boolean;
 }
 
 /** A bounded 3D linear potential wake. Sources, wave work and the wet surface use the same finite geometry. */
@@ -40,9 +43,10 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
   private host!: SolverHost;
   private operator!: QuayPotential;
   private regions!: [Region, Region, Region, Region, Region];
+  private pressureHead?: Region;
   private shape!: { cells: readonly [number, number]; cellSize: number; origin: readonly [number, number] };
   private depths!: readonly number[];
-  private density = 1025;
+  private rho = 1025;
   private g = 9.81;
   private kick!: Float64Array;
   private bulkKick!: Float64Array;
@@ -50,7 +54,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
   private mid!: Float64Array;
   private nextHeight!: Float64Array;
   private nextBulk!: Float64Array;
-  private pressure!: Float64Array;
+  private forcingPressure!: Float64Array;
   private sponge?: Float64Array;
 
   constructor(
@@ -93,7 +97,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
 
   init(host: SolverHost, params: FiniteQuayWakeParams): void {
     if (!params) throw invalidLoad('Pass the finite quay grid and depth faces.');
-    const { cells, cellSize, depths, origin = [0, 0], density = 1025, initial, sponge } = params;
+    const { cells, cellSize, depths, origin = [0, 0], density = 1025, initial, sponge, pressureAtDepth } = params;
     const [gx, gy, gz] = host.gravity;
     if (
       gx !== 0 ||
@@ -123,7 +127,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       origin: Object.freeze([...origin] as const),
     });
     this.depths = [...depths];
-    this.density = density;
+    this.rho = density;
     this.g = -gy;
     this.host = host;
     const { surfaceCells, volumeCells } = operator;
@@ -136,11 +140,12 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       allocate('rise', surfaceCells),
       allocate('work', 5),
     ];
+    this.pressureHead = pressureAtDepth ? allocate('pressureHead', surfaceCells + volumeCells) : undefined;
     this.kick = new Float64Array(surfaceCells);
     this.bulkKick = new Float64Array(volumeCells);
     this.rise = new Float64Array(surfaceCells);
     this.mid = new Float64Array(surfaceCells);
-    this.pressure = new Float64Array(surfaceCells);
+    this.forcingPressure = new Float64Array(surfaceCells);
     this.nextHeight = new Float64Array(surfaceCells);
     this.nextBulk = new Float64Array(volumeCells);
     this.sponge =
@@ -166,11 +171,28 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
           trace[i] = value[1];
         }
       operator.project(trace, this.words(3), undefined, 0, this.words(2));
+      const head = this.headWords();
+      if (head) {
+        for (let i = 0; i < surfaceCells; i++) head[i] = this.g * height[i]!;
+        operator.project(head.subarray(0, surfaceCells), this.rise, undefined, 0, head.subarray(surfaceCells));
+      }
     }
   }
 
   step(context: StepContext, dt: number): void {
-    const { operator, density, g, kick, bulkKick, pressure, mid, rise, nextHeight, nextBulk, sponge } = this;
+    const {
+      operator,
+      rho: density,
+      g,
+      kick,
+      bulkKick,
+      forcingPressure: pressure,
+      mid,
+      rise,
+      nextHeight,
+      nextBulk,
+      sponge,
+    } = this;
     const height = this.words(0),
       trace = this.words(1),
       ledger = this.words(4);
@@ -209,6 +231,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     iterations += operator.project(mid, rise, undefined, robin, nextBulk);
     const oldRise = this.words(3),
       oldBulk = this.words(2);
+    const head = this.headWords();
     // Harmonic extension and upward flux are linear in the surface trace. Reflect the solved
     // midpoint around the old state to publish the endpoint without another elliptic solve.
     for (let i = 0; i < height.length; i++) {
@@ -218,11 +241,17 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       absorbed += 0.5 * (eta * eta - damped * damped);
       absorbedVolume += eta - damped;
       nextHeight[i] = damped;
-      trace[i] = 2 * (mid[i]! - robin * rise[i]!) - trace[i]!;
+      const next = 2 * (mid[i]! - robin * rise[i]!) - trace[i]!;
+      if (head) head[i] = (trace[i]! - next) / dt;
+      trace[i] = next;
       sourceWork -= pressure[i]! * motion * area;
       oldRise[i] = 2 * rise[i]! - oldRise[i]!;
     }
-    for (let i = 0; i < oldBulk.length; i++) oldBulk[i] = 2 * nextBulk[i]! - oldBulk[i]!;
+    for (let i = 0; i < oldBulk.length; i++) {
+      const next = 2 * nextBulk[i]! - oldBulk[i]!;
+      if (head) head[i + height.length] = (oldBulk[i]! - next) / dt;
+      oldBulk[i] = next;
+    }
     height.set(nextHeight);
     ledger[0]! += sourceWork;
     ledger[1]! += volume;
@@ -319,7 +348,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
           else if (pressure === undefined) this.bulkKick[index]! += (weight * volume) / sum;
           else {
             this.kick[index]! += (weight * volume * inverseArea) / sum;
-            this.pressure[index]! += weight * pressure;
+            this.forcingPressure[index]! += weight * pressure;
           }
         }
       if (!(sum > 0)) throw invalidLoad('Increase the source radius so it reaches a wet quay cell.');
@@ -328,6 +357,10 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
 
   private words(index: 0 | 1 | 2 | 3 | 4): Float64Array {
     return regionWords(this.host.memory, this.regions[index]) as Float64Array;
+  }
+
+  private headWords(): Float64Array | undefined {
+    return this.pressureHead && (regionWords(this.host.memory, this.pressureHead) as Float64Array);
   }
 
   private cellIndex(x: number, z: number): number {
@@ -357,6 +390,125 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     return this.operator.wetCell(this.cellIndex(x, z));
   }
 
+  /** A copy of the wet surface graph, X fastest. Bits 1, 2 and 4 are wet, open east and open north. */
+  surfaceMask(): Uint8Array {
+    const [nx] = this.shape.cells;
+    const { operator } = this;
+    const result = new Uint8Array(operator.surfaceCells);
+    for (let i = 0; i < result.length; i++) {
+      if (!operator.wetCell(i)) continue;
+      const x = i % nx,
+        z = Math.floor(i / nx);
+      result[i] =
+        1 +
+        2 * Number(operator.reaches(x + 0.5, z + 0.5, x + 1, z, 0)) +
+        4 * Number(operator.reaches(x + 0.5, z + 0.5, x, z + 1, 0));
+    }
+    return result;
+  }
+
+  get density(): number {
+    return this.rho;
+  }
+
+  /** Elevation from the retained state, for wetted hulls reading a SeaQuery. */
+  elevation(x: number, z: number): number {
+    return this.wet(x, z) ? this.surfaceAt(this.heights(), x, z) : 0;
+  }
+
+  /** Time-centred gauge pressure in Pa, from the accepted potential. Enable `pressureAtDepth`. */
+  pressure(x: number, y: number, z: number): number {
+    const head = this.headWords();
+    if (!head) throw invalidLoad('Enable pressureAtDepth on the finite quay to query its Bernoulli pressure.');
+    const depth = Math.max(0, -y),
+      plane = this.operator.surfaceCells;
+    const i = this.cellIndex(x, z);
+    if (!Number.isFinite(y) || i < 0 || depth > this.depths.at(-1)! || (this.wet(x, z) && y >= this.elevation(x, z)))
+      return 0;
+    const layer = this.layerAt(depth);
+    if (!this.operator.wetCell(i + layer * plane)) return 0;
+    const centre = (this.depths[layer]! + this.depths[layer + 1]!) / 2;
+    const readLayer = (target: number) =>
+      this.surfaceAt(head.subarray((target + 1) * plane, (target + 2) * plane), x, z, target);
+    const local = readLayer(layer);
+    const adjacent = depth < centre ? layer - 1 : layer + 1;
+    let dynamic = local;
+    if (adjacent === -1) {
+      const surface = this.surfaceAt(head.subarray(0, plane), x, z);
+      dynamic = surface + ((local - surface) * depth) / centre;
+    } else if (adjacent + 1 < this.depths.length && this.operator.wetCell(i + adjacent * plane)) {
+      const other = (this.depths[adjacent]! + this.depths[adjacent + 1]!) / 2;
+      dynamic += ((readLayer(adjacent) - local) * (depth - centre)) / (other - centre);
+    }
+    return this.rho * (dynamic - this.g * y);
+  }
+
+  /** Give the retained height, pressure and depth motion to hulls or floaters through the sea contract. */
+  seaSurface(): SeaSurface {
+    const wake = this;
+    const scratch: WakeSample = { height: 0, slope: [0, 0], velocity: [0, 0, 0] };
+    return {
+      get cell() {
+        return wake.host?.cell ?? [0, 0, 0];
+      },
+      get density() {
+        return wake.density;
+      },
+      elevation: (x, z) => wake.elevation(x, z),
+      pressure: (x, y, z) => wake.pressure(x, y, z),
+      sample(
+        x,
+        z,
+        _time,
+        out: SeaSurfaceSample = {
+          height: 0,
+          normal: [0, 1, 0],
+          velocity: [0, 0, 0],
+          current: [0, 0, 0],
+          depth: 0,
+          density: 0,
+        },
+      ) {
+        wake.sample(x, z, scratch);
+        const [a, b] = scratch.slope,
+          length = Math.sqrt(1 + a * a + b * b),
+          wet = wake.wet(x, z);
+        out.height = scratch.height;
+        out.normal[0] = -a / length;
+        out.normal[1] = 1 / length;
+        out.normal[2] = -b / length;
+        for (let i = 0; i < 3; i++) {
+          out.current[i] = 0;
+          out.velocity[i] = scratch.velocity[i]!;
+        }
+        out.depth = wet ? wake.depths.at(-1)! : 0;
+        out.density = wet ? wake.density : 0;
+        return out;
+      },
+      water: {
+        medium: 'water',
+        get cell() {
+          return wake.host?.cell ?? [0, 0, 0];
+        },
+        sample(x, y, z, _time, out = { velocity: [0, 0, 0], density: 0, temperature: 288.15 }) {
+          const i = wake.cellIndex(x, z),
+            depth = Math.max(0, -y);
+          const wet =
+            Number.isFinite(y) &&
+            i >= 0 &&
+            depth <= wake.depths.at(-1)! &&
+            wake.operator.wetCell(i + wake.layerAt(depth) * wake.operator.surfaceCells) &&
+            (wake.wet(x, z) ? y <= wake.elevation(x, z) : y < 0);
+          if (wet) wake.velocityAt(x, y, z, out.velocity);
+          else out.velocity[0] = out.velocity[1] = out.velocity[2] = 0;
+          out.density = wet ? wake.density : 0;
+          out.temperature = 288.15;
+          return out;
+        },
+      },
+    };
+  }
+
   work(): {
     joules: number;
     displacedVolume: number;
@@ -381,7 +533,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       rate = this.words(3);
     let energy = 0;
     for (let i = 0; i < height.length; i++) energy += this.g * height[i]! ** 2 + rate[i]! * trace[i]!;
-    return 0.5 * this.density * this.shape.cellSize ** 2 * energy;
+    return 0.5 * this.rho * this.shape.cellSize ** 2 * energy;
   }
 
   /** Bilinear height over visible wet cells, with centred or one-sided slopes at the wall. */
@@ -404,7 +556,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     return out;
   }
 
-  private surfaceAt(height: Float64Array, x: number, z: number): number {
+  private surfaceAt(height: Float64Array, x: number, z: number, layer = 0): number {
     const {
       cells: [nx],
       cellSize,
@@ -420,7 +572,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       value = 0;
     for (let a = 0; a < 2; a++)
       for (let b = 0; b < 2; b++) {
-        if (!this.operator.reaches(u + 0.5, v + 0.5, i + a, j + b, 0)) continue;
+        if (!this.operator.reaches(u + 0.5, v + 0.5, i + a, j + b, layer * this.operator.surfaceCells)) continue;
         const weight = (a === 0 ? 1 - fu : fu) * (b === 0 ? 1 - fv : fv);
         sum += weight;
         value += weight * height[i + a + (j + b) * nx]!;
@@ -444,8 +596,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     const plane = this.operator.surfaceCells,
       i = this.cellIndex(x, z);
     if (i < 0 || !Number.isFinite(y) || -y > this.depths.at(-1)!) return out;
-    let layer = 0;
-    while (layer + 2 < this.depths.length && this.depths[layer + 1]! < -y) layer++;
+    const layer = this.layerAt(Math.max(0, -y));
     const at = i + layer * plane;
     if (!this.operator.wetCell(at)) return out;
     const bulk = this.words(2),
@@ -460,13 +611,19 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     return out;
   }
 
+  private layerAt(depth: number): number {
+    let layer = 0;
+    while (layer + 2 < this.depths.length && this.depths[layer + 1]! < depth) layer++;
+    return layer;
+  }
+
   exportPorts(tick: number): readonly Port[] {
     return [{ field: this.heightField.name, region: this.regions[0], tick, cell: this.host.cell }];
   }
 
   importPorts(): void {}
   stateRegions(): readonly Region[] {
-    return this.regions;
+    return this.pressureHead ? [...this.regions, this.pressureHead] : this.regions;
   }
   extraState(): readonly Region[] {
     return [];

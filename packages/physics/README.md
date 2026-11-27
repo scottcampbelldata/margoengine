@@ -5272,6 +5272,11 @@ the periodic wake out of this connection. The receiver publishes height and prov
 depth-velocity queries from its accepted potential. `work()` reports source work, displaced volume and
 any energy or signed volume taken by the optional perimeter sponge.
 
+Set `pressureAtDepth: true` and pass `wake.seaSurface()` to the hull for time-centred Bernoulli pressure
+and depth velocities from the same potential. Give the finite wake its initial state before advancing the
+coupled world. The ordinary hull return uses triangle pressure integration. The wave work ledger tracks
+the applied sources and sponge, and the hull's mechanical response has a separate balance.
+
 ```ts
 import {FiniteQuayWake} from 'margoengine/physics/loads';
 import {PhysicsWorld} from 'margoengine/physics/world';

@@ -1397,6 +1397,20 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   Measured finite-edge validation, a scaled receiver for the original footage and the full render remain open.
   [Porter and Evans, 1995](https://doi.org/10.1017/S0022112095002849)
 
+  A real coarse finite diagnostic now runs the corrected vessel from tick zero through tick 4,006.
+  The original 67 s and 71 s shutters read the same accepted state on WebGPU and WebGL2, with all 12
+  original assets and the original camera. The reported GPU height residual is below 0.45 µm and the
+  final checkpoint replays exactly. The 8 m horizontal grid preserves the finite ends and the 3.98 m
+  under-apron opening. It gives diffuse unresolved waves. The 370 surveyed sites measure peak water
+  heights 0.200 m and 0.149 m against crest heights of about 1.982 m. No crest crossing occurs in
+  the diagnostic. The full run's maximum relative work residual is 1.77×10⁻¹¹.
+
+  The finite potential now provides time-centred Bernoulli pressure at depth. The analytic standing-mode
+  test checks the pressure at each depth against an independent harmonic recurrence. A live rigid hull
+  emits both finite-wake sources and moves differently with the returning pressure enabled. The water
+  work closes and both controls replay exactly. This verifies a two-way connection for the chosen hull.
+  Matching the full mechanical return work and resolving the original quay and stern remain open.
+
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.

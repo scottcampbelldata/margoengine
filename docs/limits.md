@@ -10635,7 +10635,7 @@ The finite quay receiver uses a still-water, cell-centred Cartesian volume with 
 arbitrary vertical layer thicknesses, static solids and optional horizontal face fractions. Closed faces
 carry zero normal flow. Adjacent wet cells exchange a shared conductance times the potential difference.
 The base and outside faces are closed. The optional perimeter sponge damps elevation and books the absorbed
-energy and signed volume. Size its width and run a domain comparison before treating it as an open sea.
+  energy and signed volume. Size its width and run a domain comparison before treating it as an open sea.
 
 The 60 Hz midpoint solves a Robin surface condition with block-column preconditioned conjugate gradients.
 Each unforced step uses one harmonic volume solve. A tick with submerged displacement uses one extra solve
@@ -10644,6 +10644,12 @@ same midpoint and previous state. The solver uses f64 for state and arithmetic. 
 potential in its snapshot. Source work includes the volume kick and the pressure held over the midpoint
 step. Free-hull reaction work needs a matching return operator. Wave breaking, moving obstacles, turbulent
 edge losses and the fine-grid First Wake replay remain open. The optional loads entry measures 56,771 B gzip.
+
+`pressureAtDepth` adds one f64 head value per surface and volume cell. It uses the accepted potential's
+midpoint time derivative with linear Bernoulli pressure and one-sided wet interpolation. `seaSurface()`
+gives a consumer the retained pressure and velocities. At an enabled aperture the depth state can be wet
+even when the surface is solid above it. The triangle-pressure loop and projected volume work remain
+separate until a fully matched mechanical coupling is supplied on this domain.
 
 ### Ship motion on the wake grid
 
