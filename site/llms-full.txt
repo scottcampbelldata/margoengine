@@ -5824,7 +5824,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Burnt and flooded plants (`@margoengine/scatter/states`, 2026-11-17) | Enforced: map `resolution` 1 to 1,024 cells a side (64 bytes a cell, 64 MiB at 1,024), `ambient` -60 to 59 deg C, `wind` 0 to 40 m/s, `manning` 0.01 to 0.2, every plant response range in the README. Enforced: marks within their ranges (`scorch`, `char`, `water` 0 to 100 m, `intensity` 0 to 1,000 MW/m, `ash`, `debris`, `wetness` 0 to 1). Measured on the GPU (WebGPU and the WebGL2 layer): the composed scorch height, flame length, intensity, water mark, shear velocity, debris and flow direction match the CPU formulas to 1e-3; peaks kept under weaker fire and flow; driven by a real dam-break `Flood`, the high-water mark equals the flood's own record bit for bit. Unmeasured: cost per vertex and per cell (build phase, LIM-664). | One state per map cell, read at each instance's root: a plant is treated as a whole from the cell it stands in, not along its height through the fire or flood field; the sources are read at the nearest texel. Colour needs a `material`. On the WebGL2 layer the compose pass runs as a GPU draw (KB-STATES-COMPOSECPU1 moved it off the CPU tier); the test page's first click there no longer waits on ember effects (KB-VFX-EMBERCPU1 fixed: an effect's prewarm waits for the route and over-life no longer reads back what it stored). A source updated later in the frame than the scatters (a `Flood`) is read one frame late. Marks only raise a cell (as sources do); `reset()` clears them. | By method: Van Wagner's scorch and Byram's flame length are line-fire relations fitted on surface fires in pine stands, and the char line is the flame length; crown consumption and flattening ramp linearly from the critical value to twice it (ours, not measured); debris is the hazard-rating class, not a debris transport model; meshes are not split into trunk and crown by material, only by `trunkRadius` and `crownBase`. Peaks live on the GPU: a device restore starts the map empty, and the sources compose again from what they hold then. | Set each plant's `crownBase`, `trunkRadius` and `stiffness` to its mesh; use a cell no larger than a crown; give a FireFront `settle()` result or a burnt GroundChange to light the map after a cut. |
 | Imposter ring (`@margoengine/scatter/imposter`, 2026-11-08) | Enforced: an `Imposter` from `@margoengine/lod`; WebGPU only. By method: the far ring only, drawn after the colour pass with lod's imposter shader. | A far ring of camera-facing quads costs four vertices an instance whatever the mesh, and lod already bakes and shades the atlas. | Imposters are baked still and untinted, so far instances ignore `wind`, `blades`, `variation` and `clusters`, and the far ring casts shadows with its mesh. The silhouette is the atlas's (0.996 overlap with the box on the test). | Bake the far ring's own mesh in its local space; keep a small mesh for the far ring so its shadows stay cheap. |
 | TAA `velocityOnly` (`@margoengine/taa`) | Enforced by check: construction refuses it without `depth`, and a 4x MSAA frame with no PostStack throws `state`. | With no capture of its own it reads the depth and scene target another plugin made. | No anti-aliasing and no `resolved` frame; `gpuState` throws, as there is no history. | Plain `TAA` for anti-aliasing with its vectors. |
-| TAA reactive mask (`reactive` in `@margoengine/taa`, 2026-11-08) | By method: the caller draws the mask; particles, splats and blended glTF do not write it themselves. A reactive pixel shows that frame's own jittered sample, so it aliases until history builds again; the mask is read by nearest texel; history alpha holds the mask, so `taa.velocity.resolved` alpha is the mask, not 1; GPU cost not measured (LIM-515). | The effect packages each draw differently, and a mask is the one contract all of them can meet. | Edges of reactive effects shimmer a little more than opaque ones. | Keep mask values below 1 (0.5 to 0.8) where a soft trail is acceptable and less aliasing is wanted. |
+| TAA reactive mask (`reactive` in `@margoengine/taa`, 2026-11-08) | By method: Water, Weather and VFX billboards publish theirs (Weather and VFX only while TAA reads masks, one frame after it attaches; VFX effects share one r8unorm particle mask, kept until a resize or device restore); splats, blended glTF and VFX ribbons, mesh particles and `Flame` do not write it themselves. A reactive pixel shows that frame's own jittered sample, so it aliases until history builds again; the mask is read by nearest texel; history alpha holds the mask, so `taa.velocity.resolved` alpha is the mask, not 1; GPU cost not measured (LIM-515). | The effect packages each draw differently, and a mask is the one contract all of them can meet. | Edges of reactive effects shimmer a little more than opaque ones. | Keep mask values below 1 (0.5 to 0.8) where a soft trail is acceptable and less aliasing is wanted. |
 | TAA history rejection (`rejection: 'variance'`, `locks` in `@margoengine/taa`, 2026-11-08) | By method: variance clipping uses the same nine samples as the min/max box and only narrows it, so a neighbourhood split evenly between two colours keeps as wide a box (and as much ghost) as the clamp; a lock trusts history fully for eight frames, so a transparent effect without a reactive mask that crosses a locked thin feature ghosts there, and a thin feature that really disappears lingers up to eight frames at 0.9 decay; thin detection looks only along x and y, so a diagonal one-pixel line is not locked; GPU cost not measured (LIM-523). | The resolve keeps one pass and four extra loads; locks need one r32float pair. | Fewer ghosts next to bright specks; thin lines that stay visible. | Draw transparent effects into `reactive`, which drops locks. |
 | TAA still convergence (`@margoengine/taa`, 2026-11-16, KB-TAA-CLAMP1) | Measured and enforced by [converge-browser.mjs](../packages/taa/test/converge-browser.mjs): with `settle: false` the per-frame resolve of still 8 px sine stripes stays within 1 sRGB level of the settled mean of the 8 jitter phases every frame and within 0.5 over 16 frames, in every rejection mode (RTX A6000: 102.9 to 103.4, mean 103.2, against 103.4; box-filtered 103.75). The remaining spread is the last sample's 0.1 share of the blend, which changes with the jitter. | History is fetched by the motion alone (velocity minus `taa.velocity.jitter`), one vec4 more uniform (224 B). | No contrast lost to resampling a still view's history; before, the stripes sat 10.5 levels off. | `settle` (default true) holds the exact mean once a pixel has been still for a cycle. |
 | TAA still-view settling (`settle` in `TAA` and `TAAUpscale`, `@margoengine/taa`, 2026-11-16, KB-TAA-STILL1) | Measured and enforced by [still-browser.mjs](../packages/taa/test/still-browser.mjs) and [settle-reactive-browser.mjs](../packages/taa/test/settle-reactive-browser.mjs) (RTX A6000, WebGPU, and the WebGL2 layer for the upscaler): with the camera and scene still, frames after about 16 change on 0% of pixels (largest difference 0; 0.23% to 0.36% with max d up to 241 before, and 2.4% on the bare-TAA scene); a reactive pixel never settles and leaves a trail of -1.33 levels against a bound of 3. By method: a pixel settles only when its 3x3 render footprint matched its own sample of the phase a cycle ago for a whole cycle, a test through an 8-bit hash per sample, so a change is missed only if the hash of every footprint pixel collides (1 in 256 each); a scene with per-frame noise never settles. | 32 bytes a pixel for `TAA` (66 MB at 1920 x 1080), two rgba16float output-size textures and (ceil(phases / 3) + 1) words per render pixel for `TAAUpscale`; one compute pass, one 16 B write and one copy a frame; taa root entry 15,197 to 16,667 B gzip. | A still view stops shimmering, so a still frame can be compared exactly. | `settle: false` keeps the per-frame resolve; a moving pixel is never held. |
@@ -15887,29 +15887,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   frame of a moving camera draws the image of the camera one frame before, a batch for a camera that was left is not
   added, a scene change drops both), and the `denoisemoving` case of `tests/browser-check.mjs` in `test:gpu:denoise`.
 
-### Open 2026-11-26: a collider of several kernel shapes raises its events and contact pairs once for each piece (KB-PHYSICS2D-PAIRS1, physics2d)
+### Fixed 2026-11-26: a collider of several kernel shapes raises its events and contact pairs once for each piece (KB-PHYSICS2D-PAIRS1, physics2d)
 
 - **Repro:** a ball rolling along a `trimesh`, `polyline`, concave `polygon`, `compound` or `heightfield` collider in
-  `@margoengine/physics2d`. It raises `contactstart` and `contactend` each time it crosses from one piece (triangle,
+  `@margoengine/physics2d`. It raised `contactstart` and `contactend` each time it crossed from one piece (triangle,
   segment or convex part) to the next, where Rapier raises one `contactstart` while the two colliders touch at all.
-  `physics.contactPairs(collider)` lists one pair for each pair of pieces, and `contactPair(a, b)` returns the first
-  of them, so `contactPair(a, b).touching` and `intersectionPair(a, b)` can read false while another piece touches.
-- **Cause:** the facade (`src/physics.ts`, `collectEvents` and `contactPairs`) passes on the kernel's events and
-  contacts, which belong to pairs of kernel shapes, with each shape mapped to its collider but never gathered per pair
-  of colliders.
-- **Fix (drafted, not landed):** count the touching pairs of shapes per pair of colliders and raise the event only when
-  the count leaves or returns to 0, counted again from the kernel after a restore. Give `ContactPair2D` one entry per
-  collider pair, with a manifold for each pair of shapes.
+  `physics.contactPairs(collider)` listed one pair for each pair of pieces, and `contactPair(a, b)` returned the first
+  of them, so `contactPair(a, b).touching` and `intersectionPair(a, b)` could read false while another piece touched.
+- **Cause:** the facade (`src/physics.ts`, `collectEvents` and `contactPairs`) passed on the kernel's events and
+  contacts per kernel shape without aggregating by unordered collider pair.
+- **Fix:** `Physics2D` tracks active shape-pair touch counts per unordered `Collider2D` pair (rebuilt on `restore`),
+  emitting start only when count rises from 0 and end only when count drops to 0, and `contactPairs` aggregates all
+  shape manifolds for each `other` collider into a single `ContactPair2D`.
+- **Regression:** `packages/physics2d/tests/set-shape.test.js` "multi-shape colliders aggregate contact events and contactPair per collider pair (KB-PHYSICS2D-PAIRS1)".
 
-### Open 2026-11-26: `Collider2D.setShape` refuses an outline of several kernel shapes (KB-PHYSICS2D-SETSHAPE1, physics2d)
+### Fixed 2026-11-26: `Collider2D.setShape` refuses an outline of several kernel shapes (KB-PHYSICS2D-SETSHAPE1, physics2d)
 
-- **Repro:** `collider.setShape({ shape: 'trimesh', ... })`, or any concave polygon, polyline or compound, throws
+- **Repro:** `collider.setShape({ shape: 'trimesh', ... })`, or any concave polygon, polyline or compound, threw
   `RangeError`. Rapier's `setShape` takes any shape.
-- **Cause:** `setShape` uses the kernel's `set_shape_core`, which replaces one convex core in place. An outline of
-  several pieces needs its kernel shapes replaced, with the touching pairs carried across so the change raises no
-  events of its own (this waits on KB-PHYSICS2D-PAIRS1).
-- **Fix (not started):** replace the collider's kernel shapes under the same `Collider2D`, re-apply its mass mode and
-  seams, and carry its touching pairs across the swap. Parity row C2-09 records the gap.
+- **Cause:** `setShape` only used the kernel's `set_shape_core`, which replaces one convex core in place.
+- **Fix:** single-convex-to-single-convex keeps the in-place `shape_set_core` fast path; multi-shape or non-convex
+  outlines atomically replace the collider's kernel shapes under the same `Collider2D` via `Physics2D.replaceColliderShapes`,
+  preserving settings, seams, explicit mass / mass properties, and carrying active touching pairs across the swap without
+  raising duplicate start events. Parity row C2-09 is now DONE.
+- **Regression:** `packages/physics2d/tests/set-shape.test.js` "setShape replaces multi-shape outlines in place and preserves settings, mass mode and touching state (C2-09, KB-PHYSICS2D-SETSHAPE1)".
 
 ### Fixed 2026-11-26: a long thin body that hit a wall hard and spinning swung through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
 
@@ -24068,6 +24069,16 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   `Weather` `reactive: true` draws the particles' coverage into `reactiveMask`, which Storm Light hands TAA as
   `reactive`. Regression: the `weather` case of `packages/sky/test/features-check.mjs` (streaks over the sky under
   TAA 2.30 levels with the mask, 0.87 without, at 4x; WebGPU and the WebGL2 layer).
+- **Weather's and VFX's particles reached TAA's reactive mask only by hand (sky, vfx; KB-TAA-PARTICLEMASK1).** Repro: a
+  plain stage with `Weather` (or a fast `VFX` spray) and `TAA.attach(engine)`: the streaks average into the sky, as
+  above, unless the scene sets `reactive: true` and hands `weather.reactiveMask` to TAA; VFX drew no mask at all.
+  Cause: Water published its mask on the pass context (`packages/shared/reactive-mask.js`), Weather and VFX did not.
+  Fix: TAA's read of the registry counts as demand; Weather draws and publishes its mask while TAA reads, and VFX draws
+  its billboards' alpha into one shared r8unorm particle mask (`reactiveTarget`) the same way. Storm Light, Cabin
+  Hearth and Whiteout Pass lose their wiring. Regression: the `weather` case of `packages/sky/test/features-check.mjs`
+  (now two plain `TAA.attach(e)` rigs: streaks 1.59 levels with the default, 0.76 with `reactive: false`, at 4x),
+  `packages/vfx/test/reactive-check.mjs` (a spray keeps 86% of its no-TAA brightness against 48%; WebGPU and the WebGL2
+  layer), and `packages/taa/test/reactive-mask.test.js` (the demand signal and the shared target).
 - **Local lights lit froxel fog undimmed by the fog on their path (environment).** Repro: Storm Light tour view t2
   (`view=10,34,26,-6,30,-4&beam=2.5`): 5.9% of the right sky at 255 along the beam. Cause: `localLight` in
   `volumetric.ts` left out the transmittance from the light to the sample. Fix: exp(-extinction x distance) with the
