@@ -13,12 +13,12 @@
 //    covers the five templates), or to a row of DOC_COMMANDS_ELSEWHERE that says which check owns it.
 // The scaffolded templates install their own dependencies, so scripts/template-install-check.mjs runs them. No GPU.
 // Usage: node scripts/check-dev-servers.mjs [--only=<text in "<package.json path> <script>">] [--list] [--docs-only]
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort, humanEnv, probe, runToEnd } from './support/dev-server-probe.mjs';
+import { startsServer } from './support/doc-start-command.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const packageDir = (name) => dirname(fileURLToPath(import.meta.resolve(`${name}/package.json`)));
@@ -324,10 +324,7 @@ function checkDocs() {
       continue;
     }
     // npx vite, vite, next dev, pnpm dev ...: a server start in a project of the reader's own.
-    if (
-      /^(npx |pnpm |yarn |bun |vite\b|next\b|npm (create|init|exec))/.test(text) &&
-      /\b(vite|next|dev|start|serve|preview)\b/.test(text)
-    ) {
+    if (startsServer(text)) {
       problems.push(
         `${where}: \`${text}\` starts a server that no check covers; map it in DOC_COMMANDS_ELSEWHERE with the check that owns it`,
       );

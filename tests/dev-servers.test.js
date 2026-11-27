@@ -199,6 +199,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { freePort, killTree, probe } from '../scripts/support/dev-server-probe.mjs';
 import { endTree } from '../scripts/support/shutdown.mjs';
+import { startsServer } from '../scripts/support/doc-start-command.mjs';
 
 function fixture(source) {
   const dir = mkdtempSync(join(tmpdir(), 'margo-probe-'));
@@ -427,4 +428,33 @@ test('every start command in the documentation maps to a checked server', { time
     timeout: 50_000,
   });
   assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
+});
+
+// KB-DEVSERVERS-BUILD1: tools/margo-convert/README.md builds an app with `npx vite build` before packing it, and the
+// check called that a server no check covers, because the line holds the word `vite`.
+test('a documented build is not a server start, and a server chained to one still is (KB-DEVSERVERS-BUILD1)', () => {
+  for (const line of [
+    'npx vite build',
+    'vite build --mode production',
+    'next build',
+    'pnpm exec vite build',
+    'npm exec -- vite build',
+    'bunx vite build && npx margo-convert playable dist',
+  ])
+    assert.equal(startsServer(line), false, line);
+  for (const line of [
+    'npx vite',
+    'vite',
+    'vite --port 4000',
+    'vite preview',
+    'next dev',
+    'npx vite build && npx vite preview',
+    'vite build; vite',
+    'pnpm dev',
+    'npm create vite@latest',
+    'npx serve dist',
+    'npx vite-node build.ts serve',
+  ])
+    assert.equal(startsServer(line), true, line);
+  assert.equal(startsServer('npx margo-convert playable dist'), false);
 });

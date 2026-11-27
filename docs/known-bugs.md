@@ -6,6 +6,15 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: check:dev-servers called `npx vite build` a server start (KB-DEVSERVERS-BUILD1, scripts)
+
+- **Repro:** `node scripts/check-dev-servers.mjs --docs-only`: `tools/margo-convert/README.md:138` and `:227`,
+  "`npx vite build` starts a server that no check covers" (48d01e498a, 1ec57ee7bc).
+- **Cause:** the documented-command rule took any `npx`, `vite` or `next` line holding the word `vite`, `next`, `dev`,
+  `start`, `serve` or `preview` for a server start, `vite build` and `next build` included, which write files and exit.
+- **Fix:** `scripts/support/doc-start-command.mjs` `startsServer` leaves the build commands out, one chained part at a
+  time, so `vite build && vite preview` is still a start. Regression: `tests/dev-servers.test.js`.
+
 ### Fixed 2026-11-27: VFX ribbons, mesh particles and Flame wrote no TAA reactive mask (KB-TAA-PARTICLEMASK2, vfx)
 
 - **Repro:** `TAA.attach(engine)` with a fast `VFX` that has `ribbons` (`heads: false`) or `mesh`, or a `Flame`:
