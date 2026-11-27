@@ -11236,6 +11236,13 @@ a second GPU vendor for this case; the whole `test:gpu:denoise` script on the la
 16,384-sample references take about 6 minutes each on the route; the cases above run there by name). `denoisemoving`
 with the direct chain reads 4.24 on WebGPU, 4.47 on the layer on ANGLE Vulkan and 4.46 on Direct3D 11 (4.14, and 4.38
 on Direct3D 11, before it).
+2026-11-27 (KB1664): prepare took the 7 x 7 variance into the bounced light's variance before the history blend, so a
+pixel whose history stood in for the missing samples still had its luminance stops widened by the surface's own
+structure; the 7 x 7 first estimate was already held to pixels with fewer than 4 samples counting the history. The
+variance now follows the same gate. Measured (RTX A6000; WebGPU, then the layer on ANGLE Vulkan): uncovered 6.01 and
+5.99, two frames on 4.34 and 4.34, kept 4.52 and 4.53, shadow edges 0.726 and 0.729; `denoisehistory` 5.56 (5.54
+before), `denoisemoving` 4.27 and 4.50 (4.24 and 4.47 before); the static denoise scenes are unchanged. The case now
+fails above 4.4 two frames on (4.45 on the parent). Not measured on ANGLE Direct3D 11 for this change.
 
 ## Voxel path tracer viewport while the camera moves on the WebGL2 layer (KB-VPT-ROUTE-MOVING, section 5 evidence, 2026-11-26)
 

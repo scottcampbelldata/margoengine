@@ -527,10 +527,10 @@ disposal releases them.
   variance, history and five wavelet levels. A pixel with fewer than 4 samples and no history takes a wide 7 x 7
   first estimate of its bounced light only, so the sun's shadow edges there stay sharp. Measured
   (`denoisedisocclusion`: pillars passing before a wall lit by bounce light, a lamp and sun stripes, 1 sample per
-  frame, a 4-pixel strip uncovered per frame): the pixels uncovered in the last frame are 6.09 from the converged
-  image, those uncovered in the two frames before 4.45, those that keep their history 4.53 (one raw sample: 66.66);
-  before the split they read 6.49, 4.74 and 4.64. Shadow edges on the uncovered pixels keep 0.725 of the converged
-  image's contrast (0.657 before). The WebGL2 layer reads 6.08, 4.45, 4.54 and 0.728. What is left of the gap is a
+  frame, a 4-pixel strip uncovered per frame): the pixels uncovered in the last frame are 6.01 from the converged
+  image, those uncovered in the two frames before 4.34, those that keep their history 4.52 (one raw sample: 66.66);
+  before the split they read 6.49, 4.74 and 4.64. Shadow edges on the uncovered pixels keep 0.726 of the converged
+  image's contrast (0.657 before). The WebGL2 layer reads 5.99, 4.34, 4.53 and 0.729. What is left of the gap is a
   slightly darker strip, not grain (`docs/known-bugs.md`, under the oracle for uncovered pixels). The split costs 6
   filter passes and 64 bytes a pixel (48 with a caustic chain, whose spare buffer the direct chain ends in): 127 and
   95 MiB at 1920 x 1080. Where a caustic and a direct lane together do not fit one storage binding, the direct light
@@ -814,14 +814,14 @@ Numbers on other GPUs are not measured.
   - a lamp beside a wall (160 x 120, against 16,384 samples): the lit stretch keeps 0.912 of its level at 16 samples and
     0.967 at 64 (0.883 and 0.958 before the wide levels' ratio stop), RMSE x1.99 and x1.38 below raw (it was worse than
     raw at 64 before);
-  - the viewport denoiser while the camera moves (30 frames, 1 sample each): RMS 5.47 against the converged image,
-    raw frames 16.00, a still camera 2.80, the same on the WebGL2 layer (each step waits for its sample to land);
+  - the viewport denoiser while the camera moves (30 frames, 1 sample each): RMS 5.56 against the converged image,
+    raw frames 16.00, a still camera 2.81, the same on the WebGL2 layer (each step waits for its sample to land);
   - a camera that moves every frame and never waits for a sample (`denoisemoving`, 30 frames, steps a tenth as
-    long): RMS 4.24 against the converged image at the last position and 16.09 raw on WebGPU, 4.47 and 16.07 on the
+    long): RMS 4.27 against the converged image at the last position and 16.09 raw on WebGPU, 4.50 and 16.07 on the
     WebGL2 layer, where the frame shows the batch that landed (one raw sample at rest: 16.09);
-  - the pixels a camera move uncovers (24 frames, 1 sample each, pillars before a wall): RMS 6.09 against the
-    converged image where the last frame uncovered them, 4.45 two frames on, 4.53 where the history was kept, and
-    shadow edges there keep 0.725 of the converged image's contrast (the case fails below 0.68, where a filter
+  - the pixels a camera move uncovers (24 frames, 1 sample each, pillars before a wall): RMS 6.01 against the
+    converged image where the last frame uncovered them, 4.34 two frames on, 4.52 where the history was kept, and
+    shadow edges there keep 0.726 of the converged image's contrast (the case fails below 0.68, where a filter
     blurs the sun's stripes);
   - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path; camera motion of 2
     units with the shutter open moves a 1-unit line's centroid by 0.9977 (1) and widens its profile to a standard

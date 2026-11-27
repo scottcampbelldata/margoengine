@@ -12816,7 +12816,23 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   Recurrent Blurs", GTC 2020, and "ReBLUR: A Hierarchical Recurrent Denoiser", Ray Tracing Gems II, chapter 49,
   2021, <https://doi.org/10.1007/978-1-4842-7185-8_49>; von Neumann, "Distribution of the Ratio of the Mean Square
   Successive Difference to the Variance", 1941, <https://doi.org/10.1214/aoms/1177731677>. Papers only; no code read.
-- **Job 2, what is left:** the uncovered strip is still 1.34 times the kept pixels (6.09 against 4.53), mostly on
+- **Job 2, the 7 x 7 variance held to its first estimate's pixels (2026-11-27, KB1664):** prepare took the 7 x 7
+  variance into the bounced light's variance before the history blend, so a pixel whose history stood in for its
+  missing samples still had its luminance stops widened by the surface's own structure, while the 7 x 7 first estimate
+  itself was already held to pixels with fewer than 4 samples counting the history. The variance now follows the same
+  gate (`packages/voxel-pathtracer/src/shaders.ts`, `prepare`). Measured (RTX A6000, WebGPU; the WebGL2 layer on ANGLE
+  Vulkan in brackets): uncovered in the last frame 6.01 (5.99), in the two frames before 4.34 (4.34), history kept
+  4.52 (4.53), shadow edges 0.726 (0.729); `denoisehistory` 5.56 against 5.54, `denoisemoving` 4.27 (4.50) against
+  4.24 (4.47); the static denoise scenes read the same to every printed digit. Regression: `denoisedisocclusion` now
+  fails above 4.4 two frames on (the parent reads 4.45).
+- **Job 2, the `denoisehistory` 1 percent (2026-11-27):** with the direct chain left out (`direct = false` in
+  `tracer.ts`, a local build) the case reads 5.47 again, so the direct chain accounts for all of it. Ruled out: the
+  direct chain's history flip (`dflip` toggles exactly on the frames whose combine rewrites the main history, `was ||
+  !reuse`, and both chains reproject with the same matrices); light reached by sampling the BSDF at the first bounce
+  (moving it into the bounced light reads 5.53, and the uncovered strip worsens to 6.41). Not established: which of the
+  direct chain's own variance estimate or its wavelet stops loses it; at 1 sample a frame each chain's variance comes
+  from a 3 x 3 neighbourhood of its own part, a noisier estimate than one of the sum.
+- **Job 2, what is left:** the uncovered strip is still 1.33 times the kept pixels (6.01 against 4.52), mostly on
   the floor (11.13), and a noise-free guarantee is not met. `denoisehistory`, a moving camera over a whole image of
   another scene, reads 5.54 against 5.47 before and a still camera 2.81 against 2.80: the split alone accounts for it
   (5.51 and 2.81 without the wide estimate), each part's variance now coming from its own samples; which term of the

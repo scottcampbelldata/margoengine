@@ -2052,7 +2052,7 @@ fn variance(i:u32,c:vec3f,m2:f32,part:u32,g:vec2u)->f32 {
  let through=normals[i].w*k<0.5;
  let nrm=select(vec3f(0.0,0.0,1.0),nn/len,len>1e-6);
  var loc=Local(0.0,vec3f(0.0),0.0,0.0);
- if(n<4.0&&!lane&&(p.size.w&128u)!=0u){loc=spatial(g.xy,nrm,t,foot,through);ev=max(ev,loc.v);}
+ if(n<4.0&&!lane&&(p.size.w&128u)!=0u){loc=spatial(g.xy,nrm,t,foot,through);}
  var count=n;
  // Viewport history (flag 8; 16: it is valid): where the history saw the same surface (position within two footprints,
  // normals within about 25 degrees) its estimate counts as up to 32 samples (8 seen through glass or a mirror, whose
@@ -2089,6 +2089,9 @@ fn variance(i:u32,c:vec3f,m2:f32,part:u32,g:vec2u)->f32 {
   else{textureStore(hout,g.xy,vec4u(packHalves(e.xy),kept,
    packHalves(shown.xy),packHalves(vec2f(shown.z,clamp(shown.w,0.0,8.0)+16.0*f32(mask)))));}
  }
+ // The 7 x 7 variance counts while the 7 x 7 first estimate does: fewer than 4 samples with the history. Counted before
+ // the history blend it widened the stops of pixels whose history stands in for the missing samples.
+ if(count<4.0){ev=max(ev,loc.v);}
  let own=min(loc.white,1.0)/count;let other=min(loc.white,1.0)/max(loc.n,1.0)+max(0.0,1.0-loc.white);
  dst[i]=vec4f(mix(e,loc.c,own/max(own+other,1e-6)*clamp((4.0-count)/3.0,0.0,1.0)),ev);
  if(!lane){guide[i]=vec4f(oct(nrm),t,select(foot,-1.0,through||(p.size.w&4u)!=0u));}

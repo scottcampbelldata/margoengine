@@ -771,7 +771,10 @@ try {
     // 4.74 and 4.64, and five candidate filters of the whole radiance read 6.60 to 9.64.
     assert.ok(r.fresh.rms <= r.fresh.raw / 6, 'uncovered pixels: the denoiser removes most of one raw sample');
     assert.ok(r.fresh.rms <= 6.3, 'uncovered pixels: the error with the direct light filtered apart');
-    assert.ok(r.young.rms <= 4.6, 'two frames after: the error with the direct light filtered apart');
+    // The 7 x 7 variance counts as long as the 7 x 7 first estimate does, while a pixel holds fewer than 4 samples
+    // with its history; counted before the history blend it widened the stops of pixels whose history stands in for
+    // the missing samples (young 4.45 and fresh 6.09 then, 4.34 and 6.01 since; KB1664).
+    assert.ok(r.young.rms <= 4.4, 'two frames after: the 7 x 7 variance only where the first estimate counts');
     assert.ok(r.kept.rms <= 4.7, 'pixels that keep their history: no worse for the split');
     assert.ok(r.fresh.rms <= r.kept.rms * 1.45, 'uncovered pixels: within reach of the pixels that keep their history');
     assert.ok(r.young.rms <= r.kept.rms * 1.1, 'two frames after: as the pixels that keep their history');
