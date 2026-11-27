@@ -6751,6 +6751,7 @@ Claim: a `Line`'s join, cap, miter limit, dashes, `onTop`, `antialias`, depth, c
 `LineBatch`'s square ends, `onTop` and `antialias`, survive `exportGLB` and `parseGLTFAsync`, and a second `exportModel`;
 lines in `colorMode` `'set'` or `'add'` export the colours they draw. Other viewers ignore the `extras` keys. Proof:
 `packages/exporters/tests/plugin-lines-points.test.js`.
+
 ### Terrain complex craters, rays and secondary chains (2026-11-27)
 
 `terrain/planet-recipes` shapes craters past the transition diameter with flat floors, central peaks and wall terraces
