@@ -454,10 +454,15 @@ export class QuayPotential {
   private coarsePrecondition(rhs: Float64Array, out: Float64Array, top: number, columnNorm: number): number {
     const { coarse, coarseWork: work, active } = this;
     if (!coarse || columnNorm === 0) return columnNorm;
+    // The eighth-order horizontal symbol is at most r = 1 + 4/12 + 16/90 + 64/560
+    // times the nearest-face symbol. The vertical column block bounds the full scaled
+    // eigenvalues by 2r, so this symmetric Jacobi sweep needs a weight below 1/r.
+    // See Xu and Zikatanov (2017), equation 4.4, for the symmetrized smoother.
+    const sweep = this.eighthOrder ? 0.5 : QUAY_SWEEP;
     const visits = active?.length ?? out.length;
     for (let at = 0; at < visits; at++) {
       const i = active ? active[at]! : at;
-      out[i]! *= QUAY_SWEEP;
+      out[i]! *= sweep;
     }
     this.multiply(out, work!, top);
     for (let at = 0; at < visits; at++) {
@@ -474,7 +479,7 @@ export class QuayPotential {
     let norm = 0;
     for (let at = 0; at < visits; at++) {
       const i = active ? active[at]! : at;
-      out[i]! += QUAY_SWEEP * work![i]!;
+      out[i]! += sweep * work![i]!;
       norm += rhs[i]! * out[i]!;
     }
     return norm;
