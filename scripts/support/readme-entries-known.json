@@ -12,7 +12,7 @@
   "creative": ["./stars","./planet-atmosphere","./grass-terrain","./paint-aniso","./targets-depth"],
   "culling": ["./bounds","./depth"],
   "cutscene": ["./curve-editor","./viewport","./nested-editor","./scroll"],
-  "decoders": ["./ktx2-hdr6","./zstd","./lz4","./jpeg","./bmp","./texture-rgba","./lzfse","./snappy","./avif"],
+  "decoders": ["./ktx2-hdr6","./zstd","./lz4","./bmp","./texture-rgba","./lzfse","./snappy","./avif"],
   "ecs": ["./objects","./relation-query","./reactive","./serialize","./parallel"],
   "exporters": ["./collect","./unity-precision","./unity-precision-importer","./unreal-precision","./unreal-precision-importer","./godot-precision-addon","./godot-precision","./godot-flipbook","./optimize-extra","./materials","./splats","./textures","./palette"],
   "fbx": ["./worker","./textures","./large","./legacy"],
