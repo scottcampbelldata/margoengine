@@ -461,3 +461,62 @@ test('a rod refuses a centre line it cannot make and options out of range, namin
   );
   physics.dispose();
 });
+
+test('a clamped rod twisted by an end torque turns by T d / GJ at a distance d from the clamp', () => {
+  // Saint-Venant torsion of a uniform shaft: the twist between two sections d apart under a torque T is T d / (G J). The
+  // clamp is half a link of springs, so the last link's centre, L - l / 2 from it, turns by T (L - l / 2) / GJ in the
+  // discrete rod exactly. What is left is the kernel's f32 rounding, about n links times sqrt(600 steps) units of 6e-8
+  // (3.5e-5 at 24 links), held to 1e-4.
+  for (const n of [8, 24]) {
+    const physics = new Physics(null, { gravity: [0, 0, 0] });
+    const rod = new Rod(physics, {
+      start: [0, 0, 0],
+      end: [0, 1, 0],
+      segments: n,
+      attachStart: 'fixed',
+      clamp: 'start',
+    });
+    const torque = 1,
+      expected = (torque * (1 - rod.segmentLength / 2)) / rod.stiffness.twist;
+    rod.segments[n - 1].addTorque([0, torque, 0]);
+    for (let i = 0; i < 600; i++) physics.step(1 / 60);
+    const f = rod.frames(),
+      at = 4 * (n - 1),
+      angle = 2 * Math.atan2(f[at + 1], f[at + 3]);
+    assert.ok(
+      Math.abs(angle / expected - 1) < 1e-4,
+      `${n} links: the end turned ${angle} rad, T d / GJ is ${expected}`,
+    );
+    physics.dispose();
+  }
+});
+
+test('a quarter ring clamped at one end and loaded across its plane bends and twists as Castigliano gives', () => {
+  // A ring of radius R through a quarter turn, clamped at one end, a force P at the other across the ring's plane: at an
+  // angle phi from the free end it carries a bending moment P R sin(phi) and a torque P R (1 - cos(phi)), so the tip moves
+  // P R^3 (pi / (4 EI) + (3 pi / 4 - 2) / GJ) (Castigliano's theorem on the two energies). Bending and twisting both
+  // carry it, about 2:1 here. Chords of the arc make the discrete ring first order in the links: 1.4%, 0.8% and 0.4%
+  // short at 16, 32 and 64, so 64 links are held within 0.5% and each doubling must cut the error to under 0.6 of it.
+  const errors = [];
+  for (const n of [32, 64]) {
+    const physics = new Physics(null, { gravity: [0, 0, 0] });
+    const radius = 1,
+      points = [];
+    for (let k = 0; k <= 256; k++) {
+      const a = ((k / 256) * Math.PI) / 2;
+      points.push([radius * Math.sin(a), radius * (1 - Math.cos(a)), 0]);
+    }
+    const rod = new Rod(physics, { points, segments: n, attachStart: 'fixed', clamp: 'start' });
+    const force = 0.05,
+      expected =
+        force * radius ** 3 * (Math.PI / 4 / rod.stiffness.bend + ((3 * Math.PI) / 4 - 2) / rod.stiffness.twist);
+    const before = rod.points();
+    rod.segments[n - 1].addForceAtPoint([0, 0, force], [before[3 * n], before[3 * n + 1], before[3 * n + 2]]);
+    for (let i = 0; i < 900; i++) physics.step(1 / 60);
+    const tip = rod.points()[3 * n + 2] - before[3 * n + 2];
+    errors.push(Math.abs(tip / expected - 1));
+    physics.dispose();
+  }
+  assert.ok(errors[1] < 5e-3, `64 links: ${errors[1]} off Castigliano`);
+  assert.ok(errors[1] < 0.6 * errors[0], `first order in the links: ${errors}`);
+});
