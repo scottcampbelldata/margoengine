@@ -21,13 +21,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
   `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
 
-### Open 2026-11-27: the tracked vehicle still throws plain RangeError and TypeError (KB-PHYS-TRACKEDERR1, physics)
+### Fixed 2026-11-27: the tracked vehicle threw plain RangeError and TypeError (KB-PHYS-TRACKEDERR1, physics)
 
-- **Repro:** `new TrackedVehicle(physics, chassis, {tracks: []})` throws a `RangeError` with no help link, where
+- **Repro:** `new TrackedVehicle(physics, chassis, {tracks: []})` threw a `RangeError` with no help link, where
   `Vehicle`, `Vehicle.car`, `Motorcycle`, the tyre models and `Drivetrain` throw a `MargoError` linking
   margoengine.com/errors#vehicles (P5 DYN-04, 2026-11-27).
-- **Cause:** `packages/physics/src/tracked.ts` was left out of that change because the open branch
-  `codex/physics-terramechanics` edits the same file; it takes the same `invalidVehicle` helper once that lands.
+- **Cause:** `packages/physics/src/tracked.ts` was left out of that change because an open terramechanics branch edited
+  the same file.
+- **Fix:** every refusal in `tracked.ts` (the constructor, `setInput`, `track`, the motion state and `shearShare`) is
+  `invalidVehicle`, a `MargoError` (code `unsupported`, or `state` for a chassis of another world) linking the vehicles
+  entry. Regression: `packages/physics/tests/vehicle-tracked.test.js` "a tank refuses what makes no sense, and a
+  disposed one lets go".
 
 ### Fixed 2026-11-27: check:dev-servers called `npx vite build` a server start (KB-DEVSERVERS-BUILD1, scripts)
 
