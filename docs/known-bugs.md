@@ -41,6 +41,32 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/soft-volume.test.js` ("an impulse moves a soft volume at J / M") holds
   momentum to 1e-3 of the impulse, the measured loss, and `docs/limits.md` states it.
 
+### Fixed 2026-11-27: glTF points and lines drew 1 px wide whatever width the file gave (KB-GLTF-STROKEWIDTH1, gltf, exporters)
+
+- **Repro:** `exportGLB` a scene with a 4 px `Line` or a 6 px `PointCloud` (the width goes in the primitive's `extras`
+  as `lineWidth` or `pointSize`), or take a CAD file with `BENTLEY_materials_line_style` `width: 3`, and load it with
+  `loadGLTF` or `parseGLTFAsync`: every point and line drew 1 px wide. `exportModel` of that model then wrote the
+  primitives without their `extras`, and the scene writers without `_WIDTH` or `extras`, so a round trip lost the widths.
+- **Cause:** gltf/pbr drew POINTS and LINES with the `point-list` and `line-list` topologies, which rasterize 1 px on
+  WebGPU and the WebGL2 layer, and read no width; the model writers copied attributes but not primitive `extras`.
+- **Fix:** `@margoengine/gltf/strokes` (lazy, loaded for a file that asks for a width) hands such primitives to scene-wide
+  `gltf-lines` and `gltf-points` plugins of `@margoengine/lines` and `@margoengine/points`, which draw them as instanced
+  quads at the width in CSS pixels or world units, following the node; the model skips its 1 px draw of them. The
+  writers keep `extras` and `_WIDTH` and skip those plugins. Regression: `packages/gltf/test/strokes.test.js`,
+  `packages/exporters/tests/plugin-lines-points.test.js` (round trip), and `npm run test:gpu:strokes` in packages/gltf
+  (widths measured in the frame on WebGPU and the WebGL2 layer).
+
+### Open 2026-11-27: a point cloud's pixel size is written as CSS pixels but drawn in target pixels (KB-POINTS-CSSPX1, points, exporters)
+
+- **Repro:** on a canvas drawn at device pixel ratio 2, a `PointCloud` with `size: 4` (pixels) covers 4 target pixels, 2
+  CSS pixels. `exportGLB` writes `pointSize: 4, pointSizeUnits: 'pixels'`, which the exporters README and
+  `@margoengine/gltf/strokes` read as CSS pixels, so the reloaded cloud covers 8 target pixels, twice the original.
+- **Cause:** `PointsPlugin` sizes pixel points in pixels of the drawn target unless an owner sets `pixelScale` (sciviz
+  sets CSS pixels), while `@margoengine/lines` widths and the glTF extras convention are CSS pixels. The exporter reads
+  `material.size` as it is and cannot know the target's ratio from the cloud.
+- **Next:** decide one pixel unit for `PointsPlugin` (CSS pixels, as lines) or have the exporter divide by the plugin's
+  `pixelScale` for the canvas at export; either changes drawn sizes on high-DPI screens, so it needs the points owner.
+
 ### Fixed 2026-11-27: tests picked a build's compat-*.js chunk by listing order (KB-COMPAT-CHUNKPICK1, scatter, shadows tests)
 
 - **Repro:** a package build holds two `compat-*.js` chunks once two of its entries import `packages/shared/compat.js` (vfx,

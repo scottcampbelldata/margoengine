@@ -155,6 +155,7 @@ export type { PBRDeviceDrawOptions, PBRDeviceRenderer, PBRDeformationRenderer } 
 import type { PBRInstances } from './pbr-instancing.js';
 import { laterUVs, packed, packPrimitive } from './pack.js';
 import { partLimit, splitPrepared } from './parts.js';
+import { strokeWidth, type StrokeWidth } from './stroke-width.js';
 import { buildStaticBatches, copyStaticBatches, eligible, type StaticBatch } from './coalesce.js';
 // Progressive sets this on the asset until real vertices and instances replace the placeholder boxes.
 const deferStaticBatches = Symbol.for('margoengine.gltf/pbr.defer-static-batches');
@@ -1174,6 +1175,11 @@ export interface PBRPrimitive {
   buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   /** Set for glTF POINTS (`point-list`) and LINES, LINE_LOOP, LINE_STRIP (`line-list`, as index pairs); absent for triangles. */
   topology?: 'point-list' | 'line-list';
+  /**
+   * True once a point or line primitive that asks for a width is drawn wide by `decoders.strokes` (@margoengine/points
+   * or @margoengine/lines), which then draws it in place of the model's 1 px draw. Read only.
+   */
+  widened?: boolean;
   /**
    * Set when the primitive's definition has more vertices than `maxPartVertices`: this is part `index` of `count`, all
    * with the same node, material and definition. `vertexMap` holds the definition's vertex for each local vertex:
@@ -2348,6 +2354,8 @@ export class PBRModel implements EnginePlugin {
   private relative?: Float32Array;
   private engine: Engine;
   private readonly cleanupCallbacks = new Set<() => void>();
+  /** Point and line primitives that ask for a width, for `attachStrokes`. */
+  private readonly strokeCandidates: { primitive: PBRPrimitive; width: StrokeWidth }[] = [];
   /** @internal The mesh primitives `decoders.splats` reads in place of drawing them. */
   readonly splatPrimitives: { primitive: GLTFPrimitive; nodeIndex: number }[] = [];
   /** The file's Gaussian clouds (KHR_gaussian_splatting), attached to the engine. `model.dispose()` disposes them. */
@@ -2579,6 +2587,17 @@ export class PBRModel implements EnginePlugin {
                 throw overBudget('Decoded glTF geometry exceeds byte budget', asset.maxBytes * 4);
               if (instances) made.instances = instances;
               (made.topology ? this.pointsAndLines : this.primitives).push(made);
+              // A skinned, morphed or instanced point or line keeps the model's draw, which deforms and instances it.
+              if (
+                made.topology &&
+                asset.hooks.strokes &&
+                !instances &&
+                defs[i].skin === undefined &&
+                !p.targets?.length
+              ) {
+                const width = strokeWidth(doc, p);
+                if (width) this.strokeCandidates.push({ primitive: made, width });
+              }
             }
           }
         }
@@ -2708,6 +2727,38 @@ export class PBRModel implements EnginePlugin {
     }
     this.splats = clouds;
     for (const { cloud } of clouds) this.cleanupCallbacks.add(() => cloud.dispose());
+  }
+  /**
+   * @internal Hands the points and lines that ask for a width to `decoders.strokes`, which draws them wide in place of
+   * the model's 1 px draw until the model is disposed. The loaders call it.
+   */
+  async attachStrokes(signal?: AbortSignal): Promise<void> {
+    const reader = this.asset.hooks.strokes,
+      list = this.strokeCandidates.splice(0);
+    if (!reader || !list.length) return;
+    const doc = this.asset.doc,
+      items = list.map(({ primitive: p, width }) => {
+        const id = p.definition.attributes?._WIDTH,
+          all = id === undefined ? undefined : this.asset.accessor(id, 'SCALAR'),
+          map = p.part?.vertexMap,
+          widths = all && map ? Float32Array.from(map, (v) => all[v]) : all,
+          source = p.definition.material === undefined ? undefined : doc.materials?.[p.definition.material];
+        return {
+          width,
+          vertices: p.vertices,
+          indices: p.indices,
+          ...(widths ? { widths } : {}),
+          material: { base: p.material.base, alphaMode: source?.alphaMode, extensions: source?.extensions },
+          node: p.node,
+        };
+      });
+    const handle = await reader.attach(this.engine, items, signal);
+    if (this.disposed) {
+      handle.dispose();
+      return;
+    }
+    for (const { primitive } of list) primitive.widened = true;
+    this.cleanupCallbacks.add(() => handle.dispose());
   }
   /** Borrowed GPU buffers, preserving one record per primitive and current deformation. */
   get raw() {
@@ -4103,7 +4154,7 @@ export class PBRModel implements EnginePlugin {
         if (!r.batch && !inView(c, node)) continue;
         if (
           p.topology
-            ? mode !== 'beauty'
+            ? mode !== 'beauty' || p.widened
             : through
               ? deferred || !(transmission ? transmits(m) : this.takesTransparent(m))
               : capture
@@ -6200,6 +6251,7 @@ async function withSplats(
   const model = scope.run(() => attach(instance, loaded, signal));
   try {
     await scope.run(() => model.attachSplats(signal));
+    await scope.run(() => model.attachStrokes(signal));
     return model;
   } catch (error) {
     model.dispose();

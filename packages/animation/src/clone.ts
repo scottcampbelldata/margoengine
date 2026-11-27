@@ -34,43 +34,52 @@ export async function cloneModel(model: PBRModel): Promise<PBRModel> {
   }
   // The model's own scene, which is the active one only when the clone is made from there: the clone's nodes and
   // plugin belong beside the source.
-  return sceneScope(engine, engine.sceneOf(model)).run(() => {
-    let clone: PBRModel | undefined;
-    try {
-      clone = new PBRModel(engine, model.asset, images, prepared);
-      const t = engine.store.transforms,
-        copy = (from: (typeof model.nodes)[number], to: (typeof model.nodes)[number]) => {
-          const a = from.id;
-          // Through the transform refs and one quaternion scratch: no arrays per node, the same store writes as the
-          // setters. A value the setters refuse (written into the store directly) still gets their own error.
-          const x = t.x[a],
-            y = t.y[a],
-            z = t.z[a],
-            sx = t.sx[a],
-            sy = t.sy[a],
-            sz = t.sz[a];
-          if (Number.isFinite(x + y + z)) to.position.set(x, y, z);
-          else to.setPosition([x, y, z]);
-          if (Number.isFinite(sx + sy + sz)) to.scale.set(sx, sy, sz);
-          else to.setScale([sx, sy, sz]);
-          rotation[0] = t.qx[a];
-          rotation[1] = t.qy[a];
-          rotation[2] = t.qz[a];
-          rotation[3] = t.qw[a];
-          to.setQuaternion(rotation);
-          to.visible = from.visible;
-        };
-      copy(model.root, clone.root);
-      model.nodes.forEach((node, i) => copy(node, clone!.nodes[i]));
-      model.primitives.forEach((p, i) => clone!.primitives[i]?.weights.set(p.weights));
-      // Baking would cost a tick of every mesh of the engine per copy; the source's batches fit at this very pose.
-      clone.adoptStaticBatches(model);
-      if (engine.plugins.get(model.name) === model) engine.use(clone);
-      return clone;
-    } catch (error) {
-      if (clone) clone.dispose();
-      else closeImages(images);
-      throw error;
-    }
-  });
+  const scope = sceneScope(engine, engine.sceneOf(model)),
+    made = scope.run(() => {
+      let clone: PBRModel | undefined;
+      try {
+        clone = new PBRModel(engine, model.asset, images, prepared);
+        const t = engine.store.transforms,
+          copy = (from: (typeof model.nodes)[number], to: (typeof model.nodes)[number]) => {
+            const a = from.id;
+            // Through the transform refs and one quaternion scratch: no arrays per node, the same store writes as the
+            // setters. A value the setters refuse (written into the store directly) still gets their own error.
+            const x = t.x[a],
+              y = t.y[a],
+              z = t.z[a],
+              sx = t.sx[a],
+              sy = t.sy[a],
+              sz = t.sz[a];
+            if (Number.isFinite(x + y + z)) to.position.set(x, y, z);
+            else to.setPosition([x, y, z]);
+            if (Number.isFinite(sx + sy + sz)) to.scale.set(sx, sy, sz);
+            else to.setScale([sx, sy, sz]);
+            rotation[0] = t.qx[a];
+            rotation[1] = t.qy[a];
+            rotation[2] = t.qz[a];
+            rotation[3] = t.qw[a];
+            to.setQuaternion(rotation);
+            to.visible = from.visible;
+          };
+        copy(model.root, clone.root);
+        model.nodes.forEach((node, i) => copy(node, clone!.nodes[i]));
+        model.primitives.forEach((p, i) => clone!.primitives[i]?.weights.set(p.weights));
+        // Baking would cost a tick of every mesh of the engine per copy; the source's batches fit at this very pose.
+        clone.adoptStaticBatches(model);
+        if (engine.plugins.get(model.name) === model) engine.use(clone);
+        return clone;
+      } catch (error) {
+        if (clone) clone.dispose();
+        else closeImages(images);
+        throw error;
+      }
+    });
+  // Points and lines the source draws wide are drawn wide for the clone too (gltf/pbr `decoders.strokes`).
+  try {
+    await scope.run(() => made.attachStrokes());
+  } catch (error) {
+    made.dispose();
+    throw error;
+  }
+  return made;
 }

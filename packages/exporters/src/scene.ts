@@ -782,8 +782,11 @@ const srgbToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.
  * The lines of a `Lines` plugin (its `lines`), the batches of a `LineBatches` plugin (its `batches`) and the clouds of
  * a `PointsPlugin` (its `pointClouds`). A `DebugLines` plugin's batches are one frame's debug drawing, so none is read.
  */
+// The key on the plugins gltf/pbr adds to draw a model's wide points and lines (gltf/pbr src/strokes.ts `strokesKey`):
+// the model writes those primitives itself, with their widths.
+const gltfStrokesKey = Symbol.for('margoengine.gltf-strokes.v1');
 function pluginItems(plugin: unknown): PluginItem[] {
-  if (!isObject(plugin)) return [];
+  if (!isObject(plugin) || (plugin as Record<symbol, unknown>)[gltfStrokesKey]) return [];
   const out: PluginItem[] = [],
     { lines, batches, pointClouds, drawLine } = plugin as {
       lines?: unknown;
@@ -1737,6 +1740,8 @@ export function collect(
           tangents: target.TANGENT === undefined ? undefined : perVertex(target.TANGENT, 'VEC3', 3),
         }));
       const geometry = normalizeGeometry(data, topology);
+      // A point's or line's per-vertex width multipliers, as @margoengine/lines and @margoengine/points write them.
+      if (topology && attrs._WIDTH !== undefined) geometry.widths = perVertex(attrs._WIDTH, 'SCALAR', 1).slice();
       if (side === 'back' && !topology) {
         // normalizeGeometry owns these arrays, so the source's shared front-side geometry remains untouched.
         for (let i = 0; i < geometry.indices.length; i += 3)
@@ -1892,7 +1897,12 @@ export function collect(
       let left = 0;
       for (const part of parts) {
         const topology = part.topology === 'point-list' ? 'points' : 'lines';
-        if (writes.includes(topology)) (node.lines ??= []).push(pbrPart(model!, part, topology));
+        // The width the file gave (primitive extras `lineWidth` or `pointSize`) goes back with it.
+        if (writes.includes(topology))
+          (node.lines ??= []).push({
+            ...pbrPart(model!, part, topology),
+            ...(isObject(part.definition.extras) ? { extras: part.definition.extras as Extras } : {}),
+          });
         else left++;
       }
       if (left)

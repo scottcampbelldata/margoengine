@@ -164,6 +164,32 @@ export interface GLTFDecoderHooks {
    * point cloud fallback the extension defines. Synchronous `parseGLTF` draws the fallback.
    */
   splats?: GLTFSplatReader | false;
+  /**
+   * Wide points and lines (`wideStrokes`, an internal entry of gltf/pbr): `loadGLTF` and `parseGLTFAsync` import it on
+   * their own when a POINTS or LINES primitive asks for a width (its `extras` `pointSize` or `lineWidth`, or a
+   * `BENTLEY_materials_point_style` or `BENTLEY_materials_line_style` material), and draw those primitives with
+   * @margoengine/points and @margoengine/lines. `false` draws every point and line 1 px wide. Synchronous `parseGLTF`
+   * draws them 1 px wide.
+   */
+  strokes?: GLTFStrokeReader | false;
+}
+/** One POINTS or LINES primitive that asks for a width, as gltf/pbr hands it to `GLTFStrokeReader.attach`. */
+export interface GLTFStrokeItem {
+  readonly width: import('./stroke-width.js').StrokeWidth;
+  /** gltf/pbr's packed vertices, 20 floats each: position at 0, linear RGBA colour at 16. */
+  readonly vertices: Float32Array;
+  /** Point indices, or index pairs for lines (strips and loops decoded to pairs). */
+  readonly indices: Uint32Array;
+  /** Per-vertex `_WIDTH` multipliers, when the primitive has them. */
+  readonly widths?: Float32Array;
+  readonly material: { readonly base: readonly number[]; readonly alphaMode?: unknown; readonly extensions?: object };
+  /** The node mesh the drawing follows: its world matrix and visibility. */
+  readonly node: import('@margoengine/core').Mesh;
+}
+/** What gltf/pbr needs to draw wide points and lines (`wideStrokes`, gltf/pbr's internal strokes entry, implements it). */
+export interface GLTFStrokeReader {
+  /** Draws `items` in `engine`'s current scene until the returned handle's `dispose`. */
+  attach(engine: Engine, items: readonly GLTFStrokeItem[], signal?: AbortSignal): Promise<{ dispose(): void }>;
 }
 /** One Gaussian cloud of a file, attached to the engine; `bounds` holds min xyz, max xyz of its centres in world space. */
 export interface GLTFSplatCloud {

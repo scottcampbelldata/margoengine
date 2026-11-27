@@ -22,6 +22,7 @@ import { curves } from '@margoengine/usdz/curves';
 import { mockGPU, installWebGPU } from '../../../tests/support/gpu-recorder.js';
 import { exportGLB, exportOBJ, exportSTL } from '../dist/index.js';
 import { exportUSDZ } from '../dist/usdz.js';
+import { exportModel } from '../dist/model.js';
 import { readGLB, validate } from './helpers.js';
 
 const srgb = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -136,6 +137,49 @@ test('exportGLB writes plugin lines and clouds with their widths, colours and tr
     kept.map((e) => e.lineWidth ?? e.pointSize).sort((a, b) => a - b),
     [0.05, 0.1, 3, 6],
   );
+});
+
+test('gltf/pbr draws the widths back with the lines and points plugins, and a second export writes each once', async () => {
+  const { engine } = await scene(),
+    glb = exportGLB(engine),
+    gpu = mockGPU(),
+    { canvas, restore } = installWebGPU(gpu),
+    fresh = await Engine.create(canvas, { backend: 'webgpu' });
+  restore();
+  const model = await parseGLTFAsync(fresh, glb),
+    lines = [...fresh.plugins.get('gltf-lines').lines],
+    [cloud] = [...fresh.plugins.get('gltf-points').pointClouds];
+  assert.ok(model.pointsAndLines.every((p) => p.widened));
+  assert.deepEqual(
+    lines.map((l) => [l.mode, l.material.width, l.material.worldUnits]).sort((a, b) => a[1] - b[1]),
+    [
+      ['loop', 0.05, true],
+      ['strip', 0.1, true],
+      ['strip', 3, false],
+    ],
+  );
+  near(lines.find((l) => l.material.width === 0.1).widths, [1, 2, 0.5], 'stroke widths');
+  assert.equal(cloud.material.size, 6);
+  near(cloud.sizes, [1, 2, 3], 'cloud sizes');
+  // Both writers write the model's points and lines with their extras and _WIDTH, and the gltf-lines and gltf-points
+  // plugins not again. The scene writer refuses a loaded model's material extensions, so its pass reads the file with
+  // KHR_materials_unlit taken out.
+  const { json: lit, bin } = readGLB(glb);
+  for (const m of lit.materials) delete m.extensions;
+  lit.extensionsUsed = lit.extensionsUsed?.filter((name) => name !== 'KHR_materials_unlit');
+  const second = mockGPU(),
+    installed = installWebGPU(second),
+    scenic = await Engine.create(installed.canvas, { backend: 'webgpu' });
+  installed.restore();
+  await parseGLTFAsync(scenic, lit, [bin]);
+  for (const json of [readGLB(await exportModel(model, { binary: true })).json, readGLB(exportGLB(scenic)).json]) {
+    const again = primitivesOf(json).filter((p) => (p.mode ?? 4) !== 4);
+    assert.deepEqual(
+      again.map((p) => p.extras.lineWidth ?? p.extras.pointSize).sort((a, b) => a - b),
+      [0.05, 0.1, 3, 6],
+    );
+    assert.equal(again.filter((p) => p.attributes._WIDTH !== undefined).length, 2, 'stroke and cloud multipliers');
+  }
 });
 
 test('a hidden line or cloud, or one on a hidden mesh, is left out unless onlyVisible is false', async () => {

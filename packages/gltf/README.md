@@ -966,6 +966,42 @@ Read against the extension's README (Complete, Ratified by the Khronos Group, as
 
 Limits are in [docs/limits.md](../../docs/limits.md): the clouds do not follow later node moves or visibility changes.
 
+#### Wide points and lines (`/strokes`)
+
+glTF gives a point or a line no size, and most viewers draw them 1 px wide. A POINTS or LINES primitive that asks for a width is drawn that wide by plain `loadGLTF`, `loadGLTFInWorker` or `parseGLTFAsync`, with `@margoengine/lines` and `@margoengine/points` (optional peer dependencies, loaded only for such a file). Two forms are read:
+
+- the primitive `extras` that `@margoengine/exporters` writes: `lineWidth` with `lineWidthUnits` and `pointSize` (a diameter) with `pointSizeUnits`, each `'pixels'` (CSS pixels, the default) or `'world'`, and a per-vertex `_WIDTH` multiplier;
+- the Bentley vendor material extensions CesiumJS reads: `BENTLEY_materials_line_style.width` and `BENTLEY_materials_point_style.diameter`, in CSS pixels, a point drawn as a disc.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parseGLTFAsync} from 'margoengine/gltf/pbr';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A red polyline 6 CSS pixels wide, as an exporter writes it.
+const positions = new Float32Array([-1, 0, 0, 0, 1, 0, 1, 0, 0]);
+const doc = {
+  asset: {version: '2.0'},
+  buffers: [{byteLength: positions.byteLength}],
+  bufferViews: [{buffer: 0, byteLength: positions.byteLength}],
+  accessors: [{bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [-1, 0, 0], max: [1, 1, 0]}],
+  materials: [{pbrMetallicRoughness: {baseColorFactor: [1, 0, 0, 1]}}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, mode: 3, material: 0, extras: {lineWidth: 6}}]}],
+  nodes: [{mesh: 0}],
+  scenes: [{nodes: [0]}],
+};
+const model = await parseGLTFAsync(engine, doc, [positions]);
+console.log(model.pointsAndLines[0].widened); // true: drawn 6 px wide by the `gltf-lines` plugin
+engine.render();
+// model.dispose() takes the wide lines and points with it.
+```
+
+- Lines go to a `gltf-lines` plugin and points to a `gltf-points` plugin of the model's scene, one of each shared by every model, removed with the last. Each follows its node's world matrix and visibility. A line list whose pairs join end to end (a strip or loop, decoded or written as LINES) draws as one polyline, so its joins draw and a translucent line blends once where segments meet.
+- Colour is the base colour factor times `COLOR_0`; `BLEND` keeps the alpha, `OPAQUE` and `MASK` draw it opaque. A point whose material is lit (no `KHR_materials_unlit`) shades as a sphere impostor, as the exporters write a sphere-shaded cloud.
+- `{decoders: {strokes: false}}` draws every point and line 1 px wide; so does synchronous `parseGLTF` unless it is passed `{strokes: wideStrokes}` from `@margoengine/gltf/strokes` (then `await model.attachStrokes()`). A file without `@margoengine/lines` or `@margoengine/points` installed stops with an error that names the package.
+- `exportModel` and the scene writers write these primitives back with their extras and `_WIDTH`, and leave the `gltf-lines` and `gltf-points` plugins out, so a second export holds each line once.
+
+Limits are in [docs/limits.md](../../docs/limits.md): skinned, morphed and instanced points and lines stay 1 px, and so does the Bentley line `pattern`.
+
 #### IES fixtures and image-based lights in glTF (`/lights`)
 
 `EXT_lights_ies` puts measured light fixtures on a file's nodes and `EXT_lights_image_based` gives a scene its environment. Every loader reads a file that uses them, even as required extensions, and keeps them as data; `applyGLTFLightExtensions` turns them into lights, loading `@margoengine/clustered` and `@margoengine/environment` only when the file has that light.

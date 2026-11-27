@@ -1,3 +1,4 @@
+import { hasStrokes } from './stroke-width.js';
 import { margoError } from '../../shared/errors.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
@@ -18,13 +19,22 @@ const decoding = ({ decoders: d = {}, fetch, draco, ktx2 }: GLTFLoadOptions) =>
 /**
  * Build a PBRModel from a worker's PreparedGLTF on this thread (GPU uploads happen here, at the model's setup).
  * `decoders` takes only the `instancing` reader (@margoengine/gltf/pbr-instancing) for EXT_mesh_gpu_instancing and the
- * `materials` shaders (@margoengine/gltf/extended-materials).
+ * `materials` shaders (@margoengine/gltf/extended-materials). Points and lines draw 1 px wide.
  */
 export function modelFromPrepared(
   instance: EngineKernel,
   prepared: PreparedGLTF,
   signal?: AbortSignal,
   decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials'> = {},
+): PBRModel {
+  return preparedModel(instance, prepared, signal, decoders);
+}
+/** `modelFromPrepared` that also takes the `strokes` reader, whose primitives `model.attachStrokes` then hands over. */
+function preparedModel(
+  instance: EngineKernel,
+  prepared: PreparedGLTF,
+  signal: AbortSignal | undefined,
+  decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'strokes'>,
 ): PBRModel {
   let model: PBRModel | undefined;
   try {
@@ -81,6 +91,7 @@ async function finishPrepared(
       try {
         scope.run(() => engineRuntime(instance).use(model));
         await scope.run(() => model.attachSplats(options.signal));
+        await scope.run(() => model.attachStrokes(options.signal));
         return model;
       } catch (error) {
         model.dispose();
@@ -94,7 +105,20 @@ async function finishPrepared(
       throw error;
     }
   }
-  return scope.run(() => modelFromPrepared(instance, prepared, options.signal, options.decoders));
+  // Points and lines that ask for a width are drawn wide on this thread, as loadGLTF draws them.
+  const given = options.decoders ?? {},
+    decoders =
+      given.strokes === undefined && hasStrokes(prepared.doc)
+        ? { ...given, strokes: (await import('./strokes.js')).wideStrokes }
+        : given,
+    model = scope.run(() => preparedModel(instance, prepared, options.signal, decoders));
+  try {
+    await scope.run(() => model.attachStrokes(options.signal));
+    return model;
+  } catch (error) {
+    model.dispose();
+    throw error;
+  }
 }
 const workerURL = () => new URL(/* @vite-ignore */ './workers/gltf.js?no-inline', import.meta.url);
 /**

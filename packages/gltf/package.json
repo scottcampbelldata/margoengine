@@ -48,6 +48,7 @@
     "test:browser:audio": "cd ../.. && node packages/gltf/scripts/test-audio-browser.mjs",
     "test:gpu:pixel-images": "cd ../.. && node packages/gltf/scripts/test-node-images.mjs && node packages/gltf/scripts/test-pixel-images.mjs && node packages/gltf/scripts/test-pixel-images.mjs --compat",
     "test:gpu:compression": "cd ../.. && npm run modern:test:gltf-compression",
+    "test:gpu:strokes": "cd ../.. && node packages/gltf/scripts/test-strokes-browser.mjs && node packages/gltf/scripts/test-strokes-browser.mjs --compat",
     "test:gpu:soft-mesh": "cd ../.. && node packages/gltf/scripts/test-soft-mesh-browser.mjs && node packages/gltf/scripts/test-soft-mesh-browser.mjs --compat"
   },
   "sideEffects": false,
@@ -116,6 +117,10 @@
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"
     },
+    "./strokes": {
+      "types": "./dist/strokes.d.ts",
+      "import": "./dist/strokes.js"
+    },
     "./lights": {
       "types": "./dist/lights.d.ts",
       "import": "./dist/lights.js"
@@ -180,7 +185,9 @@
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@margoengine/splats": "^1.0.0",
-    "@margoengine/audio": "^1.0.0"
+    "@margoengine/audio": "^1.0.0",
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/points": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/clustered": {
@@ -198,6 +205,12 @@
     "@margoengine/splats": {
       "optional": true
     },
+    "@margoengine/lines": {
+      "optional": true
+    },
+    "@margoengine/points": {
+      "optional": true
+    },
     "@margoengine/audio": {
       "optional": true
     }
@@ -208,6 +221,8 @@
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@margoengine/splats": "^1.0.0",
-    "@margoengine/audio": "^1.0.0"
+    "@margoengine/audio": "^1.0.0",
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/points": "^1.0.0"
   }
 }

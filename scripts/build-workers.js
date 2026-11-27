@@ -31,6 +31,10 @@ const aliases = [
   { find: /^@margoengine\/biomes\/([a-z0-9-]+)$/, replacement: `${biomesSrc}$1.ts` },
   // A file with Gaussian splats goes back to the page before anything reads them (gltf/pbr's asyncCompression).
   { find: /^@margoengine\/splats(\/data)?$/, replacement: emptyStub },
+  // Wide points and lines are handed to @margoengine/lines and @margoengine/points on the page, after the worker's
+  // prepare (gltf/pbr's attachStrokes); a worker never draws them, so it holds neither the reader nor those packages.
+  { find: /^\.\/strokes\.js$/, replacement: emptyStub },
+  { find: /^@margoengine\/(lines(\/stroke)?|points)$/, replacement: emptyStub },
 ];
 
 // Optional parts of a worker: each is a classic script of its own, dist/workers/<worker>-<part>.js, that the worker

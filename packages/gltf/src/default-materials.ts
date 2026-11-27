@@ -3,6 +3,7 @@
 import type { GLTFDocument } from '../../shared/gltf.js';
 import type { GLTFDecoderHooks } from './asset.js';
 import { hasSplats } from './splat-state.js';
+import { hasStrokes } from './stroke-width.js';
 
 // Material extensions only the physical shader (extended.ts) reads.
 const physical = [
@@ -23,7 +24,8 @@ const physical = [
 /**
  * Decoders with the physical material shader added when the file uses a physical material extension and the caller
  * did not choose (`materials` undefined): imported on first need, so apps that never load such a file ship none of its
- * WGSL. `materials: false` is kept as no shader. The same goes for `splats`, added when the file holds Gaussian splats.
+ * WGSL. `materials: false` is kept as no shader. The same goes for `splats`, added when the file holds Gaussian splats,
+ * and `strokes`, added when a point or line asks for a width.
  */
 export async function withMaterials(doc: GLTFDocument, decoders: GLTFDecoderHooks = {}): Promise<GLTFDecoderHooks> {
   if (decoders.dds === undefined && doc.textures?.some((t) => t?.extensions?.MSFT_texture_dds !== undefined))
@@ -31,6 +33,9 @@ export async function withMaterials(doc: GLTFDocument, decoders: GLTFDecoderHook
   if (decoders.splats === undefined && hasSplats(doc))
     decoders = { ...decoders, splats: (await import('./splats.js')).gaussianSplats };
   else if (decoders.splats === false) decoders = { ...decoders, splats: undefined };
+  if (decoders.strokes === undefined && hasStrokes(doc))
+    decoders = { ...decoders, strokes: (await import('./strokes.js')).wideStrokes };
+  else if (decoders.strokes === false) decoders = { ...decoders, strokes: undefined };
   if (decoders.materials !== undefined) return decoders.materials ? decoders : { ...decoders, materials: undefined };
   if (doc.materials?.some((m) => m?.extensions?.KHR_materials_pbrSpecularGlossiness !== undefined))
     return { ...decoders, materials: (await import('./spec-gloss.js')).specGlossMaterials };

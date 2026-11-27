@@ -251,6 +251,8 @@ class Writer extends Bin {
       );
     // glTF mode (3.7.2.1): without it a point or line primitive would be read as triangles.
     if (p.topology) out.mode = p.topology === 'point-list' ? 0 : 1;
+    // A point's or line's width lives in the primitive's extras (`pointSize`, `lineWidth`); every part keeps them.
+    if (def.extras !== undefined) out.extras = def.extras;
     if (def.material !== undefined) out.material = this.material(model, p.material, def.material);
     if (def.targets?.length)
       out.targets = def.targets.map((t: Record<string, number>) =>

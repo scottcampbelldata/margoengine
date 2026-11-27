@@ -142,6 +142,7 @@ interface GLTFDecoderHooks {
     };
     materials?: GLTFExtendedMaterials | false;
     splats?: GLTFSplatReader | false;
+    strokes?: GLTFStrokeReader | false;
 }
 
 interface GLTFDracoDecodeOptions extends DracoDecodeOptions {
@@ -396,6 +397,25 @@ interface GLTFStreamedImage {
         levels: number;
     } | undefined;
     close(): void;
+}
+
+interface GLTFStrokeItem {
+    readonly width: import('./stroke-width.js').StrokeWidth;
+    readonly vertices: Float32Array;
+    readonly indices: Uint32Array;
+    readonly widths?: Float32Array;
+    readonly material: {
+        readonly base: readonly number[];
+        readonly alphaMode?: unknown;
+        readonly extensions?: object;
+    };
+    readonly node: import('@margoengine/core').Mesh;
+}
+
+interface GLTFStrokeReader {
+    attach(engine: Engine, items: readonly GLTFStrokeItem[], signal?: AbortSignal): Promise<{
+        dispose(): void;
+    }>;
 }
 
 interface GLTFTexture extends GLTFProperty {

@@ -173,6 +173,8 @@ async function buildPackage(name, output) {
           '@margoengine/lightmap/imported',
           '@margoengine/loaders',
           '@margoengine/lines',
+          '@margoengine/lines/stroke',
+          '@margoengine/points',
           '@margoengine/decoders',
           '@margoengine/exporters/ktx2',
           '@margoengine/exporters/meshopt',

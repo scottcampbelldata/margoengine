@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20978274,
+  "total": 20995542,
   "history": [
     {
       "date": "2026-10-24",
@@ -14688,6 +14688,12 @@
       "commit": "HEAD",
       "reason": "water/liquid 38616 to 41848 B ceiling (built 37491 to 40629 B gzip): GPULiquid capacity, emitters and drains (FLUID-02/03, parity bar P13): an emit pass and its commit, the drains' marks in G2P, and a stable prefix-sum compaction in four compute passes (block counts, a one-workgroup scan, a ranked scatter, the new count), with their CPU twin and the live count in snapshots. They run inside the same frame encode as the step, so a split entry would only move the same class's passes. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "91eaca18c3",
+      "reason": "gltf/pbr draws glTF points and lines at the width the file asks for (primitive extras lineWidth and pointSize, Bentley line and point styles) with @margoengine/lines and @margoengine/points; the lazy strokes reader is 2,048 B gzip, the static width check about 300 B",
+      "grew": 6
     }
   ],
   "items": {
@@ -15140,7 +15146,7 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7698,
-    "@margoengine/gltf dist/workers/gltf.js": 40100,
+    "@margoengine/gltf dist/workers/gltf.js": 41508,
     "@margoengine/gltf dist/workers/progressive.js": 18481,
     "@margoengine/gltf/asset": 6177,
     "@margoengine/gltf/audio": 4958,
@@ -15153,12 +15159,12 @@
     "@margoengine/gltf/material-draw": 688,
     "@margoengine/gltf/meshopt": 1150,
     "@margoengine/gltf/metadata": 2432,
-    "@margoengine/gltf/pbr": 92219,
+    "@margoengine/gltf/pbr": 95806,
     "@margoengine/gltf/pbr-instancing": 3387,
     "@margoengine/gltf/pbr-model": 71859,
     "@margoengine/gltf/physics": 9449,
-    "@margoengine/gltf/prepare": 35588,
-    "@margoengine/gltf/progressive": 101363,
+    "@margoengine/gltf/prepare": 38242,
+    "@margoengine/gltf/progressive": 105020,
     "@margoengine/gltf/quantized": 1385,
     "@margoengine/gltf/report": 11799,
     "@margoengine/gltf/scene": 1695,
@@ -15166,9 +15172,10 @@
     "@margoengine/gltf/soft-mesh": 73133,
     "@margoengine/gltf/spec-gloss": 12038,
     "@margoengine/gltf/splats": 2356,
+    "@margoengine/gltf/strokes": 2304,
     "@margoengine/gltf/texture-coordinates": 824,
     "@margoengine/gltf/textured": 9754,
-    "@margoengine/gltf/worker": 92734,
+    "@margoengine/gltf/worker": 96392,
     "@margoengine/headless": 3309,
     "@margoengine/headless/accumulate": 4620,
     "@margoengine/headless/compare": 3721,

@@ -418,6 +418,7 @@ interface GLTFDecoderHooks {
     };
     materials?: GLTFExtendedMaterials | false;
     splats?: GLTFSplatReader | false;
+    strokes?: GLTFStrokeReader | false;
 }
 
 // used as Document
@@ -752,6 +753,25 @@ interface GLTFStreamedImage {
     close(): void;
 }
 
+interface GLTFStrokeItem {
+    readonly width: import('./stroke-width.js').StrokeWidth;
+    readonly vertices: Float32Array;
+    readonly indices: Uint32Array;
+    readonly widths?: Float32Array;
+    readonly material: {
+        readonly base: readonly number[];
+        readonly alphaMode?: unknown;
+        readonly extensions?: object;
+    };
+    readonly node: import('@margoengine/core').Mesh;
+}
+
+interface GLTFStrokeReader {
+    attach(engine: Engine, items: readonly GLTFStrokeItem[], signal?: AbortSignal): Promise<{
+        dispose(): void;
+    }>;
+}
+
 interface GLTFTexture extends GLTFProperty {
   source?: number;
   sampler?: number;
@@ -997,6 +1017,7 @@ class PBRModel implements EnginePlugin {
     scene?: CoreScene);
     get bounds(): Float32Array;
     attachSplats(signal?: AbortSignal): Promise<void>;
+    attachStrokes(signal?: AbortSignal): Promise<void>;
     get raw(): {
         primitive: PBRPrimitive;
         node: Mesh;
@@ -1141,6 +1162,7 @@ interface PBRPrimitive {
         index: GPUBuffer;
     };
     topology?: 'point-list' | 'line-list';
+    widened?: boolean;
     part?: PrimitivePart;
 }
 

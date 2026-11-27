@@ -145,6 +145,10 @@ unless `onlyVisible: false`.
 
 glTF gives a point or line no size and recommends 1 px (glTF 2.0 section 3.9.7), and no Khronos extension holds one,
 so another viewer draws them 1 px wide; Godot 4.7.2 keeps the POINTS and LINES surfaces unshaded with `point_size` 1.
+gltf/pbr draws them back at their widths (gltf README, "Wide points and lines"); `exportModel` and the scene writers
+write a loaded model's points and lines with their extras and `_WIDTH`, and skip the `gltf-lines` and `gltf-points`
+plugins that draw them, so a second export holds each once.
+
 `styleExtensions: true` (`exportGLB`, `exportGLTF`) also writes pixel widths and diameters as the vendor extensions
 `BENTLEY_materials_line_style` and `BENTLEY_materials_point_style`, which CesiumJS and iTwin.js draw: whole pixels,
 rounded and at least 1. World-unit widths and per-point multipliers have no form there. They are not Khronos

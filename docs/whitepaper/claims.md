@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Wide glTF points and lines (KB-GLTF-STROKEWIDTH1, 2026-11-27). A glTF line
+  or point that asks for a width draws that wide on WebGPU and the WebGL2 layer:
+  8 px asked, 7.98 px drawn; 0.2 m at 4 m, 6.85 px for 6.86; a 12 px Bentley
+  disc, 13.2 px with its antialiased rim; about 1 px with `strokes: false`.
+  Reproduce: `npm run test:gpu:strokes` in packages/gltf.
 - Carried water and hull panel rupture (BREAK-03 / SEA-08, 2026-11-26).
   The live wet inertia of the same moving hull changes a 37.03 mm dent
   to rupture at 41.80 mm and 605.07 J. The independently measured panel

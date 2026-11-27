@@ -967,6 +967,10 @@
       "types": "./dist/gltf/splats.d.ts",
       "import": "./dist/gltf/splats.js"
     },
+    "./gltf/strokes": {
+      "types": "./dist/gltf/strokes.d.ts",
+      "import": "./dist/gltf/strokes.js"
+    },
     "./gltf/lights": {
       "types": "./dist/gltf/lights.d.ts",
       "import": "./dist/gltf/lights.js"
