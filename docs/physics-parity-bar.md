@@ -131,7 +131,7 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
 - **Convex breaker (three.js `physics_ammo_break`):** a convex object breaks on impact above a threshold into convex
   pieces around the impact point; the pieces become rigid bodies with the right mass; works with any convex glTF mesh.
 - Pre-fractured pieces as an option.
-- **Today:** a stand-in (PA-40, 41, 44, 50; X-40 to X-43 MISSING). This is the biggest gap in the 14.
+- **Today:** `@margoengine/physics/breakable` (landed b63a217ba): convex breaker, pre-fractured or at the hit, pieces as rigid bodies of the exact mass, any convex glTF mesh, quick start, three.js migration note, example page (`examples/physics-breakable.html`) and debug view (`debugRender`). X-40 and X-43 DONE, X-41 and X-42 PARTIAL (concave meshes break as their hull; rigid bonds hold an impulse, not a strain). PA-40, 41 and 44 (voxel collapse and block damage, BREAK-02) and PA-50 (vfx ejecta into rigid bodies) are open in their own packages. Speed against the rival's demo waits for the quiet speed phase.
 
 ### P10. SEA-02 Ocean surface
 
@@ -213,7 +213,7 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 
 | ID | Solver | Rivals | Must have | Status today | Verdict |
 |---|---|---|---|---|---|
-| BREAK-01 | Fracture and destruction | T ammo convex break | P9 | OPEN (stand-in) | PERFECT, GAP |
+| BREAK-01 | Fracture and destruction | T ammo convex break | P9 | LANDED (physics/breakable, b63a217ba) | PERFECT |
 | BREAK-02 | Structural collapse | none | Base | CLAIMED (Fauld film) | MEETS |
 | BREAK-03 | Ductile crushing | none | Base | REOPENED | MEETS |
 | BREAK-04 | Exterior ballistics | none (projectiles are rigid bodies with CCD under P1) | Base | OPEN | DON'T BUILD |
@@ -363,5 +363,5 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 - **Required:** the 14 in Part 2, the four GAP rows in Part 3 (LIFE-05, ATMO-06, SPACE-01's example, ATMO-04's
   example), and the baseline on every landed row, item 8 first so `main` stops going red.
 - **Not required:** every other REOPENED upgrade list in `docs/physics-solver-audit.md`; DON'T BUILD rows stay unbuilt.
-- **Largest gaps in the 14:** BREAK-01 (convex breaker), SEA-04 (interactive ripples), DYN-07 (character and ragdoll),
+- **Largest gaps in the 14:** SEA-04 (interactive ripples), DYN-07 (character and ragdoll),
   SEA-02 (`setWind`, sync query), and DYN-01's 14 open Rapier rows.

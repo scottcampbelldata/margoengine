@@ -7852,6 +7852,25 @@ pieces live when it was taken, so take it after the last break. The fracture hel
 `voronoiFractureGeometry`, `voronoiFracturePolyhedron` and `computePolyhedronMassProperties` give the cells and their
 mass properties without a world.
 
+Coming from three.js `physics_ammo_break`. That example does the breaking by hand around Ammo.js: it calls
+`ConvexObjectBreaker.prepareBreakableObject(mesh, mass, velocity, angularVelocity, true)` on each object, walks Ammo's
+dispatcher manifolds every frame, compares each contact point's `getAppliedImpulse()` with a fracture impulse, calls
+`subdivideByImpact(mesh, point, normal, ...)` for the broken one, and then, for every piece it returns, builds a
+`btConvexHullShape` from the piece's vertices, a `btRigidBody` with the piece's `userData.mass` and velocities, adds both
+to the scene and the world, and removes the original. In Margo the same scene is the quick start above: `add()` once per
+object, and the contact watch, the threshold (`bondStrength`, N s like the applied impulse), the convex hulls, the masses
+(from the pieces' own volume and `density`) and the velocities are built in. What maps across:
+
+| three.js + Ammo (`physics_ammo_break`) | Margo |
+| --- | --- |
+| `prepareBreakableObject(mesh, mass, v, w, true)` | `breakable.add(mesh, { density })`; then `body.body.setLinearVelocity(v)` |
+| fracture impulse checked against `getAppliedImpulse()` per contact | `bondStrength` per bond, from every contact automatically (`minImpactImpulse` filters taps) |
+| `subdivideByImpact(mesh, point, normal, ...)` | `fractureMode: 'impact'` (cells cluster around the hit), or `'prefractured'` |
+| `btConvexHullShape` and `btRigidBody` per piece, by hand | made for you: `event.fragments[i].body` and `.mesh` in `onBreak` |
+| `userData.mass` from the piece's volume | `fragment.mass`, exact polyhedral mass, inertia and centre of mass |
+| pieces never break again unless marked breakable | `secondaryFracture: true` (default); `anchors` keep a base standing |
+| removing debris yourself | `maxDebris`, `debrisLifetime` and debris sleep |
+
 What it does not do (`docs/limits.md`): a concave mesh breaks as its convex hull (split it with `convexDecomposition`
 first); damage is an impulse budget per bond, not a stress or energy model; cut faces are flat. See
 [`examples/physics-breakable.html`](../../examples/physics-breakable.html) for a stone pillar, a brick wall and a framed
