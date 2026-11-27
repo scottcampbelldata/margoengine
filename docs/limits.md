@@ -1698,6 +1698,33 @@ layer could answer null right after the first frame, while the layer's CPU culli
 which now drives Chrome through its own DevTools socket and runs the layer's probes alone (in
 [known-bugs.md](known-bugs.md)).
 
+### Rerun 2026-11-27 (Windows 11, packages built at b958f1a9b6)
+
+The same script on the workstation (Ryzen 9 9950X with its integrated AMD Radeon graphics, and an RTX A6000). Results
+only: no timings.
+
+| Browser | GPU (as the browser reports it) | Rows | Bugs |
+| --- | --- | --- | --- |
+| Firefox 157.0 (Playwright's build) | NVIDIA RTX A6000 | 95: native 48 pass; layer 44 pass, 1 refusal, 2 differences | 0 |
+| Edge 158.0.4370.33, `MARGO_GPU=amd` | AMD Radeon integrated (`amd`, `rdna-2`; ANGLE Direct3D 11) | 95: native 48 pass; layer 43 pass, 4 differences | 0 |
+| WebKit 27.2, Playwright's Windows build (not Safari; no WebGPU, no `OffscreenCanvas`) | not reported | 81: native 8 refusals, 33 unmeasured; layer 37 pass | 3 reported, below |
+
+- Firefox: `msaaAspects` refuses (`compatibility-layer`, no `WEBGL_stencil_texturing`); `bitmapCopies` differs in the
+  same 1,521 values as on 2026-11-15 (the layer keeps both copy rules, Firefox's native copy breaks one); GTAO creases
+  differ by at most 0.046 (mean gap 0.00084), against 0.0225 and 0.00056 on 2026-11-15. The cause of that growth was
+  not traced; the row has no bar beyond 1/255 for a pass.
+- AMD integrated: `implicitFootprint` and `mipFiltering` differ by the driver's compressed mip blend (accepted
+  2026-11-10; `features-browser.mjs` holds the layer to native's LOD there), `derivativeBranch` by native's own error
+  (KB-AMD-HELPERDERIV1), GTAO creases by at most 0.047 (mean gap 0.00083). Every step of the package's `test:gpu`
+  (32 steps, WebGPU against the layer on the same GPU) passes on this GPU, at d88c50b716.
+- WebKit, Windows build: `external` needs `VideoFrame` and the materials video case needs `captureStream`, which this
+  build lacks. `bitmapCopies` is a wrong result on the layer there: uploading a 2D canvas with
+  `UNPACK_PREMULTIPLY_ALPHA_WEBGL` returns straight colour in this build (read back with raw WebGL2), and the layer
+  tells a straight bitmap from a premultiplied one by that upload, so a straight bitmap copied into a premultiplied
+  destination keeps its colour. Safari 27.2 on macOS kept both copy rules on 2026-11-15.
+- Still not measured: real phones, Safari's feature rows after `canvasRead` with an unlocked screen, the iOS
+  Simulator, a headset, and the integrated-GPU frame budget (timing, deferred by the build phase).
+
 ## Platform
 
 | Limit | Starts at | Why | What you see | Escape hatch |

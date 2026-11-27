@@ -107,7 +107,8 @@ async function main() {
   window.ready = true;
 }
 main().catch((e) => {
-  errors.push(String(e?.stack ?? e));
+  // The name and message first: a WebKit stack holds neither, and the matrix reads a refusal off the first line.
+  errors.push(`${e}\n${e?.stack ?? ''}`);
   window.check = { info: () => ({ errors }) };
   window.ready = true;
 });

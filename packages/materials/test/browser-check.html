@@ -7,11 +7,14 @@ const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls
 const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const solid=(r,g,b,a=255)=>new Texture({data:new Uint8Array([r,g,b,a,r,g,b,a,r,g,b,a,r,g,b,a]),width:2,height:2});
-const canvas=new OffscreenCanvas(8,8),ctx=canvas.getContext('2d');ctx.fillStyle='#00ff00';ctx.fillRect(0,0,8,8);
+// An OffscreenCanvas, or a detached <canvas> in a browser without one (old WebKit).
+const canvasOf=(width,height)=>typeof OffscreenCanvas==='function'?new OffscreenCanvas(width,height):Object.assign(document.createElement('canvas'),{width,height});
+const pngBlob=c=>c.convertToBlob?c.convertToBlob({type:'image/png'}):new Promise(resolve=>c.toBlob(resolve,'image/png'));
+const canvas=canvasOf(8,8),ctx=canvas.getContext('2d');ctx.fillStyle='#00ff00';ctx.fillRect(0,0,8,8);
 const canvasTexture=new Texture(canvas,{minFilter:'nearest',magFilter:'nearest'});
 // Top half of the texture red, bottom half blue: with flipY the top of the image lands at UV v=1 (top of a plane).
-const flip=new OffscreenCanvas(4,4),fc=flip.getContext('2d');fc.fillStyle='#ff0000';fc.fillRect(0,0,4,2);fc.fillStyle='#0000ff';fc.fillRect(0,2,4,2);
-const png=new OffscreenCanvas(4,4),pc=png.getContext('2d');pc.fillStyle='#ff8000';pc.fillRect(0,0,4,4);const pngURL=URL.createObjectURL(await png.convertToBlob({type:'image/png'}));
+const flip=canvasOf(4,4),fc=flip.getContext('2d');fc.fillStyle='#ff0000';fc.fillRect(0,0,4,2);fc.fillStyle='#0000ff';fc.fillRect(0,2,4,2);
+const png=canvasOf(4,4),pc=png.getContext('2d');pc.fillStyle='#ff8000';pc.fillRect(0,0,4,4);const pngURL=URL.createObjectURL(await pngBlob(png));
 const scenarios={
   loaded:async()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:await loadTexture(pngURL)})),
   basic:()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:solid(0,0,255)})),
@@ -52,7 +55,7 @@ scenarios.sampler=()=>{
 };
 // Texture.update(region): the whole canvas turns red but only its top half uploads; with flipY it lands at the plane's top.
 scenarios.canvasRegion=()=>{
-  const c=new OffscreenCanvas(8,8),g=c.getContext('2d');g.fillStyle='#00ff00';g.fillRect(0,0,8,8);
+  const c=canvasOf(8,8),g=c.getContext('2d');g.fillStyle='#00ff00';g.fillRect(0,0,8,8);
   const t=new Texture(c,{magFilter:'nearest',minFilter:'nearest',mipmaps:false}),m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:t}));
   return {destroy(){m.destroy();t.dispose();},step(){g.fillStyle='#ff0000';g.fillRect(0,0,8,8);t.update({x:0,y:0,width:8,height:4});}};
 };

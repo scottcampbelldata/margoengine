@@ -91,11 +91,17 @@ function clearView(device, view, clearValue) {
   device.queue.submit([e.finish()]);
 }
 
+/** A drawing canvas: an OffscreenCanvas, or a detached <canvas> in a browser without one (old WebKit). */
+function canvasOf(width, height) {
+  if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(width, height);
+  return Object.assign(document.createElement('canvas'), { width, height });
+}
+
 /** A layer device whose WebGL2 hides OES_draw_buffers_indexed (as ANGLE's OpenGL back end on some GPUs). */
 async function unindexed() {
   const gpu = createCompatGPU({
     createContext: (attributes) => {
-      const gl = new OffscreenCanvas(1, 1).getContext('webgl2', attributes);
+      const gl = canvasOf(1, 1).getContext('webgl2', attributes);
       const get = gl.getExtension.bind(gl);
       gl.getExtension = (name) => (name === 'OES_draw_buffers_indexed' ? null : get(name));
       return gl;
@@ -1145,7 +1151,7 @@ const D = array<vec3f, 8>(vec3f(1,0,0), vec3f(-1,0,0), vec3f(0,1,0), vec3f(0,-1,
 
   /** An external texture from a VideoFrame: sampled clamped to the edge and loaded. */
   async external(device) {
-    const c = new OffscreenCanvas(4, 2),
+    const c = canvasOf(4, 2),
       g = c.getContext('2d');
     for (let i = 0; i < 8; i++) {
       g.fillStyle = `rgb(${i * 30}, ${255 - i * 30}, ${(i * 70) % 256})`;
@@ -1217,7 +1223,7 @@ const D = array<vec3f, 8>(vec3f(1,0,0), vec3f(-1,0,0), vec3f(0,1,0), vec3f(0,-1,
     }
     // An opaque canvas source takes the layer's unpack-flag path: the same crop and flip (WebGPU's origin counts from
     // the top-left of the unflipped source).
-    const canvas = new OffscreenCanvas(W, H);
+    const canvas = canvasOf(W, H);
     canvas.getContext('2d').putImageData(new ImageData(data.map((v, i) => (i % 4 === 3 ? 255 : v)), W, H), 0, 0);
     for (const crop of [false, true]) out[`canvas/${crop ? 'crop' : 'whole'}/flip`] = await copy(canvas, { crop, flipY: true });
     return out;
@@ -1347,7 +1353,7 @@ struct V { @builtin(position) p: vec4f, @location(0) @interpolate(flat) i: u32 }
     const code = '@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f { return select(textureLoad(b, vec2i(0), 0), textureLoad(a, vec2i(0), 0), p.x < 1.0); }';
     const entries = [{ binding: 0, resource: a.createView() }, { binding: 1, resource: b.createView() }];
     const first = await shade(device, { w: 2, prelude, code, entries });
-    const green = new OffscreenCanvas(2, 2),
+    const green = canvasOf(2, 2),
       gg = green.getContext('2d');
     gg.fillStyle = '#00ff00';
     gg.fillRect(0, 0, 2, 2);
