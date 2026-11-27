@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20959881,
+  "total": 20961532,
   "history": [
     {
       "date": "2026-10-24",
@@ -14647,6 +14647,12 @@
       "commit": "rod-split",
       "reason": "@margoengine/physics/rod measured 11,878 B gzip over its 9,197 B ceiling: WrappedRope, WrappedRopeSolver and MooringLine had joined Rod in it. Split by what a user imports, not raised: rod keeps Rod (4,499 B, ceiling 4,755), the new @margoengine/physics/wrapped-rope holds the capstan ropes (4,906 B, ceiling 5,162) and @margoengine/physics/mooring the lumped-mass mooring line (3,488 B, ceiling 3,744). A rod no longer carries a mooring line's code, and each feature pays only for itself; the three share no code but the errors and math every physics entry imports.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "water/liquid 35538 to 37189 B ceiling (built 34502 to 36105 B gzip): GPULiquid surfaceTension (the continuum surface force in its conservative form on the grid, Brackbill et al. 1992 and Lafaurie et al. 1994, one more compute pass a substep and its CPU twin) and adhesion to walls and colliders (Akinci et al. 2013), FLUID-02/03, parity bar P13. They are terms of the same grid update, so a split entry would only move the same passes. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16300,7 +16306,7 @@
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
-    "@margoengine/water/liquid": 35538,
+    "@margoengine/water/liquid": 37189,
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,

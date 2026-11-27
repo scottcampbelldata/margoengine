@@ -251,10 +251,12 @@ build", 069f20095) and used by `docs/physics-solver-audit.md`:
   and a debug view (particles by speed or density, the grid, the container, colliders); on the WebGL2 layer its CPU twin
   steps it (`packages/water/test/gpu-liquid-check.mjs` passes on both). Since 2026-11-27 also capsule, plane and
   triangle-mesh colliders (`bakeLiquidMesh`, a distance field) and `link(body, collider)`, one call that couples a
-  `PhysicsBody` both ways (a linked 500 kg/m³ box floats at its Archimedes draft within the check's bound). The CPU solvers `physics/pbf`, `physics/dfsph`
+  `PhysicsBody` both ways (a linked 500 kg/m³ box floats at its Archimedes draft within the check's bound), and
+  `surfaceTension` (continuum surface force on the grid; a drop holds the Laplace pressure 2 sigma / R within the grid's
+  bound) with `adhesion` to walls and colliders (a film hangs from the ceiling exactly when adhesion beats gravity). The CPU solvers `physics/pbf`, `physics/dfsph`
   and `physics/flip` stay the accurate route. Not DONE; open against the wider rival set (three.js and its ecosystem,
   Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): emitters and drains that add and remove
-  particles at run time; surface tension and wall adhesion; more than one liquid (per-particle colour or kind, mixing);
+  particles at run time; more than one liquid (per-particle colour or kind, mixing);
   and speed against the rivals' demos, measured in the speed phase.
 
 ### P14. LIFE-04 Flocking

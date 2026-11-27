@@ -9,8 +9,8 @@
 // four storage buffers (WebGPU's default limit is eight). The build strips the comments inside the WGSL strings
 // (docs/conventions.md, "Shader comments").
 
-/** Floats of the simulation uniform: twelve vec4 of parameters, then six vec4 per collider. */
-export const LIQUID_SIM_FLOATS = (12 + 6 * 8) * 4;
+/** Floats of the simulation uniform: thirteen vec4 of parameters, then six vec4 per collider. */
+export const LIQUID_SIM_FLOATS = (13 + 6 * 8) * 4;
 /** Floats of the debug view uniform. */
 export const LIQUID_DEBUG_FLOATS = 28;
 
@@ -64,6 +64,8 @@ struct Sim {
   pointer: vec4f,
   // pointer velocity, strength
   pointerVel: vec4f,
+  // surface tension factor dt sigma / rho0, adhesion in m/s^2, adhesion reach, unused
+  surface: vec4f,
   colliders: array<Collider, 8>,
 }
 @group(0) @binding(0) var<uniform> sim: Sim;
@@ -110,6 +112,23 @@ fn pick(s: Stencil, k: u32) -> vec3f {
 fn index3(n: vec3u) -> u32 {
   return n.x + sim.dims.x * (n.y + sim.dims.y * n.z);
 }
+// The node on one axis that mirrors node i across a wall within two cells of it, or NONE. A node on a wall is its own
+// mirror, so it counts twice.
+fn mirror(axis: u32, i: u32) -> u32 {
+  let lo = i32(PAD);
+  let hi = i32(PAD + sim.cells[axis]);
+  let k = i32(i);
+  var m = -1;
+  if (k >= lo - 2 && k <= lo + 2) { m = 2 * lo - k; } else if (k >= hi - 2 && k <= hi + 2) { m = 2 * hi - k; }
+  if (m < 0 || m >= i32(sim.dims[axis])) { return NONE; }
+  return u32(m);
+}
+// Node i one step along axis a up (or down), held inside the grid.
+fn step3(i: vec3u, a: u32, up: bool) -> vec3u {
+  var o = i;
+  if (up) { o[a] = min(i[a] + 1u, sim.dims[a] - 1u); } else { o[a] = select(0u, i[a] - 1u, i[a] > 0u); }
+  return o;
+}
 // Node index of the stencil node at offset o.
 fn nodeOf(s: Stencil, o: vec3u) -> u32 {
   return index3(s.base + o);
@@ -117,6 +136,17 @@ fn nodeOf(s: Stencil, o: vec3u) -> u32 {
 // x_i - x_p of the stencil node at offset o, in world units.
 fn offsetOf(s: Stencil, o: vec3u) -> vec3f {
   return (vec3f(o) - s.f) * sim.cell.xyz;
+}
+`;
+
+/** The share of a rest-liquid node's mass on the far side of a flat face t cells away (the B-spline integral up to t). */
+const SPLINE_COVER = /* wgsl */ `
+fn splineCover(t: f32) -> f32 {
+  if (t <= -1.5) { return 0.0; }
+  if (t >= 1.5) { return 1.0; }
+  if (t < -0.5) { return pow(t + 1.5, 3.0) / 6.0; }
+  if (t <= 0.5) { return 1.0 / 6.0 + 0.75 * (t + 0.5) - (t * t * t + 0.125) / 3.0; }
+  return 1.0 - pow(1.5 - t, 3.0) / 6.0;
 }
 `;
 
@@ -210,6 +240,13 @@ fn distanceTo(k: u32, x: vec3f) -> f32 {
   if (u32(c.center.w + 0.5) == 4u) { return meshSample(c, rotateQ(vec4f(-c.rot.xyz, c.rot.w), x - c.center.xyz)); }
   return collide(k, x).w;
 }
+// The adhesion profile: 1 within half the reach of a surface, a cubic Hermite step down to 0 at the reach.
+fn adhesionKernel(d: f32, reach: f32) -> f32 {
+  if (d >= reach) { return 0.0; }
+  if (d <= 0.5 * reach) { return 1.0; }
+  let t = (d - 0.5 * reach) / (0.5 * reach);
+  return (1.0 - t) * (1.0 - t) * (1.0 + 2.0 * t);
+}
 // The velocity of collider k's surface at x.
 fn bodyVelocity(k: u32, x: vec3f) -> vec3f {
   let c = sim.colliders[k];
@@ -261,17 +298,6 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 export const LIQUID_STRESS_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}
 @group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read_write> grid: array<atomic<i32>>;
-// The node on one axis that mirrors node i across a wall within two cells of it, or NONE. A node on a wall is its own
-// mirror, so it counts twice.
-fn mirror(axis: u32, i: u32) -> u32 {
-  let lo = i32(PAD);
-  let hi = i32(PAD + sim.cells[axis]);
-  let k = i32(i);
-  var m = -1;
-  if (k >= lo - 2 && k <= lo + 2) { m = 2 * lo - k; } else if (k >= hi - 2 && k <= hi + 2) { m = 2 * hi - k; }
-  if (m < 0 || m >= i32(sim.dims[axis])) { return NONE; }
-  return u32(m);
-}
 // The grid's mass at node n plus its mirrors across the walls, in particles.
 fn wallMass(n: vec3u) -> f32 {
   let m = vec3u(mirror(0u, n.x), mirror(1u, n.y), mirror(2u, n.z));
@@ -289,14 +315,7 @@ fn wallMass(n: vec3u) -> f32 {
   }
   return f32(sum) / FIXED;
 }
-// The share of a rest-liquid node's mass on the far side of a flat face t cells away (the B-spline integral up to t).
-fn splineCover(t: f32) -> f32 {
-  if (t <= -1.5) { return 0.0; }
-  if (t >= 1.5) { return 1.0; }
-  if (t < -0.5) { return pow(t + 1.5, 3.0) / 6.0; }
-  if (t <= 0.5) { return 1.0 / 6.0 + 0.75 * (t + 0.5) - (t * t * t + 0.125) / 3.0; }
-  return 1.0 - pow(1.5 - t, 3.0) / 6.0;
-}
+${SPLINE_COVER}
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= sim.counts.x) { return; }
@@ -353,6 +372,49 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 }
 `;
 
+/**
+ * The gradient of c for the surface tension (run only when it is on): per node the gradient of c, its density over rest
+ * density with the walls mirrored and the colliders read as liquid at rest, by central differences, and its length.
+ */
+export const LIQUID_NORMALS_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}
+@group(0) @binding(1) var<storage, read> grid: array<vec4i>;
+@group(0) @binding(2) var<storage, read_write> surf: array<vec4f>;
+// c at node n: its mass with the wall mirrors, plus the colliders' cover, over the rest density.
+fn color(n: vec3u) -> f32 {
+  let m = vec3u(mirror(0u, n.x), mirror(1u, n.y), mirror(2u, n.z));
+  var sum = 0;
+  for (var z = 0u; z < 2u; z++) {
+    if (z == 1u && m.z == NONE) { continue; }
+    for (var y = 0u; y < 2u; y++) {
+      if (y == 1u && m.y == NONE) { continue; }
+      for (var x = 0u; x < 2u; x++) {
+        if (x == 1u && m.x == NONE) { continue; }
+        let at = vec3u(select(n.x, m.x, x == 1u), select(n.y, m.y, y == 1u), select(n.z, m.z, z == 1u));
+        sum += grid[index3(at)].x;
+      }
+    }
+  }
+  var ghost = 0.0;
+  let p = sim.origin.xyz + vec3f(n) * sim.cell.xyz;
+  for (var k = 0u; k < sim.counts.z; k++) { ghost += splineCover(-distanceTo(k, p) / sim.boxMax.w); }
+  return f32(sum) / FIXED / sim.invCell.w + ghost;
+}
+${SPLINE_COVER}
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let node = id.x;
+  if (node >= sim.counts.y) { return; }
+  let i = vec3u(node % sim.dims.x, (node / sim.dims.x) % sim.dims.y, node / sim.dims.w);
+  var g = vec3f(0.0);
+  for (var a = 0u; a < 3u; a++) {
+    let u = step3(i, a, true);
+    let d = step3(i, a, false);
+    g[a] = (color(u) - color(d)) / (f32(u[a] - d[a]) * sim.cell[a]);
+  }
+  surf[node] = vec4f(g, length(g));
+}
+`;
+
 /** Adds one impulse on collider k and its moment about the centre to the fixed-point sums. */
 const ADD_IMPULSE = /* wgsl */ `
 fn addImpulse(k: u32, r: vec3f, j: vec3f) {
@@ -371,6 +433,8 @@ fn addImpulse(k: u32, r: vec3f, j: vec3f) {
 export const LIQUID_GRID_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}
 @group(0) @binding(1) var<storage, read_write> grid: array<vec4i>;
 @group(0) @binding(2) var<storage, read_write> forces: array<atomic<i32>>;
+// The normals pass's grad c and |grad c| per node.
+@group(0) @binding(4) var<storage, read> surf: array<vec4f>;
 ${ADD_IMPULSE}
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -386,6 +450,25 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   var v = vec3f(raw.yzw) / FIXED / m + sim.gravity.xyz * dt;
   let i = vec3u(node % sim.dims.x, (node / sim.dims.x) % sim.dims.y, node / sim.dims.w);
   let x = sim.origin.xyz + vec3f(i) * sim.cell.xyz;
+  // Surface tension, the continuum surface force in its conservative form (Lafaurie et al. 1994): f = div T with
+  // T = sigma (|grad c| I - grad c grad c^T / |grad c|) by central differences of the neighbours' T (Brackbill et al.
+  // 1992's sigma kappa grad c without a unit normal), as the acceleration f / rho at the node, with rho at least a
+  // quarter of rest density so the near-empty edge nodes are not flung.
+  if (sim.surface.x > 0.0) {
+    var f = vec3f(0.0);
+    for (var j = 0u; j < 3u; j++) {
+      let u = step3(i, j, true);
+      let d = step3(i, j, false);
+      let span = f32(u[j] - d[j]) * sim.cell[j];
+      let su = surf[index3(u)];
+      let sd = surf[index3(d)];
+      var e = vec3f(0.0);
+      e[j] = 1.0;
+      if (su.w > 0.0) { f += (su.w * e - su.xyz * (su[j] / su.w)) / span; }
+      if (sd.w > 0.0) { f -= (sd.w * e - sd.xyz * (sd[j] / sd.w)) / span; }
+    }
+    v += sim.surface.x * f / max(m / sim.invCell.w, 0.25);
+  }
   // The pointer: nodes within its radius take on its velocity at a rate falling to zero at the edge.
   if (sim.counts.w != 0u) {
     let e = x - sim.pointer.xyz;
@@ -393,6 +476,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     if (q < 1.0) {
       let k = 1.0 - exp(-sim.pointerVel.w * (1.0 - q) * (1.0 - q) * dt);
       v += (sim.pointerVel.xyz - v) * k;
+    }
+  }
+  // Adhesion: liquid one to two cells from a wall is pulled towards it.
+  let adh = sim.surface.y;
+  let reach = sim.surface.z;
+  if (adh > 0.0) {
+    for (var a = 0u; a < 3u; a++) {
+      v[a] -= adh * dt * (adhesionKernel(x[a] - sim.boxMin[a], reach) - adhesionKernel(sim.boxMax[a] - x[a], reach));
     }
   }
   // No node moves more than one cell in a substep.
@@ -403,6 +494,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   // Coulomb friction; the body takes the opposite of that change of momentum.
   for (var k = 0u; k < sim.counts.z; k++) {
     let hit = collide(k, x);
+    if (adh > 0.0 && hit.w > 0.0) {
+      // Adhesion to the collider: the liquid is pulled in along -n, and the body takes the opposite pull.
+      let pull = adh * dt * adhesionKernel(hit.w, reach);
+      if (pull > 0.0) {
+        v -= pull * hit.xyz;
+        addImpulse(k, x - sim.colliders[k].center.xyz, m * pull * hit.xyz);
+      }
+    }
     if (hit.w >= 0.0) { continue; }
     let vb = bodyVelocity(k, x);
     var t = v - vb;

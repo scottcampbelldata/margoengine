@@ -984,6 +984,12 @@ debug view through `setPointer`, `setColliders` and `setDebug`):
   least four cells.
 - `gravity` [0, -9.81, 0] m/s², `density` 1000 kg/m³ (it sets the particle mass and so `forces`), `viscosity`
   0.0005 m²/s (kinematic; up to cell² / (8 * substep)).
+- `surfaceTension` 0 N/m (water is 0.072; up to density * cell³ / (2 pi substep²)): pulls the free surface tight, so
+  drops round up, jets bead and a drop of radius R holds 2 sigma / R more pressure inside. At a tank's grid scale water's
+  own value is below what a cell resolves; raise it (10 N/m rounds a 0.2 m cube into a ball in under a second). It adds
+  one compute pass a substep. `adhesion` 0 m/s²: the pull of the walls and colliders on liquid within one cell of them
+  (fading to nothing at two); above gravity a film hangs from the ceiling and the liquid wets the walls, and a collider
+  takes the opposite pull.
 - `speedOfSound` default 2 * sqrt(|g| * box height) m/s: higher is stiffer (less compression) and takes more substeps,
   each 0.4 * cell / speedOfSound long. `maxSubsteps` 32 a frame; a frame that needs more runs in slow motion
   (`stats.realTime` false). A frame advances at most 1/30 s.

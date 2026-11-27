@@ -50,6 +50,8 @@ export interface GPULiquidOptions {
     density?: number;
     speedOfSound?: number;
     viscosity?: number;
+    surfaceTension?: number;
+    adhesion?: number;
     maxSubsteps?: number;
     seed?: number;
     paused?: boolean;
@@ -280,6 +282,8 @@ export interface ResolvedLiquidParams {
     particleMass: number;
     speedOfSound: number;
     viscosity: number;
+    surfaceTension: number;
+    adhesion: number;
     maxSubstep: number;
     maxSubsteps: number;
     seed: number;
@@ -330,6 +334,8 @@ export function liquidSubsteps(p: ResolvedLiquidParams, dt: number, cap?: number
     n: number;
     h: number;
 };
+
+export function liquidSurfaceNormals(p: ResolvedLiquidParams, grid: Float64Array): Float64Array;
 
 export function resolveLiquidParams(options?: GPULiquidOptions, fixedCount?: number): ResolvedLiquidParams;
 

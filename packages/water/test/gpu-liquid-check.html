@@ -160,6 +160,41 @@ window.check = async () => {
   const linked = liquid.forces.length;
   link.unlink();
 
+  // Surface tension and adhesion: one frame of a cube of liquid against the ceiling, GPU against the twin; then without
+  // gravity the cube pulls into a drop with the Laplace pressure 2 sigma / R inside.
+  const dropCount = compat ? 4096 : 32768;
+  const dropBox = { min: [-0.2, -0.2, -0.2], max: [0.2, 0.2, 0.2] };
+  const wet = { count: dropCount, box: dropBox, fill: { min: [-0.1, 0, -0.1], max: [0.1, 0.2, 0.1] }, resolution: compat ? 16 : 32, surfaceTension: 10, adhesion: 15, speedOfSound: 2, surface: false };
+  const wetLiquid = GPULiquid.attach(engine, wet);
+  wetLiquid.step(1 / 60);
+  const wetGpu = (await wetLiquid.snapshot()).particles;
+  const wetParams = resolveLiquidParams(wetLiquid.options, dropCount);
+  const wetTwin = createLiquidState(wetParams);
+  stepLiquidCPU(wetTwin, wetParams, 1 / 60);
+  let wetGap = 0;
+  for (let i = 0; i < dropCount * F; i++) if (i % F < 3) wetGap = Math.max(wetGap, Math.abs(wetGpu[i] - wetTwin.particles[i]));
+  wetLiquid.dispose();
+  const dropLiquid = GPULiquid.attach(engine, { ...wet, fill: { min: [-0.1, -0.1, -0.1], max: [0.1, 0.1, 0.1] }, adhesion: 0, gravity: [0, 0, 0], viscosity: 0.006 });
+  let dropPressure = 0, dropFrames = 0;
+  const dropR = 0.2 * Math.cbrt(3 / (4 * Math.PI));
+  for (let k = 0; k < 180; k++) {
+    dropLiquid.step(1 / 60);
+    if (k < 120) continue;
+    const d = (await dropLiquid.snapshot()).particles;
+    let sum = 0, n = 0;
+    for (let i = 0; i < dropCount; i++) {
+      if (Math.hypot(d[i * F], d[i * F + 1], d[i * F + 2]) > dropR / 2) continue;
+      const r = Math.min(d[i * F + 3], 3);
+      sum += r > 1 ? ((1000 * 4) / 7) * (r ** 7 - 1) : 0;
+      n++;
+    }
+    dropPressure += sum / n;
+    dropFrames++;
+  }
+  dropPressure /= dropFrames;
+  const dropCell = dropLiquid.stats.cellSize;
+  dropLiquid.dispose();
+
   const shot = new OffscreenCanvas(W, H);
   const ctx = shot.getContext('2d', { willReadFrequently: true });
   const grab = async (delta = 1 / 60) => {
@@ -225,6 +260,10 @@ window.check = async () => {
     bob: high - low,
     linked,
     spacing: liquid.spacing,
+    wetGap,
+    dropPressure,
+    dropR,
+    dropCell,
     outside,
     nonFinite,
     pointerVz,

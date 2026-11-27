@@ -11024,7 +11024,8 @@ free-water pairs outside the active density constraints, checked separately from
 
 ### GPU particle liquid (FLUID-02 and FLUID-03, parity bar P13)
 
-`GPULiquid` in `@margoengine/water/liquid` is the real-time liquid: MLS-MPM in five WebGPU compute passes a substep, at
+`GPULiquid` in `@margoengine/water/liquid` is the real-time liquid: MLS-MPM in five WebGPU compute passes a substep (six with surface tension, whose pass takes the gradient of the
+density on the grid for the continuum surface force the grid update applies), at
 most four storage buffers a stage (particles, grid, collider sums, mesh distance fields, plus the uniform), no
 readback in the step. Colliders are signed distances in the WGSL: sphere, box, capsule and plane in closed form, a
 mesh as a trilinear field (`bakeLiquidMesh`) with its normal by central differences; the collider sums are read and

@@ -15033,6 +15033,23 @@ compute shaders), and no companion code of any paper was opened.
   [Adaptively Sampled Distance Fields](https://doi.org/10.1145/344779.344899) (SIGGRAPH 2000): a sampled distance field
   read by trilinear interpolation, with its normal from the field's gradient, as a collider's level set; the capsule
   and plane distances are the closed forms (segment distance less the radius, and n . (x - p)).
+- J. U. Brackbill, D. B. Kothe and C. Zemach,
+  [A Continuum Method for Modeling Surface Tension](https://doi.org/10.1016/0021-9991(92)90240-Y) (J. Comput. Phys. 100,
+  1992): surface tension as the volume force sigma kappa grad c of a smoothed colour c (here the density over rest
+  density on the grid), the acceleration f / rho, and the explicit step limit dt < sqrt(rho h^3 / (2 pi sigma)) that
+  bounds `surfaceTension`. B. Lafaurie, C. Nardone, R. Scardovelli, S. Zaleski and G. Zanetti,
+  [Modelling Merging and Fragmentation in Multiphase Flows with SURFER](https://doi.org/10.1006/jcph.1994.1123) (J.
+  Comput. Phys. 113, 1994): the same force in conservative form, the divergence of the capillary tensor
+  sigma (|grad c| I - grad c grad c^T / |grad c|), which needs no unit normal where |grad c| is small. A first version
+  scattered that tensor as a particle stress (MLS-MPM's stress path); it gained energy at the surface, where particles
+  under rest density carry no pressure to resist the tension (the tensile instability of particle methods, J. W.
+  Swegle, D. L. Hicks and S. W. Attaway, [Smoothed Particle Hydrodynamics Stability
+  Analysis](https://doi.org/10.1006/jcph.1995.1010), J. Comput. Phys. 116, 1995), so the force is taken on the grid.
+- Nadir Akinci, Gizem Akinci and Matthias Teschner,
+  [Versatile Surface Tension and Adhesion for SPH Fluids](https://doi.org/10.1145/2508363.2508395) (ACM TOG 32(6),
+  2013): adhesion as a pull of the liquid towards the boundary with a kernel of the distance. Theirs is zero next to the
+  boundary so SPH particles are not drawn into the boundary's particles; here the boundary is a constraint on the grid,
+  so the pull is full within a cell and fades to zero at two (a cubic Hermite step).
 - Hu et al. 2018 (above), section 6: two-way rigid coupling by giving the body the opposite of the momentum the grid
   takes at its boundary. `link` does this between frames: the collider follows the body's pose and velocity, and the
   summed impulse and moment (about the collider's centre) go to the body through its own `applyImpulse` and

@@ -126,6 +126,78 @@ test("a floor collider's force balances the column's weight and momentum change,
   assert.ok(Math.abs(-force - weight) <= (Math.abs(momentum() - p0) * p.particleMass) / time + 0.01 * weight);
 });
 
+test('surface tension rounds a cube of liquid into a drop with the Laplace pressure 2 sigma / R inside', () => {
+  // Without gravity a 0.2 m cube of liquid (4,096 particles, 8 a cell of 0.025 m) with sigma = 10 N/m pulls into a ball
+  // of the same volume, R = 0.2 (3 / (4 pi))^(1/3) = 0.124 m. The surface force (on the grid, from the gradient of the
+  // density) smears the surface over about a cell, so the curvature it sees lies between that of balls a cell smaller and larger: the mean pressure inside (from the
+  // particles' density by the Tait equation, averaged over the second half second while the drop still rings) lies
+  // between 2 sigma / (R + h) and 2 sigma / (R - h). Without the surface force it is zero and the cube keeps its
+  // corners.
+  const sigma = 10;
+  const p = resolveLiquidParams({
+    count: 4096,
+    box: { min: [-0.2, -0.2, -0.2], max: [0.2, 0.2, 0.2] },
+    fill: { min: [-0.1, -0.1, -0.1], max: [0.1, 0.1, 0.1] },
+    gravity: [0, 0, 0],
+    speedOfSound: 2,
+    resolution: 16,
+    viscosity: 0.002,
+    surfaceTension: sigma,
+  });
+  const s = createLiquidState(p);
+  const R = 0.2 * Math.cbrt(3 / (4 * Math.PI));
+  const h = p.cellSize;
+  let pressure = 0,
+    frames = 0,
+    corner = 0;
+  for (let f = 0; f < 60; f++) {
+    stepLiquidCPU(s, p, 1 / 60);
+    if (f < 30) continue;
+    let sum = 0,
+      n = 0;
+    corner = 0;
+    for (let i = 0; i < p.count; i++) {
+      const b = i * F;
+      const d = Math.hypot(s.particles[b], s.particles[b + 1], s.particles[b + 2]);
+      corner = Math.max(corner, d);
+      if (d > R / 2) continue;
+      const r = Math.min(s.particles[b + 3], 3);
+      sum += r > 1 ? ((p.density * p.speedOfSound ** 2) / 7) * (r ** 7 - 1) : 0;
+      n++;
+    }
+    pressure += sum / n;
+    frames++;
+  }
+  pressure /= frames;
+  assert.ok(pressure >= (2 * sigma) / (R + h) && pressure <= (2 * sigma) / (R - h), `pressure ${pressure} Pa against 2 sigma / R = ${(2 * sigma) / R} Pa`);
+  // The cube's corners (0.173 m out) are pulled in to the ball's radius within a cell.
+  assert.ok(corner < R + h, `farthest particle ${corner} m against R ${R} m`);
+});
+
+test('adhesion above gravity holds a film on the ceiling, and below gravity lets it fall', () => {
+  // Liquid within one cell of a wall takes the full adhesion, so a film thinner than a cell hangs exactly when the
+  // adhesion beats gravity (the walls hold it from moving into them).
+  for (const [adhesion, held] of [
+    [0.5 * 9.81, false],
+    [1.5 * 9.81, true],
+  ]) {
+    const p = resolveLiquidParams({
+      count: 1600,
+      box: { min: [-0.2, 0, -0.2], max: [0.2, 0.2, 0.2] },
+      fill: { min: [-0.1, 0.19, -0.1], max: [0.1, 0.2, 0.1] },
+      resolution: 32,
+      adhesion,
+    });
+    const s = createLiquidState(p);
+    for (let f = 0; f < 30; f++) stepLiquidCPU(s, p, 1 / 60);
+    let top = 0;
+    for (let i = 0; i < p.count; i++) if (s.particles[i * F + 1] > 0.2 - 2 * p.cellSize) top++;
+    assert.equal(top, held ? p.count : 0, `adhesion ${adhesion}: ${top} of ${p.count} still on the ceiling`);
+  }
+  assert.throws(() => resolveLiquidParams({ adhesion: -1 }), { code: 'unsupported' });
+  assert.throws(() => resolveLiquidParams({ surfaceTension: 1e6 }), /surfaceTension/);
+});
+
 test('the same options give the same state, and a copied state repeats the same steps', () => {
   const options = { count: 600, seed: 9, colliders: [{ shape: 'sphere', position: [0, 0.2, 0], radius: 0.1 }] };
   const run = (frames) => {

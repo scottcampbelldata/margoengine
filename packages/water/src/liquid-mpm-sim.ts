@@ -137,6 +137,19 @@ export interface GPULiquidOptions {
   speedOfSound?: number;
   /** Kinematic viscosity in m²/s, 0 up to cellSize² / (8 * substep). Default 0.0005. */
   viscosity?: number;
+  /**
+   * Surface tension in N/m (water 0.072), from 0 up to the explicit limit density * cellSize³ / (2 pi substep²), by the
+   * continuum surface force on the grid in its conservative form. It pulls the free surface tight: drops round up, jets break into beads, the
+   * pressure inside a drop of radius R is 2 sigma / R. At a tank's grid scale water's own value is too small to see; raise
+   * it to see the scale the grid resolves. Adds one compute pass a substep. Default 0.
+   */
+  surfaceTension?: number;
+  /**
+   * Adhesion of the liquid to the container's walls and the colliders: the acceleration in m/s² that pulls liquid
+   * towards a surface, in full within one cell of it and fading to nothing at two, 0 to 1000. Above gravity a film
+   * clings to the ceiling and wets the walls; a collider takes the opposite pull. Default 0.
+   */
+  adhesion?: number;
   /** Most substeps one frame takes, integer 1..256; a frame that needs more runs in slow motion. Default 32. */
   maxSubsteps?: number;
   /** Seed of the start lattice's jitter, integer 0..2^32 - 1. Default 0. */
@@ -179,6 +192,8 @@ export interface ResolvedLiquidParams {
   particleMass: number;
   speedOfSound: number;
   viscosity: number;
+  surfaceTension: number;
+  adhesion: number;
   /** Longest substep in seconds: LIQUID_CFL * h / c. */
   maxSubstep: number;
   maxSubsteps: number;
@@ -331,6 +346,11 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   const maxSubstep = (LIQUID_CFL * h) / speedOfSound;
   const viscosity = num(options.viscosity, Math.min(5e-4, (h * h) / (8 * maxSubstep)), 'viscosity', 0, (h * h) / (8 * maxSubstep));
   const maxSubsteps = num(options.maxSubsteps, 32, 'maxSubsteps', 1, 256, true);
+  // Brackbill et al. (1992): an explicit capillary step needs dt < sqrt(rho h^3 / (2 pi sigma)).
+  const density0 = num(options.density, 1000, 'density', 1e-3, 1e6);
+  const tensionMax = (density0 * h * h * h) / (2 * Math.PI * maxSubstep * maxSubstep);
+  const surfaceTension = num(options.surfaceTension, 0, 'surfaceTension', 0, tensionMax);
+  const adhesion = num(options.adhesion, 0, 'adhesion', 0, 1000);
   const seed = num(options.seed, 0, 'seed', 0, 2 ** 32 - 1, true);
   if (options.paused !== undefined && typeof options.paused !== 'boolean')
     throw liquidError('GPULiquid paused must be true or false');
@@ -426,6 +446,8 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     particleMass: density * volume,
     speedOfSound,
     viscosity,
+    surfaceTension,
+    adhesion,
     maxSubstep,
     maxSubsteps,
     seed,
@@ -746,6 +768,106 @@ function stencil(p: ResolvedLiquidParams, x: number, a: number, w: Float64Array,
 
 /** A particle within this many cells of a collider reads the collider as liquid at rest in its density. */
 const GHOST_REACH = 3;
+/** c at node (ix, iy, iz): its mass with the wall mirrors, plus the colliders' cover, over the rest density. */
+function surfaceColor(p: ResolvedLiquidParams, grid: Float64Array, ix: number, iy: number, iz: number, scratch: number[][]): number {
+  const [mx, my, mz, x, normal] = scratch as [number[], number[], number[], [number, number, number], number[]];
+  const [nx, ny] = p.dims;
+  const kx = wallMirrors(p, 0, ix, mx),
+    ky = wallMirrors(p, 1, iy, my),
+    kz = wallMirrors(p, 2, iz, mz);
+  let m = 0;
+  for (let z = 0; z < kz; z++)
+    for (let y = 0; y < ky; y++) for (let k = 0; k < kx; k++) m += grid[(mx[k]! + nx * (my[y]! + ny * mz[z]!)) * 4]!;
+  let ghost = 0;
+  if (p.colliders.length) {
+    x[0] = p.origin[0] + ix * p.cell[0];
+    x[1] = p.origin[1] + iy * p.cell[1];
+    x[2] = p.origin[2] + iz * p.cell[2];
+    const hc = Math.cbrt(p.cell[0] * p.cell[1] * p.cell[2]);
+    for (const c of p.colliders) ghost += splineCover(-colliderDistance(c, x, normal) / hc);
+  }
+  return m / LIQUID_FIXED / p.restDensity + ghost;
+}
+
+/**
+ * The gradient of c at every node of the grid (before its update) and its length, by central differences of c, the
+ * density over rest density with the walls mirrored and the colliders read as liquid at rest (one-sided at the grid's
+ * edge), four floats a node; `grid` holds the fixed-point sums of the particle-to-grid passes.
+ */
+export function liquidSurfaceNormals(p: ResolvedLiquidParams, grid: Float64Array): Float64Array {
+  const [nx, ny, nz] = p.dims;
+  const scratch = [[0, 0], [0, 0], [0, 0], [0, 0, 0], [0, 0, 0]];
+  const color = new Float64Array(p.nodes);
+  for (let iz = 0, n = 0; iz < nz; iz++)
+    for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++, n++) color[n] = surfaceColor(p, grid, ix, iy, iz, scratch);
+  const out = new Float64Array(p.nodes * 4);
+  for (let iz = 0, n = 0; iz < nz; iz++)
+    for (let iy = 0; iy < ny; iy++)
+      for (let ix = 0; ix < nx; ix++, n++) {
+        const i = [ix, iy, iz];
+        const g = [0, 0, 0];
+        for (let a = 0; a < 3; a++) {
+          const up = [...i],
+            dn = [...i];
+          up[a] = Math.min(p.dims[a]! - 1, i[a]! + 1);
+          dn[a] = Math.max(0, i[a]! - 1);
+          const at = (v: number[]) => color[v[0]! + nx * (v[1]! + ny * v[2]!)]!;
+          g[a] = (at(up) - at(dn)) / ((up[a]! - dn[a]!) * p.cell[a]!);
+        }
+        out[n * 4] = Math.fround(g[0]!);
+        out[n * 4 + 1] = Math.fround(g[1]!);
+        out[n * 4 + 2] = Math.fround(g[2]!);
+        out[n * 4 + 3] = Math.fround(Math.hypot(g[0]!, g[1]!, g[2]!));
+      }
+  return out;
+}
+
+/**
+ * div T / sigma at node (ix, iy, iz) into `out`, by central differences (one-sided at the grid's edge) of column j of
+ * T / sigma = |g| I - g g^T / |g| at the neighbours along j.
+ */
+function surfaceForce(p: ResolvedLiquidParams, surf: Float64Array, ix: number, iy: number, iz: number, out: number[]): void {
+  const [nx, ny] = p.dims;
+  const i = [ix, iy, iz];
+  out[0] = out[1] = out[2] = 0;
+  for (let j = 0; j < 3; j++) {
+    const up = [...i],
+      dn = [...i];
+    up[j] = Math.min(p.dims[j]! - 1, i[j]! + 1);
+    dn[j] = Math.max(0, i[j]! - 1);
+    const span = (up[j]! - dn[j]!) * p.cell[j]!;
+    for (const [v, sign] of [
+      [up, 1],
+      [dn, -1],
+    ] as const) {
+      const o = (v[0]! + nx * (v[1]! + ny * v[2]!)) * 4;
+      const l = surf[o + 3]!;
+      if (!(l > 0)) continue;
+      const k = surf[o + j]! / l;
+      for (let r = 0; r < 3; r++) out[r] = out[r]! + (sign * ((r === j ? l : 0) - surf[o + r]! * k)) / span;
+    }
+  }
+}
+
+/** A node under this share of rest density takes the surface force as one at it. */
+export const LIQUID_TENSION_FLOOR = 0.25;
+
+/** Cells from a wall or collider that adhesion reaches. */
+export const LIQUID_ADHESION_REACH = 2;
+
+/**
+ * The adhesion profile: 1 within half the reach of a surface, falling smoothly (a cubic Hermite step) to 0 at the
+ * reach. Akinci et al. (2013) pull liquid towards a boundary the same way but leave the band next to it at zero, so
+ * SPH particles are not drawn into the boundary's particles; here the walls and colliders are hard constraints on the
+ * grid, and the nodes next to them, a whole cell apart, are the ones that must hold the liquid, so the profile is full
+ * there.
+ */
+export function adhesionKernel(d: number, reach: number): number {
+  if (d >= reach) return 0;
+  if (d <= reach / 2) return 1;
+  const t = (d - reach / 2) / (reach / 2);
+  return (1 - t) * (1 - t) * (1 + 2 * t);
+}
 
 /**
  * The share of a rest-liquid node's mass that lies on the far side of a flat face t cells from the node (t > 0 inside
@@ -891,7 +1013,13 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         }
   }
 
-  // Grid update: velocity, gravity, the pointer, the speed limit, the colliders, the walls.
+  // Surface tension: per node the gradient of c, the density over rest density with the walls mirrored and the
+  // colliders read as liquid at rest (as in the stress pass), by central differences.
+  const surf = p.surfaceTension ? liquidSurfaceNormals(p, grid) : undefined;
+  const ks = (dt * p.surfaceTension) / p.density;
+  const f3 = [0, 0, 0];
+
+  // Grid update: velocity, gravity, surface tension, the pointer, adhesion, the speed limit, the colliders, the walls.
   const vmax = p.cellSize / dt;
   const pointer = p.pointer;
   const lo = LIQUID_PAD;
@@ -910,6 +1038,18 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         x[0] = p.origin[0] + ix * cell[0];
         x[1] = p.origin[1] + iy * cell[1];
         x[2] = p.origin[2] + iz * cell[2];
+        if (surf) {
+          // The continuum surface force in its conservative form (Lafaurie et al. 1994): f = div T with the capillary
+          // tensor T = sigma (|grad c| I - grad c grad c^T / |grad c|), which equals sigma kappa grad c (Brackbill et al.
+          // 1992) but needs no unit normal where |grad c| is small. The acceleration is f / rho at the node, so the
+          // force's integral across the surface is the Laplace jump; a node under LIQUID_TENSION_FLOOR of rest density
+          // (the far edge of the particles' spread) is pushed as one at that density, so near-empty nodes are not flung.
+          surfaceForce(p, surf, ix, iy, iz, f3);
+          const cw = 1 / Math.max(m / p.restDensity, LIQUID_TENSION_FLOOR);
+          vx += ks * cw * f3[0]!;
+          vy += ks * cw * f3[1]!;
+          vz += ks * cw * f3[2]!;
+        }
         if (pointer) {
           const ex = x[0] - pointer.position[0],
             ey = x[1] - pointer.position[1],
@@ -922,6 +1062,16 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
             vz += (pointer.velocity[2] - vz) * k;
           }
         }
+        // Adhesion: liquid one to two cells from a wall is pulled towards it.
+        if (p.adhesion) {
+          const reach = LIQUID_ADHESION_REACH * p.cellSize;
+          for (let a = 0; a < 3; a++) {
+            const pull = p.adhesion * dt * (adhesionKernel(x[a]! - p.boxMin[a]!, reach) - adhesionKernel(p.boxMax[a]! - x[a]!, reach));
+            if (a === 0) vx -= pull;
+            else if (a === 1) vy -= pull;
+            else vz -= pull;
+          }
+        }
         const speed = Math.hypot(vx, vy, vz);
         if (speed > vmax) {
           vx *= vmax / speed;
@@ -930,7 +1080,31 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         }
         for (let k = 0; k < p.colliders.length; k++) {
           const c = p.colliders[k]!;
-          if (colliderDistance(c, x, normal) >= 0) continue;
+          const sd = colliderDistance(c, x, normal);
+          if (p.adhesion && sd > 0) {
+            // Adhesion to the collider: the liquid is pulled in along -n and the body takes the opposite pull.
+            const a = p.adhesion * dt * adhesionKernel(sd, LIQUID_ADHESION_REACH * p.cellSize);
+            if (a > 0) {
+              vx -= a * normal[0]!;
+              vy -= a * normal[1]!;
+              vz -= a * normal[2]!;
+              const rx = x[0] - c.position[0],
+                ry = x[1] - c.position[1],
+                rz = x[2] - c.position[2];
+              const jx = m * a * normal[0]!,
+                jy = m * a * normal[1]!,
+                jz = m * a * normal[2]!;
+              const o = k * 6,
+                FS = LIQUID_FORCE_FIXED;
+              impulses[o] += fixed(jx, FS);
+              impulses[o + 1] += fixed(jy, FS);
+              impulses[o + 2] += fixed(jz, FS);
+              impulses[o + 3] += fixed(ry * jz - rz * jy, FS);
+              impulses[o + 4] += fixed(rz * jx - rx * jz, FS);
+              impulses[o + 5] += fixed(rx * jy - ry * jx, FS);
+            }
+          }
+          if (sd >= 0) continue;
           const rx = x[0] - c.position[0],
             ry = x[1] - c.position[1],
             rz = x[2] - c.position[2];

@@ -18,12 +18,14 @@ import {
   LIQUID_DEBUG_PARTICLES_WGSL,
   LIQUID_G2P_WGSL,
   LIQUID_GRID_WGSL,
+  LIQUID_NORMALS_WGSL,
   LIQUID_P2G_WGSL,
   LIQUID_SIM_FLOATS,
   LIQUID_STRESS_WGSL,
 } from './liquid-mpm-shaders.js';
 import {
   createLiquidState,
+  LIQUID_ADHESION_REACH,
   LIQUID_FORCE_FIXED,
   LIQUID_GAMMA,
   LIQUID_PARTICLE_FLOATS,
@@ -51,6 +53,7 @@ export {
   createLiquidState,
   LIQUID_PARTICLE_FLOATS,
   liquidStateHash,
+  liquidSurfaceNormals,
   liquidSubsteps,
   MAX_GPU_LIQUID_NODES,
   MAX_GPU_LIQUID_PARTICLES,
@@ -181,6 +184,8 @@ export class GPULiquid implements EnginePlugin {
   private pulling?: Promise<LiquidForce[]>;
   private links: LinkEntry[] = [];
   private sdfBuf?: GPUBuffer;
+  /** Surface normals a node, made on the first step with surface tension (16 bytes until then). */
+  private surfBuf?: GPUBuffer;
   private sdfKey: readonly unknown[] = [];
   private sdfOffsets: number[] = [];
   private lastPointer?: LiquidVec3;
@@ -194,7 +199,7 @@ export class GPULiquid implements EnginePlugin {
   private debugUniform?: GPUBuffer;
   private lineBuf?: GPUBuffer;
   private lineCount = 0;
-  private compute?: { clear: Pass; p2g: Pass; stress: Pass; grid: Pass; g2p: Pass };
+  private compute?: { clear: Pass; p2g: Pass; stress: Pass; normals: Pass; grid: Pass; g2p: Pass };
   private debugPipelines = new Map<string, [GPURenderPipeline, GPUBindGroup, GPURenderPipeline]>();
   private lineGroups = new Map<GPURenderPipeline, GPUBindGroup>();
 
@@ -612,6 +617,7 @@ export class GPULiquid implements EnginePlugin {
         this.sdfBuf = undefined;
         this.sdfKey = [];
         this.meshFields(device);
+        this.surfBuf = this.buffer(device, 16, STORAGE);
         this.buildPasses(device);
       }
       this.needsInit = true;
@@ -635,7 +641,8 @@ export class GPULiquid implements EnginePlugin {
       grid = this.gridBuf!,
       forces = this.forceBuf!,
       particles = this.particleBuf!,
-      sdf = this.sdfBuf!;
+      sdf = this.sdfBuf!,
+      surf = this.surfBuf!;
     const pass = (code: string, buffers: GPUBuffer[]): Pass => {
       const pipeline = device.createComputePipeline({
         layout: 'auto',
@@ -651,7 +658,8 @@ export class GPULiquid implements EnginePlugin {
       clear: pass(LIQUID_CLEAR_WGSL, [sim, grid]),
       p2g: pass(LIQUID_P2G_WGSL, [sim, particles, grid]),
       stress: pass(LIQUID_STRESS_WGSL, [sim, particles, grid, sdf]),
-      grid: pass(LIQUID_GRID_WGSL, [sim, grid, forces, sdf]),
+      normals: pass(LIQUID_NORMALS_WGSL, [sim, grid, surf, sdf]),
+      grid: pass(LIQUID_GRID_WGSL, [sim, grid, forces, sdf, surf]),
       g2p: pass(LIQUID_G2P_WGSL, [sim, particles, grid, forces, sdf]),
     };
   }
@@ -713,6 +721,7 @@ export class GPULiquid implements EnginePlugin {
     f.set([...p.gravity, 0], 36);
     const ptr = p.pointer;
     f.set(ptr ? [...ptr.position, ptr.radius, ...ptr.velocity, ptr.strength] : [0, 0, 0, 1, 0, 0, 0, 0], 40);
+    f.set([(h * p.surfaceTension) / p.density, p.adhesion, LIQUID_ADHESION_REACH * p.cellSize, 0], 48);
     p.colliders.forEach((c, i) => {
       const m = c.mesh;
       f.set(
@@ -729,7 +738,7 @@ export class GPULiquid implements EnginePlugin {
           ...(m ? m.center : [0, 0, 0]),
           0,
         ],
-        48 + i * 24,
+        52 + i * 24,
       );
     });
     device.queue.writeBuffer(this.simUniform!, 0, this.simData);
@@ -738,6 +747,15 @@ export class GPULiquid implements EnginePlugin {
   /** Encodes `n` substeps of `h` seconds in one compute pass. */
   private encodeSteps(encoder: GPUCommandEncoder, device: GPUDevice, p: ResolvedLiquidParams, n: number, h: number): void {
     this.meshFields(device);
+    const tension = p.surfaceTension > 0;
+    if (!this.surfBuf || (tension && this.surfBuf.size < p.nodes * 16)) {
+      if (this.surfBuf) {
+        this.surfBuf.destroy();
+        this.owned.splice(this.owned.indexOf(this.surfBuf), 1);
+      }
+      this.surfBuf = this.buffer(device, tension ? p.nodes * 16 : 16, GPUBufferUsage.STORAGE);
+      this.compute = undefined;
+    }
     if (!this.compute) this.buildPasses(device);
     const rt = this.compute!;
     this.writeSimUniforms(device, p, h);
@@ -753,12 +771,13 @@ export class GPULiquid implements EnginePlugin {
       run(rt.clear, nodeGroups);
       run(rt.p2g, particleGroups);
       run(rt.stress, particleGroups);
+      if (tension) run(rt.normals, nodeGroups);
       run(rt.grid, nodeGroups);
       run(rt.g2p, particleGroups);
     }
     pass.end();
     this.stats.steps += n;
-    this.stats.dispatches = 5 * n;
+    this.stats.dispatches = (tension ? 6 : 5) * n;
     this.forceTime += n * h;
   }
 
@@ -1043,7 +1062,7 @@ export class GPULiquid implements EnginePlugin {
   private release(): void {
     for (const resource of this.owned) resource.destroy();
     this.owned = [];
-    this.particleBuf = this.simUniform = this.gridBuf = this.forceBuf = this.debugUniform = this.lineBuf = this.sdfBuf = undefined;
+    this.particleBuf = this.simUniform = this.gridBuf = this.forceBuf = this.debugUniform = this.lineBuf = this.sdfBuf = this.surfBuf = undefined;
     this.sdfKey = [];
     this.pulling = undefined;
     this.forceTime = 0;

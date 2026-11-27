@@ -68,6 +68,14 @@ try {
   const draftBound = 0.25 * r.stats.cellSize + r.spacing / 2 + r.bob / 2;
   assert.ok(Math.abs(r.draft - 0.1) <= draftBound, `floating box draft ${r.draft} m against 0.1 m (bound ${draftBound})`);
   assert.equal(r.linked, 1, 'forces holds the linked body');
+  // The capillary stress and adhesion passes against the twin (the same bound as the first frame above).
+  if (r.compat) assert.equal(r.wetGap, 0);
+  else assert.ok(r.wetGap < 1e-4, `surface tension and adhesion frame: worst position gap ${r.wetGap}`);
+  // Laplace: the mean pressure inside the drop between 2 sigma / (R + h) and 2 sigma / (R - h) (gpu-liquid.test.js).
+  assert.ok(
+    r.dropPressure >= 20 / (r.dropR + r.dropCell) && r.dropPressure <= 20 / (r.dropR - r.dropCell),
+    `drop pressure ${r.dropPressure} Pa against 2 sigma / R = ${20 / r.dropR} Pa (cell ${r.dropCell} m)`,
+  );
   assert.equal(r.nonFinite, 0, 'every particle stays finite');
   assert.equal(r.outside, 0, 'every particle stays inside the container');
   assert.ok(r.pointerVz > 0.3, `liquid at the pointer takes on its velocity: ${r.pointerVz} m/s`);
@@ -84,7 +92,8 @@ try {
   console.log(
     `ok gpu liquid (${r.stats.backend}): ${r.count} particles, ${r.stats.nodes} nodes, hash ${r.hashes[0]}, ` +
       `twin gap ${r.worstPos.toExponential(2)} m, force ${r.gpuForceY?.toFixed(3)} N, lifts ${r.lifts.map((x) => x.toFixed(2))} N, ` +
-      `draft ${r.draft.toFixed(4)} m (bob ${r.bob.toFixed(4)}), pointer ${r.pointerVz.toFixed(2)} m/s, ` +
+      `draft ${r.draft.toFixed(4)} m (bob ${r.bob.toFixed(4)}), drop ${r.dropPressure.toFixed(1)} Pa vs ${(20 / r.dropR).toFixed(1)}, ` +
+      `pointer ${r.pointerVz.toFixed(2)} m/s, ` +
       `lit ${r.litFrame1}, moved ${r.movedPixels}, speed ${r.speedDiff}, lines ${r.linesDiff}`,
   );
 } finally {

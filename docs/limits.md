@@ -8332,8 +8332,21 @@ each) on a grid of at most 4,194,304 nodes (16 B each), 8 to 256 cells along the
   little, raise `viscosity` to settle sooner). The top layer reads under rest density and carries no pressure, so a free
   surface sinks into the liquid by about a cell. A stiffer liquid needs a higher `speedOfSound` and proportionally more
   substeps.
-- One liquid, one density and one viscosity; no surface tension, no adhesion, no two-phase air, no spray or foam of its
-  own (the surface's `whitewater` can draw them from the particles' velocities).
+- One liquid, one density and one viscosity; no two-phase air, no spray or foam of its own (the surface's `whitewater`
+  can draw them from the particles' velocities).
+- Surface tension is the continuum surface force on the grid, so it acts over the cells the surface's density falls
+  across (about one), not on a sharp surface: a feature under a few cells across (a thin jet, a small drop) is rounded
+  by the grid's curvature, not its own. Measured: without gravity a 0.2 m cube at sigma = 10 N/m pulls into a ball and
+  holds 150.8 Pa inside against Laplace's 2 sigma / R = 161.2 Pa (WebGPU, 32,768 particles, cell 0.0125 m, averaged
+  over 2 to 3 s; the check's bound is 2 sigma / (R + h) to 2 sigma / (R - h)), and 146 to 177 Pa on the CPU twin at a
+  0.025 m cell; the spurious currents round that drop stay near 0.004 m/s. It is explicit, so it is refused above
+  density * cell³ / (2 pi substep²) (Brackbill et al.'s capillary step limit). Nodes under a quarter of rest density
+  (the far edge of the particles' spread) take its push as nodes at a quarter, which keeps them from being flung and
+  slightly softens the force there.
+- Adhesion is a pull towards the walls and colliders with a set acceleration within one cell (fading out at two), not a
+  contact angle: the angle a drop makes with a wall follows from adhesion, gravity and surface tension together and is
+  not set directly. A film thinner than a cell hangs from the ceiling exactly when adhesion is above gravity
+  (`gpu-liquid.test.js`); liquid on a side wall is pulled sideways only, so it still runs down the wall.
 - Colliders are up to 8 spheres, boxes, capsules, planes and triangle meshes, moved by the caller or by a linked body
   (`link`). A mesh is a distance field of at most 64³ samples (`bakeLiquidMesh`, all mesh fields together at most
   2,097,152 samples), so detail finer than its sample spacing is rounded off (a baked cube's edges by up to one spacing)
