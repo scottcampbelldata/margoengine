@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: the lock left out gltf's lines and points peers, so the api gate crashed (KB-LOCK-GLTFPEERS1)
+
+- **Repro:** `node --test tests/package-lock-sync.test.js` or `npm run quality -- --gate=api` on a5342703e3: hygiene
+  threw "package-lock.json is stale" before the gate measured anything.
+- **Cause:** a5342703e3 added `@margoengine/lines` and `@margoengine/points` to gltf's package.json as optional peers
+  and dev dependencies, without the lock. Behind it `site/llms-full.txt` was stale too, the next thing hygiene refuses.
+- **Fixed:** the lock regenerated offline (`npm install --ignore-scripts --package-lock-only --offline`; ten lines, no
+  new package or version) and the llms files rebuilt. The gate now runs through and reports its own items.
+- **Regression test:** `tests/package-lock-sync.test.js` ("package-lock.json lists each workspace with the
+  dependencies of its package.json" fails on the old lock).
+
 ### Fixed 2026-11-27: the quality gate measured a tree another session was writing in (KB-QUALITY-CROSSTREE1)
 
 - **Repro:** during a gate run in one lane's folder, another session's uncommitted sky edits sat in it: `sky/sun`
