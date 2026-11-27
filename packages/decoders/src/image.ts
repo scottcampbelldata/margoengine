@@ -19,18 +19,24 @@ export interface DecodeImageOptions {
   /** Aborts before decoding, or while a KTX2 decoder waits; rejects with the signal's reason. */
   signal?: AbortSignal;
   /**
-   * Largest pixel count accepted for PNG, WebP, JPEG and AVIF, default 2^26 (8192 squared). Checked from the header,
-   * before the pixels are allocated; a larger image throws RangeError.
+   * Largest pixel count accepted for PNG, WebP, JPEG, AVIF and JPEG 2000, default 2^26 (8192 squared). Checked from
+   * the header, before the pixels are allocated; a larger image throws RangeError. JPEG 2000 reads at most 2^28.
    */
   maxPixels?: number;
 }
 
 /** The name of a file's image format from its first bytes, or undefined when it is not one {@link decodeImage} knows. */
-export function imageFormat(bytes: Uint8Array): 'png' | 'jpeg' | 'webp' | 'dds' | 'ktx' | 'ktx2' | 'avif' | undefined {
+export function imageFormat(
+  bytes: Uint8Array,
+): 'png' | 'jpeg' | 'webp' | 'dds' | 'ktx' | 'ktx2' | 'avif' | 'jpeg2000' | undefined {
   const text = (at: number, length: number): string => String.fromCharCode(...bytes.subarray(at, at + length));
   if (bytes[0] === 0x89 && text(1, 3) === 'PNG') return 'png';
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpeg';
   if (text(0, 4) === 'RIFF' && text(8, 4) === 'WEBP') return 'webp';
+  // JPEG 2000: a raw codestream opens with its SOC and SIZ markers, a JP2 file with its signature box (T.800 A.4.1,
+  // A.5.1 and I.5.1).
+  if (bytes[0] === 0xff && bytes[1] === 0x4f && bytes[2] === 0xff && bytes[3] === 0x51) return 'jpeg2000';
+  if (text(0, 12) === '\0\0\0\x0cjP  \r\n\x87\n') return 'jpeg2000';
   if (text(0, 4) === 'DDS ') return 'dds';
   if (bytes[0] === 0xab && text(1, 6) === 'KTX 11') return 'ktx';
   if (bytes[0] === 0xab && text(1, 6) === 'KTX 20') return 'ktx2';
@@ -108,8 +114,8 @@ function nodeBasis(): ReturnType<typeof import('./codec.js').startBasis> {
 }
 
 /**
- * Decodes a stored texture to RGBA8 pixels, top row first, whatever holds it: PNG, JPEG, WebP, DDS, KTX or KTX2. Compressed
- * blocks are decoded on the CPU, Basis Universal through the transcoder this package ships.
+ * Decodes a stored texture to RGBA8 pixels, top row first, whatever holds it: PNG, JPEG, WebP, AVIF, JPEG 2000, DDS,
+ * KTX or KTX2. Compressed blocks are decoded on the CPU, Basis Universal through the transcoder this package ships.
  *
  * @example
  * import {decodeImage} from 'margoengine/decoders/image';
@@ -117,9 +123,10 @@ function nodeBasis(): ReturnType<typeof import('./codec.js').startBasis> {
  * if (file.length) console.log((await decodeImage(file)).width);
  *
  * @throws TypeError when `bytes` is not a Uint8Array.
- * @throws RangeError when a PNG, WebP, JPEG or AVIF image has more than `maxPixels` pixels.
+ * @throws RangeError when a PNG, WebP, JPEG, AVIF or JPEG 2000 image has more than `maxPixels` pixels.
  * @throws MargoError `unsupported` for unsupported coding tools or image item types.
- * @throws MargoError `failed` when the bytes are not a known image, or are damaged.
+ * @throws MargoError `failed` when the bytes are not a known image, or are damaged or cut short. A cut JPEG 2000 file
+ * still holds a rougher picture: `decodeJPEG2000` from `@margoengine/decoders/jpeg2000` returns it.
  */
 export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions = {}): Promise<DecodedImage> {
   if (!(bytes instanceof Uint8Array)) throw new TypeError("bytes must be a Uint8Array; pass the image file's bytes");
@@ -147,9 +154,22 @@ export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions
       const image = await (await import('./avif.js')).decodeAVIF(bytes, options);
       return { width: image.width, height: image.height, data: image.data as Uint8Array };
     }
+    case 'jpeg2000': {
+      const { decodeJPEG2000 } = await import('./jpeg2000.js');
+      const { width, height, data, truncated } = await decodeJPEG2000(bytes, {
+        signal: options.signal,
+        ...(options.maxPixels === undefined ? {} : { maxPixels: Math.min(options.maxPixels, 2 ** 28) }),
+      });
+      if (truncated)
+        throw decodeFailed(
+          'This JPEG 2000 file stops early; pass the whole file, or take the picture it holds from decodeJPEG2000 of ' +
+            '@margoengine/decoders/jpeg2000',
+        );
+      return { width, height, data: data as Uint8Array };
+    }
     default:
       throw decodeFailed(
-        'This file is not an image decodeImage reads; pass a PNG, JPEG, WebP, AVIF, DDS, KTX or KTX2 file',
+        'This file is not an image decodeImage reads; pass a PNG, JPEG, WebP, AVIF, JPEG 2000, DDS, KTX or KTX2 file',
       );
   }
 }

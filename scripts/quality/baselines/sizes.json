@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21330151,
+  "total": 21410381,
   "history": [
     {
       "date": "2026-10-24",
@@ -15085,6 +15085,12 @@
       "commit": "073cb76d59",
       "reason": "3MF boolean operations and secure content in the shared 3MF reader (boolean elements and the encrypted-part refusal): measured {\"@margoengine/loaders/threemf-materials\":14954} (materials before: 14711 B gzip). Core/stage untouched.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-d-jpeg2000-image",
+      "reason": "decodeImage reads JPEG 2000: decoders/image 1,041,675 to 1,115,573 B gzip measured with its lazy assets (the route loads jpeg2000.js, its worker and jpeg2000.wasm only for such a file). Leaving the format out would make the one any-image call refuse a format the package decodes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15376,7 +15382,7 @@
     "@margoengine/decoders/draco-native": 81143,
     "@margoengine/decoders/draco-points": 158608,
     "@margoengine/decoders/geotiff": 1690,
-    "@margoengine/decoders/image": 1068811,
+    "@margoengine/decoders/image": 1149041,
     "@margoengine/decoders/jpeg": 5234,
     "@margoengine/decoders/jpeg2000": 76904,
     "@margoengine/decoders/jxl": 902154,

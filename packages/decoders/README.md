@@ -140,7 +140,7 @@ Checked against dwebp 1.4.0, run as an outside tool, on 139 real files: the Y, U
 
 ## Any image to pixels (`@margoengine/decoders/image`, `/bc`)
 
-`decodeImage(bytes, {signal, maxPixels})` turns a PNG, JPEG, WebP, AVIF, DDS, KTX or KTX2 file into RGBA8 rows, whichever it is: the file's signature picks the reader, and each reader loads only when a file needs it. `maxPixels` (default 2^26, 8192 squared) bounds PNG, WebP, JPEG and AVIF before their pixels are allocated: a larger image throws `RangeError`. `imageFormat(bytes)` names the format. `textureFileToRGBA(file)` does it for a parsed `TextureFile`. `decodeBC(format, blocks, width, height)` from `/bc` decodes BC1 to BC7 on the CPU. Basis Universal KTX2 goes through a worker in a browser and through the shipped Wasm in the calling thread in Node.
+`decodeImage(bytes, {signal, maxPixels})` turns a PNG, JPEG, WebP, AVIF, JPEG 2000, DDS, KTX or KTX2 file into RGBA8 rows, whichever it is: the file's signature picks the reader, and each reader loads only when a file needs it. `maxPixels` (default 2^26, 8192 squared) bounds PNG, WebP, JPEG, AVIF and JPEG 2000 (at most 2^28) before their pixels are allocated: a larger image throws `RangeError`. A JP2 file or raw codestream decodes in a worker through `/jpeg2000`; one that stops early throws `failed` here, and `decodeJPEG2000` gives the picture it holds. `imageFormat(bytes)` names the format. `textureFileToRGBA(file)` does it for a parsed `TextureFile`. `decodeBC(format, blocks, width, height)` from `/bc` decodes BC1 to BC7 on the CPU. Basis Universal KTX2 goes through a worker in a browser and through the shipped Wasm in the calling thread in Node.
 
 ```ts
 import {decodeImage, imageFormat} from 'margoengine/decoders/image';
@@ -269,6 +269,20 @@ export async function preview(url: string, signal: AbortSignal) {
 `JPEG2000Decoder` takes `workerLimit` (hardware threads capped at 4, 1 to 16), `timeout` (10 s plus 4 s per MiB;
 `Infinity` disables it) and `decoderPath` (a folder holding `jpeg2000.wasm`; default the package's own file).
 `loadJPEG2000` takes `decoderPath` and `signal`.
+
+Any other image and JPEG 2000 go through one call, `decodeImage` of `/image`, when 8 bits are enough:
+
+```ts
+import {decodeImage, imageFormat} from 'margoengine/decoders/image';
+
+const file = Uint8Array.from(
+  atob('/0//UQApAAAAAAADAAAAAgAAAAAAAAAAAAAAAwAAAAIAAAAAAAAAAAABBwEB/1IADAAAAAEAAAQEAAH/XAAEIED/kAAKAAAAAAAPAAH/kwD/2Q=='),
+  (c) => c.charCodeAt(0),
+);
+console.log(imageFormat(file)); // jpeg2000
+const {width, height, data} = await decodeImage(file);
+console.log(width, height, data[0]); // 3 2 128
+```
 
 Decoded: every progression order and progression order change, tiles and tile-parts, packed packet headers (PPM, PPT),
 every code-block style, the reversible 5-3 and irreversible 9-7 wavelets, both component transforms, region-of-interest

@@ -165,9 +165,9 @@ test('the reference PNGs read', () => {
   assert.equal(decodePNG(fixture('webp/dwebp/lossy.png')).width, 97);
 });
 
-test('an unknown file is refused with every format decodeImage reads named, JPEG and AVIF included (KB-DECODERS-README-JPEG)', async () => {
+test('an unknown file is refused with every format decodeImage reads named, JPEG, AVIF and JPEG 2000 included (KB-DECODERS-README-JPEG)', async () => {
   await assert.rejects(decodeImage(new Uint8Array(16)), (error) => {
-    for (const name of ['PNG', 'JPEG', 'WebP', 'AVIF', 'DDS', 'KTX', 'KTX2'])
+    for (const name of ['PNG', 'JPEG', 'WebP', 'AVIF', 'JPEG 2000', 'DDS', 'KTX', 'KTX2'])
       assert.match(error.message, new RegExp(`\\b${name}\\b`), name);
     return true;
   });

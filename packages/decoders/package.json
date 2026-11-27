@@ -35,6 +35,7 @@
     "prepack": "npm run build",
     "test:browser:hdr6": "cd ../.. && node packages/decoders/tests/hdr6-browser.mjs",
     "test:browser:avif": "cd ../.. && node packages/decoders/tests/avif-browser.mjs",
+    "test:browser:jpeg2000": "cd ../.. && node packages/decoders/tests/jpeg2000-browser.mjs",
     "test:avif:native": "node scripts/test-avif-native.mjs",
     "test:gpu:compression": "cd ../.. && npm run modern:test:gltf-compression"
   },

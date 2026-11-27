@@ -1,48 +1,16 @@
-// `@margoengine/decoders/jpeg2000` through its Wasm module, on the calling thread and in workers. The streams are built
-// here from the marker syntax of Rec. ITU-T T.800 Annex A and the boxes of Annex I; every packet is empty, so each
-// sample is the middle of its range. The coding passes themselves are tested in the crate (`cargo test`).
+// `@margoengine/decoders/jpeg2000` through its Wasm module, on the calling thread and in workers. The hand-built streams
+// follow the marker syntax of Rec. ITU-T T.800 Annex A and the boxes of Annex I (support/jpeg2000-streams.js), with
+// empty packets, so each sample is the middle of its range; OpenJPEG's streams (fixtures/jpeg2000, written by
+// generate-jpeg2000-openjpeg.py) carry real packets, whose pixels an outside encoder and decoder give. The coding passes
+// are also tested in the crate (`cargo test`).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { JPEG2000Decoder, decodeJPEG2000, loadJPEG2000 } from '../dist/jpeg2000.js';
-
-const be = (value, bytes) => Array.from({ length: bytes }, (_, i) => (value >>> (8 * (bytes - 1 - i))) & 255);
-const segment = (marker, body) => [...be(marker, 2), ...be(body.length + 2, 2), ...body];
-
-/** One 8-bit grey tile with `levels` decomposition levels and the reversible filter; `style` is the code-block style. */
-function codestream(width, height, { levels = 0, style = 0 } = {}) {
-  const size = [width, height, 0, 0, width, height, 0, 0].flatMap((v) => be(v, 4));
-  // One empty packet per resolution: a single zero bit each.
-  const packets = new Array(levels + 1).fill(0);
-  return Uint8Array.from([
-    ...be(0xff4f, 2),
-    ...segment(0xff51, [0, 0, ...size, 0, 1, 7, 1, 1]),
-    ...segment(0xff52, [0, 0, 0, 1, 0, levels, 4, 4, style, 1]),
-    ...segment(0xff5c, [0x20, ...new Array(3 * levels + 1).fill(8 << 3)]),
-    ...segment(0xff90, [0, 0, ...be(14 + packets.length, 4), 0, 1]),
-    ...be(0xff93, 2),
-    ...packets,
-    ...be(0xffd9, 2),
-  ]);
-}
-
-const box = (type, body) => [...be(body.length + 8, 4), ...[...type].map((c) => c.charCodeAt(0)), ...body];
-
-/** A greyscale JP2 file around a codestream. */
-function jp2(stream, width, height) {
-  const header = [
-    ...box('ihdr', [...be(height, 4), ...be(width, 4), 0, 1, 7, 7, 0, 0]),
-    ...box('colr', [1, 0, 0, ...be(17, 4)]),
-  ];
-  return Uint8Array.from([
-    ...box('jP  ', [0x0d, 0x0a, 0x87, 0x0a]),
-    ...box(
-      'ftyp',
-      [...'jp2 \0\0\0\0jp2 '].map((c) => c.charCodeAt(0)),
-    ),
-    ...box('jp2h', header),
-    ...box('jp2c', [...stream]),
-  ]);
-}
+import { decodeImage, imageFormat } from '../dist/image.js';
+import { decodePNG } from '../dist/png.js';
+import { vectors } from './support/jpeg2000-fuzz.js';
+import { codestream, jp2 } from './support/jpeg2000-streams.js';
 
 const grey = (pixels, sample, opaque) => Array.from({ length: pixels }, () => [sample, sample, sample, opaque]).flat();
 const linked = (code, anchor, pattern) => (error) => {
@@ -128,4 +96,41 @@ test('loading obeys its signal and a failed load is not kept', async () => {
   const loading = loadJPEG2000({ signal: controller.signal });
   controller.abort();
   await assert.rejects(loading, { name: 'AbortError' });
+});
+
+test('OpenJPEG streams decode to its pixels: lossless exactly, lossy within one level', async () => {
+  const read = await loadJPEG2000();
+  const all = vectors();
+  assert.equal(all.length, 16);
+  for (const { file, pixels, lossless, bytes } of all) {
+    const image = read(bytes);
+    const expected = decodePNG(new Uint8Array(readFileSync(new URL(`fixtures/jpeg2000/${pixels}`, import.meta.url))));
+    assert.deepEqual([image.width, image.height, image.truncated], [expected.width, expected.height, false], file);
+    let worst = 0;
+    for (let i = 0; i < expected.data.length; i++) worst = Math.max(worst, Math.abs(image.data[i] - expected.data[i]));
+    assert.ok(worst <= (lossless ? 0 : 1), `${file}: ${worst} levels apart`);
+  }
+});
+
+test('decodeImage names a codestream and a JP2 file and decodes them in a worker', { timeout: 60000 }, async () => {
+  const read = await loadJPEG2000();
+  for (const { file, bytes } of vectors().filter(({ file }) => ['grey.j2k', 'rgba.jp2'].includes(file))) {
+    assert.equal(imageFormat(bytes), 'jpeg2000', file);
+    const { width, height, data } = read(bytes);
+    assert.deepEqual(await decodeImage(bytes), { width, height, data }, file);
+  }
+  const stream = codestream(13, 9, { levels: 2 });
+  assert.equal(imageFormat(stream), 'jpeg2000');
+  assert.equal(imageFormat(jp2(stream, 13, 9)), 'jpeg2000');
+  // The signature is the whole marker pair or box, not its first bytes.
+  assert.equal(imageFormat(stream.subarray(0, 3)), undefined);
+  assert.equal(imageFormat(jp2(stream, 13, 9).subarray(0, 11)), undefined);
+  // A picture cut short is a damaged file here; decodeJPEG2000 gives what it holds.
+  const cut = stream.subarray(0, stream.length - 3);
+  await assert.rejects(decodeImage(cut), { code: 'failed', message: /stops early.*decodeJPEG2000/ });
+  assert.equal((await decodeJPEG2000(cut)).truncated, true);
+  await assert.rejects(decodeImage(stream, { maxPixels: 116 }), RangeError);
+  // decodeImage takes larger limits than this decoder holds; the file is read within its own.
+  assert.equal((await decodeImage(stream, { maxPixels: 2 ** 30 })).width, 13);
+  await assert.rejects(decodeImage(stream, { signal: AbortSignal.abort() }), { name: 'AbortError' });
 });

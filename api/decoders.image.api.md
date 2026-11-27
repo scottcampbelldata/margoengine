@@ -16,7 +16,7 @@ export interface DecodedImage {
 
 export function decodeImage(bytes: Uint8Array, options?: DecodeImageOptions): Promise<DecodedImage>;
 
-export function imageFormat(bytes: Uint8Array): 'png' | 'jpeg' | 'webp' | 'dds' | 'ktx' | 'ktx2' | 'avif' | undefined;
+export function imageFormat(bytes: Uint8Array): 'png' | 'jpeg' | 'webp' | 'dds' | 'ktx' | 'ktx2' | 'avif' | 'jpeg2000' | undefined;
 
 export const nodeKTX2: {
     transcode(bytes: Uint8Array, options?: DecodeImageOptions): Promise<TranscodedKTX2Result>;
