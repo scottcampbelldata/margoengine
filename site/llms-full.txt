@@ -17230,15 +17230,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   0.447 of the clear night, a pall of 1e-6 puts the night and its clouds out (below 1e-4), and the glow is even over
   the dome in its own colour.
 
-### Open 2026-11-26: a fire's glow on its smoke ignores the scene's light units (KB-VFX-GLOWUNITS1, vfx)
+### Fixed 2026-11-27: a fire's glow on its smoke ignored the scene's light units (KB-VFX-GLOWUNITS1, vfx and weather)
 
-- **Repro:** packages/vfx/src/lit.ts: a glow of irradiance E lights a puff as a sun of intensity pi E / 1,000 would,
-  whatever the scene's sun is. In a scene whose sun is 5 (timber valley) the column glow is pi / 5 of what the haze of
-  KB-WEATHER-FIREHAZE1 takes (which refers 1,000 W/m^2 to the sky's `lighting.intensity`); in a scene lit in lux
-  (`lighting.intensity: SUN_ILLUMINANCE`, about 108,000) the glow is invisible.
-- **Cause:** the glow's unit is fixed at 1,000 W/m^2 = intensity pi; nothing tells the lit puffs the scene's noon sun.
-- **Owed in vfx:** the glow referred to the scene's noon sun (the engine sun's intensity at the zenith, or an option),
-  with a test of one fire in a scene at sun 5 and one in lux giving the same share of the noon light.
+- **Repro:** packages/vfx/src/lit.ts: a glow of irradiance E lit a puff as a sun of intensity pi E / 1,000 would,
+  whatever the scene's sun was. In a scene whose sun is 5 (timber valley) the column glow was pi / 5 of what the haze
+  of KB-WEATHER-FIREHAZE1 takes (which refers 1,000 W/m^2 to the sky's `lighting.intensity`); in a scene lit in lux
+  (`lighting.intensity: SUN_ILLUMINANCE`, about 108,000) the glow was invisible.
+- **Cause:** the glow's unit was fixed at 1,000 W/m^2 = intensity pi; nothing told the lit puffs the scene's noon sun.
+- **Fix:** `VFXLit.noon` (default pi, the old reference) is the engine intensity of the noon sun the glow is referred to;
+  the uniform's power is written times noon / pi, so a glow of E is E / 1,000 of that sun in any units. `SmokeOptions.noon`
+  passes it on, `FireFront.noon` writes it on every column (made before or after), and `WeatherDrive` sets each front's
+  `noon` from its sky's `lighting.intensity` every frame, the reference its haze already uses. Regression:
+  packages/vfx/test/lit.test.js (sun 5, lux, 1 and pi give the same share), packages/vfx/test/smoke.test.js,
+  packages/weather/tests/air-load.test.js. Real frames (timber valley, 22:00, 960 x 540, aerial-west): the columns' lit
+  bases brighten by up to 45, 33, 27 levels (noon 5 against the old pi). The ridge and fire-line views frame no column,
+  so they are unchanged bit for bit. Weak spot left: KB-VFX-COLUMNAMBIENT1.
+
+### Open 2026-11-27: a smoke column over a fire at night reads blue-black above its base (KB-VFX-COLUMNAMBIENT1, vfx)
+
+- **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=aerial-west --query=hour=22 --out=<folder>`: the
+  columns are lit orange only near their source point and read as dark blue-black shapes against the orange pall above.
+- **Cause:** a column's puffs take the glow of one point at its base (falling as 1 / d^2 over the km the column climbs)
+  and the engine's moonlit ambient; the firelit haze round them, and the rest of the burning front, give them no light.
+- **Owed in vfx:** the puffs' ambient from the air they sit in (the drive's firelit haze light) or the front as a line
+  of sources, with a test and a real frame.
 
 ### Fixed 2026-11-26: the smoke haze over a burning valley took no light from the fire (KB-WEATHER-FIREHAZE1, weather and vfx)
 
