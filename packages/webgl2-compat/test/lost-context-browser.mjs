@@ -38,6 +38,8 @@ try {
     let thrown = null;
     device.pushErrorScope('validation');
     try {
+      // A frame's own 4x attachment, made after the loss (KB-COMPAT-LOSTMSAA1).
+      device.createTexture({ size: [16, 16], format: 'rgba8unorm', sampleCount: 4, usage: 0x10 });
       const pipeline = device.createRenderPipeline(descriptor),
         encoder = device.createCommandEncoder(),
         pass = encoder.beginRenderPass({

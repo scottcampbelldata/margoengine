@@ -19,7 +19,7 @@ const task = () => new Promise((resolve) => setTimeout(resolve, 0));
 async function stand() {
   const enums = Object.fromEntries(COMPAT_LIMITS.map((name, i) => [name, 0x1000 + i]));
   const values = new Map(COMPAT_LIMITS.map((_, i) => [0x1000 + i, 4096]));
-  const state = { lost: false, failing: false };
+  const state = { lost: false, failing: false, samples: [4, 1] };
   const failed = () => {
     if (state.failing === 'reset' && !state.queued) {
       state.queued = true;
@@ -36,7 +36,14 @@ async function stand() {
     LINK_STATUS: 0x8b82,
     DRAW_FRAMEBUFFER: 0x8ca9,
     FRAMEBUFFER_COMPLETE: 0x8cd5,
+    RENDERBUFFER: 0x8d41,
+    SAMPLES: 0x80a9,
+    RGBA8: 0x8058,
+    R32UI: 0x8236,
+    RGBA8_SNORM: 0x8f97,
     checkFramebufferStatus: () => (failed() ? 0x8cdd : 0x8cd5),
+    // A lost context answers every query with null; a live one lists a format's sample counts.
+    getInternalformatParameter: () => (failed() || state.lost ? null : new Int32Array(state.samples)),
     getProgramParameter: () => !failed(),
     getProgramInfoLog: () => (state.failing === 'broken' ? 'L0001: a real link error' : ''),
     getError: () => 0,
@@ -62,6 +69,8 @@ async function stand() {
     lost: () => lost,
     reset: () => (state.failing = 'reset'),
     broken: () => (state.failing = 'broken'),
+    lose: () => (state.lost = true),
+    samples: (counts) => (state.samples = counts),
   };
 }
 
@@ -95,6 +104,29 @@ test('a GPU reset met by a framebuffer status loses the device; its scope resolv
   await task();
   assert.equal(t.lost(), 'unknown');
   assert.deepEqual(t.errors, []);
+});
+
+/** A 4x colour target of `format`, as a frame's own attachments are made. */
+const multisampled = (device, format = 'rgba8unorm') =>
+  device.createTexture({ size: [4, 4], format, sampleCount: 4, usage: 0x10 });
+
+test('a 4x texture made at a reset or on a lost context is not refused as unsupported (KB-COMPAT-LOSTMSAA1)', async () => {
+  for (const loss of ['reset', 'lose']) {
+    const s = await stand();
+    s[loss]();
+    assert.doesNotThrow(() => multisampled(s.device), loss);
+    assert.deepEqual(s.errors, [], loss);
+  }
+});
+
+test('on a live context a format without 4x samples is still refused', async () => {
+  const s = await stand();
+  // An integer format lists no 4x count; a format with no renderbuffer answers null.
+  s.samples([]);
+  assert.throws(() => multisampled(s.device, 'r32uint'), /4x multisampled r32uint textures/);
+  const t = await stand();
+  t.broken();
+  assert.throws(() => multisampled(t.device, 'rgba8snorm'), /4x multisampled rgba8snorm textures/);
 });
 
 test('an async pipeline that failed at a reset resolves on the lost device', async () => {

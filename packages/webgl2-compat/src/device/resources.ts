@@ -817,7 +817,10 @@ export class CompatTexture {
         device.enum(info.internal),
         gl.SAMPLES,
       ) as Int32Array | null;
-      if (!counts?.includes(4))
+      // A lost context answers null, during a GPU reset before isContextLost() turns true (KB-COMPAT-LOSSREPORT1): the
+      // device's event reports that loss, and a lost device makes textures without errors (WebGPU). Only a format with
+      // no renderbuffer answers null on a live context.
+      if (counts ? !counts.includes(4) : !info.renderable)
         throw device.unsupported(
           `4x multisampled ${this.format} textures (this WebGL2 has no multisample ${info.internal} renderbuffers)`,
         );
