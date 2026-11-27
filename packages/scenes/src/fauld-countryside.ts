@@ -16,6 +16,12 @@ export {
   FAULD_SLOTS,
   type FauldEra,
   type FauldSky,
+  FAULD_PLANT_MODELS,
+  fauldDem,
+  layFauldGround,
+  type FauldDemMeta,
+  type FauldGround,
+  type FauldGroundOptions,
 } from './fauld-world.js';
 
 /** Settings of {@link attach}: the shared Fauld settings; the era defaults to `before` (the morning of 27 November 1944). */

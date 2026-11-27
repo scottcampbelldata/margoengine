@@ -167,6 +167,10 @@
       "types": "./dist/cameras/hologram.d.ts",
       "import": "./dist/cameras/hologram.js"
     },
+    "./cameras/clearance": {
+      "types": "./dist/cameras/clearance.d.ts",
+      "import": "./dist/cameras/clearance.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"

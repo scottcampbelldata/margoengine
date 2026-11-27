@@ -220,6 +220,22 @@ export const entries = [
     fix: 'Tilt the source camera off its up axis, pass `distance` above 0, `gap` in [0, 1) and `views` such as `{front: {rotation: 180, mirror: true}}`, create the engine with WebGPU (or the WebGL2 compatibility layer), and create a new HologramOutput after dispose.',
   },
   {
+    id: 'camera-clearance',
+    title: '@margoengine/cameras/clearance: camera sight check',
+    kind: 'family',
+    messages: [
+      'Camera clearance: position and target must be three finite numbers; see https://margoengine.com/errors#camera-clearance',
+      'Camera clearance: fov must be inside (0, 180) degrees and aspect above 0; see https://margoengine.com/errors#camera-clearance',
+      'Camera clearance: the view must not be empty or straight up or down; see https://margoengine.com/errors#camera-clearance',
+      'Camera clearance: an occluder needs a radius above 0 and top above bottom; see https://margoengine.com/errors#camera-clearance',
+      'Camera clearance: every choice needs at least one view; see https://margoengine.com/errors#camera-clearance',
+      'Camera clearance: give at least one choice; see https://margoengine.com/errors#camera-clearance',
+    ],
+    cause:
+      'sightClearance or clearestShot was given a view with no direction or looking straight up or down, a field of view or aspect out of range, an occluder with no size, no choices, or a choice with no views.',
+    fix: 'Pass a finite position and target apart from each other and not one above the other, fov inside (0, 180), occluders with radius above 0 and top above bottom, and at least one choice with at least one view.',
+  },
+  {
     id: 'face-driver',
     title: '@margoengine/input/face: webcam face to morph targets',
     kind: 'family',

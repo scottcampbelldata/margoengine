@@ -306,9 +306,34 @@ Each lens is on the film's 24.89 x 14 mm filmback inside a named band (wide 18 t
 to 135; a 28 or 200 mm row takes the nearest band edge), the aim drifts across the subject by 7 percent of the frame
 width, and the page query carries the lens (`stop` f/8 or f/11, `focusDistance` at the harmonic mean of the subject's
 near and far faces, so the thin-lens depth of field covers it);
+every camera is checked against the scene's own ground, trees and hedges (`tools/shot/fauld-sight.mjs`,
+`sightClearance`) and, where blocked, turned about its subject, stepped in towards the crater rim or lifted, the least
+that works (`tools/shot/fauld-sight.json` records each row);
 stills through the shot tool, which adds the page's ground under each camera (`shot.page.ground`):
 `node tools/shot/cli.mjs tools/shot/shots/fauld-fr008.json --stills --out <folder>`, or by hand
 `node packages/scenes/test/fauld-still.mjs --shots=fr008,fr074 --out=<folder>`.
+
+### The Fauld ground without an engine
+
+Tools that must know where the hills, hedges and trees stand without rendering them (shot cameras kept clear with
+`@margoengine/cameras/clearance`) build the same ground on the CPU: `layFauldGround({ dem, era, crater })` gives the
+biome world, farm, planting exclusions and height, `fauldDem(meta, heights)` reads the height grid and
+`FAULD_PLANT_MODELS` names the plant models. All three are exported by `/fauld-countryside`.
+
+```js
+import { BiomePlacement } from '@margoengine/biomes/placement';
+import { fauldDem, layFauldGround } from '@margoengine/scenes/fauld-countryside';
+
+// Needs the asset library served at /asset-library/ (the OS Terrain 50 grid).
+async function trees(url = '/asset-library/dem/os-terrain-50/fauld_sk12_sk23') {
+  const meta = await (await fetch(`${url}.json`)).json();
+  const dem = fauldDem(meta, new Float32Array(await (await fetch(`${url}.f32`)).arrayBuffer()));
+  using ground = await layFauldGround({ dem, era: 'before' });
+  const placement = BiomePlacement.attach(ground.world, { exclusions: ground.exclusions });
+  return { plants: (await placement.tile(12, 12)).count, height: ground.height(0, 0) };
+}
+console.log(typeof trees); // function
+```
 
 ## The Fauld explosion: `@margoengine/scenes/fauld-blast`
 

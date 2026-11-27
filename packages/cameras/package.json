@@ -61,6 +61,10 @@
     "./hologram": {
       "types": "./dist/hologram.d.ts",
       "import": "./dist/hologram.js"
+    },
+    "./clearance": {
+      "types": "./dist/clearance.d.ts",
+      "import": "./dist/clearance.js"
     }
   },
   "files": [

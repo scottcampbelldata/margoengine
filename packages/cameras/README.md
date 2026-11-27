@@ -592,6 +592,36 @@ https://wp.optics.arizona.edu/oscoutreach/poptics-peppers-pyramid/ (four faces s
   alone, every slot's turn and mirror, the wedge cut, gap, distance, one update per frame, resize, device restore
   and disposal. Add -- --compat for the WebGL2 compatibility layer.
 
+## Camera clearance: optional /clearance
+
+Whether a camera sees its subject past the ground and the things standing near its sight lines, before it is rendered:
+trees, hedges and posts as upright cylinders (`Occluder`, with an `opacity` under 1 for a bare crown) over a height
+function. `sightClearance(view, scene, limits)` measures the share of the subject seen (default at least 0.5), the
+share of the frame and of its middle covered by occluders in the foreground (nearer than 0.4 of the way; default at
+most 0.15 and 0.05) and the nearest occluder to the lens (default no nearer than 4 m). `clearestShot(choices, views,
+scene, limits)` takes camera choices best first (turns before lifts) and answers the first whose every view is clear,
+or the least blocked one. CPU only: 32 x 18 frame rays and 15 subject rays a view, each marched over the ground. It
+knows only the ground and the cylinders you give it: buildings, overhangs and leaf shapes are not seen.
+
+```js
+import { clearestShot } from '@margoengine/cameras/clearance';
+
+// A bank 5 m high between a long low lens and its subject, and a trunk 10 m off the lens.
+const scene = {
+  ground: (x, z) => (z > 60 && z < 140 ? 5 : 0),
+  occluders: [{ x: 0, z: 287, bottom: 0, top: 12, radius: 0.6 }],
+};
+const view = ({ turn, height }) => ({
+  position: [297 * Math.sin(turn), height, 297 * Math.cos(turn)],
+  target: [0, 2, 0],
+  fov: 6,
+  subject: { centre: [0, 0, 0], width: 20, height: 8 },
+});
+const choices = [1.7, 4, 9, 15].flatMap((height) => [0, 0.1, -0.1].map((turn) => ({ turn, height })));
+const best = clearestShot(choices, (c) => [view(c)], scene);
+console.log(best.choice, best.clearance.clear, best.clearance.subject);
+```
+
 ## Attachment ownership and validation
 
 CameraProjection.attach(engine) registers the projection with the engine, while

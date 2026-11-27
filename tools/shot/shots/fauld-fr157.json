@@ -11,28 +11,28 @@
         {
           "time": 0,
           "position": [
-            86.84,
+            74.361,
             1.7,
-            122.306
+            84.419
           ],
           "target": [
-            -2.131,
+            -1.471,
             2,
-            1.513
+            1.296
           ],
           "fov": 15.94
         },
         {
           "time": 6.291666666666667,
           "position": [
-            89.405,
+            76.722,
             1.7,
-            120.485
+            82.34
           ],
           "target": [
-            4.696,
+            3.831,
             2,
-            -3.334
+            -3.375
           ],
           "fov": 15.94,
           "ease": "smoothstep"
@@ -56,7 +56,7 @@
         "sky": "dawn",
         "focus": "0,0",
         "stop": "8",
-        "focusDistance": "140.6"
+        "focusDistance": "105.5"
       },
       "engine": "fauldStill.engine",
       "ground": "fauldStill.height",
@@ -80,7 +80,7 @@
         2,
         0
       ],
-      "size": 75
+      "size": 56
     }
   }
 }

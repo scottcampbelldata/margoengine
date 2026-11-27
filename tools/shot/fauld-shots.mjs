@@ -10,6 +10,8 @@
 // The blast rows (set margo:scenes/fauld-blast) take their film second, subject and aim from BLAST below, and frame the
 // whole column when the row's visual is the column: the lens is the row's own, or the longest band lens that holds the
 // column (its height and width at the shot's middle from BlastCloud, built packages) when the row's is too long.
+// Every camera is checked for a clear sight of its subject (fauld-sight.mjs) and turned or lifted until it has one;
+// tools/shot/fauld-sight.json records each row's turn, lift and measures (build:packages first; the asset library).
 // It also writes packages/scenes/test/fauld-blast-ground.json: the OS Terrain 50 ground under every blast camera key
 // (--dem=<grid .f32>, default the asset library's dem/os-terrain-50/fauld_sk12_sk23.f32 beside the Projects folder),
 // which the scenes test reads to keep each blast camera clear under the cloud deck (the grid is not in the repository).
@@ -17,6 +19,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FAULD_CENTRE, FAULD_SIZE } from '../../packages/scenes/dist/fauld-countryside.js';
 import { BlastCloud } from '../../packages/weather/dist/eruption.js';
+import { clearestShot } from '../../packages/cameras/dist/clearance.js';
+import { fauldSight } from './fauld-sight.mjs';
 
 const arg = (n, d) => process.argv.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3) ?? d;
 const csv = readFileSync(arg('csv', '../channel-films/Docs/fauld-shot-list-recut.csv'), 'utf8');
@@ -238,6 +242,39 @@ const half = FAULD_SIZE / 2,
         FAULD_CENTRE.northing - Math.max(-half, Math.min(half, z)),
       ),
     );
+// The camera's sight to its subject over the scene's own ground, trees and hedges (fauld-sight.mjs, the sight check
+// of @margoengine/cameras/clearance): each row's own place first, then turned about its subject, then lifted, the least
+// that clears the lens, the foreground and the ground between (--library=<asset library>).
+const sight = fauldSight({
+  library: arg('library', fileURLToPath(new URL('../../../../Assets/blender-library', import.meta.url))),
+  dem: demPath,
+});
+// How tall each subject stands, metres.
+const HEIGHTS = {
+  crater: 6,
+  farm: 6,
+  hanbury: 14,
+  church: 25,
+  inn: 8,
+  works: 15,
+  reservoir: 2,
+  dove: 4,
+  fields: 2,
+  slope: 4,
+  dump: 4,
+  landing: 2,
+  front: 3,
+};
+// Lifts in metres and turns in degrees, least first. Turns keep the camera in the south half (the sun behind or beside
+// it); a row that names where it stands turns at most 12 degrees.
+const LIFTS = [0, 0.5, 1.3, 2.5, 4.5, 8, 14, 22, 34];
+const TURNS = [0, ...[6, 12, 18, 24, 30, 36, 42, 48, 60, 72, 84, 96, 108, 120, 132, 144].flatMap((k) => [k, -k])];
+// Inside the wooded crater of today the trees are what the shot is about: they may stand between and about the camera,
+// though not against the lens, over the near foreground (a fifth of the way) or filling the middle of the frame.
+// Elsewhere the subject's foot must show too: 85 percent of its points, so a bank just before it does not hide it.
+const OPEN = { subject: 0.85 };
+const WOODED = { subject: 0.2, near: 0.2, foreground: 0.25, centre: 0.15 };
+const sightReport = {};
 const blastGround = {};
 let n = 0;
 for (const r of parse(csv)) {
@@ -276,6 +313,9 @@ for (const r of parse(csv)) {
   if (what === 'crater' && !drone && /rim|wood|memorial|stone|path|fence|birch|leaves/.test(vis))
     dist = Math.max(dist, 150);
   if (b?.dist) dist = b.dist;
+  // A distance only that rule chose may step in towards the rim before the camera is lifted.
+  const steps =
+    what === 'crater' && !b && !drone && !km && !from && dist === 150 ? [dist, 0.85 * dist, 0.75 * dist] : [dist];
   // A column shot holds the whole cloud at the shot's middle: aimed at half its top, 1.3 of its height and 1.2 of its
   // width in frame, on the row's lens or the longest band lens that holds it.
   let lens = listed;
@@ -289,10 +329,7 @@ for (const r of parse(csv)) {
   }
   const fov = (2 * Math.atan(FILMBACK[1] / 2 / lens) * 180) / Math.PI;
   // Look from the south half (the low November sun behind or beside the camera), bearing by row.
-  const bearing = b?.bearing ?? Math.PI * (0.25 + 0.5 * hash(r.id)),
-    ox = Math.cos(bearing) * dist,
-    oz = Math.sin(bearing) * dist,
-    pos0 = [tx + ox, h0, tz + oz],
+  const home = b?.bearing ?? Math.PI * (0.25 + 0.5 * hash(r.id)),
     tgtH = b
       ? b.what === 'column'
         ? Math.round(col.top / 2)
@@ -303,47 +340,122 @@ for (const r of parse(csv)) {
         ? 0
         : what === 'crater' && /floor|up the|walls/.test(vis)
           ? 25
-          : 2,
-    tgt0 = [tx, tgtH, tz];
-  let pos1 = [...pos0],
-    tgt1 = [...tgt0];
+          : 2;
   const speed = Number(cam.match(/(\d+(?:\.\d+)?) m\/s/)?.[1] ?? 0.6),
     deg = Number(cam.match(/(\d+) deg/)?.[1] ?? 5) * (Math.PI / 180),
-    fwd = [-ox / dist, -oz / dist],
-    side = [-fwd[1], fwd[0]],
     travel = speed * dur;
-  if (/orbit|arc/.test(cam)) {
-    const b1 = bearing + deg;
-    pos1 = [tx + Math.cos(b1) * dist, h1, tz + Math.sin(b1) * dist];
-  } else if (/pull back/.test(cam)) pos1 = [pos0[0] - fwd[0] * dist * 0.4, h1, pos0[2] - fwd[1] * dist * 0.4];
-  else if (/push|dolly/.test(cam)) pos1 = [pos0[0] + fwd[0] * travel, h1, pos0[2] + fwd[1] * travel];
-  else if (/track|slide/.test(cam)) {
-    pos1 = [pos0[0] + side[0] * travel, h1, pos0[2] + side[1] * travel];
-    tgt1 = [tgt0[0] + side[0] * travel, tgt0[1], tgt0[2] + side[1] * travel];
-  } else if (/pan/.test(cam)) tgt1 = [tx + side[0] * dist * Math.tan(deg), tgtH, tz + side[1] * dist * Math.tan(deg)];
-  else if (/crane|rise/.test(cam)) {
-    const c = cam.match(/crane (\d+) to (\d+) m|(\d+) m up to (\d+) m/);
-    if (c) {
-      pos0[1] = Number(c[1] ?? c[3]);
-      pos1[1] = Number(c[2] ?? c[4]);
-    } else pos1[1] = /down/.test(cam) ? Math.max(1, pos0[1] - travel) : pos0[1] + travel;
-  } else if (/descen/.test(cam)) pos1[1] = Math.max(2, h0 - (drone ? h0 * 0.12 : travel));
-  if (/tilt up/.test(cam)) tgt1 = [tgt0[0], tgt0[1] + dist * Math.tan(deg), tgt0[2]];
-  else if (/tilt/.test(cam)) tgt1 = [tgt0[0], tgt0[1] - dist * Math.tan(deg), tgt0[2]];
-  // The aim drifts across the subject (DRIFT of the frame width at the subject), across the camera's own sideways.
-  const halfWidth = dist * (FILMBACK[0] / 2 / lens),
-    drift = (DRIFT / 2) * 2 * halfWidth;
-  tgt0[0] -= side[0] * drift;
-  tgt0[2] -= side[1] * drift;
-  tgt1[0] += side[0] * drift;
-  tgt1[2] += side[1] * drift;
+  // The move from a bearing round the subject, raised by `lift` metres.
+  const move = (bearing, lift, dist) => {
+    const ox = Math.cos(bearing) * dist,
+      oz = Math.sin(bearing) * dist,
+      pos0 = [tx + ox, h0, tz + oz],
+      tgt0 = [tx, tgtH, tz],
+      fwd = [-ox / dist, -oz / dist],
+      side = [-fwd[1], fwd[0]];
+    let pos1 = [...pos0],
+      tgt1 = [...tgt0];
+    if (/orbit|arc/.test(cam)) {
+      const b1 = bearing + deg;
+      pos1 = [tx + Math.cos(b1) * dist, h1, tz + Math.sin(b1) * dist];
+    } else if (/pull back/.test(cam)) pos1 = [pos0[0] - fwd[0] * dist * 0.4, h1, pos0[2] - fwd[1] * dist * 0.4];
+    else if (/push|dolly/.test(cam)) pos1 = [pos0[0] + fwd[0] * travel, h1, pos0[2] + fwd[1] * travel];
+    else if (/track|slide/.test(cam)) {
+      pos1 = [pos0[0] + side[0] * travel, h1, pos0[2] + side[1] * travel];
+      tgt1 = [tgt0[0] + side[0] * travel, tgt0[1], tgt0[2] + side[1] * travel];
+    } else if (/pan/.test(cam)) tgt1 = [tx + side[0] * dist * Math.tan(deg), tgtH, tz + side[1] * dist * Math.tan(deg)];
+    else if (/crane|rise/.test(cam)) {
+      const c = cam.match(/crane (\d+) to (\d+) m|(\d+) m up to (\d+) m/);
+      if (c) {
+        pos0[1] = Number(c[1] ?? c[3]);
+        pos1[1] = Number(c[2] ?? c[4]);
+      } else pos1[1] = /down/.test(cam) ? Math.max(1, pos0[1] - travel) : pos0[1] + travel;
+    } else if (/descen/.test(cam)) pos1[1] = Math.max(2, h0 - (drone ? h0 * 0.12 : travel));
+    if (/tilt up/.test(cam)) tgt1 = [tgt0[0], tgt0[1] + dist * Math.tan(deg), tgt0[2]];
+    else if (/tilt/.test(cam)) tgt1 = [tgt0[0], tgt0[1] - dist * Math.tan(deg), tgt0[2]];
+    // The aim drifts across the subject (DRIFT of the frame width at the subject), across the camera's own sideways.
+    const halfWidth = dist * (FILMBACK[0] / 2 / lens),
+      drift = (DRIFT / 2) * 2 * halfWidth;
+    tgt0[0] -= side[0] * drift;
+    tgt0[2] -= side[1] * drift;
+    tgt1[0] += side[0] * drift;
+    tgt1[2] += side[1] * drift;
+    pos0[1] += lift;
+    pos1[1] += lift;
+    return [
+      [pos0, tgt0],
+      [pos1, tgt1],
+    ];
+  };
   // The subject is what the frame holds of the place: never wider than the frame at the subject's distance (a shot from
   // among the fields frames a part of them, and a subject wider than the frame would put the camera inside it).
-  const size = Math.min(
+  const sizeAt = (d) =>
+    Math.min(
       b?.what === 'column' ? Math.round(col.width) : b?.what === 'base' ? 300 : SIZES[what],
-      Math.round(dist * (FILMBACK[0] / lens)),
-    ),
-    optics = lensFor(lens, dist, size);
+      Math.round(d * (FILMBACK[0] / lens)),
+    );
+  // The first clear camera, else the least blocked; checked at the move's start, middle and end.
+  const scene = await sight(b ? (b.mud ? '1944' : 'before') : eraOf(r)),
+    foot = [tx, scene.ground(tx, tz), tz],
+    subjectHeight =
+      b?.what === 'column' ? Math.round(col.top) : b?.what === 'base' ? 180 : Math.max(HEIGHTS[what], b?.aim ?? 0),
+    world = ([p, t], size) => ({
+      position: [p[0], p[1] + scene.ground(p[0], p[2]), p[2]],
+      target: [t[0], t[1] + scene.ground(t[0], t[2]), t[2]],
+      fov,
+      subject: { centre: foot, width: size, height: subjectHeight },
+    }),
+    middle = (a, c) => ({
+      ...a,
+      position: a.position.map((v, i) => (v + c.position[i]) / 2),
+      target: a.target.map((v, i) => (v + c.target[i]) / 2),
+    });
+  // Under an overcast sky there is no sun to keep behind the camera: any side of the subject will do.
+  const sunless = ['overcast', 'grey', 'rain', 'snow', 'mist'].includes(b ? 'overcast' : skyOf(r.look)),
+    turns = sunless ? [...TURNS, 156, -156, 168, -168, 180] : TURNS;
+  let best;
+  search: for (const lift of LIFTS)
+    for (const [d, turn] of steps.flatMap((d) => turns.map((turn) => [d, turn]))) {
+      const bearing = home + (turn * Math.PI) / 180;
+      if (
+        b?.bearing !== undefined
+          ? Math.abs(turn) > 12
+          : !sunless && (bearing < 0.1 * Math.PI || bearing > 0.9 * Math.PI)
+      )
+        continue;
+      const keys = move(bearing, lift, d),
+        [first, last] = keys.map((k) => world(k, sizeAt(d))),
+        near = [
+          ...(await scene.near(first.position[0], first.position[2], d)),
+          ...(await scene.near(last.position[0], last.position[2], d)),
+        ],
+        { clearance } = clearestShot(
+          [keys],
+          () => [first, middle(first, last), last],
+          {
+            ground: scene.ground,
+            occluders: [...new Set(near)],
+          },
+          b ? {} : eraOf(r) === 'today' && what === 'crater' ? WOODED : OPEN,
+        );
+      // Among views that stay blocked, a lift has to earn its height: a hundredth of a penalty point a metre.
+      const score = clearance.penalty + lift / 100;
+      if (clearance.clear || !best || score < best.score) best = { keys, turn, lift, distance: d, clearance, score };
+      if (clearance.clear) break search;
+    }
+  const [[pos0, tgt0], [pos1, tgt1]] = best.keys,
+    measure = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null),
+    size = sizeAt(best.distance),
+    optics = lensFor(lens, best.distance, size);
+  sightReport[r.id] = {
+    distance: Math.round(best.distance),
+    turn: best.turn,
+    lift: best.lift,
+    clear: best.clearance.clear,
+    subject: measure(best.clearance.subject),
+    foreground: measure(best.clearance.foreground),
+    centre: measure(best.clearance.centre),
+    lens: measure(best.clearance.lens),
+  };
   const place = b ? 'blast' : r.set.endsWith('crater') ? 'crater' : 'countryside',
     query = new URLSearchParams({
       place,
@@ -353,6 +465,11 @@ for (const r of parse(csv)) {
       stop: String(optics.stop),
       focusDistance: String(optics.focusDistance),
       ...(b ? { blast: String(b.t), ...(b.mud ? { mud: '1' } : {}) } : {}),
+      // The page draws plants 1,200 m round the camera and 12-triangle stand-ins beyond: a farther ground subject
+      // widens it to 1.6 of the distance, the ground behind included (the scene's limit is 3,000 m).
+      ...(!b && !drone && best.distance > 1000
+        ? { radius: String(Math.min(3000, Math.round(1.6 * best.distance))) }
+        : {}),
     }),
     people = r.source_tag.includes('PEOPLE') ? ` (fallback until people: ${r.fallback})` : '';
   const file = {
@@ -414,5 +531,6 @@ for (const r of parse(csv)) {
     ]);
   n++;
 }
+writeFileSync('tools/shot/fauld-sight.json', `${JSON.stringify(sightReport, null, 1)}\n`);
 writeFileSync('packages/scenes/test/fauld-blast-ground.json', `${JSON.stringify(blastGround)}\n`);
 console.log(`${n} Fauld shot files written`);

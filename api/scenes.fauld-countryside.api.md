@@ -5,6 +5,7 @@
 ```ts
 import { BiomeWorld } from "@margoengine/biomes";
 import { Farmland } from "@margoengine/biomes/farmland";
+import { Exclusion } from "@margoengine/biomes/placement";
 import { BiomeView } from "@margoengine/biomes/view";
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { DOF } from "@margoengine/dof";
@@ -37,6 +38,8 @@ export const FAULD_PLACES: Readonly<{
     dove: readonly [-300, -2600];
     tutbury: readonly [3100, -1300];
 }>;
+
+export const FAULD_PLANT_MODELS: Readonly<Record<string, string>>;
 
 export const FAULD_SIZE = 6400;
 
@@ -99,11 +102,43 @@ export const FAULD_SLOTS: Readonly<{
 
 export type FauldCountrysideSettings = FauldWorldSettings;
 
+export interface FauldDemMeta {
+    readonly width: number;
+    readonly depth: number;
+    readonly cellsize_m: number;
+    readonly xll_easting: number;
+    readonly ytop_northing: number;
+}
+
 export type FauldEra = 'before' | '1944' | 'today';
+
+export interface FauldGround extends Disposable {
+    readonly world: BiomeWorld;
+    readonly farm: Farmland;
+    readonly exclusions: readonly Exclusion[];
+    height(x: number, z: number): number;
+    dispose(): void;
+}
+
+export interface FauldGroundOptions {
+    readonly era?: FauldEra;
+    readonly seed?: number;
+    readonly dem: (easting: number, northing: number) => number;
+    readonly crater?: {
+        readonly geometry: {
+            readonly positions: ArrayLike<number>;
+        };
+    };
+    readonly signal?: AbortSignal;
+}
 
 export type FauldSky = 'dawn' | 'lowSun' | 'overcast' | 'grey' | 'dusk' | 'night' | 'snow' | 'rain' | 'mist';
 
 export function attach(engine: EngineKernel, settings?: FauldCountrysideSettings): Promise<FauldWorld>;
+
+export function fauldDem(meta: FauldDemMeta, data: Float32Array): (easting: number, northing: number) => number;
+
+export function layFauldGround(options: FauldGroundOptions): Promise<FauldGround>;
 
 // Not exported from this entry, but used by the exports above:
 

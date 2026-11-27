@@ -239,6 +239,10 @@
       "types": "./dist/cameras/hologram.d.ts",
       "import": "./dist/cameras/hologram.js"
     },
+    "./cameras/clearance": {
+      "types": "./dist/cameras/clearance.d.ts",
+      "import": "./dist/cameras/clearance.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"

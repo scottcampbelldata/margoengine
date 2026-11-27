@@ -14,6 +14,7 @@
 import type { EngineKernel, Mesh, Vec3 } from '@margoengine/core';
 import { BiomeWorld, defineBiome } from '@margoengine/biomes';
 import { BiomeEditor } from '@margoengine/biomes/editor';
+import type { Exclusion } from '@margoengine/biomes/placement';
 import '@margoengine/biomes/splines';
 import {
   FARMLAND_MATERIALS,
@@ -35,7 +36,7 @@ import { textured } from '@margoengine/gltf/textured';
 import { Shadows } from '@margoengine/shadows';
 import { GTAO } from '@margoengine/post/gtao';
 import { DOF } from '@margoengine/dof';
-import { libraryMesh, type LibraryMeshPart } from './library-mesh.js';
+import { libraryMesh } from './library-mesh.js';
 import { libraryParts } from './library-parts.js';
 
 /** World size, metres. */
@@ -197,8 +198,11 @@ export const FAULD_HAZE_SCALE_HEIGHT = 500;
  */
 export const FAULD_CLOUD_DECK = Object.freeze({ bottom: 1000, top: 1600 });
 
-/** Hedge shrubs and hedge trees by library file. */
-const MODELS: Readonly<Record<string, string>> = {
+/**
+ * The hedge shrubs and trees by plant mesh name (`library:<key>`): their model files under `margo-library/fauld/`,
+ * without `.gltf`.
+ */
+export const FAULD_PLANT_MODELS: Readonly<Record<string, string>> = Object.freeze({
   oak: 'trees/oak',
   ash: 'trees/ash',
   birch: 'trees/birch',
@@ -206,7 +210,7 @@ const MODELS: Readonly<Record<string, string>> = {
   hazel: 'hedges/hawthorn_b',
   hawthorn: 'hedges/hawthorn_a',
   blackthorn: 'hedges/blackthorn_a',
-};
+});
 
 /** Ground scans (Poly Haven, CC0) under `margo-library/fauld/ground/`, the repeat in metres and the winter colour. */
 const GROUND: Readonly<Record<string, { file: string; repeat: number; color: readonly [number, number, number] }>> = {
@@ -239,23 +243,30 @@ async function groundImage(url: string, signal?: AbortSignal): Promise<GroundIma
 
 const join = (root: string, path: string) => (root.endsWith('/') ? root : root + '/') + path;
 
-/** The OS Terrain 50 grid: float32 metres, row 0 the northmost (see its .json). */
-async function loadDem(url: string, signal?: AbortSignal) {
-  const meta = (await (await fetch(url.replace(/\.f32$/, '.json'), signal ? { signal } : {})).json()) as {
-      width: number;
-      depth: number;
-      cellsize_m: number;
-      xll_easting: number;
-      ytop_northing: number;
-    },
-    bytes = await (await fetch(url, signal ? { signal } : {})).arrayBuffer(),
-    data = new Float32Array(bytes);
+/** The size and corner of a height grid, as the `.json` beside it says. */
+export interface FauldDemMeta {
+  readonly width: number;
+  readonly depth: number;
+  readonly cellsize_m: number;
+  readonly xll_easting: number;
+  readonly ytop_northing: number;
+}
+
+/**
+ * The OS Terrain 50 grid (float32 metres, row 0 the northmost) as the height at OS (easting, northing), bilinear between
+ * sample centres.
+ * @throws RangeError for a grid whose length is not width x depth.
+ * @example
+ * const meta = await (await fetch('/dem/fauld.json')).json();
+ * const dem = fauldDem(meta, new Float32Array(await (await fetch('/dem/fauld.f32')).arrayBuffer()));
+ * const metres = dem(FAULD_CENTRE.easting, FAULD_CENTRE.northing);
+ */
+export function fauldDem(meta: FauldDemMeta, data: Float32Array): (easting: number, northing: number) => number {
   if (data.length !== meta.width * meta.depth)
     throw new RangeError(
-      `fauld: ${url} holds ${data.length} heights, not ${meta.width} x ${meta.depth}; regenerate the grid and its .json together.`,
+      `fauld: the height grid holds ${data.length} heights, not ${meta.width} x ${meta.depth}; regenerate the grid and its .json together.`,
     );
-  // Height at OS (easting, northing), bilinear between sample centres.
-  return (e: number, n: number) => {
+  return (e, n) => {
     const fx = (e - meta.xll_easting - meta.cellsize_m / 2) / meta.cellsize_m,
       fz = (meta.ytop_northing - meta.cellsize_m / 2 - n) / meta.cellsize_m,
       i = Math.max(0, Math.min(meta.width - 2, Math.floor(fx))),
@@ -267,8 +278,17 @@ async function loadDem(url: string, signal?: AbortSignal) {
   };
 }
 
+async function loadDem(url: string, signal?: AbortSignal) {
+  const init = signal ? { signal } : {},
+    meta = (await (await fetch(url.replace(/\.f32$/, '.json'), init)).json()) as FauldDemMeta;
+  return fauldDem(meta, new Float32Array(await (await fetch(url, init)).arrayBuffer()));
+}
+
 /** A crater model's heights binned on a 2 m grid (the highest vertex in each bin), centred on the origin. */
-function craterHeights(part: LibraryMeshPart): { at(x: number, z: number): number | undefined; half: number } {
+function craterHeights(part: { readonly geometry: { readonly positions: ArrayLike<number> } }): {
+  at(x: number, z: number): number | undefined;
+  half: number;
+} {
   const p = part.geometry.positions,
     half = 260,
     bin = 2,
@@ -305,6 +325,134 @@ const CRATER_SPOIL = defineBiome({
   ground: [{ material: 'crater-marl' }, { material: 'mud', moisture: [0.85, null] }],
 });
 
+/** What {@link layFauldGround} builds from. */
+export interface FauldGroundOptions {
+  /** Default `'before'`. */
+  readonly era?: FauldEra;
+  /** Default 1944. */
+  readonly seed?: number;
+  /** Height at OS (easting, northing): {@link fauldDem} of the OS Terrain 50 grid. */
+  readonly dem: (easting: number, northing: number) => number;
+  /** The era's crater model, of which only the heights are read. Default none (the ground before 1944). */
+  readonly crater?: { readonly geometry: { readonly positions: ArrayLike<number> } };
+  readonly signal?: AbortSignal;
+}
+
+/** The place without an engine: its biome world, farm, planting exclusions and ground height. */
+export interface FauldGround extends Disposable {
+  readonly world: BiomeWorld;
+  readonly farm: Farmland;
+  /** Where nothing is planted: what the view and `BiomePlacement` take, so both place the same trees and hedges. */
+  readonly exclusions: readonly Exclusion[];
+  height(x: number, z: number): number;
+  dispose(): void;
+}
+
+const ring = (c: readonly [number, number], r: number, k = 24) =>
+  Array.from(
+    { length: k },
+    (_, i) =>
+      [c[0] + r * Math.cos((i / k) * 2 * Math.PI), c[1] + r * Math.sin((i / k) * 2 * Math.PI)] as [number, number],
+  );
+
+/**
+ * The ground of {@link attachFauldWorld} on the CPU alone, for tools that must know where the hills, hedges and trees
+ * stand without rendering them (such as keeping shot cameras clear with `@margoengine/cameras/clearance`).
+ * @throws RangeError for an unknown era; rejects with the signal's reason when aborted.
+ * @example
+ * using ground = await layFauldGround({ dem, era: 'before' });
+ * const placement = BiomePlacement.attach(ground.world, { exclusions: ground.exclusions });
+ * const trees = await placement.tile(12, 12);
+ */
+export async function layFauldGround(options: FauldGroundOptions): Promise<FauldGround> {
+  const era = options.era ?? 'before',
+    seed = options.seed ?? 1944,
+    signal = options.signal,
+    demAt = options.dem,
+    bowl = options.crater ? craterHeights(options.crater) : undefined;
+  if (!['before', '1944', 'today'].includes(era))
+    throw new RangeError(`fauld: unknown era ${era}; pass 'before', '1944' or 'today'.`);
+  // The rim height the crater model's edge meets: the ground's mean round a 250 m circle.
+  let rim = 0;
+  for (let k = 0; k < 32; k++) {
+    const a = (k / 32) * 2 * Math.PI;
+    rim += demAt(FAULD_CENTRE.easting + 250 * Math.cos(a), FAULD_CENTRE.northing - 250 * Math.sin(a)) / 32;
+  }
+  const lift = bowl ? rim - 44.9 : 0,
+    n = FAULD_SIZE / FAULD_STEP + 1,
+    samples = new Float32Array(n * n);
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const x = -FAULD_SIZE / 2 + i * FAULD_STEP,
+        z = -FAULD_SIZE / 2 + j * FAULD_STEP;
+      let h = demAt(FAULD_CENTRE.easting + x, FAULD_CENTRE.northing - z);
+      if (bowl) {
+        const c = bowl.at(x, z),
+          w = 1 - smooth(150, 200, Math.hypot(x, z));
+        // The crater's own heights inside, easing into the real ground from 150 to 200 m out (no mesh edge, no band).
+        if (c !== undefined) h = h * (1 - w) + (c + lift) * w;
+      }
+      samples[j * n + i] = h;
+    }
+  const world = await BiomeWorld.create({
+    seed,
+    origin: [-FAULD_SIZE / 2, -FAULD_SIZE / 2],
+    size: [FAULD_SIZE, FAULD_SIZE],
+    climate: lowlandFarmWorld.climate,
+    height: { samples, width: n, depth: n, unit: 'm' },
+    biomes: [...lowlandFarmWorld.biomes, CRATER_SPOIL],
+    paint: [...FARMLAND_PAINT, { biome: CRATER_SPOIL.id }],
+    ...(signal ? { signal } : {}),
+  });
+  const keep = [
+      ring(FAULD_PLACES.hanbury, 260),
+      ring(FAULD_PLACES.works, 110),
+      ring(FAULD_PLACES.reservoir, 70),
+      era === 'before' ? ring(FAULD_PLACES.farm, 45) : ring(FAULD_PLACES.crater, 230),
+    ],
+    E = FAULD_SIZE / 2,
+    farm = layoutFarmland(world, {
+      seed,
+      fieldSize: 42000,
+      keep,
+      connect: [
+        [-E, 260],
+        FAULD_PLACES.hanbury,
+        era === 'before' ? FAULD_PLACES.farm : [0, 260],
+        FAULD_PLACES.works,
+        [E, -900],
+        [-420, -E],
+        [-900, E],
+      ],
+    }),
+    editor = BiomeEditor.attach(world);
+  for (const edit of farmlandEdits(farm, {}, [
+    ring([380, -620], 230),
+    ...(era === 'today' ? [ring(FAULD_PLACES.crater, 200)] : []),
+  ]))
+    editor.apply(edit);
+  // The fresh crater: bare marl and gypsum thrown out over its bowl and lip (about 230 m across in the RAF survey).
+  if (era === '1944') editor.polygon(CRATER_SPOIL.id, ring(FAULD_PLACES.crater, 175, 48));
+  const height = (x: number, z: number) => {
+    const g = world.heightAt(x, z),
+      c = bowl && Math.hypot(x, z) < 150 ? bowl.at(x, z) : undefined;
+    // Inside the crater the model's finer heights (a camera or prop never sits under a slump the terrain smooths).
+    return c === undefined ? g : Math.max(g, c + lift);
+  };
+  const dispose = () => world.dispose();
+  return {
+    world,
+    farm,
+    exclusions: [
+      ...farm.exclusions,
+      ...(era === '1944' ? [{ kind: 'polygon' as const, points: ring(FAULD_PLACES.crater, 205) }] : []),
+    ],
+    height,
+    dispose,
+    [Symbol.dispose]: dispose,
+  };
+}
+
 /** Builds the shared Fauld ground, farmland, sky and weather into `engine`. */
 export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorldSettings = {}): Promise<FauldWorld> {
   const era = settings.era ?? 'before',
@@ -335,79 +483,16 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
                 maxTriangles: 600000,
                 ...(signal ? { signal } : {}),
               },
-            ),
-      bowl = crater ? craterHeights(crater) : undefined;
-    // The rim height the crater model's edge meets: the ground's mean round a 250 m circle.
-    let rim = 0;
-    for (let k = 0; k < 32; k++) {
-      const a = (k / 32) * 2 * Math.PI;
-      rim += demAt(FAULD_CENTRE.easting + 250 * Math.cos(a), FAULD_CENTRE.northing - 250 * Math.sin(a)) / 32;
-    }
-    const lift = bowl ? rim - 44.9 : 0,
-      n = FAULD_SIZE / FAULD_STEP + 1,
-      samples = new Float32Array(n * n);
-    for (let j = 0; j < n; j++)
-      for (let i = 0; i < n; i++) {
-        const x = -FAULD_SIZE / 2 + i * FAULD_STEP,
-          z = -FAULD_SIZE / 2 + j * FAULD_STEP;
-        let h = demAt(FAULD_CENTRE.easting + x, FAULD_CENTRE.northing - z);
-        if (bowl) {
-          const c = bowl.at(x, z),
-            w = 1 - smooth(150, 200, Math.hypot(x, z));
-          // The crater's own heights inside, easing into the real ground from 150 to 200 m out (no mesh edge, no band).
-          if (c !== undefined) h = h * (1 - w) + (c + lift) * w;
-        }
-        samples[j * n + i] = h;
-      }
-    const world = await BiomeWorld.create({
+            );
+    const ground = await layFauldGround({
+      era,
       seed,
-      origin: [-FAULD_SIZE / 2, -FAULD_SIZE / 2],
-      size: [FAULD_SIZE, FAULD_SIZE],
-      climate: lowlandFarmWorld.climate,
-      height: { samples, width: n, depth: n, unit: 'm' },
-      biomes: [...lowlandFarmWorld.biomes, CRATER_SPOIL],
-      paint: [...FARMLAND_PAINT, { biome: CRATER_SPOIL.id }],
+      dem: demAt,
+      ...(crater ? { crater } : {}),
       ...(signal ? { signal } : {}),
     });
-    disposers.push(() => world.dispose());
-    const ring = (c: readonly [number, number], r: number, k = 24) =>
-        Array.from(
-          { length: k },
-          (_, i) =>
-            [c[0] + r * Math.cos((i / k) * 2 * Math.PI), c[1] + r * Math.sin((i / k) * 2 * Math.PI)] as [
-              number,
-              number,
-            ],
-        ),
-      keep = [
-        ring(FAULD_PLACES.hanbury, 260),
-        ring(FAULD_PLACES.works, 110),
-        ring(FAULD_PLACES.reservoir, 70),
-        era === 'before' ? ring(FAULD_PLACES.farm, 45) : ring(FAULD_PLACES.crater, 230),
-      ],
-      E = FAULD_SIZE / 2,
-      farm = layoutFarmland(world, {
-        seed,
-        fieldSize: 42000,
-        keep,
-        connect: [
-          [-E, 260],
-          FAULD_PLACES.hanbury,
-          era === 'before' ? FAULD_PLACES.farm : [0, 260],
-          FAULD_PLACES.works,
-          [E, -900],
-          [-420, -E],
-          [-900, E],
-        ],
-      }),
-      editor = BiomeEditor.attach(world);
-    for (const edit of farmlandEdits(farm, {}, [
-      ring([380, -620], 230),
-      ...(era === 'today' ? [ring(FAULD_PLACES.crater, 200)] : []),
-    ]))
-      editor.apply(edit);
-    // The fresh crater: bare marl and gypsum thrown out over its bowl and lip (about 230 m across in the RAF survey).
-    if (era === '1944') editor.polygon(CRATER_SPOIL.id, ring(FAULD_PLACES.crater, 175, 48));
+    disposers.push(() => ground.dispose());
+    const { world, farm, height } = ground;
     const sun = sunPath({ latitude: degrees(52.84), dayOfYear: 332, hour: settings.hour ?? sky.hour }),
       preset = PresetScene.attach(engine, {
         ...SCENE_PRESETS[sky.preset],
@@ -440,7 +525,7 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
     disposers.push(() => shadows.dispose());
     // Woods, hedgerows and hedge trees: the biomes' species from the library models with their bark maps.
     const registry: Record<string, NonNullable<BiomeViewOptions['meshes']>[string]> = {};
-    for (const [key, file] of Object.entries(MODELS))
+    for (const [key, file] of Object.entries(FAULD_PLANT_MODELS))
       registry[`library:${key}`] = await libraryParts(join(library, `margo-library/fauld/${file}.gltf`), {
         maxTriangles: 250000,
         kind: 'bark',
@@ -473,21 +558,12 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       sky: preset.sky,
       shadows,
       materials,
-      exclusions: [
-        ...farm.exclusions,
-        ...(era === '1944' ? [{ kind: 'polygon' as const, points: ring(FAULD_PLACES.crater, 205) }] : []),
-      ],
+      exclusions: ground.exclusions,
       radius,
       meshes: registry,
       ...(signal ? { signal } : {}),
     });
     disposers.push(() => view.dispose());
-    const height = (x: number, z: number) => {
-      const g = world.heightAt(x, z),
-        c = bowl && Math.hypot(x, z) < 150 ? bowl.at(x, z) : undefined;
-      // Inside the crater the model's finer heights (a camera or prop never sits under a slump the terrain smooths).
-      return c === undefined ? g : Math.max(g, c + lift);
-    };
     // The winter haze lies in the boundary layer, not at every height: the sky fog thins by e every 500 m above the
     // ground round the subject (a stable November boundary layer is 100 to 500 m deep; Stull, "An Introduction to
     // Boundary Layer Meteorology", 1988, ch. 12), so the drone shots look down through thin air onto the fields instead

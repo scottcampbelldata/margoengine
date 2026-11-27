@@ -13481,6 +13481,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ## Open defects
 
+### Open 2026-11-27: five Fauld shot cameras still cannot see their subject (shot generator, KB-SHOT-FAULDSIGHT1)
+
+- **Repro:** `node tools/shot/fauld-shots.mjs`; `tools/shot/fauld-sight.json` marks fr073, fr108, fr114, fr136 and fr146 `"clear": false` with 0 of the subject seen.
+- **Cause:** their target is the crater floor (or the farm site) 450 m off on a long lens, below the plateau rim: no turn or lift up to 34 m sees it. The rows describe the rim, a fence, a path or the skyline, which the generator does not aim at.
+- **Left:** aim each of these rows at what it describes (its own target in the generator), then judge a still. Their cameras are unchanged.
+- **Also seen:** the lorry of fr031 and the memorial stone of fr139 have no model, so those frames show their places without them.
+
 ### Fixed 2026-11-26: margoengine/viz cost 264 B gzip more than @margoengine/points for PointsPlugin (package build, splats, KB-INL1b)
 
 - **Repro:** `npm run build:packages`, then `node --test --test-name-pattern="a kit costs only" tests/umbrella.test.js`: `import { PointsPlugin } from 'margoengine/viz'` bundled the same modules as importing it from `@margoengine/points`, but its entry and static chunks gzipped to 27,696 B against 27,431 B, past the test's 64 B.

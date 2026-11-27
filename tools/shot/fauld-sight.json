@@ -1,0 +1,1022 @@
+{
+ "fr001": {
+  "distance": 2000,
+  "turn": 6,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.803,
+  "foreground": 0.085,
+  "centre": 0.02,
+  "lens": 159.369
+ },
+ "fr002": {
+  "distance": 1200,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.797,
+  "foreground": 0.058,
+  "centre": 0.043,
+  "lens": 88.716
+ },
+ "fr004": {
+  "distance": 3000,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr005": {
+  "distance": 560,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr006": {
+  "distance": 300,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr007": {
+  "distance": 3000,
+  "turn": -6,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.895,
+  "foreground": 0.077,
+  "centre": 0,
+  "lens": 67.639
+ },
+ "fr008": {
+  "distance": 400,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr010": {
+  "distance": 700,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr011": {
+  "distance": 1500,
+  "turn": 24,
+  "lift": 22,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0.031,
+  "centre": 0,
+  "lens": 234.448
+ },
+ "fr012": {
+  "distance": 25,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr013": {
+  "distance": 120,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr016": {
+  "distance": 600,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr017": {
+  "distance": 25,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr018": {
+  "distance": 90,
+  "turn": 84,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr022": {
+  "distance": 980,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr029": {
+  "distance": 160,
+  "turn": 42,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr031": {
+  "distance": 300,
+  "turn": -132,
+  "lift": 22,
+  "clear": true,
+  "subject": 0.89,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr038": {
+  "distance": 210,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr039": {
+  "distance": 60,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr040": {
+  "distance": 250,
+  "turn": 48,
+  "lift": 34,
+  "clear": true,
+  "subject": 0.933,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr041": {
+  "distance": 120,
+  "turn": 42,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr042": {
+  "distance": 60,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr043": {
+  "distance": 160,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr054": {
+  "distance": 1500,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr055": {
+  "distance": 2000,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.957,
+  "foreground": 0.014,
+  "centre": 0,
+  "lens": 196.554
+ },
+ "fr056": {
+  "distance": 2600,
+  "turn": 6,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.867,
+  "foreground": 0.032,
+  "centre": 0.046,
+  "lens": 191.505
+ },
+ "fr057": {
+  "distance": 400,
+  "turn": 12,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.62,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr058": {
+  "distance": 3000,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr059": {
+  "distance": 2800,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.906,
+  "foreground": 0.08,
+  "centre": 0.038,
+  "lens": 63.389
+ },
+ "fr060": {
+  "distance": 2000,
+  "turn": 18,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.73,
+  "foreground": 0.113,
+  "centre": 0.038,
+  "lens": 131.535
+ },
+ "fr061": {
+  "distance": 800,
+  "turn": 108,
+  "lift": 22,
+  "clear": true,
+  "subject": 0.538,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr062": {
+  "distance": 60,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.867,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr063": {
+  "distance": 280,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr064": {
+  "distance": 60,
+  "turn": -18,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr065": {
+  "distance": 25,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.867,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr066": {
+  "distance": 160,
+  "turn": -24,
+  "lift": 0.5,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr067": {
+  "distance": 400,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr068": {
+  "distance": 250,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr069": {
+  "distance": 150,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr070": {
+  "distance": 60,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr071": {
+  "distance": 450,
+  "turn": 48,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.887,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr072": {
+  "distance": 2800,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr073": {
+  "distance": 450,
+  "turn": 0,
+  "lift": 0,
+  "clear": false,
+  "subject": 0,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr074": {
+  "distance": 400,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr075": {
+  "distance": 128,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr076": {
+  "distance": 25,
+  "turn": 6,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.933,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr077": {
+  "distance": 600,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr078": {
+  "distance": 210,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr079": {
+  "distance": 300,
+  "turn": 96,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.733,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr080": {
+  "distance": 280,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr081": {
+  "distance": 450,
+  "turn": 24,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.86,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr082": {
+  "distance": 560,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr083": {
+  "distance": 420,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr084": {
+  "distance": 420,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr085": {
+  "distance": 450,
+  "turn": 18,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr086": {
+  "distance": 980,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr087": {
+  "distance": 280,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr088": {
+  "distance": 450,
+  "turn": -96,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.94,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr089": {
+  "distance": 160,
+  "turn": 0,
+  "lift": 14,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr100": {
+  "distance": 450,
+  "turn": 48,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr102": {
+  "distance": 200,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr103": {
+  "distance": 160,
+  "turn": -144,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr104": {
+  "distance": 300,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr105": {
+  "distance": 25,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr106": {
+  "distance": 168,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr107": {
+  "distance": 60,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr108": {
+  "distance": 450,
+  "turn": 0,
+  "lift": 0,
+  "clear": false,
+  "subject": 0,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr109": {
+  "distance": 400,
+  "turn": 24,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.86,
+  "foreground": 0.011,
+  "centre": 0,
+  "lens": 153.847
+ },
+ "fr110": {
+  "distance": 25,
+  "turn": -18,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.933,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr111": {
+  "distance": 128,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr112": {
+  "distance": 120,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr113": {
+  "distance": 128,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.933,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr114": {
+  "distance": 450,
+  "turn": 0,
+  "lift": 0,
+  "clear": false,
+  "subject": 0,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr115": {
+  "distance": 700,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr116": {
+  "distance": 400,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr117": {
+  "distance": 25,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr128": {
+  "distance": 300,
+  "turn": 12,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0.118,
+  "centre": 0,
+  "lens": 27.823
+ },
+ "fr131": {
+  "distance": 420,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr132": {
+  "distance": 560,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr134": {
+  "distance": 113,
+  "turn": -6,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.283,
+  "foreground": 0.032,
+  "centre": 0,
+  "lens": 17.045
+ },
+ "fr135": {
+  "distance": 840,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr136": {
+  "distance": 450,
+  "turn": 6,
+  "lift": 0,
+  "clear": false,
+  "subject": 0,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr137": {
+  "distance": 300,
+  "turn": 12,
+  "lift": 1.3,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0.113,
+  "centre": 0.044,
+  "lens": 36.397
+ },
+ "fr138": {
+  "distance": 200,
+  "turn": 42,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr139": {
+  "distance": 128,
+  "turn": 72,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.763,
+  "foreground": 0.085,
+  "centre": 0,
+  "lens": 10.216
+ },
+ "fr140": {
+  "distance": 128,
+  "turn": 12,
+  "lift": 14,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0.022,
+  "centre": 0,
+  "lens": 4.22
+ },
+ "fr141": {
+  "distance": 128,
+  "turn": 18,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.489,
+  "foreground": 0.049,
+  "centre": 0,
+  "lens": 7.922
+ },
+ "fr142": {
+  "distance": 113,
+  "turn": 30,
+  "lift": 0.5,
+  "clear": true,
+  "subject": 0.369,
+  "foreground": 0.099,
+  "centre": 0,
+  "lens": 8.921
+ },
+ "fr143": {
+  "distance": 160,
+  "turn": 42,
+  "lift": 8,
+  "clear": true,
+  "subject": 0.215,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr144": {
+  "distance": 128,
+  "turn": -18,
+  "lift": 8,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0.084,
+  "centre": 0.037,
+  "lens": 8.776
+ },
+ "fr145": {
+  "distance": 113,
+  "turn": -6,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.507,
+  "foreground": 0.109,
+  "centre": 0,
+  "lens": 13.377
+ },
+ "fr146": {
+  "distance": 450,
+  "turn": 6,
+  "lift": 0,
+  "clear": false,
+  "subject": 0,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr147": {
+  "distance": 128,
+  "turn": -18,
+  "lift": 8,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0.108,
+  "centre": 0.084,
+  "lens": 7.739
+ },
+ "fr148": {
+  "distance": 25,
+  "turn": 12,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.907,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr149": {
+  "distance": 113,
+  "turn": 36,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.299,
+  "foreground": 0.085,
+  "centre": 0.056,
+  "lens": 14.117
+ },
+ "fr152": {
+  "distance": 980,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr153": {
+  "distance": 128,
+  "turn": -108,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.827,
+  "foreground": 0.126,
+  "centre": 0.098,
+  "lens": 10.346
+ },
+ "fr154": {
+  "distance": 25,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ },
+ "fr155": {
+  "distance": 128,
+  "turn": 18,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.489,
+  "foreground": 0.05,
+  "centre": 0,
+  "lens": 7.909
+ },
+ "fr156": {
+  "distance": 160,
+  "turn": -96,
+  "lift": 14,
+  "clear": true,
+  "subject": 0.305,
+  "foreground": 0.147,
+  "centre": 0.113,
+  "lens": 17.41
+ },
+ "fr157": {
+  "distance": 113,
+  "turn": -6,
+  "lift": 0,
+  "clear": true,
+  "subject": 0.307,
+  "foreground": 0.038,
+  "centre": 0,
+  "lens": 15.808
+ },
+ "fr158": {
+  "distance": 120,
+  "turn": 0,
+  "lift": 0,
+  "clear": true,
+  "subject": 1,
+  "foreground": 0,
+  "centre": 0,
+  "lens": null
+ }
+}
