@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { Water } from '../dist/index.js';
+import { ShallowWaterSurface } from '../dist/shallow-surface.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 // The bridge is internal (not an export of the package): find the solver map in the built query-state chunk by what
@@ -117,4 +118,50 @@ test('sprayCount sizes the droplet pool; a count that is not a multiple of 64 fr
       TypeError,
       String(sprayCount),
     );
+});
+
+test('a shallow-water mirror samples its source once per cell and rebuilds only its own GPU resources', () => {
+  const { h, terrain, water } = setup();
+  const points = [];
+  const source = {
+    shape: { columns: 16, rows: 16, width: 16, depth: 16, centre: [0, 0] },
+    sample(x, z, out) {
+      points.push([x, z]);
+      out.depth = 0.5;
+      out.surface = 0.75;
+      out.velocity.splice(0, 2, 0.2, -0.1);
+      return out;
+    },
+  };
+  const mirror = ShallowWaterSurface.attach(h.engine, { surface: water, source });
+  h.frame();
+  assert.equal(points.length, 16 * 16);
+  assert.deepEqual(points[0], [-7.5, -7.5]);
+  assert.deepEqual(points.at(-1), [7.5, 7.5]);
+  const first = water.coastalDepthTexture;
+  assert.equal(first.label, 'shallow water surface');
+  water.onDeviceRestored(h.engine);
+  assert.equal(first.destroyed, true);
+  h.frame();
+  assert.equal(points.length, 2 * 16 * 16);
+  const restored = water.coastalDepthTexture;
+  assert.equal(restored.label, 'shallow water surface');
+  assert.notEqual(restored, first);
+  mirror.dispose();
+  h.frame();
+  assert.equal(restored.destroyed, true);
+  assert.equal(terrain.destroyed, false, 'the caller still owns the terrain texture');
+  assert.equal(points.length, 2 * 16 * 16);
+  water.dispose();
+  terrain.destroy();
+});
+
+test('a shallow-water mirror requires flowing terrain and a synchronous source', () => {
+  const water = new Water({ still: true, terrain: { heightmap: () => undefined, origin: [0, 0], size: [1, 1] } });
+  assert.throws(() => new ShallowWaterSurface({ surface: water }), {
+    name: 'MargoError',
+    code: 'state',
+    message: /needs flowing Water with terrain and a synchronous grid source; supply both/,
+  });
+  water.dispose();
 });

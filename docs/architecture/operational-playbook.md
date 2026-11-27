@@ -529,6 +529,16 @@ control flow). Evidence: `packages/terrain/test/rocks.test.js` (CPU shape bounds
 plain mesh's close-up detail, rain 0.69, tide band 0.61, the blend's foot 40 of 255 from bare ground against 96, far
 shimmer 0.17 against 0.15). Missing: shading cost, other GPUs.
 
+### Section 5 evidence for the SEA-12 Hydro surface mirror (2026-11-26)
+
+`ShallowWaterSurface` uploads the latest CPU Hydro depth, bed and discharge to Water on both renderers.
+Hydro owns the clock, pressure reaction and rigid impulse. Water owns the upload resources and draw
+interpolation. The test `packages/water/test/shallow-surface.browser.mjs` exercises both backends,
+including exact seek, a live guided pressure impulse and restoring ordinary Water when the mirror
+detaches. The 8×8 grid changes depth by 0.016331 m and its draw residual is below 0.086 μm. The
+CPU bridge test checks device restore and caller-owned terrain lifetime. Asynchronous standalone GPU
+Flood feedback and the original production shots remain open.
+
 ### Section 5 evidence: the flood's film clock and the sea, WebGPU and the WebGL2 layer (water/flood push 4, 2026-11-17)
 
 The clock: the flood runs in ticks of 1 / 120 s of m steps each. Inputs are a log of snapshots (sources, walls with their

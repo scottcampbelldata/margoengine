@@ -3,7 +3,7 @@
 // slender structure's segments (a rod's links) that the structure solves with its own stiffness.
 export * from './debris-contact.js';
 export * from './flood-blockage.js';
-export * from './flood-body-drag.js';
+export { FloodBodyDragSolver, type FloodBodyDragBody, type FloodBodyDragParams } from './flood-body-drag.js';
 export * from './flood-paddle.js';
 export * from './flood-wading.js';
 export * from './morison.js';

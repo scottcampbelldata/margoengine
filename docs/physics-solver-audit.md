@@ -1198,6 +1198,31 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   about an offset centre, pressure-independent passive memory, dry and rewet transitions, two native
   layouts and replay. `loads-kernel.test.js` guards exact legacy behavior, the coupled numerical envelope
   and rejection of a singular six-axis matrix before it publishes a wrench.
+  The opt-in rigid wake uses accepted transverse point acceleration and the actual wetted lift arm.
+  `coupling/loads-member-viv.test.js` matches the independent Carberry force-transducer peak at two
+  rates, finds the uncoupled control outside the bound and checks live linear and angular impulse.
+  Quantitative force phase and free-response amplitude remain outside that frequency qualification.
+  `coupling/projected-drag-settlement.test.js` checks accepted drag after Hydro transport, f64 wetness,
+  a rejected dry impulse, an independently rewet control, overlap order and bit-identical seek.
+  Water’s `shallow-surface.browser.mjs` draws a single coupled Hydro state. Both renderers show the
+  16.331 mm depth change with a draw residual below 0.086 μm and verify the associated rigid
+  pressure impulse, volume and replay. The original film shots still need their own playback check.
+
+**Commit and test receipts on public main**
+
+| Audit item | Commit and test |
+| --- | --- |
+| 1. Hydrostatic righting | `4195a70985`, `loads.test.js` checks finite-angle box and mesh righting, the small-heel GM limit and the independently photographed free float. |
+| 2. Exact displacement | `4195a70985`, `loads.test.js` checks clipped box and closed hull displacement and the transformed ellipsoid cap centroid. |
+| 3. Rod segments | `7bcfb11e3`, `loads-segments.test.js` checks buoyancy, drag and finite wet intervals. SOFT-02 owns the rod integration. |
+| 4. Incident pressure | `983be44429`, `loads.test.js` checks live incident pressure on submerged and partly wet meshes and the single acceleration contribution. |
+| 5. Radiation and rotational inertia | `113a391fde`, `loads.test.js` checks Lamb inertia and Cummins memory. `16800c8b12`, `loads-radiation-coupled-profile.test.js` and `loads-coupled-radiation.test.js` check full cross-axis coefficients, forces, modal work and replay. |
+| 6. Debris and anchors | `113a391fde`, `coupling/loads-debris.test.js` checks held-out Haehnel–Daly impacts and reciprocal impulses. `coupling/loads-mooring.test.js` checks the taut oscillator, slack and dynamic anchorage. |
+| 7. Independent measurements | `983be44429`, `loads.test.js` checks the withheld Sarpkaya β = 4480 diameter series. `4195a70985` checks independent Hori float heel. `113a391fde` checks held-out Haehnel–Daly force. `16800c8b12` checks Vugts sway–roll in its width-confined geometry. The historic Keulegan–Carpenter cases remain outside the Sarpkaya envelope. |
+| 8. Reciprocal neighbours | `c8af3a4312`, `coupling/loads-hull-projected-drag.test.js`, `coupling/loads-reciprocal.test.js`, `coupling/loads-swim-actuators.test.js`, `coupling/loads-paddle.test.js` and `coupling/loads-wading.test.js` check return impulse. `16800c8b12`, `coupling/moving-cylinder-blockage.test.js` checks accepted pressure, closing cells and seam replay. `1a6c425709`, `water/test/loads-quay.browser.mjs` checks the component render. |
+| 9. Drag and wind geometry | `1a6c425709`, `loads-compact-drag.test.js` and `loads.test.js` check projected area and centroid, drag against held-out cube measurements, and separate spin damping. `c8af3a4312`, `loads.test.js` checks dissipative stiff drag. |
+| 10. Coded errors | `4195a70985`, `loads.test.js` checks actionable mesh and shape errors. `c8af3a4312`, `coupling/moving-cylinder-blockage.test.js` checks the public factory repair. `16800c8b12`, `loads-coupled-radiation.test.js` checks incompatible profile inputs. |
+| 11. Native work and origin cells | `1a6c425709`, `loads.test.js` checks independent static origin cells, one SIMD batch and replay. `16800c8b12`, `loads-kernel.test.js` and `loads-coupled-radiation.test.js` check both layouts and memory variants. Live origin shifts require the field-registry repair requested in the work queue. |
 
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 

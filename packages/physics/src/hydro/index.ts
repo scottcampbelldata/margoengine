@@ -37,7 +37,14 @@ import {
 import type { ShallowBlockageFields, ShallowMovingCylinder, ShallowMovingFootprint } from './blockage-contract.js';
 import type { CylinderBlockage } from './cylinder.js';
 import type { RigidCylinderCoupling, RigidCylinderOptions } from './cylinder-rigid.js';
+import type { FloodBodyDragBody } from '../loads/flood-body-drag.js';
+import type {
+  ProjectedFloodDragCoupling,
+  ProjectedFloodDragOptions,
+  ProjectedFloodDragWater,
+} from '../loads/flood-drag-settlement.js';
 export type { RigidCylinderCoupling, RigidCylinderOptions } from './cylinder-rigid.js';
+export type { ProjectedFloodDragCoupling, ProjectedFloodDragOptions } from '../loads/flood-drag-settlement.js';
 import { DRY, manning, type ShallowGrid, type ShallowSide, shallowRates, velocityOf } from './shallow.js';
 
 export { DRY, manning, type ShallowGrid, type ShallowSide, shallowRates, velocityOf } from './shallow.js';
@@ -212,6 +219,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private readonly id: string;
   private cylinder?: CylinderBlockage;
   private cylinderCouplingRate?: RateLevel;
+  private projectedDrag?: ProjectedFloodDragWater;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
   private bedShape!: BedShape;
@@ -293,6 +301,24 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     return ShallowWaterSolver.withRigidBlockage(footprint, options);
   }
 
+  /**
+   * Settle projected rigid drag after wet/dry water transport. Add the free
+   * rigid bodies first, then use the supplied staggered order in the fixed
+   * bed origin. Wet and dry cells keep their water volume in this exchange.
+   */
+  static async withProjectedBodyDrag(
+    bodies: readonly FloodBodyDragBody[],
+    options: ProjectedFloodDragOptions = {},
+  ): Promise<ProjectedFloodDragCoupling> {
+    options.signal?.throwIfAborted();
+    const { projectedFloodDragCoupling } = await import('../loads/flood-drag-settlement.js');
+    options.signal?.throwIfAborted();
+    const water = new ShallowWaterSolver(options.id);
+    const { endpoint, coupling } = projectedFloodDragCoupling(water, bodies, options);
+    water.projectedDrag = endpoint;
+    return coupling;
+  }
+
   private static async withMovingBlockage(
     shape: ShallowMovingCylinder | ShallowMovingFootprint,
     options: { readonly id?: string; readonly signal?: AbortSignal },
@@ -340,6 +366,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
           ? [
               { field: this.cylinder.fields.motion, access: 'read' as const },
               { field: this.cylinder.fields.reaction, access: 'write' as const },
+            ]
+          : []),
+        ...(this.projectedDrag
+          ? [
+              { field: this.projectedDrag.fields.request, access: 'read' as const },
+              { field: this.projectedDrag.fields.receipt, access: 'write' as const },
             ]
           : []),
       ],
@@ -406,11 +438,21 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       x0: this.x0,
       z0: this.z0,
     };
-    const { courant = 0.4, density = WATER_DENSITY, rate = this.cylinderCouplingRate ?? 0, timeScale = 1 } = params;
+    const {
+      courant = 0.4,
+      density = WATER_DENSITY,
+      rate = this.cylinderCouplingRate ?? this.projectedDrag?.rate ?? 0,
+      timeScale = 1,
+    } = params;
     if (this.cylinderCouplingRate !== undefined && rate !== this.cylinderCouplingRate)
       throw new MargoError(
         'unsupported',
         'The cylinder and its rigid exchange must share a rate; use the rate passed to withRigidCylinder.',
+      );
+    if (this.projectedDrag && rate !== this.projectedDrag.rate)
+      throw new MargoError(
+        'unsupported',
+        'Use the rate passed to withProjectedBodyDrag for its water solver. See https://margoengine.com/errors#hydrodynamic-loads',
       );
 
     if (!(timeScale > 0 && Number.isFinite(timeScale)))
@@ -505,6 +547,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     this.state = host.allocate('state', count * 3 * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.ledger = host.allocate('ledger', LEDGER * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.published = host.allocate('published', count * 3 * 4, 'f32', SURFACE_WATER_LAYOUT);
+    this.projectedDrag?.init(host, params);
     if (this.cylinder) {
       if (
         this.scale !== 1 ||
@@ -633,6 +676,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    const dragRequest = this.projectedDrag?.request(context);
     const port = this.runoff && context.inputs.get(this.runoff.field.name);
     let runoff: Float64Array | undefined;
     if (port) {
@@ -677,6 +721,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       ledger[4]! += 1;
     }
     ledger[3]! += 1;
+    if (dragRequest) this.projectedDrag!.settle(dragRequest, this.words(), this.grid.bed, dt);
     this.publish();
   }
 
@@ -899,11 +944,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
 
   exportPorts(tick: number): readonly Port[] {
     const water = { field: SURFACE_WATER_FIELD.name, region: this.published, tick, cell: this.cell };
-    return this.cylinder ? [water, this.cylinder.reaction(tick, this.cell)] : [water];
+    if (this.cylinder) return [water, this.cylinder.reaction(tick, this.cell)];
+    return this.projectedDrag ? [water, this.projectedDrag.receipt(tick, this.cell)] : [water];
   }
 
   stateRegions(): readonly Region[] {
-    return this.cylinder ? [this.state, this.ledger, ...this.cylinder.states()] : [this.state, this.ledger];
+    return [this.state, this.ledger, ...(this.cylinder?.states() ?? []), ...(this.projectedDrag?.stateRegions() ?? [])];
   }
 
   extraState(): readonly Region[] {

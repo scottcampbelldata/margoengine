@@ -13,6 +13,24 @@ export const EARTH_ROTATION = 0.00007292115;
 
 export const FORCING_WORDS = 5;
 
+export interface ProjectedFloodDragCoupling {
+    readonly water: ShallowWaterSolver;
+    readonly request: Solver<Record<string, never>>;
+    readonly relay: Solver<Record<string, never>>;
+    readonly order: readonly [string, string, string, string];
+    readonly fields: {
+        readonly request: FieldDescriptor;
+        readonly receipt: FieldDescriptor;
+    };
+}
+
+export interface ProjectedFloodDragOptions {
+    readonly id?: string;
+    readonly rigidId?: string;
+    readonly rate?: RateLevel;
+    readonly signal?: AbortSignal;
+}
+
 export interface RigidCylinderCoupling {
     readonly water: ShallowWaterSolver;
     readonly predictor: Solver;
@@ -131,6 +149,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     }): Promise<ShallowWaterSolver>;
     static withRigidCylinder(cylinder: ShallowMovingCylinder, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
     static withRigidFootprint(footprint: ShallowMovingFootprint, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
+    static withProjectedBodyDrag(bodies: readonly FloodBodyDragBody[], options?: ProjectedFloodDragOptions): Promise<ProjectedFloodDragCoupling>;
     describe(): SolverDescription;
     init(host: SolverHost, params: ShallowWaterParams): void;
     get blockageFields(): ShallowBlockageFields | undefined;
@@ -202,12 +221,23 @@ interface FieldUse {
     readonly optional?: boolean;
 }
 
+interface FloodBodyDragBody {
+    readonly row: number;
+    readonly centre?: Vec3;
+    readonly halfHeight: number | Vec3;
+    readonly area: number | Vec3;
+    readonly projection?: Projection;
+    readonly dragCoefficient: number;
+}
+
 interface Port {
     readonly field: string;
     readonly region: Region;
     readonly tick: number;
     readonly cell: Cell;
 }
+
+type Projection = 'box' | 'ellipsoid';
 
 type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -262,4 +292,6 @@ interface StepContext {
     readonly inputs: ReadonlyMap<string, Port>;
     readonly cell: Cell;
 }
+
+type Vec3 = readonly [number, number, number];
 ```

@@ -124,7 +124,12 @@ export interface LoadMember {
   /** Use the measured smooth-cylinder interpolation for oscillatory flow. Default 'dnv' uses DNV/White. */
   readonly coefficients?: 'dnv' | 'sarpkaya-1976';
   /** Vortex shedding: Strouhal number and fixed-cylinder lift amplitude (default none; {strouhal: 0.2, lift: 0.3}). */
-  readonly vortex?: { readonly strouhal?: number; readonly lift?: number };
+  readonly vortex?: {
+    readonly strouhal?: number;
+    readonly lift?: number;
+  };
+  /** Drive the coherent wake with the rigid midpoint's cross-flow acceleration. Default is free shedding. */
+  readonly vortexCoupling?: 'body-acceleration';
 }
 
 /** What a {@link LoadSolver} is made from. */
@@ -212,6 +217,7 @@ export class LoadSolver implements Solver<LoadParams> {
   private memberLoads: MemberLoad[] = [];
   private forces!: Region;
   private wakes!: Region;
+  private wakeMotion: Region | undefined;
   private history: Region | undefined;
   private hasCoupledRadiation = false;
   private builds: LoadsBuilds | undefined;
@@ -357,6 +363,18 @@ export class LoadSolver implements Solver<LoadParams> {
         throw invalidLoad(
           "The 'sarpkaya-1976' member model needs a smooth cylinder; set roughness to 0 or select 'dnv'.",
         );
+      if (m.vortexCoupling !== undefined) {
+        const { strouhal = 0.2, lift = 0.3 } = m.vortex ?? {};
+        if (
+          m.vortexCoupling !== 'body-acceleration' ||
+          m.row === undefined ||
+          !m.from.some((value, axis) => value !== m.to[axis]) ||
+          !(strouhal > 0 && Number.isFinite(strouhal) && lift >= 0 && Number.isFinite(lift))
+        )
+          throw invalidLoad(
+            'Use body-acceleration vortex coupling on a finite-length rigid member with positive Strouhal number and nonnegative lift.',
+          );
+      }
     }
     this.members = members;
     this.memberLoads = members.map(() => ({ force: [0, 0, 0], lift: 0 }));
@@ -369,6 +387,8 @@ export class LoadSolver implements Solver<LoadParams> {
       throw invalidLoad('Invalid hydrodynamic force capacity; omit capacity to use the world body rows.');
     this.forces = host.allocate('forces', Math.max(1, capacity) * FORCE_WORDS * 8, 'f64', LOADS_LAYOUT);
     this.wakes = host.allocate('wakes', Math.max(1, members.length) * 2 * 8, 'f64', LOADS_LAYOUT);
+    if (members.some((member) => member.vortexCoupling === 'body-acceleration'))
+      this.wakeMotion = host.allocate('wake-motion', members.length * 4 * 8, 'f64', LOADS_LAYOUT);
     if (radiationWords > 1) this.history = host.allocate('radiation', radiationWords * 8, 'f64', LOADS_LAYOUT);
     if (this.builds) {
       const kernel = bindLoadsKernel(host, this.builds);
@@ -511,6 +531,7 @@ export class LoadSolver implements Solver<LoadParams> {
     this.sampleCell = port?.cell ?? this.cell;
     const out = regionWords(this.host.memory, this.forces) as Float64Array,
       wakes = regionWords(this.host.memory, this.wakes) as Float64Array,
+      wakeMotion = this.wakeMotion ? (regionWords(this.host.memory, this.wakeMotion) as Float64Array) : undefined,
       dt = 1 / rateOf(context.level),
       t = (context.tick + 0.5) / rateOf(context.level),
       rho = this.sea.density,
@@ -530,7 +551,7 @@ export class LoadSolver implements Solver<LoadParams> {
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
       this.loadBody(b, bodies, at, t, dt, rho, history);
     }
-    this.members.forEach((m, index) => this.loadMember(m, index, bodies, t, dt, rho, wakes));
+    this.members.forEach((m, index) => this.loadMember(m, index, bodies, t, dt, rho, wakes, wakeMotion));
     this.heldBodies = this.rows.size;
     this.batchCalls = 0;
     if (this.native && bodies && this.heldBodies > 0) this.holdNative(bodies, this.native);
@@ -848,7 +869,10 @@ export class LoadSolver implements Solver<LoadParams> {
     dt: number,
     rho: number,
     wakes: Float64Array,
+    wakeMotion: Float64Array | undefined,
   ): void {
+    const coupled = m.vortexCoupling === 'body-acceleration';
+    const motionAt = 4 * index;
     let from: Vec3 = [m.from[0], m.from[1], m.from[2]],
       to: Vec3 = [m.to[0], m.to[1], m.to[2]],
       v: Vec3 = [0, 0, 0],
@@ -856,14 +880,26 @@ export class LoadSolver implements Solver<LoadParams> {
       cm: Vec3 = [0, 0, 0],
       mass = 0,
       onBody = false;
+    if (coupled) {
+      // A circular member uses a canonical local direction for its wake and wet quadrature.
+      const first = to.findIndex((coordinate, k) => coordinate !== from[k]);
+      if (to[first]! < from[first]!) [from, to] = [to, from];
+    }
     if (m.row !== undefined) {
-      if (!bodies) return;
       const at = m.row * BODY_WORDS;
-      if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) return;
+      if (!bodies || at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) {
+        if (coupled) {
+          resetMemberWake(wakes, wakeMotion!, index);
+          const report = this.memberLoads[index]!;
+          report.force = [0, 0, 0];
+          report.lift = 0;
+        }
+        return;
+      }
       const q: [number, number, number, number] = [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!],
         origin: Vec3 = [bodies[at]!, bodies[at + 1]!, bodies[at + 2]!];
-      from = add(origin, rotate(q, m.from));
-      to = add(origin, rotate(q, m.to));
+      from = add(origin, rotate(q, from));
+      to = add(origin, rotate(q, to));
       v = [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!];
       w = [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!];
       cm = [bodies[at + 7]!, bodies[at + 8]!, bodies[at + 9]!];
@@ -893,6 +929,7 @@ export class LoadSolver implements Solver<LoadParams> {
       total: Vec3 = [0, 0, 0],
       moment: Vec3 = [0, 0, 0],
       added = new Float64Array(9);
+    const incident = coupled ? ([0, 0, 0] as Vec3) : undefined;
     let liftSum = 0,
       wetSpeed = 0,
       across: Vec3 = [0, 0, 0];
@@ -941,25 +978,78 @@ export class LoadSolver implements Solver<LoadParams> {
       for (let k = 0; k < 3; k++) total[k]! += f[k]!;
       const arm = onBody ? cross(sub(p, cm), f) : ([0, 0, 0] as Vec3);
       for (let k = 0; k < 3; k++) moment[k]! += arm[k]!;
-      wetSpeed = Math.max(wetSpeed, speedN);
-      if (speedN > 0) across = normalise(cross(e, vrN));
+      if (incident) {
+        const perpendicular = sub(u, scale(e, dot(u, e)));
+        const stream = Math.sqrt(dot(perpendicular, perpendicular));
+        if (!Number.isFinite(stream)) throw invalidLoad('Use a finite incident water speed for rigid vortex coupling.');
+        if (stream > 0) {
+          // The shedding frequency uses the incident streamwise speed in the cylinder's frame.
+          // Body motion transverse to that direction drives q through acceleration.
+          const inline = (stream - dot(vp, perpendicular) / stream) / (2 * stream);
+          for (let k = 0; k < 3; k++) incident[k]! += inline * perpendicular[k]!;
+        }
+      } else {
+        wetSpeed = Math.max(wetSpeed, speedN);
+        if (speedN > 0) across = normalise(cross(e, vrN));
+      }
       liftSum += half;
     }
-    // Vortex shedding: van der Pol's wake q'' + eps w_f (q^2 - 1) q' + w_f^2 q = 0 at w_f = 2 pi St U / D (the member held
-    // still: its cross-flow motion's coupling is left to the rigid body), lift 1/4 rho U^2 D C_L0 q across the flow.
-    let lift = 0;
-    if (m.vortex && wetSpeed > 0) {
+    let liftCoefficient = 0;
+    if (incident) {
+      wetSpeed = Math.sqrt(dot(incident, incident));
+      const motion = wakeMotion!;
+      if (!Number.isFinite(wetSpeed)) throw invalidLoad('Use a finite incident water speed for rigid vortex coupling.');
+      if (wetSpeed > 0 && wet > 0) {
+        across = normalise(cross(e, incident));
+        const midpoint = add(from, scale(axis, 0.5));
+        const velocity = add(v, cross(w, sub(midpoint, cm)));
+        const elapsed = t - motion[motionAt + 3]!;
+        const previous: Vec3 = [motion[motionAt]!, motion[motionAt + 1]!, motion[motionAt + 2]!];
+        const acceleration =
+          motion[motionAt + 3]! > 0 && elapsed > 0 ? dot(sub(velocity, previous), across) / elapsed : 0;
+        const omega = (2 * Math.PI * (m.vortex?.strouhal ?? 0.2) * wetSpeed) / D;
+        // Facchinetti, de Langre and Biolley (2004), Eqs. 5, 9 and 14. Their A=12 uses the material
+        // acceleration, in m/s², divided by diameter. Lift is coherent over the clipped wet interval.
+        const drive = (12 * acceleration) / D;
+        if (!Number.isFinite(drive))
+          throw invalidLoad('Choose a physical member diameter and acceleration for the vortex oscillator.');
+        if (!(omega > 0 && omega * dt < Math.PI))
+          throw invalidLoad(
+            'Resolve vortex shedding below the world step’s Nyquist frequency; raise the Loads and rigid rates or use a larger member diameter.',
+          );
+        const prior = wakes[2 * index]!;
+        const priorDerivative = wakes[2 * index + 1]!;
+        const q = wakeStep(wakes, index, omega, drive, dt);
+        liftCoefficient = ((m.vortex?.lift ?? 0.3) * q) / 2;
+        const lift = scale(across, 0.5 * rho * wetSpeed * wetSpeed * D * liftSum * liftCoefficient);
+        const centreOfLift = add(from, scale(axis, (wetFrom + wetTo) / 2));
+        const torque = cross(sub(centreOfLift, cm), lift);
+        if (![q, wakes[2 * index + 1]!, ...lift, ...torque].every(Number.isFinite)) {
+          wakes[2 * index] = prior;
+          wakes[2 * index + 1] = priorDerivative;
+          throw invalidLoad(
+            'Use smaller vortex forcing or a finer fixed world step to keep the wake and wrench finite.',
+          );
+        }
+        motion.set(velocity, motionAt);
+        motion[motionAt + 3] = t;
+        for (let k = 0; k < 3; k++) {
+          total[k]! += lift[k]!;
+          moment[k]! += torque[k]!;
+        }
+      } else resetMemberWake(wakes, motion, index);
+    } else if (m.vortex && wetSpeed > 0) {
       const st = m.vortex.strouhal ?? 0.2,
         cl0 = m.vortex.lift ?? 0.3,
         wf = (2 * Math.PI * st * wetSpeed) / D,
-        q = wakeStep(wakes, index, wf, 0, dt);
-      lift = 0.25 * rho * wetSpeed * wetSpeed * D * cl0 * q;
+        q = wakeStep(wakes, index, wf, 0, dt),
+        lift = 0.25 * rho * wetSpeed * wetSpeed * D * cl0 * q;
       for (let k = 0; k < 3; k++) total[k]! += lift * liftSum * across[k]!;
+      liftCoefficient = lift / (0.5 * rho * wetSpeed * wetSpeed * D);
     }
     const report = this.memberLoads[index]!;
     report.force = [total[0], total[1], total[2]];
-    // C_L = C_L0 q / 2.
-    report.lift = wetSpeed > 0 ? lift / (0.5 * rho * wetSpeed * wetSpeed * D) : 0;
+    report.lift = liftCoefficient;
     if (onBody) {
       const acc = this.rowOf(m.row!, mass);
       for (let k = 0; k < 3; k++) {
@@ -984,12 +1074,21 @@ export class LoadSolver implements Solver<LoadParams> {
   }
 
   stateRegions(): readonly Region[] {
-    return this.history ? [this.wakes, this.history] : [this.wakes];
+    const regions = [this.wakes];
+    if (this.history) regions.push(this.history);
+    if (this.wakeMotion) regions.push(this.wakeMotion);
+    return regions;
   }
 
   extraState(): readonly Region[] {
     return [this.forces];
   }
+}
+
+function resetMemberWake(wakes: Float64Array, motion: Float64Array, index: number): void {
+  wakes[2 * index] = 2;
+  wakes[2 * index + 1] = 0;
+  motion.fill(0, 4 * index, 4 * (index + 1));
 }
 
 function addInertiaAxis(matrix: Float64Array, direction: Vec3, coefficient: number): void {

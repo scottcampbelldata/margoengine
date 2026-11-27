@@ -72,6 +72,108 @@ function point3(values: Float32Array, at: number): Vec3 {
   return [values[at]!, values[at + 1]!, values[at + 2]!];
 }
 
+export type FloodDragProfile = Required<FloodBodyDragBody>;
+
+export function floodDragProfiles(bodies: readonly FloodBodyDragBody[]): FloodDragProfile[] {
+  if (!bodies?.length) throw invalidLoad('Provide the dynamic body rows and their flood drag profiles.');
+  const rows = new Set<number>();
+  const profiles = bodies.map(
+    ({ row, centre = ORIGIN, halfHeight, area, projection = 'ellipsoid', dragCoefficient }): FloodDragProfile => {
+      if (!Number.isSafeInteger(row) || row < 0 || rows.has(row))
+        throw invalidLoad('Use one profile per configured dynamic flood body row.');
+      if (
+        centre?.length !== 3 ||
+        !centre.every(Number.isFinite) ||
+        !validExtent(halfHeight) ||
+        !validExtent(area) ||
+        (projection !== 'box' && projection !== 'ellipsoid') ||
+        !(dragCoefficient >= 0 && Number.isFinite(dragCoefficient))
+      )
+        throw invalidLoad(
+          'Choose finite flood geometry, positive projected dimensions and a nonnegative drag coefficient.',
+        );
+      rows.add(row);
+      return {
+        row,
+        centre: [centre[0], centre[1], centre[2]],
+        halfHeight: copyExtent(halfHeight),
+        area: copyExtent(area),
+        projection,
+        dragCoefficient,
+      };
+    },
+  );
+  return profiles.sort((a, b) => a.row - b.row);
+}
+
+/** Solve one wet stencil from a rigid pose and the supplied water state. */
+export function solveFloodProfile(
+  grid: FloodDragGrid,
+  profile: FloodDragProfile,
+  rigid: Float32Array,
+  at: number,
+  bodyCell: Cell,
+  input: {
+    readonly water: Float32Array | Float64Array;
+    readonly dt: number;
+    readonly forcing?: Float64Array;
+    readonly bottom?: Float64Array;
+  },
+) {
+  const { centre, halfHeight, area, projection, dragCoefficient } = profile;
+  const { water, dt, forcing, bottom } = input;
+  if (rigid[at + 23] !== 1 || dragCoefficient === 0) return undefined;
+  const rotation = normalizeQuaternion(rigid.subarray(at + 3, at + 7));
+  const inverse = conjugateQuaternion(rotation);
+  const offset = rotateByQuaternion(centre, rotation);
+  const bodyCentre = grid.point(rigid.subarray(at + 7, at + 10), bodyCell);
+  const profileCentre: Vec3 = [bodyCentre[0] + offset[0], bodyCentre[1] + offset[1], bodyCentre[2] + offset[2]];
+  const height = projected(halfHeight, rotateByQuaternion([0, 1, 0], inverse), projection);
+  if (!(height > 0 && Number.isFinite(height)))
+    throw invalidLoad('Choose a rigid profile with finite positive vertical support.');
+  const sample = grid.sample(water, forcing, profileCentre, height, dt, bottom);
+  if (!sample) return undefined;
+  const body: FloodBlockageBody = {
+    centre: bodyCentre,
+    velocity: point3(rigid, at + 10),
+    angularVelocity: point3(rigid, at + 13),
+    inverseMass: rigid[at + 16]!,
+    inverseInertia: [
+      rigid[at + 17]!,
+      rigid[at + 18]!,
+      rigid[at + 19]!,
+      rigid[at + 20]!,
+      rigid[at + 21]!,
+      rigid[at + 22]!,
+    ],
+  };
+  const exchange = floodBlockageExchange({
+    cells: sample.cells.map(({ index, depth, wetWeight, x, z }) => ({
+      index,
+      depth,
+      x,
+      z,
+      weight: wetWeight,
+      dischargeX: water[3 * index + 1]! + dt * (forcing?.[FORCING_WORDS * index] ?? 0),
+      dischargeZ: water[3 * index + 2]! + dt * (forcing?.[FORCING_WORDS * index + 1] ?? 0),
+    })),
+    body,
+    cellArea: grid.cellArea,
+    density: grid.density,
+    interval: dt,
+    dragCoefficient,
+    wetArea: (x, z) => {
+      const speed = hypot(x, z);
+      const direction = rotateByQuaternion([x / speed, 0, z / speed], inverse);
+      return sample.wet * projected(area, direction, projection);
+    },
+    elevation: sample.point[1],
+  });
+  if (!exchange.bodyImpulse.every(Number.isFinite))
+    throw invalidLoad('Choose wet-profile positions and body inertia whose reaction wrench fits finite SI values.');
+  return { sample, bodyCentre, exchange };
+}
+
 /**
  * Reciprocal form drag for a compact body or hull in a persistently wet
  * shallow-water patch. The drag step uses Morison's quadratic resistance and
@@ -93,8 +195,7 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
   private grid!: FloodDragGrid;
   private rate: RateLevel = 0;
   private bedCell: Cell = ORIGIN;
-  private cellArea = 0;
-  private bodies: ReadonlyArray<Required<FloodBodyDragBody>> = [];
+  private bodies: readonly FloodDragProfile[] = [];
   private waterForcing!: Region;
   private bodyImpulse!: Region;
   // Process-local scratch is fully reset each step. Arena regions only
@@ -119,39 +220,15 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
   }
 
   init(host: SolverHost, params: FloodBodyDragParams): void {
-    if (!params?.bodies?.length) throw invalidLoad('Provide the dynamic body rows and their flood drag profiles.');
+    const bodies = floodDragProfiles(params?.bodies);
     const rate = params.rate ?? 0;
     if (!isRateLevel(rate)) throw invalidLoad('Match the flood drag rate to the water and rigid rate levels.');
     const grid = new FloodDragGrid(params);
-    const rows = new Set<number>();
-    const bodies = params.bodies.map(
-      ({ row, centre = ORIGIN, halfHeight, area, projection = 'ellipsoid', dragCoefficient }) => {
-        if (!Number.isSafeInteger(row) || row < 0 || rows.has(row))
-          throw invalidLoad('Use one profile per configured dynamic flood body row.');
-        if (
-          centre?.length !== 3 ||
-          !centre.every(Number.isFinite) ||
-          !validExtent(halfHeight) ||
-          !validExtent(area) ||
-          (projection !== 'box' && projection !== 'ellipsoid') ||
-          !(dragCoefficient >= 0 && Number.isFinite(dragCoefficient))
-        )
-          throw invalidLoad(
-            'Choose finite flood geometry, positive projected dimensions and a nonnegative drag coefficient.',
-          );
-        rows.add(row);
-        return {
-          row,
-          centre: [centre[0], centre[1], centre[2]] as const,
-          halfHeight: copyExtent(halfHeight),
-          area: copyExtent(area),
-          projection,
-          dragCoefficient,
-        };
-      },
+    const capacity = bodyRowsOf(
+      host,
+      this.id,
+      bodies.map(({ row }) => row),
     );
-    bodies.sort((a, b) => a.row - b.row);
-    const capacity = bodyRowsOf(host, this.id, [...rows]);
     this.waterForcing = host.allocate(
       'flood-body-water-forcing',
       grid.count * FORCING_WORDS * 8,
@@ -166,7 +243,6 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
     this.rate = rate;
     this.bodies = bodies;
     this.bedCell = [...params.bed.cell];
-    this.cellArea = (params.bed.width / params.bed.columns) * (params.bed.depth / params.bed.rows);
   }
 
   step({ inputs, tick, cell }: StepContext, dt: number): void {
@@ -189,60 +265,16 @@ export class FloodBodyDragSolver implements Solver<FloodBodyDragParams> {
     forcingWork.fill(0);
     impulseWork.fill(0);
     for (const profile of this.bodies) {
-      const { row, centre, halfHeight, area, projection, dragCoefficient } = profile;
-      const at = row * BODY_WORDS;
-      if (rigid[at + 23] !== 1 || dragCoefficient === 0) continue;
-      const rotation = normalizeQuaternion(rigid.subarray(at + 3, at + 7));
-      const inverse = conjugateQuaternion(rotation);
-      const offset = rotateByQuaternion(centre, rotation);
-      const bodyCentre = grid.point(rigid.subarray(at + 7, at + 10), bodyPort.cell);
-      const profileCentre: Vec3 = [bodyCentre[0] + offset[0], bodyCentre[1] + offset[1], bodyCentre[2] + offset[2]];
-      const height = projected(halfHeight, rotateByQuaternion([0, 1, 0], inverse), projection);
-      if (!(height > 0 && Number.isFinite(height)))
-        throw invalidLoad('Choose a rigid profile with finite positive vertical support.');
-      const sample = grid.sample(water, forcingWork, profileCentre, height, dt);
-      if (!sample) continue;
-      const body: FloodBlockageBody = {
-        centre: bodyCentre,
-        velocity: point3(rigid, at + 10),
-        angularVelocity: point3(rigid, at + 13),
-        inverseMass: rigid[at + 16]!,
-        inverseInertia: [
-          rigid[at + 17]!,
-          rigid[at + 18]!,
-          rigid[at + 19]!,
-          rigid[at + 20]!,
-          rigid[at + 21]!,
-          rigid[at + 22]!,
-        ],
-      };
-      const exchange = floodBlockageExchange({
-        cells: sample.cells.map(({ index, depth, wetWeight, x, z }) => ({
-          index,
-          depth,
-          x,
-          z,
-          weight: wetWeight,
-          dischargeX: water[3 * index + 1]! + dt * forcingWork[FORCING_WORDS * index]!,
-          dischargeZ: water[3 * index + 2]! + dt * forcingWork[FORCING_WORDS * index + 1]!,
-        })),
-        body,
-        cellArea: this.cellArea,
-        density: grid.density,
-        interval: dt,
-        dragCoefficient,
-        wetArea: (x, z) => {
-          const speed = hypot(x, z);
-          const direction = rotateByQuaternion([x / speed, 0, z / speed], inverse);
-          return sample.wet * projected(area, direction, projection);
-        },
-        elevation: sample.point[1],
+      const { row } = profile;
+      const result = solveFloodProfile(grid, profile, rigid, row * BODY_WORDS, bodyPort.cell, {
+        water,
+        dt,
+        forcing: forcingWork,
       });
-      if (!exchange.bodyImpulse.every(Number.isFinite))
-        throw invalidLoad('Choose wet-profile positions and body inertia whose reaction wrench fits finite SI values.');
-      const [jx, , jz] = exchange.bodyImpulse;
-      impulseWork.set(exchange.bodyImpulse, row * IMPULSE_WORDS);
-      grid.react(forcingWork, sample, jx, jz, dt);
+      if (!result) continue;
+      const [jx, , jz] = result.exchange.bodyImpulse;
+      impulseWork.set(result.exchange.bodyImpulse, row * IMPULSE_WORDS);
+      grid.react(forcingWork, result.sample, jx, jz, dt);
     }
     (regionWords(host.memory, this.waterForcing) as Float64Array).set(forcingWork);
     (regionWords(host.memory, this.bodyImpulse) as Float64Array).set(impulseWork);

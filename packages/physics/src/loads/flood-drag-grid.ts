@@ -21,7 +21,7 @@ interface WetCell {
   readonly z: number;
 }
 
-interface DragSample {
+export interface DragSample {
   readonly cells: readonly WetCell[];
   readonly wet: number;
   readonly point: [number, number, number];
@@ -35,6 +35,7 @@ export class FloodDragGrid {
   readonly count: number;
   readonly cellSize: number;
   readonly density: number;
+  readonly cellArea: number;
   private readonly dx: number;
   private readonly dz: number;
   private readonly x0: number;
@@ -63,6 +64,7 @@ export class FloodDragGrid {
     this.count = bed.columns * bed.rows;
     this.dx = bed.width / bed.columns;
     this.dz = bed.depth / bed.rows;
+    this.cellArea = this.dx * this.dz;
     this.x0 = bed.centre[0] - bed.width / 2;
     this.z0 = bed.centre[1] - bed.depth / 2;
     this.densityArea = density * this.dx * this.dz;
@@ -100,11 +102,12 @@ export class FloodDragGrid {
   }
 
   sample(
-    water: Float32Array,
-    forcing: Float64Array,
+    water: Float32Array | Float64Array,
+    forcing: Float64Array | undefined,
     point: readonly [number, number, number],
     halfHeight: number,
     dt: number,
+    bottomAt?: Float64Array,
   ): DragSample | undefined {
     const [x, y, z] = point;
     const nx = this.bed.columns;
@@ -129,6 +132,7 @@ export class FloodDragGrid {
         const at = i * stride + j;
         // Same volume-equivalent average of the two triangles as ShallowWaterSolver's unblocked bed.
         const bottom =
+          bottomAt?.[index] ??
           (elevations[at]! + elevations[at + stride + 1]! + 2 * (elevations[at + 1]! + elevations[at + stride]!)) / 6;
         const lower = Math.max(y - halfHeight, bottom);
         const upper = Math.min(y + halfHeight, bottom + depth);
@@ -158,8 +162,8 @@ export class FloodDragGrid {
       yWet += share * cell.wetCentre;
       zWet += share * cell.z;
       const offset = FORCING_WORDS * index;
-      vx += (share * (water[3 * index + 1]! + dt * forcing[offset]!)) / depth;
-      vz += (share * (water[3 * index + 2]! + dt * forcing[offset + 1]!)) / depth;
+      vx += (share * (water[3 * index + 1]! + dt * (forcing?.[offset] ?? 0))) / depth;
+      vz += (share * (water[3 * index + 2]! + dt * (forcing?.[offset + 1] ?? 0))) / depth;
       inverseMass += (share * share) / (this.densityArea * depth);
     }
     return { cells, wet, point: [xWet, yWet, zWet], vx, vz, inverseMass };

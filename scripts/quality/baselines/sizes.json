@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20685735,
+  "total": 20692221,
   "history": [
     {
       "date": "2026-10-24",
@@ -14191,6 +14191,18 @@
       "commit": "c8af3a4312",
       "grew": 2,
       "reason": "@margoengine/physics/loads grew from 35538 to 39422 B gzip and from a 36605 to a 40605 B ceiling. @margoengine/physics/hydro grew from 13617 to 14291 B gzip and from a 14026 to a 14720 B ceiling. SEA-12 adds passive six-axis radiation and conservative merging for fully closing moving cut cells. The optional entries reuse the existing body and water ports. Native panels and obstruction stages load on demand. A split would still ship the load or water path that consumes them."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "16800c8b12",
+      "grew": 1,
+      "reason": "Add the optional @margoengine/water/shallow-surface entry at 1706 B gzip under a 1962 B ceiling. It uploads the Hydro state into the existing Water renderer. The Water root gains zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "16800c8b12",
+      "grew": 1,
+      "reason": "@margoengine/physics/hydro grew from 14291 to 18683 B gzip and from a 14720 to a 19244 B ceiling. SEA-12 settles paired projected drag in the final wet/dry state, after finite-volume transport. The optional Hydro path lazy-loads its settlement code and shares the existing rigid and water ports. Separating the pressure and drag entry stubs would still load the same solver for the coupled scene."
     }
   ],
   "items": {
@@ -15034,7 +15046,7 @@
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,
     "@margoengine/physics/groundwater": 4158,
-    "@margoengine/physics/hydro": 14720,
+    "@margoengine/physics/hydro": 19244,
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
     "@margoengine/physics/landscape": 4538,
@@ -15839,6 +15851,7 @@
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1380,
     "@margoengine/water/settings": 6689,
+    "@margoengine/water/shallow-surface": 1962,
     "@margoengine/water/ships": 11259,
     "@margoengine/water/splash": 5893,
     "@margoengine/water/underwater": 9344,

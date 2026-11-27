@@ -191,6 +191,7 @@ export interface LoadMember {
         readonly strouhal?: number;
         readonly lift?: number;
     };
+    readonly vortexCoupling?: 'body-acceleration';
 }
 
 export interface LoadParams {

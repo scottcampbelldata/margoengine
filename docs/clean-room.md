@@ -12923,7 +12923,7 @@ formulas). Written from standards, papers and public reports only (no code of an
 - M. L. Facchinetti, E. de Langre and F. Biolley, "Vortex-induced travelling waves along a cable", Eur. J. Mech. B/Fluids 23,
   199-208, 2004 (sections 2 and eq. 5, read): the van der Pol wake, q = 2 C_L / C_L0, C_L0 0.3, A / eps 40 and the lift
   magnification, written here as the root of K^3 - K = (A / eps) y0 / 2 (the two cube roots of eq. 5 multiply to 1/3 and their
-  cubes sum to that). eps 0.3 alone is from their companion paper as remembered (J. Fluids Struct. 19, 2004, not read).
+  cubes sum to that). The companion paper verifies eps 0.3 and A 12 for the wake equation described below.
 - USACE Coastal Engineering Manual, EM 1110-2-1100, tables VI-5-52 and VI-5-53 (read), and Y. Goda, "New wave pressure
   formulae for composite breakwaters", Proc. 14th ICCE, 1974 (eqs. 1 to 8, read): Sainflou's and Goda's wall pressures.
 - F. Tukker, TU Delft MSc thesis, 2021 (sections 2.2 and 2.3, page images read), restating PIANC report 180 (2015): a bow
@@ -12938,6 +12938,27 @@ drag and added mass axes. The strip-theory drag of a spinning body, the
 added mass held as M (M + A)^-1 (F + W) - W with members' added mass in the same tensor, the water's acceleration as a centred
 difference of the pure sample, and the quay wall's doubling by 1 + R at its face are this package's own arrangement. Proof:
 `packages/physics/tests/loads.test.js` and `tests/coupling/loads.test.js`.
+
+Rigid member vibration uses the material midpoint's accepted linear and angular velocity to drive the existing wake
+oscillator. The dimensional source is (12 / D) times its acceleration along the lift direction, and the sectional
+lift is ρ U² D C_L0 q / 4. Here U is the mean incident normal stream relative to the member along that stream.
+The coherent load acts at the clipped wetted interval centre. The branch keeps the existing Morison drag and
+added inertia, with the wake as a separate force. [Facchinetti, de Langre and Biolley (2004), Eqs. 5, 9 and 14](https://doi.org/10.1016/j.jfluidstructs.2003.12.004).
+
+The held-out prescribed-motion test uses the 2005 Carberry experiment with A/D = 0.25, Re = 4410 and f_e/f_0 = 1.15.
+The dominant peak comes from a separate strain-gauge force transducer. The motor sets only the prescribed
+displacement. The simulated vortex-force signal matches the observed frequency at both world rates. The free
+shedding control uses the same prescribed motion and gives a frequency ratio of 1.03338.
+The independent case differs from the earlier Re = 2300, A/D = 0.5 series. Its measured vortex-force phase is
+−78°. A force comparison needs a shared definition of the viscous and apparent-mass contributions.
+[Carberry, Sheridan and Rockwell (2005), §2 and Fig. 17(c)](https://flair.monash.edu/publications/pdfs/Carberry_etal_JFM2005.pdf).
+
+Facchinetti's Figure 9 already includes Khalak and Williamson's peak amplitudes. The independent Usta and Duranay
+free-vibration cases give A/D of 0.9375, 0.7877 and 0.6861 at currents of 0.338, 0.390 and 0.442 m/s. The
+unchanged Facchinetti structural equations give 0.152, 0.126 and 0.101 for those inputs. Their higher blockage
+and low mass ratio place those cases in a regime where wake-branch selection and the force applied in each
+part of the cycle matter. [Khalak and Williamson (1999)](https://doi.org/10.1006/jfls.1999.0236) ·
+[Usta and Duranay (2021), Tables 2, 4, 6 and 8](https://www.jafmonline.net/article_1102_c667d53acd899a97a85de0c201ba99be.pdf).
 
 For hydrostatics, spheres and ellipsoids use an analytic cap. A closed mesh or box reuses
 SEA-08 wetted triangle clipping and [D. A. Dunavant's degree-four triangle quadrature (1985)](https://doi.org/10.1002/nme.1620210612).
@@ -13062,6 +13083,16 @@ neighbour. For one obstacle bounded by the area of a grid cell, a two-cell aggre
 one cell's worth of water storage. Both Runge–Kutta stages integrate mass and discharge with the same
 pair and swept geometry before dividing by the aggregate's new open area. The common internal
 face term cancels, and the wall pressure still contributes one paired impulse to water and rigid.
+
+Projected drag at a shoreline uses the finite-volume water state after wetting, drying, and bed friction.
+The implicit impulse uses final cell masses and the same normalized weights for slip and spreading.
+The geometric lever arm is the weighted centre of the accepted water slices. The rigid receipt takes its
+impulse and moment from the actual signed changes in f64 discharge at those slices. This applies the
+force and first-moment identities in [C. S. Peskin (2002), *The immersed boundary method*, §5,
+equations 5.1–5.8](https://doi.org/10.1017/S0962492902000077) at the accepted centre of immersion.
+The same force law and reduced mobility as the fixed-wet exchange dissipate the isolated pair's
+kinetic energy. The manufactured shoreline test compares the post-flux momentum to independent
+ordinary HYDRO transport. The split sends each deposited impulse into the next transport step.
 
 The same shallow-water impulse model loads clipped paddle blades at their actual lever arms and wading
 profiles at their centres of pressure. The rigid shaft receives torque from the immersed blade, and a

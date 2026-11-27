@@ -4151,6 +4151,10 @@
       "types": "./dist/water/flood.d.ts",
       "import": "./dist/water/flood.js"
     },
+    "./water/shallow-surface": {
+      "types": "./dist/water/shallow-surface.d.ts",
+      "import": "./dist/water/shallow-surface.js"
+    },
     "./water/flood-bake": {
       "types": "./dist/water/flood-bake.d.ts",
       "import": "./dist/water/flood-bake.js"

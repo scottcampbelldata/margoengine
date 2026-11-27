@@ -1205,6 +1205,59 @@ of 100 s over flats 500 m wide leaves most of their water (Doggerland's 260 s N-
 m there; none of it sat in a closed basin), so give the wave the period the scene needs (Storegga's run-in periods were
 tens of minutes) or a smoother bed (lower `roughness`) rather than finer cells (FG-09).
 
+### Draw a PhysicsWorld flood with Water
+
+Attach the optional ShallowWaterSurface mirror to a flowing Water surface. Advance the PhysicsWorld first and
+render it after each desired tick. The shallow-water solver owns the water state and clock. The mirror samples
+each cell centre and uploads a drawing copy for Water's coastal surface and depth effects. The Water terrain
+texture must match the solver's number of cells, extent and centre in the same coordinate frame. The texture
+remains caller-owned. Use this path for the framework's rigid-body pressure or drag coupling, with the same
+ShallowWaterSolver supplied to the mirror.
+
+The mirror supports WebGPU and the full WebGL2 compatibility layer. It uses the live depth and bed height.
+Water's existing coastal interpolation, shoreline threshold and velocity reconstruction also apply. The
+mirror does not publish simulated foam, breakers or GPU flood diagnostics.
+
+```ts
+import { EngineKernel } from '@margoengine/core';
+import { bedSurface } from '@margoengine/physics/earth';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { Water } from '@margoengine/water';
+import { ShallowWaterSurface } from '@margoengine/water/shallow-surface';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const grid = { columns: 8, rows: 4, width: 12, depth: 8, centre: [0, 0] as const };
+const source = new ShallowWaterSolver();
+const bed = bedSurface(grid, new Float64Array((grid.columns + 1) * (grid.rows + 1)));
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(source, { bed, depth: (x) => (x < -2 ? 0.8 : 0.15) });
+const texture = engine.gpu!.createTexture({
+  size: [grid.columns, grid.rows],
+  format: 'r32float',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+engine.gpu!.queue.writeTexture(
+  { texture },
+  new Float32Array(grid.columns * grid.rows),
+  { bytesPerRow: grid.columns * 4 },
+  [grid.columns, grid.rows],
+);
+const water = Water.attach(engine, {
+  height: -1,
+  size: [grid.width, grid.depth],
+  terrain: { heightmap: () => texture, origin: [-6, -4], size: [grid.width, grid.depth] },
+});
+const mirror = ShallowWaterSurface.attach(engine, { surface: water, source });
+world.advance(1);
+engine.render({ delta: 0 });
+mirror.dispose();
+water.dispose();
+texture.destroy();
+engine.dispose();
+```
+
+
 ### Display the framework's suspended sediment
 
 Pass a `SedimentTransport` solver as `sediment.source` to sample its concentration for the existing flood

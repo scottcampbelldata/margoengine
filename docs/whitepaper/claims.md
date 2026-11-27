@@ -402,6 +402,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   and `loads-coupled-radiation.test.js` under `packages/physics/tests`.
   [Vugts, Report 194, width-confined rectangular section](https://doi.org/10.3233/ISP-1968-1516702).
 
+- Single-state flood drawing (SEA-12). The guided footprint exchanges 109.80056 N·s of pressure impulse with
+  Hydro in its first tick, with a rigid receipt residual of (1.92×10^{-5}) N·s. Volume is exact in the periodic
+  tank fixture. Water draws the same state on WebGPU and WebGL2, matching the 0.016331 m depth signal within
+  (8.60×10^{-8}) m and replaying to hash `8c2148a93a035d51`. At a fixed body pose the water-only comparison
+  changes 229 WebGPU and 235 WebGL2 pixels. Run `node packages/water/test/shallow-surface.browser.mjs` with
+  and without `--compat` after building Physics and Water.
+
 - Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
   properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
   2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts

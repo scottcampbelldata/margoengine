@@ -3822,6 +3822,45 @@ console.log(water.sample(300, 50).depth > 0); // true: the flood has reached 300
 console.log(Math.abs(water.volume() + water.budget.out - start) < 1e-6 * start); // true: every cubic metre accounted for
 ```
 
+#### Projected body drag at a wet/dry shoreline
+
+`ShallowWaterSolver.withProjectedBodyDrag` couples a compact body or hull to water that can drain or rewet.
+The request takes the previous rigid pose. The water completes its transport and dry-cell momentum resets,
+then recomputes the wetted profile and implicit drag from its final f64 state. The relay sends the accepted
+horizontal impulse and corresponding moment to rigid on the same tick. Fully dry profiles receive zero.
+The exchange changes horizontal discharge and leaves volume to the water solver.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+using physics = new Physics(null, {gravity, fixedTimestep: 1 / 60});
+const debris = physics.addBody(null, {
+  position: [0, 0.4, 0], colliders: {shape: 'sphere', radius: 0.2, mass: 20}, linearDamping: 0,
+});
+const bed = bedSurface({columns: 2, rows: 1, width: 2, depth: 1, centre: [0, 0]}, new Float64Array(6));
+const {water, request, relay, order} = await ShallowWaterSolver.withProjectedBodyDrag([
+  {row: debris.row, halfHeight: 0.2, area: Math.PI * 0.2 ** 2, dragCoefficient: 0.8},
+]);
+const world = new PhysicsWorld({gravity, rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(request, {})
+  .add(water, {bed, depth: 0.75, velocity: () => [1, 0], roughness: 0})
+  .add(relay, {}).couple(order, 'staggered');
+world.advance(1);
+console.log(debris.linearVelocity[0] > 0);
+```
+
+Use the same fixed origin and rate for all four solvers. The mode accepts one configured profile per dynamic
+body and processes overlapping profiles in ascending rigid row order. Use free horizontal and rotational
+motion to close an isolated water/body momentum and energy ledger. Guides and rigid contacts can exchange
+momentum with their supports. Disable duplicate form drag on the same body in a concurrent `LoadSolver` or
+`HullSolver`. Each kick enters the completed water state, so its effect on transport starts in the next step.
+
 #### Moving obstructions and pressure reaction
 
 `ShallowWaterSolver.withRigidFootprint` uses a full-depth convex obstruction. Describe it in horizontal
@@ -4172,6 +4211,22 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
 
 The sea, current and wind can use separate origin cells. Set `cellSize` to the PhysicsWorld cell length
 if it differs from the default of 4096 m. World-fixed members use the LoadSolver's origin cell.
+
+Set `vortexCoupling: 'body-acceleration'` on a circular member attached to a dynamic rigid row
+in a nearly uniform steady current. The wake follows the member midpoint's transverse acceleration,
+including rotation. Its coherent lift acts through the wetted interval centre. `memberLoad(i).lift`
+reports the vortex lift coefficient. The default vortex remains free shedding. Keep the shedding
+frequency below half the common world rate.
+
+```ts
+import type {LoadMember} from 'margoengine/physics/loads';
+
+const member = {
+  row: 0, from: [0, 0, -0.5], to: [0, 0, 0.5], diameter: 0.08, period: Infinity,
+  vortexCoupling: 'body-acceleration',
+} satisfies LoadMember;
+console.log(member.vortexCoupling); // body-acceleration
+```
 
 Use `await LoadSolver.load({id, signal})` for the optional Rust SIMD wrench batch. It uses the containing
 world's plain or shared memory. It batches the ordinary 32-word rows and six-axis 41-word rows

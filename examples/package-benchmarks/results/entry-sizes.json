@@ -5891,6 +5891,10 @@
         "raw": 38,
         "gzip": 58
       },
+      "./water/shallow-surface": {
+        "raw": 48,
+        "gzip": 68
+      },
       "./water/flood-bake": {
         "raw": 43,
         "gzip": 63
@@ -15056,8 +15060,8 @@
         "gzip": 17356
       },
       "./hydro": {
-        "raw": 36968,
-        "gzip": 14291
+        "raw": 50291,
+        "gzip": 18683
       },
       "./foam": {
         "raw": 17324,
@@ -15076,8 +15080,8 @@
         "gzip": 14217
       },
       "./loads": {
-        "raw": 105853,
-        "gzip": 39422
+        "raw": 108057,
+        "gzip": 40200
       },
       "./surge": {
         "raw": 9465,
@@ -18200,6 +18204,10 @@
       "./flood": {
         "raw": 40556,
         "gzip": 14457
+      },
+      "./shallow-surface": {
+        "raw": 3500,
+        "gzip": 1706
       },
       "./flood-bake": {
         "raw": 10165,
