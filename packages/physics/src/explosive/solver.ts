@@ -25,6 +25,7 @@ import type {
   StepContext,
 } from '../world/solver.js';
 import { rateOf } from '../world/solver.js';
+import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import {
   chargeEnergy,
   energyBudget,
@@ -35,6 +36,7 @@ import {
   gurneyVelocity,
   metalSpeed,
 } from './charge.js';
+import { type Firing, fireGun, type GunOptions, HISTORY_WORDS } from './gun.js';
 
 /** The layout version of the explosion and fragment regions. */
 export const EXPLOSION_LAYOUT = 2;
@@ -86,9 +88,29 @@ export interface ChargeOptions {
   readonly case?: ChargeCase;
 }
 
+/** A gun placed in the world, on a rigid body (a carrier: a ship, a carriage) or fixed. */
+export interface GunMount extends Omit<GunOptions, 'recoilMass'> {
+  /** When it fires, seconds of world time (default 0). */
+  readonly time?: number;
+  /**
+   * The rigid body row it is mounted on. Its mass is the recoiling mass, its pose aims the bore, and the recoil goes into
+   * it through `bodyImpulses` (the solver must be made with `carriers: true`). Leave it out for a gun fixed in the world.
+   */
+  readonly body?: number;
+  /** The breech, m: in the body's frame on a carrier, else in the world. */
+  readonly breech: Vec3;
+  /** The bore's direction, in the same frame as `breech`. */
+  readonly axis: Vec3;
+  /** The shot's drag coefficient on the bore's area (default 0.3). */
+  readonly shotDrag?: number;
+}
+
 /** What an {@link ExplosionSolver} is made from. */
 export interface ExplosionParams {
-  readonly charges: readonly ChargeOptions[];
+  /** Charges (default none); a solver needs charges or guns. */
+  readonly charges?: readonly ChargeOptions[];
+  /** Guns (default none): each fires its shot, recoils into its carrier and makes a muzzle blast. */
+  readonly guns?: readonly GunMount[];
   /** The height of the ground fragments land on, metres (default 0). */
   readonly groundHeight?: number;
   /** The seed of the fragments' masses and directions (default 0): another seed breaks the same cases another way. */
@@ -103,6 +125,44 @@ export interface ExplosionCounts {
   readonly flying: number;
   /** Fragment steps taken in all. */
   readonly fragmentSteps: number;
+  /** Integration steps of the guns fired, in the bore and the blowdown. */
+  readonly gunSteps: number;
+}
+
+/** Words of a gun's state: fired (0 or 1), fire time, the shot's muzzle time and the recoil's duration (s), then samples. */
+const GUN_HEAD = 4;
+/** Samples of a gun's backward momentum, uniform over its recoil's duration. */
+export const GUN_SAMPLES = 128;
+const GUN_WORDS = GUN_HEAD + GUN_SAMPLES;
+const SHOT_GUN = -1;
+
+interface Gun {
+  readonly options: GunOptions;
+  readonly time: number;
+  readonly body: number;
+  readonly breech: Vec3;
+  readonly axis: Vec3;
+}
+
+/** v rotated by the unit quaternion q = (x, y, z, w). */
+function rotate(q: ArrayLike<number>, v: Vec3): Vec3 {
+  const x = q[0]!,
+    y = q[1]!,
+    z = q[2]!,
+    w = q[3]!;
+  const tx = 2 * (y * v[2] - z * v[1]),
+    ty = 2 * (z * v[0] - x * v[2]),
+    tz = 2 * (x * v[1] - y * v[0]);
+  return [v[0] + w * tx + (y * tz - z * ty), v[1] + w * ty + (z * tx - x * tz), v[2] + w * tz + (x * ty - y * tx)];
+}
+
+function vec(value: unknown, what: string, unit = false): Vec3 {
+  if (!Array.isArray(value) || value.length !== 3 || !value.every((v) => typeof v === 'number' && Number.isFinite(v)))
+    throw new RangeError(`${what} must be three finite numbers; got ${String(value)}.`);
+  if (!unit) return [value[0], value[1], value[2]];
+  const n = hypot(value[0], value[1], value[2]);
+  if (!(n > 0)) throw new RangeError(`${what} must not be zero; give the bore's direction.`);
+  return [value[0] / n, value[1] / n, value[2] / n];
 }
 
 interface Placed {
@@ -143,8 +203,21 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
   private ground = 0;
   private steps = 0;
   private flyingNow = 0;
+  private guns: Gun[] = [];
+  private gunRegion: Region | null = null;
+  private impulseRegion: Region | null = null;
+  private gunSteps = 0;
+  private readonly carriers: boolean;
 
-  constructor(readonly id = 'explosion') {
+  /**
+   * @param options.carriers - true when guns are mounted on rigid bodies: the solver then reads `bodies` and adds the recoil
+   * to `bodyImpulses`, so a world with a rigid solver is needed.
+   */
+  constructor(
+    readonly id = 'explosion',
+    options: { readonly carriers?: boolean } = {},
+  ) {
+    this.carriers = options.carriers === true;
     this.explosionsField = {
       name: `${id}:explosions`,
       kind: 'particleSet',
@@ -169,14 +242,23 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       fields: [
         { field: this.explosionsField, access: 'write' },
         { field: this.fragmentsField, access: 'write' },
+        ...(this.carriers
+          ? [
+              { field: BODIES_FIELD, access: 'read' as const },
+              { field: BODY_IMPULSES_FIELD, access: 'accumulate' as const },
+            ]
+          : []),
       ],
     };
   }
 
   init(host: SolverHost, params: ExplosionParams): void {
-    const charges = params?.charges;
-    if (!Array.isArray(charges) || charges.length === 0)
-      throw new TypeError('An ExplosionSolver needs charges: world.add(solver, {charges: [{position, mass}]}).');
+    const charges = params?.charges ?? [];
+    const guns = params?.guns ?? [];
+    if (!Array.isArray(charges) || !Array.isArray(guns) || charges.length + guns.length === 0)
+      throw new TypeError(
+        'An ExplosionSolver needs charges or guns: world.add(solver, {charges: [{position, mass}]}) or {guns: [...]}.',
+      );
     const ground = params.groundHeight ?? 0;
     if (!Number.isFinite(ground))
       throw new RangeError(`Ground height must be a finite number of metres; got ${ground}.`);
@@ -307,10 +389,37 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         drag,
       };
     });
+    const rows = this.carriers ? host.bodyRows() : 0;
+    this.guns = guns.map((mount, index) => {
+      const at = `Gun ${index}`;
+      const time = finite(mount.time ?? 0, `${at} time`, 'Give the firing time in seconds of world time.');
+      let body = -1;
+      if (mount.body !== undefined) {
+        if (!this.carriers)
+          throw new MargoError(
+            'state',
+            `${at} is on body ${mount.body}; make the solver with new ExplosionSolver(id, {carriers: true}) so the recoil reaches it.`,
+          );
+        if (!(Number.isInteger(mount.body) && mount.body >= 0 && mount.body < rows))
+          throw new RangeError(`${at} body must be a rigid body row from 0 to ${rows - 1}; got ${mount.body}.`);
+        body = mount.body;
+      }
+      const { time: _t, body: _b, breech, axis, shotDrag, ...options } = mount;
+      // A trial firing on a fixed mount checks the load now, with its fix, rather than at the firing.
+      fireGun(options);
+      const drag = finite(shotDrag ?? 0.3, `${at} shot drag`, 'Pass a coefficient such as 0.3.');
+      const area = (Math.PI * options.bore * options.bore) / 4;
+      fragments.push([0, 0, 0, 0, 0, 0, options.shotMass, WAITING]);
+      drags.push((AIR_DENSITY * drag * area) / (2 * options.shotMass));
+      owners.push(SHOT_GUN - index);
+      return { options, time, body, breech: vec(breech, `${at} breech`), axis: vec(axis, `${at} axis`, true) };
+    });
     this.host = host;
+    this.gunRegion = host.allocate('guns', Math.max(1, this.guns.length) * GUN_WORDS * 8, 'f64', EXPLOSION_LAYOUT);
+    if (this.carriers) this.impulseRegion = host.allocate('recoil', rows * IMPULSE_WORDS * 8, 'f64', 1);
     this.explosionRegion = host.allocate(
       'explosions',
-      this.placed.length * EXPLOSION_WORDS * 8,
+      (this.placed.length + this.guns.length) * EXPLOSION_WORDS * 8,
       'f64',
       EXPLOSION_LAYOUT,
     );
@@ -323,9 +432,9 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     );
     this.fragmentDrag = Float64Array.from(drags);
     this.fragmentCharge = Int32Array.from(owners);
-    const rows = this.explosions();
+    const table = this.explosions();
     this.placed.forEach((c, i) =>
-      rows.set(
+      table.set(
         [
           ...c.position,
           c.time,
@@ -343,6 +452,8 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         i * EXPLOSION_WORDS,
       ),
     );
+    // A gun's muzzle blast row waits with no time until the gun fires.
+    for (let k = 0; k < this.guns.length; k++) table[(this.placed.length + k) * EXPLOSION_WORDS + 3] = Infinity;
     const frag = this.fragmentWords();
     fragments.forEach((row, i) => frag.set(row, i * FRAGMENT_WORDS));
   }
@@ -356,7 +467,98 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     return new Float64Array(
       this.live().memory.buffer,
       this.explosionRegion!.byteOffset,
-      this.placed.length * EXPLOSION_WORDS,
+      (this.placed.length + this.guns.length) * EXPLOSION_WORDS,
+    );
+  }
+  private gunWords(): Float64Array {
+    return new Float64Array(this.live().memory.buffer, this.gunRegion!.byteOffset, this.guns.length * GUN_WORDS);
+  }
+
+  /** The gun's backward momentum, kg m/s, `t` seconds after it fired, from its samples. */
+  private recoilAt(words: Float64Array, o: number, t: number): number {
+    const duration = words[o + 3]!;
+    if (t <= 0) return 0;
+    const x = Math.min(t / duration, 1) * (GUN_SAMPLES - 1);
+    const i = Math.min(Math.floor(x), GUN_SAMPLES - 2);
+    const a = words[o + GUN_HEAD + i]!,
+      b = words[o + GUN_HEAD + i + 1]!;
+    return a + (b - a) * (x - i);
+  }
+
+  /** Fire gun `k`: its ballistics with its carrier's mass, its recoil samples, its shot and its muzzle blast. */
+  private fire(k: number, bodies: Float32Array | null, words: Float64Array): void {
+    const gun = this.guns[k]!;
+    let origin: Vec3 = gun.breech,
+      axis = gun.axis,
+      velocity: Vec3 = [0, 0, 0],
+      recoilMass: number | undefined;
+    if (gun.body >= 0 && bodies) {
+      const at = gun.body * BODY_WORDS;
+      const q = bodies.subarray(at + 3, at + 7);
+      const local = rotate(q, gun.breech);
+      origin = [bodies[at]! + local[0], bodies[at + 1]! + local[1], bodies[at + 2]! + local[2]];
+      axis = rotate(q, gun.axis);
+      velocity = [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!];
+      const inverse = bodies[at + 16]!;
+      if (inverse > 0) recoilMass = 1 / inverse;
+    }
+    const firing: Firing = fireGun({ ...gun.options, recoilMass });
+    this.gunSteps += firing.steps;
+    const o = k * GUN_WORDS;
+    const duration = firing.muzzleTime + firing.blowdownTime;
+    words[o] = 1;
+    words[o + 1] = gun.time;
+    words[o + 2] = firing.muzzleTime;
+    words[o + 3] = duration;
+    // Resample the history's momentum uniformly over the duration (the history's times only increase).
+    const h = firing.history;
+    let r = 0;
+    for (let i = 0; i < GUN_SAMPLES; i++) {
+      const t = (duration * i) / (GUN_SAMPLES - 1);
+      while (r + 2 * HISTORY_WORDS <= h.length && h[r + HISTORY_WORDS]! <= t) r += HISTORY_WORDS;
+      const t0 = h[r]!,
+        m0 = h[r + 4]!;
+      if (r + HISTORY_WORDS >= h.length) words[o + GUN_HEAD + i] = m0;
+      else {
+        const t1 = h[r + HISTORY_WORDS]!,
+          m1 = h[r + HISTORY_WORDS + 4]!;
+        words[o + GUN_HEAD + i] = t1 > t0 ? m0 + ((m1 - m0) * (t - t0)) / (t1 - t0) : m1;
+      }
+    }
+    const travel = gun.options.travel;
+    const muzzle: Vec3 = [origin[0] + axis[0] * travel, origin[1] + axis[1] * travel, origin[2] + axis[2] * travel];
+    // The shot: from the muzzle, at the carrier's velocity plus its own over the ground.
+    const f = this.fragmentWords();
+    const shot = this.fragmentCount - this.guns.length + k;
+    f.set(
+      [
+        ...muzzle,
+        velocity[0] + axis[0] * firing.shotVelocity,
+        velocity[1] + axis[1] * firing.shotVelocity,
+        velocity[2] + axis[2] * firing.shotVelocity,
+        gun.options.shotMass,
+        WAITING,
+      ],
+      shot * FRAGMENT_WORDS,
+    );
+    // The muzzle blast: the gas's energy as the shot leaves, all into the air.
+    const row = (this.placed.length + k) * EXPLOSION_WORDS;
+    this.explosions().set(
+      [
+        ...muzzle,
+        gun.time + firing.muzzleTime,
+        firing.muzzleGasEnergy,
+        firing.muzzleGasEnergy,
+        0,
+        0,
+        firing.muzzleGasMass,
+        0,
+        0,
+        0,
+        0,
+        0,
+      ],
+      row,
     );
   }
   private fragmentWords(): Float64Array {
@@ -369,16 +571,27 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
 
   step(context: StepContext, dt: number): void {
     const host = this.live();
-    const end = (context.tick + 1) / rateOf(context.level);
+    const rate = rateOf(context.level);
+    const start = context.tick / rate,
+      end = (context.tick + 1) / rate;
+    if (this.guns.length > 0) this.stepGuns(context, start, end);
     const rows = this.explosions();
-    for (let i = 0; i < this.placed.length; i++) if (this.placed[i]!.time < end) rows[i * EXPLOSION_WORDS + 9] = 1;
+    for (let i = 0; i < this.placed.length + this.guns.length; i++)
+      if (rows[i * EXPLOSION_WORDS + 3]! < end) rows[i * EXPLOSION_WORDS + 9] = 1;
+    const gunWords = this.gunWords();
     const f = this.fragmentWords();
     const g = host.gravity;
     let flying = 0;
     for (let i = 0; i < this.fragmentCount; i++) {
       const o = i * FRAGMENT_WORDS;
       let state = f[o + 7]!;
-      if (state === WAITING && this.placed[this.fragmentCharge[i]!]!.time < end) state = FLYING;
+      const owner = this.fragmentCharge[i]!;
+      if (state === WAITING) {
+        const o = (SHOT_GUN - owner) * GUN_WORDS;
+        const launch =
+          owner >= 0 ? this.placed[owner]!.time : gunWords[o] === 1 ? gunWords[o + 1]! + gunWords[o + 2]! : Infinity;
+        if (launch < end) state = FLYING;
+      }
       if (state !== FLYING) {
         f[o + 7] = state;
         continue;
@@ -411,11 +624,71 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     this.flyingNow = flying;
   }
 
+  /** Fire the guns whose time has come and push their carriers back by the recoil this step holds. */
+  private stepGuns(context: StepContext, start: number, end: number): void {
+    const host = this.live();
+    const words = this.gunWords();
+    let bodies: Float32Array | null = null;
+    let impulses: Float64Array | null = null;
+    if (this.carriers) {
+      const source = context.inputs.get(BODIES_FIELD.name)?.region;
+      if (!source || source.type !== 'f32' || source.layout !== 2)
+        throw new MargoError(
+          'state',
+          "The guns need the rigid solver's layout-2 bodies field; add a RigidSolver to the world before the ExplosionSolver.",
+        );
+      bodies = new Float32Array((source.memory ?? host.memory).buffer, source.byteOffset, source.byteLength / 4);
+      impulses = new Float64Array(
+        host.memory.buffer,
+        this.impulseRegion!.byteOffset,
+        this.impulseRegion!.byteLength / 8,
+      );
+      impulses.fill(0);
+    }
+    for (let k = 0; k < this.guns.length; k++) {
+      const gun = this.guns[k]!;
+      const o = k * GUN_WORDS;
+      if (words[o] !== 1 && gun.time < end) this.fire(k, bodies, words);
+      if (words[o] !== 1 || gun.body < 0 || !bodies || !impulses) continue;
+      const since = words[o + 1]!;
+      const pushed = this.recoilAt(words, o, end - since) - this.recoilAt(words, o, Math.max(start - since, 0));
+      if (pushed === 0) continue;
+      // Backward along the bore as it points now, at the breech: the linear impulse and its moment about the centre of mass.
+      const at = gun.body * BODY_WORDS;
+      const q = bodies.subarray(at + 3, at + 7);
+      const axis = rotate(q, gun.axis);
+      const local = rotate(q, gun.breech);
+      const arm: Vec3 = [
+        bodies[at]! + local[0] - bodies[at + 7]!,
+        bodies[at + 1]! + local[1] - bodies[at + 8]!,
+        bodies[at + 2]! + local[2] - bodies[at + 9]!,
+      ];
+      const j: Vec3 = [-axis[0] * pushed, -axis[1] * pushed, -axis[2] * pushed];
+      const row = gun.body * IMPULSE_WORDS;
+      impulses[row] = impulses[row]! + j[0];
+      impulses[row + 1] = impulses[row + 1]! + j[1];
+      impulses[row + 2] = impulses[row + 2]! + j[2];
+      impulses[row + 3] = impulses[row + 3]! + (arm[1] * j[2] - arm[2] * j[1]);
+      impulses[row + 4] = impulses[row + 4]! + (arm[2] * j[0] - arm[0] * j[2]);
+      impulses[row + 5] = impulses[row + 5]! + (arm[0] * j[1] - arm[1] * j[0]);
+    }
+  }
+
   exportPorts(tick: number): readonly Port[] {
     this.live();
     return [
       { field: this.explosionsField.name, region: this.explosionRegion!, tick, cell: [0, 0, 0] },
       { field: this.fragmentsField.name, region: this.fragmentRegion!, tick, cell: [0, 0, 0] },
+      ...(this.impulseRegion
+        ? [
+            {
+              field: BODY_IMPULSES_FIELD.name,
+              region: this.impulseRegion,
+              tick,
+              cell: [0, 0, 0] as [number, number, number],
+            },
+          ]
+        : []),
     ];
   }
 
@@ -423,7 +696,12 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
 
   stateRegions(): readonly Region[] {
     this.live();
-    return [this.explosionRegion!, this.fragmentRegion!];
+    return [
+      this.explosionRegion!,
+      this.fragmentRegion!,
+      this.gunRegion!,
+      ...(this.impulseRegion ? [this.impulseRegion] : []),
+    ];
   }
 
   extraState(): readonly Region[] {
@@ -432,7 +710,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
 
   /** The work the last steps did (the fragment steps are counted since the solver was made). */
   get counts(): ExplosionCounts {
-    return { flying: this.flyingNow, fragmentSteps: this.steps };
+    return { flying: this.flyingNow, fragmentSteps: this.steps, gunSteps: this.gunSteps };
   }
 
   /** Charge `index` as the `explosions` field publishes it. @throws RangeError for an index out of range. */
@@ -467,6 +745,36 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       heat: r[12]!,
       craterRadius: r[13]!,
     };
+  }
+
+  /**
+   * Gun `index`: whether it has fired, when, when its shot left the muzzle, and its backward momentum so far (kg m/s, the
+   * impulse its gas has given its carrier or mounting). @throws RangeError for an index out of range.
+   */
+  gun(index: number): { fired: boolean; time: number; muzzleTime: number; recoilMomentum: number } {
+    if (!(Number.isInteger(index) && index >= 0 && index < this.guns.length))
+      throw new RangeError(`ExplosionSolver has guns 0 to ${this.guns.length - 1}; got ${index}.`);
+    const w = this.gunWords(),
+      o = index * GUN_WORDS;
+    return {
+      fired: w[o] === 1,
+      time: w[o + 1]!,
+      muzzleTime: w[o + 2]!,
+      recoilMomentum: w[o] === 1 ? w[o + GUN_HEAD + GUN_SAMPLES - 1]! : 0,
+    };
+  }
+
+  /**
+   * Gun `index`'s muzzle blast as the `explosions` field publishes it (its row follows the charges'): where and when the
+   * shot left, the gas's energy and mass then, and whether that time has come. Before the gun fires its time is Infinity.
+   * @throws RangeError for an index out of range.
+   */
+  muzzleBlast(index: number): { position: Vec3; time: number; energy: number; gasMass: number; detonated: boolean } {
+    if (!(Number.isInteger(index) && index >= 0 && index < this.guns.length))
+      throw new RangeError(`ExplosionSolver has guns 0 to ${this.guns.length - 1}; got ${index}.`);
+    const o = (this.placed.length + index) * EXPLOSION_WORDS;
+    const r = this.explosions().subarray(o, o + EXPLOSION_WORDS);
+    return { position: [r[0]!, r[1]!, r[2]!], time: r[3]!, energy: r[4]!, gasMass: r[8]!, detonated: r[9] === 1 };
   }
 
   /** A copy of the fragments: rows of {@link FRAGMENT_WORDS} words (x, y, z, vx, vy, vz, mass, state). */

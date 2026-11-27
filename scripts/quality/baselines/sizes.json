@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20861278,
+  "total": 20865410,
   "history": [
     {
       "date": "2026-10-24",
@@ -14490,6 +14490,12 @@
       "commit": "84c630c2ad",
       "reason": "@margoengine/vfx 39065 to 39167 B gzip (ceiling 39137 to 40343), @margoengine/vfx/fire-front 9796 to 9879 B (ceiling 9841 to 10176): KB-VFX-GLOWUNITS1 refers a fire's glow on its smoke to the scene's noon sun (VFXLit.noon, its check and uniform scale in the root's lit feature; Smoke and FireFront noon, the front's setter writing every column). Without it a fire is invisible in a scene lit in lux and pi/5 too dim at sun 5. No waste: WGSL comments are stripped and the code is the option, its range check and its forwarding. A split would put a 100 B option behind an import() every lit effect needs. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "guns",
+      "reason": "FIRE-05: gun interior ballistics and recoil (+4132 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -15330,7 +15336,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 4309,
+    "@margoengine/physics/explosive": 8441,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

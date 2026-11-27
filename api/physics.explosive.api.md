@@ -91,10 +91,12 @@ export interface EnergyBudget {
 export interface ExplosionCounts {
     readonly flying: number;
     readonly fragmentSteps: number;
+    readonly gunSteps: number;
 }
 
 export interface ExplosionParams {
-    readonly charges: readonly ChargeOptions[];
+    readonly charges?: readonly ChargeOptions[];
+    readonly guns?: readonly GunMount[];
     readonly groundHeight?: number;
     readonly seed?: number;
     readonly soil?: GroundOptions;
@@ -104,7 +106,9 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
     readonly id: string;
     readonly explosionsField: FieldDescriptor;
     readonly fragmentsField: FieldDescriptor;
-    constructor(id?: string);
+    constructor(id?: string, options?: {
+        readonly carriers?: boolean;
+    });
     describe(): SolverDescription;
     init(host: SolverHost, params: ExplosionParams): void;
     step(context: StepContext, dt: number): void;
@@ -127,6 +131,19 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
         heat: number;
         craterRadius: number;
     };
+    gun(index: number): {
+        fired: boolean;
+        time: number;
+        muzzleTime: number;
+        recoilMomentum: number;
+    };
+    muzzleBlast(index: number): {
+        position: Vec3;
+        time: number;
+        energy: number;
+        gasMass: number;
+        detonated: boolean;
+    };
     fragments(): Float64Array;
 }
 
@@ -137,6 +154,28 @@ export interface Explosive {
 }
 
 export const FRAGMENT_WORDS = 8;
+
+export interface Firing {
+    readonly muzzleVelocity: number;
+    readonly shotVelocity: number;
+    readonly muzzleTime: number;
+    readonly peakPressure: number;
+    readonly peakBreech: number;
+    readonly peakBase: number;
+    readonly burnt: number;
+    readonly recoilMomentumAtExit: number;
+    readonly recoilMomentum: number;
+    readonly recoilVelocity: number;
+    readonly blowdownTime: number;
+    readonly afterEffect: number;
+    readonly muzzleGasEnergy: number;
+    readonly muzzleGasMass: number;
+    readonly efficiency: number;
+    readonly history: Float64Array;
+    readonly steps: number;
+}
+
+export const GUN_SAMPLES = 128;
 
 export const GURNEY_FRACTION = 0.7;
 
@@ -149,7 +188,63 @@ export interface GroundOptions {
     readonly law?: CraterLaw;
 }
 
+export interface GunMount extends Omit<GunOptions, 'recoilMass'> {
+    readonly time?: number;
+    readonly body?: number;
+    readonly breech: Vec3;
+    readonly axis: Vec3;
+    readonly shotDrag?: number;
+}
+
+export interface GunOptions {
+    readonly bore: number;
+    readonly travel: number;
+    readonly chamber: number;
+    readonly shotMass: number;
+    readonly charge: number;
+    readonly propellant?: Propellant;
+    readonly web: number;
+    readonly form?: number;
+    readonly recoilMass?: number;
+    readonly resistance?: number;
+    readonly startPressure?: number;
+    readonly ignitionPressure?: number;
+    readonly atmosphere?: number;
+    readonly step?: number;
+}
+
 export type GurneyGeometry = 'cylinder' | 'sphere' | 'flatSandwich' | 'openFacedSandwich' | 'asymmetricSandwich';
+
+export const HISTORY_WORDS = 5;
+
+export const PROPELLANTS: {
+    readonly cordite: {
+        readonly name: 'cordite';
+        readonly force: 1015800;
+        readonly covolume: 0.0006982;
+        readonly gamma: 1.2;
+        readonly density: 1560;
+        readonly burnRate: 2.4295e-9;
+        readonly pressureIndex: 1;
+    };
+    readonly pebblePowder: {
+        readonly name: 'pebble powder';
+        readonly force: 253900;
+        readonly covolume: 0.0006067;
+        readonly gamma: 1.2;
+        readonly density: 1700;
+    };
+};
+
+export interface Propellant {
+    readonly name: string;
+    readonly force: number;
+    readonly covolume: number;
+    readonly gamma?: number;
+    readonly density: number;
+    readonly burnRate?: number;
+    readonly pressureIndex?: number;
+}
 
 export const SONDER_CRATER_LAW: CraterLaw;
 
@@ -159,7 +254,11 @@ export function airborneFraction(scaled: number): number;
 
 export function chargeEnergy(mass: number, explosive?: Explosive): number;
 
+export function closedVesselPressure(propellant: Propellant, loading: number): number;
+
 export function energyBudget(energy: number, depth?: number, options?: GroundOptions, aboveGround?: boolean): EnergyBudget;
+
+export function fireGun(options: GunOptions): Firing;
 
 export function gurneyVelocity(explosive: Explosive): number;
 

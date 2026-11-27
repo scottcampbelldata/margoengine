@@ -29,4 +29,15 @@ export {
   type ExplosionParams,
   ExplosionSolver,
   FRAGMENT_WORDS,
+  GUN_SAMPLES,
+  type GunMount,
 } from './solver.js';
+export {
+  closedVesselPressure,
+  type Firing,
+  fireGun,
+  type GunOptions,
+  HISTORY_WORDS,
+  type Propellant,
+  PROPELLANTS,
+} from './gun.js';

@@ -7431,6 +7431,51 @@ world.advance(60);
 console.log(solver.charge(1).air / solver.charge(1).energy, solver.counts.flying);
 ```
 
+Guns (interior ballistics). `fireGun(options)` fires a gun's charge with a lumped model: Resal's energy equation, Lagrange's
+pressure gradient and Corner's burning law. The propellant burns at `burnRate` × p^`pressureIndex` through its `web`, with
+a grain `form` (1 a cord, 0 a tube). Its gas follows the Noble-Abel law (`force`, `covolume`, `gamma`). The shot is driven
+down the bore while the gun recoils, and momentum is conserved exactly among the shot, the gun and the gas. After the shot
+leaves, the bore blows down through the muzzle as a choked nozzle; that is the recoil's after-effect. The result
+(`Firing`) gives:
+
+- the muzzle and ground velocities and the muzzle time;
+- the peak mean, breech and base pressures;
+- the recoil momentum at the muzzle and after the blowdown;
+- the muzzle gas's energy and mass;
+- a `history` of time, travel, speed, pressure and recoil momentum.
+
+`PROPELLANTS` holds cordite and pebble powder, with Noble-Abel constants fitted to Noble and Abel's closed-vessel
+pressures. `closedVesselPressure(propellant, loading)` gives that pressure. Cordite's burning rate is calibrated to the
+1911 Britannica's 6-in. gun at 2150 ft/s.
+
+In `ExplosionSolver`, `guns` places guns in the world. Each fires at its `time` from its `breech` along its `axis`. On a
+rigid `body`, which needs `new ExplosionSolver(id, { carriers: true })` and a `RigidSolver`, the body's mass is the
+recoiling mass, its pose aims the gun, and the recoil goes into the body through `bodyImpulses` at the breech. The shot
+flies as a fragment with `shotDrag` on the bore's area. `muzzleBlast(i)` is the gun's row in the explosions field: the
+muzzle gas's energy, all of it into the air, at the time the shot leaves.
+
+```ts
+import { ExplosionSolver, fireGun } from '@margoengine/physics/explosive';
+import { Physics } from '@margoengine/physics';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+
+const IN = 0.0254, LB = 0.45359237;
+const sixInch = { bore: 6 * IN, travel: 5.48, chamber: 730 * IN ** 3, shotMass: 100 * LB, charge: 13.25 * LB, web: 0.15 * IN };
+const fired = fireGun(sixInch);
+console.log(fired.muzzleVelocity.toFixed(0), 'm/s', (fired.peakPressure / 1e6).toFixed(0), 'MPa');
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, -9.81, 0], fixedTimestep: 1 / 60 });
+const carriage = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [2, 1, 1], mass: 7000 } });
+const battery = new ExplosionSolver('battery', { carriers: true });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] })
+  .add(new RigidSolver(), { physics })
+  .add(battery, { guns: [{ ...sixInch, time: 0.1, body: carriage.row, breech: [0, 0.5, 0], axis: [1, 0.05, 0] }] })
+  .couple(['battery', 'rigid'], 'staggered');
+world.advance(30);
+console.log(carriage.linearVelocity, battery.gun(0).recoilMomentum, battery.muzzleBlast(0).energy);
+```
+
 ## Natural lightning and thunder
 
 `LightningSolver` advances a single cloud-to-ground leader in the electric field above a flat plane or a sampled
