@@ -31,6 +31,7 @@
 //   insurance maps' storey and material notes.
 import type { GeometryData } from '@margoengine/geometry/utils';
 import { MeshBuilder, add, clip, cross, dot, lerp, random, scale, sub, unit, type V3 } from './mesh-builder.js';
+import { buildInterior, type Hole, type Side } from './building-interiors.js';
 
 /** The style sets. Each is a full set of defaults; any option given overrides it. */
 export type BuildingStyle =
@@ -151,6 +152,12 @@ export interface BuildingRuleOptions {
   readonly detail?: BuildingDetail;
   /** What is built behind the windows. Default `cells` at `far` detail, else `rooms`. */
   readonly interior?: BuildingInterior;
+  /** Stairs between the storeys of furnished rooms, with the wells and guards. Default true. */
+  readonly stairs?: boolean;
+  /** Kitchen, bathroom and toilet rooms with their fixtures. Default true. */
+  readonly fixtures?: boolean;
+  /** Tatami, rugs, curtains, bedding and cushions in homes. Default true. */
+  readonly softFurnishings?: boolean;
   /** Ground point under the middle of the footprint `[x, y, z]`. Default `[0, 0, 0]`. */
   readonly origin?: readonly [number, number, number];
   /** Turn about +y, radians; the front (+z) faces `[sin yaw, cos yaw]`. Default 0. */
@@ -170,6 +177,11 @@ export type BuildingPart =
   | 'walls'
   | 'interior'
   | 'furniture'
+  | 'stairs'
+  | 'fixtures'
+  | 'metalwork'
+  | 'fabric'
+  | 'mats'
   | 'trim'
   | 'roof'
   | 'glass'
@@ -213,26 +225,58 @@ export interface Building {
   /** Roof covering height above the ground at local `[x, z]` (NaN off the roof). */
   roofHeight(x: number, z: number): number;
   /** Chimney top above the ground and its local `[x, z]`, when it has one. */
-  readonly chimney?: { readonly top: number; readonly at: readonly [number, number] };
+  readonly chimney?: {
+    readonly top: number;
+    readonly at: readonly [number, number];
+  };
   /** Steps built: each flight's riser height and tread depth, metres. */
-  readonly steps: readonly { readonly rise: number; readonly tread: number; readonly count: number }[];
+  readonly steps: readonly {
+    readonly rise: number;
+    readonly tread: number;
+    readonly count: number;
+  }[];
   /** Railing heights built (porches and balconies), metres above their deck. */
   readonly railings: readonly number[];
   /** Rooms built (`interior: 'rooms'`), local metres, between the inner faces of walls and partitions. */
   readonly rooms: readonly BuildingRoom[];
-  /** Furnishing blocks built, local metres. */
+  /** Furnishing and fixture blocks built, local metres. */
   readonly furniture: readonly BuildingFurniture[];
+  /** Stairs built, one entry from each storey to the next (empty when no room can hold one), local metres. */
+  readonly stairs: readonly BuildingStair[];
   /** Doorways through partition walls, local metres. */
   readonly doorways: readonly BuildingDoorway[];
 }
 /** A room: its storey, its floor rectangle (local `[x, z]`), floor level, clear height to the ceiling and area. */
 export interface BuildingRoom {
   readonly floor: number;
+  /** What the room is furnished as. */
+  readonly use: BuildingRoomUse;
   readonly min: readonly [number, number];
   readonly max: readonly [number, number];
   readonly level: number;
   readonly height: number;
   readonly area: number;
+}
+/** What a room is furnished as. */
+export type BuildingRoomUse = 'living' | 'kitchen' | 'bathroom' | 'bedroom' | 'office' | 'toilet' | 'shop' | 'store';
+/**
+ * The stair from one storey to the next: its footprint on the floor (the well open in the floor above), local metres.
+ * `dog-leg` is two flights and a half landing; `straight` one flight.
+ */
+export interface BuildingStair {
+  /** The storey it starts on. */
+  readonly floor: number;
+  readonly kind: 'dog-leg' | 'straight';
+  readonly min: readonly [number, number];
+  readonly max: readonly [number, number];
+  /** Risers from floor to floor. */
+  readonly risers: number;
+  readonly rise: number;
+  readonly tread: number;
+  /** Clear width of a flight. */
+  readonly width: number;
+  /** Height of the guard round the well above. */
+  readonly guard: number;
 }
 /** A furnishing block: an axis-aligned box in local metres. */
 export interface BuildingFurniture {
@@ -250,8 +294,13 @@ export interface BuildingDoorway {
   readonly normal: 'x' | 'z';
 }
 
-type Resolved = Required<Omit<BuildingRuleOptions, 'origin'>> & { origin: readonly [number, number, number] };
-type StyleSet = Omit<Resolved, 'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior'>;
+type Resolved = Required<Omit<BuildingRuleOptions, 'origin'>> & {
+  origin: readonly [number, number, number];
+};
+type StyleSet = Omit<
+  Resolved,
+  'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior' | 'stairs' | 'fixtures' | 'softFurnishings'
+>;
 
 const BASE: StyleSet = {
   width: 9.1,
@@ -470,6 +519,12 @@ const PALETTES: Record<
   const common = {
     interior: m([0.55, 0.52, 0.47], 0.9),
     furniture: m([0.26, 0.17, 0.1], 0.55),
+    stairs: m([0.3, 0.2, 0.11], 0.5),
+    fixtures: m([0.78, 0.78, 0.75], 0.15),
+    // Brushed stainless steel.
+    metalwork: m([0.56, 0.57, 0.58], 0.35, 0.6),
+    fabric: m([0.32, 0.27, 0.2], 0.95),
+    mats: m([0.42, 0.38, 0.18], 0.9),
     glass: m([0.02, 0.025, 0.03], 0.05),
     base: m([0.32, 0.31, 0.29], 0.9),
     chimney: m([0.28, 0.1, 0.06], 0.9),
@@ -488,6 +543,7 @@ const PALETTES: Record<
     },
     concrete: {
       ...common,
+      stairs: m([0.42, 0.41, 0.39], 0.85),
       walls: m([0.5, 0.49, 0.46], 0.85),
       trim: m([0.55, 0.54, 0.51], 0.8),
       roof: m([0.25, 0.25, 0.24], 0.9),
@@ -506,6 +562,9 @@ const PALETTES: Record<
     },
     frame: {
       ...common,
+      // Cast iron and the dyed wool of rugs and drapes.
+      metalwork: m([0.07, 0.07, 0.075], 0.5, 0.8),
+      fabric: m([0.28, 0.05, 0.04], 0.95),
       walls: m([0.7, 0.68, 0.62], 0.75),
       trim: m([0.75, 0.74, 0.7], 0.7),
       roof: m([0.2, 0.17, 0.14], 0.9),
@@ -515,6 +574,8 @@ const PALETTES: Record<
     },
     brick: {
       ...common,
+      metalwork: m([0.07, 0.07, 0.075], 0.5, 0.8),
+      fabric: m([0.05, 0.09, 0.07], 0.95),
       walls: m([0.3, 0.11, 0.06], 0.9),
       trim: m([0.55, 0.5, 0.42], 0.85),
       roof: m([0.12, 0.12, 0.12], 0.9),
@@ -645,6 +706,9 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
     reveal: Math.min(num(o, 'reveal', 0.02, 0.5, s.reveal), wall * 0.9),
     detail: pick(o, 'detail', ['far', 'mid', 'near'], 'mid'),
     interior: pick(o, 'interior', ['rooms', 'cells', 'none'], o.detail === 'far' ? 'cells' : 'rooms'),
+    stairs: bool(o, 'stairs', true),
+    fixtures: bool(o, 'fixtures', true),
+    softFurnishings: bool(o, 'softFurnishings', true),
     origin: tuple(o, 'origin', 3, -1e5, 1e5, [0, 0, 0]) as [number, number, number],
     yaw: num(o, 'yaw', -4 * Math.PI, 4 * Math.PI, 0),
     seed: num(o, 'seed', -0x80000000, 0xffffffff, 1, true),
@@ -652,21 +716,6 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
   return r;
 }
 
-interface Side {
-  start: V3;
-  dir: V3;
-  out: V3;
-  length: number;
-}
-interface Hole {
-  kind: BuildingOpening['kind'];
-  side: number;
-  floor: number;
-  a0: number;
-  a1: number;
-  y0: number;
-  y1: number;
-}
 const UP: V3 = [0, 1, 0];
 
 /**
@@ -689,6 +738,11 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     walls: new MeshBuilder(),
     interior: new MeshBuilder(),
     furniture: new MeshBuilder(),
+    stairs: new MeshBuilder(),
+    fixtures: new MeshBuilder(),
+    metalwork: new MeshBuilder(),
+    fabric: new MeshBuilder(),
+    mats: new MeshBuilder(),
     trim: new MeshBuilder(),
     roof: new MeshBuilder(),
     glass: new MeshBuilder(),
@@ -738,7 +792,15 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
         if (si === 0 && k === 0 && doorBays.has(j)) {
           const dw = Math.min(o.door[0], bw - 0.3),
             dh = Math.min(o.door[1], h - 0.25);
-          holes.push({ kind: 'door', side: si, floor: k, a0: c - dw / 2, a1: c + dw / 2, y0: fy, y1: fy + dh });
+          holes.push({
+            kind: 'door',
+            side: si,
+            floor: k,
+            a0: c - dw / 2,
+            a1: c + dw / 2,
+            y0: fy,
+            y1: fy + dh,
+          });
           if (o.storefront && dh + 0.6 < h - 0.2)
             holes.push({
               kind: 'transom',
@@ -869,7 +931,14 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
       w = h.a1 - h.a0,
       hh = h.y1 - h.y0,
       mid = at(s, (h.a0 + h.a1) / 2, (h.y0 + h.y1) / 2);
-    openings.push({ kind: h.kind, side: h.side, floor: h.floor, centre: mid, width: w, height: hh });
+    openings.push({
+      kind: h.kind,
+      side: h.side,
+      floor: h.floor,
+      centre: mid,
+      width: w,
+      height: hh,
+    });
     const plane = (a: number, yy: number, off = -rev) => at(s, a, yy, off);
     if (h.kind === 'door') {
       buildDoor(parts, s, plane, h, near, far, o);
@@ -895,13 +964,19 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     }
   }
 
-  // Interior floors: one slab per storey (and a ceiling under a pitched roof).
-  const levels = flat ? floors : [...floors, eaves];
-  for (const fy of levels) parts.interior.box([0, fy - 0.1, 0], [W / 2 - th, 0.1, D / 2 - th]);
   if (flat) parts.roof.box([0, eaves - 0.1, 0], [W / 2 - th, 0.1, D / 2 - th]);
-  const inside = buildInterior(parts, o, sides, holes, floors, eaves);
-  // Base: the foundation from below the ground to the floor, slightly proud of the walls.
-  parts.base.box([0, (o.plinth - 0.3) / 2, 0], [W / 2 + 0.02, (o.plinth + 0.3) / 2, D / 2 + 0.02]);
+  const inside = buildInterior(parts, o, sides, holes, floors, eaves, !flat);
+  // Base: the foundation from below the ground to the floor, slightly proud of the walls: a ring under the walls and,
+  // inside it, a fill that stops under the ground floor's slab, so no face of it shares the floor's plane.
+  const ix = W / 2 - th,
+    iz = D / 2 - th,
+    foot = (x0: number, x1: number, z0: number, z1: number, top: number) =>
+      parts.base.box([(x0 + x1) / 2, (top - 0.3) / 2, (z0 + z1) / 2], [(x1 - x0) / 2, (top + 0.3) / 2, (z1 - z0) / 2]);
+  foot(-W / 2 - 0.02, W / 2 + 0.02, iz, D / 2 + 0.02, o.plinth);
+  foot(-W / 2 - 0.02, W / 2 + 0.02, -D / 2 - 0.02, -iz, o.plinth);
+  foot(-W / 2 - 0.02, -ix, -iz, iz, o.plinth);
+  foot(ix, W / 2 + 0.02, -iz, iz, o.plinth);
+  foot(-ix, ix, -iz, iz, o.plinth - 0.2);
 
   // Roof.
   const roof = buildRoof(parts, o, eaves, near, far);
@@ -1452,7 +1527,11 @@ function buildRoof(
         depth: 0.05,
       });
   }
-  const mapped = fills.map((f) => ({ poly: f.poly.map(map), toward: map(f.toward), depth: f.depth }));
+  const mapped = fills.map((f) => ({
+    poly: f.poly.map(map),
+    toward: map(f.toward),
+    depth: f.depth,
+  }));
   const isFront = (f: { toward: V3 }) => f.toward[2] > 0.5;
   const frontTop = Math.max(
     ...[0, ...mapped.filter(isFront).flatMap((f) => f.poly.map((p) => p[1]))],
@@ -1791,245 +1870,4 @@ export function townBuildings(lots: readonly BuildingLot[], options: TownBuildin
       yaw: Math.atan2(front[0], front[1]),
     };
   });
-}
-
-// Interiors. Room widths: two ken (2 x 1.82 m, the Edo-ma module) for the Japanese sets and 12 ft (3.66 m) for the
-// western sets. Partition walls are 0.1 m (Japanese shoji and fusuma frames) and 0.12 m (a 2 by 4 stud wall with lath
-// and plaster); doorways are 0.86 by 1.8 m (fusuma opening) and 32 by 80 in (0.81 by 2.03 m). Furnishing blocks keep to
-// the sizes of their period pieces (chabudai, tansu, zabuton; table, chair, sideboard, bed, wardrobe; shop counter and
-// shelves; office desks; stacked crates) and are placed only where they block no window, doorway or door.
-const ROOM_WIDTH = { japan: 3.64, western: 3.66 } as const;
-function buildInterior(
-  parts: Record<BuildingPart, MeshBuilder>,
-  o: Resolved,
-  sides: Side[],
-  holes: Hole[],
-  floors: number[],
-  eaves: number,
-): { rooms: BuildingRoom[]; furniture: BuildingFurniture[]; doorways: BuildingDoorway[] } {
-  const rooms: BuildingRoom[] = [],
-    furniture: BuildingFurniture[] = [],
-    doorways: BuildingDoorway[] = [];
-  if (o.interior === 'none') return { rooms, furniture, doorways };
-  const W = o.width,
-    D = o.depth,
-    th = o.wall,
-    x0 = -W / 2 + th,
-    x1 = W / 2 - th,
-    z0 = -D / 2 + th,
-    z1 = D / 2 - th,
-    japan = o.style.startsWith('japan'),
-    use =
-      o.style === 'japan-2011-warehouse' || o.style === 'western-1910-depot'
-        ? 'store'
-        : o.style === 'japan-2011-concrete'
-          ? 'office'
-          : 'home',
-    ceilingOf = (k: number) => (k + 1 < floors.length ? floors[k + 1] : eaves) - 0.2,
-    m = parts.interior,
-    f = parts.furniture;
-  if (o.interior === 'cells') {
-    // One cell per window: back wall, floor, ceiling and two sides, facing in: the room cell of van Dongen 2008.
-    for (const h of holes) {
-      if (h.kind === 'door' || h.kind === 'transom') continue;
-      const s = sides[h.side],
-        fy = floors[h.floor],
-        cy = ceilingOf(h.floor),
-        a0 = Math.max(th, h.a0 - 0.6),
-        a1 = Math.min(s.length - th, h.a1 + 0.6),
-        depth = Math.min(3.6, ((h.side % 2 === 0 ? D : W) - 2 * th) / 2),
-        p = (a: number, y: number, off: number): V3 =>
-          add(add(s.start, scale(s.dir, a)), [s.out[0] * off, y, s.out[2] * off]),
-        i0 = -th,
-        i1 = -th - depth,
-        g = fy + 0.005;
-      m.poly([p(a0, fy, i1), p(a1, fy, i1), p(a1, cy, i1), p(a0, cy, i1)], s.out);
-      m.poly([p(a0, g, i0), p(a1, g, i0), p(a1, g, i1), p(a0, g, i1)], UP);
-      m.poly([p(a0, cy, i0), p(a1, cy, i0), p(a1, cy, i1), p(a0, cy, i1)], [0, -1, 0]);
-      m.poly([p(a0, fy, i0), p(a0, fy, i1), p(a0, cy, i1), p(a0, cy, i0)], s.dir);
-      m.poly([p(a1, fy, i0), p(a1, fy, i1), p(a1, cy, i1), p(a1, cy, i0)], scale(s.dir, -1));
-    }
-    return { rooms, furniture, doorways };
-  }
-  const pt = japan ? 0.1 : 0.12,
-    dw = japan ? 0.86 : 0.81,
-    dh = japan ? 1.8 : 2.03,
-    bays = Math.max(1, Math.round(W / o.bayWidth)),
-    bw = W / bays;
-  // Each opening on the inner wall face, in local terms: the wall plane and the span along it.
-  const span = (h: Hole) => {
-    if (h.side === 0) return { axis: 'z' as const, plane: z1, lo: -W / 2 + h.a0, hi: -W / 2 + h.a1, h };
-    if (h.side === 2) return { axis: 'z' as const, plane: z0, lo: W / 2 - h.a1, hi: W / 2 - h.a0, h };
-    if (h.side === 1) return { axis: 'x' as const, plane: x1, lo: D / 2 - h.a1, hi: D / 2 - h.a0, h };
-    return { axis: 'x' as const, plane: x0, lo: -D / 2 + h.a0, hi: -D / 2 + h.a1, h };
-  };
-  const box = (b: MeshBuilder, ax: number, bx: number, ay: number, by: number, az: number, bz: number) =>
-    b.box([(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2], [(bx - ax) / 2, (by - ay) / 2, (bz - az) / 2]);
-  for (let k = 0; k < floors.length; k++) {
-    const fy = floors[k],
-      cy = ceilingOf(k),
-      open = use === 'store' || (k === 0 && o.storefront),
-      n = open ? 1 : Math.max(1, Math.round((x1 - x0) / ROOM_WIDTH[japan ? 'japan' : 'western'])),
-      xs = [x0];
-    for (let j = 1; j < n; j++) {
-      // A partition on a bay line where one is close, so none stands behind a window.
-      const even = x0 + (j * (x1 - x0)) / n,
-        snap = -W / 2 + bw * Math.round((even + W / 2) / bw);
-      xs.push(Math.abs(snap - even) < 0.6 && snap - xs[xs.length - 1] > 2.4 && x1 - snap > 2.4 ? snap : even);
-    }
-    xs.push(x1);
-    const zs = !open && z1 - z0 > 6 ? [z0, z1 - 0.55 * (z1 - z0), z1] : [z0, z1],
-      floorDoors: BuildingDoorway[] = [];
-    for (let j = 1; j < xs.length - 1; j++)
-      for (let r = 0; r + 1 < zs.length; r++) {
-        const za = zs[r] + (r > 0 ? pt / 2 : 0),
-          zb = zs[r + 1] - (r + 1 < zs.length - 1 ? pt / 2 : 0),
-          d0 = za + 0.3,
-          d1 = d0 + dw,
-          x = xs[j];
-        if (d1 > zb - 0.1) {
-          box(m, x - pt / 2, x + pt / 2, fy, cy, za, zb);
-          continue;
-        }
-        box(m, x - pt / 2, x + pt / 2, fy, cy, za, d0);
-        box(m, x - pt / 2, x + pt / 2, fy, cy, d1, zb);
-        box(m, x - pt / 2, x + pt / 2, fy + dh, cy, d0, d1);
-        floorDoors.push({ floor: k, centre: [x, fy + dh / 2, (d0 + d1) / 2], width: dw, height: dh, normal: 'x' });
-      }
-    if (zs.length === 3)
-      for (let i = 0; i + 1 < xs.length; i++) {
-        const xa = xs[i] + (i > 0 ? pt / 2 : 0),
-          xb = xs[i + 1] - (i + 1 < xs.length - 1 ? pt / 2 : 0),
-          c = (xa + xb) / 2,
-          z = zs[1];
-        box(m, xa, c - dw / 2, fy, cy, z - pt / 2, z + pt / 2);
-        box(m, c + dw / 2, xb, fy, cy, z - pt / 2, z + pt / 2);
-        box(m, c - dw / 2, c + dw / 2, fy + dh, cy, z - pt / 2, z + pt / 2);
-        floorDoors.push({ floor: k, centre: [c, fy + dh / 2, z], width: dw, height: dh, normal: 'z' });
-      }
-    doorways.push(...floorDoors);
-    const openings = holes.filter((h) => h.floor === k).map(span);
-    for (let i = 0; i + 1 < xs.length; i++)
-      for (let r = 0; r + 1 < zs.length; r++) {
-        const rx0 = xs[i] + (i > 0 ? pt / 2 : 0),
-          rx1 = xs[i + 1] - (i + 1 < xs.length - 1 ? pt / 2 : 0),
-          rz0 = zs[r] + (r > 0 ? pt / 2 : 0),
-          rz1 = zs[r + 1] - (r + 1 < zs.length - 1 ? pt / 2 : 0),
-          mx = (rx0 + rx1) / 2,
-          mz = (rz0 + rz1) / 2;
-        rooms.push({
-          floor: k,
-          min: [rx0, rz0],
-          max: [rx1, rz1],
-          level: fy,
-          height: cy - fy,
-          area: (rx1 - rx0) * (rz1 - rz0),
-        });
-        const placed: BuildingFurniture[] = [];
-        // A block fits when it is inside the room, clear of the others, of every doorway's approach (0.9 m each side)
-        // and of each outer door (1.2 m), and lower than the sill of any window it stands within 0.9 m of.
-        const fits = (ax: number, bx: number, az: number, bz: number, top: number) => {
-          if (ax < rx0 + 0.02 || bx > rx1 - 0.02 || az < rz0 + 0.02 || bz > rz1 - 0.02) return false;
-          for (const q of placed) if (ax < q.max[0] && bx > q.min[0] && az < q.max[2] && bz > q.min[2]) return false;
-          for (const d of floorDoors) {
-            const [cx, , cz] = d.centre,
-              [ex, ez] = d.normal === 'x' ? [0.9, d.width / 2 + 0.05] : [d.width / 2 + 0.05, 0.9];
-            if (ax < cx + ex && bx > cx - ex && az < cz + ez && bz > cz - ez) return false;
-          }
-          for (const s of openings) {
-            const near =
-                s.axis === 'z'
-                  ? Math.min(Math.abs(az - s.plane), Math.abs(bz - s.plane))
-                  : Math.min(Math.abs(ax - s.plane), Math.abs(bx - s.plane)),
-              [lo, hi] = s.axis === 'z' ? [ax, bx] : [az, bz],
-              door = s.h.kind === 'door' || s.h.kind === 'balcony-door';
-            if (lo < s.hi + 0.1 && hi > s.lo - 0.1 && near < (door ? 1.2 : 0.9) && (door || top > s.h.y0 - 0.05))
-              return false;
-          }
-          return true;
-        };
-        const put = (kind: string, cx: number, cz: number, sx: number, sz: number, h: number, pieces?: () => void) => {
-          const ax = cx - sx / 2,
-            bx = cx + sx / 2,
-            az = cz - sz / 2,
-            bz = cz + sz / 2;
-          if (!fits(ax, bx, az, bz, fy + h)) return false;
-          if (pieces) pieces();
-          else box(f, ax, bx, fy, fy + h, az, bz);
-          placed.push({ kind, floor: k, min: [ax, fy, az], max: [bx, fy + h, bz] });
-          return true;
-        };
-        // Against a wall: each wall of the room at its middle, then a quarter of the way along either way.
-        const againstWall = (kind: string, w: number, d: number, h: number) => {
-          for (const t of [0.5, 0.25, 0.75]) {
-            const ax = rx0 + (rx1 - rx0) * t,
-              az = rz0 + (rz1 - rz0) * t,
-              spots: [number, number, number, number][] = [
-                [rx0 + 0.03 + d / 2, az, d, w],
-                [rx1 - 0.03 - d / 2, az, d, w],
-                [ax, rz0 + 0.03 + d / 2, w, d],
-                [ax, rz1 - 0.03 - d / 2, w, d],
-              ];
-            for (const [cx, cz, sx, sz] of spots) if (put(kind, cx, cz, sx, sz, h)) return;
-          }
-        };
-        const legs = (cx: number, cz: number, hx: number, hz: number, top: number, leg: number) => {
-          for (const [sx, sz] of [
-            [-1, -1],
-            [1, -1],
-            [1, 1],
-            [-1, 1],
-          ])
-            box(f, cx + sx * hx - leg, cx + sx * hx + leg, fy, top, cz + sz * hz - leg, cz + sz * hz + leg);
-        };
-        if (use === 'store') {
-          // Crates stacked two high in rows across the back half, 1.2 m cubes on 1.8 m centres.
-          for (let cx = rx0 + 1.2; cx + 1.2 < rx1; cx += 1.8)
-            for (let cz = rz0 + 1.2; cz < mz; cz += 1.8)
-              put('crates', cx, cz, 1.2, 1.2, 2.4, () => {
-                box(f, cx - 0.6, cx + 0.6, fy, fy + 1.2, cz - 0.6, cz + 0.6);
-                box(f, cx - 0.55, cx + 0.55, fy + 1.2, fy + 2.4, cz - 0.55, cz + 0.55);
-              });
-        } else if (k === 0 && o.storefront) {
-          // A shop counter across the floor and shelving against a wall.
-          put('counter', mx, rz0 + 0.45 * (rz1 - rz0), Math.max(1.2, rx1 - rx0 - 2.4), 0.6, 0.95);
-          againstWall('shelves', Math.min(3, (rx1 - rx0) * 0.5), 0.4, 2.2);
-        } else if (use === 'office') {
-          put('desk', mx, mz, 1.4, 0.7, 0.72, () => {
-            box(f, mx - 0.7, mx + 0.7, fy + 0.69, fy + 0.72, mz - 0.35, mz + 0.35);
-            box(f, mx + 0.25, mx + 0.68, fy, fy + 0.69, mz - 0.33, mz + 0.33);
-            box(f, mx - 0.68, mx - 0.64, fy, fy + 0.69, mz - 0.33, mz + 0.33);
-          });
-          put('chair', mx, mz - 0.7, 0.5, 0.5, 0.95);
-          againstWall('cabinet', 0.9, 0.45, 1.8);
-        } else if (japan) {
-          put('low table', mx, mz, 0.9, 0.9, 0.33, () => {
-            box(f, mx - 0.45, mx + 0.45, fy + 0.3, fy + 0.33, mz - 0.45, mz + 0.45);
-            legs(mx, mz, 0.38, 0.38, fy + 0.3, 0.03);
-          });
-          put('cushion', mx - 0.8, mz, 0.55, 0.55, 0.08);
-          put('cushion', mx + 0.8, mz, 0.55, 0.55, 0.08);
-          againstWall('tansu', 1.0, 0.45, 1.1);
-        } else if (k === 0) {
-          put('table', mx, mz, 1.2, 0.8, 0.76, () => {
-            box(f, mx - 0.6, mx + 0.6, fy + 0.72, fy + 0.76, mz - 0.4, mz + 0.4);
-            legs(mx, mz, 0.54, 0.34, fy + 0.72, 0.03);
-          });
-          for (const sx of [-1, 1]) {
-            const cx = mx + sx * 0.85;
-            put('chair', cx, mz, 0.45, 0.45, 0.9, () => {
-              box(f, cx - 0.22, cx + 0.22, fy + 0.42, fy + 0.46, mz - 0.22, mz + 0.22);
-              box(f, cx + sx * 0.2 - 0.02, cx + sx * 0.2 + 0.02, fy + 0.46, fy + 0.9, mz - 0.2, mz + 0.2);
-              legs(cx, mz, 0.19, 0.19, fy + 0.42, 0.02);
-            });
-          }
-          againstWall('sideboard', 1.2, 0.5, 0.9);
-        } else {
-          againstWall('bed', 1.4, 1.95, 0.6);
-          againstWall('wardrobe', 1.0, 0.6, 1.9);
-        }
-        furniture.push(...placed);
-      }
-  }
-  return { rooms, furniture, doorways };
 }

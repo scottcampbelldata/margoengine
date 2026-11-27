@@ -114,6 +114,9 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
     ['rooms', 'cells', 'none'],
     'Behind the windows: furnished rooms, one room cell per window, or nothing.',
   ),
+  c('stairs', 'detail', onOff, 'Stairs between the storeys of furnished rooms.'),
+  c('fixtures', 'detail', onOff, 'Kitchen, bathroom and toilet rooms with their fixtures.'),
+  c('softFurnishings', 'detail', onOff, 'Tatami, rugs, curtains, bedding and cushions in homes.'),
   n('seed', 'detail', 1, 0, 1_000_000, 1, '', 'Seed for small differences.'),
 ];
 const BUILDING_INDEX = settingIndex(BUILDING_SETTINGS);
@@ -128,6 +131,9 @@ const FLAGS = [
   'bands',
   'cornice',
   'brackets',
+  'stairs',
+  'fixtures',
+  'softFurnishings',
 ];
 /** Every building setting at its default, as a fresh object to edit. */
 export function buildingSettingDefaults(): Record<string, BuildingSettingValue> {
@@ -153,8 +159,12 @@ export function buildingOptionsFromSettings(values: BuildingSettingValues): Buil
     ...pair(v, 'storeys', 'storeyHeight', [set.storeys.length, set.storeys[0]], (count, h) => ({
       storeys: Array(count).fill(h),
     })),
-    ...pair(v, 'windowWidth', 'windowHeight', set.window, (w, h) => ({ window: [w, h] })),
-    ...pair(v, 'doorWidth', 'doorHeight', set.door, (w, h) => ({ door: [w, h] })),
+    ...pair(v, 'windowWidth', 'windowHeight', set.window, (w, h) => ({
+      window: [w, h],
+    })),
+    ...pair(v, 'doorWidth', 'doorHeight', set.door, (w, h) => ({
+      door: [w, h],
+    })),
   } as BuildingRuleOptions;
 }
 // Two rows that make one option: the one not given comes from the style set.
@@ -228,10 +238,14 @@ export function harbourOptionsFromSettings(values: BuildingSettingValues): {
   boat: FishingBoatOptions;
 } {
   checkSettings(HARBOUR_INDEX, values, 'harbour', 'the rows in @margoengine/procedural/building-settings');
-  const out = { seaWall: {}, tetrapod: {}, quay: {}, breakwater: {}, slipway: {}, boat: {} } as Record<
-    string,
-    Record<string, unknown>
-  >;
+  const out = {
+    seaWall: {},
+    tetrapod: {},
+    quay: {},
+    breakwater: {},
+    slipway: {},
+    boat: {},
+  } as Record<string, Record<string, unknown>>;
   for (const [name, value] of Object.entries(values)) {
     const [piece, key] = name.split('.');
     out[piece][key] = value === 'on' ? true : value === 'off' ? false : value;
@@ -276,7 +290,10 @@ export function buildingPlanOptionsFromSettings(values: BuildingSettingValues): 
     rest: Record<string, BuildingSettingValue> = {};
   for (const [name, value] of Object.entries(values)) (PLAN_INDEX.has(name) ? plan : rest)[name] = value;
   checkSettings(PLAN_INDEX, plan, 'building plan', 'the rows in @margoengine/procedural/building-settings');
-  return { ...buildingOptionsFromSettings(rest), ...plan } as BuildingPlanOptions;
+  return {
+    ...buildingOptionsFromSettings(rest),
+    ...plan,
+  } as BuildingPlanOptions;
 }
 
 /** Every city control, in panel order. All rebuild (live false). */

@@ -993,7 +993,8 @@ braces and a chimney that clears the roof by the building code. `detail` (`far`,
 geometry there is, so a whole town can be `mid` and the hero house `near`.
 
 It returns `{parts, palette, options, floors, eaves, top, openings, footprint, roofHeight(x, z), chimney, steps,
-railings, rooms, furniture, doorways}`: one `GeometryData` per part (`walls`, `interior`, `furniture`, `trim`, `roof`, `glass`, `frames`, `doors`, `base`,
+railings, rooms, furniture, doorways, stairs}`: one `GeometryData` per part (`walls`, `interior`, `furniture`,
+`stairs`, `fixtures`, `metalwork`, `fabric`, `mats`, `trim`, `roof`, `glass`, `frames`, `doors`, `base`,
 `porch`, `awning`, `chimney`, `gutters`; a part with nothing in it is left out), all in world space with UVs in metres
 for tiling textures and tangents, plus a suggested material for each part. The origin is on the ground under the middle
 of the footprint, the front faces +z turned by `yaw`.
@@ -1051,6 +1052,10 @@ console.log(town.length, Object.keys(town[0].parts).length > 5); // 1 true
 | `chimney`, `chimneyAt` | false, [0.4, 0] | -0.9 to 0.9 each | a chimney and its place as shares of the half width and depth |
 | `gutters`, `cornerBoards`, `casings`, `bands`, `cornice`, `brackets` | true, false, false, false, false, false | | trim |
 | `detail` | `mid` | `far`, `mid`, `near` | small geometry |
+| `interior` | `rooms` (`cells` at `far`) | `rooms`, `cells`, `none` | what stands behind the windows |
+| `stairs` | true | | stairs between the storeys of furnished rooms, with their wells and guards |
+| `fixtures` | true | | kitchen, bathroom and toilet rooms with their fixtures |
+| `softFurnishings` | true | | tatami, rugs, curtains, bedding and cushions in homes |
 | `origin`, `yaw`, `seed` | [0, 0, 0], 0, 1 | | placement and the seed of small differences |
 
 Measured sizes the tests hold (packages/procedural/test/building-rules.test.js): Japan's Building Standard Law
@@ -1073,14 +1078,40 @@ doors) and furnishing blocks of the period (chabudai, zabuton and tansu; table, 
 shop counter and shelves; office desks; stacked crates), each placed only where it blocks no window, doorway or door.
 `cells` (the default at `far`) builds one five-faced room cell behind each window instead, the cell that interior
 mapping traces (van Dongen 2008) made as geometry, ten triangles a window; `none` keeps the inner wall faces and
-floors only. The result lists `rooms` (floor rectangle, level, clear height, area), `furniture` (kind and box) and
-`doorways`, all in local metres.
+floors only. The result lists `rooms` (use, floor rectangle, level, clear height, area), `furniture` (kind and box),
+`doorways` and `stairs`, all in local metres.
+
+Between the storeys of furnished rooms stands a stair: a dog-leg of two flights and a half landing, stacked from floor
+to floor (or, between two floors where that does not fit, one straight flight), with treads, risers, stringers, a
+handrail with balusters, the floor above open over it and a guard round the well. Its steps keep the International
+Residential Code R311.7 (36 in wide, risers at most 7 3/4 in, treads at least 10 in, 6 ft 8 in of headroom) and R312
+(a guard of at least 36 in with openings under a 4 in sphere), or Japan's Building Standard Law Enforcement Order
+art. 23 (concrete public buildings 0.9 or 1.2 m wide with risers of 0.18 m at most; wooden houses 0.78 m wide with
+0.21 m), the going set by Blondel's rule. It stands in one room on every floor, clear of doorways and outer doors, and
+clear of the windows where the plan allows (else it passes one, as a stair window does). `stairs` is empty when no room
+can hold one (narrow or very divided plans).
+
+With `fixtures`, a home's ground floor (a shop block's first floor) has a kitchen at the back (a fitted counter with
+sink, hob and a refrigerator in the 2011 house; a cast iron range with its flue, a legged sink and an ice box in 1910)
+and a bathroom (tub, water closet and washbasin, the 1910 closet with a high tank), upstairs when the ground floor has
+only two rooms; a concrete public building has a toilet room on each floor. A fixture keeps clear floor in front of it,
+and a water closet the room beside it that IRC R307.1 asks for. With `softFurnishings`, Japanese homes are laid with
+Edo-ma tatami (no four corners meeting) and sleep on futons, western homes have a rug and made beds with pillows and
+blankets, and the windows of living rooms and bedrooms have a pair of curtains. Nothing taller than a sill stands
+before a window.
 
 ```ts
 import {generateBuilding} from 'margoengine/procedural/building-rules';
 const house = generateBuilding({style: 'western-1910-house'});
-console.log(house.rooms.length, house.furniture.some((f) => f.kind === 'bed')); // 8 true
+console.log(house.rooms.length, house.furniture.some((f) => f.kind === 'range')); // 8 true
+console.log(house.stairs[0].kind, house.stairs[0].risers, house.parts.stairs !== undefined); // dog-leg 16 true
 ```
+
+Sources for the interiors: Blondel 1675-1683, Cours d'architecture; Merrell, Schkufza, Li, Koltun and Agrawala 2011,
+"Interactive Furniture Layout Using Interior Design Guidelines" (https://doi.org/10.1145/2010324.1964982); Germer and
+Schwarz 2009, "Procedural Arrangement of Furniture for Real-Time Walkthroughs"
+(https://doi.org/10.1111/j.1467-8659.2009.01351.x); International Code Council 2021, International Residential Code,
+R307.1, R311.7 and R312; Japan, Building Standard Law Enforcement Order, art. 23.
 
 ## City generator (`@margoengine/procedural/city`)
 
@@ -1178,8 +1209,9 @@ where their planes cross (45 degrees in plan between equal pitches), walls open 
 main roof is cut open behind each dormer, and nothing hidden is left to draw. A dormer is left out where a wing or the
 tower already covers that part of the slope, or where the roof is too low for one.
 
-It returns `{parts, palette, blocks, top, openings, dormers, rooms, furniture, doorways, roofHeight(x, z),
-insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding`; `roofHeight` is the upper envelope of
+It returns `{parts, palette, blocks, top, openings, dormers, rooms, furniture, doorways, stairs, roofHeight(x, z),
+insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding` (the stairs are the main block's; a
+wing has its own only when given by hand with `stairs: true`); `roofHeight` is the upper envelope of
 the blocks' roofs. `BUILDING_PLAN_SETTINGS` and `buildingPlanOptionsFromSettings` in
 `@margoengine/procedural/building-settings` are its slider rows.
 

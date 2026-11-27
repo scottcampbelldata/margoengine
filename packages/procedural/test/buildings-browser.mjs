@@ -31,7 +31,7 @@ try {
       background: '#9fb4c8',
       exactSize: [960, 540],
       capacity: 4096,
-      camera: { position: [20, 26, 70], target: [20, 4, 0], far: 600 },
+      camera: { position: [20, 26, 70], target: [20, 4, 0], near: 0.05, far: 600 },
       onError: (e) => errors.push(String(e?.message ?? e)),
     });
     const hex = (c) =>
@@ -121,6 +121,72 @@ try {
       for (const [name, g] of Object.entries(b.parts)) add(g, b.palette[name]);
       nx += probe.options.width + 6;
     }
+    // Cutaways far from the street: one floor of a house at a time, seen from above, its walls and roof left off, so
+    // the stair, its guard, the fixtures and the soft furnishings show.
+    const cuts = [];
+    const indoor = ['interior', 'furniture', 'stairs', 'fixtures', 'metalwork', 'fabric', 'mats'];
+    // Triangles of one floor, what stands higher flattened to the cut height.
+    const slice = (g, lo, hi) => {
+      const keep = [];
+      for (let t = 0; t < g.indices.length; t += 3) {
+        const y = [0, 1, 2].map((k) => g.positions[3 * g.indices[t + k] + 1]);
+        if (Math.min(...y) >= lo && Math.min(...y) < hi - 0.01)
+          keep.push(g.indices[t], g.indices[t + 1], g.indices[t + 2]);
+      }
+      const positions = g.positions.slice();
+      for (let i = 1; i < positions.length; i += 3) positions[i] = Math.min(positions[i], hi);
+      return { ...g, positions, indices: new Uint32Array(keep) };
+    };
+    for (const style of ['japan-2011-house', 'western-1910-house', 'western-1910-brick'])
+      for (const floor of [0, 1]) {
+        const at = [cuts.length * 40, 0, -600];
+        const b = generateBuilding({ style, origin: at, detail: 'near' });
+        const lo = b.floors[floor] - 0.01,
+          hi = b.floors[floor] + (floor === 0 ? b.floors[1] - b.floors[0] - 0.25 : 1.6);
+        for (const name of indoor) {
+          if (!b.parts[name]) continue;
+          const g = slice(b.parts[name], lo - (name === 'interior' ? 0.2 : 0), hi);
+          if (g.indices.length) add(g, b.palette[name]);
+        }
+        const r = Math.max(b.options.width, b.options.depth);
+        cuts.push([
+          [at[0], b.floors[floor] + r * 0.95, at[2] + r * 0.6],
+          [at[0], b.floors[floor], at[2]],
+        ]);
+      }
+    // From inside: the foot of each house's stair, and its kitchen, at eye height.
+    for (const style of ['japan-2011-house', 'western-1910-house']) {
+      const at = [cuts.length * 40, 0, -600];
+      const b = generateBuilding({ style, origin: at, detail: 'near' });
+      for (const [name, g] of Object.entries(b.parts)) add(g, b.palette[name]);
+      for (const target of [
+        {
+          floor: 0,
+          x: (b.stairs[0].min[0] + b.stairs[0].max[0]) / 2,
+          z: (b.stairs[0].min[1] + b.stairs[0].max[1]) / 2,
+        },
+        (() => {
+          const f = b.furniture.find((q) => q.kind === 'kitchen counter' || q.kind === 'sink');
+          return { floor: f.floor, x: (f.min[0] + f.max[0]) / 2, z: (f.min[2] + f.max[2]) / 2 };
+        })(),
+      ]) {
+        const room = b.rooms.find(
+          (q) =>
+            q.floor === target.floor &&
+            target.x >= q.min[0] &&
+            target.x <= q.max[0] &&
+            target.z >= q.min[1] &&
+            target.z <= q.max[1],
+        );
+        // The room corner farthest from the target, a little in from the walls.
+        const cx = target.x - room.min[0] > room.max[0] - target.x ? room.min[0] + 0.15 : room.max[0] - 0.15,
+          cz = target.z - room.min[1] > room.max[1] - target.z ? room.min[1] + 0.15 : room.max[1] - 0.15;
+        cuts.push([
+          [at[0] + cx, room.level + 1.7, at[2] + cz],
+          [at[0] + target.x, room.level + 0.8, at[2] + target.z],
+        ]);
+      }
+    }
     const views = [
       [
         [20, 26, 70],
@@ -142,6 +208,7 @@ try {
         [60, 14, -270],
         [56, 6, -305],
       ],
+      ...cuts,
     ];
     window.view = async (i) => {
       stage.engine.camera.position = views[i][0];
@@ -151,7 +218,7 @@ try {
     };
     await window.view(0);
     window.fixture = stage;
-    return { errors };
+    return { errors, views: views.length };
   });
   assert.deepEqual(result.errors, []);
   const shot = await browser.page.locator('canvas').screenshot();
@@ -160,7 +227,7 @@ try {
   );
   await mkdir(dir, { recursive: true });
   await writeFile(dir + 'street.png', shot);
-  for (let i = 1; i < 5; i++) {
+  for (let i = 1; i < result.views; i++) {
     await browser.page.evaluate((v) => window.view(v), i);
     await writeFile(`${dir}near-${i}.png`, await browser.page.locator('canvas').screenshot());
   }

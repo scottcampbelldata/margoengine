@@ -157,7 +157,7 @@ interface BuildingMaterial {
     readonly metalness: number;
 }
 
-type BuildingPart = 'walls' | 'interior' | 'furniture' | 'trim' | 'roof' | 'glass' | 'frames' | 'doors' | 'base' | 'porch' | 'awning' | 'chimney' | 'gutters';
+type BuildingPart = 'walls' | 'interior' | 'furniture' | 'stairs' | 'fixtures' | 'metalwork' | 'fabric' | 'mats' | 'trim' | 'roof' | 'glass' | 'frames' | 'doors' | 'base' | 'porch' | 'awning' | 'chimney' | 'gutters';
 
 type BuildingRidge = 'auto' | 'x' | 'z';
 
@@ -207,6 +207,9 @@ interface BuildingRuleOptions {
     readonly reveal?: number;
     readonly detail?: BuildingDetail;
     readonly interior?: BuildingInterior;
+    readonly stairs?: boolean;
+    readonly fixtures?: boolean;
+    readonly softFurnishings?: boolean;
     readonly origin?: readonly [number, number, number];
     readonly yaw?: number;
     readonly seed?: number;

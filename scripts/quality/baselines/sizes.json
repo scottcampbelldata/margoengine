@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21235568,
+  "total": 21250617,
   "history": [
     {
       "date": "2026-10-24",
@@ -15019,6 +15019,12 @@
       "commit": "22d3e015",
       "reason": "New optional entry decoders/jpeg2000, 74,664 B gzip with its inline Wasm asset (jpeg2000.wasm alone 51,121 B gzip): one clean-room JPEG 2000 Part 1 decoder; splitting it would add fetch and assembly work",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "building-interiors",
+      "reason": "Limits gap row 19: stairs with wells and guards, kitchen, bathroom and toilet fixtures and soft furnishings in rules buildings: procedural/building-rules 13,038 to 17,904 B gzip measured, building-plans 17,288 to 22,260, city 26,424 to 31,190 (it builds with the rules). All three options default on and generateBuilding is synchronous, so a split entry would need a second import before a house had stairs.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16007,12 +16013,12 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 17803,
-    "@margoengine/procedural/building-rules": 13427,
+    "@margoengine/procedural/building-plans": 22928,
+    "@margoengine/procedural/building-rules": 18442,
     "@margoengine/procedural/building-settings": 5862,
     "@margoengine/procedural/buildings": 1758,
     "@margoengine/procedural/caves": 1677,
-    "@margoengine/procedural/city": 27217,
+    "@margoengine/procedural/city": 32126,
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,

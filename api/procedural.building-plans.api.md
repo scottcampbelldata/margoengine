@@ -56,6 +56,7 @@ export interface PlannedBuilding {
     readonly rooms: readonly BuildingRoom[];
     readonly furniture: readonly BuildingFurniture[];
     readonly doorways: readonly BuildingDoorway[];
+    readonly stairs: readonly BuildingStair[];
     roofHeight(x: number, z: number): number;
     insideBlock(index: number, x: number, y: number, z: number): boolean;
 }
@@ -100,7 +101,7 @@ interface BuildingOpening {
     readonly height: number;
 }
 
-type BuildingPart = 'walls' | 'interior' | 'furniture' | 'trim' | 'roof' | 'glass' | 'frames' | 'doors' | 'base' | 'porch' | 'awning' | 'chimney' | 'gutters';
+type BuildingPart = 'walls' | 'interior' | 'furniture' | 'stairs' | 'fixtures' | 'metalwork' | 'fabric' | 'mats' | 'trim' | 'roof' | 'glass' | 'frames' | 'doors' | 'base' | 'porch' | 'awning' | 'chimney' | 'gutters';
 
 type BuildingRidge = 'auto' | 'x' | 'z';
 
@@ -110,12 +111,15 @@ type BuildingRoofing = 'tile' | 'shingle' | 'metal' | 'membrane';
 
 interface BuildingRoom {
     readonly floor: number;
+    readonly use: BuildingRoomUse;
     readonly min: readonly [number, number];
     readonly max: readonly [number, number];
     readonly level: number;
     readonly height: number;
     readonly area: number;
 }
+
+type BuildingRoomUse = 'living' | 'kitchen' | 'bathroom' | 'bedroom' | 'office' | 'toilet' | 'shop' | 'store';
 
 interface BuildingRuleOptions {
     readonly style?: BuildingStyle;
@@ -159,9 +163,24 @@ interface BuildingRuleOptions {
     readonly reveal?: number;
     readonly detail?: BuildingDetail;
     readonly interior?: BuildingInterior;
+    readonly stairs?: boolean;
+    readonly fixtures?: boolean;
+    readonly softFurnishings?: boolean;
     readonly origin?: readonly [number, number, number];
     readonly yaw?: number;
     readonly seed?: number;
+}
+
+interface BuildingStair {
+    readonly floor: number;
+    readonly kind: 'dog-leg' | 'straight';
+    readonly min: readonly [number, number];
+    readonly max: readonly [number, number];
+    readonly risers: number;
+    readonly rise: number;
+    readonly tread: number;
+    readonly width: number;
+    readonly guard: number;
 }
 
 type BuildingStyle = 'japan-2011-house' | 'japan-2011-concrete' | 'japan-2011-warehouse' | 'western-1910-house' | 'western-1910-false-front' | 'western-1910-brick' | 'western-1910-depot';

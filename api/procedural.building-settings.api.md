@@ -130,6 +130,9 @@ interface BuildingRuleOptions {
     readonly reveal?: number;
     readonly detail?: BuildingDetail;
     readonly interior?: BuildingInterior;
+    readonly stairs?: boolean;
+    readonly fixtures?: boolean;
+    readonly softFurnishings?: boolean;
     readonly origin?: readonly [number, number, number];
     readonly yaw?: number;
     readonly seed?: number;

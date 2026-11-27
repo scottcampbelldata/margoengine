@@ -33,6 +33,7 @@ export interface Building {
     readonly railings: readonly number[];
     readonly rooms: readonly BuildingRoom[];
     readonly furniture: readonly BuildingFurniture[];
+    readonly stairs: readonly BuildingStair[];
     readonly doorways: readonly BuildingDoorway[];
 }
 
@@ -80,7 +81,7 @@ export interface BuildingOpening {
     readonly height: number;
 }
 
-export type BuildingPart = 'walls' | 'interior' | 'furniture' | 'trim' | 'roof' | 'glass' | 'frames' | 'doors' | 'base' | 'porch' | 'awning' | 'chimney' | 'gutters';
+export type BuildingPart = 'walls' | 'interior' | 'furniture' | 'stairs' | 'fixtures' | 'metalwork' | 'fabric' | 'mats' | 'trim' | 'roof' | 'glass' | 'frames' | 'doors' | 'base' | 'porch' | 'awning' | 'chimney' | 'gutters';
 
 export type BuildingRidge = 'auto' | 'x' | 'z';
 
@@ -90,12 +91,15 @@ export type BuildingRoofing = 'tile' | 'shingle' | 'metal' | 'membrane';
 
 export interface BuildingRoom {
     readonly floor: number;
+    readonly use: BuildingRoomUse;
     readonly min: readonly [number, number];
     readonly max: readonly [number, number];
     readonly level: number;
     readonly height: number;
     readonly area: number;
 }
+
+export type BuildingRoomUse = 'living' | 'kitchen' | 'bathroom' | 'bedroom' | 'office' | 'toilet' | 'shop' | 'store';
 
 export interface BuildingRuleOptions {
     readonly style?: BuildingStyle;
@@ -139,9 +143,24 @@ export interface BuildingRuleOptions {
     readonly reveal?: number;
     readonly detail?: BuildingDetail;
     readonly interior?: BuildingInterior;
+    readonly stairs?: boolean;
+    readonly fixtures?: boolean;
+    readonly softFurnishings?: boolean;
     readonly origin?: readonly [number, number, number];
     readonly yaw?: number;
     readonly seed?: number;
+}
+
+export interface BuildingStair {
+    readonly floor: number;
+    readonly kind: 'dog-leg' | 'straight';
+    readonly min: readonly [number, number];
+    readonly max: readonly [number, number];
+    readonly risers: number;
+    readonly rise: number;
+    readonly tread: number;
+    readonly width: number;
+    readonly guard: number;
 }
 
 export type BuildingStyle = 'japan-2011-house' | 'japan-2011-concrete' | 'japan-2011-warehouse' | 'western-1910-house' | 'western-1910-false-front' | 'western-1910-brick' | 'western-1910-depot';
@@ -168,5 +187,5 @@ type Resolved = Required<Omit<BuildingRuleOptions, 'origin'>> & {
     origin: readonly [number, number, number];
 };
 
-type StyleSet = Omit<Resolved, 'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior'>;
+type StyleSet = Omit<Resolved, 'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior' | 'stairs' | 'fixtures' | 'softFurnishings'>;
 ```

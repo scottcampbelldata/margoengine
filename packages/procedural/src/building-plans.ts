@@ -30,6 +30,7 @@ import {
   type BuildingPart,
   type BuildingRoom,
   type BuildingRuleOptions,
+  type BuildingStair,
   generateBuilding,
   resolveBuildingOptions,
 } from './building-rules.js';
@@ -108,16 +109,19 @@ export interface PlannedBuilding {
   /** Openings left visible (an opening inside another block is dropped), world. */
   readonly openings: readonly BuildingOpening[];
   readonly dormers: readonly BuildingDormer[];
-  /** Rooms, furnishing blocks and doorways of every block, in plan-local metres (before origin and yaw). */
+  /** Rooms, furnishing blocks, doorways and stairs of every block, in plan-local metres (before origin and yaw). */
   readonly rooms: readonly BuildingRoom[];
   readonly furniture: readonly BuildingFurniture[];
   readonly doorways: readonly BuildingDoorway[];
+  readonly stairs: readonly BuildingStair[];
   /** Roof covering height of the whole at plan-local `[x, z]` (NaN off every roof): the upper envelope of the blocks. */
   roofHeight(x: number, z: number): number;
   /** Whether plan-local point `[x, y, z]` is inside block `index`'s solid, the space its parts were cut by. */
   insideBlock(index: number, x: number, y: number, z: number): boolean;
 }
 
+/** The parts behind the walls, which only an earlier block cuts. */
+const INDOOR = new Set<BuildingPart>(['interior', 'furniture', 'stairs', 'fixtures', 'metalwork', 'fabric', 'mats']);
 // a x + b y + c z <= d.
 type Half = readonly [number, number, number, number];
 interface Solid {
@@ -135,7 +139,9 @@ interface Block {
   readonly parts: Partial<Record<BuildingPart, GeometryData>>;
   readonly solids: Solid[];
   readonly roof: (x: number, z: number) => number;
-  readonly info: Omit<BuildingPlanBlock, 'footprint'> & { footprint: [number, number][] };
+  readonly info: Omit<BuildingPlanBlock, 'footprint'> & {
+    footprint: [number, number][];
+  };
   readonly building?: Building;
 }
 
@@ -227,7 +233,11 @@ function blockSolids(b: Building, planes: Plane[]): Solid[] {
       planes.forEach((q, j) => {
         if (j !== i) h.push([p.a - q.a, 0, p.g - q.g, q.d - p.d]);
       });
-      out.push({ halves: h, lo: [-W - ov, b.eaves - ov * 2 - 1, -D - ov], hi: [W + ov, top, D + ov] });
+      out.push({
+        halves: h,
+        lo: [-W - ov, b.eaves - ov * 2 - 1, -D - ov],
+        hi: [W + ov, top, D + ov],
+      });
     });
   return out;
 }
@@ -560,7 +570,11 @@ function buildDormer(
       if (kind === 'hip')
         m.roof.slab([P(e, eaveY, zf), P(xc, yTop, zr), P(xc, yTop, zBack), P(e, eaveY, zBack)], slabT, [0, 1, 0]);
       else m.roof.slab([P(e, eaveY, zf), P(xc, yTop, zf), P(xc, yTop, zBack), P(e, eaveY, zBack)], slabT, up);
-      planes.push({ aX: -sx * td, aZ: 0, c: ye + slabT + hw * td + sx * xc * td });
+      planes.push({
+        aX: -sx * td,
+        aZ: 0,
+        c: ye + slabT + hw * td + sx * xc * td,
+      });
       // Barge boards (gable) or the eave fascia along each side.
       if (kind === 'gable') m.trim.beam(P(e, eaveY - 0.05, zf + 0.02), P(xc, yTop - 0.05, zf + 0.02), 0.03, 0.16);
     }
@@ -611,7 +625,14 @@ function buildDormer(
     parts,
     solid,
     roof,
-    window: { kind: 'window', side: flip ? 2 : 0, floor: -1, centre: c, width: ww - 2 * fr, height: wh - 2 * fr },
+    window: {
+      kind: 'window',
+      side: flip ? 2 : 0,
+      floor: -1,
+      centre: c,
+      width: ww - 2 * fr,
+      height: wh - 2 * fr,
+    },
     roofAtFace: yr,
   };
 }
@@ -650,14 +671,33 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
   const shared = { ...base };
   delete shared.origin;
   delete shared.yaw;
-  const specs: { kind: 'main' | 'wing' | 'tower'; opts: BuildingRuleOptions; at: V3; turn: number }[] = [
-    { kind: 'main', opts: shared as BuildingRuleOptions, at: [0, 0, 0], turn: 0 },
+  const specs: {
+    kind: 'main' | 'wing' | 'tower';
+    opts: BuildingRuleOptions;
+    at: V3;
+    turn: number;
+  }[] = [
+    {
+      kind: 'main',
+      opts: shared as BuildingRuleOptions,
+      at: [0, 0, 0],
+      turn: 0,
+    },
   ];
+  // The stairs are the main block's: a wing or tower gets its own only when a hand-given wing asks for them.
   const wingDepth = D / 2 + wl;
   const planWing = (x: number, back: boolean) =>
     specs.push({
       kind: 'wing',
-      opts: { ...shared, width: ww, depth: wingDepth, ridge: 'z', chimney: false, balcony: 0 } as BuildingRuleOptions,
+      opts: {
+        ...shared,
+        width: ww,
+        depth: wingDepth,
+        ridge: 'z',
+        chimney: false,
+        balcony: 0,
+        stairs: false,
+      } as BuildingRuleOptions,
       at: [x, 0, (back ? -1 : 1) * (wingDepth / 2)],
       turn: back ? 2 : 0,
     });
@@ -674,7 +714,12 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
       delete rest.turn;
       specs.push({
         kind: 'wing',
-        opts: { ...shared, chimney: false, ...rest } as BuildingRuleOptions,
+        opts: {
+          ...shared,
+          chimney: false,
+          stairs: false,
+          ...rest,
+        } as BuildingRuleOptions,
         at: [at[0], 0, at[1]],
         turn,
       });
@@ -717,6 +762,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
         storefront: false,
         awning: false,
         chimney: false,
+        stairs: false,
       } as BuildingRuleOptions,
       at: [sx * (W / 2 - s / 2 + 0.3 * s), 0, sz * (D / 2 - s / 2 + 0.3 * s)],
       turn: 0,
@@ -830,7 +876,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
   const merged: Partial<Record<BuildingPart, GeometryData[]>> = {};
   blocks.forEach((blk, j) => {
     for (const [name, g] of Object.entries(blk.parts) as [BuildingPart, GeometryData][]) {
-      const indoor = name === 'interior' || name === 'furniture',
+      const indoor = INDOOR.has(name),
         cutters = blocks.flatMap((other, i) =>
           i === j || (indoor && i > j) ? [] : other.solids.map((s) => ({ s, eps: i < j ? EPS : -EPS })),
         );
@@ -865,14 +911,18 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
   });
   const dormerOut = dormerList.map((dm) => {
     const [X, Z] = world(dm.window.centre[0], dm.window.centre[2]);
-    const window = { ...dm.window, centre: [X, origin[1] + dm.window.centre[1], Z] as const };
+    const window = {
+      ...dm.window,
+      centre: [X, origin[1] + dm.window.centre[1], Z] as const,
+    };
     openings.push(window);
     return { window, roofAtFace: dm.roofAtFace };
   });
   const earlier = (j: number, p: V3) => blocks.some((_, i) => i < j && insideBlock(i, p[0], p[1], p[2], EPS));
   const rooms: BuildingRoom[] = [],
     furniture: BuildingFurniture[] = [],
-    doorways: BuildingDoorway[] = [];
+    doorways: BuildingDoorway[] = [],
+    stairs: BuildingStair[] = [];
   blocks.forEach((blk, j) => {
     const b = blk.building;
     if (!b) return;
@@ -896,6 +946,13 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
         max: [number, number, number] = [Math.max(a[0], e[0]), f.max[1], Math.max(a[1], e[1])];
       if (earlier(j, [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2])) continue;
       furniture.push({ ...f, min, max });
+    }
+    for (const t of b.stairs) {
+      const a = plan2(t.min[0], t.min[1]),
+        e = plan2(t.max[0], t.max[1]),
+        min: [number, number] = [Math.min(a[0], e[0]), Math.min(a[1], e[1])],
+        max: [number, number] = [Math.max(a[0], e[0]), Math.max(a[1], e[1])];
+      stairs.push({ ...t, min, max });
     }
     for (const d of b.doorways) {
       const [x, z] = plan2(d.centre[0], d.centre[2]);
@@ -924,6 +981,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     rooms,
     furniture,
     doorways,
+    stairs,
     roofHeight(x: number, z: number) {
       let best = -Infinity;
       for (const blk of blocks) {

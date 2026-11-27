@@ -3970,6 +3970,12 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   again. It ends with its host, closed or not (Node starts each child in a job that kills it on close). The real close
   test then passed 20 of 20 beside four CPU hogs (3.1 min, 100% CPU). Regression: tests/killer.test.js.
 
+### Fixed 2026-11-27: every rules building's ground floor flickered between floor and foundation (KB-PROC-FLOORFIGHT1, procedural, buildings)
+
+- **Repro:** `packages/procedural/test/building-interiors.test.js`, "the foundation never shares the plane of the ground floor"; seen from inside in `packages/procedural/test/buildings-browser.mjs` as a sawtooth of two colours across the floor.
+- **Cause:** the foundation (`base`) was one box over the whole footprint topped at the ground floor's level, the same plane as the top of the floor slab, so the depth test picked either.
+- **Fixed:** the foundation is a ring under the walls (it still shows its 2 cm ledge) with a fill inside it that stops under the slab. Regression: the test above.
+
 ### Fixed 2026-11-27: every importer of the display module carried the inverse display curve (KB-SIZE-DISPLAYINV1, shared, bundle size)
 
 - **Repro:** `tests/display-neutral-inverse.test.js`, "a bundle that uses the forward display curve carries nothing of the inverse": bundle `export { displayShader } from 'packages/shared/display.js'`; the output held `((254.5/255+.055)/1.055)**2.4` and the white constant. In the sky cloud entries this was +51 B (volumetric-clouds base 11,262 to 11,313 B gzip) and +54 B (compat-clouds base 23,870 to 23,924), both over their ceilings.
