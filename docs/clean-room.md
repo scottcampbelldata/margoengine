@@ -12814,6 +12814,17 @@ the reported ±0.020 uncertainty on the ratio. The manufactured oblique wave and
 wake-to-foam test separately measure estimator convergence and verify exact replay.
 [Saket et al., 2018](https://arxiv.org/abs/1703.04354)
 
+#### SEA-04 moving pressure amplitude
+
+Havelock's 1908 deep-water pressure impulse solution, sections 12–13 and equations 67–69,
+gives a radial Green function. A moving finite pressure field superposes the impulse at each
+held midpoint. The test computes a direct periodic modal sum and an independent open-water
+Hankel integral for the raised-cosine footprint. Spatial and periodic-image effects are
+measured from those two references. Radial integration by parts bounds the tail separately
+from the finite quadrature. The production gauge signal matches the periodic sum to
+1.08e−15 m and the open reference to 98.44 µm against an independent 149.40 µm budget.
+[Havelock, 1908](https://doi.org/10.1098/rspa.1908.0097)
+
 #### SEA-04 pressure on a prescribed mean hull
 
 The finite wake closes the mean hull cells and places the small-motion flux
