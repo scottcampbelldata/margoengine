@@ -49,6 +49,17 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
 - speed at least equal to the rival's own demo of the same scene. Measured in the quiet speed phase, per AGENTS.md; no
   timing gates before then.
 
+**The bar for these 14 is the best on the market (Scott, 2026-11-27):** "All 14 of those need to be the absolute best on
+the market today. They have to hit every point to pass. Do not half build them." This replaces "must meet, not exceed"
+for Part 2 only. For each of the 14:
+
+- The rivals are every web 3D engine and library on the market today (three.js and its ecosystem, Babylon.js,
+  PlayCanvas, Rapier, the best specialised web library for the feature), not only the examples named below. The item
+  has every feature any of them has, and is at least as good at each.
+- Every point of its list below passes. An item is done only when none is PARTIAL, approximate, a stand-in or left
+  for later; a known limit that a rival does not have is a gap to build, not a note in `docs/limits.md`.
+- A row is not set DONE or VERIFIED while any point is open. Open points are listed under the item until they close.
+
 ### P1. DYN-01 3D rigid bodies and contact
 
 - **Body types:** dynamic, static (fixed), kinematic by position and by velocity (Babylon "animated"); switch type at
