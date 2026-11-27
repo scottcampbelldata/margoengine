@@ -255,7 +255,7 @@ test("cluster culling never drops a cluster a spot lights, up to pi/2 (CPU mirro
     return !(axial + radius < 0 || radial * cosine - axial * sine > radius);
   };
   let seed = 7;
-  const random = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31) * 2 - 1;
+  const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31) * 2 - 1;
   const p = [0.3, -0.2, -5],
     direction = [0.36, 0.48, -0.8],
     range = 6;

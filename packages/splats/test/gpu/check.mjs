@@ -461,7 +461,7 @@ try {
   // premultiplication or colour conversion) to the exact pixels written, alpha included.
   {
     let seed = 11;
-    const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) >>> 8) / 2 ** 24,
+    const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8) / 2 ** 24,
       images = [
         [61, 23, () => random() * 256],
         [64, 64, (i) => (i % 4 === 3 ? 255 : -Math.log(random() + 1e-9) * 6)],

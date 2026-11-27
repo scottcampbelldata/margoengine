@@ -103,7 +103,7 @@ function misses(tris, count = 6000) {
     missed = 0,
     cast = 0;
   const rnd = () => {
-    seed = (seed * 1103515245 + 12345) >>> 0;
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     return seed / 2 ** 32;
   };
   for (let n = 0; n < count; n++) {
@@ -233,7 +233,7 @@ test('closed: every node mesh (whole or with octants left out) and a lone skirte
 function noiseNodes() {
   let seed = 99;
   const rnd = () => {
-      seed = (seed * 1103515245 + 12345) >>> 0;
+      seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
       return seed / 2 ** 32;
     },
     nodes = [];

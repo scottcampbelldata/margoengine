@@ -93,7 +93,7 @@ test('a million-edge graph lays out step by step (diagnostic timing)', () => {
   const nodes = 100_000,
     edges = new Uint32Array(2_000_000);
   let seed = 7;
-  const next = () => (seed = (seed * 1103515245 + 12345) >>> 0) % nodes;
+  const next = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8) % nodes;
   for (let i = 0; i < edges.length; i += 2) {
     edges[i] = next();
     edges[i + 1] = next();

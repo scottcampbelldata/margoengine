@@ -6,7 +6,7 @@
 //      node packages/decoders/scripts/meshopt-vectors.mjs --write  (also replace those cases in
 //      tests/fixtures/meshopt-vectors.json; tests/fixtures/meshopt-views.json records their sizes and hashes, so
 //      update it to match)
-// The committed cases were recorded earlier and encode the same values; color8Raw (out-of-range YCoCg, whose decoding
+// The committed cases were recorded earlier from other random values; color8Raw (out-of-range YCoCg, whose decoding
 // the specification leaves open) is kept as recorded.
 import { readFile, writeFile } from 'node:fs/promises';
 import { meshoptDecodeGltfBuffer } from '../dist/meshopt.js';
@@ -15,7 +15,7 @@ import { colorFilter, encodeAttributes, quantizeColor } from '../tests/support/m
 const file = new URL('../tests/fixtures/meshopt-vectors.json', import.meta.url),
   vectors = JSON.parse(await readFile(file, 'utf8'));
 let seed = 5;
-const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
+const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32;
 const b64 = (bytes) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
 const vector = (name, encoded, expected, count, stride, filter) => ({
   name,

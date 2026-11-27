@@ -6,7 +6,7 @@ import { crc32c, parseE57, parseXML, readE57Header, writeE57, writeE57Document }
 
 function scanData(n, seed = 9) {
   let s = seed;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   const positions = new Float64Array(n * 3),
     intensity = new Float64Array(n),
     rgb = new Uint8Array(n * 3);
@@ -131,7 +131,7 @@ test('E57 integrity: a flipped byte fails its page checksum; truncated or corrup
     (e) => e instanceof RangeError && /CRC-32C/.test(e.message),
   );
   let s = 21;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   const cpu = cpuTimer();
   for (let i = 0; i < 300; i++) {
     const bytes = i < 150 ? file.slice(0, Math.floor(random() * file.length)) : file.slice();

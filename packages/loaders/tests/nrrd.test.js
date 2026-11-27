@@ -279,7 +279,7 @@ test('gzip members are read in turn, data after the last is ignored, and a damag
   const two = join(head(fields(2)), gzipSync(Buffer.from([7])), gzipSync(Buffer.from([8])), 'trailing text');
   assert.deepEqual([...(await parseNRRD(two)).data], [7, 8]);
   const big = Buffer.alloc(300000);
-  for (let i = 0, x = 1; i < big.length; i++) big[i] = (x = (x * 1103515245 + 12345) >>> 0) >>> 24;
+  for (let i = 0, x = 1; i < big.length; i++) big[i] = (x = (Math.imul(x, 1103515245) + 12345) >>> 0) >>> 24;
   const spans = await parseNRRD(
     join(head(fields(big.length + 1)), gzipSync(big, { level: 0 }), gzipSync(Buffer.from([9])), 'junk'),
   );

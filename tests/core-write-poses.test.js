@@ -35,7 +35,7 @@ function pose(engine, id) {
   );
 }
 // A fixed sequence from a small linear congruential generator: the test is the same on every run.
-const generator = (seed) => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648 - 0.5;
+const generator = (seed) => () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2147483648 - 0.5;
 
 test('writePoses writes the bits setPosition and setQuaternion write, Euler lanes and world matrices included', async (t) => {
   const bulk = await engineOf(64),

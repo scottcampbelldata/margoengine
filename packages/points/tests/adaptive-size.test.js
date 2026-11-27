@@ -97,7 +97,7 @@ test('sizes are not rewritten while the drawn nodes stay the same', async () => 
 test('a jump over more points than one selection sizes finishes on the next selections', async () => {
   const positions = new Float32Array(3 * 1_500_000);
   let s = 7;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   for (let i = 0; i < positions.length; i += 3) positions.set([random(), 0.5, random()], i);
   const tree = buildOctree({ positions }, { maxPointsPerNode: 300_000, grid: 512 }),
     oc = new OctreeCloud(host(), tree, { adaptiveSize: true, minNodePixels: 1e9, pointBudget: 2_000_000 }),

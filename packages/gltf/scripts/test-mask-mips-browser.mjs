@@ -94,7 +94,7 @@ function reference(rgba, width, height, keep) {
 /** Deterministic test pixels: a sparse binary cut-out (green leaves on magenta holes) or random fractional alpha. */
 function pixels(width, height, kind) {
   let seed = 12345;
-  const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32;
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < width * height; i++)
     if (kind === 'cutout') data.set(random() < 0.25 ? [40, 200, 60, 255] : [255, 0, 255, 0], i * 4);

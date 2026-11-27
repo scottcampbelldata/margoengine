@@ -49,7 +49,7 @@ function bruteForceBinary(alpha, width, height) {
 
 test('alphaToSdf on random binary images equals the brute-force centre distances', () => {
   let seed = 11;
-  const rand = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
+  const rand = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32;
   const p = { radius: 5, cutoff: 0.3 };
   for (const [width, height, density] of [
     [9, 7, 0.1],

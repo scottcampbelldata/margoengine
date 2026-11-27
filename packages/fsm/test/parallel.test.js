@@ -316,7 +316,7 @@ test('misuse is refused with a clear error', () => {
 
 test('a seeded run of regions equals each region run alone, when no guard links them', () => {
   let seed = 12345;
-  const next = (limit) => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) % limit;
+  const next = (limit) => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) >>> 8) % limit;
   const events = ['a', 'b', 'c', 'd'];
   for (let round = 0; round < 50; round++) {
     const defs = {};

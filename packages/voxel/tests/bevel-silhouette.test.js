@@ -91,7 +91,7 @@ const measure = (mesh) => {
 };
 
 let seed = 7;
-const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2147483648;
 const blob = (size, fill) => {
   const cells = [];
   for (let x = 0; x < size; x++)

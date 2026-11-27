@@ -84,7 +84,7 @@ test('LZF: decodes the binary_compressed body of the Margo spiral PCD', () => {
 test('LZF: the test compressor round trips literals, short and long references and far distances', () => {
   let seed = 12345;
   const random = () => {
-    seed = (seed * 1103515245 + 12345) >>> 0;
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     return seed >>> 24;
   };
   const far = new Uint8Array(20000);

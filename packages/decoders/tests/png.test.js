@@ -104,7 +104,7 @@ function encode({ width, height, colour, depth, samples, interlace = false, filt
 
 // Deterministic pseudo-random samples.
 let seed = 7;
-const random = (max) => ((seed = (seed * 1103515245 + 12345) >>> 0) >>> 8) % (max + 1);
+const random = (max) => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8) % (max + 1);
 
 const cases = [];
 for (const [colour, depths] of Object.entries({

@@ -52,7 +52,7 @@ function noise(context, seconds) {
     data = buffer.getChannelData(0);
   let seed = 12345;
   for (let i = 0; i < data.length; i++) {
-    seed = (seed * 1103515245 + 12345) >>> 0;
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     data[i] = (seed / 4294967296) * 2 - 1;
   }
   return buffer;

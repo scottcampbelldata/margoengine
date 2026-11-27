@@ -74,7 +74,8 @@ test('slope is Horn 1981 (exact on a plane, edges included) and relief is the wi
   for (const v of s.slope) assert.ok(Math.abs(v - 45) < 1e-4, 'slope ' + v);
   const random = new Float32Array(41 * 29);
   let seed = 7;
-  for (let k = 0; k < random.length; k++) random[k] = ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32) * 50;
+  for (let k = 0; k < random.length; k++)
+    random[k] = ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32) * 50;
   const g = { heights: random, resolution: [41, 29], size: [40, 28] },
     r = localRelief(g, 3, 2),
     at = (i, j) => random[Math.min(Math.max(j, 0), 28) * 41 + Math.min(Math.max(i, 0), 40)];

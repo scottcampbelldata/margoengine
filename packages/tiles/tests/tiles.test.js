@@ -160,7 +160,7 @@ test('fuzz: truncated or corrupt content never crashes or hangs; errors are Type
     subtree({ tiles: [1, 1, 0, 1, 0], contents: 1, children: 0 }),
   ];
   let seed = 7;
-  const random = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   const cpu = cpuTimer();
   let thrown = 0;
   for (const sample of samples)

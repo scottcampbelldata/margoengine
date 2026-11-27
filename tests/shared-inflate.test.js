@@ -6,7 +6,7 @@ import { constants, deflateRawSync, deflateSync } from 'node:zlib';
 import { inflateRaw, inflateZlib } from '../packages/shared/inflate.js';
 
 let seed = 3;
-const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) >>> 8;
+const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8;
 const failed = { name: 'MargoError', code: 'failed' };
 
 test('inflates what node:zlib deflates at every level, strategy and window size', () => {

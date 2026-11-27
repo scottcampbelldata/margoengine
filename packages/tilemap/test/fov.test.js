@@ -106,7 +106,7 @@ test('a corridor wall is seen along its whole length', () => {
 test('random maps match the exact ray oracle from many viewers, radii and wall densities', () => {
   let seed = 12345;
   const rand = () => {
-    seed = (seed * 1103515245 + 12345) >>> 0;
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     return seed / 2 ** 32;
   };
   let compared = 0;

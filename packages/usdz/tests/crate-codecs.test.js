@@ -94,7 +94,7 @@ test('TOKENS section of the OpenUSD triangle fixture', () => {
 test('LZ4 decodes what the test writer encodes', () => {
   let seed = 7;
   const noise = () => {
-    seed = (seed * 1103515245 + 12345) >>> 0;
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     return seed >>> 24;
   };
   const inputs = [

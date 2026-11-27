@@ -148,7 +148,7 @@ test('flips and moves in any order leave the GPU rows equal to the instances, an
     engine = new Engine(canvas(), await TransformStore.create(64), renderer, undefined, null);
   // A fixed sequence from a small linear congruential generator: the test is the same on every run.
   let seed = 7;
-  const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2147483648;
   try {
     const geometries = [box(), box(2)],
       mirrored = new PbrMaterial({ doubleSided: true }),

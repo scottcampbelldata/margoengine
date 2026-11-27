@@ -9,7 +9,7 @@ import { serve, writePotree1, writePotree2 } from './potree-writer.js';
 
 function scan(n = 6000) {
   let s = 11;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   const positions = new Array(n * 3),
     colors = new Array(n * 3);
   for (let i = 0; i < n; i++) {

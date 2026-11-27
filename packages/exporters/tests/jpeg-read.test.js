@@ -82,7 +82,7 @@ test('decodeJPEG ends in a clean error or a picture on damaged bytes, never a cr
   let state = 12345;
   const next = (limit) => {
     state = (Math.imul(state, 1103515245) + 12345) >>> 0;
-    return state % limit;
+    return (state >>> 8) % limit;
   };
   for (const name of ['baseline-420.jpg', 'progressive-420.jpg', 'restart-420.jpg']) {
     const whole = fixture(name);

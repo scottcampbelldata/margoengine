@@ -124,7 +124,7 @@ test('svd converges on a 512 x 512 matrix of many repeated columns and keeps A =
     data = new Float32Array(n * n);
   let seed = 1;
   for (let i = 0; i < data.length; i++) {
-    seed = (seed * 1103515245 + 12345) >>> 0;
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     data[i] = seed / 2 ** 32 - 0.5;
   }
   const a = ctx.array(data, { shape: [n, n] });

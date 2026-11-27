@@ -30,7 +30,7 @@ export function image(width, height, seed = 1, alpha = true) {
   const data = new Uint8Array(width * height * 4);
   let s = seed;
   for (let i = 0; i < data.length; i++) {
-    s = (s * 1103515245 + 12345) >>> 0;
+    s = (Math.imul(s, 1103515245) + 12345) >>> 0;
     data[i] = i % 4 === 3 && !alpha ? 255 : (s >>> 16) & 255;
   }
   return data;

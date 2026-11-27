@@ -28,7 +28,7 @@ const WATER=blocks.define('water',{textures:5,layer:'translucent',shape:'liquid'
 const TALL=blocks.define('tallgrass',{textures:2,layer:'cutout',shape:'cross',solid:false});
 const TORCH=blocks.define('torch',{textures:3,layer:'cutout',shape:'cross',solid:false,light:14});
 const SLAB=blocks.define('slab',{textures:0,shape:'slab'});
-let seed=12345;const rand=()=>((seed=(seed*1103515245+12345)>>>0)>>>8)/16777216;
+let seed=12345;const rand=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)>>>8)/16777216;
 function terrain(world){
  for(let cz=0;cz<3;cz++)for(let cx=0;cx<3;cx++)for(let cy=0;cy<2;cy++)world.addChunk(cx,cy,cz);
  const edits=[];

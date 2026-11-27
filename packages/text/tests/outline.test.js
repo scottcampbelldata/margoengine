@@ -79,8 +79,8 @@ function sampleTexels(width, height) {
   for (let j = 0; j < height; j += 3) for (let i = 0; i < width; i += 3) out.push([i, j]);
   let seed = 12345;
   for (let n = 0; n < 400; n++) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    out.push([seed % width, (seed >> 8) % height]);
+    seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff;
+    out.push([(seed >>> 16) % width, (seed >>> 8) % height]);
   }
   return out;
 }

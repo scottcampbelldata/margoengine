@@ -68,8 +68,8 @@ test('a corrupt or short stream throws a coded error, never hangs or reads out o
   let seed = 5;
   for (let trial = 0; trial < 300; trial++) {
     const bad = Uint8Array.from(packed);
-    seed = (seed * 1103515245 + 12345) % 2 ** 31;
-    bad[seed % bad.length] ^= 1 << ((seed >> 8) % 8);
+    seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff;
+    bad[(seed >>> 8) % bad.length] ^= 1 << (seed >>> 28);
     try {
       decodeBrotli(bad);
     } catch (e) {

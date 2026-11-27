@@ -38,8 +38,8 @@ function tree(cloud) {
   // A seeded shuffle, so a node's points are an even sample of its cube.
   const order = [...Array(n).keys()];
   for (let i = n - 1, seed = 9; i > 0; i--) {
-    seed = (seed * 1103515245 + 12345) % 2 ** 31;
-    const j = seed % (i + 1);
+    seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff;
+    const j = (seed >>> 8) % (i + 1);
     [order[i], order[j]] = [order[j], order[i]];
   }
   const root = split(order, min, side, 'r');

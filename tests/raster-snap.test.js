@@ -8,7 +8,7 @@ import { SNAP, packedTolerance } from '../scripts/support/raster-snap.mjs';
 // A seeded generator, so a failure repeats.
 let seed = 12345;
 const random = () => {
-  seed = (seed * 1103515245 + 12345) % 2 ** 31;
+  seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff;
   return seed / 2 ** 31;
 };
 const barycentric = ([a, b, c], [x, y]) => {

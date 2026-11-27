@@ -184,7 +184,7 @@ test('a mesh disposed in the second engine stops the sync before the first engin
 test('the bulk result is what the setters give, bit for bit', async () => {
   const { transform, bridge, links, engine } = await linked(60);
   let seed = 7;
-  const next = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x40000000 - 1;
+  const next = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 0x40000000 - 1;
   for (const { entity, mesh } of links) {
     const row = transform.index(entity),
       f = transform.fields,

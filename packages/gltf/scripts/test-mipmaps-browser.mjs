@@ -44,7 +44,7 @@ function down(bytes, w, h, weighted, srgb) {
 
 function pixels(width, height, kind) {
   let seed = 777;
-  const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32,
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32,
     data = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {

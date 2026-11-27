@@ -55,7 +55,7 @@ const rot = (v, q) => qmul(qmul(q, [...v, 0]), conj(q)).slice(0, 3);
 // A seeded rest rotation per bone, so the rig's local frames are not the world's (as in a real export).
 function seeded(seed) {
   let x = seed;
-  return () => ((x = (x * 1103515245 + 12345) >>> 0) / 2 ** 32) * 2 - 1;
+  return () => ((x = (Math.imul(x, 1103515245) + 12345) >>> 0) / 2 ** 32) * 2 - 1;
 }
 function makeRig(naming, seed = 7, profiles) {
   const rnd = seeded(seed),

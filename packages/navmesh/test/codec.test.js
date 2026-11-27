@@ -28,7 +28,7 @@ const options = { cs: 0.25, ch: 0.1, walkableRadius: 2, walkableHeight: 10, walk
 const queries = (size, n = 200) => {
   const out = [];
   let seed = 12345;
-  const next = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const next = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
   for (let i = 0; i < n; i++)
     out.push([
       [next() * size, 0, next() * size],

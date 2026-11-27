@@ -475,19 +475,25 @@ test('triangle streams carry header 0xe1, the only one the meshopt specification
       const v = y * (side + 1) + x;
       tris.push([v, v + 1, v + side + 1], [v + 1, v + side + 2, v + side + 1]);
     }
-  let seed = 1;
-  for (let i = tris.length - 1; i > 0; i--) {
-    seed = (seed * 1103515245 + 12345) >>> 0;
-    const j = seed % (i + 1);
-    [tris[i], tris[j]] = [tris[j], tris[i]];
+  // The codes appear in about 4 of 10 triangle orders, so several orders are round-tripped and counted together.
+  let tested = 0;
+  for (let first = 1; first <= 16; first++) {
+    const order = tris.slice();
+    let seed = first;
+    for (let i = order.length - 1; i > 0; i--) {
+      seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+      const j = (seed >>> 8) % (i + 1);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    const flat = order.flat(),
+      { bytes, indices } = encodeTriangles(flat, (side + 1) * (side + 1));
+    assert.equal(bytes[0], 0xe1);
+    const decoded = new Uint32Array(meshoptDecodeGltfBuffer(bytes, flat.length, 4, 'TRIANGLES', 'NONE').buffer);
+    assert.deepEqual([...decoded], [...indices]);
+    const codes = bytes.subarray(1, 1 + order.length);
+    tested += codes.filter((code) => code >> 4 < 15 && ((code & 15) === 13 || (code & 15) === 14)).length;
   }
-  const flat = tris.flat(),
-    { bytes, indices } = encodeTriangles(flat, (side + 1) * (side + 1));
-  assert.equal(bytes[0], 0xe1);
-  const decoded = new Uint32Array(meshoptDecodeGltfBuffer(bytes, flat.length, 4, 'TRIANGLES', 'NONE').buffer);
-  assert.deepEqual([...decoded], [...indices]);
-  const codes = bytes.subarray(1, 1 + tris.length);
-  assert.ok(codes.some((code) => code >> 4 < 15 && ((code & 15) === 13 || (code & 15) === 14)));
+  assert.ok(tested > 0);
 });
 
 test('the streams decode with encodeVertexBuffer and encodeTriangles used on their own', () => {

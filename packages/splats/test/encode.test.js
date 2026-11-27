@@ -25,7 +25,7 @@ function difference(a, b) {
 
 test('encodeWebpLossless writes files the WebP decoder reads back exactly', () => {
   let seed = 7;
-  const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) >>> 8) / 2 ** 24;
+  const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8) / 2 ** 24;
   for (const [w, h, fill] of [
     [1, 1, () => random() * 256],
     [37, 11, () => random() * 256],

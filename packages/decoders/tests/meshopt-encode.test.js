@@ -15,7 +15,7 @@ import {
 } from './support/meshopt-encode.js';
 
 let seed = 7;
-const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
+const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32;
 const bytes = (view) => new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
 
 test('attributes: header, tail padding and baseline follow the bitstream layout', () => {

@@ -60,7 +60,7 @@ async function settled(octree, frame) {
 function square(n) {
   const positions = new Float32Array(n * n * 3);
   let s = 3;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   for (let i = 0; i < n * n; i++)
     positions.set(
       [(((i % n) + random()) / n) * 8 - 4, (((Math.floor(i / n) + random()) / n) * 8 - 4) * 1, (random() - 0.5) * 0.01],

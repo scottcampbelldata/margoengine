@@ -157,7 +157,7 @@ test('a loop of delays runs its time, and one that cannot end is an error, not a
 
 test('one update ends where any split of it does, over seeded machines', () => {
   let seed = 2024;
-  const next = (limit) => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) % limit;
+  const next = (limit) => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) >>> 8) % limit;
   for (let round = 0; round < 200; round++) {
     const names = ['p', 'a', 'b', 'c', 'q', 'd', 'e'],
       states = { p: {}, a: { parent: 'p' }, b: { parent: 'p' }, c: { parent: 'p' }, q: {}, d: { parent: 'q' }, e: {} },

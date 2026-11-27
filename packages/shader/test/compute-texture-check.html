@@ -12,7 +12,7 @@ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const size=32;
 // Conway's life on a wrapped grid: the pair must swap after each dispatch or the generations come out wrong.
 const seed=new Uint8Array(size*size*4);
-{let s=12345;for(let i=0;i<size*size;i++){s=(s*1103515245+12345)&0x7fffffff;const v=(s>>16)&1?255:0;seed.set([v,0,0,255],i*4);}}
+{let s=12345;for(let i=0;i<size*size;i++){s=(Math.imul(s,1103515245)+12345)&0x7fffffff;const v=(s>>16)&1?255:0;seed.set([v,0,0,255],i*4);}}
 const life=pingPong(size,size,{format:'rgba8unorm',data:seed});
 const step=new ComputePass(life.pixels,i=>{
   const at=life.coord(i),x=at.x.toInt(),y=at.y.toInt(),sum=Var(0);

@@ -921,7 +921,7 @@ window.runOctree = async () => {
     world = new Float64Array(n * 3),
     classification = new Uint8Array(n);
   let seed = 7;
-  const rand = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const rand = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   for (let i = 0; i < n; i++) {
     const x = rand() * 1000 - 500,
       y = rand() * 1000 - 500,

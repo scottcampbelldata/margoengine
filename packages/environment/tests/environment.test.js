@@ -298,7 +298,7 @@ test('ZIP chunks inflate correctly from stored, fixed-Huffman and dynamic-Huffma
     height = 16,
     n = width * height;
   let seed = 99;
-  const random = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
   const values = Array.from({ length: n }, (_, i) => (i % 50 < 25 ? Math.floor(random() * 4) : random() * 1000));
   const channels = {
     R: { type: 'FLOAT', values },
@@ -360,7 +360,7 @@ test('OpenEXR rejects unsupported and malformed files with errors instead of cra
   }
   // Random corruption of the pixel data either decodes to the right size or throws an Error.
   let seed = 12345;
-  const random = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
   let rejected = 0,
     survived = 0;
   for (const name of [

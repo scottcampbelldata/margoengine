@@ -15,7 +15,7 @@ import { OctreeCloud, buildOctree } from '../dist/octree.js';
 
 function cloud(n, seed = 5) {
   let s = seed;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   const positions = new Float32Array(n * 3),
     colors = new Uint8Array(n * 4);
   for (let i = 0; i < n; i++) {

@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: some tests' random generator lost its low bits and repeated early (KB-TEST-LCG1)
+
+- **Repro.** `seed = (seed * 1103515245 + 12345) >>> 0` from seed 3 repeats after 6,445 draws with a period of 419, so a
+  test drawing many random cases from it checked the same few again. Found writing the tilemap search tests.
+- **Cause.** The product passes 2^53, where a float drops the low bits that `>>> 0` or a mask keeps. 55 places in 51
+  files used it. Several also took a remainder of the raw state, whose low bits repeat early in any generator modulo a
+  power of two.
+- **Fix.** Every product is `Math.imul(seed, 1103515245)`, a remainder by 2^31 is the mask `0x7fffffff`, and draws
+  that took a remainder of the raw state shift it down first. The exporters triangle-code test now counts its codes over
+  16 triangle orders: they appear in about 4 of 10 orders, and its former one order had them by chance.
+  `tests/lcg-generators.test.js` checks each file that holds the multiplier for both faults. The page filed with a
+  browser vendor in `docs/upstream-reports/KB1042f` stays as filed.
+
 ### Fixed 2026-11-27: the points pixel size check was in no GPU chain (KB-POINTS-GPUPLAN1)
 
 - **Repro.** `node --test tests/modern-extension-suite.test.js tests/parallel-check.test.js` on a829b78da's parents:
@@ -58,15 +71,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix.** [docs/guides/kits.md](guides/kits.md) states 106,118 B and names the growth by package and commit.
 - **Regression test:** `tests/umbrella.test.js` ("a kit costs only what the app uses, and its full size is what
   docs/guides/kits.md states").
-
-### Open 2026-11-27: some tests' random generator loses its low bits and repeats early (KB-TEST-LCG1)
-
-- **Repro.** `seed = (seed * 1103515245 + 12345) >>> 0` from seed 3 repeats after 6,445 draws with a period of 419, so a
-  test drawing many random cases from it checks the same few again. Found writing the tilemap search tests.
-- **Cause.** The product passes 2^53, where a float drops the low bits that `>>> 0` keeps. `Math.imul` keeps them.
-  Fixed in the tilemap path, replan and hpa tests (`test/grid-fixtures.js`; `test/path.test.js` holds the check). The
-  same expression, or its `% 2 ** 31` and `& 0x7fffffff` forms, remains in other packages' tests; each needs its
-  generator replaced and its expectations re-proven by the package's owner.
 
 ### Open 2026-11-27: advancing wake transmits flow through the Wigley hull (KB-SEA04-STEM1)
 

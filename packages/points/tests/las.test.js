@@ -7,7 +7,7 @@ import { LAS_RECORD_SIZES, decodePoints, lasCrs, parseLAS, readLASHeader, writeL
 /** A seeded synthetic survey: a sloped ground with buildings, in UTM-like metres far from the origin. */
 function survey(n, seed = 3) {
   let s = seed;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   const positions = new Float64Array(n * 3),
     intensity = new Uint16Array(n),
     classification = new Uint8Array(n),
@@ -169,7 +169,7 @@ test('LAZ: compressed files load the decoder by themselves; another plugs in thr
 test('fuzz: truncated and corrupt LAS never crashes or hangs; errors are TypeError, RangeError or coded', async () => {
   const file = writeLAS({ ...survey(64), wkt: 'GEOGCS["x"]', epsg: 4326 });
   let s = 11;
-  const random = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  const random = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31;
   const cpu = cpuTimer();
   for (let i = 0; i < 600; i++) {
     const bytes = i < 300 ? file.slice(0, Math.floor(random() * file.length)) : file.slice();

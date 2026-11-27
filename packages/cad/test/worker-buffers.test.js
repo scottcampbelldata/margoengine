@@ -29,7 +29,7 @@ test('the worker buffers are bit for bit the buffers of core Geometry', () => {
   same([], [], []);
   // Random float64 positions far from the origin: the float32 rounding and the radius rounding are where they differ.
   let seed = 7;
-  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31 - 0.5) * 2000 + 12345.678;
+  const rand = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31 - 0.5) * 2000 + 12345.678;
   const positions = Array.from({ length: 300 }, rand),
     normals = Array.from({ length: 300 }, () => 0.5),
     indices = Array.from({ length: 297 }, (_, i) => (i * 7) % 100);

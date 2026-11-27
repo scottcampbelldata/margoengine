@@ -11,7 +11,7 @@ import { decodeGIF } from './support/gif.mjs';
 // Expected GIF pixels: alpha below 128 is transparent (0, 0, 0, 0), anything else opaque.
 const flatten = (data) => Uint8Array.from(data, (v, i) => (data[i - (i % 4) + 3] < 128 ? 0 : i % 4 === 3 ? 255 : v));
 let seed = 7;
-const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) >>> 8) / 2 ** 24;
+const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8) / 2 ** 24;
 
 test('GIF round trip: exact palette, transparency, cumulative delays, loop forever', async () => {
   const colors = [

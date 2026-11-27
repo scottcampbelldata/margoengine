@@ -176,7 +176,7 @@ test('a hidden label is measured shown, then hidden in the same update', () => {
 
 test('many labels: the grid finds the same placement as testing every pair, and the result repeats', () => {
   let seed = 7;
-  const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2147483648;
   const points = Array.from({ length: 400 }, () => [
     random() * 800,
     random() * 400,

@@ -73,7 +73,7 @@ test('Capsule.intersectsBox: a box empty on an infinite axis meets nothing', () 
 
 test('unbounded boxes agree with their far finite stand-ins on random shapes', () => {
   let s = 12345;
-  const rnd = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648) * 8 - 4;
+  const rnd = () => ((s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 2147483648) * 8 - 4;
   const p = () => [rnd(), rnd(), rnd()];
   const pick = () => (rnd() > 0 ? rnd() : rnd() > 0 ? -inf : inf);
   let checked = 0;

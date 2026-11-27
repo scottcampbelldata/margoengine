@@ -126,7 +126,7 @@ test('the derived marching cubes table: every case closes into loops; a sphere c
 
 test('random fields (every ambiguous face configuration) still give closed, consistently wound surfaces', () => {
   let seed = 7;
-  const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32 - 0.5;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32 - 0.5;
   for (let trial = 0; trial < 5; trial++) {
     const n = 12,
       field = new Float32Array(n * n * n);

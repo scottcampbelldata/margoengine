@@ -286,7 +286,7 @@ window.check = {
 };
 // A lump of two lit blocks around `at`: the same cells wherever it sits.
 function lump(at){
- const cells=[];let seed=99;const next=()=>((seed=(seed*1103515245+12345)>>>0)>>>8)/16777216;
+ const cells=[];let seed=99;const next=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)>>>8)/16777216;
  for(let x=-4;x<4;x++)for(let y=-4;y<4;y++)for(let z=-4;z<4;z++){const r=next(),n=next();if(Math.hypot(x+.5,y+.5,z+.5)<=3.4+r*.9)cells.push([at[0]+x,at[1]+y,at[2]+z,n<.5?LIT:LIT_BLUE]);}
  return cells;
 }
