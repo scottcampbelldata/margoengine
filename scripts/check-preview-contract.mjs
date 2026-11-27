@@ -1,7 +1,7 @@
 // GPU-only frame-graph work must refuse the small preview during setup, so /auto can escalate.
 // Parse executable syntax, not comments or WGSL strings. Reviewed preview routes name their regression evidence.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseAst } from 'rolldown/parseAst';
 
@@ -41,7 +41,7 @@ const backendTest = (node) =>
   [node.left, node.right].some((n) => literal(n, 'webgpu') || literal(n, 'webgl2'));
 
 // A GPU alias is resolved only from setup's parameters/locals, never from unrelated method text.
-function refusal(method, imports) {
+function refusal(method, imports, inherited = false) {
   const all = nodes(method),
     gpu = new Set(['gpu']);
   for (const n of all) {
@@ -104,7 +104,10 @@ function refusal(method, imports) {
         if (result !== undefined) return result;
       }
     } else if (statement.type === 'ExpressionStatement') {
-      if (statement.expression.type === 'CallExpression' && imports.has(statement.expression.callee?.name)) return true;
+      const call = statement.expression.type === 'CallExpression' ? statement.expression.callee : undefined;
+      if (imports.has(call?.name)) return true;
+      // super.setup(engine) runs the base class's setup, which refuses when the inherited flag says so.
+      if (inherited && call?.object?.type === 'Super' && key({ key: call.property }) === 'setup') return true;
     } else if (statement.type === 'ReturnStatement') return false;
     else if (statement.type === 'ThrowStatement') return unsupported(statement) ? true : undefined;
     else if (statement.type === 'IfStatement') {
@@ -118,14 +121,59 @@ function refusal(method, imports) {
   return scan(body) === true;
 }
 
-/** Returns every owner with backend-gated passes and no setup refusal or tested preview route. */
-export function inspectPreviewContract(source, file, routes = previewRoutes) {
-  const ast = parseAst(source, { lang: file.endsWith('.tsx') ? 'tsx' : file.endsWith('.ts') ? 'ts' : 'js' });
-  const imported = new Set(
+const parse = (source, file) =>
+  parseAst(source, { lang: file.endsWith('.tsx') ? 'tsx' : file.endsWith('.ts') ? 'ts' : 'js' });
+const webgpuImports = (ast) =>
+  new Set(
     ast.body
       .filter((n) => n.type === 'ImportDeclaration' && /\/require-webgpu\.js$/.test(n.source.value))
       .flatMap((n) => n.specifiers.filter((s) => s.imported?.name === 'requireWebGPU').map((s) => s.local.name)),
   );
+const readSource = (file) => {
+  for (const candidate of [file, file.replace(/\.js$/, '.ts'), file.replace(/\.js$/, '.tsx')])
+    if (existsSync(join(root, candidate)))
+      return { file: candidate, source: readFileSync(join(root, candidate), 'utf8') };
+  return undefined;
+};
+const classes = (ast) =>
+  ast.body
+    .map((n) => (n.type === 'ExportNamedDeclaration' ? n.declaration : n))
+    .filter((n) => n?.type === 'ClassDeclaration');
+/**
+ * Whether the base class a class extends refuses the preview in its own setup (or in one it inherits). Only a base
+ * declared in the same file or imported by a relative path is followed; a class from another package is not read.
+ */
+function baseRefuses(cls, ast, file, read, depth = 0) {
+  const name = cls.superClass?.type === 'Identifier' ? cls.superClass.name : undefined;
+  if (!name || depth > 4) return false;
+  let base = classes(ast).find((n) => n.id?.name === name),
+    baseAst = ast,
+    baseFile = file;
+  if (!base) {
+    const from = ast.body.find(
+      (n) =>
+        n.type === 'ImportDeclaration' &&
+        n.importKind !== 'type' &&
+        n.source.value.startsWith('.') &&
+        n.specifiers.some((s) => s.local.name === name && s.importKind !== 'type'),
+    );
+    if (!from) return false;
+    const exported = from.specifiers.find((s) => s.local.name === name).imported?.name ?? name;
+    const found = read(posix.normalize(posix.join(posix.dirname(file), from.source.value)));
+    if (!found) return false;
+    baseAst = parse(found.source, found.file);
+    baseFile = found.file;
+    base = classes(baseAst).find((n) => n.id?.name === exported);
+  }
+  if (!base) return false;
+  const inherited = baseRefuses(base, baseAst, baseFile, read, depth + 1);
+  const setup = base.body.body.find((m) => key(m) === 'setup');
+  return setup ? refusal(setup, webgpuImports(baseAst), inherited) : inherited;
+}
+/** Returns every owner with backend-gated passes and no setup refusal or tested preview route. */
+export function inspectPreviewContract(source, file, routes = previewRoutes, read = readSource) {
+  const ast = parse(source, file);
+  const imported = webgpuImports(ast);
   const failures = [],
     owners = [];
   const walk = (node, ancestors = []) => {
@@ -142,8 +190,12 @@ export function inspectPreviewContract(source, file, routes = previewRoutes) {
         // A private object plugin can be installed inside a function which refuses first (shared scene depth).
         const enclosing = ancestors.filter((n) => /Function/.test(n.type));
         const backendTests = nodes(node).filter(backendTest).length;
+        // A class without its own setup runs its base class's setup; super.setup() in an override runs it too.
+        const inherited = node.type === 'ClassDeclaration' && baseRefuses(node, ast, file, read);
+        const ownSetup = members.some((m) => key(m) === 'setup');
         const accepted =
-          methods.some((m) => refusal(m, imported)) ||
+          (inherited && !ownSetup) ||
+          methods.some((m) => refusal(m, imported, inherited)) ||
           enclosing.some((m) => refusal(m, imported)) ||
           routes[id]?.[0] === backendTests;
         owners.push({ id, accepted, backendTests });

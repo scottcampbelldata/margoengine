@@ -46,7 +46,11 @@ export abstract class ScreenEffect implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'Screen effect disposed; create a new effect');
     if (!this.host) throw margoError('state', 'Use an effect inside PostStack or call its attach method');
-    if (!engine.gpu) throw margoError('unsupported', 'Screen effects require a GPU backend; use WebGPU or full WebGL2');
+    if (!engine.gpu)
+      throw margoError(
+        'unsupported',
+        'Screen effects require a GPU backend; use WebGPU or full WebGL2; see https://margoengine.com/errors#webgpu',
+      );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: this.uniformBytes, usage: 0x40 | 0x8 });
   }

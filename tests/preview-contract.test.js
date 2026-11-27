@@ -115,3 +115,34 @@ test('all package pass owners meet the preview contract, enforced by verify and 
   assert.ok(owners.length > 100);
   assert.ok(PARALLEL.flat().includes('npm run check:preview-contract'));
 });
+
+test('a class without its own setup is held to its base class setup, in the file or a relative import (MeshBlend)', () => {
+  const file = 'packages/post/src/mesh-blend.ts';
+  const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
+  const baseFile = 'packages/post/src/screen-effect.ts';
+  const base = readFileSync(new URL('../' + baseFile, import.meta.url), 'utf8');
+  const reader = (text) => (path) =>
+    path.replace(/\.js$/, '.ts') === baseFile ? { file: baseFile, source: text } : undefined;
+  assert.equal(previewRoutes[file + ':MeshBlend'], undefined);
+  assert.deepEqual(inspectPreviewContract(source, file, previewRoutes, reader(base)).failures, []);
+  const open = base.replace('if (!engine.gpu)', 'if (false)');
+  assert.notEqual(open, base);
+  assert.equal(inspectPreviewContract(source, file, previewRoutes, reader(open)).failures.length, 1);
+  const unlinked = base.replace('; see https://margoengine.com/errors#webgpu', '');
+  assert.notEqual(unlinked, base);
+  assert.equal(inspectPreviewContract(source, file, previewRoutes, reader(unlinked)).failures.length, 1);
+  assert.equal(inspectPreviewContract(source, file, previewRoutes, () => undefined).failures.length, 1);
+});
+
+test('an overriding setup inherits the base refusal only through super.setup()', () => {
+  const base = "class Base { setup(engine) { requireGPU(engine, 'Base'); } }";
+  // Base precedes the owner template's Example class in the same file.
+  const derived = (setup) => owner(setup).replace('class Example {', `${base}\nclass Example extends Base {`);
+  assert.equal(fails(derived('super.setup(engine);')), 0);
+  assert.equal(fails(derived('')), 1, 'an override that skips super.setup() loses the refusal');
+  assert.equal(fails(derived("if (engine.backend !== 'webgpu') return; super.setup(engine);")), 1);
+  const noSetup = owner('')
+    .replace('setup(engine) {  }', '')
+    .replace('class Example {', `${base}\nclass Example extends Base {`);
+  assert.equal(fails(noSetup), 0);
+});
