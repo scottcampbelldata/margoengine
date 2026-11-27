@@ -14819,6 +14819,15 @@ the row with its fix.
   each time. Run 3, which may have started after the 60-minute load ended, passed every leaf. So under load this leaf
   fails on the WebGL2 layer in 2 of 3 runs, and the gate neither reports why nor ends. Next: print the leaf's error
   and find what keeps the gate alive after it, then the failure itself. Logs `.lane/owner-culling-*.log`.
+- **2026-11-27 (lane A, later): the 2 of 3 "failures" and the "hang" were the repro's own 900 s outer `timeout`, not a
+  culling or WebGL2 defect.** Runs 1 and 2 had finished 58 and 57 of the 60 leaves when the outer limit hit; under the
+  load, 36 and 45 leaves waited on a Chromium teardown (`kernel had not finished tearing it down`), against 1 in run 3,
+  so the whole gate ran past 900 s. GNU `timeout` ends the running leaf's tree first, so the gate saw a nonzero close,
+  printed its one-line `failed` and was then ended itself (124). Reproduced in 3 s: `timeout 3` around a gate-shaped
+  parent whose leaf sleeps 10 s prints the same `failed` line and exits 124. The gate's own failure line now says how a
+  leaf ended (exit code or signal, seconds, and the start-failure note for 0xC0000142), from `failureLine` in
+  `scripts/support/run-limited.mjs`. Regression: tests/gpu-test-limit.test.js (a failed step names its exit code). The
+  first fetch failure above stays open.
 
 ## Sciviz comparison gaps
 

@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { runLimited } from './support/run-limited.mjs';
+import { failureLine, runLimited } from './support/run-limited.mjs';
 import {
   CPU_LIMIT_MS,
   OWNER_FIXTURES,
@@ -43,7 +43,7 @@ if (
         label: `owner/lifetime CPU ${run.join(',')}`,
       });
       if (!cpu.ok) {
-        console.error(cpu.message ?? `Owner/lifetime CPU ${run.join(',')} failed`);
+        console.error(failureLine(`Owner/lifetime CPU ${run.join(',')}`, cpu));
         process.exitCode = 1;
         cpuOk = false;
         break;
@@ -80,7 +80,7 @@ if (
               },
             );
             if (!gpu.ok) {
-              console.error(gpu.message ?? `${label} failed`);
+              console.error(failureLine(label, gpu));
               process.exitCode = 1;
               break gpu;
             }

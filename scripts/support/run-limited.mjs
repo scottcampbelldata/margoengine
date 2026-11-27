@@ -4,6 +4,7 @@
 import { spawn } from 'node:child_process';
 import { closeSync, openSync } from 'node:fs';
 import { endTree } from './shutdown.mjs';
+import { startFailureNote } from './start-failure.mjs';
 
 /** Default limit for one GPU test, in minutes. The slowest real test takes under 5. */
 export const DEFAULT_TEST_MINUTES = 10;
@@ -33,7 +34,8 @@ export function testLimitMs(packageMinutes, env = process.env) {
 }
 
 /**
- * Runs `command` in `cwd`, output passed through. Resolves `{ ok, timedOut, aborted, seconds, message?, survivors? }`;
+ * Runs `command` in `cwd`, output passed through. Resolves `{ ok, timedOut, aborted, seconds, code, signal, message?,
+ * survivors? }`, `code` and `signal` as the shell's close gave them (null when the kill gave the result first);
  * past `limitMs` the whole process tree is killed and `message` names `label` and how to raise the limit. When `signal`
  * aborts (the heat watch, scripts/support/heat.mjs; a stopped side-by-side run) the tree is killed too and `aborted` is
  * true: the caller states why. A killed tree is gone when this resolves, so its folder, log and ports are free; `survivors`
@@ -64,7 +66,7 @@ export function runLimited(
     // KB-VFX-SEEKHANG1 this waited on the shell's close for good, and a 10-minute limit held local CI's step for 120.
     const stop = () => {
       ended = end(child.pid);
-      ended.then((left) => left.length > 0 && finish(null));
+      ended.then((left) => left.length > 0 && finish(null, null));
     };
     const timer = startLimit(() => {
       timedOut = true;
@@ -76,7 +78,7 @@ export function runLimited(
     };
     if (signal?.aborted) abort();
     else signal?.addEventListener('abort', abort, { once: true });
-    const finish = async (code) => {
+    const finish = async (code, closeSignal = null) => {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
       const survivors = await ended;
@@ -86,6 +88,8 @@ export function runLimited(
         timedOut,
         aborted,
         seconds,
+        code,
+        signal: closeSignal,
         ...(survivors.length > 0 && { survivors }),
         ...(timedOut && {
           message: `${label} hung: no result after ${Math.round(limitMs / 1000)} s, ${survivors.length ? `process tree not ended (pids ${survivors.join(', ')} still run; end them by hand)` : 'process tree killed'}; find the stuck step (page, server or await) and fix it, or raise the limit with MARGO_GPU_TEST_TIMEOUT_MIN or "margo.gpuTestTimeoutMinutes" in the package's package.json if the test is genuinely slower`,
@@ -95,4 +99,21 @@ export function runLimited(
     child.once('error', () => finish(1));
     child.once('close', finish);
   });
+}
+
+/**
+ * The line a gate prints for a failed {@link runLimited} result: its hang message, or how the step ended (exit code,
+ * signal, seconds) with the note for a process Windows could not start. Before this the owner/lifetime gate printed only
+ * "<label> failed" for a leaf whose tree a caller's own outer limit had ended, which read as a test failure with no
+ * reason (#8, 2026-11-27: two of three loaded runs of `--packages=culling` under a 900 s outer `timeout`).
+ */
+export function failureLine(label, result, note = startFailureNote) {
+  if (result.message) return result.message;
+  const how = result.signal ? `ended by ${result.signal}` : `exit code ${result.code ?? 'unknown'}`;
+  const start = note(result.code);
+  return (
+    `${label} failed: ${how} after ${result.seconds} s` +
+    (result.code === 0 ? '' : '; if it printed no result of its own, its process tree was ended from outside') +
+    (start ? `; ${start}` : '')
+  );
 }

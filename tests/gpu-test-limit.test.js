@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { DEFAULT_TEST_MINUTES, runLimited, testLimitMs } from '../scripts/support/run-limited.mjs';
+import { DEFAULT_TEST_MINUTES, failureLine, runLimited, testLimitMs } from '../scripts/support/run-limited.mjs';
 import { spawn } from 'node:child_process';
 import { endTree, waitSignaled } from '../scripts/support/shutdown.mjs';
 
@@ -199,6 +199,29 @@ test('a passing test and a failing test finish normally, with no timeout message
   assert.deepEqual([pass.ok, pass.timedOut, pass.message], [true, false, undefined]);
   const fail = await runLimited(`${node} -e "process.exit(3)"`, { cwd: tmpdir(), limitMs: 30_000 });
   assert.deepEqual([fail.ok, fail.timedOut, fail.message], [false, false, undefined]);
+});
+
+// #8 (2026-11-27): the owner/lifetime gate printed "<leaf> failed" and nothing else for a leaf whose tree an outer
+// `timeout 900` had ended, which read as a WebGL2 test failure. The result now carries how the step ended.
+test('a failed step names its exit code, and a step Windows could not start names that', async () => {
+  const fail = await runLimited(`${node} -e "process.exit(7)"`, { cwd: tmpdir(), limitMs: 30_000 });
+  assert.deepEqual([fail.ok, fail.code, fail.signal], [false, 7, null]);
+  assert.match(
+    failureLine('owner/lifetime GPU x', fail),
+    /^owner\/lifetime GPU x failed: exit code 7 after [\d.]+ s; /,
+  );
+  assert.match(failureLine('x', fail), /ended from outside/);
+  const pass = await runLimited(`${node} -e "process.exit(0)"`, { cwd: tmpdir(), limitMs: 30_000 });
+  assert.equal(pass.code, 0);
+  const start = failureLine('x', { ok: false, code: 0xc0000142, signal: null, seconds: 0.1 }, (code) =>
+    code === 0xc0000142 ? 'STATUS_DLL_INIT_FAILED' : '',
+  );
+  assert.match(start, /exit code 3221225794 after 0\.1 s; .*; STATUS_DLL_INIT_FAILED$/);
+  assert.match(
+    failureLine('x', { ok: false, code: null, signal: 'SIGTERM', seconds: 2 }, () => ''),
+    /x failed: ended by SIGTERM after 2 s/,
+  );
+  assert.equal(failureLine('x', { ok: false, timedOut: true, message: 'x hung: no result' }), 'x hung: no result');
 });
 
 test('the limit: environment beats the package setting, which beats the 10 minute default', () => {
