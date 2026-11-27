@@ -1340,7 +1340,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,380 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,382 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -11388,6 +11388,10 @@ applied. That fix took `lightmap/apply` from 2,476 B to 2,442 B min+gzip (ceilin
 ## Batch 196 non-XR stereo
 
 Optional cameras/stereo is 3,144 B min+gzip (previously 0 B), ceiling 3,400 B. StereoOutput.render replaces the application's engine.render call in its frame loop; it uses two scene draws and one fullscreen packing pass, with one plugin update per pair. Default mode side-by-side, eye separation 0.064 world units, convergence at the camera target, source engine.camera, source camera layers, default scene, unswapped eyes, column stripes and phase 0. Infinity focus gives parallel frusta. StereoRig also preserves custom projection hooks; orthographic eyes correctly have no depth disparity. The packed output is display colour (RGBA8 eye textures); anaglyph is the published red/cyan Dubois transform in linear light. Two RGBA8 eye targets use 8 * eyeWidth * eyeHeight bytes, plus core's normal render attachments. Rows/columns refer to physical backing pixels; a physical barrier needs calibrated optics and pixel-aligned presentation. On automatic canvas resize the projection follows the new aspect immediately and eye resolution catches up on the next frame; exactSize canvases give caller-controlled physical dimensions. No XR session or automatic engine.start takeover. Dispose the output before its engine. Native WebGPU and WebGL2 compatibility work; native WebGL-only engines reject.
+
+## Camera sight clearance (2026-11-27)
+
+Optional cameras/clearance (new entry). CPU only: each view casts 32 x 18 frame rays and 15 subject rays over a height function (steps of 0.5 m, 1 percent of the distance far out) and upright cylinders; it does not see buildings, overhangs or leaf shapes, and a feature thinner than a step or a ray gap can be missed. The Fauld shot generator reads plants within 600 m of the lens. Five Fauld rows stay blocked (KB-SHOT-FAULDSIGHT1).
 
 ## Four-view pyramid hologram (2026-11-26)
 
@@ -29250,6 +29254,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   responding to a moving predator. BB-4, BB-6 and AVIARY-3 still have open shot checks in the demo review.
 
 ## Open defects
+
+### Open 2026-11-27: five Fauld shot cameras still cannot see their subject (shot generator, KB-SHOT-FAULDSIGHT1)
+
+- **Repro:** `node tools/shot/fauld-shots.mjs`; `tools/shot/fauld-sight.json` marks fr073, fr108, fr114, fr136 and fr146 `"clear": false` with 0 of the subject seen.
+- **Cause:** their target is the crater floor (or the farm site) 450 m off on a long lens, below the plateau rim: no turn or lift up to 34 m sees it. The rows describe the rim, a fence, a path or the skyline, which the generator does not aim at.
+- **Left:** aim each of these rows at what it describes (its own target in the generator), then judge a still. Their cameras are unchanged.
+- **Also seen:** the lorry of fr031 and the memorial stone of fr139 have no model, so those frames show their places without them.
 
 ### Fixed 2026-11-26: margoengine/viz cost 264 B gzip more than @margoengine/points for PointsPlugin (package build, splats, KB-INL1b)
 
