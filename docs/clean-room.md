@@ -1,5 +1,19 @@
 # Clean room
 
+### JPEG 2000 Part 1 decoder (decoders/jpeg2000-kernel, 2026-11-27)
+
+`packages/decoders/jpeg2000-kernel` is a Margo-authored Rust crate, built in pieces: the codestream syntax of Annex A
+(SIZ, COD, COC, QCD, QCC, RGN, POC, PPM, PPT, SOT and SOD; the tile-part rules; the precedence of tile COC over tile
+COD over main COC over main COD, and the same for QCC and QCD), and the canvas geometry of Annex B (tiles,
+tile-components, resolutions, sub-bands, precincts and code-block sizes), from Rec. ITU-T T.800 | ISO/IEC 15444-1,
+"JPEG 2000 image coding system: Core coding system" (ITU, 2002 and 2015 editions),
+<https://www.itu.int/rec/T-REC-T.800>; David S. Taubman and Michael W. Marcellin, *JPEG2000: Image Compression
+Fundamentals, Standards and Practice* (Kluwer, 2002), <https://doi.org/10.1007/978-1-4615-0799-4>; and David
+Taubman, "High performance scalable image compression with EBCOT" (IEEE Transactions on Image Processing 9(7),
+2000), <https://doi.org/10.1109/83.847830>. No decoder's source (OpenJPEG, Kakadu, Grok, jpx.js or any other) was
+read. Part 2 extensions (marker range 0xFF70 to 0xFF7F, MCT above 1, arbitrary kernels) and the HT block coder of
+Part 15 are refused as unsupported, not skipped.
+
 ### Soft volumes from a mesh (P8, SOFT-04 and SOFT-06, 2026-11-27)
 
 `SoftBodyDesc.volume` (`packages/physics/src/soft.ts`, `weldMesh` in `soft-volume.ts`) welds a mesh's split vertices
