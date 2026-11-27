@@ -1947,9 +1947,9 @@ engine.render({delta: 0});
 - `craterField({radius, density | count, dMin, dMax, exponent, seed, depthRatio, rimRatio, maxDepth, floor, ejecta, blend})`:
   craters are Poisson placed, uniformly over the sphere, with diameters from a power law (cumulative exponent 2 by
   default, Neukum et al. 2001) between `dMin` (default `radius / 20,000`) and `dMax` (`radius / 4`). `density` counts
-  craters of `dMin` or more per million square kilometres (default 1,000), or give `count` for the whole planet. Depth is
-  `0.196 D^1.01` and rim height `0.036 D^1.01` with D in kilometres (Pike 1977), a crater is never deeper than
-  `maxDepth` 3,400 m (larger ones are scaled, not clipped). The ejecta blanket is `0.14 R^0.74 (r / R)^-3` metres beyond
+  craters of `dMin` or more per million square kilometres (default 1,000), or give `count` for the whole planet. Depth,
+  rim crest to floor, is `0.196 D^1.01` and rim height above the ground `0.036 D^1.01` with D in kilometres (Pike 1977);
+  a floor is never more than `maxDepth` 3,400 m below the ground (larger craters are scaled, not clipped). The ejecta blanket is `0.14 R^0.74 (r / R)^-3` metres beyond
   the rim (McGetchin et al. 1973), the rim uplift falls off as `(r / R)^-4`, both fade to nothing by 3 radii. `floor`
   is the fraction of the radius that is flat floor (default 0). A younger crater replaces what an older one left inside
   its rim and fades into it over `blend` radii (0.15). Heights are relative to the undisturbed ground: `combine` it with a base.

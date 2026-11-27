@@ -8344,7 +8344,7 @@ TypeScript FFT does 11,264 butterflies per 2048-point frame and 4,121 frames too
 
 `@margoengine/terrain/planet-recipes`, 3,216 B min+gzip (new entry; the planet entry is no larger: the shared noise moved to an
 internal module). Defaults, each with its source in the README: crater density 1,000 per 10^6 km^2 of diameter `dMin` or more,
-`dMin` radius / 20,000, `dMax` radius / 4 (at most the radius), cumulative exponent 2 (1 to 3), depth 0.196 D^1.01 and rim 0.036 D^1.01
+`dMin` radius / 20,000, `dMax` radius / 4 (at most the radius), cumulative exponent 2 (1 to 3), depth 0.196 D^1.01 from rim crest to floor and rim 0.036 D^1.01
 (D in km, Pike 1977; the coefficients are taken from the plan and were not re-read from the paper, which could not be opened
 here; only depth over diameter about 0.2 under 15 km and the 3,400 m depth ceiling were confirmed against its abstract),
 ejecta 0.14 R^0.74 (r / R)^-3 m (McGetchin et al. 1973, coefficients as in the plan), rim uplift (r / R)^-4 and the fade from 2.5

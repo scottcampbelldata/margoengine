@@ -1,8 +1,11 @@
 // Crater fields for PlanetTerrain: a procedural, deterministic, lazily generated impact crater population.
 // Clean room, from these sources only:
 // - Pike 1977, "Size-Dependence in the Shape of Fresh Impact Craters on the Moon", in Impact and Explosion Cratering
-//   (Pergamon), pp. 489-509: simple craters have depth about 0.196 D^1.01 and rim height about 0.036 D^1.01 (kilometres);
-//   apparent depth never exceeds about 3,400 m. Checked against secondary sources (2026-11-11): Pike's own summary gives
+//   (Pergamon), pp. 489-509: simple craters have depth, rim crest to floor, about 0.196 D^1.01 and rim height above the
+//   surrounding ground about 0.036 D^1.01 (kilometres); apparent depth (floor below that ground) never exceeds about
+//   3,400 m. That depth is measured from the rim crest agrees with Collins, Melosh and Marcus 2005, "Earth Impact Effects
+//   Program", Meteoritics & Planetary Science 40, 817-840, and with Pike's apparent depth about 0.2 of the apparent
+//   diameter, itself about 0.83 of the rim diameter (NTRS 19780057837): 0.166 D against 0.196 D - 0.036 D = 0.16 D. Checked against secondary sources (2026-11-11): Pike's own summary gives
 //   depth/diameter about 0.2 for simple lunar craters under 15 km (NASA NTRS 19780057837, Pike 1977, "Apparent
 //   depth/apparent diameter relation for lunar craters", Proc. Lunar Sci. Conf. 8, 3427-3436), and "IMPACTS: A program
 //   to calculate the effects of a hypervelocity impact into a Solar System body" (2022, arXiv:2203.07476) cites Pike
@@ -35,11 +38,11 @@ export interface CraterFieldOptions {
   exponent?: number;
   /** An integer. Default 1. Another seed makes another population. */
   seed?: number;
-  /** Depth coefficient: depth = depthRatio * D^1.01 with D in kilometres (Pike 1977), 0 or more. Default 0.196. */
+  /** Depth coefficient: rim crest to floor = depthRatio * D^1.01 with D in kilometres (Pike 1977), 0 or more. Default 0.196. */
   depthRatio?: number;
   /** Rim height coefficient: rim = rimRatio * D^1.01 with D in kilometres, 0 or more. Default 0.036. */
   rimRatio?: number;
-  /** Deepest a crater gets, in metres, above 0. Default 3,400 (Pike 1977); larger craters are scaled down, not clipped. */
+  /** Deepest a floor gets below the surrounding ground, in metres, above 0. Default 3,400 (Pike 1977); larger craters are scaled down, not clipped. */
   maxDepth?: number;
   /** Fraction of a crater's radius that is flat floor, 0 to below 1. Default 0. */
   floor?: number;
@@ -270,10 +273,12 @@ export function craterField(options: CraterFieldOptions = {}): CraterField {
   }) as CraterField;
   function craterHeight(previous: number, s: number, diameter: number): number {
     const km = diameter / 1000,
-      simple = depthRatio * km ** 1.01 * 1000,
-      scale = simple > maxDepth ? maxDepth / simple : 1,
-      depth = simple * scale,
-      rim = rimRatio * km ** 1.01 * 1000 * scale,
+      crestToFloor = depthRatio * km ** 1.01 * 1000,
+      full = rimRatio * km ** 1.01 * 1000,
+      below = Math.max(0, crestToFloor - full),
+      scale = below > maxDepth ? maxDepth / below : 1,
+      depth = below * scale,
+      rim = full * scale,
       radiusM = diameter / 2,
       thickness = ejecta ? 0.14 * radiusM ** 0.74 : 0,
       uplift = Math.max(0, rim - 0.14 * radiusM ** 0.74),

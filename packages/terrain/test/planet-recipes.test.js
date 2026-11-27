@@ -51,10 +51,12 @@ test('an isolated crater has the Pike depth and rim ratios and the McGetchin eje
     km = D / 1000,
     Rm = D / 2;
   const centre = field(crater.x, crater.y, crater.z, 0);
-  near(-centre / D, (0.196 * km ** 1.01 * 1000) / D, 0.02, 'depth over diameter');
   const rim = field(...away(crater, Rm), 0);
   const expectedRim = 0.036 * km ** 1.01 * 1000;
   near(rim / D, expectedRim / D, 0.02, 'rim height over diameter');
+  // Pike's depth runs from the rim crest to the floor, so the floor lies depth minus rim height below the ground.
+  near((rim - centre) / D, (0.196 * km ** 1.01 * 1000) / D, 0.02, 'rim to floor depth over diameter');
+  near(-centre / D, ((0.196 - 0.036) * km ** 1.01 * 1000) / D, 0.02, 'floor below the ground over diameter');
   const without = craterField({ radius: R, dMin: 5000, dMax: 10000, count: 40, seed: 3, ejecta: false });
   const p = away(crater, 2 * Rm);
   const blanket = field(...p, 0) - without(...p, 0);
