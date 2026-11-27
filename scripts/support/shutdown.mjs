@@ -8,6 +8,24 @@ import { execFile, spawn, spawnSync } from 'node:child_process';
 /** How long `closeAll` may take in all before it throws. */
 export const SHUTDOWN_BUDGET_MS = 30_000;
 
+/** How long a process may run on after its last browser suite closed before {@link reportLinger} names what holds it. */
+export const LINGER_MS = 60_000;
+
+/**
+ * Names what keeps a process running after its suite closed (KB-P3h-stop: a suite that had printed its passing result
+ * did not exit, and nothing said what held it). The timer does not hold the process itself, so it fires only when
+ * something else does; it reports and changes nothing. Clear the returned timer when the process goes back to work.
+ */
+export function reportLinger(after = 'its browser suite closed', { ms = LINGER_MS, report = console.error } = {}) {
+  return setTimeout(
+    () =>
+      report(
+        `[linger] process ${process.pid} is still running ${ms / 1000} s after ${after}; open resources: ${process.getActiveResourcesInfo().join(', ') || 'none'}`,
+      ),
+    ms,
+  ).unref();
+}
+
 /** Pending nested teardown steps, shared by a resource and wrappers that own its shutdown. */
 export const SHUTDOWN_STEPS = Symbol('shutdown steps');
 

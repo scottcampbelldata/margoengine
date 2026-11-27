@@ -8497,6 +8497,16 @@ Two other ways a Node process on Windows stops with no output were measured on t
 stderr pipe its reader is not draining blocks the whole process, timers included (a 4 MiB write held a 500 ms timer
 for good), and `process.exit` waits for a worker thread blocked in a system call.
 
+### Open 2026-11-27: the one unexplained stop of the Blender nodes browser check (KB-P3h-stop, scripts, not reproduced)
+
+- **Repro:** none. The run above under KB-P3h is the only sighting. 6 more runs of
+  `MARGO_COMPAT=1 MARGO_TRACE_SHUTDOWN=1 node packages/blender/tests/nodes-browser.mjs` on 2026-11-27 all exited (70 to
+  102 s), their longest browser teardown step 309 ms.
+- **Cause:** not known. Every close step of `openBrowser` is bounded and throws, which this suite does not catch.
+- **Instrumented 2026-11-27:** a process still running 60 s after its last browser suite closed prints one `[linger]`
+  line naming its open resources (`reportLinger`, scripts/support/shutdown.mjs; tests/linger-report.test.js). A silent
+  stop with no such line means the event loop itself was blocked, for example by an undrained output pipe.
+
 ### Fixed 2026-11-15: committed Wasm blueprints differed by build system
 
 Repro (before): read a blueprint listed in `scripts/wasm-blueprints.mjs` for a

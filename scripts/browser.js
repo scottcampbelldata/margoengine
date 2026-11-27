@@ -12,9 +12,12 @@ import { trackPipelines } from './support/gpu-ready.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 import { holdStaleDocumentGpu } from './support/stale-document.js';
 import { compatIgnoredLine, compatRun, compatShim } from './support/compat-shim.js';
-import { closeAll, traceShutdown } from './support/shutdown.mjs';
+import { closeAll, reportLinger, traceShutdown } from './support/shutdown.mjs';
 import { watchStartupErrors } from './support/page-startup.js';
 import { windowsSession } from './support/windows-session.mjs';
+
+/** The report armed by the last suite close (reportLinger); a new suite in the same process clears it. */
+let linger;
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
@@ -536,6 +539,7 @@ export async function openBrowser({
   // Device pixels per CSS pixel of the page (window.devicePixelRatio), for high-density display tests.
   deviceScaleFactor = 1,
 } = {}) {
+  clearTimeout(linger);
   // A compatibility run never passes as one in silence on a page the script pins to native WebGPU.
   const ignored = compatIgnoredLine(startPath, compat);
   if (ignored) console.warn(ignored);
@@ -708,6 +712,7 @@ export async function openBrowser({
           await closeAll({ browser });
         } finally {
           await closeServer();
+          linger = reportLinger();
         }
         if (unsettled) throw unsettled;
         if (wgsl.modules.size)
