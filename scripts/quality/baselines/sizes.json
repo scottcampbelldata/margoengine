@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20762327,
+  "total": 20767273,
   "history": [
     {
       "date": "2026-10-24",
@@ -14323,6 +14323,12 @@
       "commit": "0a8cb3001",
       "reason": "physics/ship 27,203 ceiling to its new size: oars, the RowingSolver with Caplan and Gardner's measured blade and its spline. A rowing shell is a boat of the same entry; a split would carry the shared frame and errors twice. One feature of the ship entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "1e1f51c75",
+      "reason": "physics/ship 29,114 ceiling to its new size: sailing yachts, the Delft series' regression tables, the ORC's sail tables, the velocity prediction and the SailingSolver. A yacht is a boat of the same entry; a split would carry the shared frame and errors twice. One feature of the ship entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15196,7 +15202,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 29114,
+    "@margoengine/physics/ship": 34060,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,

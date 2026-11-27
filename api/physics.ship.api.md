@@ -479,6 +479,44 @@ export const SEA_WATER_VISCOSITY = 0.0000011883;
 
 export const SHALLOW_LIMIT = 1.2;
 
+export interface SailingControl {
+    heading: number | null;
+    flat: number;
+    reef: number;
+}
+
+export interface SailingParams extends YachtFluids {
+    readonly yachts: readonly Yacht[];
+    readonly wind?: readonly [number, number, number] | FlowField;
+    readonly capacity?: number;
+    readonly level?: RateLevel;
+}
+
+export class SailingSolver implements Solver<SailingParams> {
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: SailingParams): void;
+    control(index: number): SailingControl;
+    status(index: number): SailingStatus;
+    step(context: StepContext, _dt: number): void;
+    importPorts(_tick: number): void;
+    exportPorts(tick: number): readonly Port[];
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface SailingStatus {
+    speed: number;
+    leeway: number;
+    heel: number;
+    heading: number;
+    apparentAngle: number;
+    apparentSpeed: number;
+    drive: number;
+    side: number;
+    resistance: number;
+}
+
 export interface Ship {
     readonly row: number;
     readonly model: ManoeuvringModel;
@@ -671,6 +709,90 @@ export interface WaveHull {
     readonly run?: number;
 }
 
+export interface Yacht {
+    readonly row: number;
+    readonly hull: YachtHull;
+    readonly rig?: YachtRig;
+    readonly waterline?: readonly [number, number, number];
+    readonly forward?: readonly [number, number, number];
+    readonly up?: readonly [number, number, number];
+    readonly roll?: 'model' | 'hull';
+    readonly metacentricHeight?: number;
+}
+
+export interface YachtFluids {
+    readonly density?: number;
+    readonly viscosity?: number;
+    readonly air?: number;
+    readonly gravity?: number;
+}
+
+export interface YachtHull {
+    readonly length: number;
+    readonly beam: number;
+    readonly draught: number;
+    readonly volume: number;
+    readonly waterplane: number;
+    readonly lcb: number;
+    readonly lcf: number;
+    readonly prismatic: number;
+    readonly midship: number;
+    readonly keel: {
+        readonly draught: number;
+        readonly volume: number;
+        readonly root: number;
+        readonly tip: number;
+        readonly thickness: number;
+        readonly centre: number;
+    };
+    readonly rudder: {
+        readonly area: number;
+        readonly chord: number;
+        readonly thickness: number;
+    };
+}
+
+export interface YachtRig {
+    readonly I: number;
+    readonly J: number;
+    readonly P: number;
+    readonly E: number;
+    readonly boom: number;
+    readonly freeboard: number;
+    readonly mass: number;
+    readonly metacentricHeight: number;
+}
+
+export interface YachtRun {
+    speed: number;
+    heel: number;
+    leeway: number;
+    flat: number;
+    reef: number;
+    apparentAngle: number;
+    apparentSpeed: number;
+    drive: number;
+    side: number;
+}
+
+export interface YachtSails {
+    drive: number;
+    heel: number;
+    centre: number;
+    angle: number;
+    speed: number;
+}
+
+export interface YachtWater {
+    resistance: number;
+    side: number;
+    upright: number;
+    heeled: number;
+    appendages: number;
+    induced: number;
+    slope: number;
+}
+
 export function addedResistance(hull: WaveHull, amplitude: number, omega: number, alpha: number, speed: number, gravity?: number, density?: number): number;
 
 export function ankudinovShallow(ratio: number, hull: {
@@ -771,6 +893,10 @@ export function thrusterAhead(m: number): [number, number];
 
 export function thrusterThrust(power: number, diameter: number, density?: number): number;
 
+export function velocityPrediction(hull: YachtHull, rig: YachtRig, tws: number, twa: number, fluids?: YachtFluids & {
+    readonly maxHeel?: number;
+}): YachtRun;
+
 export function wageningenB(prop: BSeriesPropeller, J: number): {
     kt: number;
     kq: number;
@@ -779,6 +905,12 @@ export function wageningenB(prop: BSeriesPropeller, J: number): {
 export function waveSpectrum(omega: number, h: number, t1: number): number;
 
 export const wrap: (angle: number) => number;
+
+export function yachtSails(rig: YachtRig, awa: number, aws: number, heel: number, flat?: number, reef?: number, fluids?: YachtFluids): YachtSails;
+
+export function yachtWater(h: YachtHull, speed: number, heel: number, leeway: number, fluids?: YachtFluids): YachtWater;
+
+export function yachtWettedArea(h: YachtHull): number;
 
 // Not exported from this entry, but used by the exports above:
 

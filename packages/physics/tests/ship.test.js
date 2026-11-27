@@ -32,6 +32,9 @@ import {
   Propeller,
   ShipSolver,
   holtropMennen,
+  SailingSolver,
+  velocityPrediction,
+  yachtWettedArea,
   bladeCoefficients,
   RowingSolver,
   savitsky,
@@ -1516,4 +1519,91 @@ test("oars: Caplan and Gardner's Macon blade, Coppel et al.'s eight, and a singl
     () => row({ oars: [{ pin: [0, 0, 1], side: 2, outboard: 2 }], crew: 80, drag: 3 }, {}, 0, 100, 4),
     (e) => e.code === 'unsupported' && /side: 1/.test(e.message),
   );
+});
+
+test("a sailing yacht by the Delft series and the ORC's sails: Sysser 44's wetted area, the YD-41's ORC polar, and a yacht on a rigid body at its VPP speed", () => {
+  const kn = 0.514444;
+  // Sysser 44 (Kleijweg, Table C.1): the wetted-area regression against its measured 23.83 m^2.
+  const sysser = {
+    length: 10,
+    beam: 3.013,
+    draught: 0.681,
+    volume: 8.087,
+    waterplane: 20.13,
+    lcb: 5.329,
+    lcf: 5.625,
+    prismatic: 0.554,
+    midship: 0.712,
+    keel: { draught: 1.9, volume: 0.2, root: 1.4, tip: 0.8, thickness: 0.12, centre: 0.7 },
+    rudder: { area: 0.6, chord: 0.5, thickness: 0.12 },
+  };
+  assert.ok(Math.abs(yachtWettedArea(sysser) / 23.83 - 1) < 0.01, `${yachtWettedArea(sysser)}`);
+  // The YD-41 (Larsson and Eliasson's design as Teixeira tabulates it) against its ORC certificate's polar (Teixeira, Table
+  // XIII-1, computed by the ORC's VPP from the measured hull). Its keel and rudder geometry and GM 2.5 m (BM from the
+  // waterplane, KG from its ballast) are assumptions; Teixeira's own Delft-series VPP came within 16 percent.
+  const hull = {
+      length: 11.9,
+      beam: 3.18,
+      draught: 0.4,
+      volume: 6.05,
+      waterplane: 26.8,
+      lcb: 6.44,
+      lcf: 6.82,
+      prismatic: 0.56,
+      midship: 0.72,
+      keel: { draught: 2.3, volume: 0.25, root: 1.6, tip: 0.9, thickness: 0.12, centre: 0.9 },
+      rudder: { area: 0.9, chord: 0.6, thickness: 0.12 },
+    },
+    rig = { I: 16.2, J: 5.1, P: 16.7, E: 5.6, boom: 1.8, freeboard: 1, mass: 6200, metacentricHeight: 2.5 },
+    winds = [6, 8, 10, 12, 14, 16, 20, 24],
+    polar = {
+      52: [5.79, 6.98, 7.67, 7.99, 8.13, 8.21, 8.3, 8.27],
+      60: [6.12, 7.29, 7.94, 8.27, 8.43, 8.54, 8.65, 8.66],
+      75: [6.37, 7.5, 8.14, 8.56, 8.89, 9.11, 9.35, 9.45],
+      90: [6.22, 7.41, 8.11, 8.6, 9.07, 9.49, 10.08, 10.4],
+      110: [5.45, 6.69, 7.68, 8.31, 8.84, 9.4, 10.6, 11.31],
+      120: [5.01, 6.34, 7.4, 8.11, 8.65, 9.2, 10.48, 12.04],
+      135: [4.31, 5.59, 6.68, 7.57, 8.19, 8.7, 9.83, 11.27],
+      150: [3.62, 4.76, 5.78, 6.64, 7.41, 8.0, 8.9, 9.9],
+    };
+  let sum = 0,
+    n = 0;
+  for (const [twa, speeds] of Object.entries(polar))
+    winds.forEach((tws, i) => {
+      const run = velocityPrediction(hull, rig, tws * kn, Number(twa) * DEG),
+        off = Math.abs(run.speed / kn / speeds[i] - 1);
+      assert.ok(off < 0.15, `${twa} degrees in ${tws} kn: ${run.speed / kn} kn against ${speeds[i]}`);
+      sum += off;
+      n++;
+    });
+  assert.ok(sum / n < 0.06, `${sum / n}`);
+  // On a rigid body (pitch held: nothing floats it here) under the solver, reaching across a 12 kn wind and close-hauled,
+  // the yacht settles to the VPP's speed and heel at the true wind angle its helm holds it at.
+  for (const twa of [90, 52]) {
+    const tws = 12 * kn,
+      physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+      body = physics.addBody(null, {
+        linearVelocity: [3, 0, 0],
+        enabledRotations: [true, true, false],
+        colliders: { shape: 'box', halfExtents: [6, 2, 1.6], mass: 6200 },
+      }),
+      sailing = new SailingSolver(),
+      world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+        .add(new RigidSolver(), { physics })
+        .add(sailing, {
+          yachts: [{ row: body.row, hull, rig }],
+          wind: [-tws * Math.cos(twa * DEG), 0, -tws * Math.sin(twa * DEG)],
+        })
+        .couple(['sailing', 'rigid'], 'staggered');
+    sailing.control(0).heading = 0;
+    for (let t = 1; t <= 60 * 120; t++) world.advance(t);
+    const s = sailing.status(0),
+      vpp = velocityPrediction(hull, rig, tws, twa * DEG - s.heading);
+    assert.ok(
+      Math.abs(s.speed / vpp.speed - 1) < 0.05,
+      `${twa}: ${s.speed / kn} kn against the VPP's ${vpp.speed / kn}`,
+    );
+    // Heeled to port, the wind from starboard.
+    assert.ok(Math.abs(-s.heel - vpp.heel) < 2.5 * DEG, `${twa}: heel ${s.heel / DEG} against ${vpp.heel / DEG}`);
+  }
 });

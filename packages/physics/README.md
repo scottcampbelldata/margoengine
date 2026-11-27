@@ -4316,6 +4316,19 @@ world.advance(60 * 30);
 console.log(shell.position[0] > 100); // true: well under way
 ```
 
+Sailing yachts: `yachtWater(hull, speed, heel, leeway)` is a yacht's water forces by the Delft Systematic Yacht Hull Series (Keuning and Katgert's 2008 upright residuary resistance, Keuning and Sonnenberg's 1998 heel, keel, side force and effective span), `yachtSails(rig, awa, aws, heel, flat, reef)` its mainsail's and jib's forces by the ORC's 2023 tables in the heeled rig's plane, and `velocityPrediction(hull, rig, tws, twa)` balances them into its steady speed, heel and leeway, flattening the sails for speed and depowering past `maxHeel` (default 30 degrees). The hull is the DSYHS's parameters (`{length, beam, draught, volume, waterplane, lcb, lcf, prismatic, midship, keel, rudder}`, LCB and LCF from the bow) and the rig `{I, J, P, E, boom, freeboard, mass, metacentricHeight}`. Under a `SailingSolver` (`{yachts: [{row, hull, rig}], wind}`, the wind a velocity or a flow field of air) the yacht sails on its rigid body: the keel's side force at its centre of lateral resistance and the sails' force at their centre of effort heel it against g m GM sin(phi) (or a HullSolver's, `roll: 'hull'`), and the helm holds `control(i).heading`. Leave out `rig` and give `metacentricHeight` when the sails are another solver's, such as AERO-02's `SailForce` on a cloth lashed to the mast.
+
+```ts
+import {velocityPrediction} from 'margoengine/physics/ship';
+
+// The YD-41 reaching across 12 knots of true wind: about 8.8 kn (its ORC certificate: 8.60 kn).
+const hull = {length: 11.9, beam: 3.18, draught: 0.4, volume: 6.05, waterplane: 26.8, lcb: 6.44, lcf: 6.82, prismatic: 0.56, midship: 0.72,
+  keel: {draught: 2.3, volume: 0.25, root: 1.6, tip: 0.9, thickness: 0.12, centre: 0.9}, rudder: {area: 0.9, chord: 0.6, thickness: 0.12}};
+const rig = {I: 16.2, J: 5.1, P: 16.7, E: 5.6, boom: 1.8, freeboard: 1, mass: 6200, metacentricHeight: 2.5};
+const run = velocityPrediction(hull, rig, 12 * 0.514444, Math.PI / 2);
+console.log((run.speed / 0.514444).toFixed(1)); // 8.8
+```
+
 ```ts
 import {savitsky} from 'margoengine/physics/ship';
 

@@ -17176,6 +17176,21 @@ Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in hori
 this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
 the ship solver heels in its turn".
 
+### Sailing yachts (SEA-09, `yachtWater`, `yachtSails`, `velocityPrediction`, `SailingSolver`, 2026-11-27)
+
+`packages/physics/src/ship/sailing.ts`, written from N. Kleijweg, MSc thesis, TU Delft,
+https://repository.tudelft.nl/file/File_b89cddac-c130-429c-9b24-b71e453a1061 (eqs. 2.1 to 2.15, Tables B.2 to B.5 and C.1,
+read: Keuning and Katgert's 2008 regression and the Sysser hulls), G. Borba Labi, EMSHIP MSc thesis, Liege / Rostock 2019,
+https://matheo.uliege.be/bitstream/2268.2/8502/1/BORBA%20LABI%20%20Gaetan%20(Solent)%20-%20URO.pdf (eqs. 73 to 91, Tables 10
+to 17, read: Keuning and Sonnenberg's 1998 heel, keel, side force and effective span), the ORC VPP Documentation 2023,
+https://orc2.orc.org/rules/ORC%20VPP%20Documentation%202023.pdf (section 5, Tables 5.1 and 5.4, eqs. 5.34 to 5.48, read),
+and P. Teixeira, MSc thesis, IST Lisbon (Tables X-2 and XIII-1, read: the YD-41's particulars and its ORC certificate's
+polar, the measurement the test holds). Keuning and Katgert's, Keuning and Sonnenberg's and Hazen's papers themselves were
+not obtained. No VPP code was read. The heel's effect on the apparent wind, the linear kheff, the depowering order's
+search, putting the keel's side force at its centre of lateral resistance on a rigid body and the critically damped helm
+are this package's own. Proof: `packages/physics/tests/ship.test.js`, "a sailing yacht", and
+`packages/physics/tests/coupling/sailing.test.js`.
+
 ### Oars (SEA-09, `RowingSolver`, `bladeCoefficients`, `MACON_BLADE`, 2026-11-27)
 
 `packages/physics/src/ship/rowing.ts`, written from A. Coppel, T. Gardner, N. Caplan and D. Hargreaves, "Oar blade force

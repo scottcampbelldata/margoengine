@@ -12,6 +12,7 @@ export * from './propeller.js';
 export * from './race.js';
 export * from './resistance.js';
 export * from './rowing.js';
+export * from './sailing.js';
 export * from './shallow.js';
 export * from './squat.js';
 export * from './waves.js';
