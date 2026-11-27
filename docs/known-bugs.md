@@ -19012,6 +19012,17 @@ Cause: the references render on Mitsuba's cuda_ad_rgb variant, whose parallel ac
 frozen record pins raw hashes as for the deterministic scalar_rgb references. Fix to build: pin the CUDA references by
 their display hash and a raw tolerance, or render them on scalar_rgb.
 
+2026-11-27 (lane A, RTX A6000): built and measured, not landed. On scalar_rgb (each 1024-sample picture the float64
+mean of 8 chunk renders of 128 samples, seeds seed x 8 + i, a zero pdf returning before its division) two full
+captures repeat every raw hash. The KB6016b gate on the split-model row passes on absolute (446,167 <= 484,953),
+square, max, edge and flat but not `foreground >= 47776`: 47,760, native and compat. Cause of the 16: not the zero-pdf
+guard and not CUDA's run-to-run order. The two CUDA captures of 2026-11-11 (same seed) give the same foreground on every
+row (47,776; no pixel differs). Against them the scalar picture loses 59 silhouette pixels and gains 43; at every lost
+one its raw value is exactly 0 where CUDA's is about 1e-4, so none of the pixel's 1,024 samples hit the surface
+(coverage, from the `factors` term, which divides by no pdf). That is a new Monte Carlo draw of pixels covered about
+once in 1,024 samples (no hit in 1,024 has a chance near 37 percent); the other rows move by -23, -10 and +14 pixels
+the same way. Held at 47,776 for a ruling on re-deriving the figure from the new references.
+
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 
 Base dab36e5f9, Apple silicon Mac. Stage CPU 134/134; `test:gpu`, `test:gpu:features` (each on WebGPU and with
