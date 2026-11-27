@@ -346,6 +346,14 @@ of the sea against Monahan's 1.84%). `whitecap()` in `packages/water/src/index.t
 train, so the longest trains decide where foam forms, and its edge is a metre wide. Recorded as
 KB-WATER-WHITECAPBANDS1 in `docs/known-bugs.md`; not changed outside SEA-13.
 
+### SEA-02 far sea rows in the Kitty Hawk s18 frame (logged by the rendering lane, 2026-11-26)
+
+From a few tens of metres to the horizon the s18 sea is evenly spaced parallel crest rows. The scene passes four
+hand-set trains; Water's own default, `seaState(wind)`, is eight JONSWAP trains and is less regular (0.26 against 0.40
+column autocorrelation in the far quarter of a bare Water view) but still a sum of trains. Water has no spectral far
+sea unless a `SpectralSea` is passed as `sea`. Recorded as KB-WATER-FARROWS1 in `docs/known-bugs.md`; not changed
+outside SEA-02.
+
 ## Scope: solvers only (Scott, 2026-11-26)
 
 The physics engine is the whole job. It is built in two stages:

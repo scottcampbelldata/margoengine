@@ -148,6 +148,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Owed:** a coded error with an errors-page link that says to add `viewFormats` (a validation error scope around
   that `createView`), with its test.
 
+### Open 2026-11-26: the far sea shows even parallel rows of crests, as Water's default sea is a sum of eight trains (KB-WATER-FARROWS1, water, SEA-02)
+
+- **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, 3.6 m up over the dune coast's sea): from a few
+  tens of metres to the horizon the sea is evenly spaced parallel rows of crests. `@margoengine/scenes` `duneCoast`
+  passes Water four hand-set trains (72 m, 41 m, 11 m, 5 m). A bare kernel with only Water (`horizon`, chop 0.75,
+  camera 3.6 m up looking 5 degrees down, 1920 x 1080, no TAA), measured as the strongest autocorrelation of each
+  column's luma over the quarter of the water below the horizon at lags of 4 pixels or more, reads 0.40 with them.
+- **Package default:** Water with no `waves` and `wind: 12` takes `seaState(12)`: eight fetch-limited JONSWAP trains on
+  fixed wavelengths with Horvath's directional spread. The same view reads 0.26, less regular, but still a finite sum of
+  trains whose crests repeat across the frame; Water has no spectral far sea of its own. `sea` (a `SpectralSea` of
+  `@margoengine/physics/sea`, up to 896 components) and `FFTOcean` (`@margoengine/water/fft`, a separate plugin that
+  cannot be Water's far sea with its coast, foam and spray) are the spectral paths.
+- **Cause:** Water draws its far sea from at most eight swell trains unless a physics sea is passed; a sea of a wind
+  needs a continuous spectrum (Tessendorf 2001 cascades, or many components) to lose the rows.
+- **Owner:** SEA-02, ocean surface synthesis (Codex, `docs/physics-work-queue.md`; REOPENED). The scene's four hand-set
+  trains are the film lane's to change (to `wind` or a `sea`) once the package default holds; not changed by the
+  rendering lane.
+
 ### Open 2026-11-26: whitecaps on a swell sea break along the long swell crests in soft-edged bands (KB-WATER-WHITECAPBANDS1, water, SEA-13)
 
 - **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, 3.6 m up over the dune coast's sea, wind 12 m/s,
