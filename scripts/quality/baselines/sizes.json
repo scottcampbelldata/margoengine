@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21031986,
+  "total": 21032396,
   "history": [
     {
       "date": "2026-10-24",
@@ -14736,6 +14736,12 @@
       "commit": "lane-d",
       "reason": "navmesh/weighted-any-angle 4333 to 4968 B (ceiling 4521 to 5224): where a path ends up on a mesh vertex the other side of the vertex is tried too, and a portal reads the same whichever polygon found it first, so no path of the 150 seeded queries costs more than before the bound was tightened (30 cost less) and an answer no longer hangs on earlier queries. The step is part of every route call, so a second entry would save nothing; no other entry grows.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "e9d3c881cd",
+      "reason": "@margoengine/vfx/smoke 3933 to 4343 B gzip (ceiling 4189 to 4599): KB-VFX-ROOFDOTS1, the gallery option (two wall obstacle boxes, the jet's direction mask and speed at the walls, births as wide as the layer and the option's checks). A second entry would have to copy the roof layer's node graph or rewrite the column's curves from outside",
+      "grew": 1
     }
   ],
   "items": {
@@ -16286,7 +16292,7 @@
     "@margoengine/vfx/shadows": 3061,
     "@margoengine/vfx/shapes": 3848,
     "@margoengine/vfx/skinned": 2314,
-    "@margoengine/vfx/smoke": 4189,
+    "@margoengine/vfx/smoke": 4599,
     "@margoengine/vfx/soft": 1493,
     "@margoengine/vfx/solid": 3969,
     "@margoengine/vfx/sort": 1280,

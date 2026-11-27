@@ -17983,13 +17983,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   uniforms and WGSL) and `packages/sky/test/features-check.mjs look` (GPU, WebGPU and WebGL2: the falloff, the sight,
   two spots adding, the haze's mean along the ray).
 
-### Open 2026-11-27: a smoke layer under a roof reads as separate puffs far from its fire (KB-VFX-ROOFDOTS1, vfx)
+### Fixed 2026-11-27: a smoke layer under a roof read as separate puffs far from its fire (KB-VFX-ROOFDOTS1, vfx and scenes)
 
-- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr096.json --stills --out <folder>`: dark round puffs show
-  one by one in the haze over the casings.
-- **Cause:** the layer under a `ceiling` runs out radially with puffs of one size, so they thin as 1 / distance and no
-  longer overlap; walls hide the part that runs into them instead of turning it along the tunnel.
-- **Owed in vfx:** a layer that fills a gallery (two walls turn the jet along it) with puffs that widen as they thin.
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr096.json --stills --out <folder>`: dark round puffs
+  showed one by one in the haze over the casings.
+- **Cause:** the layer under a `ceiling` ran out radially with puffs of one size, so they thinned as 1 / distance and
+  no longer overlapped; walls only hid the part that ran into them instead of turning it along the tunnel.
+- **Fix:** `SmokeOptions.gallery` (two walls under the roof): the layer turns along the gallery both ways
+  (Delichatsios 1981) at the ceiling jet's speed where it meets the walls, fills it wall to wall and passes neither;
+  the Fauld tunnels give each fire's smoke its gallery (`fauldGallery`). Real frame: fr096's dots are one continuous
+  layer. Weak spots left: that layer reads flat black, and two round puffs show at its lower edge. Regression:
+  packages/vfx/test/smoke.test.js, packages/vfx/test/smoke-check.mjs, packages/scenes/test/fauld-tunnels.test.js.
 
 ### Fixed 2026-11-27: a fire's sparks drew white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
 
