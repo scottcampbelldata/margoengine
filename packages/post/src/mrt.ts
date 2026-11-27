@@ -57,7 +57,7 @@ export interface TargetOutput {
   /** Built-in value written. Default 'albedo' when `wgsl` is unset. */
   value?: TargetValue;
   /**
-   * WGSL expression of type `vec4f` over `t: TargetSurface` {position: vec3f, normal: vec3f, albedo: vec4f, roughness:
+   * WGSL expression of type `vec4f` (`vec4u` or `vec4i` for an integer format) over `t: TargetSurface` {position: vec3f, normal: vec3f, albedo: vec4f, roughness:
    * f32, metalness: f32, occlusion: f32, emissive: vec3f, eye: vec3f, shadow: f32, light: vec3f, subject: f32, ground:
    * f32}, all world space: `vec4f(t.normal.y, 0, 0, 1)`. `shadow` is the sun's visibility (1 lit, 0 hidden), `light`
    * the unit direction toward the sun, `subject` 1 on models added with `{subject: true}`, `ground` 0 on models added
@@ -65,16 +65,25 @@ export interface TargetOutput {
    */
   wgsl?: string;
   /**
-   * A float or normalised colour format. Default 'rgba8unorm' for albedo, 'r32float' for distance, 'rgba16float'
-   * otherwise. 32-bit float targets filter only with `float32-filterable`; read them with `textureLoad`.
+   * A colour format: float, normalised, or unsigned or signed integer (`r8uint` to `rgba32sint`, `rgb10a2uint`).
+   * Default 'rgba8unorm' for albedo, 'r32float' for distance, 'rgba16float' otherwise. An integer format needs `wgsl`,
+   * an expression of type `vec4u` (`uint`) or `vec4i` (`sint`), because the built-in values are floats:
+   * `{wgsl: 'vec4u(u32(t.subject), 0u, 0u, 0u)', format: 'r8uint'}`; read it as `texture_2d<u32>` (`<i32>`) with
+   * `textureLoad`. 32-bit float targets filter only with `float32-filterable`; read them with `textureLoad` too.
    */
   format?: GPUTextureFormat;
-  /** Clear value where nothing is drawn. Default transparent black. */
+  /**
+   * Clear value where nothing is drawn. Default transparent black. An integer format takes whole numbers inside its
+   * range (`r8uint` 0 to 255, `r16sint` -32768 to 32767).
+   */
   clear?: GPUColor;
 }
 /** Options for {@link SceneTargets}. */
 export interface SceneTargetsOptions {
-  /** Named outputs, 1 to 7, in attachment order: a built-in value name or a {@link TargetOutput}. */
+  /**
+   * Named outputs, 1 to 7, in attachment order: a built-in value name or a {@link TargetOutput}. Together they must fit
+   * the device's `maxColorAttachmentBytesPerSample` (32 by default; `rgba8unorm` and `rgba16float` cost 8 each).
+   */
   outputs: Readonly<Record<string, TargetValue | TargetOutput>>;
   /**
    * Frame-graph order of the targets pass. Default -4.5: after the passes at -5 that change core's shader and draw
@@ -132,8 +141,44 @@ const frameLight = (code: string): string | undefined => {
   return /(^|,)\s*sun:vec4f/.test(fields) ? 'frame.sun.xyz' : undefined;
 };
 const identifier = /^[A-Za-z][A-Za-z0-9_]*$/;
-// Integer and depth formats would need other WGSL output types; colour-renderable float and unorm formats only.
+// Colour-renderable formats: float and unorm outputs are vec4f, integer ones vec4u or vec4i (a WGSL fragment output
+// matches its target's sample type). Depth and snorm formats are left out.
 const floatFormat = /^(r|rg|rgba|bgra)(8unorm|8unorm-srgb|16float|32float)$|^rgb10a2unorm$|^rg11b10ufloat$/;
+const integerFormat = /^(r|rg|rgba)(8|16|32)(uint|sint)$|^rgb10a2uint$/;
+const outputType = (format: string): 'vec4f' | 'vec4u' | 'vec4i' =>
+  format.endsWith('uint') ? 'vec4u' : format.endsWith('sint') ? 'vec4i' : 'vec4f';
+const members = (formats: readonly string[]): string =>
+  formats.map((format, i) => `@location(${i}) o${i}:${outputType(format)}`).join(',');
+const channelCount = (format: string): number =>
+  format.startsWith('rgb') || format.startsWith('bgra') ? 4 : format.startsWith('rg') ? 2 : 1;
+/** Throws unless an integer target's `clear` holds whole numbers inside the range of each of its channels. */
+const checkClear = (name: string, format: string, clear: GPUColor): void => {
+  const dict = clear as GPUColorDict,
+    values = Symbol.iterator in Object(clear) ? [...(clear as Iterable<number>)] : [dict.r, dict.g, dict.b, dict.a],
+    signed = format.endsWith('sint');
+  for (let i = 0; i < channelCount(format); i++) {
+    const bits = format === 'rgb10a2uint' ? (i < 3 ? 10 : 2) : Number(/\d+/.exec(format)![0]),
+      low = signed ? -(2 ** (bits - 1)) : 0,
+      high = 2 ** (signed ? bits - 1 : bits) - 1,
+      value = values[i]!;
+    if (!Number.isInteger(value) || value < low || value > high)
+      throw new RangeError(
+        `SceneTargets output '${name}' clear value ${value} does not fit ${format}; use a whole number from ${low} to ${high}`,
+      );
+  }
+};
+/**
+ * Bytes one sample of the attachments counts against `maxColorAttachmentBytesPerSample` (WebGPU, "Texture Format
+ * Capabilities"): each format's render target pixel byte cost, placed at its component alignment, in attachment order.
+ * 8-bit unorm RGBA and BGRA and the packed formats cost 8.
+ */
+const bytesPerSample = (formats: readonly string[]): number =>
+  formats.reduce((offset, format) => {
+    const packed = format === 'rg11b10ufloat' || format.startsWith('rgb10a2'),
+      align = packed ? 4 : Number(/\d+/.exec(format)![0]) / 8,
+      cost = packed || /^(rgba|bgra)8unorm/.test(format) ? 8 : channelCount(format) * align;
+    return Math.ceil(offset / align) * align + cost;
+  }, 0);
 
 /**
  * Multiple render targets with named outputs: one pass draws the scene's surfaces into a texture per output, plus a
@@ -202,17 +247,24 @@ export class SceneTargets implements EnginePlugin {
         throw new TypeError(`SceneTargets output '${name}' wgsl must be a WGSL vec4f expression over t`);
       const [expression, format] = values[output.value ?? 'albedo'],
         chosen = output.format ?? (output.wgsl ? 'rgba16float' : format);
-      if (!floatFormat.test(chosen))
+      const integer = integerFormat.test(chosen);
+      if (!integer && !floatFormat.test(chosen))
         throw new TypeError(
-          `SceneTargets output '${name}' format '${chosen}' is not a float or unorm colour format; use rgba16float or rgba8unorm`,
+          `SceneTargets output '${name}' format '${chosen}' is not a float, unorm or integer colour format; use rgba16float, rgba8unorm or r32uint`,
         );
+      if (integer && !output.wgsl)
+        throw new TypeError(
+          `SceneTargets output '${name}' format '${chosen}' needs wgsl of type ${outputType(chosen)}; the built-in values are floats`,
+        );
+      const clear = output.clear ?? { r: 0, g: 0, b: 0, a: 0 };
+      if (integer) checkClear(name, chosen, clear);
       this.formats.push(chosen);
-      this.clears.push(output.clear ?? { r: 0, g: 0, b: 0, a: 0 });
-      lines.push(`o.o${i}=vec4f(${output.wgsl ?? expression});`);
+      this.clears.push(clear);
+      lines.push(`o.o${i}=${outputType(chosen)}(${output.wgsl ?? expression});`);
     });
     this.code =
       surface +
-      `struct MargoCapture {${this.formats.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\n` +
+      `struct MargoCapture {${members(this.formats)}}\n` +
       `fn margoTargets(t:TargetSurface)->MargoCapture {var o:MargoCapture;${lines.join('')}return o;}\n`;
     this.hookSet = [this.makeHook(0, 1), this.makeHook(0, 0), this.makeHook(1, 1), this.makeHook(1, 0)];
   }
@@ -233,7 +285,7 @@ export class SceneTargets implements EnginePlugin {
           else if (light)
             // Terrain returns `margoSSR(n, v, base, metal, rough)` as a MargoSSR: the same outputs under that name.
             capture =
-              `struct MargoSSR {${this.formats.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\n` +
+              `struct MargoSSR {${members(this.formats)}}\n` +
               `fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {_=v;let o=margoTargets(TargetSurface(margoPosition,n,vec4f(base,1),rough,metal,1.0,vec3f(0),frame.eye.xyz,${sunVisibility(code, 'margoPosition', 'n')},${light},${flag}));return MargoSSR(${fields});}\n`;
           else
             throw margoError(
@@ -316,6 +368,18 @@ export class SceneTargets implements EnginePlugin {
       throw margoError(
         'unsupported',
         'SceneTargets needs WebGPU; create the engine with webgpu; see https://margoengine.com/errors#webgpu',
+      );
+    if (this.formats.includes('rg11b10ufloat') && !engine.gpu.features?.has('rg11b10ufloat-renderable'))
+      throw margoError(
+        'unsupported',
+        "SceneTargets cannot draw into rg11b10ufloat on this device; create the engine with features: ['rg11b10ufloat-renderable'], or use rgba16float",
+      );
+    const bytes = bytesPerSample(this.formats),
+      limit = engine.gpu.limits?.maxColorAttachmentBytesPerSample ?? 32;
+    if (bytes > limit)
+      throw margoError(
+        'unsupported',
+        `SceneTargets outputs take ${bytes} bytes per sample and this device allows ${limit}; pass fewer outputs or smaller formats, or use a second SceneTargets`,
       );
     this.engine = engine;
     this.device = engine.gpu;

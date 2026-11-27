@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21085684,
+  "total": 21089563,
   "history": [
     {
       "date": "2026-10-24",
@@ -14881,6 +14881,12 @@
       "commit": "e750b057",
       "reason": "gltf progressive worker +672 B (18,196 to 18,868 gzip): it streams Draco files (each primitive's decode asked of the main thread) and meshopt files in place of falling back to a whole load; a split would add a second worker file and request for every progressive load",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "702e74bf55",
+      "reason": "SceneTargets integer colour formats (three.js parity row 19): mrt 4,539 to 5,149 gzip, and depth, pixelate, curvature and depth-downsample that include it grow 571 to 608 B: uint and sint outputs, clear range checks and the bytes-per-sample and rg11b10ufloat errors in place of GPU validation failures; a split would put the format checks behind an import() every SceneTargets needs at construction",
+      "grew": 5
     }
   ],
   "items": {
@@ -15826,10 +15832,10 @@
     "@margoengine/post/caustics": 11426,
     "@margoengine/post/color-average": 8292,
     "@margoengine/post/contact-shadows": 7616,
-    "@margoengine/post/curvature": 10677,
+    "@margoengine/post/curvature": 11493,
     "@margoengine/post/decals": 5524,
-    "@margoengine/post/depth": 4763,
-    "@margoengine/post/depth-downsample": 7026,
+    "@margoengine/post/depth": 5520,
+    "@margoengine/post/depth-downsample": 7768,
     "@margoengine/post/filter-graph": 13850,
     "@margoengine/post/fxaa": 4890,
     "@margoengine/post/glitch": 7455,
@@ -15845,10 +15851,10 @@
     "@margoengine/post/material-decals": 9819,
     "@margoengine/post/mesh-blend": 10741,
     "@margoengine/post/motion-blur": 8989,
-    "@margoengine/post/mrt": 4647,
+    "@margoengine/post/mrt": 5405,
     "@margoengine/post/outline": 7282,
     "@margoengine/post/overlays": 11128,
-    "@margoengine/post/pixelate": 10491,
+    "@margoengine/post/pixelate": 11297,
     "@margoengine/post/render-graph": 8004,
     "@margoengine/post/rt-gi": 16063,
     "@margoengine/post/rt-reflections": 16807,

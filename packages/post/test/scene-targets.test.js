@@ -116,7 +116,14 @@ test('SceneTargets checks its outputs and names the fix', () => {
     RangeError,
   );
   assert.throws(() => new SceneTargets({ outputs: { a: 'colour' } }), { message: /unknown; use albedo/ });
-  assert.throws(() => new SceneTargets({ outputs: { a: { format: 'r32uint' } } }), { message: /float or unorm/ });
+  assert.throws(() => new SceneTargets({ outputs: { a: { format: 'r32uint' } } }), {
+    message: /needs wgsl of type vec4u/,
+  });
+  assert.throws(() => new SceneTargets({ outputs: { a: { value: 'subject', format: 'rg16sint' } } }), {
+    message: /needs wgsl of type vec4i/,
+  });
+  for (const format of ['depth32float', 'rgba8snorm'])
+    assert.throws(() => new SceneTargets({ outputs: { a: { format } } }), { message: /float, unorm or integer/ });
   assert.throws(() => new SceneTargets({ outputs: { 'two words': 'albedo' } }), TypeError);
   assert.throws(() => new SceneTargets({ outputs: { a: { wgsl: '' } } }), TypeError);
   assert.throws(() => new SceneTargets({ outputs: { a: 'albedo' }, order: Number.NaN }), TypeError);
@@ -357,4 +364,95 @@ test('SceneTargets.add {ground: false}: plants hide the ground and are not groun
   assert.match(plant.hooks[0].declarations(core), /frame\.light\.xyz,0\.0,1\.0\)\);/);
   assert.throws(() => targets.add(soil, { ground: 'no' }), TypeError);
   targets.dispose();
+});
+
+const ids = {
+  id: { wgsl: 'vec4u(u32(t.subject), 7u, 0u, 0u)', format: 'rg32uint' },
+  side: { wgsl: 'vec4i(i32(sign(t.normal.x)), 0, 0, 0)', format: 'r16sint', clear: [-1, 0, 0, 0] },
+  colour: 'albedo',
+};
+
+test('SceneTargets integer formats write vec4u and vec4i outputs in every capture shader', () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, { outputs: ids }),
+    log = h.gpu.record(() => h.frame([])),
+    replay = modules(log).find((code) => code.includes('fn margoTargets('));
+  const members = /@location\(0\) o0:vec4u,@location\(1\) o1:vec4i,@location\(2\) o2:vec4f\}/;
+  assert.match(replay, new RegExp('struct MargoCapture \{' + members.source));
+  assert.match(replay, /o\.o0=vec4u\(vec4u\(u32\(t\.subject\), 7u, 0u, 0u\)\);/);
+  assert.match(replay, /o\.o1=vec4i\(vec4i\(i32\(sign\(t\.normal\.x\)\), 0, 0, 0\)\);/);
+  assert.match(replay, /o\.o2=vec4f\(t\.albedo\);/);
+  const pipeline = log.find((e) => e[0] === 'renderPipeline' && e[2].fragment?.targets?.length === 3)[2];
+  assert.deepEqual(
+    pipeline.fragment.targets.map((t) => t.format),
+    ['rg32uint', 'r16sint', 'rgba8unorm'],
+  );
+  const hooks = [];
+  targets.add({
+    setCapture(hook) {
+      hooks.push(hook);
+      return () => {};
+    },
+    onDispose: () => () => {},
+    draw() {},
+  });
+  assert.match(
+    hooks[0].declarations('struct Surface {base:vec4f}'),
+    new RegExp('struct MargoCapture \{' + members.source),
+  );
+  assert.match(
+    hooks[0].declarations('struct Frame { camera:mat4x4f,eye:vec4f,light:vec4f }'),
+    new RegExp('struct MargoSSR \{' + members.source),
+  );
+  targets.dispose();
+});
+
+test('SceneTargets integer clear values are whole numbers inside the format range', () => {
+  const make = (format, clear) =>
+    new SceneTargets({ outputs: { a: { wgsl: format.endsWith('uint') ? 'vec4u()' : 'vec4i()', format, clear } } });
+  make('r8uint', [255, -9, 0.5, 0]); // channels the format lacks are not read
+  make('rgba16sint', { r: -32768, g: 32767, b: 0, a: 0 });
+  make('rgb10a2uint', [1023, 1023, 1023, 3]);
+  make('rgba32uint', [4294967295, 0, 0, 0]);
+  for (const [format, clear] of [
+    ['r8uint', [256, 0, 0, 0]],
+    ['r8uint', [-1, 0, 0, 0]],
+    ['rg8sint', [0, 128, 0, 0]],
+    ['r32uint', { r: 1.5, g: 0, b: 0, a: 0 }],
+    ['rgb10a2uint', [0, 0, 0, 4]],
+  ])
+    assert.throws(() => make(format, clear), { name: 'RangeError', message: /does not fit/ }, format);
+});
+
+test('SceneTargets refuses outputs over maxColorAttachmentBytesPerSample and names the sizes', () => {
+  // WebGPU render target pixel byte costs: rgba8unorm 8, each rgba16float 8, r32float 4.
+  const five = { a: 'albedo', n: 'normal', p: 'position', e: 'emissive', m: 'material' };
+  assert.throws(() => SceneTargets.attach(harness().engine, { outputs: five }), {
+    code: 'unsupported',
+    message: /take 40 bytes per sample and this device allows 32/,
+  });
+  // r8uint at 0, rgba32uint aligned up to 4 (16 bytes), rg16uint 4: 24.
+  const packed = {
+    a: { wgsl: 'vec4u()', format: 'r8uint' },
+    b: { wgsl: 'vec4u()', format: 'rgba32uint' },
+    c: { wgsl: 'vec4u()', format: 'rg16uint' },
+    d: 'albedo',
+  };
+  SceneTargets.attach(harness().engine, { outputs: packed }).dispose();
+  const roomy = harness();
+  roomy.engine.gpu.limits.maxColorAttachmentBytesPerSample = 64;
+  SceneTargets.attach(roomy.engine, { outputs: five }).dispose();
+});
+
+test('SceneTargets asks for rg11b10ufloat-renderable before drawing into rg11b10ufloat', () => {
+  const outputs = { hdr: { value: 'emissive', format: 'rg11b10ufloat' } },
+    plain = harness();
+  plain.engine.gpu.features = new Set();
+  assert.throws(() => SceneTargets.attach(plain.engine, { outputs }), {
+    code: 'unsupported',
+    message: /features: \['rg11b10ufloat-renderable'\]/,
+  });
+  const able = harness();
+  able.engine.gpu.features = new Set(['rg11b10ufloat-renderable']);
+  SceneTargets.attach(able.engine, { outputs }).dispose();
 });

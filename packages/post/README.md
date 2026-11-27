@@ -1297,7 +1297,7 @@ lens.options.dirt = (device: GPUDevice) => {  // your own dirt image, made once 
 `@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in
 value (`albedo`, `normal` (world), `position` (world), `distance` (from the camera), `emissive`, `material`
 (roughness, metalness, occlusion)) or your WGSL `vec4f` expression over `t: TargetSurface` (the same values, all world
-space), with its own float or normalised colour format. Core meshes always draw (a replay of core's shader with the
+space), with its own float, normalised or integer colour format. Core meshes always draw (a replay of core's shader with the
 lighting left out); add gltf/pbr models, materials meshes and a `Terrain` with `targets.add(model)` so their own maps,
 skinning and instances write the outputs, a lit `Scatter` with `targets.add(scatter, {ground: false})` and a `Water` the same way (`@margoengine/water`). The pass runs after the passes at -5 that change core's shader and draw
 shadow maps (`Shadows`, sections), whatever order they were attached in, and before the main pass (`order: -4.5` by
@@ -1332,6 +1332,43 @@ const targets = SceneTargets.attach(engine, {
   },
 });
 targets.onResize(() => console.log(targets.texture('normal')?.width));
+```
+
+Integer outputs. Any colour-renderable `uint` or `sint` format (`r8uint` to `rgba32sint`, `rgb10a2uint`) takes
+`wgsl` of type `vec4u` or `vec4i`; the built-in values are floats and need a float or normalised format. Its `clear`
+takes whole numbers inside the format's range (default 0). Read the texture as `texture_2d<u32>` or
+`texture_2d<i32>` with `textureLoad`; integer textures cannot be filtered. Checked on a real GPU, WebGPU and the
+WebGL2 layer, by `test/scene-targets-integer-browser.mjs`: `r32uint`, `rg16sint` and `rgba8uint` outputs of a core
+floor, a materials mesh and a water read back exact on every pixel, clear values included.
+
+The outputs together must fit the device's `maxColorAttachmentBytesPerSample`, 32 on a default device. WebGPU counts
+8 bytes for `rgba8unorm`, `bgra8unorm` and the `rgb10a2` formats and `rg11b10ufloat`, otherwise a format's own size,
+each placed at its component size: four `rgba16float` outputs fill it. `attach` throws `unsupported` with the total
+when they do not fit; pass smaller formats or use a second `SceneTargets`. `rg11b10ufloat` also needs the engine
+created with `features: ['rg11b10ufloat-renderable']`. Sources: W3C, "WebGPU", Texture Format Capabilities
+(<https://www.w3.org/TR/webgpu/#texture-format-caps>); W3C, "WebGPU Shading Language", fragment outputs
+(<https://www.w3.org/TR/WGSL/>); C. Burns and W. Hunt, "The Visibility Buffer: A Cache-Friendly Approach to Deferred
+Shading", JCGT 2(2), 2013 (<https://jcgt.org/published/0002/02/04/>), an integer id target in use.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { SceneTargets } from 'margoengine/post/mrt';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const targets = SceneTargets.attach(engine, {
+  outputs: {
+    colour: 'albedo',
+    // 1 core meshes, 2 the subject, 3 models added as not ground; 0 where nothing is drawn.
+    kind: {
+      wgsl: 'vec4u(select(select(1u, 2u, t.subject > 0.5), 3u, t.ground < 0.5), 0u, 0u, 0u)',
+      format: 'r8uint',
+    },
+    // Height in centimetres, -32768 where nothing is drawn.
+    height: { wgsl: 'vec4i(i32(t.position.y * 100.0), 0, 0, 0)', format: 'r16sint', clear: [-32768, 0, 0, 0] },
+  },
+});
+targets.onResize(() => console.log(targets.texture('kind')?.format));
+engine.start();
 ```
 
 The look masks of a shot (`tools/shot`, docs/shots.md) from the sun's shadow and a subject model:
