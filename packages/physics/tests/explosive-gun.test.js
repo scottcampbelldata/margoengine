@@ -26,18 +26,28 @@ const cordite = [
   55.86, 63.33,
 ];
 
-test("the Noble-Abel gas gives Noble and Abel's closed-vessel pressures: pebble powder within 5 %, cordite within 14 %", () => {
-  density.forEach((g, i) => {
-    const p = closedVesselPressure(PROPELLANTS.pebblePowder, g * 1000) / TON;
-    assert.ok(Math.abs(p / pebble[i] - 1) < 0.05, `pebble powder at ${g}: ${p} against ${pebble[i]}`);
-    const c = closedVesselPressure(PROPELLANTS.cordite, g * 1000) / TON;
-    // The lowest densities lose the most heat to the vessel's walls; from 0.08 up the fit is within 8 %.
-    assert.ok(Math.abs(c / cordite[i] - 1) < (g < 0.08 ? 0.14 : 0.08), `cordite at ${g}: ${c} against ${cordite[i]}`);
-  });
+test("the Noble-Abel gas fitted on half of Noble and Abel's closed-vessel pressures gives the other half within the fit's scatter", () => {
+  // The constants were fitted (least squares of Delta / p against Delta) on the even rows only; the odd rows are held out.
+  for (const [propellant, measured] of [
+    [PROPELLANTS.pebblePowder, pebble],
+    [PROPELLANTS.cordite, cordite],
+  ]) {
+    const error = (i) => closedVesselPressure(propellant, density[i] * 1000) / TON / measured[i] - 1;
+    const fit = density.map((_, i) => i).filter((i) => i % 2 === 0);
+    const held = density.map((_, i) => i).filter((i) => i % 2 === 1);
+    const rms = (rows) => Math.sqrt(rows.reduce((a, i) => a + error(i) ** 2, 0) / rows.length);
+    const scatter = rms(fit);
+    assert.ok(rms(held) < 1.5 * scatter, `${propellant.name}: held-out rms ${rms(held)} against the fit's ${scatter}`);
+    for (const i of held)
+      assert.ok(
+        Math.abs(error(i)) < 3 * scatter,
+        `${propellant.name} at ${density[i]}: ${error(i)}, scatter ${scatter}`,
+      );
+  }
   // Cordite's force against its gas, measured apart: 700 cc a gram at 0 C and 760 mm, at 4758 K, is R T0 = 1.24 MJ/kg.
   const measured = (101325 * 0.7 * 4758) / 273;
   assert.ok(Math.abs(PROPELLANTS.cordite.force / measured - 1) < 0.2, `force ${PROPELLANTS.cordite.force}`);
-  assert.throws(() => closedVesselPressure(PROPELLANTS.cordite, 2 / PROPELLANTS.cordite.covolume), /covolume/);
+  assert.throws(() => closedVesselPressure(PROPELLANTS.cordite, 2 / PROPELLANTS.cordite.covolume), coded);
 });
 
 // The 6-in. gun: 13 lb 4 oz of size 30 cordite in a 730 cubic inch chamber, 6100 cubic inches of bore, a 100 lb shot, and
@@ -51,7 +61,7 @@ const sixInch = {
   web: 0.15 * IN,
 };
 
-test("the 6-in. gun: cordite's burning rate gives its 2150 ft/s, and the peak pressure is 2 to 3 times the mean as measured", () => {
+test("the 6-in. gun: cordite's burning rate is calibrated to its 2150 ft/s, and the peak pressure is 2 to 3 times the mean as measured", () => {
   const fired = fireGun(sixInch);
   assert.ok(
     Math.abs(fired.muzzleVelocity / FT / 2150 - 1) < 0.005,
@@ -67,6 +77,34 @@ test("the 6-in. gun: cordite's burning rate gives its 2150 ft/s, and the peak pr
   const low = fireGun({ ...sixInch, ignitionPressure: 1e6 }).muzzleVelocity,
     high = fireGun({ ...sixInch, ignitionPressure: 1e7 }).muzzleVelocity;
   assert.ok(Math.abs(high / low - 1) < 0.01, `${low} against ${high}`);
+});
+
+test("calibrated on the 6-in. gun, cordite predicts Noble's 100-calibre gun: other charges, other cord sizes, 46.6 ft of travel", () => {
+  // Ingalls, "Interior Ballistics" (1912), chapter V: Noble's six-inch Elswick gun, 100 lb shot, densities of loading 0.40,
+  // 0.44 and 0.55 (a 1386.5 cubic inch chamber), muzzle at 46.6 ft. Crusher pressures in lb/in^2; Ingalls calls the 0".35
+  // round's pressure "certainly erroneous", so only its velocity is checked.
+  const PSI = 6894.757;
+  const gun = (charge, web) => ({
+    bore: 6 * IN,
+    travel: 46.6 * FT,
+    chamber: 1386.5 * IN ** 3,
+    shotMass: 100 * LB,
+    charge: charge * LB,
+    web: web * IN,
+  });
+  for (const [charge, diameter, velocity, pressure] of [
+    [20, 0.3, 2914, 36960],
+    [22, 0.35, 2915, null],
+    [27.5, 0.4, 3284, 47040],
+  ]) {
+    const fired = fireGun(gun(charge, diameter / 2));
+    const v = fired.muzzleVelocity / FT;
+    assert.ok(Math.abs(v / velocity - 1) < 0.05, `${diameter}" cordite: ${v} ft/s against ${velocity}`);
+    if (pressure !== null) {
+      const p = fired.peakBreech / PSI;
+      assert.ok(Math.abs(p / pressure - 1) < 0.1, `${diameter}" cordite: ${p} lb/in^2 against ${pressure}`);
+    }
+  }
 });
 
 test('the gun recoils with exactly the momentum the shot and the gas carry, and every joule of the charge is accounted', () => {

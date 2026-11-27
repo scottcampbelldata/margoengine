@@ -20,14 +20,19 @@
 // losses are carried one by one), and the 6-in. gun firing used to calibrate cordite's burning rate and to validate the peak
 // pressure; A. Noble and F. A. Abel, "Researches on explosives. Fired
 // gunpowder", Phil. Trans. R. Soc. 165, 1875 (through that article); C. Corner, "Theory of the Interior Ballistics of
-// Guns", 1950, for the lumped model's shape (known through its standard restatements, not read); J. D. Anderson, "Modern
+// Guns", 1950, for the lumped model's shape (known through its standard restatements, not read); J. M. Ingalls, "Interior
+// Ballistics", 1912, chapter V, for Noble's measured firings of a 100-calibre six-inch gun with 0.3, 0.35 and 0.4 in.
+// cordite, which validate the burning rate calibrated on the 6-in. gun; J. D. Anderson, "Modern
 // Compressible Flow", for the choked nozzle.
 import { invalidExplosive } from './errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { pow } from '@margoengine/math/pinned';
 
-/** Cordite's burning rate coefficient, m/s per Pa, calibrated so the 1911 article's 6-in. gun fires at 2150 ft/s. */
-const CORDITE_BURN_RATE = 2.4295e-9;
+/**
+ * Cordite's burning rate coefficient, m/s per Pa, calibrated so the 1911 article's 6-in. gun fires at 2150 ft/s, and checked
+ * on Noble's 100-calibre gun (tests/explosive-gun.test.js).
+ */
+const CORDITE_BURN_RATE = 2.474e-9;
 
 /** A propellant: its Noble-Abel gas, its burning law and its solid density. */
 export interface Propellant {
@@ -47,23 +52,24 @@ export interface Propellant {
 }
 
 /**
- * Propellants with Noble-Abel constants fitted to Noble and Abel's closed-vessel pressures (1911 Britannica, Table 1,
- * 21 densities of loading from 0.05 to 0.6 each). Pebble powder's fit is within 5 % of every measurement, cordite's within
- * 14 % (8 % from a density of loading of 0.08 up; the lowest densities lose the most heat to the vessel). Cordite's burning
- * rate is calibrated to the 1911 article's 6-in. gun (2150 ft/s); pebble powder's was not measured there, so give one.
- * The solid densities are assumptions (a double-base propellant's 1560 kg/m^3; a black powder's 1700 kg/m^3).
+ * Propellants with Noble-Abel constants fitted to half of Noble and Abel's closed-vessel pressures (1911 Britannica, Table 1:
+ * the even rows of 21 densities of loading from 0.05 to 0.6) and tested on the other half: pebble powder's held-out rows
+ * within 2.3 %, cordite's within 7.5 % (the lowest densities lose the most heat to the vessel). Cordite's burning rate is
+ * calibrated to the 1911 article's 6-in. gun (2150 ft/s) and checked on Noble's 100-calibre six-inch gun (Ingalls 1912):
+ * three other charges and cord sizes, muzzle velocities within 3.5 %. Pebble powder's burning rate was not measured there,
+ * so give one. The solid densities are assumptions (a double-base propellant's 1560 kg/m^3; a black powder's 1700 kg/m^3).
  */
 export const PROPELLANTS = {
   cordite: {
     name: 'cordite',
-    force: 1.0158e6,
-    covolume: 6.982e-4,
+    force: 1.0069e6,
+    covolume: 7.0719e-4,
     gamma: 1.2,
     density: 1560,
     burnRate: CORDITE_BURN_RATE,
     pressureIndex: 1,
   },
-  pebblePowder: { name: 'pebble powder', force: 2.539e5, covolume: 6.067e-4, gamma: 1.2, density: 1700 },
+  pebblePowder: { name: 'pebble powder', force: 2.5388e5, covolume: 5.9677e-4, gamma: 1.2, density: 1700 },
 } as const satisfies Record<string, Propellant>;
 
 /**
