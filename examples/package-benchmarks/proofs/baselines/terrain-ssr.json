@@ -1,8 +1,8 @@
 {
  "proof": "terrain-ssr",
- "ref": "e2177dc6e5",
- "revision": "e2177dc6e50e2fce0f654da781dc7c8d495f6c56",
- "capturedAt": "67f268eb9f31c955b1de04d966c63ca6c5e4a3d8",
+ "ref": "cd69a365b6",
+ "revision": "cd69a365b6e51a2011213a3e8926d8e8bd4765df",
+ "capturedAt": "4515ae8698f98cdacea8ff7b642ee4688fb340d7",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
@@ -11,8 +11,8 @@
   "clipmapGrid 64": "c48812e0208b49132b2fb944d63fdc96fd76cd532cf782389875e21b6078a415",
   "clipmapGrid 128": "71fac6941aeedbf69839aa59b264d01b8c6e3b7d2fcf9f483aa96781a291227a",
   "clipmapGrid 256": "02e385168df28404482337aea803bb22a1d2a5570c9eeac28231ebd5bda79efc",
-  "script {}": "71db46b823402e1c05bb0b1b7e662c5cde38e542bed7b8d222403272326a401e",
-  "script {\"normalmap\":true,\"terrain\":{\"origin\":[-2048,512.5],\"resolution\":32,\"levels\":3,\"cellSize\":0.5,\"heightScale\":250,\"heightOffset\":-20}}": "9d3ebbaca581c7ee6198ce0e0a5377e5b2083333723aa7a60599fd3c5692d6e4",
-  "script {\"terrain\":{\"levels\":12,\"resolution\":8}}": "e9bef5c1ec23d12e0356b1c751aa3bcff7b1c8adedb5f51428d95a09ab9f8e13"
+  "script {}": "5feabd6fb0d2db0d4ce206a890e0faecf5e3c47ee4e4895d8ee5a955a67479aa",
+  "script {\"normalmap\":true,\"terrain\":{\"origin\":[-2048,512.5],\"resolution\":32,\"levels\":3,\"cellSize\":0.5,\"heightScale\":250,\"heightOffset\":-20}}": "7a867d87c5668045b1ed4ac483166921a9326bcee21a1da2f3d1b95e83ae2ccc",
+  "script {\"terrain\":{\"levels\":12,\"resolution\":8}}": "c8e811d8c90ca992d81d251c1e6b3b837fa52a0ac577365fd8dcaa8102e32d7e"
  }
 }
