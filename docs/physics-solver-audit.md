@@ -1295,7 +1295,7 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
 
   The longitudinal mode of a rectangular hull exposed an extra beam-sized convolution on each lateral
-  quadrature point. `7f6bd00737` removes that second beam dependence. It matches the exact end-face mode,
+  quadrature point. `0dc6e0416a` removes that second beam dependence. It matches the exact end-face mode,
   including the known bilinear scatter and depth transfer, in `coupling/seakeeping.test.js`. The same file's
   code-built and GLB-imported workboat test gives identical rise, righting, rigid trajectory, wake and replay
   for the same geometry and mass properties. The live free-motion test still closes the combined wake work
