@@ -15,6 +15,7 @@ export const demoPages = [
   'hud-preview',
   'batched-mesh',
   'buoyancy',
+  'cyprus-raft',
   'clipping-planes',
   'scene-targets',
   'depth-texture',

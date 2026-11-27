@@ -1272,6 +1272,10 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.
+  The standalone [Cyprus raft demo](../examples/cyprus-raft.html) uses a Blender-built period interpretation,
+  based on George Clark’s 1874 Great Lakes patent. The loaded asset floats on the same spectral and passing wake
+  state that Water draws. The sealed chambers and timber displacement mesh are separate from the visible grate.
+  The [asset source](../examples/assets/source/sea12/README.md) records the construction and modeled mass.
 
 **Commit and test receipts on public main**
 

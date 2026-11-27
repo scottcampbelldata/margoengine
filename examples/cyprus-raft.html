@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Great Lakes life raft · Margo Engine</title>
+  <style>
+    :root { color-scheme: dark; background: #131a1d; color: #ecf0ee; font: 17px/1.5 system-ui, sans-serif; }
+    body { margin: 0; }
+    main { width: min(1280px, calc(100% - 48px)); margin: 32px auto; }
+    h1 { margin: 0 0 6px; font-size: clamp(1.75rem, 4vw, 2.7rem); line-height: 1.15; font-weight: 630; }
+    p { margin: 0 0 18px; color: #c7d1d4; }
+    a { color: #b7dae1; }
+    .frame { position: relative; aspect-ratio: 16 / 9; background: #253135; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 8px; }
+    .controls label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .scrub { flex: 1 1 220px; }
+    input[type="range"] { flex: 1; min-width: 80px; accent-color: #acd2da; }
+    button, select { min-height: 36px; padding: 5px 11px; border: 1px solid #53636b; border-radius: 5px; color: inherit; background: #20292d; font: inherit; }
+    button:not(:disabled), select:not(:disabled) { cursor: pointer; }
+    output { font-variant-numeric: tabular-nums; }
+    #elapsed { min-width: 5ch; }
+    #status { margin: 8px 0 0; }
+    #status:empty { display: none; }
+    [data-capture] main { width: 100%; margin: 0; }
+    [data-capture] .frame { width: 100%; height: 100dvh; aspect-ratio: auto; }
+    [data-capture] header, [data-capture] .controls, [data-capture] .readout { display: none; }
+    [data-capture] #status:not(:empty) { position: absolute; inset: 16px auto auto 16px; }
+    @media (max-width: 640px) { main { width: calc(100% - 24px); margin: 16px auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Great Lakes life raft</h1>
+      <p>A modeled lake trial with an empty reversible raft. Period reference: <a href="https://americanhistory.si.edu/collections/object/nmah_843796">George Clark’s 1874 patent model</a>.</p>
+    </header>
+    <div class="frame">
+      <canvas id="viewport" aria-label="A wooden life raft rolling and rising on a lake"></canvas>
+      <p id="status" data-webgpu-status role="status">Loading the raft and lake…</p>
+    </div>
+    <div class="controls">
+      <button id="play" type="button" disabled>Play</button>
+      <button id="reset" type="button" disabled>Reset</button>
+      <label class="scrub" for="time">Time <input id="time" type="range" min="0" max="720" value="0" disabled></label>
+      <output id="elapsed" for="time">0.00 s</output>
+      <label for="lighting">Lighting
+        <select id="lighting" disabled>
+          <option value="overcast">Overcast</option>
+          <option value="bright">Bright</option>
+          <option value="night">Night</option>
+        </select>
+      </label>
+    </div>
+    <p class="readout"><output id="measurement"></output></p>
+  </main>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    if (new URLSearchParams(location.search).has('qa')) document.documentElement.dataset.capture = '';
+    if (await needsWebGPU('#viewport')) await import('./cyprus-raft.ts');
+  </script>
+</body>
+</html>
