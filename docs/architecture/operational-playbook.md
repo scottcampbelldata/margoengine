@@ -9877,6 +9877,14 @@ shaded against 0.99999 lit, the frame darker inside the shaded mask, 1 everywher
 tools/shot/test/look-masks-check.mjs (every mask check runs on a real shot). Missing: local lights' shadows in the
 visibility, core meshes as the subject.
 
+**T6 reads the masks' interiors (KB-LOOK-TV-BOUNCE1, 2026-11-26).** The masks are a sharp capture; the frame is resolved
+from supersamples with motion blur, depth of field and bloom, so a pixel on a mask's edge holds both sides. `bounce` and
+`shadowTint` (`@margoengine/headless/look`) average each ground mask's interior, `GROUND_INSET` (1/360 of the frame's
+shorter side, 3 pixels at 1080p) in from every edge; bounds unchanged. Evidence: the calm rail-line shot read bounce 146.5
+percent with the edges and 15.0 without (the lights give 19 on level soil); headless tests/look-clean.test.js holds
+blurred 9-pixel shadow strips to their sharp value. Missing: the same inset for `grain` in the penumbra band, whose
+one-pixel interior may be too thin at 1080p (KB-LOOK-TV-PENUMBRA2).
+
 **Plants in the masks (KB-LOOK-MASKOCCLUDE1, 2026-11-26).** A lit `Scatter` (`@margoengine/scatter`, the `material`
 option) is a capture model: `setCapture`/`draw(c, 'capture')` draw this frame's three LOD rings (the main camera's culled
 set, as `drawShadow`) into the hook's pass with the colour pass's own lit stage (vertex, wind, LOD dither, blade normal,

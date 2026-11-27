@@ -6,6 +6,72 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: `bounce` and `shadowTint` averaged the ground masks' edge pixels, where the frame mixes lit and shadowed ground (KB-LOOK-TV-BOUNCE1, headless)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-rail-line.json --once --seconds 1.1 --out <dir>`
+  with `page.query` `{"weather": "calm"}`: bounce 146.5 percent early and 117.7 mid (bound 10 to 35), shadowed ground
+  brighter than lit ground under a full sun. The default (blowup) shot read 114.6 and 130.3.
+- **Cause:** the shaded-ground mask of that shot is mostly strips a few pixels wide between plants and trunks. The
+  masks come from a sharp capture, while the frame is resolved from 2 x 2 supersamples with 8-subframe motion blur,
+  depth of field and bloom, so a strip's edge pixels hold the lit ground's light (mixed pixels: P. Fisher, "The pixel:
+  a snare and a delusion", Int. J. Remote Sensing 18(3), 679-685, 1997, https://doi.org/10.1080/014311697219015).
+  `bounce` and `shadowTint` averaged every mask pixel. Split by mask erosion on the calm early probe: 146.5 percent with
+  the edges, 45.1 with one pixel off, 17.2 with two, 15.0 with three and 15.1 with four, and divided by the captured
+  albedo the same; the scene's lights (sun 3.21 at 29.5 degrees up, ambient 0.1) give 19 percent on level soil. The
+  terrain shading was right; the measure was not.
+- **Fix:** `meanLab` in `packages/headless/src/look.ts` averages each ground mask's interior, `GROUND_INSET` (1/360 of
+  the frame's shorter side: 3 pixels at 1080p, 1 at 360p) in from every edge, as `grain` and `speckle` already read
+  their masks' interiors. The bound is unchanged. Rail-line shot after the fix: calm reads bounce 15.0 and 25.1 percent
+  and shadowTint 19.1 and 17.5 b* (pass); blowup see KB-LOOK-TV-PALL1.
+- **Regression:** `packages/headless/tests/look-clean.test.js`, "T6 bounce and shadowTint read the ground masks inside
+  their edges": 9-pixel shadow strips under a 5 x 5 blur read 31.6 percent before the fix against 23.6 sharp, and the
+  same 23.6 after it.
+
+### Open 2026-11-26: under the blowup's smoke pall the rail-line ground's shadows hold 73 to 87 percent of the lit ground and are 1 to 2 b* cooler (KB-LOOK-TV-PALL1, weather, look bar; needs a maintainer decision)
+
+- **Repro:** the rail-line shot above at its default weather (blowup, 16:00), after KB-LOOK-TV-BOUNCE1: bounce 72.9
+  percent early and 86.8 mid (bound 10 to 35), shadowTint 1.91 and 1.04 b* (bound 3 or more).
+- **Cause:** the light under the pall. The scene record (`--measure`) gives a sun of intensity 0.249 and colour
+  [1, 0.30, 0.04] (3.9 percent of the calm sun's luminance) and the same white ambient 0.1, so level soil takes
+  0.0167 of its albedo from the sun and 0.1 from the sky: 86 percent in shadow, which the frame reads. A dense smoke
+  pall does this to real light: at Izana in August 2023, with aerosol optical depth 2.25 to 3.63 at 500 nm, direct
+  normal irradiance fell 72 to 99 percent and global only 21 to 27 percent (R. D. Garcia et al., "Impact of spectral
+  aerosol radiative forcing at the Izana observatory during the August 2023 extreme wildfires", Atmos. Meas. Tech. 19,
+  3151-3167, 2026, https://doi.org/10.5194/amt-19-3151-2026), so nearly all the light is diffuse and shadows fade; smoke
+  absorbs blue, so the diffuse light is not cooler than the sun's.
+- **Decision owed:** the T6 bound (10 to 35 percent, cooler shadows) describes sunlit ground. Scott decides whether a
+  shot under a smoke pall is held to it, is exempt from T6, or the blowup is lit differently. No bound was moved.
+
+### Open 2026-11-26: terrain's ambient light is a white floor, not the sky's light or `lighting.ambient` (KB-TERRAIN-SKYAMBIENT1, terrain, sky)
+
+- **Repro:** `packages/terrain/src/shader.ts`, the fragment: `linear=direct*frame.radiance.xyz*frame.light.w+base*frame.radiance.w`.
+  The terrain `Frame` has no ambient field, and `Sky.add(terrain)` throws (terrain's `addLighting` takes `shader` and
+  `bindings`, the sky gives `pbr` and `bindings`).
+- **Cause:** core meshes, gltf/pbr and materials take the sky's nine-coefficient irradiance (`skyIrradiance`) or
+  `lighting.ambient` times `radiance[3]`; terrain takes only `radiance[3]`, which the sky sets to its ambient floor
+  (0.1 in timber valley), white. Shaded ground is lit by a grey floor while a rock beside it is lit by the blue sky, so
+  ground shadows are never sky-tinted (the calm rail-line shot passes shadowTint only through the warm sun) and do not
+  follow the sky's brightness. `packages/environment/src/hemisphere.ts` says terrain takes `lighting.ambient`; it does not.
+- **Owed:** terrain takes the sky's ambient as core meshes do (a terrain lighting hook from `@margoengine/sky`, or the
+  ambient colour in terrain's frame), with a regression test on both GPU backends; then T6 is measured again on the
+  rail-line shot in both weathers.
+
+### Open 2026-11-26: the calm rail-line shot reads penumbra grain 0.92 and 0.82 (KB-LOOK-TV-PENUMBRA2, cause not yet found)
+
+- **Repro:** the rail-line shot with `{"weather": "calm"}`: penumbra 0.919 code early and 0.820 mid (bound 0.7). The
+  default blowup shot now passes (0.598 and 0.621; 0.804 early when last measured, before KB-LOOK-TV-SHIMMER1
+  bounded the plants' sway), so the blowup failure of KB-LOOK-TV-PENUMBRA1 no longer shows.
+- **Cause:** not found yet. Under the full sun the penumbra bands carry 13 times the sun the pall leaves, so any
+  movement of plant shadows or mixed edge pixels inside the band shows as grain; whether this is the same mask-edge
+  mixing as KB-LOOK-TV-BOUNCE1 (`grain` reads a one-pixel interior) or real noise is owed.
+
+### Open 2026-11-26: the rail-line shot still shimmers 5.7 to 9.2 percent after the plants' sway was bounded (KB-LOOK-TV-SHIMMER2, BIO-01)
+
+- **Repro:** rail-line shot `--once --seconds 1.1` after KB-LOOK-TV-SHIMMER1 (1d1729c194): shimmerMoving 5.71 percent
+  early and 7.25 mid at blowup, 6.22 and 9.18 calm (bound 0.5), down from 16.8 to 19.1. Measurement only.
+- **Owner:** plant motion and wind sway belong to BIO-01 (scatter, physics/vegetation); no plant-motion change was made
+  here. Candidates named by the SHIMMER1 work: impostor switches and the fire front.
+
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 
 - **Repro:** `node packages/tonemap/tests/settings-browser.mjs --compat` on the workstation (RTX A6000, Chrome, ANGLE
@@ -741,6 +807,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   KB-SCATTER-CAPTURESTALE1): bounce 104.8% early and 121.1% mid (bound 10 to 35), shadowTint 0.29 and -1.41 b* (bound
   3 or more), penumbra 0.804 code early (bound 0.7) and 0.445 mid (pass). Plants in the masks did not bring bounce into
   range, so BOUNCE1 stays open on its own cause; `ScatterInstances` capture and the masks check are still owed.
+- **Measured again 2026-11-26** after KB-LOOK-TV-BOUNCE1 (the T6 checks read the masks' interiors): calm passes T6;
+  blowup reads bounce 72.9 and 86.8 percent and shadowTint 1.91 and 1.04 b*, the light under the pall
+  (KB-LOOK-TV-PALL1). `ScatterInstances` capture and the masks check are still owed.
 
 ### Open 2026-11-26: the night sky dome shows clear stars through a smoke pall (KB-SKY-NIGHTPALL1, sky and weather)
 

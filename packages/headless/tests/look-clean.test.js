@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { encodePNG } from '../dist/index.js';
 import { decodePNG } from '../dist/compare.js';
 import {
+  GROUND_INSET,
   LOOK_CHECKS,
   LOOK_FAMILY_BOUNDS,
   LOOK_FAMILY_NAMES,
@@ -350,6 +351,43 @@ test('T6 bounce and shadowTint: shadow holds 10 to 35 percent of the lit ground 
   const empty = bounce(rich, { lit: mask(size, size, () => false), shadow });
   assert.equal(empty.pass, false);
   assert.match(empty.missing, /lit and shadowed ground/);
+});
+
+test('T6 bounce and shadowTint read the ground masks inside their edges, where the frame mixes both sides', () => {
+  // KB-LOOK-TV-BOUNCE1: the timber-valley rail-line shot read bounce 146 percent (calm, 1080p) because its shadows
+  // are strips a few pixels wide between plants, and the frame, resolved from supersamples with motion blur, gives
+  // a strip's edge pixels the lit ground's light while the sharp mask still calls them shadow. Here: 9-pixel shadow
+  // strips across lit ground, blurred by a 5 x 5 box (2 pixels each way) as a resolve and blur would.
+  const size = 720,
+    sun = [200, 180, 140],
+    shade = [96, 92, 100],
+    strip = (x) => x >= 360 && x % 40 < 9,
+    lit = mask(size, size, (x) => !strip(x)),
+    shadow = mask(size, size, (x) => strip(x)),
+    sharp = image(size, size, (x) => (strip(x) ? shade : sun)),
+    blurred = image(size, size, (x, y) => {
+      const sum = [0, 0, 0];
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const i = (Math.min(size - 1, Math.max(0, y + dy)) * size + Math.min(size - 1, Math.max(0, x + dx))) * 4;
+          for (let c = 0; c < 3; c++) sum[c] += sharp.data[i + c];
+        }
+      return sum.map((v) => Math.round(v / 25));
+    }),
+    truth = bounce(sharp, { lit, shadow }),
+    seen = bounce(blurred, { lit, shadow }),
+    tint = shadowTint(blurred, { lit, shadow });
+  assert.ok(truth.pass, `sharp ${truth.value}`);
+  // 720 pixels: an inset of 2, the blur's reach, so the strips' interiors are pure shadow again.
+  assert.ok(Math.abs(seen.value - truth.value) < 0.5, `blurred ${seen.value}, sharp ${truth.value}`);
+  assert.ok(seen.pass, `blurred ${seen.value}`);
+  assert.ok(Math.abs(tint.value - shadowTint(sharp, { lit, shadow }).value) < 0.5, `tint ${tint.value}`);
+  assert.equal(GROUND_INSET, 1 / 360);
+  // A shadow no wider than the inset has no interior: nothing to measure, not a pass.
+  const thin = mask(size, size, (x) => x >= 360 && x % 40 < 4),
+    none = bounce(blurred, { lit, shadow: thin });
+  assert.equal(none.pass, false);
+  assert.match(none.missing, /lit and shadowed ground/);
 });
 
 test('T7 night: a night that reads on a phone has a mean luma of 24 and lights over 180', () => {

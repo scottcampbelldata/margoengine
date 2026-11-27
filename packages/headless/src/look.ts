@@ -14,6 +14,8 @@
 // - Light discs: connected components, Rosenfeld and Pfaltz (1966).
 // - Flicker: frame mean brightness changes, Guthier et al. (2011); Eilertsen et al. (2013).
 // - Luma: ITU-R BT.709 coefficients on the encoded values; sRGB curve from IEC 61966-2-1.
+// - Mixed pixels at mask edges (T6 ground means over the masks' interiors): P. Fisher, "The pixel: a snare and a
+//   delusion", Int. J. Remote Sensing 18(3) (1997).
 import type { HeadlessPixels } from './index.js';
 import { decodePNG } from './compare.js';
 import { rangeError, typeError } from '../../shared/errors.js';
@@ -2279,8 +2281,45 @@ export interface BounceOptions {
   bound?: LookBound;
 }
 
+/**
+ * The share of the frame's shorter side kept clear of a ground mask's edge by {@link bounce} and {@link shadowTint}:
+ * 1/360, 3 pixels at 1080p and 1 at 360p (at least 1).
+ */
+export const GROUND_INSET = 1 / 360;
+
+/**
+ * Inside flags of pixels whose whole (2r + 1) x (2r + 1) square is inside (a binary erosion by a square, as two
+ * separable passes of running counts); the frame's border counts as outside.
+ */
+function inset(width: number, height: number, inside: Uint8Array, r: number): Uint8Array {
+  const rows = new Uint8Array(width * height),
+    out = new Uint8Array(width * height),
+    span = 2 * r + 1;
+  for (let y = 0; y < height; y++) {
+    let run = 0;
+    for (let x = 0; x < width; x++) {
+      run = inside[y * width + x] ? run + 1 : 0;
+      if (run >= span) rows[y * width + x - r] = 1;
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    let run = 0;
+    for (let y = 0; y < height; y++) {
+      run = rows[y * width + x] ? run + 1 : 0;
+      if (run >= span) out[(y - r) * width + x] = 1;
+    }
+  }
+  return out;
+}
+
+// A ground mask comes from a sharp capture of the scene, while the frame is resolved from supersamples and carries
+// motion blur, depth of field and bloom, so a pixel on a mask's edge holds light from both sides of it: a mixed
+// pixel (Fisher, "The pixel: a snare and a delusion", 1997). Lit and shadowed ground are therefore averaged over
+// their interiors, as patch colour is read in a patch's centre away from its edges (ISO 14524), a GROUND_INSET of
+// the frame in from every edge (KB-LOOK-TV-BOUNCE1: thin shadows between plants took the lit ground's light).
 function meanLab(frame: LookImage, mask: LookMask, what: string) {
-  const inside = maskBits(frame, mask, what);
+  const r = Math.max(1, Math.round(Math.min(frame.width, frame.height) * GROUND_INSET)),
+    inside = inset(frame.width, frame.height, maskBits(frame, mask, what), r);
   let n = 0,
     Y = 0,
     b = 0;
@@ -2294,7 +2333,8 @@ function meanLab(frame: LookImage, mask: LookMask, what: string) {
 }
 
 /**
- * T6: the mean luminance of the shadowed ground as a percent of the lit ground's, in linear light. Shadow that holds
+ * T6: the mean luminance of the shadowed ground as a percent of the lit ground's, in linear light, each averaged over
+ * its mask's interior ({@link GROUND_INSET} in from the edges, where the frame mixes both sides). Shadow that holds
  * 10 to 35 percent of the sunlit value carries bounce and sky light; under 10 is crushed, over 35 flat.
  */
 export function bounce(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult {
@@ -2305,7 +2345,10 @@ export function bounce(frame: LookImage, { lit, shadow, bound }: BounceOptions):
   return result('bounce', (100 * s.Y) / l.Y, bound, { lit: l.n, shadow: s.n });
 }
 
-/** T6: how much cooler (lower b*) the shadowed ground is than the lit ground, in CIE b* points: at least 3. */
+/**
+ * T6: how much cooler (lower b*) the shadowed ground is than the lit ground, in CIE b* points (at least 3), over the
+ * masks' interiors as {@link bounce}.
+ */
 export function shadowTint(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult {
   const l = meanLab(frame, lit, 'lit'),
     s = meanLab(frame, shadow, 'shadow');

@@ -681,8 +681,8 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `motionBlur` | T8: % of edge centres of pixels moving over 8 pixels a frame whose edge is narrower than half their travel | 5 | `moving` |
 | `silhouette` | T5: % of the subject's outline with 15 L* or more against what is behind | [80, 100] | the `subject` mask |
 | `silhouetteShape` | T5: % of the subject (at 320 x 180, three L* values) in one value | [70, 100] | the `subject` mask |
-| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light | [10, 35] | the `lit` and `shadow` masks |
-| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun | [3, 100] | the `lit` and `shadow` masks |
+| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (`GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] | the `lit` and `shadow` masks |
+| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun, over the masks' interiors as `bounce` | [3, 100] | the `lit` and `shadow` masks |
 | `nightLuma`, `nightPeak` | T7: mean luma, and the luma of the brightest 1%, of a night frame | [24, 255], [180, 255] | the frame; run only when a shot names them |
 
 | Export | What it does |

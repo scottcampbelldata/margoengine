@@ -98,6 +98,8 @@ export interface FoamEdgesOptions {
     bound?: LookBound;
 }
 
+export const GROUND_INSET: number;
+
 export interface HorizonSeamOptions {
     viewProjection: ArrayLike<number>;
     sky?: LookMask;

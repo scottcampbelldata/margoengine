@@ -11746,6 +11746,12 @@ width as a blur measure: P. Marziliano, F. Dufaux, S. Winkler and T. Ebrahimi, A
 against the half travel of a 180 degree shutter). Chosen here, not from the papers: the stair test (a step with no value
 between its plateaus in the 3 x 4 window of its two pixels, on an edge that is not straight along a pixel row or column), the 24 code strong
 step, the 15 L* outline contrast, the three-value shape at 320 x 180, the 5 percent allowance of `motionBlur`.
+T6 ground means over the masks' interiors (KB-LOOK-TV-BOUNCE1, 2026-11-26): mixed pixels at class edges, P. Fisher, The
+pixel: a snare and a delusion, International Journal of Remote Sensing 18(3), 679-685 (1997),
+https://doi.org/10.1080/014311697219015. The inset of 1/360 of the shorter side is ours, set from the rail-line shot
+(bounce 146.5, 45.1, 17.2, 15.0 and 15.1 percent at 0 to 4 pixels in). Why shadows fade under smoke (KB-LOOK-TV-PALL1):
+R. D. Garcia et al., Impact of spectral aerosol radiative forcing at the Izana observatory during the August 2023
+extreme wildfires, Atmos. Meas. Tech. 19, 3151-3167 (2026), https://doi.org/10.5194/amt-19-3151-2026.
 
 ## Gunfire: vfx/gunfire (2026-11-18)
 
