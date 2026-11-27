@@ -34,9 +34,23 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
+import type { ShallowBlockageFields, ShallowMovingCylinder, ShallowMovingFootprint } from './blockage-contract.js';
+import type { CylinderBlockage } from './cylinder.js';
+import type { RigidCylinderCoupling, RigidCylinderOptions } from './cylinder-rigid.js';
+export type { RigidCylinderCoupling, RigidCylinderOptions } from './cylinder-rigid.js';
 import { DRY, manning, type ShallowGrid, type ShallowSide, shallowRates, velocityOf } from './shallow.js';
 
 export { DRY, manning, type ShallowGrid, type ShallowSide, shallowRates, velocityOf } from './shallow.js';
+export {
+  SHALLOW_BLOCKAGE_LAYOUT,
+  SHALLOW_BLOCKAGE_MOTION_WORDS,
+  SHALLOW_BLOCKAGE_REACTION_WORDS,
+  SHALLOW_RIGID_BLOCKAGE_LAYOUT,
+  SHALLOW_RIGID_BLOCKAGE_MOTION_WORDS,
+  type ShallowBlockageFields,
+  type ShallowMovingCylinder,
+  type ShallowMovingFootprint,
+} from './blockage-contract.js';
 
 /** The registry field of the water on the ground: per cell h (m), hu and hv (m^2/s), owned by {@link ShallowWaterSolver}. */
 export const SURFACE_WATER_FIELD: FieldDescriptor = {
@@ -196,6 +210,8 @@ export interface WaterSample {
 /** Conservative shallow water on the ground, a framework solver (`Solver`). */
 export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private readonly id: string;
+  private cylinder?: CylinderBlockage;
+  private cylinderCouplingRate?: RateLevel;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
   private bedShape!: BedShape;
@@ -249,6 +265,69 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     }
   }
 
+  /** Load optional moving cut cells for a full-depth cylinder and open its accepted wall reaction port. */
+  static async withCylinder(
+    cylinder: ShallowMovingCylinder,
+    options: { readonly id?: string; readonly signal?: AbortSignal } = {},
+  ): Promise<ShallowWaterSolver> {
+    return ShallowWaterSolver.withMovingBlockage(cylinder, options);
+  }
+
+  /** Create the optional translating cylinder and its guided rigid predictor and reaction solvers. */
+  static async withRigidCylinder(
+    cylinder: ShallowMovingCylinder,
+    options: RigidCylinderOptions = {},
+  ): Promise<RigidCylinderCoupling> {
+    return ShallowWaterSolver.withRigidBlockage(cylinder, options);
+  }
+
+  /**
+   * Create a guided full-depth convex blockage and its same-rate rigid
+   * predictor and reaction solvers. Lock Y and rotation and enable X/Z
+   * translation. Use the common origin and the body's centre of mass.
+   */
+  static async withRigidFootprint(
+    footprint: ShallowMovingFootprint,
+    options: RigidCylinderOptions = {},
+  ): Promise<RigidCylinderCoupling> {
+    return ShallowWaterSolver.withRigidBlockage(footprint, options);
+  }
+
+  private static async withMovingBlockage(
+    shape: ShallowMovingCylinder | ShallowMovingFootprint,
+    options: { readonly id?: string; readonly signal?: AbortSignal },
+    useRigidPrecision = false,
+  ): Promise<ShallowWaterSolver> {
+    options.signal?.throwIfAborted();
+    if (!shape)
+      throw new MargoError(
+        'unsupported',
+        'Provide a moving cylinder radius or a convex guided footprint. See https://margoengine.com/errors#hydrodynamic-loads',
+      );
+    const { CylinderBlockage } = await import('./cylinder.js');
+    options.signal?.throwIfAborted();
+    const solver = new ShallowWaterSolver(options.id);
+    // Initial storage and the first pose use the same precision as the rigid field.
+    const geometry =
+      useRigidPrecision && shape.centre?.length === 2
+        ? { ...shape, centre: [Math.fround(shape.centre[0]), Math.fround(shape.centre[1])] as const }
+        : shape;
+    solver.cylinder = new CylinderBlockage(solver.id, geometry);
+    return solver;
+  }
+
+  private static async withRigidBlockage(
+    shape: ShallowMovingCylinder | ShallowMovingFootprint,
+    options: RigidCylinderOptions,
+  ): Promise<RigidCylinderCoupling> {
+    const water = await ShallowWaterSolver.withMovingBlockage(shape, options, true);
+    const { rigidCylinderCoupling } = await import('./cylinder-rigid.js');
+    options.signal?.throwIfAborted();
+    const coupling = rigidCylinderCoupling(water, shape.bodyRow, options);
+    water.cylinderCouplingRate = options.rate ?? 0;
+    return coupling;
+  }
+
   describe(): SolverDescription {
     return {
       id: this.id,
@@ -257,6 +336,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
         { field: SURFACE_WATER_FORCING_FIELD, access: 'write' },
         { field: SURFACE_WATER_POTENTIAL_FIELD, access: 'write' },
         ...(this.runoff ? [{ field: this.runoff.field, access: 'read' as const }] : []),
+        ...(this.cylinder
+          ? [
+              { field: this.cylinder.fields.motion, access: 'read' as const },
+              { field: this.cylinder.fields.reaction, access: 'write' as const },
+            ]
+          : []),
       ],
       rate: this.level,
       stableRate: () => this.level,
@@ -321,7 +406,13 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       x0: this.x0,
       z0: this.z0,
     };
-    const { courant = 0.4, density = WATER_DENSITY, rate = 0, timeScale = 1 } = params;
+    const { courant = 0.4, density = WATER_DENSITY, rate = this.cylinderCouplingRate ?? 0, timeScale = 1 } = params;
+    if (this.cylinderCouplingRate !== undefined && rate !== this.cylinderCouplingRate)
+      throw new MargoError(
+        'unsupported',
+        'The cylinder and its rigid exchange must share a rate; use the rate passed to withRigidCylinder.',
+      );
+
     if (!(timeScale > 0 && Number.isFinite(timeScale)))
       throw new RangeError(
         `A time scale is a finite number of the water's seconds per world second above 0 (got ${timeScale}); pass one, or leave it unset for 1.`,
@@ -389,7 +480,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     // The bed at the start (read again every step).
     this.cellBeds(bed.elevations);
     this.roughness = new Float64Array(count);
-    const roughness = params.roughness ?? 0.03;
+    const roughness = params.roughness ?? (this.cylinder ? 0 : 0.03);
     for (let j = 0; j < nz; j++)
       for (let i = 0; i < nx; i++) {
         const [x, z] = this.centreOf(i, j),
@@ -414,6 +505,23 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     this.state = host.allocate('state', count * 3 * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.ledger = host.allocate('ledger', LEDGER * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.published = host.allocate('published', count * 3 * 4, 'f32', SURFACE_WATER_LAYOUT);
+    if (this.cylinder) {
+      if (
+        this.scale !== 1 ||
+        this.runoff ||
+        this.inflows.length ||
+        this.rain ||
+        this.wind ||
+        this.coriolis ||
+        this.blocks.some((v) => v !== 0) ||
+        this.roughness.some((v) => v !== 0)
+      )
+        throw new MargoError(
+          'unsupported',
+          'Cylinder cut cells use an unforced periodic channel at unit time scale; remove the bed sources or use standard shallow water.',
+        );
+      this.cylinder.init(host, this.grid);
+    }
     // The start: a level or a depth, and a velocity, at each cell centre.
     this.fill(params);
     this.publish();
@@ -447,6 +555,11 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
         f[i + nx * j] = f0 + beta * y;
       }
     return f;
+  }
+
+  /** Optional motion and accepted reaction ports when configured with a translating cylinder. */
+  get blockageFields(): ShallowBlockageFields | undefined {
+    return this.cylinder?.fields;
   }
 
   /** Seconds of the water's time per second of world time. */
@@ -536,6 +649,19 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     }
     this.cell = context.cell;
     this.cellBeds(this.ground.elevations);
+    if (this.cylinder) {
+      if (this.forcing || this.potential)
+        throw new MargoError(
+          'unsupported',
+          'Cylinder cut cells use an unforced periodic channel; disconnect surface forcing or use standard shallow water.',
+        );
+      const steps = this.cylinder.step(this.grid, this.words(), context, dt, this.density, this.courant);
+      const ledger = this.ledgerWords();
+      ledger[3]! += 1;
+      ledger[4]! += steps;
+      this.publish();
+      return;
+    }
     // t0 the world's time; the water runs `scale` of its seconds each world second.
     const t0 = context.tick / rateOf(context.level),
       scale = this.scale,
@@ -770,11 +896,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   }
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: SURFACE_WATER_FIELD.name, region: this.published, tick, cell: this.cell }];
+    const water = { field: SURFACE_WATER_FIELD.name, region: this.published, tick, cell: this.cell };
+    return this.cylinder ? [water, this.cylinder.reaction(tick, this.cell)] : [water];
   }
 
   stateRegions(): readonly Region[] {
-    return [this.state, this.ledger];
+    return this.cylinder ? [this.state, this.ledger, ...this.cylinder.states()] : [this.state, this.ledger];
   }
 
   extraState(): readonly Region[] {
@@ -806,6 +933,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   /** The water's volume, m^3. */
   volume(): number {
     const s = this.words();
+    if (this.cylinder) return this.cylinder.volume(s, this.grid.dx * this.grid.dz);
     let v = 0;
     for (let k = 0; k < this.nx * this.nz; k++) v += s[3 * k]!;
     return v * this.grid.dx * this.grid.dz;

@@ -13,6 +13,30 @@ export const EARTH_ROTATION = 0.00007292115;
 
 export const FORCING_WORDS = 5;
 
+export interface RigidCylinderCoupling {
+    readonly water: ShallowWaterSolver;
+    readonly predictor: Solver;
+    readonly reaction: Solver;
+    readonly order: readonly [string, string, string, string];
+}
+
+export interface RigidCylinderOptions {
+    readonly id?: string;
+    readonly rigidId?: string;
+    readonly rate?: RateLevel;
+    readonly signal?: AbortSignal;
+}
+
+export const SHALLOW_BLOCKAGE_LAYOUT = 1;
+
+export const SHALLOW_BLOCKAGE_MOTION_WORDS = 4;
+
+export const SHALLOW_BLOCKAGE_REACTION_WORDS = 8;
+
+export const SHALLOW_RIGID_BLOCKAGE_LAYOUT = 2;
+
+export const SHALLOW_RIGID_BLOCKAGE_MOTION_WORDS = 7;
+
 export const SURFACE_WATER_FIELD: FieldDescriptor;
 
 export const SURFACE_WATER_FORCING_FIELD: FieldDescriptor;
@@ -20,6 +44,11 @@ export const SURFACE_WATER_FORCING_FIELD: FieldDescriptor;
 export const SURFACE_WATER_LAYOUT = 1;
 
 export const SURFACE_WATER_POTENTIAL_FIELD: FieldDescriptor;
+
+export interface ShallowBlockageFields {
+    readonly motion: FieldDescriptor;
+    readonly reaction: FieldDescriptor;
+}
 
 export interface ShallowBuilding {
     readonly min: readonly [number, number];
@@ -42,6 +71,14 @@ export interface ShallowGrid {
 export interface ShallowInflow {
     readonly position: readonly [number, number];
     readonly discharge: number | ((time: number) => number);
+}
+
+export interface ShallowMovingCylinder extends ShallowBlockageBody {
+    readonly radius: number;
+}
+
+export interface ShallowMovingFootprint extends ShallowBlockageBody {
+    readonly footprint: ReadonlyArray<readonly [number, number]>;
 }
 
 export interface ShallowRunoffInput {
@@ -88,8 +125,15 @@ export interface ShallowWaterParams {
 
 export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     constructor(id?: string, runoff?: ShallowRunoffInput);
+    static withCylinder(cylinder: ShallowMovingCylinder, options?: {
+        readonly id?: string;
+        readonly signal?: AbortSignal;
+    }): Promise<ShallowWaterSolver>;
+    static withRigidCylinder(cylinder: ShallowMovingCylinder, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
+    static withRigidFootprint(footprint: ShallowMovingFootprint, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
     describe(): SolverDescription;
     init(host: SolverHost, params: ShallowWaterParams): void;
+    get blockageFields(): ShallowBlockageFields | undefined;
     get timeScale(): number;
     get waterDensity(): number;
     step(context: StepContext, dt: number): void;
@@ -174,6 +218,11 @@ interface Region {
     readonly type: ElementType;
     readonly layout: number;
     readonly memory?: WebAssembly.Memory;
+}
+
+interface ShallowBlockageBody {
+    readonly bodyRow: number;
+    readonly centre: readonly [number, number];
 }
 
 interface Solver<Params = unknown> {

@@ -462,10 +462,44 @@ test('SEA-12 a rotating sphere retains its viscous torque with translational dra
   simulation.advance(1);
   const at = bodies[0].row * FORCE_WORDS;
   const force = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
-  const exact = -8 * Math.PI * 1025.9 * SEA_WATER_VISCOSITY * radius ** 3 * spin;
+  const damping = 8 * Math.PI * 1025.9 * SEA_WATER_VISCOSITY * radius ** 3;
+  const inertia = (2 * 30 * radius ** 2) / 5;
+  const exact = (-damping * spin) / (1 + damping / (60 * inertia));
   // The f32 input is rounded once; the finite-Re correction is Re²/1200 at this spin.
   const re = (spin * radius ** 2) / SEA_WATER_VISCOSITY;
   assert.ok(near(force[at + 3], exact, 2 ** -23 + (re * re) / 1200));
+});
+
+test('SEA-12 stiff compact drag dissipates energy without rebounding a light body', () => {
+  const mass = 0.01;
+  const radius = 0.3;
+  const speed = 30;
+  const density = 1025.9;
+  const { bodies, world: simulation } = world(
+    still(),
+    [
+      {
+        position: [0, -3, 0],
+        velocity: [speed, 0, 0],
+        collider: { shape: 'sphere', radius, mass },
+        load: { shape: { sphere: radius }, drag: 1, addedMass: [0, 0, 0] },
+      },
+    ],
+    [],
+    {},
+    [0, 0, 0],
+  );
+  simulation.advance(1);
+  const damping = 0.5 * density * Math.PI * radius ** 2 * speed;
+  const expected = speed / (1 + damping / (60 * mass));
+  assert.ok(Math.abs(bodies[0].linearVelocity[0] - expected) <= speed * 2 ** -22);
+  let prior = speed;
+  for (let tick = 2; tick <= 60; tick++) {
+    const previous = bodies[0].linearVelocity[0];
+    assert.ok(previous >= 0 && previous < prior);
+    simulation.advance(tick);
+    prior = previous;
+  }
 });
 
 test('SEA-12 the acceleration stencil stays in water at a moving free surface', () => {
@@ -639,6 +673,67 @@ test('SEA-12 one native wrench batch matches the reference across many rigid bod
   native.simulation.restoreSnapshot(snapshot.bytes);
   native.simulation.advance(36);
   assert.equal(native.simulation.hash(), final);
+});
+
+test('SEA-12 a resonant radiation kernel couples translational and rotational energy to a passive memory', () => {
+  const radius = 0.3;
+  const mass = 10;
+  const inertia = (2 * mass * radius * radius) / 5;
+  const dt = 1 / 60;
+  const frequency = 9;
+  const decayRate = 0.8;
+  const strength = 85;
+  const { bodies, world: simulation } = world(
+    still(),
+    [
+      {
+        position: [0, -4, 0],
+        velocity: [0, 0.8, 0],
+        spin: [0, 0.7, 0],
+        collider: { shape: 'sphere', radius, mass },
+        load: {
+          shape: { sphere: radius },
+          addedMass: [0, 0, 0],
+          drag: 0,
+          spinDrag: 0,
+          radiationResonances: [
+            { axis: 1, frequency, decayRate, strength },
+            { axis: 4, frequency, decayRate, strength },
+          ],
+        },
+      },
+    ],
+    [],
+    {},
+    [0, 0, 0],
+  );
+  const model = (m, initial) => {
+    let speed = initial;
+    let position = 0;
+    let quadrature = 0;
+    let energy = (m * speed * speed) / 2;
+    return () => {
+      const k = frequency * frequency;
+      quadrature = (quadrature + dt * (speed - k * position)) / (1 + decayRate * dt + (k + strength / m) * dt * dt);
+      speed -= (dt * strength * quadrature) / m;
+      position += dt * quadrature;
+      const next = (m * speed * speed + strength * (quadrature * quadrature + k * position * position)) / 2;
+      assert.ok(next <= energy + 16 * Number.EPSILON * energy);
+      energy = next;
+      return speed;
+    };
+  };
+  const linear = model(mass, 0.8);
+  const angular = model(inertia, 0.7);
+  for (let tick = 1; tick <= 100; tick++) {
+    simulation.advance(tick);
+    // The rigid state and the angular mobility each travel through the f32 port.
+    const bound = 2 * tick * 2 ** -23;
+    const expectedV = linear();
+    const expectedW = angular();
+    assert.ok(Math.abs(bodies[0].linearVelocity[1] - expectedV) < bound, `linear mode at tick ${tick}`);
+    assert.ok(Math.abs(bodies[0].angularVelocity[1] - expectedW) < bound, `angular mode at tick ${tick}`);
+  }
 });
 
 test('SEA-12 an inclined ellipsoid takes buoyancy through the transformed half-cap centroid', () => {

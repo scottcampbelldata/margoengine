@@ -3,17 +3,28 @@ import test from 'node:test';
 import { bedSurface } from '../../dist/earth.js';
 import { FORCING_WORDS, ShallowWaterSolver, SURFACE_WATER_FORCING_FIELD } from '../../dist/hydro.js';
 import { Physics } from '../../dist/index.js';
-import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SwimSolver } from '../../dist/life.js';
-import { LoadSolver } from '../../dist/loads.js';
+import {
+  SWIM_CONTACT_FIELD,
+  SWIM_CONTACT_LAYOUT,
+  SWIM_PASSIVE_REACTION_FIELD,
+  SWIM_PASSIVE_REACTION_LAYOUT,
+  SWIM_WAKE_FIELD,
+  SWIM_WAKE_LAYOUT,
+  SwimSolver,
+} from '../../dist/life.js';
+import { FloodBodyDragSolver, LoadSolver, SwimDragToWater } from '../../dist/loads.js';
 import { HullSolver } from '../../dist/seakeeping.js';
 import {
   BODY_FORCES_FIELD,
+  BODY_IMPULSES_FIELD,
   FORCE_WORDS,
+  IMPULSE_WORDS,
   PhysicsWorld,
   regionWords,
   RigidSolver,
   worldMemory,
 } from '../../dist/world.js';
+import { seekEqualsContinuous } from './harness.js';
 
 const RHO = 1000;
 const WIDTH = 2;
@@ -134,6 +145,7 @@ function waterOf(world) {
   );
   world.add(water, { bed, depth: DEPTH, density: RHO, roughness: 0, sides: SIDES });
   return {
+    bed,
     water,
     sea: { elevation: (x, z) => water.sample(x, z).surface, water: water.flow, density: RHO, cell: ORIGIN },
   };
@@ -302,4 +314,218 @@ test('SEA-12 and LIFE-03 exchange resolved axial impulse and keep the one-cell m
     'the SEA-12 reaction changes the swimmer thrust by changing the live water',
   );
   context.diagnostic(JSON.stringify({ ...both, total, expected }));
+});
+
+test('SEA-12 and LIFE-03 return applied passive drag to live shallow-water momentum', async (context) => {
+  const fishMass = 8,
+    probeMass = 6,
+    fishSpeed = 0.65,
+    probeSpeed = -0.5,
+    formArea = 0.045;
+  const initialMomentum = fishMass * fishSpeed + probeMass * probeSpeed;
+  async function run({ fishReturn = true, loadsReturn = true, passiveReaction = true, shared = false } = {}) {
+    await Physics.load({ threads: shared });
+    const world = new PhysicsWorld({ rate: RATE, memory: worldMemory(shared) });
+    const { bed, sea, water } = waterOf(world);
+    using physics = new Physics(null, { fixedTimestep: DT, arena: world.arena });
+    const probe = rigidBody(physics, [0, -0.25, 0.5], [0, 0, probeSpeed], probeMass);
+    const loads = new LoadSolver();
+    const swimmer = await SwimSolver.load({ passiveReaction });
+    const receiver = new FloodBodyDragSolver();
+    const reaction = new SwimDragToWater();
+    world.add(new RigidSolver(), { physics });
+    world.add(swimmer, {
+      flow: sea.water,
+      bodies: [
+        {
+          position: [0, -0.25, -0.5],
+          velocity: [0, 0, fishSpeed],
+          mass: fishMass,
+          volume: fishMass / RHO,
+          length: 0.5,
+          width: 0.12,
+          height: 0.12,
+          tail: { amplitude: 0, span: 0.22, wavelength: 0.75 },
+          frequency: 0,
+          wettedArea: 0,
+          formDragArea: formArea,
+          crossflowDrag: [0, 0],
+          axialAddedMassRatio: 0,
+        },
+      ],
+    });
+    world.add(loads, { sea, bodies: [{ row: probe.row, shape: { sphere: 0.1 }, drag: 0, addedMass: [0, 0, 0] }] });
+    world.add(receiver, {
+      bed,
+      density: RHO,
+      bodies: [{ row: probe.row, halfHeight: 0.1, area: Math.PI * 0.01, dragCoefficient: loadsReturn ? 1 : 0 }],
+    });
+    if (fishReturn) world.add(reaction, { bed, density: RHO });
+    world.couple(['swim', 'loads', receiver.id, ...(fishReturn ? [reaction.id] : []), 'water', 'rigid'], 'staggered');
+    let impulse = 0,
+      waterResidual = 0;
+    for (let frame = 1; frame <= 32; frame++) {
+      const priorWater = waterMomentum(water)[1],
+        priorSpeed = swimmer.read(0).velocity[2];
+      world.advance(frame);
+      const port = swimmer.exportPorts(frame - 1).find((item) => item.field === SWIM_PASSIVE_REACTION_FIELD.name);
+      assert.equal(port !== undefined, passiveReaction);
+      const wetDrag = port ? regionWords(world.memory, port.region) : undefined;
+      if (wetDrag) {
+        assert.equal(port.region.layout, SWIM_PASSIVE_REACTION_LAYOUT);
+        assert.equal(wetDrag.length, 8);
+        assert.equal(wetDrag[7], 1);
+        assert.ok(wetDrag[3] === 0 && wetDrag[4] === 0);
+        const expectedImpulse = fishMass * (priorSpeed - swimmer.read(0).velocity[2]);
+        assert.ok(Math.abs(wetDrag[5] - expectedImpulse) < 16 * Number.EPSILON * fishMass);
+        if (frame === 1) {
+          const damping = 0.5 * RHO * formArea * fishSpeed;
+          const speed = (fishMass * fishSpeed) / (fishMass + DT * damping);
+          assert.ok(Math.abs(wetDrag[5] - DT * damping * speed) < 8 * Number.EPSILON);
+        }
+      }
+      const dragImpulse = wetDrag?.[5] ?? 0;
+      impulse += dragImpulse;
+      const opposite = receiver.exportPorts(frame - 1).find((item) => item.field === BODY_IMPULSES_FIELD.name);
+      const rigidImpulse = regionWords(world.memory, opposite.region)[IMPULSE_WORDS * probe.row + 2];
+      waterResidual = Math.max(
+        waterResidual,
+        Math.abs(waterMomentum(water)[1] - priorWater + rigidImpulse - (fishReturn ? dragImpulse : 0)),
+      );
+    }
+    const snapshot = world.takeSnapshot();
+    world.advance(44);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(44);
+    assert.equal(world.hash(), hash);
+    return {
+      hash,
+      impulse,
+      waterResidual,
+      fish: swimmer.read(0).velocity[2] * fishMass,
+      probe: horizontal(probe, probeMass)[1],
+      water: waterMomentum(water)[1],
+    };
+  }
+  const both = await run();
+  const shared = await run({ shared: true });
+  const noFish = await run({ fishReturn: false });
+  const noLoads = await run({ loadsReturn: false });
+  const optOut = await run({ fishReturn: false, passiveReaction: false });
+  assert.deepEqual(both, shared);
+  assert.equal(noFish.fish, optOut.fish);
+  assert.equal(noFish.probe, optOut.probe);
+  assert.equal(noFish.water, optOut.water);
+  const total = both.fish + both.probe + both.water;
+  assert.ok(Math.abs(total - initialMomentum) < 128 * 2 ** -24 * probeMass);
+  assert.ok(both.waterResidual < 512 * Number.EPSILON && both.impulse > 0.5);
+  assert.ok(both.probe > noFish.probe + 1e-5, 'the deposited passive drag changes the SEA-12 force');
+  assert.ok(both.fish < noLoads.fish - 1e-5, 'SEA-12 return changes the passive drag of the swimmer');
+  context.diagnostic(JSON.stringify({ ...both, total, initialMomentum }));
+});
+
+test('SEA-12 passive receipt separates turning-strip drag from gravity, buoyancy, contact and added momentum', async () => {
+  const gravity = [0, -9.81, 0],
+    contact = [6, 4, 5];
+  const mass = 8,
+    displaced = 9,
+    length = 0.55,
+    width = 0.15,
+    height = 0.2,
+    spin = 1.2;
+  const startVelocity = [0.36, 0, 0.53];
+  const world = new PhysicsWorld({ rate: RATE, gravity, memory: worldMemory(false) });
+  const swimmer = await SwimSolver.load({ passiveReaction: true, readContacts: true });
+  let wrench;
+  const contactSource = {
+    describe: () => ({
+      id: 'contact',
+      fields: [{ field: SWIM_CONTACT_FIELD, access: 'write' }],
+      rate: 0,
+      stableRate: () => 0,
+    }),
+    init(host) {
+      wrench = host.allocate('contact-wrench', 6 * 8, 'f64', SWIM_CONTACT_LAYOUT);
+      regionWords(host.memory, wrench).set(contact);
+    },
+    step() {},
+    importPorts() {},
+    exportPorts: (tick) => [{ field: SWIM_CONTACT_FIELD.name, region: wrench, tick, cell: ORIGIN }],
+    stateRegions: () => [wrench],
+    extraState: () => [],
+  };
+  world.add(contactSource, {});
+  world.add(swimmer, {
+    density: RHO,
+    bodies: [
+      {
+        position: [0, 0, 0],
+        velocity: startVelocity,
+        angularVelocity: [0, spin, 0],
+        mass,
+        volume: displaced / RHO,
+        length,
+        width,
+        height,
+        wettedArea: 0,
+        formDragArea: 0.035,
+        crossflowDrag: [0.8, 0],
+        tail: { amplitude: 0, span: width, wavelength: length },
+        frequency: 0,
+      },
+    ],
+  });
+  world.couple(['contact', 'swim'], 'staggered');
+  world.advance(1);
+  const port = swimmer.exportPorts(0).find((item) => item.field === SWIM_PASSIVE_REACTION_FIELD.name);
+  const packet = regionWords(world.memory, port.region);
+  const end = swimmer.read(0).velocity;
+  // The integrated ellipsoidal potential-flow strips carry A_x and A_y. Rotation of
+  // this tensor contributes ω×((M+A)u) − (M+A)(ω×u) to the momentum equation.
+  const addedX = (2 / 3) * Math.PI * RHO * length * (height / 2) ** 2;
+  const addedY = (2 / 3) * Math.PI * RHO * length * (width / 2) ** 2;
+  const expectedX =
+    (mass + addedX) * (startVelocity[0] - end[0]) + DT * (contact[0] + addedX * spin * startVelocity[2]);
+  const expectedZ = mass * (startVelocity[2] - end[2]) + DT * (contact[2] + addedX * spin * startVelocity[0]);
+  const expectedY = ((contact[1] + gravity[1] * (mass - displaced)) * DT) / (mass + addedY);
+  assert.ok(Math.abs(packet[3] - expectedX) < 128 * Number.EPSILON);
+  assert.ok(Math.abs(packet[5] - expectedZ) < 128 * Number.EPSILON);
+  assert.ok(Math.abs(end[1] - expectedY) < 32 * Number.EPSILON);
+  assert.ok(Math.abs(packet[3]) > 0.01 && packet[5] > 0.01 && packet[4] === 0);
+});
+
+test('SEA-12 passive swimmer and its shallow-water receiver reproduce capped seek', async () => {
+  const swimmers = await Promise.all([
+    SwimSolver.load({ passiveReaction: true }),
+    SwimSolver.load({ passiveReaction: true }),
+  ]);
+  seekEqualsContinuous(() => {
+    const swimmer = swimmers.shift();
+    const world = new PhysicsWorld({ rate: RATE });
+    const { bed, water } = waterOf(world);
+    const reaction = new SwimDragToWater();
+    world.add(swimmer, {
+      flow: water.flow,
+      bodies: [
+        {
+          position: [0, -0.25, 0],
+          velocity: [0, 0, 0.65],
+          mass: 5,
+          volume: 0.005,
+          length: 0.5,
+          width: 0.12,
+          height: 0.12,
+          tail: { amplitude: 0, span: 0.22, wavelength: 0.75 },
+          frequency: 0,
+          wettedArea: 0,
+          formDragArea: 0.045,
+          crossflowDrag: [0, 0],
+          axialAddedMassRatio: 0,
+        },
+      ],
+    });
+    world.add(reaction, { bed, density: RHO });
+    return world.couple([swimmer.id, reaction.id, water.id], 'staggered');
+  });
 });

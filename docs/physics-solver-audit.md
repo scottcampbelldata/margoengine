@@ -1144,6 +1144,9 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   the phase-dependent KC error. The held-out Sarpkaya 1976 test compares force coefficients and the measured
   peak of ten β = 4480 runs against calibration from β = 3123 and 5260. Mass and drag mean absolute errors are
   0.092 and 0.063, compared with 0.039 and 0.214 for DNV. The maximum normalized peak-load error is 0.374.
+  The 57 Keulegan–Carpenter 1958 runs are outside this calibration. Their maximum β, including printed
+  rounding, is below 3,076. The Sarpkaya calibration starts at 3,123. The DNV fallback reproduces these
+  subcritical data with mean absolute errors of 0.429 in inertia and 0.379 in drag.
 
   The next checkpoint adds implicit rotational water inertia, passive modal Cummins radiation and measured
   woody-debris impact. `loads.test.js` checks rotational coefficients against the NACA Report 323 table, the
@@ -1164,8 +1167,27 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   the false acceleration impulse reproduced by the live sea fixture as a wave crosses a floating body's sample.
   Water's `loads-quay.browser.mjs` exercises FW-6 and CY-9 at component level. On both GPU backends the existing
   wake changes the advancing vessel and the debris trajectory, supplies the quay's wash and crest, and
-  drives the rendered mesh. The wake-only draw changes 3,210 WebGPU pixels and 3,214 WebGL2 pixels.
-  The worst wake geometry difference is 0.29 μm. The two rigs replay to hash `3dde8e8d83646b20`.
+  drives the rendered mesh. The wake-only draw changes 3,212 WebGPU pixels and 3,211 WebGL2 pixels.
+  The worst wake geometry difference is 0.29 μm. The two rigs replay to hash `2403bb19b4c9de7f`.
+  `coupling/moving-cylinder-blockage.test.js` proves accepted pressure, geometric displaced volume,
+  next-tick feedback from a real rigid row and replay for a guided cylinder and a rectangular pier.
+  `coupling/flood-blockage.test.js` proves the paired impulse for partial immersion. The live
+  `coupling/loads-paddle.test.js` and `coupling/loads-wading.test.js` cover LIFE-07 shaft torque and
+  LIFE-01 water/body exchange and reduced load on the stance contacts.
+  `loads-radiation-profile.test.js` validates passive strip and panel modes against their reference band and
+  the held-out Vugts triangular section. The loaded resonator test holds the six-axis body's linear and
+  angular damping against the exact discrete system. `coupling/loads-reciprocal.test.js` now also uses the
+  public passive swim and body-drag receipts with live shallow water and independent disable controls.
+  It closes opposing impulse per step to (2.02×10^{-16}) N·s and the 44-frame total to (3.94×10^{-7}) N·s.
+  `coupling/loads-hull-projected-drag.test.js` exercises reciprocal drag on the production SEA-08 hull
+  and SEA-12 debris in the same water. The two moving bodies return momentum through separate profiles.
+  The 48-frame maximum drift is (1.02×10^{-6}) N·s with identical plain and shared replay.
+  `coupling/flood-body-drag.test.js` checks eccentric torque, yaw-dependent projection, dry zero,
+  passive energy and framework seek. The fitted-draft handoff uses the same coefficients in the
+  live TypeScript and SIMD heave and roll solves and checks their held wrenches against the implicit recurrence.
+  `coupling/loads-swim-actuators.test.js` checks two-way tail and fin recoil through the production receiver,
+  live HYDRO and projected rigid drag, with independent disabled paths. The worst water-step momentum
+  residual is (1.27×10^{-15}) N·s and the 40-frame total residual is (5.77×10^{-7}) N·s.
 
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 

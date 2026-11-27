@@ -11,6 +11,10 @@ export const SWIM_CONTACT_FIELD: FieldDescriptor;
 
 export const SWIM_CONTACT_LAYOUT = 1;
 
+export const SWIM_PASSIVE_REACTION_FIELD: FieldDescriptor;
+
+export const SWIM_PASSIVE_REACTION_LAYOUT = 1;
+
 export const SWIM_WAKE_FIELD: FieldDescriptor;
 
 export const SWIM_WAKE_LAYOUT = 1;
@@ -62,6 +66,8 @@ export interface SwimOptions {
     readonly level?: RateLevel;
     readonly readSchoolIntent?: boolean;
     readonly readContacts?: boolean;
+    readonly passiveReaction?: boolean;
+    readonly passiveReactionField?: string;
     readonly fields?: {
         readonly kinematics?: string;
         readonly intent?: string;

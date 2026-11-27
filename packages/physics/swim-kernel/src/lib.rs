@@ -142,7 +142,13 @@ struct Wake {
     wet: f64,
 }
 
-fn step(body: &Body, p: &Parameters, m: &Medium, dt: f64) -> (Body, Wake, Wake) {
+fn step(
+    body: &Body,
+    p: &Parameters,
+    m: &Medium,
+    dt: f64,
+    passive: Option<&mut core::mem::MaybeUninit<Wake>>,
+) -> (Body, Wake, Wake) {
     let q = body.orientation;
     let flow = rotate(q, m.flow, true);
     let water_acceleration = rotate(q, m.acceleration, true);
@@ -233,6 +239,7 @@ fn step(body: &Body, p: &Parameters, m: &Medium, dt: f64) -> (Body, Wake, Wake) 
 
     // Passive axial resistance is handled by a linearly implicit impulse.
     let mut damping = [0.0, 0.0, axial_drag * forward];
+    let mut drag_cross_force = [0.0; 3];
     let mut rotational_damping = [0.0; 3];
     // Four-point Gauss-Legendre per half-body: integrates z^3 exactly for pure yaw or pitch
     // with constant strip width. Opposite strips give opposing loads about the COM.
@@ -249,8 +256,14 @@ fn step(body: &Body, p: &Parameters, m: &Medium, dt: f64) -> (Body, Wake, Wake) 
                 let dy = 0.5 * rho * p.vertical_cd * p.width * area_factor * crossflow[1].abs();
                 damping[0] += dx;
                 damping[1] += dy;
-                force[0] -= dx * body.angular[1] * z;
-                force[1] += dy * body.angular[0] * z;
+                let cross_x = dx * body.angular[1] * z;
+                let cross_y = dy * body.angular[0] * z;
+                force[0] -= cross_x;
+                force[1] += cross_y;
+                if passive.is_some() {
+                    drag_cross_force[0] -= cross_x;
+                    drag_cross_force[1] += cross_y;
+                }
                 torque[0] += dy * relative[1] * z;
                 torque[1] -= dx * relative[0] * z;
                 rotational_damping[0] += dy * z * z;
@@ -377,6 +390,21 @@ fn step(body: &Body, p: &Parameters, m: &Medium, dt: f64) -> (Body, Wake, Wake) 
         radius,
         wet: m.wet,
     };
+    if let Some(receipt) = passive {
+        // Rearranging the implicit velocity equation gives F_drag = F_cross - D v_rel,next.
+        // Return that actual impulse to the water, separately from the buoyancy, ambient and
+        // added inertia, contact, gravity, and actuator loads already held in the integration.
+        let drag = add(
+            drag_cross_force,
+            scale(multiply(damping, next_relative), -1.0),
+        );
+        receipt.write(Wake {
+            position: add(body.position, rotate(q, m.buoyancy_offset, false)),
+            impulse: scale(rotate(q, drag, false), -dt),
+            radius: 0.5 * sqrt(p.width * p.height),
+            wet: m.wet,
+        });
+    }
     (
         next,
         wake(-length * 0.5, [0.0, 0.0, thrust], p.tail_span * 0.5),
@@ -396,13 +424,65 @@ unsafe extern "C" fn swim_step(
     count: usize,
     dt: f64,
 ) -> i32 {
+    unsafe {
+        integrate(
+            input,
+            parameters,
+            medium,
+            output,
+            kinematics,
+            wakes,
+            core::ptr::null_mut(),
+            count,
+            dt,
+        )
+    }
+}
+
+/// The ordinary step ABI, with one additional passive drag receipt per swimmer.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn swim_step_passive(
+    input: *const Body,
+    parameters: *const Parameters,
+    medium: *const Medium,
+    output: *mut Body,
+    kinematics: *mut Motion,
+    wakes: *mut Wake,
+    passive: *mut core::mem::MaybeUninit<Wake>,
+    count: usize,
+    dt: f64,
+) -> i32 {
+    unsafe {
+        integrate(
+            input, parameters, medium, output, kinematics, wakes, passive, count, dt,
+        )
+    }
+}
+
+unsafe fn integrate(
+    input: *const Body,
+    parameters: *const Parameters,
+    medium: *const Medium,
+    output: *mut Body,
+    kinematics: *mut Motion,
+    wakes: *mut Wake,
+    passive: *mut core::mem::MaybeUninit<Wake>,
+    count: usize,
+    dt: f64,
+) -> i32 {
     for index in 0..count {
         unsafe {
+            let receipt = if passive.is_null() {
+                None
+            } else {
+                Some(&mut *passive.add(index))
+            };
             let (body, tail, fin) = step(
                 &*input.add(index),
                 &*parameters.add(index),
                 &*medium.add(index),
                 dt,
+                receipt,
             );
             let values = core::slice::from_raw_parts((&body as *const Body).cast::<f64>(), 19);
             if values.iter().any(|value| !value.is_finite()) {

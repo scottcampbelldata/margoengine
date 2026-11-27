@@ -12985,6 +12985,10 @@ and its peak versus the load cell. The coefficient bands follow the calibration 
 The peak comparison also includes the original Morison residual from Eq. (16). Mean absolute errors in the ten
 runs are 0.092 for `C_M` and 0.063 for `C_D`, with a maximum peak `C_F` error of 0.374. DNV gives
 0.039 and 0.214 mean coefficient errors, respectively, on the same runs. DNV remains the default.
+The independent Keulegan–Carpenter Table 3 runs reach β = 3,000, or below 3,076 allowing for half
+the printed precision in both inputs. The land-based oscillation data fall below the Sarpkaya calibration
+band, and DNV §6.7.2.1 gives its oscillatory correction for supercritical flow. All 57 runs use the DNV
+fallback and show 0.429 and 0.379 mean absolute errors in inertia and drag. These are scope diagnostics.
 
 Optional rotational inertia uses the velocity potential for a rotating ellipsoid. Integrate the outer potential
 in Lamb's Art. 112 Eq. (6) against the normal velocity to get the fluid kinetic energy. The denominator has
@@ -13040,6 +13044,47 @@ dot product while preserving the reference reduction order. Plain and shared imp
 321 mixed rows bit for bit. The live-world test measures one call for 24 bodies, checks every wrench
 and trajectory against the TypeScript variant and replays the same snapshot hash. Field queries
 convert any separate origins through integer cell differences, with a live test at cell indices up to 2²⁹.
+
+The shallow-water coupling distinguishes immersed drag from impermeable blockage. The immersed drag
+stages matched body and water impulses using the same wet-cell weights and the body and water point
+mobilities in the implicit quadratic slip equation. Mass remains in the water cells. Body-local principal
+areas are projected along slip. The exposed box-face sum and the ellipsoid cofactor norm follow directly
+from the corresponding projected triangles and transformed unit-sphere area. The obstruction
+integrates each face opening in time and length. It integrates its moving wall pressure and lever arm
+over the same time interval. The resulting conservative flux balance gives the fluid's geometric
+storage and the rigid reaction in the same tick. The guided rigid test feeds the changed body velocity
+back into the next accepted obstruction step. The pressure wall uses Causon, Ingram and Mingham,
+Sections 3.2–3.2.1. [Causon et al. (2001), *A Cartesian cut cell method for shallow water flows with moving boundaries*](https://doi.org/10.1016/S0309-1708(01)00010-0) ·
+[Sanders, Schubert and Gallegos (2008), *Integral formulation of shallow-water equations with anisotropic porosity*](https://doi.org/10.1016/j.jhydrol.2008.08.009)
+
+The same shallow-water impulse model loads clipped paddle blades at their actual lever arms and wading
+profiles at their centres of pressure. The rigid shaft receives torque from the immersed blade, and a
+driven motor returns momentum to the water. The test uses actual revolute and shallow-water solvers.
+The wading solver applies buoyancy to the legged body and returns the coupled horizontal force to the
+water. The support-force test proves reduced ground load and supplies the pressure balance.
+[R. Labbé et al. (2019), *Physics of rowing oars*, Eq. 4](https://doi.org/10.1088/1367-2630/ab4226) ·
+[M. I. V. Orselli and M. Duarte (2011), *Joint forces and torques when walking in shallow water*](https://doi.org/10.1016/j.jbiomech.2011.01.017)
+
+The swim transport records passive linear drag after the native body and fin solve. It evaluates the exposed
+strip mobility against the accepted velocity and returns that drag separately from actuator, contact, gravity,
+buoyancy and added-fluid momentum. The live receiver uses wet weights and opposite horizontal impulse, with
+44-frame rigid/swimmer/water closure through the public body-drag adapter and independent disabled-return
+controls. A separate hull and debris fixture tests the two directions through the live shallow-water
+port with no external impulse writer. The actuator receiver distributes the signed tail and pectoral
+reactions from the separately published wake field. The active two-way test checks both impulses and
+a 40-frame closed momentum ledger after disabling each return in turn. The rotated strip test checks
+the traction decomposition. [Peskin (2002), *The immersed boundary method*, §5](https://doi.org/10.1017/S0962492902000077) The damping coefficient of a compact body is now evaluated from the starting slip
+and applied at the end-of-step velocity. The stiff lightweight case checks the analytic speed and steady loss
+of kinetic energy.
+
+For floating hulls, `radiationProfile` fits nonnegative band-pass terms to the physical damping of the existing
+strip theory or finite-depth panel reference at the solved draft. Each resonator uses `x′ = q` and
+`q′ = v − ω²x − γq`. Its stored energy is `r(q² + ω²x²)/2`. Backward Euler's energy balance separates
+physical damping and numerical loss. The box case's largest normalized RMS fit error is 3.36%. A triangular
+holdout from Vugts Report 194 Table 5.1 and Fig. 6.5 has a 0.30 m draft and a normalized forced-heave crest
+of 0.57–0.60. The geometry-only profile computes 0.299987 m and 0.597699. The measured damping is held out
+of the reference solve and of the fit. [J. H. Vugts (1968), *The hydrodynamic coefficients for swaying, heaving and rolling cylinders in a free surface*](https://doi.org/10.3233/ISP-1968-1516702) ·
+[T. Pérez and T. I. Fossen (2008), *Time- vs. Frequency-domain Identification of Parametric Radiation Force Models*](https://doi.org/10.4173/mic.2008.1.1)
 
 ### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
 

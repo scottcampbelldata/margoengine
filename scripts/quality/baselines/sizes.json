@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20659736,
+  "total": 20681041,
   "history": [
     {
       "date": "2026-10-24",
@@ -14179,6 +14179,12 @@
       "commit": "f8140fd20",
       "reason": "Gizmo split (manager's ruling on PR #604): the ray drivers rayHover, rayDown, rayMove, rayUp, scaleDown and scaleTo leave TransformControls for GizmoRayDriver in xr/gizmo, so a desktop page stops paying for XR code. Measured gzip at one base (acbe01aba): controls/transform 13,279 to 12,763 B (ceiling 14,362 to 13,146), controls root 29,670 to 29,175 B (ceiling 31,182 to 30,051), xr/gizmo 1,541 to 2,342 B (ceiling 1,797 to 2,598). controls/transform keeps the aim hook and the closest-point axis solve with its parallel guard. Only these three rows are written",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ce06986663",
+      "grew": 2,
+      "reason": "@margoengine/physics/loads grew from 20816 to 35538 B gzip and from a 21441 to a 36605 B ceiling. @margoengine/physics/hydro grew from 7829 to 13617 B gzip and from a 7885 to a 14026 B ceiling. SEA-12 adds draft-dependent radiation, moving cut-cell pressure, projected hull and compact-body drag, paddle, wading and swimmer coupling. Those are optional Physics entry points and share the body and water solvers. The moving obstruction and native panel calculation load on demand. Splitting off ports would still require both solvers at every coupling."
     }
   ],
   "items": {
@@ -15022,7 +15028,7 @@
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,
     "@margoengine/physics/groundwater": 4158,
-    "@margoengine/physics/hydro": 7885,
+    "@margoengine/physics/hydro": 14026,
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
     "@margoengine/physics/landscape": 4538,
@@ -15030,7 +15036,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 21441,
+    "@margoengine/physics/loads": 36605,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 8785,

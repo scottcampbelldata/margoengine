@@ -76,9 +76,11 @@ const minmod = (a: number, b: number): number =>
 
 /** The value at the face between c and d seen from the left: WENO-Z. */
 function weno5z(a: number, b: number, c: number, d: number, e: number): number {
-  const q0 = (2 * a - 7 * b + 11 * c) / 6,
-    q1 = (-b + 5 * c + 2 * d) / 6,
-    q2 = (2 * c + 5 * d - e) / 6,
+  // Form the polynomials as increments to the central value so that a
+  // constant field survives the weighted blend exactly.
+  const q0 = (2 * (a - c) - 7 * (b - c)) / 6,
+    q1 = (-(b - c) + 2 * (d - c)) / 6,
+    q2 = (5 * (d - c) - (e - c)) / 6,
     s0 = a - 2 * b + c,
     s1 = b - 2 * c + d,
     s2 = c - 2 * d + e,
@@ -95,7 +97,7 @@ function weno5z(a: number, b: number, c: number, d: number, e: number): number {
     a0 = 0.1 * (1 + r0 * r0),
     a1 = 0.6 * (1 + r1 * r1),
     a2 = 0.3 * (1 + r2 * r2);
-  return (a0 * q0 + a1 * q1 + a2 * q2) / (a0 + a1 + a2);
+  return c + (a0 * q0 + a1 * q1 + a2 * q2) / (a0 + a1 + a2);
 }
 
 /** The HLL flux of (h, hu, hv) normal to a face into `out`, with one-sided speeds bounded by 0. */
@@ -108,8 +110,10 @@ function hll(
   uR: number,
   vR: number,
   out: Float64Array,
+  reference?: number,
 ): void {
-  out[0] = out[1] = out[2] = 0;
+  out[0] = out[2] = 0;
+  out[1] = reference === undefined ? 0 : -0.5 * g * reference * reference;
   if (hL <= DRY && hR <= DRY) return;
   const cL = Math.sqrt(g * hL),
     cR = Math.sqrt(g * hR),
@@ -121,7 +125,9 @@ function hll(
     qR = hR * uR,
     product = ap * am;
   out[0] = (ap * qL - am * qR + product * (hR - hL)) / span;
-  out[1] = (ap * (qL * uL + 0.5 * g * hL * hL) - am * (qR * uR + 0.5 * g * hR * hR) + product * (qR - qL)) / span;
+  const pL = reference === undefined ? 0.5 * g * hL * hL : 0.5 * g * (hL - reference) * (hL + reference);
+  const pR = reference === undefined ? 0.5 * g * hR * hR : 0.5 * g * (hR - reference) * (hR + reference);
+  out[1] = (ap * (qL * uL + pL) - am * (qR * uR + pR) + product * (qR - qL)) / span;
   out[2] = (ap * qL * vL - am * qR * vR + product * (hR * vR - hL * vL)) / span;
 }
 
@@ -169,8 +175,24 @@ export function shallowRates(
   rhu: Float64Array,
   rhv: Float64Array,
 ): number {
-  let out = sweep(grid, h, hu, hv, time, true, rh, rhu, rhv);
-  if (grid.nz > 1) out += sweep(grid, h, hu, hv, time, false, rh, rhv, rhu);
+  return shallowOpenRates(grid, h, hu, hv, time, rh, rhu, rhv);
+}
+
+/** Uses the same conservative face flux on an optional periodic cut-cell opening. */
+export function shallowOpenRates(
+  grid: ShallowGrid,
+  h: Float64Array,
+  hu: Float64Array,
+  hv: Float64Array,
+  time: number,
+  rh: Float64Array,
+  rhu: Float64Array,
+  rhv: Float64Array,
+  openX?: Float64Array,
+  openZ?: Float64Array,
+): number {
+  let out = sweep(grid, h, hu, hv, time, true, rh, rhu, rhv, openX);
+  if (grid.nz > 1) out += sweep(grid, h, hu, hv, time, false, rh, rhv, rhu, openZ);
   return out;
 }
 
@@ -187,6 +209,7 @@ function sweep(
   rh: Float64Array,
   rn: Float64Array,
   rt: Float64Array,
+  openings?: Float64Array,
 ): number {
   const { nx, nz, bed, g } = grid,
     cells = alongX ? nx : nz,
@@ -274,28 +297,38 @@ function sweep(
       const top = Math.min(Math.max(bL, bR), Math.min(hL + bL, hR + bR)),
         hLs = Math.max(0, Math.min(hL + bL - top, hL)),
         hRs = Math.max(0, Math.min(hR + bR - top, hR));
-      hll(g, hLs, uL, vL, hRs, uR, vR, flux);
+      const right = at(f === cells ? 0 : f);
+      const reference = openings ? h[at(f - 1)]! : undefined;
+      const referenceRight = h[right]!;
+      hll(g, hLs, uL, vL, hRs, uR, vR, flux, reference);
+      // In cut cells, use pressure relative to this cell's hydrostatic
+      // pressure. Its contribution on the closed water contour sums to zero.
+      const offset =
+        reference === undefined ? 0 : 0.5 * g * (reference - referenceRight) * (reference + referenceRight);
       // Each side's interface source, written as a pressure added to the flux it sees.
-      const leftN = flux[1]! + 0.5 * g * (hL + hLs) * (top - bL),
-        rightN = flux[1]! - 0.5 * g * (hRs + hR) * (bR - top);
+      const opening = openings ? openings[right]! : 1;
+      const mass = opening * flux[0]!;
+      const tangent = opening * flux[2]!;
+      const leftN = opening * (flux[1]! + 0.5 * g * (hL + hLs) * (top - bL)),
+        rightN = opening * (flux[1]! + offset - 0.5 * g * (hRs + hR) * (bR - top));
       if (f > 0) {
         const k = at(f - 1);
-        rh[k]! -= flux[0]! / d;
+        rh[k]! -= mass / d;
         rn[k]! -= leftN / d;
-        rt[k]! -= flux[2]! / d;
-      } else leaving -= flux[0]! * width;
+        rt[k]! -= tangent / d;
+      } else leaving -= mass * width;
       if (f === cells && periodic) {
         // The face past the far end is the near end's first: what leaves one cell there enters the other, exactly.
         const k = at(0);
-        rh[k]! += flux[0]! / d;
+        rh[k]! += mass / d;
         rn[k]! += rightN / d;
-        rt[k]! += flux[2]! / d;
+        rt[k]! += tangent / d;
       } else if (f < cells) {
         const k = at(f);
-        rh[k]! += flux[0]! / d;
+        rh[k]! += mass / d;
         rn[k]! += rightN / d;
-        rt[k]! += flux[2]! / d;
-      } else leaving += flux[0]! * width;
+        rt[k]! += tangent / d;
+      } else leaving += mass * width;
     }
     // The centred bed source of the second-order scheme: g (h_w + h_e) / 2 (b_w - b_e) / d (Audusse et al. 2004, section 3).
     for (let c = 0; c < cells; c++) {

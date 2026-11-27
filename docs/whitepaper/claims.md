@@ -386,6 +386,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   wind torque. Reproduce with `node --test packages/physics/tests/loads-compact-drag.test.js`.
   [Khan et al., Fig. 15](https://doi.org/10.1016/j.expthermflusci.2017.12.013).
 
+- Hull radiation at computed draft (SEA-12). The independent triangular tank section has a 0.30 m
+  draft and normalized forced-heave damping crest of 0.57–0.60. The geometry-only strip model predicts
+  0.299987 m and 0.597699. Nonnegative modal coefficients retain passive energy balance. The separate
+  box case has a maximum 3.36% normalized RMS fit error against the numerical reference band.
+  Reproduce with `node --test packages/physics/tests/loads-radiation-profile.test.js`.
+  [Vugts, Report 194, Table 5.1 and Fig. 6.5](https://scispace.com/pdf/the-hydrodynamic-coefficients-for-swaying-heaving-and-3a4lrtj0vo.pdf).
+
 - Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
   properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
   2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts

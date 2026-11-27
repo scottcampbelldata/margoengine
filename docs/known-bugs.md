@@ -13,6 +13,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   imports: `physics/tissue`, `rail`, `seismic`, `lightning`, `strands`, `outdoor-sound`, `drainage-fog`, `vortices`,
   `aeolian`, `audio/outdoor`), api (102 items, `tsdoc physics` such as `TissueSolverParams`) and readme-types (the
   physics README example 132: `TerrainBedParams` needs `centre`, `SwimSolver.id` is private).
+- **SEA-12 follow-up:** the ray example supplies its bed centre and reads the solver ID through `describe()`.
+  The Physics README type gate checks both calls.
 - **Owner:** the physics solver rows whose commits added them (SEA-12 at 113a391fde and 1a6c425709, K2-09 at
   2f22453d8b and the rest of the physics queue); found by gap lane B's gate for KB-LOOK-TV-BOUNCE1, which changes none
   of them.

@@ -42,7 +42,14 @@ import { bindLoadsKernel, LOADS_KERNEL_WORDS, loadLoadsBuilds, type LoadsBuilds,
 import { cylinderCoefficients, tangentialDrag, wakeStep } from './morison.js';
 import { memberOrbit } from './oscillatory.js';
 import { type LocatedWater, localFlow, localSea } from './origin.js';
-import { type LoadRadiationMode, prepareRadiation, type RadiationMode } from './radiation.js';
+import {
+  type LoadRadiationMode,
+  type LoadRadiationResonance,
+  prepareRadiation,
+  prepareRadiationResonance,
+  type RadiationMode,
+  type RadiationResonance,
+} from './radiation.js';
 import { ellipsoidAddedInertia, ellipsoidAddedMass, equivalentEllipsoid } from './shapes.js';
 import { smoothOscillatoryCylinder } from './smooth-cylinder.js';
 import { flowAcceleration, waterAcceleration, waterVelocity } from './water.js';
@@ -78,6 +85,8 @@ export interface LoadBody {
   readonly addedInertia?: 'ellipsoid' | readonly [number, number, number];
   /** Passive exponential radiation kernels in the principal motions at the rigid centre of mass. Default empty. */
   readonly radiation?: readonly LoadRadiationMode[];
+  /** Passive resonant radiation kernels in the principal motions at the rigid centre of mass. Default empty. */
+  readonly radiationResonances?: readonly LoadRadiationResonance[];
   /** 'surface' integrates incident pressure on a box or closed mesh. Default 'compact' uses a local plane and point acceleration. */
   readonly pressureModel?: 'compact' | 'surface';
   /** The wind's drag coefficient on its emerged area. The default follows Reynolds number and shape. */
@@ -133,6 +142,7 @@ interface BodyRuntime {
   readonly addedMass: Vec3;
   readonly addedInertia: Vec3;
   readonly radiation: readonly RadiationMode[];
+  readonly resonances: readonly RadiationResonance[];
   readonly dragGeometry: CompactDragGeometry;
   readonly sphere: boolean;
   /** A box's exact half extents, also used for its vertical support. */
@@ -265,7 +275,16 @@ export class LoadSolver implements Solver<LoadParams> {
         radiationWords += 2;
         return prepared;
       });
-      return this.prepare(spec, modes);
+      if (spec.radiationResonances !== undefined && !Array.isArray(spec.radiationResonances))
+        throw invalidLoad(
+          'Invalid radiation resonances; supply an array of axis, frequency, decayRate and strength records.',
+        );
+      const resonances = (spec.radiationResonances ?? []).map((mode) => {
+        const prepared = prepareRadiationResonance(mode, 1 / rateOf(this.level), radiationWords);
+        radiationWords += 3;
+        return prepared;
+      });
+      return this.prepare(spec, modes, resonances);
     });
     for (const m of members) {
       if (
@@ -326,7 +345,11 @@ export class LoadSolver implements Solver<LoadParams> {
   }
 
   /** A body's equivalent ellipsoid, frame and added mass. */
-  private prepare(spec: LoadBody, radiation: readonly RadiationMode[]): BodyRuntime {
+  private prepare(
+    spec: LoadBody,
+    radiation: readonly RadiationMode[],
+    resonances: readonly RadiationResonance[],
+  ): BodyRuntime {
     const shape = spec.shape;
     if (!shape || typeof shape !== 'object')
       throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box} or {mesh}.');
@@ -402,7 +425,21 @@ export class LoadSolver implements Solver<LoadParams> {
     )
       throw invalidLoad('Invalid rotational added inertia; give three finite nonnegative m² values or use ellipsoid.');
     const dragGeometry = compactDragGeometry(volume, axes, frame, mesh, box);
-    return { spec, axes, frame, centre, volume, addedMass, addedInertia, radiation, dragGeometry, sphere, box, mesh };
+    return {
+      spec,
+      axes,
+      frame,
+      centre,
+      volume,
+      addedMass,
+      addedInertia,
+      radiation,
+      resonances,
+      dragGeometry,
+      sphere,
+      box,
+      mesh,
+    };
   }
 
   /** The water's velocity at a point and time: the sea's water plus every flow (water.ts). */
@@ -424,6 +461,10 @@ export class LoadSolver implements Solver<LoadParams> {
   }
 
   step(context: StepContext, _dt: number): void {
+    if (this.history && context.level !== this.level)
+      throw invalidLoad(
+        'Radiation memory needs a fixed rate; match the Loads level to its coupling group or use a staggered group.',
+      );
     this.cell = [context.cell[0], context.cell[1], context.cell[2]];
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     this.sampleCell = port?.cell ?? this.cell;
@@ -529,6 +570,7 @@ export class LoadSolver implements Solver<LoadParams> {
     const wet = submerged / b.volume;
     const buoyancy = densityGravity * submerged;
     let added: Vec3 = [0, 0, 0];
+    const spinInertia: Vec3 = [0, 0, 0];
     if (wet > 0) {
       const u = this.water(centre[0], Math.min(centre[1], surface), centre[2], t, [0, 0, 0]),
         a = this.acceleration(centre[0], Math.min(centre[1], surface), centre[2], t, [0, 0, 0]),
@@ -573,8 +615,14 @@ export class LoadSolver implements Solver<LoadParams> {
           typeof given === 'number' ? given : given?.[i],
           i,
         );
-        const f = 0.5 * rho * area * wet * speed * dot(vr, axis);
-        const m = compactSpinTorque(geometry, i, dot(w, axis), wet, rho, this.nu, b.spec.spinDrag);
+        const damping = 0.5 * rho * area * wet * speed;
+        const spin = dot(w, axis);
+        const f = damping * dot(vr, axis);
+        const m = compactSpinTorque(geometry, i, spin, wet, rho, this.nu, b.spec.spinDrag);
+        // Freeze the positive slip and spin coefficients, then hold the resulting
+        // drag at the end-of-step velocity. This keeps a strong drag from reversing a light body.
+        added[i]! += dt * damping;
+        if (spin !== 0) spinInertia[i] = (-dt * m) / spin;
         for (let k = 0; k < 3; k++) {
           force[k]! += f * axis[k]!;
           torque[k]! += m * axis[k]!;
@@ -615,10 +663,10 @@ export class LoadSolver implements Solver<LoadParams> {
     } else acc.force[1] += buoyancy;
     for (let axis = 0; axis < 3; axis++) {
       addInertiaAxis(acc.added, axesWorld[axis]!, added[axis]!);
-      const inertia = b.addedInertia[axis]! * rho * submerged;
+      const inertia = b.addedInertia[axis]! * rho * submerged + spinInertia[axis]!;
       if (inertia > 0) addInertiaAxis((acc.rotational ??= new Float64Array(9)), axesWorld[axis]!, inertia);
     }
-    if (history && b.radiation.length > 0) {
+    if (history) {
       const exposed = Math.sqrt(wet);
       for (const mode of b.radiation) {
         const angular = mode.axis >= 3;
@@ -632,12 +680,27 @@ export class LoadSolver implements Solver<LoadParams> {
         // Its incremental acceleration contributes a positive term on the inertial side.
         const load = -mode.strength * exposed * (mode.decay * history[previous]! + mode.integral * exposed * velocity);
         const inertia = mode.strength * mode.integral * wet * dt;
-        const wrench = angular ? acc.torque : acc.force;
-        for (let k = 0; k < 3; k++) wrench[k]! += load * direction[k]!;
-        if (inertia > 0) {
-          const addedMatrix = angular ? (acc.rotational ??= new Float64Array(9)) : acc.added;
-          addInertiaAxis(addedMatrix, direction, inertia);
+        addRadiationWrench(acc, direction, angular, load, inertia);
+      }
+      for (const resonance of b.resonances) {
+        const angular = resonance.axis >= 3;
+        const direction = axesWorld[resonance.axis % 3]!;
+        const velocity = dot(angular ? w : v, direction);
+        const previous = resonance.index;
+        if (history[0] === 1) {
+          history[previous + 1] =
+            resonance.inverse *
+            (history[previous + 1]! -
+              resonance.stiffnessTime * history[previous]! +
+              dt * history[previous + 2]! * velocity);
+          history[previous]! += dt * history[previous + 1]!;
         }
+        history[previous + 2] = exposed;
+        const predicted =
+          resonance.inverse *
+          (history[previous + 1]! - resonance.stiffnessTime * history[previous]! + dt * exposed * velocity);
+        const inertia = resonance.strength * wet * dt * dt * resonance.inverse;
+        addRadiationWrench(acc, direction, angular, -resonance.strength * exposed * predicted, inertia);
       }
     }
   }
@@ -863,6 +926,13 @@ function addInertiaAxis(matrix: Float64Array, direction: Vec3, coefficient: numb
   for (let row = 0; row < 3; row++)
     for (let column = 0; column < 3; column++)
       matrix[row * 3 + column]! += coefficient * direction[row]! * direction[column]!;
+}
+
+function addRadiationWrench(loads: BodyLoads, direction: Vec3, angular: boolean, load: number, inertia: number): void {
+  const wrench = angular ? loads.torque : loads.force;
+  for (let axis = 0; axis < 3; axis++) wrench[axis]! += load * direction[axis]!;
+  if (inertia > 0)
+    addInertiaAxis(angular ? (loads.rotational ??= new Float64Array(9)) : loads.added, direction, inertia);
 }
 
 function holdTorque(torque: Vec3, added: Float64Array, bodies: Float32Array, at: number): Vec3 {

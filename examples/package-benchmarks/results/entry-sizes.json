@@ -15024,8 +15024,8 @@
         "gzip": 9482
       },
       "./life": {
-        "raw": 15724,
-        "gzip": 6645
+        "raw": 16543,
+        "gzip": 6884
       },
       "./crush": {
         "raw": 59895,
@@ -15056,8 +15056,8 @@
         "gzip": 17356
       },
       "./hydro": {
-        "raw": 19340,
-        "gzip": 7829
+        "raw": 35498,
+        "gzip": 13617
       },
       "./foam": {
         "raw": 17324,
@@ -15076,8 +15076,8 @@
         "gzip": 14217
       },
       "./loads": {
-        "raw": 52925,
-        "gzip": 20816
+        "raw": 94286,
+        "gzip": 35538
       },
       "./surge": {
         "raw": 9465,
@@ -18868,14 +18868,14 @@
       "brotli": 4100
     },
     "packages/physics/dist/swim-kernel.wasm": {
-      "raw": 6410,
-      "gzip": 3563,
-      "brotli": 3262
+      "raw": 6890,
+      "gzip": 3802,
+      "brotli": 3455
     },
     "packages/physics/dist/swim-kernel-shared.wasm": {
-      "raw": 6501,
-      "gzip": 3628,
-      "brotli": 3284
+      "raw": 6981,
+      "gzip": 3869,
+      "brotli": 3506
     },
     "packages/physics/dist/locomotion-kernel.wasm": {
       "raw": 10782,

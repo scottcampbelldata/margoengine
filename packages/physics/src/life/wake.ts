@@ -12,3 +12,12 @@ export const SWIM_WAKE_FIELD: FieldDescriptor = Object.freeze({
 });
 
 export const SWIM_WAKE_WORDS = 8;
+
+/** One f64 row `[x,y,z, Ix,Iy,Iz, radius,wetFraction]` per swimmer in body-index order. */
+export const SWIM_PASSIVE_REACTION_LAYOUT = 1;
+/** Equal and opposite water impulse of the actual implicit passive linear drag, in N·s and already wet-weighted. */
+export const SWIM_PASSIVE_REACTION_FIELD: FieldDescriptor = Object.freeze({
+  ...SWIM_WAKE_FIELD,
+  name: 'swimPassiveDragImpulse',
+  quantity: 'position, passive drag impulse, smoothing radius and wetted fraction',
+});

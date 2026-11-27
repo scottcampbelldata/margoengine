@@ -3749,12 +3749,12 @@ world.add(rays, { bodies: [{
   fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
 }] });
 const seabed = new TerrainBed();
-world.add(seabed, { columns: 40, rows: 40, width: 4, depth: 4,
+world.add(seabed, { columns: 40, rows: 40, width: 4, depth: 4, centre: [0, 0],
   elevations: () => -0.5, bedrock: () => -0.502 });
 const sediment = TracerSolver.withBedChange('sand');
 world.add(sediment, { bed: seabed.bed, bedJets: { availableMass: 0.023,
   mobileLayer: { thickness: 0.002, porosity: 0.4 } } });
-world.couple([rays.id, 'sand', 'bed'], 'staggered');
+world.couple([rays.describe().id, 'sand', 'bed'], 'staggered');
 world.advance(1);
 console.log(sediment.jetErosion > 0, seabed.volume(-0.5) < 0); // true true
 ```
@@ -3820,6 +3820,48 @@ const start = water.volume();
 world.advance(30 * 60); // one minute
 console.log(water.sample(300, 50).depth > 0); // true: the flood has reached 300 m
 console.log(Math.abs(water.volume() + water.budget.out - start) < 1e-6 * start); // true: every cubic metre accounted for
+```
+
+#### Moving obstructions and pressure reaction
+
+`ShallowWaterSolver.withRigidFootprint` uses a full-depth convex obstruction. Describe it in horizontal
+metres relative to an upright rigid body's centre of mass. The body moves on X/Z and receives the
+water's accepted pressure impulse. The optional factory creates the same-rate predictor and reaction
+solvers and supplies their staggered order. `withRigidCylinder` takes a radius for a circular footprint.
+`withCylinder` exposes motion and reaction fields for a prescribed path. These modes use a flat, wet,
+periodic channel on the world clock.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, -9.81, 0] as const;
+using physics = new Physics(null, {gravity, fixedTimestep: 1 / 60});
+const obstruction = physics.addBody(null, {
+  position: [0, 0.4, 0], linearVelocity: [0.4, 0, 0],
+  enabledTranslations: [true, false, true], lockRotations: true, canSleep: false,
+  colliders: {shape: 'box', halfExtents: [0.18, 0.7, 0.14], mass: 512},
+});
+const {water, predictor, reaction, order} = await ShallowWaterSolver.withRigidFootprint({
+  bodyRow: obstruction.row, centre: [0, 0],
+  footprint: [[-0.18, -0.14], [0.18, -0.14], [0.18, 0.14], [-0.18, 0.14]],
+});
+const bed = bedSurface({columns: 8, rows: 8, width: 4, depth: 4, centre: [0, 0]}, new Float64Array(81));
+const world = new PhysicsWorld({rate: {num: 60, den: 1}, gravity})
+  .add(new RigidSolver(), {physics})
+  .add(predictor, {})
+  .add(water, {
+    bed, depth: 0.9,
+    sides: {minX: 'periodic', maxX: 'periodic', minZ: 'periodic', maxZ: 'periodic'},
+  })
+  .add(reaction, {})
+  .couple(order, 'staggered');
+const volume = water.volume();
+world.advance(12);
+console.log(obstruction.linearVelocity[0] < 0.4, Math.abs(water.volume() - volume) < 1e-9);
 ```
 
 ### Tides, storm surge and currents (`@margoengine/physics/surge`)
@@ -4117,7 +4159,7 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
   - buoyancy at the displaced volume's centroid, which produces a righting moment. The local sea height sets the horizontal cut. Boxes and meshes integrate pressure on clipped triangles. Spheres and ellipsoids use their exact cap. The Froude–Krylov force uses the water's acceleration;
   - `pressureModel: 'surface'` reads incident gauge pressure from `sea.pressure` for a box or closed mesh and integrates its wrench over the actual clipped waterline. The default `'compact'` uses the local plane and point acceleration. Additional `flows` still contribute their own acceleration;
   - added mass per axis from Lamb's ellipsoid integrals, held implicitly so light bodies stay stable;
-  - rotational added inertia with `addedInertia: 'ellipsoid'` or three measured m² per displaced kg values along the shape axes. The default is zero. `radiation` supplies passive Cummins modes as `{axis, strength, decayTime}` with axis 0–2 for translation and 3–5 for rotation. A mode contributes `strength * exp(-t / decayTime)` to the radiation kernel. The default is an empty array. Supply coefficients for the body and draft;
+  - rotational added inertia with `addedInertia: 'ellipsoid'` or three measured m² per displaced kg values along the shape axes. The default is zero. `radiation` supplies passive Cummins modes as `{axis, strength, decayTime}`. A mode contributes `strength * exp(-t / decayTime)` to the radiation kernel. `radiationResonances` supplies band-pass modes as `{axis, strength, frequency, decayRate}`. Axes 0–2 are translation and 3–5 are rotation. Both lists default to empty. Use the same fixed world rate throughout the load group and coefficients for the body and draft;
   - drag on the actual principal projections, from Morrison's sphere correlation or the Hölzer–Sommerfeld shape law, with optional `drag` coefficients;
   - independent rotational viscous torque. `spinDrag` scales it, default 1;
   - windage at the area centroid of the emerged silhouette. `windage` overrides the shape- and Reynolds-dependent coefficient.
@@ -4130,6 +4172,24 @@ if it differs from the default of 4096 m. World-fixed members use the LoadSolver
 Use `await LoadSolver.load({id, signal})` for the optional Rust SIMD wrench batch. It uses the containing
 world's plain or shared memory and holds all active rows in one call. The synchronous constructor uses
 the TypeScript reference. `workCounts()` reports the number of held bodies, native calls and reserved scratch bytes.
+
+`radiationProfile(mesh, {mass, density, centre})` computes coefficients at the hull's still-water draft.
+Its default reference is deep-water strip theory. Select `panels: {frequencies, depth}` for the native
+three-dimensional reference. Use the returned `addedMass`, `addedInertia` and
+`radiationResonances: profile.resonances` on the same mesh in the loads solver.
+`frequencyResponse` reports the sampled band and the fit error in each principal motion.
+
+```ts
+import {radiationProfile} from 'margoengine/physics/loads';
+
+const mesh = {
+  vertices: [-2,-0.5,-1, 2,-0.5,-1, 2,0.5,-1, -2,0.5,-1, -2,-0.5,1, 2,-0.5,1, 2,0.5,1, -2,0.5,1],
+  indices: [0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,4,7, 0,7,3, 1,2,6, 1,6,5, 0,1,5, 0,5,4, 3,7,6, 3,6,2],
+};
+const profile = await radiationProfile(mesh, {mass: 4100, density: 1025, centre: [0, 0, 0]});
+const loads = {addedMass: profile.addedMass, addedInertia: profile.addedInertia, radiationResonances: profile.resonances};
+console.log(profile.draft.toFixed(2), loads.radiationResonances.length > 0); // 0.50 true
+```
 
 Omit `capacity` to use the world's rigid body rows. Unsupported load inputs raise `MargoError` with
 code `unsupported` and a repair instruction. [Hydrodynamic input help](https://margoengine.com/errors#hydrodynamic-loads)
@@ -4164,6 +4224,94 @@ or moving rigid anchor. Specify the two rigid rows, optional body-local pins, un
 axial rigidity `EA` in newtons. `lineLoad(index)` reports the average tension and anchor reaction for
 the step. Put it in the same-rate staggered group before the rigid solver. For a heavy line with sag
 or seabed contact, use `Rod` with `segmentLoads`.
+
+For a compact rigid body or hull in a flood, `FloodBodyDragSolver` returns horizontal form drag to the water
+with equal and opposite impulse. Give each rigid row a measured frontal area or three principal areas
+and a vertical half-extent. A three-axis profile follows the body's rotation. Set `drag: 0` on its
+`LoadSolver` body or `drag: false` on `HullSolver` to apply form drag once. Use the same grid and rate for
+water and drag, and run drag before water and rigid. The exchange cells must remain wet throughout the step. Locks and joints carry external support reactions.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {FloodBodyDragSolver, LoadSolver} from 'margoengine/physics/loads';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+using physics = new Physics(null, {fixedTimestep: 1 / 60});
+const body = physics.addBody(null, {position: [0, -0.25, 0], enabledTranslations: [true, false, true],
+  colliders: {shape: 'box', halfExtents: [0.1, 0.1, 0.15], mass: 6}});
+const water = new ShallowWaterSolver();
+const drag = new FloodBodyDragSolver();
+const bed = bedSurface({columns: 1, rows: 1, width: 2, depth: 2, centre: [0, 0]}, new Float64Array(4).fill(-0.5));
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(water, {bed, depth: 0.5, roughness: 0, velocity: () => [0.5, 0]});
+const sea = {elevation: (x: number, z: number) => water.sample(x, z).surface,
+  water: {...water.flow, medium: 'water' as const}, density: 1000, cell: [0, 0, 0] as const};
+world.add(new LoadSolver(), {sea, bodies: [{row: body.row, shape: {box: [0.1, 0.1, 0.15]}, drag: 0}]});
+world.add(drag, {bed, bodies: [{row: body.row, halfHeight: 0.1, area: [0.06, 0.06, 0.04], projection: 'box', dragCoefficient: 0.8}]});
+world.couple(['loads', drag.id, 'water', 'rigid'], 'staggered');
+world.advance(1);
+console.log(body.linearVelocity[0] > 0);
+```
+
+`FloodPaddleSolver` pushes a rigid shaft through each submerged blade's specified frontal area, normal and
+drag coefficient. It adds the opposite horizontal impulse to the shallow water. Couple it before
+`ShallowWaterSolver` and the rigid solver at their common rate. `readBlade(index)` reads its impulse.
+`FloodWadingSolver` exchanges horizontal drag with `LeggedLocomotion` and adds the immersed profile's buoyancy
+to its support load. Enable `readLoad` on the legged solver and use that solver's `world.levelOf` for both water
+and wading. The world order is wading, water, legs. `readBody(index)` reads the wading force.
+
+To return swimmer drag, opt in to `passiveReaction` on `SwimSolver` and add `SwimDragToWater` with the same
+bed and rate as the receiving shallow water. Add `SwimDragToWater.actuators()` to return the tail and fin
+impulses from the wake field. Both receivers distribute the signed horizontal N·s packets. Couple the
+swimmer first, both receivers next and water last. Give the swimmer that water's flow.
+
+```ts
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {SwimSolver} from 'margoengine/physics/life';
+import {SwimDragToWater} from 'margoengine/physics/loads';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const world = new PhysicsWorld({rate: {num: 60, den: 1}});
+const water = new ShallowWaterSolver();
+const swimmer = await SwimSolver.load({passiveReaction: true});
+const passive = new SwimDragToWater();
+const active = SwimDragToWater.actuators();
+const bed = bedSurface({columns: 1, rows: 1, width: 3, depth: 3, centre: [0, 0]}, new Float64Array(4).fill(-1));
+world.add(water, {bed, depth: 1, roughness: 0});
+world.add(swimmer, {flow: {...water.flow, medium: 'water' as const}, bodies: [{position: [0, -0.5, 0], velocity: [0, 0, 0.4],
+  mass: 8, volume: 0.008, length: 0.5, width: 0.12, height: 0.12,
+  tail: {amplitude: 0.06, span: 0.15, wavelength: 0.52}, frequency: 1.6}]});
+world.add(passive, {bed}).add(active, {bed});
+world.couple([swimmer.describe().id, passive.id, active.id, 'water'], 'staggered');
+world.advance(2);
+console.log(water.sample(0, 0).velocity);
+```
+
+```ts
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {LeggedLocomotion} from 'margoengine/physics/legged';
+import {FloodWadingSolver} from 'margoengine/physics/loads';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const legs = await LeggedLocomotion.load({readLoad: true});
+const water = new ShallowWaterSolver();
+const wading = new FloodWadingSolver();
+const bed = bedSurface({columns: 2, rows: 2, width: 2, depth: 2, centre: [0, 0]}, new Float64Array(9));
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(legs, {bodies: [{kind: 'biped', mass: 75, position: [0, 1.2, 0]}]});
+const rate = world.levelOf('legged-locomotion');
+world.add(water, {bed, depth: 1, roughness: 0, velocity: () => [1, 0], rate});
+world.add(wading, {bed, bodies: [{mass: 75, centreOffset: -0.5, halfHeight: 0.4, area: 0.2, volume: 0.03, dragCoefficient: 1}], rate});
+world.couple(['floodWading', 'water', 'legged-locomotion'], 'staggered');
+world.advance(1);
+console.log(wading.readBody(0)[1] > 0);
+```
 
 A moving slender structure (a `Rod`'s links, a hose, a mooring line) takes its loads from `segmentLoads(sea, options)`
 before each step. It uses the members' physics: DNV's coefficients by roughness and KC, Reynolds drag below the crisis,

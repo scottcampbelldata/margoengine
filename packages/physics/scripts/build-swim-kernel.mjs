@@ -59,6 +59,9 @@ const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: 
 assert.ok(all.subarray(0, base).every((byte) => byte === 0xa7));
 assert.ok(all.subarray(end).every((byte) => byte === 0xa7));
 assert.equal(typeof instance.exports.swim_step, 'function');
+assert.equal(instance.exports.swim_step.length, 8);
+assert.equal(typeof instance.exports.swim_step_passive, 'function');
+assert.equal(instance.exports.swim_step_passive.length, 9);
 
 const target = fileURLToPath(new URL('../src/life/swim-kernel' + (shared ? '-shared' : '') + '.wasm', import.meta.url));
 writeFileSync(target, bytes);

@@ -31,7 +31,13 @@ import {
   type SwimSpinePoint,
   type SwimTail,
 } from './model.js';
-import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './wake.js';
+import {
+  SWIM_PASSIVE_REACTION_FIELD,
+  SWIM_PASSIVE_REACTION_LAYOUT,
+  SWIM_WAKE_FIELD,
+  SWIM_WAKE_LAYOUT,
+  SWIM_WAKE_WORDS,
+} from './wake.js';
 
 export { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT } from './wake.js';
 
@@ -145,6 +151,10 @@ export interface SwimOptions {
   readonly readSchoolIntent?: boolean;
   /** Read externally computed contact forces and torques while swimming (default false). */
   readonly readContacts?: boolean;
+  /** Publish the passive linear drag's water impulse separately from the actuator wake (default false). */
+  readonly passiveReaction?: boolean;
+  /** Override the passive reaction output name when several swimmer solvers publish. */
+  readonly passiveReactionField?: string;
   /** Field names when more than one group registers ports (default names match SchoolSolver). */
   readonly fields?: {
     readonly kinematics?: string;
@@ -295,6 +305,7 @@ type Lease = ReturnType<typeof allocate>;
 function allocate(
   host: SolverHost,
   count: number,
+  passiveReaction: boolean,
 ): {
   bodies: Region;
   next: Region;
@@ -305,6 +316,7 @@ function allocate(
   nextKinematics: Region;
   wake: Region;
   nextWake: Region;
+  passive?: { current: Region; next: Region };
 } {
   const rows = (name: string, width: number, layout = 1) => host.allocate(name, width * count * 8, 'f64', layout);
   return {
@@ -317,6 +329,12 @@ function allocate(
     nextKinematics: rows('swim-kinematics-next', KINEMATICS_WORDS, SCHOOL_LAYOUT),
     wake: rows('swim-wake', 2 * SWIM_WAKE_WORDS, SWIM_WAKE_LAYOUT),
     nextWake: rows('swim-wake-next', 2 * SWIM_WAKE_WORDS, SWIM_WAKE_LAYOUT),
+    passive: passiveReaction
+      ? {
+          current: rows('swim-passive-reaction', SWIM_WAKE_WORDS, SWIM_PASSIVE_REACTION_LAYOUT),
+          next: rows('swim-passive-reaction-next', SWIM_WAKE_WORDS, SWIM_PASSIVE_REACTION_LAYOUT),
+        }
+      : undefined,
   };
 }
 
@@ -340,6 +358,7 @@ export class SwimSolver implements Solver<SwimParams> {
     kinematics: FieldDescriptor;
     intent: FieldDescriptor;
     wake: FieldDescriptor;
+    passive?: FieldDescriptor;
     contacts: FieldDescriptor;
   };
   private readonly surface: SeaSurfaceSample = {
@@ -361,7 +380,15 @@ export class SwimSolver implements Solver<SwimParams> {
     private readonly builds: SwimKernelBuilds,
     options: SwimOptions,
   ) {
-    const { id = 'swim', level = 0, fields, readSchoolIntent = false, readContacts = false } = options;
+    const {
+      id = 'swim',
+      level = 0,
+      fields,
+      readSchoolIntent = false,
+      readContacts = false,
+      passiveReaction = false,
+      passiveReactionField,
+    } = options;
     if (!isRateLevel(level)) throw new RangeError('Choose a swim rate level from 0 to 7.');
     this.id = id;
     this.preferred = level;
@@ -374,6 +401,11 @@ export class SwimSolver implements Solver<SwimParams> {
           : { ...SCHOOL_KINEMATICS_FIELD, name: fields.kinematics },
       intent: fields?.intent === undefined ? SCHOOL_INTENT_FIELD : { ...SCHOOL_INTENT_FIELD, name: fields.intent },
       wake: fields?.wake === undefined ? SWIM_WAKE_FIELD : { ...SWIM_WAKE_FIELD, name: fields.wake },
+      passive: passiveReaction
+        ? passiveReactionField === undefined
+          ? SWIM_PASSIVE_REACTION_FIELD
+          : { ...SWIM_PASSIVE_REACTION_FIELD, name: passiveReactionField }
+        : undefined,
       contacts: fields?.contacts === undefined ? SWIM_CONTACT_FIELD : { ...SWIM_CONTACT_FIELD, name: fields.contacts },
     };
   }
@@ -391,6 +423,7 @@ export class SwimSolver implements Solver<SwimParams> {
       fields: [
         { field: this.fields.kinematics, access: 'write' },
         { field: this.fields.wake, access: 'write' },
+        ...(this.fields.passive ? [{ field: this.fields.passive, access: 'write' as const }] : []),
         ...(this.readSchoolIntent ? [{ field: this.fields.intent, access: 'read' as const }] : []),
         ...(this.readContacts ? [{ field: this.fields.contacts, access: 'read' as const }] : []),
       ],
@@ -443,8 +476,9 @@ export class SwimSolver implements Solver<SwimParams> {
     this.density = density;
     this.sea = sea;
     this.flow = flow;
-    const kernel = instantiateSwimKernel(host, this.builds);
-    const lease = allocate(host, models.length);
+    const withPassive = this.fields.passive !== undefined;
+    const kernel = instantiateSwimKernel(host, this.builds, withPassive);
+    const lease = allocate(host, models.length, withPassive);
     const bodyWords = words(host, lease.bodies);
     const motion = words(host, lease.kinematics);
     const commands = words(host, lease.command);
@@ -614,16 +648,18 @@ export class SwimSolver implements Solver<SwimParams> {
       for (let component = 0; component < CONTACT_WORDS; component++)
         medium[mediumAt + 22 + component] = finite(contacts?.[row * CONTACT_WORDS + component] ?? 0, 'contact wrench');
     }
-    const status = kernel(
+    const args = [
       lease.bodies.byteOffset,
       lease.parameters.byteOffset,
       lease.medium.byteOffset,
       lease.next.byteOffset,
       lease.nextKinematics.byteOffset,
       lease.nextWake.byteOffset,
-      models.length,
-      dt,
-    );
+    ] as const;
+    const passive = lease.passive;
+    const status = passive
+      ? kernel.passive(...args, passive.next.byteOffset, models.length, dt)
+      : kernel.step(...args, models.length, dt);
     if (status)
       throw new RangeError(
         'Swimming integration exceeded its numeric range. Use smaller loads or consistent swimmer dimensions in SI units.',
@@ -631,6 +667,7 @@ export class SwimSolver implements Solver<SwimParams> {
     words(host, lease.bodies).set(words(host, lease.next));
     words(host, lease.kinematics).set(words(host, lease.nextKinematics));
     words(host, lease.wake).set(words(host, lease.nextWake));
+    if (passive) words(host, passive.current).set(words(host, passive.next));
   }
 
   private water(
@@ -726,6 +763,9 @@ export class SwimSolver implements Solver<SwimParams> {
       ? [
           { field: fields.kinematics.name, region: lease.kinematics, tick, cell: ORIGIN },
           { field: fields.wake.name, region: lease.wake, tick, cell: ORIGIN },
+          ...(fields.passive && lease.passive
+            ? [{ field: fields.passive.name, region: lease.passive.current, tick, cell: ORIGIN }]
+            : []),
         ]
       : [];
   }
@@ -734,7 +774,9 @@ export class SwimSolver implements Solver<SwimParams> {
 
   stateRegions(): readonly Region[] {
     const { lease } = this;
-    return lease ? [lease.bodies, lease.command, lease.kinematics, lease.wake] : [];
+    return lease
+      ? [lease.bodies, lease.command, lease.kinematics, lease.wake, ...(lease.passive ? [lease.passive.current] : [])]
+      : [];
   }
 
   extraState(): readonly Region[] {

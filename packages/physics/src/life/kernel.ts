@@ -18,6 +18,18 @@ type SwimStep = (
   dt: number,
 ) => number;
 
+type SwimPassiveStep = (
+  body: number,
+  parameters: number,
+  medium: number,
+  next: number,
+  kinematics: number,
+  wake: number,
+  passiveReaction: number,
+  count: number,
+  dt: number,
+) => number;
+
 async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
   try {
     if (url.protocol === 'file:') {
@@ -58,7 +70,11 @@ export async function loadSwimKernel(signal?: AbortSignal): Promise<SwimKernelBu
   return { plain, shared };
 }
 
-export function instantiateSwimKernel(host: SolverHost, builds: SwimKernelBuilds): SwimStep {
+export function instantiateSwimKernel(
+  host: SolverHost,
+  builds: SwimKernelBuilds,
+  withPassive: boolean,
+): { step: SwimStep; passive: SwimPassiveStep } {
   const module = isShared(host.memory) ? builds.shared : builds.plain;
   if (!module)
     throw new MargoError(
@@ -68,11 +84,15 @@ export function instantiateSwimKernel(host: SolverHost, builds: SwimKernelBuilds
   const stack = host.allocate('swim-kernel-stack', STACK_BYTES + 16, 'u8', 1);
   const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
   const pointer = exports.__stack_pointer;
-  if (!(pointer instanceof WebAssembly.Global) || typeof exports.swim_step !== 'function')
+  if (
+    !(pointer instanceof WebAssembly.Global) ||
+    typeof exports.swim_step !== 'function' ||
+    (withPassive && typeof exports.swim_step_passive !== 'function')
+  )
     throw new MargoError(
       'failed',
       'The swimming kernel is missing exports. Run the Physics package and swimming Wasm builds.',
     );
   pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
-  return exports.swim_step as SwimStep;
+  return { step: exports.swim_step as SwimStep, passive: exports.swim_step_passive as SwimPassiveStep };
 }
