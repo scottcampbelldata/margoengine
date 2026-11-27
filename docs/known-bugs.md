@@ -420,8 +420,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   second it swings 0.246 D. Strip wake models feed a mode only where the local shedding frequency meets it, so a strongly
   sheared flow feeds less span than the measurement shows; the paper's CFD resolves the wake along the span and is within
   5 %.
-- **Open:** the wakes' correlation along the span in sheared flow (a coupling between neighbouring wake oscillators, as in
-  diffusive wake models), checked on this case and on the paper's bidirectionally sheared cases.
+- **Ruled out (2026-11-27):** the drag's damping outside the lock-in span (a mean drag of 0.5 or 0.25 in place of 1 leaves
+  the swing at 0.27 D and 0.24 D, so the swing is short of excitation, not over-damped); locking each wake's frequency to its
+  segment's own cross-flow frequency within a band of the local shedding (30 %: 0.246 D; 60 %: the third mode, 0.11 D).
+- **Open:** an excitation model that feeds a strongly sheared span as measured, from the published time-domain VIV load
+  models (the excitation force synchronised to the cross-flow velocity, Thorsen, Saevik and Larsen 2014 and 2016), checked
+  on this case and on the paper's bidirectionally sheared cases with no new fitting.
 
 ### Open 2026-11-27: a rod pinned at both ends blows up at coarse steps under high tension, and at fine steps when stretched (KB-PHYS-RODSTRING1, physics rod)
 
