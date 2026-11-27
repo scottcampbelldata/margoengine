@@ -8,8 +8,20 @@ import { fault } from '../../shared/errors.js';
 /** A world-space vector [x, y, z]. */
 export type LiquidVec3 = readonly [number, number, number];
 
-/** Floats per particle record: position, density ratio, velocity, unused, then the three rows of C, each padded to 4. */
+/**
+ * Floats per particle record: position (0..2), density over rest density (3), velocity (4..6), liquid index (7), the
+ * APIC matrix C row by row (8..16) and the particle's linear RGB colour (17..19).
+ */
 export const LIQUID_PARTICLE_FLOATS = 20;
+/** Offset of a particle's colour in its record. */
+export const LIQUID_COLOR_OFFSET = 17;
+/**
+ * Words per grid node: while particles scatter, the fixed-point sums of weight, mass, momentum (3) and colour (3); after
+ * the grid update the node's velocity (3), mass and weight as f32 bits, the colour sums kept.
+ */
+export const LIQUID_GRID_STRIDE = 8;
+/** Most liquids one GPULiquid holds. */
+export const MAX_LIQUIDS = 4;
 /** Most particles one GPULiquid holds. */
 export const MAX_GPU_LIQUID_PARTICLES = 1_048_576;
 /** Most grid nodes one GPULiquid holds (64 MiB of grid). */
@@ -104,8 +116,11 @@ export interface LiquidCollider {
 export interface LiquidDebugOptions {
   /** Turns the view on. Default false. */
   enabled?: boolean;
-  /** Colour particles by `'speed'` or `'density'`, or `'off'` to keep the liquid surface. Default `'speed'`. */
-  particles?: 'speed' | 'density' | 'off';
+  /**
+   * Colour particles by `'speed'`, `'density'` or their own `'color'` (each liquid's, as it mixes), or `'off'` to keep the
+   * liquid surface. Default `'speed'`.
+   */
+  particles?: 'speed' | 'density' | 'color' | 'off';
   /** Speed drawn at the top of the colour ramp, m/s, > 0. Default the speed of a fall through the container's height. */
   speedScale?: number;
   /** Draws the grid on the container's floor and back wall. Default true. */
@@ -133,6 +148,17 @@ export interface GPULiquidOptions {
   gravity?: LiquidVec3;
   /** Liquid density in kg/m³, for `forces`. Default 1000 (water). */
   density?: number;
+  /**
+   * Up to 4 liquids, each with its own start box, density, viscosity and colour; they share the container, the grid and
+   * the speed of sound, and `count` is split between them by the volume of their boxes. A heavier liquid sinks through a
+   * lighter one. Default one liquid from `fill`, `density` and `viscosity`.
+   */
+  liquids?: readonly LiquidKindOptions[];
+  /**
+   * How fast neighbouring particles' colours blend, 1/s, 0 to 1000: each particle's colour relaxes towards the mean
+   * colour of the liquid round it at this rate, so a dye spreads where the liquid stirs. 0 keeps every colour. Default 0.
+   */
+  mixing?: number;
   /** Speed of sound in m/s, 0.05..1000; higher is stiffer and takes more substeps. Default 2 * sqrt(|g| * box height). */
   speedOfSound?: number;
   /** Kinematic viscosity in m²/s, 0 up to cellSize² / (8 * substep). Default 0.0005. */
@@ -162,6 +188,33 @@ export interface GPULiquidOptions {
   colliders?: readonly LiquidCollider[];
   /** Debug view. Default off. */
   debug?: LiquidDebugOptions;
+}
+
+/** One liquid of {@link GPULiquidOptions.liquids}. */
+export interface LiquidKindOptions {
+  /** Its start box inside the container; boxes of different liquids must not overlap. Default `fill` (first liquid only). */
+  fill?: LiquidBox;
+  /** Density in kg/m³, 0.001 to 1,000,000. Default the options' `density`. */
+  density?: number;
+  /** Kinematic viscosity in m²/s, in the same range as `viscosity`. Default the options' `viscosity`. */
+  viscosity?: number;
+  /** Linear RGB colour, each 0 to 1; the surface tints the light through it. Default [1, 1, 1] (the surface's own colour). */
+  color?: LiquidVec3;
+}
+
+/** A checked liquid with its start block. */
+export interface ResolvedLiquidKind {
+  fillMin: LiquidVec3;
+  fillMax: LiquidVec3;
+  lattice: LiquidVec3;
+  /** First particle and number of particles. */
+  start: number;
+  count: number;
+  density: number;
+  /** density over the options' density, the particle's mass in units of particleMass. */
+  massRatio: number;
+  viscosity: number;
+  color: LiquidVec3;
 }
 
 /** The resolved, checked parameters the CPU twin and the GPU step run on. */
@@ -194,6 +247,9 @@ export interface ResolvedLiquidParams {
   viscosity: number;
   surfaceTension: number;
   adhesion: number;
+  /** The liquids; the first's fill and lattice are also `fillMin`, `fillMax` and `lattice`. */
+  kinds: ResolvedLiquidKind[];
+  mixing: number;
   /** Longest substep in seconds: LIQUID_CFL * h / c. */
   maxSubstep: number;
   maxSubsteps: number;
@@ -219,13 +275,13 @@ export interface ResolvedCollider {
   mesh?: LiquidMeshShape;
 }
 
-/** The liquid's state: interleaved particle records (the GPU buffer's layout) and the collider impulse sums. */
+/** The liquid's state: interleaved particle records (the GPU buffer's layout), the collider impulse sums and the grid. */
 export interface LiquidState {
   /** count * LIQUID_PARTICLE_FLOATS floats. */
   particles: Float32Array;
   /** Per collider: impulse on the body (x, y, z) then its moment about the centre (x, y, z), in fixed-point units. */
   impulses: Float64Array;
-  /** The grid of the last substep: per node mass, then velocity (after the grid update). */
+  /** The grid of the last substep, LIQUID_GRID_STRIDE words a node: after the update velocity, mass, weight, colour sums. */
   grid: Float64Array;
 }
 
@@ -314,17 +370,44 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     },
     'fill',
   );
-  for (let a = 0; a < 3; a++)
-    if (fill.min[a]! < container.min[a]! || fill.max[a]! > container.max[a]!)
-      throw liquidError('GPULiquid fill must lie inside box');
-  // The start lattice: equal spacing s in the fill volume, rounded to whole columns in x and z, filled from the floor.
-  const fs = [0, 1, 2].map((a) => fill.max[a]! - fill.min[a]!);
-  const s = Math.cbrt((fs[0]! * fs[1]! * fs[2]!) / count);
-  const nx = Math.max(1, Math.round(fs[0]! / s)),
-    nz = Math.max(1, Math.round(fs[2]! / s));
-  const lattice: LiquidVec3 = [fs[0]! / nx, s, fs[2]! / nz];
+  const liquidList = options.liquids ?? [{}];
+  if (!Array.isArray(liquidList) || liquidList.length < 1 || liquidList.length > MAX_LIQUIDS)
+    throw liquidError(`GPULiquid liquids must be an array of 1 to ${MAX_LIQUIDS} liquids`);
+  const fills = liquidList.map((k, i) => {
+    if (!k || typeof k !== 'object') throw liquidError(`GPULiquid liquids[${i}] must be an object`);
+    if (i > 0 && k.fill === undefined) throw liquidError(`GPULiquid liquids[${i}].fill is required; give each liquid after the first its own box`);
+    const f = i === 0 && k.fill === undefined ? fill : box(k.fill, fill, `liquids[${i}].fill`);
+    for (let a = 0; a < 3; a++)
+      if (f.min[a]! < container.min[a]! || f.max[a]! > container.max[a]!)
+        throw liquidError(i ? `GPULiquid liquids[${i}].fill must lie inside box` : 'GPULiquid fill must lie inside box');
+    return f;
+  });
+  for (let i = 0; i < fills.length; i++)
+    for (let j = 0; j < i; j++)
+      if ([0, 1, 2].every((a) => fills[i]!.min[a]! < fills[j]!.max[a]! && fills[j]!.min[a]! < fills[i]!.max[a]!))
+        throw liquidError(`GPULiquid liquids[${j}] and liquids[${i}] start in overlapping boxes; move one so they only touch`);
+  // The start lattice: one spacing s for every liquid, rounded to whole columns in x and z per box, filled from its
+  // floor; count is split by volume.
+  const volumes = fills.map((f) => (f.max[0] - f.min[0]) * (f.max[1] - f.min[1]) * (f.max[2] - f.min[2]));
+  const total = volumes.reduce((a, b) => a + b, 0);
+  const s = Math.cbrt(total / count);
+  let given = 0;
+  const blocks = fills.map((f, i) => {
+    const n = i === fills.length - 1 ? count - given : Math.round((count * volumes[i]!) / total);
+    if (n < 1) throw liquidError(`GPULiquid liquids[${i}].fill gets no particles of ${count}; enlarge it or raise count`);
+    const start = given;
+    given += n;
+    const nx = Math.max(1, Math.round((f.max[0] - f.min[0]) / s)),
+      nz = Math.max(1, Math.round((f.max[2] - f.min[2]) / s));
+    const lattice: LiquidVec3 = [(f.max[0] - f.min[0]) / nx, s, (f.max[2] - f.min[2]) / nz];
+    return { fillMin: f.min, fillMax: f.max, lattice, start, count: n };
+  });
+  if (given !== count) throw liquidError(`GPULiquid liquids split ${count} particles into ${given}; enlarge the smaller boxes`);
+  const lattice = blocks[0]!.lattice;
   const longest = Math.max(size[0]!, size[1]!, size[2]!);
-  const spacing = Math.cbrt(lattice[0] * lattice[1] * lattice[2]);
+  // The mean volume a particle starts with, the rest density's.
+  const volume = blocks.reduce((a, b) => a + b.count * b.lattice[0] * b.lattice[1] * b.lattice[2], 0) / count;
+  const spacing = Math.cbrt(volume);
   const autoRes = Math.min(256, Math.max(8, Math.round(longest / (2 * spacing))));
   const resolution = num(options.resolution, autoRes, 'resolution', 8, 256, true);
   const h0 = longest / resolution;
@@ -351,6 +434,18 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   const tensionMax = (density0 * h * h * h) / (2 * Math.PI * maxSubstep * maxSubstep);
   const surfaceTension = num(options.surfaceTension, 0, 'surfaceTension', 0, tensionMax);
   const adhesion = num(options.adhesion, 0, 'adhesion', 0, 1000);
+  const mixing = num(options.mixing, 0, 'mixing', 0, 1000);
+  const kinds = blocks.map((b, i): ResolvedLiquidKind => {
+    const k = liquidList[i]!;
+    const kd = num(k.density, density0, `liquids[${i}].density`, 1e-3, 1e6);
+    return {
+      ...b,
+      density: kd,
+      massRatio: kd / density0,
+      viscosity: num(k.viscosity, viscosity, `liquids[${i}].viscosity`, 0, (h * h) / (8 * maxSubstep)),
+      color: vec(k.color, [1, 1, 1], `liquids[${i}].color`, 0, 1),
+    };
+  });
   const seed = num(options.seed, 0, 'seed', 0, 2 ** 32 - 1, true);
   if (options.paused !== undefined && typeof options.paused !== 'boolean')
     throw liquidError('GPULiquid paused must be true or false');
@@ -416,8 +511,8 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   for (const key of ['enabled', 'grid', 'container', 'colliders'] as const)
     if (d[key] !== undefined && typeof d[key] !== 'boolean') throw liquidError(`GPULiquid debug.${key} must be true or false`);
   const mode = d.particles ?? 'speed';
-  if (mode !== 'speed' && mode !== 'density' && mode !== 'off')
-    throw liquidError(`GPULiquid debug.particles must be 'speed', 'density' or 'off', not ${String(mode)}`);
+  if (mode !== 'speed' && mode !== 'density' && mode !== 'color' && mode !== 'off')
+    throw liquidError(`GPULiquid debug.particles must be 'speed', 'density', 'color' or 'off', not ${String(mode)}`);
   const debug: Required<LiquidDebugOptions> = {
     enabled: d.enabled ?? false,
     particles: mode,
@@ -426,13 +521,12 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     container: d.container ?? true,
     colliders: d.colliders ?? true,
   };
-  const volume = lattice[0] * lattice[1] * lattice[2];
   return {
     count,
     boxMin: container.min,
     boxMax: container.max,
-    fillMin: fill.min,
-    fillMax: fill.max,
+    fillMin: blocks[0]!.fillMin,
+    fillMax: blocks[0]!.fillMax,
     lattice,
     cell,
     cellSize: h,
@@ -448,6 +542,8 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     viscosity,
     surfaceTension,
     adhesion,
+    kinds,
+    mixing,
     maxSubstep,
     maxSubsteps,
     seed,
@@ -472,26 +568,39 @@ const pcg = (v: number): number => {
   return ((word >>> 22) ^ word) >>> 0;
 };
 
-/** The start state: the fill block on its lattice, every particle within a quarter spacing of its site, at rest. */
+/**
+ * The start state: each liquid's block on its lattice, every particle within a quarter spacing of its site, at rest,
+ * with its liquid's index and colour.
+ */
 export function createLiquidState(params: ResolvedLiquidParams): LiquidState {
-  const { count, fillMin, fillMax, lattice, boxMin, boxMax } = params;
-  const nx = Math.max(1, Math.round((fillMax[0] - fillMin[0]) / lattice[0]));
-  const nz = Math.max(1, Math.round((fillMax[2] - fillMin[2]) / lattice[2]));
+  const { count, boxMin, boxMax } = params;
   const particles = new Float32Array(count * LIQUID_PARTICLE_FLOATS);
-  for (let i = 0; i < count; i++) {
-    const ix = i % nx,
-      iz = Math.floor(i / nx) % nz,
-      iy = Math.floor(i / (nx * nz));
-    const site = [ix + 0.5, iy + 0.5, iz + 0.5];
-    const b = i * LIQUID_PARTICLE_FLOATS;
-    for (let a = 0; a < 3; a++) {
-      const jitter = (pcg(params.seed * 3 + a + 3 * i * 0x9e37) / 4294967296 - 0.5) * 0.5;
-      const x = fillMin[a]! + (site[a]! + jitter) * lattice[a]!;
-      particles[b + a] = Math.min(boxMax[a]!, Math.max(boxMin[a]!, x));
+  params.kinds.forEach((k, kind) => {
+    const { fillMin, fillMax, lattice } = k;
+    const nx = Math.max(1, Math.round((fillMax[0] - fillMin[0]) / lattice[0]));
+    const nz = Math.max(1, Math.round((fillMax[2] - fillMin[2]) / lattice[2]));
+    for (let j = 0; j < k.count; j++) {
+      const i = k.start + j;
+      const ix = j % nx,
+        iz = Math.floor(j / nx) % nz,
+        iy = Math.floor(j / (nx * nz));
+      const site = [ix + 0.5, iy + 0.5, iz + 0.5];
+      const b = i * LIQUID_PARTICLE_FLOATS;
+      for (let a = 0; a < 3; a++) {
+        const jitter = (pcg(params.seed * 3 + a + 3 * i * 0x9e37) / 4294967296 - 0.5) * 0.5;
+        const x = fillMin[a]! + (site[a]! + jitter) * lattice[a]!;
+        particles[b + a] = Math.min(boxMax[a]!, Math.max(boxMin[a]!, x));
+      }
+      particles[b + 3] = 1;
+      particles[b + 7] = kind;
+      particles.set(k.color, b + LIQUID_COLOR_OFFSET);
     }
-    particles[b + 3] = 1;
-  }
-  return { particles, impulses: new Float64Array(MAX_LIQUID_COLLIDERS * 6), grid: new Float64Array(params.nodes * 4) };
+  });
+  return {
+    particles,
+    impulses: new Float64Array(MAX_LIQUID_COLLIDERS * 6),
+    grid: new Float64Array(params.nodes * LIQUID_GRID_STRIDE),
+  };
 }
 
 /** FNV-1a of the particle bytes, as 8 hex digits. */
@@ -777,7 +886,7 @@ function surfaceColor(p: ResolvedLiquidParams, grid: Float64Array, ix: number, i
     kz = wallMirrors(p, 2, iz, mz);
   let m = 0;
   for (let z = 0; z < kz; z++)
-    for (let y = 0; y < ky; y++) for (let k = 0; k < kx; k++) m += grid[(mx[k]! + nx * (my[y]! + ny * mz[z]!)) * 4]!;
+    for (let y = 0; y < ky; y++) for (let k = 0; k < kx; k++) m += grid[(mx[k]! + nx * (my[y]! + ny * mz[z]!)) * LIQUID_GRID_STRIDE]!;
   let ghost = 0;
   if (p.colliders.length) {
     x[0] = p.origin[0] + ix * p.cell[0];
@@ -921,7 +1030,8 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
   const [nx, ny] = p.dims;
   const k4 = [4 / (cell[0] * cell[0]), 4 / (cell[1] * cell[1]), 4 / (cell[2] * cell[2])];
   const kp = (dt * p.speedOfSound * p.speedOfSound) / LIQUID_GAMMA;
-  const kv = dt * p.viscosity;
+  const G = LIQUID_GRID_STRIDE;
+  const mixing = p.mixing ? 1 - Math.exp(-p.mixing * dt) : 0;
   const w = new Float64Array(12);
   const base = [0, 0, 0];
   const d = [0, 0, 0];
@@ -929,7 +1039,7 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
   const mx = [0, 0],
     my = [0, 0],
     mz = [0, 0];
-  const at = (ix: number, iy: number, iz: number) => (ix + nx * (iy + ny * iz)) * 4;
+  const at = (ix: number, iy: number, iz: number) => (ix + nx * (iy + ny * iz)) * G;
   const normal = [0, 0, 0];
   const x: [number, number, number] = [0, 0, 0];
   const hc = Math.cbrt(cell[0] * cell[1] * cell[2]);
@@ -942,9 +1052,11 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
   };
   grid.fill(0);
 
-  // P2G, mass and APIC momentum: m_i += w, (m v)_i += w (v + C d).
+  // P2G: weight n_i += w (the number density), mass m_i += w m_p and APIC momentum (m v)_i += w m_p (v + C d), in units
+  // of particleMass; the colour sums when the colours mix.
   for (let i = 0; i < p.count; i++) {
     const b = i * F;
+    const mr = p.kinds[particles[b + 7]!]!.massRatio;
     for (let a = 0; a < 3; a++) base[a] = stencil(p, particles[b + a]!, a, w, a * 4);
     for (let c = 0; c < 3; c++)
       for (let bb = 0; bb < 3; bb++)
@@ -953,10 +1065,12 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
           offsets(aa, bb, c);
           const node = at(base[0]! + aa, base[1]! + bb, base[2]! + c);
           grid[node] += fixed(weight, S);
+          grid[node + 1] += fixed(weight * mr, S);
           for (let r = 0; r < 3; r++) {
-            const row = b + 8 + r * 4;
+            const row = b + 8 + r * 3;
             const cd = particles[row]! * d[0]! + particles[row + 1]! * d[1]! + particles[row + 2]! * d[2]!;
-            grid[node + 1 + r] += fixed(weight * (particles[b + 4 + r]! + cd), S);
+            grid[node + 2 + r] += fixed(weight * mr * (particles[b + 4 + r]! + cd), S);
+            if (mixing) grid[node + 5 + r] += fixed(weight * particles[b + LIQUID_COLOR_OFFSET + r]!, S);
           }
         }
   }
@@ -996,7 +1110,10 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
     const ratio = rho / p.restDensity;
     particles[b + 3] = ratio;
     const capped = Math.min(Math.fround(ratio), LIQUID_MAX_RATIO);
-    const pc = capped > 1 ? (kp * (capped ** LIQUID_GAMMA - 1)) / capped : 0;
+    // Each liquid's Tait pressure on the shared number density (Solenthaler and Pajarola 2008) and its own viscosity.
+    const kind = p.kinds[particles[b + 7]!]!;
+    const pc = capped > 1 ? (kind.massRatio * kp * (capped ** LIQUID_GAMMA - 1)) / capped : 0;
+    const kv = dt * kind.viscosity * kind.massRatio;
     for (let c = 0; c < 3; c++)
       for (let bb = 0; bb < 3; bb++)
         for (let aa = 0; aa < 3; aa++) {
@@ -1005,10 +1122,10 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
           const node = at(base[0]! + aa, base[1]! + bb, base[2]! + c);
           for (let r = 0; r < 3; r++) {
             // (C + C^T) kd, row r: C[r] . kd plus column r of C . kd.
-            const row = b + 8 + r * 4;
+            const row = b + 8 + r * 3;
             const cd = particles[row]! * kd[0]! + particles[row + 1]! * kd[1]! + particles[row + 2]! * kd[2]!;
-            const ctd = particles[b + 8 + r]! * kd[0]! + particles[b + 12 + r]! * kd[1]! + particles[b + 16 + r]! * kd[2]!;
-            grid[node + 1 + r] += fixed(weight * (pc * kd[r]! - kv * (cd + ctd)), S);
+            const ctd = particles[b + 8 + r]! * kd[0]! + particles[b + 11 + r]! * kd[1]! + particles[b + 14 + r]! * kd[2]!;
+            grid[node + 2 + r] += fixed(weight * (pc * kd[r]! - kv * (cd + ctd)), S);
           }
         }
   }
@@ -1025,16 +1142,17 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
   const lo = LIQUID_PAD;
   for (let iz = 0, node = 0; iz < p.dims[2]; iz++)
     for (let iy = 0; iy < ny; iy++)
-      for (let ix = 0; ix < nx; ix++, node += 4) {
-        const mf = grid[node]!;
+      for (let ix = 0; ix < nx; ix++, node += G) {
+        const mf = grid[node + 1]!;
         if (mf <= 0) {
-          grid[node] = grid[node + 1] = grid[node + 2] = grid[node + 3] = 0;
+          grid.fill(0, node, node + G);
           continue;
         }
         const m = mf / S;
-        let vx = grid[node + 1]! / S / m + p.gravity[0] * dt,
-          vy = grid[node + 2]! / S / m + p.gravity[1] * dt,
-          vz = grid[node + 3]! / S / m + p.gravity[2] * dt;
+        const count = grid[node]! / S;
+        let vx = grid[node + 2]! / S / m + p.gravity[0] * dt,
+          vy = grid[node + 3]! / S / m + p.gravity[1] * dt,
+          vz = grid[node + 4]! / S / m + p.gravity[2] * dt;
         x[0] = p.origin[0] + ix * cell[0];
         x[1] = p.origin[1] + iy * cell[1];
         x[2] = p.origin[2] + iz * cell[2];
@@ -1045,7 +1163,7 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
           // force's integral across the surface is the Laplace jump; a node under LIQUID_TENSION_FLOOR of rest density
           // (the far edge of the particles' spread) is pushed as one at that density, so near-empty nodes are not flung.
           surfaceForce(p, surf, ix, iy, iz, f3);
-          const cw = 1 / Math.max(m / p.restDensity, LIQUID_TENSION_FLOOR);
+          const cw = 1 / (Math.max(count / p.restDensity, LIQUID_TENSION_FLOOR) * (m / Math.max(count, 1e-30)));
           vx += ks * cw * f3[0]!;
           vy += ks * cw * f3[1]!;
           vz += ks * cw * f3[2]!;
@@ -1145,10 +1263,11 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         if ((ix <= lo && vx < 0) || (ix >= lo + p.cells[0] && vx > 0)) vx = 0;
         if ((iy <= lo && vy < 0) || (iy >= lo + p.cells[1] && vy > 0)) vy = 0;
         if ((iz <= lo && vz < 0) || (iz >= lo + p.cells[2] && vz > 0)) vz = 0;
-        grid[node] = m;
-        grid[node + 1] = Math.fround(vx);
-        grid[node + 2] = Math.fround(vy);
-        grid[node + 3] = Math.fround(vz);
+        grid[node] = Math.fround(vx);
+        grid[node + 1] = Math.fround(vy);
+        grid[node + 2] = Math.fround(vz);
+        grid[node + 3] = m;
+        grid[node + 4] = count;
       }
 
   // G2P: velocity and APIC C = sum w v (D^-1 d)^T, advect, out of the colliders, inside the walls.
@@ -1159,15 +1278,21 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
       vy = 0,
       vz = 0;
     const B = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const tint = [0, 0, 0];
+    let around = 0;
     for (let c = 0; c < 3; c++)
       for (let bb = 0; bb < 3; bb++)
         for (let aa = 0; aa < 3; aa++) {
           const weight = w[aa]! * w[4 + bb]! * w[8 + c]!;
           offsets(aa, bb, c);
           const node = at(base[0]! + aa, base[1]! + bb, base[2]! + c);
-          const gx = grid[node + 1]!,
-            gy = grid[node + 2]!,
-            gz = grid[node + 3]!;
+          const gx = grid[node]!,
+            gy = grid[node + 1]!,
+            gz = grid[node + 2]!;
+          if (mixing) {
+            around += weight * grid[node + 4]!;
+            for (let r = 0; r < 3; r++) tint[r] = tint[r]! + (weight * grid[node + 5 + r]!) / S;
+          }
           vx += weight * gx;
           vy += weight * gy;
           vz += weight * gz;
@@ -1198,9 +1323,10 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         (v[2]! - (c.velocity[2] + ax * ry - ay * rx)) * normal[2]!;
       if (vn >= 0) continue;
       for (let a = 0; a < 3; a++) v[a] = v[a]! - vn * normal[a]!;
-      const jx = vn * normal[0]!,
-        jy = vn * normal[1]!,
-        jz = vn * normal[2]!;
+      const mr = p.kinds[particles[b + 7]!]!.massRatio;
+      const jx = mr * vn * normal[0]!,
+        jy = mr * vn * normal[1]!,
+        jz = mr * vn * normal[2]!;
       const o = k * 6,
         FS = LIQUID_FORCE_FIXED;
       impulses[o] += fixed(jx, FS);
@@ -1220,9 +1346,14 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
       }
       particles[b + a] = x[a]!;
       particles[b + 4 + a] = v[a]!;
-      particles[b + 8 + a * 4] = B[a * 3]!;
-      particles[b + 9 + a * 4] = B[a * 3 + 1]!;
-      particles[b + 10 + a * 4] = B[a * 3 + 2]!;
+      particles[b + 8 + a * 3] = B[a * 3]!;
+      particles[b + 9 + a * 3] = B[a * 3 + 1]!;
+      particles[b + 10 + a * 3] = B[a * 3 + 2]!;
+      // Mixing: the colour relaxes towards the weighted mean colour of the liquid round it.
+      if (mixing && around > 0) {
+        const o = b + LIQUID_COLOR_OFFSET + a;
+        particles[o] = particles[o]! + (tint[a]! / around - particles[o]!) * mixing;
+      }
     }
   }
 }

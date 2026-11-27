@@ -894,6 +894,9 @@ engine.render({ delta: 1 / 60 });
 console.log(await liquid.readWhitewater()); // { spray, foam, bubbles }
 ```
 
+`particles.colorOffset` reads a linear RGB colour per particle from the positions' own records (same `stride`): the
+surface then tints the light through the liquid by the thickness-weighted mean colour of the particles along each ray,
+on top of `color`, so coloured liquids, dyes and mixed particle systems draw in their colours.
 `particles.velocities` follows the positions' layout (same `stride`; `velocityOffset` for an interleaved array). The
 defaults are the paper's: trapped-air range `trappedAir` [5, 20] m/s, `waveCrest` [2, 8], `kineticEnergy` [5, 50] J with
 `particleMass` 1000 * (2 * radius)^3 kg (a water cube one spacing wide; small scenes need a lower energy range, as
@@ -1012,10 +1015,18 @@ debug view through `setPointer`, `setColliders` and `setDebug`):
 - `paused` false; `step(dt)` advances now in equal substeps (0 to 1 s), also while paused.
 - `surface` (attach only): `ParticleLiquid` options for the surface, or `false` for none; default radius the particle
   spacing. `liquid.surface` is that `ParticleLiquid`, its options live. The particle buffer is also yours:
-  `liquid.particleBuffer(engine.gpu)` holds five vec4 a particle (position and density over rest density, velocity, the
-  three rows of the APIC matrix), to draw or read with your own shaders.
-- `debug` (or `setDebug`): `{ enabled, particles: 'speed' | 'density' | 'off', speedScale?, grid, container,
-  colliders }`. On, it colours every particle by its speed (blue still to red at `speedScale`, default the speed of a
+  `liquid.particleBuffer(engine.gpu)` holds 20 floats a particle (position and density over rest density, velocity and
+  liquid index, the APIC matrix row by row, then the linear RGB colour at `LIQUID_COLOR_OFFSET`), to draw or read with
+  your own shaders.
+- `liquids`, up to 4: `{ fill, density?, viscosity?, color? }` each, sharing the container, the grid and the speed of
+  sound; `count` is split between them by the volume of their `fill` boxes (which must not overlap; the first defaults
+  to `fill`), and `density`, `viscosity` default to the options' own. A heavier liquid sinks through a lighter one:
+  each liquid's Tait pressure acts on the shared number density (Solenthaler and Pajarola 2008). `color` (linear RGB,
+  default white) tints the light through the surface. `mixing` 0 per second: each particle's colour relaxes towards
+  the mean colour of the liquid round it at this rate, so a dye spreads where the liquid stirs; the particles keep
+  their own liquid's density and viscosity. With `liquids` or `mixing` the surface draws each particle's colour.
+- `debug` (or `setDebug`): `{ enabled, particles: 'speed' | 'density' | 'color' | 'off', speedScale?, grid, container,
+  colliders }`; `'color'` shows each particle's own colour. On, it colours every particle by its speed (blue still to red at `speedScale`, default the speed of a
   fall through the container) or by its density over rest density (0.8 blue to 1.2 red), and hides the surface while it
   does; it draws the container's edges, the grid on its floor and back wall, and the colliders and pointer as lines.
 
@@ -1026,6 +1037,22 @@ WebGL2 compatibility layer the same passes run on the CPU (`stats.backend` is `'
 draws them; keep `count` to a few thousand there. `stepLiquidCPU`, `createLiquidState` and `resolveLiquidParams` are
 that CPU twin, for tests and offline use. Measured compression, the force accuracy on bodies and the limits:
 [limits](../../docs/limits.md#gpu-particle-liquid-gpuliquid). Example page: `examples/gpu-liquid.html`.
+
+Oil on water, with a dye that spreads as you stir:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { GPULiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [0, 0.8, 2.2], target: [0, 0.3, 0] } });
+const liquid = GPULiquid.attach(engine, {
+  liquids: [
+    { fill: { min: [-0.5, 0, -0.5], max: [0.5, 0.25, 0.5] }, color: [0.6, 0.85, 1] }, // water
+    { fill: { min: [-0.5, 0.25, -0.5], max: [0.5, 0.35, 0.5] }, density: 900, viscosity: 0.002, color: [1, 0.8, 0.2] }, // oil
+  ],
+  mixing: 0.5,
+});
+engine.render({ delta: 1 / 60 });
+```
 
 Float a physics body in it, and hold a mesh in the flow:
 

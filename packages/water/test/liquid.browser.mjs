@@ -154,8 +154,9 @@ try {
       const out = new Float64Array(texture.width * texture.height);
       for (let y = 0; y < texture.height; y++) {
         const line =
-          bytes === 4 ? new Float32Array(raw, y * row, texture.width) : new Uint16Array(raw, y * row, texture.width);
-        for (let x = 0; x < texture.width; x++) out[y * texture.width + x] = bytes === 4 ? line[x] : f16(line[x]);
+          bytes === 4 ? new Float32Array(raw, y * row, texture.width) : new Uint16Array(raw, y * row, (texture.width * bytes) / 2);
+        for (let x = 0; x < texture.width; x++)
+          out[y * texture.width + x] = bytes === 4 ? line[x] : f16(line[bytes === 8 ? x * 4 + 3 : x]);
       }
       buffer.destroy();
       return out;
@@ -257,7 +258,8 @@ try {
     const rec = recorder();
     stack = PostStack.attach(engine, [pattern(), liquid, rec.plugin]);
     engine.render({ delta: 0 });
-    const thick = await readTexture(liquid.targets[3], 2);
+    // The thickness target holds colour times thickness and the thickness in alpha (rgba16float); read the alpha.
+    const thick = await readTexture(liquid.targets[3], 8);
     const color = await readBuffer(rec.buffer);
     const cx = W / 2,
       cy = H / 2;
@@ -407,7 +409,7 @@ try {
   assert.ok(result.shell.meanError < 0.01, `shell mean depth error ${result.shell.meanError}`);
   assert.deepEqual(result.shellStats.steady, { passes: 6, draws: 6, bytes: 320, particles: 20000, groups: 0, whitewater: 0 });
   assert.equal(result.shellStats.first.bytes, 320 + 240000);
-  // Thickness through the centre equals the exact chord (r16float: 11 significant bits).
+  // Thickness through the centre equals the exact chord (rgba16float: 11 significant bits).
   assert.ok(
     Math.abs(result.chord.measured - result.chord.expected) / result.chord.expected < 0.002,
     JSON.stringify(result.chord),

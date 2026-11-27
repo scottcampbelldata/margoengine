@@ -28,6 +28,8 @@ import {
   LIQUID_ADHESION_REACH,
   LIQUID_FORCE_FIXED,
   LIQUID_GAMMA,
+  LIQUID_COLOR_OFFSET,
+  LIQUID_GRID_STRIDE,
   LIQUID_PARTICLE_FLOATS,
   liquidError,
   MAX_LIQUID_MESH_SAMPLES,
@@ -48,6 +50,9 @@ import {
 } from './liquid-mpm-sim.js';
 
 export {
+  LIQUID_COLOR_OFFSET,
+  LIQUID_GRID_STRIDE,
+  MAX_LIQUIDS,
   bakeLiquidMesh,
   colliderDistance,
   createLiquidState,
@@ -69,6 +74,7 @@ export type {
   LiquidCollider,
   LiquidDebugOptions,
   LiquidForce,
+  LiquidKindOptions,
   LiquidMeshBakeOptions,
   LiquidMeshShape,
   LiquidPointer,
@@ -77,6 +83,7 @@ export type {
   LiquidStats,
   LiquidVec3,
   ResolvedCollider,
+  ResolvedLiquidKind,
   ResolvedLiquidParams,
 } from './liquid-mpm-sim.js';
 
@@ -265,6 +272,8 @@ export class GPULiquid implements EnginePlugin {
           stride: LIQUID_PARTICLE_FLOATS,
           offset: 0,
           velocityOffset: 4,
+          // Several liquids or mixing colours tint the surface with each particle's own colour.
+          ...(rest.liquids || rest.mixing ? { colorOffset: LIQUID_COLOR_OFFSET } : {}),
         },
       });
     }
@@ -453,12 +462,16 @@ export class GPULiquid implements EnginePlugin {
     const data = snapshot.particles;
     for (let i = 0; i < data.length; i++)
       if (!Number.isFinite(data[i])) throw liquidError(`GPULiquid.restore: snapshot value ${i} is not finite`);
-    for (let i = 0; i < this.count; i++)
+    for (let i = 0; i < this.count; i++) {
       for (let a = 0; a < 3; a++) {
         const x = data[i * F + a]!;
         if (x < boxMin[a]! || x > boxMax[a]!)
           throw liquidError(`GPULiquid.restore: particle ${i} lies outside the container`);
       }
+      const kind = data[i * F + 7]!;
+      if (!Number.isInteger(kind) || kind < 0 || kind >= this.params.kinds.length)
+        throw liquidError(`GPULiquid.restore: particle ${i} names liquid ${kind}; this liquid has ${this.params.kinds.length}`);
+    }
     this.pending = data.slice();
     this.needsInit = true;
     this.stats.steps = snapshot.steps;
@@ -551,7 +564,7 @@ export class GPULiquid implements EnginePlugin {
     requireWebGPU(engine, 'GPULiquid');
     const device = engine.gpu!;
     const limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
-    const need = Math.max(this.count * LIQUID_PARTICLE_FLOATS * 4, this.params.nodes * 16, MAX_LIQUID_MESH_SAMPLES * 4);
+    const need = Math.max(this.count * LIQUID_PARTICLE_FLOATS * 4, this.params.nodes * LIQUID_GRID_STRIDE * 4, MAX_LIQUID_MESH_SAMPLES * 4);
     if (need > limit)
       throw fault(
         'unsupported',
@@ -612,7 +625,7 @@ export class GPULiquid implements EnginePlugin {
       this.debugUniform = this.buffer(device, LIQUID_DEBUG_FLOATS * 4, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
       if (!this.compat) {
         this.simUniform = this.buffer(device, this.simData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-        this.gridBuf = this.buffer(device, p.nodes * 16, STORAGE);
+        this.gridBuf = this.buffer(device, p.nodes * LIQUID_GRID_STRIDE * 4, STORAGE);
         this.forceBuf = this.buffer(device, FORCE_BYTES, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
         this.sdfBuf = undefined;
         this.sdfKey = [];
@@ -721,7 +734,11 @@ export class GPULiquid implements EnginePlugin {
     f.set([...p.gravity, 0], 36);
     const ptr = p.pointer;
     f.set(ptr ? [...ptr.position, ptr.radius, ...ptr.velocity, ptr.strength] : [0, 0, 0, 1, 0, 0, 0, 0], 40);
-    f.set([(h * p.surfaceTension) / p.density, p.adhesion, LIQUID_ADHESION_REACH * p.cellSize, 0], 48);
+    f.set([(h * p.surfaceTension) / p.density, p.adhesion, LIQUID_ADHESION_REACH * p.cellSize, p.mixing ? 1 - Math.exp(-p.mixing * h) : 0], 48);
+    for (let k = 0; k < 4; k++) {
+      const kind = p.kinds[Math.min(k, p.kinds.length - 1)]!;
+      f.set([kind.massRatio, h * kind.viscosity * kind.massRatio, 0, 0], 52 + k * 4);
+    }
     p.colliders.forEach((c, i) => {
       const m = c.mesh;
       f.set(
@@ -738,7 +755,7 @@ export class GPULiquid implements EnginePlugin {
           ...(m ? m.center : [0, 0, 0]),
           0,
         ],
-        52 + i * 24,
+        68 + i * 24,
       );
     });
     device.queue.writeBuffer(this.simUniform!, 0, this.simData);
@@ -859,7 +876,7 @@ export class GPULiquid implements EnginePlugin {
     const u = this.debugData;
     u.set(c.camera.matrix, 0);
     u.set([rx, 0, rz, this.spacing * 0.5], 16);
-    u.set([ux, uy, uz, p.debug.particles === 'density' ? 2 : 1], 20);
+    u.set([ux, uy, uz, p.debug.particles === 'density' ? 2 : p.debug.particles === 'color' ? 3 : 1], 20);
     u.set([p.debug.speedScale, 0, encode ? 1 : 0, 0], 24);
     c.device.queue.writeBuffer(this.debugUniform!, 0, u as Float32Array<ArrayBuffer>);
   }

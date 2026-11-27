@@ -239,6 +239,43 @@ window.check = async () => {
   const stats = { ...liquid.stats };
   liquid.dispose();
   const frameAfterDispose = await grab(1 / 60);
+
+  // Two liquids, red and a heavier blue, side by side and mixing: one frame against the twin (positions and colours),
+  // then the surface draws each side in its own colour.
+  const twoCount = compat ? 2048 : 32768;
+  const two = {
+    count: twoCount,
+    seed: 5,
+    liquids: [
+      { fill: { min: [-0.5, 0, -0.5], max: [0, 0.4, 0.5] }, color: [1, 0.15, 0.1] },
+      { fill: { min: [0, 0, -0.5], max: [0.5, 0.4, 0.5] }, color: [0.1, 0.2, 1], density: 2000 },
+    ],
+    mixing: 5,
+  };
+  const twoLiquid = GPULiquid.attach(engine, two);
+  twoLiquid.step(1 / 60);
+  const twoGpu = (await twoLiquid.snapshot()).particles;
+  const twoParams = resolveLiquidParams(twoLiquid.options, twoCount);
+  const twoTwin = createLiquidState(twoParams);
+  stepLiquidCPU(twoTwin, twoParams, 1 / 60);
+  let twoGap = 0, colorGap = 0;
+  for (let i = 0; i < twoCount * F; i++) {
+    const o = i % F, gap = Math.abs(twoGpu[i] - twoTwin.particles[i]);
+    if (o < 3) twoGap = Math.max(twoGap, gap);
+    else if (o >= 17) colorGap = Math.max(colorGap, gap);
+  }
+  twoLiquid.options.paused = true;
+  // A light background: the colour tints the light through the liquid, as ParticleLiquid's own colour does.
+  engine.scene.background = '#d0d0d0';
+  const twoFrame = await grab(0);
+  let redPixels = 0, bluePixels = 0;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const k = (y * W + x) * 4, r = twoFrame[k], b = twoFrame[k + 2];
+      if (r > b + 25 && x < W / 2) redPixels++;
+      if (b > r + 25 && x > W / 2) bluePixels++;
+    }
+  twoLiquid.dispose();
   engine.dispose();
 
   return {
@@ -278,6 +315,10 @@ window.check = async () => {
     debugDraws,
     surfaceBack,
     afterDisposeLit: nonBg(frameAfterDispose),
+    twoGap,
+    colorGap,
+    redPixels,
+    bluePixels,
   };
 };
 window.ready = true;

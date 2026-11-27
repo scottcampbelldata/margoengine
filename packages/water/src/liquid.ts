@@ -23,6 +23,8 @@ declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: num
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 const ADD = { srcFactor: 'one', dstFactor: 'one', operation: 'add' } as const;
+/** The thickness target: colour times thickness in rgb and the thickness in alpha, summed over the sprites. */
+const THICKNESS_FORMAT = 'rgba16float';
 
 /** Most particles one ParticleLiquid draws. */
 export const MAX_LIQUID_PARTICLES = 4_194_304;
@@ -59,6 +61,12 @@ export interface ParticleSource {
   velocities?: Float32Array | ParticleBuffer;
   /** Floats before the first velocity, integer >= 0. Default 0. */
   velocityOffset?: number;
+  /**
+   * Floats before the first particle colour in `positions`, integer >= 0: particle i's linear RGB is the three floats at
+   * `colorOffset + i * stride`, and the surface tints the light through the liquid by the thickness-weighted mean colour
+   * of the particles along each view ray (on top of `color`). Default none: every particle is white.
+   */
+  colorOffset?: number;
 }
 
 /**
@@ -336,6 +344,7 @@ export class ParticleLiquid implements EnginePlugin {
     range('particles.stride', s.stride, 3, 64, true);
     range('particles.offset', s.offset, 0, 2 ** 31, true);
     range('particles.velocityOffset', s.velocityOffset, 0, 2 ** 31, true);
+    range('particles.colorOffset', s.colorOffset, 0, 2 ** 31, true);
     if (s.velocities !== undefined && !held(s.velocities))
       throw fault('state', 'ParticleLiquid particles.velocities must be a Float32Array, a GPUBuffer or a GpuArray');
     const stride = s.stride ?? 3,
@@ -350,6 +359,8 @@ export class ParticleLiquid implements EnginePlugin {
         if (!Number.isFinite(s.positions[b]! + s.positions[b + 1]! + s.positions[b + 2]!))
           throw rangeError(`ParticleLiquid particle ${i} has a non-finite position; pass finite centres`, 'geometry');
       }
+      if (s.colorOffset !== undefined && count && s.colorOffset + (count - 1) * stride + 3 > s.positions.length)
+        throw rangeError('ParticleLiquid particles.colorOffset reads past the end of positions; pass an offset inside each record', 'geometry');
       return count;
     }
     if (s.count === undefined)
@@ -490,7 +501,7 @@ export class ParticleLiquid implements EnginePlugin {
       fragment: {
         module: sprite,
         entryPoint: 'thickness',
-        targets: [{ format: 'r16float', blend: { color: add, alpha: add } }],
+        targets: [{ format: THICKNESS_FORMAT, blend: { color: add, alpha: add } }],
       },
     });
     const filter = device.createShaderModule({ code: filterShader });
@@ -560,7 +571,7 @@ export class ParticleLiquid implements EnginePlugin {
       make('r32float'),
       make('r32float'),
       make('r32float'),
-      make('r16float', tw, th),
+      make(THICKNESS_FORMAT, tw, th),
       make('depth32float'),
     ];
   }
@@ -646,7 +657,9 @@ export class ParticleLiquid implements EnginePlugin {
     const d = light.direction,
       dl = Math.hypot(d[0], d[1], d[2]) || 1;
     v.set([d[0] / dl, d[1] / dl, d[2] / dl, o.shininess ?? 2000], 60);
-    v.set([light.radiance[0] * d[3], light.radiance[1] * d[3], light.radiance[2] * d[3], 0], 64);
+    // radiance.w: 1 + the colour offset of a coloured source, 0 for white particles.
+    const tinted = this.source.colorOffset;
+    v.set([light.radiance[0] * d[3], light.radiance[1] * d[3], light.radiance[2] * d[3], tinted === undefined ? 0 : tinted + 1], 64);
     v.set([light.ambient[0], light.ambient[1], light.ambient[2], this.foamOn ? 1 : 0], 68);
     v.set([...(o.skyHorizon ?? [0.38, 0.53, 0.67]), this.environment ? 1 : 0], 72);
     v.set([...(o.skyZenith ?? [0.045, 0.16, 0.34]), scale], 76);
@@ -717,7 +730,7 @@ export class ParticleLiquid implements EnginePlugin {
           fragment: {
             module,
             entryPoint: fragment,
-            targets: [blend ? { format: 'r16float', blend: { color: ADD, alpha: ADD } } : { format: 'r32float' }],
+            targets: [blend ? { format: THICKNESS_FORMAT, blend: { color: ADD, alpha: ADD } } : { format: 'r32float' }],
           },
           ...(blend
             ? {}

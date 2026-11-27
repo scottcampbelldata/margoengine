@@ -68,7 +68,7 @@ try {
         engine.render({ delta: 0 });
         const steady = { ...liquid.frameStats };
         const raw = await read(d, liquid.targets[0], 4);
-        const thick = await read(d, liquid.targets[3], 2);
+        const thick = await read(d, liquid.targets[3], 8);
         const band = narrowBand ? await liquid.readNarrowBand() : undefined;
         stack.dispose();
         liquid.dispose();
@@ -104,7 +104,8 @@ try {
         sb = 0;
       for (let y = 0; y < full.thick.height; y++)
         for (let x = 0; x < full.thick.width; x++) {
-          const i = y * (full.thick.row / 2) + x;
+          // rgba16float: the thickness is the alpha of each pixel.
+          const i = y * (full.thick.row / 2) + x * 4 + 3;
           sa += half(ta[i]);
           sb += half(tb[i]);
         }

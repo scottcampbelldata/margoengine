@@ -89,6 +89,13 @@ try {
   assert.equal(r.debugDraws, 1, 'the line view is one draw');
   assert.ok(r.surfaceBack, 'the surface comes back after the particle view');
   assert.equal(r.afterDisposeLit, 0, `clean canvas after dispose: ${r.afterDisposeLit} px`);
+  // Two liquids mixing, against the twin: positions as the first frame above, colours to the colour sums' rounding.
+  if (r.compat) assert.equal(r.twoGap + r.colorGap, 0);
+  else {
+    assert.ok(r.twoGap < 1e-4, `two liquids: worst position gap ${r.twoGap}`);
+    assert.ok(r.colorGap < 1e-3, `two liquids: worst colour gap ${r.colorGap}`);
+  }
+  assert.ok(r.redPixels > 200 && r.bluePixels > 200, `the surface draws each liquid's colour: ${r.redPixels} red, ${r.bluePixels} blue px`);
   console.log(
     `ok gpu liquid (${r.stats.backend}): ${r.count} particles, ${r.stats.nodes} nodes, hash ${r.hashes[0]}, ` +
       `twin gap ${r.worstPos.toExponential(2)} m, force ${r.gpuForceY?.toFixed(3)} N, lifts ${r.lifts.map((x) => x.toFixed(2))} N, ` +

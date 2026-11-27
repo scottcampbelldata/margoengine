@@ -48,6 +48,8 @@ export interface GPULiquidOptions {
     resolution?: number;
     gravity?: LiquidVec3;
     density?: number;
+    liquids?: readonly LiquidKindOptions[];
+    mixing?: number;
     speedOfSound?: number;
     viscosity?: number;
     surfaceTension?: number;
@@ -59,6 +61,10 @@ export interface GPULiquidOptions {
     colliders?: readonly LiquidCollider[];
     debug?: LiquidDebugOptions;
 }
+
+export const LIQUID_COLOR_OFFSET = 17;
+
+export const LIQUID_GRID_STRIDE = 8;
 
 export const LIQUID_PARTICLE_FLOATS = 20;
 
@@ -83,7 +89,7 @@ export interface LiquidCollider {
 
 export interface LiquidDebugOptions {
     enabled?: boolean;
-    particles?: 'speed' | 'density' | 'off';
+    particles?: 'speed' | 'density' | 'color' | 'off';
     speedScale?: number;
     grid?: boolean;
     container?: boolean;
@@ -102,6 +108,13 @@ export interface LiquidFrameStats {
     particles: number;
     groups: number;
     whitewater: number;
+}
+
+export interface LiquidKindOptions {
+    fill?: LiquidBox;
+    density?: number;
+    viscosity?: number;
+    color?: LiquidVec3;
 }
 
 export interface LiquidLink {
@@ -175,6 +188,8 @@ export type LiquidVec3 = readonly [number, number, number];
 export const MAX_GPU_LIQUID_NODES = 4194304;
 
 export const MAX_GPU_LIQUID_PARTICLES = 1048576;
+
+export const MAX_LIQUIDS = 4;
 
 export const MAX_LIQUID_COLLIDERS = 8;
 
@@ -250,6 +265,7 @@ export interface ParticleSource {
     offset?: number;
     velocities?: Float32Array | ParticleBuffer;
     velocityOffset?: number;
+    colorOffset?: number;
 }
 
 export interface ResolvedCollider {
@@ -261,6 +277,18 @@ export interface ResolvedCollider {
     angularVelocity: LiquidVec3;
     friction: number;
     mesh?: LiquidMeshShape;
+}
+
+export interface ResolvedLiquidKind {
+    fillMin: LiquidVec3;
+    fillMax: LiquidVec3;
+    lattice: LiquidVec3;
+    start: number;
+    count: number;
+    density: number;
+    massRatio: number;
+    viscosity: number;
+    color: LiquidVec3;
 }
 
 export interface ResolvedLiquidParams {
@@ -284,6 +312,8 @@ export interface ResolvedLiquidParams {
     viscosity: number;
     surfaceTension: number;
     adhesion: number;
+    kinds: ResolvedLiquidKind[];
+    mixing: number;
     maxSubstep: number;
     maxSubsteps: number;
     seed: number;

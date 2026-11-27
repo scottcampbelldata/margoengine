@@ -6,7 +6,7 @@
 //   separable passes plus a small 2D clean-up pass);
 // - the Beer-Lambert law for absorption along the thickness and the exact unpolarised Fresnel reflectance.
 // Every render pass reads textures with textureLoad and needs no workgroup memory, barriers or float blending beyond
-// r16float, so the WebGL2 compatibility layer runs each one as an ordinary draw.
+// rgba16float, so the WebGL2 compatibility layer runs each one as an ordinary draw.
 
 /** Shared uniform block. Offsets in floats are listed in liquid.ts. */
 export const liquidBlock = `
@@ -26,12 +26,14 @@ fn rayAt(px:vec2f)->vec3f {return normalize(unproject(ndc(px),1.0)-u.eye.xyz);}
 export const spriteShader = `${liquidBlock}
 @group(0) @binding(1) var<storage,read> points:array<f32>;
 @group(0) @binding(2) var scene:texture_depth_2d;
-struct Sprite {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) @interpolate(flat) center:vec3f}
+struct Sprite {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) @interpolate(flat) center:vec3f,@location(2) @interpolate(flat) color:vec3f}
 @vertex fn sprite(@builtin(vertex_index) v:u32,@builtin(instance_index) i:u32)->Sprite {
  let b=u32(u.particles.y)+i*u32(u.particles.x);
  let c=vec3f(points[b],points[b+1u],points[b+2u]);
  let r=u.eye.w;let to=c-u.eye.xyz;let d=length(to);
- var out:Sprite;out.center=c;out.world=c;out.clip=vec4f(2,2,2,1);
+ var out:Sprite;out.center=c;out.world=c;out.clip=vec4f(2,2,2,1);out.color=vec3f(1);
+ // A coloured source: the particle's linear RGB at radiance.w - 1 floats into its record.
+ if(u.radiance.w>0.5){let k=i*u32(u.particles.x)+u32(u.radiance.w-0.5);out.color=vec3f(points[k],points[k+1u],points[k+2u]);}
  // The eye inside a sphere, or a non-finite centre, draws nothing (a zero-area triangle outside the clip volume).
  if(!(d>r*1.0001)||!(d<3.0e38)){return out;}
  let n=to/d;let a=select(vec3f(0,1,0),vec3f(1,0,0),abs(n.y)>0.9);
@@ -67,7 +69,7 @@ struct Depth {@location(0) depth:vec4f,@builtin(frag_depth) z:f32}
  let full=vec4f(at.xy/u.zenith.w,at.zw);
  let far=min(t.y,sceneDistance(full,dir));let near=max(t.x,0.0);
  if(t.x<0.0||far<=near){discard;}
- return vec4f((far-near)*u.particles.w,0,0,1);
+ let th=(far-near)*u.particles.w;return vec4f(i.color*th,th);
 }
 `;
 
@@ -174,12 +176,14 @@ fn sceneAt(px:vec2f)->vec3f {
  var n=cross(side(p,d,c,vec2i(1,0)),side(p,d,c,vec2i(0,1)));
  n=select(view,normalize(n),dot(n,n)>0.0);n=select(n,-n,dot(n,view)<0.0);
  let size=vec2f(textureDimensions(thick));
- let t=textureSampleLevel(thick,linear,at.xy*u.zenith.w/size,0).x;
+ let sum=textureSampleLevel(thick,linear,at.xy*u.zenith.w/size,0);let t=sum.w;
+ // The particles' mean colour along the ray, weighted by their thickness (white without a coloured source).
+ let mean=select(vec3f(1),sum.rgb/sum.w,sum.w>1e-6);
  let ior=u.absorption.w;let cosine=clamp(dot(n,view),0.0,1.0);let f=fresnel(cosine,ior);
  // Refraction: follow the refracted ray for the thickness and read the scene where it leaves the liquid.
  let bent=refract(-view,n,1.0/ior);let exit=c+bent*t;let q=u.viewProj*vec4f(exit,1);
  let behind=select(now.rgb,sceneAt(u.viewport.xy+(q.xy/q.w*vec2f(0.5,-0.5)+0.5)*u.viewport.zw),q.w>0.0);
- let transmitted=behind*exp(-u.absorption.rgb*t)*u.tint.rgb;
+ let transmitted=behind*exp(-u.absorption.rgb*t)*u.tint.rgb*mean;
  let reflected=sky(reflect(-view,n));
  let h=normalize(u.light.xyz+view);
  let highlight=u.radiance.rgb*f*pow(max(dot(n,h),0.0),u.light.w)*(u.light.w+8.0)/25.13274123*max(dot(n,u.light.xyz),0.0);

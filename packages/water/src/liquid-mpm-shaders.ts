@@ -1,16 +1,17 @@
 // WGSL of GPULiquid (`@margoengine/water/liquid`): the five compute passes of one MLS-MPM substep and the debug view.
 // The step is the CPU twin's (liquid-mpm-sim.ts) in f32, pass for pass. Buffers:
-// - particles: per particle five vec4f, (x, y, z, density ratio), (vx, vy, vz, 0) and the rows of the APIC matrix C;
-// - grid: per node four i32, the fixed-point mass and momentum while particles scatter, then the node's velocity and mass as
-//   f32 bits after the grid update;
+// - particles: per particle five vec4f, (x, y, z, density ratio), (vx, vy, vz, liquid), the APIC matrix C row by row in
+//   the next nine floats and the particle's colour in the last three;
+// - grid: per node two vec4i, the fixed-point weight, mass, momentum and colour sums while particles scatter, then the
+//   node's velocity, mass and weight as f32 bits after the grid update (the colour sums kept);
 // - forces: per collider eight i32, the fixed-point impulse on the body and its moment about the centre;
 // - sdf: the distance fields of the mesh colliders, one after another.
 // Every scatter is an integer atomicAdd, so the sums and the whole step are the same on every run. A stage binds at most
 // four storage buffers (WebGPU's default limit is eight). The build strips the comments inside the WGSL strings
 // (docs/conventions.md, "Shader comments").
 
-/** Floats of the simulation uniform: thirteen vec4 of parameters, then six vec4 per collider. */
-export const LIQUID_SIM_FLOATS = (13 + 6 * 8) * 4;
+/** Floats of the simulation uniform: thirteen vec4 of parameters, four of the liquids, then six vec4 per collider. */
+export const LIQUID_SIM_FLOATS = (17 + 6 * 8) * 4;
 /** Floats of the debug view uniform. */
 export const LIQUID_DEBUG_FLOATS = 28;
 
@@ -18,13 +19,16 @@ const HEADER = /* wgsl */ `
 struct Particle {
   // position, density over rest density
   pos: vec4f,
-  // velocity, unused
+  // velocity, liquid index
   vel: vec4f,
-  // rows of the affine velocity matrix C, unused
+  // the affine velocity matrix C row by row (c0.xyz, c0.w c1.xy, c1.zw c2.x), then the colour (c2.yzw)
   c0: vec4f,
   c1: vec4f,
   c2: vec4f,
 }
+fn row0(p: Particle) -> vec3f { return p.c0.xyz; }
+fn row1(p: Particle) -> vec3f { return vec3f(p.c0.w, p.c1.xy); }
+fn row2(p: Particle) -> vec3f { return vec3f(p.c1.zw, p.c2.x); }
 struct Collider {
   // centre, kind (0 sphere, 1 box, 2 capsule, 3 plane, 4 mesh)
   center: vec4f,
@@ -64,8 +68,10 @@ struct Sim {
   pointer: vec4f,
   // pointer velocity, strength
   pointerVel: vec4f,
-  // surface tension factor dt sigma / rho0, adhesion in m/s^2, adhesion reach, unused
+  // surface tension factor dt sigma / rho0, adhesion in m/s^2, adhesion reach, colour mixing factor of a substep
   surface: vec4f,
+  // per liquid: mass over particleMass, its viscous factor dt nu * mass, unused, unused
+  kinds: array<vec4f, 4>,
   colliders: array<Collider, 8>,
 }
 @group(0) @binding(0) var<uniform> sim: Sim;
@@ -260,11 +266,12 @@ export const LIQUID_CLEAR_WGSL = /* wgsl */ `${HEADER}
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= sim.counts.y) { return; }
-  grid[id.x] = vec4i(0);
+  grid[2u * id.x] = vec4i(0);
+  grid[2u * id.x + 1u] = vec4i(0);
 }
 `;
 
-/** P2G, mass and APIC momentum: m_i += w, (m v)_i += w (v + C d). */
+/** P2G: weight n_i += w, mass m_i += w m_p, APIC momentum (m v)_i += w m_p (v + C d), and the colour sums when mixing. */
 export const LIQUID_P2G_WGSL = /* wgsl */ `${HEADER}
 @group(0) @binding(1) var<storage, read> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read_write> grid: array<atomic<i32>>;
@@ -273,18 +280,25 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= sim.counts.x) { return; }
   let p = particles[id.x];
   let s = stencil(p.pos.xyz);
+  let mr = sim.kinds[min(u32(p.vel.w), 3u)].x;
   for (var c = 0u; c < 3u; c++) {
     for (var b = 0u; b < 3u; b++) {
       for (var a = 0u; a < 3u; a++) {
         let o = vec3u(a, b, c);
         let weight = pick(s, a).x * pick(s, b).y * pick(s, c).z;
         let d = offsetOf(s, o);
-        let q = p.vel.xyz + vec3f(dot(p.c0.xyz, d), dot(p.c1.xyz, d), dot(p.c2.xyz, d));
-        let n = nodeOf(s, o) * 4u;
+        let q = mr * (p.vel.xyz + vec3f(dot(row0(p), d), dot(row1(p), d), dot(row2(p), d)));
+        let n = nodeOf(s, o) * 8u;
         atomicAdd(&grid[n], toFixed(weight, FIXED));
-        atomicAdd(&grid[n + 1u], toFixed(weight * q.x, FIXED));
-        atomicAdd(&grid[n + 2u], toFixed(weight * q.y, FIXED));
-        atomicAdd(&grid[n + 3u], toFixed(weight * q.z, FIXED));
+        atomicAdd(&grid[n + 1u], toFixed(weight * mr, FIXED));
+        atomicAdd(&grid[n + 2u], toFixed(weight * q.x, FIXED));
+        atomicAdd(&grid[n + 3u], toFixed(weight * q.y, FIXED));
+        atomicAdd(&grid[n + 4u], toFixed(weight * q.z, FIXED));
+        if (sim.surface.w > 0.0) {
+          atomicAdd(&grid[n + 5u], toFixed(weight * p.c2.y, FIXED));
+          atomicAdd(&grid[n + 6u], toFixed(weight * p.c2.z, FIXED));
+          atomicAdd(&grid[n + 7u], toFixed(weight * p.c2.w, FIXED));
+        }
       }
     }
   }
@@ -309,7 +323,7 @@ fn wallMass(n: vec3u) -> f32 {
       for (var x = 0u; x < 2u; x++) {
         if (x == 1u && m.x == NONE) { continue; }
         let at = vec3u(select(n.x, m.x, x == 1u), select(n.y, m.y, y == 1u), select(n.z, m.z, z == 1u));
-        sum += atomicLoad(&grid[index3(at) * 4u]);
+        sum += atomicLoad(&grid[index3(at) * 8u]);
       }
     }
   }
@@ -350,8 +364,10 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let capped = min(ratio, MAX_RATIO);
   // Tait: vol * p = c^2 / gamma * (r^gamma - 1) / r, times dt in k4.w; no pressure below rest density.
   var pc = 0.0;
-  if (capped > 1.0) { pc = sim.k4.w * (pow(capped, GAMMA) - 1.0) / capped; }
-  let kv = sim.boxMin.w;
+  // Each liquid's Tait pressure on the shared number density (Solenthaler and Pajarola 2008) and its own viscosity.
+  let kind = sim.kinds[min(u32(p.vel.w), 3u)];
+  if (capped > 1.0) { pc = kind.x * sim.k4.w * (pow(capped, GAMMA) - 1.0) / capped; }
+  let kv = kind.y;
   for (var c = 0u; c < 3u; c++) {
     for (var b = 0u; b < 3u; b++) {
       for (var a = 0u; a < 3u; a++) {
@@ -359,13 +375,13 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
         let weight = pick(s, a).x * pick(s, b).y * pick(s, c).z;
         let kd = offsetOf(s, o) * sim.k4.xyz;
         // (C + C^T) kd: the rows of C dotted with kd, plus the columns of C weighted by kd.
-        let cd = vec3f(dot(p.c0.xyz, kd), dot(p.c1.xyz, kd), dot(p.c2.xyz, kd));
-        let ctd = p.c0.xyz * kd.x + p.c1.xyz * kd.y + p.c2.xyz * kd.z;
+        let cd = vec3f(dot(row0(p), kd), dot(row1(p), kd), dot(row2(p), kd));
+        let ctd = row0(p) * kd.x + row1(p) * kd.y + row2(p) * kd.z;
         let m = weight * (pc * kd - kv * (cd + ctd));
-        let n = nodeOf(s, o) * 4u;
-        atomicAdd(&grid[n + 1u], toFixed(m.x, FIXED));
-        atomicAdd(&grid[n + 2u], toFixed(m.y, FIXED));
-        atomicAdd(&grid[n + 3u], toFixed(m.z, FIXED));
+        let n = nodeOf(s, o) * 8u;
+        atomicAdd(&grid[n + 2u], toFixed(m.x, FIXED));
+        atomicAdd(&grid[n + 3u], toFixed(m.y, FIXED));
+        atomicAdd(&grid[n + 4u], toFixed(m.z, FIXED));
       }
     }
   }
@@ -390,7 +406,7 @@ fn color(n: vec3u) -> f32 {
       for (var x = 0u; x < 2u; x++) {
         if (x == 1u && m.x == NONE) { continue; }
         let at = vec3u(select(n.x, m.x, x == 1u), select(n.y, m.y, y == 1u), select(n.z, m.z, z == 1u));
-        sum += grid[index3(at)].x;
+        sum += grid[2u * index3(at)].x;
       }
     }
   }
@@ -440,14 +456,17 @@ ${ADD_IMPULSE}
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let node = id.x;
   if (node >= sim.counts.y) { return; }
-  let raw = grid[node];
-  if (raw.x <= 0) {
-    grid[node] = vec4i(0);
+  let raw = grid[2u * node];
+  let more = grid[2u * node + 1u];
+  if (raw.y <= 0) {
+    grid[2u * node] = vec4i(0);
+    grid[2u * node + 1u] = vec4i(0);
     return;
   }
   let dt = sim.origin.w;
-  let m = f32(raw.x) / FIXED;
-  var v = vec3f(raw.yzw) / FIXED / m + sim.gravity.xyz * dt;
+  let weight = f32(raw.x) / FIXED;
+  let m = f32(raw.y) / FIXED;
+  var v = vec3f(f32(raw.z), f32(raw.w), f32(more.x)) / FIXED / m + sim.gravity.xyz * dt;
   let i = vec3u(node % sim.dims.x, (node / sim.dims.x) % sim.dims.y, node / sim.dims.w);
   let x = sim.origin.xyz + vec3f(i) * sim.cell.xyz;
   // Surface tension, the continuum surface force in its conservative form (Lafaurie et al. 1994): f = div T with
@@ -467,7 +486,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
       if (su.w > 0.0) { f += (su.w * e - su.xyz * (su[j] / su.w)) / span; }
       if (sd.w > 0.0) { f -= (sd.w * e - sd.xyz * (sd[j] / sd.w)) / span; }
     }
-    v += sim.surface.x * f / max(m / sim.invCell.w, 0.25);
+    v += sim.surface.x * f / (max(weight / sim.invCell.w, 0.25) * (m / max(weight, 1e-30)));
   }
   // The pointer: nodes within its radius take on its velocity at a rate falling to zero at the edge.
   if (sim.counts.w != 0u) {
@@ -519,7 +538,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let lo = i <= vec3u(PAD);
   let hi = i >= vec3u(PAD) + sim.cells.xyz;
   v = select(v, vec3f(0.0), (lo & (v < vec3f(0.0))) | (hi & (v > vec3f(0.0))));
-  grid[node] = bitcast<vec4i>(vec4f(v, m));
+  grid[2u * node] = bitcast<vec4i>(vec4f(v, m));
+  grid[2u * node + 1u] = vec4i(bitcast<i32>(weight), more.yzw);
 }
 `;
 
@@ -538,13 +558,20 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   var b0 = vec3f(0.0);
   var b1 = vec3f(0.0);
   var b2 = vec3f(0.0);
+  var tint = vec3f(0.0);
+  var around = 0.0;
   for (var c = 0u; c < 3u; c++) {
     for (var b = 0u; b < 3u; b++) {
       for (var a = 0u; a < 3u; a++) {
         let o = vec3u(a, b, c);
         let weight = pick(s, a).x * pick(s, b).y * pick(s, c).z;
         let kd = offsetOf(s, o) * sim.k4.xyz;
-        let gv = bitcast<vec4f>(grid[nodeOf(s, o)]).xyz;
+        let gv = bitcast<vec4f>(grid[2u * nodeOf(s, o)]).xyz;
+        if (sim.surface.w > 0.0) {
+          let more = grid[2u * nodeOf(s, o) + 1u];
+          around += weight * bitcast<f32>(more.x);
+          tint += weight * vec3f(more.yzw) / FIXED;
+        }
         v += weight * gv;
         b0 += weight * gv.x * kd;
         b1 += weight * gv.y * kd;
@@ -561,7 +588,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     let vn = dot(v - bodyVelocity(k, x), hit.xyz);
     if (vn >= 0.0) { continue; }
     v -= vn * hit.xyz;
-    addImpulse(k, x - sim.colliders[k].center.xyz, vn * hit.xyz);
+    addImpulse(k, x - sim.colliders[k].center.xyz, sim.kinds[min(u32(p.vel.w), 3u)].x * vn * hit.xyz);
   }
   // Inside the walls; a particle held at a wall keeps no velocity into it.
   let lo = x < sim.boxMin.xyz;
@@ -569,10 +596,13 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   x = clamp(x, sim.boxMin.xyz, sim.boxMax.xyz);
   v = select(v, vec3f(0.0), (lo & (v < vec3f(0.0))) | (hi & (v > vec3f(0.0))));
   p.pos = vec4f(x, p.pos.w);
-  p.vel = vec4f(v, 0.0);
-  p.c0 = vec4f(b0, 0.0);
-  p.c1 = vec4f(b1, 0.0);
-  p.c2 = vec4f(b2, 0.0);
+  // Mixing: the colour relaxes towards the weighted mean colour of the liquid round it.
+  var color = p.c2.yzw;
+  if (sim.surface.w > 0.0 && around > 0.0) { color += (tint / around - color) * sim.surface.w; }
+  p.vel = vec4f(v, p.vel.w);
+  p.c0 = vec4f(b0, b1.x);
+  p.c1 = vec4f(b1.yz, b2.xy);
+  p.c2 = vec4f(b2.z, color);
   particles[id.x] = p;
 }
 `;
@@ -583,7 +613,7 @@ struct View {
   matrix: mat4x4f,
   // camera right, sprite radius
   right: vec4f,
-  // camera up, mode (1 speed, 2 density)
+  // camera up, mode (1 speed, 2 density, 3 the particle's colour)
   up: vec4f,
   // speed at the top of the ramp, unused, sRGB encode, unused
   params: vec4f,
@@ -633,6 +663,7 @@ fn vertex(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> O
   o.clip = view.matrix * vec4f(world, 1.0);
   o.uv = uv;
   o.color = ramp(t);
+  if (view.up.w > 2.5) { o.color = p.c2.yzw; }
   return o;
 }
 @fragment

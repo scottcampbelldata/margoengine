@@ -198,6 +198,85 @@ test('adhesion above gravity holds a film on the ceiling, and below gravity lets
   assert.throws(() => resolveLiquidParams({ surfaceTension: 1e6 }), /surfaceTension/);
 });
 
+test('two liquids: the floor carries both weights, the heavier sinks through the lighter, colours mix only when asked', () => {
+  // A layer of 3000 kg/m3 liquid starts on top of a layer of 1000 kg/m3 in a free-slip column on a floor collider. The
+  // body takes the opposite of the liquid's change of momentum, so over a window its impulse is -(dP + M g T) with M the
+  // sum of both liquids' masses (each particle weighs its liquid's mass ratio), within the fixed-point rounding.
+  const box = { min: [-0.15, 0, -0.15], max: [0.15, 0.9, 0.15] };
+  const options = {
+    count: 1600,
+    box,
+    liquids: [
+      { fill: { min: [-0.15, 0.1, -0.15], max: [0.15, 0.3, 0.15] }, color: [0, 0, 1] },
+      { fill: { min: [-0.15, 0.3, -0.15], max: [0.15, 0.5, 0.15] }, density: 3000, color: [1, 0, 0] },
+    ],
+    colliders: [{ shape: 'box', position: [0, 0.05, 0], halfExtents: [0.3, 0.05, 0.3] }],
+  };
+  const p = resolveLiquidParams(options);
+  assert.deepEqual(p.kinds.map((k) => [k.count, k.massRatio]), [[800, 1], [800, 3]]);
+  const s = createLiquidState(p);
+  const mass = (i) => p.kinds[s.particles[i * F + 7]].massRatio;
+  const momentum = () => {
+    let m = 0;
+    for (let i = 0; i < p.count; i++) m += mass(i) * s.particles[i * F + 5];
+    return m;
+  };
+  for (let k = 0; k < 10; k++) stepLiquidCPU(s, p, 1 / 60);
+  const p0 = momentum();
+  let impulse = 0,
+    time = 0,
+    substeps = 0;
+  for (let k = 0; k < 20; k++) {
+    substeps += stepLiquidCPU(s, p, 1 / 60);
+    time += 1 / 60;
+    impulse += s.impulses[1] / FORCE_FIXED;
+  }
+  const M = 800 + 3 * 800;
+  const expected = -(momentum() - p0) + M * -9.81 * time;
+  // As in the one-liquid test, six standard deviations of the rounding, the heavy particles' terms three times larger.
+  const bound = 6 * 0.29 * (3 * Math.sqrt(substeps * 3 * 27 * 2 * p.count) / FIXED + Math.sqrt(substeps * (p.nodes + p.count)) / FORCE_FIXED);
+  assert.ok(Math.abs(impulse - expected) <= bound, `impulse ${impulse} vs ${expected} (bound ${bound})`);
+  // The heavy layer has sunk below the light one by 1.5 s (Rayleigh-Taylor).
+  for (let k = 0; k < 60; k++) stepLiquidCPU(s, p, 1 / 60);
+  const mean = (kind) => {
+    let y = 0,
+      n = 0;
+    for (let i = 0; i < p.count; i++) if (s.particles[i * F + 7] === kind) (y += s.particles[i * F + 1]), n++;
+    return y / n;
+  };
+  assert.ok(mean(1) < mean(0), `heavy liquid at ${mean(1)} m, light at ${mean(0)} m`);
+  // Without mixing every particle keeps its liquid's colour exactly; with it, colours blend where the liquids meet.
+  for (let i = 0; i < p.count; i++)
+    assert.deepEqual([...s.particles.subarray(i * F + 17, i * F + 20)], s.particles[i * F + 7] ? [1, 0, 0] : [0, 0, 1]);
+  const pm = resolveLiquidParams({ ...options, colliders: [], mixing: 20 });
+  const sm = createLiquidState(pm);
+  for (let k = 0; k < 20; k++) stepLiquidCPU(sm, pm, 1 / 60);
+  let blended = 0,
+    worst = 0;
+  for (let i = 0; i < pm.count; i++) {
+    const r = sm.particles[i * F + 17],
+      b = sm.particles[i * F + 19];
+    worst = Math.max(worst, Math.abs(r + b - 1), -r, -b, r - 1, b - 1);
+    if (r > 0.05 && b > 0.05) blended++;
+  }
+  // A blend of red and blue stays on the line between them, within the colour sums' rounding: each relaxation moves a
+  // colour part of the way to a weighted mean whose channels are each off by at most 27 half-units of 1 / 65,536 over a
+  // weight sum of at least 1 (a lone particle's own), and the relaxation is a contraction, so the two channels' sum is
+  // off by at most twice that, 4.2e-4, however many substeps.
+  assert.ok(worst <= (2 * 27 * 0.5) / 65536, `off the red-blue line by ${worst}`);
+  assert.ok(blended > 50, `${blended} particles blended at the interface`);
+  for (const bad of [
+    { liquids: [] },
+    { liquids: Array.from({ length: 5 }, () => ({})) },
+    { liquids: [{}, {}] },
+    { liquids: [{ fill: { min: [-0.5, 0, -0.5], max: [0, 0.5, 0.5] } }, { fill: { min: [-0.1, 0, -0.5], max: [0.5, 0.5, 0.5] } }] },
+    { liquids: [{ color: [2, 0, 0] }] },
+    { liquids: [{ density: 0 }] },
+    { mixing: -1 },
+  ])
+    assert.throws(() => resolveLiquidParams(bad), (e) => e.code === 'unsupported' && /errors#gpu-liquid/.test(e.message), JSON.stringify(bad));
+});
+
 test('the same options give the same state, and a copied state repeats the same steps', () => {
   const options = { count: 600, seed: 9, colliders: [{ shape: 'sphere', position: [0, 0.2, 0], radius: 0.1 }] };
   const run = (frames) => {
@@ -229,6 +308,9 @@ test('GPULiquid.restore checks the whole snapshot before it changes anything', (
   const out = good.slice();
   out[7 * F + 1] = 2;
   assert.throws(() => liquid.restore(bad(out)), /outside the container/);
+  const kind = good.slice();
+  kind[3 * F + 7] = 1;
+  assert.throws(() => liquid.restore(bad(kind)), /names liquid 1/);
   liquid.restore(bad(good, { steps: 4 }));
   assert.equal(liquid.stats.steps, 4);
   liquid.dispose();

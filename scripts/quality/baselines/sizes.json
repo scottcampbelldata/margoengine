@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20966819,
+  "total": 20969789,
   "history": [
     {
       "date": "2026-10-24",
@@ -14670,6 +14670,12 @@
       "commit": "HEAD",
       "reason": "@margoengine/exporters 41,048 to 41,164 B gzip (+116 B, ceiling 41,130 to 42,399): GLTFOptions.styleExtensions writes plugin line widths and point diameters as the BENTLEY line and point style extensions; it is a few lines inside the glTF material writer that every glTF export runs, so an entry of its own would copy the writer.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "water/liquid 37189 to 38616 B ceiling (built 36105 to 37491 B gzip): GPULiquid takes up to 4 liquids of their own density, viscosity and colour (each liquid's Tait pressure on the shared number density, Solenthaler and Pajarola 2008; the grid node holds weight and mass apart, eight words) with colour mixing, and ParticleLiquid draws each particle's colour (colorOffset: the thickness target carries colour times thickness). FLUID-02/03, parity bar P13. The liquids live in the same passes and the colour in the same surface pass, so a split would duplicate them. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16324,7 +16330,7 @@
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
-    "@margoengine/water/liquid": 37189,
+    "@margoengine/water/liquid": 38616,
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,

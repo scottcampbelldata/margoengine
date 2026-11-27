@@ -15033,6 +15033,11 @@ compute shaders), and no companion code of any paper was opened.
   [Adaptively Sampled Distance Fields](https://doi.org/10.1145/344779.344899) (SIGGRAPH 2000): a sampled distance field
   read by trilinear interpolation, with its normal from the field's gradient, as a collider's level set; the capsule
   and plane distances are the closed forms (segment distance less the radius, and n . (x - p)).
+- Barbara Solenthaler and Renato Pajarola,
+  [Density Contrast SPH Interfaces](https://doi.org/10.2312/SCA/SCA08/211-218) (SCA 2008): with liquids of different
+  densities the density is taken from the particles' number density and each particle's pressure from its own rest
+  density, which keeps the interface sharp; here the grid sums the particles' weight (the number density) apart from their
+  mass, and each liquid's Tait pressure scales with its density.
 - J. U. Brackbill, D. B. Kothe and C. Zemach,
   [A Continuum Method for Modeling Surface Tension](https://doi.org/10.1016/0021-9991(92)90240-Y) (J. Comput. Phys. 100,
   1992): surface tension as the volume force sigma kappa grad c of a smoothed colour c (here the density over rest

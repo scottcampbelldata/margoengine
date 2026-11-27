@@ -275,10 +275,13 @@ default density is 1 kg/m³ as in Rapier, not a real material's.
   triangle-mesh colliders (`bakeLiquidMesh`, a distance field) and `link(body, collider)`, one call that couples a
   `PhysicsBody` both ways (a linked 500 kg/m³ box floats at its Archimedes draft within the check's bound), and
   `surfaceTension` (continuum surface force on the grid; a drop holds the Laplace pressure 2 sigma / R within the grid's
-  bound) with `adhesion` to walls and colliders (a film hangs from the ceiling exactly when adhesion beats gravity). The CPU solvers `physics/pbf`, `physics/dfsph`
+  bound) with `adhesion` to walls and colliders (a film hangs from the ceiling exactly when adhesion beats gravity), and up
+  to 4 `liquids` of their own density, viscosity and colour (a heavier one sinks, the floor carries both weights) whose
+  colours blend at `mixing`, drawn in their colours by the surface (`ParticleLiquid` `colorOffset`, which any particle
+  system can use). The CPU solvers `physics/pbf`, `physics/dfsph`
   and `physics/flip` stay the accurate route. Not DONE; open against the wider rival set (three.js and its ecosystem,
   Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): emitters and drains that add and remove
-  particles at run time; more than one liquid (per-particle colour or kind, mixing);
+  particles at run time;
   and speed against the rivals' demos, measured in the speed phase.
 
 ### P14. LIFE-04 Flocking

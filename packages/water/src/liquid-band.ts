@@ -171,7 +171,7 @@ struct Ball {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1)
  let full=vec4f(i.clip.xy/u.zenith.w,i.clip.zw);let z=textureLoad(scene,vec2i(full.xy),0);
  var far=along+e;if(z>0.0){far=min(far,dot(unproject(ndc(full.xy),z)-u.eye.xyz,dir));}
  let near=max(along-e,0.0);if(along+e<0.0||far<=near){discard;}
- return vec4f((far-near)*u.particles.w,0,0,1);
+ let th=(far-near)*u.particles.w;return vec4f(th,th,th,th);
 }
 `;
 
