@@ -960,6 +960,46 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.emit('afterstep', dt);
     this.attachments.forEach(this.attachmentAfter);
   }
+  /** Number of threads solving islands on {@link Physics.stepAsync} (1 on the main thread alone). */
+  get threadCount(): number {
+    return this.kernel.threadCount;
+  }
+  /**
+   * Starts `count - 1` worker threads (the main thread is the last of `count`) for {@link Physics.stepAsync}.
+   * Requires a world created on shared memory (`new Physics(engine, { arena: new Arena(worldMemory(true)) })`)
+   * after `await Physics.load({ threads: true })`.
+   */
+  async useThreads(count: number, options?: { signal?: AbortSignal }): Promise<this> {
+    this.live();
+    await this.kernel.useThreads(count, options);
+    return this;
+  }
+  /** Stops the worker threads started by {@link Physics.useThreads}; later steps solve on the main thread alone. */
+  endThreads(): this {
+    this.kernel.endThreads();
+    return this;
+  }
+  /**
+   * Runs one fixed step with the step's islands solved across the worker threads started by {@link Physics.useThreads},
+   * giving the exact same bits, events, breaks, quarantines and attachments as {@link Physics.step}.
+   */
+  async stepAsync(): Promise<void> {
+    this.live();
+    const kernel = this.kernel,
+      dt = this.fixedTimestep;
+    this.emit('beforestep', dt);
+    if (this.disposed) return;
+    this.followers.forEach(this.followMesh);
+    this.attachments.forEach(this.attachmentStep);
+    await kernel.stepAsync(dt);
+    if (this.disposed) return;
+    this.stepCount++;
+    this.dispatch(dt);
+    this.reportBreaks();
+    this.reportQuarantine();
+    this.emit('afterstep', dt);
+    this.attachments.forEach(this.attachmentAfter);
+  }
   private readonly attachmentAfter = (attachment: PhysicsAttachment): void =>
     attachment.afterStep?.(this.fixedTimestep);
   /**
