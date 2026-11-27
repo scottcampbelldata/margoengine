@@ -7,9 +7,15 @@
 // - Hooft, after E. O. Tuck, "Shallow-water flows past slender bodies", J. Fluid Mech. 26, 1966: mean sinkage C_z (V / L^2)
 //   Fn_h^2 / sqrt(1 - Fn_h^2) with C_z 1.46 (of 1.4 to 1.53), and trim by the stern C_theta (V / L^3) Fn_h^2 / sqrt(1 -
 //   Fn_h^2) radians with C_theta 1, the scaling Tuck's slender-body theory gives in open water of constant depth.
-// Fn_h = V / sqrt(g h). All hold below Fn_h 0.7 (Huuska's limit), where the flow under the ship is still subcritical.
+// Fn_h = V / sqrt(g h). All hold up to Fn_h 0.7 (Huuska's limit), where the flow under the ship is still subcritical.
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { shipError } from './errors.js';
+
+/**
+ * The depth Froude number up to which the squat laws hold, 0.7: Huuska's limit, where the flow under the ship is still
+ * subcritical, as Serban and Panaitescu (2016) and PIANC (1997) state it.
+ */
+export const SQUAT_FROUDE_LIMIT = 0.7;
 
 /** What a squat law needs: the ship's length, beam, draught, block coefficient, its speed, the water's depth. */
 export interface SquatCase {
@@ -52,9 +58,9 @@ function depthFroude(c: SquatCase): number {
     throw shipError(`A speed is finite m/s, 0 or more (got ${speed}); pass one.`);
   const g = c.gravity ?? gravityMagnitude(DEFAULT_GRAVITY),
     fn = speed / Math.sqrt(g * depth);
-  if (!(fn < 0.7))
+  if (!(fn <= SQUAT_FROUDE_LIMIT))
     throw shipError(
-      `Squat laws hold below a depth Froude number of 0.7 (got ${fn.toFixed(3)}); slow the ship or deepen the water.`,
+      `Squat laws hold up to a depth Froude number of 0.7 (got ${fn.toFixed(3)}); slow the ship or deepen the water.`,
     );
   return fn;
 }

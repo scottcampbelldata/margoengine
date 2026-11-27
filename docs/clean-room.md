@@ -17477,6 +17477,15 @@ KVLCC2's 1.4 m model 4.10), to KRISO's first 20/5 overshoot at h/T 1.2, 3.8 degr
 - h/T 2.0: the reach.
 Proof: `packages/physics/tests/ship.test.js`, "banks and shallows against measurement".
 
+### The ship's squat limit and default shaft depth (SEA-09, `SQUAT_FROUDE_LIMIT`, `shaftDepth`, 2026-11-27)
+
+- The squat laws hold up to a depth Froude number of 0.7 (Huuska's limit, where the flow under the ship is still
+  subcritical), as S. Serban and V. Panaitescu state it in their 2016 squat review (already read for `squat`). The solver
+  holds a faster ship's squat at the limit's.
+- The default shaft depth, the draught less 0.52 propeller diameters, is KCS's: its propeller centre 0.02913 L below the
+  waterline (the Tokyo 2015 CFD workshop's KCS particulars, https://t2015.nmri.go.jp/kcs_gc.html, read), with L 230 m,
+  draught 10.8 m and diameter 7.9 m (SIMMAN 2008's KCS particulars, read): (10.8 - 6.70) / 7.9 = 0.52.
+
 ### Measured checks for the ships (SEA-09, `B4_70_FOUR_QUADRANT`, `fourQuadrantCoefficients`, 2026-11-27)
 
 - R. F. Roddy, D. E. Hess and W. E. Faller, "A tool to predict the four-quadrant performance of the Wageningen B-screw

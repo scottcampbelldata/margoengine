@@ -52,11 +52,17 @@ import {
   VAPOUR_PRESSURE,
   VortexCavity,
 } from './race.js';
-import { squat } from './squat.js';
+import { SQUAT_FROUDE_LIMIT, squat } from './squat.js';
 import { shipError } from './errors.js';
 
 type Vec3 = [number, number, number];
 const SHIP_LAYOUT = 1;
+/**
+ * The propeller shaft's height above the keel over the propeller's diameter when the ship does not give its shaft depth:
+ * KCS's, (10.8 - 0.02913 x 230) / 7.9 = 0.52 (Tokyo 2015 CFD workshop's KCS particulars), its blade tip 0.02 diameter above
+ * the keel.
+ */
+const SHAFT_HEIGHT = 0.52;
 /**
  * f64 words of a ship's autopilot state: the integral, the track's leg, the reference heading and rate, a started flag and
  * the drift angle low-passed.
@@ -123,8 +129,8 @@ export interface Ship {
     readonly merit?: number;
   };
   /**
-   * The propeller shaft's depth below the waterline at rest, m (default the draught less 0.6 diameters: a tip 0.1 diameter
-   * above the keel, an assumption, not a published figure; give the ship's own).
+   * The propeller shaft's depth below the waterline at rest, m (default the draught less 0.52 diameters, KCS's: its propeller
+   * centre 0.02913 L below the waterline, Tokyo 2015 CFD workshop, with draught 10.8 m and diameter 7.9 m; give the ship's own).
    */
   readonly shaftDepth?: number;
   /** Symmetric tunnel outlets in metres for the water field: `halfSpan` from centreline, `depth` below the design waterline. */
@@ -804,13 +810,13 @@ export class ShipSolver implements Solver<ShipParams> {
       if (Number.isFinite(h) && speed > 0) {
         const block = ship.block ?? M.volume / (L * M.beam * d);
         if (h > d) {
-          // Held below the laws' limit of Fn_h 0.7.
+          // Faster than the laws' limit of Fn_h 0.7 (Huuska's, SQUAT_FROUDE_LIMIT), the squat is held at the limit's.
           const sq = squat({
             length: L,
             beam: M.beam,
             draught: d,
             block,
-            speed: Math.min(speed, 0.69 * Math.sqrt(this.g * h)),
+            speed: Math.min(speed, SQUAT_FROUDE_LIMIT * Math.sqrt(this.g * h)),
             depth: h,
             gravity: this.g,
           });
@@ -820,7 +826,7 @@ export class ShipSolver implements Solver<ShipParams> {
       }
       // The race: behind the propeller at its shaft, along -forward for thrust ahead.
       const P = M.propeller,
-        shaftDepth = ship.shaftDepth ?? Math.max(P.diameter / 2, d - 0.6 * P.diameter),
+        shaftDepth = ship.shaftDepth ?? Math.max(P.diameter / 2, d - SHAFT_HEIGHT * P.diameter),
         prop = add(add(mid, scale(f, P.position * L)), scale(up, -shaftDepth)),
         // The race's own speed over the water it came from: the far wake less the inflow (momentum theory).
         induced = Math.max(0, forces.race - Math.max(0, forces.thrust > 0 ? forces.inflow : -forces.inflow));

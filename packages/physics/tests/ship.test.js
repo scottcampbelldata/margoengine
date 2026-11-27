@@ -28,6 +28,7 @@ import {
   KCS_MODEL,
   KVLCC2_L7,
   KVLCC2_SHALLOW,
+  SQUAT_FROUDE_LIMIT,
   KVLCC2_PROPELLER,
   Manoeuvring,
   Propeller,
@@ -254,6 +255,10 @@ test('squat: the published canal case, ICORELS 0.34186 m and Huuska 0.52909 m; T
   assert.ok(Math.abs(fast.mean / slow.mean - shape(4) / shape(2)) < 1e-12);
   assert.ok(fast.trim > 0 && fast.bow > fast.mean);
   assert.throws(() => squat({ ...c, speed: 8 }), /0\.7/);
+  // The laws hold up to Huuska's limit, Fn_h 0.7 itself, and not past it.
+  assert.equal(SQUAT_FROUDE_LIMIT, 0.7);
+  assert.ok(squat({ ...c, speed: 0.7 * Math.sqrt(98.1) }).mean > fast.mean);
+  assert.throws(() => squat({ ...c, speed: 0.7001 * Math.sqrt(98.1) }), /0\.7/);
 });
 
 test('a tunnel thruster keeps its momentum bound: 234 kN for 1,000 kW through a 2 m tunnel', () => {
@@ -385,6 +390,9 @@ test('a rigid body held by the ship solver follows the MMG ship through a turn',
     flow = ships.water.sample(behind[0], behind[1], behind[2], 0).velocity;
   assert.ok(flow[0] * race.direction[0] + flow[2] * race.direction[2] > 0.1);
   assert.ok(ships.wash(0).length === 1 && ships.sources(0).length >= 3);
+  // With no shaft depth given, the shaft is KCS's published 0.52 diameters above the keel.
+  const shaft = p[1] - race.position[1];
+  assert.ok(Math.abs(shaft - (KVLCC2_L7.draught - 0.52 * KVLCC2_L7.propeller.diameter)) < 1e-3, `shaft depth ${shaft}`);
 });
 
 test("a ship under way presses its hull's draught on the water: a WakeSolver behind it makes its wake", () => {

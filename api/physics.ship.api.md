@@ -500,6 +500,8 @@ export const SEA_WATER_VISCOSITY = 0.0000011883;
 
 export const SHALLOW_LIMIT = 1.2;
 
+export const SQUAT_FROUDE_LIMIT = 0.7;
+
 export interface SailingControl {
     heading: number | null;
     flat: number;

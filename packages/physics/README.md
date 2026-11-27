@@ -4546,7 +4546,7 @@ Each ship is `{row, model}` and takes these settings:
 - `midship`, `forward` and `up` in the body's frame (defaults the origin, +X and +Y).
 - `rudderRate`: default 2.32 degrees a second, the SOLAS 35-to-30 degrees in 28 s.
 - `thruster`: `{diameter, power, position, merit}` for a bow thruster. `merit` is its static merit coefficient C = T^(3/2) / (P sqrt(rho A)) (default 0.82; Beveridge 1971 measured 0.55 to 1.5 on models, 2 the ideal), so its thrust is (C / 2)^(2/3) of the momentum bound `thrusterThrust`; with way on its force and moment fall and rise again as Chislett's captive tests show (`thrusterAhead(U / U_j)`).
-- `shaftDepth`: the propeller shaft's depth below the waterline, m (default the draught less 0.6 diameters).
+- `shaftDepth`: the propeller shaft's depth below the waterline, m (default the draught less 0.52 diameters, KCS's published propeller centre).
 - `thrusterOutlet`: `{halfSpan, depth}` in metres from the centreline and below the design waterline. Requires a
   thruster and a depth at least half its diameter. Omit it to keep the tunnel out of the water field.
 - `block` and `addedMass`: `addedMass: false` leaves the surge, sway and yaw added mass to a HullSolver's strips (the ship still claims their damping).
