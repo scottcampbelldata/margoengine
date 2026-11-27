@@ -12849,6 +12849,22 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   cost the uncovered strip (6.41). Removing the correlation would need the first vertex's light estimated apart from
   its continuation (light sampling alone there, or a second BSDF ray for the direct part), a transport and cost
   trade-off not made here. The 0.09 stays open.
+- **Job 2, the first vertex's light estimated apart from its continuation, measured as an experiment (2026-11-27,
+  RTX A6000, WebGPU; a local build, not kept):** the anti-correlation lead above, built two ways. (A) Light sampling
+  alone at the first vertex: its light-sampled lights take weight 1, and the continuation's next hit leaves out their
+  share (environment map, sun disk, sampled emitters and area lights; the constant sky and delta lobes keep theirs).
+  (B) The same with one extra BSDF ray for the direct part, MIS-weighted against light sampling. Rays per pixel per
+  frame, from the code (no counter exists): A the same as now; B one more trace for every pixel whose first hit is
+  a diffuse or rough surface, so up to one more per pixel. As landed, then A, then B: `denoisehistory` 5.56, 5.67,
+  6.06 (still camera 2.81, 3.20, 3.24; raw 16.00, 16.87, 16.89); uncovered strip 6.01, 6.85, 6.46 (two frames on
+  4.34, 4.61, 4.82; kept 4.52, 4.53, 4.50); glossy perspective RMSE at 16 / 64 / 256 / 1024 spp 0.03385 / 0.02424
+  / 0.01817 / 0.01114, A 0.03669 / 0.02567 / 0.01873 / 0.01134, B 0.03357 / 0.02302 / 0.01673 / 0.01187; diffuse
+  perspective at 16 spp 0.02151, 0.02262, 0.02224. Both variants failed the uncovered-pixel bound of
+  `denoisedisocclusion`. Neither is better on every case, and B only gains on the glossy scene below 1024 spp by
+  spending an extra ray. Light sampling alone loses the BSDF half of MIS, which is what keeps the first vertex's
+  light low in variance on glossy lobes and large lights, and that costs more than the correlation it removes.
+  Recorded as an accepted difference in [limits.md](limits.md); the MIS estimator stays the default and the 0.09
+  stays as measured. Not run on the WebGL2 layer (the shader change was not kept).
 - **Job 2, what is left:** the uncovered strip is still 1.33 times the kept pixels (6.01 against 4.52), mostly on
   the floor (11.13), and a noise-free guarantee is not met. `denoisehistory`, a moving camera over a whole image of
   another scene, reads 5.54 against 5.47 before and a still camera 2.81 against 2.80: the split alone accounts for it
