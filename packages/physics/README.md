@@ -5646,6 +5646,11 @@ the periodic wake out of this connection. The receiver publishes height and prov
 depth-velocity queries from its accepted potential. `work()` reports source work, displaced volume and
 any energy or signed volume taken by the optional perimeter sponge.
 
+When at least half the volume grid is solid, the fine-grid solve visits wet cells in their usual
+rectangular order using a list of indices. The list takes four bytes per wet cell. Source ports, bulk
+potential and snapshots keep their rectangular layouts. This follows the sparse-row traversal principle
+in [Yousef Saad, *Iterative Methods for Sparse Linear Systems*, 2nd ed. (2003)](https://doi.org/10.1137/1.9780898718003).
+
 Set `pressureAtDepth: true` and pass `wake.seaSurface()` to the hull for time-centred Bernoulli pressure
 and depth velocities from the same potential. Give the finite wake its initial state before advancing the
 coupled world. The ordinary hull return uses triangle pressure integration. The wave work ledger tracks

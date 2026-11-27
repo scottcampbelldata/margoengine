@@ -37,6 +37,7 @@ export class QuayPotential {
   private readonly cellArea: number;
   private readonly topDistance: number;
   private readonly wet: Uint8Array;
+  private readonly active?: Uint32Array;
   private readonly diagonal: Float64Array;
   private readonly columnInverse: Float64Array;
   private readonly east: Float64Array;
@@ -84,6 +85,7 @@ export class QuayPotential {
     this.residual = new Float64Array(count);
     this.direction = new Float64Array(count);
     this.applied = new Float64Array(count);
+    let wetCount = 0;
     for (let i = 0; i < count; i++) {
       const wetValue = wet?.[i] ?? 1;
       const x = openX?.[i] ?? 1;
@@ -91,6 +93,14 @@ export class QuayPotential {
       if ((wetValue !== 0 && wetValue !== 1) || !(x >= 0 && x <= 1 && z >= 0 && z <= 1))
         throw invalidLoad('Use zero or one for each cell and a fraction in [0, 1] for each horizontal opening.');
       this.wet[i] = wetValue;
+      wetCount += wetValue;
+    }
+    // Dense slots and face order remain authoritative. Skip zero rows on substantially dry grids.
+    if (wetCount * 2 <= count) {
+      const active = new Uint32Array(wetCount);
+      let next = 0;
+      for (let i = 0; i < count; i++) if (this.wet[i]) active[next++] = i;
+      this.active = active;
     }
     for (let y = 0; y < layers; y++) {
       const thickness = depths[y + 1]! - depths[y]!;
@@ -198,6 +208,7 @@ export class QuayPotential {
       cellArea,
       topDistance,
       wet,
+      active,
       potential,
       residual,
       direction,
@@ -217,8 +228,10 @@ export class QuayPotential {
     if (!(face > 0 && Number.isFinite(face))) throw invalidLoad('Use a finite positive surface conductance.');
     this.factorColumns(face);
     this.coarse?.prepare(face);
-    potential.fill(0);
-    for (let i = 0; i < n; i++) {
+    this.clearWet(potential);
+    const visits = active?.length ?? n;
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
       const top = i < plane && wet[i] ? face : 0;
       const rhs = (top ? top * surface[i]! : 0) - (source?.[i] ?? 0);
       residual[i] = rhs;
@@ -233,14 +246,18 @@ export class QuayPotential {
       if (!(curvature > 0 && Number.isFinite(curvature)))
         throw invalidLoad('Check that the wet geometry and face fractions form a connected potential solve.');
       const stride = energyResidual / curvature;
-      for (let i = 0; i < n; i++) {
+      for (let at = 0; at < visits; at++) {
+        const i = active ? active[at]! : at;
         potential[i]! += stride * direction[i]!;
         residual[i]! -= stride * applied[i]!;
       }
       columnResidual = this.precondition(residual, applied);
       const next = this.coarsePrecondition(residual, applied, face, columnResidual);
       const ratio = next / energyResidual;
-      for (let i = 0; i < n; i++) direction[i] = applied[i]! + ratio * direction[i]!;
+      for (let at = 0; at < visits; at++) {
+        const i = active ? active[at]! : at;
+        direction[i] = applied[i]! + ratio * direction[i]!;
+      }
       energyResidual = next;
     }
     if (!(columnResidual <= threshold))
@@ -252,11 +269,19 @@ export class QuayPotential {
     return iterations;
   }
 
+  private clearWet(out: Float64Array): void {
+    const { active } = this;
+    if (!active) out.fill(0);
+    else for (let at = 0; at < active.length; at++) out[active[at]!] = 0;
+  }
+
   // A block Jacobi preconditioner solves each vertical column exactly. Thin surface layers then
   // do not force the horizontal search to resolve their large vertical conductance on every step.
   private factorColumns(top: number): void {
-    const { down, wet, diagonal, columnInverse: inverse, surfaceCells: plane } = this;
-    for (let i = 0; i < inverse.length; i++) {
+    const { down, wet, active, diagonal, columnInverse: inverse, surfaceCells: plane } = this;
+    const visits = active?.length ?? inverse.length;
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
       if (!wet[i]) continue;
       const upper = i < plane ? 0 : down[i - plane]!;
       const eliminated = upper === 0 ? 0 : upper * upper * inverse[i - plane]!;
@@ -268,13 +293,16 @@ export class QuayPotential {
   }
 
   private precondition(rhs: Float64Array, out: Float64Array): number {
-    const { down, columnInverse: inverse, surfaceCells: plane } = this;
-    for (let i = 0; i < out.length; i++) {
+    const { down, active, columnInverse: inverse, surfaceCells: plane } = this;
+    const visits = active?.length ?? out.length;
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
       const upper = i < plane ? 0 : down[i - plane]!;
       out[i] = rhs[i]! + (upper === 0 ? 0 : upper * inverse[i - plane]! * out[i - plane]!);
     }
     let norm = 0;
-    for (let i = out.length - 1; i >= 0; i--) {
+    for (let at = visits - 1; at >= 0; at--) {
+      const i = active ? active[at]! : at;
       out[i] = inverse[i]! * (out[i]! + (down[i] ? down[i]! * out[i + plane]! : 0));
       norm += rhs[i]! * out[i]!;
     }
@@ -282,17 +310,28 @@ export class QuayPotential {
   }
 
   private coarsePrecondition(rhs: Float64Array, out: Float64Array, top: number, columnNorm: number): number {
-    const { coarse, coarseWork: work } = this;
+    const { coarse, coarseWork: work, active } = this;
     if (!coarse || columnNorm === 0) return columnNorm;
-    for (let i = 0; i < out.length; i++) out[i]! *= QUAY_SWEEP;
+    const visits = active?.length ?? out.length;
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
+      out[i]! *= QUAY_SWEEP;
+    }
     this.multiply(out, work!, top);
-    for (let i = 0; i < out.length; i++) work![i] = rhs[i]! - work![i]!;
-    coarse.add(work!, out);
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
+      work![i] = rhs[i]! - work![i]!;
+    }
+    coarse.add(work!, out, active);
     this.multiply(out, work!, top);
-    for (let i = 0; i < out.length; i++) work![i] = rhs[i]! - work![i]!;
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
+      work![i] = rhs[i]! - work![i]!;
+    }
     this.precondition(work!, work!);
     let norm = 0;
-    for (let i = 0; i < out.length; i++) {
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
       out[i]! += QUAY_SWEEP * work![i]!;
       norm += rhs[i]! * out[i]!;
     }
@@ -300,10 +339,12 @@ export class QuayPotential {
   }
 
   private multiply(u: Float64Array, out: Float64Array, top: number): number {
-    const { surfaceCells: plane, volumeCells: n, nx, wet, east, north, down, horizontalCorrection } = this;
-    out.fill(0);
+    const { surfaceCells: plane, volumeCells: n, nx, wet, active, east, north, down, horizontalCorrection } = this;
+    this.clearWet(out);
     let work = 0;
-    for (let i = 0; i < n; i++) {
+    const visits = active?.length ?? n;
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
       const value = u[i]!;
       const correction = horizontalCorrection?.[Math.floor(i / plane)];
       if (east[i]) {

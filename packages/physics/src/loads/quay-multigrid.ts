@@ -236,15 +236,18 @@ export class QuayCoarseCorrection {
     this.top = top;
   }
 
-  add(fineResidual: Float64Array, correction: Float64Array): void {
+  add(fineResidual: Float64Array, correction: Float64Array, active?: Uint32Array): void {
     const { labels, rhs, solution } = this;
     rhs.fill(0);
-    for (let i = 0; i < labels.length; i++) {
+    const visits = active?.length ?? labels.length;
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
       const group = labels[i]!;
       if (group >= 0) rhs[group]! += fineResidual[i]!;
     }
     this.solve();
-    for (let i = 0; i < labels.length; i++) {
+    for (let at = 0; at < visits; at++) {
+      const i = active ? active[at]! : at;
       const group = labels[i]!;
       if (group >= 0) correction[i]! += solution[group]!;
     }
