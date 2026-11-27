@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20859456,
+  "total": 20859469,
   "history": [
     {
       "date": "2026-10-24",
@@ -14472,6 +14472,12 @@
       "commit": "ground-split",
       "reason": "FIRE-05: the ground share split into ground shock, crater work and heat (+633 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "pending",
+      "reason": "physics/ship 35,261 ceiling to its new size 35,274 (+13 B): KCS's fitted rudder roll lever and roll decay, so it heels as MARIN and KRISO measured. Two constants of one ship model; nothing to split. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15349,7 +15355,7 @@
     "@margoengine/physics/seakeeping": 40620,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 35261,
+    "@margoengine/physics/ship": 35274,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,
