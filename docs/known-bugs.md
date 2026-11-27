@@ -6,6 +6,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a voxel-pathtracer unit test failed on a loaded machine; the viewport ignored the fixed band budget (KB-VPT-BANDS-LOAD1, voxel-pathtracer)
+
+- **Repro (before):** `packages/voxel-pathtracer` unit suite (`node --test tests/*.test.js`) 15 times while 28 CPU
+  burners and a loop of the points build ran: 2 of 7 finished runs failed "agx tone mapping is computed in the display
+  shader" (`tests/tracer.test.js`) with `11 !== 3`; 12 runs beside the points build alone all passed.
+- **Cause:** the viewport cuts its trace into row bands sized by `WorkPacer` from wall-clock times (`src/dispatch.ts`).
+  Loaded, the fake GPU's submissions read as slow, the bands shrank, and the frame made band bind groups (the trace
+  layout's 11 entries, a buffer at binding 2 too) and a band uniform buffer after the display group. The test took the
+  last group with a buffer at binding 2 as the display group and compared GPU bytes the bands had changed. The fixed
+  band budget `voxelTraceWork` that pins bands in tests applied to `renderImage` only, not to the viewport.
+- **Fix:** both routes band through one `bandWork` (`src/tracer.ts`), so `voxelTraceWork` pins the viewport's bands as
+  well; the test pins it and finds the display group by its layout.
+- **Regression:** `tests/tracer.test.js` "agx tone mapping ... (forced bands)": 8-row bands, as a loaded machine gives,
+  must band the viewport and keep 3 display bindings and the same GPU bytes; it fails on the parent. The GPU
+  determinism case (`browser-check.mjs determinism`, WebGPU and `--compat`) passes with the change.
+
 ### Fixed 2026-11-27: the timber-valley aftermath drew a black frame under its smoke weather (KB-LOOK-TV-CRUSH1, KB-SKY-SMOKE-BLACK1; scenes)
 
 - **Repro:** `@margoengine/scenes/timber-valley` with the `aftermath` preset (weather `smoke`, fire `burnt`, 22 August

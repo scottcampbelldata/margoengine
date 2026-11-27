@@ -84,6 +84,14 @@ import type {
 } from './types.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 
+// The work a row band of a trace may carry: the measured GPU's (WorkPacer, from wall-clock times), or a fixed budget
+// set on the device as `voxelTraceWork` (the test switch of browser-check's determinism case and the unit tests). Both
+// the viewport and renderImage band through this, so a test that fixes it sees the same bands however loaded the
+// machine is: bands change no pixel's sums, but they do change the bind groups and the band uniform buffer a frame
+// allocates (KB-VPT-BANDS-LOAD1: a loaded machine's smaller bands broke tracer.test.js's agx check).
+const bandWork = (gpu: { device: GPUDevice; pacer: WorkPacer }): number =>
+  (gpu.device as unknown as { voxelTraceWork?: number }).voxelTraceWork ?? gpu.pacer.budget;
+
 declare const GPUBufferUsage: {
   MAP_READ: number;
   COPY_SRC: number;
@@ -1787,7 +1795,7 @@ export class VoxelPathTracer implements EnginePlugin {
       // Bands of whole workgroups (8 rows) whose offsets meet the storage alignment.
       step = Math.max(8, bandRowStep(width, device.limits.minStorageBufferOffsetAlignment ?? 256)),
       bounces = this.#settings.maxBounces,
-      chunks = planTrace(width, height, s0, count, step, pathBudget(bounces), pathBudget(bounces, gpu.pacer.budget)),
+      chunks = planTrace(width, height, s0, count, step, pathBudget(bounces), pathBudget(bounces, bandWork(gpu))),
       write = (target: GPUBuffer, offset: number, k: TraceChunk) =>
         this.#writeFrame(
           device,
@@ -2348,9 +2356,7 @@ export class VoxelPathTracer implements EnginePlugin {
             }
             // Row bands of the tile, each its own submission of at most the measured GPU's budget (bands change no
             // pixel's sums); the frame uniform is written before each, in queue order.
-            // Test switch (browser-check's determinism case): a fixed band budget, to prove bands change no value.
-            const paced = (device as unknown as { voxelTraceWork?: number }).voxelTraceWork ?? gpu.pacer.budget;
-            for (const k of planTrace(w, h, s, count, step, pathBudget(bounces), pathBudget(bounces, paced))) {
+            for (const k of planTrace(w, h, s, count, step, pathBudget(bounces), pathBudget(bounces, bandWork(gpu)))) {
               const whole = k.rows === h,
                 key = `${k.y0}+${k.rows}`;
               let banded = whole ? group! : bands.get(key);

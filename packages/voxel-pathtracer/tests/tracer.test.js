@@ -12,24 +12,42 @@ import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
 const FRAME = 800;
-test('agx tone mapping is computed in the display shader: same bindings as neutral, no extra GPU memory', async () => {
-  const h = await ready({ toneMapping: 'agx', denoise: false });
-  h.frame();
-  await settle();
-  h.frame();
-  const used = h.tracer.stats.gpuBytes,
-    display = () => h.device.groups.findLast((g) => g.entries?.some((e) => e.binding === 2 && e.resource.buffer));
-  assert.equal(display().entries.length, 3);
-  assert.ok(!h.device.textures.some((t) => t.dimension === '3d'));
-  h.tracer.setOptions({ toneMapping: 'neutral' });
-  h.frame();
-  await settle();
-  h.frame();
-  assert.equal(display().entries.length, 3);
-  assert.equal(h.tracer.stats.gpuBytes, used);
-  h.tracer.dispose();
-  assert.equal(h.tracer.stats.gpuBytes, 0);
-});
+// Regression (KB-VPT-BANDS-LOAD1, 2026-11-27): the viewport cuts its trace into row bands sized by the measured GPU
+// (WorkPacer, from wall-clock times). On a loaded machine the fake GPU's submissions "took" longer, the bands shrank,
+// and the new band bind groups (the trace layout's 11 entries, also with a buffer at binding 2) and band uniform buffer
+// came after the display group: the check read the last group with a buffer at binding 2 (11, not 3) and GPU bytes
+// that the bands had changed. The viewport ignored `voxelTraceWork`, the fixed band budget renderImage honours. Now
+// both routes band through it, the check pins it, and it finds the display group by its layout; the forced case (8-row
+// bands, as a loaded machine gives) failed every time on the parent.
+const BANDS = { whole: Number.MAX_SAFE_INTEGER, forced: 1 };
+for (const [name, work] of Object.entries(BANDS))
+  test(`agx tone mapping is computed in the display shader: same bindings as neutral, no extra GPU memory (${name} bands)`, async () => {
+    const harness = fakeEngine();
+    harness.device.voxelTraceWork = work;
+    const h = await ready({ toneMapping: 'agx', denoise: false }, harness);
+    h.frame();
+    await settle();
+    h.frame();
+    const used = h.tracer.stats.gpuBytes,
+      // The display layout: a vertex-visible uniform at 0 and two read-only storage buffers.
+      isDisplay = (g) =>
+        g.layout.entries?.length === 3 &&
+        g.layout.entries[0].buffer?.type === 'uniform' &&
+        g.layout.entries[0].visibility & GPUShaderStage.VERTEX,
+      display = () => h.device.groups.findLast(isDisplay),
+      traceGroups = () => h.device.groups.filter((g) => g.entries.length === 11).length;
+    assert.equal(traceGroups() > 2, name === 'forced', 'the forced budget bands the viewport trace');
+    assert.equal(display().entries.length, 3);
+    assert.ok(!h.device.textures.some((t) => t.dimension === '3d'));
+    h.tracer.setOptions({ toneMapping: 'neutral' });
+    h.frame();
+    await settle();
+    h.frame();
+    assert.equal(display().entries.length, 3);
+    assert.equal(h.tracer.stats.gpuBytes, used);
+    h.tracer.dispose();
+    assert.equal(h.tracer.stats.gpuBytes, 0);
+  });
 const isMargo = (code) => (error) => error.name === 'MargoError' && error.code === code;
 
 // Attaches and runs frames until the trace and display pipelines are compiled.
