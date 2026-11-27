@@ -54,6 +54,16 @@ interface MeshData {
   pid: Growable<Uint32Array>;
   p: Growable<Uint32Array>;
 }
+interface BooleanReference {
+  objectId: string;
+  path?: string;
+  transform: Float64Array;
+}
+interface BooleanData {
+  operation: string;
+  base: BooleanReference;
+  operands: BooleanReference[];
+}
 interface ObjectData {
   id: string;
   name?: string;
@@ -67,6 +77,8 @@ interface ObjectData {
   displaced?: boolean;
   /** The object's shape is a volumetric level set, which has no triangles. */
   levelSet?: boolean;
+  /** The object's shape is a boolean operation on other objects (boolean operations extension). */
+  boolean?: BooleanData;
   components: { objectId: string; path?: string; uuid?: string; transform: Float64Array }[];
   alternatives: { objectId: string; path?: string; uuid?: string; resolution: string }[];
 }
@@ -109,6 +121,8 @@ export interface ThreeMFExtension {
   };
   /** The extension reads level set objects, which the core reader otherwise refuses. */
   levelSets?: boolean;
+  /** The extension reads boolean shape objects, which the core reader otherwise refuses. */
+  booleans?: boolean;
   /** An element the reader does not know, with its attributes. */
   open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
   /** The end of any element. */
@@ -278,6 +292,26 @@ function parseModel(
             object.mesh = { vertices: floats(), triangles: uints(), pid: uints(), p: uints() };
             if (name === 'displacementmesh') object.displaced = true;
             break;
+          case 'booleanshape':
+          case 'boolean': {
+            const shape = name === 'boolean' ? object?.boolean : object;
+            if (!shape)
+              throw new LoaderError(
+                F,
+                'syntax',
+                `<${name}> outside ${name === 'boolean' ? '<booleanshape>' : '<object>'}`,
+              );
+            if (!a.objectid) throw new LoaderError(F, 'syntax', `<${name}> without objectid`);
+            // The extension's own attributes are unqualified, `path` among them.
+            const reference = {
+              objectId: a.objectid,
+              path: a.path ?? production(a, 'path'),
+              transform: parseTransform(a.transform),
+            };
+            if (name === 'boolean') object!.boolean!.operands.push(reference);
+            else object!.boolean = { operation: a.operation ?? 'union', base: reference, operands: [] };
+            break;
+          }
           case 'levelset':
             if (!object) throw new LoaderError(F, 'syntax', '<levelset> outside <object>');
             object.levelSet = true;
@@ -419,8 +453,8 @@ const normalizePath = (path: string): string => path.replace(/\\/g, '/').replace
  * production extension: items and components in other model parts, UUIDs and alternative representations). Build item
  * and component transforms are baked into the positions, which are converted to meters by default. The result has one
  * group per build item object and color; `colors` is present only when some triangle has per-corner colors. A
- * displacement mesh gives its base triangles, in groups marked `displaced`; a volumetric level set throws
- * `unsupported`.
+ * displacement mesh gives its base triangles, in groups marked `displaced`; a volumetric level set or a boolean shape
+ * throws `unsupported`.
  */
 export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFResult> {
   return read3MF(input, options);
@@ -483,7 +517,9 @@ export async function read3MF(
   /** The paths a model part's objects name, in components and alternatives. */
   const named = (model: Model): string[] =>
     [...model.objects.values()].flatMap((o) =>
-      [...o.components, ...o.alternatives].flatMap(({ path }) => (path ? [path] : [])),
+      [...o.components, ...o.alternatives, ...(o.boolean ? [o.boolean.base, ...o.boolean.operands] : [])].flatMap(
+        ({ path }) => (path ? [path] : []),
+      ),
     );
   // Load every model part the root names before the synchronous build walk. A part's own build is ignored.
   for (const path of [...root.items.flatMap(({ path }) => (path ? [path] : [])), ...named(root)]) await load(path);
@@ -657,6 +693,12 @@ export async function read3MF(
     }
     // Core 3MF: an `other` mesh is never output, however it is reached; the type of an object of components is ignored.
     if (shown.mesh && shown.type === 'other') return;
+    if (shown.boolean && !extension?.booleans)
+      throw new LoaderError(
+        F,
+        'unsupported',
+        `object ${shown.id.slice(0, 32)} is a boolean shape; read the package with parse3MFBoolean from @margoengine/loaders/threemf-boolean`,
+      );
     if (shown.levelSet && !extension?.levelSets)
       throw new LoaderError(
         F,

@@ -69,6 +69,18 @@ export function read3MFMaterials(input: BinaryInput, options: ThreeMFOptions, ex
 
 type BinaryInput = ArrayBuffer | ArrayBufferView;
 
+interface BooleanData {
+    operation: string;
+    base: BooleanReference;
+    operands: BooleanReference[];
+}
+
+interface BooleanReference {
+    objectId: string;
+    path?: string;
+    transform: Float64Array;
+}
+
 type Color = [number, number, number, number];
 
 class Growable<T extends Float32Array | Uint32Array> {
@@ -145,6 +157,7 @@ interface ObjectData {
     mesh?: MeshData;
     displaced?: boolean;
     levelSet?: boolean;
+    boolean?: BooleanData;
     components: {
         objectId: string;
         path?: string;
@@ -173,6 +186,7 @@ interface ThreeMFExtension {
         close(model: ThreeMFModel, name: string): void;
     };
     levelSets?: boolean;
+    booleans?: boolean;
     open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
     close?(model: ThreeMFModel, name: string): void;
     ready?(read: (path: string) => Promise<Uint8Array>, context: ThreeMFReadContext): Promise<void>;

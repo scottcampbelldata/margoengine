@@ -1319,6 +1319,10 @@
       "types": "./dist/loaders/geo.d.ts",
       "import": "./dist/loaders/geo.js"
     },
+    "./loaders/threemf-boolean": {
+      "types": "./dist/loaders/threemf-boolean.d.ts",
+      "import": "./dist/loaders/threemf-boolean.js"
+    },
     "./loaders/threemf-displacement": {
       "types": "./dist/loaders/threemf-displacement.d.ts",
       "import": "./dist/loaders/threemf-displacement.js"

@@ -1670,6 +1670,24 @@ const file = await export3MF(
 console.log(`${file.length} bytes`);
 ```
 
+### Boolean shapes
+
+The [3MF Boolean Operations Extension](https://github.com/3MFConsortium/spec_booleans) lets a file ask its reader to unite, subtract or intersect meshes. `objectInfo`'s `boolean` takes a step, `{ operation, operands }`, or a list of steps applied in order: `operation` is `'union'` (default), `'difference'` or `'intersection'`, and each operand is a closed mesh node in the node's frame, written once however often it is named. The node's own mesh is the base and keeps its material; the file requires the extension. It needs a `model` object of the node's own, without slices or alternatives. Margo writes the operations; it does not evaluate them. `parse3MFBoolean` (`@margoengine/loaders/threemf-boolean`) reads them back.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+const positions = new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]);
+const geometry = { positions, indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] };
+// The same shape, 10 mm along X, cut out of the part.
+const cutter = { name: 'cutter', geometry, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.01, 0, 0, 1] };
+const file = await export3MF(
+  { nodes: [{ name: 'Part', geometry }] },
+  { objectInfo: () => ({ boolean: { operation: 'difference', operands: [cutter] } }) },
+);
+console.log(`${file.length} bytes`);
+```
+
 ## Collision and UV animation per engine
 
 Name nodes with the `-col`, `-convcol`, `-colonly` and `-convcolonly` suffixes and author `materialAnimations` once; each

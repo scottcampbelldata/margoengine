@@ -209,6 +209,10 @@
       "types": "./dist/geo.d.ts",
       "import": "./dist/geo.js"
     },
+    "./threemf-boolean": {
+      "types": "./dist/threemf-boolean.d.ts",
+      "import": "./dist/threemf-boolean.js"
+    },
     "./threemf-displacement": {
       "types": "./dist/threemf-displacement.d.ts",
       "import": "./dist/threemf-displacement.js"

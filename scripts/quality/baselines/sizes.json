@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21305913,
+  "total": 21318777,
   "history": [
     {
       "date": "2026-10-24",
@@ -15067,6 +15067,12 @@
       "commit": "a918f9e7a6",
       "reason": "3MF volumetric, implicit and displacement extensions: exporters/threemf 36665 to 42752 B gzip with its lazy chunk; 37842 B load with the entry and the 5481 B writer of the three extensions loads by import() only for a file that asks for one. New optional entries loaders/threemf-volumetric (14055 B) and threemf-displacement (12936 B), each holding the shared 3MF reader. Core/stage untouched.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "6002757cef",
+      "reason": "3MF boolean operations: measured {\"@margoengine/loaders/threemf-boolean\":12489} (before: exporters/threemf 42752, volumetric 14055, displacement 12936 B gzip). The reader holds the boolean elements in the shared 3MF reader, so every entry that reads it grows; the new optional entry loaders/threemf-boolean validates and returns the shapes. Core/stage untouched.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15710,6 +15716,7 @@
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
+    "@margoengine/loaders/threemf-boolean": 12864,
     "@margoengine/loaders/threemf-displacement": 13325,
     "@margoengine/loaders/threemf-lattice": 19099,
     "@margoengine/loaders/threemf-materials": 14883,

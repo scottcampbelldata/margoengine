@@ -39,6 +39,11 @@ export interface ThreeMFBeamGroup {
     balls?: readonly number[];
 }
 
+export interface ThreeMFBoolean {
+    operation?: (typeof OPERATIONS)[number];
+    operands: readonly ExportNode[];
+}
+
 export type ThreeMFCapMode = (typeof CAPS)[number];
 
 export interface ThreeMFComposite {
@@ -193,6 +198,7 @@ export interface ThreeMFObjectInfo {
     volume?: ThreeMFVolume;
     levelSet?: ThreeMFLevelSet;
     displacement?: ThreeMFDisplacement;
+    boolean?: ThreeMFBoolean | readonly ThreeMFBoolean[];
 }
 
 export type ThreeMFObjectType = (typeof TYPES)[number];
@@ -427,6 +433,8 @@ interface MorphData {
     normals?: ArrayLike<number>;
     tangents?: ArrayLike<number>;
 }
+
+const OPERATIONS: readonly ['union', 'difference', 'intersection'];
 
 interface PixelArtSampling {
     mipmaps?: 'none' | 'nearest';

@@ -115,7 +115,26 @@ export interface ThreeMFObjectInfo {
    * or level set. Default none.
    */
   displacement?: ThreeMFDisplacement;
+  /**
+   * Unites, subtracts or intersects meshes with the node's shape (boolean operations extension), one step after another
+   * when given a list; the consumer evaluates it. The file then requires the extension. It needs a build item or
+   * component of the node's own, a `model` type, and no slices or alternatives. Default none.
+   */
+  boolean?: ThreeMFBoolean | readonly ThreeMFBoolean[];
 }
+
+/** One boolean step on a node's shape. */
+export interface ThreeMFBoolean {
+  /** Default `'union'`. */
+  operation?: (typeof OPERATIONS)[number];
+  /**
+   * The meshes applied, in order, each a closed mesh given in the node's frame: this node's own transform places the
+   * result. A node given twice is written once.
+   */
+  operands: readonly ExportNode[];
+}
+
+const OPERATIONS = ['union', 'difference', 'intersection'] as const;
 
 /** One closed contour of a layer, or in a `support` object one open path, with colours. */
 export interface ThreeMFSliceOutline {
@@ -601,6 +620,8 @@ type Described = ThreeMFObjectInfo & {
   type: ThreeMFObjectType;
   checked?: ReturnType<typeof checkLattice>;
   layered?: ReturnType<typeof checkSlices>;
+  /** The node's boolean steps. */
+  steps?: ThreeMFBoolean[];
 };
 
 /** Turns a Y-up object's frame to the file's Z up: `(x, y, z)` to `(x, -z, y)`. */
@@ -1493,7 +1514,7 @@ export async function export3MF(
     base: Base,
     name: string | undefined,
     { type = 'model', partNumber, modelResolution }: ThreeMFObjectInfo,
-    { alternatives = '', lattice = '', slices = '', rooted = false, volume = '', shape = '' } = {},
+    { alternatives = '', lattice = '', slices = '', rooted = false, volume = '', shape = '', bare = false } = {},
   ): number => {
     const at = id++,
       resolution = (modelResolution === undefined ? '' : ` pa:modelresolution="${modelResolution}"`) + slices,
@@ -1508,7 +1529,7 @@ export async function export3MF(
       id: at,
       part,
       xml:
-        `<object id="${at}" type="${type}"${resolution} pid="${base.group}" pindex="${base.index}"${named(name)}${numberedPart(partNumber)}${unique('object', name)}>` +
+        `<object id="${at}" type="${type}"${resolution}${bare ? '' : ` pid="${base.group}" pindex="${base.index}"`}${named(name)}${numberedPart(partNumber)}${unique('object', name)}>` +
         `${shape || `<mesh${volume}><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles>${lattice}</mesh>`}${alternatives}</object>`,
     });
     return at;
@@ -1550,7 +1571,23 @@ export async function export3MF(
         volume: given.volume,
         levelSet: given.levelSet,
         displacement: given.displacement,
+        steps: given.boolean && ([given.boolean].flat() as ThreeMFBoolean[]),
       };
+    if (info.steps) {
+      if (type !== 'model') throw new RangeError('3MF applies boolean operations only to a model object');
+      if (together)
+        throw new RangeError(
+          "3MF writes boolean operations on a node's own object; use assembly: false or 'components'",
+        );
+      if (info.slices || info.alternatives)
+        throw new RangeError('3MF a boolean shape takes no slices or alternatives on the same node');
+      for (const { operation = 'union', operands } of info.steps) {
+        if (!OPERATIONS.includes(operation))
+          throw new RangeError(`3MF boolean operation must be one of ${OPERATIONS.join(', ')}`);
+        if (!Array.isArray(operands) || !operands.length)
+          throw new RangeError('3MF boolean operations need at least one operand node');
+      }
+    }
     if (!TYPES.includes(type)) throw new RangeError(`3MF object type must be one of ${TYPES.join(', ')}`);
     if ((info.volume || info.levelSet || info.displacement) && together)
       throw new RangeError(
@@ -1925,6 +1962,34 @@ export async function export3MF(
       .map((face, i) => prefixed(face).replace('/>', `${corners[i]}/>`))
       .join('')}</d:triangles></d:displacementmesh>`;
   };
+  /** The operand meshes written, by their node, once for each reflection of the frame they stand in. */
+  const operandIds = [new Map<ExportNode, number>(), new Map<ExportNode, number>()];
+  /** Writes a node's boolean steps over its own object `from`, and gives the last shape's id. */
+  const booleanOf = (
+    info: ReturnType<typeof infoOf>,
+    from: number,
+    mirrored: boolean,
+    base: Base,
+    name: string | undefined,
+  ): number => {
+    let at = from;
+    info.steps!.forEach(({ operation = 'union', operands }, step) => {
+      const applied = operands.map((node) => {
+        const known = operandIds[Number(mirrored)];
+        let operand = known.get(node);
+        if (operand === undefined)
+          known.set(node, (operand = meshObject(node, mirrored, { type: 'model' }, node.name, true, false)));
+        return `<bo:boolean objectid="${operand}"/>`;
+      });
+      const shape = `<bo:booleanshape objectid="${at}" operation="${operation}">${applied.join('')}</bo:booleanshape>`,
+        last = step === info.steps!.length - 1;
+      // A shape takes no property of its own (the extension's chapter 2); the part number names the finished one.
+      at = object([], [], base, name, last ? info : { type: 'model' }, { shape, rooted: true, bare: true });
+    });
+    booleans = true;
+    return at;
+  };
+  let booleans = false;
   const placed = (drawn: readonly Drawable[]): void => {
     const { name, world: matrix } = drawn[0],
       determinant = determinant3(matrix),
@@ -1976,7 +2041,8 @@ export async function export3MF(
       beamed = info.lattice && numbered(info.lattice),
       layered = info.slices && numbered(info.slices),
       fielded = [info.volume, info.levelSet, info.displacement].map((value) => value && numbered(value)),
-      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others, beamed, layered, fielded])} ${keys.join('|')}`;
+      combined = info.steps && numbered(answers.get(drawn[0].source!)!.boolean!),
+      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others, beamed, layered, fielded, combined])} ${keys.join('|')}`;
     let at = shared.get(key);
     if (at === undefined) {
       const welded = weldParts(parts, mirrored);
@@ -2005,9 +2071,11 @@ export async function export3MF(
           shape = fields!.levelSet(info.levelSet, domain, filled, toGeometry, box);
         } else if (filled !== undefined) volume = ` v:volumeid="${filled}"`;
       }
-      const rooted = !!(shape || volume),
-        written = object(vertices, faces, base, name, info, { alternatives, lattice, slices, shape, volume, rooted });
-      shared.set(key, (at = written));
+      const rooted = !!(shape || volume || info.steps),
+        // The part number names the finished shape, so a boolean's base takes none.
+        own = info.steps ? { type: info.type } : info,
+        written = object(vertices, faces, base, name, own, { alternatives, lattice, slices, shape, volume, rooted });
+      shared.set(key, (at = info.steps ? booleanOf(info, written, mirrored, base, name) : written));
     }
     if (info.type === 'other') return;
     const transform = ` transform="${itemTransform(placement, scale)}"`;
@@ -2105,7 +2173,8 @@ export async function export3MF(
       (lattices.size ? ` xmlns:b="${BEAMS}"` : '') +
       (lattices.has('b2') ? ` xmlns:b2="${BALLS}"` : '') +
       (sliced.size ? ` xmlns:s="${SLICE}"` : '') +
-      declared.namespaces,
+      declared.namespaces +
+      (booleans ? ' xmlns:bo="http://schemas.3mf.io/3dmanufacturing/booleanoperations/2023/07"' : ''),
     // A package whose model parts refer to others must require the production extension (its chapter 1), and one with
     // beam lattices theirs (beam lattice extension chapter 1).
     // A file whose mesh is too coarse without its layers requires the slice extension (its chapter 2).
@@ -2114,6 +2183,7 @@ export async function export3MF(
       ...lattices,
       ...(sliced.has('lowres') ? ['s'] : []),
       ...declared.required,
+      ...(booleans ? ['bo'] : []),
     ],
     required = extensions.length ? ` requiredextensions="${extensions.join(' ')}"` : '',
     modelOf = (head: string, body: string, own: readonly string[], items: string): string =>

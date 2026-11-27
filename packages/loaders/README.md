@@ -163,7 +163,7 @@ try {
 
 - Core `Geometry` holds positions and normals only, at most 11,184,810 vertices (`CORE_MAX_VERTICES`): UVs and vertex colors are kept in `LoadedGeometry` but not rendered. `toGeometries` and `createMeshes` split a larger mesh into consecutive triangle ranges of at most that many vertices (or `maxPartVertices`) and 67,108,864 indices each; smooth normals are computed over the whole mesh first, so the parts meet without seams, and a vertex on a cut is stored in both parts. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
 - PLY face colors and other per-face scalar properties become per-face groups (`group.color`, `group.properties`). OFF reads ASCII and big-endian binary files and keeps each face's color or colormap index in its group. `parseVTK` reads legacy POLYDATA surfaces only; `parseVTKLegacy` (`/vtk-legacy`) reads every legacy dataset type with VERTICES and LINES cells and cell data, and `parseVTKXML` (`/vtk-xml`) the XML files. PCD ignores fields other than position, normal, rgb/rgba and intensity.
-- 3MF: `parse3MF` reads the core format and base materials; textures, composite materials and multi-properties come from `parse3MFMaterials` (`/threemf-materials`), beam lattices and slices from `parse3MFLattice` (`/threemf-lattice`), volumetric and implicit data from `parse3MFVolumetric` (`/threemf-volumetric`) and displacement maps from `parse3MFDisplacement` (`/threemf-displacement`). `parse3MF` reads a displacement mesh as its base triangles, in groups marked `displaced`, and refuses a level set object (`unsupported`), as it has no triangles. ZIP64 and encrypted packages are refused; meshes of type `other` are skipped, however the build reaches them, and the type of an object of components is ignored (core specification). A group of another type than `model` says so in `objectType`, and `partNumber` and `itemPartNumber` carry the `partnumber` of its mesh object and build item. The production extension is read under whatever prefix a file declares: `buildUUID` on the result, `itemUUID`, `componentUUID`, `uuid` and `alternativeUUID` on each group, and `modelPath` for a mesh from a part other than the root. As the extension asks, only the root part may name another part, and another part's build is ignored.
+- 3MF: `parse3MF` reads the core format and base materials; textures, composite materials and multi-properties come from `parse3MFMaterials` (`/threemf-materials`), beam lattices and slices from `parse3MFLattice` (`/threemf-lattice`), volumetric and implicit data from `parse3MFVolumetric` (`/threemf-volumetric`) and displacement maps from `parse3MFDisplacement` (`/threemf-displacement`). `parse3MF` reads a displacement mesh as its base triangles, in groups marked `displaced`, and refuses a level set object or a boolean shape (`unsupported`), as neither has triangles of its own; `parse3MFBoolean` (`/threemf-boolean`) reads boolean shapes. ZIP64 and encrypted packages are refused; meshes of type `other` are skipped, however the build reaches them, and the type of an object of components is ignored (core specification). A group of another type than `model` says so in `objectType`, and `partNumber` and `itemPartNumber` carry the `partnumber` of its mesh object and build item. The production extension is read under whatever prefix a file declares: `buildUUID` on the result, `itemUUID`, `componentUUID`, `uuid` and `alternativeUUID` on each group, and `modelPath` for a mesh from a part other than the root. As the extension asks, only the root part may name another part, and another part's build is ignored.
 - glTF lives in gltf and gltf/pbr.
 
 ## STL
@@ -1051,6 +1051,24 @@ const geometry = {
 const file = await export3MF({ nodes: [{ geometry }] }, { objectInfo: () => ({ displacement: { image, height: 0.001 } }) });
 const { displacementGroups, meshes } = await parse3MFDisplacement(file);
 console.log(displacementGroups[0].height, meshes[0].triangleGroups.length);
+```
+
+## 3MF boolean shapes
+
+`parse3MFBoolean` returns each shape with its `operation`, its `base` and `operands` (each with a transform and, for a mesh, its triangles) and the places the build puts it, and refuses what the extension rules out. It does not evaluate the operations.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import { parse3MFBoolean } from 'margoengine/loaders/threemf-boolean';
+
+const positions = new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]);
+const geometry = { positions, indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] };
+const file = await export3MF(
+  { nodes: [{ name: 'Part', geometry }] },
+  { objectInfo: () => ({ boolean: { operation: 'difference', operands: [{ geometry }] } }) },
+);
+const { shapes } = await parse3MFBoolean(file);
+console.log(shapes[0].operation, shapes[0].operands.length);
 ```
 
 ## 3MF textures and colour groups
