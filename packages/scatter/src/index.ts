@@ -53,7 +53,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import { coverBlend, coverCode, coverVeil, splitDeclaration } from './cover.js';
-import { addAmbientVeil } from '../../shared/ambient-veil.js';
+import { addAmbientVeil, markCover, underWanted } from '../../shared/ambient-veil.js';
 import { captureStage, type ScatterCapture } from './capture.js';
 export { coverCode, coverDeclaration, splitDeclaration } from './cover.js';
 import { OrderedCull, candidateShader } from './order.js';
@@ -70,6 +70,8 @@ declare const GPUBufferUsage: {
 };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** One draw of the colour pass: an LOD ring and the stage it draws with. */
+type ScatterHeldDraw = [number, { pipeline: GPURenderPipeline; groups: GPUBindGroup[]; lighting?: GPUBindGroup }];
 const heightFormats = ['r32float', 'r16float', 'rgba32float', 'rgba16float', 'r8unorm'];
 /**
  * What `Scatter.velocityParts` hands `@margoengine/scatter/velocity`: this frame's culled instances and how each LOD ring
@@ -617,7 +619,20 @@ export class Scatter implements EnginePlugin {
     key: '',
     culled: false,
   };
-  private readonly ambientVeil = { veil: (c: ScatterPassContext, format: GPUTextureFormat) => this.veil(c, format) };
+  private readonly ambientVeil = {
+    veil: (c: ScatterPassContext, format: GPUTextureFormat): boolean => this.veil(c, format),
+  };
+  /**
+   * The covered parts' depth draws held back from the colour pass while an effect reads the surface under them
+   * (`wantUnder` in packages/shared/ambient-veil.js, KB-SCATTER-AOFRINGE1), for the `:cover-depth` pass of the same
+   * frame and view.
+   */
+  private readonly heldDepth = {
+    encoder: undefined as GPUCommandEncoder | undefined,
+    view: undefined as object | undefined,
+    lit: false,
+    draws: [] as ScatterHeldDraw[],
+  };
   private leaveVeils?: () => void;
   private readonly presentation = overlayDepthPass();
   private readonly attachment = this.presentation.colorAttachments[0];
@@ -1236,6 +1251,14 @@ export class Scatter implements EnginePlugin {
         if (c.backend === 'webgpu') this.drawColour(c);
       },
     });
+    // After an ambient occlusion effect's `under` pass (1.51) has kept the depth under the covered blades.
+    graph.add({
+      name: this.name + ':cover-depth',
+      order: 1.52,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.drawHeldDepth(c);
+      },
+    });
   }
   /**
    * Records the distribute (cull) pass, in candidate order (./order.js): each candidate's Instance and ring flags at
@@ -1588,7 +1611,10 @@ export class Scatter implements EnginePlugin {
     // covered parts' depth where they cover (KB-SCENES-DUNE-GTAO1), after all the blending, so no blade's depth hides a
     // blade behind it that blends later, and ambient occlusion, depth of field and later meshes see the grass. A stage
     // that cannot carry coverage (see `coverCode`) draws its rings opaque.
-    const draws: [number, NonNullable<typeof cover>][] = [];
+    const draws: [number, NonNullable<typeof cover>][] = [],
+      held = this.heldDepth;
+    held.encoder = held.view = undefined;
+    held.draws.length = 0;
     for (let i = 0; i < 3; i++) {
       const part = parts[i];
       if (part === undefined) continue;
@@ -1599,15 +1625,35 @@ export class Scatter implements EnginePlugin {
       if (parts[i] === 'cover' && cover) draws.push([i, cover]);
       else if (parts[i] === 'split' && tip) draws.push([i, tip]);
     }
+    // An effect that reads the surface under the covered parts (ambient occlusion: the ambient light a hashed depth
+    // pixel holds is mostly that surface's) takes it before their depth lands; the depth then draws at 1.52.
+    const depths = underWanted(c.device) ? held.draws : draws;
     for (let i = 2; i >= 0; i--) {
-      if (parts[i] === 'cover' && coverDepth) draws.push([i, coverDepth]);
-      else if (parts[i] === 'split' && tipDepth) draws.push([i, tipDepth]);
+      if (parts[i] === 'cover' && coverDepth) depths.push([i, coverDepth]);
+      else if (parts[i] === 'split' && tipDepth) depths.push([i, tipDepth]);
+    }
+    if (held.draws.length) {
+      held.encoder = c.encoder;
+      held.view = c.view;
+      held.lit = lit;
+      markCover(c);
     }
     this.attachment.view = c.color;
     this.depthAttachment.view = c.depth;
+    this.drawParts(c, draws, lit);
+    const veiled = this.veiled;
+    veiled.encoder = c.encoder;
+    veiled.depth = c.depth;
+    veiled.view = c.view;
+    veiled.key = key;
+    veiled.culled = culled;
+    this.drawn(c);
+  }
+  /** Draws `draws` (ring, stage) in one pass over `c.color` and `c.depth`. */
+  private drawParts(c: ScatterPassContext, draws: ScatterHeldDraw[], lit: boolean): void {
     const pass = c.encoder.beginRenderPass(this.presentation);
     applyView(pass, c);
-    let current: typeof opaque | undefined;
+    let current: ScatterHeldDraw[1] | undefined;
     for (const [i, use] of draws) {
       if (use !== current) {
         current = use;
@@ -1622,22 +1668,25 @@ export class Scatter implements EnginePlugin {
       else pass.drawIndexedIndirect(this.colourCommands(), i * 20);
     }
     pass.end();
-    const veiled = this.veiled;
-    veiled.encoder = c.encoder;
-    veiled.depth = c.depth;
-    veiled.view = c.view;
-    veiled.key = key;
-    veiled.culled = culled;
-    this.drawn(c);
+  }
+  /** The covered parts' depth that this frame's view held back from its colour pass (see `heldDepth`). */
+  private drawHeldDepth(c: ScatterPassContext): void {
+    const held = this.heldDepth;
+    if (!held.draws.length || held.encoder !== c.encoder || held.view !== c.view) return;
+    this.attachment.view = c.color;
+    this.depthAttachment.view = c.depth;
+    this.drawParts(c, held.draws, held.lit);
+    held.encoder = held.view = undefined;
+    held.draws.length = 0;
   }
   /**
    * Draws this view's covered parts over an ambient replay's target (`c.color`, of `format`) as veils: where a blade
    * covers a share of a pixel, that share of the light behind it leaves the target (packages/shared/ambient-veil.js).
-   * Opaque parts need none: they own their pixels' depth, so the replay holds nothing there.
+   * Opaque parts need none: they own their pixels' depth, so the replay holds nothing there. Returns whether it drew.
    */
-  private veil(c: ScatterPassContext, format: GPUTextureFormat): void {
+  private veil(c: ScatterPassContext, format: GPUTextureFormat): boolean {
     const veiled = this.veiled;
-    if (c.encoder !== veiled.encoder || c.depth !== veiled.depth || c.view !== veiled.view) return;
+    if (c.encoder !== veiled.encoder || c.depth !== veiled.depth || c.view !== veiled.view) return false;
     const lit = !!this.options.material;
     let pass: GPURenderPassEncoder | undefined;
     for (let i = 0; i < 3; i++) {
@@ -1662,6 +1711,7 @@ export class Scatter implements EnginePlugin {
       else pass.drawIndexedIndirect(this.colourCommands(), i * 20);
     }
     pass?.end();
+    return !!pass;
   }
   /**
    * Lets a capture hook (`@margoengine/post` SSR, SceneTargets, LightBounce: `targets.add(scatter)`) draw the plants'
@@ -2010,6 +2060,8 @@ export class Scatter implements EnginePlugin {
     this.maps = undefined;
     this.leaveVeils?.();
     this.leaveVeils = this.veiled.encoder = this.veiled.depth = this.veiled.view = undefined;
+    this.heldDepth.encoder = this.heldDepth.view = undefined;
+    this.heldDepth.draws.length = 0;
     this.pbrShader = '';
     this.pbrBindings.length = 0;
     this.pbrGroups.clear();

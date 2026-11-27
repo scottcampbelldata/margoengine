@@ -5930,24 +5930,42 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **After:** GTAO 0.999 mean, 0.995 least; SSAO 0.823 and 0.797 (its range check still counts the slats a little).
 - **Regression:** `packages/post/test/ssao-silhouette-browser.mjs`, WebGPU and the WebGL2 layer.
 
-### Open 2026-11-27: ambient occlusion leaves pale pixels along grass blade edges (KB-SCATTER-AOFRINGE1, scatter and post)
+### Fixed 2026-11-27: ambient occlusion left pale pixels along grass blade edges (KB-SCATTER-AOFRINGE1, scatter and post)
 
-- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file>` with the shots
+- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file>` with the shots
   `view=camp-buildings` and `view=camp-buildings&occlusion=0`; enlarge the grass at the lower left (pixels 370 to 470
-  across, 975 to 1055 down): with occlusion on, pale one-pixel outlines run along blades over the shaded sand at their
+  across, 975 to 1055 down): with occlusion on, pale one-pixel outlines ran along blades over the shaded sand at their
   feet. Counted as pixels over 8 codes of luma above their 5 x 5 median with occlusion and not without, lower 45 percent
-  of the frame: 41,520 (mean 19.6 codes; 9,408 under `weather=clear&hour=9`). RTX A6000, WebGPU.
+  of the frame: 41,520 when filed (mean 19.6 codes; 9,408 under `weather=clear&hour=9`), 20,673 (mean 18.5) and 6,513
+  on the main of the fix. RTX A6000, WebGPU.
 - **Cause:** a covered blade's depth is written where its coverage passes a hash (KB-SCENES-DUNE-GTAO1), and that pixel
-  is mostly sand wherever the coverage is low. The ambient replay holds the sand's light there (times one less the
-  coverage), but the occlusion is worked out at the blade's depth, so the sand's share is not darkened while the bare
-  pixels beside it are. The error is the sand's share times the difference of the two visibilities.
-- **Ruled out (same view, measured):** writing no covered depth at all leaves 3,307 pale pixels but also takes 90
-  percent of the darkening grass causes (mean 6.07 to 0.60 codes); no depth on the edges of blades wide enough to have
-  an opaque core leaves 36,390 (12 percent fewer) with 11 percent less darkening; a depth threshold of 0.5 or 0.75 on
-  those blades leaves 39,255 and 37,449. The pale pixels are the other face of the occlusion the hashed depth gives, so
-  no threshold removes one without the other.
-- **What a fix needs:** the occlusion of a veiled pixel worked out at the depth under the blades (the surface whose
-  light the replay holds) with the blades still counted as occluders: a second depth read in `SSAO` and `GTAO`.
+  is mostly sand wherever the coverage is low. The ambient replay, depth-equal against the blade's depth, held none of
+  the sand's light there, and the occlusion was worked out at the blade's depth, so the sand's share was not darkened
+  while the bare pixels beside it were.
+- **Ruled out (same view, measured when filed):** writing no covered depth at all leaves 3,307 pale pixels but also
+  takes 90 percent of the darkening grass causes (mean 6.07 to 0.60 codes); no depth on the edges of blades wide enough
+  to have an opaque core leaves 36,390 with 11 percent less darkening; a depth threshold of 0.5 or 0.75 leaves 39,255
+  and 37,449. A second depth read alone fixes nothing: the replay must hold the light under the blades too.
+- **Fix:** while `SSAO` or `GTAO` reads the surface under covered strips (`wantUnder`, packages/shared/ambient-veil.js),
+  `Scatter` holds its covered depth back from its colour pass to `<name>:cover-depth` (order 1.52). Between them
+  `ssao:under` (1.51) copies the depth under the blades and replays that surface's ambient light with the blades'
+  veils; `ssao:covered` (1.53) copies the blades' depth. At extraction a pixel whose depth is a blade's that nothing
+  drew over takes the depth under it as its centre, its normal and position come from there and its ambient light is
+  that replay, while the kernels search occluders in the scene's depth, blades included (layered depth images: Shade,
+  Gortler, He and Szeliski, SIGGRAPH 1998, https://doi.org/10.1145/280814.280882; multi-layer screen-space occlusion:
+  Bavoil and Sainz, SIGGRAPH 2009 Talks, https://history.siggraph.org/?p=148934; Mara, McGuire, Nowrouzezahrai and
+  Luebke, HPG 2016, https://doi.org/10.2312/hpg.20161195). A frame with no covered blade runs the passes and bindings
+  of before.
+- **After:** the dune coast view above 6,297 pale pixels (mean 11.8 codes), mean darkening 6.07 to 7.32 codes; clear
+  sky 4,132. Regression test `packages/scatter/test/grass-ao-fringe.browser.mjs` (`npm run test:browser:grass-ao-fringe`
+  in the scatter package), 320 x 240, before to after: GTAO 4,226 to 1,096 (WebGL2 layer 4,240 to 1,036), SSAO 2,038
+  to 155 (2,465 to 448), bounds 1,536 and 921; the grass darkens about 45,000 pixels (31,000 before; bound 2,304); a
+  view with no blade is byte-identical to one without grass, and its hash matches the build before the fix on all four
+  runs. `tests/ambient-veil.test.js` checks the handshake.
+- **Weak spots:** the pale pixels left are no more frequent on blade-depth pixels than elsewhere (279 of 1,096 in the
+  GTAO run, against 21,856 of 76,800 pixels): the pixel-scale variation of the occlusion the hashed blade depth casts,
+  which the blur only averages. The blades themselves are still not darkened (see docs/limits.md). An `SSAOSource`
+  model under a blade's depth pixel gives its ambient light to the under replay but its normal comes from depth.
 
 ### Fixed 2026-11-27: the wind left no mark on the dune coast's sand (KB-SCENES-SCOUR1, terrain and scenes)
 

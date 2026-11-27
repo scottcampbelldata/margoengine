@@ -136,6 +136,7 @@
     "test:browser:repeat": "cd ../.. && node packages/scatter/test/repeat.browser.mjs",
     "test:browser:grass-pixel": "cd ../.. && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-pixel.browser.mjs && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-pixel.browser.mjs --compat",
     "test:browser:grass-ao": "cd ../.. && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-ao.browser.mjs && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-ao.browser.mjs --compat",
+    "test:browser:grass-ao-fringe": "cd ../.. && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-ao-fringe.browser.mjs && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-ao-fringe.browser.mjs --compat && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-ao-fringe.browser.mjs --effect=ssao && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-ao-fringe.browser.mjs --effect=ssao --compat",
     "test:browser:grass-shadow": "cd ../.. && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-shadow.browser.mjs && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-shadow.browser.mjs --compat",
     "test:browser:grass-tiles": "cd ../.. && node packages/scatter/test/grass-tiles.browser.mjs",
     "test:browser:inner": "cd ../.. && node packages/scatter/test/inner.browser.mjs",

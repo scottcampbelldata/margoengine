@@ -741,7 +741,7 @@ export class VFX implements EnginePlugin {
   private readonly reactiveAttachments: GPURenderPassColorAttachment[] = [];
   /** The last billboard pass, whose coverage an ambient replay of the same frame, view and depth veils. */
   private readonly veiled: { encoder?: GPUCommandEncoder; depth?: GPUTextureView; view?: Context['view'] } = {};
-  private readonly ambientVeil = { veil: (c: Context, format: GPUTextureFormat) => this.veil(c, format) };
+  private readonly ambientVeil = { veil: (c: Context, format: GPUTextureFormat): boolean => this.veil(c, format) };
   private leaveVeils?: () => void;
   private readonly reactivePass: GPURenderPassDescriptor = {
     colorAttachments: this.reactiveAttachments,
@@ -1574,11 +1574,13 @@ export class VFX implements EnginePlugin {
   /**
    * Draws this frame's billboards over an ambient replay's target (`c.color`, of `format`) as a veil: where a particle
    * covers alpha of a pixel, that share of the light of the surface behind it leaves the target, so occlusion takes no
-   * more than the pixel holds (KB-SSAO-BLENDVEIL1). Only after this view's own billboard pass of the same frame.
+   * more than the pixel holds (KB-SSAO-BLENDVEIL1). Only after this view's own billboard pass of the same frame; returns
+   * whether it drew.
    */
-  private veil(c: Context, format: GPUTextureFormat): void {
+  private veil(c: Context, format: GPUTextureFormat): boolean {
     const veiled = this.veiled;
-    if (!this.visible || c.encoder !== veiled.encoder || c.depth !== veiled.depth || c.view !== veiled.view) return;
+    if (!this.visible || c.encoder !== veiled.encoder || c.depth !== veiled.depth || c.view !== veiled.view)
+      return false;
     const [pipeline, group] = this.prepare(c, undefined, false, format);
     this.attachment.view = c.color;
     this.depthAttachment.view = c.depth;
@@ -1591,6 +1593,7 @@ export class VFX implements EnginePlugin {
     if (this.route) pass.draw(3, this.capacity);
     else pass.drawIndirect(this.visible, 0);
     pass.end();
+    return true;
   }
   /**
    * The billboards' coverage into the frame's shared reactive mask, which TAA reads by itself (KB-TAA-PARTICLEMASK1):

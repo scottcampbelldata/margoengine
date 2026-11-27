@@ -263,12 +263,15 @@ test('SSAO kernels read view depth from one r32float target the extractor writes
   const groups = log.filter((entry) => entry[0] === 'group').map((entry) => entry[2].entries),
     at = (entries, binding) => entries.find((e) => e.binding === binding)?.resource,
     extract = groups.find((g) => g.length === 4 && at(g, 0)?.buffer),
-    occlusion = groups.find((g) => g.length === 7),
+    occlusion = groups.find((g) => g.length === 9),
     blurs = groups.filter((g) => g.length === 5);
   const depth = at(extract, 3);
   assert.equal(formats.get(depth), 'r32float', 'the extractor writes an r32float view depth');
   assert.notEqual(depth, at(extract, 2), 'apart from the rgba16float gbuffer');
   assert.equal(at(occlusion, 6), depth, 'the occlusion kernel reads it');
+  // With no covered blade depth held back (KB-SCATTER-AOFRINGE1) the occluders are the centre depth and view depth.
+  assert.equal(at(occlusion, 8), depth, 'its occluders read the same view depth');
+  assert.equal(at(occlusion, 7), at(occlusion, 1), 'and the same scene depth');
   assert.equal(blurs.length, 2);
   for (const blur of blurs) assert.equal(at(blur, 4), depth, 'both blur passes weigh by it');
   s.ssao.dispose();

@@ -15,9 +15,17 @@ import { preset } from '../../shared/preset.js';
 import { margoError } from '../../shared/errors.js';
 import { orthographic } from '../../shared/projection.js';
 import { fullscreen, render, group as bind } from '../../shared/gpu.js';
-import { drawAmbientVeils } from '../../shared/ambient-veil.js';
+import { drawAmbientVeils, coverMarked, wantUnder, type AmbientVeil } from '../../shared/ambient-veil.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { extractShader, ssaoShader, blurShader, compositeShader } from './shaders.js';
+import {
+  extractShader,
+  extractUnderShader,
+  centreShader,
+  underAmbientShader,
+  ssaoShader,
+  blurShader,
+  compositeShader,
+} from './shaders.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import { displayFor, linearShader, premultipliedCanvas } from '../../shared/display.js';
@@ -122,6 +130,10 @@ export class SSAO implements EnginePlugin {
   private disposed = false;
   private host?: StackHost;
   private ao?: GPUTextureView;
+  private raw?: GPUTextureView;
+  private viewDepth?: GPUTextureView;
+  private depthOnly?: GPUTextureView;
+  private depthFormat?: GPUTextureFormat;
   private input?: GPUTextureView;
   private key = '';
   // Shader patches are cached per source string; pass descriptors are rebuilt with their targets in resize().
@@ -164,6 +176,42 @@ export class SSAO implements EnginePlugin {
   private readonly view = this.values.subarray(16, 32);
   private readonly projection = this.values.subarray(32, 48);
   private readonly directionValues = [new Float32Array([1, 0, 0.5, 0]), new Float32Array([0, 1, 0.5, 0])];
+  /** Removes this effect from the device's readers of the surface under covered blades (KB-SCATTER-AOFRINGE1). */
+  private leaveUnder?: () => void;
+  private extractUnder?: GPUComputePipeline;
+  /**
+   * The targets of a frame whose covered blade depth was held back (packages/shared/ambient-veil.js), made on the first
+   * such frame: the depth under the blades (U), with the blades' depth (Dc), the centre depth (C), the occluders' view
+   * depth, the ambient replay of the surface under the blades (4x while the scene is, resolved into `ambient`), and the
+   * passes and groups that use them.
+   */
+  private under?: {
+    depth: GPUTextureView;
+    cover: GPUTextureView;
+    centre: GPUTextureView;
+    ambient: GPUTextureView;
+    target: GPUTextureView;
+    groups: { get(copy?: GPUBufferBinding): GPUBindGroup[] };
+    centrePipeline: GPURenderPipeline;
+    centreGroup: GPUBindGroup;
+    centrePass: GPURenderPassDescriptor;
+    mergePipeline: GPURenderPipeline;
+    mergeGroup: GPUBindGroup;
+    mergePass: GPURenderPassDescriptor;
+    clearPass: GPURenderPassDescriptor;
+    resolvePass?: GPURenderPassDescriptor;
+    geometryPass: GPURenderPassDescriptor;
+  };
+  /** The frame and view whose surface under the blades was kept (`ssao:under`), and whether its blades' depth was. */
+  private readonly underFrame = {
+    encoder: undefined as GPUCommandEncoder | undefined,
+    view: undefined as object | undefined,
+    covered: false,
+  };
+  /** This frame's occlusion kernel reads the centre and occluder depths of `under`. */
+  private centred = false;
+  /** The veils that drew over the replay of the surface under the blades before their depth landed. */
+  private readonly veiledUnder = new Set<AmbientVeil>();
   constructor(readonly options: SSAOOptions = {}) {
     this.options = preset((new.target as typeof SSAO).presetKey, options);
     this.validate();
@@ -226,7 +274,12 @@ export class SSAO implements EnginePlugin {
     )
       throw new RangeError('Invalid SSAO options; radius must be in (0, 100], bias 0 up to radius, samples 1-32.');
   }
-  /** The occlusion kernel (compute, bindings: frame, depth, gbuffer, 4x4 noise, the `kernel()` buffer, r32float output, r32float view depth with 0 for no surface). */
+  /**
+   * The occlusion kernel (compute, bindings: frame, the centre depth, gbuffer, 4x4 noise, the `kernel()` buffer, r32float
+   * output, r32float view depth with 0 for no surface, then the occluders' depth and their r32float view depth). The
+   * centre and occluder depths are the same textures except where covered blades' depth lies over another surface
+   * (KB-SCATTER-AOFRINGE1): there the centre is that surface and the occluders are the scene, blades included.
+   */
   protected occlusionShader(): string {
     return ssaoShader;
   }
@@ -259,6 +312,7 @@ export class SSAO implements EnginePlugin {
         compute: { module: this.device!.createShaderModule({ code }), entryPoint: 'main' },
       });
     this.extract = create(extractShader);
+    this.extractUnder = create(extractUnderShader);
     this.occlusion = create(this.occlusionShader());
     this.blur = create(blurShader);
     this.noise = this.device.createTexture({
@@ -282,6 +336,7 @@ export class SSAO implements EnginePlugin {
       this.directions.push(b);
       this.device.queue.writeBuffer(b, 0, data);
     }
+    this.leaveUnder = wantUnder(this.device);
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -343,6 +398,25 @@ export class SSAO implements EnginePlugin {
         }
       },
     });
+    // Covered blades hold their depth back from 1.5 to 1.52 while this effect reads (see packages/shared/ambient-veil.js).
+    graph.add({
+      name: 'ssao:under',
+      order: 1.51,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.keepUnder(c);
+      },
+    });
+    graph.add({
+      name: 'ssao:covered',
+      order: 1.53,
+      execute: (c) => {
+        if (c.backend !== 'webgpu') return;
+        const frame = this.underFrame;
+        if (frame.encoder !== c.encoder || frame.view !== c.view) return;
+        this.captureTarget!.copyDepth(c.encoder, this.under!.cover, 1);
+        frame.covered = true;
+      },
+    });
     graph.add({
       name: 'ssao:extract',
       order: 10,
@@ -360,7 +434,8 @@ export class SSAO implements EnginePlugin {
       name: 'ssao:occlusion',
       order: 11,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.dispatch(c, this.occlusion!, this.viewGroups!.get(this.slice)[1]);
+        if (c.backend === 'webgpu')
+          this.dispatch(c, this.occlusion!, (this.centred ? this.under!.groups : this.viewGroups!).get(this.slice)[1]);
       },
     });
     graph.add({
@@ -436,6 +511,8 @@ export class SSAO implements EnginePlugin {
     if (!host) this.captureTarget?.dispose();
     for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
+    this.under = undefined;
+    this.underFrame.encoder = this.underFrame.view = undefined;
     this.width = c.width;
     this.height = c.height;
     const texture = (format: GPUTextureFormat, usage: number) => {
@@ -457,6 +534,7 @@ export class SSAO implements EnginePlugin {
       this.captureTarget = new SceneTarget(c.device, this.textures[0], depth, c.descriptor.multisample?.count ?? 4);
     }
     this.depth = depth.createView();
+    this.depthFormat = depth.format;
     const depthOnly = depth.createView({ aspect: 'depth-only' });
     // Normals plus a half-float view depth (what sources write); the kernels read view depth at full precision from
     // viewDepth, so orthographic eye moves and scenes past 65,504 units keep their occlusion (KB1900).
@@ -522,8 +600,13 @@ export class SSAO implements EnginePlugin {
         { buffer: this.samples! },
         raw,
         viewDepth,
+        depthOnly,
+        viewDepth,
       ]),
     ]);
+    this.raw = raw;
+    this.viewDepth = viewDepth;
+    this.depthOnly = depthOnly;
     this.groups = [
       ...this.viewGroups.get(),
       group(this.blur!, [raw, this.gbuffer, x, { buffer: this.directions[0] }, viewDepth]),
@@ -570,7 +653,30 @@ export class SSAO implements EnginePlugin {
   }
   private extractScene(c: PostPassContext): void {
     this.extractDepth(c);
-    this.dispatch(c, this.extract!, this.viewGroups!.get(this.slice)[0]);
+    const frame = this.underFrame,
+      under = frame.encoder === c.encoder && frame.view === c.view && frame.covered ? this.under : undefined;
+    frame.encoder = frame.view = undefined;
+    this.centred = !!under;
+    if (under) {
+      // The centre depth: the surface under the blades where their depth is the scene's (see shaders.ts).
+      under.centrePass.depthStencilAttachment!.depthLoadOp = c.view ? 'load' : 'clear';
+      const centre = c.encoder.beginRenderPass(under.centrePass);
+      applyView(centre, c);
+      centre.setPipeline(under.centrePipeline);
+      centre.setBindGroup(0, under.centreGroup);
+      centre.draw(3);
+      centre.end();
+      // Strips blended after 1.51 (smoke) veil the light under the blades as they veil the scene's.
+      const color = c.color;
+      c.color = under.target;
+      try {
+        drawAmbientVeils(c, 'rgba16float', this.veiledUnder);
+      } finally {
+        c.color = color;
+      }
+      if (under.resolvePass) c.encoder.beginRenderPass(under.resolvePass).end();
+      this.dispatch(c, this.extractUnder!, under.groups.get(this.slice)[0]);
+    } else this.dispatch(c, this.extract!, this.viewGroups!.get(this.slice)[0]);
     const gbuffer = this.replayViews[0] ?? this.gbuffer!,
       ambient = this.replayViews[1] ?? this.ambient!;
     // Replays must test the same coverage samples as the scene; their sampled outputs stay 1x.
@@ -599,6 +705,30 @@ export class SSAO implements EnginePlugin {
         pass.end();
       }
     } else c.encoder.beginRenderPass(this.clearPass!).end();
+    const color = c.color;
+    c.color = ambient;
+    try {
+      c.draw({ pipeline: this.replayPipeline(c), clear: false, bindings: c.bindings });
+      // Blades and other strips blended over those surfaces leave only part of that light in a pixel.
+      drawAmbientVeils(c, 'rgba16float');
+    } finally {
+      c.color = color;
+    }
+    if (this.replayViews.length) c.encoder.beginRenderPass(this.resolvePass!).end();
+    if (under) {
+      // Where the centre is the surface under the blades, so is the ambient light the composite takes out.
+      const merge = c.encoder.beginRenderPass(under.mergePass);
+      applyView(merge, c);
+      merge.setPipeline(under.mergePipeline);
+      merge.setBindGroup(0, under.mergeGroup);
+      merge.draw(3);
+      merge.end();
+    }
+    // A PostStack resolves its shared capture once, after every effect has replayed into it.
+    if (!this.host) this.captureTarget!.resolve(c.encoder, true);
+  }
+  /** Core's lit shader for `c`, returning only its ambient term, drawn depth-equal over the scene. */
+  private replayPipeline(c: PostPassContext): GPURenderPipeline {
     // The replay keeps the whole lit shader and returns only the ambient term, so it statically uses every binding the
     // scene's shader uses and binds all of c.bindings, as SSGI's and SSR's replays do. A plugin binding read above
     // `let direct=` (TerrainColors' look uniform, KB-POST-GTAO-TERRAINLOOK1) fits the layout as well as one read below.
@@ -641,18 +771,149 @@ export class SSAO implements EnginePlugin {
       });
       this.ambientShader = code;
     }
+    return this.ambientPipeline;
+  }
+  /**
+   * `ssao:under` (1.51), in a frame whose covered blades hold their depth back: keeps the depth under the blades and the
+   * ambient light of that surface, veiled by the blades' coverage (KB-SCATTER-AOFRINGE1).
+   */
+  private keepUnder(c: PostPassContext): void {
+    const frame = this.underFrame;
+    frame.encoder = frame.view = undefined;
+    frame.covered = false;
+    if (!this.enabled || !this.captureTarget || !coverMarked(c)) return;
+    const under = (this.under ??= this.underTargets(c));
+    this.captureTarget.copyDepth(c.encoder, under.depth, 1);
+    if (this.sources.size) {
+      const g = under.geometryPass,
+        depth = g.depthStencilAttachment!,
+        stencil = c.descriptor.depthStencil!.format.includes('stencil');
+      depth.view = c.depth;
+      depth.stencilLoadOp = stencil ? 'load' : undefined;
+      depth.stencilStoreOp = stencil ? 'store' : undefined;
+      const pass = c.encoder.beginRenderPass(g);
+      try {
+        applyView(pass, c);
+        // Their normals go to the G-buffer, which ssao:extract writes again whole.
+        for (const source of this.sources)
+          source.draw(c, 'occlusion', this.replayViews[0] ?? this.gbuffer!, c.depth, 'all', {
+            pass,
+            view: viewMatrix(this.drawView, c.camera),
+            depthCompare: 'equal',
+          });
+      } finally {
+        pass.end();
+      }
+    } else c.encoder.beginRenderPass(under.clearPass).end();
     const color = c.color;
-    c.color = ambient;
+    c.color = under.target;
+    this.veiledUnder.clear();
     try {
-      c.draw({ pipeline: this.ambientPipeline, clear: false, bindings: c.bindings });
-      // Blades and other strips blended over those surfaces leave only part of that light in a pixel.
-      drawAmbientVeils(c, 'rgba16float');
+      c.draw({ pipeline: this.replayPipeline(c), clear: false, bindings: c.bindings });
+      drawAmbientVeils(c, 'rgba16float', undefined, this.veiledUnder);
     } finally {
       c.color = color;
     }
-    if (this.replayViews.length) c.encoder.beginRenderPass(this.resolvePass!).end();
-    // A PostStack resolves its shared capture once, after every effect has replayed into it.
-    if (!this.host) this.captureTarget!.resolve(c.encoder, true);
+    frame.encoder = c.encoder;
+    frame.view = c.view;
+  }
+  /** The targets, passes and groups of `under`, at this size and depth format. */
+  private underTargets(c: PostPassContext): NonNullable<SSAO['under']> {
+    const device = c.device,
+      format = this.depthFormat!,
+      size = [this.width, this.height],
+      sampled = GPUTextureUsage.TEXTURE_BINDING,
+      attachment = GPUTextureUsage.RENDER_ATTACHMENT;
+    const texture = (f: GPUTextureFormat, usage: number, sampleCount = 1) => {
+      const t = device.createTexture({ size, format: f, usage, sampleCount });
+      this.textures.push(t);
+      return t;
+    };
+    const depthTexture = () => texture(format, sampled | attachment);
+    const u = depthTexture(),
+      k = depthTexture(),
+      centre = depthTexture(),
+      only = (t: GPUTexture) => t.createView({ aspect: 'depth-only' }),
+      ambient = texture('rgba16float', sampled | attachment).createView(),
+      occluders = texture('r32float', sampled | GPUTextureUsage.STORAGE_BINDING).createView(),
+      many = this.captureTarget!.samples === 4 ? texture('rgba16float', attachment, 4).createView() : undefined,
+      target = many ?? ambient;
+    const module = (code: string) => device.createShaderModule({ code });
+    const centreModule = module(centreShader),
+      centrePipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module: centreModule, entryPoint: 'vertex' },
+        fragment: { module: centreModule, entryPoint: 'fragment', targets: [] },
+        depthStencil: { format, depthWriteEnabled: true, depthCompare: 'always' },
+      });
+    const mergeModule = module(underAmbientShader),
+      mergePipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module: mergeModule, entryPoint: 'vertex' },
+        fragment: { module: mergeModule, entryPoint: 'fragment', targets: [{ format: 'rgba16float' }] },
+      });
+    const bindGroup = (p: GPUComputePipeline | GPURenderPipeline, resources: (GPUTextureView | GPUBufferBinding)[]) =>
+      device.createBindGroup({
+        layout: p.getBindGroupLayout(0),
+        entries: resources.map((resource, binding) => ({ binding, resource })),
+      });
+    const centreView = only(centre),
+      noise = this.noise!.createView(),
+      clear = { r: 0, g: 0, b: 0, a: 0 };
+    return {
+      depth: u.createView(),
+      cover: k.createView(),
+      centre: centre.createView(),
+      ambient,
+      target,
+      groups: uniformGroups(this.uniform!, (uniform) => [
+        bindGroup(this.extractUnder!, [
+          uniform,
+          centreView,
+          this.gbuffer!,
+          this.viewDepth!,
+          this.depthOnly!,
+          occluders,
+        ]),
+        bindGroup(this.occlusion!, [
+          uniform,
+          centreView,
+          this.gbuffer!,
+          noise,
+          { buffer: this.samples! },
+          this.raw!,
+          this.viewDepth!,
+          this.depthOnly!,
+          occluders,
+        ]),
+      ]),
+      centrePipeline,
+      centreGroup: bindGroup(centrePipeline, [only(u), only(k), this.depthOnly!]),
+      centrePass: {
+        colorAttachments: [],
+        depthStencilAttachment: {
+          view: centre.createView(),
+          depthLoadOp: 'clear',
+          depthClearValue: 0,
+          depthStoreOp: 'store',
+          ...(format.includes('stencil') ? { stencilReadOnly: true } : {}),
+        },
+      },
+      mergePipeline,
+      mergeGroup: bindGroup(mergePipeline, [ambient, centreView, this.depthOnly!]),
+      mergePass: { colorAttachments: [{ view: this.ambient!, loadOp: 'load', storeOp: 'store' }] },
+      clearPass: { colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: clear }] },
+      resolvePass: many
+        ? { colorAttachments: [{ view: many, resolveTarget: ambient, loadOp: 'load', storeOp: 'discard' }] }
+        : undefined,
+      geometryPass: {
+        colorAttachments: [
+          { view: this.replayViews[0] ?? this.gbuffer!, loadOp: 'load', storeOp: 'store' },
+          { view: target, loadOp: 'clear', storeOp: 'store', clearValue: clear },
+        ],
+        depthStencilAttachment: { view: undefined!, depthLoadOp: 'load', depthStoreOp: 'store' },
+      },
+    };
   }
   private release(): void {
     if (!this.host) this.captureTarget?.dispose();
@@ -670,7 +931,12 @@ export class SSAO implements EnginePlugin {
     this.width = this.height = 0;
     this.uniform = this.samples = undefined;
     this.noise = undefined;
-    this.extract = this.occlusion = this.blur = undefined;
+    this.extract = this.extractUnder = this.occlusion = this.blur = undefined;
+    this.leaveUnder?.();
+    this.leaveUnder = this.under = this.raw = this.viewDepth = this.depthOnly = undefined;
+    this.underFrame.encoder = this.underFrame.view = undefined;
+    this.centred = false;
+    this.veiledUnder.clear();
     this.composite = this.ambientPipeline = undefined;
     this.original = this.scene = this.depth = this.gbuffer = this.ambient = undefined;
     this.originalFormat = undefined;

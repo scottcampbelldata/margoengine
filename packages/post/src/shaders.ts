@@ -3,6 +3,7 @@
 // 0.004 m at 6 m, so an orthographic picture moved with the eye along its view (KB1900). A full-precision camera-space
 // depth buffer is the choice of McGuire, Mara and Luebke, "Scalable Ambient Obscurance", HPG 2012.
 import { displayShader } from '../../shared/display.js';
+import { margoError } from '../../shared/errors.js';
 export const frame = /* wgsl */ `
 struct Frame {inverse:mat4x4f,view:mat4x4f,projection:mat4x4f,params:vec4f,size:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -50,6 +51,46 @@ export const extractShader =
   textureStore(output,p,vec4f(normal,-c.z));textureStore(viewDepth,p,vec4f(-c.z));
 }
 `;
+// Covered blades (KB-SCATTER-AOFRINGE1): a covered blade writes depth where a hash of its coverage passes, so most of
+// such a pixel's colour is the surface under it. In a frame whose covered depth was held back (packages/shared/
+// ambient-veil.js) the pixel is worked out at that surface, the centre depth C: the depth under the blades U where a
+// blade's depth Dc landed and nothing drew over it since (D still equals Dc), else the scene depth D. The occluders
+// stay the scene's depth, so the blades still shade what is around them: one depth for the point whose occlusion is
+// found and another for what occludes it, as layered depth images keep the hidden surface under a visible one (Shade,
+// Gortler, He and Szeliski, "Layered Depth Images", SIGGRAPH 1998, https://doi.org/10.1145/280814.280882), and as
+// screen-space occlusion over several depth layers does (Bavoil and Sainz, "Multi-Layer Dual-Resolution Screen-Space
+// Ambient Occlusion", SIGGRAPH 2009 Talks, https://history.siggraph.org/?p=148934; Mara, McGuire, Nowrouzezahrai and
+// Luebke, "Deep G-Buffers for Stable Global Illumination Approximation", HPG 2016,
+// https://doi.org/10.2312/hpg.20161195).
+export const centreShader = `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}
+@group(0) @binding(0) var under:texture_depth_2d;
+@group(0) @binding(1) var cover:texture_depth_2d;
+@group(0) @binding(2) var depth:texture_depth_2d;
+@fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {
+  let q=vec2i(p.xy);let u=textureLoad(under,q,0);let k=textureLoad(cover,q,0);let d=textureLoad(depth,q,0);
+  return select(d,u,k!=u&&d==k);
+}`;
+// Where the centre depth is the one under the blades, the ambient light is the replay of that surface.
+export const underAmbientShader = `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}
+@group(0) @binding(0) var under:texture_2d<f32>;
+@group(0) @binding(1) var centre:texture_depth_2d;
+@group(0) @binding(2) var depth:texture_depth_2d;
+@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {
+  let q=vec2i(p.xy);if(textureLoad(centre,q,0)==textureLoad(depth,q,0)){discard;}
+  return textureLoad(under,q,0);
+}`;
+// The extractor for such a frame also writes each pixel's occluder view depth, from the scene's depth.
+export const extractUnderShader = extractShader
+  .replace(
+    '@compute',
+    '@group(0) @binding(4) var occluderDepth:texture_depth_2d;\n@group(0) @binding(5) var occluders:texture_storage_2d<r32float,write>;\n@compute',
+  )
+  .replace(
+    'let p=vec2i(id.xy);let d=textureLoad(depth,p,0);',
+    'let p=vec2i(id.xy);let d=textureLoad(depth,p,0);let od=textureLoad(occluderDepth,p,0);textureStore(occluders,p,vec4f(select(-viewPosition(p,od).z,0.0,od==0)));',
+  );
+if (!extractUnderShader.includes('textureStore(occluders') || !extractUnderShader.includes('var occluders'))
+  throw margoError('failed', 'SSAO: the occluder extractor patch no longer matches; update extractUnderShader');
 // SSAO: normal-oriented hemisphere kernel with a range check, after Mittring, "Finding Next Gen: CryEngine 2"
 // (SIGGRAPH 2007 course) and J. Chapman, "SSAO Tutorial" (2013).
 export const ssaoShader =
@@ -61,8 +102,11 @@ export const ssaoShader =
 @group(0) @binding(4) var<storage,read> kernel:array<vec4f>;
 @group(0) @binding(5) var output:texture_storage_2d<r32float,write>;
 @group(0) @binding(6) var viewDepth:texture_2d<f32>;
+@group(0) @binding(7) var occluderDepth:texture_depth_2d;
+@group(0) @binding(8) var occluders:texture_2d<f32>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
+  _=textureLoad(occluderDepth,vec2i(0),0);
   let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);let centre=textureLoad(viewDepth,p,0).r;
   if(centre==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
   let n=normalize(data.xyz);let position=viewPosition(p,textureLoad(depth,p,0));
@@ -76,7 +120,7 @@ export const ssaoShader =
     let clip=f.projection*vec4f(samplePosition,1);
     if(clip.w<=0){continue;}
     let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;if(any(uv<vec2f(0))||any(uv>=vec2f(1))){continue;}
-    let neighbor=textureLoad(viewDepth,vec2i(uv*vec2f(size)),0).r;
+    let neighbor=textureLoad(occluders,vec2i(uv*vec2f(size)),0).r;
     if(neighbor!=0){let weight=smoothstep(0.0,1.0,f.params.x/max(abs(neighbor-centre),0.0001));occlusion+=select(0.0,weight,neighbor<-samplePosition.z-f.params.y);}
   }
   textureStore(output,p,vec4f(clamp(1-occlusion/f32(samples),0.0,1.0)));

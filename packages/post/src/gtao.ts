@@ -54,6 +54,9 @@ export interface GTAOOptions {
 // occludes, is kept and only its azimuth is moved onto the slice, so an open plane of any tilt reads exactly 1 and a
 // sample already in the slice is unchanged. The falloff keeps the sample's true distance. Projecting straight along the
 // slice axis instead changes the height by (n.axis)(axis.delta) and does not help.
+// The horizons are searched over the occluder depth (binding 7), the scene's depth; the pixel's own point and normal
+// come from the centre depth (binding 1), which under covered blades is the surface beneath them (KB-SCATTER-AOFRINGE1,
+// see shaders.ts). The two are the same texture in every other frame.
 const gtaoShader =
   frame +
   `
@@ -63,6 +66,8 @@ const gtaoShader =
 @group(0) @binding(4) var<storage,read> pattern:array<vec4f>;
 @group(0) @binding(5) var output:texture_storage_2d<r32float,write>;
 @group(0) @binding(6) var viewDepth:texture_2d<f32>;
+@group(0) @binding(7) var occluderDepth:texture_depth_2d;
+@group(0) @binding(8) var occluders:texture_2d<f32>;
 const PI=3.14159265;
 fn arc(h:f32,g:f32)->f32 {return 0.25*(cos(g)-cos(2.0*h-g)+2.0*h*sin(g));}
 fn skyArc(h:f32,g:f32)->f32 {return sign(h)*arc(h,g);}
@@ -85,7 +90,7 @@ fn sky(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u)-
       for(var s=0;s<2;s++){
         let q=vec2i(floor(vec2f(p)+0.5+select(-offset,offset,s==1)));
         if(any(q<vec2i(0))||any(q>=vec2i(size))){continue;}
-        let sd=textureLoad(depth,q,0);if(sd==0){continue;}
+        let sd=textureLoad(occluderDepth,q,0);if(sd==0){continue;}
         let full=viewPosition(q,sd)-position;let distance=length(full);let delta=full-slide*dot(full,axis);
         let cosine=mix(dot(delta,v)/max(length(delta),1e-6),-1.0,clamp((distance/f.size.z-0.6)*2.5,0.0,1.0));
         horizon[s]=max(horizon[s],cosine);
@@ -99,7 +104,7 @@ fn sky(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u)-
 }
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}
-  let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);_=textureLoad(noise,vec2i(0),0);
+  let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);_=textureLoad(noise,vec2i(0),0);_=textureLoad(occluders,vec2i(0),0);
   if(textureLoad(viewDepth,p,0).r==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
   let position=viewPosition(p,textureLoad(depth,p,0));let n=normalize(data.xyz);
   // Toward the eye: from the point for perspective, the constant view axis for orthographic (clip w constant).
@@ -122,7 +127,7 @@ fn sky(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u)-
       for(var s=0;s<2;s++){
         let q=vec2i(floor(vec2f(p)+0.5+select(-offset,offset,s==1)));
         if(any(q<vec2i(0))||any(q>=vec2i(size))){continue;}
-        let sd=textureLoad(depth,q,0);if(sd==0){continue;}
+        let sd=textureLoad(occluderDepth,q,0);if(sd==0){continue;}
         let full=viewPosition(q,sd)-position;let distance=length(full);let delta=full-slide*dot(full,axis);
         let cosine=mix(dot(delta,v)/max(length(delta),1e-6),-1.0,clamp((distance/f.params.x-0.6)*2.5,0.0,1.0));
         horizon[s]=max(horizon[s],cosine);

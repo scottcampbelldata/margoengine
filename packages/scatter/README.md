@@ -882,7 +882,11 @@ every `Scatter` option, with `blades` shading on by default.
   `GTAO` darken only ambient light: the covered blades take their share of each pixel out of the ground's ambient light
   as they take it out of its colour (the product of one less each coverage, the revealage of McGuire and Bavoil,
   "Weighted Blended Order-Independent Transparency", JCGT 2013), so a blade never leaves a black pixel behind
-  (KB-SCENES-GRASSBLACK1). Nothing to call: attaching both is enough. See `docs/limits.md`.
+  (KB-SCENES-GRASSBLACK1). A pixel whose blade depth passed its hash is mostly ground where the coverage is low, so
+  while `SSAO` or `GTAO` is attached the covered depth draws in its own pass (`<name>:cover-depth`, order 1.52) after
+  the effect has kept the depth and ambient light under the blades (order 1.51): the effect then works out such a
+  pixel's occlusion at the ground, with the blades still counted as occluders, and leaves no pale outline along the
+  blades (KB-SCATTER-AOFRINGE1). Nothing to call: attaching both is enough. See `docs/limits.md`.
   Dune grass (1.6 cm leaves) to 230 m at 480 x 270 without MSAA: 4,902 lone pixels per million before, 0 after on
   WebGPU and 7.8 on the WebGL2 layer, mean luma within 0.31 codes of the same view drawn at 4 x 4 the pixels. Shadows
   keep a pixel floor with a hashed keep (Persson 2012; Cook, Halstead, Planck and Ryu, SIGGRAPH 2007), as does a

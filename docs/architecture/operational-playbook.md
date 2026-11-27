@@ -11380,4 +11380,17 @@ Intel and AMD under Direct3D 11, and a corpus record of the guide's program.
 - Evidence: `packages/scatter/test/grass-ao.browser.mjs` checks the bound `shut >= open * visibility` per pixel
   (12,231 pixels broke it before, 0 after, RTX A6000, WebGPU and the WebGL2 layer);
   `packages/post/test/ssao-silhouette-browser.mjs` checks one-pixel slits (KB-SSAO-LONEPIXEL1).
-- Missing: veils for blended meshes and particles; SSGI and SSR composites under blended coverage are not measured.
+- Covered depth (KB-SCATTER-AOFRINGE1): a covered blade writes depth where a hash of its coverage passes, so such a
+  pixel's colour is mostly the surface under it. While an occlusion effect reads that surface (`wantUnder`), `Scatter`
+  holds its covered depth back from its colour pass (order 1.5, `markCover`) to `<name>:cover-depth` (order 1.52).
+  Pass order in such a frame: 1.5 scatter colour, 1.51 `ssao:under` (depth copy U, ambient replay and veils of the
+  surface under the blades), 1.52 covered depth, 1.53 `ssao:covered` (depth copy Dc), 10 `ssao:extract` (centre depth
+  C = U where Dc != U and the scene depth D == Dc, else D; late veils such as smoke over the under replay; the
+  extractor and kernels place the pixel at C and search occluders in D; the ambient light where C != D is the under
+  replay). A frame with no covered blade runs today's passes on today's bindings, bit for bit.
+- Evidence: `packages/scatter/test/grass-ao-fringe.browser.mjs` (GTAO and SSAO, WebGPU and the WebGL2 layer, RTX
+  A6000): pale pixels 4,226 to 1,096 (GTAO), 2,038 to 155 (SSAO), the grass still darkening over 3 percent of the frame,
+  and a view without blades byte-identical to one without grass and to the build before the change.
+- Missing: veils for blended meshes and particles; SSGI and SSR composites under blended coverage are not measured;
+  the pale pixels left are as frequent on blade-depth pixels as elsewhere (the pixel-scale variation of the hashed
+  occluders), not yet bounded on a second GPU.
