@@ -1,12 +1,11 @@
 // Pixel-only black-box comparison. No rival implementation files are read or copied.
 // Installs must live outside Margo; this script is not a timing benchmark or a correctness gate.
 import { readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { openBrowser } from './browser.js';
 import { build } from 'vite';
-const rivalRoot =
-  process.env.MARGO_DENSITY_RIVALS ?? fileURLToPath(new URL('../../engine-bench/batch-181-density', import.meta.url));
+import { engineBenchRoot } from './support/engine-bench.mjs';
+const rivalRoot = process.env.MARGO_DENSITY_RIVALS ?? resolve(engineBenchRoot(), 'batch-181-density');
 const names = ['regl-scatterplot', '@deck.gl/core', '@deck.gl/layers'];
 const manifests = await Promise.all(
   names.map((name) => readFile(resolve(rivalRoot, 'node_modules', name, 'package.json'), 'utf8').then(JSON.parse)),

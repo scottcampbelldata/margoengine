@@ -7,7 +7,7 @@ import { deferSpeedEntry } from '../scripts/support/speed-phase.mjs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildPages, browserSession, externalEngines, serve } from './lib/browser.mjs';
-import { environment, mainRoot, root } from './lib/env.mjs';
+import { environment, root } from './lib/env.mjs';
 import { openGate, settle } from './lib/gate.mjs';
 import {
   SCHEMA,
@@ -22,6 +22,7 @@ import {
 import { metricRecord, partialMetrics } from './lib/stats.mjs';
 import { SUITES, loadSuite } from './suites/index.mjs';
 import { browserLabel } from '../scripts/lib/browser.mjs';
+import { engineBenchRoot } from '../scripts/support/engine-bench.mjs';
 
 if (!deferSpeedEntry(import.meta.url, 'bench/cli.mjs')) {
   const { values: o, positionals } = parseArgs({
@@ -41,7 +42,7 @@ if (!deferSpeedEntry(import.meta.url, 'bench/cli.mjs')) {
       'baseline-name': { type: 'string' },
       record: { type: 'boolean' },
       engines: { type: 'string', default: 'margo' },
-      'engine-bench': { type: 'string', default: resolve(mainRoot, '../engine-bench') },
+      'engine-bench': { type: 'string', default: engineBenchRoot() },
       cases: { type: 'string' },
       'no-gate': { type: 'boolean' },
       'quiet-max': { type: 'string', default: '20' },

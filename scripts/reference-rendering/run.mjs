@@ -1,6 +1,5 @@
 // Black-box Sample Viewer screenshot. Images remain outside this repository.
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,11 +11,9 @@ import { decodePNG } from '../../tests/support/png.js';
 import { saveReference } from './reference.mjs';
 import { viewerBudget } from './proof-contract.mjs';
 import { GAMMA_22, SRGB_ENCODE, installViewerTransfer } from './viewer-transfer.mjs';
+import { engineBenchRoot } from '../support/engine-bench.mjs';
 
-const root = join(
-  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
-  'batch-160',
-);
+const root = join(engineBenchRoot(), 'batch-160');
 const family = process.argv.find((a) => a.startsWith('--case='))?.slice(7) ?? 'metallic-roughness';
 // --like-for-like: the viewer's pow(x, 1/2.2) transfer and one sample per pixel (viewer-transfer.mjs, docs/limits.md),
 // gated by the case's own `likeForLike` row. Native WebGPU only: the rewrite acts on WGSL modules.

@@ -6,9 +6,10 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { externalAssetRoot, requireExternalAssets, externalAssets } from '../scripts/support/external-test-assets.mjs';
 import { SERIAL } from '../scripts/verify.mjs';
+import { engineBenchRoot } from '../scripts/support/engine-bench.mjs';
 
 test('all worktrees and direct tests resolve the same external assets without an environment export', () => {
-  assert.equal(externalAssetRoot({}), resolve(import.meta.dirname, '../../engine-bench/batch-160/gltf-gpu-samples'));
+  assert.equal(externalAssetRoot({}), resolve(engineBenchRoot({}), 'batch-160/gltf-gpu-samples'));
   assert.equal(
     externalAssetRoot({ MARGO_ENGINE_BENCH: 'test-results/bench' }),
     resolve('test-results/bench/batch-160/gltf-gpu-samples'),

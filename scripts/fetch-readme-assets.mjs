@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { downloadArguments } from './support/download-arguments.mjs';
 import { fetchFixture } from './support/fetch-fixture.mjs';
 import { externalAssets, externalAssetRoot } from './support/external-test-assets.mjs';
+import { engineBenchRoot } from './support/engine-bench.mjs';
 
 // Shared required assets keep one cache and one source/hash record for verify and README execution.
 export const readmeExternalFiles = { '/model.usdz': 'usdz-static/BoxTextured.blender.usdz' };
@@ -14,7 +15,7 @@ for (const { file } of externalAssets.filter(({ file }) => file.startsWith('potr
 }
 
 export const readmeCache = () =>
-  resolve(process.env.MARGO_README_SAMPLES ?? resolve(import.meta.dirname, '../../engine-bench/readme-samples'));
+  resolve(process.env.MARGO_README_SAMPLES ?? resolve(engineBenchRoot(), 'readme-samples'));
 const corpus = JSON.parse(
   readFileSync(new URL('../packages/loaders/tests/real-files/manifest.json', import.meta.url), 'utf8'),
 ).files;

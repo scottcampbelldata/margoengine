@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -8,10 +7,10 @@ import { displayImage } from './linear-image.mjs';
 import { saveReference } from './reference.mjs';
 import { encodePNG } from '../support/visual-image.js';
 import { killChildTreeSync } from '../support/shutdown.mjs';
+import { engineBenchRoot } from '../support/engine-bench.mjs';
 
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
-export const benchRoot =
-  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url));
+export const benchRoot = engineBenchRoot();
 /**
  * Only public Mitsuba APIs; bounded CPU reference execution, independent from the browser renderer. `minutes` is the
  * process tree's hard deadline (default 20); the scalar decomposition references take longer.

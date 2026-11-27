@@ -22,12 +22,11 @@ import {
   SEED,
   TEXELS_PER_UNIT,
 } from './cornell-box.mjs';
+import { engineBenchRoot } from '../../../scripts/support/engine-bench.mjs';
 
 if (!deferSpeedEntry(import.meta.url, 'packages/lightmap/scripts/rival-bench.mjs')) {
   const blender = process.env.MARGO_BLENDER || 'C:\\blender\\blender.exe';
-  const outDir = process.env.MARGO_ENGINE_BENCH
-    ? join(process.env.MARGO_ENGINE_BENCH, 'data', 'cornell')
-    : fileURLToPath(new URL('../../../../engine-bench/batch-168/data/cornell', import.meta.url));
+  const outDir = join(engineBenchRoot(), 'batch-168', 'data', 'cornell');
 
   const bakeOptions = (light, bounces) => ({
     radiometry: 'physical',

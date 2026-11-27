@@ -12,16 +12,13 @@ import { saveReference } from './reference.mjs';
 import { encodePNG } from '../support/visual-image.js';
 import { killChildTreeSync } from '../support/shutdown.mjs';
 import { decodePNG } from '../../tests/support/png.js';
+import { engineBenchRoot } from '../support/engine-bench.mjs';
 
 const family = process.argv.find((x) => x.startsWith('--case='))?.slice(7);
 assert.ok(['transmission', 'volume'].includes(family), 'Choose --case=transmission or --case=volume');
 const entry = referenceCase(family),
   { width, height } = entry.settings;
-const out = join(
-  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
-  'batch-160',
-  family,
-);
+const out = join(engineBenchRoot(), 'batch-160', family);
 const baselinePath = `docs/whitepaper/results/batch-160-${family}-transport.json`;
 const measure = process.argv.includes('--measure');
 assert.ok(!measure || !existsSync(baselinePath), '--measure cannot replace an established budget');

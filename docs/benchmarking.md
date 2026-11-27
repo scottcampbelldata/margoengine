@@ -348,6 +348,10 @@ Margo's implementation is `bench/scenes/margo.js`. **Other engines' implementati
 The clean-room rule forbids it. They live in a separate `engine-bench/margo-bench/` folder next to this checkout, written there and
 built there:
 
+"Next to this checkout" means next to the **main** checkout, from every git worktree, including one nested under it
+(`.claude/worktrees/<name>`). The standard samples tests and README examples read live in the same folder.
+`MARGO_ENGINE_BENCH` names another folder. Scripts take the path from `scripts/support/engine-bench.mjs`.
+
 ```text
 engine-bench/
   node_modules/three, ...          the engines, installed there

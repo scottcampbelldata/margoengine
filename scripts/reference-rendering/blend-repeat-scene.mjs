@@ -3,17 +3,14 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { engineBenchRoot } from '../support/engine-bench.mjs';
 
 export const sourceSha256 = '863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12';
 export const sourceURL =
   'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/IORTestGrid/glTF-Binary/IORTestGrid.glb';
 
 export function blendRepeatRoot(env = process.env) {
-  return resolve(
-    env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench/', import.meta.url)),
-    'batch-160',
-  );
+  return resolve(engineBenchRoot(env), 'batch-160');
 }
 
 /** Reads the fixture under `root`. An absent file is fetched only with `download`; otherwise this fails and names it. */

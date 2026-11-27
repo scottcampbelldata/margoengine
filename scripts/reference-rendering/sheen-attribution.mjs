@@ -7,7 +7,8 @@
 // row of the SheenTestGrid spheres. The model is a measurement aid; no Margo shader uses it.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
+import { engineBenchRoot } from '../support/engine-bench.mjs';
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -78,10 +79,7 @@ async function main() {
   const { pictureError } = await import('./compare.mjs');
   const { decodePNG } = await import('../../tests/support/png.js');
   const { GAMMA_22, SRGB_ENCODE } = await import('./viewer-transfer.mjs');
-  const root = join(
-    process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
-    'batch-160',
-  );
+  const root = join(engineBenchRoot(), 'batch-160');
   const entry = referenceCase('sheen');
   const settings = { ...entry.settings, exactSize: [entry.settings.width, entry.settings.height] };
   const scene = prepareScene(readFileSync(join(root, entry.model, entry.model + '.glb')), entry);

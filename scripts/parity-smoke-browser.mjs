@@ -11,12 +11,13 @@ import { SCENES, STANDARD, caseId, sceneParams } from '../bench/scenes/catalog.j
 import { parityCases } from '../bench/scenes/parity.js';
 import { smokeStatus } from '../bench/lib/smoke-result.mjs';
 import { browserLabel } from './lib/browser.mjs';
+import { engineBenchRoot } from './support/engine-bench.mjs';
 
 const { values: o } = parseArgs({
   options: {
     runs: { type: 'string', default: '1' },
     engines: { type: 'string', default: 'margo,three-webgpu-parity,three-webgl-parity' },
-    'engine-bench': { type: 'string', default: resolve(root, '../engine-bench') },
+    'engine-bench': { type: 'string', default: engineBenchRoot() },
     cases: { type: 'string' },
     standard: { type: 'string' },
     out: { type: 'string', default: 'test-results/bp-159-smoke.json' },

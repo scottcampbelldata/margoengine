@@ -7,8 +7,6 @@ import { cpus, platform, release, totalmem, version } from 'node:os';
 import { resolve } from 'node:path';
 
 export const root = resolve(import.meta.dirname, '../..');
-/** The main checkout (a git worktree may live under it in <dir>/worktrees/<name>). */
-export const mainRoot = root.replace(/[\\/]\.[\w-]+[\\/]worktrees[\\/][^\\/]+$/, '');
 
 const run = (file, args) => {
   try {

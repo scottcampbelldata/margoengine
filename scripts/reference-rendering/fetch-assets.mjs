@@ -1,16 +1,13 @@
 // Downloads standard test data and its legal notice, never renderer source.
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { referenceCase, assetCommit } from './cases.mjs';
 import { packGLTF } from './pack.mjs';
 import { downloadArguments } from '../support/download-arguments.mjs';
-const root = join(
-  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
-  'batch-160',
-);
+import { engineBenchRoot } from '../support/engine-bench.mjs';
+const root = join(engineBenchRoot(), 'batch-160');
 const args = downloadArguments(
   `Usage: node scripts/reference-rendering/fetch-assets.mjs [--case=<name>]
 Downloads one reference case's Khronos sample model and its README into engine-bench/batch-160.

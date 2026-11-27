@@ -1,23 +1,18 @@
-// Shared standard test inputs: explicit environment override or the cache beside all worktrees.
+// Shared standard test inputs: explicit environment override or the cache beside the main checkout.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { requiredFixture } from './required-fixture.mjs';
+import { engineBenchRoot } from './engine-bench.mjs';
 
 export const externalAssets = JSON.parse(readFileSync(new URL('./external-test-assets.json', import.meta.url), 'utf8'));
 export const externalAssetRecovery = 'node scripts/reference-rendering/fetch-skip-assets.mjs';
 
 /** Resolve identically in verify, individual package tests and the downloader, without a shell export. */
 export function externalAssetRoot(env = process.env) {
-  return resolve(
-    env.MARGO_SPLAT_SAMPLES ??
-      resolve(
-        env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench/', import.meta.url)),
-        'batch-160/gltf-gpu-samples',
-      ),
-  );
+  return resolve(env.MARGO_SPLAT_SAMPLES ?? resolve(engineBenchRoot(env), 'batch-160/gltf-gpu-samples'));
 }
 
 /** Validate every input in a family, including companions, before any conformance enumeration can omit one. */

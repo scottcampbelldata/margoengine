@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { blendRepeatRoot, blendRepeatScene } from '../scripts/reference-rendering/blend-repeat-scene.mjs';
+import { engineBenchRoot } from '../scripts/support/engine-bench.mjs';
 
 const root = blendRepeatRoot();
 
 test('the default fixture cache is beside the checkout on every platform and an explicit override wins', () => {
-  assert.equal(blendRepeatRoot({}), resolve(fileURLToPath(new URL('../../engine-bench/batch-160', import.meta.url))));
+  assert.equal(blendRepeatRoot({}), resolve(engineBenchRoot({}), 'batch-160'));
   const override = resolve('test-results', 'blend-cache');
   assert.equal(blendRepeatRoot({ MARGO_ENGINE_BENCH: override }), join(override, 'batch-160'));
 });

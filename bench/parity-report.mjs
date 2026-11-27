@@ -6,17 +6,18 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import sharp from 'sharp';
-import { mainRoot, root } from './lib/env.mjs';
+import { root } from './lib/env.mjs';
 import { featureCell, featureGzip } from './lib/feature-bytes.mjs';
 import { dirs } from './lib/results.mjs';
 import { SCENES, caseId } from './scenes/catalog.js';
 import { LABELS, ROWS } from './scenes/parity.js';
+import { engineBenchRoot } from '../scripts/support/engine-bench.mjs';
 
 const { values: o, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     out: { type: 'string', default: 'docs/whitepaper/perf-vs-threejs.md' },
-    'engine-bench': { type: 'string', default: resolve(mainRoot, '../engine-bench') },
+    'engine-bench': { type: 'string', default: engineBenchRoot() },
     threshold: { type: 'string', default: '0.05' },
     // --print: one line per scene in the run (verdict, primary medians, image match) and no document written.
     print: { type: 'boolean' },
