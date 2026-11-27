@@ -369,7 +369,32 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   before); `packages/selection` CPU tests and `instanced-move`, `picking`, `models` and `hit-details` browser checks
   pass.
 
-### Open 2026-11-27: five package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
+### Fixed 2026-11-27: OIT `blending: true` failed every frame on a glass with a thickness map (KB-OIT-BLENDTHICK1, gltf)
+
+- **Repro:** `node scripts/run-with-timeout.mjs -- node packages/oit/test/gpu/real-check.mjs` (RTX A6000 and Intel Arc
+  140V): GlassVaseFlowers under `OIT.attach(engine, { blending: true })` gave "In entries[10], binding index 10 not
+  present in the bind group layout", then "[Invalid CommandBuffer] is invalid" on every submit. Passed on 6a79dc30b
+  (2026-11-25), failed on 3b3db1b10 (2026-11-26).
+- **Cause:** gltf builds a draw's group 1 from the material's maps, while each pipeline's `layout: 'auto'` holds only the
+  bindings its own entry points statically use (WebGPU, "default pipeline layout"; WGSL, "Statically Accessed",
+  W3C Candidate Recommendations, https://www.w3.org/TR/webgpu/ and https://www.w3.org/TR/WGSL/). 212d482e00 (KB4000)
+  put a transmissive material with a thickness map on the extended shader, which binds that map at slot 20 (binding
+  10). Only the transmission tint (`margoTint`, `margoVolumeTint`) reads it; under OIT blending the lit draw is the
+  `transparent` entry, which never does, so its layout had no binding 10 and the group was invalid. Earlier
+  per-case guards in `textureGroup` (packed base maps, unauthored physical maps, the view block) covered other
+  bindings of the same class.
+- **Fix:** gltf notes, when it makes a pipeline, which bindings of each group its vertex and fragment entry points reach
+  (`staticBindings` in `packages/gltf/src/group.ts`: functions reachable from the entry points by name, the resources
+  they name; shader text ships with no comments, KB-WGSL1), and `pipelineGroup` binds only those. The thickness map
+  stays in the tint's group and out of the lit draw's.
+- **Regression:** `packages/gltf/test/static-bindings.test.js` (the reachability, and the OIT blending shader of a
+  thickness-mapped glass: `transparent` binds no slot 20, `margoTint` does); `packages/oit/test/gpu/real-check.mjs`
+  passes on WebGPU and `MARGO_COMPAT=1` (failed on main). gltf CPU tests (610), `scripts/test-gltf-browser.mjs`,
+  `scripts/gltf-pbr-materials-gpu-check.js`, `packages/gltf/scripts/test-extensions-browser.js`,
+  `packages/gltf/scripts/test-native-volume.mjs` and `packages/oit/test/gpu/blending-check.mjs` pass. gltf/pbr is
+  91,150 B gzip.
+
+### Open 2026-11-27: four package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
 
 - **Repro:** `npm run build:packages` on c886aef6c, Intel Arc 140V (Windows, Edge 158), each under
   `node scripts/run-with-timeout.mjs --max=4 --`. Each fails the same way with `packages/shared/clear-color.js` put back
@@ -378,13 +403,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
     factor, horizon included") miss, error 0.0025 to 0.011 at radius 0.02 and the r 0.634 rows.
   - `node packages/biomes/tests/browser-check.mjs`: `requestDevice` fails with DXGI_ERROR_DEVICE_REMOVED, then
     "[Device] is lost" (the parent run); past the 4-minute limit on main.
-  - `node packages/oit/test/gpu/real-check.mjs`: "[Invalid CommandBuffer] is invalid due to a previous error".
   - `node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position along the view: 3 bytes over 2,
     worst 7".
   - `node packages/sky/test/features-check.mjs sleet astro hillaire`: "sleet off by more than one half-float step".
-- **Cause:** not established for any of the five; each is owed to its package (core lighting, biomes, oit, post,
-  sky), found and fixed with its own regression. The sixth, the material back-side check, is KB-PICK-MIRRORROWS1
-  above (fixed). On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.
+- **Cause:** not established for any of the four; each is owed to its package (core lighting, biomes, post, sky),
+  found and fixed with its own regression. Two more were fixed: the material back-side check (KB-PICK-MIRRORROWS1)
+  and the OIT real-file check (KB-OIT-BLENDTHICK1), both above. On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.
 
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 

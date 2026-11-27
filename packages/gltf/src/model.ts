@@ -21,7 +21,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { splitNodeMatrix } from './node-matrix.js';
-import { pipelineGroup } from './group.js';
+import { notePipeline, pipelineGroup } from './group.js';
 import { viewMatrix } from '../../shared/view.js';
 import { captureScene, type SceneScope } from '../../shared/scene-scope.js';
 import { applyView, inView } from '../../shared/view-rect.js';
@@ -5452,9 +5452,11 @@ export class PBRModel implements EnginePlugin {
       }
       const view = code.includes('margoView.'),
         packedCode = code.includes('var margoBaseMaps:'),
-        hold = (name: string, made: GPURenderPipeline) => {
+        hold = (name: string, made: GPURenderPipeline, wanted: GPURenderPipelineDescriptor) => {
           if (draws.pipelines.size >= 4096) draws.pipelines.clear();
           draws.pipelines.set(name, made);
+          // Its groups bind only what its entry points read: the auto layout holds nothing else (KB-OIT-BLENDTHICK1).
+          notePipeline(made, inputs.code, wanted);
           if (view) viewPipelines.add(made);
           if (packedCode) packedPipelines.add(made);
           return made;
@@ -5465,12 +5467,12 @@ export class PBRModel implements EnginePlugin {
             scratch.compiling!.set(
               name,
               c.device.createRenderPipelineAsync(wanted).then((made) => {
-                if (!draws.pipelines.has(name)) hold(name, made);
+                if (!draws.pipelines.has(name)) hold(name, made, wanted);
               }),
             );
         };
       if (scratch.compiling) later(key, descriptor);
-      else pipeline = hold(key, c.device.createRenderPipeline(descriptor));
+      else pipeline = hold(key, c.device.createRenderPipeline(descriptor), descriptor);
       // Transmission's first draw: what is behind times the tint (no blend constant, see below).
       if (tinted) {
         const wanted: GPURenderPipelineDescriptor = {
@@ -5501,7 +5503,7 @@ export class PBRModel implements EnginePlugin {
           },
         };
         if (scratch.compiling) later(key + ':tint', wanted);
-        else hold(key + ':tint', c.device.createRenderPipeline(wanted));
+        else hold(key + ':tint', c.device.createRenderPipeline(wanted), wanted);
       }
     }
     if (scratch.compiling) return undefined!;
