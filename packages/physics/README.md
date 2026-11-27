@@ -51,6 +51,8 @@ engine.start(); // each frame's delta drives the accumulator
 
 ## Rigid bodies quick start
 
+Densities by name: `density: 'steel'` (or `collider.setDensity('oak')`) takes the material's kg/m³ from `densities`, real values from the CRC Handbook, the USDA Wood Handbook and Callister (air, water, seawater, ice, human, balsa, pine, oak, cork, rubber, plastic, glass, concrete, brick, granite, sand, aluminium, steel, iron, copper, lead, gold); `densityOf(name)` reads one. The default stays 1 kg/m³, Rapier's, so values tuned for Rapier carry over.
+
 A floor, a bouncing ball, two seconds of fixed steps, and the mass the solver computed from the ball's density (kg/m³; 1 by
 default, as in Rapier, so pass a real one):
 

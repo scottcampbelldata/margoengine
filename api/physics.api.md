@@ -165,7 +165,7 @@ export interface ColliderSettings {
     restitution?: number;
     frictionCombine?: CombineRule;
     restitutionCombine?: CombineRule;
-    density?: number;
+    density?: number | MaterialName;
     mass?: number;
     massless?: boolean;
     sensor?: boolean;
@@ -1056,6 +1056,8 @@ export interface MagicCurve {
     E: number;
 }
 
+export type MaterialName = keyof typeof densities;
+
 export interface MechanismOptions {
     frequency?: number;
     damping?: number;
@@ -1623,7 +1625,7 @@ export class PhysicsCollider {
         z: number;
     }): boolean;
     density(): number;
-    setDensity(density: number): this;
+    setDensity(material: number | MaterialName): this;
     translationWrtParent(): {
         x: number;
         y: number;
@@ -2407,6 +2409,33 @@ export { buildHull as convexHull };
 function buildHull(input: ArrayLike<number>): HullFaces;
 
 export function coupleDofs(physics: Physics, multibody: Multibody, linkA: PhysicsBody, linkB: PhysicsBody, options?: DofCouplingOptions): DofCoupling;
+
+export const densities: Readonly<{
+    air: 1.204;
+    water: 998;
+    seawater: 1025;
+    ice: 917;
+    human: 1010;
+    balsa: 160;
+    pine: 510;
+    oak: 750;
+    cork: 240;
+    rubber: 1100;
+    plastic: 1050;
+    glass: 2500;
+    concrete: 2400;
+    brick: 1920;
+    granite: 2700;
+    sand: 1600;
+    aluminium: 2700;
+    steel: 7850;
+    iron: 7870;
+    copper: 8960;
+    lead: 11340;
+    gold: 19300;
+}>;
+
+export function densityOf(value: number | MaterialName): number;
 
 export function estimateMeshMassProperties(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: MeshMassFallbackOptions): MeshMassProperties;
 

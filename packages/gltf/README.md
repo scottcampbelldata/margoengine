@@ -1000,7 +1000,7 @@ Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their no
 
 #### Rigid bodies in glTF (`/physics`, draft)
 
-`KHR_physics_rigid_bodies` carries colliders, mass, joints and trigger volumes on a file's nodes, and `KHR_implicit_shapes` its boxes, spheres, cylinders, capsules and planes. Every loader reads a file that uses them, even as required extensions, and keeps them as data; `applyGLTFPhysics` builds them in `@margoengine/physics`, which it loads on first use, so authored physics survives export.
+`KHR_physics_rigid_bodies` carries colliders, mass, joints and trigger volumes on a file's nodes, and `KHR_implicit_shapes` its boxes, spheres, cylinders, capsules and planes. Every loader reads a file that uses them, even as required extensions, and keeps them as data; `applyGLTFPhysics` builds them in `@margoengine/physics`, which it loads on first use, so authored physics survives export. A collider's `extras.margo` (written by `@margoengine/blender/components`) may set `density` (kg/m³ or a material name of the physics package's `densities`) and `decomposition: true`, which splits a mesh collider into convex parts with `@margoengine/physics/decomposition`, loaded only for such a file. A model made from prepared geometry (a `.margo` scene) has no buffers, so a mesh collider reads the first drawn node of that mesh.
 
 ```ts
 import {createStage} from 'margoengine';

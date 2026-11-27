@@ -230,10 +230,11 @@ Tag an object in Blender (Object Properties, Custom Properties) and the `compone
 
 | Tag | Values | Meaning |
 | --- | --- | --- |
-| `margo:collider` | `box`, `sphere`, `capsule`, `cylinder` | A collider sized from the mesh's own box (the object's scale applies); an off-centre mesh gets a child node at its box's centre for the shape. Capsules and cylinders stand along Blender's Z (the engine's Y). |
+| `margo:collider` | `box`, `sphere`, `capsule`, `cylinder`, `hull`, `mesh`, `decomposition` | `box` to `cylinder`: a collider sized from the mesh's own box (the object's scale applies); an off-centre mesh gets a child node at its box's centre for the shape. Capsules and cylinders stand along Blender's Z (the engine's Y). `hull`: the convex hull of the mesh itself. `mesh`: the mesh's triangles, for a static or kinematic body (a dynamic body takes `hull` or `decomposition`). `decomposition`: the mesh split into convex parts at load (`convexDecomposition` of `@margoengine/physics/decomposition`, loaded only then), so a cup or a chair has its hollows. Each takes its volume, centre of mass and inertia from the closed mesh. |
 | `margo:size` | 3 numbers (box), 1 (sphere radius), 2 (radius, height) | Overrides the size from the mesh, in the mesh's units before scale. |
 | `margo:body` | `static`, `dynamic`, `kinematic` | A static collider is the default for a collider without a body; a body without a collider gets a box. |
-| `margo:mass` | kg | A dynamic body's mass; without it the mass follows the shape's volume at density 1. |
+| `margo:mass` | kg | A dynamic body's mass; without it the mass follows the shape's volume at `margo:density`. |
+| `margo:density` | kg/m³ above 0, or a material name | A dynamic body's density: a number, or a name of the physics package's `densities` (`steel`, `oak`, `pine`, `glass`, `concrete`, `water`, `rubber` ...). The mass is the density times the shape's volume, with the inertia of that shape. Not with `margo:mass`. Without either, density 1 (Rapier's default). Written to the collider's glTF `extras.margo`, which `@margoengine/gltf/physics` reads. |
 | `margo:friction`, `margo:restitution` | numbers of at least 0 | The collider's physics material (friction 0.6, restitution 0 by default). |
 | `margo:trigger` | `true` | A sensor volume in place of a solid collider: `scene.physics.onTrigger` reports what enters and leaves. |
 | `margo:light` | `point`, `spot`, `directional` | A punctual light on the object, pointing down its local -Z (Blender's -Z) with `margo:color` (3 linear numbers), `margo:intensity` (candela, or lux for `directional`; default 1), `margo:range`, and for a spot `margo:inner_cone` and `margo:outer_cone` (radians, default 0 and pi/4). |

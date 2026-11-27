@@ -40,7 +40,7 @@ interface ColliderSettings {
     restitution?: number;
     frictionCombine?: CombineRule;
     restitutionCombine?: CombineRule;
-    density?: number;
+    density?: number | MaterialName;
     mass?: number;
     massless?: boolean;
     sensor?: boolean;
@@ -132,6 +132,8 @@ interface InteractionGroups {
     readonly filter: number;
     readonly testMode?: 'and' | 'or';
 }
+
+type MaterialName = keyof typeof densities;
 
 type Quat = readonly [number, number, number, number];
 
@@ -246,4 +248,29 @@ type ShapeOptions = {
 };
 
 type Vec3 = readonly [number, number, number];
+
+const densities: Readonly<{
+    air: 1.204;
+    water: 998;
+    seawater: 1025;
+    ice: 917;
+    human: 1010;
+    balsa: 160;
+    pine: 510;
+    oak: 750;
+    cork: 240;
+    rubber: 1100;
+    plastic: 1050;
+    glass: 2500;
+    concrete: 2400;
+    brick: 1920;
+    granite: 2700;
+    sand: 1600;
+    aluminium: 2700;
+    steel: 7850;
+    iron: 7870;
+    copper: 8960;
+    lead: 11340;
+    gold: 19300;
+}>;
 ```

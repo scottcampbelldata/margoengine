@@ -14,7 +14,8 @@ import {
   combineRule,
   combines,
 } from './kernel.js';
-import type { CollisionPairKind, CombineRule, ColliderOptions, InteractionGroups, ShapeOptions } from './shapes.js';
+import type { CollisionPairKind, CombineRule, ColliderOptions, InteractionGroups, MaterialName, ShapeOptions } from './shapes.js';
+import { densityOf } from './shapes.js';
 import { readGroups, writeGroups } from './groups.js';
 import { meshConnectedComponents, meshHalfEdges, type HalfEdgeTopology } from './mesh-tools.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
@@ -546,8 +547,9 @@ export class PhysicsCollider {
   density(): number {
     return this.columns().colliderDensity[this.handle];
   }
-  /** Kilograms a cubic metre; the body's mass, centre and inertia are worked out again at once. */
-  setDensity(density: number): this {
+  /** Kilograms a cubic metre, or a material of {@link densities}; the body's mass, centre and inertia are worked out again at once. */
+  setDensity(material: number | MaterialName): this {
+    const density = densityOf(material);
     if (!(density >= 0) || density === Infinity)
       throw bodyInput('Collider density must be a finite number of at least 0; pass kilograms a cubic metre.');
     this.columns().colliderDensity[this.handle] = density;

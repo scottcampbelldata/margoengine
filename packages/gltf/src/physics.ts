@@ -87,7 +87,16 @@ interface Motion {
 }
 interface NodePhysics {
   motion?: Motion;
-  collider?: { geometry?: Geometry; physicsMaterial?: number; collisionFilter?: number };
+  collider?: {
+    geometry?: Geometry;
+    physicsMaterial?: number;
+    collisionFilter?: number;
+    /**
+     * Margo's own collider settings (glTF `extras`, written by `@margoengine/blender/components`): `density` in kg/m³ or a
+     * material name of the physics package's `densities`, and `decomposition` to split a mesh into convex parts.
+     */
+    extras?: { margo?: { density?: number | string; decomposition?: boolean } };
+  };
   trigger?: { geometry?: Geometry; nodes?: number[]; collisionFilter?: number };
   joint?: { connectedNode?: number; joint?: number; enableCollision?: boolean };
 }
@@ -106,6 +115,8 @@ interface Part {
   base: number;
   geometry: Geometry;
   extra: object;
+  /** Split the mesh into convex parts (`extras.margo.decomposition`). */
+  decompose?: boolean;
   made?: Collider;
   size?: Vec3;
 }
@@ -449,13 +460,18 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
   const engine = model['engine'],
     home = engine?.sceneOf?.(model),
     scope = home ? sceneScope(engine, home) : captureScene(engine);
-  const { Physics: World, collisionGroups } = await import('@margoengine/physics').catch((error) => {
+  const { Physics: World, collisionGroups, densityOf } = await import('@margoengine/physics').catch((error) => {
     throw margoError(
       'unsupported',
       `glTF physics needs @margoengine/physics (${error instanceof Error ? error.message : error}): install it to use @margoengine/gltf/physics`,
     );
   });
   if (!options.physics) await World.load();
+  // A mesh asked to be split into convex parts loads the decomposition entry, only then.
+  const wantsSplit = (((model.asset.doc as GLTFDocument).nodes ?? []) as NodeDoc[]).some(
+    (n: NodeDoc) => n.extensions?.KHR_physics_rigid_bodies?.collider?.extras?.margo?.decomposition === true,
+  );
+  const decompose = wantsSplit ? (await import('@margoengine/physics/decomposition')).convexDecomposition : null;
   const own = !options.physics,
     physics = options.physics ?? scope.run(() => World.attach(engine)),
     doc = model.asset.doc as GLTFDocument & Record<string, any>,
@@ -536,6 +552,24 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     if (!list) {
       const mesh = doc.meshes?.[index];
       if (!mesh) throw invalid('KHR_physics_rigid_bodies geometry mesh');
+      const position = (vertices: Float32Array) => {
+        const positions = new Float32Array((vertices.length / 20) * 3);
+        // The 80-byte vertex of gltf/pbr begins with its position.
+        for (let v = 0, o = 0; o < vertices.length; v += 3, o += 20) positions.set(vertices.subarray(o, o + 3), v);
+        return positions;
+      };
+      // A model built from prepared geometry (a .margo scene) has no buffers to read: its primitives carry the mesh, in the
+      // node's frame, so the first drawn node showing this mesh gives it.
+      if (!doc.buffers?.length) {
+        const all = model.primitives ?? [],
+          user = all.find((p) => p.nodeIndex !== undefined && nodes[p.nodeIndex]?.mesh === index)?.nodeIndex,
+          drawn = all.filter((p) => p.nodeIndex === user);
+        if (user !== undefined && drawn.length) {
+          list = drawn.map((p) => ({ positions: position(p.vertices), indices: p.indices }));
+          meshes.set(index, list);
+          return list;
+        }
+      }
       // A primitive split into parts gives one piece per part, each with its own indices.
       list = mesh.primitives
         .filter((p: GLTFPrimitive) => (p.mode ?? 4) >= 4)
@@ -599,7 +633,9 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
       if (!points.length) return undefined;
       collider = geometry.convexHull
         ? { shape: 'convexHull', points: Float32Array.from(points) }
-        : { shape: 'trimesh', vertices: Float32Array.from(points), indices: Uint32Array.from(indices) };
+        : part.decompose && decompose
+          ? (decompose({ vertices: Float32Array.from(points), indices: Uint32Array.from(indices) }) as ColliderOptions)
+          : { shape: 'trimesh', vertices: Float32Array.from(points), indices: Uint32Array.from(indices) };
     }
     const own = collider as { offset?: Vec3; rotation?: Quat };
     return {
@@ -642,7 +678,13 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
   };
   nodes.forEach((_, i) => {
     const { collider, trigger } = data(i) ?? {};
-    if (collider) attach(i, collider.geometry, settings(i, collider.collisionFilter, collider.physicsMaterial));
+    if (collider) {
+      const margo = collider.extras?.margo,
+        extra: Record<string, unknown> = settings(i, collider.collisionFilter, collider.physicsMaterial);
+      if (margo?.density !== undefined) extra.density = densityOf(margo.density as Parameters<typeof densityOf>[0]);
+      attach(i, collider.geometry, extra);
+      if (margo?.decomposition === true) parts.get(carrier(i) >= 0 ? carrier(i) : i)!.at(-1)!.decompose = true;
+    }
     if (trigger?.nodes) for (const child of trigger.nodes) triggerOf.set(child, i);
     // A trigger detects and has no mass.
     if (trigger?.geometry)

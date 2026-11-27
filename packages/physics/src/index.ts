@@ -57,7 +57,8 @@ export {
   HeightfieldCell,
   interactionGroups,
 } from "./shapes.js";
-export type { InteractionGroups } from "./shapes.js";
+export type { InteractionGroups, MaterialName } from "./shapes.js";
+export { densities, densityOf } from "./shapes.js";
 export type {
   CollisionPairKind,
   ShapeOptions,

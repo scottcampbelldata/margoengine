@@ -76,7 +76,9 @@ export interface MargoScene {
 }
 
 const bodies = new Set(['static', 'dynamic', 'kinematic']),
-  shapes = new Set(['box', 'sphere', 'capsule', 'cylinder']),
+  shapes = new Set(['box', 'sphere', 'capsule', 'cylinder', 'hull', 'mesh', 'decomposition']),
+  /** Shapes taken from the mesh itself rather than fitted to its box (PA-87). */
+  meshShapes = new Set(['hull', 'mesh', 'decomposition']),
   lights = new Set(['point', 'spot', 'directional']),
   cameraTypes = new Set(['perspective', 'orthographic']),
   known = new Set([
@@ -84,6 +86,7 @@ const bodies = new Set(['static', 'dynamic', 'kinematic']),
     'margo:body',
     'margo:trigger',
     'margo:mass',
+    'margo:density',
     'margo:friction',
     'margo:restitution',
     'margo:size',
@@ -190,19 +193,25 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
     if (!shape && (body || trigger)) shape = 'box';
     if (shape) {
       if (typeof node.mesh !== 'number') bad('margo:collider', 'on a mesh object (the collider is sized by the mesh)');
+      const fromMesh = meshShapes.has(shape);
+      if (fromMesh && props['margo:size'] !== undefined)
+        bad('margo:size', 'on a box, sphere, capsule or cylinder collider (a hull, mesh or decomposition is the mesh itself)');
+      if (shape === 'mesh' && body === 'dynamic')
+        bad('margo:collider', 'hull or decomposition on a dynamic body (a mesh collider is for static and kinematic bodies)');
       const [min, max] = meshBounds(asset.geometry[node.mesh as number]),
         extent = [0, 1, 2].map((a) => max[a] - min[a]) as Vec3,
         center = [0, 1, 2].map((a) => (max[a] + min[a]) / 2) as Vec3,
         size = list('margo:size', shape === 'box' ? 3 : shape === 'sphere' ? 1 : 2);
-      let implicit: Json;
-      if (shape === 'box') implicit = { size: size ?? extent };
+      let implicit: Json = {};
+      if (fromMesh) implicit = {};
+      else if (shape === 'box') implicit = { size: size ?? extent };
       else if (shape === 'sphere') implicit = { radius: size?.[0] ?? Math.max(...extent) / 2 };
       else {
         const radius = size?.[0] ?? Math.max(extent[0], extent[2]) / 2,
           height = size?.[1] ?? (shape === 'capsule' ? Math.max(extent[1] - 2 * radius, 0) : extent[1]);
         implicit = { radiusTop: radius, radiusBottom: radius, height };
       }
-      const shapeIndex = shapeList.push({ type: shape, [shape]: implicit }) - 1,
+      const shapeIndex = fromMesh ? -1 : shapeList.push({ type: shape, [shape]: implicit }) - 1,
         physicsData: Json = {};
       const friction = number('margo:friction', 0),
         restitution = number('margo:restitution', 0);
@@ -214,10 +223,25 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
             dynamicFriction: friction ?? 0.6,
             restitution: restitution ?? 0,
           }) - 1;
-      const part: Json = { geometry: { shape: shapeIndex } };
+      // A hull, mesh or decomposition is the object's own mesh, in its own frame (KHR_physics_rigid_bodies geometry.mesh).
+      const part: Json = {
+        geometry: fromMesh ? { mesh: node.mesh, ...(shape === 'hull' ? { convexHull: true } : {}) } : { shape: shapeIndex },
+      };
       if (material !== undefined && !trigger) part.physicsMaterial = material;
+      // Margo's own settings ride in the collider's extras: a density (kg/m³ or a material name) and a decomposition.
+      const density = props['margo:density'];
+      if (density !== undefined) {
+        if (!(typeof density === 'string' ? density.length > 0 : Number.isFinite(density) && (density as number) > 0))
+          bad('margo:density', 'kilograms a cubic metre above 0, or a material name such as steel, oak or water');
+        if (body !== 'dynamic') bad('margo:density', 'on a dynamic body (margo:body = dynamic)');
+        if (props['margo:mass'] !== undefined) bad('margo:density', 'or margo:mass, not both');
+      }
+      if (density !== undefined || shape === 'decomposition')
+        part.extras = {
+          margo: { ...(density !== undefined ? { density } : {}), ...(shape === 'decomposition' ? { decomposition: true } : {}) },
+        };
       // Off centre by more than float noise in the exported vertices.
-      const offset = center.some((v) => Math.abs(v) > 1e-5 * Math.max(...extent));
+      const offset = !fromMesh && center.some((v) => Math.abs(v) > 1e-5 * Math.max(...extent));
       let holder = physicsData;
       if (offset) {
         // A shape is centred on its node: an off-centre mesh gets a child node at its box's centre for the shape.
@@ -234,7 +258,7 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
       } else if (props['margo:mass'] !== undefined) bad('margo:mass', 'on a dynamic body (margo:body = dynamic)');
       if (Object.keys(physicsData).length) extensions.KHR_physics_rigid_bodies = physicsData;
     } else
-      for (const key of ['margo:mass', 'margo:friction', 'margo:restitution', 'margo:size'])
+      for (const key of ['margo:mass', 'margo:density', 'margo:friction', 'margo:restitution', 'margo:size'])
         if (props[key] !== undefined) bad(key, 'on an object with margo:collider or margo:body');
     // Lights: the object's node carries it, pointing down its -Z (Blender's -Z of the object, after Y-up).
     const light = text('margo:light', lights);

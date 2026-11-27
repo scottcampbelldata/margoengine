@@ -4,6 +4,7 @@ import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, Kerne
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import {
   bounds,
+  densityOf,
   geometryPositions,
   roundness,
   usedVertices,
@@ -309,6 +310,7 @@ export function kernelCollider(
   fit: { geometry: ColliderGeometry | null; scale: Vec3 },
   hulls: HullRows,
 ): KernelCollider {
+  if (typeof options.density === 'string') options = { ...options, density: densityOf(options.density) };
   if (options.shape === 'tetrahedron') options = tetrahedronHull(options);
   const shape = shapeServed(options.shape) ? served[options.shape] : undefined;
   if (!shape)
@@ -436,7 +438,7 @@ export function kernelCollider(
         voxels = enclosed;
       } else if (options.massFallback === 'winding') {
         fallbackMassProperties = estimateMeshMassProperties(meshVertices, meshIndices, {
-          density: options.density,
+          density: options.density as number | undefined, // a name was resolved above
           mass: options.mass,
         });
         kernelSolid = false;
@@ -570,7 +572,7 @@ export function kernelCollider(
         ? 0
         : options.mass !== undefined
           ? options.mass / whole()
-          : (options.density ?? 1);
+          : ((options.density as number | undefined) ?? 1); // a name was resolved above
   return {
     name: options.shape,
     shape,

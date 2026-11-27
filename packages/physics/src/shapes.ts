@@ -2,6 +2,48 @@ import type { Geometry } from '@margoengine/core';
 import type { Quat, Vec3 } from './math.js';
 import { bodyInput } from './rigid-errors.js';
 
+/**
+ * Densities of common materials in kg/m³ at room temperature, for `density: 'steel'` on a collider or
+ * `collider.setDensity('oak')`. Metals, glass, water, ice and concrete from the CRC Handbook of Chemistry and Physics
+ * (97th ed., 2016); woods at 12 percent moisture from the USDA Wood Handbook (FPL-GTR-282, 2021, table 5-3a: specific
+ * gravity times 1000 kg/m³ and the moisture); polymers from their mid-range in Callister and Rethwisch, Materials Science
+ * and Engineering (10th ed., 2018, appendix B); the human body from Clauser, McConville and Young (AMRL-TR-69-70, 1969).
+ */
+export const densities = Object.freeze({
+  air: 1.204,
+  water: 998,
+  seawater: 1025,
+  ice: 917,
+  human: 1010,
+  balsa: 160,
+  pine: 510,
+  oak: 750,
+  cork: 240,
+  rubber: 1100,
+  plastic: 1050,
+  glass: 2500,
+  concrete: 2400,
+  brick: 1920,
+  granite: 2700,
+  sand: 1600,
+  aluminium: 2700,
+  steel: 7850,
+  iron: 7870,
+  copper: 8960,
+  lead: 11340,
+  gold: 19300,
+});
+/** A material named in {@link densities}. */
+export type MaterialName = keyof typeof densities;
+/** A density in kg/m³ from a number or a material name; a name not in {@link densities} is refused naming them. */
+export function densityOf(value: number | MaterialName): number {
+  if (typeof value === 'number') return value;
+  const found = (densities as Record<string, number>)[value];
+  if (found === undefined || !Object.hasOwn(densities, value))
+    throw bodyInput(`Unknown material '${String(value)}'; pass kilograms a cubic metre or one of ${Object.keys(densities).join(', ')}.`);
+  return found;
+}
+
 /** Geometry-like source: a core `Geometry` (stride-6 interleaved vertices) or raw arrays. */
 export type ColliderGeometry =
   | Geometry
@@ -221,8 +263,11 @@ export interface ColliderSettings {
   restitution?: number;
   frictionCombine?: CombineRule;
   restitutionCombine?: CombineRule;
-  /** Density in kg per cubic unit (default 1). Ignored when `mass` is set. */
-  density?: number;
+  /**
+   * Density in kg per cubic metre, or the name of a material in {@link densities} (`'steel'`, `'oak'`, `'water'` ...).
+   * Default 1, Rapier's, so values tuned for Rapier carry over; pass a real one for real masses. Ignored when `mass` is set.
+   */
+  density?: number | MaterialName;
   mass?: number;
   /**
    * Adds no mass and no inertia to the body, and skips computing them (default false). For the static world pieces of a
