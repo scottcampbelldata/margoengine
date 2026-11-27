@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20837508,
+  "total": 20837504,
   "history": [
     {
       "date": "2026-10-24",
@@ -14374,9 +14374,9 @@
     },
     {
       "date": "2026-11-27",
-      "commit": "feat(physics) SEA-12 submerged hull wake transfer",
+      "commit": "46d930c1a5",
       "grew": 2,
-      "reason": "SEA-12 optional depth and lateral span wake transfer: physics/sea grows from 6405 to 7624 B gzip, ceiling 6661 to 7880 B. physics/seakeeping grows from 37788 to 39440 B gzip, ceiling 38618 to 40624 B. Projection uses the existing wake spectrum and source normalization; the hull uses its existing strip geometry and tick. A split would have to expose those internals and require the caller to wire a second source stage. The core and stage entries have no added imports."
+      "reason": "SEA-12 optional depth and lateral span wake transfer: physics/sea grows from 6405 to 7624 B gzip, ceiling 6661 to 7880 B. physics/seakeeping grows from 37788 to 39436 B gzip, ceiling 38618 to 40620 B. Projection uses the existing wake spectrum and source normalization; the hull uses its existing strip geometry and tick. A split would have to expose those internals and require the caller to wire a second source stage. The core and stage entries have no added imports."
     }
   ],
   "items": {
@@ -15248,7 +15248,7 @@
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 7880,
-    "@margoengine/physics/seakeeping": 40624,
+    "@margoengine/physics/seakeeping": 40620,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 35261,

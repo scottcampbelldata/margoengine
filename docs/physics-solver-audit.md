@@ -1264,6 +1264,14 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   the 1.435 m steady transverse wavelength at that time. Independent amplitude, energy exchange, resolved
   production reflection and splash still need qualification.
 
+  The opt-in production source transfer in `46d930c1a5` conserves signed volume while distributing advancing
+  hull flux over depth bands and transverse quadrature points. `sea-wake.test.js` checks the finite-depth modal
+  response, and `coupling/seakeeping.test.js` checks the live transfer and frame-zero replay. The actual First Wake
+  trajectory runs all 4,005 ticks with the new source. On the same 1.2 m grid the 71 s crest is +0.334 m and the
+  trough −0.522 m. The eight-length independent KRISO KCS run has 15.10 mm profile RMS error against 0.4695 mm
+  measurement uncertainty. The predicted profile RMS is 25.70 mm versus 15.32 mm measured. No values were fit
+  to that cut. The linear wake mode remains outside the amplitude requirement.
+
   Intersecting the archived quay mesh at still water gives the main wall at z = −10.55 m and the east return
   at x = 200.4 m. The old diagnostic used the above-water lip at z = −9.93 m. At 9.7 m depth the existing
   shallow-water wall's propagation speed is 9.75 m/s, versus 2.07–4.59 m/s for the authored wave bands.
