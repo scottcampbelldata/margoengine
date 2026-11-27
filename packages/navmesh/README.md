@@ -90,7 +90,7 @@ The generator voxelises the walkable triangles (slope below `walkableSlopeAngle`
 | `minRegionArea`, `mergeRegionArea` | 8, 20 | cells |
 | `maxVertsPerPoly` | 6 | 3..6 |
 | `detailSampleDist`, `detailSampleMaxError` | 6, 1 | world units; with a distance > 0 vertex heights come from the original triangles and polygons only merge while that surface stays within the error of their plane |
-| `borderSize` | 0 | voxels; accepted, no effect on a single mesh |
+| `borderSize` | 0 | voxels (a fraction rounds up) of empty grid padding on each side; it counts toward the 16,000,000 cells and adds no polygons. With tiles, the least context margin a tile sees: the larger of it and `ceil(walkableRadius) + 2` |
 | `buildBvTree` | true | spatial index for endpoint snapping |
 | `obstacles` | [] | `{min, max}` world-space boxes carved out of the walkable area |
 | `areas` | [] | `{min, max, area}` world-space boxes of marked ground, area numbers 1 to 255, for route filters (`./agents`) |
