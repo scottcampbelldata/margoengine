@@ -1,5 +1,8 @@
-import json,struct,urllib.request,zipfile,io
+import argparse,json,struct,urllib.request,zipfile,io
 from pathlib import Path
+parser=argparse.ArgumentParser(description='Read the final plotfile of a public AMReX sample on Zenodo and rewrite the osc-cylinder fixtures. Run from the repository root.',allow_abbrev=False)
+parser.add_argument('--local',action='store_true',help='reuse the plotfile already under test-results instead of reading it again')
+args=parser.parse_args()
 q=json.load(urllib.request.urlopen('https://zenodo.org/api/records/20091893',timeout=30));f=q['files'][0];url=f['links']['self'];size=f['size']
 class Remote(io.RawIOBase):
  def __init__(self):self.pos=0;self.cache={};self.records=[]
@@ -22,7 +25,7 @@ class Remote(io.RawIOBase):
   self.pos+=n;return self.cache[key]
 r=Remote();z=zipfile.ZipFile(r);first='plt02330';sel=[x for x in z.infolist() if x.filename.startswith(first+'/')]
 start=min(x.header_offset for x in sel);end=max(x.header_offset+30+len(x.filename.encode())+len(x.extra)+x.compress_size+64 for x in sel)
-if '--local' not in __import__('sys').argv:
+if not args.local:
  r.seek(start);r.read(end-start)
  out=Path('test-results/batch176/amr/osc-native');out.mkdir(exist_ok=True)
  for x in sel:

@@ -19,8 +19,6 @@ import numpy as np
 
 OUT = Path("examples/assets/sciviz")
 CACHE = Path("test-results/sciviz-data")
-OUT.mkdir(parents=True, exist_ok=True)
-CACHE.mkdir(parents=True, exist_ok=True)
 
 
 def download(url, name):
@@ -126,6 +124,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("only", choices=["mri", "wind", "stars", "all"], default="all", nargs="?")
     args = parser.parse_args()
+    OUT.mkdir(parents=True, exist_ok=True)
+    CACHE.mkdir(parents=True, exist_ok=True)
     if args.only in ["mri", "all"]:
         mri()
     if args.only in ["wind", "all"]:

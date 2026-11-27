@@ -2,6 +2,12 @@
 Requires Python 3.13, xarray, zarr, fsspec, aiohttp, h5netcdf and h5py.
 Run from the repository root. Each network operation has a 60 second timeout.
 """
+import argparse
+
+argparse.ArgumentParser(
+    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+).parse_args()
+
 import hashlib
 import json
 import pathlib

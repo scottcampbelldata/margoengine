@@ -2,6 +2,12 @@
 Run from repository root: python scripts/prepare-sciviz-mapped.py. Network requests have 60s deadlines.
 These are demo preparations, not general-purpose radar readers. Original files stay in the lane.
 """
+import argparse
+
+argparse.ArgumentParser(
+    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+).parse_args()
+
 import csv
 import gzip
 import hashlib

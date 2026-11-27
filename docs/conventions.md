@@ -371,6 +371,15 @@ connection a browser holds, so a suite that passed every assertion could hang on
 `openBrowser` and `startDevServer` already close that way. `tests/browser-teardown.test.js` (part of `npm run verify`)
 fails for any script that starts a browser and an HTTP server of its own without `closeAll`.
 
+## Scripts that download
+
+A script that downloads or installs anything reads its arguments before it does any work: `--help` prints usage and
+exits 0, and an argument it does not take prints the error and usage and exits 2. Neither one reaches the network or
+writes a file. JavaScript uses `downloadArguments` from `scripts/support/download-arguments.mjs` and runs its body only
+when that returns values; Python calls `argparse` before its first request. Add the script to
+`tests/download-script-arguments.test.js`, which runs each one with the network and file writes refused and fails on an
+unlisted script that downloads. Never run one to find out which flags it takes: read it.
+
 ## Lifecycle repair audit (2026-11-10)
 
 Engine-bound factories are additive convenience APIs. Construction that already registers or installs a

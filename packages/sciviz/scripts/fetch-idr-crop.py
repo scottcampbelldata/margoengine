@@ -3,7 +3,10 @@
 Requires tifffile, imagecodecs and numpy. Run from the repository root, under a hard process limit.
 Only public decoder APIs are used; no library implementation source is read.
 """
-import pathlib, urllib.request, io, json, hashlib
+import argparse, pathlib, urllib.request, io, json, hashlib
+argparse.ArgumentParser(
+    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+).parse_args()
 import tifffile, numpy as np
 url='https://ftp.ebi.ac.uk/pub/databases/IDR/idr0096-tratwal-marrowquant/20210609-ftp-ome-tiffs/GFP11_6192_omWAT%20(20x).ome.tiff'
 records=[]

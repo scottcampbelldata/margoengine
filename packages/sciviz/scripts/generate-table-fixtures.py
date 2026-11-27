@@ -1,6 +1,12 @@
 """Regenerate standard-data fixtures with PyArrow 26.0.1, never its source code.
 Run with pyarrow installed; TLC source download lives under this lane's ignored test-results.
 """
+import argparse
+
+argparse.ArgumentParser(
+    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+).parse_args()
+
 from pathlib import Path
 import json
 import urllib.request

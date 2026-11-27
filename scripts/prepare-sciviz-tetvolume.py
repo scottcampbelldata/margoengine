@@ -2,6 +2,12 @@
 No solver or triangulation code is copied. This is an offline demo preparation, not a file reader API.
 Run from repository root: python scripts/prepare-sciviz-tetvolume.py. Download deadline: 60 seconds.
 """
+import argparse
+
+argparse.ArgumentParser(
+    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+).parse_args()
+
 import array
 import hashlib
 import io

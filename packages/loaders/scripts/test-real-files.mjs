@@ -64,6 +64,7 @@ import { readDXFHatch } from '../dist/dxf-hatch.js';
 import { parseVRML, parseX3D } from '../dist/vrml.js';
 import { parseVTKXML } from '../dist/vtk-xml.js';
 import { parseUSDAInWorker } from '../dist/worker.js';
+import { downloadArguments } from '../../../scripts/support/download-arguments.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(here, '../../..');
@@ -1188,45 +1189,57 @@ async function zipReader(bytes) {
   return { entries, read: (name) => readZipEntry(bytes, byName.get(name)) };
 }
 
-const report = [];
-const drawings = [];
-for (const item of manifest.files) {
-  if (only && !only.includes(item.format) && !only.includes(item.id)) continue;
-  const row = { id: item.id, format: item.format, file: item.file };
-  try {
-    const bytes = await fetchChecked(item, item.format);
-    const read = (companion) => fetchChecked(companion, item.format);
-    const outcome = await checks[item.check](bytes, item, read);
-    if (outcome.notRun) {
-      row.status = 'NOT RUN';
-      row.result = outcome.notRun;
-    } else {
-      row.status = 'PASS';
-      row.result = outcome.result;
-      for (const d of outcome.draw ?? []) {
-        drawings.push({ ...d, id: item.id });
-        // Files with vertex colours are drawn a second time through the /render entry.
-        if (d.geometry?.colors && d.geometry.indices) drawings.push({ ...d, id: item.id, pbr: true });
-      }
-    }
-  } catch (error) {
-    row.status = error.notRun ? 'NOT RUN' : 'FAIL';
-    row.result = `${error.code ?? error.name}: ${error.message}`.slice(0, 400);
-    if (process.env.REAL_FILES_TRACE) console.error(error);
-  }
-  report.push(row);
-  console.log(`${row.status.padEnd(7)} ${row.id}: ${row.result}`);
-}
-await mkdir(root, { recursive: true });
-await writeFile(resolve(root, 'report.json'), JSON.stringify(report, null, 2));
-if (process.env.REAL_FILES_RENDER === '1') {
-  const { renderAll } = await import('./real-files-render.mjs');
-  await renderAll(drawings, resolve(root, 'pictures'), report);
-}
-const failed = report.filter((r) => r.status === 'FAIL'),
-  notRun = report.filter((r) => r.status === 'NOT RUN');
-console.log(
-  `${report.length} files: ${report.length - failed.length - notRun.length} passed, ${failed.length} failed, ${notRun.length} not run`,
+const args = downloadArguments(
+  `Usage: npm run test:real-files -w @margoengine/loaders
+Downloads every file in tests/real-files/manifest.json, checks its hash and opens it with the loader.
+It takes no flags. Environment variables:
+  REAL_FILES_DIR       where downloads go (default test-results/real-files)
+  REAL_FILES_RUNTIMES  folder holding the comparison runtimes (npm run test:real-files:runtimes)
+  REAL_FILES_ONLY      comma-separated formats or ids to run
+  REAL_FILES_RENDER    1 draws every geometry on the GPU
+  --help               print this and download nothing`,
 );
-if (failed.length) process.exitCode = 1;
-else if (notRun.length) process.exitCode = 2;
+if (args) {
+  const report = [];
+  const drawings = [];
+  for (const item of manifest.files) {
+    if (only && !only.includes(item.format) && !only.includes(item.id)) continue;
+    const row = { id: item.id, format: item.format, file: item.file };
+    try {
+      const bytes = await fetchChecked(item, item.format);
+      const read = (companion) => fetchChecked(companion, item.format);
+      const outcome = await checks[item.check](bytes, item, read);
+      if (outcome.notRun) {
+        row.status = 'NOT RUN';
+        row.result = outcome.notRun;
+      } else {
+        row.status = 'PASS';
+        row.result = outcome.result;
+        for (const d of outcome.draw ?? []) {
+          drawings.push({ ...d, id: item.id });
+          // Files with vertex colours are drawn a second time through the /render entry.
+          if (d.geometry?.colors && d.geometry.indices) drawings.push({ ...d, id: item.id, pbr: true });
+        }
+      }
+    } catch (error) {
+      row.status = error.notRun ? 'NOT RUN' : 'FAIL';
+      row.result = `${error.code ?? error.name}: ${error.message}`.slice(0, 400);
+      if (process.env.REAL_FILES_TRACE) console.error(error);
+    }
+    report.push(row);
+    console.log(`${row.status.padEnd(7)} ${row.id}: ${row.result}`);
+  }
+  await mkdir(root, { recursive: true });
+  await writeFile(resolve(root, 'report.json'), JSON.stringify(report, null, 2));
+  if (process.env.REAL_FILES_RENDER === '1') {
+    const { renderAll } = await import('./real-files-render.mjs');
+    await renderAll(drawings, resolve(root, 'pictures'), report);
+  }
+  const failed = report.filter((r) => r.status === 'FAIL'),
+    notRun = report.filter((r) => r.status === 'NOT RUN');
+  console.log(
+    `${report.length} files: ${report.length - failed.length - notRun.length} passed, ${failed.length} failed, ${notRun.length} not run`,
+  );
+  if (failed.length) process.exitCode = 1;
+  else if (notRun.length) process.exitCode = 2;
+}

@@ -2,6 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { downloadArguments } from './support/download-arguments.mjs';
 import { fetchFixture } from './support/fetch-fixture.mjs';
 import { externalAssets, externalAssetRoot } from './support/external-test-assets.mjs';
 
@@ -107,6 +108,15 @@ export async function fetchReadmeFFmpeg() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await fetchReadmeAssets();
-  if (process.argv.includes('--ffmpeg')) await fetchReadmeFFmpeg();
+  const args = downloadArguments(
+    `Usage: node scripts/fetch-readme-assets.mjs [--ffmpeg]
+Downloads the pinned samples the README examples read, into engine-bench outside the repository.
+  --ffmpeg   also download the pinned Windows FFmpeg build (after npm run build:packages)
+  --help     print this and download nothing`,
+    { ffmpeg: { type: 'boolean' } },
+  );
+  if (args) {
+    await fetchReadmeAssets();
+    if (args.ffmpeg) await fetchReadmeFFmpeg();
+  }
 }
