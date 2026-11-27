@@ -27,6 +27,7 @@ static mut WORLD: World = World {
     tt_p: Col::new(), tt_a: Col::new(), tt_len: Col::new(), tethers: 0,
     sk_p: Col::new(), sk_x: Col::new(), sk_y: Col::new(), sk_z: Col::new(), sk_vx: Col::new(), sk_vy: Col::new(), sk_vz: Col::new(),
     sk_nx: Col::new(), sk_ny: Col::new(), sk_nz: Col::new(), sk_max: Col::new(), sk_back: Col::new(), skins: 0,
+    cb_head: Col::new(), cb_next: Col::new(), cbx: Col::new(), cby: Col::new(), cbz: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -59,6 +60,7 @@ columns! {
     fc_a, fc_b, fc_c, fc_wa, fc_wb, fc_wc, fc_row, fc_nx, fc_ny, fc_nz, fc_px, fc_py, fc_pz, fc_vx, fc_vy, fc_vz, fc_f, fc_r, fc_j, fc_k, kr, elimit, bmesh,
     tt_p, tt_a, tt_len,
     sk_p, sk_x, sk_y, sk_z, sk_vx, sk_vy, sk_vz, sk_nx, sk_ny, sk_nz, sk_max, sk_back,
+    cbx, cby, cbz,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.

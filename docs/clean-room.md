@@ -12380,6 +12380,14 @@ Written clean room from the papers below; no engine's source and no companion co
 - N. Molino, Z. Bao and R. Fedkiw, "A Virtual Node Algorithm for Changing Mesh Topology During Simulation", SIGGRAPH 2004 (copies of a vertex for each side of a crack).
 - M. Stewart, *Some General Theorems of Considerable Use in the Higher Parts of Mathematics*, 1746 (a cevian's length from the sides).
 
+### Vertex block descent for cloth (`@margoengine/physics/soft`, 2026-11-27)
+
+Written clean room from the paper below; its companion code was not read. A cloth on the vertex-block solver has its edges as springs; each pass visits the particles in order and takes one Newton step on the particle's own three coordinates of the incremental potential (inertia m/(2h^2)|x - y|^2 plus the springs at it), the spring Hessian projected to stay positive when squeezed, damping stiffness-proportional at each edge's own frequency, and the first guess from the paper's adaptive initialisation (gravity scaled by the particle's last acceleration along it, clamped to 0..1), whose previous velocity is a column of the soft world. A thread's measured strain limit is projected after the passes (Provot 1995).
+
+- A. H. Chen, Z. Liu, Y. Yang and C. Yuksel, "Vertex Block Descent", ACM Transactions on Graphics 43(4), SIGGRAPH 2024. https://doi.org/10.1145/3658179
+- X. Provot, "Deformation Constraints in a Mass-Spring Model to Describe Rigid Cloth Behavior", Graphics Interface 1995 (strain limiting).
+- H. M. Irvine, *Cable Structures*, 1981 (the elastic cable sag the test meets).
+
 ### Shape matching (`@margoengine/physics/soft`, 2026-11-24)
 
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.

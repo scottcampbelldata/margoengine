@@ -921,6 +921,21 @@ console.log(physics.alpha, drawn.length);
 - **Surface collider.** `soft.createSurfaceCollider(body, {friction})` gives a body made from triangles (`trimesh`, `cloth`, `clothTube`) a deformable triangle-mesh collider that follows its particles each step with each vertex's speed, so every rigid shape, convex hulls and meshes included, rests on cloth and is dragged by its friction; particles meet every shape directly through the kernel's swept particle probe. It is removed with the body.
 - **Drawing.** `drawSoftBody(engine, body, {material, images, uvs})` from `margoengine/gltf/soft-mesh` draws a cloth or any body with triangles as a PBR mesh that follows it every frame, normals and tangents recomputed and texture coordinates from `body.grid` (`{nu, nv, wrap}` for a body built by `cloth`, `clothAnisotropic` or `clothTube`, null otherwise); see the gltf README.
 - **World.** `soft.create`, `soft.remove`, `soft.list()`, `soft.onTear(listener)`, `soft.hash()` (equal across two runs that did the same), `soft.substeps` (default 8) and `soft.iterations` (default 2), `soft.dispose()`.
+- **Vertex block descent.** `desc.setSolver('vertex-block')` (or `body.setSolver`) on a cloth or rope solves its edges by vertex block descent (Chen et al. 2024) instead of the edge sweep and the exact thread solve: every edge is a spring (a fabric thread of its measured stiffness, any other edge the stiffness its softness gives on its two masses, a rigid edge a very stiff spring), and each pass takes one Newton step on each particle's three coordinates of the step's incremental potential, damped by each edge's damping ratio, with threads held within their measured strain after the passes. Its first guess takes gravity only as far as the particle was last accelerating along it (the paper's adaptive initialisation), so a resting cloth hangs at its exact equilibrium whatever the passes. A strip of the default cotton hangs to Irvine's elastic-cable sag within 0.1 percent at two passes or eight; a soft edge rings at its own frequency.
+
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics);
+const curtain = soft.create(
+  SoftBodyDesc.cloth([0, 2, 0], [0.1, 0, 0], [0, 0, 0.1], 10, 10).setPinnedParticles([0, 9]).setSolver('vertex-block'),
+);
+for (let i = 0; i < 60; i++) physics.step();
+console.log(curtain.solver); // 'vertex-block'
+```
 - **Adaptive tearing.** A body of triangles (a cloth, a trimesh) whose material has `adaptiveTearing = true` and a `tearStrain` tears through its faces instead of at its edges: after each step a face stretched past the tear strain is cut across its greatest stretch, from a crack tip, a corner on the boundary or any corner, to the far side, where a vertex is inserted and the face beyond is split, so the mesh stays whole (Pfaff et al. 2014). The crack opens behind its tip: a vertex the crack's sides divide is copied, one for each side, its mass shared by area. So a tear runs where the stretch sends it, not where the mesh has edges, and a woven sheet, whose threads hold and whose weave shears, tears along its threads as fabric does. The body is rebuilt at each step that cuts it (`soft.onTear` hands you the new body in `pieces`); mass is kept exactly, and momentum by every cut. `maxTearsPerStep` caps the cuts a step (default 8 here); with `soft.splitOnTear = 'all'` a sheet the cuts part becomes separate bodies.
 
 ```js

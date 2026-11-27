@@ -21,6 +21,8 @@ pub const SHEET: u32 = 4;
 /// An edge whose `omega` holds a spring stiffness in N/m, not a natural frequency: its compliance is 1/k whatever its
 /// particles weigh (a fabric's shear rigidity, which a pinned corner must not stiffen), and `zeta` its damping ratio.
 pub const STIFFNESS: u32 = 8;
+/// An edge of a sheet on the vertex-block solver (cloth_block.rs): a spring of the block solve, not swept or held exactly.
+pub const BLOCK: u32 = 16;
 /// No contact: the value of `kc` for a particle that meets nothing (a contact holds its table row plus one).
 pub const NONE: u32 = 0;
 /// Planes held for each particle.
@@ -277,6 +279,14 @@ pub struct World {
     pub sk_max: Col<f32>,
     pub sk_back: Col<f32>,
     pub skins: usize,
+    /// Each particle's first block edge slot, and the next slot (cloth_block.rs); scratch, built for each piece.
+    pub cb_head: Col<u32>,
+    pub cb_next: Col<u32>,
+    /// A block-solved particle's velocity at the start of the last piece, before gravity (cloth_block.rs): its acceleration
+    /// decides how much of gravity the next piece's first guess takes.
+    pub cbx: Col<f32>,
+    pub cby: Col<f32>,
+    pub cbz: Col<f32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -297,6 +307,9 @@ impl World {
             grow(v, particles);
         }
         for v in [&mut self.rx, &mut self.ry, &mut self.rz, &mut self.slx, &mut self.sly, &mut self.slz, &mut self.sw] {
+            grow(v, particles);
+        }
+        for v in [&mut self.cbx, &mut self.cby, &mut self.cbz] {
             grow(v, particles);
         }
         for v in [&mut self.b_omega, &mut self.b_zeta, &mut self.bqx, &mut self.bqy, &mut self.bqz, &mut self.bqw] {
@@ -454,6 +467,7 @@ impl World {
         self.fem_implicit(h);
         self.solve_projective(h, iterations);
         let vertex_block = self.prepare_vertex_blocks();
+        let cloth_block = self.prepare_cloth_blocks(h, gravity);
         self.shape_begin();
         self.fem_begin();
         self.volume_begin();
@@ -461,6 +475,9 @@ impl World {
         for _ in 0..iterations {
             for e in 0..self.edges {
                 self.solve_edge(e, h);
+            }
+            if cloth_block {
+                self.solve_cloth_blocks(h);
             }
             self.solve_tethers();
             self.solve_skin();
@@ -473,6 +490,9 @@ impl World {
         }
         if vertex_block {
             self.solve_vertex_block_translation(h);
+        }
+        if cloth_block {
+            self.limit_cloth_blocks();
         }
         self.solve_rigid(h);
         // The exact solve of the threads may pull a skinned particle past its limits; the skin has the last word before contacts.
@@ -578,8 +598,9 @@ impl World {
         if w == 0.0 {
             return;
         }
-        // An edge the exact solve holds (src/rigid.rs: a rigid edge, a sheet's compliant thread) is not swept.
-        if self.held_exactly(e) {
+        // An edge the exact solve holds (src/rigid.rs: a rigid edge, a sheet's compliant thread) is not swept, nor one of the
+        // vertex-block solve (cloth_block.rs).
+        if self.held_exactly(e) || self.eflags[e] & BLOCK != 0 {
             return;
         }
         let dx = self.x[a] - self.x[b];

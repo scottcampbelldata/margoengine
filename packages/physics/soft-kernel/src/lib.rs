@@ -16,6 +16,7 @@
 extern crate alloc;
 
 pub mod api;
+mod cloth_block;
 mod col;
 mod crack_band;
 pub mod attach;

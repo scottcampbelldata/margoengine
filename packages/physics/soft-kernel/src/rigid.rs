@@ -23,7 +23,7 @@
 // All the algebra is in f64, from f32 positions, with only + - * / sqrt and compares, so a result is the same on every run.
 use crate::col::Col;
 use crate::math::sqrt;
-use crate::world::{NONE, SHEET, SLOTS, STIFFNESS, TENSION, TORN, World};
+use crate::world::{BLOCK, NONE, SHEET, SLOTS, STIFFNESS, TENSION, TORN, World};
 
 /// Row kinds.
 /// No particle or no body in a row's slot (the kernel's NONE, 0, is a row number plus one elsewhere).
@@ -246,7 +246,7 @@ impl World {
     /// its compliance): what the exact solve may hold.
     fn candidate(&self, e: usize) -> bool {
         let held = self.omega[e] == 0.0 || self.eflags[e] & (SHEET | STIFFNESS) == SHEET | STIFFNESS;
-        held && self.eflags[e] & TORN == 0 && self.w[self.ea[e] as usize] + self.w[self.eb[e] as usize] > 0.0
+        held && self.eflags[e] & (TORN | BLOCK) == 0 && self.w[self.ea[e] as usize] + self.w[self.eb[e] as usize] > 0.0
     }
 
     /// An edge's compliance over the piece's length squared: 1 / (k h^2) for a sheet's edge of stiffness k (XPBD's

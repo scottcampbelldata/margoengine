@@ -119,6 +119,8 @@ const TENSION = 2;
 const SHEET = 4;
 /** An edge whose `omega` is a spring stiffness in N/m (a fabric's shear), not a natural frequency. */
 const STIFFNESS = 8;
+/** An edge of a sheet on the vertex-block solver (cloth_block.rs). */
+const BLOCK = 16;
 /** A shear rigidity of 1 gf/(cm deg), Kawabata's unit, in N/m per radian: 9.80665e-3 N / 0.01 m x 180 / pi. */
 const GF_PER_CM_DEGREE = ((9.80665e-3 / 0.01) * 180) / Math.PI;
 /** The shear angle KES-F reads the shear hysteresis 2HG at: 0.5 degrees, in degrees. */
@@ -4388,6 +4390,8 @@ export class SoftBodies implements PhysicsAttachment {
       const flags = f.flags![t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL | PROJECTIVE_CELL);
       f.flags![t] = flags | cellSolverFlag(solver, f.model![t]!);
     }
+    // A cloth or rope takes the solver in its edges.
+    if (count === 0) this.writeMaterial(body);
   }
 
   /** @internal Writes a body's material into its cell rows while retaining their rest shapes. */
@@ -4594,7 +4598,8 @@ export class SoftBodies implements PhysicsAttachment {
     c.b_zeta[body.handle] = shapeMatchingSoftness.dampingRatio;
     c.vb_omega[body.handle] = body.material.volumeSoftness.naturalFrequency * 2 * Math.PI;
     c.vb_zeta[body.handle] = body.material.volumeSoftness.dampingRatio;
-    const sets = body.clusterInfo.map((info) => new Set(info.members));
+    const sets = body.clusterInfo.map((info) => new Set(info.members)),
+      blocks = body.cellRange.count === 0 && body.solverKind === 'vertex-block';
     for (let e = 0; e < body.edgeTotal; e++) {
       const row = body.firstEdge + e,
         bend = e >= body.structural,
@@ -4612,7 +4617,7 @@ export class SoftBodies implements PhysicsAttachment {
       // of their own, are the fabric's shear: a stiffness, so the kernel takes the particles' masses as they are.
       const kind = bend ? 0 : body.edgeKinds[e],
         shear = body.material.shear;
-      let flags = c.eflags[row]! & ~(SHEET | STIFFNESS);
+      let flags = c.eflags[row]! & ~(SHEET | STIFFNESS | BLOCK);
       // A sheet's edges: a woven sheet's threads, or every structural edge of a body of triangles with no cells (a trimesh, a
       // cloth made of one), which has no redundant edge.
       const sheet =
@@ -4643,6 +4648,8 @@ export class SoftBodies implements PhysicsAttachment {
         c.zeta[row] = fabricShearDamping(shear);
         flags |= STIFFNESS;
       }
+      // A body of edges with no cells on the vertex-block solver: its edges are springs of the block solve (cloth_block.rs).
+      if (blocks) flags |= BLOCK;
       c.eflags[row] = flags;
       // The cells' module tears and flows the edges (it smooths the load, shields the interior and keeps the pieces), so the
       // solver's own test is off.
@@ -4791,6 +4798,9 @@ export class SoftBodies implements PhysicsAttachment {
         'sly',
         'slz',
         'sw',
+        'cbx',
+        'cby',
+        'cbz',
       ] as const,
       bcols = [
         'b_on',

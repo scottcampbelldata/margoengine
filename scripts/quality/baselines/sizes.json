@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20942373,
+  "total": 20953697,
   "history": [
     {
       "date": "2026-10-24",
@@ -14630,6 +14630,12 @@
       "commit": "08c21f5dcc",
       "reason": "exporters/threemf 19,618 to 28,528 B gzip: deflate, metadata, thumbnail, metallic display properties, components and the mesh check, plus the JPEG reader and PNG writer as lazy chunks that only a metallic-roughness map loads; a second entry would split one writer",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "09da1e52e",
+      "reason": "@margoengine/physics/soft 161,433 to 168,429 B gzip budget (measured 163,523 + 3%) and its lazy soft kernel 107,182 to 111,510 (measured 108,262 + 3%): the soft kernel's cloth vertex blocks (cloth_block.rs: the per-particle Newton block of the springs, the adaptive first guess and strain limiting, with three state columns), on top of the tether and skin rows landed earlier the same day. They are solver passes inside the step's loop, so they live in the soft kernel every cloth loads; a second blueprint would duplicate the step.",
+      "grew": 2
     }
   ],
   "items": {
@@ -15511,9 +15517,9 @@
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,
     "@margoengine/physics/snowpack": 5172,
-    "@margoengine/physics/soft": 161433,
+    "@margoengine/physics/soft": 168429,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 56034,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 107182,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 111510,
     "@margoengine/physics/strands": 6171,
     "@margoengine/physics/surf": 7669,
     "@margoengine/physics/surge": 4734,
