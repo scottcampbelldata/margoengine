@@ -49,6 +49,45 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
+## Rigid bodies quick start
+
+A floor, a bouncing ball, two seconds of fixed steps, and the mass the solver computed from the ball's density (kg/m³; 1 by
+default, as in Rapier, so pass a real one):
+
+```ts
+import { Physics } from '@margoengine/physics';
+await Physics.load();
+const physics = new Physics(null); // new Physics(engine) steps with the engine and moves the meshes you pass
+physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
+const ball = physics.addBody(null, { position: [0, 5, 0], colliders: { shape: 'sphere', radius: 0.5, density: 1000, restitution: 0.6 } });
+for (let i = 0; i < 120; i++) physics.step();
+console.log(ball.position, ball.mass); // mass 523.6 kg = 1000 x 4/3 pi 0.5^3
+```
+
+A live page with all of it at once (instanced bodies on heightfield terrain, a pointer ray, an explosion, every shape with
+its computed mass): `examples/physics-rigid.html`.
+
+### From three.js and Rapier
+
+The three.js Rapier examples (`physics_rapier_basic`, `physics_rapier_instancing`, `physics_rapier_terrain`) load
+Rapier, make a world with a gravity, describe each body and collider with `RigidBodyDesc` and `ColliderDesc`, call
+`world.step()` each frame, and copy every body's translation and rotation into its mesh (or into
+`InstancedMesh.setMatrixAt`) themselves. In Margo:
+
+| three.js + Rapier | Margo |
+| --- | --- |
+| `await RAPIER.init(); new RAPIER.World({x: 0, y: -9.81, z: 0})` | `await Physics.load(); new Physics(engine)` (gravity -9.81 m/s² by default; `physics.gravity`) |
+| `world.createRigidBody(RigidBodyDesc.dynamic().setTranslation(x, y, z))` then `world.createCollider(ColliderDesc.ball(r), body)` | `physics.addBody(mesh, { position, colliders: { shape: 'sphere', radius: r } })`; `type: 'fixed'`, `'kinematicPosition'` or `'kinematicVelocity'` for the others |
+| `world.step()` and `mesh.position.copy(body.translation())` every frame | nothing: the engine steps at a fixed rate and moves each body's mesh, interpolated |
+| one body per instance, copied into `setMatrixAt` each frame | `new InstancedBodies(physics, instancedMesh, { colliders })` |
+| `ColliderDesc.heightfield(rows, cols, heights, scale)` | `{ shape: 'heightfield', rows, columns, heights, scale }`, the same column-major layout |
+| `world.castRay(new Ray(o, d), maxToi, true)` | `physics.raycast(o, d, { maxDistance })`, which returns the body, collider, point, normal and mesh |
+| `body.applyImpulse({x, y, z}, true)` | `body.applyImpulse([x, y, z])` (arrays, and bodies wake by default) |
+
+Rapier's own names (`setNextKinematicTranslation` is `setNextPosition`, `lockRotations`, `enableCcd` is `ccd`,
+`collisionGroups`, `activeEvents` as `physics.on('contactstart')`) are listed row by row in
+[docs/physics-collision-parity.md](../../docs/physics-collision-parity.md).
+
 ## Character controller quick start
 
 A kinematic capsule that walks, climbs slopes up to 45 degrees and slides off steeper ones, steps up 0.3 m ledges, snaps
