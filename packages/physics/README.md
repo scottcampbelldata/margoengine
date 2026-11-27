@@ -386,6 +386,40 @@ console.log(tentacle.points().length, hose.held('end')); // 75 true
 hose.release('end'); // the hose is let go at the tank
 ```
 
+For direction, a rod blends toward a shape you give it: `rod.setTarget(points, {frequency, damping})` pulls each link toward
+its place on `points` as a spring on its own mass (default 1 Hz, critically damped), with its bending, loads and contacts
+acting too, and `rod.setTarget(null)` lets go. `segmentAirLoads(wind)` loads a rod in the air (rigging, a kite line, a vine)
+with a wind field's drag and its vortices, which make a taut wire sing. `swayFlow({speed, period, seed})` is a seeded sway,
+three travelling gusts about no mean, to add to any loads' `flows`, so a kelp bed or a field of grass moves gently and the
+same seed moves it the same way every run.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {Rod} from 'margoengine/physics/rod';
+import {segmentAirLoads, swayFlow} from 'margoengine/physics/loads';
+
+await Physics.load();
+const physics = new Physics(null);
+const breeze = {
+  medium: 'air' as const,
+  cell: [0, 0, 0] as const,
+  sample(_x: number, _y: number, _z: number, _t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 1.225, temperature: 288}) {
+    out.velocity[0] = 6;
+    out.velocity[1] = out.velocity[2] = 0;
+    return out;
+  },
+};
+// A pennant line on a mast in a 6 m/s breeze that gusts, seeded.
+const line = new Rod(physics, {start: [0, 5, 0], end: [0, 3, 0], segments: 16, radius: 0.003, density: 1150,
+  attachStart: 'fixed', loads: segmentAirLoads(breeze, {flows: [swayFlow({speed: 1.5, period: 4, seed: 11, medium: 'air'})]})});
+// A tentacle reaching for a mark, then let go.
+const tentacle = new Rod(physics, {start: [2, 0, 0], end: [2, 0.4, 0], segments: 12, radius: 0.01, attachStart: 'fixed'});
+tentacle.setTarget([[2, 0, 0], [2.2, 0.3, 0], [2.4, 0.3, 0]], {frequency: 1.5});
+for (let i = 0; i < 120; i++) physics.step();
+tentacle.setTarget(null);
+console.log(line.points().length, tentacle.valid); // 51 true
+```
+
 ## Loose props on a moving deck
 
 Props resting on a moving body (cups, plates and chairs in a ship's saloon, crates in a lift) stick, slide and tip as its

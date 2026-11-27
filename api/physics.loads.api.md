@@ -333,6 +333,15 @@ export const SEA_WATER_VISCOSITY = 0.00000119;
 
 export const SPHERE_ADDED_MASS = 0.5;
 
+export const STANDARD_AIR: Readonly<{
+    density: 1.225;
+    viscosity: 0.000014607;
+}>;
+
+export interface SegmentAirLoadOptions extends SegmentLoadOptions {
+    readonly density?: number;
+}
+
 export interface SegmentLoad {
     force: [number, number, number];
     moment: [number, number, number];
@@ -379,6 +388,15 @@ export interface SegmentState {
     readonly angularVelocity: readonly [number, number, number];
     readonly diameter: number;
     readonly length: number;
+}
+
+export interface SwayOptions {
+    readonly speed: number;
+    readonly period?: number;
+    readonly seed?: number;
+    readonly direction?: readonly [number, number, number];
+    readonly wavelength?: number;
+    readonly medium?: 'air' | 'water';
 }
 
 export class SwimDragToWater implements Solver<SwimDragToWaterParams> {
@@ -519,6 +537,8 @@ export function sampleWoodyDebrisImpact(impact: WoodyDebrisImpact, elapsed: numb
     readonly impulse: number;
 };
 
+export function segmentAirLoads(air: FlowField, options?: SegmentAirLoadOptions): SegmentLoads;
+
 export function segmentLoads(sea: LoadWater, options?: SegmentLoadOptions): SegmentLoads;
 
 export function sheddingFrequency(speed: number, diameter: number, strouhal?: number): number;
@@ -536,6 +556,8 @@ export function standingWave(height: number, period: number, depth: number, opti
 };
 
 export function steadyDrag(roughness: number): number;
+
+export function swayFlow(options: SwayOptions): FlowField;
 
 export function tangentialDrag(normal: number, sinPhi: number, cosPhi: number, m?: number, n?: number): number;
 

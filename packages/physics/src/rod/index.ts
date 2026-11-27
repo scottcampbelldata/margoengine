@@ -17,6 +17,14 @@ import type { ColliderSettings } from '../shapes.js';
 import type { SegmentLoad, SegmentLoads, SegmentState } from '../loads/segments.js';
 import { checkVec, type Vec3 } from '../math.js';
 
+/** Options of {@link Rod.setTarget}. */
+export interface RodTargetOptions {
+  /** Natural frequency of the pull toward the shape, Hz (default 1). */
+  frequency?: number;
+  /** Damping ratio of the pull (default 1, critical: the rod settles on the shape without overshoot). */
+  damping?: number;
+}
+
 /** Which end of a rod. */
 export type RodEnd = 'start' | 'end';
 
@@ -181,6 +189,10 @@ export class Rod implements PhysicsAttachment {
   private readonly out: SegmentLoad[] = [];
   /** Per link, the force and torque the water put on for the step, taken off after it. */
   private readonly held6: Float64Array;
+  /** The target shape's link centres (xyz each), its angular frequency and damping ratio; null for none. */
+  private target: Float64Array | null = null;
+  private targetOmega = 0;
+  private targetZeta = 1;
   private removed = false;
 
   /**
@@ -385,6 +397,75 @@ export class Rod implements PhysicsAttachment {
     this.ends[end].joint = joint;
   }
 
+  /**
+   * Blends the rod toward a shape, for direction: a tentacle reaching, a vine curling to a mark, a hose laid along a path.
+   * Each link is pulled toward its place on `points` (resampled along their length to the rod's links, start to end) by a
+   * spring of natural `frequency` and `damping` ratio on the link's own mass, `m (w^2 (x_target - x) - 2 zeta w v)`, so the
+   * rod moves there as a mass on such a spring does, with its own bending and the loads and contacts acting as well. The
+   * force is held over a step, so `2 pi frequency` times the step is held to 0.5 or less, and `damping` to what the step can
+   * take. `null` lets go.
+   * @throws MargoError (code `unsupported`) for fewer than two points, a shape of no length, or a frequency or damping out of
+   * range, naming the bound.
+   */
+  setTarget(points: readonly Vec3[] | null, options: RodTargetOptions = {}): this {
+    this.check();
+    if (points === null) {
+      this.target = null;
+      return this;
+    }
+    if (!Array.isArray(points) || points.length < 2)
+      throw invalidRod(
+        'A rod target is two or more points of the shape to blend toward, or null to let go; pass them.',
+      );
+    for (const point of points) checkVec(point, 'Rod target point');
+    const dt = this.owner.fixedTimestep,
+      { frequency = 1, damping = 1 } = options,
+      most = 0.5 / (2 * Math.PI * dt);
+    if (!(frequency > 0 && frequency <= most))
+      throw invalidRod(
+        `A rod target's frequency is above 0 and at most ${most.toFixed(2)} Hz at this world's step (got ${frequency}); pass one in range.`,
+      );
+    const omega = 2 * Math.PI * frequency;
+    if (!(damping >= 0 && 2 * damping * omega * dt <= 1))
+      throw invalidRod(
+        `A rod target's damping is 0 or more and at most ${(1 / (2 * omega * dt)).toFixed(2)} at this frequency and step (got ${damping}); pass one in range.`,
+      );
+    const n = this.segments.length,
+      nodes = resample(points, n),
+      centres = new Float64Array(3 * n);
+    if (!(length(sub(nodes[n]!, nodes[0]!)) > 0 || nodes.some((node) => length(sub(node, nodes[0]!)) > 0)))
+      throw invalidRod('A rod target has no length: its points are all one; pass a shape along the rod.');
+    for (let i = 0; i < n; i++)
+      for (let a = 0; a < 3; a++) centres[3 * i + a] = (nodes[i]![a]! + nodes[i + 1]![a]!) / 2;
+    this.target = centres;
+    this.targetOmega = omega;
+    this.targetZeta = damping;
+    for (const body of this.segments) if (body.sleeping) body.wakeUp();
+    return this;
+  }
+
+  /** The target's springs on each link for the step, added to what `held6` holds. */
+  private applyTarget(): void {
+    const target = this.target!,
+      held = this.held6,
+      w = this.targetOmega,
+      stiff = w * w,
+      damp = 2 * this.targetZeta * w;
+    for (let i = 0; i < this.segments.length; i++) {
+      const body = this.segments[i]!;
+      if (!body.valid) continue;
+      const m = body.mass,
+        c = body.worldCenterOfMass,
+        v = body.linearVelocity,
+        force: V = [0, 0, 0];
+      for (let a = 0; a < 3; a++) force[a] = m * (stiff * (target[3 * i + a]! - c[a]!) - damp * v[a]!);
+      held[6 * i] += force[0];
+      held[6 * i + 1] += force[1];
+      held[6 * i + 2] += force[2];
+      body.addForce(force, undefined, true);
+    }
+  }
+
   /** False after `remove()`. */
   get valid(): boolean {
     return !this.removed;
@@ -469,8 +550,13 @@ export class Rod implements PhysicsAttachment {
    * tree solves implicitly with the rod's springs (kernel FLOW_X and DRAG_ACROSS).
    */
   beforeStep(dt: number): void {
-    const loads = this.loads;
-    if (!loads || this.removed) return;
+    if (this.removed) return;
+    if (this.loads) this.applyLoads(this.loads, dt);
+    if (this.target) this.applyTarget();
+  }
+
+  /** The loads provider's forces on each link for the step, held in `held6` for `afterStep` to take off. */
+  private applyLoads(loads: SegmentLoads, dt: number): void {
     const g = this.owner.gravity,
       columns = this.owner.kernel.columns,
       l = this.segmentLength;
@@ -558,7 +644,7 @@ export class Rod implements PhysicsAttachment {
 
   /** @internal Takes off the water's forces of the step just taken. */
   afterStep(): void {
-    if (!this.loads || this.removed) return;
+    if (this.removed) return;
     const held = this.held6;
     for (let i = 0; i < this.segments.length; i++) {
       const k = i * 6;

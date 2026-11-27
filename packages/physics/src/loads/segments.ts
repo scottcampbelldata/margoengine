@@ -8,8 +8,8 @@
 //
 // Each segment's wake oscillator is driven by the segment's own acceleration across the flow (Facchinetti, de Langre and
 // Biolley 2004, eq. 2, A = 12), so a cable free across a flow locks onto its own frequency.
-import type { FlowField, FlowSample } from '@margoengine/math/fields';
-import { hypot } from '@margoengine/math/pinned';
+import type { FlowCell, FlowField, FlowSample } from '@margoengine/math/fields';
+import { atan2, cos, hypot, sin } from '@margoengine/math/pinned';
 import { invalidLoad } from './errors.js';
 import { cylinderCoefficients, reynoldsDrag, tangentialDrag, wakeStep } from './morison.js';
 import { SEA_WATER_VISCOSITY, type LoadWater } from './solver.js';
@@ -281,4 +281,130 @@ export function segmentLoads(sea: LoadWater, options: SegmentLoadOptions = {}): 
       throw invalidLoad("Segment loads' vortex takes a Strouhal number above 0 and a lift of 0 or more; pass them.");
   }
   return new Provider(sea, options);
+}
+
+/** Air at sea level in the International Standard Atmosphere (15 C): density, kg/m^3, and kinematic viscosity, m^2/s. */
+export const STANDARD_AIR = Object.freeze({ density: 1.225, viscosity: 1.4607e-5 });
+
+/** Options of {@link segmentAirLoads}: those of the water's loads, and the air's density. */
+export interface SegmentAirLoadOptions extends SegmentLoadOptions {
+  /** Air density, kg/m^3 (default 1.225, the standard atmosphere at sea level). */
+  readonly density?: number;
+}
+
+/**
+ * The air's loads on a rod's segments: cables, rigging, vines and grass in the wind. The same loads as {@link segmentLoads}
+ * in a medium with no surface: each segment's drag across and along by its Reynolds number (a cable at 10 m/s and 1 cm is
+ * at Re 7,000), the air's added mass and buoyancy (a millionth of a rope's own, kept for honesty), and vortex lift at the
+ * Strouhal frequency, which makes a taut wire sing (aeolian vibration). `air` is a wind field (medium `'air'`), such as an
+ * ATMO wind; its velocity is sampled at each segment. Steady air by default (`period: Infinity`), air's viscosity.
+ * @throws MargoError (code `unsupported`) for a field that is not air, or an option out of range, naming the fix.
+ */
+export function segmentAirLoads(air: FlowField, options: SegmentAirLoadOptions = {}): SegmentLoads {
+  if (!air || typeof air.sample !== 'function' || air.medium !== 'air')
+    throw invalidLoad("Segment air loads need a wind: pass a FlowField of medium 'air' (an ATMO wind or your own).");
+  const { density = STANDARD_AIR.density, ...rest } = options;
+  if (!(density > 0 && Number.isFinite(density)))
+    throw invalidLoad(`The air's density is above 0 (got ${density}); pass kg/m^3, or leave it out for 1.225.`);
+  return segmentLoads(
+    // The loads only sample the medium's velocity and density, so a wind stands where the water would, under a surface
+    // a light year up (finite, as the water's acceleration needs, and above anything a scene holds).
+    { density, elevation: () => 9.46e15, water: air as unknown as LoadWater['water'] },
+    { period: Number.POSITIVE_INFINITY, viscosity: STANDARD_AIR.viscosity, ...rest },
+  );
+}
+
+/** Options of {@link swayFlow}. */
+export interface SwayOptions {
+  /** The sway's peak speed, m/s. */
+  readonly speed: number;
+  /** The slowest gust's period, s (default 6); two faster ones ride on it at 0.53 and 0.29 of it. */
+  readonly period?: number;
+  /** The seed: the same seed gives the same sway, bit for bit (default 1). */
+  readonly seed?: number;
+  /** The direction it sways along, horizontal (default [1, 0, 0]); each gust turns up to 30 degrees off it. */
+  readonly direction?: readonly [number, number, number];
+  /** The distance over which the sway's phase turns once, m (default 30): neighbouring stalks sway nearly together. */
+  readonly wavelength?: number;
+  /** What it moves (default 'water'): it only adds to the loads' flows, which take any medium. */
+  readonly medium?: 'air' | 'water';
+}
+
+/** Mulberry32 (Tommy Ettinger, 2017): a 32-bit generator of integer operations only, the same on every engine. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A seeded sway: a director's flow that moves kelp, grass, vines and hanging cables gently and never the same way twice,
+ * for {@link SegmentLoadOptions.flows} (on a rod's water or air loads). Three gusts of falling weight (0.6, 0.3, 0.1 of
+ * `speed`), periods `period`, 0.53 and 0.29 of it (no common beat), each turned off `direction` and phased by the seed, and
+ * each travelling along its direction with a `wavelength`, so a field of stalks sways as a wave crosses it. Its mean is
+ * zero: it sways about the flow the scene already has. It is film direction, not a measured gust spectrum.
+ * @throws MargoError (code `unsupported`) for a speed, period, wavelength or direction out of range.
+ */
+export function swayFlow(options: SwayOptions): FlowField {
+  const {
+    speed,
+    period = 6,
+    seed = 1,
+    direction = [1, 0, 0],
+    wavelength = 30,
+    medium = 'water',
+  } = options ?? ({} as SwayOptions);
+  if (!(speed >= 0 && Number.isFinite(speed)))
+    throw invalidLoad(`A sway's speed is 0 or more m/s (got ${speed}); pass one.`);
+  if (!(period > 0 && Number.isFinite(period)))
+    throw invalidLoad(`A sway's period is above 0 s (got ${period}); pass one.`);
+  if (!(wavelength > 0))
+    throw invalidLoad(`A sway's wavelength is above 0 m (got ${wavelength}); pass one, or Infinity.`);
+  const across = hypot(direction[0], 0, direction[2]);
+  if (!(across > 0)) throw invalidLoad('A sway moves along a horizontal direction; pass one with an x or z part.');
+  const random = seeded(Number.isSafeInteger(seed) ? seed : 1),
+    base = atan2(direction[2], direction[0]),
+    gusts = [0.6, 0.3, 0.1].map((weight, k) => {
+      const angle = base + (random() * 2 - 1) * (Math.PI / 6),
+        dx = cos(angle),
+        dz = sin(angle);
+      return {
+        weight: weight * speed,
+        omega: (2 * Math.PI) / (period * [1, 0.53, 0.29][k]!),
+        phase: random() * 2 * Math.PI,
+        dx,
+        dz,
+        k: (2 * Math.PI) / wavelength,
+      };
+    });
+  const cell: FlowCell = [0, 0, 0];
+  return {
+    medium,
+    cell,
+    sample(
+      x: number,
+      _y: number,
+      z: number,
+      t: number,
+      out: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 },
+    ) {
+      let u = 0,
+        w = 0;
+      for (const g of gusts) {
+        const v = g.weight * sin(g.omega * t + g.phase - g.k * (g.dx * x + g.dz * z));
+        u += v * g.dx;
+        w += v * g.dz;
+      }
+      out.velocity[0] = u;
+      out.velocity[1] = 0;
+      out.velocity[2] = w;
+      out.density = 0;
+      out.temperature = 0;
+      return out;
+    },
+  };
 }

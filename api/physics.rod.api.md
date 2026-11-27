@@ -16,6 +16,7 @@ export class Rod implements PhysicsAttachment {
         readonly axial: number;
     };
     constructor(owner: Physics, options: RodOptions);
+    setTarget(points: readonly Vec3[] | null, options?: RodTargetOptions): this;
     get valid(): boolean;
     held(end: RodEnd): boolean;
     release(end: RodEnd): this;
@@ -53,6 +54,11 @@ export interface RodOptions {
     time?: number;
     collider?: Omit<ColliderSettings, 'offset' | 'rotation' | 'density' | 'mass' | 'massProperties'>;
     body?: Omit<BodyOptions, 'type' | 'position' | 'rotation' | 'colliders'>;
+}
+
+export interface RodTargetOptions {
+    frequency?: number;
+    damping?: number;
 }
 
 // Not exported from this entry, but used by the exports above:

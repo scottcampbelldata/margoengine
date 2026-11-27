@@ -17147,3 +17147,19 @@ were checked against those figures; Table 6's printed "(log R_n - 301)" is read 
 as the figures need. No B-series code was read. Fitting MMG's quadratics by least squares between bollard pull and zero
 thrust is this package's own. Proof: `packages/physics/tests/ship.test.js`, "a Wageningen B-series propeller's open water".
 
+
+## physics rods in air, direction and work counts (2026-11-27)
+
+Files: `packages/physics/src/loads/segments.ts` (`segmentAirLoads`, `swayFlow`), `packages/physics/src/rod/index.ts`
+(`setTarget`). No rival engine source and no paper's companion code was read.
+
+- The independence (cross-flow) principle for an inclined cylinder (S. F. Hoerner, *Fluid-Dynamic Drag*, 1965, chapter 3):
+  the drag across is the cylinder's at the flow's part across it. Used for the test's closed form of a cable hanging in a
+  uniform wind, w sin(theta) = 1/2 rho C_D D (U cos theta)^2, a straight line because every load on it is uniform.
+- International Standard Atmosphere (ISO 2533:1975), sea level at 15 C: density 1.225 kg/m^3 and kinematic viscosity
+  1.4607e-5 m^2/s.
+- Mulberry32, a 32-bit generator of integer operations (T. Ettinger, 2017; public domain description). Used for the sway's
+  seeded phases and headings, so a seed gives the same bits on every engine.
+- Own derivations: the target pull as a spring of natural frequency w and damping ratio zeta on each link's own mass, so a
+  rod pulled as a whole moves as one critically damped mass, d (1 - (1 + w t) e^(-w t)); the step bound 2 pi f dt <= 0.5 for
+  a force held over a step; the rod's work counts, 2n - 3 pairs looked at and n joints for n links.
