@@ -326,8 +326,6 @@ function readFloat(data: DataView, at: number, bits: number, little: boolean): n
   return h & 0x8000 ? -v : v;
 }
 
-const SIZES = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8];
-
 const refuse = (what: string): Error =>
   decodeFailed(`TIFF ${what} is not supported; save the image as baseline 8-bit, 16-bit or float RGB, grey or palette`);
 
@@ -548,39 +546,10 @@ export function parseTIFF(bytes: Uint8Array, options: TIFFOptions = {}): Decoded
     codecs = options.codecs ?? {};
   if (!(Number.isSafeInteger(maxPixels) && maxPixels > 0))
     throw new RangeError('TIFF maxPixels must be a positive integer');
-  const little = bytes[0] === 0x49 && bytes[1] === 0x49,
-    view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (bytes.length < 8 || (!little && !(bytes[0] === 0x4d && bytes[1] === 0x4d)) || view.getUint16(2, little) !== 42)
-    throw corrupt('header is missing');
-  const u16 = (at: number) => view.getUint16(at, little),
-    u32 = (at: number) => view.getUint32(at, little),
-    ifd = u32(4);
-  if (ifd + 2 > bytes.length) throw corrupt('first IFD offset is past the end');
-  const entries = u16(ifd),
-    tags = new Map<number, number[]>();
-  if (ifd + 2 + entries * 12 > bytes.length) throw corrupt('IFD runs past the end');
-  for (let e = 0; e < entries; e++) {
-    const at = ifd + 2 + e * 12,
-      type = u16(at + 2),
-      count = u32(at + 4),
-      size = SIZES[type] ?? 0;
-    // Only BYTE, SHORT, LONG, RATIONAL and UNDEFINED fields are read; others (ASCII, signed, ...) are skipped.
-    if (![1, 3, 4, 5, 7].includes(type)) continue;
-    const offset = size * count > 4 ? u32(at + 8) : at + 8;
-    if (offset + size * count > bytes.length) throw corrupt(`tag ${u16(at)} runs past the end`);
-    tags.set(
-      u16(at),
-      Array.from({ length: count }, (_, i) =>
-        type === 1 || type === 7
-          ? bytes[offset + i]
-          : type === 3
-            ? u16(offset + i * 2)
-            : type === 4
-              ? u32(offset + i * 4)
-              : u32(offset + i * 8) / u32(offset + i * 8 + 4),
-      ),
-    );
-  }
+  const {
+    little,
+    directories: [tags],
+  } = scanTIFF(bytes, true);
   const tag = (id: number, fallback?: number): number => {
     const value = tags.get(id)?.[0] ?? fallback;
     if (value === undefined) throw corrupt(`required tag ${id} is missing`);

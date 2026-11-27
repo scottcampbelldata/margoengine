@@ -56,11 +56,50 @@ function bmp() {
   bytes.set(bgr.slice(6), 62);
   return bytes;
 }
+/**
+ * The same 2 x 2 RGB image as a BigTIFF (libtiff, "The BigTIFF File Format"): version 43, 8-byte offsets, 20-byte
+ * entries, and the strip's offset and length as LONG8 (type 16). `little` picks the byte order.
+ */
+function bigTIFF(little) {
+  const entries = [
+      [256, 3, 1, 2],
+      [257, 3, 1, 2],
+      [258, 3, 3, [8, 8, 8]],
+      [259, 3, 1, 1],
+      [262, 3, 1, 2],
+      [273, 16, 1, 0],
+      [277, 3, 1, 3],
+      [278, 3, 1, 2],
+      [279, 16, 1, rgb.length],
+    ],
+    ifd = 16,
+    pixels = ifd + 8 + entries.length * 20 + 8,
+    bytes = new Uint8Array(pixels + rgb.length),
+    view = new DataView(bytes.buffer);
+  bytes.set(little ? [0x49, 0x49] : [0x4d, 0x4d]);
+  view.setUint16(2, 43, little);
+  view.setUint16(4, 8, little);
+  view.setBigUint64(8, BigInt(ifd), little);
+  view.setBigUint64(ifd, BigInt(entries.length), little);
+  entries.forEach(([tag, type, count, value], i) => {
+    const at = ifd + 8 + i * 20;
+    view.setUint16(at, tag, little);
+    view.setUint16(at + 2, type, little);
+    view.setBigUint64(at + 4, BigInt(count), little);
+    if (type === 16) view.setBigUint64(at + 12, BigInt(tag === 273 ? pixels : value), little);
+    // Three SHORTs fit the 8-byte value field.
+    else [value].flat().forEach((v, k) => view.setUint16(at + 12 + k * 2, v, little));
+  });
+  bytes.set(rgb, pixels);
+  return bytes;
+}
 const channel = (c) => [0, 1, 2, 3].map((i) => rgb[i * 3 + c]);
 const files = {
   png: png(),
   bmp: bmp(),
   tiff: tiff({ width: 2, height: 2, spp: 3, bits: 8, photometric: 2, samples: rgb }),
+  BigTIFF: bigTIFF(true),
+  'big-endian BigTIFF': bigTIFF(false),
   'float tiff': tiff({
     ...{ width: 2, height: 2, spp: 3, bits: 32, float: true, photometric: 2 },
     samples: rgb.map((v) => v / 255),
@@ -127,6 +166,22 @@ test('ImageDecoder reads JPEG 2000, a raw codestream and a JP2 file', async () =
   }
 });
 
+test('ImageDecoder reads a BigTIFF tifffile wrote, 16-bit samples scaled to bytes', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const bytes = new Uint8Array(
+    await readFile(
+      new URL('../../decoders/tests/fixtures/tiff-scientific/big-le-uint16-lzw-tile.tif', import.meta.url),
+    ),
+  );
+  const image = await decode(bytes, 'Grayscale');
+  assert.deepEqual(image.shape, [19, 21, 1]);
+  // The first page as the fixture was written: pixel i holds (i * 31 + 50000) modulo 2^16.
+  assert.deepEqual(
+    [...image.data],
+    Array.from({ length: 19 * 21 }, (_, i) => Math.round((((i * 31 + 50000) % 65536) * 255) / 65535)),
+  );
+});
+
 test('ImageDecoder gives an empty matrix for a stream it cannot decode', async () => {
   const damaged = [
     new Uint8Array(0),
@@ -142,13 +197,7 @@ test('ImageDecoder gives an empty matrix for a stream it cannot decode', async (
   assert.deepEqual((await decode(damaged[1], 'Grayscale')).shape, [0, 0, 1]);
 });
 
-test('ImageDecoder refuses unread formats, bad attributes, types and old opsets', async () => {
-  const unsupported = (bytes, pattern) =>
-    assert.rejects(
-      decode(Uint8Array.from(bytes)),
-      (error) => error.code === 'unsupported' && pattern.test(error.message),
-    );
-  await unsupported([0x49, 0x49, 43, 0, 8, 0, 0, 0], /BigTIFF/);
+test('ImageDecoder refuses bad attributes, types and old opsets', async () => {
   await assert.rejects(decode(files.png, 'rgb'), /pixel_format/);
   await assert.rejects(decode(files.png, 'RGB', 20, [p.attr('extra', 1)]), /pixel_format/);
   await assert.rejects(decode(files.png, 'RGB', 19), /ImageDecoder/);

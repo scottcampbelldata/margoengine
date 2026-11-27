@@ -71,8 +71,8 @@ reader, which has its own proof.
 
 | Point of the specification | Margo |
 | --- | --- |
-| BMP, JPEG, TIFF, PNG, WebP, PNM | read (classic TIFF only; PBM, PGM, PPM) |
-| JPEG 2000 | not built: rejects with code `unsupported` |
+| BMP, JPEG, TIFF, PNG, WebP, PNM | read (classic TIFF and BigTIFF's 64-bit offsets, 2026-11-27; PBM, PGM, PPM) |
+| JPEG 2000 | read through `decoders/jpeg2000` (2026-11-27); not checked against the conformance corpus (docs/limits.md) |
 | Lossless JPEG (optional) | read |
 | A stream that cannot be decoded | empty matrix `[0, 0, channels]` |
 | Grayscale weights | none given; Rec. ITU-R BT.601 luma, https://www.itu.int/rec/R-REC-BT.601 |

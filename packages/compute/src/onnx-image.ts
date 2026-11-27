@@ -1,7 +1,6 @@
 // ai.onnx ImageDecoder (opset 20, https://onnx.ai/onnx/operators/onnx__ImageDecoder.html). The stream's own signature
 // picks a reader of @margoengine/decoders, an optional peer that loads only when a model decodes that format. The grey
 // weights are the luma of Rec. ITU-R BT.601 (https://www.itu.int/rec/R-REC-BT.601); the operator names none.
-import { fault } from '../../shared/errors.js';
 
 /** What ImageDecoder returns: bytes in height, width, channel order. */
 export interface ImagePixels {
@@ -15,13 +14,6 @@ interface Rgba {
 }
 type Reader = (bytes: Uint8Array) => Rgba;
 
-const unsupported = (what: string) =>
-  fault(
-    'unsupported',
-    `ONNX ImageDecoder does not read ${what}; convert the image to PNG, JPEG, JPEG 2000, WebP, BMP, TIFF or PNM`,
-    'compute',
-  );
-
 /** The reader for a stream's signature, loaded on demand; undefined when the bytes are no image format the operator names. */
 async function reader(bytes: Uint8Array): Promise<Reader | undefined> {
   const starts = (...signature: number[]) => signature.every((v, i) => bytes[i] === v);
@@ -33,8 +25,13 @@ async function reader(bytes: Uint8Array): Promise<Reader | undefined> {
   if (starts(0x52, 0x49, 0x46, 0x46) && String.fromCharCode(...bytes.subarray(8, 12)) === 'WEBP')
     return (await import('@margoengine/decoders/webp')).parseWebP;
   if (starts(0x42, 0x4d)) return (await import('@margoengine/decoders/bmp')).parseBMP;
-  if (starts(0x49, 0x49, 43, 0) || starts(0x4d, 0x4d, 0, 43)) throw unsupported('BigTIFF');
-  if (starts(0x49, 0x49, 42, 0) || starts(0x4d, 0x4d, 0, 42)) {
+  // Version 42 is classic TIFF; 43 is BigTIFF, whose offsets are 64-bit.
+  if (
+    starts(0x49, 0x49, 42, 0) ||
+    starts(0x4d, 0x4d, 0, 42) ||
+    starts(0x49, 0x49, 43, 0) ||
+    starts(0x4d, 0x4d, 0, 43)
+  ) {
     const [{ parseTIFF }, { loadTIFFCodecs }] = await Promise.all([
       import('@margoengine/decoders/tiff'),
       import('@margoengine/decoders/tiff-codecs'),

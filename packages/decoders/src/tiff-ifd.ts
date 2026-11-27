@@ -8,8 +8,11 @@ export const corrupt = (problem: string): Error =>
 /** ASCII tags kept per directory besides ImageDescription's own `descriptions`: GeoAsciiParams, GDAL_METADATA, GDAL_NODATA. */
 const KEPT_ASCII = new Set([270, 34737, 42112, 42113]);
 
-/** Every directory of a classic TIFF or BigTIFF file, bounded and cycle-checked. */
-export function scanTIFF(bytes: Uint8Array) {
+/**
+ * Every directory of a classic TIFF or BigTIFF file, bounded and cycle-checked; with `firstOnly`, the first alone,
+ * reading nothing after its entries.
+ */
+export function scanTIFF(bytes: Uint8Array, firstOnly = false) {
   const little = bytes[0] === 73 && bytes[1] === 73;
   if (bytes.length < 8 || (!little && !(bytes[0] === 77 && bytes[1] === 77))) throw corrupt('header is missing');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -65,9 +68,10 @@ export function scanTIFF(bytes: Uint8Array) {
   while (ifd) {
     if (seen.has(ifd)) throw corrupt('cyclic IFD chain');
     seen.add(ifd);
+    if (ifd + head > bytes.length) throw corrupt(`${directories.length ? 'IFD' : 'first IFD'} offset is past the end`);
     const count = bigTIFF ? u64(ifd) : u16(ifd),
       tags = new Map<number, number[]>();
-    bound(ifd + head, count * stride + inline);
+    if (ifd + head + count * stride + (firstOnly ? 0 : inline) > bytes.length) throw corrupt('IFD runs past the end');
     let description = '';
     const ascii = new Map<number, string>();
     for (let e = 0; e < count; e++) {
@@ -79,7 +83,7 @@ export function scanTIFF(bytes: Uint8Array) {
       if (!size) continue;
       const slot = at + (bigTIFF ? 12 : 8),
         offset = n * size <= inline ? slot : pointer(slot);
-      bound(offset, n * size);
+      if (offset + n * size > bytes.length) throw corrupt(`tag ${id} runs past the end`);
       if (type === 2) {
         if (KEPT_ASCII.has(id)) {
           const text = new TextDecoder().decode(bytes.subarray(offset, offset + n));
@@ -123,6 +127,7 @@ export function scanTIFF(bytes: Uint8Array) {
     directories.push(tags);
     descriptions.push(description);
     asciiTags.push(ascii);
+    if (firstOnly) break;
     ifd = pointer(ifd + head + count * stride);
   }
   if (!directories.length) throw corrupt('no image directories');

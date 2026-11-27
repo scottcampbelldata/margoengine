@@ -245,8 +245,11 @@ test('TIFF refuses truncated and malformed headers, IFDs and strips, oversized i
   bom[1] = 0x4d;
   failed(() => parseTIFF(bom), /header is missing/);
   const magic = grey();
+  magic[2] = 44;
+  failed(() => parseTIFF(magic), /version is invalid/);
+  // Version 43 is BigTIFF, which a classic body does not hold.
   magic[2] = 43;
-  failed(() => parseTIFF(magic), /header is missing/);
+  failed(() => parseTIFF(magic), /BigTIFF offset layout is invalid/);
   const ifdPast = grey();
   new DataView(ifdPast.buffer).setUint32(4, ifdPast.length, true);
   failed(() => parseTIFF(ifdPast), /first IFD offset is past the end/);
@@ -571,8 +574,9 @@ test('TIFF refuses malformed and unsupported files with named errors', () => {
   assert.throws(() => parseTIFF(good, { maxPixels: 3 }), RangeError);
   failed(() => parseTIFF(good.subarray(0, 6)), /header is missing/);
   const notTiff = good.slice();
-  notTiff[2] = 43;
-  failed(() => parseTIFF(notTiff), /header is missing/);
+  // 42 is classic TIFF and 43 BigTIFF; no other version exists.
+  notTiff[2] = 44;
+  failed(() => parseTIFF(notTiff), /version is invalid/);
   failed(
     () =>
       parseTIFF(tiff({ width: 2, height: 2, spp: 1, bits: 8, photometric: 1, compression: 9, samples: [1, 2, 3, 4] })),

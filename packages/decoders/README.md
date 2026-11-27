@@ -373,7 +373,8 @@ Four small synchronous readers, each its own entry and each written from its pub
   types 1, 2, 3 and their RLE forms 9, 10, 11; 8-, 15-, 16-, 24- and 32-bit pixels; colour maps of 15 to 32 bits;
   any origin corner; alpha from the descriptor bits, with a TGA 2.0 extension area's "no alpha" honoured and
   premultiplied alpha divided out.
-- `parseTIFF(bytes, {maxPixels?, codecs?, keep16Bit?})` reads the first image: little- or big-endian, strips or tiles,
+- `parseTIFF(bytes, {maxPixels?, codecs?, keep16Bit?})` reads the first image of a classic TIFF or a BigTIFF (64-bit
+  offsets, [libtiff's BigTIFF description](https://libtiff.gitlab.io/libtiff/specification/bigtiff.html)): little- or big-endian, strips or tiles,
   uncompressed, LZW (with Predictor 2 at 8 and 16 bits), PackBits, Deflate, LZMA, Zstandard and WebP (lossless and
   lossy, 8-bit RGB or RGBA; these three through `codecs`, see `loadTIFFCodecs` below) as libtiff writes them, CCITT
   bilevel coding (Modified Huffman, Group 3 one- and two-dimensional with or without byte-aligned EOLs, Group 4, the
