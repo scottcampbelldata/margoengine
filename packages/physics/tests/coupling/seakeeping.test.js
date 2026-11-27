@@ -6,8 +6,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { hostMath } from '../../../../scripts/check-pinned-math.mjs';
 import { Physics } from '../../dist/index.js';
-import { FiniteQuayWake } from '../../dist/loads.js';
+import { finiteQuayPointSource, FiniteQuayWake } from '../../dist/loads.js';
 import {
+  bakeWakeAdvancePoints,
   bakeWakeWaterplane,
   GRAVITY,
   hullMemory,
@@ -2736,14 +2737,25 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
       linearVelocity: [1.25, 0, 0],
       colliders: { shape: 'convexHull', points: mesh.vertices, mass: 2400 },
     });
-    const hull = new HullSolver('hull', { minimumRadius: 0.25, submergedAdvance: [0, 0.25, 0.55] });
+    const points = finite ? finiteQuayPointSource('hull.advancingPoints') : undefined;
+    const hull = new HullSolver(
+      'hull',
+      points ? { minimumRadius: 0.25, pointAdvance: points } : { minimumRadius: 0.25, submergedAdvance: [0, 0.25, 0.55] },
+    );
     const cells = [48, 32],
       cellSize = 0.25;
     const wake = finite
-      ? new FiniteQuayWake('wake', { surface: hull.wakeSourceField, submerged: hull.submergedWakeSource })
+      ? new FiniteQuayWake('wake', { surface: hull.wakeSourceField, points })
       : new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
+    const waterline = stillWaterline(mesh, body.mass, density);
     const wakeWaterplane = finite
-      ? { plane: bakeWakeWaterplane(mesh, stillWaterline(mesh, body.mass, density), { maxPanelSize: 0.5 }), radius: 0.15 }
+      ? { plane: bakeWakeWaterplane(mesh, waterline, { maxPanelSize: 0.5 }), radius: 0.15 }
+      : undefined;
+    const wakeAdvancePoints = finite
+      ? {
+          geometry: bakeWakeAdvancePoints(mesh, waterline, { depths: [0, 0.25, 0.75], panelSizes: [0.25, 0.5] }),
+          radius: 0.15,
+        }
       : undefined;
     const sea = finite ? wake.seaSurface() : new SpectralSea({
       waves: {
@@ -2758,7 +2770,7 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
     world
       .add(new RigidSolver(), { physics })
       .add(hull, {
-        hulls: [{ row: body.row, mesh, wakeWaterplane }],
+        hulls: [{ row: body.row, mesh, wakeWaterplane, wakeAdvancePoints }],
         sea,
         radiation: false,
         addedMass: false,

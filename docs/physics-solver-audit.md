@@ -1473,6 +1473,15 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   verifies the closed upper neighbour, signed volume, work and the coded error below the bed. Both memory
   modes replay exactly. This replaces uniform-depth band smearing for compatible finite-domain publishers.
 
+  `coupling/loads-wake-advance-points.test.js` checks the live producer through the same finite receiver.
+  The point bake separates signs within a cell and preserves signed longitudinal area and three first
+  moments. During the archived shutters its 9,077 point rows preserve the signed volume and moment
+  sums to 4.8×10⁻¹² in the scene's SI units. An independent mesh integral gives at most 4.7935% complex
+  error across six original modes before receiver projection. Including independent discretized depth
+  and horizontal transfer gives 4.8992% at 0.025 m and 6.4490% at 0.075 m. The code-built and GLB hull
+  test also uses the point publisher. These are source checks. The full quay replay still needs a
+  spatially converged propagation solve.
+
   The [local oblique-packet comparison](../packages/physics/scripts/measure-finite-quay-local-packet.mjs)
   launches a 1.29 m carrier 1.84 m from the surveyed 5.72 m aperture. At 0.15 m resolution with both
   fourth-order options, the 9 m crop's surface trace differs by up to 13 nm between an open and sealed

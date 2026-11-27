@@ -18076,6 +18076,14 @@ the surface flux with the same weighted depth values. The mode test uses the
 uniform-layer normal mode and its Neumann bed as an independent reference.
 [Bao et al. (2017), §2](https://arxiv.org/abs/1701.07169)
 
+The point publisher clips the mesh's wetted faces at the reference depth edges and each XZ bin.
+It integrates the signed X component of panel area and its first moments. For each sign within a
+bin, the centroid preserves the integrated longitudinal displacement and all three first moments.
+Multiply the signed area by through-water speed and step length for volume. This follows the
+normal component of the linear advancing-hull source distribution. The projection radius and
+receiving depth grid are separate numerical choices.
+[Zhang et al., Interference effects on the Kelvin wake of a monohull ship, 2015](https://doi.org/10.1016/j.euromechflu.2014.12.006)
+
 The reference hull waterplane cuts the indexed triangle mesh into exact spans between adjacent
 longitudinal knots. On each subdivided trapezoid use four-point Gauss–Legendre nodes in each
 direction on `[0,1]`. The change of coordinates includes the local trapezoid breadth. The affine

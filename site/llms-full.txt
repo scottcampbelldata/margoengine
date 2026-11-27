@@ -15443,13 +15443,19 @@ uses three f64 values per node for local X, Z and area. The copied bake is paire
 row per node. The existing advancing source keeps its own resolution. Use a radius supported by the chosen
 wake receiver and choose the spacing from the physical wavelengths. Changing the equilibrium mass or
 density can require a new bake. Large heel and changes of immersion need a live waterplane.
-The optional seakeeping entry measures 41,106 B gzip.
+The optional seakeeping entry measures 42,604 B gzip.
 
 The finite point-depth port stores signed cubic metres per row at a discrete depth coordinate. It
 linearly distributes the volume between the nearest wet depth samples, including the free surface.
 The last depth cell and closed neighbours take the whole local share. Inspect the still-water
 layer schedule and receiver spacing to resolve short vertical wavelengths. The band-based periodic
 receiver and matched guided-hull operators use their existing source ports.
+
+`Hull.wakeAdvancePoints` pairs with `HullSolver`'s optional `pointAdvance` field. The bake stores
+four f64 values per centroid. The live port stores five f64 values per row and retains signed area
+and first moments within each bin. Choose panel sizes and depth edges from the wavelengths and draft.
+The same reference hull contributes heave, roll and pitch through its separate waterplane field.
+Large immersion changes require a new reference or a live wetted surface.
 
 Water's optional wake entry draws the rigid wet mask and the finite-domain heights from the same source.
 The mask is fixed per attachment and occupies one u32 per cell on the GPU. The surface reconstruction

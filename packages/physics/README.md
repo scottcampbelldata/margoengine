@@ -5719,6 +5719,53 @@ world.advance(4);
 console.log(wake.work().displacedVolume); // about 0.002 m³
 ```
 
+#### Bake a point-depth advancing hull
+
+A hull can publish these points from its indexed geometry. Use `bakeWakeAdvancePoints` at the hull's
+equilibrium waterline with positive receiver-independent `panelSizes` for each of its chosen depth
+intervals. The closed outward-wound mesh supplies the signed longitudinal area of its wet panels.
+Within each bin, centroids for positive and negative areas retain the net signed volume and its
+three first moments. `maxRows` is an optional bake budget. [Tuck, Scullen and Lazauskas (2000), Eq. 4](https://www.scullen.com.au/DSc/Publications/tuck_scullen_lazauskas_00e.pdf)
+
+Give the hull `wakeAdvancePoints: {geometry, radius}`. Pass the same descriptor to the hull
+solver as `pointAdvance` and to the finite receiver as `points`. Select one advancing source
+mode. The surface-motion field can still carry independent heave, roll and pitch. The projection
+radius controls deposition on the receiving grid. The bake controls geometry resolution.
+This is a linearized reference hull source. Point depths follow the equilibrium plane and the
+source's XZ positions follow the posed reference plane. Large immersion changes, large angles
+and changing wetted geometry require a live panel integration or a new settled reference.
+
+```ts
+import {boxGeometry} from 'margoengine/geometry';
+import {Physics} from 'margoengine/physics';
+import {finiteQuayPointSource, FiniteQuayWake} from 'margoengine/physics/loads';
+import {bakeWakeAdvancePoints, HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const density = 1024;
+const world = new PhysicsWorld({rate: {num: 60, den: 1}});
+using physics = new Physics(null, {arena: world.arena, fixedTimestep: 1 / 60, substeps: 1});
+const body = physics.addBody(null, {
+  linearVelocity: [1, 0, 0], colliders: {shape: 'box', halfExtents: [2, 1, 1], mass: 8 * density},
+});
+const box = boxGeometry(4, 2, 2);
+const mesh = {vertices: box.positions, indices: box.indices};
+const geometry = bakeWakeAdvancePoints(mesh, 0, {depths: [0, 0.25, 0.5, 1], panelSizes: [0.25, 0.25, 0.5]});
+const points = finiteQuayPointSource('ship.advancingPoints');
+const hull = new HullSolver('hull', {pointAdvance: points});
+const wake = new FiniteQuayWake('wake', {surface: hull.wakeSourceField, points});
+world.add(new RigidSolver(), {physics}).add(hull, {
+  hulls: [{row: body.row, mesh, wakeAdvancePoints: {geometry, radius: 0.25}}],
+  sea: {density, elevation: () => 0},
+  addedMass: false, radiation: false, rollDamping: false, drag: false, greenWater: false, slamming: false,
+}).add(wake, {
+  cells: [40, 24], cellSize: 0.25, origin: [-5, -3], depths: [0, 0.125, 0.25, 0.5, 1, 2], density,
+}).couple(['hull', 'wake', 'rigid'], 'staggered');
+world.advance(1);
+console.log(wake.energy() > 0); // true
+```
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.

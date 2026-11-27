@@ -99,6 +99,10 @@ export interface Hull {
         readonly plane: WakeWaterplane;
         readonly radius: number;
     };
+    readonly wakeAdvancePoints?: {
+        readonly geometry: WakeAdvancePoints;
+        readonly radius: number;
+    };
     readonly compartments?: readonly Compartment[];
     readonly openings?: readonly Opening[];
 }
@@ -195,6 +199,7 @@ export class HullSolver implements Solver<HullParams> {
     readonly id: string;
     readonly wakeSourceField: FieldDescriptor;
     readonly submergedWakeSource?: SubmergedWakeSource;
+    readonly pointWakeSource?: FieldDescriptor;
     constructor(id?: string, wake?: HullWake, crushDamage?: FieldDescriptor | undefined, girderSeams?: FieldDescriptor | undefined);
     static withShellApertures(field: FieldDescriptor, options?: {
         readonly id?: string;
@@ -228,6 +233,7 @@ export interface HullWake {
     readonly minimumRadius?: number;
     readonly advance?: boolean;
     readonly submergedAdvance?: readonly number[];
+    readonly pointAdvance?: FieldDescriptor;
 }
 
 export interface LateralSection {
@@ -324,6 +330,17 @@ export interface SlamStation {
 
 export type Vec3 = readonly [number, number, number];
 
+export interface WakeAdvancePointOptions {
+    readonly depths: readonly number[];
+    readonly panelSizes: readonly number[];
+    readonly maxRows?: number;
+}
+
+export interface WakeAdvancePoints {
+    readonly waterline: number;
+    readonly nodes: Float64Array;
+}
+
 export interface WakeWaterplane {
     readonly waterline: number;
     readonly nodes: Float64Array;
@@ -348,6 +365,8 @@ export interface WettedLoads {
 export function addedMassInfinite(sections: readonly Section[], centre: readonly [number, number, number], density: number): Float64Array;
 
 export function bakeHullPanels(mesh: HullMesh, options: HullPanelOptions): Promise<HullPanelResponse>;
+
+export function bakeWakeAdvancePoints(mesh: HullMesh, waterline: number, options: WakeAdvancePointOptions): WakeAdvancePoints;
 
 export function bakeWakeWaterplane(mesh: HullMesh, waterline: number, options: WakeWaterplaneOptions): WakeWaterplane;
 

@@ -53,3 +53,4 @@ export {
 } from './radiation.js';
 export { type HullMemory, hullMemory, type RadiationPair, stillWaterline } from './memory.js';
 export { bakeWakeWaterplane, type WakeWaterplane, type WakeWaterplaneOptions } from './wake-waterplane.js';
+export { bakeWakeAdvancePoints, type WakeAdvancePoints, type WakeAdvancePointOptions } from './wake-advance-points.js';

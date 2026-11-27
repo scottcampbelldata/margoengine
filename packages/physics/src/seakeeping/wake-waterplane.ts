@@ -1,4 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
+import { requireWakeHullMesh } from './wake-mesh.js';
 import type { HullMesh } from './wetted.js';
 
 // Four-point Gauss–Legendre on [0, 1], DLMF §3.5(v).
@@ -114,28 +115,7 @@ export function bakeWakeWaterplane(mesh: HullMesh, waterline: number, options: W
       'Bake a finite reference waterline with positive panel spacing and a whole row limit.',
     );
 
-  const { vertices, indices } = mesh ?? {};
-  if (
-    !vertices ||
-    !indices ||
-    !Number.isSafeInteger(vertices.length) ||
-    !Number.isSafeInteger(indices.length) ||
-    vertices.length < 9 ||
-    indices.length < 3 ||
-    vertices.length % 3 !== 0 ||
-    indices.length % 3 !== 0
-  )
-    throw new MargoError('state', 'Pass vertex triples and indexed triangles for the closed hull waterplane.');
-  for (let i = 0; i < vertices.length; i++) {
-    if (!Number.isFinite(vertices[i]))
-      throw new MargoError('state', 'Use finite hull coordinates before baking the waterplane.');
-  }
-  for (let i = 0; i < indices.length; i++) {
-    const vertex = indices[i]!;
-    if (!Number.isSafeInteger(vertex) || vertex < 0 || vertex >= vertices.length / 3)
-      throw new MargoError('state', 'Use triangle indices that select vertices in the supplied hull mesh.');
-  }
-  const strips = cutStrips(cutLines({ vertices, indices }, waterline), maxPanelSize);
+  const strips = cutStrips(cutLines(requireWakeHullMesh(mesh), waterline), maxPanelSize);
   const rows = strips.reduce((sum, { along, across }) => sum + along * across * NODES, 0);
   if (
     !Number.isSafeInteger(rows) ||

@@ -14551,6 +14551,11 @@
     },
     {
       "date": "2026-11-27",
+      "commit": "sea-12-point-depth-hull-publisher",
+      "reason": "SEA-12 signed indexed hull advancing points move the optional physics/seakeeping entry from 41106 to 42604 B gzip and its ceiling from 42340 to 43883 B. The producer reuses HullSolver state and rows, and the geometry bake shares the existing wake mesh validation. A split would add a second state and setup route for the same hull. Core and Stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
       "commit": "sea-12-reference-waterplane",
       "reason": "SEA-12 precise indexed reference waterplane and per-hull optional source rows move physics/seakeeping from 39456 to 41106 B gzip and its ceiling from 40620 to 42340 B. The bake and live publisher share mesh and wake layout validation in the same optional entry. A split would require callers to manage two independent wake imports. Core and Stage are unchanged."
     },
@@ -15537,7 +15542,7 @@
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 7880,
-    "@margoengine/physics/seakeeping": 42340,
+    "@margoengine/physics/seakeeping": 43883,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,
