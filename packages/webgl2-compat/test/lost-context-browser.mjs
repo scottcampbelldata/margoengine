@@ -91,6 +91,64 @@ try {
   assert.deepEqual(r.errors, [], 'no uncaptured error');
   assert.deepEqual(pageErrors, []);
   console.log('webgl2-compat: a lost WebGL2 context loses the device, with no layer fault and no validation error');
+
+  // KB-COMPAT-LOSSREPORT1: a real GPU reset. Chrome learns of it in the synchronous query that waited for it (a link,
+  // checkFramebufferStatus) but sets isContextLost() and fires webglcontextlost only in a later task, so a failure read
+  // before then was reported as the layer's own program that did not link or as an incomplete framebuffer. The GPU
+  // process of this browser is crashed (its own process, not the driver), then each device does its work in one
+  // synchronous block that ends with isContextLost() still false on every context.
+  await page.evaluate(async () => {
+    const { createCompatGPU } = await import('/packages/webgl2-compat/dist/device.js');
+    window.lossDevices = [];
+    for (let i = 0; i < 2; i++) {
+      const device = await (await createCompatGPU().requestAdapter()).requestDevice(),
+        errors = [];
+      device.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+      window.lossDevices.push({ device, errors });
+    }
+  });
+  const cdp = await page.context().browser().newBrowserCDPSession();
+  await cdp.send('Browser.crashGpuProcess');
+  const reset = await page.evaluate(async () => {
+    const [a, b] = window.lossDevices;
+    const out = {};
+    // The layer's own helper program, built after the reset.
+    try {
+      a.device.replayer.helper('gpu-reset-test', 'out vec4 c;\nvoid main() { c = vec4(1.0); }');
+      out.helperThrown = null;
+    } catch (e) {
+      out.helperThrown = String(e?.message ?? e);
+    }
+    // A render pass into a texture made after the reset: its framebuffer's completeness is read at the submit.
+    b.device.pushErrorScope('validation');
+    const target = b.device.createTexture({
+        size: [4, 4],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      }),
+      encoder = b.device.createCommandEncoder();
+    encoder
+      .beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store' }] })
+      .end();
+    b.device.queue.submit([encoder.finish()]);
+    const passScoped = b.device.popErrorScope();
+    out.lostAtEnd = [a, b].map((d) => d.device.gl.isContextLost());
+    out.passScoped = await passScoped.then((e) => e?.message ?? null);
+    const timeout = new Promise((r) => setTimeout(() => r(null), 5000));
+    out.lost = await Promise.all([a, b].map((d) => Promise.race([d.device.lost.then((l) => l.reason), timeout])));
+    // fixed-wait: observe any delayed uncaptured-error task after the devices have reported their loss.
+    await new Promise((r) => setTimeout(r, 50));
+    out.errors = [a, b].flatMap((d) => d.errors);
+    return out;
+  });
+  await cdp.detach();
+  assert.deepEqual(reset.lostAtEnd, [false, false], 'the work ran before isContextLost() showed the reset');
+  assert.equal(reset.helperThrown, null, "the layer's own helper program does not throw after a GPU reset");
+  assert.equal(reset.passScoped, null, 'a framebuffer made after a GPU reset is not reported as incomplete');
+  assert.deepEqual(reset.lost, ['unknown', 'unknown'], 'every device is lost');
+  assert.deepEqual(reset.errors, [], 'no uncaptured error');
+  assert.deepEqual(pageErrors, []);
+  console.log('webgl2-compat: a GPU reset before isContextLost() shows it loses the device, with no fault or error');
 } finally {
   await context.close();
 }

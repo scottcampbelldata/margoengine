@@ -200,6 +200,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   a lost context by contract. Proved on two real resets: a helper link and a render pass right after the reset (one
   with `isContextLost()` still false) threw nothing, raised no error, both scopes resolved `null` and `device.lost`
   resolved `'unknown'`. Regression: `packages/webgl2-compat/test/lost-report.test.js` (all four fail on the parent).
+  Since 2026-11-27 also in a real browser on every `test:gpu`: `packages/webgl2-compat/test/lost-context-browser.mjs`
+  crashes the browser's own GPU process (CDP `Browser.crashGpuProcess`, not a driver reset), builds a helper program
+  and a new framebuffer while `isContextLost()` is still false on both contexts, and checks that nothing throws, the
+  scope resolves `null`, both devices are lost (`'unknown'`) and no uncaptured error is raised (3 of 3 runs pass at
+  cd4508a015; the helper case threw the "did not link" fault before this fix).
 
 ### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
 

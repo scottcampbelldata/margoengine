@@ -2278,7 +2278,10 @@ live context is still reported. The adapter's capability probes (highp int, fres
 on the adapter's own new context and decide only workarounds for it; the preview renderer and `webglPicking` keep
 their contract (`failed` on a lost context). Evidence: lost-report.test.js (fails on the parent), lost-context-browser.mjs,
 compute-browser.mjs, and two real resets: a link and a render pass right after the reset, with isContextLost() still
-false, raised nothing and lost the device.
+false, raised nothing and lost the device. lost-context-browser.mjs repeats that on every test:gpu without a driver
+reset: it crashes the browser's own GPU process through CDP `Browser.crashGpuProcess` (Chrome, RTX A6000: the first
+link after it fails with an empty log, a new framebuffer reads 0x8cdd and isContextLost() stays false for the whole
+synchronous block).
 
 ## A new package brings its records (fast gate, 2026-11-16)
 
