@@ -27,6 +27,7 @@ import { applyView } from '../../shared/view-rect.js';
 import { reactiveBlend, reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
 import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import { surfacePass, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
+import { addAmbientVeil } from '../../shared/ambient-veil.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -738,6 +739,10 @@ export class VFX implements EnginePlugin {
     depthStencilAttachment: this.depthAttachment,
   };
   private readonly reactiveAttachments: GPURenderPassColorAttachment[] = [];
+  /** The last billboard pass, whose coverage an ambient replay of the same frame, view and depth veils. */
+  private readonly veiled: { encoder?: GPUCommandEncoder; depth?: GPUTextureView; view?: Context['view'] } = {};
+  private readonly ambientVeil = { veil: (c: Context, format: GPUTextureFormat) => this.veil(c, format) };
+  private leaveVeils?: () => void;
   private readonly reactivePass: GPURenderPassDescriptor = {
     colorAttachments: this.reactiveAttachments,
     depthStencilAttachment: this.depthAttachment,
@@ -1017,6 +1022,7 @@ export class VFX implements EnginePlugin {
       );
     this.engine = engine;
     this.device = engine.gpu;
+    this.leaveVeils = addAmbientVeil(this.device, this.ambientVeil);
     const limits = this.device.limits;
     if (
       this.capacity * 64 > limits.maxStorageBufferBindingSize ||
@@ -1426,7 +1432,12 @@ export class VFX implements EnginePlugin {
     pass.end();
   }
   /** The pipeline and group 0 of a draw into the frame, or with `hook` into its pass. */
-  private prepare(c: Context, hook?: SurfaceTransparency, reactive = false): [GPURenderPipeline, GPUBindGroup] {
+  private prepare(
+    c: Context,
+    hook?: SurfaceTransparency,
+    reactive = false,
+    veil?: GPUTextureFormat,
+  ): [GPURenderPipeline, GPUBindGroup] {
     if (this.renderFormat !== c.format || this.renderDepth !== c.descriptor.depthStencil!.format) {
       this.renderFormat = c.format;
       this.renderDepth = c.descriptor.depthStencil!.format;
@@ -1460,7 +1471,8 @@ export class VFX implements EnginePlugin {
       (fog ? ':fog' : '') +
       (samples ? ':soft' + samples : '') +
       (declarations ?? '') +
-      (reactive ? ':reactive' : '');
+      (reactive ? ':reactive' : '') +
+      (veil ? ':veil:' + veil : '');
     for (const r of this.runtimes) if (r.key) key += r.key(slot);
     let pipeline = this.renders.get(key);
     if (!pipeline) {
@@ -1491,9 +1503,10 @@ export class VFX implements EnginePlugin {
               ? [...hook.targets]
               : [
                   {
-                    format: c.format,
+                    format: veil ?? c.format,
+                    // A veil keeps 1 - alpha of what is under it and adds nothing (packages/shared/ambient-veil.js).
                     blend: {
-                      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                      color: { srcFactor: veil ? 'zero' : 'src-alpha', dstFactor: 'one-minus-src-alpha' },
                       alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
                     },
                   },
@@ -1552,7 +1565,32 @@ export class VFX implements EnginePlugin {
     else pass.drawIndirect(this.visible!, 0);
     pass.end();
     this.engine!.stats.drawCalls++;
+    const veiled = this.veiled;
+    veiled.encoder = c.encoder;
+    veiled.depth = c.depth;
+    veiled.view = c.view;
     this.drawReactive(c);
+  }
+  /**
+   * Draws this frame's billboards over an ambient replay's target (`c.color`, of `format`) as a veil: where a particle
+   * covers alpha of a pixel, that share of the light of the surface behind it leaves the target, so occlusion takes no
+   * more than the pixel holds (KB-SSAO-BLENDVEIL1). Only after this view's own billboard pass of the same frame.
+   */
+  private veil(c: Context, format: GPUTextureFormat): void {
+    const veiled = this.veiled;
+    if (!this.visible || c.encoder !== veiled.encoder || c.depth !== veiled.depth || c.view !== veiled.view) return;
+    const [pipeline, group] = this.prepare(c, undefined, false, format);
+    this.attachment.view = c.color;
+    this.depthAttachment.view = c.depth;
+    this.depthAttachment.stencilReadOnly = c.descriptor.depthStencil!.format.includes('stencil') ? true : undefined;
+    const pass = c.encoder.beginRenderPass(this.presentation);
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, group);
+    for (const r of this.runtimes) r.bind?.(pass, pipeline, 1);
+    applyView(pass, c);
+    if (this.route) pass.draw(3, this.capacity);
+    else pass.drawIndirect(this.visible, 0);
+    pass.end();
   }
   /**
    * The billboards' coverage into the frame's shared reactive mask, which TAA reads by itself (KB-TAA-PARTICLEMASK1):
@@ -1597,6 +1635,8 @@ export class VFX implements EnginePlugin {
     return { particles: this.particles, indirect: this.indirect, alive: this.alive, visible: this.visible };
   }
   private release(): void {
+    this.leaveVeils?.();
+    this.leaveVeils = this.veiled.encoder = this.veiled.depth = this.veiled.view = undefined;
     for (const runtime of this.runtimes) runtime.dispose?.();
     for (const buffer of [
       this.uniform,

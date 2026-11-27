@@ -5609,17 +5609,25 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   `Mesh & FacadeMesh` (the internal class and the public interface), so `setParent` accepts either. `examples/kitty-hawk`
   lost its cast. Regression: tests/public-engine-types.test.js (KB-GLTF-MESHTYPE1).
 
-### Open 2026-11-27: blended meshes and particles over a surface do not veil its ambient light (KB-SSAO-BLENDVEIL1, post, vfx)
+### Fixed 2026-11-27: particles blended over a surface did not veil its ambient light (KB-SSAO-BLENDVEIL1, post, vfx)
 
-- **Repro:** not reproduced yet; read from the code. Attach `GTAO` and draw dense dark smoke or a blended mesh in front
-  of an occluded wall, before the PostStack's composite: the composite takes the wall's whole ambient light times
-  (1 - visibility) out of the blended colour, as it did under grass (KB-SCENES-GRASSBLACK1). Measured on Fauld frame
-  fr096 (1920 x 1080, RTX A6000, WebGPU, one frozen instant): not seen there. Over the 576,068 pixels the smoke changes,
-  occlusion took 0.015 of 255 levels on average and 0.9 at most (0.023 and 2.9 with the smoke off), because the store
-  has almost no ambient light underground; the frame's flat black smoke was KB-FAULD-SMOKEBLACK1. A repro needs a
-  scene with strong ambient light behind dense dark smoke.
-- **Cause:** only `Scatter` registers an ambient veil (`packages/shared/ambient-veil.js`); vfx particles, smoke and
-  core's blended meshes register none. SSGI and SSR under blended coverage are not measured.
+- **Repro (before):** `node packages/vfx/test/smoke-ao.browser.mjs`: 3,000 dark puffs (alpha 0.55) in front of the crease
+  of a pale floor and wall under a strong ambient light, GTAO on: 1,143 of 76,800 pixels fell under their colour without
+  GTAO times their visibility, worst by 0.186 in linear light (RTX A6000, WebGPU). Not seen in Fauld fr096, whose store
+  has almost no ambient light underground.
+- **Cause:** only `Scatter` registered an ambient veil (`packages/shared/ambient-veil.js`). The occlusion composite takes
+  ambient * (1 - visibility) out of the pixel, and the replay held the wall's whole ambient light under puffs that left
+  only 1 - alpha of the wall in the pixel, so it took more light than the pixel held.
+- **Fix:** `packages/vfx/src/base.ts`: every `VFX` registers a veil that draws the same frame's billboards again over
+  the replay target, black, blended `zero, one-minus-src-alpha`, so the light there keeps 1 - alpha of each puff
+  (Porter and Duff's over, SIGGRAPH 1984; the revealage of McGuire and Bavoil, "Weighted Blended Order-Independent
+  Transparency", JCGT 2013, https://jcgt.org/published/0002/02/09/). It draws only after the view's own billboard pass
+  of the same frame and depth.
+- **After:** 0 pixels under the bound (worst 0.021, inside the 0.04 tolerance), 3,357 pixels still occluded; the
+  WebGL2 layer 0 and 3,585.
+- **Still open:** ribbons, mesh particles, billboards drawn through an order-independent pass and core's blended meshes
+  register no veil yet (docs/limits.md); SSGI and SSR under blended coverage are not measured.
+- **Regression:** `packages/vfx/test/smoke-ao.browser.mjs` (in the package's `test:gpu`, WebGPU and `--compat`).
 
 ### Fixed 2026-11-27: smoke in the Fauld tunnels' dusty air read as flat black shapes (KB-FAULD-SMOKEBLACK1, scenes)
 
