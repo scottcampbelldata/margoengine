@@ -1668,6 +1668,143 @@ console.log(battery.fired.length, battery.impacts().length, battery.hits().lengt
   rigging is rigid pieces (no ropes or sails); sinking is a Blender bake (`docs/limits.md`). Sources are in
   `docs/clean-room.md`.
 
+## Flocks of birds and fish (`@margoengine/vfx/flocking`)
+
+`GPUFlock` flies thousands of boids by Reynolds's three rules, separation, alignment and cohesion, inside a vision
+cone, fleeing predators (a pointer is a predator at its world position), drawn to attractors, around sphere obstacles
+and inside a box or sphere. On WebGPU each step runs on the GPU and one instanced draw shows every bird or fish facing
+its velocity, banking into turns and flapping or swimming; nothing is read back. Quick start:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { GPUFlock } from 'margoengine/vfx/flocking';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const flock = GPUFlock.attach(engine, { count: 16_384 });
+flock.setPredators([{ position: [0, 0, 0], radius: 6 }]);
+engine.start();
+```
+
+A step hashes each boid into a bucket of a spatial-hash grid one neighbour radius wide, sorts the boids into their
+buckets (an atomic count, two prefix scans, then a rank by index so a bucket lists its boids in the same order on every
+run), and moves each boid by the boids of its 3 x 3 x 3 cells: eight compute passes. A boid steers by at most
+`maxNeighbors` neighbours (default 24) in that grid order, which bounds its work in a dense crowd. The same options and
+seed give the same state on the same GPU and driver, step for step, also after `snapshot()` and `restore()`; the CPU
+twin `stepFlockCPU` runs the same steps in the same order (one 16,384-boid step on WebGPU matches it within 1e-6 m).
+On the WebGL2 compatibility layer the flock steps that CPU twin (`flock.stats.backend` is `'webgl2-compat'`) and the
+same draw shows it; keep counts there to a few thousand.
+
+**The pointer as the predator.** Unproject the pointer onto the depth of the flock's centre:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { projectPoint, screenToWorld } from 'margoengine/math/project';
+import { GPUFlock } from 'margoengine/vfx/flocking';
+
+const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 6, 34] } });
+const flock = GPUFlock.attach(engine, { count: 16_384 });
+const at = { x: 0, y: 0, z: 0 };
+canvas.addEventListener('pointermove', (event) => {
+  const depth = projectPoint({ x: 0, y: 0, z: 0 }, engine.camera, at)?.z ?? 0.5;
+  const p = screenToWorld(event.offsetX, event.offsetY, depth, engine.camera, canvas.clientWidth, canvas.clientHeight, at);
+  if (p) flock.setPredators([{ position: [p.x, p.y, p.z], radius: 7, strength: 18 }]);
+});
+engine.start();
+```
+
+**Your own birds or fish from glTF.** `geometry` takes a glTF mesh's geometry as it is (a core `Geometry`, or
+`{ positions, normals?, indices?, weights? }`), modelled facing +Z with +Y up. It is scaled so its farthest vertex sits
+at 1, then by `scale`. Without `weights` a bird's vertices flap by their distance from the spine and a fish's swim by
+their distance behind the head; `weights` (0 to 1 a vertex) choose which parts move:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
+import { GPUFlock } from 'margoengine/vfx/flocking';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/fish.glb');
+const mesh = model.meshes.find((m) => m.geometry)!;
+const school = GPUFlock.attach(engine, { preset: 'fish', geometry: mesh.geometry!, count: 8192, scale: 0.3 });
+model.dispose();
+engine.start();
+```
+
+**Debug view.** `setDebug({ enabled: true })` draws a velocity line on every boid (blue slow to red at `maxSpeed`), and
+for the inspected boid (`selectedIndex`, default 0) the bounds, its grid cell and 3 x 3 x 3 neighbourhood, its
+separation sphere, its neighbour radius as a vision cone, and arrows of its velocity (white), separation (red),
+alignment (cyan), cohesion (green) and predator push (orange). `velocities`, `grid`, `perception` and `vectors` turn
+each part off.
+
+**Determinism, snapshots and stepping by hand.**
+
+```ts
+import { Engine } from 'margoengine/core';
+import { GPUFlock, flockStateHash } from 'margoengine/vfx/flocking';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const flock = GPUFlock.attach(engine, { count: 4096, seed: 7, paused: true });
+for (let i = 0; i < 30; i++) flock.step(1 / 60);
+const saved = await flock.snapshot();
+for (let i = 0; i < 30; i++) flock.step(1 / 60);
+const end = flockStateHash((await flock.snapshot()).boids);
+flock.restore(saved);
+for (let i = 0; i < 30; i++) flock.step(1 / 60);
+console.log(end === flockStateHash((await flock.snapshot()).boids)); // true
+```
+
+`step(dt)` runs now, also while `paused` (0 to 1 s, split into equal steps of at most 0.05 s); a frame advances the
+flock by its delta, up to 0.25 s. `snapshot()` reads the state back (eight floats a boid: x, y, z, flap phase, vx, vy,
+vz, bank), `restore(snapshot)` puts it back, and `reset(seed?)` starts again from the seed. Device loss restarts the
+flock from its seed.
+
+Options (every one but `count` can change between frames, through `flock.options` or the setters):
+
+| Option | Default | Meaning |
+|---|---|---|
+| `count` | 4,096 | Boids, 1 to 262,144 (and what the device's storage binding holds). |
+| `seed` | 1337 | Starting positions, velocities and phases, a 32-bit integer. |
+| `preset` | `'bird'` | `'bird'` (flap and bank) or `'fish'` (tail wave, a quarter of the bank); `setPreset`. |
+| `geometry` | built-in | A glTF mesh's geometry or `{ positions, normals?, indices?, weights? }`, up to 16,384 triangles. |
+| `bounds` | box, half size `[18, 10, 18]` | `{ shape: 'box', center?, halfSize }` or `{ shape: 'sphere', center?, radius }`. |
+| `boundsMargin`, `boundsStrength` | 3, 6 | Soft turn-back depth and strength inside the bounds. |
+| `separation`, `alignment`, `cohesion` | 1.8, 1.1, 1 | Rule weights, 0 or more. |
+| `separationRadius`, `neighborRadius` | 1.1, 2.6 | Separation range and the alignment and cohesion range, world units. |
+| `visionAngle` | 1.5 pi (270 degrees) | Full vision cone, 0.05 to 2 pi; separation also sees any boid within half its radius. |
+| `maxNeighbors` | 24 | Neighbours a boid steers by, 1 to 128, in grid order. |
+| `minSpeed`, `maxSpeed` | 4, 10 | Cruise speed limits (1.35 times max while fleeing). |
+| `maxForce`, `maxTurnAccel` | 14, 12 | Steering and turning acceleration caps (2.5 and 2 times while fleeing or dodging). |
+| `attractors` | `[]` | Up to 16 `{ position, strength = 2.5, radius = 0 (everywhere) }`; `setAttractors`. |
+| `predators` | `[]` | Up to 16 `{ position, radius = 6, strength = 12 }`; `setPredators`. |
+| `obstacles` | `[]` | Up to 32 spheres `{ position, radius, strength = 8 }`; `setObstacles`. |
+| `scale`, `bankStrength` | 0.42, 0.55 | Mesh size and roll into turns. |
+| `flapFrequency`, `flapAmplitude` | 5.5 Hz (bird), 7 Hz (fish); 0.45 | Flap or swim rate (faster at speed) and size. |
+| `color`, `accentColor` | `'#e8eef8'`, `'#4c7cc2'` (bird); `'#38c6e8'`, `'#f0a83c'` (fish) | Body and tip colours. |
+| `lightDirection`, `lightColor`, `ambient` | `[0.45, 1, 0.35]`, white, 0.38 | The flock's own key light and ambient. |
+| `paused` | false | Frames stop stepping; `step(dt)` still runs. |
+| `debug` | off | See the debug view above; `setDebug`, `getDebug`. |
+
+A bad option throws `MargoError` `unsupported` naming it, with a link to
+[margoengine.com/errors#flocking](https://margoengine.com/errors#flocking); `step` or `snapshot` before attach throws
+`state`, any call after `dispose()` throws `disposed`. `using flock = GPUFlock.attach(...)` disposes it at the end of
+the scope. The live page is [examples/gpu-flocking.html](../../examples/gpu-flocking.html).
+
+**From three.js.** three.js's `webgl_gpgpu_birds` example keeps the birds' positions and velocities in two float
+textures that `GPUComputationRenderer` updates with fragment shaders you write (the three rules and the mouse predator,
+each bird looking at every other), then draws its own bird geometry whose vertex shader reads those textures;
+`webgpu_compute_birds` does the same work with compute nodes over storage buffers. In Margo that whole page is the quick start
+above: the flock's count is `count` instead of a texture size, the rule sliders become the weights `separation`,
+`alignment` and `cohesion` and the ranges `separationRadius` and `neighborRadius`, the mouse predator becomes
+`setPredators` (see the pointer example), and your own bird is `geometry`. Neighbours come from the hash grid instead of
+every other bird, so the work grows with the boids near each one rather than with the square of the count, and the
+same seed flies the same flock every run.
+
+**Flock or school solver?** `GPUFlock` is the drawn flock: thousands of boids for a shot, in f32 on the GPU.
+`SchoolSolver` in [`@margoengine/physics/schooling`](../physics/README.md) is the physical one: hundreds of members in
+f64 on a physics world, with Couzin's three zones, the nearest neighbours, predicted predators, point-mass locomotion
+and the intent ports LIFE-03's swimmers read. Limits are in `docs/limits.md` and sources in `docs/clean-room.md`.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

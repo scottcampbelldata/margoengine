@@ -12,6 +12,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { FireFront } = await load('../dist/fire-front.js');
   const { Flame } = await load('../dist/flame.js');
   const { Battery, HullFire } = await load('../dist/gunfire.js');
+  const { GPUFlock } = await load('../dist/flocking.js');
   return [
     {
       name: 'Clouds.attach',
@@ -97,6 +98,13 @@ export async function fixtures(load = (entry) => import(entry)) {
           columns: 1,
         });
         return { plugin: fire, dispose: () => fire.dispose() };
+      },
+    },
+    {
+      name: 'GPUFlock.attach',
+      create({ engine }) {
+        const flock = GPUFlock.attach(engine, { count: 64 });
+        return { plugin: flock, dispose: () => flock.dispose() };
       },
     },
   ];

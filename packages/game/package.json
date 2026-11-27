@@ -4107,6 +4107,10 @@
       "types": "./dist/vfx/gunfire.d.ts",
       "import": "./dist/vfx/gunfire.js"
     },
+    "./vfx/flocking": {
+      "types": "./dist/vfx/flocking.d.ts",
+      "import": "./dist/vfx/flocking.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"

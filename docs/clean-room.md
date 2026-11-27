@@ -14828,6 +14828,43 @@ by mass, independently limited lateral acceleration, and the exact drag-only spe
   weight and the horizontal component supplies centripetal acceleration. Their component ratio is `a/g`.
 
 
+### GPU flocking (LIFE-04, `@margoengine/vfx/flocking`, 2026-11-27)
+
+Written from the papers and documents below, read as text. No engine source was read, three.js's GPU birds examples
+included: the README's three.js note describes those examples from their public descriptions. Taken over from a
+Gemini draft on Scott's order; every shader and step was rewritten or checked line by line against these sources.
+
+- Craig W. Reynolds, [Flocks, Herds, and Schools: A Distributed Behavioral Model](https://doi.org/10.1145/37402.37406)
+  (SIGGRAPH 1987): separation (collision avoidance), alignment (velocity matching) and cohesion (flock centering),
+  each from the neighbours a boid perceives.
+- Craig W. Reynolds, [Steering Behaviors For Autonomous Characters](https://www.red3d.com/cwr/steer/gdc99/) (Game
+  Developers Conference 1999): steering as a desired velocity at maximum speed minus the current velocity, truncated to
+  a maximum force; flee from a predator; containment. Each rule here asks that way and the sum is capped by `maxForce`.
+- Iain D. Couzin, Jens Krause, Richard James, Graeme D. Ruxton and Nigel R. Franks,
+  [Collective Memory and Spatial Sorting in Animal Groups](https://doi.org/10.1006/jtbi.2002.3065) (Journal of
+  Theoretical Biology 218, 2002): a blind volume behind the animal (`visionAngle`) and a bounded turning rate (here a
+  cap on the acceleration across the heading, `maxTurnAccel`).
+- Michele Ballerini et al., [Interaction ruling animal collective behavior depends on topological rather than metric distance](https://doi.org/10.1073/pnas.0711437105)
+  (PNAS 105, 2008): real flocks steer by a bounded number of neighbours. `maxNeighbors` bounds the count, but takes the
+  neighbours in grid order, not the nearest (the physics `SchoolSolver` takes the nearest; `docs/limits.md`).
+- Matthias Teschner, Bruno Heidelberger, Matthias Müller, Danat Pomeranets and Markus Gross,
+  [Optimized Spatial Hashing for Collision Detection of Deformable Objects](https://matthias-research.github.io/pages/publications/tetraederCollision.pdf)
+  (VMV 2003): the cell hash, three large primes XORed and masked to a power-of-two table.
+- Simon Green, [Particle Simulation using CUDA](https://developer.download.nvidia.com/assets/cuda/files/particles.pdf)
+  (NVIDIA, 2010), and Rama C. Hoetzlein, Fast Fixed-Radius Nearest Neighbors: Interactive Million-Particle Fluids (GPU
+  Technology Conference 2014): a uniform grid one interaction radius wide, a count per cell, a prefix sum into cell
+  starts, a scatter into cell order, and a search of the 3 x 3 x 3 cells around each particle.
+- Guy E. Blelloch, Prefix Sums and Their Applications (CMU-CS-90-190, 1990): the work-efficient up-sweep and
+  down-sweep exclusive scan of each 256-bucket block and of the block sums.
+- Mark Jarzynski and Marc Olano, [Hash Functions for GPU Rendering](https://jcgt.org/published/0009/03/02/) (JCGT 9(3),
+  2020), on M. E. O'Neill's PCG (2014): the per-boid tint hash.
+
+Margo's own: the rank pass after the atomic scatter (each boid counts the lower indices in its bucket, so a bucket lists
+its boids in index order and the step is deterministic on one GPU and driver), counting a bucket once when two of the 27
+cells share it, the CPU twin in the same order with the cell index in f32, splitting a long `dt` into equal steps of at
+most 0.05 s, the predator push strength (1 + 2 u^2), the containment and obstacle pushes, the banking and flap-phase
+animation, and the built-in bird and fish meshes.
+
 ### Bubbles (`BubbleSolver`, `@margoengine/physics/bubbles`, 2026-11-26, FW-4)
 
 Written from papers and a thesis read as text (no code, no companion repositories):
