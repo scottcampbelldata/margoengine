@@ -5729,7 +5729,7 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   bands still cross a print (their relief does not); at 20 m and eye height a print is about a pixel tall.
 - **Regression:** `packages/terrain/test/deform-mesh.browser.mjs` and `packages/terrain/test/deform.test.js`.
 
-### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
+### Fixed 2026-11-27: the dune-coast scene did not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 
 - **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>` and compare the seven
   views with Library of Congress negatives LC-W861-35, LC-W86-15, LC-W86-21, LC-W86-38, LC-W86-120 and LC-W85-110.
@@ -5754,7 +5754,8 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   light; `@margoengine/procedural/sheds` now gives boards UVs along their grain and a board map (`shedBoardMap`), the
   inner faces and floor as parts of their own and the openings' average daylight factor (Crisp and Littlefair 1984),
   and the scene textures them and scales their ambient light, tests packages/procedural/test/sheds.test.js and
-  dune-coast-still.mjs. Each is fixed in its owning package with a regression test.
+  dune-coast-still.mjs. Each is fixed in its owning package with a regression test. Wind scour, the last item, is
+  KB-SCENES-SCOUR1 above (`packages/terrain/test/scour.test.js`, `packages/scenes/test/scenes.test.js`).
 
 ### Fixed 2026-11-18: the WebGL2 layer allocated kilobytes of JavaScript heap every frame (KB-COMPAT-FRAMEALLOC1, webgl2-compat, culling, shadows, compute)
 
