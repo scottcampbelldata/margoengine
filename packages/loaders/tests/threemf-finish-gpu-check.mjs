@@ -185,6 +185,31 @@ try {
     }
   }
   console.log(`3MF translucent display properties${compat ? ' (compat)' : ''}: 2 cases match`);
+  // Groups that look alike share a material, and edges over the crease angle stay sharp.
+  const grid = [16, 28, 40, 52, 64, 76, 88, 100, 112],
+    points = grid.flatMap((x) => grid.map((y) => [x, y])),
+    look = async (options) => {
+      const made = await page.evaluate((o) => window.check.groups(o), options);
+      return { made, seen: await page.evaluate((at) => window.check.pixels(at), points) };
+    },
+    sharp = await look({ normals: 'flat' }),
+    creased = await look({}),
+    rounded = await look({ creaseAngle: 180 }),
+    differ = (a, b) => a.filter((rgb, i) => rgb.some((value, k) => Math.abs(value - b[i][k]) > 6)).length;
+  assert.equal(creased.made.listed, 12, 'one material listed per group');
+  assert.equal(creased.made.made, 1, 'twelve groups that differ in vertex colour alone share one material');
+  assert.equal(differ(creased.seen, sharp.seen), 0, 'a cube drawn smooth by default keeps its edges');
+  assert.ok(
+    differ(rounded.seen, sharp.seen) > 8,
+    `creaseAngle 180 rounds the edges: ${differ(rounded.seen, sharp.seen)}`,
+  );
+  // Each face keeps its own colour through the shared material: red, green and blue lead somewhere.
+  for (let channel = 0; channel < 3; channel++)
+    assert.ok(
+      creased.seen.some((rgb) => rgb.every((value, k) => k === channel || rgb[channel] > value + 20)),
+      `no pixel of the face of channel ${channel}`,
+    );
+  console.log(`3MF shared materials and creases${compat ? ' (compat)' : ''}: cube matches`);
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);
 } finally {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21427386,
+  "total": 21473958,
   "history": [
     {
       "date": "2026-10-24",
@@ -15133,6 +15133,12 @@
       "commit": "jpeg2000-conformance",
       "reason": "decoders/jpeg2000 75,876 to 77,274 B gzip measured: the restricted ICC method of JP2 files (the package's ICC reader joins the entry and its worker, so file5, file7 and file8 of T.803 come out in their own colours) and the 0xFF30 to 0xFF3F markers. A lazy chunk for the profile reader would need a second request and an async step inside the synchronous reader of loadJPEG2000.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf-corpus",
+      "reason": "3MF corpus: duplicate property ids refused and the lattice-only message (threemf.ts, about 300 B in every entry that includes the reader). Also records the budgets 23a7f0798c left out: threemf-evaluate 31261 B and threemf-beams 2796 B are new, threemf-volumetric 19311 B budget against 23730 B (parse3MFEvaluated joins the readers; the stages are shared, so a split would parse a package twice). mesh-edit/modeling, boolean-exact, boolean-batch and hull: the zero-area triangle removal of 9f3d0b83f5, whose budgets were left out too.",
+      "grew": 9
     }
   ],
   "items": {
@@ -15776,13 +15782,15 @@
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
-    "@margoengine/loaders/threemf-boolean": 14492,
+    "@margoengine/loaders/threemf-beams": 3052,
+    "@margoengine/loaders/threemf-boolean": 15151,
     "@margoengine/loaders/threemf-displacement": 16281,
-    "@margoengine/loaders/threemf-lattice": 19099,
+    "@margoengine/loaders/threemf-evaluate": 32199,
+    "@margoengine/loaders/threemf-lattice": 19951,
     "@margoengine/loaders/threemf-materials": 15403,
     "@margoengine/loaders/threemf-mesh": 4316,
     "@margoengine/loaders/threemf-secure": 8938,
-    "@margoengine/loaders/threemf-volumetric": 19311,
+    "@margoengine/loaders/threemf-volumetric": 24442,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,
     "@margoengine/loaders/vdb": 6406,
@@ -15896,11 +15904,11 @@
     "@margoengine/mcp/resources": 2313,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/mesh-edit/bake": 5070,
-    "@margoengine/mesh-edit/boolean-batch": 10775,
-    "@margoengine/mesh-edit/boolean-exact": 10618,
+    "@margoengine/mesh-edit/boolean-batch": 11755,
+    "@margoengine/mesh-edit/boolean-exact": 11596,
     "@margoengine/mesh-edit/geometry": 15785,
-    "@margoengine/mesh-edit/hull": 12352,
-    "@margoengine/mesh-edit/modeling": 35466,
+    "@margoengine/mesh-edit/hull": 13345,
+    "@margoengine/mesh-edit/modeling": 37194,
     "@margoengine/mesh-edit/modifiers": 8564,
     "@margoengine/mesh-edit/remesh": 9967,
     "@margoengine/mesh-edit/repair": 9920,

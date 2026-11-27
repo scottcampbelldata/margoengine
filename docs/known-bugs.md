@@ -6,6 +6,48 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: create3MFMesh made a material for every group, so a coloured scan crashed the page (KB-3MF-SCANGROUPS1, loaders)
+
+- **Repro:** `create3MFMesh` on the 3MF Consortium's `examples/material/kinect_scan.3mf` (3mf-samples 665e20dc4d,
+  282,544 triangles, 57,464 groups, one per first-corner vertex colour): the browser tab crashed.
+- **Cause:** one `Material` and one draw per group, though groups that differ in vertex colour alone look alike
+  (`packages/loaders/src/threemf-mesh.ts`).
+- **Fixed:** groups that look alike share a material, and opaque ranges that follow each other are one draw.
+  Regression: `packages/loaders/tests/threemf-finish-gpu-check.mjs`.
+
+### Fixed 2026-11-27: create3MFMesh smoothed normals across the edges of a box (KB-3MF-CREASE1, loaders)
+
+- **Repro:** `create3MFMesh` with its defaults on the Consortium's `multiprop-opaque.3mf` and
+  `multiprop-translucent.3mf`: the cubes shade as rounded blobs, and the translucent one has dark curved lines.
+- **Cause:** `'smooth'` shared one normal among all the faces at a position, at any angle.
+- **Fixed:** faces more than `creaseAngle` (default 40 degrees) apart keep their own normals. Regression:
+  `packages/loaders/tests/threemf-finish-gpu-check.mjs`.
+
+### Fixed 2026-11-27: a second 3MF property resource of one id silently replaced the first (KB-3MF-DUPID1, loaders)
+
+- **Repro:** two `colorgroup` or `basematerials` elements with the same `id` (the Consortium's
+  `MUSTFAIL_Chapter5a_DuplicatedBaseMaterials.3mf`): the file loaded with the second one's colours.
+- **Cause:** property resources went into maps by id without a check (`packages/loaders/src/threemf.ts`).
+- **Fixed:** a `syntax` error names the id. Regression: `packages/loaders/tests/threemf-materials.test.js`.
+
+### Fixed 2026-11-27: a build of beam lattices alone said only that it held no triangles (KB-3MF-LATTICEONLY1, loaders)
+
+- **Repro:** `parse3MF` on the Consortium's `examples/beam lattice/pyramid.3mf`.
+- **Cause:** the core reader did not note that an object it built nothing of was a lattice.
+- **Fixed:** the error names the object and `parse3MFEvaluated`. Regression:
+  `packages/loaders/tests/threemf-materials.test.js`.
+
+### Open 2026-11-27: a transmissive material ignores its colour map in the light it passes (KB-MAT-TINTMAP1, materials)
+
+- **Repro:** on a #cccccc background draw a quad with `new Material({ transmission: 1, roughness: 0.5, ...o })` and
+  read the middle pixel. `color: [1, 0, 0, 1]` gives (203, 2, 2); `map` set to a red texel gives (203, 202, 202), the
+  same as no colour at all, and so does a red `layered()` layer. Adding `new Transmission()` changed no value in that
+  scene. The Consortium's `multiprop-translucent.3mf` therefore draws without its two picture layers. glTF's
+  KHR_materials_transmission tints transmitted light by the whole base colour, texture included.
+- **Cause:** in the tinted-background path the tint is one constant, `color` x transmission x volume attenuation
+  (`Material.tint`, `packages/materials/src/built-material.ts`), so no per-pixel colour reaches it. Why the scene with
+  the pass reads the same is not established.
+
 ### Fixed 2026-11-27: a JPEG 2000 stream with a marker of 0xFF30 to 0xFF3F was refused as cut (KB-J2K-BAREMARKER1, decoders)
 
 - **Repro:** `decodeJPEG2000` on test codestream `p0_02.j2k` of Rec. ITU-T T.803, which holds the marker 0xFF30 in its

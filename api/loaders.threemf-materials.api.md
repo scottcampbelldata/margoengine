@@ -165,6 +165,7 @@ interface ObjectData {
     pid?: string;
     pindex?: number;
     mesh?: MeshData;
+    beamLattice?: boolean;
     displaced?: boolean;
     levelSet?: boolean;
     boolean?: BooleanData;

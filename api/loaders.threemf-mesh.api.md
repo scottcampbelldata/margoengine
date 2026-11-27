@@ -16,6 +16,7 @@ export interface ThreeMFMesh {
 
 export interface ThreeMFMeshOptions {
     normals?: 'smooth' | 'flat';
+    creaseAngle?: number;
     roughness?: number;
     metalness?: number;
     doubleSided?: boolean;

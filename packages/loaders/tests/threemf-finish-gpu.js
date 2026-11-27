@@ -237,5 +237,37 @@ async function glassReference(thickness, color = GLASS.color) {
 /** The last frame's RGB at each point. */
 const pixels = (points) => points.map(([x, y]) => [...frame.slice((y * 128 + x) * 4, (y * 128 + x) * 4 + 3)]);
 
-window.check = { drawn, reference, glass, glassReference, pixels, texels: TEXELS, colors: COLORS, errors };
+/**
+ * A cube turned to show three faces, as parse3MFMaterials gives a part whose triangles each name a colour: one group
+ * per triangle, the two of a face alike. Returns how many materials create3MFMesh listed and made for its twelve groups.
+ */
+async function groups(options = {}) {
+  shown?.();
+  const { positions, indices } = box(),
+    [cy, sy, cx, sx] = [Math.cos(0.6), Math.sin(0.6), Math.cos(0.5), Math.sin(0.5)],
+    corners = [...indices].flatMap((v) => {
+      const [x, y, z] = positions.slice(v * 3, v * 3 + 3),
+        u = x * cy + z * sy,
+        w = z * cy - x * sy;
+      return [u * 0.5, (y * cx - w * sx) * 0.5, (y * sx + w * cx) * 0.5];
+    }),
+    loaded = {
+      kind: 'mesh',
+      positions: new Float32Array(corners),
+      indices: Uint32Array.from(indices, (_, i) => i),
+      uvs: new Float32Array((corners.length / 3) * 2),
+      textures: [],
+      groups: Array.from({ length: 12 }, (_, t) => ({
+        start: t * 3,
+        count: 3,
+        color: [0, 1, 2].map((k) => (Math.floor(t / 4) === k ? 1 : 0.2)).concat(1),
+      })),
+    },
+    model = await create3MFMesh(engine, loaded, { doubleSided: false, ...options });
+  shown = () => model.dispose();
+  await show();
+  return { listed: model.materials.length, made: new Set(model.materials).size };
+}
+
+window.check = { groups, drawn, reference, glass, glassReference, pixels, texels: TEXELS, colors: COLORS, errors };
 window.ready = true;

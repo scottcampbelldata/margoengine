@@ -80,6 +80,8 @@ interface ObjectData {
   pid?: string;
   pindex?: number;
   mesh?: MeshData;
+  /** The object's mesh holds a beam lattice, which the core reader makes no triangles of. */
+  beamLattice?: boolean;
   /** The mesh is a `displacementmesh`: these are its base triangles. */
   displaced?: boolean;
   /** The object's shape is a volumetric level set, which has no triangles. */
@@ -151,6 +153,20 @@ export interface ThreeMFExtension {
 }
 
 const IDENTITY = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
+/** Property resources of the core and materials formats, which share one set of ids. */
+const PROPERTY_RESOURCES = new Set([
+  'basematerials',
+  'colorgroup',
+  'texture2d',
+  'texture2dgroup',
+  'compositematerials',
+  'multiproperties',
+  'pbmetallicdisplayproperties',
+  'pbspeculardisplayproperties',
+  'translucentdisplayproperties',
+  'pbmetallictexturedisplayproperties',
+  'pbspeculartexturedisplayproperties',
+]);
 /** Resource elements whose content only an extension reads (volumetric, implicit and displacement extensions). */
 const FIELDS = new Set([
   'image3d',
@@ -215,6 +231,7 @@ function parseModel(
     metadata: Object.create(null),
   };
   const propertyIds = model.propertyIds,
+    resourceIds = new Set<string>(),
     /** The namespace each prefix was last declared for. */
     prefixes = new Map<string, string>();
   /** A production extension attribute, under whatever prefix the part declares for it (`p` when it declares none). */
@@ -254,6 +271,12 @@ function parseModel(
         if (extension?.element?.(model, name, a)) return;
         if (name === 'slicestack') sliceStacks++;
         if (sliceStacks) return;
+        if (PROPERTY_RESOURCES.has(name) && a.id) {
+          // A second resource of one id would silently replace the first.
+          if (resourceIds.has(a.id))
+            throw new LoaderError(F, 'syntax', `duplicate property resource id ${a.id.slice(0, 32)}`);
+          resourceIds.add(a.id);
+        }
         switch (name) {
           case 'model':
             if (sawModel) throw new LoaderError(F, 'syntax', 'nested <model>');
@@ -325,6 +348,10 @@ function parseModel(
             else object!.boolean = { operation: a.operation ?? 'union', base: reference, operands: [] };
             break;
           }
+          case 'beamlattice':
+            if (object) object.beamLattice = true;
+            extension?.open?.(model, name, a);
+            break;
           case 'levelset':
             if (!object) throw new LoaderError(F, 'syntax', '<levelset> outside <object>');
             object.levelSet = true;
@@ -601,9 +628,12 @@ export async function read3MF(
   /** What the production extension says of the object being emitted. */
   let identity: Pick<LoadedGroup, 'uuid' | 'componentUUID' | 'alternativeUUID'> = {};
   const wanted = options.modelResolution ?? 'fullres';
+  /** A built object that is a beam lattice and no triangles, so an empty result can say why. */
+  let latticeOnly: string | undefined;
   const emitMesh = (model: Model, o: ObjectData, mesh: MeshData, m: Float64Array): void => {
     const vertexCount = mesh.vertices.length / 3,
       triangleCount = mesh.triangles.length / 3;
+    if (!triangleCount && o.beamLattice) latticeOnly ??= o.id;
     if (!vertexCount && !triangleCount) return; // an empty mesh adds nothing; skip the per-instance bookkeeping
     const tri = mesh.triangles.array,
       source = mesh.vertices.array;
@@ -740,8 +770,15 @@ export async function read3MF(
     itemUUID = item.uuid;
     emit(root, item.objectId, item.path, item.transform, 0);
   }
-  if (!indices.length && !extension?.hasGeometry?.())
+  if (!indices.length && !extension?.hasGeometry?.()) {
+    if (latticeOnly !== undefined)
+      throw new LoaderError(
+        F,
+        'syntax',
+        `the build contains no triangles: object ${latticeOnly.slice(0, 32)} is a beam lattice with none of its own; parse3MFEvaluated from @margoengine/loaders/threemf-evaluate makes them`,
+      );
     throw new LoaderError(F, 'syntax', 'the build contains no triangles');
+  }
   const result: ThreeMFResult = {
     kind: 'mesh',
     positions: positions.result(),

@@ -10,6 +10,7 @@ import {
   type TextureOptions,
 } from '@margoengine/materials';
 import { layered, type MaterialLayer } from '@margoengine/materials/layered';
+import { creasedNormals } from '@margoengine/geometry/utils';
 import { SRGBToLinear } from '@margoengine/math/color';
 import { computeVertexNormals } from './normals.js';
 import type {
@@ -27,10 +28,13 @@ const F = '3MF';
 /** Options of {@link create3MFMesh}. */
 export interface ThreeMFMeshOptions {
   /**
-   * `'smooth'` (default) shares one area-weighted normal where corners meet at the same position, as `parse3MF` and
-   * `createMeshes` shade; `'flat'` gives every triangle its face normal.
+   * `'smooth'` (default) shares one angle-weighted normal where corners meet at the same position and their faces are
+   * within `creaseAngle` of each other, so edges sharper than that stay sharp; `'flat'` gives every triangle its face
+   * normal.
    */
   normals?: 'smooth' | 'flat';
+  /** The largest angle between faces that `'smooth'` normals blend across, in degrees, 0 to 180. Default 40. */
+  creaseAngle?: number;
   /**
    * Every material's roughness, 0 to 1, in place of the file's value and map. Default: that of the group's `metallic` or
    * `translucent`, 1 - the glossiness of its `specular`, else 0.6.
@@ -51,7 +55,10 @@ export interface ThreeMFMeshOptions {
 /** What {@link create3MFMesh} made. The textures and materials are its own: `dispose()` releases them with the mesh. */
 export interface ThreeMFMesh {
   mesh: MaterialMesh<Material[]>;
-  /** One per group, in `groups` order, empty groups left out. */
+  /**
+   * One per group, in `groups` order, empty groups left out. Groups that look alike (a scan has one per vertex colour)
+   * share one `Material`, so changing it changes them all.
+   */
   materials: Material[];
   /** The decoded textures, by their index in `textures`. */
   textures: Map<number, Texture>;
@@ -78,18 +85,6 @@ async function decode(texture: ThreeMFTexture, signal?: AbortSignal): Promise<Te
     magFilter: filter,
     mipmaps: !nearest,
   });
-}
-
-function smoothIndices(positions: Float32Array): Uint32Array {
-  const first = new Map<string, number>(),
-    out = new Uint32Array(positions.length / 3);
-  for (let v = 0; v < out.length; v++) {
-    const key = `${positions[v * 3]},${positions[v * 3 + 1]},${positions[v * 3 + 2]}`;
-    let at = first.get(key);
-    if (at === undefined) first.set(key, (at = v));
-    out[v] = at;
-  }
-  return out;
 }
 
 /** One channel of a glTF-layout map: the texture and channel it samples, and the byte a sampled texel becomes. */
@@ -390,6 +385,8 @@ export async function create3MFMesh(
     throw new LoaderError(F, 'unsupported', 'create3MFMesh needs triangles; pass parse3MFMaterials output');
   const mode = options.normals ?? 'smooth';
   if (mode !== 'smooth' && mode !== 'flat') throw new LoaderError(F, 'range', 'normals must be smooth or flat');
+  const crease = options.creaseAngle ?? 40;
+  if (!(crease >= 0 && crease <= 180)) throw new LoaderError(F, 'range', 'creaseAngle must be 0 to 180 degrees');
   const count = positions.length / 3,
     used = new Set<number>();
   for (const group of groups) {
@@ -400,9 +397,19 @@ export async function create3MFMesh(
     /** Repacked metalness and roughness maps, shared by the groups that sample them alike. */
     finishes = new Map<string, Texture>(),
     materials: Material[] = [],
+    /** The materials made so far by what they were made from, and a number for each texture in those keys. */
+    made = new Map<string, Material>(),
+    ids = new Map<Texture, number>(),
+    keyOf = (parts: unknown[]) =>
+      JSON.stringify(parts, (_, value) => {
+        if (!(value instanceof Texture)) return value;
+        let id = ids.get(value);
+        if (id === undefined) ids.set(value, (id = ids.size));
+        return `texture ${id}`;
+      }),
     paths = meanPaths(loaded);
   const release = () => {
-    for (const material of materials) material.dispose();
+    for (const material of made.values()) material.dispose();
     for (const texture of [...textures.values(), ...finishes.values()]) texture.dispose();
   };
   try {
@@ -414,7 +421,8 @@ export async function create3MFMesh(
     }
     const colors = new Float32Array(count * 4).fill(1),
       uvs = [new Float32Array(count * 2), new Float32Array(count * 2)],
-      geometryGroups: { start: number; count: number; materialIndex: number }[] = [];
+      drawn: { start: number; count: number; materialIndex: number }[] = [],
+      unique: Material[] = [];
     for (const group of groups) {
       if (!group.count) continue;
       const vertices = indices.subarray(group.start, group.start + group.count),
@@ -498,40 +506,47 @@ export async function create3MFMesh(
             : translucent
               ? volumeOf(translucent, loaded.metresPerUnit ?? 1, paths.get(group.objectId)!)
               : {};
-      geometryGroups.push({ start: group.start, count: group.count, materialIndex: materials.length });
-      const material = new Material({
-        ...physical,
-        ...(map ? { map } : {}),
-        ...(finish && !features.length ? { metalRoughnessMap: finish } : {}),
-        ...(options.unlit ? { shading: 'basic' as const } : {}),
-        roughness,
-        metalness,
-        doubleSided: options.doubleSided ?? true,
-        transparent,
-        features: features.length ? [layered({ layers: features })] : [],
-      });
+      const slot = specularMap && slots.get(specular!.layer!),
+        key = keyOf([physical, map, finish, specularMap, slot, features, roughness, metalness, transparent]);
+      let material = made.get(key);
+      if (!material) {
+        material = new Material({
+          ...physical,
+          ...(map ? { map } : {}),
+          ...(finish && !features.length ? { metalRoughnessMap: finish } : {}),
+          ...(options.unlit ? { shading: 'basic' as const } : {}),
+          roughness,
+          metalness,
+          doubleSided: options.doubleSided ?? true,
+          transparent,
+          features: features.length ? [layered({ layers: features })] : [],
+        });
+        made.set(key, material);
+        if (slot) material.setUVTransform({ texCoord: slot }, 'specularColorMap');
+      }
       materials.push(material);
-      if (specularMap && slots.get(specular!.layer!))
-        material.setUVTransform({ texCoord: slots.get(specular!.layer!) }, 'specularColorMap');
+      // Opaque ranges that follow each other with one material are one draw; see-through ones stay apart to sort.
+      const index = unique.indexOf(material),
+        last = drawn[drawn.length - 1];
+      if (last && !transparent && last.materialIndex === index && last.start + last.count === group.start)
+        last.count += group.count;
+      else {
+        if (index < 0) unique.push(material);
+        drawn.push({ start: group.start, count: group.count, materialIndex: index < 0 ? unique.length - 1 : index });
+      }
     }
     if (!materials.length) throw new LoaderError(F, 'unsupported', 'the result has no nonempty groups to draw');
     const normals =
       mode === 'flat'
         ? computeVertexNormals(positions, indices)
-        : (() => {
-            const shared = smoothIndices(positions),
-              welded = computeVertexNormals(
-                positions,
-                indices.map((v) => shared[v]),
-              ),
-              out = new Float32Array(count * 3);
-            for (let v = 0; v < count; v++) out.set(welded.subarray(shared[v] * 3, shared[v] * 3 + 3), v * 3);
-            return out;
-          })();
+        : creasedNormals(positions, { indices, angle: crease, tolerance: 0 });
+    // A corner of triangles with no area only gets no direction, and a mesh needs one for every vertex.
+    for (let v = 0; v < normals.length; v += 3)
+      if (!normals[v] && !normals[v + 1] && !normals[v + 2]) normals[v + 2] = 1;
     const mesh = createMesh(
       engine,
-      { positions, normals, indices, uvs: uvs[0], uvs1: uvs[1], colors, groups: geometryGroups },
-      materials,
+      { positions, normals, indices, uvs: uvs[0], uvs1: uvs[1], colors, groups: drawn },
+      unique,
       { renderOrder: options.renderOrder ?? 0 },
     );
     const dispose = () => {

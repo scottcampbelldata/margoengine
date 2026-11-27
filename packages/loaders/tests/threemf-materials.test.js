@@ -605,3 +605,30 @@ test('broken display properties are named errors', async () => {
   await refuses(textured(MAPS + mapped('basecolorfactor="red"')), 'syntax');
   await refuses(textured(METALS, COORDS.replace('texid="1"', 'texid="1" displaypropertiesid="20"')), 'syntax');
 });
+
+const COLOURS = '<colorgroup id="3"><color color="#FF0000"/><color color="#00FF00"/></colorgroup>';
+test('two property resources of one id are refused instead of the second replacing the first', async () => {
+  const base = '<basematerials id="3"><base name="a" displaycolor="#0000FF"/></basematerials>',
+    triangle = '<triangle v1="0" v2="1" v3="2" pid="3" p1="0"/>';
+  for (const [parse, resources] of [
+    [parse3MF, COLOURS + COLOURS],
+    [parse3MF, base + COLOURS],
+    [parse3MFMaterials, COLOURS + base],
+    [parse3MFMaterials, TEXTURE + COORDS + COORDS + COLOURS],
+    [parse3MFMaterials, TEXTURE + COORDS.replace('id="2"', 'id="1"') + COLOURS],
+  ])
+    await assert.rejects(
+      parse(pack(model(resources, triangle), { '3D/Texture/a.png': PNG })),
+      (error) => error.code === 'syntax' && /duplicate property resource id/.test(error.message),
+      resources,
+    );
+});
+
+test('a build of beam lattices alone says which reader makes their triangles', async () => {
+  const lattice = `<model unit="millimeter"><resources><object id="4" type="model"><mesh>${VERTICES}<triangles/><beamlattice radius="0.1" minlength="0.01"><beams><beam v1="0" v2="1"/></beams></beamlattice></mesh></object></resources><build><item objectid="4"/></build></model>`;
+  for (const parse of [parse3MF, parse3MFMaterials])
+    await assert.rejects(
+      parse(pack(lattice)),
+      (error) => error.code === 'syntax' && /object 4 is a beam lattice.*parse3MFEvaluated/.test(error.message),
+    );
+});
