@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20995542,
+  "total": 20997982,
   "history": [
     {
       "date": "2026-10-24",
@@ -14694,6 +14694,12 @@
       "commit": "91eaca18c3",
       "reason": "gltf/pbr draws glTF points and lines at the width the file asks for (primitive extras lineWidth and pointSize, Bentley line and point styles) with @margoengine/lines and @margoengine/points; the lazy strokes reader is 2,048 B gzip, the static width check about 300 B",
       "grew": 6
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-c4",
+      "reason": "3MF metallic display properties: loaders/threemf-materials 12722 to 13482 B (pbmetallic and pbmetallictexturedisplayproperties on every property group and stack, with their errors), threemf-lattice (which reads it) 16870 to 17633 B, loaders/threemf-mesh 2352 to 3224 B (draws them: repacks the two linear maps into one glTF-layout map, decoded by the lazily imported optional @margoengine/decoders peer, and gives every stack layer the material numbers). A second entry would parse the file twice or duplicate the stack sampling.",
+      "grew": 3
     }
   ],
   "items": {
@@ -15331,9 +15337,9 @@
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
-    "@margoengine/loaders/threemf-lattice": 17377,
-    "@margoengine/loaders/threemf-materials": 13104,
-    "@margoengine/loaders/threemf-mesh": 2608,
+    "@margoengine/loaders/threemf-lattice": 18162,
+    "@margoengine/loaders/threemf-materials": 13887,
+    "@margoengine/loaders/threemf-mesh": 3480,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,
     "@margoengine/loaders/vdb": 6406,

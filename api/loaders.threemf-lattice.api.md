@@ -171,11 +171,22 @@ interface ThreeMFLayer {
 interface ThreeMFMaterialGroup extends LoadedGroup {
     texture?: number;
     layers?: ThreeMFLayer[];
+    metallic?: ThreeMFMetallic;
 }
 
 interface ThreeMFMaterials extends ThreeMFResult {
     groups: ThreeMFMaterialGroup[];
     textures: ThreeMFTexture[];
+}
+
+interface ThreeMFMetallic {
+    name: string;
+    metalness: number;
+    roughness: number;
+    metalnessTexture?: number;
+    roughnessTexture?: number;
+    baseColorFactor?: [number, number, number, number];
+    layer?: number;
 }
 
 interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {

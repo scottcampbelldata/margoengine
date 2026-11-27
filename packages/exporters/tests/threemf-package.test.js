@@ -295,3 +295,47 @@ test('one image shared through many texture records is one part of the package',
   const clamped = { ...nodes[1], material: { baseColorTexture: { image, mimeType: 'image/png', wrapS: 'clamp' } } };
   assert.equal(count(await model(await export3MF({ nodes: [nodes[0], clamped] })), /<m:texture2d [^>]*tilestyleu/g), 2);
 });
+
+test('metalness, roughness and their map read back through parse3MFMaterials', async () => {
+  const flat = await parse3MFMaterials(
+    await export3MF({
+      nodes: [
+        { geometry: mesh(), material: { name: 'Steel', metalness: 1, roughness: 0.25 } },
+        { geometry: mesh(), material: { name: 'Painted', color: [1, 0, 0, 1], metalness: 0, roughness: 0.5 } },
+      ],
+    }),
+  );
+  assert.deepEqual(
+    flat.groups.map(({ metallic }) => [metallic.name, metallic.metalness, metallic.roughness]),
+    [
+      ['Steel', 1, 0.25],
+      ['Painted', 0, 0.5],
+    ],
+  );
+  const picture = async (data) => ({
+    image: await png({ width: 2, height: 1, data: new Uint8Array(data) }, 2, false),
+    mimeType: 'image/png',
+  });
+  const material = {
+    baseColorTexture: await picture([255, 255, 255, 255, 255, 255, 255, 255]),
+    // glTF layout: roughness in green, metalness in blue.
+    metallicRoughnessTexture: await picture([0, 40, 200, 255, 0, 220, 10, 255]),
+    metalness: 0.75,
+    roughness: 0.5,
+  };
+  const geometry = mesh(faces, { uvs: new Float32Array(16) });
+  for (const color of [
+    [1, 1, 1, 1],
+    [0.5, 0.25, 0.125, 1],
+  ]) {
+    const read = await parse3MFMaterials(await export3MF({ nodes: [{ geometry, material: { ...material, color } }] }));
+    const { metallic, layers } = read.groups[0];
+    assert.equal(!!layers, color[0] !== 1, 'a tint makes a stack');
+    assert.deepEqual([metallic.metalness, metallic.roughness], [0.75, 0.5]);
+    assert.equal(metallic.metalnessTexture, metallic.roughnessTexture);
+    assert.equal(metallic.layer, layers ? 1 : undefined);
+    // One resource for both values: roughness in red, metalness in green.
+    const image = await decodeImage(read.textures[metallic.roughnessTexture].data);
+    assert.deepEqual([...image.data], [40, 200, 0, 255, 220, 10, 0, 255]);
+  }
+});

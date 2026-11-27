@@ -13,11 +13,22 @@ export interface ThreeMFLayer {
 export interface ThreeMFMaterialGroup extends LoadedGroup {
     texture?: number;
     layers?: ThreeMFLayer[];
+    metallic?: ThreeMFMetallic;
 }
 
 export interface ThreeMFMaterials extends ThreeMFResult {
     groups: ThreeMFMaterialGroup[];
     textures: ThreeMFTexture[];
+}
+
+export interface ThreeMFMetallic {
+    name: string;
+    metalness: number;
+    roughness: number;
+    metalnessTexture?: number;
+    roughnessTexture?: number;
+    baseColorFactor?: [number, number, number, number];
+    layer?: number;
 }
 
 export interface ThreeMFTexture {

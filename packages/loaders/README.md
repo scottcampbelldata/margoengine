@@ -1014,7 +1014,7 @@ for (const { positions, indices, groups, matrices } of model.instances) {
 
 ## 3MF textures and colour groups
 
-`parse3MFMaterials` from `@margoengine/loaders/threemf-materials` reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup` coordinates, `compositematerials` and `multiproperties`. The plain `parse3MF` stays as small as it was.
+`parse3MFMaterials` from `@margoengine/loaders/threemf-materials` reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup` coordinates, `compositematerials`, `multiproperties` and the metallic display properties. The plain `parse3MF` stays as small as it was.
 
 ```ts
 import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
@@ -1029,10 +1029,19 @@ console.log(image.width, uvs?.length);
 - **Groups.** A group's `texture` indexes `textures`; a triangle without one falls in a separate group. Each texture carries its image bytes, `contentType`, `tileStyleU`, `tileStyleV` and `filter`.
 - **Composites.** `compositematerials` mix their base colours by weight into one colour.
 - **Layers.** A group whose triangles use a `multiproperties` carries its whole stack in `layers`, bottom first: each layer's `kind` (`'color'` or `'texture'`), a texture layer's `texture`, its `blend` (`'mix'` or `'multiply'`, from `blendmethods`) and the name of its per-vertex values in `attributes` (`layerColor<k>`: sRGB red, green, blue and linear alpha; `layerUV<k>`: u and v). A pindex a row leaves out is 0. `multiproperties` that break the spec's rules (a second colour group, a material group not first or twice, a nested `multiproperties`) are `syntax` errors. For older readers `texture` still names the first texture layer and `colors` the colour layers mixed together.
+- **Metalness and roughness.** A group's `metallic` holds the display properties of its triangles (their first corner's, as the spec says): `name`, `metalness` and `roughness` from `pbmetallic` on base materials, colour groups and composites, or from `pbmetallictexturedisplayproperties` on a texture group, where the two numbers are factors and `metalnessTexture` and `roughnessTexture` index the maps in `textures` (red channel; roughness in red and metalness in green when both name one resource), with `baseColorFactor` when it is not white. A stack takes the lowest layer that has any, named by `metallic.layer`. Triangles that differ in it fall in separate groups. Specular and translucent display properties are not read.
+
+```ts
+import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
+
+const bytes = await (await fetch('/prints/gears.3mf')).arrayBuffer();
+for (const { name, metallic } of (await parse3MFMaterials(bytes)).groups)
+  console.log(name, metallic?.metalness, metallic?.roughness);
+```
 
 ### Drawing it: `create3MFMesh`
 
-`create3MFMesh` from `@margoengine/loaders/threemf-mesh` draws that result as one `@margoengine/materials` mesh (an optional peer) with a material per group: vertex colours, the texture as the colour map, and a layer stack through `layered()`. The layers blend as the 3MF Materials and Properties Extension 1.2.1 (chapter 5) specifies, in linear light: mix is `new.rgb * new.a + below.rgb * (1 - new.a)`, multiply `new.rgb * below.rgb`, and the bottom layer is opaque.
+`create3MFMesh` from `@margoengine/loaders/threemf-mesh` draws that result as one `@margoengine/materials` mesh (an optional peer) with a material per group: vertex colours, the texture as the colour map, and a layer stack through `layered()`. Each material takes its group's `metallic` metalness and roughness, maps included (repacked into one glTF-layout map from the texels the optional `@margoengine/decoders` peer reads exactly). The layers blend as the 3MF Materials and Properties Extension 1.2.1 (chapter 5) specifies, in linear light: mix is `new.rgb * new.a + below.rgb * (1 - new.a)`, multiply `new.rgb * below.rgb`, and the bottom layer is opaque.
 
 ```ts
 import { Engine } from '@margoengine/core';
@@ -1049,7 +1058,7 @@ model.dispose(); // or `using model = ...`
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `normals` | `'smooth'` | `'smooth'` shares a normal where corners meet at one position; `'flat'` gives each triangle its face normal |
-| `roughness`, `metalness` | 0.6, 0 | Every material's surface numbers |
+| `roughness`, `metalness` | the file's, else 0.6, 0 | Every material's surface numbers; a number given here replaces the file's value and its map |
 | `doubleSided` | true | Draw both faces |
 | `unlit` | false | Draw the colours without light (`shading: 'basic'`) |
 | `renderOrder` | 0 | Draw order of the mesh |

@@ -1,8 +1,9 @@
-// 3MF materials extension on top of parse3MF: texture2d, texture2dgroup, compositematerials and multiproperties.
+// 3MF materials extension on top of parse3MF: texture2d, texture2dgroup, compositematerials, multiproperties and the
+// metallic display properties.
 import { LoaderError, type LoadedGroup } from './types.js';
 import type { BinaryInput } from './util.js';
 import { floats } from './util.js';
-import { SRGBToLinear, LinearToSRGB } from '@margoengine/math/color';
+import { SRGBToLinear, LinearToSRGB, hexColor } from '@margoengine/math/color';
 import {
   cornerProperty,
   read3MF,
@@ -14,6 +15,8 @@ import {
 
 const F = '3MF';
 type Color = [number, number, number, number];
+/** The arguments that name one triangle. */
+type Triangle = Parameters<ThreeMFExtension['bucket']>;
 
 /** One `<texture2d>` of a package with the bytes of its image. */
 export interface ThreeMFTexture {
@@ -50,12 +53,42 @@ export interface ThreeMFLayer {
   blend: 'mix' | 'multiply';
 }
 
+/**
+ * The metalness and roughness a group's triangles are shown with: the materials extension's `pbmetallic`, or its
+ * `pbmetallictexturedisplayproperties` (chapter 7 of the extension).
+ */
+export interface ThreeMFMetallic {
+  /** The element's `name`, usually the material's. */
+  name: string;
+  /** The metalness, 0 to 1. With `metalnessTexture` it is the factor over the sampled value (default 1). */
+  metalness: number;
+  /** The roughness, 0 to 1. With `roughnessTexture` it is the factor over the sampled value (default 1). */
+  roughness: number;
+  /**
+   * Index into `textures` of the linear map metalness is sampled from, at the group's own coordinates and with the tile
+   * style and filter of its colour texture: the red channel, or the green one when `roughnessTexture` is the same
+   * resource.
+   */
+  metalnessTexture?: number;
+  /** Index into `textures` of the linear map roughness is sampled from, in its red channel. */
+  roughnessTexture?: number;
+  /** `basecolorfactor`, sRGB red, green, blue and linear alpha over the colour texture, when it is not white. */
+  baseColorFactor?: [number, number, number, number];
+  /** In a `multiproperties` stack, the index of the layer these properties come from. */
+  layer?: number;
+}
+
 /** A group of {@link ThreeMFMaterials}: {@link LoadedGroup} with the texture its triangles sample. */
 export interface ThreeMFMaterialGroup extends LoadedGroup {
   /** Index into `textures`: the group's only texture, or the first texture layer of its `layers`. */
   texture?: number;
   /** The whole layer stack, when the group's triangles use a `multiproperties`; `create3MFMesh` draws it. */
   layers?: ThreeMFLayer[];
+  /**
+   * The metallic display properties of the group's triangles (their first corner's, as the spec says); absent when the
+   * file gives none. In a stack they are those of the lowest layer that has any. `create3MFMesh` draws them.
+   */
+  metallic?: ThreeMFMetallic;
 }
 
 /** What {@link parse3MFMaterials} returns: {@link ThreeMFResult} with textures, and one vertex per triangle corner. */
@@ -87,6 +120,26 @@ interface Store {
   multis: Map<string, Multi>;
   /** Base material and composite groups, which a multiproperties may name once, first. */
   materials: Set<string>;
+  /** Display property resources by id. */
+  displays: Map<string, Display>;
+  /** A property group's `displaypropertiesid`. */
+  shown: Map<string, string>;
+  /** The `displaypropertiesid` of single `<base>` elements, as the 3MF Consortium's metallic sample writes it. */
+  bases: Map<string, Map<number, string>>;
+}
+/** `'other'`: specular and translucent properties, which are not read. */
+type Display =
+  | { kind: 'metallic'; entries: ThreeMFMetallic[] }
+  | { kind: 'texture'; entry: ThreeMFMetallic; metalness: string; roughness: string }
+  | { kind: 'other' };
+
+/** A display property number: `fallback` when absent, refused below 0 or above `max`. */
+function amount(value: string | undefined, fallback: number, max: number, what: string): number {
+  if (value === undefined) return fallback;
+  const number = value.trim() ? Number(value) : Number.NaN;
+  if (!(Number.isFinite(number) && number >= 0 && number <= max))
+    throw new LoaderError(F, 'range', `invalid ${what} "${value.slice(0, 32)}"`);
+  return number;
 }
 
 function list(value: string | undefined, what: string): number[] {
@@ -103,7 +156,9 @@ function required(value: string | undefined, element: string, attribute: string)
 
 /**
  * Reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup`
- * coordinates, `compositematerials` as mixed colours, and `multiproperties` layers. Every triangle corner gets its own
+ * coordinates, `compositematerials` as mixed colours, `multiproperties` layers, and the metallic display properties
+ * (`pbmetallic` and `pbmetallictexturedisplayproperties`) as each group's `metallic`; specular and translucent display
+ * properties are not read. Every triangle corner gets its own
  * vertex, so `uvs` and `colors` can differ across a seam; `uvs` use Margo's convention, v = 1 - the file's v. `colors` is
  * present when corners of a triangle differ or a layer sets them. A group's `texture` indexes `textures`. In
  * `multiproperties` colour layers mix by their alpha, and the first texture layer sets the group's texture: draw
@@ -112,7 +167,9 @@ function required(value: string | undefined, element: string, attribute: string)
  * @param input The package's bytes.
  * @param options The same options as `parse3MF`.
  * @returns The merged mesh with its coordinates, colours and images.
- * @throws LoaderError with the codes of `parse3MF`, with `range` for a property index outside its group.
+ * @throws LoaderError with the codes of `parse3MF`, with `range` for a property index outside its group or its display
+ *   properties and for a metalness or roughness outside 0 to 1 (a texture's factor: below 0), and `syntax` for display
+ *   properties that are not defined or are of a kind their group cannot take.
  *
  * @example
  * ```ts
@@ -144,14 +201,62 @@ export async function read3MFMaterials(
   let group: TextureGroup | undefined,
     multi: Multi | undefined,
     composite: Composite | undefined,
+    /** The open `pbmetallicdisplayproperties`, and the open `basematerials` with the `<base>` elements seen in it. */
+    metals: ThreeMFMetallic[] | undefined,
+    materialGroup: { id: string; count: number } | undefined,
     textured = false,
     varied = false,
     translucent = false;
   const store = (model: ThreeMFModel): Store => {
     let found = stores.get(model);
-    if (!found)
-      stores.set(model, (found = { textures: new Map(), groups: new Map(), multis: new Map(), materials: new Set() }));
+    if (!found) {
+      found = {
+        textures: new Map(),
+        groups: new Map(),
+        multis: new Map(),
+        materials: new Set(),
+        displays: new Map(),
+        shown: new Map(),
+        bases: new Map(),
+      };
+      stores.set(model, found);
+    }
     return found;
+  };
+  /** The metallic properties of entry `index` of a property group. Read after parsing, so a later resource counts. */
+  const finish = (model: ThreeMFModel, id: string, index: number): ThreeMFMetallic | undefined => {
+    const { displays, shown, bases, groups, multis, textures: known } = store(model),
+      layers = multis.get(id);
+    if (layers) {
+      for (let layer = 0; layer < layers.pids.length; layer++) {
+        const found = finish(model, layers.pids[layer], layers.rows[index]?.[layer] ?? 0);
+        if (found) return { ...found, layer };
+      }
+      return undefined;
+    }
+    const reference = shown.get(id) ?? bases.get(id)?.get(index);
+    if (reference === undefined) return undefined;
+    const display = displays.get(reference),
+      refuse = (code: 'syntax' | 'range', what: string): never => {
+        throw new LoaderError(F, code, what);
+      },
+      short = reference.slice(0, 32);
+    if (!display) return refuse('syntax', `display properties ${short} are not defined`);
+    if (display.kind === 'other') return undefined;
+    if ((display.kind === 'texture') !== groups.has(id))
+      return refuse('syntax', `property group ${id.slice(0, 32)} cannot take the kind of display properties ${short}`);
+    if (display.kind === 'metallic')
+      return (
+        display.entries[index] ?? refuse('range', `property index ${index} is outside display properties ${short}`)
+      );
+    const map = (texture: string): number =>
+      known.get(texture) ?? refuse('syntax', `texture ${texture.slice(0, 32)} is not defined`);
+    return { ...display.entry, metalnessTexture: map(display.metalness), roughnessTexture: map(display.roughness) };
+  };
+  /** A triangle's metallic properties: its first corner's. */
+  const finishAt = (...[model, object, mesh, t]: Triangle): ThreeMFMetallic | undefined => {
+    const property = cornerProperty(model, object, mesh, t, 0);
+    return property && finish(model, property.id, property.index);
   };
 
   /** What one corner samples: a texture and uv, a colour, or both through layers. */
@@ -211,7 +316,21 @@ export async function read3MFMaterials(
 
   const extension: ThreeMFExtension = {
     element(model, name, a) {
-      if (name === 'basematerials' && a.id) store(model).materials.add(a.id);
+      if (name === 'basematerials' || name === 'colorgroup') {
+        if (a.id && a.displaypropertiesid) store(model).shown.set(a.id, a.displaypropertiesid);
+        if (name === 'basematerials' && a.id) {
+          store(model).materials.add(a.id);
+          materialGroup = { id: a.id, count: 0 };
+        }
+      } else if (name === 'base' && materialGroup) {
+        const index = materialGroup.count++;
+        if (a.displaypropertiesid) {
+          const { bases } = store(model);
+          let own = bases.get(materialGroup.id);
+          if (!own) bases.set(materialGroup.id, (own = new Map()));
+          own.set(index, a.displaypropertiesid);
+        }
+      }
     },
     open(model, name, a) {
       switch (name) {
@@ -232,9 +351,44 @@ export async function read3MFMaterials(
           const id = required(a.id, name, 'id');
           group = { texture: required(a.texid, name, 'texid'), coords: [] };
           store(model).groups.set(id, group);
+          if (a.displaypropertiesid) store(model).shown.set(id, a.displaypropertiesid);
           model.propertyIds.push(id);
           break;
         }
+        case 'pbmetallicdisplayproperties':
+          metals = [];
+          store(model).displays.set(required(a.id, name, 'id'), { kind: 'metallic', entries: metals });
+          break;
+        case 'pbmetallic':
+          metals?.push({
+            name: a.name ?? '',
+            metalness: amount(a.metallicness, 0, 1, 'metallicness'),
+            roughness: amount(a.roughness, 1, 1, 'roughness'),
+          });
+          break;
+        case 'pbmetallictexturedisplayproperties': {
+          const factor = a.basecolorfactor === undefined ? undefined : hexColor(a.basecolorfactor.trim());
+          if (a.basecolorfactor !== undefined && !factor)
+            throw new LoaderError(F, 'syntax', `invalid color "${a.basecolorfactor.slice(0, 16)}"`);
+          store(model).displays.set(required(a.id, name, 'id'), {
+            kind: 'texture',
+            metalness: required(a.metallictextureid, name, 'metallictextureid'),
+            roughness: required(a.roughnesstextureid, name, 'roughnesstextureid'),
+            entry: {
+              name: a.name ?? '',
+              // A factor above 1 brightens the sampled value, which stays at most 1.
+              metalness: amount(a.metallicfactor, 1, Number.MAX_VALUE, 'metallicfactor'),
+              roughness: amount(a.roughnessfactor, 1, Number.MAX_VALUE, 'roughnessfactor'),
+              ...(factor?.some((value) => value !== 1) ? { baseColorFactor: factor } : {}),
+            },
+          });
+          break;
+        }
+        case 'pbspeculardisplayproperties':
+        case 'pbspeculartexturedisplayproperties':
+        case 'translucentdisplayproperties':
+          store(model).displays.set(required(a.id, name, 'id'), { kind: 'other' });
+          break;
         case 'tex2coord': {
           const u = Number(a.u),
             v = Number(a.v);
@@ -276,6 +430,7 @@ export async function read3MFMaterials(
           if (!base) throw new LoaderError(F, 'syntax', `material group ${a.matid.slice(0, 32)} is not defined`);
           composite = { base, indices: list(a.matindices, 'matindices'), colors: [] };
           store(model).materials.add(id);
+          if (a.displaypropertiesid) store(model).shown.set(id, a.displaypropertiesid);
           model.properties.set(id, composite.colors);
           model.propertyIds.push(id);
           break;
@@ -310,6 +465,8 @@ export async function read3MFMaterials(
       if (name === 'texture2dgroup') group = undefined;
       else if (name === 'multiproperties') multi = undefined;
       else if (name === 'compositematerials') composite = undefined;
+      else if (name === 'pbmetallicdisplayproperties') metals = undefined;
+      else if (name === 'basematerials') materialGroup = undefined;
     },
     async ready(read) {
       for (const texture of textures) texture.data = await read(texture.path);
@@ -317,7 +474,10 @@ export async function read3MFMaterials(
     bucket(model, object, mesh, t) {
       const property = cornerProperty(model, object, mesh, t, 0),
         layered = property && store(model).multis.has(property.id) ? `|m${property.id}` : '';
-      return String(at(model, model, object, mesh, t, 0).texture ?? '') + layered;
+      const metallic = finishAt(model, object, mesh, t),
+        // The name does not change how a triangle looks, so it does not split a group.
+        shown = metallic ? `|p${JSON.stringify({ ...metallic, name: undefined })}` : '';
+      return String(at(model, model, object, mesh, t, 0).texture ?? '') + layered + shown;
     },
     corner(model, object, mesh, t, k) {
       const property = cornerProperty(model, object, mesh, t, k),
@@ -357,6 +517,8 @@ export async function read3MFMaterials(
     group(target: ThreeMFMaterialGroup, model, object, mesh, t) {
       const { texture } = at(model, model, object, mesh, t, 0);
       if (texture !== undefined) target.texture = texture;
+      const metallic = finishAt(model, object, mesh, t);
+      if (metallic) target.metallic = metallic;
       const property = cornerProperty(model, object, mesh, t, 0),
         { multis, groups, textures: known } = store(model),
         layers = property && multis.get(property.id);

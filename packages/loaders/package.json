@@ -27,7 +27,7 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --experimental-test-module-mocks --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js",
-    "test:gpu": "cd ../.. && node packages/loaders/tests/split-scale-check.mjs && node packages/loaders/tests/materialx-reference-check.mjs && node packages/loaders/tests/mtl-gpu-check.mjs && node packages/loaders/tests/threemf-layers-gpu-check.mjs",
+    "test:gpu": "cd ../.. && node packages/loaders/tests/split-scale-check.mjs && node packages/loaders/tests/materialx-reference-check.mjs && node packages/loaders/tests/mtl-gpu-check.mjs && node packages/loaders/tests/threemf-layers-gpu-check.mjs && node packages/loaders/tests/threemf-finish-gpu-check.mjs",
     "test:render:browser": "npm run build && node scripts/test-render-browser.mjs",
     "test:real-files": "npm run build && node scripts/test-real-files.mjs",
     "test:real-files:runtimes": "node scripts/fetch-real-files-runtimes.mjs",
@@ -36,7 +36,8 @@
     "test:gpu:split-scale": "npm run build && node tests/split-scale-check.mjs",
     "test:gpu:materialx-reference": "npm run build && node tests/materialx-reference-check.mjs",
     "test:gpu:mtl": "npm run build && node tests/mtl-gpu-check.mjs",
-    "test:gpu:threemf-layers": "npm run build && node tests/threemf-layers-gpu-check.mjs"
+    "test:gpu:threemf-layers": "npm run build && node tests/threemf-layers-gpu-check.mjs",
+    "test:gpu:threemf-finish": "npm run build && node tests/threemf-finish-gpu-check.mjs"
   },
   "sideEffects": false,
   "exports": {

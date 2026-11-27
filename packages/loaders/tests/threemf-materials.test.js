@@ -370,3 +370,135 @@ test('create3MFMesh refuses what one materials mesh cannot draw, before it touch
     globalThis.createImageBitmap = saved;
   }
 });
+
+const METALS =
+  '<m:pbmetallicdisplayproperties id="20"><m:pbmetallic name="Steel" metallicness="1" roughness="0.25"/><m:pbmetallic name="Paint" metallicness="0" roughness="0.5"/><m:pbmetallic name="Default"/></m:pbmetallicdisplayproperties>';
+const THREE = '<base name="a" displaycolor="#FF0000"/>'.repeat(3);
+const finishes = (result) =>
+  result.groups.map(({ count, metallic }) => [
+    count / 3,
+    metallic && [metallic.name, metallic.metalness, metallic.roughness],
+  ]);
+
+test('pbmetallic values follow the property index of base materials, colour groups and composites', async () => {
+  const triangles = (pid) =>
+    [0, 1, 2, 1].map((p) => `<triangle v1="0" v2="1" v3="2" pid="${pid}" p1="${p}"/>`).join('');
+  const expected = [
+    [1, ['Steel', 1, 0.25]],
+    [2, ['Paint', 0, 0.5]],
+    [1, ['Default', 0, 1]],
+  ];
+  for (const [resources, pid] of [
+    [`${METALS}<basematerials id="4" displaypropertiesid="20">${THREE}</basematerials>`, 4],
+    [
+      `${METALS}<m:colorgroup id="6" displaypropertiesid="20">${'<m:color color="#00FF00"/>'.repeat(3)}</m:colorgroup>`,
+      6,
+    ],
+    [
+      `${METALS}<basematerials id="4">${THREE}</basematerials><m:compositematerials id="5" matid="4" matindices="0 1" displaypropertiesid="20">${'<m:composite values="1 1"/>'.repeat(3)}</m:compositematerials>`,
+      5,
+    ],
+  ]) {
+    // One colour throughout, so only the finish splits the groups; the last triangle joins the second.
+    const result = await parse3MFMaterials(pack(model(resources, triangles(pid))));
+    assert.deepEqual(finishes(result), expected, `property group ${pid}`);
+  }
+});
+
+test('equal finishes stay one group, and a file without display properties has no metallic', async () => {
+  const twice =
+    '<m:pbmetallicdisplayproperties id="20"><m:pbmetallic name="a" metallicness="1" roughness="0.2"/><m:pbmetallic name="b" metallicness="1" roughness="0.2"/></m:pbmetallicdisplayproperties><basematerials id="4" displaypropertiesid="20"><base name="a" displaycolor="#FF0000"/><base name="b" displaycolor="#FF0000"/></basematerials>';
+  const triangles = '<triangle v1="0" v2="1" v3="2" pid="4" p1="0"/><triangle v1="0" v2="2" v3="3" pid="4" p1="1"/>';
+  assert.deepEqual(finishes(await parse3MFMaterials(pack(model(twice, triangles)))), [[2, ['a', 1, 0.2]]]);
+  const bare = await parse3MFMaterials(pack(model(`<basematerials id="4">${THREE}</basematerials>`, triangles)));
+  assert.ok(bare.groups.every((group) => !('metallic' in group)));
+});
+
+const MAPS =
+  '<m:texture2d id="30" path="/3D/Texture/m.png" contenttype="image/png"/><m:texture2d id="31" path="/3D/Texture/r.png" contenttype="image/png"/>';
+const mapped = (extra) =>
+  `<m:pbmetallictexturedisplayproperties id="21" name="Worn" metallictextureid="30" roughnesstextureid="31" ${extra}/>`;
+const PARTS = { '3D/Texture/a.png': PNG, '3D/Texture/m.png': PNG, '3D/Texture/r.png': PNG };
+const shownCoords = COORDS.replace('texid="1"', 'texid="1" displaypropertiesid="21"');
+const CORNER = '<triangle v1="0" v2="1" v3="2" pid="2" p1="0"/>';
+
+test('metallic texture properties name their maps, factors and base colour factor', async () => {
+  for (const [extra, expected] of [
+    ['', { metalness: 1, roughness: 1 }],
+    [
+      'metallicfactor="0.5" roughnessfactor="2" basecolorfactor="#80FF40"',
+      { metalness: 0.5, roughness: 2, baseColorFactor: [0x80 / 255, 1, 0x40 / 255, 1] },
+    ],
+    ['basecolorfactor="#FFFFFF"', { metalness: 1, roughness: 1 }],
+  ]) {
+    const result = await parse3MFMaterials(pack(model(MAPS + mapped(extra) + TEXTURE + shownCoords, CORNER), PARTS));
+    // Textures are listed in the file's order: the two maps, then the colour texture.
+    assert.deepEqual(result.groups[0].metallic, {
+      name: 'Worn',
+      ...expected,
+      metalnessTexture: 0,
+      roughnessTexture: 1,
+    });
+    assert.equal(result.groups[0].texture, 2);
+  }
+});
+
+test('a stack takes the lowest layer that has display properties, named by its place', async () => {
+  const resources = `${MAPS}${mapped('')}${TEXTURE}${shownCoords}${METALS}<m:colorgroup id="6"><m:color color="#FFFFFF"/></m:colorgroup><basematerials id="4" displaypropertiesid="20">${THREE}</basematerials>`;
+  const stack = async (pids, row) => {
+    const layers = `<m:multiproperties id="7" pids="${pids}"><m:multi pindices="${row}"/></m:multiproperties>`,
+      xml = model(resources + layers, '<triangle v1="0" v2="1" v3="2" pid="7" p1="0"/>');
+    return (await parse3MFMaterials(pack(xml, PARTS))).groups[0].metallic;
+  };
+  const over = await stack('6 2', '0 1');
+  assert.deepEqual([over.name, over.layer, over.roughnessTexture], ['Worn', 1, 1]);
+  const under = await stack('4 2', '1 0');
+  assert.deepEqual([under.name, under.layer, under.metalness], ['Paint', 0, 0]);
+});
+
+test("display properties after their group, and on one base as the Consortium's sample writes them, are read", async () => {
+  const late = `<basematerials id="4" displaypropertiesid="20">${THREE}</basematerials>${METALS}`;
+  const result = await parse3MFMaterials(pack(model(late, '<triangle v1="0" v2="1" v3="2" pid="4" p1="0"/>')));
+  assert.equal(result.groups[0].metallic.name, 'Steel');
+  const metallic = await parse3MFMaterials(await sample('multiprop-metallic.3mf'));
+  assert.deepEqual(
+    metallic.groups.map((group) => group.metallic),
+    [
+      { name: 'MetalProp', metalness: 1, roughness: 0.2, layer: 0 },
+      { name: 'MetalProp', metalness: 1, roughness: 0.2 },
+    ],
+  );
+});
+
+test('specular and translucent display properties are passed over', async () => {
+  for (const other of ['pbspeculardisplayproperties', 'translucentdisplayproperties']) {
+    const xml = model(
+      `<m:${other} id="20"/><basematerials id="4" displaypropertiesid="20">${THREE}</basematerials>`,
+      '<triangle v1="0" v2="1" v3="2" pid="4" p1="0"/>',
+    );
+    assert.equal((await parse3MFMaterials(pack(xml))).groups[0].metallic, undefined);
+  }
+});
+
+test('broken display properties are named errors', async () => {
+  const triangle = (p) => `<triangle v1="0" v2="1" v3="2" pid="4" p1="${p}"/>`;
+  const base = (reference) => `<basematerials id="4" displaypropertiesid="${reference}">${THREE}</basematerials>`;
+  const one = (attributes) =>
+    `<m:pbmetallicdisplayproperties id="20"><m:pbmetallic name="x" ${attributes}/></m:pbmetallicdisplayproperties>${base(20)}`;
+  for (const [resources, code, p = 0] of [
+    [base(99), 'syntax'],
+    [one('metallicness="1" roughness="0.5"'), 'range', 1],
+    [one('metallicness="1.5"'), 'range'],
+    [one('roughness="-0.1"'), 'range'],
+    [one('roughness="rough"'), 'range'],
+    // A texture's properties on a base material group.
+    [MAPS + mapped('') + base(21), 'syntax'],
+  ])
+    await refuses(parse3MFMaterials(pack(model(resources, triangle(p)), PARTS)), code);
+  const textured = (display, coords = shownCoords) =>
+    parse3MFMaterials(pack(model(display + TEXTURE + coords, CORNER), PARTS));
+  await refuses(textured(mapped('')), 'syntax');
+  await refuses(textured(MAPS + mapped('metallicfactor="-1"')), 'range');
+  await refuses(textured(MAPS + mapped('basecolorfactor="red"')), 'syntax');
+  await refuses(textured(METALS, COORDS.replace('texid="1"', 'texid="1" displaypropertiesid="20"')), 'syntax');
+});
