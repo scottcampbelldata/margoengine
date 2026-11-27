@@ -21,6 +21,7 @@ import { pow } from '@margoengine/math/pinned';
 import type { ManoeuvringModel } from './mmg.js';
 import { KVLCC2_PROPELLER, type PropellerCurves, rudderLiftSlope } from './propeller.js';
 import { ittc1957, SEA_WATER_VISCOSITY } from './resistance.js';
+import { shipError } from './errors.js';
 
 const PI = 3.141592653589793;
 
@@ -84,14 +85,14 @@ export function empiricalModel(hull: EmpiricalHull): ManoeuvringModel & { readon
     ['draught', d],
   ] as const)
     if (!(v > 0 && Number.isFinite(v)))
-      throw new RangeError(`A hull's ${name} is finite metres above 0 (got ${v}); pass it.`);
-  if (!(Cb > 0.3 && Cb < 1)) throw new RangeError(`A block coefficient lies in (0.3, 1) (got ${Cb}); pass one.`);
+      throw shipError(`A hull's ${name} is finite metres above 0 (got ${v}); pass it.`);
+  if (!(Cb > 0.3 && Cb < 1)) throw shipError(`A block coefficient lies in (0.3, 1) (got ${Cb}); pass one.`);
   if (!(trim >= 0 && Number.isFinite(trim)))
-    throw new RangeError(
+    throw shipError(
       `Trim by the stern is finite metres, 0 or more (got ${trim}); the regressions hold no trim by the bow.`,
     );
   if (!(hull.propeller?.diameter > 0 && hull.rudder?.area > 0 && hull.rudder?.span > 0))
-    throw new RangeError('A hull needs its propeller {diameter} and rudder {area, span} in metres; pass them.');
+    throw shipError('A hull needs its propeller {diameter} and rudder {area, span} in metres; pass them.');
   const rho = hull.density ?? 1025,
     nu = hull.viscosity ?? SEA_WATER_VISCOSITY,
     g = hull.gravity ?? gravityMagnitude(DEFAULT_GRAVITY),

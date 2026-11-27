@@ -9,6 +9,7 @@
 //   Fn_h^2) radians with C_theta 1, the scaling Tuck's slender-body theory gives in open water of constant depth.
 // Fn_h = V / sqrt(g h). All hold below Fn_h 0.7 (Huuska's limit), where the flow under the ship is still subcritical.
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
+import { shipError } from './errors.js';
 
 /** What a squat law needs: the ship's length, beam, draught, block coefficient, its speed, the water's depth. */
 export interface SquatCase {
@@ -44,17 +45,15 @@ function depthFroude(c: SquatCase): number {
     ['depth', depth],
   ] as const)
     if (!(v > 0 && Number.isFinite(v)))
-      throw new RangeError(`A squat case's ${name} is finite and above 0 (got ${v}); pass it.`);
+      throw shipError(`A squat case's ${name} is finite and above 0 (got ${v}); pass it.`);
   if (!(depth > draught))
-    throw new RangeError(
-      `The water (${depth} m) is deeper than the draught (${draught} m) for a ship afloat; pass both.`,
-    );
+    throw shipError(`The water (${depth} m) is deeper than the draught (${draught} m) for a ship afloat; pass both.`);
   if (!(speed >= 0 && Number.isFinite(speed)))
-    throw new RangeError(`A speed is finite m/s, 0 or more (got ${speed}); pass one.`);
+    throw shipError(`A speed is finite m/s, 0 or more (got ${speed}); pass one.`);
   const g = c.gravity ?? gravityMagnitude(DEFAULT_GRAVITY),
     fn = speed / Math.sqrt(g * depth);
   if (!(fn < 0.7))
-    throw new RangeError(
+    throw shipError(
       `Squat laws hold below a depth Froude number of 0.7 (got ${fn.toFixed(3)}); slow the ship or deepen the water.`,
     );
   return fn;
@@ -73,7 +72,7 @@ export function squat(c: SquatCase): Squat {
   let ks = 1;
   if (c.channel) {
     if (!(c.channel.area > 0.98 * B * T))
-      throw new RangeError(
+      throw shipError(
         `A channel's cross-section (${c.channel.area} m^2) is larger than the ship's; pass its area in m^2.`,
       );
     const s1 = ((0.98 * B * T) / c.channel.area) * (c.channel.k1 ?? 1);

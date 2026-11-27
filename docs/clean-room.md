@@ -17091,3 +17091,18 @@ paper's companion code was read.
 Own derivations: the friction demand of a prop on a ship's deck, R^T (a - g) at the prop, from the deck's motion in doubles
 (`packages/physics/tests/deck-props.test.js`); the tipping criterion, half width over the height of the centre of mass
 against that demand; the slow-heel onset at atan mu.
+### Ship thruster from measurements, and the ship entry's coded errors (SEA-09, 2026-11-26)
+
+`THRUSTER_MERIT_COEFFICIENT`, `THRUSTER_AHEAD` and `thrusterAhead` in `packages/physics/src/ship/solver.ts`, and
+`src/ship/errors.ts`, written from:
+
+- J. L. Beveridge, "Design and performance of bow thrusters", Naval Ship Research and Development Center report 3611,
+  1971, https://web.itu.edu.tr/takinaci/Comp_Progs/BowThruster/Design%20and%20performance%20of%20bow%20thrusters-Beveridge-1971.pdf
+  (pages 5 to 11 and Figure 2, read): the static merit coefficient C = T^(3/2) / (P sqrt(rho A)) with its ideal 2 for a
+  straight duct, Table 1's measured coefficients (0.55 to 1.5), and Figure 2b, Chislett's captive surface-ship body force
+  and moment against U / U_j, digitised here to about 0.02.
+
+The conversion (C / 2)^(2/3) to a share of the momentum bound follows from Beveridge's definitions. The errors follow
+the loads entry's arrangement (`src/loads/errors.ts`). Proof: `packages/physics/tests/ship.test.js`, "a tunnel thruster
+keeps its momentum bound" and "the ship solver refuses what it cannot be made from".
+

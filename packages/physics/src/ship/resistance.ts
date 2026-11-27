@@ -13,6 +13,7 @@
 //   C_F = 0.075 / (log10 Re - 2)^2 and the air resistance C_AA = C_DA rho_A A_VS / (rho S).
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { cos, exp, ln, pow } from '@margoengine/math/pinned';
+import { shipError } from './errors.js';
 
 const LN10 = 2.302585092994046;
 /** Sea water's kinematic viscosity at 15 degrees C, m^2/s (the value that gives Holtrop and Mennen's example its C_F). */
@@ -23,7 +24,7 @@ export const SEA_WATER_DENSITY = 1025;
 /** The ITTC-1957 model-ship correlation line: C_F = 0.075 / (log10 Re - 2)^2. */
 export function ittc1957(reynolds: number): number {
   if (!(reynolds > 100 && Number.isFinite(reynolds)))
-    throw new RangeError(`The friction line takes a Reynolds number above 100 (got ${reynolds}); pass V L / nu.`);
+    throw shipError(`The friction line takes a Reynolds number above 100 (got ${reynolds}); pass V L / nu.`);
   const l = ln(reynolds) / LN10 - 2;
   return 0.075 / (l * l);
 }
@@ -131,11 +132,11 @@ export function holtropMennen(hull: HoltropHull, speed: number, options: Holtrop
     ['waterplane', CWP],
   ] as const)
     if (!(value > 0 && Number.isFinite(value)))
-      throw new RangeError(`A hull's ${name} is finite and above 0 (got ${value}); pass it.`);
+      throw shipError(`A hull's ${name} is finite and above 0 (got ${value}); pass it.`);
   if (!Number.isFinite(lcb) || !(AT >= 0) || !Number.isFinite(stern))
-    throw new RangeError(`A hull's lcb (percent of L) and stern are finite and its transom area 0 or more; pass them.`);
+    throw shipError(`A hull's lcb (percent of L) and stern are finite and its transom area 0 or more; pass them.`);
   if (!(speed >= 0 && Number.isFinite(speed)))
-    throw new RangeError(`A speed is finite m/s, 0 or more (got ${speed}); pass one.`);
+    throw shipError(`A speed is finite m/s, 0 or more (got ${speed}); pass one.`);
   const rho = options.density ?? SEA_WATER_DENSITY,
     nu = options.viscosity ?? SEA_WATER_VISCOSITY,
     g = options.gravity ?? gravityMagnitude(DEFAULT_GRAVITY),
@@ -241,7 +242,7 @@ export function holtropMennen(hull: HoltropHull, speed: number, options: Holtrop
     const D = prop.diameter,
       Z = prop.blades;
     if (!(D > 0 && Number.isFinite(D) && Number.isInteger(Z) && Z >= 2 && Z <= 9))
-      throw new RangeError(`A propeller has a diameter above 0 and 2 to 9 blades (got ${D} m, ${Z}); pass them.`);
+      throw shipError(`A propeller has a diameter above 0 and 2 to 9 blades (got ${D} m, ${Z}); pass them.`);
     const CV = k1 * CF + CA,
       CP1 = 1.45 * CP - 0.315 - 0.0225 * lcb;
     if (hull.screws === 2) {

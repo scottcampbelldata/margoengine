@@ -4128,7 +4128,8 @@ Each ship is `{row, model}` and takes these settings:
 - `model`: a `ManoeuvringModel` with the particulars, hydrodynamic derivatives and interaction constants. `KVLCC2_L7` is the 7 m KVLCC2 model of the paper, and `scaleModel(model, factor)` Froude-scales it (`scaleModel(KVLCC2_L7, 320 / 7)` is the tanker).
 - `midship`, `forward` and `up` in the body's frame (defaults the origin, +X and +Y).
 - `rudderRate`: default 2.32 degrees a second, the SOLAS 35-to-30 degrees in 28 s.
-- `thruster`: `{diameter, power, position}` for a bow thruster.
+- `thruster`: `{diameter, power, position, merit}` for a bow thruster. `merit` is its static merit coefficient C = T^(3/2) / (P sqrt(rho A)) (default 0.82; Beveridge 1971 measured 0.55 to 1.5 on models, 2 the ideal), so its thrust is (C / 2)^(2/3) of the momentum bound `thrusterThrust`; with way on its force and moment fall and rise again as Chislett's captive tests show (`thrusterAhead(U / U_j)`).
+- `shaftDepth`: the propeller shaft's depth below the waterline, m (default the draught less 0.6 diameters).
 - `thrusterOutlet`: `{halfSpan, depth}` in metres from the centreline and below the design waterline. Requires a
   thruster and a depth at least half its diameter. Omit it to keep the tunnel out of the water field.
 - `block` and `addedMass`: `addedMass: false` leaves the surge, sway and yaw added mass to a HullSolver's strips (the ship still claims their damping).
@@ -4146,7 +4147,7 @@ Steer with `control(i)`:
 
 The autopilot places the poles of the ship's own manoeuvring model, linearised in sway and yaw at its speed (`Manoeuvring.linearize`), with an integral of the heading error, so a course-unstable hull such as KVLCC2 holds its heading and a steady wind leaves no offset. It eases into a new heading through a second-order reference at its own frequency, places its gains again when the speed changes by a tenth, and on a track crabs into a steady drift low-passed over 10 L / U. `status(i)` then gives its `heading`, `headingOrdered` and `track` (`leg`, `course`, `crossTrack`, positive to starboard of the leg, and `done`).
 
-`status(i)` reads speed, drift, yaw rate, rudder angle, the forces, the squat, the thruster's push and the quay's pull.
+`status(i)` reads speed, drift, yaw rate, rudder angle, the forces, the squat, the thruster's push and the quay's pull. Every refusal of the ship entry is a coded `MargoError` (`unsupported`) whose message names the fix and links to margoengine.com/errors#ships.
 
 What it gives the rest of the engine:
 - `sea(base)`: the sea drawn down along each hull by its squat (ICORELS and Hooft's form of Tuck's law, Huuska's factor in a channel). Pass it to the `HullSolver` as its sea, so the hull sinks and trims by its own hydrostatics and the drawdown shows. `drawdown(x, z)` reads it.

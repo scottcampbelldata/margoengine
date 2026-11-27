@@ -20,6 +20,7 @@
 // - The rudder jet: the rudder's side force turns the race by its momentum, tan phi = F / (rho A_w V_w^2).
 import { cos, exp, sin } from '@margoengine/math/pinned';
 import { atan2, type PropellerRace, raceVelocity } from './propeller.js';
+import { shipError } from './errors.js';
 
 const PI = 3.141592653589793;
 const LN2 = 0.6931471805599453;
@@ -258,7 +259,7 @@ export class VortexCavity {
   private on = false;
   constructor(private readonly gas = 1) {
     if (!(gas >= 0 && gas <= 1))
-      throw new RangeError(`A gas saturation lies in [0, 1] (got ${gas}); pass one, 1 for harbour water.`);
+      throw shipError(`A gas saturation lies in [0, 1] (got ${gas}); pass one, 1 for harbour water.`);
   }
   /** Updates with the flow's sigma against the vortex's inception index; returns whether a cavity stands. */
   update(sigma: number, inception: number): boolean {

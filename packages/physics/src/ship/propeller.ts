@@ -18,6 +18,7 @@
 //   D (Hamill and Kee 2016) handing over to Fuehrer and Roemisch's 2.6 D / X, and the profile exp(-22.2 (r / X)^2).
 import { cos, exp, pow, sin } from '@margoengine/math/pinned';
 import { angleOf } from '../flight.js';
+import { shipError } from './errors.js';
 
 const PI = 3.141592653589793;
 
@@ -69,11 +70,11 @@ export class Propeller {
   /** @throws RangeError for a diameter not above 0 or curves without bollard thrust or a zero-thrust advance. */
   constructor(diameter: number, curves: PropellerCurves = KVLCC2_PROPELLER) {
     if (!(diameter > 0 && Number.isFinite(diameter)))
-      throw new RangeError(`A propeller's diameter is finite metres above 0 (got ${diameter}); pass one.`);
+      throw shipError(`A propeller's diameter is finite metres above 0 (got ${diameter}); pass one.`);
     const [k0, k1, k2] = curves?.thrust ?? [],
       [q0] = curves?.torque ?? [];
     if (!(k0! > 0 && q0! > 0 && Number.isFinite(k1) && Number.isFinite(k2) && curves.pitch > 0 && curves.pitch < 3))
-      throw new RangeError(
+      throw shipError(
         'Open-water curves have K_T and K_Q above 0 at bollard pull and a pitch ratio in (0, 3); pass {thrust, torque, pitch}.',
       );
     this.diameter = diameter;
@@ -82,9 +83,7 @@ export class Propeller {
     const disc = k1! * k1! - 4 * k2! * k0!,
       root = k2 !== 0 ? (-k1! - Math.sqrt(Math.max(0, disc))) / (2 * k2!) : -k0! / k1!;
     if (!(root > 0 && Number.isFinite(root)))
-      throw new RangeError(
-        'These open-water curves never lose their thrust as the advance grows; pass measured curves.',
-      );
+      throw shipError('These open-water curves never lose their thrust as the advance grows; pass measured curves.');
     this.zeroThrust = root;
     // Healey's lift and drag with the hydrodynamic pitch angle phi, fitted so the first quadrant's thrust matches the
     // quadratic's at bollard pull, its slope there and its zero (the geometric pitch angle does not: a real blade's zero lift
@@ -275,14 +274,14 @@ export function raceVelocity(
 /** Fujii's rudder lift slope f_alpha = 6.13 Lambda / (Lambda + 2.25) for aspect ratio Lambda (MMG standard method, eq. 38). */
 export function rudderLiftSlope(aspect: number): number {
   if (!(aspect > 0 && Number.isFinite(aspect)))
-    throw new RangeError(`A rudder's aspect ratio is finite and above 0 (got ${aspect}); pass span^2 / area.`);
+    throw shipError(`A rudder's aspect ratio is finite and above 0 (got ${aspect}); pass span^2 / area.`);
   return (6.13 * aspect) / (aspect + 2.25);
 }
 
 /** A tunnel thruster's ideal thrust (4 rho A)^(1/3) P^(2/3), N, for power `power` W through a tunnel of `diameter` m. */
 export function thrusterThrust(power: number, diameter: number, density = 1025): number {
   if (!(power >= 0 && diameter > 0 && Number.isFinite(power) && Number.isFinite(diameter)))
-    throw new RangeError(
+    throw shipError(
       `A thruster has a power of 0 W or more and a tunnel above 0 m (got ${power}, ${diameter}); pass them.`,
     );
   const area = (PI * diameter * diameter) / 4;

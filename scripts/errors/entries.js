@@ -8,6 +8,15 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'ships',
+    title: '@margoengine/physics/ship: ships under way',
+    kind: 'family',
+    messages: [],
+    cause:
+      'The ship entry was given something it cannot use: a manoeuvring model, hull, propeller, rudder, thruster, wall, track or heading with a missing, negative or non-finite value, a body row that is not a whole number, a speed of 0 or less, or a ship index past its ships. Each message names the value it was given.',
+    fix: 'Pass the value the message names, in SI units (metres, seconds, radians, newtons, watts, kg/m^3): a model from `KVLCC2_L7`, `scaleModel` or `empiricalModel`, a body row from the rigid solver, a track of two or more waypoints, a finite heading or null, and a ship index from 0 to one less than the ships given.',
+  },
+  {
     id: 'hydrodynamic-loads',
     title: '@margoengine/physics/loads inputs',
     kind: 'family',

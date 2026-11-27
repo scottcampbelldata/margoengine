@@ -33,6 +33,8 @@ import {
   scaleModel,
   squat,
   thrusterThrust,
+  thrusterAhead,
+  THRUSTER_MERIT,
 } from '../dist/ship.js';
 import { PhysicsWorld, RigidSolver } from '../dist/world.js';
 
@@ -234,6 +236,19 @@ test('squat: the published canal case, ICORELS 0.34186 m and Huuska 0.52909 m; T
 test('a tunnel thruster keeps its momentum bound: 234 kN for 1,000 kW through a 2 m tunnel', () => {
   assert.ok(Math.abs(thrusterThrust(1e6, 2) / 1e3 - 234) < 0.5);
   assert.throws(() => thrusterThrust(-1, 2), /power/);
+  // Beveridge (1971): the static merit coefficient C = T^(3/2) / (P sqrt(rho A)) is 2 for the bound, so a thruster of C has
+  // (C / 2)^(2/3) of it; the default, his 800-hp LST unit's 0.82, gives back C = 0.82 from its own thrust and power.
+  const T = THRUSTER_MERIT * thrusterThrust(1e6, 2),
+    C = T ** 1.5 / (1e6 * Math.sqrt(1025 * Math.PI));
+  assert.ok(Math.abs(C - 0.82) < 1e-9, `${C}`);
+  assert.ok(Math.abs(THRUSTER_MERIT - (0.82 / 2) ** (2 / 3)) < 1e-15);
+  // With way on, force and moment follow Chislett's captive tanker (Beveridge's Figure 2b): the force at its least, 0.30,
+  // near U / U_j 0.6, the moment at its least, 0.55, near 0.4, and both whole again at rest.
+  assert.deepEqual(thrusterAhead(0), [1, 1]);
+  assert.deepEqual(thrusterAhead(0.6), [0.3, 0.62]);
+  assert.deepEqual(thrusterAhead(0.4), [0.37, 0.55]);
+  assert.ok(Math.abs(thrusterAhead(0.7)[0] - 0.315) < 1e-12);
+  assert.deepEqual(thrusterAhead(5), [0.53, 1.07]);
 });
 
 /** A world of one KVLCC2 L7 box hull (no gravity: the plane alone) under a ShipSolver, at 60 Hz. */
@@ -264,7 +279,7 @@ test('SEA-15 a live tunnel water jet reverses, keeps nozzle momentum and restore
   const measuredExit = 1.02;
   const area = (Math.PI * diameter * diameter) / 4;
   const thrust = density * area * measuredExit ** 2;
-  const power = (thrust / (0.55 * Math.cbrt(4 * density * area))) ** 1.5;
+  const power = (thrust / (THRUSTER_MERIT * Math.cbrt(4 * density * area))) ** 1.5;
   const position = 1,
     halfSpan = 0.2,
     depth = 0.2;
@@ -681,6 +696,22 @@ test('the ship solver refuses what it cannot be made from, naming the fix', () =
   assert.throws(() => plane({}, { params: { depth: -2 } }), /depth/);
   assert.throws(() => plane({}, { params: { walls: [{ from: [0], to: [1, 1] }] } }), /wall/);
   assert.throws(() => new ShipSolver().control?.(0), /no ship/);
+  // Every refusal of the ship entry is a coded MargoError that links to its entry on the errors page.
+  const coded = (fn, text) =>
+    assert.throws(
+      fn,
+      (e) =>
+        e.name === 'MargoError' && e.code === 'unsupported' && text.test(e.message) && /errors#ships$/.test(e.message),
+    );
+  coded(() => plane({ row: -1 }), /body row/);
+  coded(() => plane({ autopilot: { bandwidth: 0 } }), /bandwidth/);
+  coded(() => new Manoeuvring({ ...KVLCC2_L7, length: 0 }), /length/);
+  coded(() => new Manoeuvring(KVLCC2_L7).linearize(0), /speed/);
+  coded(() => holtropMennen({ ...{ length: -1 } }, 5), /./);
+  coded(() => squat({ length: 0 }), /./);
+  const { ships, world } = plane({}, { speed: 1 });
+  ships.control(0).track = { waypoints: [[0, 0]] };
+  coded(() => world.advance(1), /two or more waypoints/);
 });
 
 /** A box hull of `size` (x, y, z) about its centre, each face a 4 by 4 grid, wound outward. */

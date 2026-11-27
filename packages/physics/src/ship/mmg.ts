@@ -9,6 +9,7 @@
 // position is (x, z) and its heading psi turns from +X toward +Z (a ship heading +X turns to starboard toward +Z).
 import { cos, exp, sin } from '@margoengine/math/pinned';
 import { atan2, Propeller, type PropellerCurves, KVLCC2_PROPELLER } from './propeller.js';
+import { shipError } from './errors.js';
 
 const DEG = 3.141592653589793 / 180;
 
@@ -105,7 +106,7 @@ export const KVLCC2_L7: ManoeuvringModel = Object.freeze({
 /** A model scaled by `factor` in length (Froude scaling: the non-dimensional coefficients stay). */
 export function scaleModel(model: ManoeuvringModel, factor: number): ManoeuvringModel {
   if (!(factor > 0 && Number.isFinite(factor)))
-    throw new RangeError(`A scale is a finite factor above 0 (got ${factor}); pass one, such as 320 / 7.`);
+    throw shipError(`A scale is a finite factor above 0 (got ${factor}); pass one, such as 320 / 7.`);
   return {
     ...model,
     length: model.length * factor,
@@ -197,11 +198,11 @@ export class Manoeuvring {
       ['volume', model?.volume],
     ] as const)
       if (!(value! > 0 && Number.isFinite(value)))
-        throw new RangeError(`A manoeuvring model's ${name} is finite and above 0 (got ${value}); pass it.`);
+        throw shipError(`A manoeuvring model's ${name} is finite and above 0 (got ${value}); pass it.`);
     this.model = model;
     this.density = options.density ?? 1025;
     if (options.resistance !== undefined && typeof options.resistance !== 'function')
-      throw new TypeError("A hull's resistance is a function of the speed, m/s, giving N; pass one, or none for R'_0.");
+      throw shipError("A hull's resistance is a function of the speed, m/s, giving N; pass one, or none for R'_0.");
     this.resistanceAt = options.resistance;
     this.state = { x: 0, z: 0, heading: 0, u: 0, v: 0, r: 0, rudder: 0, ...state };
     this.propeller = new Propeller(model.propeller.diameter, model.propeller.curves);
@@ -340,8 +341,7 @@ export class Manoeuvring {
 
   /** Advances the ship by `dt` s (fourth-order Runge-Kutta; the rudder turns toward its order at its rate first). */
   step(dt: number): this {
-    if (!(dt > 0 && Number.isFinite(dt)))
-      throw new RangeError(`A step is finite seconds above 0 (got ${dt}); pass one.`);
+    if (!(dt > 0 && Number.isFinite(dt))) throw shipError(`A step is finite seconds above 0 (got ${dt}); pass one.`);
     const s = this.state,
       order = Math.max(-this.rudderLimit, Math.min(this.rudderLimit, this.order)),
       turn = this.rudderRate * dt;
@@ -375,7 +375,7 @@ export class Manoeuvring {
    */
   linearize(speed: number): { a: [number, number, number, number]; b: [number, number] } {
     if (!(speed > 0 && Number.isFinite(speed)))
-      throw new RangeError(`A speed is finite m/s above 0 (got ${speed}); pass one.`);
+      throw shipError(`A speed is finite m/s above 0 (got ${speed}); pass one.`);
     const save = this.revolutions,
       L = this.model.length,
       out = new Float64Array(6),
@@ -408,7 +408,7 @@ export class Manoeuvring {
    */
   selfPropulsion(speed: number): number {
     if (!(speed > 0 && Number.isFinite(speed)))
-      throw new RangeError(`A speed is finite m/s above 0 (got ${speed}); pass one.`);
+      throw shipError(`A speed is finite m/s above 0 (got ${speed}); pass one.`);
     const M = this.model,
       resistance = this.resistanceAt
         ? this.resistanceAt(speed)

@@ -260,7 +260,9 @@ export interface Ship {
         readonly diameter: number;
         readonly power: number;
         readonly position?: number;
+        readonly merit?: number;
     };
+    readonly shaftDepth?: number;
     readonly thrusterOutlet?: {
         readonly halfSpan: number;
         readonly depth: number;
@@ -385,7 +387,11 @@ export interface SquatCase {
     readonly gravity?: number;
 }
 
-export const THRUSTER_MERIT = 0.55;
+export const THRUSTER_AHEAD: readonly (readonly [number, number, number])[];
+
+export const THRUSTER_MERIT: number;
+
+export const THRUSTER_MERIT_COEFFICIENT = 0.82;
 
 export const TIP_VORTEX_GONE = 1.5;
 
@@ -443,6 +449,8 @@ export function scaleModel(model: ManoeuvringModel, factor: number): Manoeuvring
 export function squat(c: SquatCase): Squat;
 
 export function steerTrack(track: ShipTrack, x: number, z: number, length: number, state: TrackState): TrackState;
+
+export function thrusterAhead(m: number): [number, number];
 
 export function thrusterThrust(power: number, diameter: number, density?: number): number;
 

@@ -9,7 +9,8 @@
 //   lowered by the ship's sinkage and trim over its length, for the HullSolver to float the hull on, so the hull sinks and
 //   trims by its own hydrostatics and the drawdown shows;
 // - the propellers' races as the water's flow (`water`, a FlowField; propeller.ts), for foam, bubbles, the bed and divers;
-// - a bow thruster's push, its ideal thrust (4 rho A)^(1/3) P^(2/3) times a figure of merit, falling as the ship gathers way;
+// - a bow thruster's push, its ideal thrust (4 rho A)^(1/3) P^(2/3) times (C / 2)^(2/3) for its measured static merit
+//   coefficient C, its force and moment falling and rising again with way on as Chislett's captive tests show (Beveridge 1971);
 // - suction toward a quay or bank alongside, from the return flow squeezed through the gap (a one-dimensional continuity
 //   estimate, uncalibrated: docs/limits.md);
 // - the hull's pressure on the surface as wake sources (`sources(t)`) for a `WakeSolver`, so it makes a bow wave and a Kelvin
@@ -18,7 +19,7 @@
 // State: each ship's rudder angle. Its controls (revolutions, rudder order, thruster) are inputs, set with `control()`.
 import type { FlowField, FlowSample, SeaSource, SeaSurface } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
-import { atan2, cos, exp } from '@margoengine/math/pinned';
+import { atan2, cos, exp, pow } from '@margoengine/math/pinned';
 import type { SeaQuery } from '../seakeeping/wetted.js';
 import { regionWords } from '../world/memory.js';
 import {
@@ -48,6 +49,7 @@ import {
   VortexCavity,
 } from './race.js';
 import { squat } from './squat.js';
+import { shipError } from './errors.js';
 
 type Vec3 = [number, number, number];
 const SHIP_LAYOUT = 1;
@@ -57,8 +59,47 @@ const SHIP_LAYOUT = 1;
  */
 const PILOT_WORDS = 6;
 const THRUSTER_JET_WORDS = 8;
-/** A tunnel thruster's figure of merit: its thrust over the momentum bound (installed thrusters give about 0.45 to 0.65). */
-export const THRUSTER_MERIT = 0.55;
+/**
+ * A tunnel thruster's static merit coefficient C = T^(3/2) / (P sqrt(rho A)), whose ideal for a straight duct is 2 (Beveridge,
+ * "Design and performance of bow thrusters", NSRDC report 3611, 1971, pages 5 to 11, read): measured on models 0.55 to 0.87
+ * for stock and installed units and up to 1.5 for the best (his Table 1); 0.82 is his 800-hp LST unit's. The thrust over the
+ * momentum bound `thrusterThrust` is then (C / 2)^(2/3).
+ */
+export const THRUSTER_MERIT_COEFFICIENT = 0.82;
+/** The thrust over the momentum bound of a thruster of merit coefficient 0.82: (0.82 / 2)^(2/3). */
+export const THRUSTER_MERIT = pow(THRUSTER_MERIT_COEFFICIENT / 2, 2 / 3);
+/**
+ * A bow thruster's body force and moment at ahead speed over their static values, against the ship's speed over the jet's,
+ * U / U_j: Chislett's captive tanker model as Beveridge (1971) reproduces it (his Figure 2b, read from the figure to about
+ * 0.02). The force falls to 0.30 near U / U_j 0.6 and the moment to 0.55 near 0.4, both rising after; held past 1.6.
+ */
+export const THRUSTER_AHEAD: readonly (readonly [number, number, number])[] = [
+  [0, 1, 1],
+  [0.1, 1.03, 1.04],
+  [0.15, 1, 1],
+  [0.2, 0.75, 0.8],
+  [0.3, 0.48, 0.6],
+  [0.4, 0.37, 0.55],
+  [0.5, 0.32, 0.57],
+  [0.6, 0.3, 0.62],
+  [0.8, 0.33, 0.75],
+  [1, 0.38, 0.86],
+  [1.2, 0.43, 0.95],
+  [1.4, 0.48, 1.02],
+  [1.6, 0.53, 1.07],
+];
+
+/** The thruster's force and moment ratios at U / U_j = `m`, by straight lines between `THRUSTER_AHEAD`'s points. */
+export function thrusterAhead(m: number): [number, number] {
+  const table = THRUSTER_AHEAD,
+    x = Math.max(0, Math.min(table[table.length - 1]![0], m));
+  let i = 1;
+  while (i < table.length - 1 && table[i]![0] < x) i++;
+  const [x0, f0, n0] = table[i - 1]!,
+    [x1, f1, n1] = table[i]!,
+    s = (x - x0) / (x1 - x0);
+  return [f0 + s * (f1 - f0), n0 + s * (n1 - n0)];
+}
 
 /** A ship: the body row it is the hull of, its MMG model and where its frame lies on the body. */
 export interface Ship {
@@ -70,7 +111,18 @@ export interface Ship {
   readonly forward?: readonly [number, number, number];
   readonly up?: readonly [number, number, number];
   /** A bow thruster: its tunnel's diameter, m, its power, W, and its place forward of the midship, m (default 0.42 L). */
-  readonly thruster?: { readonly diameter: number; readonly power: number; readonly position?: number };
+  readonly thruster?: {
+    readonly diameter: number;
+    readonly power: number;
+    readonly position?: number;
+    /** Its static merit coefficient C (default 0.82; Beveridge's measured 0.55 to 1.5, ideal 2). */
+    readonly merit?: number;
+  };
+  /**
+   * The propeller shaft's depth below the waterline at rest, m (default the draught less 0.6 diameters: a tip 0.1 diameter
+   * above the keel, an assumption, not a published figure; give the ship's own).
+   */
+  readonly shaftDepth?: number;
   /** Symmetric tunnel outlets in metres for the water field: `halfSpan` from centreline, `depth` below the design waterline. */
   readonly thrusterOutlet?: { readonly halfSpan: number; readonly depth: number };
   /** Its block coefficient, for its squat (default the model's volume over L B T). */
@@ -226,20 +278,18 @@ export class ShipSolver implements Solver<ShipParams> {
   init(host: SolverHost, params: ShipParams): void {
     const { ships, depth, walls = [], density = 1025, level = 0 } = params ?? ({} as ShipParams);
     if (!Array.isArray(ships) || ships.length === 0)
-      throw new TypeError(
-        'Ships under way need their bodies: pass {ships: [{row, model}]}, a model such as KVLCC2_L7.',
-      );
+      throw shipError('Ships under way need their bodies: pass {ships: [{row, model}]}, a model such as KVLCC2_L7.');
     if (!(density > 0 && Number.isFinite(density)))
-      throw new RangeError(`Water's density is finite kg/m^3 above 0 (got ${density}); pass one, or 1025.`);
+      throw shipError(`Water's density is finite kg/m^3 above 0 (got ${density}); pass one, or 1025.`);
     if (depth !== undefined && typeof depth !== 'function' && !(depth > 0))
-      throw new RangeError(
+      throw shipError(
         `The water's depth is metres above 0 or a function of (x, z) (got ${depth}); pass one, or none for deep water.`,
       );
     for (const wall of walls)
       if (!(wall?.from?.length === 2 && wall.to?.length === 2 && [...wall.from, ...wall.to].every(Number.isFinite)))
-        throw new RangeError('A wall is {from: [x, z], to: [x, z]} in metres; pass its two ends.');
+        throw shipError('A wall is {from: [x, z], to: [x, z]} in metres; pass its two ends.');
     if (!(Number.isInteger(level) && level >= 0 && level <= 7))
-      throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}); pass one.`);
+      throw shipError(`A rate level is a whole number from 0 to 7 (got ${level}); pass one.`);
     this.host = host;
     this.level = level as RateLevel;
     this.density = density;
@@ -249,7 +299,7 @@ export class ShipSolver implements Solver<ShipParams> {
     let top = -1;
     this.runtime = ships.map((ship) => {
       if (!(Number.isInteger(ship?.row) && ship.row >= 0))
-        throw new RangeError(`A ship's body row is a whole number, 0 or more (got ${ship?.row}); pass the body's row.`);
+        throw shipError(`A ship's body row is a whole number, 0 or more (got ${ship?.row}); pass the body's row.`);
       top = Math.max(top, ship.row);
       if (
         ship.thruster &&
@@ -259,7 +309,15 @@ export class ShipSolver implements Solver<ShipParams> {
           [ship.thruster.diameter, ship.thruster.power, ship.thruster.position ?? 0].every(Number.isFinite)
         )
       )
-        throw new RangeError('A thruster is {diameter in m above 0, power in W, position}; pass them.');
+        throw shipError('A thruster is {diameter in m above 0, power in W, position}; pass them.');
+      if (ship.thruster?.merit !== undefined && !(ship.thruster.merit > 0 && ship.thruster.merit <= 2))
+        throw shipError(
+          `A thruster's static merit coefficient lies in (0, 2], 2 the ideal straight duct (got ${ship.thruster.merit}); pass one, or leave it for 0.82.`,
+        );
+      if (ship.shaftDepth !== undefined && !(ship.shaftDepth > 0 && Number.isFinite(ship.shaftDepth)))
+        throw shipError(
+          `A shaft's depth is finite metres below the waterline above 0 (got ${ship.shaftDepth}); pass one.`,
+        );
       const outlet = ship.thrusterOutlet;
       if (
         outlet &&
@@ -271,11 +329,11 @@ export class ShipSolver implements Solver<ShipParams> {
           Number.isFinite(outlet.depth)
         )
       )
-        throw new RangeError(
+        throw shipError(
           'A bow thruster outlet needs a tunnel, positive half-span and full submergence; pass finite dimensions in metres and depth at least half the diameter.',
         );
       if (ship.rudderRate !== undefined && !(ship.rudderRate > 0 && Number.isFinite(ship.rudderRate)))
-        throw new RangeError(`A rudder's rate is finite rad/s above 0 (got ${ship.rudderRate}); pass one.`);
+        throw shipError(`A rudder's rate is finite rad/s above 0 (got ${ship.rudderRate}); pass one.`);
       const hull = ship.hull,
         mmg = new Manoeuvring(
           ship.model,
@@ -297,7 +355,7 @@ export class ShipSolver implements Solver<ShipParams> {
           Number.isFinite(pilot.damping ?? 0.8)
         )
       )
-        throw new RangeError(
+        throw shipError(
           `An autopilot's bandwidth (in U / L) and damping ratio are finite and above 0 (got ${pilot.bandwidth}, ${pilot.damping}); pass them, or leave them for 0.5 and 0.8.`,
         );
       return {
@@ -374,7 +432,7 @@ export class ShipSolver implements Solver<ShipParams> {
     if (control.track) {
       const track = control.track;
       if (!Array.isArray(track.waypoints) || track.waypoints.length < 2)
-        throw new RangeError('A track is {waypoints: [[x, z], ...]} with two or more waypoints; pass them.');
+        throw shipError('A track is {waypoints: [[x, z], ...]} with two or more waypoints; pass them.');
       const at = PILOT_WORDS * index,
         state: TrackState = status.track ?? { leg: words[at + 1]!, course: 0, crossTrack: 0, done: false };
       state.leg = words[at + 1]!;
@@ -391,9 +449,7 @@ export class ShipSolver implements Solver<ShipParams> {
       status.track = null;
       if (control.heading !== null && control.heading !== undefined) {
         if (!Number.isFinite(control.heading))
-          throw new RangeError(
-            `A heading is finite radians (got ${control.heading}); pass one, or null to steer by hand.`,
-          );
+          throw shipError(`A heading is finite radians (got ${control.heading}); pass one, or null to steer by hand.`);
         wanted = control.heading;
       }
     }
@@ -445,21 +501,21 @@ export class ShipSolver implements Solver<ShipParams> {
   /** Ship `index`'s controls, to read and set: `ships.control(0).revolutions = 2`. */
   control(index: number): ShipControl {
     const r = this.runtime[index];
-    if (!r) throw new RangeError(`There is no ship ${index}; pass 0 to ${this.runtime.length - 1}.`);
+    if (!r) throw shipError(`There is no ship ${index}; pass 0 to ${this.runtime.length - 1}.`);
     return r.control;
   }
 
   /** What ship `index` did in the last step. */
   status(index: number): ShipStatus {
     const r = this.runtime[index];
-    if (!r) throw new RangeError(`There is no ship ${index}; pass 0 to ${this.runtime.length - 1}.`);
+    if (!r) throw shipError(`There is no ship ${index}; pass 0 to ${this.runtime.length - 1}.`);
     return r.status;
   }
 
   /** The self-propulsion revolutions of ship `index` at `speed` m/s (thrust balancing its resistance). */
   revolutionsFor(index: number, speed: number): number {
     const r = this.runtime[index];
-    if (!r) throw new RangeError(`There is no ship ${index}; pass 0 to ${this.runtime.length - 1}.`);
+    if (!r) throw shipError(`There is no ship ${index}; pass 0 to ${this.runtime.length - 1}.`);
     return r.mmg.selfPropulsion(speed);
   }
 
@@ -514,15 +570,15 @@ export class ShipSolver implements Solver<ShipParams> {
       let push = 0;
       if (ship.thruster && ship.thruster.power > 0 && control.thruster !== 0) {
         const { diameter, power } = ship.thruster,
-          full = THRUSTER_MERIT * thrusterThrust(power, diameter, this.density),
+          merit = ship.thruster.merit ?? THRUSTER_MERIT_COEFFICIENT,
+          full = pow(merit / 2, 2 / 3) * thrusterThrust(power, diameter, this.density),
           jet = Math.sqrt(full / (this.density * 0.25 * Math.PI * diameter * diameter)),
-          m = Math.abs(u) / jet,
-          loss = m <= 0 ? 1 : Math.max(0.5, 1 - 1.25 * m * exp(1 - 2.5 * m)),
+          [force, moment] = thrusterAhead(Math.abs(u) / jet),
           command = Math.max(-1, Math.min(1, control.thruster));
-        push = command * full * loss;
+        push = command * full * force;
         Y += push;
         const forwardOffset = ship.thruster.position ?? 0.42 * L;
-        N += forwardOffset * push;
+        N += forwardOffset * command * full * moment;
         const outlet = ship.thrusterOutlet;
         if (jets && outlet && Math.abs(command) > 0) {
           const direction = scale(s, -Math.sign(command));
@@ -600,7 +656,7 @@ export class ShipSolver implements Solver<ShipParams> {
       }
       // The race: behind the propeller at its shaft, along -forward for thrust ahead.
       const P = M.propeller,
-        shaftDepth = Math.max(P.diameter / 2, d - 0.6 * P.diameter),
+        shaftDepth = ship.shaftDepth ?? Math.max(P.diameter / 2, d - 0.6 * P.diameter),
         prop = add(add(mid, scale(f, P.position * L)), scale(up, -shaftDepth)),
         // The race's own speed over the water it came from: the far wake less the inflow (momentum theory).
         induced = Math.max(0, forces.race - Math.max(0, forces.thrust > 0 ? forces.inflow : -forces.inflow));
