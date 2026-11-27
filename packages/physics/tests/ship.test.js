@@ -32,6 +32,10 @@ import {
   Propeller,
   ShipSolver,
   holtropMennen,
+  addedResistance,
+  besselI1,
+  besselK1,
+  driftLoads,
   iceResistance,
   huuska,
   icorels,
@@ -1213,4 +1217,109 @@ test("level ice resists a ship by Riska et al.'s regression: Hu and Zhou's print
     () => plane({ iceHull: { stem: 2, bow: 1, parallel: 1 } }),
     (e) => e.code === 'unsupported' && /stem angle/.test(e.message),
   );
+});
+
+test("waves' mean drift: S175's beam-sea sway and head-sea added resistance as Yasukawa and Adnan measured them, KVLCC2's as Lee et al. and Sadat-Hosseini et al. did", () => {
+  // The modified Bessel functions to Abramowitz and Stegun's tables.
+  assert.ok(Math.abs(besselI1(1) - 0.565159) < 1e-6 && Math.abs(besselK1(1) - 0.601907) < 1e-6);
+  assert.ok(Math.abs(besselI1(5) / 24.33564 - 1) < 1e-6 && Math.abs(besselK1(3) / 0.0401564 - 1) < 1e-5);
+  const g = 9.81,
+    rho = 1025,
+    omega = (L, r) => Math.sqrt((2 * Math.PI * g) / (r * L)),
+    // S175 (Yasukawa 2006, Table 1; k_yy 0.269 L) at Fn 0.15, upright, H / L 0.02 (Yasukawa and Adnan 2006, Figs. 8 and 9,
+    // read from the figures to about 3 percent): added resistance over rho g zeta^2 B^2 / L in head seas, sway force in
+    // beam seas from starboard.
+    s175 = { length: 175, beam: 25.4, draught: 9.5, block: 0.572, pitchGyration: 0.269 },
+    U = 0.15 * Math.sqrt(g * 175),
+    unit = (rho * g * 25.4 ** 2) / 175;
+  for (const [r, measured] of [
+    [1.0, 8.25],
+    [1.2, 6.0],
+    [1.5, 2.6],
+  ]) {
+    const sigma = addedResistance(s175, 1, omega(175, r), 0, U, g, rho) / unit;
+    assert.ok(Math.abs(sigma / measured - 1) < 0.15, `S175 head seas at lambda/L ${r}: ${sigma} against ${measured}`);
+  }
+  for (const [r, measured] of [
+    [0.5, -10.9],
+    [0.7, -5.2],
+    [1.0, -1.0],
+  ]) {
+    const beam = driftLoads(
+      s175,
+      { amplitude: 1, period: (2 * Math.PI) / omega(175, r), direction: -Math.PI / 2 },
+      0,
+      U,
+      g,
+      rho,
+    );
+    assert.ok(
+      Math.abs(beam.Y / unit / measured - 1) < 0.25,
+      `S175 beam seas at lambda/L ${r}: ${beam.Y / unit} against ${measured}`,
+    );
+    // From starboard the waves push the ship to port, and their added resistance is SNNM's for beam seas.
+    const side = addedResistance(s175, 1, omega(175, r), Math.PI / 2, U, g, rho);
+    assert.ok(beam.X < 0 && Math.abs(beam.X / -side - 1) < 1e-6, `${beam.X} ${side}`);
+  }
+  // KVLCC2 at Fn 0.142 in head seas (Hizir et al. 2019, Fig. 6, read from the figure): the measured band of Lee et al. 2013
+  // (H / L 0.010 and 0.015) and Sadat-Hosseini et al. 2013, from the peak to long waves.
+  const kvlcc2 = { length: 320, beam: 58, draught: 20.8, block: 0.8098 },
+    Uk = 0.142 * Math.sqrt(g * 320),
+    unitK = (rho * g * 58 ** 2) / 320;
+  let sum = 0;
+  const band = [
+    [1.0, 5.35, 7.15],
+    [1.2, 6.05, 6.9],
+    [1.4, 3.6, 4.35],
+    [1.6, 1.95, 2.05],
+    [2.0, 0.55, 0.95],
+  ];
+  for (const [r, lo, hi] of band) {
+    const sigma = addedResistance(kvlcc2, 1, omega(320, r), 0, Uk, g, rho) / unitK,
+      off = sigma > hi ? sigma / hi - 1 : sigma < lo ? 1 - sigma / lo : 0;
+    assert.ok(off < 0.35, `KVLCC2 at lambda/L ${r}: ${sigma} against ${lo} to ${hi}`);
+    sum += off;
+  }
+  // Off the band by 8 percent on average, 33 percent at lambda/L 1.6 (docs/limits.md).
+  assert.ok(sum / band.length < 0.1, `${sum / band.length}`);
+  assert.throws(
+    () => driftLoads(s175, { amplitude: 1, period: 0, direction: 0 }, 0, U),
+    (e) => e.code === 'unsupported' && /period above 0/.test(e.message),
+  );
+});
+
+test("KVLCC2 turns in an irregular head sea as Hasnan et al.'s free-running model did: its approach speed, advance, tactical diameter and drift", () => {
+  // Hasnan, Yasukawa et al. 2019 (Tables 7, 9 and 11): KVLCC2 at the screw's 15.5 kn calm-water revolutions met a
+  // Bretschneider sea of H_1/3 4.4 m and T_1 10.6 s (as measured), cos^4 spread, from ahead; it slowed to 13.0 kn and
+  // turned at 35 degrees with advance 2.86 to 2.95 L, tactical diameter 2.99 to 3.18 L, and drifted 0.56 to 0.58 L between
+  // its headings at 90 and 450 degrees (0.23 to 0.31 L in calm water).
+  const k = 320 / 7,
+    v0 = (15.5 * 0.514444) / Math.sqrt(k),
+    waves = { significantHeight: 4.4 / k, period: 10.6 / Math.sqrt(k), direction: Math.PI, spread: 4 },
+    rate = 2.32 * DEG * Math.sqrt(k),
+    n = new Manoeuvring(KVLCC2_L7, { u: v0 }).selfPropulsion(v0),
+    straight = new Manoeuvring(KVLCC2_L7, { u: v0 }, { rudderRate: rate, waves });
+  straight.revolutions = n;
+  while (straight.time < 300) straight.step(0.05);
+  const knots = (Math.hypot(straight.state.u, straight.state.v) / v0) * 15.5;
+  assert.ok(Math.abs(knots / 13 - 1) < 0.08, `${knots} kn against 13.0`);
+  for (const side of [1, -1]) {
+    const m = new Manoeuvring(KVLCC2_L7, { u: straight.state.u }, { rudderRate: rate, waves });
+    m.revolutions = n;
+    m.order = side * 35 * DEG;
+    let advance, diameter;
+    const marks = [];
+    while (m.time < 2000 && marks.length < 2) {
+      m.step(0.05);
+      const h = Math.abs(m.state.heading);
+      if (advance === undefined && h >= Math.PI / 2) advance = m.state.x / 7;
+      if (diameter === undefined && h >= Math.PI) diameter = Math.abs(m.state.z) / 7;
+      if (h >= Math.PI / 2 + 2 * Math.PI * marks.length) marks.push([m.state.x, m.state.z]);
+    }
+    const drift = Math.hypot(marks[1][0] - marks[0][0], marks[1][1] - marks[0][1]) / 7;
+    assert.ok(advance > 2.86 * 0.97 && advance < 2.95 * 1.03, `advance ${advance}`);
+    assert.ok(diameter > 2.99 * 0.97 && diameter < 3.18 * 1.03, `tactical diameter ${diameter}`);
+    // 15 percent short of the measured drift (docs/limits.md), within twice its 9 percent spread between runs.
+    assert.ok(drift > 0.56 * 0.8 && drift < 0.58 * 1.2, `drift ${drift}`);
+  }
 });

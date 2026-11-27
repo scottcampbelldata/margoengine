@@ -4172,6 +4172,7 @@ Each ship is `{row, model}` and takes these settings:
 - `block` and `addedMass`: `addedMass: false` leaves the surge, sway and yaw added mass to a HullSolver's strips (the ship still claims their damping).
 - `hull`: the hull's form for `holtropMennen` (`{length, beam, draughtFore, draughtAft, volume, lcb, midship, waterplane, ...}`). Given, the straight run's resistance at each speed is Holtrop and Mennen's, rising with the waves the hull makes, in place of the model's constant R'_0; `revolutionsFor` balances it.
 - `autopilot`: `{bandwidth, damping}`, the heading loop's natural frequency in units of U / L (default 1) and its damping ratio (default 0.8).
+- `waveHull`: `{pitchGyration, entrance, run}`, the hull as waves see it: k_yy / L (default 0.25) and its waterline's lengths of entrance and run, m (default (1 - C_WP) L each for C_WP = (1 + 2 C_B) / 3, an assumption: give the hull's own, which the short-wave reflection depends on).
 - `iceHull`: `{stem, bow, parallel}`, the stem angle (rad) and the lengths of the bow and parallel midbody (m), so the ship breaks the solver's level ice (`ice`).
 - `roll`: for a model with `heel`, what holds the ship upright: `'model'` (default) gives the body the model's restoring moment g m GM sin(phi) and roll damping, and needs the world's gravity; `'hull'` leaves them to a HullSolver floating the body.
 
@@ -4192,7 +4193,7 @@ while (kcs.time < 10) {
 console.log(Math.round((-most * 180) / Math.PI)); // 19
 ```
 
-The solver also takes `depth` (a number or a function of (x, z): for squat, and for shallow water), `walls` (quays and banks, `{from, to}`), `density` and `ice: {thickness}` (level ice, m, a number or a function of (x, z), 0 for open water). A ship with an `iceHull` going ahead through level ice is held back by Riska et al.'s (1997) regression of Baltic full-scale trials (`iceResistance(hull, thickness, speed)`: a breaking part C1 and a part C2 growing with speed); stopped, the ice holds it up to C1, and `status(i).ice` reads the force. Broken floes are ICE-04's: give the same body to a `PackIceSolver` as a vessel and couple `['ship', 'pack-ice', 'rigid']`, and the ship and floes push each other. A wall alongside, within half a ship length of the midship along it, pushes the ship by Vantorre et al.'s (2003) regression of captive tests (`bankLoads`): toward the bank and bow away at usual depths, off it in very shallow water (below h/T about 1.2), and the propeller ahead draws the stern in; `status(i).suction` and `bankMoment` read the force and moment, and `bankInRange` whether the hull is in the regression's range. Where the water is under ten draughts deep, each ship runs on its model corrected for the depth (`shallowWater(model, depth)`): every hull derivative and the sway and yaw added masses by Ankudinov et al. (1990), the surge added mass by Li and Wu (1990), held at h / T 1.2 below that; the model is made again when the draught over depth moves by a hundredth. A ship then turns wider as the water shoals, as ships do.
+The solver also takes `depth` (a number or a function of (x, z): for squat, and for shallow water), `walls` (quays and banks, `{from, to}`), `density` and `ice: {thickness}` (level ice, m, a number or a function of (x, z), 0 for open water). With `waves`, regular `{amplitude, period, direction}` or irregular `{significantHeight, period, direction, spread}` (the direction the waves travel, rad on the ground plane; a Bretschneider spectrum in the significant height and mean period, spread as cos^spread), each ship meets their mean drift loads as Yasukawa (2006) adds them to the MMG forces: the surge force by the ITTC's SNNM added resistance (Liu and Papanikolaou; `addedResistance`), the sway force and yaw moment by the short-wave reflection on the waterline facing the waves times Fujii and Takahashi's draft factor (`driftLoads`, `irregularDriftLoads`). In head seas it slows, and in a turn it drifts down the waves; `status(i).forces.XW`, `YW` and `NW` read them. The wave-frequency heave, roll and pitch are a HullSolver's on the same sea. A ship with an `iceHull` going ahead through level ice is held back by Riska et al.'s (1997) regression of Baltic full-scale trials (`iceResistance(hull, thickness, speed)`: a breaking part C1 and a part C2 growing with speed); stopped, the ice holds it up to C1, and `status(i).ice` reads the force. Broken floes are ICE-04's: give the same body to a `PackIceSolver` as a vessel and couple `['ship', 'pack-ice', 'rigid']`, and the ship and floes push each other. A wall alongside, within half a ship length of the midship along it, pushes the ship by Vantorre et al.'s (2003) regression of captive tests (`bankLoads`): toward the bank and bow away at usual depths, off it in very shallow water (below h/T about 1.2), and the propeller ahead draws the stern in; `status(i).suction` and `bankMoment` read the force and moment, and `bankInRange` whether the hull is in the regression's range. Where the water is under ten draughts deep, each ship runs on its model corrected for the depth (`shallowWater(model, depth)`): every hull derivative and the sway and yaw added masses by Ankudinov et al. (1990), the surge added mass by Li and Wu (1990), held at h / T 1.2 below that; the model is made again when the draught over depth moves by a hundredth. A ship then turns wider as the water shoals, as ships do.
 
 Steer with `control(i)`:
 - `revolutions`, rev/s, negative astern; `revolutionsFor(i, speed)` gives the self-propulsion revolutions;
@@ -4237,6 +4238,18 @@ The parts work on their own too:
 - `wageningenB({blades, area, pitch, reynolds}, J)`: a Wageningen B-series propeller's K_T and K_Q by Oosterveld and van Oossanen's (1975) polynomials, with their Reynolds correction; `bSeriesCurves(propeller)` fits MMG's quadratic curves to them from bollard pull to zero thrust, for a model's `propeller.curves`.
 - `holtropMennen(hull, speed)`: Holtrop and Mennen's resistance with the wake fraction, thrust deduction and eta_R; `ittc1957(Re)` is the friction line.
 - `squat`, `icorels` and `huuska`, `rudderLiftSlope` (Fujii) and `thrusterThrust`.
+
+```ts
+import {addedResistance, irregularDriftLoads} from 'margoengine/physics/ship';
+
+// KVLCC2 at 15.5 kn in head waves 1.2 ship lengths long: 747 kN per metre squared of wave amplitude.
+const kvlcc2 = {length: 320, beam: 58, draught: 20.8, block: 0.81};
+const omega = Math.sqrt((2 * Math.PI * 9.81) / (1.2 * 320));
+console.log(Math.round(addedResistance(kvlcc2, 1, omega, 0, 7.97) / 1000)); // 747
+// In a 4.4 m, 10.6 s sea from ahead (cos^4 spread) at 6.7 m/s: about 1.1 MN.
+const sea = {significantHeight: 4.4, period: 10.6, direction: Math.PI, spread: 4};
+console.log(Math.round(-irregularDriftLoads(kvlcc2, sea, 0, 6.7).X / 1000)); // 1132
+```
 
 ```ts
 import {iceResistance} from 'margoengine/physics/ship';

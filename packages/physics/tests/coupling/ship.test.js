@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { KVLCC2_L7, ShipSolver } from '../../dist/ship.js';
+import { KVLCC2_L7, Manoeuvring, ShipSolver } from '../../dist/ship.js';
 import { PackIceSolver } from '../../dist/pack-ice.js';
 import { PhysicsWorld, RigidSolver, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
@@ -86,4 +86,43 @@ test('ShipSolver with PackIceSolver: a ship drives through floes, each pushing t
     gained > 0 && ice.impulse < 0 && Math.abs(gained + ice.impulse) <= 1e-3 * gained,
     `${gained} ${ice.impulse}`,
   );
+});
+
+test('ShipSolver in waves: a rigid body is pushed by the waves as the MMG ship with the same sea is', () => {
+  const M = KVLCC2_L7,
+    speed = 1.18,
+    sea = { significantHeight: 0.1, period: 1.55, direction: Math.PI / 2, spread: 4 },
+    physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+    body = physics.addBody(null, {
+      position: [0, 0, 0],
+      linearVelocity: [speed, 0, 0],
+      colliders: { shape: 'box', halfExtents: [M.length / 2, M.draught, M.beam / 2], mass: 1025 * M.volume },
+    }),
+    model = { ...M, centre: 0, gyration: Math.sqrt((M.length ** 2 + M.beam ** 2) / 12) },
+    ships = new ShipSolver(),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(ships, { ships: [{ row: body.row, model, rudderRate: 0.2 }], waves: sea })
+      .couple(['ship', 'rigid'], 'staggered'),
+    reference = new Manoeuvring(model, { u: speed }, { rudderRate: 0.2, waves: sea, gravity: 9.80665 }),
+    calm = new Manoeuvring(model, { u: speed }, { rudderRate: 0.2 }),
+    n = reference.selfPropulsion(speed);
+  reference.revolutions = calm.revolutions = ships.control(0).revolutions = n;
+  for (let t = 1; t <= 60 * 30; t++) {
+    world.advance(t);
+    reference.step(1 / 60);
+    calm.step(1 / 60);
+  }
+  const p = body.position;
+  // Beam seas travelling toward +Z push it to starboard and its unsteered hull yaws off its course, a metre and more from
+  // where it runs in calm water; the body keeps to the MMG ship's track within 5 cm over 30 s.
+  assert.ok(
+    Math.hypot(reference.state.x - calm.state.x, reference.state.z - calm.state.z) > 1,
+    `${reference.state.z} against ${calm.state.z} in calm water`,
+  );
+  assert.ok(
+    Math.hypot(p[0] - reference.state.x, p[2] - reference.state.z) < 0.05,
+    `${p} against ${reference.state.x}, ${reference.state.z}`,
+  );
+  assert.ok(ships.status(0).forces.YW > 0);
 });

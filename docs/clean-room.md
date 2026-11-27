@@ -17176,6 +17176,32 @@ Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in hori
 this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
 the ship solver heels in its turn".
 
+### A ship's mean wave drift (SEA-09, `addedResistance`, `driftLoads`, `irregularDriftLoads`, `ShipParams.waves`, 2026-11-27)
+
+`packages/physics/src/ship/waves.ts` and the waves in `packages/physics/src/ship/mmg.ts` and `solver.ts`, written from:
+- ITTC Recommended Procedure 7.5-04-01-01.1, "Preparation, conduct and analysis of speed/power trials", rev. 08, 2024,
+  Annex G, eqs. G-13 to G-32 and Fig. G-3, https://www.ittc.info/media/11972/75-04-01-011.pdf (read: Liu and
+  Papanikolaou's SNNM added resistance, its waterline wedges and its irregular-sea integral), and ITTC 7.5-02-07-02.8,
+  rev. 02, 2024 (the spectrum and spreading).
+- H. Yasukawa, "Simulations of ship maneuvering in waves (1st report: turning motion)", J. JASNAOE 4, 127-136, 2006,
+  doi:10.2534/jjasnaoe.4.127 (eqs. 1 to 3 and 23 to 27, Tables 1 and 2: the drift loads in the MMG equations).
+- K. K. Yang, M. G. Seo and Y. Kim, J. SNAK 52(4), 338-348, 2015, doi:10.3744/SNAK.2015.52.4.338 (eq. 19), and D.
+  Matulja et al., Brodogradnja 62(3), 259-264, 2011 (eq. 19): Faltinsen et al.'s 1980 short-wave formula restated; the
+  1980 paper itself was not obtained.
+- M. Kuroda et al., J. JASNAOE 8, 171-176, 2008, and M. Tsujimoto et al., J. JASNAOE 8, 177-184, 2008 (the draft factor
+  pi^2 I1^2 / (pi^2 I1^2 + K1^2)).
+- M. A. A. Hasnan, H. Yasukawa, N. Hirata, D. Terada and A. Matsuda, "Study of ship turning in irregular waves", J. Mar.
+  Sci. Technol., 2019, doi:10.1007/s00773-019-00698-1 (eqs. 1 to 3, Tables 7, 9 and 11: the sea and KVLCC2's measured
+  turns).
+- Measured data read from figures: H. Yasukawa and F. A. Adnan, J. JASNAOE 3, 133-138, 2006, Figs. 8 and 9 (S175's drift
+  loads); O. Hizir et al., IJNAOE 11, 143-153, 2019, Fig. 6 (Lee et al.'s and Sadat-Hosseini et al.'s KVLCC2 added
+  resistance).
+- M. Abramowitz and I. A. Stegun, Handbook of Mathematical Functions, 9.8.3, 9.8.4, 9.8.7 and 9.8.8 (I1, K1).
+No seakeeping or drift code was read. Using the SNNM's own wedges as the waterline for the sway and yaw integral, the
+wedges' default from C_WP, and tabling an irregular sea's loads by heading are this package's own. Proof:
+`packages/physics/tests/ship.test.js`, "waves' mean drift" and "KVLCC2 turns in an irregular head sea", and
+`packages/physics/tests/coupling/ship.test.js`, "ShipSolver in waves".
+
 ### A ship in level ice (SEA-09, `iceResistance`, `ShipParams.ice`, 2026-11-27)
 
 `packages/physics/src/ship/ice.ts` and the ice in `packages/physics/src/ship/solver.ts`, written from J. Hu and L. Zhou,

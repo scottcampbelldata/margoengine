@@ -39,6 +39,7 @@ import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mm
 import { type HoltropHull, holtropMennen } from './resistance.js';
 import { type BankLoads, bankLoads } from './bank.js';
 import { iceResistance } from './ice.js';
+import type { IrregularWaves, RegularWaves } from './waves.js';
 import { shallowWater } from './shallow.js';
 import { raceVelocity, thrusterThrust } from './propeller.js';
 import {
@@ -159,6 +160,8 @@ export interface Ship {
   readonly roll?: 'model' | 'hull';
   /** Its ice-going form for level ice (`ice`): stem angle, rad, and the lengths of its bow and parallel midbody, m. */
   readonly iceHull?: { readonly stem: number; readonly bow: number; readonly parallel: number };
+  /** Its hull as waves see it: pitch gyration over L (default 0.25), and its waterline's entrance and run, m (`WaveHull`). */
+  readonly waveHull?: { readonly pitchGyration?: number; readonly entrance?: number; readonly run?: number };
 }
 
 /** A quay or a bank, as a vertical wall along the segment from `from` to `to`, [x, z] m. */
@@ -181,6 +184,12 @@ export interface ShipParams {
    * `iceHull` is given breaks with Riska et al.'s (1997) resistance (`iceResistance`) (default none).
    */
   readonly ice?: { readonly thickness: number | ((x: number, z: number) => number) };
+  /**
+   * The waves the ships meet, regular `{amplitude, period, direction}` or irregular `{significantHeight, period, direction,
+   * spread}` (direction the way they travel, rad on the ground plane): their mean drift loads (`driftLoads`,
+   * `irregularDriftLoads`) join each ship's MMG forces (default none). The wave-frequency motions are a HullSolver's.
+   */
+  readonly waves?: RegularWaves | IrregularWaves;
   /**
    * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
    * given, it must be the same.
@@ -397,7 +406,9 @@ export class ShipSolver implements Solver<ShipParams> {
           {},
           {
             density,
+            gravity: this.g > 0 ? this.g : 9.80665,
             rudderRate: ship.rudderRate ?? (65 / 28) * (Math.PI / 180),
+            ...(params.waves ? { waves: params.waves, waveHull: ship.waveHull ?? {} } : {}),
             ...(hull
               ? { resistance: (speed: number) => (speed > 0 ? holtropMennen(hull, speed, { density }).total : 0) }
               : {}),
@@ -643,7 +654,7 @@ export class ShipSolver implements Solver<ShipParams> {
         order = Math.max(-mmg.rudderLimit, Math.min(mmg.rudderLimit, ordered ?? control.rudder)),
         turn = mmg.rudderRate * dt;
       rudders[index] = rudders[index]! + Math.max(-turn, Math.min(turn, order - rudders[index]!));
-      const state = { x: 0, z: 0, heading: 0, u, v, r, rudder: rudders[index]!, heel: phi, rollRate: p },
+      const state = { x: 0, z: 0, heading, u, v, r, rudder: rudders[index]!, heel: phi, rollRate: p },
         forces = mmg.forces(state, status.forces);
       let X = forces.X,
         Y = forces.Y,

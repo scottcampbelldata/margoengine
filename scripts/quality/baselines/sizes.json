@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20755213,
+  "total": 20757574,
   "history": [
     {
       "date": "2026-10-24",
@@ -14305,6 +14305,12 @@
       "commit": "c80430a84",
       "reason": "physics/ship 21,459 ceiling to its new size: level ice by Riska et al.'s 1997 regression (iceResistance) wired into the ship solver. One feature of the ship entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "d44a80c70",
+      "reason": "physics/ship 22,000 ceiling to its new size: the waves' mean drift loads (the ITTC's SNNM added resistance, the short-wave waterline reflection with its draft factor, Bretschneider's spectrum) in the MMG forces. Manoeuvring in waves is the ship's own forces; a separate entry would carry the MMG step twice. One feature of the ship entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15178,7 +15184,7 @@
     "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 22000,
+    "@margoengine/physics/ship": 24361,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,

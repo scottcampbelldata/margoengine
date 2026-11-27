@@ -26,6 +26,12 @@ export interface BankLoads {
     inRange: boolean;
 }
 
+export interface DriftLoads {
+    X: number;
+    Y: number;
+    N: number;
+}
+
 export const ESTABLISHMENT_LENGTH = 3.25;
 
 export interface EmpiricalHull {
@@ -133,6 +139,13 @@ export interface IceHull {
     readonly parallel: number;
 }
 
+export interface IrregularWaves {
+    readonly significantHeight: number;
+    readonly period: number;
+    readonly direction: number;
+    readonly spread?: number;
+}
+
 export const KCS_MODEL: ManoeuvringModel;
 
 export const KCS_PROPELLER: PropellerCurves;
@@ -149,11 +162,14 @@ export class Manoeuvring {
     rudderRate: number;
     rudderLimit: number;
     time: number;
+    waves: RegularWaves | IrregularWaves | undefined;
     constructor(model: ManoeuvringModel, state?: Partial<ManoeuvringState>, options?: {
         readonly density?: number;
         readonly gravity?: number;
         readonly rudderRate?: number;
         readonly resistance?: (speed: number) => number;
+        readonly waves?: RegularWaves | IrregularWaves;
+        readonly waveHull?: Partial<WaveHull>;
     });
     setModel(model: ManoeuvringModel): this;
     forces(s: ManoeuvringState, out?: ManoeuvringForces): ManoeuvringForces;
@@ -179,6 +195,9 @@ export interface ManoeuvringForces {
     inflow: number;
     torque: number;
     K: number;
+    XW: number;
+    YW: number;
+    NW: number;
 }
 
 export interface ManoeuvringHeel {
@@ -286,6 +305,12 @@ export interface RaceNumbers {
     turn: number;
 }
 
+export interface RegularWaves {
+    readonly amplitude: number;
+    readonly period: number;
+    readonly direction: number;
+}
+
 export interface ResolvedRace extends PropellerRace {
     readonly blades: number;
     readonly revolutions: number;
@@ -340,6 +365,11 @@ export interface Ship {
         readonly bow: number;
         readonly parallel: number;
     };
+    readonly waveHull?: {
+        readonly pitchGyration?: number;
+        readonly entrance?: number;
+        readonly run?: number;
+    };
 }
 
 export interface ShipControl {
@@ -358,6 +388,7 @@ export interface ShipParams {
     readonly ice?: {
         readonly thickness: number | ((x: number, z: number) => number);
     };
+    readonly waves?: RegularWaves | IrregularWaves;
     readonly capacity?: number;
     readonly level?: RateLevel;
 }
@@ -483,6 +514,18 @@ export class VortexCavity {
     get cavitating(): boolean;
 }
 
+export interface WaveHull {
+    readonly length: number;
+    readonly beam: number;
+    readonly draught: number;
+    readonly block: number;
+    readonly pitchGyration?: number;
+    readonly entrance?: number;
+    readonly run?: number;
+}
+
+export function addedResistance(hull: WaveHull, amplitude: number, omega: number, alpha: number, speed: number, gravity?: number, density?: number): number;
+
 export function ankudinovShallow(ratio: number, hull: {
     readonly length: number;
     readonly beam: number;
@@ -509,11 +552,17 @@ export function bankInRange(hull: BankHull, depth: number): boolean;
 
 export function bankLoads(hull: BankHull, yB: number, depth: number, u: number, thrust: number, density?: number, gravity?: number): BankLoads;
 
+export function besselI1(x: number): number;
+
+export function besselK1(x: number): number;
+
 export function cavityRadius(circulation: number, core: number, ambient: number, vapour?: number, density?: number): number;
 
 export function collapseTime(radius: number, difference: number, density?: number): number;
 
 export function coreDeficit(circulation: number, core: number, density?: number): number;
+
+export function driftLoads(hull: WaveHull, waves: RegularWaves, heading: number, speed: number, gravity?: number, density?: number, out?: DriftLoads): DriftLoads;
 
 export function empiricalModel(hull: EmpiricalHull): ManoeuvringModel & {
     readonly range: EmpiricalRange;
@@ -534,6 +583,8 @@ export function iceResistance(hull: IceHull, thickness: number, speed: number): 
 export function icorels(c: SquatCase, cs?: number): number;
 
 export function inceptionIndex(circulation: number, core: number, speed: number): number;
+
+export function irregularDriftLoads(hull: WaveHull, sea: IrregularWaves, heading: number, speed: number, gravity?: number, density?: number, out?: DriftLoads): DriftLoads;
 
 export function ittc1957(reynolds: number): number;
 
@@ -568,6 +619,8 @@ export function wageningenB(prop: BSeriesPropeller, J: number): {
     kt: number;
     kq: number;
 };
+
+export function waveSpectrum(omega: number, h: number, t1: number): number;
 
 export const wrap: (angle: number) => number;
 

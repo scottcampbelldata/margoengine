@@ -19,6 +19,14 @@
 import { cos, exp, sin } from '@margoengine/math/pinned';
 import { atan2, Propeller, type PropellerCurves, KVLCC2_PROPELLER } from './propeller.js';
 import { shipError } from './errors.js';
+import {
+  type DriftLoads,
+  driftLoads,
+  type IrregularWaves,
+  irregularDriftLoads,
+  type RegularWaves,
+  type WaveHull,
+} from './waves.js';
 
 const DEG = 3.141592653589793 / 180;
 
@@ -210,6 +218,10 @@ export interface ManoeuvringForces {
   torque: number;
   /** The hull's and rudder's roll moment about the centre of gravity, N m (starboard down positive; 0 without heel). */
   K: number;
+  /** The waves' mean drift loads in it (Yasukawa 2006's X_W, Y_W, N_W; 0 without waves). */
+  XW: number;
+  YW: number;
+  NW: number;
 }
 
 /**
@@ -239,6 +251,11 @@ export class Manoeuvring {
   private roll: [number, number, number, number] = [0, 0, 0, 0];
   /** The hull's straight-run resistance at a speed, N, in place of R'_0 (a Holtrop and Mennen estimate), or none. */
   private readonly resistanceAt: ((speed: number) => number) | undefined;
+  /** The waves it meets, regular or irregular, and its hull as they see it; and an irregular sea's loads tabled by heading. */
+  waves: RegularWaves | IrregularWaves | undefined;
+  private readonly waveHull: Partial<WaveHull>;
+  private driftTable: { speed: number; key: string; loads: Float64Array } | undefined;
+  private readonly drift: DriftLoads = { X: 0, Y: 0, N: 0 };
 
   /**
    * @param state The start: position, heading, velocities (default at rest, heading +X).
@@ -254,6 +271,8 @@ export class Manoeuvring {
       readonly gravity?: number;
       readonly rudderRate?: number;
       readonly resistance?: (speed: number) => number;
+      readonly waves?: RegularWaves | IrregularWaves;
+      readonly waveHull?: Partial<WaveHull>;
     } = {},
   ) {
     for (const [name, value] of [
@@ -270,6 +289,8 @@ export class Manoeuvring {
     if (options.resistance !== undefined && typeof options.resistance !== 'function')
       throw shipError("A hull's resistance is a function of the speed, m/s, giving N; pass one, or none for R'_0.");
     this.resistanceAt = options.resistance;
+    this.waves = options.waves;
+    this.waveHull = options.waveHull ?? {};
     this.state = { x: 0, z: 0, heading: 0, u: 0, v: 0, r: 0, rudder: 0, heel: 0, rollRate: 0, ...state };
     this.propeller = new Propeller(model.propeller.diameter, model.propeller.curves);
     this.rudderRate = options.rudderRate ?? 1.76 * DEG;
@@ -339,6 +360,9 @@ export class Manoeuvring {
         inflow: 0,
         torque: 0,
         K: 0,
+        XW: 0,
+        YW: 0,
+        NW: 0,
       },
       M = this.model,
       H = M.heel,
@@ -463,9 +487,14 @@ export class Manoeuvring {
       XR = -(1 - R.resistanceDeduction) * FN * sd,
       YR = -(1 + R.forceIncrease) * FN * cd,
       NR = -(xR + R.forceIncrease * xH) * FN * cd;
-    o.X = XH + XR + XP;
-    o.Y = YH + YR;
-    o.N = NH + NR;
+    // The waves' mean drift (Yasukawa 2006, eqs. 1 to 3).
+    const w = this.waves ? this.waveDrift(s.heading, U) : null;
+    o.XW = w ? w.X : 0;
+    o.YW = w ? w.Y : 0;
+    o.NW = w ? w.N : 0;
+    o.X = XH + XR + XP + o.XW;
+    o.Y = YH + YR + o.YW;
+    o.N = NH + NR + o.NW;
     o.thrust = thrust;
     o.rudderNormal = FN;
     o.rudderInflow = Math.sqrt(UR2);
@@ -478,6 +507,54 @@ export class Manoeuvring {
     // The roll moment about G: the hull's about the water plane moved to G, and the rudder's side force at its depth (eq. 4).
     o.K = H ? KH + zG * YH - (zR - zG) * YR : 0;
     return o;
+  }
+
+  /**
+   * The waves' mean drift loads at `heading` rad and `speed` m/s: regular waves directly, an irregular sea from a table over
+   * the waves' direction off the bow (5 degree steps), made again when the speed moves by 5 percent or the sea changes.
+   */
+  private waveDrift(heading: number, speed: number): DriftLoads {
+    const M = this.model,
+      hull: WaveHull = {
+        length: M.length,
+        beam: M.beam,
+        draught: M.draught,
+        block: M.volume / (M.length * M.beam * M.draught),
+        ...this.waveHull,
+      },
+      waves = this.waves!;
+    if ('amplitude' in waves) return driftLoads(hull, waves, heading, speed, this.gravity, this.density, this.drift);
+    const key = `${waves.significantHeight},${waves.period},${waves.spread ?? 2},${M.length},${M.draught}`,
+      steps = 72;
+    let t = this.driftTable;
+    if (!t || t.key !== key || Math.abs(speed - t.speed) > 0.05 * Math.max(t.speed, 1e-9)) {
+      const loads = new Float64Array(3 * (steps + 1)),
+        one: DriftLoads = { X: 0, Y: 0, N: 0 };
+      for (let i = 0; i <= steps; i++) {
+        irregularDriftLoads(
+          hull,
+          { ...waves, direction: (2 * Math.PI * i) / steps },
+          0,
+          speed,
+          this.gravity,
+          this.density,
+          one,
+        );
+        loads[3 * i] = one.X;
+        loads[3 * i + 1] = one.Y;
+        loads[3 * i + 2] = one.N;
+      }
+      t = this.driftTable = { speed, key, loads };
+    }
+    let rel = (waves.direction - heading) / (2 * Math.PI);
+    rel = (rel - Math.floor(rel)) * steps;
+    const i = Math.min(steps - 1, Math.floor(rel)),
+      f = rel - i,
+      l = t.loads;
+    this.drift.X = l[3 * i]! + f * (l[3 * i + 3]! - l[3 * i]!);
+    this.drift.Y = l[3 * i + 1]! + f * (l[3 * i + 4]! - l[3 * i + 1]!);
+    this.drift.N = l[3 * i + 2]! + f * (l[3 * i + 5]! - l[3 * i + 2]!);
+    return this.drift;
   }
 
   /** The state's rates: d(x, z, heading, u, v, r, heel, roll rate)/dt from eq. 4 (and Fukui et al.'s roll, eq. 4). */
