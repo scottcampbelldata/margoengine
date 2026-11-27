@@ -17390,6 +17390,17 @@ Y'_r - m'_x and X'_beta r - m'_y to MMG's terms, and laying sway and yaw in hori
 this package's own. Proof: `packages/physics/tests/ship.test.js`, "KCS heels outward in its turn" and "a rigid body held by
 the ship solver heels in its turn".
 
+Calibration (2026-11-27). Fukui et al. print neither KCS's rudder roll lever nor its roll damping. The steady roll moment is a
+near-cancellation: the hull's outward moment, about -0.13 q d, against the rudder's inward one, about +0.08. So both values
+were fitted to two numbers, MARIN's final and largest roll in the 35 degree starboard turn (5.09 and 16.98 degrees, Yun et
+al. 2021, Table 5). That gives the lever 0.236 d below the water plane, where the rudder's geometric centroid is 0.54 d, and
+the decay coefficient a = 1.0 in place of Yasukawa and Yoshimura's 0.035 for another hull.
+Validated on data not fitted:
+- KRISO's three model scales: largest roll 15.0 to 15.5 degrees, within 12 percent; steady 4.58 to 4.92, within 10 percent.
+- The port turn.
+- The advance and tactical diameter.
+- The 20/20 and 10/10 zigzags' first overshoots.
+
 ### Measured checks for the ships (SEA-09, `B4_70_FOUR_QUADRANT`, `fourQuadrantCoefficients`, 2026-11-27)
 
 - R. F. Roddy, D. E. Hess and W. E. Faller, "A tool to predict the four-quadrant performance of the Wageningen B-screw

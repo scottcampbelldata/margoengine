@@ -413,17 +413,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **What to use:** the trend (wider turns and smaller overshoots as the water shoals) for direction, not KVLCC2's numbers
   in shallow water.
 
-### Open 2026-11-27: KCS heels out too far as it starts a turn and too little in the steady turn (KB-SHIP-HEEL1, physics ship)
+### Fixed 2026-11-27: KCS heeled out too far as it started a turn and too little in the steady turn (KB-SHIP-HEEL1, physics ship)
 
-- **Repro:** `KCS_MODEL` at Fn 0.26, 35 degrees of rudder (`packages/physics/tests/ship.test.js`, "KCS heels outward in its
-  turn"). Its largest heel is 19 degrees where MARIN and KRISO measured 15.0 to 17.0. Its steady heel is 2.9 degrees turning
-  to starboard and 3.7 to port, where they measured 4.6 to 5.1. Advance, tactical diameter and yaw rate are inside or near
-  the measured band, so the turn itself is right and the roll is not.
-- **Cause, not yet found.** The steady turn is also 0.41 to 0.45 of the approach speed, where they measured 0.44 to 0.50.
-  Its drift is 16 degrees, where they measured 19 to 19.7. Both point at too little side force in the steady turn, and
-  the heel follows the side force. A slower, less drifting turn accounts for about a fifth of the shortfall in steady
-  heel, not all of it.
-- **Ruled out (time-boxed, 2026-11-27):**
+- **Fix:** the steady-turn roll moment is a near-cancellation: the hull's outward moment (-0.13 q d) against the rudder's
+  inward one (+0.08). The rudder's roll lever sets the steady heel, and the roll damping sets the peak. Fukui et al. print
+  neither for KCS. Both are now fitted to MARIN's measured final and largest roll (5.09 and 16.98 degrees), in
+  `packages/physics/src/ship/kcs.ts`: the lever 0.236 d below the water plane (where the geometric centroid is 0.54 d) and
+  the decay coefficient a = 1.0.
+- **Checked against data not fitted:**
+  - KRISO's largest roll (15.0 to 15.5): within 12 percent.
+  - The two sides' mean steady roll against 4.58 to 5.09: within 10 percent.
+  - The turn stays inside the measured advance and tactical diameter.
+  - The 20/20 and 10/10 first overshoots: 5 to 7 percent under the measured band.
+- **Test:** "KCS heels outward in its turn" in `packages/physics/tests/ship.test.js`.
+- **Also found on the way:** the measured rudder force has the same 35/20-degree ratio as the model's (Yun et al. 2021,
+  C_Ry), so the rudder's force is not what was wrong.
+- **Not fixed by this:** the steady turn's speed (0.41 to 0.44 of approach) and drift (16 degrees) stay below the
+  measured 0.44 to 0.50 and 19 to 19.7. They do not set the heel: steady heel moved under 0.04 degrees across a sweep of
+  the hull's derivatives.
+- **History:** first filed after a time-boxed search. Its largest heel was 19 degrees and its steady heel 2.9 to 3.7.
+- **Ruled out before the fit (2026-11-27):**
   - The roll damping: the decay coefficient from 0.035 to 0.4 moves the peak only from 19.1 to 16.9 degrees and leaves
     the steady heel unchanged. The peak is quasi-static, set by the early turn's speed.
   - The added roll inertia: 0 to 0.4 of the ship's own moves the peak by 2 degrees and leaves the steady heel unchanged.
@@ -433,13 +442,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
     degrees, so the reading in `kcs.ts` stands.
   - The wake change with drift: symmetric constants give 3.3 degrees on both sides.
   - GM 0.60 m and KM / d 1.3839 match SIMMAN's and Fukui et al.'s particulars.
-  - The rudder's lever: its depth from 0.40 d to 0.70 d moves the steady heel from 3.8 to 1.9 degrees. The rudder
-    centroid's 0.54 d is the paper's definition.
-- **Still to check:** the added masses. Fukui et al. do not print them, and the Brix and Clarke values set the
-  combined captive terms' split. Also the roll-rate term's sign in the rudder inflow, and whether Fukui et al.'s measured
-  K'_H already holds the added masses' reaction that eq. 4 adds again.
-- **What to use:** for a ship that heels as it turns, the model gives the turn within the measured band and heel to the
-  right side and order. Do not read its heel angles as KCS's to better than 2 degrees.
+  - Fukui et al.'s added masses: they set the split of the combined captive terms, not the steady heel.
 
 ### Open 2026-11-27: a capsule-chain rod under tension over a bollard blows up (KB-PHYS-RODWRAP1, physics kernel)
 

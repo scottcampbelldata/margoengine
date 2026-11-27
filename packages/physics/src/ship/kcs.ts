@@ -68,6 +68,12 @@ export const KCS_MODEL: ManoeuvringModel = Object.freeze({
     // Below the water plane: the draught less KG = KM - GM.
     gravityDepth: D - (KM - GM),
     straightening: -0.36,
+    // Calibrated, as Fukui et al. print neither (docs/clean-room.md): the roll lever of the rudder's side force, 0.236 of
+    // the draught below the water plane (its geometric centroid is 0.54), and the roll decay coefficient a = 1.0, fitted to
+    // MARIN's final and largest roll in the 35 degree turn (5.09 and 16.98 degrees) and checked against KRISO's three model
+    // scales, the port turn and the zigzags.
+    rudderDepth: 0.236 * D,
+    decay: 1.0,
     // c_x0 X'_0, X'_r phi, c_xbb X'_bb, c_xrr X'_rr.
     surge: [-0.12 * -0.0183, 0.0258, 2.31 * -0.0603, 3.5 * -0.0162] as const,
     // Y'_phi, c_yb Y'_v, c_yr (Y'_r - m'_x), Y'_bb phi, -Y'_br phi, Y'_rr phi.

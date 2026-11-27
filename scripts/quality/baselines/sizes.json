@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20859724,
+  "total": 20859737,
   "history": [
     {
       "date": "2026-10-24",
@@ -14478,6 +14478,12 @@
       "commit": "8baf3f7935",
       "reason": "@margoengine/sky/look 2644 to 2808 B gzip (ceiling 2796 to 3064): KB-SKY-NIGHTPALL1 makes the night sky and its clouds seen through the smoke layer (layerTransmittance, lowLayer: t^(1/sin e) per ray plus the layer's glow), so a starry dome goes out under a thick pall. The WGSL comments are already stripped at build, so nothing is waste; the bytes are the one new shader function and its uniform rows. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "pending",
+      "reason": "physics/ship 35,261 ceiling to its new size 35,274 (+13 B): KCS's fitted rudder roll lever and roll decay, so it heels as MARIN and KRISO measured. Two constants of one ship model; nothing to split. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15355,7 +15361,7 @@
     "@margoengine/physics/seakeeping": 40620,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 35261,
+    "@margoengine/physics/ship": 35274,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 156167,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,
