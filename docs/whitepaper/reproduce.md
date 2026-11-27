@@ -5185,4 +5185,5 @@ seeds; no fixture download.
 Build packages, then `node --test packages/exporters/tests/plugin-lines-points.test.js`.
 
 ## Grass blade shadows (scatter/grass)
-Build packages, then `npm run test:browser:grass-shadow --workspace @margoengine/scatter` (WebGPU and the WebGL2 layer).
+Build packages, then `npm run test:browser:grass-shadow --workspace @margoengine/scatter` (WebGPU and the WebGL2 layer;
+each runs `Shadows` and `VirtualShadows`).

@@ -2,29 +2,47 @@
 <script type="module">
 // Real-GPU proof that GrassScatter casts the blades it draws (grass-shadow.browser.mjs reads the canvas): clumps at the
 // origin of a flat floor, the sun 45 degrees up from +X, seen from straight above. A point (x, y, z) of a blade shades
-// the floor at (x - y, 0, z).
+// the floor at (x - y, 0, z), in Shadows and in VirtualShadows.
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Engine,box} from '/packages/core/dist/index.js';
 import {GrassScatter} from '/packages/scatter/dist/grass.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+import {readScatter} from '/packages/scatter/dist/read.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-2,16,0.02],target:[-2,0,0],near:0.5,far:100}}),device=engine.gpu;
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 engine.lighting.direction.set([1,1,0]);
 const floor=engine.createMesh().setGeometry(box(40,0.1,40)).setPosition([0,-0.05,0]);
-const shadows=Shadows.attach(engine,{distance:40});
-shadows.add(floor,{castShadow:false});
-let scatter,remove;
+let scatter,remove,shadows,virtual=false;
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();};
 window.check={
- // One instance within a millimetre of the origin, its shape `grass`; with `cast` it is added to Shadows.
- async show(grass,cast){
+ // Casts with 'shadows' (cascaded maps) or 'virtual' (VirtualShadows) from the next show.
+ use(kind){
+  remove?.();remove=undefined;shadows?.dispose();
+  virtual=kind==='virtual';
+  shadows=virtual?VirtualShadows.attach(engine,{distance:40,filter:'hard'}):Shadows.attach(engine,{distance:40});
+  shadows.add(floor,{castShadow:false});
+ },
+ // One instance within a millimetre of the origin, its shape `grass`; with `cast` it casts. `wind` and `time` (seconds
+ // on the wind clock) bend it; every later frame holds that time.
+ async show(grass,cast,wind,time=0){
   remove?.();remove=undefined;scatter?.dispose();
   device.pushErrorScope('validation');
-  scatter=GrassScatter.attach(engine,{count:1,area:[0.001,0.001],scale:[1,1],seed:3,lod:[60,70,80],lodFade:0,color:[0.8,0.8,0.8],grass});
+  scatter=GrassScatter.attach(engine,{count:1,area:[0.001,0.001],scale:[1,1],seed:3,lod:[60,70,80],lodFade:0,color:[0.8,0.8,0.8],grass,...(wind&&{wind,sway:{height:4,stiffness:0.25}})});
   if(cast)remove=shadows.add(scatter);
-  await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+  scatter.advanceTime(time);
+  await waitForPipelines(frame);
+  // VirtualShadows asks for its pages from the frames already seen.
+  for(let i=0;i<(virtual?30:2);i++)await frame();
   const e=await device.popErrorScope();if(e)errors.push(e.message);
   return errors.splice(0);
+ },
+ // The drawn blade's near-ring vertices as the vertex stage poses them: [x, y, z] each.
+ async posed(){
+  const read=await readScatter(engine,scatter,{pose:true}),p=read.rings[0].posed.positions,out=[];
+  for(let i=0;i<p.length;i+=3)out.push([p[i],p[i+1],p[i+2]]);
+  return out;
  },
  // Where a world point lands on the canvas, 0..1 from the top left.
  pixel([x,y,z]){const m=engine.camera.matrix,cx=m[0]*x+m[4]*y+m[8]*z+m[12],cy=m[1]*x+m[5]*y+m[9]*z+m[13],w=m[3]*x+m[7]*y+m[11]*z+m[15];return [cx/w*0.5+0.5,0.5-cy/w*0.5];},

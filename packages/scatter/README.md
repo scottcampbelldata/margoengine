@@ -888,8 +888,9 @@ every `Scatter` option, with `blades` shading on by default.
 - Normals turn across the width (`round`) so flat blades shade round; wind, ground alignment and blade shading are the
   plain `Scatter`'s.
 - The shape is compiled into the shaders: make a new `GrassScatter` to change it.
-- Real-GPU proof: `npm run test:browser:grass --workspace @margoengine/scatter`, and the shadows the blades cast,
-  `npm run test:browser:grass-shadow --workspace @margoengine/scatter` (build the packages first).
+- Real-GPU proof: `npm run test:browser:grass --workspace @margoengine/scatter`, and the shadows the blades cast, still
+  and wind-bent, in `Shadows` and `VirtualShadows`: `npm run test:browser:grass-shadow --workspace @margoengine/scatter`
+  (build the packages first).
   The coverage: `npm run test:browser:grass-pixel --workspace @margoengine/scatter` (WebGPU, then the WebGL2 layer).
 
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:

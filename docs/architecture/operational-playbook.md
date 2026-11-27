@@ -10177,8 +10177,11 @@ percent darker. Missing: other GPUs, the cost of the extra draw (speed phase def
 Grass blade shadows (2026-11-27): `packages/scatter/test/grass-shadow.browser.mjs` reads the shadow `shadows.add(grass)`
 casts from the picture on WebGPU and the WebGL2 layer (RTX A6000): a 2 m and a 4 m blade cast 2.05 m and 4.00 m,
 narrowing 0.607 from 1 m to 3 m out against the blade's own 0.577, and 16 blades a clump shade 1,610 pixels against 91.
-With the blade pose left out of the shadow pass the shadow runs 4.95 m at one width and the test fails. Missing: other
-GPUs, wind-bent and covered-ring shadows, and `VirtualShadows`.
+With the blade pose left out of the shadow pass the shadow runs 4.95 m at one width and the test fails. The same test
+runs `VirtualShadows` (2.00 m and 4.05 m, narrowing 0.580, 1,501 pixels against 79) and a wind across the sun's way: in
+both, 2.5 m from the root the shadow moves 0.59 m with the wind and lies within 0.02 m of where the sun throws the
+blade's posed spine, read back with `readScatter`. It fails with the wind left out of the shadow pass, and with
+`VirtualShadows` drawing no `drawShadow` caster. Missing: other GPUs and covered-ring shadows.
 
 **No submission of the coastal flow's set-up holds the GPU for seconds (KB-SCENES-DUNE-ARCHANG1, 2026-11-21, GPU
 behaviour).** The dune coast hung the device on a laptop GPU (DXGI_ERROR_DEVICE_HUNG within 3 s, three runs of three).

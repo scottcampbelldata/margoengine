@@ -1,14 +1,16 @@
 // Real-GPU proof (run from the repository root after building packages; --compat or MARGO_COMPAT=1 for the WebGL2
 // compatibility layer):
 //   node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/grass-shadow.browser.mjs
-// GrassScatter's shadow pass builds the same blades as its colour pass. The shadow is read from the picture, as the
-// floor pixels that darken when `shadows.add(grass)` is called:
+// GrassScatter's shadow pass builds the same blades as its colour pass, in Shadows and in VirtualShadows. The shadow is
+// read from the picture, as the floor pixels that darken when `shadows.add(grass)` is called:
 // 1. One upright blade, h tall and tapering to a point, under a sun 45 degrees up: its shadow reaches h along the floor
 //    and narrows as the blade does, sqrt(1 - d / h) of its root width at distance d (the blade's spine climbs as
 //    h (1 - (1 - t)^2) while its width falls as 1 - t). The ring mesh the pose starts from is a straight band of one
 //    width, so a pass that skipped the pose would not narrow.
 // 2. Twice the height casts twice as far.
 // 3. Sixteen blades a clump shade far more floor than one.
+// 4. A wind across the sun's way bends the blade, and its shadow bends with it: the shadow lies where the sun throws the
+//    blade's posed spine (read back from the GPU), far from where it lay without wind.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -23,16 +25,16 @@ page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
 const luma = (image, k) => 0.2126 * image.data[k * 4] + 0.7152 * image.data[k * 4 + 1] + 0.0722 * image.data[k * 4 + 2];
-const frame = async (grass, cast) => {
-  const errors = await page.evaluate(([g, c]) => window.check.show(g, c), [grass, cast]);
-  assert.deepEqual(errors, [], JSON.stringify({ grass, cast }));
+const frame = async (grass, cast, wind, time) => {
+  const errors = await page.evaluate(([g, c, w, t]) => window.check.show(g, c, w, t), [grass, cast, wind, time]);
+  assert.deepEqual(errors, [], JSON.stringify({ grass, cast, wind, time }));
   const png = await page.locator('canvas').screenshot();
   return { png, image: await decodePNG(png) };
 };
 /** The shadow the grass casts: its pixel mask, read at floor points, and its area in pixels. */
-const shadow = async (grass, keep) => {
-  const lit = await frame(grass, false),
-    cast = await frame(grass, true);
+const shadow = async (grass, keep, wind, time) => {
+  const lit = await frame(grass, false, wind, time),
+    cast = await frame(grass, true, wind, time);
   if (keep) await writeFile(`test-results/${keep}.png`, cast.png);
   const { width, height } = lit.image,
     mask = new Uint8Array(width * height);
@@ -67,48 +69,111 @@ const shadow = async (grass, keep) => {
     for (let pz = -3; pz <= 3; pz += 0.01) if (at(-distance, pz)) hit++;
     return hit * 0.01;
   };
+  /** The middle, in z, of the shadow on that line. */
+  const middle = (distance) => {
+    let sum = 0,
+      hit = 0;
+    for (let pz = -3; pz <= 3; pz += 0.01)
+      if (at(-distance, pz)) {
+        sum += pz;
+        hit++;
+      }
+    return sum / hit;
+  };
   let reach = 0;
   for (let d = 0.05; d <= 7; d += 0.05) if (across(d) > 0) reach = d;
-  return { area, across, reach };
+  return { area, across, middle, reach };
+};
+
+/**
+ * Where the sun throws the posed blade's spine at `distance` from the root: z at x = -distance. The strip's vertices
+ * come in pairs from root to tip, and a point (x, y, z) shades the floor at (x - y, 0, z).
+ */
+function thrown(vertices, distance) {
+  const spine = [];
+  for (let i = 0; i + 1 < vertices.length; i += 2) {
+    const [x, y, z] = vertices[i].map((v, axis) => (v + vertices[i + 1][axis]) / 2);
+    spine.push([x - y, z]);
+  }
+  for (let i = 1; i < spine.length; i++) {
+    const [x0, z0] = spine[i - 1],
+      [x1, z1] = spine[i];
+    if (x0 >= -distance && x1 < -distance) return z0 + ((z1 - z0) * (-distance - x0)) / (x1 - x0);
+  }
+  return Number.NaN;
+}
+
+const check = async (kind) => {
+  await page.evaluate((k) => window.check.use(k), kind);
+  const blade = {
+      blades: 1,
+      width: 1.5,
+      heightVariance: 0,
+      radius: 0,
+      lean: 0,
+      round: 0,
+      segments: [16, 16, 16],
+    },
+    low = await shadow({ ...blade, height: 2 }, `grass-shadow-${kind}-blade-2m`),
+    tall = await shadow({ ...blade, height: 4 }, `grass-shadow-${kind}-blade-4m`),
+    near = tall.across(1),
+    far = tall.across(3),
+    narrowing = far / near,
+    expected = Math.sqrt(1 / 3);
+  const many = await shadow({ ...blade, height: 2, width: 0.15, radius: 1, blades: 16 }, `grass-shadow-${kind}-16`),
+    one = await shadow({ ...blade, height: 2, width: 0.15, radius: 1, blades: 1 });
+  // The wind blows along +Z, across the sun's way; the time is the one of these with the largest bend, found from the
+  // posed blade.
+  const windy = { ...blade, height: 4, width: 0.6 },
+    wind = [0, 1, 1];
+  let time = 0,
+    posed;
+  for (const t of [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]) {
+    await frame(windy, false, wind, t);
+    const vertices = await page.evaluate(() => window.check.posed());
+    if (!posed || Math.abs(thrown(vertices, 2.5)) > Math.abs(thrown(posed, 2.5))) [time, posed] = [t, vertices];
+  }
+  const still = await shadow(windy),
+    bent = await shadow(windy, `grass-shadow-${kind}-wind`, wind, time),
+    at = [1.5, 2, 2.5].map((d) => ({
+      d,
+      still: still.middle(d),
+      bent: bent.middle(d),
+      thrown: thrown(posed, d),
+    }));
+  const results = {
+    reach: [low.reach, tall.reach].map((v) => +v.toFixed(2)),
+    across: [near, far].map((v) => +v.toFixed(2)),
+    narrowing: +narrowing.toFixed(3),
+    area: { one: one.area, sixteen: many.area },
+    wind: { time, at: at.map((row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, +v.toFixed(2)]))) },
+  };
+  console.log(kind, JSON.stringify(results));
+  assert.ok(near > 0.25, `${kind}: the blade's shadow has width 1 m out (${near} m)`);
+  // The blade is a point at its tip, so the last of its shadow is under a pixel wide.
+  assert.ok(tall.reach > 3.4 && tall.reach <= 4.15, `${kind}: a 4 m blade casts about 4 m (${tall.reach})`);
+  assert.ok(low.reach > 1.7 && low.reach <= 2.15, `${kind}: a 2 m blade casts about 2 m (${low.reach})`);
+  assert.ok(
+    Math.abs(narrowing - expected) < 0.1,
+    `${kind}: width 3 m out over width 1 m out is ${narrowing}, the blade's own ${expected.toFixed(3)}`,
+  );
+  assert.ok(one.area > 20 && many.area > 4 * one.area, `${kind}: 16 blades shade ${many.area} pixels, one ${one.area}`);
+  const last = at.at(-1),
+    moved = last.thrown - last.still;
+  assert.ok(Math.abs(moved) > 0.3, `${kind}: the wind moves the shadow ${moved} m`);
+  for (const row of at)
+    assert.ok(
+      Math.abs(row.bent - row.thrown) < 0.12,
+      `${kind}: ${row.d} m out the shadow lies at ${row.bent}, the posed blade throws it to ${row.thrown}`,
+    );
+  return results;
 };
 
 await runSuite(
   async () => {
     console.log('adapter', JSON.stringify(hardware.webgpu));
     await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
-    const blade = {
-        blades: 1,
-        width: 1.5,
-        heightVariance: 0,
-        radius: 0,
-        lean: 0,
-        round: 0,
-        segments: [16, 16, 16],
-      },
-      low = await shadow({ ...blade, height: 2 }, 'grass-shadow-blade-2m'),
-      tall = await shadow({ ...blade, height: 4 }, 'grass-shadow-blade-4m'),
-      near = tall.across(1),
-      far = tall.across(3),
-      narrowing = far / near,
-      expected = Math.sqrt(1 / 3);
-    const many = await shadow({ ...blade, height: 2, width: 0.15, radius: 1, blades: 16 }, 'grass-shadow-16'),
-      one = await shadow({ ...blade, height: 2, width: 0.15, radius: 1, blades: 1 });
-    const results = {
-      reach: [low.reach, tall.reach].map((v) => +v.toFixed(2)),
-      across: [near, far].map((v) => +v.toFixed(2)),
-      narrowing: +narrowing.toFixed(3),
-      area: { one: one.area, sixteen: many.area },
-    };
-    console.log(JSON.stringify(results));
-    assert.ok(near > 0.25, `the blade's shadow has width 1 m out (${near} m)`);
-    // The blade is a point at its tip, so the last of its shadow is under a pixel wide.
-    assert.ok(tall.reach > 3.4 && tall.reach <= 4.15, `a 4 m blade casts about 4 m (${tall.reach})`);
-    assert.ok(low.reach > 1.7 && low.reach <= 2.15, `a 2 m blade casts about 2 m (${low.reach})`);
-    assert.ok(
-      Math.abs(narrowing - expected) < 0.1,
-      `width 3 m out over width 1 m out is ${narrowing}, the blade's own ${expected.toFixed(3)}`,
-    );
-    assert.ok(one.area > 20 && many.area > 4 * one.area, `16 blades shade ${many.area} pixels, one ${one.area}`);
+    const results = { shadows: await check('shadows'), virtual: await check('virtual') };
     assert.deepEqual(pageErrors, []);
     console.log('ok scatter grass shadows', JSON.stringify(results));
   },
