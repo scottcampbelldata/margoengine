@@ -1340,7 +1340,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,388 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,392 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -5788,7 +5788,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Sphere and blended reflection probes (`shape: 'sphere'`, `reflectionBlend: 'weighted'` in `@margoengine/environment/probes`, 2026-11-08) | By method: a sphere probe's parallax point is the far hit of the reflected ray with its sphere and its fade runs past the surface; weighted blending sums probes by fade weight, normalised past 1; on an Apple M6 (Metal) both match a CPU mirror within 3.2e-7 at 512 random rays (LIM-549). | No cost without them (box probes in order keep their shader text); a sphere adds one ray-sphere solve per probe per fragment. | Spheres are centred where they are created; capture still sees through each probe's own position only; cost not timed. | Use spheres for round or open areas and weighted blending where probes overlap at a doorway or a clearing. |
 | Local fog volumes (`@margoengine/environment/fog-volumes`, 2026-11-08) | Enforced: at most 256 volumes per `FogVolumes`, axis-aligned boxes (`min` < `max`) and spheres (`radius` > 0), `density` 0 to 1,000 per m, `noise` 0 to 1. By method: each froxel adds every volume's extinction and albedo-weighted scattering to the fog's; on an Apple M6 (Metal) the integrated volume of a box, a sphere and a noisy box equals a CPU mirror of the froxel pass within 0.002 + 1% (LIM-545). | The volumes share the fog's froxel grid, so they get its lighting, shafts, shadows and reprojection for one buffer read per froxel and volume. | Every froxel tests every volume, so the froxel pass grows with the count (cost not timed); a volume thinner than a froxel is blurred over it and its neighbours; boxes do not rotate; a volume cannot remove global fog. | Keep the count small and the volumes larger than a few froxels; raise `grid` for small volumes. |
 | Procedural studio environment (`@margoengine/environment/studio`, 2026-11-08) | Enforced: `width` a power of two 16 to 4,096 (height half), colours three finite values of 0 or more, per light an angular `width` and `height` in (0, PI), `intensity` 0 to 65,504, `color` 0 to 1 and `softness` 0 to 1. By method: the room depends on elevation alone and a softbox is a gnomonic rectangle with a smoothstep edge; on an Apple M6 (Metal) an Environment made from it keeps the image in its cube within 0.15% and its SH within 0.024% (LIM-547). | No download and deterministic bytes: the same options give the same image on every machine. | An image, not a scene: softboxes are infinitely far (no parallax or distance falloff) and give no contact shadow; made on the CPU in one pass over its texels (8.4 M at width 4,096); cost not timed. | Keep the default width 512 for lighting; add `@margoengine/shadows` for contact shadows. |
-| Fogged transparents (`VolumetricFog.add`, `@margoengine/environment/volumetric`, 2026-11-08) | By method: a fragment of an added drawable reads the integrated volume at its own depth and is drawn as straight alpha `a (c T + L) + (1 - a) dst` over the fogged frame, exactly the fogged blend; on an Apple M6 (Metal) the hook equals a CPU mirror within 1.7e-7 (checked under 1e-3) at 192 froxel centres (LIM-548). | One extra pass over the frame for everything added; no shader or call changes without `add`. | Additive, multiply and transmission surfaces keep their own draw unfogged; the fog's lookup is one froxel wide like its composite; cost not timed. | Use normal blending for fogged glass and smoke. |
+| Fogged transparents (`VolumetricFog.add`, `@margoengine/environment/volumetric`, 2026-11-08) | By method: a fragment of an added drawable reads the integrated volume at its own depth and is drawn as straight alpha `a (c T + L) + (1 - a) dst` over the fogged frame, exactly the fogged blend; on an Apple M6 (Metal) the hook equals a CPU mirror within 1.7e-7 (checked under 1e-3) at 192 froxel centres (LIM-548). | One extra pass over the frame for everything added; no shader or call changes without `add`. | Additive, multiply and transmission surfaces keep their own draw unfogged; added drawables draw right after the fog, before particles that were not added, so an unadded flame or ember behind an added smoke column is not dimmed by it (the Fauld tunnels, 2026-11-27); the fog's lookup is one froxel wide like its composite; cost not timed. | Use normal blending for fogged glass and smoke. |
 | Raw `shader` lighting effects on coated materials | Enforced by method ([pbr-hooks.js](../packages/shared/pbr-hooks.js)): only a `pbr` `direct` hook reaches clearcoat and sheen sun lobes. An effect that edits the `direct+ambient(s)` text itself reaches the base's light alone. | The coat's light adds after the sum, unscaled by the share it leaves the layers under it. | Such an effect leaves a coat highlight in its shadow. `Shadows`, `Clustered` and the other effects in this repository use `pbr`. | Return `direct` from `pbr(group)`. |
 | Native glass tint draw | Enforced by method ([shader.ts](../packages/gltf/src/shader.ts)): a loaded transmissive material draws twice, a multiply of the light behind and the lit surface, and both sample the material's maps. Cost measured (quiet-gated, RTX A6000, 1920 × 1080 4x, screen-filling glass, [tint-pass-gpu.json](../examples/package-benchmarks/results/tint-pass-gpu.json)): four maps, one layer 0.52 ms a frame against 0.33 ms with no tint draw and 0.39 ms with the older factors-only draw; 16 layers 4.46, 2.56 and 3.47 ms; eight maps, 16 layers 6.88, 3.41 and 4.65 ms. | Base colour, transmission, metal, sheen and clearcoat maps change how much light passes through, so the multiply has to read them. | The tint draw takes 17 to 57 percent of the GPU time of these glass-only frames at 1920 × 1080, 0.03 to 0.2 ms per million glass pixels. Glass with no maps pays as well: 3.41 ms against 2.69 ms for the factors-only draw at 16 layers, because the surface read also covers metal and thin film. | The `Transmission` pass from `@margoengine/materials`. |
 | Native glass on a display-encoded target | Package-owned scene capture and one snapshot before each native glass surface. | Decode the stored background and lit surface, multiply the linear transmitted share, add, then encode once. HDR targets retain their existing blend path. | A full scene capture and a copy pass per native glass primitive; 4x scenes also resolve before each snapshot. Native transmission remains a sightline tint, without screen-space refraction. | Use `Transmission` for refracted HDR scene copies. |
@@ -6062,7 +6062,9 @@ in `packages/cad/test/cad-limits.test.js`).
 | Local exposure (`LocalExposure` in `@margoengine/tonemap/local`, 2026-11-08) | By method: the bilateral blur is separable (horizontal then vertical), an approximation of the 2D filter that can leave a faint halo along thin bright lines; quarter-resolution base (4 by 4 blocks), or 8 by 8, 16 by 16 and so on when three sigma would need more than 32 taps a side (2026-11-15; the blur always reaches three sigma), read bilinearly, so a strong edge in the base softens across one block; the whole source is filtered, not one view rect; three r32float textures (about 1.5 MB at 1920 by 1080 at the default radius); GPU time not measured (LIM-486). Entry `@margoengine/tonemap/local` 2,234 to 2,335 B gzip. | Separable passes keep the cost linear in the radius. | Very fine structures are not separated into their own regions. | Lower `edges` for sharper region borders. |
 | Sprite masks (`SpriteLayer` `mask` in `@margoengine/sprites`, 2026-11-08) | One rect or circle per layer, hard edged. | The test runs per pixel in the layer's fragment shader against one uniform, so a mask costs no extra pass or texture. | By method: a pixel is in or out by its centre, so edges step by whole pixels and do not antialias; a turned or scaled shape needs a rect or circle (no polygons or image masks). Every layer's uniform grew from 16 to 48 B for it. Proved on one GPU, an RTX A6000, pixel for pixel. Time not measured. | Draw into a `target` and composite it with your own mask pass for soft or image masks. |
 | Isometric, staggered and hexagonal maps (`@margoengine/tilemap/iso`, `/hex`, 2026-11-08) | The cells in view are written each frame, 48 B each; one draw per run of one tileset in paint order. Oblique maps, and infinite maps that are not orthogonal, are refused by the Tiled importer; `fromTMX` (TMX through `@margoengine/loaders`) reads orthogonal maps only, as the loader does not carry the orientation. | Drawing in paint order across the whole view is what lets tall tiles cover the cells behind them; a cached 64 x 64 chunk per draw, as `TileMap` uses, would draw a tall tile on a chunk's edge under its neighbour's cells. | By method: the CPU cost grows with the cells in view (not measured); a turned hexagonal tile's edge pixels fall where rounding puts them; a tile wider than its cell may overlap a cell drawn later in the same row. Proved on one GPU, an RTX A6000, pixel for pixel against images painted from the layout rules. Time not measured. | Orthogonal maps draw with `TileMap` and its chunk cache; split a huge view into several targets. |
-| Grid pathfinding (`@margoengine/tilemap/path`, 2026-11-08) | Up to `maxCells` (default 1,000,000) cells searched per call; arrays of the grid's size (about 21 B per cell) made per call. | A tile map is a grid, so a plain heap search over its cells needs no navigation mesh. | By method: one search per call on the calling thread (no incremental or hierarchical search; jump point pruning with `jumpPoints` on grids of one cost without corner cutting, plain A* elsewhere); costs are per cell entered, not per edge; a staggered map's left and right cells in one row are two steps apart. Time not measured. | For big open worlds use `@margoengine/navmesh`; for many units to one goal reuse one `flowField`. |
+| Grid pathfinding (`@margoengine/tilemap/path`, 2026-11-08) | Up to `maxCells` (default 1,000,000) cells searched per call; arrays of the grid's size (about 21 B per cell) made per call. | A tile map is a grid, so a plain heap search over its cells needs no navigation mesh. | By method: one search per call on the calling thread (jump point pruning with `jumpPoints` on grids of one cost without corner cutting, plain A* elsewhere); costs are per cell entered, not per edge; a staggered map's left and right cells in one row are two steps apart. Time not measured. | For a changing map or long paths use `tilemap/replan` or `tilemap/hpa`; for big open worlds `@margoengine/navmesh`; for many units to one goal reuse one `flowField`. |
+| Replanning (`PathReplanner` in `@margoengine/tilemap/replan`, 2026-11-27) | One goal per replanner; about 40 B per cell held while it lives; `maxCells` per call. | D* Lite keeps each cell's distance to the goal, so a change costs the cells it can matter to. | By method: exact (the cost a fresh A* gives, checked over 400 changing grids); the first call costs about an A* search; changes near the goal can cost more than a fresh search; a cost below the lowest seen starts afresh unless `minCost` was set; the caller must name every changed cell; a new goal needs a new replanner. Time not measured. | Set `minCost` when costs will drop; use `findPath` for one-off queries and `flowField` for many units on a still map. |
+| Hierarchical paths (`PathHierarchy` in `@margoengine/tilemap/hpa`, 2026-11-27) | One level of square clusters; about 20 B per cell plus the graph; built by searching each cluster once from each of its nodes. | A query searches the graph and only the clusters the path crosses. | By method: a path is found whenever one exists; exact with `detour: 0`, otherwise above the cheapest by at most (2 detour + 1) L highest per cluster border a cheapest path crosses (L sqrt(2) with corner steps, else 1; highest the dearest open cell); no second level of clusters; changed cells rebuild the clusters around them on the next query; all on the calling thread. On a 256 x 256 map, 200 long queries cost 0.6% more in total than the cheapest, the worst 3.5% more. Time not measured. | Use `detour: 0` or `findPath` where the exact cost matters. |
 | Field of view and fog of war (`@margoengine/tilemap/fov`, 2026-11-08) | One scan of up to `max(width, height)` rows per octant per viewer on the calling thread; a mask of `width * height` bytes per call (or the `into` mask), `FogOfWar` keeps two. | Shadowcasting visits only the cells that light can still reach, so a closed room costs its own cells. | By method: sight is from the viewer's cell centre and not symmetric; orthogonal and isometric grids only (staggered and hexagonal refused); no partial light or light levels; the fog image is one pixel per cell, drawn by the caller. Time not measured. | For light levels use `@margoengine/voxel/light-rgb` or a lighting pass; for hex fog test cells with `@margoengine/tilemap/hex` lines. |
 | Pixel-art scaling (`@margoengine/pixel/scale`, 2026-11-08) | One pass a canvas view (or one into `target`), 4 texel reads a pixel for `'sharp-bilinear'` and up to 20 for `'edge'`; the picture covers whole screen pixels. | Covering each screen pixel by its share of each texel keeps art pixels flat and even at any size. | By method: two texels a side are mixed, so below 1 times the picture is not averaged over all it covers; `'edge'` below 2 times draws as `'sharp-bilinear'`; colours mix as stored (sRGB values), not in linear light; texels past the edge repeat the edge. Time not measured. | Draw the art at the size you need below 1 times. |
 | CRT look (`@margoengine/pixel/crt`, 2026-11-08) | One pass a canvas view (or one into `target`), 9 texel reads a pixel. | Working from the art's own rows keeps one scanline per art pixel at any screen size. | By method: a stylised look, not a model of a real tube (no beam spread with brightness, no persistence, no interlace, no colour bleed); one grille pattern (three columns); the art row under each pixel is taken whole, not mixed with the next; colours as stored, not in linear light. Time not measured. | For a measured tube model use a dedicated post pass. |
@@ -6218,7 +6220,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Stored height grids (`@margoengine/terrain/height-grid`, 2026-11-17) | Enforced: integer `width` and `height` 2 to 65,536 with `width * height` heights; `size` each above 0 to 100,000; finite `origin`, `base`, `exaggeration` and numeric `fill`; an infinite height throws (NaN and the `noData` value are the missing marks). The grid is copied once into a Float32Array (4 bytes a texel), a missing sample is filled once at creation, and a read is one bilinear lookup with no allocation. | A stored survey grid has real ground size and missing samples (GDAL_NODATA, voids), which a height function does not carry; the entry reads it as the surface `Terrain` and `TerrainQuery` read (texel (0, 0) at the corner, last texel at `origin + size`) or, with `registration: 'area'`, as GeoTIFF cells. | Heights are held as float32, so a world height past about 16 million units loses its fraction; outside the box the edge heights hold (no extrapolation); `'nearest'` fill follows the eight neighbours, so it is not the Euclidean nearest on a wide void; a 65,536 by 65,536 grid is 17 GB and cannot be made, the practical grid is what fits in memory. | Cut a large raster into tiles and give each its own `origin`, or stream it through `@margoengine/terrain/stream`; fill voids with a number or `'min'` when a flat floor is wanted. |
 | GeoTIFF georeference and no-data (`@margoengine/decoders/geotiff`, 2026-11-17) | Enforced: a ModelPixelScale of 3 numbers, a ModelTiepoint of a multiple of 6, a ModelTransformation of 16, finite values, a GeoKey directory of version 1 whose key count fits its tag and whose double and ASCII parameters lie inside theirs, and a GDAL_NODATA that is a number or `nan`; each failure is a MargoError coded `failed`. `openTIFF` keeps four ASCII tags per directory (270, 34737, 42113, 42112) and no other. Reads tags only, no pixels. | The georeference of a stored survey grid (a USGS 3DEP exportImage, an SRTM tile) is in its tags; the entry reads the standard tags (OGC 19-008r4) and GDAL's no-data text without a GIS library. | One tie point plus a pixel scale, or one transformation: several tie points with no scale are listed in `tiepoints`, not interpolated (no ground control point warp); a geographic or projected system is named by its EPSG code and citation only, with no datum shift or reprojection, so a geographic grid's degrees are not metres; GDAL_METADATA is kept as text, its scale and offset are not applied. | Reproject and rescale with GDAL before loading, or read the heights and apply the scale and offset from `page.ascii.get(42112)` yourself. |
 | Wind-built sand surface (`TerrainColors` `sandSurface`, 2026-11-16) | By method: ripples, streaks, grainflow and lee/stoss sorting are shading only (no geometry, no shadows between ripples); one wind direction per mesh; the ripple fade assumes a pixel of 1/1,000 of the distance (about 1080 lines at 50 degrees), so a 4K frame drops ripples about 2 times nearer than it could and a frame of under 500 lines may shimmer before they fade; slip faces are found from the normal against the wind, not from the dune's crest; measured on an RTX A6000 (`test/sand.browser.mjs`, WebGPU and the WebGL2 layer): near luma spread 1.77 times, slip face 1.047 and windward face 0.963 times in sRGB luma against `sandSurface: false`, far shimmer 1.08 times. | Per-pixel noise on the existing sand band costs four to six value-noise reads and no texture or binding; the footprint constant avoids screen derivatives, which WGSL forbids inside the per-mesh branch. | Ripples read within about 20 m at 1080 lines and fade beyond; no ripple shadows under a low sun. | Raise `ripple` for coarser sand that should read farther; `sandSurface: false` for the plain bands. |
-| Terrain deformation (`@margoengine/terrain/deform`, 2026-11-08) | Enforced: `size` 64 to 2,048 texels within the device's 2D texture and storage limits, `texel`, `depth` and `distance` above 0, `rim`, `softness`, `darken` and each `layers` entry 0 to 1, `fade` 0 or more, `steps` 4 to 32; a print's length and width up to 94 texels; up to 1,024 prints pressed a frame (the rest wait). Unmeasured: cost, other GPUs (LIM-497). | Prints are shaded, not built: a fragment-level relief needs no clipmap cells finer than a footprint and costs one compute pass a changed frame. | By method: prints are shading only (parallax and normals), so the ground's outline, shadows, SSR capture and `TerrainQuery` keep the undeformed surface; a print is kept only while the map's window holds it and lost on device loss; depths are stored as half floats (0.06 mm at 10 cm); a print's walls are not shadowed by the sun; softness by layer needs painted weights. | Keep prints within half the map of the camera (or `follow` the player); give rock layers softness 0 with painted weights. |
+| Terrain deformation (`@margoengine/terrain/deform`, 2026-11-08) | Enforced: `size` 64 to 2,048 texels within the device's 2D texture and storage limits, `texel`, `depth` and `distance` above 0, `rim`, `softness`, `darken` and each `layers` entry 0 to 1, `fade` 0 or more, `steps` 4 to 32; a print's length and width up to 94 texels; up to 1,024 prints pressed a frame (the rest wait); `persist` needs `fade` 0 and keeps at most 16,384 prints and track pieces; `walk` takes two or more points, `step` above 0, `jitter` 0 to 1. A ground mesh drawn by core's standard shader takes prints as a terrain does (2026-11-27, WebGPU and the WebGL2 layer, `deform-mesh.browser.mjs`). Unmeasured: cost, other GPUs (LIM-497). | Prints are shaded, not built: a fragment-level relief needs no clipmap cells finer than a footprint and costs one compute pass a changed frame. | By method: prints are shading only (parallax and normals), so the ground's outline, shadows, SSR capture and `TerrainQuery` keep the undeformed surface; a print is kept only while the map's window holds it and lost on device loss unless `persist` is on; on a mesh there is no softness by layer and no floating origin, and colour bands drawn by an earlier patch (sand ripples) still cross a print; depths are stored as half floats (0.06 mm at 10 cm); a print's walls are not shadowed by the sun; softness by layer needs painted weights. | Keep prints within half the map of the camera (or `follow` the player); give rock layers softness 0 with painted weights. |
 | Plants that thrash with the Beaufort wind (`ScatterWind` speed, `windClockRate` of `@margoengine/scatter`, 2026-11-17; rewritten for KB-LOOK-TV-SHIMMER1, 2026-11-26) | Enforced: speed 0 to 100 m/s (`RangeError` past it). Measured on the GPU (WebGPU and the WebGL2 layer): a breeze below force 4 draws the same pixels as no speed (`wind-speed.browser.mjs`), and a 0.3 m blade's top after 1 s of 20 m/s is within 1 percent of its reach of where 3.7 s of no speed puts it (`sway.browser.mjs`; 95 of 36,864 pixels of a 0.8 m block field differ between a 17.2 m/s gale's 1 s and 3.19 s of no speed). | The wind clock runs max(1, U / 5.4) times as fast and drives the gust, branch and leaf terms; each plant follows the gusts through its own response 1 / sqrt(1 + r^4) (r the gust's frequency over the plant's own, 2.55 H^-0.59 Hz) and sways the rest at its own frequency on the real clock. The bend amount stays `strength` (`windBend` of the weather, full from 20 m/s). | By method: no lock-in of the crop waves to the plants' own frequency (Py et al. 2006); `ScatterInstances` batches take the three-number wind and keep the plain clock (rate 1). | Give each kind of plant its own Scatter, or its own `sway`, when their motion should differ. |
 | Bounded wind sway (`sway` of `ScatterOptions` and `ScatterBatch`, `swayTip` and `swayFrequency` of `@margoengine/scatter`, KB-LOOK-TV-SHIMMER1, 2026-11-26) | Enforced: `stiffness` 0.1 to 10 and `height` a positive finite float (`RangeError`). Measured on the GPU (WebGPU and the WebGL2 layer, `sway.browser.mjs`, 60 s at 20 Hz at full strength and 0, 5.4, 20 and 40 m/s): a 25 m plant's top stays within 1.10 m, moves at most 2.27 m/s and sways strongest at 0.1 to 1 Hz; a 0.3 m plant's top within 0.065 m; both stems keep their length within 1 percent. `tests/nature.browser.mjs` checks the bound over plants 0 to 100 m tall. | A plant's top moves at most strength x min(0.354 H, reach), reach = 1.2 m / stiffness, H the mesh top times the instance's scale; `windDetail` adds at most half that again. The stem bows as a tapered beam (0.74 x^2 + 0.26 x^4) and sinks by half the integral of its slope squared (its length kept to second order). Cost per scattered vertex: one `pow`, two `inverseSqrt`, one more `sin`; `ScatterInstances` records grow from 128 to 144 bytes. | By method: the 1.2 m reach is an estimate, not a measured gale tip deflection: the tip deflections of Peltola et al. 1993 and James et al. 2006 could not be read in full; it rests on crown bending of 2 to 5 cm in 4 to 8 m/s winds for 9.5 to 13.5 m Scots pines (Peltola et al. 1993 as quoted by Cardona and Dabiri 2021) scaled by U^2 to 20 m/s and to the top, about a metre for a 15 to 25 m tree, and is unverified above 25 m. No mean downwind lean, no per-branch modes (Habel et al. 2009 levels 2 to 4, Rodriguez et al. 2008), and impostors do not sway. | `sway.stiffness` per species; `PlantMotion` of `@margoengine/scatter/plant-motion` for solved plants. |
 | Ground that changes on screen (`@margoengine/terrain/ground-change`, 2026-11-17) | Enforced: grid `resolution` 1 to 4,096 cells a side within the device's 2D texture limit, `size` above 0 up to 1e6 m; a mesh must be a `heightfieldGeometry` on the same square grid at the identity transform; a clipmap `Terrain`'s heightmap must be `r32float` with COPY_SRC and COPY_DST, its texels the grid; film time 0 to 1e9 s; every event option range in the README (widths, depths and reaches above 0, shares 0 to 1, bank face 10 to 89 degrees, ash elongation 1 to 12, slide bulking 1 to 2). Measured: scour depth on Sumer et al. 1992 to 1e-9; volumes kept to 2% (scour), 4% (gully fan), 5% (slide lobe); burn length to breadth on Alexander 1985 to 3%; crater heave on the ballistic h = H (1 - (1 - t/T)^2) to 1e-9, its bowl and (r / R)^-3 blanket to 1e-9 and the blanket's volume to 3% of `ejecta` times the bowl's (2026-11-24); drawn heights 0.05 of 255 from real geometry of the same heights. Measured once, on the dev PC under load (not a benchmark): a changed frame recomputes the box around every active event, 31 ms for 148,225 vertices with eight events active, 82 ms for the first frame. Unmeasured: other GPUs (LIM-663). | Closed forms of film time, not a simulation: the same ground at a time however it is reached, at the cost of no interaction between events beyond order (a later event lays its cover over an earlier one and adds its height). | By method: the events are shaped by their laws, not by the terrain (a gully follows its path, not the steepest descent; lava follows its path, not the slope, unless its path and arrival times come from `LavaFlow.lavaEvent()` of `@margoengine/weather/lava`, which runs down the slope; mud covers the land side of its shore line to its reach, not a flood simulation); covers and heights are one value per grid vertex (per heightmap texel on a terrain); a terrain's CPU copies (`TerrainQuery`, sculpt) keep the base heights, and the SSR capture of a terrain sees the covers but not the wet gloss; plants of a `Scatter` given `scatterGround()` are kept or cleared by the covers (one share per grid vertex, so a thin dusting of ash clears them as a thick one would once its cover byte is full), and those left standing are charred, ash-dusted and mud-marked only through a `PlantStates` map fed by `plantCovers()` (`@margoengine/scatter/states`); the mesh's culling sphere only grows while attached (a lowered mesh keeps the larger sphere until `dispose`, which draws the same picture). | Draw the paths down the real slope (`TerrainQuery` or `@margoengine/biomes` flow lines); use a grid fine enough for the narrowest event (two cells across a gully at least); pair mud with `@margoengine/water` for the water itself. |
@@ -9360,7 +9362,10 @@ prebuilt and not in `draco-native`. Regression:
 points`).
 
 With E58 and E59 (several KD decoders and repeated ids, 2026-11-27), which drop
-the id sort, the Wasm is 137,361 bytes (52,199 B gzip -9).
+the id sort, the Wasm is 137,361 bytes (52,199 B gzip -9). With E60 and E61 (version 1.3
+and the normalized byte) it is 137,356 bytes (52,255 B gzip -9). With E62 (vertices no
+traversal reaches) it is 137,557 bytes (52,315 B gzip -9). With E63 to E66
+(header and predictor bytes) it is 137,597 bytes (52,401 B gzip -9).
 
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes
@@ -15860,6 +15865,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: the stated size of margoengine/web is stale (KB-KITS-WEBSIZE1)
+
+- **Repro.** `node --test tests/umbrella.test.js` after `npm run build:packages`: `margoengine/web: 106118 B,
+  docs/guides/kits.md says 103021 B`, past the 3 percent the test allows. Found on a tree based on 272eb08a9b; the
+  web kit holds no tilemap entry, so the tilemap work that found it adds nothing to it.
+- **Cause.** Not traced to its commits yet: the roots the kit bundles have grown since the row was last measured. The
+  fix is to name what grew, check each growth is under its entry's ceiling, and restate the row with that history.
+
+### Open 2026-11-27: some tests' random generator loses its low bits and repeats early (KB-TEST-LCG1)
+
+- **Repro.** `seed = (seed * 1103515245 + 12345) >>> 0` from seed 3 repeats after 6,445 draws with a period of 419, so a
+  test drawing many random cases from it checks the same few again. Found writing the tilemap search tests.
+- **Cause.** The product passes 2^53, where a float drops the low bits that `>>> 0` keeps. `Math.imul` keeps them.
+  Fixed in the tilemap path, replan and hpa tests (`test/grid-fixtures.js`; `test/path.test.js` holds the check). The
+  same expression, or its `% 2 ** 31` and `& 0x7fffffff` forms, remains in other packages' tests; each needs its
+  generator replaced and its expectations re-proven by the package's owner.
+
 ### Open 2026-11-27: advancing wake transmits flow through the Wigley hull (KB-SEA04-STEM1)
 
 - **Repro.** The [Wigley comparison](../packages/physics/scripts/sea04-stem.md) drives the actual `HullSolver` and
@@ -21373,10 +21395,34 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 
 - **Repro:** not reproduced yet; read from the code. Attach `GTAO` and draw dense dark smoke or a blended mesh in front
   of an occluded wall, before the PostStack's composite: the composite takes the wall's whole ambient light times
-  (1 - visibility) out of the blended colour, as it did under grass (KB-SCENES-GRASSBLACK1). A likely cause of the flat
-  black smoke in Fauld frame fr096, not yet checked.
+  (1 - visibility) out of the blended colour, as it did under grass (KB-SCENES-GRASSBLACK1). Measured on Fauld frame
+  fr096 (1920 x 1080, RTX A6000, WebGPU, one frozen instant): not seen there. Over the 576,068 pixels the smoke changes,
+  occlusion took 0.015 of 255 levels on average and 0.9 at most (0.023 and 2.9 with the smoke off), because the store
+  has almost no ambient light underground; the frame's flat black smoke was KB-FAULD-SMOKEBLACK1. A repro needs a
+  scene with strong ambient light behind dense dark smoke.
 - **Cause:** only `Scatter` registers an ambient veil (`packages/shared/ambient-veil.js`); vfx particles, smoke and
   core's blended meshes register none. SSGI and SSR under blended coverage are not measured.
+
+### Fixed 2026-11-27: smoke in the Fauld tunnels' dusty air read as flat black shapes (KB-FAULD-SMOKEBLACK1, scenes)
+
+- **Repro (before):** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr096.json --stills --out <folder>`: black blobs
+  and a black band across the upper half; fr093 black blotches in the doorway, fr091 a dark patch over the flames.
+- **Cause:** the scene never added its smoke to its `VolumetricFog`. The fog composites over the opaque scene before
+  the particles draw, so each puff covered the lit dust glow with the smoke's own dim colour and none of the air in
+  front of it. In fr096 that glow is nearly all the light of the middle of the frame (without the fog the walls there
+  are black), so smoke tens of metres off read as holes in it. Ruled out first: occlusion (KB-SSAO-BLENDVEIL1 above,
+  0.9 levels at most) and the local shadow maps (white puffs stayed black without them).
+- **Fix:** `@margoengine/scenes/fauld-tunnels` calls `fog.add(smoke.effect)` for every smoke column: it draws after the
+  fog's composite, each puff behind the in-scattered light and transmittance between the camera and it (Wronski,
+  "Volumetric Fog", SIGGRAPH 2014 Advances in Real-Time Rendering,
+  https://advances.realtimerendering.com/s2014/; premultiplied composite as `VolumetricFog.add` documents).
+- **After:** pixels at or under luma 1.5: fr096 21,705 to 0, fr093 17,112 to 0 (960 x 540, RTX A6000, WebGPU); fr092
+  unchanged (5 pixels by over 4 levels).
+- **Weak spots:** fr096's smoke is now only a faint soft shade in the haze: the columns in view are tens of metres off,
+  and none curls past the casings as the shot list asks. Fog-added smoke draws before the flames and embers, so a flame
+  behind a column is not dimmed by it (docs/limits.md).
+- **Regression:** `packages/scenes/test/fauld-smoke-fog.mjs` (every smoke column is one the fog draws, and fr096 has
+  under 200 black pixels: 4 unfogged and 23,371 black before).
 
 ### Fixed 2026-11-27: the dune coast's grass blades showed black fragments (KB-SCENES-GRASSBLACK1, post and scatter)
 
@@ -21417,6 +21463,21 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **After:** GTAO 0.999 mean, 0.995 least; SSAO 0.823 and 0.797 (its range check still counts the slats a little).
 - **Regression:** `packages/post/test/ssao-silhouette-browser.mjs`, WebGPU and the WebGL2 layer.
 
+### Fixed 2026-11-27: the dune coast's sand carried no footprints (KB-SCENES-PRINTS1, terrain and scenes)
+
+- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=camp-buildings`: the
+  sand between the camp and the rail was untrodden, where LC-W86-15 and LC-W86-38 show it walked over.
+- **Cause:** `TerrainDeformation` took only a clipmap `Terrain`; the scene's ground is a mesh with `TerrainColors`, its
+  cells 2.15 m wide, so no print could be pressed in it.
+- **Fix:** `TerrainDeformation` attaches to a ground mesh (core's standard shader, `openMeshBlock`), lays walking
+  trails (`walk`) and keeps prints under a moving camera (`persist`); the dune coast's `footprints` setting (default 1)
+  treads them between the sheds, to the rail and along it. Parallax occlusion mapping after Tatarchuk, I3D 2006
+  (https://doi.org/10.1145/1111411.1111423); gait means of Murray, Drought and Kory, J. Bone Joint Surg. 46-A, 1964, as
+  tabled at https://ouhsc.edu/bserdac/dthompso/web/gait/KNMATICS/stride.htm.
+- **Weak spots:** prints are shading, with no shadow of their own and no broken sand round them; the ripples' colour
+  bands still cross a print (their relief does not); at 20 m and eye height a print is about a pixel tall.
+- **Regression:** `packages/terrain/test/deform-mesh.browser.mjs` and `packages/terrain/test/deform.test.js`.
+
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 
 - **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>` and compare the seven
@@ -21424,7 +21485,8 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **What differs:** (1) fixed 2026-11-17 (KB-SKY-OVERCAST1): the overcast sky was a 2D cloud sheet with dark holes, an
   orange glow toward the sun and the sun disc showing, with a dark brown band at the horizon, where the photographs show
   an even pale grey deck and a pale haze; (2) fixed 2026-11-16: no grass blade rendered on the hummocks; (3) fixed 2026-11-16: the sand was smooth mottled colour with no ripples or
-  wind streaks (footprints and scour stay open); (4) the sea is flat grey with a white band at the waterline and no breaking lines;
+  wind streaks; fixed 2026-11-27: footprints trodden round the camp and the rail (`footprints`, KB-SCENES-PRINTS1); wind scour
+  stays open; (4) the sea is flat grey with a white band at the waterline and no breaking lines;
   (5) fixed 2026-11-27 (KB-SCENES-SHEDBOX1): the sheds read as plain boxes at 60 m (no wood texture, no dark interior
   through the open door).
 - **Cause:** (1) at full cover the sheet was still its shape noise (holes), its opacity let the disc and Preetham's
@@ -32901,6 +32963,45 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/kd-decoders.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder refused version 1.3 streams and some normalized bytes (batch 133, E60 and E61)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Unsupported` for a version 1.3 stream
+  (`445241434f0103000000000000000000`) and `Invalid` for a descriptor whose
+  normalized byte is 2 or more.
+- **Cause:** `native/draco/src/sequential.rs` admitted 1.0 to 1.2 only, read a
+  varint unique id only from 2.0 and bounded the normalized byte at 1.
+- **Fix:** the observed rules
+  ([E60 and E61](clean-room.md#batch-133-e60-and-e61-version-13-and-the-normalized-byte-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/version13.bin`.
+
+### Fixed 2026-11-27: optional Draco decoder refused meshes with an unreached vertex (batch 133, E62)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Invalid` for a 2.2 mesh of `tests/fixtures/multi.bin` with the
+  header faces lowered from 12 to 11, symbols from 11 to 10 and splits 0.
+- **Cause:** `native/draco/src/traversal.rs` refused a mesh in which the
+  attribute traversal leaves a vertex without an entry.
+- **Fix:** the vertex takes entry zero
+  ([E62](clean-room.md#batch-133-e62-vertices-no-traversal-reaches-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/unreached.bin`.
+
+### Fixed 2026-11-27: optional Draco decoder differed on decoder header and predictor bytes (batch 133, E63 to E66)
+
+- **Repro:** on damaged seamed meshes `@margoengine/decoders/draco-native`
+  refused streams the prebuilt decodes (a connectivity id of 128 to 254, a
+  decoder type of 2 or more, an unknown prediction method, a transform the
+  attribute cannot use) and accepted a per-corner decoder with the degree
+  traversal, which the prebuilt rejects.
+- **Cause:** `native/draco/src/sequential.rs` and `integer.rs` allowed only
+  the values a valid file holds, and not the same ones.
+- **Fix:** the observed rules
+  ([E63 to E66](clean-room.md#batch-133-e63-to-e66-attribute-decoder-header-and-predictor-bytes-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/headers.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -32936,26 +33037,36 @@ E26 to E40):
   `E35 one-triangle normal mode` cases in
   `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
   int32 arithmetic of that mode is not established.
-- Not probed: position-reading predictors on attribute decoders with seams that
-  split vertices, and constrained multi-parallelogram before 2.2 beyond the
-  retained cases.
-- Point clouds of version 1.3: Margo answers `Unsupported`. The prebuilt reads
-  some 1.x clouds relabelled 1.3, but admitting them to Margo's 1.x layout gave
-  other output, so the layout is not established. Repro: any `E56 no decoder`
-  cloud with minor version 3, for example hex
-  `445241434f0103000000000000000000`.
+- Damaged seamed meshes of version 2.2 (mutation probes of 2026-11-27, after
+  E63 to E66): of the differences left, most are streams the prebuilt decodes
+  and Margo refuses as truncated or in the EdgeBreaker symbol and start-face
+  counts, and a few decode to other values. Reproduce by changing one to three
+  of the first 60 bytes of the seamed meshes in the retained fixtures. Cause:
+  not yet established.
+- Constrained multi-parallelogram before 2.2: only one retained mesh uses it.
+  Mutating it gave no other values (24,756 accepted streams match); some damaged
+  streams are refused by one decoder only.
+- Damaged streams of versions 1.0 to 1.3 (found 2026-11-27 by changing one or
+  two bytes of retained streams): some that the prebuilt decodes Margo refuses,
+  some decode to other values and a few that it rejects decode. A refusal repro,
+  a 1.0 cloud:
+  `445241434f0100000000000100000001010000000409030103000300010f0000122150620000b4ffe8030000`.
+  Valid streams are not known to differ. Cause: not yet established.
 - Damaged KD clouds (found 2026-11-27 by changing single bytes of retained
   one-decoder streams): some that the prebuilt decodes Margo refuses, and some
   decode to other values. A refusal repro, a level 3 stream whose number
   probability byte is 0:
   `445241434f020300010000ae000000010100020100000307000000ae0000000006244e363c820614000000d3591f17174c1a89e9023259a4007f8a6ec439b3040000000000000008000000a46a6b1e34593001`.
   Valid streams are not known to differ. Cause: not yet established.
-- A version 2.2 standard EdgeBreaker mesh of `tests/fixtures/multi.bin` with the
-  header faces lowered from 12 to 11, symbols from 11 to 10 and splits 0: the
-  prebuilt decodes 12 points, Margo answers `Invalid` (as before E50).
+- Lowered header counts: one retained 2.2 mesh, with some lowered face and
+  symbol counts, decodes in the prebuilt and answers `Unsupported` in Margo,
+  which reads the second attribute at another offset; two 1.1 variants answer
+  `Invalid`. Repro:
+  `445241434f02020101000000060300030000026f0bff02014001ff000002000603000b03050200160101fe00042c040000f2050000ac07000084000000580300008c0200007c0400005a04000032030000b2050000da050000aa0400006c070000360600001601000052030000640000007804000005010004550100007b0200000d0200004b0200006c020000c4020000aa000000a9000000c90200000903000089000000970200002c01000026059bc8d02220000000e000000020`.
+  Cause: not yet established.
 
-Except for these refusals, predictor 6 mode 0 and the deliberate index refusal
-in [limits.md](limits.md), no difference found by these probes is open.
+No valid stream is known to differ apart from historical KD clouds and
+predictor 6 mode 0; the deliberate index refusal is in [limits.md](limits.md).
 
 ### Historical: batch 133 optional landing GPU request (resume 9)
 
