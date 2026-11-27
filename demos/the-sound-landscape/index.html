@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-OqgD8PZV.js"><script src="./assets/inline-e2c9e772.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#131e20">
+<link rel="icon" href="data:,">
+<title>The Sound Landscape · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-Cy-L8UZy.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cc95oB4k.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>The Sound Landscape</h1>
+    <p>Play an original sound and follow its frequencies across a 3D relief.</p>
+  </header>
+  <section aria-label="Sound and view controls">
+    <div class="tool-row">
+      <fieldset>
+        <legend>Sound</legend>
+        <button type="button" data-clip="bells" aria-pressed="true" disabled>Bells</button>
+        <button type="button" data-clip="sweep" aria-pressed="false" disabled>Sweep</button>
+        <button type="button" data-clip="pulses" aria-pressed="false" disabled>Pulses</button>
+      </fieldset>
+      <button type="button" id="view" aria-pressed="false" disabled>Overhead view</button>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="landscape" aria-label="Three-dimensional spectrogram. Time runs left to right and frequency increases away from the front edge. Peak level is given by height and color." aria-describedby="clip-details"></canvas>
+        <div id="labels" aria-hidden="true"></div>
+        <div id="notice"><p id="status" role="status">Building the sound landscape…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p id="clip-details">Overlapping tones leave narrow ridges as each bell rings out.</p>
+        <div class="scale" aria-label="Spectrum magnitude scale, minus 62 to minus 11 decibels relative to full scale">
+          <span>−62</span><i aria-hidden="true"></i><span>−11 dBFS</span>
+        </div>
+      </figcaption>
+    </figure>
+    <div class="transport">
+      <button type="button" class="play" id="play" disabled>Play sound</button>
+      <div class="time">
+        <label class="sr-only" for="time">Playhead position in seconds</label>
+        <input id="time" type="range" min="0" max="6.24" value="0" step=".01" disabled>
+        <span><output id="elapsed" for="time">0.00</output> / 6.24 s</span>
+      </div>
+      <div class="peak"><span>Peak at playhead</span><output id="peak">—</output></div>
+    </div>
+    <p id="audio-note" role="status" hidden></p>
+  </section>
+  <footer>
+    <span>Original synthesized audio</span><span>Log frequency · Hann window · <span id="renderer">Margo Engine</span></span>
+  </footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><script src="./assets/inline-b8273817.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#152025">
+<link rel="icon" href="data:,">
+<title>Speed · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-D8o54h4N.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BjlFpiYi.css">
+</head>
+<body>
+<main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>Speed</h1><p>Watch a precision turntable and a passing train through the same shutter. Change the exposure to see what motion does to each edge.</p></header>
+<section class="exhibit" aria-label="Rail yard motion-blur exhibit">
+  <figure>
+    <div class="viewport">
+      <canvas id="track" aria-label="A spinning calibration turntable and a silver train moving along an elevated rail platform"></canvas>
+      <p id="loading" role="status">Opening the test platform…</p>
+      <p id="error" role="alert" hidden></p>
+    </div>
+    <figcaption><span>Exposure test platform</span><span id="motion-status">Running</span></figcaption>
+  </figure>
+  <aside>
+    <fieldset id="controls" disabled>
+      <legend>Shutter angle</legend>
+      <label for="shutter"><span>Exposure</span><output id="angle" for="shutter">180°</output></label>
+      <input id="shutter" type="range" min="0" max="360" value="180">
+      <div class="ticks" aria-hidden="true"><span>0°</span><span>180°</span><span>360°</span></div>
+      <div class="exposure">
+        <button type="button" data-shutter="0" aria-pressed="false">0°</button>
+        <button type="button" data-shutter="180" aria-pressed="true">180°</button>
+        <button type="button" data-shutter="360" aria-pressed="false">360°</button>
+      </div>
+      <div class="actions"><button id="play" type="button">Pause</button><button id="reset" type="button">Reset pass</button></div>
+    </fieldset>
+    <dl><div><dt>Turntable</dt><dd>280 rpm</dd></div><div><dt>Train</dt><dd>83 km/h</dd></div></dl>
+    <p class="tip">Pause on a frame and change the shutter to compare the same moment.</p>
+  </aside>
+</section>
+<footer><a href="./source/README.md">Motion and exposure model</a></footer>
+</main>
+</body></html>

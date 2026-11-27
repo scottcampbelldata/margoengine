@@ -1,0 +1,58 @@
+:root { background:#eee9dc;color:#253035;color-scheme:light;font:1rem/1.43 system-ui,sans-serif; }
+* { box-sizing:border-box; }
+body { margin:0; }
+main { width:min(calc(100% - 3.65rem),88rem);margin:auto;padding:1.4rem 0 2rem; }
+a { color:inherit;text-underline-offset:.23em; }
+nav a { font-weight:730;text-decoration:none;font-size:.85rem; }
+nav span { border-left:1px solid #91918b;color:#4c5856;font-size:.82rem;margin-left:.66rem;padding-left:.75rem; }
+header { display:flex;align-items:end;justify-content:space-between;gap:.72rem 2rem;margin:1.55rem 0 .96rem; }
+h1 { margin:0;font:500 clamp(3.6rem,9.55vw,8.6rem)/.87 Georgia,serif;letter-spacing:-.083em; }
+header p { max-width:23rem;font-size:.98rem;color:#4c5552;margin:0; }
+.workshop { display:grid;grid-template-columns:minmax(0,1fr) minmax(18rem,23rem);border:1px solid #7f8275; }
+.visual { position:relative;margin:0;min-height:34rem;background:#a8a89b; }
+#view { position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab; }
+#view:active { cursor:grabbing; }
+figure p { position:absolute;inset:0;z-index:3;background:#c3c6b7;color:#283333;display:grid;place-content:center;text-align:center;padding:1rem;margin:0; }
+figure p[hidden] { display:none; }
+figcaption { position:absolute;left:.85rem;right:.85rem;bottom:.84rem;display:flex;justify-content:space-between;gap:.5rem;pointer-events:none; }
+figcaption>* { background:#242c2adf;color:#f2ebe0;border:1px solid #a29e8b;padding:.4rem .55rem;font:620 .77rem ui-monospace,monospace; }
+aside { background:#e0dece;border-left:1px solid #7f8275;padding:.86rem; }
+fieldset { border:0;padding:0;margin:0;min-width:0; }
+legend { font:710 1rem/1.3 system-ui,sans-serif;margin-bottom:.48rem; }
+.range { display:grid;grid-template-columns:1fr auto;align-items:center; }
+label { font-size:.83rem;font-weight:680; }
+output { color:#5c3c29;font:720 .86rem ui-monospace,monospace; }
+.range input { grid-column:1/-1; }
+input[type=range] { width:100%;height:38px;margin:0;cursor:pointer;accent-color:#8e5938; }
+.quick { display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.25rem 0 .78rem; }
+button,select { border:1px solid #8a8977;color:#25312f;background:#d0cbbc;border-radius:.14rem;font:690 .83rem system-ui,sans-serif;min-height:42px;padding:.25rem .48rem;cursor:pointer; }
+button:hover:enabled { background:#e3cd9d; }
+button:disabled { cursor:default;opacity:.6; }
+:focus-visible { outline:2px solid #9b5b32;outline-offset:2px; }
+.draft { border:1px solid #798372;background:#263635;color:#f2ebda; }
+.draft>div:first-child { border-bottom:1px solid #75837b;display:flex;justify-content:space-between;gap:.4rem;padding:.45rem .59rem;font:620 .74rem ui-monospace,monospace; }
+.draft span { color:#cfdbcc;text-align:right; }
+#plan { display:block;width:100%;height:auto;aspect-ratio:420/164;touch-action:none;cursor:grab; }
+#plan:active { cursor:grabbing; }
+.planInputs { display:flex;align-items:center;gap:.68rem;border-top:1px solid #75837b;padding:.35rem .5rem; }
+.planInputs>label { font-size:.71rem;white-space:nowrap; }
+.planInputs select { min-height:31px;margin-left:.2rem; }
+.offset { flex:1;display:flex;align-items:center;gap:.32rem; }
+.offset input { min-width:3rem;accent-color:#e9b87b; }
+.check { margin:.52rem .02rem 0;min-height:42px;display:flex;align-items:center;gap:.43rem; }
+.check input { margin:0;width:17px;height:17px;accent-color:#3d6559; }
+dl { display:flex;justify-content:space-between;gap:.8rem;border-top:1px solid #929284;margin:.05rem 0 0;padding:.5rem 0 0; }
+dt { color:#4f5c55;font-size:.73rem; }
+dd { margin:0;font:730 .91rem ui-monospace,monospace; }
+footer { margin-top:.63rem;color:#4c5856;font-size:.84rem; }
+@media(max-width:780px) {
+  main { width:calc(100% - 24px);padding-top:.75rem; }
+  header { display:block;margin:.94rem 0 .66rem; }
+  h1 { font-size:clamp(3.24rem,13.4vw,5.6rem); }
+  header p { margin-top:.52rem;font-size:.89rem;line-height:1.32; }
+  .workshop { grid-template-columns:1fr; }
+  .visual { min-height:clamp(14.2rem,62vw,24rem); }
+  aside { border:0;border-top:1px solid #7f8275;padding:.62rem .67rem; }
+  figcaption { left:.52rem;right:.52rem;bottom:.48rem; }
+  figcaption>* { padding:.35rem .42rem;font-size:.69rem; }
+}

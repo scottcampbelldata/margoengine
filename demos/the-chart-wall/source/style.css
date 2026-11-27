@@ -1,0 +1,78 @@
+:root {
+  color-scheme:light;
+  --page:#efede4;
+  --canvas:#fcfaf2;
+  --ink:#21261c;
+  --text:#52584a;
+  --edge:#c5c5b6;
+  --green:#305c4b;
+  --ochre:#a35624;
+  --purple:#66528a;
+  background:var(--page);
+  color:var(--ink);
+  font:16px/1.46 "Segoe UI",system-ui,sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0; }
+main { width:min(92%,87rem); margin:auto; padding-bottom:3rem; }
+a { color:#315b43; text-underline-offset:.19em; }
+nav { display:flex; justify-content:space-between; gap:.5rem; padding:.86rem 0 .62rem; border-bottom:1px solid var(--edge); }
+nav a { font-size:.85rem; font-weight:700; text-decoration:none; }
+nav span { margin-left:.4rem; color:var(--text); font-weight:500; }
+header { padding:clamp(1.75rem,4.3vw,3.8rem) 0 clamp(1.18rem,2.36vw,2rem); }
+h1 { font:400 clamp(3.15rem,8.7vw,8.55rem)/.9 Georgia,serif; letter-spacing:-.083em; margin:0; }
+header p { margin:.95rem 0 0; max-width:43rem; color:var(--text); font-size:clamp(1rem,1.5vw,1.22rem); }
+.console { display:grid; grid-template-columns:minmax(11rem,1fr) minmax(15rem,1.5fr); gap:.4rem 1.5rem; align-items:center; border-block:1px solid var(--edge); padding:.86rem 0 .8rem; }
+.readout output { display:block; font:400 clamp(2.15rem,4vw,3.14rem)/.95 Georgia,serif; letter-spacing:-.06em; color:var(--green); font-variant-numeric:lining-nums tabular-nums; }
+.readout span { color:var(--text); font-size:.85rem; }
+.year label { display:flex; align-items:baseline; justify-content:space-between; gap:.4rem; font-weight:650; }
+.year output { color:var(--green); font:650 .9rem/1.2 "Cascadia Mono",Consolas,monospace; }
+.year input { width:100%; height:2.15rem; margin:0; accent-color:var(--green); cursor:pointer; }
+.year input:disabled { cursor:default; }
+.year div { display:flex; justify-content:space-between; color:var(--text); font-size:.7rem; margin-top:-.3rem; }
+.gallery { display:grid; grid-template-columns:minmax(0,1.09fr) minmax(0,1fr); position:relative; gap:0 1.05rem; margin-top:1.02rem; }
+.gallery article { min-width:0; display:grid; align-content:start; grid-template-rows:auto auto auto; background:var(--canvas); border:1px solid var(--edge); }
+.chart-heading { display:grid; grid-template-columns:1fr auto; align-items:start; gap:.55rem; min-height:5.5rem; padding:1rem 1.15rem .56rem; }
+h2 { margin:0; font:400 clamp(1.8rem,3.5vw,3.65rem)/1 Georgia,serif; letter-spacing:-.065em; }
+.chart-heading p { margin:.24rem 0 0; color:var(--text); font-size:.82rem; }
+button { min-width:4rem; min-height:2.65rem; color:var(--green); background:var(--canvas); border:1px solid #a9b29c; padding:.35rem .57rem; font:650 .78rem/1.2 "Segoe UI",system-ui,sans-serif; cursor:pointer; white-space:nowrap; }
+button:hover:not(:disabled) { background:#e2e8dc; border-color:var(--green); }
+button:disabled { opacity:.48; cursor:default; }
+:focus-visible { outline:2px solid #385d3f; outline-offset:3px; }
+.chart { margin:0; position:relative; min-width:0; }
+canvas { width:100%; height:clamp(290px,34vw,480px); display:block; touch-action:pan-y!important; }
+.chart [data-sciviz-legend] {
+  display:flex; align-items:center; gap:clamp(.28rem,1vw,.8rem);
+  top:5px!important; left:62px!important; right:auto!important; padding:0!important;
+  border:0!important; border-radius:0!important; background:none!important; font-size:11px!important;
+}
+.chart [data-sciviz-legend] > div { margin-top:0!important; gap:4px!important; }
+.chart [data-sciviz-legend] [data-sciviz-swatch] { margin-inline:0!important; }
+.caption { margin:0; padding:.54rem 1.15rem .9rem; border-top:1px solid #dddcd0; color:var(--text); font-size:.78rem; min-height:3.13rem; }
+.plot-status { position:absolute; inset:0; display:grid; place-items:center; background:var(--canvas); color:var(--text); font-size:.87rem; }
+#status { position:absolute; inset:0; z-index:3; background:var(--canvas); display:grid; align-content:center; justify-items:center; gap:.55rem; padding:1.1rem; text-align:center; }
+#status strong { font:400 1.45rem/1.2 Georgia,serif; }
+#status span,#status a { font-size:.88rem; color:var(--text); }
+[hidden] { display:none!important; }
+footer { margin:1.14rem 0 0; color:var(--text); font-size:.84rem; max-width:54rem; }
+summary { font-weight:650; cursor:pointer; color:var(--green); }
+details p { margin:.57rem 0; }
+.sr-only { position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media(max-width:815px) {
+  .console { grid-template-columns:1fr 1.43fr; gap:.85rem .8rem; }
+  .gallery { grid-template-columns:1fr; gap:.9rem; }
+  .chart-heading { min-height:0; padding:.8rem .85rem .43rem; }
+  .caption { padding-left:.85rem; padding-right:.85rem; min-height:0; }
+}
+
+.history-axes { position:absolute; inset:0; pointer-events:none; color:#424a3e; font:12px/1 "Segoe UI",Arial,sans-serif; }
+.history-axes > span { position:absolute; white-space:nowrap; }
+.history-axes .x { transform:translate(-50%,-50%); }
+.history-axes .y { transform:translate(-100%,-50%); }
+.history-axes .x-title { font-weight:600; transform:translate(-50%,-50%); }
+.history-axes .y-title { font-weight:600; transform:translate(-50%,-50%) rotate(-90deg); }
+.history-legend { position:absolute; left:62px; top:5px; display:flex; align-items:center; gap:clamp(.28rem,1vw,.8rem); font-size:11px; line-height:15px; white-space:nowrap; }
+.history-legend span { display:flex; align-items:center; gap:4px; }
+.history-legend i { width:16px; height:3px; border-radius:2px; }
+
+.history-hover { position:absolute; top:0; left:0; width:max-content; max-width:calc(100% - 8px); padding:.37rem .49rem; border:1px solid #aaa99d; color:#293c32; background:#fcfaf2; font:.73rem/1.3 "Segoe UI",Arial,sans-serif; }

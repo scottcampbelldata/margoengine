@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BrLm6C5g.js"><script src="./assets/inline-760b4f3d.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#201c2d">
+  <meta name="description" content="Separate a glazed sculpture into its 35 solid 3D Voronoi cells.">
+  <link rel="icon" href="data:,">
+  <title>Voronoi Shatter Art · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BZ1oO00Z.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-ZQfItCD2.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Geometric sculpture</span></nav>
+    <header>
+      <h1>Voronoi Shatter Art</h1>
+      <p>Pull a glazed sculpture apart to expose the faces of its nearest-point cells.</p>
+    </header>
+    <section id="exhibit" aria-label="Ecliptic sculpture">
+      <div class="stage">
+        <canvas id="view" role="img" aria-label="An iridescent twisted ring over a round gallery pedestal"></canvas>
+        <p id="status" role="status">Splitting the sculpture…</p>
+        <div class="caption"><span>Ecliptic</span><span id="pieces">35 cells</span></div>
+      </div>
+      <div class="controls">
+        <label for="drift">Separate cells</label>
+        <output id="value" for="drift">52%</output>
+        <input id="drift" type="range" min="0" max="100" value="52" step="1" disabled>
+        <div class="ends" aria-hidden="true"><span>Assembled</span><span>Separated</span></div>
+      </div>
+    </section>
+    <details>
+      <summary>How the cuts work</summary>
+      <p>Each solid piece contains the part of the sculpture closest to one 3D site. The amber faces lie on planes halfway between neighboring sites. The slider eases the pieces apart and brings them back together.</p>
+    </details>
+  </main>
+</body>
+</html>

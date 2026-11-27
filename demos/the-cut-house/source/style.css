@@ -1,0 +1,56 @@
+:root { color-scheme: light; --paper: #e8e4d7; --ink: #2c3431; --rule: #a6a99a; --clay: #a45e35; color: var(--ink); background: var(--paper); font-family: "Segoe UI", Arial, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+p, h1, figure, ul { margin: 0; }
+[hidden] { display: none !important; }
+main { max-width: 1320px; width: calc(100% - 80px); margin: auto; padding: 25px 0 22px; }
+nav { padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
+nav a, footer, .cut-label label, .cut-count, .key, .element label, #element-id { font: 11px/1.35 "Cascadia Mono", Consolas, monospace; letter-spacing: .05em; }
+nav a, footer a { color: #38514b; text-underline-offset: 3px; }
+nav a { text-decoration: none; }
+header { display: grid; grid-template-columns: 1fr minmax(200px, 35ch); gap: 25px; align-items: end; padding: 12px 0 18px; }
+h1 { font: 400 clamp(49px, 7.6vw, 106px)/.91 Georgia, serif; letter-spacing: -.065em; }
+header p { max-width: 35ch; color: #536459; font-size: 16px; line-height: 1.45; padding-bottom: 3px; }
+.views { display: flex; border: 1px solid #b1ad9a; border-bottom: 0; background: #d8d9c9; }
+button, select { min-height: 42px; font: 600 13px "Segoe UI", Arial, sans-serif; color: #36473d; border: 1px solid #9d9b85; border-radius: 2px; background: #e5e5d7; cursor: pointer; }
+.views button { min-width: 99px; flex: 0 1 140px; padding: 0 9px; border: 0; border-right: 1px solid #adad97; border-radius: 0; }
+button[aria-pressed="true"] { color: #f1ede0; background: #41584d; }
+button:disabled, select:disabled, input:disabled { opacity: .62; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #945536; outline-offset: 2px; }
+figure { position: relative; background: #293731; border: 1px solid #3d544c; isolation: isolate; }
+canvas { display: block; width: 100%; height: clamp(330px, 51vh, 640px); }
+.key { position: absolute; bottom: 13px; left: 14px; color: #e0d4c0; pointer-events: none; }
+.key::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; background: #e8a14c; }
+.status,.error { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); padding: 14px; width: min(88%, 340px); background: #31413a; border: 1px solid #7c9080; font-size: 13px; color: #f3ecdd; text-align: center; }
+.error a { display: inline-block; margin-top: 7px; color: #f7c77d; }
+.cut-bar { display: grid; grid-template-columns: minmax(94px, .43fr) 2fr minmax(91px, .42fr); gap: 17px; padding: 8px 13px; align-items: center; border: 1px solid var(--rule); border-top: 0; background: #deded0; }
+.cut-label label, .element label { display: block; color: #4c6255; }
+#distance { display: block; font: 19px/1.23 Georgia, serif; }
+#section { width: 100%; height: 37px; margin: 0; accent-color: var(--clay); cursor: ew-resize; }
+.cut-count { color: #5a6357; text-align: right; }
+#cut-count { font-weight: 700; color: #9a5938; }
+.info { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 25px; padding: 9px 13px; border: 1px solid var(--rule); border-top: 0; background: #e5e4d9; }
+.element { display: grid; align-items: center; grid-template-columns: auto minmax(125px, 1fr); gap: 8px 11px; }
+.element select { width: 100%; padding: 0 7px; text-overflow: ellipsis; }
+#element-id { display: block; font-size: 10px; grid-column: 1 / -1; min-height: 13px; color: #4a6456; }
+details { padding-top: 11px; color: #445f51; font-size: 13px; }
+summary { cursor: pointer; }
+#rooms { margin-top: 7px; padding-left: 16px; font-size: 12px; line-height: 1.5; }
+footer { display: flex; justify-content: space-between; gap: 12px; padding-top: 11px; }
+@media (max-width: 760px) {
+  main { width: 100%; padding: 14px 12px 15px; }
+  nav { padding-bottom: 8px; }
+  header { display: block; padding: 10px 0 13px; }
+  h1 { font-size: clamp(49px, 11.8vw, 72px); }
+  header p { margin-top: 7px; font-size: 13px; padding: 0; }
+  .views button { flex: 1; min-width: 0; font-size: 12px; padding: 0 3px; }
+  canvas { height: clamp(272px, 83vw, 425px); }
+  .key { left: 8px; bottom: 9px; font-size: 9px; }
+  .cut-bar { grid-template-columns: minmax(59px,.55fr) 2fr minmax(48px,.38fr); padding: 6px 8px; gap: 8px; }
+  #distance { font-size: 17px; }
+  .cut-label label,.cut-count,.element label { font-size: 9px; }
+  .info { grid-template-columns: 1fr; gap: 3px; padding: 8px; }
+  .element select { min-height: 39px; font-size: 12px; }
+  details { padding-top: 1px; }
+  footer { font-size: 10px; }
+}

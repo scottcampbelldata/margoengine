@@ -1,0 +1,65 @@
+
+:root{color-scheme:dark;--ink:#f4eadc;--soft:#c2b4c0;--muted:#a49aa9;--canvas:#17151b;--line:#4b414c;--copper:#f1a887;--blue:#a6bbfb;--panel:#1b191f;--fixed:"Bahnschrift","Aptos",sans-serif;--serif:Georgia,"Times New Roman",serif}
+*{box-sizing:border-box}
+body{margin:0;background:#19171d;color:var(--ink);font-family:var(--fixed);line-height:1.4}
+main{width:min(100% - 72px,1080px);margin:auto;padding:33px 0 22px}
+header{margin-bottom:22px}
+.back{display:inline-block;color:var(--soft);font-size:.79rem;text-decoration:none;letter-spacing:.025em}
+.back:hover{color:var(--ink)}
+h1{font:400 clamp(2.6rem,5.8vw,5.1rem)/.95 var(--serif);letter-spacing:-.066em;margin:.25em 0 .19em}
+p{margin:0}
+.intro{font-size:clamp(.98rem,1.65vw,1.18rem);color:var(--soft)}
+.exhibit{display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,1.43fr);align-items:start;gap:clamp(34px,6.5vw,82px);border-top:1px solid var(--line);padding-top:22px}
+.instrument{padding-top:31px}
+.readout{display:grid;grid-template-columns:1fr 1.15fr .86fr;border-block:1px solid var(--line);padding:14px 0 12px;gap:9px;font-variant-numeric:tabular-nums}
+.readout span,.plot-head,legend{display:block;color:var(--muted);font-size:.72rem;letter-spacing:.06em}
+.readout output{font-size:clamp(1.05rem,2.2vw,1.8rem);font-weight:550;line-height:1.4;color:var(--ink)}
+.train-actions{display:grid;grid-template-columns:1.52fr 1fr 1fr;gap:7px;margin-top:13px}
+button{font:550 .87rem/1.15 var(--fixed);min-height:44px;padding:.45em .6em;background:#232028;color:var(--ink);border:1px solid #544856;border-radius:3px;cursor:pointer}
+button:hover{background:#352d37;border-color:#9f7c8c}
+button:focus-visible,a:focus-visible,canvas:focus-visible{outline:2px solid #f8bea0;outline-offset:2px}
+button:disabled{opacity:.66;cursor:default}
+button.primary{background:var(--copper);color:#271822;border-color:var(--copper)}
+button.primary:hover{background:#ffc3a4;border-color:#ffc3a4}
+button[aria-pressed=true]{border-color:#b98170;background:#362832}
+fieldset{min-inline-size:0;border:0;margin:20px 0 0;padding:0}
+fieldset button{min-width:98px;margin-right:6px}
+legend{margin-bottom:6px;padding:0}
+.circle,.diamond{display:inline-block;width:8px;height:8px;margin-right:4px;position:relative;top:-1px;vertical-align:middle;background:var(--blue);border-radius:50%}
+.diamond{background:var(--copper);border-radius:0;transform:rotate(45deg)}
+#map-help{margin-top:8px;color:var(--soft);font-size:.78rem;max-width:290px}
+figure{margin:0;min-width:0}
+.plot-head{display:flex;justify-content:space-between;margin-bottom:6px}
+.plot-head span:first-child{color:var(--ink);font-weight:650}
+.atlas{position:relative;border:1px solid #665268;background:#211c29;isolation:isolate}
+canvas{display:block;width:100%;height:auto;aspect-ratio:1;cursor:crosshair;touch-action:manipulation}
+#notice{position:absolute;inset:0;z-index:1;background:#211c29;display:grid;align-content:center;text-align:center;padding:20px;color:var(--soft)}
+#notice[hidden]{display:none}
+#error:not(:empty){color:#ffb79e;margin-top:8px}
+.scale{display:flex;align-items:center;justify-content:center;gap:9px;color:var(--soft);font-size:.71rem;margin-top:9px}
+.gradient{width:min(132px,41%);height:6px;border-radius:6px;background:linear-gradient(90deg,#5579bc,#363357,#754150,#c6715c)}
+figcaption{text-align:center;color:var(--soft);font-size:.77rem;margin-top:4px}
+footer{border-top:1px solid var(--line);margin-top:18px;padding-top:10px;color:var(--muted);font-size:.74rem;line-height:1.5;display:flex;justify-content:space-between;gap:20px}
+footer strong{color:var(--soft);font-weight:550}
+@media(max-width:740px){
+  main{width:min(100% - 36px,550px);padding-top:18px}
+  header{margin-bottom:14px}
+  h1{font-size:clamp(2.28rem,9.8vw,3.45rem);margin:.28em 0 .16em}
+  .intro{font-size:.9rem}
+  .exhibit,.instrument{display:contents}
+  main{display:grid}
+  .readout{padding:8px 0 7px;order:1}
+  .readout output{font-size:1.32rem}
+  .train-actions{order:2;margin-top:8px}
+  .patterns{order:3;margin:9px 0 11px;display:flex;align-items:center;gap:7px}
+  .patterns legend{float:left;margin:0 6px 0 0;min-width:75px;align-self:center}
+  .patterns button{margin:0;min-height:38px}
+  figure{order:4}
+  fieldset:not(.patterns){order:5;margin-top:16px}
+  #map-help{max-width:none}
+  footer{order:6;display:block}
+}
+@media(max-width:365px){
+  main{width:calc(100% - 28px)}
+  .patterns button{min-width:82px}
+}

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-42c15f07.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19282a">
+  <meta name="description" content="Draw an outline and use live polygon offsets, unions, extrusion and bevels to turn it into a solid.">
+  <title>Shapes From Lines · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-Ci9lXZ5k.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-NwO4ko6K.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>Shapes From Lines</h1>
+      <p>Draw on the grid. Offset your outline, join it to the ring and give the result a beveled edge.</p>
+    </header>
+    <section aria-label="Outline drawing and solid modeling">
+      <figure>
+        <canvas id="view" aria-label="Drafting grid and live 3D cast-metal model"></canvas>
+        <div class="caption draft"><b>Outline</b><span id="instruction">Drag to draw a closed shape</span></div>
+        <div class="caption solid"><b>Solid</b><span id="dimensions">—</span></div>
+        <div id="status" role="status"><strong>Opening the drafting table…</strong><span id="reason"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="bench">
+        <div class="sliders">
+          <label for="offset">Outline offset <output id="offset-value" for="offset">+7 mm</output><input type="range" id="offset" min="-18" max="18" value="7" step="1" disabled></label>
+          <label for="thickness">Thickness <output id="thickness-value" for="thickness">20 mm</output><input type="range" id="thickness" min="0" max="34" value="20" step="1" disabled></label>
+          <label for="bevel">Bevel <output id="bevel-value" for="bevel">3 mm</output><input type="range" id="bevel" min="0" max="4" value="3" step=".5" disabled></label>
+        </div>
+        <div class="actions"><button type="button" class="choice" id="joined" aria-pressed="true" disabled>Union ring</button><button type="button" class="choice" id="smooth" aria-pressed="true" disabled>Smooth curve</button><button id="reset" type="button" disabled>Reset outline</button></div>
+      </div>
+      <div class="base">
+        <p id="readout" role="status">—</p>
+        <details><summary>Geometry and references</summary>
+          <p>The closed spline or hand-drawn polygon is offset first. The union adds the ring where it meets the outline. Thickness sets the full depth. The bevel fits inside that depth.</p>
+          <p><a href="https://doi.org/10.1016/B978-0-12-079050-0.50020-5">Catmull–Rom interpolation</a> · <a href="https://doi.org/10.1145/129902.129906">Polygon clipping</a></p>
+        </details>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

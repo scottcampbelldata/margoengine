@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ebe6d9">
+  <meta name="description" content="Carve a lapis specimen with a second triangle mesh and inspect the closed surface left by the cut.">
+  <link rel="icon" href="data:,">
+  <title>Mesh Booleans · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DHRhBqaM.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bnqlpptx.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine</a><span></span>Web demos</nav>
+    <header>
+      <h1>Mesh Booleans</h1>
+      <p>Carve a lapis specimen with a second mesh. Follow the new triangles into the cut.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive triangle-mesh carving">
+      <figure>
+        <canvas id="scene" aria-label="Lapis specimen and brass cutter on a gridded lapidary stand"></canvas>
+        <figcaption><span id="stage-caption">Stone and cutter · separated</span></figcaption>
+        <div id="status" role="status"><strong>Preparing the specimen…</strong><span id="error"></span><a id="requirements" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Cut and inspect the stone">
+        <fieldset id="controls" disabled>
+          <legend>Carve the stone</legend>
+          <div id="depths" class="depths" role="group" aria-label="Cut depth">
+            <button type="button" data-depth="0" aria-pressed="false">Pocket</button>
+            <button type="button" data-depth="1" aria-pressed="false">Deep pocket</button>
+            <button type="button" data-depth="2" aria-pressed="true">Through</button>
+          </div>
+          <button class="primary" type="button" id="carve" aria-pressed="false">Carve mesh</button>
+          <p class="explain" id="explain">Cut a passage from front to back.</p>
+          <div class="inspect">
+            <button type="button" id="rear" aria-pressed="false">Inspect back</button>
+            <button type="button" id="wire" aria-pressed="false">Show triangles</button>
+          </div>
+        </fieldset>
+        <dl aria-label="Mesh measurements">
+          <div><dt>Stone triangles</dt><dd><output id="triangles">—</output></dd></div>
+          <div><dt>Unpaired edges</dt><dd><output id="edges">—</output></dd></div>
+          <div><dt>Removed volume</dt><dd><output id="volume">—</output></dd></div>
+        </dl>
+        <div class="key"><span><i class="stock"></i>Original stone</span><span><i class="cut"></i>Cut surface</span></div>
+      </aside>
+    </section>
+    <footer>
+      <p>The volume and edge counts come from the triangle mesh on screen.</p>
+      <details><summary>How mesh subtraction works</summary><p>The Boolean splits both surfaces where they cross. It keeps the outside of the stone and reverses the cutter faces that become the inside of the cut.</p><p><a href="https://www.cs.columbia.edu/cg/mesh-arrangements/">Read the SIGGRAPH paper on mesh arrangements</a>.</p></details>
+    </footer>
+  </main>
+</body>
+</html>

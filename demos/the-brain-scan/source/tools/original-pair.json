@@ -1,0 +1,24 @@
+{
+  "record": "10.5281/zenodo.17486320",
+  "sample": "sub-18",
+  "pair": {
+    "CE-T1W": {
+      "filename": "cerebrovascular-disease/sub-18/CE-T1W.nii.gz",
+      "offset": 2882062838,
+      "compressed": 130210639,
+      "original": 130425502,
+      "method": 8,
+      "crc": 732258320,
+      "sha256": "87ba2fce53970e5a1fddb37090a917b29e2ed174f31954d9d61c61e91da43d50"
+    },
+    "CT-BONE": {
+      "filename": "cerebrovascular-disease/sub-18/CT-BONE.nii.gz",
+      "offset": 3012275345,
+      "compressed": 33653640,
+      "original": 33879266,
+      "method": 8,
+      "crc": 3475348660,
+      "sha256": "0e17eccad5a39304fa7887c2a063f4b9bc64cba4cf8e432fc6a450ad8be106e4"
+    }
+  }
+}

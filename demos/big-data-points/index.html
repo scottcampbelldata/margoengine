@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-671ad54e.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#252522">
+  <meta name="description" content="Explore millions of measured lidar returns from Kīlauea’s summit as a real progressive 3D point cloud.">
+  <title>Big Data Points · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/r-B5tjO1b1.bin" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-Hs5jLvga.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B6IPgjQ4.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>Big Data Points</h1>
+      <p>Turn a lidar survey of Kīlauea’s summit. Raise the point budget to bring the caldera’s walls and floor into focus.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive lidar survey">
+      <figure>
+        <canvas id="view" aria-label="Three-dimensional lidar point cloud of Kīlauea’s summit"></canvas>
+        <figcaption><div><strong>Kīlauea summit</strong><span>Hawaiʻi · July 2019 survey</span></div><div class="scale"><i id="scale"></i><span>1 km</span></div></figcaption>
+        <div id="status" role="status"><strong>Opening the lidar survey…</strong><span id="reason"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Survey controls">
+        <div class="turn">
+          <label for="angle">View angle</label><output id="degrees" for="angle">24°</output>
+          <input id="angle" type="range" min="-70" max="100" value="24" step="1" disabled>
+        </div>
+        <fieldset>
+          <legend>Point budget</legend>
+          <div id="budgets">
+            <button type="button" data-budget="5500" aria-pressed="false" disabled>Coarse</button>
+            <button type="button" data-budget="65500" aria-pressed="true" disabled>Survey</button>
+            <button type="button" data-budget="2000000" aria-pressed="false" disabled>Full</button>
+          </div>
+          <p id="budget-note">Up to 65,500 points drawn per frame.</p>
+        </fieldset>
+        <dl>
+          <div><dt>Rendered points</dt><dd id="drawn">—</dd></div>
+          <div><dt>Loaded points</dt><dd id="loaded">—</dd></div>
+          <div><dt>Available in this crop</dt><dd>2,000,000</dd></div>
+        </dl>
+        <p id="load-note" aria-live="polite"></p>
+        <div class="key" aria-label="Elevation legend">
+          <strong>Elevation</strong><i></i><div><span id="low">—</span><span id="high">—</span></div>
+        </div>
+      </aside>
+    </section>
+    <footer>
+      <p>USGS airborne lidar · 4.3 × 3.6 km crop · True vertical scale</p>
+      <details>
+        <summary>Survey and processing notes</summary>
+        <p>Each rendered point comes from an elevation return in the USGS archive. This exhibit progressively loads smaller spatial tiles within the chosen point budget. Color comes from elevation, with directional shading derived from nearby elevations.</p>
+        <p><a href="https://www.usgs.gov/data/digital-elevation-model-klauea-volcano-hawaii-based-july-2019-airborne-lidar-surveys">USGS survey and elevation model</a> · <a href="https://registry.opendata.aws/usgs-lidar/">USGS point cloud archive</a></p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

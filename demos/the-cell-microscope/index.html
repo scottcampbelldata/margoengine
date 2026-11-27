@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-655defb3.js"></script><link rel="modulepreload" crossorigin href="./assets/compat-YK57ZCbA-CpLc6vno.js"><link rel="modulepreload" crossorigin href="./assets/dist-DtGcMfVQ.js"><script src="./assets/inline-61329bc2.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore a real cryo-electron microscopy map of mitochondrial ATP synthase as a surface and a volume.">
+  <meta name="theme-color" content="#eeece7">
+  <title>The Cell Microscope · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/density-Bpx1nRfF.bin" crossorigin>
+  <script type="module" crossorigin src="./assets/index-SHdO0i6r.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B-P8DpTb.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Cell Microscope</h1>
+      <p>See the same cryo-EM map as a solid contour and a cloud of density.</p>
+    </header>
+    <section class="instrument" aria-label="Cryo-electron microscopy viewer">
+      <figure>
+        <canvas id="view" aria-label="Rotatable cryo-electron microscopy map of mitochondrial ATP synthase"></canvas>
+        <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="landmark" id="head-mark" hidden><i aria-hidden="true"></i><span>Catalytic head</span></div>
+        <div class="landmark" id="rotor-mark" hidden><i aria-hidden="true"></i><span>Membrane rotor</span></div>
+        <figcaption>
+          <div><strong>ATP synthase</strong><span>EMD-3164</span></div>
+          <div class="scale"><i id="bar"></i><span>50 Å</span></div>
+        </figcaption>
+        <div class="notice" id="status" role="status">
+          <strong>Opening the density map…</strong><span id="reason"></span>
+          <a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a>
+        </div>
+      </figure>
+      <aside aria-label="Microscope controls">
+        <div class="modes" role="group" aria-label="Rendering mode">
+          <button id="surface" aria-pressed="true" disabled>Surface</button>
+          <button id="volume" aria-pressed="false" disabled>Volume</button>
+        </div>
+        <div class="control">
+          <label for="value" id="control-label">Contour level</label>
+          <output for="value" id="amount">0.085</output>
+          <input id="value" type="range" aria-describedby="effect" min="0.055" max="0.185" step="0.005" value="0.085" disabled>
+          <p id="effect">Raise the level to leave only the strongest density.</p>
+          <div class="density-key" id="density-key" hidden><i></i><span>Lower density</span><span>Higher density</span></div>
+        </div>
+        <div class="rotate" role="group" aria-label="Rotate specimen">
+          <button id="left" aria-label="Rotate left" disabled>←</button>
+          <button id="right" aria-label="Rotate right" disabled>→</button>
+          <button id="reset" aria-label="Reset specimen view" disabled>Reset</button>
+        </div>
+        <dl>
+          <div><dt>Specimen</dt><dd>Bovine mitochondrial ATP synthase</dd></div>
+          <div><dt>Reported resolution</dt><dd>6.7 Å</dd></div>
+          <div><dt>Display grid</dt><dd>29 × 31 × 43</dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer>
+      <p>ATP synthase uses energy stored across the mitochondrial membrane to make ATP.</p>
+      <details>
+        <summary>Map and display notes</summary>
+        <p>In Volume mode color and transparency describe map density in arbitrary units. The labels mark regions located with the accompanying 5ARA model. The original specimen was isolated from bovine mitochondria. The display uses a cropped, regularly sampled grid from the deposited map.</p>
+        <p><a href="https://www.ebi.ac.uk/emdb/EMD-3164">EMD-3164 archive</a> · <a href="https://doi.org/10.7554/eLife.10180">Zhou and colleagues, 2015</a> · <a href="https://www.rcsb.org/structure/5ARA">5ARA fitted model</a></p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

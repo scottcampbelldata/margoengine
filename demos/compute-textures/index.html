@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#172220">
+<link rel="icon" href="data:,">
+<title>Compute Textures · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DoT79mX4.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DJbSdmQL.css">
+</head><body>
+<main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>Compute Textures</h1><p>Watch two virtual chemicals diffuse through a plate. Change the recipe or seed a new reaction by touching the glass.</p></header>
+<section class="exhibit" aria-label="Gray–Scott reaction-diffusion plate">
+<figure><div class="view"><canvas id="plate" aria-label="A dark plate showing a growing reaction–diffusion pattern" tabindex="0"></canvas>
+<p id="loading" role="status">Opening the reaction plate…</p><p id="error" role="alert" hidden></p></div>
+<figcaption><span>192 × 192 simulation</span><a href="./source/README.md">How it computes</a></figcaption></figure>
+<aside>
+<fieldset id="controls" disabled>
+<legend>Reaction recipe</legend>
+<div class="recipes"><button type="button" data-recipe="labyrinth" aria-pressed="true">Labyrinth</button><button type="button" data-recipe="cells" aria-pressed="false">Cells</button><button type="button" data-recipe="branches" aria-pressed="false">Branches</button></div>
+<dl><div><dt>Feed</dt><dd id="feed">0.035</dd></div><div><dt>Removal</dt><dd id="kill">0.060</dd></div><div><dt>Iterations</dt><dd id="steps">0</dd></div></dl>
+<div class="transport"><button type="button" id="toggle" aria-pressed="true">Pause</button><button type="button" id="step">Step</button><button type="button" id="restart">Restart</button></div>
+<p>Tap or drag inside the plate to add reagent. With the plate focused, press Enter to seed its center.</p>
+</fieldset>
+</aside></section>
+</main></body></html>

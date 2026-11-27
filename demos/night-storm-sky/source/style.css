@@ -1,0 +1,41 @@
+@charset "UTF-8";
+:root{color-scheme:dark;background:#0c101b;color:#eeedf3;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(calc(100% - 64px),1336px);margin:auto;padding:23px 0 26px}
+nav{display:flex;gap:.65rem;align-items:center;color:#777e99;font-size:.75rem}
+nav a,footer a{color:#b5bcda;text-decoration:none}
+nav a:hover,footer a:hover{text-decoration:underline}
+header{margin:25px 0 19px}
+h1{font-family:Georgia,serif;font-weight:400;letter-spacing:-.056em;font-size:clamp(3rem,6.5vw,5.5rem);line-height:.99;margin:0 0 12px}
+header p,.notes p{margin:0;color:#c5c8d7;line-height:1.45}
+figure{margin:0;position:relative;overflow:hidden;background:#111a2b;border:1px solid #3b4563;isolation:isolate}
+canvas{width:100%;height:clamp(370px,54vw,620px);display:block}
+#loading,#error{position:absolute;left:16px;bottom:14px;margin:0;background:#0c101b;padding:.68rem .84rem;border:1px solid #4d5671;max-width:calc(100% - 32px);font-size:.83rem}
+#error{color:#ffd7d5}
+.controls{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:0;padding:15px 0;border-bottom:1px solid #31384d}
+.act{display:flex;align-items:center;gap:19px;flex-wrap:wrap}
+button,label{font:600 .85rem system-ui,sans-serif}
+button{border:1px solid #e5deff;border-radius:3px;min-height:46px;padding:0 17px;background:#e5deff;color:#15132a;cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.68;cursor:default}
+label{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;color:#ddddef}
+input{accent-color:#e5deff;width:17px;height:17px;margin:0}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #f6c482;outline-offset:3px}
+.notes{text-align:right;font-size:.77rem}
+#state{color:#c1c9eb;min-height:1.1em;margin-top:.18rem}
+footer{font-size:.73rem;display:flex;flex-wrap:wrap;gap:8px 16px;color:#969eb6;padding-top:13px}
+@media(max-width:700px){
+  main{width:calc(100% - 28px);padding:17px 0 18px}
+  header{margin:21px 0 15px}
+  h1{font-size:clamp(2.75rem,11.9vw,4.5rem);margin-bottom:7px}
+  header p{font-size:.9rem}
+  canvas{height:clamp(366px,55svh,570px)}
+  .controls{display:block;padding:11px 0}
+  .act{gap:15px}
+  .notes{text-align:left;margin-top:7px}
+  button{padding:0 13px}
+}
+.plate-capture main,.plate-capture section,.plate-capture figure{padding:0;margin:0;width:100vw;height:100vh;border:none;max-width:none}
+.plate-capture canvas{width:100vw;height:100vh}
+.plate-capture nav,.plate-capture header,.plate-capture footer,.plate-capture .controls{display:none}

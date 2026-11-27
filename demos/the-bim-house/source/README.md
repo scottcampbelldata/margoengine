@@ -1,0 +1,7 @@
+# The BIM House
+
+Open the entry, gallery and roof studio of the original Rain Courtyard House. An upper storey is hidden when necessary to show the selected floor. Walk mode restores its ceiling. Enter walk mode on a selected storey and move using WASD or arrow keys. On touch, move from the left side and turn from the right. Selecting a visible wall reads and highlights the corresponding IFC product, with a world-anchored leader. The accessible wall list can select the same products independently of the canvas.
+
+The open IFC4 model was written for this exhibit. `generate.mjs` creates its project, site, building and storey relationships, extrusion solids, materials and property and quantity sets. The verified public Margo IFC library and its caller-owned parser read the IFC file during the build. The browser receives the compact geometry and BIM records from that read, then draws the original model with Margo and collides the walk controls against those same IFC surfaces. The original IFC file can be downloaded from the exhibit.
+
+References: [buildingSMART IFC spatial structure](https://standards.buildingsmart.org/IFC/RELEASE/IFC4_3/HTML/concepts/Object_Connectivity/Spatial_Structure/content.html), [IfcBuildingStorey](https://standards.buildingsmart.org/IFC/RELEASE/IFC4_3/HTML/lexical/IfcBuildingStorey.htm) and [National BIM Standard, buildingSMART information exchange](https://nibs.org/wp-content/uploads/2025/04/NBIMS-US_V3_4.6_BPie.pdf).

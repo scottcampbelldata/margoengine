@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-ec69896e.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ece8d9">
+  <meta name="description" content="Turn a live technical drawing of a refractor. Solid edges show the outside and dashed edges reveal the hidden parts.">
+  <title>The Technical Drawing · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BtVLhjFJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CEOFPFk8.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Technical Drawing</h1>
+      <p>Orbit a refractor and its equatorial mount. See which edges disappear behind the parts from each angle.</p>
+    </header>
+    <section class="exhibit" aria-label="Technical illustration of a mounted telescope">
+      <figure>
+        <canvas id="view" aria-label="Rotatable refractor and mount drawn with solid visible edges and dashed hidden edges"></canvas>
+        <figcaption>Equatorial refractor</figcaption>
+        <span id="aperture-label" class="callout" hidden>Objective hood</span>
+        <span id="polar-label" class="callout" hidden>Polar housing</span>
+        <span id="shaft-label" class="callout" hidden>Weight shaft</span>
+        <div id="status" role="status"><strong>Drawing the refractor…</strong><span id="reason"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Drawing controls">
+        <div class="rotation">
+          <label for="angle">View angle</label><output id="degrees" for="angle">28°</output>
+          <input id="angle" type="range" min="-90" max="125" value="28" step="1" disabled>
+        </div>
+        <div class="buttons">
+          <button type="button" id="hidden" aria-pressed="true" disabled>Hidden lines</button>
+          <button type="button" id="reset" disabled>Reset view</button>
+        </div>
+        <ul class="legend" aria-label="Line conventions">
+          <li><i class="sample visible" aria-hidden="true"></i>Visible edge</li>
+          <li><i class="sample hidden-line" aria-hidden="true"></i>Hidden edge</li>
+        </ul>
+        <dl>
+          <div><dt>Hood opening</dt><dd>Ø 150 mm</dd></div>
+          <div><dt>Polar-axis altitude</dt><dd>42°</dd></div>
+          <div><dt>Light baffles</dt><dd>4</dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer>
+      <p>Dashed lines follow real edges behind the tube and mount.</p>
+      <details><summary>Drawing and model references</summary>
+        <p>The illustration uses a real crease-edge pass and depth-tested hidden strokes. The bent supports, tapered tube, lens cell and bearing shapes are original.</p>
+        <p><a href="https://www.asme.org/codes-standards/find-codes-standards/line-conventions-and-lettering">ASME line conventions</a> · <a href="https://science.nasa.gov/universe/telescopes-101/">NASA telescope optics</a></p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

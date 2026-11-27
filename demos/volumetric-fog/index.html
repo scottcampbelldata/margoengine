@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Pl-OquIl.js"><script src="./assets/inline-0eaf9b5d.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#202924">
+<link rel="icon" href="data:,">
+<title>Volumetric Fog · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-D2GRuoSD.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-4JopYk3e.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>Volumetric Fog</h1>
+    <p>Morning light crosses a cedar grove. Add mist to see where the trees block the light.</p>
+  </header>
+  <section aria-label="Forest fog controls">
+    <div class="controls">
+      <label>
+        <span>Local fog</span>
+        <input id="density" type="range" min="0" max="100" value="40" step="1" disabled>
+        <output id="amount" for="density">40%</output>
+      </label>
+      <label>
+        <span>Forward scattering</span>
+        <input id="phase" type="range" min="0" max="79" value="63" step="1" disabled>
+        <output id="asymmetry" for="phase">0.63</output>
+      </label>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="grove" aria-label="A mossy trail in a dawn forest with pale sunlight crossing banks of ground mist." aria-describedby="guide"></canvas>
+        <div id="notice"><p id="status" role="status">Preparing the forest and fog…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p id="guide">Fog scatters sunlight toward the camera. Air in the trees’ shadows stays darker.</p>
+        <span id="medium">0.036 m⁻¹ peak single-volume extinction</span>
+      </figcaption>
+    </figure>
+  </section>
+  <footer><span>Fixed dawn lighting</span><span id="renderer">Margo Engine</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-383d56cb.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e9e9db">
+  <link rel="icon" href="data:,">
+  <title>The Weigh Station · Margo Engine</title>
+  <link rel="preload" href="./assets/bodies-Cd6SxFFQ.bin" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-D1Ae-6Yd.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DD8VoObg.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>The Weigh Station</h1><p>Weigh a machined part in three metals. See where it balances and how much it resists turning.</p></header>
+    <div class="exhibit">
+      <figure aria-label="Precision balance with the selected part in 3D">
+        <canvas id="part"></canvas>
+        <p id="status" role="status">Taring the balance…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="overlay"><output id="scale" aria-label="Scale display">—</output><button type="button" id="reset" disabled>Reset view</button></div>
+      </figure>
+      <aside>
+        <fieldset id="operations" disabled>
+          <legend>Part</legend>
+          <button type="button" data-step="0" aria-pressed="true">Flywheel</button>
+          <button type="button" data-step="1" aria-pressed="false">Cam</button>
+          <button type="button" data-step="2" aria-pressed="false">Yoke</button>
+          <label for="metal">Metal</label>
+          <select id="metal">
+            <option value="0">Aluminium</option>
+            <option value="1">Carbon steel</option>
+            <option value="2">Copper</option>
+          </select>
+        </fieldset>
+        <dl>
+          <div><dt>Volume</dt><dd><output id="volume">—</output></dd></div>
+          <div><dt>Metal density</dt><dd><output id="density">—</output></dd></div>
+          <div><dt>Centre of mass (X, Y, Z)</dt><dd><output id="centre">—</output></dd></div>
+        </dl>
+        <table>
+          <caption>Inertia at the centre of mass <span>kg·cm²</span></caption>
+          <thead><tr><td></td><th scope="col">X</th><th scope="col">Y</th><th scope="col">Z</th></tr></thead>
+          <tbody><tr><th scope="row">X</th><td id="i0">—</td><td id="i3">—</td><td id="i5">—</td></tr>
+          <tr><th scope="row">Y</th><td id="i3b">—</td><td id="i1">—</td><td id="i4">—</td></tr>
+          <tr><th scope="row">Z</th><td id="i5b">—</td><td id="i4b">—</td><td id="i2">—</td></tr></tbody>
+        </table>
+      </aside>
+    </div>
+    <footer>Drag the view to turn the part. The amber cross marks the balance point from above. <a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

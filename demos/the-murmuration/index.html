@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-7f5f1e5c.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Move through a living flock of 16,384 starlings above a dusk marsh.">
+  <meta name="theme-color" content="#271b24">
+  <title>The Murmuration · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/marsh-sky-sF1NxFok.webp" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-7mCWPUnh.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CgtGJ1VF.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Murmuration</h1>
+      <p>Sixteen thousand starlings above a salt marsh at dusk. Move through the flock and watch the birds part around you.</p>
+    </header>
+    <section aria-label="Interactive starling flock">
+      <figure>
+        <canvas id="view" aria-label="Live flock above an estuary. Drag or touch the sky to disturb the flock."></canvas>
+        <div id="disturbance" aria-hidden="true" hidden></div>
+        <figcaption>Salt marsh at dusk</figcaption>
+        <div id="status" role="status"><strong>Opening the estuary…</strong><span id="error-reason"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="controls">
+        <div role="group" aria-label="Flock controls">
+          <button id="disturb" type="button" disabled>Send a disturbance</button>
+          <button id="pause" type="button" aria-pressed="false" disabled>Pause</button>
+          <button id="reset" type="button" disabled>Reset</button>
+        </div>
+        <p><strong>16,384</strong> starlings</p>
+      </div>
+    </section>
+    <footer>
+      <p>Each bird responds to nearby birds and the disturbance. The flock shape emerges as they move together.</p>
+      <details><summary>Flocking model</summary>
+        <p>This is a Reynolds-style boid model with a limited neighborhood, inspired by starling roosts. Real starlings have been observed responding to a fixed number of nearest neighbors.</p>
+        <p>The fixed dusk backdrop was rendered in Margo. The flock and its response to your movement are live.</p>
+        <ul>
+          <li><a href="https://www.cs.toronto.edu/~dt/siggraph97-course/cwr87/">Craig Reynolds on flocking rules</a></li>
+          <li><a href="https://doi.org/10.1073/pnas.0711437105">Starling field observations</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+
+</body>
+</html>

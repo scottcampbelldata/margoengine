@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-FBodgj0s.js"><script src="./assets/inline-2b66f398.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#272c25">
+  <meta name="description" content="Walk through a high-country meadow and watch the grass bend, flatten and recover under a changing sky.">
+  <title>The Meadow | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DOMpLFAN.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DzOyiOjo.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Meadow</h1>
+      <p>Walk through a high-country meadow and watch the grass bend and rise again. Tap a patch to press it from where you stand.</p>
+    </header>
+    <section aria-label="High-country meadow">
+      <figure id="viewport">
+        <canvas id="scene" aria-label="Wind moving through long grasses and wildflowers in a high mountain meadow"></canvas>
+        <p id="loading" role="status">Opening the meadow…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <div class="instrument">
+        <fieldset id="movement" disabled>
+          <legend>Along the meadow</legend>
+          <div class="actions">
+            <button type="button" id="walk" aria-pressed="false">Walk forward</button>
+            <button type="button" id="press">Press grass</button>
+            <button type="button" id="reset">Return</button>
+          </div>
+          <p class="distance">Distance <output id="distance">0.0 m</output></p>
+        </fieldset>
+        <fieldset id="weather" disabled>
+          <legend>Sun elevation <output id="sun-value" for="sun">15°</output></legend>
+          <input id="sun" aria-label="Sun elevation" type="range" min="6" max="50" value="15" step="1">
+          <div class="limits"><span>Low sun</span><span>High sun</span></div>
+        </fieldset>
+      </div>
+    </section>
+    <footer><a href="https://www.cg.tuwien.ac.at/research/publications/2017/JAHRMANN-2017-RRTG/">Responsive grass rendering</a><a href="./source/README.md">Scene notes</a></footer>
+  </main>
+</body>
+</html>

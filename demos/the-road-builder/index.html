@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#e7dec9">
+<link rel="icon" href="data:,">
+<title>The Road Builder · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-aUSVDjFZ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BWvmEdtL.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>The Road Builder</h1><p>Cut a road into rolling terrain. Add a junction, change the banking or draw your own branch from the crossing.</p></header>
+<section class="exhibit" aria-label="Interactive road and terrain model">
+<figure><div class="view"><canvas id="land" aria-label="Miniature hillside with curbed roads and conifer groves" tabindex="0"></canvas><canvas id="sketch" aria-hidden="true"></canvas>
+<p id="loading" role="status">Opening the hillside…</p><p id="error" role="alert" hidden></p></div>
+<figcaption><span id="distance">–</span><a href="./source/README.md">Road geometry</a></figcaption>
+</figure>
+<aside><fieldset id="controls" disabled>
+<legend>Road network</legend>
+<div class="view-controls"><button type="button" id="add">Add hillside spur</button><button type="button" id="draw" aria-pressed="false">Draw branch</button></div>
+<label for="bank">Bank angle <output id="bank-value" for="bank">8°</output></label>
+<input type="range" id="bank" min="0" max="17" step="1" value="8">
+<label class="option"><input type="checkbox" id="plan"> Overhead plan</label>
+<p id="status" role="status">Add a spur to see the terrain and junction rebuild.</p>
+</fieldset></aside>
+</section>
+</main></body></html>

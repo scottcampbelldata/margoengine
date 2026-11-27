@@ -1,0 +1,1 @@
+import{h as e,m as t,p as n}from"./index-DOMpLFAN.js";var r=class extends Error{constructor(e,t){super(t),this.name=`MargoError`,this.code=e}static[Symbol.hasInstance](e){return e instanceof Error&&e.name===`MargoError`}},i=(r,i=e,a=import.meta.url)=>(n(r,t(i,a)),r);export{r as n,i as t};

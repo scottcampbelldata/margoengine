@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dce6e6">
+  <meta name="description" content="Four 3D spline families share one drafting table. Measure the curve and follow a moving frame along its length.">
+  <link rel="icon" href="data:,">
+  <title>The Curve Lab · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Bp0KVZkK.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-ChcgI0o6.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine</a><span></span>Web demos</nav>
+    <header>
+      <h1>The Curve Lab</h1>
+      <p>Give four curves the same seven points. Move the probe to see which part of each curve is closest.</p>
+    </header>
+    <section class="lab" aria-label="Spline measurement instrument">
+      <figure>
+        <canvas id="lab" aria-label="A brass spline over a blue drafting table. A probe tracks the nearest point and a colored frame marks a station along the curve."></canvas>
+        <figcaption><span>Moving frame</span><span><i class="t"></i>Tangent</span><span><i class="n"></i>Normal</span><span><i class="b"></i>Binormal</span></figcaption>
+        <div id="status" role="status"><strong>Opening the instrument…</strong><span id="error"></span><a id="requirements" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Spline controls">
+        <fieldset id="controls" disabled>
+          <legend>Curve type</legend>
+          <div class="choices">
+            <button type="button" data-curve="0" aria-pressed="true">Catmull–Rom</button>
+            <button type="button" data-curve="1" aria-pressed="false">Bézier</button>
+            <button type="button" data-curve="2" aria-pressed="false">Hermite</button>
+            <button type="button" data-curve="3" aria-pressed="false">B-spline</button>
+          </div>
+          <p class="kind-note" id="kind-note">The curve passes through every brass point.</p>
+          <label class="slider-title" for="probe">Probe position <output id="probe-position" for="probe">67.5%</output></label>
+          <input type="range" id="probe" min="0" max="1000" value="675">
+          <label class="slider-title" for="station">Frame along curve <output id="station-position" for="station">64.0%</output></label>
+          <input type="range" id="station" min="0" max="1000" value="640">
+          <button type="button" id="overhead" aria-pressed="false">View from above</button>
+        </fieldset>
+        <dl aria-label="Measurements">
+          <div><dt>Arc length</dt><dd><output id="length">—</output></dd></div>
+          <div><dt>Nearest gap</dt><dd><output id="gap">—</output></dd></div>
+          <div><dt>Nearest station</dt><dd><output id="nearest">—</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer>
+      <p>The dashed line joins the blue probe to the nearest point on the curve.</p>
+      <details><summary>How the measurements work</summary><p>The length is an approximation from closely spaced samples. The closest-point calculation searches each cubic segment. The moving frame uses distance along the curve and carries its normal through bends with minimal twist.</p><p><a href="https://doi.org/10.1145/1330511.1330513">Wang and colleagues on rotation-minimizing frames</a>.</p></details>
+    </footer>
+  </main>
+</body>
+</html>

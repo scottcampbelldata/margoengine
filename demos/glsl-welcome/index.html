@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-c2fc357c.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eeeae1">
+  <meta name="description" content="Edit a GLSL fragment shader and see it run in Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>GLSL Welcome · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-B0B5dAPW.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BSE6sFop.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery">
+      <a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a>
+      <span>Shader lab</span>
+    </nav>
+    <header>
+      <h1>GLSL Welcome</h1>
+      <p>Paste or edit a fragment shader. Run it to see what your GPU draws.</p>
+    </header>
+    <section id="exhibit" aria-label="Fragment shader workspace">
+      <figure class="preview">
+        <div class="frame">
+          <canvas id="view" role="img" aria-label="Output of the current fragment shader"></canvas>
+        </div>
+        <figcaption class="preview-tools">
+          <div class="preview-title">
+            <span id="swatch" aria-hidden="true"></span>
+            <span id="active-name">Iridescent silk</span>
+          </div>
+          <div id="engine-status" role="status">Opening GPU…</div>
+        </figcaption>
+        <div class="phase">
+          <label for="phase">Phase</label>
+          <input id="phase" type="range" min="0" max="100" value="0" disabled>
+          <output id="phase-value" for="phase">0.00</output>
+        </div>
+      </figure>
+      <div class="console">
+        <div class="console-heading">
+          <label for="fragment">Fragment source</label>
+          <button id="run" type="button" disabled>Run shader <span aria-hidden="true">↗</span></button>
+        </div>
+        <div class="examples" role="group" aria-label="Load a shader example">
+          <button type="button" data-example="silk" aria-pressed="true" disabled>Iridescence</button>
+          <button type="button" data-example="signal" aria-pressed="false" disabled>Signal</button>
+          <button type="button" data-example="petal" aria-pressed="false" disabled>Petals</button>
+        </div>
+        <p id="diagnostic" role="status" aria-live="polite">Loading the GLSL compiler…</p>
+        <div class="editor">
+          <textarea id="fragment" aria-describedby="editor-help" rows="16" maxlength="4500" spellcheck="false"
+            autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off" disabled></textarea>
+        </div>
+      </div>
+    </section>
+    <details class="notes" id="editor-help">
+      <summary>Shader inputs and supported GLSL</summary>
+      <p><code>uv</code> is the position across the preview from 0 to 1, with its origin at the lower left.
+        <code>phase</code> is the slider value. Write the pixel to <code>color</code>. Run with the button or
+        <kbd>Ctrl</kbd> + <kbd>Enter</kbd> (<kbd>⌘</kbd> + <kbd>Enter</kbd> on Mac).</p>
+      <p>This lab accepts straight-line GLSL ES 3.00 with float vectors, local declarations, arithmetic,
+        swizzles and common math functions. Keep the displayed inputs and output when pasting a full fragment,
+        or paste just the statements inside <code>main</code>. Each edit is limited to 36 statements and
+        800 expression tokens.</p>
+    </details>
+  </main>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CShf0JqZ.js"><script src="./assets/inline-d1e95ec2.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111419">
+  <meta name="description" content="Scrub through the April 8, 2024 total solar eclipse over Dallas, Texas.">
+  <link rel="icon" href="data:,">
+  <title>The Eclipse · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-kfdTshkV.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BmkH10PH.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">↖ <span>Margo Web Demos</span></a><span>Astronomical sky</span></nav>
+    <header>
+      <h1>The Eclipse</h1>
+      <p><time datetime="2024-04-08">April 8, 2024</time><br><span>Dallas, Texas</span></p>
+    </header>
+    <section class="exhibit" aria-label="Solar eclipse observation">
+      <figure id="stage" class="stage">
+        <canvas id="sky" role="img" aria-label="The Dallas skyline and a solar close-up of the April 8 eclipse"></canvas>
+        <figcaption class="labels"><span>Trinity River · horizon</span><span>Solar close-up</span></figcaption>
+        <p id="status" role="status">Opening the sky…</p>
+      </figure>
+      <div class="controls">
+        <div class="reading">
+          <div><output id="time-readout" for="time">13:27:40</output> <span class="unit">CDT</span><p id="phase">Partial eclipse</p></div>
+          <dl><div><dt>Sun covered</dt><dd id="coverage">—</dd></div><div><dt>Direct light</dt><dd id="flux">—</dd></div></dl>
+        </div>
+        <div class="timeline">
+          <label for="time" class="visually-hidden">Scrub local time</label>
+          <input id="time" type="range" min="0" max="10800" step="1" disabled>
+          <span class="time-band" aria-hidden="true"><i id="partial-band"></i><i id="total-band"></i></span>
+          <div class="ends"><time>12:15</time><time>15:15</time></div>
+        </div>
+        <div class="jumps" aria-label="Eclipse events">
+          <button type="button" data-jump="start" disabled>First contact</button>
+          <button type="button" data-jump="peak" disabled>Totality</button>
+          <button type="button" data-jump="end" disabled>Last contact</button>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <p>Drag through three hours of local time. The close-up tracks the Sun while the horizon darkens as the Moon blocks direct sunlight.</p>
+      <details>
+        <summary>About the reconstruction</summary>
+        <p>Sun and Moon positions come from NASA JPL Horizons for central Dallas. Coverage is the fraction of the visible solar disc hidden by the Moon. Direct light also accounts for the dimmer solar limb. The horizon is an illustrative clear-sky reconstruction with residual twilight. The corona and skyline are rendered interpretations.</p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

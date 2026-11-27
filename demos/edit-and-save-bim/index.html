@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-a669b4d3.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Edit door properties in a furnished IFC pavilion and download the verified revised file.">
+  <meta name="theme-color" content="#192d31">
+  <title>Edit and Save BIM · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/tern-pavilion-BCPPY4to.mesh" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-BGyUd9Do.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CkgCciRN.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>Edit and Save BIM</h1>
+      <p>Change the recorded properties of a pavilion door and download a checked IFC file.</p>
+    </header>
+    <section class="exhibit" aria-label="Tern Garden Pavilion and door editor">
+      <figure>
+        <canvas id="view" aria-label="Tern Garden Pavilion with the selected IFC door framed in the model"></canvas>
+        <figcaption>Tern Garden Pavilion <span id="view-label">Pavilion overview</span></figcaption>
+        <div id="status" role="status"><strong>Opening the pavilion…</strong><span id="detail"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="IFC door properties">
+        <div class="selection">
+          <label for="door">Door</label>
+          <select id="door" disabled>
+            <option>Garden entrance</option>
+            <option>Plant room</option>
+          </select>
+          <button id="overview" type="button" disabled>Overview</button>
+        </div>
+        <div class="title"><h2 id="name">Garden entrance</h2><span id="tag">D01</span></div>
+        <label class="measure" for="rating">Acoustic rating <output id="rating-value" for="rating">Rw 30 dB</output></label>
+        <input id="rating" type="range" min="24" max="48" value="30" step="2" disabled>
+        <label class="self"><input id="closing" type="checkbox" checked disabled> Self-closing</label>
+        <p id="changes" role="status">Values from the original file.</p>
+        <div class="tools">
+          <button id="restore" type="button" disabled>Reset door</button>
+          <button id="prepare" type="button" disabled>Prepare IFC</button>
+          <a id="download" download="tern-pavilion-revised.ifc" hidden>Download revised IFC</a>
+        </div>
+        <p id="export-status" role="status"></p>
+      </aside>
+    </section>
+    <footer>
+      <p>The editor writes the two selected properties to the door occurrence in the IFC file.</p>
+      <details>
+        <summary>Model and references</summary>
+        <p>The rating and self-closing entries are IFC4 <code>Pset_DoorCommon</code> information. The displayed ratings are model records.</p>
+        <p><a href="./tern-pavilion.ifc" download>Original IFC model</a> · <a href="https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcsharedbldgelements/lexical/ifcdoor.htm">buildingSMART IFC4 doors</a></p>
+        <p>Export uses That Open Engine’s web-ifc 0.0.78 under MPL-2.0. <a href="https://github.com/ThatOpen/engine_web-ifc/archive/4310503d8618a0870c2166f101471078d528f4c1.tar.gz">Peer source</a> · <a href="https://github.com/ThatOpen/engine_web-ifc/blob/4310503d8618a0870c2166f101471078d528f4c1/LICENSE.md">License</a></p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

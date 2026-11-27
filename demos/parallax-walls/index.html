@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><link rel="modulepreload" crossorigin href="./assets/scene-8THETzKx.js"><script src="./assets/inline-5eeb4926.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#242520">
+<link rel="icon" href="data:,">
+<title>Parallax Walls · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BYv2xlBc.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-5M4LOg29.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>Parallax Walls</h1><p>Tilt the view across a brick tunnel and a rounded limestone arch. Compare a recessed height field with three-axis stone projection.</p></header>
+<section class="exhibit" aria-label="Interactive underground masonry exhibit">
+<figure><div class="frame"><canvas id="vault" aria-label="Red brick and limestone walls with a rounded arch and bronze gate"></canvas>
+<p id="loading" role="status">Opening the masonry vault…</p><p id="error" role="alert" hidden></p></div>
+<figcaption><span>Brick vault and limestone pier</span><a href="./source/README.md">Material methods</a></figcaption>
+</figure>
+<fieldset id="controls" disabled>
+<legend>Masonry surface</legend>
+<div class="modes"><button type="button" data-mode="relief" aria-pressed="true">Relief</button><button type="button" data-mode="flat" aria-pressed="false">Flat</button></div>
+<label for="yaw">View angle <output id="yaw-value" for="yaw">−21°</output></label>
+<input type="range" id="yaw" min="-38" max="37" value="-21" step="1">
+<label for="depth">Joint depth <output id="depth-value" for="depth">35 mm</output></label>
+<input type="range" id="depth" min="0" max="100" value="100" step="1">
+<label class="option"><input type="checkbox" id="projection" checked> Triplanar limestone</label>
+<p id="surface">Relief moves the apparent mortar joints as your view changes.</p>
+</fieldset>
+</section>
+</main></body></html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DFeTvxn5.js"><script src="./assets/webgl2-preload-7d7cc043.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#172223">
+<link rel="icon" href="data:,">
+<title>Area Lights · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-CooOeDmS.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BwAPNKDL.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>Area Lights</h1>
+    <p>Move the source and compare its highlight on three finishes.</p>
+  </header>
+  <section aria-label="Lighting controls">
+    <div class="controls">
+      <fieldset>
+        <legend>Emitter</legend>
+        <button type="button" data-shape="sphere" aria-pressed="true" disabled>Sphere</button>
+        <button type="button" data-shape="disc" aria-pressed="false" disabled>Disc</button>
+        <button type="button" data-shape="tube" aria-pressed="false" disabled>Tube</button>
+        <button type="button" data-shape="line" aria-pressed="false" disabled>Line</button>
+      </fieldset>
+      <div class="carriage">
+        <label for="position">Slide emitter</label>
+        <input id="position" aria-valuetext="12 centimetres left" type="range" min="-42" max="42" value="-12" step="1" disabled>
+        <output id="offset" for="position">−12 cm</output>
+      </div>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="bench" aria-label="An optical studio bench with polished nickel, satin brass and glazed ceramic spheres under a selectable shaped light." aria-describedby="description"></canvas>
+        <div id="notice"><p id="status" role="status">Setting the light…</p><p id="error" role="alert"></p></div>
+      </div>
+      <div class="swatches" aria-label="Sample finishes">
+        <span><i class="nickel" aria-hidden="true"></i> Polished nickel</span>
+        <span><i class="brass" aria-hidden="true"></i> Satin brass</span>
+        <span><i class="ceramic" aria-hidden="true"></i> Glazed ceramic</span>
+      </div>
+      <figcaption>
+        <p id="description">A spherical source makes a compact, round highlight.</p>
+        <span class="power">520 lm · fixed exposure</span>
+      </figcaption>
+    </figure>
+  </section>
+  <footer><span>Margo clustered lighting</span><span id="renderer">Margo Engine</span></footer>
+</main>
+</body>
+</html>

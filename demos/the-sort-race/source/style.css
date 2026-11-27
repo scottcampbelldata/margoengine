@@ -1,0 +1,64 @@
+:root{color-scheme:dark;--bg:#111017;--panel:#181721;--ink:#f4f1ed;--muted:#b5afc1;--edge:#383542;--chart:#100f17;--lime:#e8ff89;--violet:#d4aaff;font-family:"Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink)}
+main{width:min(100%,1312px);margin-inline:auto;padding-inline:45px}
+.masthead{height:70px;border-bottom:1px solid var(--edge);display:flex;align-items:center;justify-content:space-between}
+.back{color:var(--ink);text-decoration:none;font-size:13px;font-weight:650;display:flex;gap:9px;align-items:center}
+.back span{color:var(--lime);font-size:18px}
+.discipline,.axis-key,.axis-x,.axis-y,.lane-state,.costs{font-family:ui-monospace,Consolas,monospace}
+.discipline{color:var(--muted);letter-spacing:.13em;font-size:11px;text-transform:uppercase}
+.opening{display:grid;grid-template-columns:1fr 236px;align-items:end;gap:36px;padding:34px 0 31px}
+h1,h2,p,figure{margin:0}
+h1{font-size:clamp(48px,7.4vw,110px);letter-spacing:-.074em;line-height:.99;font-weight:660}
+.opening p{margin-top:15px;font-size:clamp(14px,1.7vw,19px);color:var(--muted);line-height:1.45}
+.action{align-self:end;padding-bottom:1px}
+.action p{font-size:12px;min-height:2.9em;margin-top:8px;color:var(--muted)}
+button{border:1px solid var(--lime);background:var(--lime);color:#181b12;min-height:53px;font:inherit;font-weight:750;width:100%;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer}
+button span:last-child{font-size:22px;font-weight:400}
+button:hover:not(:disabled){background:#f5ffcb}
+button:disabled{cursor:default;background:#353a29;color:#e6ecd5;border-color:#535944}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--violet);outline-offset:4px}
+.lanes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.lane{--lane:var(--lime);border:1px solid var(--edge);background:var(--panel);padding:20px 23px 17px;min-width:0}
+.lane-b{--lane:var(--violet)}
+.lane-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:19px}
+.lane-head h2{font-size:clamp(18px,2.1vw,27px);letter-spacing:-.045em;font-weight:650;line-height:1.16}
+.lane-head p{color:var(--muted);font-size:13px;margin-top:4px}
+.lane-state{white-space:nowrap;border-left:1px solid var(--lane);padding-left:9px;margin-top:4px;color:var(--lane);font-size:11px}
+.plot{display:grid;grid-template:16px auto 16px / 32px minmax(0,1fr);align-items:stretch;column-gap:7px;row-gap:6px}
+.axis-key{grid-column:2;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+.axis-y,.axis-x{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;align-items:flex-end}
+.axis-y{flex-direction:column}
+.axis-x{grid-column:2;align-items:center}
+canvas{display:block;width:100%;min-width:0;height:clamp(124px,20vw,260px);background:var(--chart);border:1px solid var(--edge)}
+.time{display:flex;gap:9px;align-items:baseline;margin-top:11px;color:var(--lane);font-variant-numeric:tabular-nums}
+.time output{font-size:clamp(36px,5.3vw,73px);font-weight:630;line-height:1.08;letter-spacing:-.077em}
+.time>span{font:12px ui-monospace,Consolas,monospace}
+.time>span span{color:var(--muted)}
+.costs{color:var(--muted);font-size:11px;margin-top:7px;min-height:1.6em;line-height:1.45}
+.audit{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px 0 35px}
+.audit h2,.audit summary{font-size:15px;font-weight:680;line-height:1.3}
+.audit p{font-size:13px;line-height:1.5;color:var(--muted);margin-top:7px;max-width:65ch}
+.audit summary{cursor:pointer;width:max-content;max-width:100%}
+.rank-strip{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}
+.rank-strip[hidden]{display:none}
+.rank-strip span{font:11px ui-monospace,Consolas,monospace;padding:5px 7px;border:1px solid var(--edge);color:var(--muted)}
+@media(max-width:720px){
+  main{padding-inline:19px}
+  .masthead{height:52px}
+  .opening{display:block;padding:22px 0 15px}
+  .opening p{margin-top:10px}
+  .action{margin-top:16px}
+  .action p{min-height:1.45em;margin-top:7px}
+  button{min-height:47px}
+  .lanes{grid-template-columns:1fr;gap:10px}
+  .lane{padding:12px 13px 11px}
+  .lane-head{margin-bottom:9px}
+  .lane-head p{font-size:12px}
+  .plot{grid-template:11px auto 12px / 27px minmax(0,1fr);gap:5px}
+  canvas{height:clamp(124px,37vw,200px)}
+  .time{margin-top:5px}
+  .costs{margin-top:4px}
+  .audit{grid-template-columns:1fr;gap:15px;padding:17px 0 28px}
+}
+@media(prefers-reduced-motion:no-preference){button{transition:background-color 130ms,border-color 130ms}}

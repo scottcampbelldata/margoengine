@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CDE8YESl.js"><script src="./assets/webgl2-preload-2ecbb536.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12191b">
+  <meta name="description" content="Compare direct, screen-space and ray-traced illumination in a room of colored plaster.">
+  <title>Bounce Light | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DZyGYQMs.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CCnrR6GI.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Bounce Light</h1>
+      <p>Watch colored walls tint pale stone as you change how the room handles indirect light.</p>
+    </header>
+    <section aria-label="Indirect light comparison">
+      <figure id="viewport">
+        <canvas id="room" aria-label="Limestone sculpture and floor inside a room with terracotta and teal plaster walls"></canvas>
+        <p id="loading" role="status">Opening the room…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <div class="controls">
+        <fieldset id="lighting" disabled>
+          <legend>Lighting mode</legend>
+          <div class="methods">
+            <button type="button" data-mode="direct" aria-pressed="true">Direct</button>
+            <button type="button" data-mode="screen" aria-pressed="false" disabled>Screen space</button>
+            <button type="button" data-mode="traced" aria-pressed="false" disabled>Ray traced</button>
+          </div>
+        </fieldset>
+        <div class="test">
+          <button type="button" id="view" aria-pressed="false" disabled>Crop the walls</button>
+          <p id="details" aria-live="polite">The room’s direct light and a fixed ambient fill.</p>
+        </div>
+      </div>
+    </section>
+    <footer><a href="https://www.graphics.cornell.edu/~westin/consortium-home/goral.pdf">Cornell diffuse light study</a><a href="./source/README.md">Scene notes</a></footer>
+  </main>
+</body>
+</html>

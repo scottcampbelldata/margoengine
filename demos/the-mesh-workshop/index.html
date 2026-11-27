@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-8e3f919a.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#181f22">
+  <meta name="description" content="Five polygon editing tools on an industrial air housing, with real editable geometry and undo.">
+  <title>The Mesh Workshop · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CnCqjPfp.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-3E6YJtdy.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Mesh Workshop</h1>
+      <p>Shape an air housing with five polygon tools. Watch the edges and faces respond to each edit.</p>
+    </header>
+    <section aria-label="Editable air housing">
+      <figure>
+        <canvas id="view" aria-label="A 3D air housing with visible polygon edges"></canvas>
+        <figcaption><span>Ventilation housing prototype</span><span id="active">Full assembly</span></figcaption>
+        <div id="status" role="status"><strong>Opening the workshop…</strong><span id="reason"></span><a href="https://margoengine.com/webgpu.html" id="help" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="operation-board">
+        <div class="controls" role="group" aria-label="Polygon editing tools">
+          <button type="button" data-tool="bevel" disabled>Bevel</button>
+          <button type="button" data-tool="knife" disabled>Knife</button>
+          <button type="button" data-tool="subdivide" disabled>Subdivide</button>
+          <button type="button" data-tool="dissolve" disabled>Dissolve</button>
+          <button type="button" data-tool="bridge" disabled>Bridge</button>
+          <button type="button" id="undo" disabled>Undo</button>
+        </div>
+        <div class="inspection">
+          <p id="operation" role="status">Choose a tool to edit one component.</p>
+          <dl aria-label="Editable polygon count">
+            <div><dt>Vertices</dt><dd id="vertices">—</dd></div>
+            <div><dt>Edges</dt><dd id="edges">—</dd></div>
+            <div><dt>Faces</dt><dd id="faces">—</dd></div>
+            <div><dt>Boundary edges</dt><dd id="boundary">—</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <p>The fine lines follow the model’s polygon edges.</p>
+      <details><summary>Mesh operations and references</summary>
+        <p>Each tool works on a different part of the prototype. Undo restores the previous polygon positions, topology and UVs.</p>
+        <p><a href="https://people.eecs.berkeley.edu/~sequin/CS284/PAPERS/CatmullClark_SDSurf.pdf">Catmull–Clark subdivision</a> · <a href="https://developer.blender.org/docs/features/objects/mesh/bmesh/">Polygon topology</a></p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

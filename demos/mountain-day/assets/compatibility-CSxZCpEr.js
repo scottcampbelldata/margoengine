@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./dist-1sKoZXh4.js","./index-v-sVMjRu.js","./index-DMWsLGY7.css","./device-DajQy5Cv.js","./errors-CKFZBSDN-DEIUX3Qy.js"])))=>i.map(i=>d[i]);
+import{c as e}from"./index-v-sVMjRu.js";async function t(t){let[n]=await Promise.all([e(()=>import(`./dist-1sKoZXh4.js`),__vite__mapDeps([0,1,2]),import.meta.url),e(()=>import(`./device-DajQy5Cv.js`).then(e=>e.t),__vite__mapDeps([3,1,2,0,4]),import.meta.url)]);return n.install({force:!0,signal:t})}export{t as installCompatibility};

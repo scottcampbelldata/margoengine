@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-D4mU1Faw.js"><script src="./assets/inline-19ae04a8.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#18221e">
+  <meta name="description" content="Grow a 3D canopy and root system with space colonisation. Insert barriers and see the branches take a different path.">
+  <link rel="icon" href="data:,">
+  <title>Trees From Space · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DDwX1MMm.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CEUak3Hx.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Growth studies</span></nav>
+    <header>
+      <h1>Trees From Space</h1>
+      <p>Grow a canopy and its roots. Insert two barriers to see how the branches find room around them.</p>
+    </header>
+    <section id="exhibit" aria-label="Tree growth experiment">
+      <div class="runbar">
+        <div class="mode"><span class="lamp" aria-hidden="true"></span><span id="condition">Open growth</span></div>
+        <div class="actions">
+          <button type="button" id="angle" aria-pressed="false" disabled>Side view</button>
+          <button type="button" id="barriers" aria-pressed="false" disabled>Insert barriers</button>
+        </div>
+      </div>
+      <div class="chamber">
+        <canvas id="view" role="img" aria-label="A growing tree and its exposed root system inside a specimen chamber"></canvas>
+        <p id="status" role="status">Growing the specimen…</p>
+        <span class="air" aria-hidden="true">CANOPY</span>
+        <span class="soil" aria-hidden="true">ROOTS</span>
+      </div>
+      <div class="controls">
+        <div class="replay">
+          <label for="growth">Growth replay</label>
+          <output id="growth-value" for="growth">100%</output>
+          <input id="growth" type="range" min="4" max="100" step="1" value="100" disabled>
+        </div>
+        <dl aria-label="Growth measurements">
+          <div><dt>Canopy limbs</dt><dd id="upper">—</dd></div>
+          <div><dt>Root limbs</dt><dd id="lower">—</dd></div>
+          <div><dt>Barrier overlaps</dt><dd id="crossings">—</dd></div>
+        </dl>
+      </div>
+    </section>
+    <details>
+      <summary>How the growth model works</summary>
+      <p>Each attraction point pulls on its nearest branch. The branches grow toward the combined pull until they get close enough to use up the points. The barriers change the available paths and the points they can reach. Growth replay shows the solved tree from the stem outward.</p>
+    </details>
+  </main>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111017">
+  <meta name="description" content="Compare a million-key Margo radix sort with your browser’s CPU sort.">
+  <link rel="icon" href="data:,">
+  <title>The Sort Race · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DuSXanJt.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BwN2JPQ9.css">
+</head>
+<body>
+  <main id="race">
+    <header class="masthead">
+      <a href="../" class="back"><span aria-hidden="true">↖</span> Margo Web Demos</a>
+      <span class="discipline">Compute</span>
+    </header>
+    <section class="opening" aria-labelledby="title">
+      <div>
+        <h1 id="title">The Sort Race</h1>
+        <p>One million shuffled numbers. Two ways to put them in order.</p>
+      </div>
+      <div class="action">
+        <button id="run" type="button" disabled><span id="run-label">Run the sort</span><span aria-hidden="true">↗</span></button>
+        <p id="status" role="status">Preparing the experiment…</p>
+      </div>
+    </section>
+    <section class="lanes" aria-label="Sort results">
+      <article class="lane lane-a">
+        <header class="lane-head">
+          <div>
+            <h2 id="margo-title">Margo radix sort</h2>
+            <p id="backend">Checking for WebGPU</p>
+          </div>
+          <span class="lane-state" id="margo-state">Unsorted</span>
+        </header>
+        <figure class="plot">
+          <div class="axis-key">Value</div>
+          <div class="axis-y" aria-hidden="true"><span>1M</span><span>500k</span><span>0</span></div>
+          <canvas id="margo-plot" aria-label="Margo input, sampled shuffled values by array index" role="img"></canvas>
+          <div class="axis-x" aria-hidden="true"><span>0</span><span>Array index</span><span>1M</span></div>
+        </figure>
+        <div class="time"><output id="margo-time" aria-label="Margo sort duration">—</output><span>ms <span id="margo-time-label">sort + completion</span></span></div>
+        <p class="costs" id="margo-costs">Upload and readback measured separately</p>
+      </article>
+      <article class="lane lane-b">
+        <header class="lane-head">
+          <div>
+            <h2>CPU typed-array sort</h2>
+            <p>JavaScript worker</p>
+          </div>
+          <span class="lane-state" id="cpu-state">Unsorted</span>
+        </header>
+        <figure class="plot">
+          <div class="axis-key">Value</div>
+          <div class="axis-y" aria-hidden="true"><span>1M</span><span>500k</span><span>0</span></div>
+          <canvas id="cpu-plot" aria-label="CPU input, sampled shuffled values by array index" role="img"></canvas>
+          <div class="axis-x" aria-hidden="true"><span>0</span><span>Array index</span><span>1M</span></div>
+        </figure>
+        <div class="time"><output id="cpu-time" aria-label="CPU sort duration">—</output><span>ms sort</span></div>
+        <p class="costs">Input preparation and worker messaging excluded</p>
+      </article>
+    </section>
+    <section class="audit" aria-label="Verification and timing method">
+      <div class="audit-result">
+        <h2 id="audit-title">Checking every value</h2>
+        <p id="audit-copy">Each result is checked against the known ascending order from 0 to 999,999.</p>
+        <div id="rank-strip" class="rank-strip" hidden></div>
+      </div>
+      <details>
+        <summary>What the clocks measure</summary>
+        <p>Both sides get the exact same million unsigned integers. The two sorts run in sequence so they don’t compete for processor time. The Margo time runs from sort submission through completion and can include first-use shader setup. Upload, readback and verification are separate. The worker measures its built-in typed-array sort directly.</p>
+        <p>The plots follow 2,048 sampled keys to their verified ranks. The verification checks all one million. Browser elapsed times depend on this device and this run.</p>
+      </details>
+    </section>
+  </main>
+</body>
+</html>

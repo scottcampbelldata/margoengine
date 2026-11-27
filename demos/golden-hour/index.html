@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BSdtludS.js"><script src="./assets/webgl2-preload-72072d88.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#241e1a">
+<link rel="icon" href="data:,">
+<link rel="preload" as="fetch" crossorigin href="./assets/sky-golden-CefuhtKY.webp">
+<link rel="preload" as="fetch" crossorigin href="./assets/sky-overcast-BRA5G-st.webp">
+<link rel="preload" as="fetch" crossorigin href="./assets/sky-clear-D5OvEfMk.webp">
+<link rel="preload" as="fetch" crossorigin href="./assets/sky-haze-D3QakOh2.webp">
+<title>Golden Hour · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-Cs5GBSaM.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CmEQds5v.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>Golden Hour</h1>
+    <p>One sandstone basin, four kinds of daylight.</p>
+  </header>
+  <section aria-label="Landscape lighting">
+    <div class="day-row">
+      <fieldset>
+        <legend>Daylight</legend>
+        <button type="button" data-day="golden" aria-pressed="true" disabled>Golden hour</button>
+        <button type="button" data-day="clear" aria-pressed="false" disabled>Clear</button>
+        <button type="button" data-day="haze" aria-pressed="false" disabled>Haze</button>
+        <button type="button" data-day="overcast" aria-pressed="false" disabled>Overcast</button>
+      </fieldset>
+      <label class="look-label" for="look">Display look</label>
+      <select id="look" disabled>
+        <option value="neutral">Neutral</option>
+        <option value="agx" selected>AgX</option>
+        <option value="acescg">ACES fit</option>
+      </select>
+    </div>
+    <figure>
+      <div class="frame">
+        <canvas id="vista" aria-label="An original layered sandstone basin, with eroded buttes and a dry wash under a changing sky."></canvas>
+        <div id="notice"><p id="status" role="status">Opening the landscape…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p id="description">Low sun grazes the sandstone and warms the dust over the basin.</p>
+        <dl aria-label="Lighting settings">
+          <div><dt>Sun elevation</dt><dd id="sun">5°</dd></div>
+          <div><dt>Cloud cover</dt><dd id="cloud">25%</dd></div>
+        </dl>
+      </figcaption>
+    </figure>
+  </section>
+  <footer>
+    <span>Original terrain inspired by the Colorado Plateau</span><span id="renderer">Margo Engine</span>
+  </footer>
+</main>
+</body>
+</html>

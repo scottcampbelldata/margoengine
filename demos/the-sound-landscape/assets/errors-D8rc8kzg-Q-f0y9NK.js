@@ -1,0 +1,1 @@
+var e=(e,t)=>Object.assign(Error(t),{name:`MargoError`,code:e}),t=(e,t)=>`${e}; see https://margoengine.com/errors#${t}`,n=(e,n)=>TypeError(t(e,n)),r=(e,n)=>RangeError(t(e,n));export{r as n,n as r,e as t};

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-254a622d.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eee9dc">
+  <link rel="icon" href="data:,">
+  <title>Bend It · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-d4Ot6dUi.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DfhuDXlY.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>Bend It</h1><p>Curve a straight timber footbridge. Drag a point on the plan to steer the deck, then raise the centre above the channel.</p></header>
+    <section class="workshop" aria-label="Footbridge curve editor">
+      <figure class="visual">
+        <canvas id="view" aria-label="A footbridge model that deforms along an editable three-dimensional curve"></canvas>
+        <p id="status" role="status">Opening the footbridge…</p>
+        <p id="error" role="alert" hidden></p>
+        <figcaption><span>Timber footbridge</span><span>Drag to rotate</span></figcaption>
+      </figure>
+      <aside>
+        <fieldset id="edit" disabled>
+          <legend>Curve controls</legend>
+          <div class="range"><label for="bend">Lateral bend</label><output id="bendValue" for="bend">62%</output><input id="bend" type="range" min="-100" max="100" value="62"></div>
+          <div class="range"><label for="rise">Centre lift</label><output id="riseValue" for="rise">0.72 m</output><input id="rise" type="range" min="0" max="160" value="72"></div>
+          <div class="quick">
+            <button id="straight" type="button">Straight deck</button>
+            <button id="reset" type="button">Reset</button>
+          </div>
+        </fieldset>
+        <div class="draft">
+          <div><strong>Track plan</strong><span>Drag an amber point</span></div>
+          <canvas id="plan" width="420" height="164" aria-label="Top view of the footbridge spine with three editable interior knots"></canvas>
+          <div class="planInputs">
+            <label for="point">Point <select id="point" disabled><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></label>
+            <label class="offset" for="offset">Side offset <input id="offset" type="range" min="-70" max="70" value="0" disabled></label>
+          </div>
+        </div>
+        <label class="check"><input id="guide" type="checkbox" checked disabled>Show guide on model</label>
+        <dl><div><dt>Guide length</dt><dd><output id="length">—</output></dd></div><div><dt>Deck width</dt><dd>1.78 m</dd></div></dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and method</a></footer>
+  </main>
+</body>
+</html>

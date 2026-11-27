@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-1dff1bc9.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#211d29">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/ngc-3132-DErN9qIA.webp" as="image">
+  <title>The FFT Lens · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-_dkl1As6.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CY2m0_V9.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine / Web demos</a></nav>
+    <header>
+      <h1>The FFT Lens</h1>
+      <p>Take apart a Webb image by spatial frequency. Filter the spectrum, then inspect the image rebuilt by the inverse transform.</p>
+    </header>
+    <section class="instrument" aria-label="Image and Fourier spectrum">
+      <fieldset id="tools" disabled>
+        <legend>Frequency filter</legend>
+        <div class="presets">
+          <button type="button" data-mode="low" aria-pressed="true">Low pass</button>
+          <button type="button" data-mode="high" aria-pressed="false">High pass</button>
+          <button type="button" data-mode="band" aria-pressed="false">Band pass</button>
+          <button type="button" data-mode="none" aria-pressed="false">Full spectrum</button>
+        </div>
+        <div class="ranges">
+          <div><label for="cutoff">Cutoff</label><output id="frequency" for="cutoff">18 cycles / frame</output>
+            <input type="range" id="cutoff" min="2" max="110" step="1" value="18">
+          </div>
+          <div><label for="wipe">Original / reconstruction</label><output id="split" for="wipe">50%</output>
+            <input type="range" id="wipe" min="0" max="100" step="1" value="50">
+          </div>
+        </div>
+      </fieldset>
+      <div class="plates">
+        <figure>
+          <figcaption><span>Webb NIRCam · NGC 3132</span><span id="filter-label">Low pass</span></figcaption>
+          <div class="compare">
+            <img src="./assets/ngc-3132-DErN9qIA.webp" width="256" height="256" alt="Southern Ring Nebula in near infrared">
+            <canvas id="image" width="256" height="256" aria-label="Image reconstructed after the frequency filter"></canvas>
+            <div class="wipe" aria-hidden="true"></div>
+            <span class="frame-label input" aria-hidden="true">Original</span><span class="frame-label output" aria-hidden="true">Filtered</span>
+          </div>
+        </figure>
+        <figure>
+          <figcaption><span>Fourier spectrum</span><span>Log power</span></figcaption>
+          <div class="spectrum">
+            <canvas id="spectrum" width="256" height="256" aria-label="Centered spatial frequency spectrum of the image"></canvas>
+            <span class="frame-label input" aria-hidden="true">0 at center</span><span class="frame-label output" aria-hidden="true">128 cycles / edge</span>
+          </div>
+        </figure>
+      </div>
+      <div class="readouts">
+        <p id="meaning">Low pass preserves broad glow and smooths fine detail.</p>
+        <p><output id="energy">—</output><span>of spectral energy retained</span></p>
+      </div>
+      <p id="state" role="status">Opening the transform…</p>
+    </section>
+    <footer>Image credit <a href="https://esawebb.org/images/weic2207b/">NASA, ESA, CSA, STScI, and the Webb ERO Production Team</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · Resampled and filtered here · <a href="./source/README.md">Method</a></footer>
+  </main>
+</body>
+</html>

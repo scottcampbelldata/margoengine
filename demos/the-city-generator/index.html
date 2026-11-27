@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DmajU9Nj.js"><script src="./assets/inline-b5e0718c.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#212b2a">
+  <meta name="description" content="Generate a model town with original streets, lots, and buildings drawn from two architectural eras.">
+  <link rel="icon" href="data:,">
+  <title>The City Generator · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CYLabU0w.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BOVG02UD.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Urban models</span></nav>
+    <header>
+      <h1>The City Generator</h1>
+      <p>Lay out a new town, from the street network down to the shape of the shopfronts.</p>
+    </header>
+    <section id="exhibit" aria-label="City model">
+      <div class="toolbar">
+        <div class="set">
+          <label for="era">Building era</label>
+          <select id="era" disabled>
+            <option value="western-1910">1910 railway town</option>
+            <option value="modern">2011 coastal ward</option>
+          </select>
+        </div>
+        <div class="set">
+          <label for="layout">Street pattern</label>
+          <select id="layout" disabled>
+            <option value="grid">Grid</option>
+            <option value="organic">Organic</option>
+            <option value="radial">Radial</option>
+          </select>
+        </div>
+        <button id="generate" type="button" disabled>New city <span aria-hidden="true">↗</span></button>
+      </div>
+      <div class="model">
+        <canvas id="view" role="img" aria-label="A three-dimensional scale model of the generated city"></canvas>
+        <p id="status" role="status">Drawing a town…</p>
+        <button type="button" id="plan" aria-pressed="false" disabled>Plan view</button>
+      </div>
+      <div class="readout">
+        <dl aria-label="Current town counts">
+          <div><dt>Streets</dt><dd id="streets">—</dd></div>
+          <div><dt>Blocks</dt><dd id="blocks">—</dd></div>
+          <div><dt>Lots</dt><dd id="lots">—</dd></div>
+          <div><dt>Buildings</dt><dd id="buildings">—</dd></div>
+        </dl>
+        <small id="seed">Plan seed —</small>
+      </div>
+    </section>
+    <details>
+      <summary>How the town is generated</summary>
+      <p>Margo lays out the streets first, then fits lots inside the resulting blocks. The era determines the
+        building rules for each type of lot. It also sets the street furniture and markings. The two settings
+        are fictional towns inspired by North American railroad towns and Japanese coastal neighborhoods.</p>
+    </details>
+  </main>
+</body>
+</html>

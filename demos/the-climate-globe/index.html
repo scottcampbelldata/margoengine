@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-76669650.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#172631">
+  <link rel="icon" href="data:,">
+  <title>The Climate Globe · Margo Engine</title>
+  <link rel="preload" href="./assets/anomaly-2024-ClpYGKoX.field" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-CxLqdx9c.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D3OddamG.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>The Climate Globe</h1><p>Turn the globe to see where surface temperatures shifted. Scrub from 1880 to 2025, then tap a place to read its annual anomaly.</p></header>
+    <section class="instrument" aria-label="Annual surface temperature anomaly">
+      <figure>
+        <div class="sky">
+          <canvas id="view" aria-label="Rotatable globe coloured by yearly surface temperature anomaly"></canvas>
+          <canvas id="annotation" aria-hidden="true"></canvas>
+          <p id="status" role="status">Opening the temperature record…</p>
+          <p id="error" role="alert" hidden></p>
+          <div class="display"><output id="display-year">2025</output><span>Annual anomaly</span></div>
+        </div>
+        <figcaption><div><b>Relative to 1951–1980</b><span>Slate shows missing data</span></div><div class="bar"><span>−3 °C</span><span>0</span><span>+3 °C</span></div></figcaption>
+      </figure>
+      <aside>
+        <fieldset id="tools" disabled>
+          <legend>Year</legend>
+          <div class="timeline">
+            <label for="year">Browse the record</label><output id="year-control" for="year">2025</output>
+            <input id="year" type="range" min="1880" max="2025" step="1" value="2025">
+          </div>
+          <div class="buttons">
+            <button id="previous" type="button">Previous year</button>
+            <button id="play" type="button" aria-pressed="false">Play years</button>
+          </div>
+          <div class="actions"><button id="beginning" type="button">1880</button><button id="today" type="button">2025</button><button id="reset" type="button">Reset view</button></div>
+          <div class="checks"><label><input id="coast" type="checkbox" checked>Coastlines</label><label><input id="grid" type="checkbox" checked>Latitude and longitude grid</label></div>
+        </fieldset>
+        <dl>
+          <div><dt>Selected place</dt><dd><output id="selected">Tap the globe</output></dd></div>
+          <div><dt>Cell anomaly</dt><dd><output id="reading">—</output></dd></div>
+          <div><dt>Grid coverage</dt><dd><output id="coverage">—</output></dd></div>
+        </dl>
+        <p id="data-status" role="status"></p>
+      </aside>
+    </section>
+    <footer>NASA GISS/GISTEMP v4 · 2° land and ocean grid · Made with Natural Earth<br><a href="./source/README.md">Source data and units</a></footer>
+  </main>
+</body>
+</html>

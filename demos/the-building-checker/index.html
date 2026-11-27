@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-4b5b8693.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f1eee5">
+  <meta name="description" content="Open issue viewpoints inside an IFC archive and run the real door information checks.">
+  <title>The Building Checker · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/archive-4KBpPu11.mesh" as="fetch" crossorigin>
+  <link rel="preload" href="./assets/issues-D5QPTnbR.bcf" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-DPwn9Pgr.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CHLsG5NN.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Building Checker</h1>
+      <p>Inspect two door issues in a cutaway archive, then run the information checks against its IFC model.</p>
+    </header>
+    <section class="exhibit" aria-label="Archive model and door information checks">
+      <figure>
+        <canvas id="view" aria-label="Kestrel Archive Annex with highlighted door issues"></canvas>
+        <figcaption><span class="archive-name">Kestrel Archive Annex</span><span id="view-name">Building overview</span></figcaption>
+        <div id="status" role="status"><strong>Opening the archive…</strong><span id="detail"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Door issues">
+        <div class="summary"><h2>Door issues</h2><span id="summary">—</span></div>
+        <div id="issues">
+          <button type="button" class="issue" disabled><b>Ground archive</b><span>Fire rating</span></button>
+          <button type="button" class="issue" disabled><b>Mezzanine study</b><span>Self-closing</span></button>
+        </div>
+        <p id="finding" role="status">Choose an issue to open its saved viewpoint.</p>
+        <div class="actions">
+          <button id="overview" type="button" disabled>Overview</button>
+          <button id="run" type="button" disabled>Run IDS checks</button>
+        </div>
+        <p id="audit" role="status">Showing the saved check results.</p>
+      </aside>
+    </section>
+    <section class="sources" aria-label="Format and model files">
+      <p>The sample rules require an EI60 fire rating entry and a true self-closing entry for all four doors.</p>
+      <details>
+        <summary>Model and references</summary>
+        <p>These rules check the information recorded in the example file. Fire testing and code compliance are outside their scope.</p>
+        <p><a href="./archive.ifc" download>IFC model</a> · <a href="./requirements.ids" download>IDS rules</a> · <a href="./issues.bcf" download>BCF issue archive</a></p>
+        <p><a href="https://www.buildingsmart.org/standards/bsi-standards/information-delivery-specification-ids/">buildingSMART IDS</a> · <a href="https://technical.buildingsmart.org/standards/bcf/">buildingSMART BCF</a> · <a href="https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcsharedbldgelements/lexical/ifcdoor.htm">IFC4 doors</a></p>
+        <p>Live IFC reading uses That Open Engine's web-ifc 0.0.78 under MPL-2.0. <a href="https://github.com/ThatOpen/engine_web-ifc/archive/4310503d8618a0870c2166f101471078d528f4c1.tar.gz">Peer source</a> · <a href="https://github.com/ThatOpen/engine_web-ifc/blob/4310503d8618a0870c2166f101471078d528f4c1/LICENSE.md">License</a></p>
+      </details>
+    </section>
+  </main>
+</body>
+</html>

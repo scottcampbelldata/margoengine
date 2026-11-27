@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Watch a jointed robot find a collision-checked route up an overhung climbing wall.">
+  <meta name="theme-color" content="#dfddd2">
+  <title>The Climbing Robot · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/light-keeper-BSxhWf_l.mesh" crossorigin>
+  <link rel="preload" as="fetch" href="./assets/opening-red-B61iajzV.pose" crossorigin>
+  <link rel="preload" as="fetch" href="./assets/opening-cell-BG1niEze.mesh" crossorigin>
+
+  <script type="module" crossorigin src="./assets/index-D4cLBqt8.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D4ZctVpl.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CACjQSmD.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Climbing Robot</h1>
+      <p>Follow the Light Keeper up an overhang. At every move the solver checks its arms against the wall and its own body.</p>
+    </header>
+    <section aria-label="Climbing robot test cell">
+      <figure>
+        <canvas id="robot" aria-label="The Light Keeper robot on a route of climbing holds"></canvas>
+        <canvas id="full-robot" aria-label="The Light Keeper robot on a route of climbing holds" aria-hidden="true"></canvas>
+        <figcaption><span>Motion lab</span><span id="state">At the wall</span></figcaption>
+        <div id="status" role="status"><strong>Opening the motion lab…</strong><span id="error"></span><a id="requirements" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="station">
+        <div class="controls" role="group" aria-label="Climbing controls">
+          <label class="route">Route
+            <select id="route" disabled>
+              <option value="red">Red · Traverse</option>
+              <option value="blue">Blue · Center</option>
+              <option value="green">Green · Face</option>
+            </select>
+          </label>
+          <button id="climb" type="button" disabled>Climb</button>
+          <button id="reset" type="button" disabled>Reset</button>
+        </div>
+        <dl><div><dt>Holds reached</dt><dd id="contacts">0</dd></div><div><dt>Arm hull gap</dt><dd id="gap">—</dd></div></dl>
+      </div>
+    </section>
+    <footer>
+      <div><p>The route is planned in simulation. Convex hulls represent the robot’s links.</p><p id="detail-note" role="status" hidden></p></div>
+      <details><summary>How the robot climbs</summary>
+        <p>The planner shifts the pelvis to keep the next hold reachable. It then moves one limb while the others stay planted. The arm solver searches for an elbow angle that clears the overhang, holds and the body.</p>
+        <p><a href="https://robotics.stanford.edu/~latombe/papers/ijrr-bretl-06/paper.pdf">Timothy Bretl on multi-limbed robot motion planning</a></p>
+      </details>
+    </footer>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Bk0S1bxT.js"><script src="./assets/inline-197d791a.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e9e2d2">
+<link rel="icon" href="data:,">
+<title>The Painting · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-CueAo-6T.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C2mkSBVz.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Painting</h1>
+    <p>A headland at the turn of the tide. Change the brush while the wind and water move.</p>
+  </header>
+  <section aria-label="Painting controls">
+    <div class="controls">
+      <fieldset>
+        <legend>Brush</legend>
+        <label><input type="radio" name="brush" value="fine" checked disabled> Fine</label>
+        <label><input type="radio" name="brush" value="broad" disabled> Broad</label>
+        <label><input type="radio" name="brush" value="plain" disabled> Unfiltered</label>
+      </fieldset>
+      <button id="motion" type="button" disabled>Pause motion</button>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="An animated oil-painted seascape with a wind-bent pine, ochre cliffs and moving surf."></canvas>
+        <div id="notice"><p id="status" role="status">Opening the headland…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption><p id="detail">Fine marks hold the edges of grass and stone.</p><span id="renderer"></span></figcaption>
+    </figure>
+  </section>
+</main>
+</body>
+</html>

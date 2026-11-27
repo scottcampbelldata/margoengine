@@ -1,0 +1,40 @@
+{
+  "dataset": "Planetary Systems Composite Parameters (PSCompPars)",
+  "provider": "NASA Exoplanet Archive, NExScI/Caltech",
+  "doi": "10.26133/NEA13",
+  "snapshotDate": "2026-11-27",
+  "url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+  "query": "select pl_name,disc_year,discoverymethod,pl_orbper,pl_rade,pl_orbpererr1,pl_orbpererr2,pl_radeerr1,pl_radeerr2 from pscomppars where disc_year between 1992 and 2024 order by disc_year,pl_name",
+  "sourceSha256": "5163b0c03bf63627d170c140007ee9638e7ddad58050c388a19fefbe8ddbe45d",
+  "rowCount": 5844,
+  "metrics": {
+    "filename": "planets.bin",
+    "sha256": "2ebf8a0ba9d3ad94d771bac25baa3b6bf08402607180d26ebe975b2d110b1e5d",
+    "bytes": 47886,
+    "fields": [
+      "discoveryYear",
+      "methodIndex",
+      "periodDays",
+      "radiusEarth"
+    ]
+  },
+  "details": {
+    "filename": "detail.bin",
+    "sha256": "73f18213ec86335ac3e743c34d15a91b379a7f3f6485bacab834c3884b63b264",
+    "bytes": 65192,
+    "fields": [
+      "name",
+      "discoveryMethod",
+      "periodUpper",
+      "periodLower",
+      "radiusUpper",
+      "radiusLower"
+    ]
+  },
+  "methods": [
+    "Transit",
+    "Radial Velocity",
+    "Other"
+  ],
+  "missing": "null"
+}

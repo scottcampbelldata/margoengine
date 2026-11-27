@@ -1,0 +1,24 @@
+:root{color-scheme:light;--paper:#ece8df;--ink:#242824;--muted:#595d55;--edge:#bdb9ae;--light:#d9dbcd;--warm:#7a4936;font-family:"Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink)}main{max-width:1296px;margin:auto;padding:0 42px}nav{height:62px;border-bottom:1px solid var(--edge);display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}nav a{color:var(--ink);text-decoration:none;font-weight:680}nav a span{color:var(--warm);margin-right:5px}
+header{display:flex;justify-content:space-between;align-items:end;gap:28px;padding:22px 0 24px}
+h1,h2,p,figure,dl,dd{margin:0}h1{font:400 clamp(42px,7.6vw,92px)/.96 Georgia,serif;letter-spacing:-.065em}header p{font-size:clamp(13px,1.55vw,18px);line-height:1.35;color:var(--muted);max-width:23ch}
+#exhibit{border:1px solid #aaa69b;background:#e4e2d8}.frame{position:relative;height:clamp(410px,41.6vw,521px);background:#172320}canvas{display:block;width:100%;height:100%}
+.bay-labels{position:absolute;pointer-events:none;top:0;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;color:#f0e5cb;font:650 11px/1 ui-monospace,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em}.bay-labels span{background:#172220f0;padding:12px 14px;align-self:start;width:max-content;max-width:100%}.bay-labels span:nth-child(2){justify-self:end}
+.bay-labels::after{content:"";position:absolute;top:0;bottom:0;left:50%;border-left:1px solid #b9b6a977}
+#status{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 15px;background:#172320;color:#ffedcd;font-size:13px;width:max-content;max-width:85%}
+#status:empty{display:none}
+.controls{display:grid;grid-template-columns:1fr .48fr;gap:30px;padding:14px 18px 15px;border-bottom:1px solid var(--edge);background:#dedfd3}
+.field{display:flex;justify-content:space-between;font-size:13px;font-weight:650;white-space:nowrap}
+.field output{font:650 15px ui-monospace,Consolas,monospace;letter-spacing:-.05em}
+input[type=range]{width:100%;height:34px;margin:4px 0 0;accent-color:#455d4b;cursor:ew-resize}.endpoints{display:flex;justify-content:space-between;color:var(--muted);font:11px ui-monospace,Consolas,monospace}
+.switch{display:flex;gap:4px;margin-top:6px}.switch button{flex:1;min-height:34px;padding:4px 9px;white-space:nowrap;font:650 12px "Segoe UI",Arial,sans-serif;border:1px solid #9eab9d;background:transparent;color:var(--ink);cursor:pointer}.switch button[aria-pressed=true]{background:#344735;border-color:#344735;color:#f4f1e7}.switch button:hover:not([aria-pressed=true]){background:#cdd2c3}.switch button:disabled{opacity:.55;cursor:default}.mode p{color:var(--muted);font-size:11px;margin-top:5px}
+.readings{display:grid;grid-template-columns:1fr 1fr}.readings section{padding:15px 18px}.readings section+section{border-left:1px solid var(--edge)}.readings h2{font-size:15px;line-height:1.2}.readings h2 span{display:inline-block;color:#6b4a3d;font:650 12px ui-monospace,monospace;margin-right:4px}.readings dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:11px 0 8px}.readings dt{font-size:12px;color:var(--muted)}.readings dd{font:600 11px ui-monospace,Consolas,monospace;line-height:1.3;white-space:nowrap}.readings dd output{font-size:25px;letter-spacing:-.08em;font-variant-numeric:tabular-nums}.readings p{font-size:11px;color:var(--muted)}
+footer{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding:18px 0 27px;color:var(--muted);font-size:13px;line-height:1.5}footer summary{color:var(--ink);cursor:pointer;font-weight:650}footer details p{margin-top:7px}footer a{color:#375246}
+a:focus-visible,summary:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid #375246;outline-offset:3px}
+@media(max-width:720px){
+  main{padding-inline:16px}nav{height:48px}header{display:block;padding:19px 0 15px}h1{font-size:clamp(37px,11.1vw,74px)}header p{max-width:none;margin-top:7px}
+  .frame{height:clamp(218px,64vw,365px)}.bay-labels span{padding:8px;font-size:8px;letter-spacing:.02em}
+  .controls{grid-template-columns:1fr;gap:10px;padding:11px 10px}.mode{display:grid;grid-template-columns:1fr 1.58fr;column-gap:3px;align-items:center}.mode .switch{margin-top:0}.mode p{grid-column:1/-1}.switch button{min-height:44px;padding:4px 5px;font-size:11px}
+  .readings section{padding:10px 9px 11px}.readings h2{font-size:12px}.readings h2 span{font-size:10px}.readings dl{gap:4px;grid-template-columns:1fr 1.12fr}.readings dd output{font-size:21px}.readings dt,.readings p{font-size:10px}
+  footer{grid-template-columns:1fr;gap:9px;padding-top:12px}
+}

@@ -1,0 +1,325 @@
+async function e(e){e?.throwIfAborted(),await new Promise(e=>setTimeout(e,0)),e?.throwIfAborted()}function t(e,t,n,r,i=!0){if(!Number.isFinite(e)||e<t||e>n||i&&!Number.isSafeInteger(e))throw RangeError(`${r} must be ${i?`an integer`:`a number`} from ${t} to ${n}`);return e}var n=e=>Math.round(Math.max(0,Math.min(1,e))*255);function r(e,t,n,r){if(!(n instanceof Float32Array)||!n.length||n.length%3)throw RangeError(`${e} ${t} positions must hold 3 floats per vertex; pass at least one`);for(let r of n)if(!Number.isFinite(r)||Math.abs(r)>1e7)throw RangeError(`${e} ${t} positions must be finite within +-10,000,000`);let i=n.length/3,a;if(r===void 0)a=Uint32Array.from({length:i},(e,t)=>t);else if(r instanceof Uint32Array||r instanceof Uint16Array)a=Uint32Array.from(r);else throw TypeError(`${e} ${t} indices must be a Uint32Array or Uint16Array`);if(!a.length||a.length%3)throw RangeError(`${e} ${t} needs three indices per triangle; pass at least one triangle`);for(let n of a)if(n>=i)throw RangeError(`${e} ${t} index ${n} is past the last vertex; pass indices below the vertex count`);return{p:n.slice(),ix:a}}function i(e,t,n,r){let i=new Int32Array(n*r).fill(-1),a=new Float32Array(n*r*2),o=new Float32Array(n*r).fill(1/0),s=new Uint8Array(n*r),c=0,l=0,u=[0,0,0],d=[0,0,0],f=.001;for(let p=0;p<t.length/3;p++){for(let i=0;i<3;i++)u[i]=e[t[p*3+i]*2]*n,d[i]=e[t[p*3+i]*2+1]*r;let m=(u[1]-u[0])*(d[2]-d[0])-(d[1]-d[0])*(u[2]-u[0]);if(!(Math.abs(m)>1e-9)){l++;continue}let h=m>0?1:-1,g=(e,t,n)=>{let r=e,i=(e+1)%3;return h*((u[i]-u[r])*(n-d[r])-(d[i]-d[r])*(t-u[r]))},_=[0,1,2].map(e=>{let t=u[(e+1)%3]-u[e],n=d[(e+1)%3]-d[e];return .5*(Math.abs(t)+Math.abs(n))-f*Math.hypot(t,n)}),v=1e-7*Math.abs(m),y=Math.max(0,Math.floor(Math.min(...u)+f)),b=Math.min(n-1,Math.ceil(Math.max(...u)-f)-1),x=Math.max(0,Math.floor(Math.min(...d)+f)),S=Math.min(r-1,Math.ceil(Math.max(...d)-f)-1);for(let e=x;e<=S;e++)for(let t=y;t<=b;t++){let r=t+.5,l=e+.5,f=g(0,r,l),h=g(1,r,l),y=g(2,r,l);if(f+_[0]<=0||h+_[1]<=0||y+_[2]<=0)continue;let b=e*n+t,x,S,C;if(f>=-v&&h>=-v&&y>=-v)x=Math.max(0,y)/Math.abs(m),S=Math.max(0,f)/Math.abs(m),C=0,f>v&&h>v&&y>v&&(s[b]&&c++,s[b]=1);else{C=1/0,x=S=0;for(let e=0;e<3;e++){let t=e,n=(e+1)%3,i=u[n]-u[t],a=d[n]-d[t],o=Math.max(0,Math.min(1,((r-u[t])*i+(l-d[t])*a)/(i*i+a*a))),s=u[t]+o*i-r,c=d[t]+o*a-l,f=s*s+c*c;if(f<C){C=f;let e=[0,0,0];e[t]=1-o,e[n]=o,x=e[1],S=e[2]}}C=Math.sqrt(C)}C<o[b]&&(o[b]=C,i[b]=p,a[b*2]=x,a[b*2+1]=S)}}return{tri:i,bary:a,dist:o,strict:s,overlaps:c,degenerate:l}}function a(e,t,n,r,i,a){for(let o=0;o<a;o++){let a=n.slice();for(let o=0;o<i;o++)for(let s=0;s<r;s++){if(n[o*r+s])continue;let c=[];for(let e=-1;e<=1;e++)for(let t=-1;t<=1;t++){let a=s+t,l=o+e;a>=0&&l>=0&&a<r&&l<i&&n[l*r+a]&&c.push(l*r+a)}let l=c.length;l&&(a[o*r+s]=1,e.forEach((e,n)=>{let i=t[n];for(let t=0;t<i;t++){let n=0;for(let r of c)n+=e[r*i+t];e[(o*r+s)*i+t]=n/l}}))}n.set(a)}}function o(e,n,a,o){if(n.signal?.throwIfAborted(),n.radiometry!==void 0&&n.radiometry!==`legacy`&&n.radiometry!==`physical`)throw TypeError(`${a} radiometry must be 'legacy' or 'physical'`);let s=(e,n,r,i,o)=>t(e,n,r,`${a} ${i}`,o),c=s(n.width??256,1,2048,`width`),l=s(n.height??c,1,2048,`height`),u=s(n.dilate??2,0,16,`dilate`),d=s(n.aoDistance??4,.001,1e6,`aoDistance`,!1),f=s(n.bias??.001,0,1,`bias`,!1),p=s(n.seed??0,0,4294967295,`seed`),m=s(n.maxSamples??1048576,1,4194304,`maxSamples`),h=s(n.maxRays??16777216,1,67108864,`maxRays`),g=s(n.maxBytes??201326592,1,268435456,`maxBytes`),{p:_,ix:v}=r(a,`mesh`,e?.positions,e?.indices),y=_.length/3;if(!(e.uv1 instanceof Float32Array)||e.uv1.length!==y*2)throw RangeError(`${a} uv1 must hold 2 floats per vertex; pass the mesh TEXCOORD_1`);let b=e.uv1.slice();for(let e of b)if(!(e>=0&&e<=1))throw RangeError(`${a} uv1 values must be 0 to 1; repack the lightmap UVs`);let x;if(e.normals!==void 0){if(!(e.normals instanceof Float32Array)||e.normals.length!==y*3)throw RangeError(`${a} normals must hold 3 floats per vertex; match the vertex count`);for(let t of e.normals)if(!Number.isFinite(t))throw RangeError(`${a} normals must be finite; fix the mesh normals`);x=e.normals.slice()}let S=(n.occluders??[]).map((e,t)=>r(a,`occluder ${t}`,e?.positions,e?.indices)),C=structuredClone([...n.lights??[]]),w=v.length/3,T=w,E=y;for(let e of S)T+=e.ix.length/3,E+=e.p.length/3;let D=c*l,O=D*45+T*160+E*12+262144;if(O>g)throw RangeError(`${a} needs about ${O} bytes, over maxBytes; bake less`);let k=i(b,v,c,l),A=0;for(let e=0;e<D;e++)k.tri[e]>=0&&A++;if(A>m)throw RangeError(`${a} covers ${A} texels, over maxSamples; lower the size or raise it`);let j=A*o(C);if(j>h)throw RangeError(`${a} needs ${j} rays, over maxRays; lower the rays or the size`);let M=new Float32Array(E*3),N=new Uint32Array(T*3);M.set(_),N.set(v);let P=y,F=v.length;for(let e of S){M.set(e.p,P*3);for(let t=0;t<e.ix.length;t++)N[F+t]=e.ix[t]+P;P+=e.p.length/3,F+=e.ix.length}let I=new Int32Array(A),L=new Float32Array(A*3),R=new Float32Array(A*3),z=new Uint32Array(A),B=(e,t,n,r)=>r[v[e*3+t]*3+n];for(let e=0,t=0;e<D;e++){let n=k.tri[e];if(n<0)continue;let r=k.bary[e*2],i=k.bary[e*2+1],a=1-r-i,o=[0,1,2].map(e=>B(n,1,e,_)-B(n,0,e,_)),s=[0,1,2].map(e=>B(n,2,e,_)-B(n,0,e,_)),c=[o[1]*s[2]-o[2]*s[1],o[2]*s[0]-o[0]*s[2],o[0]*s[1]-o[1]*s[0]];if(x){let e=[0,1,2].map(e=>a*B(n,0,e,x)+r*B(n,1,e,x)+i*B(n,2,e,x));Math.hypot(...e)>1e-10&&(c=e)}let l=Math.hypot(...c)||1;I[t]=e,z[t]=n;for(let e=0;e<3;e++)L[t*3+e]=a*B(n,0,e,_)+r*B(n,1,e,_)+i*B(n,2,e,_),R[t*3+e]=c[e]/l;t++}return{width:c,height:l,physical:n.radiometry===`physical`,dilate:u,bias:f,aoDistance:d,seed:p,lights:C,covered:I,points:L,normals:R,owner:z,positions:M,indices:N,meshTriangles:w,occluderTriangles:S.map(e=>e.ix.length/3),triangle:k.tri,overlaps:k.overlaps,degenerate:k.degenerate}}function s(e,t,r,i){let{width:o,height:s,covered:c}=e,l=o*s,u=new Float32Array(l*3),d=new Float32Array(l),f=new Uint8Array(l);c.forEach((e,n)=>{f[e]=1,d[e]=r[n];for(let r=0;r<3;r++)u[e*3+r]=t[n*3+r]}),a([u,d],[3,1],f,o,s,e.dilate);let p=1;for(let e of u){if(!Number.isFinite(e))throw RangeError(`Lightmap lighting overflow; lower the light intensity`);p=Math.max(p,e)}let m=new Uint8Array(l*4),h=new Uint8Array(l*4);for(let e=0;e<l;e++)if(f[e]){for(let t=0;t<3;t++)m[e*4+t]=n(u[e*3+t]/p),h[e*4+t]=n(d[e]);m[e*4+3]=h[e*4+3]=255}return{width:o,height:s,lightmap:m,ao:h,irradiance:u,triangle:e.triangle,lightmapScale:p,samples:c.length,rays:i,overlaps:e.overlaps,degenerate:e.degenerate,...e.physical?{radiometry:`physical`}:{}}}const c=2147483648;function l(e={}){let{maxLeafTriangles:t=8,maxDepth:n=40,bins:r=32,strategy:i=`sah`}=e;if(!Number.isInteger(t)||t<1||t>65536)throw RangeError(`maxLeafTriangles must be an integer in 1..65536`);if(!Number.isInteger(n)||n<1||n>64)throw RangeError(`maxDepth must be an integer in 1..64`);if(!Number.isInteger(r)||r<4||r>256)throw RangeError(`bins must be an integer in 4..256`);if(i!==`sah`&&i!==`center`)throw TypeError(`strategy must be sah or center`);return{maxLeafTriangles:t,maxDepth:n,bins:r,strategy:i}}const u=/* @__PURE__ */ new Float32Array(1),d=new Int32Array(u.buffer);function f(e){let t=Math.fround(e);return t<=e||t!==t?t:t===0?-1401298464324817e-60:(u[0]=t,d[0]+=t>0?-1:1,u[0])}function p(e){let t=Math.fround(e);return t>=e||t!==t?t:t===0?1401298464324817e-60:(u[0]=t,d[0]+=t>0?1:-1,u[0])}function m(e,t,n,r=!1){if(!Number.isInteger(t)||t<3)throw RangeError(`stride must be an integer >= 3`);let i=e.length>=3?Math.floor((e.length-3)/t)+1:0,a=n?n.length:i;if(!a||a%3)throw RangeError(`Expected at least one triangle`);if(n||r)for(let o=0;o<a;o++){let a=n?n[o]:o;if(!(a>=0&&a<i)||a!==Math.floor(a))throw RangeError(`Index exceeds vertices; keep every index below the vertex count`);r&&h(e[a*t],e[a*t+1],e[a*t+2])}return a/3}function h(e,t,n){if(!Number.isFinite(e)||!Number.isFinite(t)||!Number.isFinite(n))throw RangeError(`Positions must be finite`)}function g(e,t,n,r={}){let{maxLeafTriangles:i,maxDepth:a,bins:o,strategy:s}=l(r),c=m(e,t,n),u=new Float32Array(c*6),d=new Uint32Array(c);for(let r=0;r<c;r++){let i=(n?n[r*3]:r*3)*t,a=(n?n[r*3+1]:r*3+1)*t,o=(n?n[r*3+2]:r*3+2)*t;for(let t=0;t<3;t++){let n=e[i+t],s=e[a+t],c=e[o+t];h(n,s,c),u[r*6+t]=f(n<s?n<c?n:c:s<c?s:c),u[r*6+3+t]=p(n>s?n>c?n:c:s>c?s:c)}d[r]=r}let g=new _(u,d,o,i,a,s);g.measure(0,c,0),g.subdivide(g.allocate(),0,c,0,0);let v=new Uint32Array(c*3);for(let e=0;e<c;e++){let t=d[e];n?(v[e*3]=n[t*3],v[e*3+1]=n[t*3+1],v[e*3+2]=n[t*3+2]):(v[e*3]=t*3,v[e*3+1]=t*3+1,v[e*3+2]=t*3+2)}return{nodes:g.buffer.slice(0,g.count*8*4),index:v,triangles:d}}var _=class{constructor(e,t,n,r,i,a){this.boxes=e,this.order=t,this.bins=n,this.maxLeafTriangles=r,this.maxDepth=i,this.count=0;let o=t.length;this.capacity=Math.max(1,Math.ceil(o/Math.max(1,r>>1))*2),this.buffer=/* @__PURE__ */ new ArrayBuffer(this.capacity*8*4),this.f32=new Float32Array(this.buffer),this.u32=new Uint32Array(this.buffer),this.binBoxes=new Float64Array(3*n*6),this.binCounts=new Int32Array(3*n),this.rightArea=new Float64Array(n),this.rightCount=new Int32Array(n),this.last=n-1,this.sah=a===`sah`,this.stack=new Float64Array((i+2)*24)}allocate(){if(this.count===this.capacity){this.capacity*=2;let e=/* @__PURE__ */ new ArrayBuffer(this.capacity*8*4);new Uint32Array(e).set(this.u32),this.buffer=e,this.f32=new Float32Array(e),this.u32=new Uint32Array(e)}return this.count++}measure(e,t,n){let r=this.boxes,i=this.stack,a=1/0,o=1/0,s=1/0,c=-1/0,l=-1/0,u=-1/0,d=1/0,f=1/0,p=1/0,m=-1/0,h=-1/0,g=-1/0;for(let n=e*6,i=t*6;n<i;n+=6){let e=r[n],t=r[n+1],i=r[n+2],_=r[n+3],v=r[n+4],y=r[n+5];e<a&&(a=e),t<o&&(o=t),i<s&&(s=i),_>c&&(c=_),v>l&&(l=v),y>u&&(u=y);let b=e+_,x=t+v,S=i+y;b<d&&(d=b),b>m&&(m=b),x<f&&(f=x),x>h&&(h=x),S<p&&(p=S),S>g&&(g=S)}i[n]=a,i[n+1]=o,i[n+2]=s,i[n+3]=c,i[n+4]=l,i[n+5]=u,i[n+6]=d,i[n+7]=f,i[n+8]=p,i[n+9]=m,i[n+10]=h,i[n+11]=g}subdivide(e,t,n,r,i){let{boxes:a,stack:o,binBoxes:s,binCounts:l,rightArea:u,rightCount:d,order:f,maxLeafTriangles:p,maxDepth:m,sah:h,f32:g,u32:_}=this,y=o[i],b=o[i+1],x=o[i+2],S=o[i+3],C=o[i+4],w=o[i+5],T=o[i+6],E=o[i+7],D=o[i+8],O=o[i+9],k=o[i+10],A=o[i+11],j=e*8,M=n-t;if(g[j]=y,g[j+1]=b,g[j+2]=x,g[j+3]=S,g[j+4]=C,g[j+5]=w,M<=p||r>=m){_[j+6]=t,_[j+7]=M;return}let N=O-T,P=k-E,F=A-D,I=M<this.bins?Math.max(4,M):this.bins,L=I-1,R=-1,z=0,B=0,V=0;if(h){l.fill(0,0,I*3);for(let e=0,t=I*18;e<t;e+=6)s[e]=s[e+1]=s[e+2]=1/0,s[e+3]=s[e+4]=s[e+5]=-1/0;let e=N>0?I/N:0,r=P>0?I/P:0,i=F>0?I/F:0,o=I*6,c=I*12;for(let u=t*6,d=n*6;u<d;u+=6){let t=a[u],n=a[u+1],d=a[u+2],f=a[u+3],p=a[u+4],m=a[u+5],h,g;e&&(h=(t+f-T)*e|0,h>L&&(h=L),g=h*6,l[h]++,t<s[g]&&(s[g]=t),n<s[g+1]&&(s[g+1]=n),d<s[g+2]&&(s[g+2]=d),f>s[g+3]&&(s[g+3]=f),p>s[g+4]&&(s[g+4]=p),m>s[g+5]&&(s[g+5]=m)),r&&(h=(n+p-E)*r|0,h>L&&(h=L),g=o+h*6,l[I+h]++,t<s[g]&&(s[g]=t),n<s[g+1]&&(s[g+1]=n),d<s[g+2]&&(s[g+2]=d),f>s[g+3]&&(s[g+3]=f),p>s[g+4]&&(s[g+4]=p),m>s[g+5]&&(s[g+5]=m)),i&&(h=(d+m-D)*i|0,h>L&&(h=L),g=c+h*6,l[2*I+h]++,t<s[g]&&(s[g]=t),n<s[g+1]&&(s[g+1]=n),d<s[g+2]&&(s[g+2]=d),f>s[g+3]&&(s[g+3]=f),p>s[g+4]&&(s[g+4]=p),m>s[g+5]&&(s[g+5]=m))}let f=1/0;for(let t=0;t<3;t++){if((t===0?e:t===1?r:i)===0)continue;let n=1/0,a=1/0,o=1/0,c=-1/0,p=-1/0,m=-1/0,h=0;for(let e=L;e>0;e--){let r=t*I+e,i=r*6;l[r]&&(h+=l[r],s[i]<n&&(n=s[i]),s[i+1]<a&&(a=s[i+1]),s[i+2]<o&&(o=s[i+2]),s[i+3]>c&&(c=s[i+3]),s[i+4]>p&&(p=s[i+4]),s[i+5]>m&&(m=s[i+5])),d[e]=h,u[e]=h?v(n,a,o,c,p,m):0}n=a=o=1/0,c=p=m=-1/0,h=0;for(let e=1;e<I;e++){let r=t*I+e-1,i=r*6;if(l[r]&&(h+=l[r],s[i]<n&&(n=s[i]),s[i+1]<a&&(a=s[i+1]),s[i+2]<o&&(o=s[i+2]),s[i+3]>c&&(c=s[i+3]),s[i+4]>p&&(p=s[i+4]),s[i+5]>m&&(m=s[i+5])),!h||!d[e])continue;let g=v(n,a,o,c,p,m)*h+u[e]*d[e];g<f&&(f=g,R=t,V=e)}}R>=0&&(z=R===0?T:R===1?E:D,B=R===0?e:R===1?r:i)}if(R<0){R=N>=P&&N>=F?0:P>=F?1:2;let e=R===0?N:R===1?P:F;z=R===0?T:R===1?E:D,B=e>0?2/e:0,V=1}let H=(r+1)*24,U=H+12,W=t;if(B>0){let e=1/0,r=1/0,i=1/0,s=-1/0,c=-1/0,l=-1/0,u=1/0,d=1/0,p=1/0,m=-1/0,h=-1/0,g=-1/0,_=1/0,v=1/0,y=1/0,b=-1/0,x=-1/0,S=-1/0,C=1/0,w=1/0,T=1/0,E=-1/0,D=-1/0,O=-1/0,k=t,A=n-1;for(;k<=A;){let t=k*6,n=a[t],o=a[t+1],j=a[t+2],M=a[t+3],N=a[t+4],P=a[t+5],F=n+M,I=o+N,H=j+P,U=((R===0?F:R===1?I:H)-z)*B|0;if(U>L&&(U=L),U<V){n<e&&(e=n),o<r&&(r=o),j<i&&(i=j),M>s&&(s=M),N>c&&(c=N),P>l&&(l=P),F<u&&(u=F),F>m&&(m=F),I<d&&(d=I),I>h&&(h=I),H<p&&(p=H),H>g&&(g=H),k++;continue}n<_&&(_=n),o<v&&(v=o),j<y&&(y=j),M>b&&(b=M),N>x&&(x=N),P>S&&(S=P),F<C&&(C=F),F>E&&(E=F),I<w&&(w=I),I>D&&(D=I),H<T&&(T=H),H>O&&(O=H);let W=A*6,G=f[k];f[k]=f[A],f[A]=G,a[t]=a[W],a[t+1]=a[W+1],a[t+2]=a[W+2],a[t+3]=a[W+3],a[t+4]=a[W+4],a[t+5]=a[W+5],a[W]=n,a[W+1]=o,a[W+2]=j,a[W+3]=M,a[W+4]=N,a[W+5]=P,A--}W=k,o[H]=e,o[H+1]=r,o[H+2]=i,o[H+3]=s,o[H+4]=c,o[H+5]=l,o[H+6]=u,o[H+7]=d,o[H+8]=p,o[H+9]=m,o[H+10]=h,o[H+11]=g,o[U]=_,o[U+1]=v,o[U+2]=y,o[U+3]=b,o[U+4]=x,o[U+5]=S,o[U+6]=C,o[U+7]=w,o[U+8]=T,o[U+9]=E,o[U+10]=D,o[U+11]=O}(W===t||W===n)&&(W=t+(M>>1),this.measure(t,W,H),this.measure(W,n,U));let G=this.allocate();this.subdivide(G,t,W,r+1,H);let K=this.allocate();this.subdivide(K,W,n,r+1,U),this.u32[j+6]=K,this.u32[j+7]=c|R}};function v(e,t,n,r,i,a){let o=r-e,s=i-t,c=a-n;return o*s+s*c+c*o}function y(e,t=/* @__PURE__ */ new Float64Array(16)){let n=e[0],r=e[1],i=e[2],a=e[3],o=e[4],s=e[5],c=e[6],l=e[7],u=e[8],d=e[9],f=e[10],p=e[11],m=e[12],h=e[13],g=e[14],_=e[15],v=n*s-r*o,y=n*c-i*o,b=n*l-a*o,x=r*c-i*s,S=r*l-a*s,C=i*l-a*c,w=u*h-d*m,T=u*g-f*m,E=u*_-p*m,D=d*g-f*h,O=d*_-p*h,k=f*_-p*g,A=v*k-y*O+b*D+x*E-S*T+C*w;if(!A||!Number.isFinite(A))return null;let j=1/A;return t[0]=(s*k-c*O+l*D)*j,t[1]=(i*O-r*k-a*D)*j,t[2]=(h*C-g*S+_*x)*j,t[3]=(f*S-d*C-p*x)*j,t[4]=(c*E-o*k-l*T)*j,t[5]=(n*k-i*E+a*T)*j,t[6]=(g*b-m*C-_*y)*j,t[7]=(u*C-f*b+p*y)*j,t[8]=(o*O-s*E+l*w)*j,t[9]=(r*E-n*O-a*w)*j,t[10]=(m*S-h*b+_*v)*j,t[11]=(d*b-u*S-p*v)*j,t[12]=(s*T-o*D-c*w)*j,t[13]=(n*D-r*T+i*w)*j,t[14]=(h*y-m*x-g*v)*j,t[15]=(u*x-d*y+f*v)*j,t}const b=e=>{if(e===void 0||e===`double`)return 0;if(e===`front`)return 1;if(e===`back`)return 2;throw TypeError(`Unknown side ${String(e)}; use 'front', 'back' or 'double'`)};function x(e,t,n,r,i,a,o,s,c,l,u,d,f,p,m,h,g,_,v){let y=l-o,b=u-s,x=d-c,C=f-o,w=p-s,T=m-c,E=i*T-a*w,D=a*C-r*T,O=r*w-i*C,k=y*E+b*D+x*O;if(h===0?k===0:h===1?!(k>0):!(k<0))return S(e,t,n,r,i,a,o,s,c,l,u,d,f,p,m,h,g,_,v);let A=1/k,j=e-o,M=t-s,N=n-c,P=(j*E+M*D+N*O)*A;if(!(P>=0&&P<=1))return S(e,t,n,r,i,a,o,s,c,l,u,d,f,p,m,h,g,_,v);let F=M*x-N*b,I=N*y-j*x,L=j*b-M*y,R=(r*F+i*I+a*L)*A;if(!(R>=0&&P+R<=1))return S(e,t,n,r,i,a,o,s,c,l,u,d,f,p,m,h,g,_,v);let z=(C*F+w*I+T*L)*A;return z>=g&&z<=_&&(v[0]=z,v[1]=P,v[2]=R,v[3]=k,!0)}function S(e,t,n,r,i,a,o,s,c,l,u,d,f,p,m,h,g,_,v){let y=Math.abs(r),b=Math.abs(i),x=Math.abs(a),S=y>=b&&y>=x?0:b>=x?1:2,C=S===0?r:S===1?i:a;if(C===0)return!1;let w=S===2?0:S+1,T=w===2?0:w+1;if(C<0){let e=w;w=T,T=e}let E=(e,t,n,r)=>e===0?t:e===1?n:r,D=E(w,r,i,a)/C,O=E(T,r,i,a)/C,k=E(S,o-e,s-t,c-n),A=E(S,l-e,u-t,d-n),j=E(S,f-e,p-t,m-n),M=E(w,o-e,s-t,c-n)-D*k,N=E(T,o-e,s-t,c-n)-O*k,P=E(w,l-e,u-t,d-n)-D*A,F=E(T,l-e,u-t,d-n)-O*A,I=E(w,f-e,p-t,m-n)-D*j,L=E(T,f-e,p-t,m-n)-O*j,R=I*F-L*P,z=M*L-N*I,B=P*N-F*M;if((R<0||z<0||B<0)&&(R>0||z>0||B>0))return!1;let V=R+z+B;if(h===0?V===0:h===1?!(V>0):!(V<0))return!1;let H=(R*k+z*A+B*j)/V/C;return H>=g&&H<=_&&(v[0]=H,v[1]=z/V,v[2]=B/V,v[3]=V,!0)}function C(e,t,n,r,i,a,o,s,c,l,u,d,f){let p=o-r,m=s-i,h=c-a,g=l-r,_=u-i,v=d-a,y=e-r,b=t-i,x=n-a,S=p*y+m*b+h*x,C=g*y+_*b+v*x,w,T,E;if(S<=0&&C<=0)w=1,T=0,E=0;else{let r=e-o,i=t-s,a=n-c,f=p*r+m*i+h*a,y=g*r+_*i+v*a;if(f>=0&&y<=f)w=0,T=1,E=0;else{let r=S*y-f*C;if(r<=0&&S>=0&&f<=0){let e=S-f,t=e>0?S/e:0;w=1-t,T=t,E=0}else{let i=e-l,a=t-u,o=n-d,s=p*i+m*a+h*o,c=g*i+_*a+v*o;if(c>=0&&s<=c)w=0,T=0,E=1;else{let e=s*C-S*c;if(e<=0&&C>=0&&c<=0){let e=C-c,t=e>0?C/e:0;w=1-t,T=0,E=t}else{let t=f*c-s*y;if(t<=0&&y-f>=0&&s-c>=0){let e=y-f+(s-c),t=e>0?(y-f)/e:0;w=0,T=1-t,E=t}else{let n=t+e+r;if(n>0){let t=e/n,i=r/n;w=1-t-i,T=t,E=i}else w=1,T=0,E=0}}}}}}let D=w*r+T*o+E*l,O=w*i+T*s+E*u,k=w*a+T*c+E*d;f[0]=D,f[1]=O,f[2]=k,f[3]=w,f[4]=T,f[5]=E;let A=D-e,j=O-t,M=k-n;return A*A+j*j+M*M}const w=/* @__PURE__ */ new Float64Array(12),T=/* @__PURE__ */ new Float64Array(18),E=/* @__PURE__ */ new Float64Array(9),D=/* @__PURE__ */ new Float64Array(9);function O(e,t,n){let r=e*w[0]+t*w[1]+n*w[2],i=e*w[3]+t*w[4]+n*w[5],a=e*w[6]+t*w[7]+n*w[8],o=w[9]*Math.abs(e)+w[10]*Math.abs(t)+w[11]*Math.abs(n);return!(Math.min(r,i,a)>o||Math.max(r,i,a)<-o)}function k(e,t,n){let r=e*T[0]+t*T[1]+n*T[2],i=e*T[3]+t*T[4]+n*T[5],a=e*T[6]+t*T[7]+n*T[8],o=e*T[9]+t*T[10]+n*T[11],s=e*T[12]+t*T[13]+n*T[14],c=e*T[15]+t*T[16]+n*T[17];return Math.max(r,i,a)<Math.min(o,s,c)||Math.max(o,s,c)<Math.min(r,i,a)}function A(e,t,n,r,i,a,o){let s=(t+i)*.5,c=(n+a)*.5,l=(r+o)*.5,u=(i-t)*.5,d=(a-n)*.5,f=(o-r)*.5,p=e[0]-s,m=e[1]-c,h=e[2]-l,g=e[3]-s,_=e[4]-c,v=e[5]-l,y=e[6]-s,b=e[7]-c,x=e[8]-l;if(Math.min(p,g,y)>u||Math.max(p,g,y)<-u||Math.min(m,_,b)>d||Math.max(m,_,b)<-d||Math.min(h,v,x)>f||Math.max(h,v,x)<-f)return!1;let S=g-p,C=_-m,T=v-h,E=y-g,D=b-_,k=x-v,A=p-y,j=m-b,M=h-x,N=C*k-T*D,P=T*E-S*k,F=S*D-C*E,I=N*p+P*m+F*h,L=u*Math.abs(N)+d*Math.abs(P)+f*Math.abs(F);return I>L||I<-L?!1:(w[0]=p,w[1]=m,w[2]=h,w[3]=g,w[4]=_,w[5]=v,w[6]=y,w[7]=b,w[8]=x,w[9]=u,w[10]=d,w[11]=f,O(0,-T,C)&&O(0,-k,D)&&O(0,-M,j)&&O(T,0,-S)&&O(k,0,-E)&&O(M,0,-A)&&O(-C,S,0)&&O(-D,E,0)&&O(-j,A,0))}function j(e,t,n,r){let i=e[t],a=e[t+1],o=e[t+2],s=e[t+3],c=e[t+4],l=e[t+5],u=e[t+6],d=e[t+7],f=e[t+8],p=n[r],m=n[r+1],h=n[r+2],g=n[r+3],_=n[r+4],v=n[r+5],y=n[r+6],b=n[r+7],x=n[r+8];if(Math.max(i,s,u)<Math.min(p,g,y)||Math.max(p,g,y)<Math.min(i,s,u)||Math.max(a,c,d)<Math.min(m,_,b)||Math.max(m,_,b)<Math.min(a,c,d)||Math.max(o,l,f)<Math.min(h,v,x)||Math.max(h,v,x)<Math.min(o,l,f))return!1;let S=E,C=D;S[0]=s-i,S[1]=c-a,S[2]=l-o,S[3]=u-s,S[4]=d-c,S[5]=f-l,S[6]=i-u,S[7]=a-d,S[8]=o-f,C[0]=g-p,C[1]=_-m,C[2]=v-h,C[3]=y-g,C[4]=b-_,C[5]=x-v,C[6]=p-y,C[7]=m-b,C[8]=h-x,T[0]=i,T[1]=a,T[2]=o,T[3]=s,T[4]=c,T[5]=l,T[6]=u,T[7]=d,T[8]=f,T[9]=p,T[10]=m,T[11]=h,T[12]=g,T[13]=_,T[14]=v,T[15]=y,T[16]=b,T[17]=x;let w=S[1]*S[5]-S[2]*S[4],O=S[2]*S[3]-S[0]*S[5],A=S[0]*S[4]-S[1]*S[3],j=C[1]*C[5]-C[2]*C[4],M=C[2]*C[3]-C[0]*C[5],N=C[0]*C[4]-C[1]*C[3];if(k(w,O,A)||k(j,M,N))return!1;for(let e=0;e<9;e+=3){let t=S[e],n=S[e+1],r=S[e+2];for(let e=0;e<9;e+=3){let i=C[e],a=C[e+1],o=C[e+2];if(k(n*o-r*a,r*i-t*o,t*a-n*i))return!1}}for(let e=0;e<9;e+=3)if(k(O*S[e+2]-A*S[e+1],A*S[e]-w*S[e+2],w*S[e+1]-O*S[e])||k(M*C[e+2]-N*C[e+1],N*C[e]-j*C[e+2],j*C[e+1]-M*C[e]))return!1;return!0}function M(e,t,n,r,i,a,o,s,c,l,u){for(let d=0;d<t*4;d+=4){let t=e[d],f=e[d+1],p=e[d+2],m=e[d+3];if(t*n+f*r+p*i+m<0&&t*a+f*o+p*s+m<0&&t*c+f*l+p*u+m<0)return!0}return!1}function N(e,t,n,r,i,a=0){i[a]=e[0]*t+e[4]*n+e[8]*r+e[12],i[a+1]=e[1]*t+e[5]*n+e[9]*r+e[13],i[a+2]=e[2]*t+e[6]*n+e[10]*r+e[14]}const P=/* @__PURE__ */ new Int32Array(512),F=/* @__PURE__ */ new Float64Array(512),I=/* @__PURE__ */ new Float64Array(4),L=/* @__PURE__ */ new Float64Array(6),R=/* @__PURE__ */ new Float64Array(6),z=/* @__PURE__ */ new Float64Array(9),B=1e-7,V=1213612630,H=e=>!!e&&e.vertices instanceof Float32Array&&e.indices instanceof Uint32Array;function U(e){if(H(e))return{positions:e.vertices,stride:6,normals:e.vertices,normalStride:6,normalOffset:3};if(!e||!e.positions)throw TypeError(`Expected a Geometry or {positions, indices}`);let t=e.stride??3,n=e.precision??`float32`;if(n!==`float32`&&n!==`float64`)throw TypeError(`Triangle source precision ${String(n)} is invalid; use 'float32' or 'float64'.`);let r=n===`float64`?Float64Array:Float32Array,i=e.positions instanceof r?e.positions:r.from(e.positions),a=e.normals?e.normals instanceof Float32Array?e.normals:Float32Array.from(e.normals):null;if(a&&i.length>=3&&a.length<Math.floor((i.length-3)/t)*t+3)throw RangeError(`normals are shorter than positions; supply one normal per vertex`);return{positions:i,stride:t,normals:a,normalStride:t,normalOffset:0}}function W(e,t){let n=e.indices;return!n||n instanceof Uint32Array?n??null:(m(t.positions,t.stride,n),Uint32Array.from(n))}var G=class e{static fromGeometry(t,n){if(!H(t))throw TypeError(`Expected Geometry`);return e.build(t,n)}static build(t,n){let r=U(t),i=W(t,r);return new e(g(r.positions,r.stride,i,n),H(t)?t:{positions:r.positions,stride:r.stride,normals:r.normals,precision:t.precision})}static deserialize(t,n){if(!t||t.version!==1)throw TypeError(`Unknown serialized BVH version; rebuild the BVH with this release and serialize it again`);return new e({nodes:t.nodes,index:t.index,triangles:t.triangles},n)}static fromArrayBuffer(t,n){if(!(t instanceof ArrayBuffer)||t.byteLength<16)throw TypeError(`Expected a BVH ArrayBuffer`);let[r,i,a,o]=new Uint32Array(t,0,4);if(r!==V||i!==1)throw TypeError(`Not a Margo Engine BVH buffer; pass the output of toArrayBuffer()`);let s=a*8*4;if(t.byteLength!==16+s+o*16)throw RangeError(`Truncated BVH buffer; re-read the whole file or serialize again`);return new e({nodes:t.slice(16,16+s),index:new Uint32Array(t,16+s,o*3),triangles:new Uint32Array(t,16+s+o*12,o)},n)}constructor(e,t){this.revision=0;let n=U(t);if(this.positions=n.positions,this.stride=n.stride,this.normals=n.normals,this.normalStride=n.normalStride,this.normalOffset=n.normalOffset,!(e.nodes instanceof ArrayBuffer)||!e.nodes.byteLength||e.nodes.byteLength%32)throw RangeError(`Invalid BVH nodes; pass the unmodified output of serialize()`);if(!(e.index instanceof Uint32Array)||!(e.triangles instanceof Uint32Array)||e.index.length!==e.triangles.length*3||!e.triangles.length)throw RangeError(`Invalid BVH triangles; pass the unmodified output of serialize()`);this.nodes=e.nodes,this.nodeBounds=new Float32Array(e.nodes),this.nodeData=new Uint32Array(e.nodes),this.index=e.index,this.triangles=e.triangles,m(this.positions,this.stride,this.index);let r=this.nodeData,i=this.nodeCount,a=0,o=0;for(let e=0,t=0;e<i;e++,t+=8){let n=r[t+7];if(n&2147483648){if((n&2147483647)>2||r[t+6]<=e+1||r[t+6]>=i)throw RangeError(`Invalid BVH node links; pass the unmodified output of serialize()`)}else{if(!n||r[t+6]!==a)throw RangeError(`Invalid BVH leaf ranges; pass the unmodified output of serialize()`);a+=n,o++}}if(a!==this.triangleCount)throw RangeError(`BVH leaves do not cover every triangle; pass the unmodified output of serialize()`);let s=new Uint32Array(o),c=0;for(let e=i-1;e>=0;e--){let t=e*8;if(r[t+7]&2147483648){if(c<2||s[c-1]!==e+1||s[c-2]!==r[t+6])throw RangeError(`Invalid BVH node links; pass the unmodified output of serialize()`);c-=2}s[c++]=e}if(c!==1)throw RangeError(`Invalid BVH node links; pass the unmodified output of serialize()`)}get nodeCount(){return this.nodeData.length/8}get triangleCount(){return this.triangles.length}getBoundingBox(){let e=this.nodeBounds;return{min:[e[0],e[1],e[2]],max:[e[3],e[4],e[5]]}}isLeaf(e){return!(this.nodeData[e*8+7]&c)}leafTriangles(e){let t=e*8,n=this.nodeData[t+7];if(n&2147483648)throw RangeError(`Not a leaf node; check isLeaf(node) before calling leafTriangles`);return this.triangles.subarray(this.nodeData[t+6],this.nodeData[t+6]+n)}serialize({copy:e=!0}={}){return e?{version:1,nodes:this.nodes.slice(0),index:this.index.slice(),triangles:this.triangles.slice()}:{version:1,nodes:this.nodes,index:this.index,triangles:this.triangles}}toArrayBuffer(){let e=this.nodes.byteLength,t=this.triangleCount,n=new ArrayBuffer(16+e+t*16);return new Uint32Array(n,0,4).set([V,1,this.nodeCount,t]),new Uint8Array(n,16,e).set(new Uint8Array(this.nodes)),new Uint32Array(n,16+e,t*3).set(this.index),new Uint32Array(n,16+e+t*12,t).set(this.triangles),n}refit(){this.revision++;let e=this.nodeBounds,t=this.nodeData,n=this.index,r=this.positions,i=this.stride;for(let a=this.nodeCount-1;a>=0;a--){let o=a*8,s=t[o+7];if(s&2147483648){let n=o+8,r=t[o+6]*8;e[o]=Math.min(e[n],e[r]),e[o+1]=Math.min(e[n+1],e[r+1]),e[o+2]=Math.min(e[n+2],e[r+2]),e[o+3]=Math.max(e[n+3],e[r+3]),e[o+4]=Math.max(e[n+4],e[r+4]),e[o+5]=Math.max(e[n+5],e[r+5])}else{let a=1/0,c=1/0,l=1/0,u=-1/0,d=-1/0,m=-1/0;for(let e=t[o+6]*3,f=e+s*3;e<f;e++){let t=n[e]*i,o=r[t],s=r[t+1],f=r[t+2];o<a&&(a=o),o>u&&(u=o),s<c&&(c=s),s>d&&(d=s),f<l&&(l=f),f>m&&(m=f)}e[o]=f(a),e[o+1]=f(c),e[o+2]=f(l),e[o+3]=p(u),e[o+4]=p(d),e[o+5]=p(m)}}}intersectsSegment(e,t,n={}){let r=[t[0]-e[0],t[1]-e[1],t[2]-e[2]],i=Math.hypot(r[0],r[1],r[2]);return!!this.raycastFirst({origin:e,direction:r},{...n,near:i*B,far:i*.9999999})}raycastFirst(e,t={}){let{origin:n,direction:r}=e,[i,a,o]=ee(r,t),s=b(t.side),c=t.includeFace,l=n[0],u=n[1],d=n[2],f=r[0],p=r[1],m=r[2],h=this.nodeBounds,g=this.nodeData,_=this.index,v=this.positions,y=this.stride,S=1/f,C=1/p,w=1/m,T=te(S,C,w),E=a,D=-1,O=0,k=0,A=0,j=0,M=T?q(h,0,l,u,d,S,C,w,i,E):J(h,0,l,u,d,f,p,m,S,C,w,i,E);for(M!==1/0&&(P[j]=0,F[j++]=M);j;){let e=P[--j],t=F[j];if(t>E+B*(Math.abs(E)+Math.abs(t)+1))continue;let n=e*8,r=g[n+7];if(r&2147483648){let t=e+1,r=g[n+6],a=T?q(h,t*8,l,u,d,S,C,w,i,E):J(h,t*8,l,u,d,f,p,m,S,C,w,i,E),o=T?q(h,r*8,l,u,d,S,C,w,i,E):J(h,r*8,l,u,d,f,p,m,S,C,w,i,E);a<=o?(o!==1/0&&(P[j]=r,F[j++]=o),a!==1/0&&(P[j]=t,F[j++]=a)):(a!==1/0&&(P[j]=t,F[j++]=a),P[j]=r,F[j++]=o)}else for(let e=g[n+6],t=e+r;e<t;e++){let t=_[e*3]*y,n=_[e*3+1]*y,r=_[e*3+2]*y;x(l,u,d,f,p,m,v[t],v[t+1],v[t+2],v[n],v[n+1],v[n+2],v[r],v[r+1],v[r+2],s,i,E,I)&&(D<0||I[0]<E||I[0]===E&&this.triangles[e]<this.triangles[D])&&(!c||c(this.triangles[e]))&&(E=I[0],D=e,O=I[1],k=I[2],A=I[3])}}return D<0?null:this.makeHit(D,E,O,k,A,l,u,d,f,p,m,o)}raycast(e,t={}){let{origin:n,direction:r}=e,[i,a,o]=ee(r,t),s=b(t.side),c=t.includeFace,l=n[0],u=n[1],d=n[2],f=r[0],p=r[1],m=r[2],h=this.nodeBounds,g=this.nodeData,_=this.index,v=this.positions,y=this.stride,S=1/f,C=1/p,w=1/m,T=te(S,C,w),E=[],D=0;for(P[D++]=0;D;){let e=P[--D],t=e*8;if((T?q(h,t,l,u,d,S,C,w,i,a):J(h,t,l,u,d,f,p,m,S,C,w,i,a))===1/0)continue;let n=g[t+7];if(n&2147483648)P[D++]=g[t+6],P[D++]=e+1;else for(let e=g[t+6],r=e+n;e<r;e++){let t=_[e*3]*y,n=_[e*3+1]*y,r=_[e*3+2]*y;x(l,u,d,f,p,m,v[t],v[t+1],v[t+2],v[n],v[n+1],v[n+2],v[r],v[r+1],v[r+2],s,i,a,I)&&(!c||c(this.triangles[e]))&&E.push(this.makeHit(e,I[0],I[1],I[2],I[3],l,u,d,f,p,m,o))}}return E.sort((e,t)=>e.distance-t.distance||e.faceIndex-t.faceIndex)}makeHit(e,t,n,r,i,a,o,s,c,l,u,d){let f=this.index[e*3],p=this.index[e*3+1],m=this.index[e*3+2],h=1-n-r,g=this.faceNormal(f,p,m);return{distance:t*d,point:[a+c*t,o+l*t,s+u*t],faceIndex:this.triangles[e],face:[f,p,m],barycoord:[h,n,r],normal:this.interpolateNormal(f,p,m,h,n,r,g),faceNormal:g,frontFace:i>0}}faceNormal(e,t,n){let r=this.positions,i=this.stride,a=e*i,o=t*i,s=n*i,c=r[o]-r[a],l=r[o+1]-r[a+1],u=r[o+2]-r[a+2],d=r[s]-r[a],f=r[s+1]-r[a+1],p=r[s+2]-r[a+2];return ie(l*p-u*f,u*d-c*p,c*f-l*d)}interpolateNormal(e,t,n,r,i,a,o){let s=this.normals;if(!s)return[o[0],o[1],o[2]];let c=this.normalStride,l=this.normalOffset,u=e*c+l,d=t*c+l,f=n*c+l,p=ie(s[u]*r+s[d]*i+s[f]*a,s[u+1]*r+s[d+1]*i+s[f+1]*a,s[u+2]*r+s[d+2]*i+s[f+2]*a);return p[0]||p[1]||p[2]?p:[o[0],o[1],o[2]]}closestPointToPoint(e,{maxDistance:t=1/0,minDistance:n=0}={}){if(!(t>=0)||!(n>=0))throw RangeError(`Distances must be >= 0`);let r=e[0],i=e[1],a=e[2],o=this.nodeBounds,s=this.nodeData,c=this.index,l=this.positions,u=this.stride,d=n*n,f=t*t,p=-1,m=0;P[m]=0,F[m++]=Y(o,0,r,i,a);search:for(;m;){let e=P[--m],t=e*8;if(F[m]>f*1.0000001+B)continue;let n=s[t+7];if(n&2147483648){let n=e+1,c=s[t+6],l=Y(o,n*8,r,i,a),u=Y(o,c*8,r,i,a);l<u?(P[m]=c,F[m++]=u,P[m]=n,F[m++]=l):(P[m]=n,F[m++]=l,P[m]=c,F[m++]=u)}else for(let e=s[t+6],o=e+n;e<o;e++){let t=c[e*3]*u,n=c[e*3+1]*u,o=c[e*3+2]*u,s=C(r,i,a,l[t],l[t+1],l[t+2],l[n],l[n+1],l[n+2],l[o],l[o+1],l[o+2],L);if((s<f||p<0&&s<=f)&&(f=s,p=e,R.set(L),f<=d))break search}}return p<0?null:{point:[R[0],R[1],R[2]],distance:Math.sqrt(f),faceIndex:this.triangles[p],barycoord:[R[3],R[4],R[5]]}}intersectsSphere(e,t){if(!(t>=0))throw RangeError(`Radius must be >= 0`);let n=e[0],r=e[1],i=e[2],a=t*t,o=this.nodeBounds,s=this.nodeData,c=this.index,l=this.positions,u=this.stride,d=0;for(P[d++]=0;d;){let e=P[--d],t=e*8;if(Y(o,t,n,r,i)>a*1.0000001+B)continue;let f=s[t+7];if(f&2147483648)P[d++]=s[t+6],P[d++]=e+1;else for(let e=s[t+6],o=e+f;e<o;e++){let t=c[e*3]*u,o=c[e*3+1]*u,s=c[e*3+2]*u;if(C(n,r,i,l[t],l[t+1],l[t+2],l[o],l[o+1],l[o+2],l[s],l[s+1],l[s+2],L)<=a)return!0}}return!1}intersectsBox(e,t){let n=e.min[0],r=e.min[1],i=e.min[2],a=e.max[0],o=e.max[1],s=e.max[2];if(!(n<=a&&r<=o&&i<=s))return!1;let c=t?y(t,/* @__PURE__ */ new Float64Array(16)):null;if(t&&!c)throw RangeError(`Box matrix is singular; pass an invertible matrix (no zero scale)`);let l=t?ae(t,n,r,i,a,o,s):[n,r,i,a,o,s],u=B*(Math.abs(l[0])+Math.abs(l[3])+Math.abs(l[1])+Math.abs(l[4])+Math.abs(l[2])+Math.abs(l[5])+1),d=this.nodeBounds,f=this.nodeData,p=this.index,m=this.positions,h=this.stride,g=0;for(P[g++]=0;g;){let e=P[--g],t=e*8;if(d[t]>l[3]+u||d[t+3]<l[0]-u||d[t+1]>l[4]+u||d[t+4]<l[1]-u||d[t+2]>l[5]+u||d[t+5]<l[2]-u)continue;let _=f[t+7];if(_&2147483648)P[g++]=f[t+6],P[g++]=e+1;else for(let e=f[t+6],l=e+_;e<l;e++)if(X(m,h,p,e,c,z),A(z,n,r,i,a,o,s))return!0}return!1}shapecast(e){let{intersectsBounds:t,intersectsTriangle:n,intersectsRange:r,boundsTraverseOrder:i}=e;if(typeof t!=`function`)throw TypeError(`shapecast needs intersectsBounds: pass a function that classifies node boxes`);let a=this.nodeBounds,o=this.nodeData,s=this.index,l=this.triangles,u=this.positions,d=this.stride,f={min:/* @__PURE__ */ new Float64Array(3),max:/* @__PURE__ */ new Float64Array(3)},p={a:/* @__PURE__ */ new Float64Array(3),b:/* @__PURE__ */ new Float64Array(3),c:/* @__PURE__ */ new Float64Array(3)},m=e=>{let t=e*8;return f.min[0]=a[t],f.min[1]=a[t+1],f.min[2]=a[t+2],f.max[0]=a[t+3],f.max[1]=a[t+4],f.max[2]=a[t+5],f},h=(e,t)=>{let n=t*d;e[0]=u[n],e[1]=u[n+1],e[2]=u[n+2]},g=(t,i,a)=>{let c=t*8,u=o[c+6],d=o[c+7];if(r&&r.call(e,u,d,i,a,t)===!0)return!0;if(!n)return!1;for(let t=u;t<u+d;t++)if(h(p.a,s[t*3]),h(p.b,s[t*3+1]),h(p.c,s[t*3+2]),n.call(e,p,l[t],i,a)===!0)return!0;return!1},_=(e,t)=>{let n=e*8;return o[n+7]&2147483648?_(e+1,t+1)||_(o[n+6],t+1):g(e,!0,t)},v=(n,r,a)=>{let s=n*8,l=!!(o[s+7]&c),u=t.call(e,m(n),!l,r,a,n);if(u===0||u===!1)return!1;if(u===2)return _(n,a);if(!l)return g(n,!1,a);let d=n+1,f=o[s+6];if(!i)return v(d,void 0,a+1)||v(f,void 0,a+1);let p=i.call(e,m(d)),h=i.call(e,m(f));return h<p?v(f,h,a+1)||v(d,p,a+1):v(d,p,a+1)||v(f,h,a+1)};return v(0,void 0,0)}intersectsBVH(t,n,r){if(!(t instanceof e))throw TypeError(`Expected MeshBVH`);let i=n??K,a=this.nodeBounds,o=this.nodeData,s=t.nodeBounds,l=t.nodeData,u=this.positions,d=this.stride,f=this.index,p=t.positions,m=t.stride,h=t.index,g=/* @__PURE__ */ new Int32Array(256),_=0,v=!1,y=-1,b=/* @__PURE__ */ new Float64Array,x=/* @__PURE__ */ new Float64Array(9),S=/* @__PURE__ */ new Float64Array(6);for(g[_++]=0,g[_++]=0;_;){let e=g[--_],n=g[--_],C=n*8,w=e*8;oe(i,s[w],s[w+1],s[w+2],s[w+3],s[w+4],s[w+5],S);let T=B*(Math.abs(S[0])+Math.abs(S[3])+Math.abs(S[1])+Math.abs(S[4])+Math.abs(S[2])+Math.abs(S[5])+1);if(a[C]>S[3]+T||a[C+3]<S[0]-T||a[C+1]>S[4]+T||a[C+4]<S[1]-T||a[C+2]>S[5]+T||a[C+5]<S[2]-T)continue;let E=o[C+7],D=l[w+7],O=!(E&c),k=!(D&c);if(O&&k){if(y!==e){b.length<D*9&&(b=new Float64Array(D*9));for(let e=0;e<D;e++)X(p,m,h,l[w+6]+e,i,b,e*9);y=e}for(let e=o[C+6],n=e+E;e<n;e++){X(u,d,f,e,null,x);for(let n=0;n<D;n++)if(j(x,0,b,n*9)&&(!r||(v=!0,r(this.triangles[e],t.triangles[l[w+6]+n])===!0)))return!0}continue}if(_+4>g.length){let e=new Int32Array(g.length*2);e.set(g),g=e}let A=a[C+3]-a[C]+a[C+4]-a[C+1]+a[C+5]-a[C+2],M=S[3]-S[0]+S[4]-S[1]+S[5]-S[2];k||!O&&A>=M?(g[_++]=o[C+6],g[_++]=e,g[_++]=n+1,g[_++]=e):(g[_++]=n,g[_++]=l[w+6],g[_++]=n,g[_++]=e+1)}return v}collectFrustum(e,{mode:t=`triangles`}={}){if(e.length%4||!e.length)throw RangeError(`Planes need 4 values each`);if(t!==`triangles`&&t!==`leaves`)throw TypeError(`mode must be triangles or leaves`);let n=e.length/4,r=this.nodeBounds,i=this.nodeData,a=this.index,o=this.positions,s=this.stride,l=this.triangles,u=/* @__PURE__ */ new Uint32Array(64),d=0,f=0,p=e=>{if(d===u.length){let e=new Uint32Array(u.length*2);e.set(u),u=e}u[d++]=e};for(P[f++]=0;f;){let u=P[--f],d=u*8,m=!1,h=!0;for(let t=0;t<n*4;t+=4){let n=e[t],i=e[t+1],a=e[t+2],o=e[t+3];if(n*(n>=0?r[d+3]:r[d])+i*(i>=0?r[d+4]:r[d+1])+a*(a>=0?r[d+5]:r[d+2])+o<0){m=!0;break}n*(n>=0?r[d]:r[d+3])+i*(i>=0?r[d+1]:r[d+4])+a*(a>=0?r[d+2]:r[d+5])+o<0&&(h=!1)}if(m)continue;let g=i[d+7];if(t===`leaves`)g&2147483648?(P[f++]=i[d+6],P[f++]=u+1):p(u);else if(h){let e=u,t=u;for(;i[e*8+7]&c;)e++;for(;i[t*8+7]&c;)t=i[t*8+6];for(let n=i[e*8+6],r=i[t*8+6]+i[t*8+7];n<r;n++)p(l[n])}else if(g&2147483648)P[f++]=i[d+6],P[f++]=u+1;else for(let t=i[d+6],r=t+g;t<r;t++){let r=a[t*3]*s,i=a[t*3+1]*s,c=a[t*3+2]*s;M(e,n,o[r],o[r+1],o[r+2],o[i],o[i+1],o[i+2],o[c],o[c+1],o[c+2])||p(l[t])}}return u.slice(0,d)}};const K=new Float64Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);function ee(e,{near:t=0,far:n=1/0}){let r=Math.hypot(e[0],e[1],e[2]);if(!(r>0)||!Number.isFinite(r))throw RangeError(`Ray direction must be finite and nonzero`);if(!(t>=0)||!(n>=t))throw RangeError(`Expected 0 <= near <= far`);return[t/r,n/r,r]}const te=(e,t,n)=>Number.isFinite(e)&&Number.isFinite(t)&&Number.isFinite(n);function q(e,t,n,r,i,a,o,s,c,l){let u=(e[t]-n)*a,d=(e[t+3]-n)*a;if(u>d){let e=u;u=d,d=e}if(u>c&&(c=u),d<l&&(l=d),u=(e[t+1]-r)*o,d=(e[t+4]-r)*o,u>d){let e=u;u=d,d=e}if(u>c&&(c=u),d<l&&(l=d),u=(e[t+2]-i)*s,d=(e[t+5]-i)*s,u>d){let e=u;u=d,d=e}return u>c&&(c=u),d<l&&(l=d),ne(c,l)?1/0:c}function J(e,t,n,r,i,a,o,s,c,l,u,d,f){for(let p=0;p<3;p++){let m=p===0?n:p===1?r:i,h=p===0?a:p===1?o:s,g=p===0?c:p===1?l:u,_=e[t+p],v=e[t+p+3];if(h===0){if(re(m,_,v))return 1/0;continue}let y=Number.isFinite(g)?(_-m)*g:(_-m)/h,b=Number.isFinite(g)?(v-m)*g:(v-m)/h;if(y>b){let e=y;y=b,b=e}y>d&&(d=y),b<f&&(f=b)}return ne(d,f)?1/0:d}const ne=(e,t)=>e>t&&(!Number.isFinite(e)||!Number.isFinite(t)||e>t+B*(Math.abs(t)+Math.abs(e)+1));function re(e,t,n){let r=B*(Math.abs(e)+Math.abs(t)+Math.abs(n)+1);return e<t-r||e>n+r}function ie(e,t,n){let r=Math.hypot(e,t,n);return r>0?[e/r,t/r,n/r]:[0,0,0]}function Y(e,t,n,r,i){let a=n<e[t]?e[t]-n:n>e[t+3]?n-e[t+3]:0,o=r<e[t+1]?e[t+1]-r:r>e[t+4]?r-e[t+4]:0,s=i<e[t+2]?e[t+2]-i:i>e[t+5]?i-e[t+5]:0;return a*a+o*o+s*s}function X(e,t,n,r,i,a,o=0){for(let s=0;s<3;s++){let c=n[r*3+s]*t;i?N(i,e[c],e[c+1],e[c+2],a,o+s*3):(a[o+s*3]=e[c],a[o+s*3+1]=e[c+1],a[o+s*3+2]=e[c+2])}}function ae(e,t,n,r,i,a,o){return oe(e,t,n,r,i,a,o,/* @__PURE__ */ new Float64Array(6))}function oe(e,t,n,r,i,a,o,s){let c=(t+i)*.5,l=(n+a)*.5,u=(r+o)*.5,d=(i-t)*.5,f=(a-n)*.5,p=(o-r)*.5;for(let t=0;t<3;t++){let n=e[t]*c+e[4+t]*l+e[8+t]*u+e[12+t],r=Math.abs(e[t])*d+Math.abs(e[4+t])*f+Math.abs(e[8+t])*p;s[t]=n-r,s[3+t]=n+r}return s}var Z=class extends Error{constructor(e,t){super(t),this.name=`MargoError`,this.code=e}static[Symbol.hasInstance](e){return e instanceof Error&&e.name===`MargoError`}};const Q=e=>{let t=e?.gpu??e;if(!t||typeof t.createBuffer!=`function`)throw new Z(`unsupported`,`GPU BVH needs WebGPU; pass a GPUDevice or an Engine running on WebGPU.`);return t};function se(e){let t=e.nodeCount,n=/* @__PURE__ */ new ArrayBuffer(t*8*4),r=new Float32Array(n),i=new Uint32Array(n),a=new Uint8Array(t),o=e.nodeBounds,s=e.nodeData;for(let e=0;e<t;e++){let t=e*8,n=s[t+6],l=s[t+7];if(r[t]=o[t],r[t+1]=o[t+1],r[t+2]=o[t+2],r[t+4]=o[t+3],r[t+5]=o[t+4],r[t+6]=o[t+5],l&2147483648){if(a[e]>=64)throw RangeError(`BVH is deeper than 64; rebuild it with a maxDepth of at most 64.`);a[e+1]=a[n]=a[e]+1,i[t+3]=e+1,i[t+7]=(n|c)>>>0}else i[t+3]=n,i[t+7]=l}return n}function ce(e){let{positions:t,stride:n}=e,r=Math.floor((t.length-3)/n)+1,i=new Float32Array(r*3);for(let e=0;e<r;e++)i[e*3]=t[e*n],i[e*3+1]=t[e*n+1],i[e*3+2]=t[e*n+2];return i}const le=(e,t)=>`
+struct ${t}Ray { origin: vec3f, direction: vec3f, inverse: vec3f, shear: vec3f, axes: vec3u, near: f32, far: f32 }
+fn ${e}Inverse(d: f32) -> f32 {
+
+  let m = max(abs(d), 1e-18);
+  return select(1.0 / m, -1.0 / m, d < 0.0);
+}
+
+
+
+fn ${e}Edge(p: vec2f, q: vec2f) -> f32 {
+  let swap = q.x < p.x || (q.x == p.x && q.y < p.y);
+  let s = select(p, q, swap);
+  let e = select(q, p, swap);
+  let value = s.x * e.y - s.y * e.x;
+  return select(value, -value, swap);
+}
+
+fn ${e}Triangle(r: ${t}Ray, a3: vec3f, b3: vec3f, c3: vec3f, side: u32, far: f32) -> vec4f {
+  let a = a3 - r.origin;
+  let b = b3 - r.origin;
+  let c = c3 - r.origin;
+  let az = a[r.axes.z];
+  let bz = b[r.axes.z];
+  let cz = c[r.axes.z];
+  let ax = a[r.axes.x] - r.shear.x * az;
+  let ay = a[r.axes.y] - r.shear.y * az;
+  let bx = b[r.axes.x] - r.shear.x * bz;
+  let by = b[r.axes.y] - r.shear.y * bz;
+  let cx = c[r.axes.x] - r.shear.x * cz;
+  let cy = c[r.axes.y] - r.shear.y * cz;
+  let u = ${e}Edge(vec2f(cx, cy), vec2f(bx, by));
+  let v = ${e}Edge(vec2f(ax, ay), vec2f(cx, cy));
+  let w = ${e}Edge(vec2f(bx, by), vec2f(ax, ay));
+  let det = u + v + w;
+  let positive = u >= 0.0 && v >= 0.0 && w >= 0.0;
+  let negative = u <= 0.0 && v <= 0.0 && w <= 0.0;
+  if (det == 0.0 || !(positive || negative)) { return vec4f(0.0, 0.0, 0.0, -1.0); }
+  if ((side == 1u && det < 0.0) || (side == 2u && det > 0.0)) { return vec4f(0.0, 0.0, 0.0, -1.0); }
+  let t = (u * az + v * bz + w * cz) * r.shear.z / det;
+  if (t < r.near || t > far) { return vec4f(0.0, 0.0, 0.0, -1.0); }
+  return vec4f(u / det, v / det, w / det, t);
+}
+`,ue={double:0,front:1,back:2};function de({group:e=0,binding:t=0,accept:n}={}){if(n!==void 0&&!/^[A-Za-z][A-Za-z0-9_]*$/.test(n))throw TypeError(`Invalid BVH candidate function; pass a WGSL identifier`);let r=n=>`@group(${e}) @binding(${t+n})`;return`
+struct BVHNode { lo: vec3f, left: u32, hi: vec3f, right: u32 }
+struct BVHParams { stride: u32, offset: u32, triangles: u32, nodes: u32 }
+struct BVHHit { distance: f32, face: u32, barycoord: vec3f, front: bool }
+${r(0)} var<storage, read> bvhNodes: array<BVHNode>;
+${r(1)} var<storage, read> bvhIndex: array<u32>;
+${r(2)} var<storage, read> bvhFaces: array<u32>;
+${r(3)} var<storage, read> bvhPositions: array<f32>;
+${r(4)} var<uniform> bvhParams: BVHParams;
+const BVH_MISS = 0xffffffffu;
+const BVH_INTERNAL = 0x80000000u;
+const BVH_NEVER = 3.4e38;
+
+fn bvhVertex(i: u32) -> vec3f {
+  let o = i * bvhParams.stride + bvhParams.offset;
+  return vec3f(bvhPositions[o], bvhPositions[o + 1u], bvhPositions[o + 2u]);
+}
+fn bvhRay(origin: vec3f, direction: vec3f, near: f32, far: f32) -> BVHRay {
+  let d = normalize(direction);
+  let a = abs(d);
+  var z = 2u;
+  if (a.x >= a.y && a.x >= a.z) { z = 0u; } else if (a.y >= a.z) { z = 1u; }
+  var x = (z + 1u) % 3u;
+  var y = (x + 1u) % 3u;
+  if (d[z] < 0.0) { let swap = x; x = y; y = swap; }
+  let shear = vec3f(d[x] / d[z], d[y] / d[z], 1.0 / d[z]);
+  return BVHRay(origin, d, vec3f(bvhInverse(d.x), bvhInverse(d.y), bvhInverse(d.z)), shear, vec3u(x, y, z), near, far);
+}
+
+fn bvhEnter(node: u32, r: BVHRay, far: f32) -> f32 {
+  let n = bvhNodes[node];
+  let a = (n.lo - r.origin) * r.inverse;
+  let b = (n.hi - r.origin) * r.inverse;
+  let near3 = min(a, b);
+  let far3 = max(a, b);
+  let enter = max(max(near3.x, near3.y), max(near3.z, r.near));
+  let leave = min(min(far3.x, far3.y), far3.z) * 1.0000004;
+  return select(BVH_NEVER, enter, enter <= leave && enter <= far);
+}
+${le(`bvh`,`BVH`)}fn bvhWalk(r: BVHRay, side: u32, any: bool) -> BVHHit {
+  var best = BVHHit(r.far, BVH_MISS, vec3f(0.0), false);
+  var stack: array<u32, 64>;
+  var entry: array<f32, 64>;
+  var top = 0u;
+  var node = 0u;
+  if (bvhEnter(0u, r, r.far) >= BVH_NEVER) { return best; }
+  loop {
+    let n = bvhNodes[node];
+    var next = false;
+    if ((n.right & BVH_INTERNAL) != 0u) {
+      let left = n.left;
+      let right = n.right & ~BVH_INTERNAL;
+      let tl = bvhEnter(left, r, best.distance);
+      let tr = bvhEnter(right, r, best.distance);
+      if (tl < BVH_NEVER && tr < BVH_NEVER) {
+
+        stack[top] = select(right, left, tr < tl);
+        entry[top] = max(tl, tr);
+        top += 1u;
+        node = select(left, right, tr < tl);
+        next = true;
+      } else if (tl < BVH_NEVER) {
+        node = left;
+        next = true;
+      } else if (tr < BVH_NEVER) {
+        node = right;
+        next = true;
+      }
+    } else {
+      for (var k = 0u; k < n.right; k += 1u) {
+        let at = n.left + k;
+        let i = at * 3u;
+        let a = bvhVertex(bvhIndex[i]);
+        let b = bvhVertex(bvhIndex[i + 1u]);
+        let c = bvhVertex(bvhIndex[i + 2u]);
+        let hit = bvhTriangle(r, a, b, c, side, best.distance);
+        if (hit.w < 0.0) { continue; }
+        let face = bvhFaces[at];
+        ${n?`if (!${n}(face, hit.xyz)) { continue; }`:``}
+
+        if (hit.w < best.distance || best.face == BVH_MISS || face < best.face) {
+          best = BVHHit(hit.w, face, hit.xyz, dot(cross(b - a, c - a), r.direction) < 0.0);
+          if (any) { return best; }
+        }
+      }
+    }
+    if (next) { continue; }
+
+    var found = false;
+    while (top > 0u && !found) {
+      top -= 1u;
+      if (entry[top] <= best.distance) {
+        node = stack[top];
+        found = true;
+      }
+    }
+    if (!found) { break; }
+  }
+  return best;
+}
+fn bvhClosest(origin: vec3f, direction: vec3f, near: f32, far: f32, side: u32) -> BVHHit {
+  if (dot(direction, direction) == 0.0) { return BVHHit(far, BVH_MISS, vec3f(0.0), false); }
+  return bvhWalk(bvhRay(origin, direction, near, far), side, false);
+}
+fn bvhAny(origin: vec3f, direction: vec3f, near: f32, far: f32, side: u32) -> BVHHit {
+  if (dot(direction, direction) == 0.0) { return BVHHit(far, BVH_MISS, vec3f(0.0), false); }
+  return bvhWalk(bvhRay(origin, direction, near, far), side, true);
+}
+`}const fe=`${de()}
+struct TraceRay { origin: vec3f, near: f32, direction: vec3f, far: f32 }
+struct Trace { count: u32, side: u32, any: u32, width: u32 }
+@group(1) @binding(0) var<storage, read> rays: array<TraceRay>;
+@group(1) @binding(1) var<storage, read_write> hits: array<vec4u>;
+@group(1) @binding(2) var<uniform> trace: Trace;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let i = id.y * trace.width + id.x;
+  if (i >= trace.count) { return; }
+  let ray = rays[i];
+  var hit: BVHHit;
+  if (trace.any != 0u) {
+    hit = bvhAny(ray.origin, ray.direction, ray.near, ray.far, trace.side);
+  } else {
+    hit = bvhClosest(ray.origin, ray.direction, ray.near, ray.far, trace.side);
+  }
+  if (hit.face == BVH_MISS) {
+    hits[i] = vec4u(bitcast<u32>(-1.0), BVH_MISS, 0u, 0u);
+    return;
+  }
+  let front = select(0u, BVH_INTERNAL, hit.front);
+  hits[i] = vec4u(bitcast<u32>(hit.distance), hit.face | front, bitcast<u32>(hit.barycoord.y), bitcast<u32>(hit.barycoord.z));
+}
+`,$=/* @__PURE__ */ new WeakMap;function pe(e){let t=$.get(e);return t||(t=e.createComputePipelineAsync({label:`bvh trace`,layout:`auto`,compute:{module:e.createShaderModule({label:`bvh trace`,code:fe}),entryPoint:`main`}}),$.set(e,t),t.catch(()=>$.delete(e))),t}function me(e,{near:t=0,far:n=1/0}={}){if(!(t>=0)||!(n>=t))throw RangeError(`Invalid near or far; pass 0 <= near <= far.`);let r=new Float32Array(e.length*8),i=Math.min(n,3e38);return e.forEach(({origin:e,direction:n},a)=>{let o=a*8;for(let t=0;t<3;t++)r[o+t]=e[t],r[o+4+t]=n[t];r[o+3]=t,r[o+7]=i}),r}var he=class e{#e;#t;#n;#r=/* @__PURE__ */ new Map;#i=!1;static async create(t,n){let r=Q(t);return new e(r,n,await pe(r))}static forShader(t,n){return new e(Q(t),n,null)}static async follow(t,n){let r=Q(t);return new e(r,n.bvh,await pe(r),n)}constructor(e,t,n,r=null){this.device=e,this.bvh=t,this.#e=!!r,this.#t=n;let i=t&&se(t),a=r?null:ce(t),o=r?.triangles??t.triangleCount,s=r?.nodes??t.nodeCount,c=Math.min(e.limits.maxStorageBufferBindingSize,e.limits.maxBufferSize);for(let[e,t]of[[`nodes`,s*8*4],[`positions`,a?.byteLength??r.vertices.size],[`indices`,o*12]])if(t>c)throw RangeError(`BVH ${e} take ${t} bytes, over this device's ${c}; request a higher maxStorageBufferBindingSize or split the mesh.`);let l=(t,n,r,i)=>{let a=e.createBuffer({label:t,size:r,usage:i|GPUBufferUsage.COPY_DST});return n&&e.queue.writeBuffer(a,0,n),a},u=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC;this.nodes=l(`bvh nodes`,i,s*8*4,u),this.index=l(`bvh index`,t?.index??null,o*12,u),this.faces=l(`bvh faces`,t?.triangles??null,o*4,u),this.positions=r?.vertices??l(`bvh positions`,a,a.byteLength,u),this.params=l(`bvh params`,new Uint32Array([r?.stride??3,r?.offset??0,o,s]),16,GPUBufferUsage.UNIFORM),this.#n=n&&e.createBindGroup({label:`bvh tree`,layout:n.getBindGroupLayout(0),entries:this.bindings()})}get disposed(){return this.#i}bindings(e=0){return[this.nodes,this.index,this.faces,this.positions,this.params].map((t,n)=>({binding:e+n,resource:{buffer:t}}))}update(){if(this.#o(),this.#e||!this.bvh)throw new Z(`state`,`This tree follows a GPU buffer; update it with encode on its GPUDynamicBVH.`);this.device.queue.writeBuffer(this.nodes,0,se(this.bvh)),this.device.queue.writeBuffer(this.positions,0,ce(this.bvh))}encodeTrace(e,t,n,r,{mode:i=`closest`,side:a=`double`}={}){if(this.#o(),!Number.isInteger(r)||r<0)throw RangeError(`Invalid ray count; pass a non-negative integer.`);if(i!==`closest`&&i!==`any`)throw TypeError(`Invalid trace mode; use closest or any.`);if(!Object.hasOwn(ue,a))throw TypeError(`Invalid side; use front, back or double.`);if(!r)return;if(t.size<r*8*4||n.size<r*4*4)throw RangeError(`Ray or hit buffer is too small for ${r} rays; size them with GPU_RAY_FLOATS and GPU_HIT_WORDS.`);let o=Math.ceil(r/64),s=this.device.limits.maxComputeWorkgroupsPerDimension,c=Math.min(o,s),l=Math.ceil(o/c);if(l>s)throw RangeError(`${r} rays are more than one dispatch holds; trace them in parts.`);let u=this.#t;if(!u)throw new Z(`state`,`This tree is for your own shader; make one with GPUMeshBVH.create to trace rays.`);let d=e.beginComputePass({label:`bvh trace`});d.setPipeline(u),d.setBindGroup(0,this.#n),d.setBindGroup(1,this.device.createBindGroup({label:`bvh rays`,layout:u.getBindGroupLayout(1),entries:[{binding:0,resource:{buffer:t}},{binding:1,resource:{buffer:n}},{binding:2,resource:{buffer:this.#a(r,ue[a],+(i===`any`),c*64)}}]})),d.dispatchWorkgroups(c,l),d.end()}async raycast(e,t={}){this.#o();let{signal:n}=t;n?.throwIfAborted();let r=e instanceof Float32Array?e:me(e,t);if(r.length%8)throw RangeError(`Incomplete ray buffer; pass whole rays of GPU_RAY_FLOATS floats.`);let i=r.length/8,a=this.device;for(let e=0;e<r.length;e++)if(!Number.isFinite(r[e]))throw RangeError(`Ray ${Math.floor(e/8)} is not finite; far must be at most GPU_FAR.`);let o={count:i,distance:new Float32Array(i),faceIndex:new Int32Array(i),barycoord:new Float32Array(i*3),frontFace:new Uint8Array(i)};if(!i)return o;let s=a.limits.maxStorageBufferBindingSize;if(r.byteLength>s)throw RangeError(`${i} rays take ${r.byteLength} bytes, over this device's ${s}; trace them in parts.`);let c=i*4*4,l=a.createBuffer({label:`bvh rays`,size:r.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),u=a.createBuffer({label:`bvh hits`,size:c,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),d=a.createBuffer({label:`bvh read`,size:c,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST});try{a.queue.writeBuffer(l,0,r);let e=a.createCommandEncoder({label:`bvh raycast`});this.encodeTrace(e,l,u,i,t),e.copyBufferToBuffer(u,0,d,0,c),a.queue.submit([e.finish()]),await d.mapAsync(GPUMapMode.READ),n?.throwIfAborted();let s=d.getMappedRange(),f=new Float32Array(s),p=new Uint32Array(s);for(let e=0;e<i;e++){let t=e*4,n=p[t+1];if(n===4294967295){o.distance[e]=1/0,o.faceIndex[e]=-1;continue}let r=f[t+2],i=f[t+3];o.distance[e]=f[t],o.faceIndex[e]=n&2147483647,o.frontFace[e]=n>>>31,o.barycoord[e*3]=1-r-i,o.barycoord[e*3+1]=r,o.barycoord[e*3+2]=i}return o}finally{l.destroy(),u.destroy(),d.destroy()}}dispose(){if(!this.#i){this.#i=!0;for(let e of[this.nodes,this.index,this.faces,this.params])e.destroy();this.#e||this.positions.destroy();for(let e of this.#r.values())e.destroy();this.#r.clear()}}[Symbol.dispose](){this.dispose()}#a(e,t,n,r){let i=`${e},${t},${n},${r}`,a=this.#r.get(i);return a||(this.#r.size>=64&&this.#r.delete(this.#r.keys().next().value),a=this.device.createBuffer({label:`bvh trace`,size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),this.device.queue.writeBuffer(a,0,new Uint32Array([e,t,n,r])),this.#r.set(i,a)),a}#o(){if(this.#i)throw new Z(`disposed`,`GPUMeshBVH is disposed; create a new one to trace rays.`)}},ge=64,_e=16,ve={ambient:0,directional:1,point:2,spot:3},ye=e=>`
+${e}
+struct Params {
+  count: u32, frame: u32, seed: u32, lights: u32,
+  bounces: u32, physical: u32, width: u32, rowThreads: u32,
+  bias: f32, aoDistance: f32, pad0: f32, pad1: f32,
+}
+struct Light { kind: vec4f, rgb: vec4f, direction: vec4f, position: vec4f }
+@group(1) @binding(0) var<uniform> params: Params;
+@group(1) @binding(1) var<storage, read> texels: array<vec4f>;
+@group(1) @binding(2) var<storage, read> lights: array<Light>;
+@group(1) @binding(3) var<storage, read> triangles: array<vec4f>;
+
+@group(1) @binding(4) var<storage, read_write> sums: array<vec4f>;
+@group(1) @binding(5) var live: texture_storage_2d<rgba16float, write>;
+
+var<private> skipFace: u32;
+var<private> rng: u32;
+
+fn skipOwn(face: u32, barycoord: vec3f) -> bool { return face != skipFace; }
+
+
+fn pcg(v: u32) -> u32 {
+  let state = v * 747796405u + 2891336453u;
+  let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+  return (word >> 22u) ^ word;
+}
+fn random() -> f32 {
+  rng = pcg(rng);
+  return f32(rng >> 8u) / 16777216.0;
+}
+
+
+fn directLight(p: vec3f, n: vec3f, own: u32) -> vec3f {
+  var e = vec3f(0.0);
+  for (var i = 0u; i < params.lights; i++) {
+    let l = lights[i];
+    let kind = u32(l.kind.x);
+    if (kind == 0u) { e += l.rgb.xyz; continue; }
+    var dir = l.direction.xyz;
+    var scale = 1.0;
+    var far = 3.4e38;
+    if (kind != 1u) {
+      let to = l.position.xyz - p;
+      let d = length(to);
+      if (d == 0.0) { continue; }
+      dir = to / d;
+      var reach = 0.0;
+      if (l.kind.y > 0.0) { reach = pow(d / l.kind.y, 4.0); }
+      let fade = clamp(1.0 - reach, 0.0, 1.0);
+      scale = fade * fade / max(pow(max(d, 1e-6), l.kind.z), 0.000244140625);
+      if (kind == 3u) {
+        let c = -dot(dir, l.direction.xyz);
+        let low = l.position.w;
+        let high = l.direction.w;
+        if (high > low) {
+          let t = clamp((c - low) / (high - low), 0.0, 1.0);
+          scale *= t * t * (3.0 - 2.0 * t);
+        } else {
+          scale *= select(0.0, 1.0, c >= low);
+        }
+      }
+      far = d;
+    }
+    let lambert = dot(n, dir);
+    if (!(lambert > 0.0 && scale > 0.0)) { continue; }
+
+
+    var start = p;
+    var near = params.bias;
+    skipFace = own;
+    if (kind == 1u) {
+      start = p + n * params.bias;
+      near = 0.0;
+      skipFace = BVH_MISS;
+    }
+    let blocked = bvhAny(start, dir, near, far, 0u);
+    if (blocked.face == BVH_MISS) { e += l.rgb.xyz * scale * lambert; }
+  }
+  return e;
+}
+
+fn hemisphere(n: vec3f) -> vec3f {
+  let sign = select(-1.0, 1.0, n.z >= 0.0);
+  let k = -1.0 / (sign + n.z);
+  let m = n.x * n.y * k;
+  let t = vec3f(1.0 + sign * n.x * n.x * k, sign * m, -sign * n.x);
+  let b = vec3f(m, sign + n.y * n.y * k, -n.y);
+  let u = random();
+  let phi = 6.283185307179586 * random();
+  let r = sqrt(u);
+  return normalize(t * (r * cos(phi)) + b * (r * sin(phi)) + n * sqrt(max(0.0, 1.0 - u)));
+}
+
+@compute @workgroup_size(${ge})
+fn bake(@builtin(global_invocation_id) id: vec3u) {
+  let i = id.x + id.y * params.rowThreads;
+  if (i >= params.count) { return; }
+  let a = texels[i * 2u];
+  let b = texels[i * 2u + 1u];
+  let p = a.xyz;
+  let n = b.xyz;
+  let own = bitcast<u32>(a.w);
+  rng = pcg(i ^ pcg(params.frame ^ pcg(params.seed)));
+
+
+
+  var light = vec3f(0.0);
+  var open = 1.0;
+  var x = p;
+  var hn = n;
+  var face = own;
+  var throughput = vec3f(1.0);
+  var hit: BVHHit;
+  var origin = p;
+  var dir = n;
+  for (var bounce = 0u; bounce <= params.bounces; bounce++) {
+    if (bounce > 0u) {
+      if (hit.face == BVH_MISS) { break; }
+      let t0 = triangles[hit.face * 3u];
+      let t1 = triangles[hit.face * 3u + 1u];
+      let t2 = triangles[hit.face * 3u + 2u];
+      x = origin + dir * hit.distance;
+      hn = normalize(cross(t1.xyz - t0.xyz, t2.xyz - t0.xyz));
+      if (dot(hn, dir) > 0.0) { hn = -hn; }
+
+      throughput *= vec3f(t0.w, t1.w, t2.w);
+      face = hit.face;
+    }
+    let direct = directLight(x, hn, face);
+    if (bounce == 0u) {
+      light = direct;
+    } else {
+      light += throughput * direct;
+    }
+    origin = x + hn * params.bias;
+    dir = hemisphere(hn);
+    skipFace = BVH_MISS;
+    hit = bvhClosest(origin, dir, 0.0, 3.4e38, 0u);
+    if (bounce == 0u) {
+      open = select(1.0, 0.0, hit.face != BVH_MISS && hit.distance < params.aoDistance);
+      if (params.physical == 0u) { light *= open; }
+    }
+  }
+  let sum = sums[i] + vec4f(light, open);
+  sums[i] = sum;
+  let at = bitcast<u32>(b.w);
+  textureStore(live, vec2u(at % params.width, at / params.width), vec4f(sum.xyz / f32(params.frame + 1u), 1.0));
+}
+`;function be(e){let t=e&&`gpu`in e?e.gpu:e;if(!t||typeof t.createComputePipeline!=`function`)throw TypeError(`GPULightmapBaker needs a GPUDevice or an engine with one; create the engine on WebGPU`);return t}function xe(e,t){let n=e??[.8,.8,.8];if(!Array.isArray(n)||n.length!==3||!n.every(e=>e>=0&&e<=1))throw RangeError(`GPULightmapBaker ${t} must be 3 values from 0 to 1; pass linear RGB reflectance`);return[...n]}function Se(e){let t=new Float32Array(Math.max(1,e.length)*_e);return e.forEach((e,n)=>{if(e.visible===!1)return;let r=n*_e,{type:i,color:a=[1,1,1],intensity:o=1,distance:s=0,decay:c=2,angle:l=0,penumbra:u=0}=e;if(!(i in ve))throw TypeError(`GPULightmapBaker light type must be 'ambient', 'directional', 'point' or 'spot'`);if(!Array.isArray(a)||a.length!==3)throw TypeError(`GPULightmapBaker light color must be linear RGB [r, g, b]; pass three numbers`);if(!(o>=0&&o<1/0&&s>=0&&c>=0))throw RangeError(`GPULightmapBaker light intensity, distance and decay must be finite and 0 or more`);let d=e.direction??[0,1,0],f=Math.hypot(...d)||1,p=e.position??[0,0,0];if(i===`spot`&&!(l>0&&l<=Math.PI/2&&u>=0&&u<=1))throw RangeError(`GPULightmapBaker spot light needs an angle in (0, pi/2] and a penumbra 0 to 1`);t.set([ve[i],s,c,0],r),t.set([a[0]*o,a[1]*o,a[2]*o,0],r+4),t.set([d[0]/f,d[1]/f,d[2]/f,Math.cos(l*(1-u))],r+8),t.set([p[0],p[1],p[2],Math.cos(l)],r+12)}),t}var Ce=class n{#e=0;#t=!1;#n;#r;#i;#a;#o;#s;#c;#l;constructor(e,t,n,r,i,a){this.device=e,this.#c=t,this.#n=n,this.#l=r,this.width=t.width,this.height=t.height,this.samples=t.covered.length,r.physical&&(this.radiometry=`physical`);let o=(t,n)=>{let r=e.createBuffer({size:Math.max(16,Math.ceil(t.byteLength/16)*16),usage:n});return e.queue.writeBuffer(r,0,t.buffer,t.byteOffset,t.byteLength),r},s=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST,c=new Float32Array(this.samples*8),l=new Uint32Array(c.buffer);for(let e=0;e<this.samples;e++)c.set(t.points.subarray(e*3,e*3+3),e*8),c.set(t.normals.subarray(e*3,e*3+3),e*8+4),l[e*8+3]=t.owner[e],l[e*8+7]=t.covered[e];this.#i=e.createBuffer({size:48,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),this.#a=e.createBuffer({size:Math.max(16,this.samples*16),usage:s|GPUBufferUsage.COPY_SRC}),this.#r=[o(c,s),o(a,s),o(i,s)],this.texture=e.createTexture({size:[this.width,this.height],format:`rgba16float`,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.STORAGE_BINDING|GPUTextureUsage.COPY_SRC});let u=e.createShaderModule({code:ye(de({group:0,binding:0,accept:`skipOwn`}))});this.#o=e.createComputePipeline({layout:`auto`,compute:{module:u,entryPoint:`bake`}}),this.#s=[e.createBindGroup({layout:this.#o.getBindGroupLayout(0),entries:n.bindings()}),e.createBindGroup({layout:this.#o.getBindGroupLayout(1),entries:[{binding:0,resource:{buffer:this.#i}},{binding:1,resource:{buffer:this.#r[0]}},{binding:2,resource:{buffer:this.#r[1]}},{binding:3,resource:{buffer:this.#r[2]}},{binding:4,resource:{buffer:this.#a}},{binding:5,resource:this.texture.createView()}]})]}static async create(r,i,a={}){let s=be(r),c=t(a.bounces??0,0,8,`GPULightmapBaker bounces`);if(c>0&&a.radiometry!==`physical`)throw TypeError(`GPULightmapBaker bounces need radiometry 'physical'; set it or bake without bounces`);let l=xe(a.albedo,`albedo`),u=(a.occluders??[]).map((e,t)=>xe(e?.albedo??l,`occluder ${t} albedo`)),d=o(i,{...a,maxRays:67108864},`GPULightmapBaker`,()=>0),f=Se(d.lights),p=new Float32Array(d.indices.length*4),m=d.meshTriangles,h=-1;for(let e=0;e<d.indices.length/3;e++){e===m&&(m+=d.occluderTriangles[++h]);let t=h<0?l:u[h];for(let n=0;n<3;n++){let r=d.indices[e*3+n]*3;p.set([d.positions[r],d.positions[r+1],d.positions[r+2],t[n]],(e*3+n)*4)}}await e(a.signal);let g=he.forShader(s,G.build({positions:d.positions,indices:d.indices}));s.pushErrorScope(`validation`);let _=new n(s,d,g,{seed:d.seed,lights:d.lights.length,bounces:c,physical:d.physical,bias:d.bias,aoDistance:d.aoDistance},p,f),v=await s.popErrorScope();if(v)throw _[Symbol.dispose](),new Z(`unsupported`,`GPULightmapBaker could not build its pipeline: ${v.message}; check the device limits`);return _}get passes(){return this.#e}async step(e=1){if(this.#t)throw new Z(`state`,`GPULightmapBaker is disposed; create a new one`);if(t(e,1,64,`GPULightmapBaker step passes`),!this.samples){this.#e+=e;return}let n=this.#l,r=Math.ceil(this.samples/ge),i=Math.min(r,32768),a=Math.ceil(r/i);for(let t=0;t<e;t++){let e=/* @__PURE__ */ new ArrayBuffer(48),r=new Uint32Array(e),o=new Float32Array(e);r.set([this.samples,this.#e+t,n.seed,n.lights,n.bounces,+!!n.physical,this.width,i*ge]),o.set([n.bias,n.aoDistance],8),this.device.queue.writeBuffer(this.#i,0,e);let s=this.device.createCommandEncoder(),c=s.beginComputePass();c.setPipeline(this.#o),c.setBindGroup(0,this.#s[0]),c.setBindGroup(1,this.#s[1]),c.dispatchWorkgroups(i,a),c.end(),this.device.queue.submit([s.finish()])}this.#e+=e,await this.device.queue.onSubmittedWorkDone()}async read(){if(this.#t)throw new Z(`state`,`GPULightmapBaker is disposed; create a new one`);if(!this.#e)throw new Z(`state`,`GPULightmapBaker has run no passes; call step() first`);let e=Math.max(16,this.samples*16),t=this.device.createBuffer({size:e,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),n=this.device.createCommandEncoder();n.copyBufferToBuffer(this.#a,0,t,0,e),this.device.queue.submit([n.finish()]);try{await t.mapAsync(GPUMapMode.READ);let n=new Float32Array(t.getMappedRange(0,e).slice(0)),r=new Float32Array(this.samples*3),i=new Float32Array(this.samples);for(let e=0;e<this.samples;e++){for(let t=0;t<3;t++)r[e*3+t]=n[e*4+t]/this.#e;i[e]=n[e*4+3]/this.#e}return s(this.#c,r,i,this.samples*(this.#e*(1+this.#l.bounces)))}finally{t.destroy()}}[Symbol.dispose](){if(!this.#t){this.#t=!0;for(let e of[...this.#r,this.#i,this.#a])e.destroy();this.texture.destroy(),this.#n[Symbol.dispose]()}}};const we=[.62,.57,.51],Te={direction:[-.72,.63,.286],color:[1,.81,.61],intensity:5.02},Ee={color:[.63,.77,1],intensity:.245},De={width:256,height:192,seed:15733,dilate:2,radiometry:`physical`,bounces:2,albedo:we,aoDistance:2.5,bias:.007,maxSamples:49152,lights:[{type:`directional`,...Te},{type:`ambient`,...Ee}]},Oe=(e,t)=>e.map((e,n)=>e-t[n]),ke=(e,t)=>[e[1]*t[2]-e[2]*t[1],e[2]*t[0]-e[0]*t[2],e[0]*t[1]-e[1]*t[0]],Ae=e=>{let t=Math.hypot(...e)||1;return e.map(e=>e/t)};function je(e){return[1,3,5].map(t=>{let n=Number.parseInt(e.slice(t,t+2),16)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4})}const Me={lime:`#ddd0bb`,plaster:`#c5bca8`,shade:`#b7ac96`,sand:`#b89d7f`,inlay:`#876f58`,amber:`#aa664b`,ember:`#995344`,blush:`#b17359`,slate:`#4c6564`,celadon:`#668782`,grove:`#43756d`,oak:`#9c7455`,hardwood:`#806247`,bronze:`#a78461`,ink:`#424945`,white:`#e0cbb0`,black:`#494641`};function Ne(e,t){if(t.x+t.w<=e.x||t.x>=e.x+e.w||t.y+t.h<=e.y||t.y>=e.y+e.h)return[e];let n=[];return t.x>e.x&&n.push({x:e.x,y:e.y,w:t.x-e.x,h:e.h}),t.x+t.w<e.x+e.w&&n.push({x:t.x+t.w,y:e.y,w:e.x+e.w-t.x-t.w,h:e.h}),t.y>e.y&&n.push({x:e.x,y:e.y,w:e.w,h:t.y-e.y}),t.y+t.h<e.y+e.h&&n.push({x:e.x,y:t.y+t.h,w:e.w,h:e.y+e.h-t.y-t.h}),n}function Pe(e){for(let t of[10,9,8,7,6,5]){let n=[{x:0,y:0,w:256,h:192}],r=[],i=e.map(e=>({w:Math.max(2,Math.round(e.w*t))+6,h:Math.max(2,Math.round(e.h*t))+6,chart:e}));i.sort((e,t)=>t.w*t.h-e.w*e.h);for(let{w:e,h:t,chart:a}of i){let i,o=1/0;for(let r of n){if(e>r.w||t>r.h)continue;let n=Math.min(r.w-e,r.h-t)*256+Math.max(r.w-e,r.h-t);n<o&&(i=r,o=n)}if(!i)break;let s={x:i.x,y:i.y,w:e,h:t},c=n.flatMap(e=>Ne(e,s));n=c.filter((e,t)=>!c.some((n,r)=>t!==r&&e.x>=n.x&&e.y>=n.y&&e.x+e.w<=n.x+n.w&&e.y+e.h<=n.y+n.h&&(e.w<n.w||e.h<n.h||r<t))),r.push({chart:a,x:s.x+3,y:s.y+3,w:e-6,h:t-6})}if(r.length===e.length)return r}throw RangeError(`The room surfaces do not fit their lightmap atlas.`)}function Fe(){let e=[];function t(t,n,r,i){let a=Ae(ke(Oe(n[1],n[0]),Oe(n[2],n[0])));e.push({name:t,w:r,h:i,p:n,n:n.map(()=>a),uv:[[0,1],[1,1],[1,0],[0,0]],i:[0,1,2,0,2,3]})}function n(e,n,r,i,a,o,s=!1){let c=[[r,n,a],[i,n,a],[i,n,o],[r,n,o]];t(e,s?c.reverse():c,i-r,a-o)}function r(e,n,r,i,a,o,s=!1){let c=[[r,a,n],[i,a,n],[i,o,n],[r,o,n]];t(e,s?c.reverse():c,i-r,o-a)}function i(e,n,r,i,a,o,s=!1){let c=[[n,a,r],[n,a,i],[n,o,i],[n,o,r]];t(e,s?c.reverse():c,r-i,o-a)}function a(e,t,a,o,s,c,l){n(e,s,t,a,c,l),n(e,o,t,a,c,l,!0),r(e,c,t,a,o,s),r(e,l,t,a,o,s,!0),i(e,a,c,l,o,s),i(e,t,c,l,o,s,!0)}let o=-3.48,s=3.4,c=-4.4,l=3.75,u=3.6;n(`sand`,0,o,s,l,c),r(`lime`,c,o,s,0,u),i(`plaster`,o,l,c,0,.96),i(`plaster`,o,l,c,2.88,u),i(`shade`,o,l,2,.96,2.88),i(`plaster`,o,-3.72,c,.96,2.88),i(`lime`,s,-.7,c,0,u,!0),n(`lime`,u,o,-2.68,l,c,!0),n(`lime`,u,-1.84,s,l,c,!0),n(`plaster`,u,-2.68,-1.84,l,-.51,!0),n(`plaster`,u,-2.68,-1.84,-3.16,c,!0),n(`shade`,.96,-3.79,o,2,-3.72),n(`shade`,2.88,-3.79,o,2,-3.72,!0),r(`shade`,2,-3.79,o,.96,2.88,!0),r(`shade`,-3.72,-3.79,o,.96,2.88);for(let e=0;e<9;e++){let t=1.68-e*.6;a(e%3?`oak`:`hardwood`,-3.76,-3.424,.97,2.873,t+.034,t-.033)}a(`shade`,1.35,3.21,.012,.46,-3.43,-4.34),a(`oak`,1.28,3.25,.452,.517,-3.38,-4.35),r(`plaster`,-4.389,-3.38,3.3,.027,.104);for(let e=0;e<8;e++){let t=.54+e*.307,n=[`amber`,`blush`,`ember`][e%3];a(n,t,t+.281,.79,3.085,-4.321,-4.396)}a(`bronze`,.44,3.06,3.104,3.135,-4.28,-4.4),a(`bronze`,.44,3.06,.752,.777,-4.28,-4.4),a(`slate`,-2.14,-.22,.012,.314,-2.45,-3.77),a(`celadon`,-2.16,-.2,.309,.356,-2.43,-3.79),a(`hardwood`,1.5,1.62,.032,.41,-.92,-2.29),a(`hardwood`,2.93,3.05,.032,.41,-.92,-2.29),a(`oak`,1.4,3.16,.402,.482,-.869,-2.344);for(let e=0;e<5;e++){let t=-.95-e*.299;a(e%3?`oak`:`bronze`,1.39,3.17,.484,.508,t,t-.213)}n(`inlay`,.001,-3.31,-3.26,2.83,-4.108),n(`inlay`,.001,-3.31,3.29,-4.106,-4.147),n(`inlay`,.001,3.2399999999999998,3.2889999999999997,2.83,-4.108);function d(t,n,r,i,a,o,s=1){let c=[],l=[],u=[],d=[],f=[0];for(let e=1;e<a.length;e++)f.push(f[e-1]+Math.hypot((a[e][0]-a[e-1][0])*o,a[e][1]-a[e-1][1]));let p=f.at(-1),m=Math.max(...a.map(e=>e[1]));for(let e=0;e<a.length;e++){let[t,m]=a[e],[h,g]=a[Math.max(0,e-1)],[_,v]=a[Math.min(a.length-1,e+1)];for(let a=0;a<=36;a++){let y=2*Math.PI*a/36,b=Math.cos(y),x=Math.sin(y),S=1+.024*Math.cos(y*7+.31)+.019*Math.cos(y*3-t*3.3);if(c.push([n+m*S*b,r+o*t,i+s*m*S*x]),l.push(Ae([(_-h)*o*b,g-v,(_-h)*o*x/s])),u.push([a/36,1-f[e]/p]),a>0&&e>0){let t=e*37+a,n=t-36-2;d.push(n,t-1,t,n,t,n+1)}}}e.push({name:t,w:2*Math.PI*m,h:p,p:c,n:l,uv:u,i:d})}d(`grove`,-.99,.356,-2.98,[[0,.09],[.04,.18],[.105,.29],[.18,.38],[.265,.428],[.33,.441],[.42,.446],[.515,.426],[.599,.372],[.68,.274],[.76,.213],[.85,.191],[.918,.195],[.945,.231]],1.29,1.02),d(`celadon`,-.99,.356,-2.98,[[.945,.231],[.968,.224],[.974,.197],[.947,.177]],1.29,1.02),d(`white`,-1.71,.356,-2.66,[[0,.065],[.055,.162],[.11,.197],[.25,.216],[.38,.192],[.53,.121],[.7,.09],[.83,.099],[.86,.092]],.84,1.04),d(`ember`,-1.77,.356,-3.38,[[0,.083],[.068,.125],[.14,.141],[.23,.123],[.34,.065],[.5,.071]],.66),d(`amber`,2.44,.517,-3.86,[[0,.09],[.07,.16],[.17,.19],[.28,.19],[.38,.135],[.52,.079],[.6,.084]],.94);let f=[],p=[],m=[],h=[],g=[],_=[];for(let{chart:t,x:n,y:r,w:i,h:a}of Pe(e)){_.push({x:n,y:r,w:i,h:a});let e=je(Me[t.name]),o=f.length/3;for(let o=0;o<t.p.length;o++){let s=t.p[o],c=t.n[o],l=[(n+i*t.uv[o][0])/256,(r+a*t.uv[o][1])/192];f.push(...s),p.push(...c),h.push(...l),g.push(...s,...l,...e)}for(let e of t.i)m.push(o+e)}return{mesh:{positions:new Float32Array(f),normals:new Float32Array(p),indices:new Uint32Array(m),uv1:new Float32Array(h)},vertices:new Float32Array(g),count:e.length,rectangles:_}}addEventListener(`message`,async({data:e})=>{let t,n;try{if(e.compatibility||!navigator.gpu){let{installCompatibility:e}=await import(`./compatibility-DJsv9_vK.js`);await e()}let r=await navigator.gpu.requestAdapter();if(!r)throw Error(`A GPU adapter is required for the stock lightmap bake.`);let i=r.limits;t=await r.requestDevice({requiredLimits:{maxTextureArrayLayers:i.maxTextureArrayLayers,maxBufferSize:i.maxBufferSize,maxStorageBufferBindingSize:i.maxStorageBufferBindingSize}});let a=Fe();n=await Ce.create(t,a.mesh,De);for(let e of[24,40,64]){await n.step(e-n.passes);let t=await n.read(),r={...t,triangle:t.triangle.slice(),passes:n.passes};postMessage({result:r,complete:e===64},[t.lightmap.buffer,t.irradiance.buffer,r.triangle.buffer,t.ao.buffer])}}catch(e){postMessage({error:e?.message??String(e)})}finally{n?.[Symbol.dispose](),t?.destroy(),close()}},{once:!0});

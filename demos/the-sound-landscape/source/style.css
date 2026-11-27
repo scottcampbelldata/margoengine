@@ -1,0 +1,67 @@
+
+:root{color-scheme:dark;--ink:#f5ecdc;--soft:#bbc9c3;--dim:#a5b8b1;--line:#3e5757;--champagne:#f1cc83;--surface:#162626;--sans:"Aptos","Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif}
+*{box-sizing:border-box}
+body{margin:0;background:#131e20;color:var(--ink);font:400 1rem/1.45 var(--sans)}
+main{width:min(calc(100% - 80px),1040px);margin:auto;padding:28px 0 22px}
+header{margin-bottom:18px}
+a{color:var(--soft);text-decoration:none;font-size:.78rem}
+a:hover{color:var(--ink)}
+h1{font:400 clamp(2.4rem,6.7vw,5.5rem)/.96 var(--serif);letter-spacing:-.066em;margin:.16em 0 .18em}
+p{margin:0}
+header p{color:var(--soft);font-size:clamp(.93rem,1.9vw,1.13rem)}
+.tool-row{display:flex;justify-content:space-between;gap:7px;padding:10px 0;border-top:1px solid var(--line)}
+fieldset{display:flex;align-items:center;gap:6px;border:0;margin:0;padding:0;min-inline-size:0}
+legend{float:left;color:var(--dim);font-size:.74rem;padding:0 .55rem 0 0;line-height:40px}
+button{border:1px solid #557071;border-radius:3px;background:#1d3233;color:var(--ink);padding:.4em .88em;min-height:41px;font:600 .84rem/1.1 var(--sans);cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+button:hover{background:#2b4748;border-color:#91a19a}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--champagne);outline-offset:2px}
+button:disabled{opacity:.60;cursor:default}
+button[aria-pressed=true]{border-color:#a1b0a0;background:#374946}
+figure{margin:0}
+.stage{position:relative;background:#102124;border:1px solid #4d6968;isolation:isolate}
+canvas{display:block;width:100%;height:auto;aspect-ratio:2.12}
+#labels,#notice{position:absolute;inset:0}
+#labels{pointer-events:none;overflow:hidden;color:#bdcec5}
+#labels span{position:absolute;transform:translate(-50%,-50%);font:520 .66rem/1 var(--sans);white-space:nowrap;letter-spacing:.02em}
+#labels .axis-title{color:#e4dfcb;font-size:.68rem;font-weight:620}
+#notice{display:grid;align-content:center;z-index:1;text-align:center;background:#102124;padding:20px;color:var(--soft)}
+#notice[hidden]{display:none}
+#error:not(:empty){color:#ffb791;margin-top:8px}
+figcaption{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--soft);font-size:.82rem;margin:6px 0 9px}
+.scale{white-space:nowrap;display:flex;align-items:center;gap:7px;font-size:.74rem}
+.scale i{width:min(11vw,101px);height:6px;border-radius:6px;background:linear-gradient(90deg,#193b4a,#3a847a,#c49557,#ffe3a4)}
+.transport{display:grid;grid-template-columns:auto 1fr 128px;gap:13px;align-items:stretch;border-block:1px solid var(--line);padding:9px 0}
+button.play{min-width:112px;min-height:48px;background:var(--champagne);color:#25211b;border-color:var(--champagne)}
+button.play:hover{background:#ffe4b0;border-color:#ffe4b0}
+.time{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;color:var(--soft)}
+.time input{width:100%;height:36px;min-width:0;margin:0;accent-color:var(--champagne);cursor:pointer}
+.time span{color:var(--dim);font-variant-numeric:tabular-nums;font-size:.8rem;white-space:nowrap}
+.peak{display:grid;align-content:center;justify-content:center;min-width:0;border-left:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:.78rem;color:var(--dim)}
+.peak output{color:var(--ink);font-size:1.05rem}
+#audio-note{color:#f6b292;font-size:.8rem;margin-top:8px}
+footer{display:flex;justify-content:space-between;gap:10px;color:var(--dim);font-size:.77rem;margin-top:10px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+@media(max-width:720px){
+ main{width:min(calc(100% - 28px),550px);padding-top:16px}
+ header{margin-bottom:12px}
+ h1{font-size:clamp(2.22rem,10.3vw,3.75rem);margin-top:.19em}
+ header p{font-size:.84rem}
+ canvas{aspect-ratio:1.30}
+ .tool-row{padding:7px 0;gap:4px}
+ legend{display:none}
+ button{min-height:41px;padding:.36em .66em;font-size:.77rem}
+ fieldset{gap:4px}
+ figcaption{align-items:start;font-size:.73rem;margin-bottom:6px}
+ .scale{gap:4px;font-size:.66rem}
+ .scale i{width:13vw}
+ .transport{gap:6px;grid-template-columns:auto 1fr 78px}
+ button.play{min-width:82px}
+ .time{gap:1px;grid-template-columns:1fr;align-content:center}
+ .time input{height:24px}
+ .time span{text-align:right;font-size:.68rem}
+ .peak{font-size:.65rem}
+ .peak output{font-size:.95rem}
+ #labels span{font-size:.56rem}
+ #labels .axis-title{font-size:.59rem}
+ footer{font-size:.62rem}
+}

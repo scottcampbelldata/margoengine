@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CsS1xF6j.js"><script src="./assets/inline-1ac8639a.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#22231f">
+  <meta name="description" content="Edit a real shader node graph, see the material on an original ceramic vessel, and read the generated WGSL.">
+  <title>The Shader Node Editor | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BFsrn761.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BsfseeD7.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Shader Node Editor</h1>
+      <p>Build the glaze on a ceramic vessel. Change the finish, wire a node, and see the material and generated WGSL update together.</p>
+    </header>
+    <div class="workshop">
+      <section aria-label="Material preview" class="specimen">
+        <figure id="viewport">
+          <canvas id="scene" aria-label="A sculpted ceramic vessel and a curved glaze sample on a gallery plinth"></canvas>
+          <p id="loading" role="status">Opening the material studio…</p>
+          <p id="error" role="alert" hidden></p>
+        </figure>
+        <fieldset id="finish" disabled>
+          <legend>Surface roughness <output id="roughness-value" for="roughness">0.16</output></legend>
+          <input type="range" id="roughness" min=".045" max="1" step=".005" value=".16" aria-label="Surface roughness">
+          <div class="scale"><span>Gloss</span><span>Matte</span></div>
+        </fieldset>
+        <div class="specimen-actions">
+          <button type="button" id="turn" aria-pressed="false" disabled>Orbit preview</button>
+          <span id="preview-note" role="status"></span>
+        </div>
+      </section>
+      <section aria-labelledby="graph-title" class="workbench">
+        <div class="graph-header">
+          <h2 id="graph-title">Material graph</h2>
+          <button type="button" id="restore" disabled>Reset graph</button>
+        </div>
+        <p class="connection-help">Drag a wire between sockets, or tap an output and then an input.</p>
+        <div id="graph" inert></div>
+        <details id="source-view">
+          <summary>Generated WGSL</summary>
+          <pre id="wgsl" tabindex="0" aria-label="Generated material WGSL"></pre>
+        </details>
+      </section>
+    </div>
+    <footer><a href="https://www.w3.org/TR/WGSL/">WGSL specification</a><a href="./source/README.md">Scene notes</a></footer>
+  </main>
+</body>
+</html>

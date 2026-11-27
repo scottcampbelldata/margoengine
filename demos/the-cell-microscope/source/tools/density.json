@@ -1,0 +1,56 @@
+{
+  "id": "EMD-3164",
+  "sample": "Bovine mitochondrial ATP synthase, state 1a",
+  "source": "https://files.wwpdb.org/pub/emdb/structures/EMD-3164/map/emd_3164.map.gz",
+  "license": "CC0-1.0",
+  "sourceSha256": "dbfeef1380bfc09594d4be17116e452b684a5459b607cff9b321462eebf807ad",
+  "displaySha256": "0d9a634bb97292c64d7458dc679643ce3dbab11997a74bfe239aa11b0cd83879",
+  "originalShape": [
+    256,
+    256,
+    256
+  ],
+  "displayShape": [
+    29,
+    31,
+    43
+  ],
+  "sampleCoordinates": [
+    [
+      68,
+      180,
+      4
+    ],
+    [
+      64,
+      184,
+      4
+    ],
+    [
+      44,
+      212,
+      4
+    ]
+  ],
+  "fileToDisplayAxes": [
+    "x",
+    "y",
+    "z"
+  ],
+  "spacingAngstrom": [
+    6.559999942779541,
+    6.559999942779541,
+    6.559999942779541
+  ],
+  "displayBoundsAngstrom": [
+    0,
+    183.67999839782715,
+    0,
+    196.79999828338623,
+    0,
+    275.5199975967407
+  ],
+  "integerScale": 20000,
+  "maximumQuantizationError": 2.4999454617501138e-05,
+  "encoding": "gzip, signed little-endian int16 byte planes, display x fastest"
+}

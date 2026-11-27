@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Y68ASVFC.js"><script src="./assets/webgl2-preload-69af17ad.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171622">
+  <meta name="description" content="Move a thousand coloured lights through a basalt hall and watch their shadows sweep across the room.">
+  <title>A Thousand Lights · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-Byxrp5UC.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/version-YYhCZP03.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CzgzEAmi.css">
+</head>
+<body>
+<main>
+  <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+  <header>
+    <h1>A Thousand <em>Lights</em></h1>
+    <p>Sweep a thousand moving lights through a basalt hall. Watch their colours and shadows travel across the bronze.</p>
+  </header>
+  <section class="stage" aria-label="Light installation in a dark architectural hall">
+    <canvas id="hall" aria-label="Three-dimensional bronze installation illuminated by a thousand moving lights"></canvas>
+    <div class="display">
+      <span><strong id="light-count">—</strong> lights</span>
+      <span><strong id="shadow-count">—</strong> shadow sources</span>
+    </div>
+    <p id="status" class="notice" role="status">Opening the hall…</p>
+    <div id="error" class="notice" role="alert" hidden><p id="message"></p><a id="help" href="https://margoengine.com/errors#webgpu" hidden>WebGPU support</a></div>
+  </section>
+  <section class="panel" aria-label="Light controls">
+    <div class="sweep">
+      <label for="phase">Light sweep</label><output id="phase-value" for="phase">26%</output>
+      <input type="range" id="phase" min="0" max="100" value="26" step="1" disabled>
+    </div>
+    <div class="controls">
+      <button id="play" type="button" disabled>Play sweep</button>
+      <button id="inspect" type="button" aria-pressed="false" disabled>Performance</button>
+    </div>
+  </section>
+  <div id="meter" hidden></div>
+  <footer><a href="./source/README.md">Scene notes and source</a><span>Clustered lighting · Margo Engine</span></footer>
+</main>
+</body>
+</html>

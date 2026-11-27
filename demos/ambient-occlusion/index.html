@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><script src="./assets/webgl2-preload-f88843a1.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1d292d">
+<link rel="icon" href="data:,">
+<title>Ambient Occlusion · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CVgdq9YA.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-WlXJ0KIT.css">
+</head>
+<body>
+<main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>Ambient <br>Occlusion</h1><p>Look inside a carved spiral. Switch between two ways of estimating how much ambient light reaches its narrow chambers.</p></header>
+<section class="exhibit">
+  <figure>
+    <div class="viewport">
+      <canvas id="sculpture" aria-label="Open fossil spiral with carved partitions and a dark round plinth" tabindex="0"></canvas>
+      <p id="loading" role="status">Opening the sculpture room…</p>
+      <p id="error" role="alert" hidden></p>
+    </div>
+    <figcaption><span>The Chambered Spiral</span><span>Cast mineral</span></figcaption>
+  </figure>
+  <aside>
+    <fieldset id="controls" disabled>
+      <legend>Occlusion method</legend>
+      <div class="modes" aria-label="Ambient occlusion method">
+        <button data-mode="off" aria-pressed="false">Off</button>
+        <button data-mode="ssao" aria-pressed="true">SSAO</button>
+        <button data-mode="gtao" aria-pressed="false">GTAO</button>
+      </div>
+      <label for="radius">Sampling radius <output for="radius" id="radius-value">36 cm</output></label>
+      <input id="radius" type="range" min="7" max="65" value="36" step="1">
+      <button type="button" id="reset">Reset view</button>
+    </fieldset>
+    <p id="method-note">SSAO samples the depth around each point to estimate how much of the ambient light is blocked.</p>
+    <p class="tip">Drag to orbit. The light and sculpture stay fixed between methods.</p>
+  </aside>
+</section>
+<footer><a href="./source/README.md">Sculpture and occlusion model</a></footer>
+</main>
+</body></html>

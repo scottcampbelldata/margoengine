@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-5fdf2f79.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#182932">
+  <meta name="description" content="Turn the direction of an applied pull and see the stress tensor change around a circular hole.">
+  <title>The Stress Glyphs · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BUZiL2ZX.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CxUwLD-g.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Stress Glyphs</h1>
+      <p>Change the direction of a pull. See how tension and compression turn and concentrate around a hole in the sheet.</p>
+    </header>
+    <section class="test" aria-label="Interactive plane stress field">
+      <figure>
+        <canvas id="view" aria-label="Stress glyphs and signed tangential stress around a circular opening in a plate"></canvas>
+        <figcaption><strong>Sheet under tension</strong><span>78 mm opening · 10 MPa uniform pull</span></figcaption>
+        <span id="probe" class="probe" hidden>Right rim</span>
+        <div id="status" role="status"><strong>Opening the stress field…</strong><span id="reason"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Stress controls">
+        <div class="pull">
+          <label for="angle">Pull direction</label><output id="degrees" for="angle">18°</output>
+          <input id="angle" type="range" min="0" max="90" step="1" value="18" disabled>
+          <div aria-hidden="true"><span>0°</span><span>90°</span></div>
+        </div>
+        <div class="modes" role="group" aria-label="Stress glyph display">
+          <button id="principal" aria-pressed="true" disabled>Principal</button>
+          <button id="shear" aria-pressed="false" disabled>Shear</button>
+        </div>
+        <ul class="legend" id="principal-legend" aria-label="Principal glyphs">
+          <li><i class="tension" aria-hidden="true">↔</i>Tension</li>
+          <li><i class="compression" aria-hidden="true">→←</i>Compression</li>
+        </ul>
+        <p class="shear-legend" id="shear-legend" hidden>Violet marks show the normals of the two maximum-shear planes, 45° from the principal axes.</p>
+        <dl>
+          <div><dt>Right rim tangential stress</dt><dd id="rim-stress">−6.2 MPa</dd></div>
+          <div><dt>Peak rim tension</dt><dd>30 MPa</dd></div>
+        </dl>
+        <p class="explain">Arrow axes show local directions. Length shows magnitude. At the free rim, tangential tension peaks at three times the applied stress.</p>
+      </aside>
+    </section>
+    <footer>
+      <p>Kirsch’s elastic plane-stress solution · Cropped field in an infinite sheet</p>
+      <details>
+        <summary>Model and references</summary>
+        <p>The load is a uniform 10 MPa tension far from the circular hole. The rim has zero radial and shear traction. Changing the pull rotates the analytical field and leaves the sheet geometry fixed.</p>
+        <p><a href="https://live.ocw.mit.edu/courses/3-11-mechanics-of-materials-fall-1999/2ed676922db750766161cdd004b2270a_MIT3_11F99_airy.pdf">MIT elasticity derivation</a> · <a href="https://ntrs.nasa.gov/citations/19930082747">NACA stress concentration study</a></p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

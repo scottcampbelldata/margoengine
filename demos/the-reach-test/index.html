@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-9ca02633.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#15191a">
+  <link rel="icon" href="data:,">
+  <title>The Reach Test · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-2CKCdLBs.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-AhIuz-tw.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>The Reach Test</h1><p>Move the amber target. The arm reaches while staying clear of the rounded post and the steel block.</p></header>
+    <section class="exhibit" aria-label="Interactive robot reach test">
+      <figure>
+        <canvas id="scene" aria-label="Three-link robot arm, capsule post and convex steel block"></canvas>
+        <span id="target-crosshair" aria-hidden="true" hidden></span>
+        <p id="status" role="status">Starting the reach bench…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="overlay"><span id="motion">Ready to reach</span><span>Drag the target</span></div>
+      </figure>
+      <aside>
+        <fieldset id="targets" disabled>
+          <legend>Try a target</legend>
+          <button type="button" data-position="0">Upper left</button>
+          <button type="button" data-position="1">Far side</button>
+          <button type="button" data-position="2">Inside the post</button>
+          <button type="button" data-position="3">Back left</button>
+        </fieldset>
+        <div class="range">
+          <label for="depth">Target depth</label><output id="depth-reading" for="depth">23 cm</output>
+          <input type="range" id="depth" min="-39" max="65" step="1" value="23" disabled>
+        </div>
+        <dl>
+          <div><dt>Live minimum gap</dt><dd><output id="gap">—</output></dd></div>
+          <div><dt>Nearest obstacle</dt><dd><output id="nearest">—</output></dd></div>
+          <div><dt>Distance from target</dt><dd><output id="miss">—</output></dd></div>
+        </dl>
+        <button id="reset" type="button" disabled>Reset arm</button>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and method</a></footer>
+  </main>
+</body>
+</html>

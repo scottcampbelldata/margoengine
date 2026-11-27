@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-B29p7Bpr.js"><script src="./assets/inline-bca7e744.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#131d1e">
+<link rel="icon" href="data:,">
+<title>Long Shadows · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DkkQBa1T.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DxRJG--h.css">
+</head>
+<body>
+<main>
+  <nav><a href="../">Margo Engine / Web demos</a></nav>
+  <header><h1>Long Shadows</h1><p>Follow an Alpine railway from its platform to the mountain ridge. At every stop, low sun puts shadow detail to the test.</p></header>
+  <section class="exhibit" aria-label="Alpine railway and viewpoints">
+    <figure>
+      <div class="frame">
+        <canvas id="valley" aria-label="A railway, stone viaduct and glacial valley under low afternoon sun"></canvas>
+        <p id="loading" role="status">Opening the valley…</p>
+        <p id="error" role="alert" hidden></p>
+      </div>
+      <figcaption><span id="view-name">Platform</span><span>4.7 × 5.4 km terrain</span></figcaption>
+    </figure>
+    <aside>
+      <fieldset id="controls" disabled>
+        <legend>Viewpoint</legend>
+        <div class="views">
+          <button type="button" data-view="0" aria-pressed="true"><span>Platform</span><small>Trackside detail</small></button>
+          <button type="button" data-view="1" aria-pressed="false"><span>Viaduct</span><small>Across the gorge</small></button>
+          <button type="button" data-view="2" aria-pressed="false"><span>Ridge</span><small>High over the pass</small></button>
+        </div>
+        <label class="switch"><input type="checkbox" id="far" checked> Distant terrain shadows</label>
+      </fieldset>
+      <dl>
+        <div><dt>Local shadow reach</dt><dd id="reach">—</dd></div>
+        <div><dt>Depth map</dt><dd id="method">—</dd></div>
+        <div id="page-row"><dt>Resident virtual pages</dt><dd id="pages">—</dd></div>
+      </dl>
+      <p class="observation" id="observation">Look for the small railing shadows and the much larger terrain shadows on the slopes.</p>
+    </aside>
+  </section>
+  <footer><a href="./source/README.md">Terrain and shadow model</a></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,44 @@
+@charset "UTF-8";
+:root{color-scheme:dark;background:#272c25;color:#eee9d8;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(calc(100% - 64px),1310px);margin:auto;padding:22px 0 22px}
+nav{display:flex;gap:.56rem;color:#a0a69a;font-size:.77rem}
+nav a,footer a{color:#c4cabb;text-decoration:none}
+nav a:hover,footer a:hover{text-decoration:underline}
+header{margin:21px 0 17px}
+h1{font:400 clamp(2.95rem,6vw,5.26rem)/.97 Georgia,serif;letter-spacing:-.049em;margin:0 0 10px}
+header p{margin:0;max-width:71ch;color:#d0d0bd;font-size:1rem;line-height:1.45}
+figure{position:relative;overflow:hidden;margin:0;background:#7c8d86;border:1px solid #7d8473}
+canvas{display:block;width:100%;height:clamp(395px,47vw,620px);touch-action:pan-y}
+[data-ready=true] canvas{cursor:crosshair}
+#loading,#error{position:absolute;left:12px;bottom:12px;margin:0;max-width:calc(100% - 24px);padding:.69rem .8rem;background:#303b31;border:1px solid #869483;font-size:.8rem}
+#error{color:#ffd3c4}
+.instrument{display:grid;grid-template-columns:minmax(310px,1fr) minmax(175px,.65fr);gap:32px;padding:12px 0 14px;border-bottom:1px solid #586152}
+fieldset{border:0;min-width:0;margin:0;padding:0}
+legend{margin:0 0 5px;padding:0;color:#c4cdba;font-size:.8rem}
+.actions{display:flex;flex-wrap:wrap;gap:5px}
+button{white-space:nowrap;min-height:44px;padding:8px 11px;border:1px solid #6f7e67;background:#3a473b;color:#eeeed8;font:600 .84rem system-ui,sans-serif;border-radius:2px;cursor:pointer}
+button:disabled{opacity:.7;cursor:default}
+button:hover:not(:disabled){background:#4c5c49}
+#walk{color:#263023;background:#d8c493;border-color:#d8c493}
+#walk:hover:not(:disabled){background:#e6d5a9}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #f0d59d;outline-offset:3px}
+#sun{height:28px;width:100%;margin:0;accent-color:#dfc38b}
+#sun-value{color:#f6e6b8;margin-left:4px;font-variant-numeric:tabular-nums}
+.distance,.limits{margin:5px 0 0;color:#bbcab8;font-size:.73rem}
+.distance output{color:#eee6cd;margin-left:6px;font-variant-numeric:tabular-nums}
+.limits{display:flex;justify-content:space-between}
+footer{display:flex;flex-wrap:wrap;gap:7px 16px;padding-top:12px;font-size:.75rem}
+@media(max-width:680px){
+  main{width:calc(100% - 26px);padding:16px 0 16px}
+  header{margin:18px 0 14px}
+  h1{font-size:clamp(2.92rem,10.9vw,4.6rem);margin-bottom:8px}
+  header p{font-size:.88rem}
+  canvas{height:clamp(345px,49svh,521px)}
+  .instrument{display:block;padding:9px 0 8px}
+  .actions{flex-wrap:nowrap}
+  .actions button{flex:1;min-width:0;padding:6px 2px;font-size:.79rem}
+  #weather{margin-top:10px}
+  #sun{height:25px}
+}

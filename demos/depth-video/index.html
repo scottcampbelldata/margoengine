@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-061f8d11.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#1b2331">
+  <link rel="icon" href="data:,">
+  <title>Depth Video · Margo Engine</title>
+  <link rel="preload" href="./assets/clip-0-DZXKAB49.depth" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-BnvcAkaw.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-iAce3xmh.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>Depth Video</h1><p>Play a real depth-camera recording as a moving point cloud. Drag to see each recorded frame from another angle.</p></header>
+    <section class="exhibit" aria-label="Depth camera playback">
+      <figure>
+        <canvas id="view" aria-label="Moving point cloud captured by a depth camera"></canvas>
+        <p id="status" role="status">Opening the recorded depth frames…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="caption"><span>Freiburg desk capture</span><output id="points">—</output></div>
+      </figure>
+      <aside>
+        <div class="transport">
+          <button type="button" id="play" aria-pressed="false" disabled>Play clip</button>
+          <button type="button" id="reset" disabled>Reset view</button>
+        </div>
+        <div class="range">
+          <label for="frame">Recorded time</label><output id="time" for="frame">0.00 s</output>
+          <input id="frame" type="range" min="0" max="53" step="1" value="0" disabled>
+        </div>
+        <fieldset id="modes" disabled>
+          <legend>Point colour</legend>
+          <button data-mode="range" type="button" aria-pressed="true">Camera range</button>
+          <button data-mode="rgb" type="button" aria-pressed="false">Source colour</button>
+        </fieldset>
+        <p id="buffer" role="status"></p>
+        <dl>
+          <div><dt>Recorded frame</dt><dd><output id="position">1 / 54</output></dd></div>
+          <div><dt>Capture grid</dt><dd>144 × 108</dd></div>
+          <div><dt>Capture rate</dt><dd>15 frames/s</dd></div>
+        </dl>
+        <div class="scale"><span>0.5 m</span><span>1.1 m</span><span>1.7 m and beyond</span></div>
+      </aside>
+    </section>
+    <footer>Sturm, Engelhard, Endres, Burgard and Cremers · TUM RGB-D benchmark · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a><br><a href="./source/README.md">Capture notes and source</a></footer>
+  </main>
+</body>
+</html>

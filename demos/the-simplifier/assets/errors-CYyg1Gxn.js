@@ -1,0 +1,1 @@
+import{i as e,n as t,r as n}from"./index-7hnJr1TK.js";var r=(r,i=e,a=import.meta.url)=>(t(r,n(i,a)),r),i=e=>e,a=class extends Error{constructor(e,t){super(t),this.name=`MargoError`,this.code=e}static[Symbol.hasInstance](e){return e instanceof Error&&e.name===`MargoError`}};export{r as n,i as r,a as t};

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-8f06e549.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101f27">
+  <link rel="icon" href="data:,">
+  <title>Charts You Can Hear · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CTnP789N.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CUvFOL03.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine / Web demos</a><a href="#observations">Data table</a></nav>
+    <header>
+      <div>
+        <p class="location">Golden Gate · San Francisco</p>
+        <h1>Charts You Can Hear</h1>
+      </div>
+      <p>Listen to the tide rise and fall. Every note comes from an hourly NOAA water level. Higher water makes a higher note.</p>
+    </header>
+    <section class="console" aria-labelledby="section-label">
+      <div class="transport">
+        <h2 id="section-label">Water level at the Golden Gate</h2>
+        <div class="controls">
+          <button id="play" type="button" disabled aria-label="Listen to the selected day">Listen</button>
+          <label for="day">Day
+            <select id="day">
+              <option value="0">December 1</option><option value="1">December 2</option>
+              <option value="2">December 3</option><option value="3">December 4</option>
+              <option value="4">December 5</option><option value="5">December 6</option><option value="6">December 7</option>
+            </select>
+          </label>
+          <label class="volume" for="volume">Volume
+            <input type="range" id="volume" min="0" max="100" value="55">
+          </label>
+        </div>
+        <p id="audio-status" role="status">24 hourly readings · 5.3 seconds</p>
+      </div>
+      <figure aria-describedby="summary">
+        <figcaption><span>Height relative to MLLW</span><span>NOAA 9414290 · December 2025</span></figcaption>
+        <div class="plate">
+          <canvas id="plot" aria-label="Selected day water level plot" aria-hidden="true"></canvas>
+          <div id="axes" aria-hidden="true"></div>
+          <div id="cursor" aria-hidden="true"></div>
+        </div>
+        <div class="probe">
+          <label for="hour">Hour <span>(UTC)</span></label>
+          <input id="hour" type="range" min="0" max="23" step="1" value="12" aria-describedby="keyboard-tip" aria-valuetext="12:00 UTC">
+          <output id="reading" for="hour" aria-hidden="true">—</output>
+        </div>
+        <p class="visually-hidden" id="spoken" aria-live="polite" aria-atomic="true"></p>
+        <p class="tip" id="keyboard-tip">Choose an hour with the arrow keys, or tap the chart. Use Home or End to reach the first or last reading.</p>
+      </figure>
+      <dl class="statistics" aria-label="Selected day water levels">
+        <div><dt>Lowest reading</dt><dd id="low">—</dd></div>
+        <div><dt>Highest reading</dt><dd id="high">—</dd></div>
+        <div><dt>Daily range</dt><dd id="range">—</dd></div>
+      </dl>
+      <p class="visually-hidden" id="summary"></p>
+    </section>
+    <details id="observations">
+      <summary>All 24 hourly readings for the selected day</summary>
+      <table><caption id="table-caption"></caption><thead><tr><th scope="col">Hour (UTC)</th><th scope="col">Height (m)</th></tr></thead><tbody id="table"></tbody></table>
+    </details>
+    <footer><a href="https://tidesandcurrents.noaa.gov/stationhome.html?id=9414290">NOAA station 9414290</a><a href="./source/README.md">Datum, sound mapping, and sources</a></footer>
+  </main>
+</body>
+</html>

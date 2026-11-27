@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-smAkVdMN.js"><script src="./assets/inline-fa7507cc.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171922">
+  <meta name="description" content="Change the size of a light and see live soft shadows, stained glass, and light through leaves.">
+  <link rel="icon" href="data:,">
+  <title>The Shadow Lab · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-C0SNQn29.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dv-1_x6t.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Light / transmission</span></nav>
+    <header>
+      <h1>The Shadow Lab</h1>
+      <p>Three ways to shape the same light.</p>
+    </header>
+    <figure id="lab">
+      <div class="stage">
+        <canvas id="view" role="img" aria-label="A conservatory with a bronze shadow sculpture, a leaded glass screen and a small maple"></canvas>
+        <p id="status" role="status">Opening the conservatory…</p>
+      </div>
+      <figcaption class="controls">
+        <div class="spread">
+          <div class="topline"><label for="size">Light source radius</label><output id="size-readout" for="size">4.2°</output></div>
+          <input id="size" type="range" min="0" max="120" step="1" value="42" disabled>
+          <div class="endpoints" aria-hidden="true"><span>Point source</span><span>12°</span></div>
+        </div>
+        <div class="toggles" aria-label="Transmissive materials">
+          <button type="button" id="glass" aria-pressed="true" disabled>Stained glass</button>
+          <button type="button" id="leaves" aria-pressed="true" disabled>Translucent leaves</button>
+        </div>
+      </figcaption>
+    </figure>
+    <section class="readings" aria-label="What to look for">
+      <div><h2>Bronze</h2><p>The raised fins cast wider, softer edges than the base.</p></div>
+      <div><h2>Glass</h2><p>Light takes on the color of each pane.</p></div>
+      <div><h2>Leaves</h2><p>Green light passes through the leaves. The branches block it.</p></div>
+    </section>
+    <details>
+      <summary>How the shadows are rendered</summary>
+      <p>The radius changes the soft edges of opaque shadows. The glass and thin leaf geometry use separate linear RGB transmission values. Turn off stained glass to use clear panes, or turn off translucent leaves to make them opaque.</p>
+    </details>
+  </main>
+</body>
+</html>

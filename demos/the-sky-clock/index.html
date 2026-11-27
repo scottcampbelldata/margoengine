@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-0b6a2da6.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#131e2b">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/yale-v50-DEz9CSqo.bin" as="fetch" crossorigin>
+  <title>The Sky Clock · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CG3Yyft8.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D-qGcWsl.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine / Web demos</a></nav>
+    <header>
+      <h1>The Sky Clock</h1>
+      <p>Set a date and a place on Earth. See where the Sun, the Moon, and the planets sit against the measured stars.</p>
+    </header>
+    <section class="console" aria-label="Observing sky">
+      <fieldset id="tools" disabled>
+        <legend>Observation</legend>
+        <div class="clock-controls">
+          <label>Date <span>(UTC)</span><input id="date" type="date" min="1800-01-01" max="2049-12-31" value="2026-05-20"></label>
+          <label>Time <span>(UTC)</span><input id="time" type="time" value="05:48"></label>
+          <label>Place
+            <select id="site">
+              <option value="mauna-kea">Mauna Kea</option><option value="greenwich">Greenwich</option>
+              <option value="vancouver">Vancouver</option><option value="atacama">Atacama</option>
+              <option value="sydney">Sydney</option><option value="custom">Custom coordinates</option>
+            </select>
+          </label>
+        </div>
+        <div class="coordinate-controls" id="coordinate-controls" hidden>
+          <label>Latitude <input id="latitude" type="number" min="-90" max="90" step=".001" value="19.82"></label>
+          <label>Longitude <input id="longitude" type="number" min="-180" max="180" step=".001" value="-155.47"></label>
+          <button type="button" id="place">Apply coordinates</button>
+        </div>
+        <div class="scrubber">
+          <label for="minute">Time of day <span>(UTC)</span></label>
+          <output id="scrub-readout" for="minute">05:48</output>
+          <input id="minute" type="range" min="0" max="1439" value="348" step="1">
+          <div class="times"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:59</span></div>
+        </div>
+      </fieldset>
+      <figure>
+        <figcaption><span id="location">Mauna Kea</span><span id="twilight">Astronomical twilight</span></figcaption>
+        <div class="dome">
+          <canvas id="view" aria-label="Rotatable astronomical sky" tabindex="0"></canvas>
+          <div id="labels" aria-hidden="true"></div>
+          <p id="status" role="status">Opening the sky…</p>
+          <p id="error" role="alert" hidden></p>
+        </div>
+        <div class="movement">
+          <fieldset id="view-tools" disabled aria-label="Look around the sky">
+            <button type="button" data-bearing="0">North</button><button type="button" data-bearing="90">East</button>
+            <button type="button" data-bearing="180">South</button><button type="button" data-bearing="270">West</button>
+            <button type="button" id="find-moon">Find Moon</button>
+          </fieldset>
+          <p>Drag to turn the dome, or use the arrow keys while it has focus.</p>
+        </div>
+      </figure>
+      <aside>
+        <dl class="reading">
+          <div><dt>Sun elevation</dt><dd id="sun">—</dd></div>
+          <div><dt>Moon illumination</dt><dd id="illumination">—</dd></div>
+          <div><dt>Moon phase</dt><dd id="phase">—</dd></div>
+        </dl>
+        <table><caption>Objects above the horizon</caption><thead><tr><th scope="col">Object</th><th scope="col">Bearing</th><th scope="col">Elevation</th></tr></thead><tbody id="bodies"></tbody></table>
+      </aside>
+    </section>
+    <footer>Position model valid 1800–2049 · Level observer horizon · 2,717 Yale Bright Star Catalogue entries<br><a href="./source/README.md">Calculation and source catalogue</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-4f7055a7.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Cast a typed word in live 3D and watch hot metal drain into a foundry bed.">
+  <meta name="theme-color" content="#151413">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/FoundrySans-Black-CjrsqrWu.ttf" as="fetch" crossorigin fetchpriority="high">
+  <title>Molten Words · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Dqo_DTet.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DAzQtczu.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web Demos</span></a></nav>
+    <header>
+      <h1>Molten Words</h1>
+      <p>Cast a word in hot metal. Watch it glow, cool, and drip into the bed below.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive metal casting">
+      <figure>
+        <canvas id="foundry" aria-label="Three-dimensional glowing cast letters and falling molten droplets"></canvas>
+        <p id="status" role="status">Preparing the casting bed…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <form aria-label="Casting controls" id="controls">
+        <label for="word">Type a word <small>(A–Z or 0–9)</small></label>
+        <input id="word" type="text" value="FORGE" maxlength="14" enterkeyhint="done" autocomplete="off" spellcheck="false" disabled>
+        <div class="reading"><label for="heat">Metal temperature</label><output id="temperature" for="heat">1,450 K</output></div>
+        <input id="heat" type="range" min="850" max="1850" value="1450" step="25" disabled>
+        <button id="pause" type="button" aria-pressed="false" disabled>Pause pour</button>
+      </form>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

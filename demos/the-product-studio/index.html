@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Bu2w0ZYj.js"><script src="./assets/inline-37a0a821.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#252e35">
+  <title>The Product Studio · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-eV9f2yOF.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DSEVZjgy.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header class="heading">
+      <div>
+        <h1>The Product Studio</h1>
+        <p>Photograph an original field receiver. Set the angle, then watch the softbox shadow build into a finished still.</p>
+      </div>
+      <span class="model-label">Relay B‑07<span>Field receiver</span></span>
+    </header>
+    <figure id="viewport" aria-label="Live 3D product studio">
+      <canvas id="scene" aria-label="A russet portable radio on a blue-grey cyclorama"></canvas>
+      <span id="loading" role="status">Opening the studio…</span>
+      <span id="error" role="alert" hidden></span>
+    </figure>
+    <div class="workbench">
+      <div class="controls" aria-label="Camera controls">
+        <button id="capture" type="button" disabled>Capture still</button>
+        <button id="preview" type="button" disabled>Return to preview</button>
+        <div class="pose">
+          <label for="angle">Camera angle <output id="angle-value" for="angle">19°</output></label>
+          <input type="range" id="angle" min="-25" max="44" value="19" disabled>
+        </div>
+      </div>
+      <section class="exposure" aria-label="Still capture">
+        <span id="take-status" role="status">Opening the set</span>
+        <div class="progress-row">
+          <progress id="meter" max="128" value="0" aria-label="Accumulated light samples"></progress>
+          <span><output id="sample-count">0</output> / 128 samples</span>
+        </div>
+        <button id="save" type="button" disabled>Save PNG</button>
+      </section>
+    </div>
+    <footer>
+      <span>Disk-light shadow accumulation and PBR softbox lighting</span>
+      <a href="https://graphics.pixar.com/library/StochasticSampling/paper.pdf">Cook’s light sampling paper</a>
+      <a href="https://github.com/scottcampbelldata/margoengine/tree/0efd9cff8230507a32deb49907ecd499d46925f5/packages/studio">Margo Studio</a>
+    </footer>
+  </main>
+</body>
+</html>

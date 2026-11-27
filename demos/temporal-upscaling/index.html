@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DUeKDt21.js"><script src="./assets/inline-9459dc72.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#1e2728">
+  <meta name="description" content="Compare native resolution with temporal and spatial reconstruction on an alpine cableway.">
+  <title>Temporal Upscaling | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-T3C5G7uz.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B7bF9QGl.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Temporal Upscaling</h1>
+      <p>Follow the cables and steelwork of a mountain tram. Compare native resolution with a half-size render rebuilt from successive frames.</p>
+    </header>
+    <section aria-label="Mountain cableway">
+      <figure id="viewport">
+        <canvas id="scene" aria-label="A vermilion aerial tram suspended beside a cold steel gantry at daybreak above an alpine valley"></canvas>
+        <p id="loading" role="status">Opening the cableway…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <div class="instrument">
+        <fieldset id="comparison" disabled>
+          <legend>Image reconstruction</legend>
+          <div class="modes">
+            <button type="button" data-mode="native" aria-pressed="true">Native</button>
+            <button type="button" data-mode="spatial" aria-pressed="false">Half-size spatial</button>
+            <button type="button" data-mode="temporal" aria-pressed="false">Half-size temporal</button>
+          </div>
+        </fieldset>
+        <fieldset class="camera" id="camera-controls" disabled>
+          <legend>Viewpoint</legend>
+          <div class="camera-controls">
+            <input id="view" type="range" min="0" max="1000" value="500" aria-label="Camera angle">
+            <button type="button" id="play" aria-pressed="false">Sweep camera</button>
+          </div>
+        </fieldset>
+        <div class="metrics">
+          <dl>
+            <div><dt>Scene raster</dt><dd><output id="scene-size">—</output></dd></div>
+            <div><dt>Display output</dt><dd><output id="output-size">—</output></dd></div>
+          </dl>
+          <p id="history" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+    <footer><a href="https://onlinelibrary.wiley.com/doi/full/10.1111/cgf.14018">How temporal sampling works</a><a href="./source/README.md">Scene notes</a></footer>
+  </main>
+</body>
+</html>

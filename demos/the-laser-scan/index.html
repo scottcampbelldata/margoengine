@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-fcb1ff96.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#102325">
+  <title>The Laser Scan · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/cloud-r-Ho5_u52f.tile" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-kLGDjauz.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CchsoVnR.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>The Laser Scan</h1><p>Explore a USGS lidar survey of Glacier Peak, Washington. Pick two laser returns to measure the distance between them.</p></header>
+    <section class="exhibit" aria-label="Glacier Peak lidar scan and survey measurements">
+      <figure>
+        <canvas id="cloud" aria-label="Lidar points from Glacier Peak’s summit district"></canvas>
+        <p id="status" role="status">Opening the survey points…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="caption"><span>Glacier Peak</span><span id="returns">Loading returns</span></div>
+      </figure>
+      <aside>
+        <div class="range">
+          <label for="zoom">Survey zoom</label><output id="zoom-text" for="zoom">1.0×</output>
+          <input type="range" id="zoom" min="10" max="33" value="10" step="1" disabled>
+        </div>
+        <p class="guide" id="guide">Tap the scan to set point A. Drag to turn it.</p>
+        <div class="buttons">
+          <button id="sample" type="button" disabled>Measure summit span</button>
+          <button id="clear" type="button" disabled>Clear</button>
+        </div>
+        <dl>
+          <div><dt>Point A elevation</dt><dd><output id="point-a">—</output></dd></div>
+          <div><dt>Point B elevation</dt><dd><output id="point-b">—</output></dd></div>
+          <div><dt>Height difference</dt><dd><output id="rise">—</output></dd></div>
+          <div><dt>Straight-line distance</dt><dd><output id="distance">—</output></dd></div>
+        </dl>
+        <div class="scale"><span>Lower slopes</span><span>Summit</span></div>
+      </aside>
+    </section>
+    <footer><a href="https://www.fisheries.noaa.gov/inport/item/58960">USGS survey record</a><a href="./source/README.md">Scene notes and method</a></footer>
+  </main>
+</body>
+</html>

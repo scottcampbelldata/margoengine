@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-092dd141.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#182025">
+  <link rel="icon" href="data:,">
+  <title>The Streamtubes · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BUUVLA2u.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CwufOfpY.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header>
+      <h1>The Streamtubes</h1>
+      <p>Follow the two vortices that trail a wing. Change the thickness of the tubes or isolate one vortex to see how it rolls in three dimensions.</p>
+    </header>
+    <section class="exhibit" aria-label="Wing wake exhibit">
+      <figure>
+        <div class="caption"><span>Wing wake</span><span id="angle">Oblique view</span></div>
+        <div class="showroom">
+          <canvas id="view" aria-label="Rotatable wind tunnel model with colored streamtubes" tabindex="0"></canvas>
+          <p id="status" role="status">Opening the wind tunnel…</p>
+          <p id="error" role="alert" hidden></p>
+        </div>
+        <figcaption><span><i class="cool"></i>Left wingtip</span><span><i class="warm"></i>Right wingtip</span><span>Brighter color · faster local flow</span></figcaption>
+      </figure>
+      <aside>
+        <fieldset id="tools" disabled>
+          <legend>Tube thickness</legend>
+          <div class="readout"><label for="thickness">Radius multiplier</label><output id="multiplier" for="thickness">1.00×</output></div>
+          <input id="thickness" type="range" min="0.35" max="2.40" step=".05" value="1.00">
+          <div class="bounds"><span>0.35×</span><span>2.40×</span></div>
+          <div class="buttons" aria-label="Visible vortices">
+            <button type="button" data-group="0" aria-pressed="true">Both</button>
+            <button type="button" data-group="-1" aria-pressed="false">Left</button>
+            <button type="button" data-group="1" aria-pressed="false">Right</button>
+          </div>
+          <div class="buttons views" aria-label="Camera views">
+            <button type="button" data-view="three" aria-pressed="true">Oblique</button>
+            <button type="button" data-view="top" aria-pressed="false">Overhead</button>
+            <button type="button" data-view="end" aria-pressed="false">Downstream</button>
+          </div>
+        </fieldset>
+        <dl>
+          <div><dt>Visible streamtubes</dt><dd><output id="count">20</output></dd></div>
+          <div><dt>Tube triangles</dt><dd><output id="triangles">—</output></dd></div>
+          <div><dt>Local speed range</dt><dd><output id="speed">—</output></dd></div>
+        </dl>
+        <p class="hint">Drag the model to orbit, or use the arrow keys while it has focus.</p>
+      </aside>
+    </section>
+    <footer>Illustrative counter-rotating wing wake · <a href="./source/README.md">Field and geometry</a></footer>
+  </main>
+</body>
+</html>

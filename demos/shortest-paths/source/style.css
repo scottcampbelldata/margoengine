@@ -1,0 +1,94 @@
+:root {
+  font: 15px/1.4 system-ui,sans-serif;
+  color: #2b312b;
+  background: #f3efe4;
+  --mono: "Cascadia Mono","Aptos Mono",monospace;
+  --rule: #c1b8a1;
+  --atlas: #e8e3d2;
+  --red: #a3383a;
+  --blue: #234d64;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 280px; }
+main { width: min(1290px,calc(100% - 66px)); margin: 0 auto; }
+a { color: inherit; text-underline-offset: .2em; }
+a:hover { color: var(--red); }
+nav { height: 56px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--rule); font-size: .78rem; color: #626657; }
+nav a { color: #4c5846; font-weight: 750; text-decoration: none; }
+nav span { width: 17px; height: 1px; background: var(--rule); }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 22px; padding: 26px 0 20px; }
+h1 { font: 400 clamp(3rem,5.5vw,5.5rem)/.95 Georgia,serif; color: #29372b; letter-spacing: -.06em; margin: 0; }
+header p { color: #5a6253; max-width: 35ch; margin: 0; }
+.exhibit { display: grid; grid-template-columns: minmax(0,1fr) 319px; border: 1px solid var(--rule); }
+figure { min-width: 0; position: relative; isolation: isolate; height: clamp(511px,68vh,683px); margin: 0; background: var(--atlas); }
+figure::after { position: absolute; pointer-events: none; inset: 10px; border: 1px solid #b9ae95; content: ""; }
+canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair; }
+.map-title,.north,.scale { position: absolute; z-index: 1; pointer-events: none; color: #4c5646; }
+.map-title { top: 24px; left: 24px; display: grid; gap: 1px; }
+.map-title strong { font: 400 1.15rem/1.2 Georgia,serif; letter-spacing: .105em; }
+.map-title span,.scale span { font: .66rem/1.4 var(--mono); }
+.north { top: 22px; right: 21px; display: grid; justify-items: center; gap: 3px; font: .7rem var(--mono); }
+.north i { height: 23px; width: 9px; background: #4d5645; clip-path: polygon(50% 0,100% 56%,58% 48%,58% 100%,42% 100%,42% 48%,0 56%); }
+.scale { bottom: 21px; right: 21px; display: grid; justify-items: end; gap: 5px; }
+.scale i { display: block; height: 6px; border: solid #666453; border-width: 0 1px 1px; width: 45px; }
+.pin { position: absolute; z-index: 1; pointer-events: none; display: grid; place-items: center; width: 20px; height: 20px;
+  border: 2px solid #f7efda; border-radius: 50%; transform: translate(-50%,-50%); color: #fff7e7; font: 700 .68rem var(--mono);
+  box-shadow: 0 0 0 1px #3f382c60; }
+.origin { background: var(--red); }
+.destination { background: var(--blue); }
+.pin[hidden],#status[hidden] { display: none; }
+#status { position: absolute; z-index: 2; inset: 0; display: grid; gap: 8px; place-content: center; color: #4d5848; background: var(--atlas); text-align: center; padding: 20px; }
+#status span { overflow-wrap: anywhere; }
+aside { padding: 22px; background: #f7f1e4; border-left: 1px solid var(--rule); min-width: 0; }
+fieldset { min-inline-size: 0; margin: 0; padding: 0; border: 0; }
+legend { font: 400 1.68rem/1 Georgia,serif; padding: 0; margin: 0 0 15px; color: #2b3d30; }
+.pick { display: flex; gap: 5px; margin-bottom: 14px; }
+.pick button { flex: 1; }
+button,select { color: #384737; background: #f5efdf; min-height: 40px; padding: 6px 8px; border: 1px solid #b2ac96; border-radius: 0; font: inherit; }
+button { cursor: pointer; }
+button:hover { border-color: #766c55; }
+button[aria-pressed=true] { background: #3f4e3d; color: #f8efdb; border-color: #3f4e3d; }
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible { outline: 2px solid #8c5545; outline-offset: 3px; }
+button:disabled { opacity: .55; }
+select { width: 100%; padding-right: 6px; text-overflow: ellipsis; font-size: .78rem; }
+.select-label { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: #505a48; margin: 0 0 4px; }
+.select-label[for=destination] { margin-top: 8px; }
+.select-label i { width: 15px; height: 15px; display: grid; place-items: center; color: #fff4e1; background: var(--red); font: .61rem var(--mono); border-radius: 50%; }
+.select-label[for=destination] i { background: var(--blue); }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
+.row label { display: inline-flex; gap: 5px; align-items: center; color: #505a48; font-size: .77rem; }
+.row input { accent-color: #5a6b49; margin: 0; }
+#swap { min-height: 34px; font-size: .78rem; }
+#result { border-top: 1px solid var(--rule); margin-top: 17px; padding-top: 13px; }
+.distance { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 9px; }
+.distance strong { font: 400 2.05rem/1 Georgia,serif; color: #9b3838; }
+.distance span { font: .68rem var(--mono); color: #5b6153; }
+#reachable { margin: 7px 0 9px; color: #52604e; font-size: .79rem; }
+#route-streets { margin: 0 0 11px; padding-left: 18px; max-height: 92px; overflow: auto; color: #334031; font: .67rem/1.65 var(--mono); }
+.map-key { border-top: 1px solid var(--rule); padding-top: 9px; color: #54604e; font-size: .72rem; }
+.map-key > div { display: flex; align-items: center; gap: 6px; }
+.map-key i { display: inline-block; width: 18px; height: 3px; background: #ad3c3e; }
+.map-key .ramp { margin-top: 5px; }
+.ramp i { flex: 1; height: 5px; background: linear-gradient(90deg,#245868,#3d858c,#5c9496,#ac9c78,#ba8a72); }
+.backend { color: #5b6254; margin: 8px 0 0; font: .64rem var(--mono); }
+footer { color: #596252; font-size: .77rem; padding: 6px 0 21px; }
+footer p { margin: 4px 0 0; }
+@media (max-width: 812px) {
+  main { width: calc(100% - 26px); max-width: 640px; }
+  nav { height: 42px; }
+  header { display: block; padding: 15px 0 14px; }
+  h1 { font-size: clamp(2.75rem,11vw,4.5rem); }
+  header p { font-size: .85rem; margin: 7px 0 0; max-width: 44ch; }
+  .exhibit { display: block; }
+  figure { height: clamp(341px,104vw,484px); }
+  figure::after { inset: 7px; }
+  .map-title { top: 14px; left: 15px; }
+  .map-title strong { font-size: .89rem; }
+  .north { top: 13px; right: 14px; }
+  .north i { height: 17px; }
+  .scale { bottom: 14px; right: 14px; }
+  aside { border-left: 0; border-top: 1px solid var(--rule); padding: 14px; }
+  legend { font-size: 1.27rem; margin-bottom: 10px; }
+  .pick { margin-bottom: 10px; }
+  #result { margin-top: 10px; padding-top: 9px; }
+}

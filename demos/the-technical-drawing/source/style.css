@@ -1,0 +1,59 @@
+:root {
+  color-scheme:light;
+  --paper:#ece8d9; --panel:#f1ecde; --navy:#263d40; --muted:#4c6564;
+  --edge:#aab2a4; --ink:#273c42; --red:#95472e;
+  background:var(--paper); color:var(--ink); font:16px/1.47 "Segoe UI",system-ui,sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0; }
+main { width:min(92%,87rem); margin:auto; padding-bottom:2.5rem; }
+nav { border-bottom:1px solid var(--edge); padding:.85rem 0 .68rem; }
+a { color:#246259; text-underline-offset:.18em; }
+nav a { text-decoration:none; font-size:.88rem; font-weight:700; }
+nav span { margin-left:.46rem; color:var(--muted); font-weight:500; }
+header { padding:clamp(1.43rem,3.8vw,3.25rem) 0 clamp(.93rem,2.1vw,1.76rem); }
+h1 { margin:0; color:var(--navy); font:400 clamp(3rem,7.52vw,7.35rem)/.93 Georgia,serif; letter-spacing:-.071em; }
+header p { margin:.85rem 0 0; color:var(--muted); font-size:clamp(.98rem,1.37vw,1.24rem); }
+.exhibit { display:grid; grid-template-columns:minmax(0,1fr) minmax(15rem,19rem); border:1px solid var(--edge); background:var(--panel); }
+figure { position:relative; margin:0; min-width:0; background:#eceadc; }
+canvas { width:100%; height:clamp(32rem,45vw,41rem); display:block; }
+figcaption,.callout { position:absolute; font:650 .74rem/1.24 "Cascadia Mono",Consolas,monospace; background:#eeecdfeb; pointer-events:none; }
+figcaption { bottom:1rem; left:1.05rem; padding:.34rem .43rem; color:#325451; }
+.callout { padding:.18rem .23rem; transform:translateY(-50%); color:#345e5d; white-space:nowrap; }
+#status { position:absolute; inset:0; display:grid; place-content:center; gap:.43rem; text-align:center; background:#efeddf; padding:1rem; }
+#status strong { font:400 1.47rem/1.2 Georgia,serif; }
+#status span { font-size:.84rem; }
+[hidden] { display:none!important; }
+aside { border-left:1px solid var(--edge); padding:1.18rem; }
+.rotation { display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:.24rem .5rem; }
+.rotation label { font:400 1.7rem/1.1 Georgia,serif; letter-spacing:-.04em; }
+.rotation output { color:var(--red); font:650 .84rem/1.2 "Cascadia Mono",Consolas,monospace; }
+.rotation input { grid-column:1/-1; width:100%; margin:.18rem 0 .28rem; height:2.3rem; accent-color:#2b6962; }
+.buttons { display:flex; gap:.4rem; flex-wrap:wrap; }
+button { min-height:2.75rem; padding:.44rem .68rem; border:1px solid #9aa998; background:#e9ebdf; color:var(--ink); font:650 .83rem/1.2 "Segoe UI",system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+button:disabled { opacity:.63; cursor:default; }
+button[aria-pressed="true"] { background:#e9dfc9; border-color:#ad866e; color:#8b422a; }
+button:not(:disabled):hover { border-color:#315851; }
+button:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible { outline:2px solid #205e61; outline-offset:3px; }
+.legend { display:grid; gap:.48rem; margin:1.17rem 0; list-style:none; padding:0; color:var(--muted); font-size:.82rem; }
+.legend li { display:flex; align-items:center; gap:.48rem; }
+.sample { width:1.55rem; border-top:2px solid #314a4e; }
+.sample.hidden-line { border-top:2px dashed #a05a41; }
+dl { margin:0; border-top:1px solid var(--edge); padding-top:.71rem; font-size:.81rem; color:var(--muted); }
+dl div { display:flex; justify-content:space-between; gap:.37rem; margin:.34rem 0; }
+dd { margin:0; font:650 .78rem/1.35 "Cascadia Mono",Consolas,monospace; color:var(--ink); }
+footer { display:flex; justify-content:space-between; gap:.5rem 1rem; margin-top:.79rem; color:var(--muted); font-size:.83rem; }
+footer p { margin:0; }
+footer details { max-width:29rem; }
+details p { padding-top:.5rem; }
+summary { color:#246259; font-weight:650; cursor:pointer; }
+@media(max-width:730px) {
+  .exhibit { grid-template-columns:1fr; }
+  canvas { height:clamp(22.5rem,112vw,31rem); }
+  figcaption { bottom:.58rem; left:.65rem; font-size:.66rem; }
+  .callout { font-size:.64rem; }
+  aside { border-left:0; border-top:1px solid var(--edge); padding:.77rem; }
+  .rotation label { font-size:1.47rem; }
+  .legend { grid-template-columns:1fr 1fr; margin:.82rem 0; }
+  footer { display:grid; }
+}

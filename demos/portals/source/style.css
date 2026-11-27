@@ -1,0 +1,45 @@
+:root {
+  color-scheme: dark;
+  --bg: #29252d;
+  --panel: #36313a;
+  --ink: #f5e9df;
+  --muted: #c4b4b9;
+  --edge: #655b65;
+  --accent: #e6bb90;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); }
+main { margin: 0 auto; max-width: 1350px; padding: 0 42px 23px; }
+nav { min-height: 59px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--edge); font-size: 13px; color: var(--muted); }
+nav a { color: var(--ink); font-weight: 650; text-decoration: none; }
+nav a span { color: var(--accent); margin-right: 6px; font-size: 17px; }
+header { display: flex; justify-content: space-between; align-items: end; gap: 20px; padding: 23px 0; }
+h1,p,figure { margin: 0; }
+h1 { font: 400 clamp(49px,8.7vw,111px)/.83 Georgia,serif; letter-spacing: -.052em; }
+header p { font-size: clamp(14px,1.7vw,20px); width: min(23ch,25%); line-height: 1.36; color: var(--muted); margin-bottom: 4px; }
+figure { border: 1px solid var(--edge); background: var(--panel); }
+#stage { height: clamp(410px,40vw,550px); position: relative; background: #3c3742; }
+canvas { display: block; width: 100%; height: 100%; }
+#status { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: max-content; max-width: 88%; border: 1px solid var(--edge); padding: 8px 12px; background: #26212aee; font-size: 13px; }
+#status:empty { display: none; }
+.controls { padding: 12px 17px 13px; border-top: 1px solid var(--edge); }
+.read,.ends { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.read label { font-size: 14px; font-weight: 650; }
+.read output { color: var(--accent); font: 650 13px ui-monospace,Consolas,monospace; }
+input[type=range] { width: 100%; height: 38px; margin: 2px 0 0; cursor: ew-resize; accent-color: var(--accent); }
+.ends { color: var(--muted); font-size: 12px; }
+a:focus-visible,input:focus-visible,summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.notes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; padding-top: 13px; color: var(--muted); font-size: 13px; line-height: 1.46; }
+summary { color: var(--ink); cursor: pointer; font-weight: 650; }
+details p { padding-top: 4px; }
+@media (max-width: 730px) {
+  main { padding: 0 15px 18px; }
+  nav { min-height: 46px; }
+  header { display: block; padding: 18px 0 15px; }
+  h1 { font-size: clamp(51px,15.2vw,80px); }
+  header p { width: 100%; margin: 9px 0 0; }
+  #stage { height: clamp(242px,79vw,365px); }
+  .controls { padding: 10px 11px 11px; }
+  .notes { grid-template-columns: 1fr; }
+}

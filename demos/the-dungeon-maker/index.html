@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><link rel="modulepreload" crossorigin href="./assets/scene-BejVpOdM.js"><script src="./assets/inline-4a0760e0.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#272830">
+<link rel="icon" href="data:,">
+<title>The Dungeon Maker · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Btcd1YXs.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-AIOdDlQe.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>The Dungeon Maker</h1><p>Generate a connected stone archive. Then walk its halls from the entrance to the lit vault.</p></header>
+<section class="exhibit" aria-label="Interactive procedural dungeon">
+<figure><div class="view"><canvas id="dungeon" aria-label="Connected stone chambers, carved doorways and colored lanterns" tabindex="0"></canvas>
+<p id="loading" role="status">Assembling the stone archive…</p><p id="error" role="alert" hidden></p></div>
+<figcaption><span id="location">Stone archive</span><a href="./source/README.md">How it generates</a></figcaption></figure>
+<aside>
+<fieldset id="controls" disabled><legend>Dungeon layout</legend>
+<div class="actions"><button type="button" id="next">New layout</button><button type="button" id="walk" aria-pressed="false">Walk through</button></div>
+<dl><div><dt>Seed</dt><dd id="seed">–</dd></div><div><dt>Walkable tiles</dt><dd id="rooms">–</dd></div></dl>
+<div class="walk-controls" id="walk-controls" hidden>
+<button type="button" id="turn-left" aria-label="Turn left">←</button>
+<button type="button" id="forward" aria-label="Walk forward">↑</button>
+<button type="button" id="turn-right" aria-label="Turn right">→</button>
+<button type="button" id="back" aria-label="Walk backward">↓</button>
+</div>
+<p id="status" role="status">Generate another plan or walk from the amber entrance.</p>
+</fieldset>
+</aside></section>
+</main></body></html>

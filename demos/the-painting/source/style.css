@@ -1,0 +1,41 @@
+*{box-sizing:border-box}
+:root{background:#ebe4d4;color:#272b25;--accent:#394e47;--line:#b4a88f;font-family:system-ui,sans-serif}
+body{margin:0}
+main{width:min(1160px,92vw);margin:auto;padding:25px 0 43px}
+header a{color:#42554a;text-decoration:none;font-size:.875rem}
+header a:hover{text-decoration:underline}
+h1{font:400 clamp(3.35rem,8vw,7.2rem)/.96 Georgia,serif;letter-spacing:-.064em;margin:.125em 0 .10em}
+header p{color:#485248;line-height:1.44;margin:13px 0 20px;max-width:49ch}
+.controls{display:flex;justify-content:space-between;align-items:center;gap:10px;border-block:1px solid var(--line);padding:8px 0}
+fieldset{padding:0;border:0;margin:0;display:flex;align-items:center;gap:12px;min-width:0}
+legend{float:left;padding:0 3px 0 0;font-size:.85rem;color:#485248}
+fieldset label{font-size:.85rem;display:flex;gap:5px;align-items:center;min-height:38px;white-space:nowrap}
+fieldset input{appearance:none;margin:0;border:1px solid #756c5d;border-radius:50%;width:15px;height:15px;display:grid;place-content:center}
+fieldset input:checked::before{content:'';height:8px;width:8px;border-radius:50%;background:#385749}
+button{border:1px solid #7d806a;border-radius:3px;font:700 .83rem system-ui;color:#273d34;background:#e4decc;min-height:43px;white-space:nowrap;padding:0 11px}
+:where(a,button,input):focus-visible{outline:2px solid #3d5f50;outline-offset:3px}
+:disabled{opacity:.55}
+figure{margin:14px 0 0}
+.stage{position:relative;background:#c7b49e;border:1px solid #9c917b}
+canvas{width:100%;height:auto;display:block;aspect-ratio:1.91}
+#notice{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;text-align:center;padding:12px;background:#e2d8c3}
+#notice[hidden]{display:none}
+#notice p{margin:0}
+#error{color:#843629}
+figcaption{display:flex;justify-content:space-between;gap:10px;padding:8px 0;color:#485248;font-size:.83rem;line-height:1.36;border-bottom:1px solid var(--line)}
+figcaption p{margin:0}
+#renderer{white-space:nowrap}
+@media(max-width:650px){
+  main{padding-top:21px}
+  h1{font-size:clamp(2.95rem,12vw,4.55rem)}
+  header p{font-size:.95rem;margin:10px 0 15px}
+  fieldset{gap:8px}
+  legend{position:absolute;overflow:hidden;width:1px;height:1px;clip-path:inset(50%)}
+  fieldset label{min-height:44px}
+  fieldset input{width:14px;height:14px}
+  .controls{gap:3px}
+  button{padding:0 8px}
+  canvas{aspect-ratio:1.10}
+  figcaption{display:block}
+  #renderer{display:block;margin-top:3px}
+}

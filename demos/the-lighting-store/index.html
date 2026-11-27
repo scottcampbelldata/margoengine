@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Cy0GSdtz.js"><script src="./assets/inline-532cd8d1.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ece8df">
+  <meta name="description" content="Compare two measured GE floodlight beam patterns on matching walls at real distances.">
+  <link rel="icon" href="data:,">
+  <title>The Lighting Store · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Bg2JpXuR.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cg2JewoV.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Photometry</span></nav>
+    <header>
+      <h1>The Lighting Store</h1>
+      <p>Two tested floodlights. One wall to compare their beams.</p>
+    </header>
+    <figure id="exhibit" aria-label="Live photometric comparison">
+      <div class="frame">
+        <canvas id="lights" role="img" aria-label="Two matching three-dimensional wall bays lit with measured IES profiles"></canvas>
+        <figcaption class="bay-labels"><span>Asymmetric narrow</span><span>Extra wide</span></figcaption>
+        <p id="status" role="status">Opening the test bays…</p>
+      </div>
+      <div class="controls">
+        <div class="throw">
+          <div class="field"><label for="distance">Distance to wall</label><output id="distance-readout" for="distance">1.65 m</output></div>
+          <input id="distance" type="range" min="1.6" max="3.6" step=".05" value="1.65" disabled>
+          <div class="endpoints"><span>1.60 m</span><span>3.60 m</span></div>
+        </div>
+        <div class="mode">
+          <div class="field" id="output-label">Light output</div>
+          <div class="switch" role="group" aria-labelledby="output-label">
+            <button type="button" data-mode="equal" aria-pressed="true" disabled>Equal lumens</button>
+            <button type="button" data-mode="lab" aria-pressed="false" disabled>Lab output</button>
+          </div>
+          <p id="mode-note">Both fixed at 3,000 lm</p>
+        </div>
+      </div>
+      <div class="readings">
+        <section aria-label="Asymmetric narrow profile">
+          <h2><span aria-hidden="true">A</span> Asymmetric narrow</h2>
+          <dl>
+            <div><dt>On axis</dt><dd><output id="narrow-center">—</output> lx</dd></div>
+            <div><dt>0.75 m below</dt><dd><output id="narrow-lower">—</output> lx</dd></div>
+          </dl>
+          <p>GE Evolve EFNB · Test 15050713</p>
+        </section>
+        <section aria-label="Extra wide profile">
+          <h2><span aria-hidden="true">B</span> Extra wide</h2>
+          <dl>
+            <div><dt>On axis</dt><dd><output id="wide-center">—</output> lx</dd></div>
+            <div><dt>0.75 m below</dt><dd><output id="wide-lower">—</output> lx</dd></div>
+          </dl>
+          <p>GE Evolve EFNB · Test 15050813</p>
+        </section>
+      </div>
+    </figure>
+    <footer>
+      <p>The small rings mark two points on each wall. Distance changes both the angle of the beam and how much light reaches the wall.</p>
+      <details>
+        <summary>Photometry and source</summary>
+        <p>GE Lighting Solutions bench tests 15050713 and 15050813, published in <a href="https://github.com/lfaynshteyn/ies_rescale/tree/bf2e6a6a/test/test_ies_profiles">Lev Faynshteyn’s IES fixture collection</a> under the <a id="profile-license" href="https://github.com/lfaynshteyn/ies_rescale/blob/bf2e6a6a/LICENSE">MIT license</a>. Both bays use neutral light color and fixed exposure. The readings show direct illuminance in lux.</p>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

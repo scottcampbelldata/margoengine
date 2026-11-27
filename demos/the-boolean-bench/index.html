@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-d57998c3.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e9e0">
+  <meta name="description" content="Combine two exact solids, inspect the result as a mesh, or reveal only its B-rep edges.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/operations-DJvBm2wk.bin" as="fetch" crossorigin fetchpriority="high">
+  <title>The Boolean Bench · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BSR9htWn.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Co4hxzPR.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web Demos</span></a></nav>
+    <header>
+      <h1>The Boolean Bench</h1>
+      <p>Combine two overlapping solids. Compare the volume and the actual edges left by each operation.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive B-rep Boolean operations">
+      <figure>
+        <canvas id="part" aria-label="Boolean result over a machined display bed. Drag to rotate."></canvas>
+        <p id="status" role="status">Preparing the two solids…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="stage-tools"><span>Drag to rotate</span><button id="reset" type="button" disabled>Reset view</button></div>
+      </figure>
+      <aside aria-label="Operations and measurements">
+        <fieldset id="operations" disabled>
+          <legend>Boolean operation</legend>
+          <button type="button" data-step="0" aria-pressed="true">Union</button>
+          <button type="button" data-step="1" aria-pressed="false">Subtract</button>
+          <button type="button" data-step="2" aria-pressed="false">Intersect</button>
+          
+        </fieldset>
+        <button id="edges" type="button" aria-pressed="false" disabled>Show exact edges</button>
+        <p id="feature">Keep all the material from either solid.</p>
+        <dl>
+          <div><dt>Exact volume</dt><dd><output id="volume">—</output></dd></div>
+          <div><dt>B-rep edges</dt><dd><output id="edge-count">—</output></dd></div>
+          <div><dt>B-rep faces</dt><dd><output id="faces">—</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

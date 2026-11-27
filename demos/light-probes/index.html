@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-OWwo0yuM.js"><script src="./assets/inline-633b4571.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#121a20">
+  <meta name="description" content="Roll a polished sphere through three colored rooms and watch its lighting and reflections change.">
+  <title>Light Probes | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BY8K2MXZ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DyBVIR_3.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Light Probes</h1>
+      <p>Roll a sphere past three painted alcoves. The room colors travel across its surface and change what it reflects.</p>
+    </header>
+    <section aria-label="Light-probe gallery">
+      <figure id="viewport">
+        <canvas id="scene" aria-label="A marked metal sphere on a brass rail in front of amber, green and cobalt alcoves"></canvas>
+        <p id="loading" role="status">Sampling the gallery light…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <div class="instrument">
+        <fieldset id="controls" disabled>
+          <legend>Sphere position <output id="position" for="path">−1.85 m</output></legend>
+          <input type="range" id="path" min="0" max="1000" value="89" aria-label="Sphere position along the rail">
+          <div class="axis" aria-hidden="true"><span>Amber</span><span>Verdigris</span><span>Cobalt</span></div>
+        </fieldset>
+        <div class="readout">
+          <label><input type="checkbox" id="satin" disabled> Satin finish</label>
+          <div class="light"><span id="sample" aria-hidden="true"></span><p>Local diffuse light <output id="irradiance">—</output><span id="reflection-status" hidden>Sampling reflections…</span></p></div>
+        </div>
+      </div>
+    </section>
+    <footer><a href="https://aperture.stanford.edu/papers/envmap/">Irradiance environment maps</a><a href="./source/README.md">Scene notes</a></footer>
+  </main>
+</body>
+</html>
