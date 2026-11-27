@@ -1,5 +1,28 @@
 # Clean room
 
+### Breakable objects and Voronoi fracture (BREAK-01)
+
+Saty Raghavachary, “Fracture Generation on Polygonal Meshes Using Voronoi Polygons” (ACM SIGGRAPH 2002 Conference
+Abstracts and Applications, p. 187), introduces Voronoi-cell partitioning of polygonal solids into convex fracture
+pieces with newly capped interior cut faces. Eric G. Parker and James F. O'Brien, “Real-Time Deformation and Fracture
+in a Game Environment” (ACM SIGGRAPH/Eurographics Symposium on Computer Animation, 2009, pp. 165–175), formulate
+structural connectivity graphs, cumulative impulse damage, and support-anchor detachment so grounded sections remain
+standing while unsupported overhangs break away (`X-42`, `X-43`). Matthias Müller, Nuttapong Chentanez, and Tae-Yong
+Kim, “Real Time Dynamic Fracture with Volumetric Approximate Convex Decompositions” (ACM Transactions on Graphics
+32(4), SIGGRAPH 2013, Article 115), describe impact-clustered fracture site distributions around the hit point and
+fast runtime rigid-body fragment spawning with inherited rigid velocities (`v + ω × r`). Brian Mirtich, “Fast and
+Accurate Computation of Polyhedral Mass Properties” (Journal of Graphics Tools 1(2), 1996, pp. 31–50), provides the
+exact tetrahedral volume, centroid, and inertia tensor integrals used per Voronoi cell and combined across compound
+islands via the parallel-axis theorem and cyclic Jacobi principal-axis diagonalization. Carl B. Barber, David P.
+Dobkin, and Hannu Huhdanpaa, “The Quickhull Algorithm for Convex Hulls” (ACM TOMS 22(4), 1996, pp. 469–483), supplies
+the convex-hull construction used for arbitrary input meshes and fragment colliders. `@margoengine/physics/breakable`
+is written clean room in pure TypeScript over Margo's own `@margoengine/physics` kernel (`packages/physics/src/breakable/`).
+[Raghavachary 2002](https://doi.org/10.1145/1242073.1242200),
+[Parker and O'Brien 2009](https://doi.org/10.1145/1599470.1599492),
+[Müller et al. 2013](https://doi.org/10.1145/2461912.2461934),
+[Mirtich 1996](https://doi.org/10.1080/10867651.1996.10487458),
+[Barber et al. 1996](https://doi.org/10.1145/235815.235821).
+
 ### Volumetric solids and vertex block descent (SOFT-04)
 
 Anka He Chen, Ziheng Liu, Yin Yang and Cem Yuksel, “Vertex Block Descent” (2024), §3.1–3.3, describes implicit

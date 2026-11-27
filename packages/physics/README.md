@@ -7787,3 +7787,70 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
 world.advance(12);
 console.log(flow.sample(19, 1).discharge);
 ```
+
+## Breakable objects
+
+`@margoengine/physics/breakable` breaks convex objects (any closed convex mesh, a glTF mesh's `Geometry` included, or a
+box) into convex rigid pieces when something hits them hard enough: a ball through a wall, a crate dropped on a floor,
+a blast. Quick start, a ball through a wall:
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { BreakableWorld } from '@margoengine/physics/breakable';
+
+await Physics.load();
+const physics = new Physics(null);
+const wall = new BreakableWorld(physics).add(null, { size: [2, 2, 0.3], position: [0, 1, 0], anchors: 'bottom' });
+const ball = { shape: 'sphere', radius: 0.3, density: 400 } as const;
+physics.addBody(null, { position: [0, 1.2, 2], linearVelocity: [0, 0, -20], colliders: ball });
+for (let i = 0; i < 60; i++) physics.step();
+console.log(wall.broken, wall.fragments.length);
+```
+
+How it works. The object is cut into convex Voronoi cells (`cellCount` of them, seeded, so the same seed gives the
+same pieces), either up front (`fractureMode: 'prefractured'`, the default) or at the first breaking hit, clustered
+around the hit point (`'impact'`). Neighbouring cells are joined by bonds across their shared face; each bond holds an
+impulse (`bondStrength`, N s, scaled by its face's area over the mean). Until a bond breaks the object is one rigid
+body, so it rests without jitter. Every contact on it takes damage off the bonds near the contact point: the rise of
+the pair's normal impulse over its last step, so a load it carries (its own weight, a stack on top, a steady push)
+wears nothing, times a falloff of `1 - distance / impactRadius`. When bonds break, the cells fall into islands across
+the bonds left; an island with an anchored cell stays fixed, and every other island becomes a dynamic body with the
+cells' own convex hulls as its collider and the exact mass, centre of mass and inertia of its polyhedra (Mirtich 1996)
+at the material's `density`, moving as the object did at that point (`v + w x r`). Islands break again on later hits.
+`applyImpact(point, impulse, radius?)` and `applyExplosion(center, impulse, radius)` damage and push the same way from
+code.
+
+Body options (`breakable.add(mesh, options)`, `mesh` may be `null`): `size` (box size in m; default the mesh's bounds,
+or 1 m), `geometry` (a convex mesh to break, read as its convex hull; default the mesh's), `position` and `rotation`
+(default the mesh's, or the origin), `type` (`'fixed'` when anchored, else `'dynamic'`), `fractureMode`
+(`'prefractured'`), `cellCount` (12, from 2 to 256), `sites` (your own cell centres, local), `pattern` (`'uniform'`,
+`'brick'` or `'radial'`; default `'uniform'`), `seed` (1), `bondStrength` (25 N s), `bondStrengthFn` (a strength per
+bond), `areaWeightedStrength` (true; the weight is held to 0.35 to 2.5 times), `minImpactImpulse` (the larger of 0.5
+N s and a fifth of `bondStrength`), `impactRadius` (0.45 of the largest size, at least 0.25 m), `anchors` (`'none'`;
+or `'bottom'`, `'perimeter'`, `'all-boundary'`, cell indices, or a test per cell), `anchorTolerance` (0.06 of the
+size), `density` (1 kg/m³, as Rapier's), `friction` (0.5), `restitution` (0.15), `material` and `interiorMaterial`
+(the pieces' outside and cut faces; default the mesh's material and none), `uvScale` (1 per m), `collisionGroups`,
+`debrisCollisionGroups`, `splitIslands` (false: a loose island stays one body), `secondaryFracture` (true), `onBreak`
+and `userData`.
+
+World options (`new BreakableWorld(physics, options)`): `engine` (for the pieces' meshes; default the first mesh's),
+`maxDebris` (128 live pieces, the oldest sleeping one goes first), `debrisLifetime` (30 s, or `Infinity`),
+`debrisSleepThreshold` (0.15 m/s), `debrisAngularSleepThreshold` (0.25 rad/s), `debrisSleepTime` (0.4 s: a piece
+slower than both for that long sleeps), `debrisCollisionGroups` and `onBreak`. `reset()` puts every object back whole,
+`dispose()` (or `using`) removes everything it made.
+
+Debug view: `breakable.debugRender({ cells, bonds, anchors, debris })` gives `{ vertices, colors }` line segments, the
+same shape as `physics.debugRender()`, for `@margoengine/lines` (`new Line({ mode: 'segments', positions: vertices,
+colors })`): cell seams, bonds from green (whole) to red (about to break), anchor pins, and pieces orange while awake
+and grey asleep.
+
+Deterministic: the same inputs give the same pieces and the same state. `breakable.takeSnapshot()` with
+`physics.takeSnapshot()`, restored with `restoreSnapshot` on both, steps on to the same bits; a snapshot is for the
+pieces live when it was taken, so take it after the last break. The fracture helpers `voronoiFractureBox`,
+`voronoiFractureGeometry`, `voronoiFracturePolyhedron` and `computePolyhedronMassProperties` give the cells and their
+mass properties without a world.
+
+What it does not do (`docs/limits.md`): a concave mesh breaks as its convex hull (split it with `convexDecomposition`
+first); damage is an impulse budget per bond, not a stress or energy model; cut faces are flat. See
+[`examples/physics-breakable.html`](../../examples/physics-breakable.html) for a stone pillar, a brick wall and a framed
+glass pane to shoot at, with the debug view.

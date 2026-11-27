@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20814932,
+  "total": 20834283,
   "history": [
     {
       "date": "2026-10-24",
@@ -14365,6 +14365,12 @@
       "commit": "ca6b1986b8",
       "reason": "Lossless (SOF3, 2 to 16 bits) and 12-bit JPEG in the shared reader (lane C, 2026-11-26). Measured before -> after: decoders/jpeg 3827 -> 4985, decoders/tiff 13708 -> 14843, exporters/jpeg-read 3827 -> 4887, exporters/textures 10272 -> 11307, fbx worker 130411 -> 132294 B gzip. Worth it: medical and camera files that were refused now decode exactly. A split would need a lazy import, which the synchronous decodeJPEG and parseTIFF cannot do without a new asynchronous API",
       "grew": 5
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "breakable",
+      "reason": "New optional entry @margoengine/physics/breakable (18,787 B gzip): convex objects break on impact into convex rigid pieces (BREAK-01). The convex Voronoi clipper, exact polyhedral mass properties, bond graph with anchors, contact damage, debris policy, snapshot and debug view are one feature that every breakable body uses together; a split would leave each part useless alone and duplicate the cell types across entries. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15192,6 +15198,7 @@
     "@margoengine/physics/aeolian": 5256,
     "@margoengine/physics/ageing": 4384,
     "@margoengine/physics/airborne": 7318,
+    "@margoengine/physics/breakable": 19351,
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 5981,

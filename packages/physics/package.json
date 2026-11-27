@@ -329,6 +329,10 @@
     "./pbf": {
       "types": "./dist/pbf/index.d.ts",
       "import": "./dist/pbf.js"
+    },
+    "./breakable": {
+      "types": "./dist/breakable/index.d.ts",
+      "import": "./dist/breakable.js"
     }
   },
   "files": [

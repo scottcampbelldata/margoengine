@@ -462,7 +462,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | DYN-05 | Rail vehicle dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed fa79b04868 |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | native rods, fast guides and physical skin bindings | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c53e60dc12 |
 | SOFT-05 | Muscle, fat and skin soft tissue | physics/tissue with skeletal pins, sliding planes and passive layers | Open | OPEN |
-| BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
+| BREAK-01 | Brittle and ductile fracture, destruction | physics/breakable: convex Voronoi fracture into convex rigid pieces, bond graph with anchors, contact and blast damage, debris policy | Claude (laptop), taken over from Gemini on Scott's order, 2026-11-27 | BUILDING (P9 of docs/physics-parity-bar.md) |
 | BREAK-02 | Structural collapse and load path | stand-in | Claude | CLAIMED (Fauld film) |
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 839a45208b |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 64bedcf038 |

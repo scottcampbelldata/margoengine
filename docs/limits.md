@@ -8903,6 +8903,14 @@ The optional physics/celestial entry ships independently of the physics and sky 
 
 ## Physics solver settings and speed caps (own solver)
 
+Breakable objects (`@margoengine/physics/breakable`, BREAK-01, 2026-11-27):
+- Enforced: 2 to 256 cells; sizes, strengths, densities, impulses and radii positive and finite; restitution 0 to 1; a geometry whose points span a volume. Bad input throws `MargoError` (`unsupported`) with the `#physics-breakable` help link.
+- By method, the shape: a mesh breaks as its convex hull, so a concave mesh fills in; split it with `convexDecomposition` first. Cut faces are flat (Voronoi planes), with planar UVs.
+- By method, the cells: a cell whose inscribed ball about its centroid is under 1/1000 of its own diagonal is a sliver and is dropped, so its volume (and mass) is lost. Only a site outside the body or two sites almost on top of each other make one; sites inside a box never do (`tests/breakable.test.js`, every pattern and seed at 1e-9 of the volume). Sites of the built-in patterns come from the body's bounds, so a non-box shape loses the cells of sites that fall outside it (fewer, larger pieces) and a little volume at those slivers (under 1 % in the octahedron test).
+- By method, the damage: a bond holds an impulse budget (N s), not a stress or a fracture energy. A contact's damage is the rise of the pair's normal impulse over its last step, so a carried load wears nothing, but a body placed already touching another takes its first step's weight impulse (m g dt) once. That step impulse depends on the time step. Damage falls off linearly to `impactRadius`; an area weight holds a bond to 0.35 to 2.5 times `bondStrength`. A fixed structure's pieces take 0.75 of a direct `applyImpact` impulse (0.35 of a contact's) shared out by distance, as the contact itself pushed only the fixed body.
+- State: bond damage, runtime splits, debris timers and the contacts' last impulses live outside the world's snapshot: take `breakable.takeSnapshot()` with `physics.takeSnapshot()`. A snapshot holds for the pieces live when taken; a restore across a break is refused (`state`), as the world's own snapshot needs the same bodies.
+- Size: the entry is 18,787 B gzip (the clipper, mass properties, bond graph, debris policy and debug view in one entry).
+
 Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
 - Enforced: 2 to 4,096 links; radius, density and moduli positive and finite; damping 0 or more; `loads` a provider with `apply`. `segmentLoads`: roughness, drag, added mass and viscosity finite and 0 or more, period above 0 (Infinity a steady current), a Strouhal number above 0.
 - By method, the links:
