@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10191f">
+  <title>Joints and motors · Margo Engine</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #10191f; color: #e7eeed; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: 100svh; align-items: start; }
+    #view { position: sticky; top: 0; height: 100svh; min-height: 520px; overflow: hidden; background: radial-gradient(ellipse at 50% 35%, #23333d, #10191f 75%); }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    canvas:focus-visible { outline: 2px solid #9be1cf; outline-offset: -4px; }
+    .brand, .hint { position: absolute; z-index: 1; pointer-events: none; }
+    .brand { top: 24px; left: 28px; color: #aabfc4; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+    .hint { left: 28px; bottom: 28px; max-width: 360px; line-height: 1.6; font-size: 13px; color: #c2cfce; }
+    aside { min-height: 100svh; padding: 36px 24px 28px; background: #152128; border-left: 1px solid #2d3d43; }
+    .eyebrow { margin: 0 0 14px; color: #9be1cf; text-transform: uppercase; letter-spacing: .14em; font-size: 10px; font-weight: 650; }
+    h1 { margin: 0 0 14px; font-size: 28px; line-height: 1.18; letter-spacing: -.03em; font-weight: 500; }
+    .intro { color: #aabbbc; font-size: 13px; line-height: 1.65; margin: 0 0 22px; }
+    .readout { padding: 14px 0; border-top: 1px solid #324047; border-bottom: 1px solid #324047; }
+    #status { display: flex; gap: 9px; align-items: baseline; margin: 0; font-size: 13px; line-height: 1.5; }
+    #status::before { content: ''; flex: 0 0 6px; height: 6px; border-radius: 50%; background: #9be1cf; }
+    dl { display: grid; grid-template-columns: 1fr auto; margin: 14px 0 0; gap: 8px; font-size: 12px; }
+    dt { color: #90a4a8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
+    .controls { display: grid; gap: 12px; padding-top: 20px; }
+    button { font: inherit; padding: 11px 14px; text-align: left; border: 1px solid #405057; border-radius: 5px; color: #e7eeed; background: #1b2b32; font-size: 12px; cursor: pointer; min-height: 40px; }
+    button:hover { background: #263b43; border-color: #7a9b9c; }
+    button:disabled { opacity: .45; cursor: wait; }
+    label { color: #b8c8c8; font-size: 12px; line-height: 1.5; display: flex; gap: 9px; align-items: center; }
+    input[type="checkbox"] { accent-color: #9be1cf; width: 15px; height: 15px; }
+    .note { margin-top: 20px; font-size: 11px; line-height: 1.65; color: #8da4a8; }
+    code { font-family: ui-monospace, monospace; color: #b4cecb; font-size: 11px; }
+    @media (max-width: 780px) {
+      main { grid-template-columns: 1fr; }
+      #view { position: relative; height: 62svh; min-height: 400px; }
+      aside { border-left: 0; border-top: 1px solid #2d3d43; padding: 24px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section id="view" aria-label="Interactive joints and motors scene">
+      <div class="brand">Margo Engine / @margoengine/physics</div>
+      <canvas id="viewport" tabindex="0" aria-label="A hinged door, a motorised arm and a hanging chain"></canvas>
+      <div class="hint">Drag to orbit. The gold arcs and bars are each joint's limits; the coloured axes are its frames.</div>
+    </section>
+    <aside aria-label="Joint controls">
+      <p class="eyebrow">P3 · DYN-03</p>
+      <h1>Joints and motors</h1>
+      <p class="intro">A door on a hinge with a stop and a motor, a three-link arm held in reduced coordinates with position motors on each joint, and a chain of ball joints with a swing limit on each link.</p>
+      <div class="readout">
+        <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+        <dl>
+          <dt>Door angle</dt><dd id="door-angle">—</dd>
+          <dt>Arm joint angles</dt><dd id="arm-angles">—</dd>
+          <dt>Joints</dt><dd id="joint-count">—</dd>
+          <dt>Backend</dt><dd id="backend">—</dd>
+        </dl>
+      </div>
+      <div class="controls">
+        <button id="door" type="button" disabled>Close the door (D)</button>
+        <button id="kick" type="button" disabled>Kick the chain (K)</button>
+        <label><input id="debug-view" type="checkbox" checked disabled> Show joint frames and limits</label>
+      </div>
+      <p class="note"><code>addJoint</code> · <code>addMultibody</code> · <code>debugRender({ jointFrames: true })</code> · <code>@margoengine/lines</code></p>
+    </aside>
+  </main>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./physics-joints.ts'));
+  </script>
+</body>
+</html>

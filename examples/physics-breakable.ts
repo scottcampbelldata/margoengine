@@ -1,8 +1,7 @@
 // Dedicated showcase for @margoengine/physics/breakable (BREAK-01, X-42, X-43):
 // Stone pillar, brick wall, and framed glass pane with click/Space cannonballs,
 // pre-fractured vs impact-clustered Voronoi toggle, bond-strength slider, debug overlay, and reset.
-import { createStage, PbrMaterial, box } from 'margoengine';
-import { sphereGeometry } from '@margoengine/geometry/primitives';
+import { createStage, PbrMaterial, box, sphere } from 'margoengine';
 import { OrbitControls } from '@margoengine/controls/orbit';
 import { Shadows } from '@margoengine/shadows';
 import { Lines, Line, LineMaterial } from '@margoengine/lines';
@@ -70,12 +69,12 @@ try {
   backendEl.textContent = document.documentElement.dataset.webgpuCompat !== undefined ? 'WebGL2 compat' : 'WebGPU';
 
   const shadows = Shadows.attach(engine, { resolution: 2048, distance: 32 });
-  const controls = new OrbitControls(engine.camera, canvas, {
-    target: [0.1, 1.5, 0],
-    minDistance: 4,
-    maxDistance: 24,
-    maxPolarAngle: Math.PI * 0.485,
-  });
+  // OrbitControls takes its settings as properties: an options object as a third argument was dropped unread.
+  const controls = new OrbitControls(engine.camera, canvas);
+  controls.target = [0.1, 1.5, 0];
+  controls.minDistance = 4;
+  controls.maxDistance = 24;
+  controls.maxPolarAngle = Math.PI * 0.485;
 
   const physics = new Physics(engine, {
     gravity: [0, -9.81, 0],
@@ -178,7 +177,7 @@ try {
     roughness: 0.28,
     metalness: 0.85,
   });
-  const ballGeom = sphereGeometry(0.24, 20, 14);
+  const ballGeom = sphere(0.24, 20);
 
   const structures: StructureSpec[] = [];
   const intactMeshes: ReturnType<typeof engine.createMesh>[] = [];
