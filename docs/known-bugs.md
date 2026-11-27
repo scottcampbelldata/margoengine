@@ -17047,6 +17047,19 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/kd-decoders.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder refused version 1.3 streams and some normalized bytes (batch 133, E60 and E61)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Unsupported` for a version 1.3 stream
+  (`445241434f0103000000000000000000`) and `Invalid` for a descriptor whose
+  normalized byte is 2 or more.
+- **Cause:** `native/draco/src/sequential.rs` admitted 1.0 to 1.2 only, read a
+  varint unique id only from 2.0 and bounded the normalized byte at 1.
+- **Fix:** the observed rules
+  ([E60 and E61](clean-room.md#batch-133-e60-and-e61-version-13-and-the-normalized-byte-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/version13.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -17085,11 +17098,12 @@ E26 to E40):
 - Not probed: position-reading predictors on attribute decoders with seams that
   split vertices, and constrained multi-parallelogram before 2.2 beyond the
   retained cases.
-- Point clouds of version 1.3: Margo answers `Unsupported`. The prebuilt reads
-  some 1.x clouds relabelled 1.3, but admitting them to Margo's 1.x layout gave
-  other output, so the layout is not established. Repro: any `E56 no decoder`
-  cloud with minor version 3, for example hex
-  `445241434f0103000000000000000000`.
+- Damaged streams of versions 1.0 to 1.3 (found 2026-11-27 by changing one or
+  two bytes of retained streams): some that the prebuilt decodes Margo refuses,
+  some decode to other values and a few that it rejects decode. A refusal repro,
+  a 1.0 cloud:
+  `445241434f0100000000000100000001010000000409030103000300010f0000122150620000b4ffe8030000`.
+  Valid streams are not known to differ. Cause: not yet established.
 - Damaged KD clouds (found 2026-11-27 by changing single bytes of retained
   one-decoder streams): some that the prebuilt decodes Margo refuses, and some
   decode to other values. A refusal repro, a level 3 stream whose number

@@ -4640,7 +4640,8 @@ prebuilt and not in `draco-native`. Regression:
 points`).
 
 With E58 and E59 (several KD decoders and repeated ids, 2026-11-27), which drop
-the id sort, the Wasm is 137,361 bytes (52,199 B gzip -9).
+the id sort, the Wasm is 137,361 bytes (52,199 B gzip -9). With E60 and E61 (version 1.3
+and the normalized byte) it is 137,356 bytes (52,255 B gzip -9).
 
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes

@@ -6869,6 +6869,20 @@ matched.
 | E58 several KD decoders | In a version 2.3 KD cloud every decoder's attribute list (count and descriptors) comes first, then for each decoder in the same order its tree and its own transforms. Each tree states the header's point count. Attributes come out in decoder order. | All 4,000 joins accepted by the opaque decoder equal the single clouds' attributes in order. |
 | E59 repeated ids | Attribute unique ids may repeat, within a decoder and across decoders, in sequential and KD streams; every attribute is kept in file order and a lookup by id returns the first. | Versions 1.1 and 2.0 to 2.3. |
 
+### Batch 133 E60 and E61: version 1.3 and the normalized byte (2026-11-27)
+
+Method: as E26 to E40, public calls of the opaque full decoder only; its source
+was not read. A grid of count, id and point-count widths over hand-built 1.2
+and 1.3 clouds, then 250 retained 1.0 to 1.2 streams rewritten as 1.3, kept
+only where the opaque decoder gave the original output. Every descriptor byte
+value was tried at 1.1, 2.0 and 2.3. The varint id from 1.3 agrees with the
+published specification's attribute descriptor table.
+
+| # | Rule | Probe |
+| --- | --- | --- |
+| E60 version 1.3 | Version 1.3 streams, point clouds and meshes, use the 1.2 layout except that an attribute's unique id is a varint, not two bytes. | All 250 rewritten streams match; 1.2 streams only relabelled are rejected by both. |
+| E61 normalized byte | Any nonzero normalized byte means true, at every version. A semantic above 4 rejects the stream. | All 256 values of both bytes. |
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

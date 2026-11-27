@@ -146,3 +146,9 @@ fn several_kd_decoders_and_repeated_ids_match_black_box_outputs() {
     let counts = check(include_bytes!("fixtures/kd-decoders.bin"));
     assert_eq!(counts, (95, 89, 6, 0));
 }
+
+#[test]
+fn version_13_and_normalized_bytes_match_black_box_outputs() {
+    let counts = check(include_bytes!("fixtures/version13.bin"));
+    assert_eq!(counts, (123, 99, 24, 0));
+}

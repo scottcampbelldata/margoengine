@@ -233,12 +233,14 @@ pub(crate) fn descriptor(c: &mut Cursor) -> Result<Attribute> {
     let data_type = c.byte()?;
     let components = c.byte()?;
     let normalized = c.byte()?;
-    let unique_id = if c.version < 0x200 {
+    // E60: unique ids are u16 only before 1.3.
+    let unique_id = if c.version < 0x103 {
         c.le(2)?
     } else {
         c.count()? as u32
     };
-    if semantic > 4 || components == 0 || normalized > 1 {
+    // E61: any nonzero normalized byte is true.
+    if semantic > 4 || components == 0 {
         return Err(Error::Invalid);
     }
     scalar_bytes(data_type)?;
@@ -278,7 +280,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     if kind > 1 {
         return Err(Error::Header);
     }
-    if !((major == 1 && minor <= 2) || (major == 2 && minor <= if kind == 0 { 3 } else { 2 })) {
+    if !((major == 1 && minor <= 3) || (major == 2 && minor <= if kind == 0 { 3 } else { 2 })) {
         return Err(Error::Unsupported);
     }
     c.version = u16::from(major) * 256 + u16::from(minor);
