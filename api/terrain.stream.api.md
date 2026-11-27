@@ -12,6 +12,8 @@ export class TerrainStream implements EnginePlugin {
     readonly columns: number;
     readonly heights: Float32Array;
     readonly weights: readonly Uint8Array[];
+    readonly normals?: Uint8Array;
+    readonly tint?: Uint8Array;
     disposed: boolean;
     private constructor();
     static attach(engine: EngineKernel, options: TerrainStreamOptions): TerrainStream;
@@ -50,11 +52,15 @@ export interface TerrainStreamOptions extends Omit<TerrainOptions, 'textures' | 
     readonly signal?: AbortSignal;
     readonly retries?: number;
     readonly retryDelay?: number;
+    readonly normals?: boolean;
+    readonly tint?: boolean;
 }
 
 export interface TerrainStreamTile {
     readonly heights: Float32Array;
     readonly weights?: readonly Uint8Array[];
+    readonly normals?: Uint8Array;
+    readonly tint?: Uint8Array;
 }
 
 // Not exported from this entry, but used by the exports above:

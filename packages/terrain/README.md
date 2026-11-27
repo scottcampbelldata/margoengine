@@ -558,6 +558,10 @@ up) from -Z; AO 0 removes the ambient light (151 to 0); roughness 0.1 draws the 
 the camera, so a world can be far bigger than one heightmap. The terrain draws a window of `window` x `window` tiles
 (default 4) centred on the engine camera; `load(x, z, signal)` returns tile (x, z)'s heights (`tileTexels` squared
 float32 samples, rows along +Z) and, with `weights: n`, its n weight byte arrays, or null where there is no data.
+With `normals: true` each tile with data also gives `normals` (RGBA bytes, XYZ encoded `n * 0.5 + 0.5`), which the
+terrain shades with in place of normals from its heights, so lighting keeps detail finer than the height samples; with
+`tint: true` (and weights) a tile may give `tint` (sRGB RGBA bytes), which layers marked `tint: true` move toward by
+its A, a draped photograph or a season map. Both stream, scroll and restore with the heights.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -613,7 +617,8 @@ stream.onChange((change) => console.log(change));      // bands uploaded, or the
   Brooker, "Exponential Backoff And Jitter", AWS Architecture Blog, 2015,
   https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/ (full jitter against synchronised retries).
 - Memory: the window's heightmap, a scratch copy and the CPU copy, 4 bytes a texel each (12 MB at 1,024 x 1,024), plus
-  three times 4 bytes a texel per weight texture. The window must fit the device's 2D texture limit.
+  twice 4 bytes a texel per weight texture, normal map and tint (the GPU texture and the CPU copy; `normals`, `tint`)
+  and one shared 4-byte scratch. The window must fit the device's 2D texture limit.
 
 Checked on a real GPU by `test/stream.browser.mjs` (in `test:gpu`) on nine adjacent Terrarium tiles around Mount
 Rainier (`test/fixtures/terrarium-10`, Terrain Tiles on AWS), 256 x 256 each with weights made from their heights,
@@ -624,7 +629,10 @@ budget (16,384 texels: 17 frames for the first four tiles), and a stream dispose
 `ready` with MargoError `'disposed'` (Radeon 680M). Retries (2026-11-27, RTX A6000): tiles failing twice each load on
 their third try with two retries and their third try's heights are uploaded; with one retry `ready` rejects with the
 last error after two tries a tile, `retry()` starts the four over and they load; a tile of the wrong shape is tried
-once. Cost not timed.
+once. Normals and tint (2026-11-27, RTX A6000): the same stops with a streamed normal map tilted away from the
+heights' own normals and a red tint on every other tile; the CPU copies hold exactly the mosaic's texels and the
+picture equals a plain `Terrain` given both whole, which a stream dropping either fails by 112 and 92 of 255. Cost
+not timed.
 
 ## Sculpt and paint brushes: `@margoengine/terrain/sculpt`
 

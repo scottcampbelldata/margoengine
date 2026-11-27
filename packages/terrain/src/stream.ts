@@ -24,6 +24,16 @@ export interface TerrainStreamTile {
    * weights of `TerrainTextures.weights` for this tile (layer i is channel i % 4 of array i / 4).
    */
   readonly weights?: readonly Uint8Array[];
+  /**
+   * With `TerrainStreamOptions.normals`: the tile's normals as RGBA bytes (4 per texel), XYZ encoded 0..1 (`n * 0.5 +
+   * 0.5`), the `TerrainTextures.normalmap` texels for this tile. Required on every tile with data then.
+   */
+  readonly normals?: Uint8Array;
+  /**
+   * With `TerrainStreamOptions.tint`: the tile's tint as RGBA bytes (4 per texel, sRGB colour and A how far tinted
+   * layers move toward it), the `TerrainTextures.tint` texels for this tile. Optional: a tile without it is untinted.
+   */
+  readonly tint?: Uint8Array;
 }
 
 /** What changed in the heightmap: a band of rows uploaded, or the whole window moved (`shifted`). Texel rectangle. */
@@ -74,7 +84,42 @@ export interface TerrainStreamOptions extends Omit<TerrainOptions, 'textures' | 
    * all ask again at once.
    */
   readonly retryDelay?: number;
+  /**
+   * Stream a normal map with the heights: each tile with data gives `normals`, and the terrain shades with them in place
+   * of normals from neighbouring heights (`TerrainTextures.normalmap`), so lighting keeps detail finer than the height
+   * samples. Texels not loaded yet face straight up. Default false.
+   */
+  readonly normals?: boolean;
+  /**
+   * Stream a tint texture with the heights (`TerrainTextures.tint`, as `rgba8unorm-srgb`; needs `weights`): layers with
+   * `tint: true` move toward each tile's `tint` colour by its A, a draped photograph or a season map. Texels not loaded
+   * yet, and tiles without `tint`, are untinted. Default false.
+   */
+  readonly tint?: boolean;
 }
+
+/** One streamed RGBA8 texture beside the heights: a weight texture, the normal map or the tint. */
+interface Plane {
+  /** The CPU copy, `columns` x `columns` RGBA bytes. */
+  readonly data: Uint8Array;
+  /** What a texel holds before its tile loads. */
+  readonly fill: readonly [number, number, number, number];
+  readonly format: 'rgba8unorm' | 'rgba8unorm-srgb';
+  /** The tile's bytes for this texture, or undefined for `fill`. */
+  readonly pick: (tile: TerrainStreamTile) => Uint8Array | undefined;
+  texture?: GPUTexture;
+  /** A `tileTexels` square of `fill`, copied over exposed tiles. */
+  fillTexture?: GPUTexture;
+  /** A tile of `fill` bytes, made the first time a tile without its own bytes is uploaded. */
+  fillTile?: Uint8Array;
+}
+
+/** `count` texels of RGBA bytes, each `fill`. */
+const filled = (count: number, fill: readonly number[]): Uint8Array => {
+  const a = new Uint8Array(count * 4);
+  for (let i = 0; i < a.length; i++) a[i] = fill[i % 4];
+  return a;
+};
 
 type Slot =
   | { state: 'loading'; controller: AbortController }
@@ -97,7 +142,19 @@ const integer = (v: unknown, lo: number, hi: number): boolean =>
  * Moves rows and columns of an `n` x `n` image of `c` values per texel so texel (u, v) takes old (u + sx, v + sz);
  * texels with no source get `fill`. In place, in the order that reads each row before it is overwritten.
  */
-const scroll = (a: Float32Array | Uint8Array, n: number, c: number, sx: number, sz: number, fill: number): void => {
+const scroll = (
+  a: Float32Array | Uint8Array,
+  n: number,
+  c: number,
+  sx: number,
+  sz: number,
+  fill: number | readonly number[],
+): void => {
+  // A per-texel fill (one value per channel) when the channels differ.
+  const put = (from: number, to: number) => {
+    if (typeof fill === 'number') a.fill(fill, from, to);
+    else for (let i = from; i < to; i++) a[i] = fill[(i - from) % c];
+  };
   const u0 = Math.max(0, -sx),
     u1 = Math.min(n, n - sx);
   for (let k = 0; k < n; k++) {
@@ -105,12 +162,12 @@ const scroll = (a: Float32Array | Uint8Array, n: number, c: number, sx: number, 
       from = v + sz,
       row = v * n * c;
     if (from < 0 || from >= n || u1 <= u0) {
-      a.fill(fill, row, row + n * c);
+      put(row, row + n * c);
       continue;
     }
     a.copyWithin(row + u0 * c, (from * n + u0 + sx) * c, (from * n + u1 + sx) * c);
-    a.fill(fill, row, row + u0 * c);
-    a.fill(fill, row + u1 * c, row + n * c);
+    put(row, row + u0 * c);
+    put(row + u1 * c, row + n * c);
   }
 };
 
@@ -131,6 +188,10 @@ export class TerrainStream implements EnginePlugin {
   readonly heights: Float32Array;
   /** CPU copies of the weight textures, RGBA bytes, as `heights`. */
   readonly weights: readonly Uint8Array[];
+  /** CPU copy of the normal map with `normals`, RGBA bytes as `heights`; else undefined. */
+  readonly normals?: Uint8Array;
+  /** CPU copy of the tint with `tint`, RGBA bytes as `heights`; else undefined. */
+  readonly tint?: Uint8Array;
   disposed = false;
   readonly #o: TerrainStreamOptions;
   readonly #n: number;
@@ -145,11 +206,12 @@ export class TerrainStream implements EnginePlugin {
   #engine?: Engine;
   #device?: GPUDevice;
   #height?: GPUTexture;
-  #weightTextures: GPUTexture[] = [];
+  /** The weight textures, then the normal map and the tint when streamed. */
+  readonly #planes: Plane[];
   #scratch?: GPUTexture;
+  /** RGBA8 scratch for scrolling every plane (an `-srgb` plane copies through it too: the formats differ only in sRGB). */
   #scratchWeights?: GPUTexture;
   #fill?: GPUTexture;
-  #fillWeights?: GPUTexture;
   #loading = 0;
   #version = 0;
 
@@ -183,6 +245,20 @@ export class TerrainStream implements EnginePlugin {
     const texels = this.columns * this.columns;
     this.heights = new Float32Array(texels).fill(o.fill ?? 0);
     this.weights = Array.from({ length: o.weights ?? 0 }, () => new Uint8Array(texels * 4));
+    // Unloaded normals face up: (0, 1, 0) encoded, 128 for 0 (0.502, as the shader decodes n * 2 - 1, off by 1/255).
+    const up: [number, number, number, number] = [128, 255, 128, 255],
+      none: [number, number, number, number] = [0, 0, 0, 0];
+    this.#planes = this.weights.map(
+      (data, i): Plane => ({ data, fill: none, format: 'rgba8unorm', pick: (tile) => tile.weights![i] }),
+    );
+    if (o.normals) {
+      this.normals = filled(texels, up);
+      this.#planes.push({ data: this.normals, fill: up, format: 'rgba8unorm', pick: (tile) => tile.normals });
+    }
+    if (o.tint) {
+      this.tint = new Uint8Array(texels * 4);
+      this.#planes.push({ data: this.tint, fill: none, format: 'rgba8unorm-srgb', pick: (tile) => tile.tint });
+    }
     // With a floating origin the camera is local: the window is placed around its float64 world position.
     const local = engine.camera.position,
       shift = o.floatingOrigin?.origin,
@@ -206,6 +282,8 @@ export class TerrainStream implements EnginePlugin {
         'signal',
         'retries',
         'retryDelay',
+        'normals',
+        'tint',
       ],
       rest = Object.fromEntries(Object.entries(o).filter(([key]) => !own.includes(key)));
     // The terrain reads `origin` every frame; the stream moves this array's values with the window.
@@ -344,7 +422,7 @@ export class TerrainStream implements EnginePlugin {
       sx = dx * t,
       sz = dz * t;
     scroll(this.heights, n, 1, sx, sz, this.#o.fill ?? 0);
-    for (const w of this.weights) scroll(w, n, 4, sx, sz, 0);
+    for (const plane of this.#planes) scroll(plane.data, n, 4, sx, sz, plane.fill);
     this.#place(this.#window[0] + dx, this.#window[1] + dz);
     for (const [key, slot] of this.#slots) {
       const [x, z] = key.split(',').map(Number);
@@ -360,10 +438,10 @@ export class TerrainStream implements EnginePlugin {
       depth = n - Math.abs(sz),
       textures: [GPUTexture, GPUTexture, GPUTexture][] = [
         [this.#height!, this.#scratch!, this.#fill!],
-        ...this.#weightTextures.map((w): [GPUTexture, GPUTexture, GPUTexture] => [
-          w,
+        ...this.#planes.map((plane): [GPUTexture, GPUTexture, GPUTexture] => [
+          plane.texture!,
           this.#scratchWeights!,
-          this.#fillWeights!,
+          plane.fillTexture!,
         ]),
       ];
     for (const [texture, scratch, fill] of textures) {
@@ -468,18 +546,23 @@ export class TerrainStream implements EnginePlugin {
 
   #check(tile: TerrainStreamTile): TerrainStreamTile {
     const texels = this.#t * this.#t,
-      weights = this.weights.length;
+      weights = this.weights.length,
+      bytes = (b: unknown) => b instanceof Uint8Array && b.length === texels * 4;
     if (
       !(tile.heights instanceof Float32Array) ||
       tile.heights.length !== texels ||
       !tile.heights.every(Number.isFinite) ||
       (weights > 0 &&
-        (!Array.isArray(tile.weights) ||
-          tile.weights.length !== weights ||
-          tile.weights.some((w) => !(w instanceof Uint8Array) || w.length !== texels * 4)))
+        (!Array.isArray(tile.weights) || tile.weights.length !== weights || tile.weights.some((w) => !bytes(w)))) ||
+      (this.normals && !bytes(tile.normals)) ||
+      (tile.tint !== undefined && (!this.tint || !bytes(tile.tint)))
     )
       throw new RangeError(
-        `Invalid terrain stream tile; give ${texels} finite float32 heights and ${weights} weight arrays of ${texels * 4} bytes.`,
+        `Invalid terrain stream tile; give ${texels} finite float32 heights, ${weights} weight arrays of ${texels * 4} bytes` +
+          (this.normals ? `, normals of ${texels * 4} bytes` : '') +
+          (this.tint
+            ? ` and, if any, a tint of ${texels * 4} bytes.`
+            : ' and no tint (the stream has no tint option).'),
       );
     return tile;
   }
@@ -509,9 +592,12 @@ export class TerrainStream implements EnginePlugin {
         tile = slot.tile;
       for (let j = j0; j < j1; j++) {
         this.heights.set(tile.heights.subarray(j * t, (j + 1) * t), (v + j - j0) * n + u);
-        this.weights.forEach((w, i) =>
-          w.set(tile.weights![i].subarray(j * t * 4, (j + 1) * t * 4), ((v + j - j0) * n + u) * 4),
-        );
+        for (const plane of this.#planes) {
+          const from = plane.pick(tile),
+            at = ((v + j - j0) * n + u) * 4;
+          if (from) plane.data.set(from.subarray(j * t * 4, (j + 1) * t * 4), at);
+          else for (let i = 0; i < t * 4; i++) plane.data[at + i] = plane.fill[i % 4];
+        }
       }
       queue.writeTexture(
         { texture: this.#height!, origin: [u, v] },
@@ -519,14 +605,13 @@ export class TerrainStream implements EnginePlugin {
         { offset: j0 * t * 4, bytesPerRow: t * 4 },
         [t, j1 - j0],
       );
-      this.#weightTextures.forEach((texture, i) =>
+      for (const plane of this.#planes)
         queue.writeTexture(
-          { texture, origin: [u, v] },
-          tile.weights![i] as Uint8Array<ArrayBuffer>,
+          { texture: plane.texture!, origin: [u, v] },
+          (plane.pick(tile) ?? (plane.fillTile ??= filled(t * t, plane.fill))) as Uint8Array<ArrayBuffer>,
           { offset: j0 * t * 4, bytesPerRow: t * 4 },
           [t, j1 - j0],
-        ),
-      );
+        );
       left -= (j1 - j0) * t;
       slot.row = j1;
       if (j1 === t) {
@@ -589,21 +674,33 @@ export class TerrainStream implements EnginePlugin {
       { bytesPerRow: t * 4 },
       [t, t],
     );
-    this.#weightTextures = this.weights.map((data) => {
-      const texture = device.createTexture({ size: [n, n], format: 'rgba8unorm', usage });
-      device.queue.writeTexture({ texture }, data as Uint8Array<ArrayBuffer>, { bytesPerRow: n * 4 }, [n, n]);
-      return texture;
-    });
-    if (this.weights.length) {
-      this.#scratchWeights = device.createTexture({ size: [n, n], format: 'rgba8unorm', usage: copy });
-      // New textures start at zero: no weight anywhere until a tile's weights arrive (layer 0 shows).
-      this.#fillWeights = device.createTexture({ size: [t, t], format: 'rgba8unorm', usage: copy });
+    for (const plane of this.#planes) {
+      plane.texture = device.createTexture({ size: [n, n], format: plane.format, usage });
+      device.queue.writeTexture(
+        { texture: plane.texture },
+        plane.data as Uint8Array<ArrayBuffer>,
+        { bytesPerRow: n * 4 },
+        [n, n],
+      );
+      plane.fillTexture = device.createTexture({ size: [t, t], format: plane.format, usage: copy });
+      device.queue.writeTexture(
+        { texture: plane.fillTexture },
+        filled(t * t, plane.fill) as Uint8Array<ArrayBuffer>,
+        { bytesPerRow: t * 4 },
+        [t, t],
+      );
     }
-    const w = this.#weightTextures;
+    if (this.#planes.length)
+      this.#scratchWeights = device.createTexture({ size: [n, n], format: 'rgba8unorm', usage: copy });
+    const w = this.#planes.slice(0, this.weights.length).map((plane) => plane.texture!),
+      normalmap = this.normals ? this.#planes[w.length].texture : undefined,
+      tint = this.tint ? this.#planes[this.#planes.length - 1].texture : undefined;
     return {
       heightmap: this.#height,
       layers: this.#o.colors(device),
       ...(w.length ? { weights: w.length === 1 ? [w[0], w[0]] : w } : {}),
+      ...(normalmap ? { normalmap } : {}),
+      ...(tint ? { tint } : {}),
     };
   };
 
@@ -611,9 +708,10 @@ export class TerrainStream implements EnginePlugin {
   #release(): void {
     this.#scratch?.destroy();
     this.#scratchWeights?.destroy();
+    for (const plane of this.#planes) plane.fillTexture?.destroy();
     this.#fill?.destroy();
-    this.#fillWeights?.destroy();
-    this.#scratch = this.#scratchWeights = this.#fill = this.#fillWeights = undefined;
+    this.#scratch = this.#scratchWeights = this.#fill = undefined;
+    for (const plane of this.#planes) plane.fillTexture = undefined;
   }
 
   dispose(): void {
@@ -630,7 +728,7 @@ export class TerrainStream implements EnginePlugin {
     this.terrain.dispose();
     this.#release();
     this.#engine = this.#device = this.#height = undefined;
-    this.#weightTextures = [];
+    for (const plane of this.#planes) plane.texture = undefined;
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

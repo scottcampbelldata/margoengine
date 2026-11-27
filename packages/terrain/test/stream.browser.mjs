@@ -9,6 +9,9 @@
 //    texels for them, weights included;
 // 2. the streamed terrain draws exactly the pixels of a plain Terrain given that window's heights and weights whole;
 // 3. no frame uploads more texels than the budget.
+// The tiles also carry a streamed normal map (tilted away from the heights' own normals, so a picture drawn without it
+// differs) and, on every other tile, a tint, so (1) and (2) cover both: the CPU copies, and the picture of a plain Terrain
+// given the window's normal map and tint whole.
 // Then a stream disposed with a load in flight aborts the load and rejects `ready` with MargoError 'disposed'.
 // Then retries: every tile failing twice loads on its third try and `ready` resolves; with one retry, `ready` rejects with
 // the load's error after two tries each, and `retry()` starts the failed tiles over with their retries again; a tile of
@@ -51,12 +54,23 @@ await runSuite(
             const band = (c) => Math.round(255 * Math.max(0, 1 - Math.abs(h - c) / 1500));
             weights.set([band(0), band(1500), band(3000), band(4500)], k * 4);
           }
-          tiles.set(`${i},${j}`, { heights, weights: [weights] });
+          const normals = new Uint8Array(T * T * 4);
+          for (let k = 0; k < heights.length; k++) {
+            const nx = 0.6 * Math.sin((k % T) / 9),
+              nz = 0.6 * Math.cos(Math.floor(k / T) / 7),
+              l = Math.hypot(nx, 1, nz);
+            normals.set([nx / l, 1 / l, nz / l].map((c) => Math.round((c * 0.5 + 0.5) * 255)).concat(255), k * 4);
+          }
+          const tint = (i + j) % 2 ? undefined : new Uint8Array(T * T * 4).map((_, k) => [200, 40, 40, 180][k % 4]);
+          tiles.set(`${i},${j}`, { heights, weights: [weights], normals, ...(tint ? { tint } : {}) });
         }
       // The window the stream should hold for minimum tile (x, z): the mosaic, empty tiles at fill 0 and no weight.
       const expected = (x, z) => {
         const heights = new Float32Array(N * N),
-          weights = new Uint8Array(N * N * 4);
+          weights = new Uint8Array(N * N * 4),
+          // Unloaded or empty: normals straight up, no tint.
+          normals = new Uint8Array(N * N * 4).map((_, k) => [128, 255, 128, 255][k % 4]),
+          tint = new Uint8Array(N * N * 4);
         for (let j = 0; j < W; j++)
           for (let i = 0; i < W; i++) {
             const tile = tiles.get(`${x + i},${z + j}`);
@@ -64,11 +78,13 @@ await runSuite(
             for (let r = 0; r < T; r++) {
               heights.set(tile.heights.subarray(r * T, (r + 1) * T), (j * T + r) * N + i * T);
               weights.set(tile.weights[0].subarray(r * T * 4, (r + 1) * T * 4), ((j * T + r) * N + i * T) * 4);
+              normals.set(tile.normals.subarray(r * T * 4, (r + 1) * T * 4), ((j * T + r) * N + i * T) * 4);
+              if (tile.tint) tint.set(tile.tint.subarray(r * T * 4, (r + 1) * T * 4), ((j * T + r) * N + i * T) * 4);
             }
           }
-        return { heights, weights };
+        return { heights, weights, normals, tint };
       };
-      const layers = [0, 1, 2, 3].map(() => ({ height: [-1e5, 1e5], slope: [0, 1], scale: 0.002 })),
+      const layers = [0, 1, 2, 3].map((i) => ({ height: [-1e5, 1e5], slope: [0, 1], scale: 0.002, tint: i < 2 })),
         colors = (device) => {
           const texture = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
           device.queue.writeTexture(
@@ -113,6 +129,8 @@ await runSuite(
         tileTexels: T,
         window: W,
         weights: 1,
+        normals: true,
+        tint: true,
         budget,
         colors,
         async load(x, z, signal) {
@@ -176,7 +194,12 @@ await runSuite(
           gpuWorst = Math.max(gpuWorst, Math.abs(gpu[k] - want.heights[k]));
         }
         for (let k = 0; k < want.weights.length; k++)
-          weightWorst = Math.max(weightWorst, Math.abs(stream.weights[0][k] - want.weights[k]));
+          weightWorst = Math.max(
+            weightWorst,
+            Math.abs(stream.weights[0][k] - want.weights[k]),
+            Math.abs(stream.normals[k] - want.normals[k]),
+            Math.abs(stream.tint[k] - want.tint[k]),
+          );
         // The same window drawn by a plain terrain from the whole arrays.
         look(reference.engine, x, z);
         const plain = Terrain.attach(reference.engine, {
@@ -188,7 +211,11 @@ await runSuite(
               weight = gpu.createTexture({ size: [N, N], format: 'rgba8unorm', usage: 6 });
             gpu.queue.writeTexture({ texture: heightmap }, want.heights, { bytesPerRow: N * 4 }, [N, N]);
             gpu.queue.writeTexture({ texture: weight }, want.weights, { bytesPerRow: N * 4 }, [N, N]);
-            return { heightmap, layers: colors(gpu), weights: [weight, weight] };
+            const normalmap = gpu.createTexture({ size: [N, N], format: 'rgba8unorm', usage: 6 }),
+              tint = gpu.createTexture({ size: [N, N], format: 'rgba8unorm-srgb', usage: 6 });
+            gpu.queue.writeTexture({ texture: normalmap }, want.normals, { bytesPerRow: N * 4 }, [N, N]);
+            gpu.queue.writeTexture({ texture: tint }, want.tint, { bytesPerRow: N * 4 }, [N, N]);
+            return { heightmap, layers: colors(gpu), weights: [weight, weight], normalmap, tint };
           },
         });
         streamed.engine.render({ delta: 1 / 60 });

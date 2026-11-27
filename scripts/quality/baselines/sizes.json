@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21045431,
+  "total": 21046190,
   "history": [
     {
       "date": "2026-10-24",
@@ -14779,6 +14779,12 @@
       "date": "2026-11-27",
       "commit": "sea-04-mean-hull-mask",
       "reason": "Physics/sea moves from 12263 to 14183 B gzip and its ceiling from 12631 to 14609 B. The optional mesh bake validates and converts a closed hull to the finite wake mask, including target placement and shared edges. A separate entry would require another import and its own mask and hull type documentation for the same wake setup. Named imports tree-shake the bake when unused. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "terrain-stream-normals-tint",
+      "reason": "terrain/stream streams a normal map and a tint with the heights (normals, tint options; LIM-435 gap), after the tile retries: 14,425 -> 14,823 B gzip, ceiling 14,509 -> 15,268. The two textures go through the weights' own scroll, upload and restore path as RGBA8 planes, so they add no second copy of it; a separate entry would have to subclass TerrainStream and repeat the tile check, band upload and window shift for the same tiles. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16201,7 +16207,7 @@
     "@margoengine/terrain/rvt": 7126,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/settings": 2711,
-    "@margoengine/terrain/stream": 14509,
+    "@margoengine/terrain/stream": 15268,
     "@margoengine/terrain/wet-ground": 3443,
     "@margoengine/text": 16729,
     "@margoengine/text/animate": 11627,
