@@ -330,7 +330,9 @@ function upright(world: ArrayLike<number>, zUp: boolean): number[] {
 const CORE = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02',
   MATERIAL = 'http://schemas.microsoft.com/3dmanufacturing/material/2015/02',
   RELATIONSHIP = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/',
-  THUMBNAIL = 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail';
+  THUMBNAIL = 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail',
+  /** A 3D texture part's content type (materials extension, appendix E.1); `image/png` is a thumbnail's. */
+  TEXTURE_PART = 'application/vnd.ms-package.3dmanufacturing-3dmodeltexture';
 
 /** The core specification's names, by option. */
 const NAMES = {
@@ -819,8 +821,7 @@ export async function export3MF(
             .join('') +
           '</Relationships>\n',
       ),
-    pictures = preview ? [{ name: `Metadata/thumbnail.${preview}`, data: thumbnail! }] : [],
-    extensions = new Set([...files, ...pictures].map(({ name }) => name.slice(-3)));
+    pictures = preview ? [{ name: `Metadata/thumbnail.${preview}`, data: thumbnail! }] : [];
   return encodeZIP(
     [
       {
@@ -829,8 +830,10 @@ export async function export3MF(
           '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
             '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
             '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>' +
-            (extensions.has('png') ? '<Default Extension="png" ContentType="image/png"/>' : '') +
-            (extensions.has('jpg') ? '<Default Extension="jpg" ContentType="image/jpeg"/>' : '') +
+            (preview
+              ? `<Default Extension="${preview}" ContentType="image/${preview === 'png' ? 'png' : 'jpeg'}"/>`
+              : '') +
+            files.map(({ name }) => `<Override PartName="/${name}" ContentType="${TEXTURE_PART}"/>`).join('') +
             '</Types>\n',
         ),
       },

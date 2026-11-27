@@ -109,6 +109,22 @@ test('a thumbnail is a package part with its relationship; other pictures are re
   await assert.rejects(export3MF(source, { thumbnail: Uint8Array.of(71, 73, 70) }), TypeError);
 });
 
+test('texture parts are declared as 3D textures, a thumbnail as the image it is', async () => {
+  const image = await png({ width: 1, height: 1, data: new Uint8Array(4).fill(255) }, 1, false),
+    geometry = mesh(faces, { uvs: new Float32Array(16) }),
+    source = { nodes: [{ geometry, material: { baseColorTexture: { image, mimeType: 'image/png' } } }] },
+    types = async (options) =>
+      new TextDecoder().decode(await part(await export3MF(source, options), '[Content_Types].xml')),
+    override =
+      '<Override PartName="/3D/Textures/texture1.png" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodeltexture"/>';
+  const bare = await types({});
+  assert.ok(bare.includes(override), bare);
+  assert.ok(!bare.includes('image/png'), 'no part is declared as a plain image without a thumbnail');
+  const shown = await types({ thumbnail: image });
+  assert.ok(shown.includes(override));
+  assert.ok(shown.includes('<Default Extension="png" ContentType="image/png"/>'));
+});
+
 test('metalness and roughness are display properties, one entry for each base and colour', async () => {
   const colors = new Float32Array(corners.length).map((_, i) => (i % 5) / 4),
     file = await export3MF({
