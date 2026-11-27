@@ -1,8 +1,10 @@
 // The scene writers export the lines of @margoengine/lines and the clouds of @margoengine/points, read through
 // engine.plugins by their public fields (exporters imports neither package). glTF writes each as a LINES or POINTS
 // primitive (glTF 2.0 section 3.9.7 gives them no size), its width in primitive extras (lineWidth, pointSize and their
-// units) and per-point multipliers as `_WIDTH`. No width extension is written: the Khronos validator warns
-// (MULTIPLE_EXTENSIONS) on any extension beside KHR_materials_unlit, which these unlit lines and points need. USDZ writes world-unit widths as UsdGeom `widths`. A Margo loader reads every one of them back.
+// units) and per-point multipliers as `_WIDTH`. No width extension is written by default: the Khronos validator
+// warns (MULTIPLE_EXTENSIONS) on any extension beside KHR_materials_unlit, which these unlit lines and points need;
+// `styleExtensions` asks for the BENTLEY line and point style extensions. USDZ writes world-unit widths as UsdGeom
+// `widths`. A Margo loader reads every one of them back.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, Geometry, PbrMaterial } from '@margoengine/core';
@@ -283,4 +285,50 @@ test('a splat cloud no scene writer holds is named in a warning, not dropped in 
   const warnings = [];
   exportGLB(engine, { root: box, onWarning: (w) => warnings.push(w) });
   assert.deepEqual(warnings, []);
+});
+
+test('styleExtensions writes pixel widths and diameters as the BENTLEY line and point style extensions', async () => {
+  const { engine, lines, cloud } = await scene();
+  // A fractional width rounds to whole pixels, and a hairline is still one.
+  lines.add(new Line({ positions: [0, 0, 0, 1, 0, 0], width: 2.6, color: [0, 1, 0] }));
+  lines.add(new Line({ positions: [0, 0, 0, 0, 0, 1], width: 0.2, color: [0, 0, 1] }));
+  const plain = readGLB(exportGLB(engine)).json;
+  assert.ok(!plain.extensionsUsed.some((name) => name.startsWith('BENTLEY_')), 'off by default');
+  const glb = exportGLB(engine, { styleExtensions: true }),
+    report = await validate(glb),
+    { json } = readGLB(glb),
+    parts = primitivesOf(json),
+    styleOf = (p) => json.materials[p.material].extensions;
+  assert.equal(report.errors, 0, JSON.stringify(report.messages));
+  // The one warning the vendor extensions cost, which is why they are off by default.
+  assert.deepEqual(
+    [...new Set(report.messages.filter((m) => m.severity === 1).map((m) => m.code))],
+    ['MULTIPLE_EXTENSIONS'],
+  );
+  for (const name of ['BENTLEY_materials_line_style', 'BENTLEY_materials_point_style'])
+    assert.ok(json.extensionsUsed.includes(name), name);
+  assert.equal(json.extensionsRequired, undefined, 'a reader without them still loads the file');
+  const widths = parts
+    .filter((p) => p.mode === 1 && p.extras.lineWidthUnits === 'pixels')
+    .map((p) => [p.extras.lineWidth, styleOf(p).BENTLEY_materials_line_style.width]);
+  // The extras keep the line's own width (the scene's strip is 3 pixels).
+  assert.deepEqual(
+    widths.sort((a, b) => a[0] - b[0]).map(([own, pixels]) => [Number(own.toFixed(3)), pixels]),
+    [
+      [0.2, 1],
+      [2.6, 3],
+      [3, 3],
+    ],
+  );
+  const points = parts.find((p) => p.mode === 0);
+  assert.equal(points.extras.pointSizeUnits, cloud.material.sizeUnits);
+  assert.deepEqual(styleOf(points).BENTLEY_materials_point_style, { diameter: 6 });
+  assert.deepEqual(styleOf(points).KHR_materials_unlit, {}, 'still unlit');
+  // World-unit widths have no pixel form.
+  for (const p of parts.filter((q) => q.extras?.lineWidthUnits === 'world'))
+    assert.equal(styleOf(p).BENTLEY_materials_line_style, undefined);
+  // The file reads back as before.
+  const asset = new GLTFAsset(json, [readGLB(glb).bin]);
+  assert.ok(asset.accessor(points.indices).length > 0);
+  assert.throws(() => exportGLB(engine, { styleExtensions: 1 }), /styleExtensions must be boolean/);
 });

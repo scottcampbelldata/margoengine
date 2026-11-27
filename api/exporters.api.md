@@ -191,6 +191,7 @@ export interface GLTFOptions extends SceneOptions {
     flatten?: boolean;
     generator?: string;
     sparseMorphs?: boolean;
+    styleExtensions?: boolean;
 }
 
 export interface GeometryData {

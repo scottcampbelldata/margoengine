@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20965550,
+  "total": 20966819,
   "history": [
     {
       "date": "2026-10-24",
@@ -14664,6 +14664,12 @@
       "commit": "HEAD",
       "reason": "navmesh/any-angle new at 3762 B: the exact shortest any-angle search (Polyanya), its own entry sharing the point checks and portal crossing of the navmesh search chunk; no other entry grows past its budget",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "@margoengine/exporters 41,048 to 41,164 B gzip (+116 B, ceiling 41,130 to 42,399): GLTFOptions.styleExtensions writes plugin line widths and point diameters as the BENTLEY line and point style extensions; it is a few lines inside the glTF material writer that every glTF export runs, so an entry of its own would copy the writer.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15020,7 +15026,7 @@
     "@margoengine/environment/settings": 4074,
     "@margoengine/environment/studio": 1493,
     "@margoengine/environment/volumetric": 13184,
-    "@margoengine/exporters": 41130,
+    "@margoengine/exporters": 42399,
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
     "@margoengine/exporters/capture": 7923,

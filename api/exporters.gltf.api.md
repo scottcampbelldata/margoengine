@@ -27,6 +27,7 @@ export interface GLTFOptions extends SceneOptions {
     flatten?: boolean;
     generator?: string;
     sparseMorphs?: boolean;
+    styleExtensions?: boolean;
 }
 
 export function base64(bytes: Uint8Array): string;
@@ -656,6 +657,7 @@ class Writer {
     length: number;
     pixelArt?: PixelArtSampling;
     sparseMorphs: boolean;
+    styleExtensions: boolean;
     constructor(maxBinary?: number, maxFile?: number);
     fits(bytes: number): void;
     plan(bytes: number): void;

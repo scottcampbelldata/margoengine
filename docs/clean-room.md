@@ -18282,3 +18282,14 @@ source was read.
   without which equal ways on grid-like meshes multiplied (556,203 nodes on a 798 polygon map, 841 after); off-mesh
   links as extra arrivals with the estimate scaled by the cheapest link's cost per metre (Hart, Nilsson and Raphael
   1968). Not built: the paper's intermediate pruning, which changes the work and not the path.
+
+## exporters glTF line and point style extensions (2026-11-27)
+
+`exportGLB` and `exportGLTF` `styleExtensions`, written from the specification texts only; no implementation was read.
+
+- Bentley Systems, `BENTLEY_materials_point_style` (status Complete) and `BENTLEY_materials_line_style` (status Draft),
+  glTF 2.0 vendor extensions, CesiumGS/glTF branch `vendor-extensions`,
+  https://github.com/CesiumGS/glTF/pull/91 and https://github.com/CesiumGS/glTF/pull/89: `diameter` and `width` as
+  whole pixels of at least 1 on the material.
+- Khronos, glTF 2.0 Specification, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html, section 3.9.7: points
+  and lines have no size.

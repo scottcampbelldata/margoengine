@@ -6688,3 +6688,10 @@ The path of least ground-plane length over the walkable polygons, plus off-mesh 
 Proof: `packages/navmesh/test/any-angle.test.js` compares random maps against a visibility graph Dijkstra within 1e-6
 and checks analytic cases, tile seams and a work bound. Distance only; no timing claim and no rival comparison.
 [Limits](../limits.md)
+
+## glTF line and point style extensions (exporters styleExtensions)
+
+`exportGLB` and `exportGLTF` can write pixel line widths and point diameters as `BENTLEY_materials_line_style` and
+`BENTLEY_materials_point_style`. Proof: `packages/exporters/tests/plugin-lines-points.test.js` checks the values, the
+Khronos validator (no errors, the one MULTIPLE_EXTENSIONS warning) and the default. Not tried in CesiumJS or iTwin.js.
+[Limits](../limits.md)

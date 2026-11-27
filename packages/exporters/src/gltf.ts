@@ -51,6 +51,14 @@ export interface GLTFOptions extends SceneOptions {
    * for bit. `false` writes every target dense, for a reader without sparse support. Default true.
    */
   sparseMorphs?: boolean;
+  /**
+   * Also write the pixel width of a plugin line and the pixel diameter of a plugin point cloud as the vendor
+   * extensions `BENTLEY_materials_line_style` (`width`) and `BENTLEY_materials_point_style` (`diameter`), which
+   * CesiumJS and iTwin.js draw. Both are whole pixels (rounded, at least 1) on the material; world-unit widths,
+   * per-point multipliers and dashes have no form there and stay as they are written without this. Neither is a
+   * Khronos extension, and the Khronos validator warns where one sits beside `KHR_materials_unlit`. Default false.
+   */
+  styleExtensions?: boolean;
 }
 
 /**
@@ -143,6 +151,8 @@ class Writer {
   pixelArt?: PixelArtSampling;
   /** GLTFOptions.sparseMorphs. */
   sparseMorphs = true;
+  /** GLTFOptions.styleExtensions. */
+  styleExtensions = false;
   /** BIN bytes the collected scene is known to need (vertex attributes, images) before they are written. */
   private planned = 0;
 
@@ -469,6 +479,11 @@ class Writer {
     if (mat.ior !== 1.5) extensions.KHR_materials_ior = { ior: mat.ior };
     if (mat.emissiveStrength !== 1)
       extensions.KHR_materials_emissive_strength = { emissiveStrength: mat.emissiveStrength };
+    if (this.styleExtensions && mat.width?.units === 'pixels') {
+      const pixels = Math.max(1, Math.round(mat.width.value));
+      if (mat.width.kind === 'lines') extensions.BENTLEY_materials_line_style = { width: pixels };
+      else extensions.BENTLEY_materials_point_style = { diameter: pixels };
+    }
     for (const name in extensions) this.used.add(name);
     if (Object.keys(extensions).length) out.extensions = extensions;
     const extras = copyExtras(mat.extras, 'Material extras');
@@ -833,6 +848,9 @@ function document(
   if (options.sparseMorphs !== undefined && typeof options.sparseMorphs !== 'boolean')
     throw new TypeError('sparseMorphs must be boolean');
   writer.sparseMorphs = options.sparseMorphs ?? true;
+  if (options.styleExtensions !== undefined && typeof options.styleExtensions !== 'boolean')
+    throw new TypeError('styleExtensions must be boolean');
+  writer.styleExtensions = options.styleExtensions ?? false;
   writer.pixelArt = pixelArtOf(options.pixelArt);
   const roots = collect(source, options, (bytes) => writer.plan(bytes), 'refuse', writes);
   prepare?.(roots);
