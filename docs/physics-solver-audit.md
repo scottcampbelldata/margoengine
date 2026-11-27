@@ -1319,6 +1319,34 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   [Kim, Van and Kim, 2001, §4.1](https://doi.org/10.1007/s003480100332)
   [Independent KRISO signed wave cut](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/data/KCS_data/fixed/wave_cut.dat)
 
+  A separate stern diagnostic retained the actual above-water shape from the full-height NMRI IGES.
+  The model transom lip is 15.8 mm above design water. At an independently specified +47.405 mm
+  height, two tessellations integrate 1.57611 and 1.57673 N of hydrostatic load on the aft face.
+  The separate original offset integration gives 1.58645 N. Extruding the centre-plane pressure
+  across the wetted width would give 3.260 N. This checks geometry and integration with a static
+  prescribed height. It is not a measured load comparison.
+
+  In the 3D transient diagnostic, the solid volume and open face areas come from the same
+  piecewise-affine geometry. A tilted-facet control checks the volume and both apertures exactly.
+  Full-span uniform inflow at 0.04 and 0.02 m has no discarded open face area and agrees in lateral
+  velocity RMS within 0.027% at matched duration. Mass and pressure reaction residuals stay below
+  5.56×10⁻¹⁷ m³ and 7.50×10⁻¹⁵ N·s, respectively. These checks qualify the pressure and flux routing
+  for the frozen geometry.
+
+  The earlier prismatic solve supplies a predicted 3D inlet. The transient samples 49 measured
+  velocity stations at the fixed published plane after freezing the output. At 0.24 s, the
+  aft, lateral and vertical RMS errors are 0.7990, 0.04556 and 0.11696 m/s on the 0.04 m grid.
+  The 0.02 m grid gives 0.8113, 0.03757 and 0.12214 m/s. The 0.04 m run through 0.72 s gives
+  nearly the same errors. Moving its inlet 0.12 m upstream changes axial error to 0.6709 m/s.
+  All are above the 0.00835 m/s experimental uncertainty. The lip wets locally, and no resolved
+  reversal develops. None of the observed velocities set the inlet or tune numerical parameters.
+  The separate Maki step experiment reports a shedding Strouhal number near 0.20. The finest
+  local diagnostic predicts 0.1002. A vortical 3D incoming flow, transmitting outer boundary
+  and near-wall shear treatment still need to be qualified.
+  [Maki, Beck and Troesch, 2005](http://www.iwwwfb.org/Abstracts/iwwwfb20/iwwwfb20_40.pdf)
+  [NMRI KCS geometry](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/KCS/kcs_g%26c.htm)
+  [Independent near-stern velocity cut](https://www.nmri.go.jp/study/research_organization/fluid_performance/cfd/cfdws05/Detail/data/KCS_data/fixed/kcs_vel_cut_wop.dat)
+
   The straight-quay coupling in `fbee5a3b75` enforces zero normal flow in the controlled reflected mode.
   The normal velocity is below 2×10⁻¹⁵ m/s, with an open-control speed of 3.88 mm/s in the live hull test.
   A separate low-crest browser fixture draws the coupled surface within 2.47×10⁻⁸ m of the solver on both renderers.
@@ -1462,6 +1490,18 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   these isolated dispersion comparisons. The original shot still requires convergence of its depth
   response and diffraction.
 
+  An analytical slab comparison isolates depth pressure from horizontal dispersion. An offline
+  cubic Galerkin basis with 31 open-column and seven under-apron degrees of freedom aligns with
+  the physical source bands and the 5.72 m opening. Across five frozen wavelengths from 40 m to
+  0.9496 m, its distributed-pressure matrix error is at most 0.872%, cross-aperture error 0.782%,
+  and error for a specified signed force quadrature 2.03%. At the shortest wavelength the
+  corresponding 33-layer finite-volume errors are 4.46%, 14.53% and 12.25%. The independent
+  point-source control still misses at 0.9496 m with a 49.66% full pressure-matrix error and
+  33.91% across the aperture. An exact local Green jump correction in a depth-separable model
+  reproduces the source-split control within 6.81×10⁻¹³. The general finite geometry needs an
+  equivalent for its spatially varying horizontal operator. The offline comparisons do not
+  change the runtime or qualify its depth pressure.
+
   The eighth-order layer encountered a convergence refusal on the initial potential derived from
   the archived hull sources. Its stronger horizontal stencil needs a lower weight in the
   symmetric column relaxation. With the weight corrected, the high-frequency masked-grid regression
@@ -1482,7 +1522,21 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   full-size copies of coarse edges. `coupling/loads-quay-hierarchy-memory.test.js` checks original edge
   order, protected zero edges, identical projected fields and replay. On the separate regional grids
   at 0.15 m and 0.075 m, the lower opening retained nonzero flux and the 0.001 m³ load balanced
-  within 4×10⁻¹⁷ m³. This reduces setup memory. The full-trajectory solve cost remains open.
+  within 4×10⁻¹⁷ m³. This reduces setup memory. A full-box preflight at 0.15 m and 34 layers
+  assembled the original 400 × 240 m mask and the hierarchy for 145,084,800 volume slots,
+  of which 107,565,639 are wet. The operator held 16.78 GB of typed arrays after setup.
+  The ten-minute preflight stopped during its first nonzero harmonic projection.
+  The probe used a localized trace from the archived incident spectrum on the full mask.
+
+  A separate 7.2 × 4.2 m local passage used the same archived hull-source spectrum on 0.15 m
+  and 0.075 m cells, with the same 34 depth layers and 210 fourth-order 60 Hz ticks on
+  `8a9103610a`. The four area-averaged traces use identical 0.30 × 0.30 m footprints and fixed
+  scoring windows. Weighted RMS coarse-to-fine differences are 0.093% at the incident gauge,
+  0.888% at the face, 0.975% in the reflected window and 4.400% off the ray. Both grids replay
+  exactly. Volume defects stay below 4.62×10⁻¹⁷ m³ and energy defects below 4.43×10⁻¹⁰ J.
+  The coarse and fine perimeter sponges take 37.7% and 36.2% of the initial wave energy.
+  This verifies the local passage at the fixed crop and leaves full-domain radiation and
+  the original-shot acceptance open.
 
   The opt-in fourth-order time step in `coupling/loads-finite-quay.test.js` checks held pressure, the single
   volume kick, the finite-domain absorber and failure before publication. The free-hull regression transfers
