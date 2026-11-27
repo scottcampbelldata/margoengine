@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
@@ -24,6 +23,12 @@ try {
     const camera = { position: [2, 16, 12], target: [0, 0, 0], near: 0.1, far: 200 };
     const engine = await EngineKernel.create(canvas, { backend: 'webgpu', camera });
     const device = engine.gpu;
+    const waterShaders = [];
+    const createShaderModule = device.createShaderModule.bind(device);
+    device.createShaderModule = (descriptor) => {
+      if (descriptor.code.includes('@fragment fn fragment(i:Output)->Result')) waterShaders.push(descriptor.code);
+      return createShaderModule(descriptor);
+    };
     device.pushErrorScope('validation');
     const columns = 40, rows = 32, width = 20, length = 16;
     const terrain = device.createTexture({
@@ -33,7 +38,7 @@ try {
     device.queue.writeTexture(
       { texture: terrain }, new Float32Array(columns * rows), { bytesPerRow: columns * 4 }, [columns, rows],
     );
-    const sample = async (boundary) => {
+    const sample = async (boundary, checkDetach = false) => {
       const water = Water.attach(engine, {
         height: -6, size: [width, length], segments: 16,
         waves: [{ direction: [1, 0], amplitude: 0, wavelength: 1.6 }],
@@ -54,19 +59,24 @@ try {
         };
       });
       flood.dispose();
+      if (checkDetach) engine.render({ delta: 0 });
       water.dispose();
       return at;
     };
     const inland = await sample({ east: 'open' });
     // Isolate the edge blend from the far field that already joins the sea to the solved edge.
-    const coastal = await sample({ west: 'sea', east: 'open' });
+    const coastal = await sample({ west: 'sea', east: 'open' }, true);
     const validation = (await device.popErrorScope())?.message ?? '';
     engine.dispose();
     terrain.destroy();
-    return { inland, coastal, validation };
+    return {
+      inland, coastal, validation,
+      surf: waterShaders.map((source) => /const COAST_SURF=(true|false);/.exec(source)?.[1]),
+    };
   });
   assert.deepEqual(errors, []);
   assert.equal(result.validation, '');
+  assert.deepEqual(result.surf, ['false', 'false', 'true']);
   for (const { solver, rendered } of result.inland)
     assert.ok(Math.abs(rendered - solver) < 1e-4, JSON.stringify({ solver, rendered }));
   const [sea, ...land] = result.coastal;
@@ -75,5 +85,5 @@ try {
     assert.ok(Math.abs(rendered - solver) < 1e-4, JSON.stringify({ solver, rendered }));
   console.log('Flood surface follows inland boundary elevations and retains the sea transition.');
 } finally {
-  await closeAll([browser.close]);
+  await browser.close();
 }

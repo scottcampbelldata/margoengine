@@ -366,6 +366,7 @@ const shader =
   `
 const HORIZON=false;
 const STILL=false;
+const COAST_SURF=true;
 // The most the shoreline term alone makes foam, before the grain.
 const SHORE_FOAM=0.35;
 // Foam (foamLight): the reflectance of a deep layer, its optical depth at full foam and the sky its hollows still see
@@ -504,22 +505,24 @@ fn surface(xz:vec2f,sampleWidth:f32)->Surface {
   p.y+=a*cos(r);tangent.y-=a*w.x*s;binormal.y-=a*w.y*s;
  }
  if(inCoast(xz)){
-  // p = mix(p, base + offset, w) = p (1 - w) + w base + A with A = w offset. The surf's offset and weight both change
-  // with depth, so their derivatives come from forward differences of A and w (1 cm) rather than the flat-bed ones.
-  // One loop over the three points keeps a single copy of the surf in the compiled shader (water/caustics and the
-  // capture recompile this function).
-  let e=0.01;let steps=array<vec2f,3>(vec2f(0),vec2f(e,0),vec2f(0,e));
-  var weights:array<f32,3>;var shifted:array<vec3f,3>;var offset=vec3f(0);var surfCrest=0.0;
-  for(var k=0u;k<3u;k++){
-   let here=surfHere(xz+steps[k],sampleWidth,false);weights[k]=here.weight;shifted[k]=here.surf.offset*here.weight;
-   if(k==0u){if(here.weight<=0.0){break;}offset=here.surf.offset;surfCrest=here.surf.crest;}
-  }
-  let w=weights[0];
-  if(w>0.0){
-   let base=vec3f(xz.x,frame.settings.y,xz.y);
-   let wx=(weights[1]-w)/e;let wz=(weights[2]-w)/e;let ax=(shifted[1]-shifted[0])/e;let az=(shifted[2]-shifted[0])/e;
-   tangent=tangent*(1.0-w)+vec3f(w,0,0)+(base-p)*wx+ax;binormal=binormal*(1.0-w)+vec3f(0,0,w)+(base-p)*wz+az;
-   p=mix(p,base+offset,w);crest=mix(crest,surfCrest,w);
+  if(COAST_SURF){
+   // p = mix(p, base + offset, w) = p (1 - w) + w base + A with A = w offset. The surf's offset and weight both change
+   // with depth, so their derivatives come from forward differences of A and w (1 cm) rather than the flat-bed ones.
+   // One loop over the three points keeps a single copy of the surf in the compiled shader (water/caustics and the
+   // capture recompile this function).
+   let e=0.01;let steps=array<vec2f,3>(vec2f(0),vec2f(e,0),vec2f(0,e));
+   var weights:array<f32,3>;var shifted:array<vec3f,3>;var offset=vec3f(0);var surfCrest=0.0;
+   for(var k=0u;k<3u;k++){
+    let here=surfHere(xz+steps[k],sampleWidth,false);weights[k]=here.weight;shifted[k]=here.surf.offset*here.weight;
+    if(k==0u){if(here.weight<=0.0){break;}offset=here.surf.offset;surfCrest=here.surf.crest;}
+   }
+   let w=weights[0];
+   if(w>0.0){
+    let base=vec3f(xz.x,frame.settings.y,xz.y);
+    let wx=(weights[1]-w)/e;let wz=(weights[2]-w)/e;let ax=(shifted[1]-shifted[0])/e;let az=(shifted[2]-shifted[0])/e;
+    tangent=tangent*(1.0-w)+vec3f(w,0,0)+(base-p)*wx+ax;binormal=binormal*(1.0-w)+vec3f(0,0,w)+(base-p)*wz+az;
+    p=mix(p,base+offset,w);crest=mix(crest,surfCrest,w);
+   }
   }
   let v=coastal(xz);let blend=v.blend;var level=v.surface;if(!STILL&&v.wet<=0.0001){level=coastalReach(xz,sampleWidth).x;}
   let shore=vec3f(xz.x,level,xz.y);let delta=shore-p;
@@ -807,7 +810,7 @@ ${displayShader}
  // for a moment, and the shoreline band and foam lines filled it with a flat, hard-edged pale patch
  // (KB-WATER-FOAMPATCH-KH1).
  var surfing=0.0;var surfZone=0.0;var surfFoam=0.0;var murk=0.0;
- if(isCoast&&!river){
+ if(COAST_SURF&&isCoast&&!river){
   let here=surfHere(i.xz,footprint,true);surfing=here.weight*here.surf.breaking;surfZone=here.weight*here.surf.zone;
   if(surfing>0.0){
    let q=i.world.xz;let t=frame.settings.x;
@@ -2057,14 +2060,19 @@ export class Water implements EnginePlugin {
     this.effectBindings = extra;
     this.vertexBindings = vertexExtra;
     const effectKey = effects.map((e) => e.key).join(',');
+    // Only Water's own coastal flow allocates the ray field that the breaking surf samples.
+    const river = riverKernels.get(this),
+      solver = waterSolvers.get(this),
+      showSurf = !!this.options.terrain && !this.options.still && !river && !solver;
     const format =
-      effectKey + ':' + c.format + ':' + samples + ':' + depth.format + ':' + !!shadows + (fog ? ':fog' : '');
+      `${effectKey}:${c.format}:${samples}:${depth.format}:${!!shadows}${fog ? ':fog' : ''}${showSurf ? ':surf' : ''}`;
     if (this.format !== format) {
       // Shadow sampling goes after the surface functions, which GPU probes compile on their own.
       let code =
         shader
           .replace('const HORIZON=false;', `const HORIZON=${this.horizon};`)
-          .replace('const STILL=false;', `const STILL=${!!this.options.still};`) +
+          .replace('const STILL=false;', `const STILL=${!!this.options.still};`)
+          .replace('const COAST_SURF=true;', `const COAST_SURF=${showSurf};`) +
         (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed);
       if (this.horizon) code = horizonDepthShader(code);
       let binding = 9;
@@ -2161,8 +2169,6 @@ export class Water implements EnginePlugin {
           'state',
           'Water terrain needs a sampleable 2D r32float heightmap of at least 2 cells per side; return one from options.terrain.heightmap',
         );
-      const river = riverKernels.get(this),
-        solver = waterSolvers.get(this);
       // The flow keeps one connectivity word a cell in a storage binding, and the open-sea surf nine (surf.ts).
       const cells = terrain.width * terrain.height,
         bytes = (solver || river || this.options.still ? cells + 1 : coastSurf.words(cells)) * 4,

@@ -5,6 +5,12 @@ draining out of an open inland edge retains the finite-volume elevation through 
 the shared mesh function. The focused regression `packages/water/test/flood-edge.browser.mjs` compares the captured
 draw mesh with the solver at each edge and checks that a mixed map retains its west-sea transition.
 
+Only Water's native coastal flow creates the ray field for breaking ocean surf. Flood surfaces disable those vertex
+and fragment branches at shader creation, while keeping the solver's own surface and foam. The boundary regression
+checks the selected shader branches and that detaching Flood restores coastal surf. Pipeline initialization and
+constant expressions follow the [WebGPU and WGSL specifications](https://www.w3.org/TR/webgpu/) (W3C GPU for the Web
+Working Group, 2026).
+
 The hydrostatic height follows the bed plus depth in Emmanuel Audusse, François Bouchut, Marie-Odile Bristeau,
 Rupert Klein and Benoît Perthame's [well-balanced finite-volume scheme](https://perso.math.u-pem.fr/bouchut.francois/publications/hydroproj_published.pdf)
 (2004). Wet/dry reconstruction remains as described in Scott C. Medeiros and Scott C. Hagen's
