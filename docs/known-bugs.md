@@ -2311,6 +2311,7 @@ test.
   the ANGLE Metal loss (rerun on the Mac with the new texts to see whether it is a loss or a destroy) and the orrery's
   Direct3D 11 load time on the layer against the shot tool's 180 s wait.
 - **Same on main:** main's tools/shot fails the same way. The film hook added for PA-03 does not change it.
+- **Windows run (RTX A6000, Chrome, 2026-11-27, main cd4508a015):** `MARGO_COMPAT=1 node tools/shot/test/sky-coverage-check.mjs` passes all three shots, orrery included, so the loss is specific to ANGLE Metal. A rerun on the M6 Mac with the new loss texts is the only way forward; no cause is claimed.
 
 ### Fixed 2026-11-26: GitHub CI's lint failed every pull request, and quality checked less there (KB-CI-MERGEBASE1, .github/workflows/ci.yml)
 
