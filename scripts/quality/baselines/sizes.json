@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20961532,
+  "total": 20965550,
   "history": [
     {
       "date": "2026-10-24",
@@ -14653,6 +14653,12 @@
       "commit": "HEAD",
       "reason": "water/liquid 35538 to 37189 B ceiling (built 34502 to 36105 B gzip): GPULiquid surfaceTension (the continuum surface force in its conservative form on the grid, Brackbill et al. 1992 and Lafaurie et al. 1994, one more compute pass a substep and its CPU twin) and adhesion to walls and colliders (Akinci et al. 2013), FLUID-02/03, parity bar P13. They are terms of the same grid update, so a split entry would only move the same passes. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "navmesh/any-angle new at 3762 B: the exact shortest any-angle search (Polyanya), its own entry sharing the point checks and portal crossing of the navmesh search chunk; no other entry grows past its budget",
+      "grew": 1
     }
   ],
   "items": {
@@ -15431,6 +15437,7 @@
     "@margoengine/navmesh": 11117,
     "@margoengine/navmesh dist/workers/navmesh-build.js": 18911,
     "@margoengine/navmesh/agents": 17055,
+    "@margoengine/navmesh/any-angle": 4018,
     "@margoengine/navmesh/build": 13637,
     "@margoengine/navmesh/codec": 18194,
     "@margoengine/navmesh/debug": 1755,

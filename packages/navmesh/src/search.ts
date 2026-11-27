@@ -71,7 +71,7 @@ export function heuristicScale(links: Iterable<{ start: Vec3; end: Vec3; cost: n
  * unconstrained minimum clamped to the portal: where the straight line to the goal crosses the portal's line, or, with
  * both on one side, where the line to the goal mirrored in the portal crosses it (Heron's reflection).
  */
-function crossing(ex: number, ez: number, a: Vec3, b: Vec3, gx: number, gz: number): number {
+export function crossing(ex: number, ez: number, a: Vec3, b: Vec3, gx: number, gz: number): number {
   const dx = b[0] - a[0],
     dz = b[2] - a[2],
     length2 = dx * dx + dz * dz;

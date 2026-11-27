@@ -30,6 +30,10 @@
       "types": "./dist/build.d.ts",
       "import": "./dist/build.js"
     },
+    "./any-angle": {
+      "types": "./dist/any-angle.d.ts",
+      "import": "./dist/any-angle.js"
+    },
     "./codec": {
       "types": "./dist/codec.d.ts",
       "import": "./dist/codec.js"

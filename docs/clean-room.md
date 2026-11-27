@@ -18248,3 +18248,29 @@ No paper's companion code and no other engine's source was read.
 - Exact solutions used in `packages/physics/tests/rigid-validation.test.js`: elastic collision of equal masses (the
   struck ball stops, the next takes its speed); rebound height e² h from Newton's law of restitution; g (sin t - mu cos t)
   for Coulomb sliding; 5/7 g sin t for a solid sphere rolling without slipping (I = 2/5 m r²).
+
+## navmesh exact any-angle search (2026-11-27)
+
+`@margoengine/navmesh/any-angle`, written from the papers' descriptions. No paper's companion code and no other engine's
+source was read.
+
+- M. Cui, D. D. Harabor and A. Grastien, "Compromise-free pathfinding on a navigation mesh", Proc. IJCAI 2017,
+  https://doi.org/10.24963/ijcai.2017/70 (Polyanya): search nodes (I, r) of an interval seen from a root, observable and
+  non-observable successors, the f-value with the goal mirrored in the interval's line, root-level g pruning, dead-end
+  pruning and the extra successor that arrives at the goal. Chosen: it is exact on any mesh of convex polygons, needs
+  no preprocessing, and so serves meshes that rebuild at run time.
+- D. Harabor, A. Grastien, D. Oz and V. Aksakalli, "Optimal any-angle pathfinding in practice", J. Artificial
+  Intelligence Research 56, 2016, https://jair.org/index.php/jair/article/view/11004 (Anya): the interval and root
+  formulation Polyanya extends, for grids only.
+- A. Nash, K. Daniel, S. Koenig and A. Felner, "Theta*: any-angle path planning on grids", AAAI 2007 and J. Artificial
+  Intelligence Research 39, 2010, https://arxiv.org/abs/1401.3843, and A. Nash, S. Koenig and C. Tovey, "Lazy Theta*",
+  AAAI 2010, https://ojs.aaai.org/index.php/AAAI/article/view/7566: not used. They are grid searches over vertices and
+  their paths are not proved shortest.
+- T. Lozano-Perez and M. A. Wesley, "An algorithm for planning collision-free paths among polyhedral obstacles",
+  Comm. ACM 22 (10), 1979, https://doi.org/10.1145/359156.359164: the visibility graph the test compares against.
+- Margo's own: the search over portals, not edges, so partial portals at tile seams and several portals on one edge are
+  walked (a path bends at an interval's end and follows the edge); corners read from the walls of the whole fan round a
+  vertex; one flood of the fan where a root lies on its interval; each view of a polygon or portal kept once per length,
+  without which equal ways on grid-like meshes multiplied (556,203 nodes on a 798 polygon map, 841 after); off-mesh
+  links as extra arrivals with the estimate scaled by the cheapest link's cost per metre (Hart, Nilsson and Raphael
+  1968). Not built: the paper's intermediate pruning, which changes the work and not the path.

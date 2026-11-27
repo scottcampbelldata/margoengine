@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/any-angle` finds the exact shortest path, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -262,6 +262,37 @@ console.log(hierarchy.update()); // clusters worked out again
 | `clusterTiles` | 4 | tiles along a cluster's side; more makes the coarse graph smaller and each query's two ends dearer |
 | `spacing` | a quarter of a cluster's side | world units between crossings on a wide entrance; smaller gives straighter routes and a bigger graph |
 | `filter` | none | cost per area number, as in `route`; make one hierarchy per agent type |
+
+## Exact shortest paths (`./any-angle`)
+
+```ts
+import {AnyAngleSearch} from 'margoengine/navmesh/any-angle';
+import {NavMesh} from 'margoengine/navmesh';
+
+// Eight 1 m squares round a closed middle one.
+const vertices: [number, number, number][] = [];
+for (let z = 0; z <= 3; z++) for (let x = 0; x <= 3; x++) vertices.push([x, 0, z]);
+const polygons = [0, 1, 2, 4, 6, 8, 9, 10].map(v => [v, v + 1, v + 5, v + 4]);
+const mesh = new NavMesh(vertices, polygons);
+
+const search = new AnyAngleSearch(mesh); // keep it: it reads the mesh once, and again after a change
+const route = search.route([0.5, 0, 1.5], [2.5, 0, 1.5]);
+console.log(route?.points); // start, the closed square's two corners on one side, end
+console.log(route?.length); // 1 + Math.SQRT2
+```
+
+`route` on a mesh picks a corridor of polygons first and pulls it taut, so its path is near the shortest. `AnyAngleSearch` searches every way at once (Polyanya, Cui, Harabor and Grastien 2017) and returns the path of least length that stays on the mesh, bending only at mesh corners. It works on a `NavMesh`, a `TiledNavMesh` and a `VoxelNavMesh`, needs no preparation, and answers `{points, offMesh, length, expanded}` or null; `path` returns the points alone.
+
+- Length is measured in the ground plane (XZ), as the funnel pulls paths. An off-mesh link adds its `cost`.
+- Distance only: a filter may forbid an area (`Infinity`) but not weigh it, and a polygon whose area cost is above 1 throws a `RangeError`. Use `route` for weighted ground.
+- Two parts of a mesh that meet only in a point are not joined, as with `route`.
+- The ends are not moved onto the mesh: pass points on it (see `closestPoint`).
+- `expanded` counts search nodes. The search costs more than `route` when many ways are close to equal.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `filter` | none | 1 or `Infinity` per area number |
+| `maxNodes` | 1000000 | search nodes one call may make before it throws a `MargoError` of code `failed` |
 
 ## Debug draw (`./debug`)
 

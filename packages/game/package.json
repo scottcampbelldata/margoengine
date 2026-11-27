@@ -2031,6 +2031,10 @@
       "types": "./dist/navmesh/build.d.ts",
       "import": "./dist/navmesh/build.js"
     },
+    "./navmesh/any-angle": {
+      "types": "./dist/navmesh/any-angle.d.ts",
+      "import": "./dist/navmesh/any-angle.js"
+    },
     "./navmesh/codec": {
       "types": "./dist/navmesh/codec.d.ts",
       "import": "./dist/navmesh/codec.js"

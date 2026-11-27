@@ -6681,3 +6681,10 @@ measures pitch, level and residual of stretched and shifted tones (factors 0.25 
 partials, inter-channel phase, click placement and pre-echo, a vowel's resonance, determinism and cancellation, all on
 generated signals. No listening test, rival comparison or speed claim.
 [Limits](../limits.md#phase-vocoder-audiovocoder-2026-11-27)
+
+## Exact any-angle navmesh paths (navmesh/any-angle)
+
+The path of least ground-plane length over the walkable polygons, plus off-mesh link costs, on whole and tiled meshes.
+Proof: `packages/navmesh/test/any-angle.test.js` compares random maps against a visibility graph Dijkstra within 1e-6
+and checks analytic cases, tile seams and a work bound. Distance only; no timing claim and no rival comparison.
+[Limits](../limits.md)
