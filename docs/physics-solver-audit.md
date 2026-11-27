@@ -1926,6 +1926,53 @@ What is fitted is stated: N'r at h/T 1.2 to KRISO's 20/5, the roll lever and dam
 4. **The catalog row is stale.** The state column of SEA-09 in `docs/physics-solvers.md` still says heel, leeway, keel lift, oars and planing are not built.
 5. **Squat cap and shaft depth.** The speed cap of 0.69 and the shaft depth d − 0.6 D are still assumptions. Cite them, for example ITTC squat guidance (ITTC 2017, 7.5-02-06-02) and a shaft immersion from the hull's particulars, or derive them.
 
+## Pass 6, 2026-11-27 (`main` at 00d9fdf9b)
+
+VERIFIED 0, REOPENED 1. FIRE-05 was set LANDED as a first landing; it is judged against the standard and its catalog row. The checks were narrow: its own tests, its threads test, and the tests of what it touches (the terrain bed, breakables, hull plates and rigid bodies). Each measured source was looked up.
+
+### FIRE-05 explosive source and fragments (`@margoengine/physics/explosive`, commits d6a16ef69 to 00d9fdf9b), owner Claude: REOPENED
+
+**Checked.** `tests/explosive.test.js`, `tests/explosive-gun.test.js` and `tests/coupling/explosive.test.js`, `explosive-gun`, `explosive-hits`, `explosive-kernel` and `explosive-threads`: 38 tests, 38 pass (under `scripts/run-with-timeout.mjs`, on packages built from 00d9fdf9b).
+
+What holds:
+- every refusal is a coded `MargoError` with a help link;
+- the source has no host transcendentals;
+- fragment flight is a Rust and Wasm SIMD kernel on 1 to 64 threads with the same bits, and the TypeScript and kernel hits agree to the bit;
+- frame-rate independence and seek-equals-continuous hold;
+- momentum and energy are accounted exactly for the gun's recoil and the charge's budget;
+- film direction is seeded.
+
+**Sources looked up.**
+- Sonder et al. 2022 (JGR Solid Earth 127, doi:10.1029/2022JB023952) exists. It reports up to about 8% of each blast's energy airborne and up to about 20% seismic.
+- Fielder and Guest's "Explosion craters on the Earth and Moon" (Communications of the Lunar and Planetary Laboratory 115, 1967) exists and covers Fauld.
+- Kennedy's Gurney chapter, and Noble and Abel's closed-vessel table as the 1911 Britannica's "Ballistics" prints it, are standard sources.
+
+**Validation, test by test.**
+- **Gurney speed against Kennedy's measured values, within 10%.** It checks Kennedy's own rule, E ≈ 0.7 ΔH_d, against the table it came from, and leaves out nitromethane, the case the rule misses. This is a fair check of the code, but not an independent test of the model.
+- **Air share against Sonder et al.'s 23 blasts.** The measured shares sit a factor of 1.84 above the law. The test accepts a mean off by up to a factor of 2, and each blast within 2.5 of the data's own spread, so a systematic 84% miss passes.
+- **Seismic share against "10 to 17%".** The default seismic coupling of 0.15 is taken from Sonder et al. (`charge.ts:209`), so this is calibration, not validation. The band is also the paper's airborne plus seismic total, while the test compares the seismic share alone.
+- **Fauld.**
+  - The crater-work share bound (0.1 to 0.3) is set by hand.
+  - The "measured 250 m crater" could not be confirmed as Fielder and Guest's figure. Other reports give about 300 m across at the widest, and Sonder et al.'s law gives 250 to 340 m, so the stated limit ("about 30% wider than measured in rock") may be wrong.
+- **Noble-Abel closed vessel.** The propellant constants are fitted to the same 21 pressures the test checks (`gun.ts:50`), so this is a fit check. Only cordite's force against its separately measured gas volume (20%) is independent.
+- **The 6-in. gun's 2150 ft/s.** Cordite's burning rate is calibrated to this figure (`gun.ts:29`), so the 0.5% check is self-consistent, although the test name presents it as a result. The peak-to-mean pressure ratio of 2 to 3 is held out, but only as loose as its source's "2 or 3 times".
+- **Fragment mass, speed and range, and plate perforation.** Mott's distribution is checked only as a statistical shape, and the 2 mm and 50 mm plates only as qualitative cases. Nothing is compared with a measured fragment count, mass distribution or range, or with a ballistic limit.
+
+**Fails points** 2, 3, 4 and 8; points 1, 5, 6 and 7 hold.
+
+**To do before it can be VERIFIED:**
+1. **Independent measured validation, with derived bounds.**
+   - Fragment mass distribution and count against arena or pit tests (Mott 1947's measured shells; Grady 2006, *Fragmentation of Rings and Shells*).
+   - Fragment launch speed against measured cylinder tests, other than the data the 0.7 rule came from.
+   - Fragment range or the debris field against a measured case.
+2. **Separate fits from checks.** Name every fitted constant in its test (the Noble-Abel constants, cordite's burning rate, the seismic coupling). Validate each against data not used to fit it, such as a second gun's muzzle speed and pressure from the same or another range table, or a second closed-vessel series.
+3. **The seismic share** is compared with Sonder et al.'s airborne plus seismic band. Compare like with like (their seismic share alone, up to about 20%), and use blasts not used to choose the 0.15 default.
+4. **The air share** runs 1.84 times under Sonder et al.'s blasts. Explain or correct the law's reference charge so the mean bias is gone, then bound the scatter from the data.
+5. **Fauld's crater.** Confirm the diameter from Fielder and Guest's text (or the Ministry of Defence survey) and correct either the test's 250 m or the `docs/limits.md` claim that the law overshoots rock by about 30%. Derive the crater-work bound.
+6. **Plate perforation.** Use a ballistic-limit model with a cited source (for example the THOR equations or de Marre) and test it against a measured ballistic limit, not only "2 mm opens, 50 mm holds".
+7. **Coupling.** The catalog sends ejecta mass and speed and the hot gas to ATMO-06 (dust), FIRE-03 (fire) and EARTH-06 (ejecta deposits). Only breakables read the `explosions` field. Add those couplings with a test each, plus the blast hand-off to FIRE-04 that the air share names.
+8. **The catalog row is stale.** FIRE-05's state column in `docs/physics-solvers.md` still says "stand-in: PA-51, 52, 53".
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
