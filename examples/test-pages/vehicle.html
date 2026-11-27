@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Vehicle - Margo Engine Test</title>
+<style>
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 14px system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 70vh; outline: none; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  button { font: inherit; padding: 6px 10px; }
+  #status, #help { padding: 0 8px 8px; }
+  output { font-variant-numeric: tabular-nums; }
+</style>
+<canvas id="view" tabindex="0" aria-label="A drivable car on a floor with a ramp and markers"></canvas>
+<div id="controls">
+  <button id="btnDrive">Drive 2 s</button>
+  <button id="btnTurn">Turn left 2 s</button>
+  <button id="btnBrake">Brake to a stop</button>
+  <button id="btnRamp">Drive over the ramp</button>
+  <button id="btnDebug">Debug view: on</button>
+  <button id="btnReset">Reset</button>
+</div>
+<p id="help">Click the view, then drive: W or Up to accelerate, S or Down to brake and reverse, A and D or Left and Right to steer, Space to brake. The debug view shows each suspension ray (blue mount to hub, grey hub to ground), contact normals (magenta), each tyre's push (green gripping, red sliding) and the wheels.</p>
+<p><output id="readout">Speed appears when the car is ready.</output></p>
+<div id="status" role="status">Starting the vehicle scene…</div>
+<script type="module" src="./vehicle.ts"></script></html>
