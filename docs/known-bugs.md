@@ -16712,19 +16712,27 @@ Cycles', not Margo's; the roughness blur is the route's. `@margoengine/materials
 captured scene by roughness (transmission-pass.ts, `margoTransmissionLevel`), so the next step is the proof run with
 that installation beside the default one, then the default route's choice between them.
 
-### Open 2026-11-27: the transmission proof's viewer row is 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
+### Fixed 2026-11-27: the transmission proof's viewer row was 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
 
 - **Repro:** `node scripts/reference-rendering/proof.mjs --case=transmission` on 474533d24e (RTX A6000, WebGPU):
   `absolute: 1590949 > measured 1590947` against the sample-viewer reference (proof-contract.mjs).
-- **Cause (bisected 2026-11-27, lane A):** f586413a53 (KB6016c, Scott's "fix C the core"), which writes core's GGX D
-  denominator as |n x h|^2 + a2 nh^2 so float32 keeps narrow lobes. Its parent 91a5dcc144 draws the frozen picture
-  (frame sha256 2a40e4f9...) and it draws the failing one (e7d0a3c3...), bit for bit in every process, device and
-  frame. The two frames differ in 2 channel values by 1 level each (pixels (284, 240) red 247 to 248 and (198, 241)
-  blue 109 to 110, on the spheres' highlights), which is the whole 2-level excess. Ruled out: the browser (the 11-11
-  tree on Edge 158.0.4370.45 draws the frozen picture) and KB-G2guard's G2 floor (main with the old 1e-4 floor still
-  draws the failing picture). Bisect over the 94 commits touching core, shared, gltf and gltf-pro since 7d0097b621.
-- **Status:** the frozen budget measured the imprecise D; the more precise D moves two highlight values across a
-  rounding step. No budget changed; it needs a ruling (re-derive the viewer budget on KB6016c's evidence, or keep it).
+- **Cause (bisected):** f586413a53 (KB6016c, Scott's "fix C the core"), which writes the GGX D denominator as
+  |n x h|^2 + a2 nh^2. Its parent 91a5dcc144 draws the frozen frame (sha256 2a40e4f9...), it draws e7d0a3c3..., the
+  same in every process, device and frame. Two channel values move one level: (284, 240) red 247 to 248 and
+  (198, 241) blue 109 to 110, where the sample viewer has 94 and 24. Ruled out: the browser (the 11-11 tree on Edge
+  158.0.4370.45 draws the frozen frame) and KB-G2guard's G2 floor (main with the old 1e-4 floor draws the new frame).
+- **Float64 check (lane A):** both pixels lie on roughness-0 transmissive spheres (RedTransTexture, YellowTrans), clamped
+  to roughness 0.045 (a2 = 4.1e-6), with n.h 0.582 and 0.625, far from a highlight. From the scene's own geometry,
+  light and camera, D (Walter et al. 2007 eq. 33, glTF 2.0 Appendix B.3.2) is 2.98938e-6 and 3.52147e-6 in float64.
+  The old float32 form is off by -7.4e-8 and +3.2e-7 (relative), KB6016c's by +2.3e-7 and -7.1e-8. The specular term
+  with that D adds 1.0e-7 and 1.2e-7 to the linear colour, and the two forms differ there by 3e-14 and 4.5e-14,
+  against about 4e-3 for one 8-bit level. So the D value moves neither pixel: the changed shader text changes how
+  the compiled shader rounds (a few float32 ulps), and these two values sit on an 8-bit edge. Scaling the light by
+  0.999999 on main moves 18 other channel values one level; by 1.000001, none.
+- **Fix:** the viewer and both path-transport rows are re-recorded at the measured 1590949 (full 4164104, direct
+  2632781), as Scott's KB6016b ruling of 2026-11-24 did for an exact gate after an approved core change (the
+  manager's ruling). The real gap at these pixels (153 and 85 levels to the viewer) is KB4000.
+- **Regression:** `tests/reference-rendering.test.js` pins the new figures; the proof gates every run on them.
 
 NVIDIA 617.42 and Intel Arc 4x MSAA blending variation remains the documented
 driver defect. AMD Radeon(TM) Graphics / RDNA 2, driver 32.0.21042.62, is the

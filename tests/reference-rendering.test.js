@@ -247,7 +247,9 @@ test('path-traced floats keep their row order, byte order and fixed display tran
 });
 
 for (const [family, primitives, absolute, square, max] of [
-  ['transmission', 22, 1590947, 66568819, 254],
+  // Re-recorded 2026-11-27 (KB-REF-TRANS-VIEWER1, the manager's ruling after Scott's KB6016b rule): KB6016c's GGX D
+  // text changes the compiled shader's float32 rounding, and two values on an 8-bit edge move one level each.
+  ['transmission', 22, 1590949, 66569297, 254],
   ['volume', 23, 1471401, 22496007, 110],
 ])
   test(`${family} preserves the full sample and exact viewer and path-transport budgets`, () => {

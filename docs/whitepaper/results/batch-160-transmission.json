@@ -35,14 +35,14 @@
   },
   "metrics": {
     "pixels": 262144,
-    "absolute": 1590947,
-    "square": 66568819,
+    "absolute": 1590949,
+    "square": 66569297,
     "max": 254,
-    "mae": 2.022993723551432,
-    "rmse": 9.200360351913497,
+    "mae": 2.022996266682943,
+    "rmse": 9.200393383627292,
     "foreground": 67046,
-    "foregroundAbsolute": 1590947,
-    "foregroundMae": 7.909728644015551,
+    "foregroundAbsolute": 1590949,
+    "foregroundMae": 7.909738587437481,
     "changed": 55711
   },
   "compat": {
