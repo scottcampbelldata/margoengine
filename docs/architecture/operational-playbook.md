@@ -10825,6 +10825,14 @@ pipeline; canvas, texture, URL, stream and camera inputs; restore) and `filter-g
 validation, no GPU object made in a steady frame, owners freed, loss). Missing: GPU timings, a run on a second GPU
 vendor, and a physical camera.
 
+## Optional SIMD wake transforms (SEA-04)
+
+The CPU wake can load a Rust WebAssembly SIMD plan through `WakeSolver.load()`.
+The plan copies the current input and output across its private memory on each FFT.
+The world retains height, potential and velocity in its own arena. Bit-exact scalar/native tests
+cover six mixed-radix grids, shared buffers and live wake replay. The existing Water agreement
+fixture consumes the native wake on both renderer backends.
+
 ## Contact sound evidence (SOUND-04)
 
 The optional Physics modal kernel converts per-track mechanical excitation to audio-rate sample ranges.

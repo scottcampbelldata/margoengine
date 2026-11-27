@@ -178,7 +178,10 @@ try {
       physics[Symbol.dispose]();
     } else {
       // A hull-sized pressure patch crosses a 64 m wake grid at 3 m/s, leaving its crests behind it.
-      wake = new WakeSolver();
+      wake = await WakeSolver.load();
+      if (wake.fftWork().backend !== 'wasm-simd') {
+        throw new Error('Load the production wake SIMD asset before checking renderer agreement.');
+      }
       world.add(wake, {
         cells: [128, 128],
         cellSize: 0.5,

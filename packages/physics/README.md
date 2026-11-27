@@ -3568,6 +3568,36 @@ world.advance(12);
 console.log(Number.isFinite(wake.sample(0.02, 0).height));
 ```
 
+For the native SIMD transform, use `await WakeSolver.load({ signal })`. It loads a separate Wasm
+asset and keeps the same grid, ports and snapshot bits as `new WakeSolver()`. The loaded plan's
+memory is private, so both shared and unshared worlds can use it. `fftWork()` reports the
+transforms and bytes copied per step.
+
+For measured or authored drops, `wakeRainSource` deposits the drop's volume and downward
+impulse in one wake step. When ATMO-04 supplies the local precipitation, pass recorded
+contact positions and times to `wakeRainSources` to derive the equivalent drop from its
+rain mass and energy flux. Both use metres and seconds. Give the impact a complete
+footprint inside the grid and use surface tension to resolve the propagating capillary rings.
+
+```ts
+import { WakeSolver, wakeRainSource } from 'margoengine/physics/sea';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const wake = await WakeSolver.load();
+const grid = { cells: [64, 64] as const, cellSize: 0.002, origin: [-0.064, -0.064] as const };
+const drop = { x: 0, z: 0, diameter: 0.002, fallSpeed: 6.5 };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wake, {
+  cells: grid.cells,
+  cellSize: grid.cellSize,
+  sponge: 0,
+  surfaceTension: 0.073,
+  kinematicViscosity: 1e-6,
+  sources: (t) => t < 1 / 60 ? [wakeRainSource(drop, grid, 1 / 60)] : [],
+});
+world.advance(4);
+console.log(wake.fftWork().backend); // wasm-simd
+```
+
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
 
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.

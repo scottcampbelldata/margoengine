@@ -85,6 +85,12 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'wake-fft',
+    crate: 'packages/physics/wake-fft',
+    blueprint: 'packages/physics/src/sea/wake-fft.wasm',
+    script: 'packages/physics/scripts/build-wake-fft.mjs',
+  },
+  {
     name: 'hull-panel-kernel',
     crate: 'packages/physics/hull-panel-kernel',
     blueprint: 'packages/physics/src/seakeeping/hull-panel-kernel.wasm',

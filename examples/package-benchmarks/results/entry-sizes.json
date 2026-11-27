@@ -15020,8 +15020,8 @@
         "gzip": 13878
       },
       "./sea": {
-        "raw": 23623,
-        "gzip": 9129
+        "raw": 28893,
+        "gzip": 11134
       },
       "./seakeeping": {
         "raw": 113169,
@@ -15084,8 +15084,8 @@
         "gzip": 14217
       },
       "./loads": {
-        "raw": 172538,
-        "gzip": 63109
+        "raw": 172728,
+        "gzip": 63177
       },
       "./surge": {
         "raw": 9446,
@@ -19367,6 +19367,11 @@
       "raw": 10941,
       "gzip": 5054,
       "brotli": 4493
+    },
+    "packages/physics/dist/wake-fft.wasm": {
+      "raw": 26728,
+      "gzip": 10832,
+      "brotli": 9407
     }
   },
   "splits": {

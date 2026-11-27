@@ -682,7 +682,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
         wake.sample(x, z, scratch);
         const [a, b] = scratch.slope,
           length = Math.sqrt(1 + a * a + b * b),
-          wet = wake.wet(x, z);
+          depth = wake.surfaceColumnDepth(x, z);
         out.height = scratch.height;
         out.normal[0] = -a / length;
         out.normal[1] = 1 / length;
@@ -691,8 +691,8 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
           out.current[i] = 0;
           out.velocity[i] = scratch.velocity[i]!;
         }
-        out.depth = wet ? wake.depths.at(-1)! : 0;
-        out.density = wet ? wake.density : 0;
+        out.depth = depth;
+        out.density = depth > 0 ? wake.density : 0;
         return out;
       },
       water: {
@@ -819,6 +819,17 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     const up = layer === 0 ? this.words(3)[i]! : -flux('down', at - plane) / (dx * dx);
     out[1] = y >= 0 ? up : 0.5 * (up - flux('down', at) / (dx * dx));
     return out;
+  }
+
+  private surfaceColumnDepth(x: number, z: number): number {
+    const cell = this.cellIndex(x, z);
+    if (cell < 0) return 0;
+    const { operator, depths } = this;
+    const plane = operator.surfaceCells;
+    let layer = 0;
+    // A deeper wet cavity beneath a solid shelf is not part of the surface water column.
+    while (layer + 1 < depths.length && operator.wetCell(cell + layer * plane)) layer++;
+    return depths[layer]!;
   }
 
   private layerAt(depth: number): number {

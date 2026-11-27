@@ -46,6 +46,7 @@ import type {
 } from '../world/solver.js';
 import { rateOf } from '../world/solver.js';
 import { regionWords } from '../world/memory.js';
+import { bindWakeFft, loadWakeFft, type WakeFft } from './wake-fft.js';
 import { WakeModeStep } from './wake-modes.js';
 
 const PI = 3.141592653589793;
@@ -141,7 +142,8 @@ export class WakeSolver implements Solver<WakeParams> {
   private readonly sourceField?: FieldDescriptor;
   private readonly submergedSource?: SubmergedWakeSource;
   private projected?: ProjectedWakeSource;
-  private fft!: RealFft2;
+  private fft!: WakeFft;
+  private fftModule?: WebAssembly.Module;
   private height!: Region;
   private potential!: Region;
   private previous!: Region;
@@ -181,6 +183,21 @@ export class WakeSolver implements Solver<WakeParams> {
         );
       this.submergedSource = { field: Object.freeze({ ...field }), depths: wakeDepths(depths) };
     }
+  }
+
+  /** Load the optional Rust/Wasm SIMD FFT. The synchronous constructor uses the TypeScript transform. */
+  static async load(
+    options: {
+      readonly id?: string;
+      readonly sourceField?: FieldDescriptor;
+      readonly submergedSource?: SubmergedWakeSource;
+      readonly signal?: AbortSignal;
+    } = {},
+  ): Promise<WakeSolver> {
+    const { id, sourceField, submergedSource, signal } = options;
+    const wake = new WakeSolver(id, sourceField, submergedSource);
+    wake.fftModule = await loadWakeFft(signal);
+    return wake;
   }
 
   describe(): SolverDescription {
@@ -254,7 +271,7 @@ export class WakeSolver implements Solver<WakeParams> {
       throw new MargoError('state', 'Pass a function initial(x, z) => [height, potential] or omit it for still water.');
     if (this.submergedSource && cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS)
       throw new MargoError('state', 'A projected wake supports up to 1,048,576 cells; reduce the grid dimensions.');
-    this.fft = new RealFft2(cells[0], cells[1]);
+    this.fft = this.fftModule ? bindWakeFft(this.fftModule, cells[0], cells[1]) : new RealFft2(cells[0], cells[1]);
     [this.nx, this.nz] = cells;
     this.host = host;
     this.dx = cellSize;
@@ -593,6 +610,21 @@ export class WakeSolver implements Solver<WakeParams> {
       );
     const words = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
     this.projected!.add(words, this.fft, heightSpectrum);
+  }
+
+  /** Per-step transforms for the current configuration and last active submerged bands. */
+  fftWork(): { backend: 'typescript' | 'wasm-simd'; forward: number; inverse: number; transferBytes: number } {
+    const layers = this.belowDepths.length;
+    const velocity = layers > 0 || this.surfaceRise !== undefined;
+    const forward = 3 + Number(velocity) + (this.projected?.bands ?? 0);
+    const inverse = 2 + (layers > 0 ? 3 * layers : Number(velocity));
+    const bytes = 8 * (this.nx + this.nx + 2) * this.nz;
+    return {
+      backend: this.fftModule ? 'wasm-simd' : 'typescript',
+      forward,
+      inverse,
+      transferBytes: this.fftModule ? bytes * (forward + inverse) : 0,
+    };
   }
 
   /** Nonzero projected rows and additional forward FFTs in the last executed step. */

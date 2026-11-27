@@ -11,4 +11,13 @@ export {
   type WakeParams,
   type WakeSample,
 } from './wake.js';
+export {
+  wakeRainEquivalentDrop,
+  wakeRainSource,
+  wakeRainSources,
+  type WakeRainDrop,
+  type WakeRainGrid,
+  type WakeRainImpact,
+  type WakeRainSourcesOptions,
+} from './wake-rain.js';
 export { SUBMERGED_WAKE_LAYOUT, SUBMERGED_WAKE_WORDS, type SubmergedWakeSource } from './submerged-wake.js';

@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import type { RealFft2 } from '@margoengine/math/fft';
+import type { WakeFft } from './wake-fft.js';
 import { cos, exp } from '@margoengine/math/pinned';
 import type { FieldDescriptor } from '../world/solver.js';
 
@@ -51,17 +51,17 @@ export function wakePatch(
   z: number,
   radius: number,
   volume: number,
-  h: Float64Array,
+  h: Float64Array | undefined,
   pressure = 0,
   press?: Float64Array,
-): void {
+): number {
   const { nx, nz, dx, x0, z0 } = grid,
     i0 = Math.max(0, Math.floor((x - radius - x0) / dx)),
     i1 = Math.min(nx - 1, Math.ceil((x + radius - x0) / dx)),
     j0 = Math.max(0, Math.floor((z - radius - z0) / dx)),
     j1 = Math.min(nz - 1, Math.ceil((z + radius - z0) / dx));
   let weight = 0;
-  for (let pass = 0; pass < 2; pass++)
+  for (let pass = 0; pass < (h || press ? 2 : 1); pass++)
     for (let j = j0; j <= j1; j++)
       for (let i = i0; i <= i1; i++) {
         const px = x0 + (i + 0.5) * dx - x,
@@ -72,7 +72,7 @@ export function wakePatch(
           if (pass === 0) weight += b * dx * dx;
           else {
             if (press) press[i + nx * j]! += pressure * b;
-            if (volume && weight > 0) h[i + nx * j]! += (volume * b) / weight;
+            if (h && volume && weight > 0) h[i + nx * j]! += (volume * b) / weight;
           }
         }
       }
@@ -81,6 +81,7 @@ export function wakePatch(
       'state',
       'A submerged wake source missed the grid; enclose the hull and use a radius greater than half the cell diagonal.',
     );
+  return weight;
 }
 
 /**
@@ -180,7 +181,7 @@ export class ProjectedWakeSource {
     this.spectrum = new Float64Array(2 * modes.length);
   }
 
-  add(rows: Float64Array, fft: RealFft2, heightSpectrum: Float64Array): void {
+  add(rows: Float64Array, fft: WakeFft, heightSpectrum: Float64Array): void {
     this.active.fill(0);
     this.rows = this.bands = 0;
     for (let i = 0; i < rows.length; i += SUBMERGED_WAKE_WORDS) {

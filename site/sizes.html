@@ -96,6 +96,7 @@
 <tr><th scope="row"><code>pack-ice-kernel.wasm</code></th><td>Rust SIMD pack-ice contacts and floe fracture</td><td class="num">5,716</td><td class="num">2,534</td><td class="num">2,318</td><td>PackIceSolver.load() from the optional /pack-ice entry</td></tr>
 <tr><th scope="row"><code>pack-ice-kernel-shared.wasm</code></th><td>Rust SIMD pack-ice contacts and floe fracture, shared world memory</td><td class="num">5,716</td><td class="num">2,534</td><td class="num">2,332</td><td>PackIceSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity</td><td class="num">30,756</td><td class="num">11,743</td><td class="num">10,158</td><td>ThinFilmSolver.load() from the optional /thin-film entry</td></tr>
+<tr><th scope="row"><code>wake-fft.wasm</code></th><td>Rust SIMD horizontal Fourier transforms for the dispersive wake</td><td class="num">26,728</td><td class="num">10,832</td><td class="num">9,407</td><td>WakeSolver.load() from the optional /sea entry</td></tr>
 <tr><th scope="row"><code>hull-panel-kernel.wasm</code></th><td>Rust three-dimensional hull radiation and diffraction</td><td class="num">50,232</td><td class="num">22,012</td><td class="num">19,191</td><td>bakeHullPanels() from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,525</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
 <tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,524</td><td>LoadSolver.load() with shared world memory support</td></tr>
@@ -4803,7 +4804,7 @@
 <tr><td><code>./bubbles</code></td><td class="num">6,520</td><td class="num">3,033</td></tr>
 <tr><td><code>./entry</code></td><td class="num">22,068</td><td class="num">9,429</td></tr>
 <tr><td><code>./flip</code></td><td class="num">38,669</td><td class="num">13,878</td></tr>
-<tr><td><code>./sea</code></td><td class="num">23,623</td><td class="num">9,129</td></tr>
+<tr><td><code>./sea</code></td><td class="num">28,893</td><td class="num">11,134</td></tr>
 <tr><td><code>./seakeeping</code></td><td class="num">113,169</td><td class="num">42,604</td></tr>
 <tr><td><code>./celestial</code></td><td class="num">20,211</td><td class="num">9,482</td></tr>
 <tr><td><code>./life</code></td><td class="num">16,543</td><td class="num">6,884</td></tr>
@@ -4819,7 +4820,7 @@
 <tr><td><code>./surf</code></td><td class="num">18,940</td><td class="num">7,413</td></tr>
 <tr><td><code>./rogue</code></td><td class="num">18,460</td><td class="num">7,386</td></tr>
 <tr><td><code>./ship</code></td><td class="num">32,845</td><td class="num">14,217</td></tr>
-<tr><td><code>./loads</code></td><td class="num">172,538</td><td class="num">63,109</td></tr>
+<tr><td><code>./loads</code></td><td class="num">172,728</td><td class="num">63,177</td></tr>
 <tr><td><code>./surge</code></td><td class="num">9,446</td><td class="num">4,478</td></tr>
 <tr><td><code>./ice</code></td><td class="num">6,791</td><td class="num">3,227</td></tr>
 <tr><td><code>./glacier</code></td><td class="num">7,631</td><td class="num">3,484</td></tr>

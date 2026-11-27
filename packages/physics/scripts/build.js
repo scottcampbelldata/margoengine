@@ -17,10 +17,11 @@ const dist = distDir(root);
 const exposeOptionalWasmUrl = {
   name: 'expose-optional-wasm-url',
   renderChunk(code) {
-    if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
+    if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm') && !code.includes('wake-fft.wasm'))
+      return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -210,6 +211,7 @@ for (const name of ['pack-ice-kernel.wasm', 'pack-ice-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/pack-ice', name), resolve(dist, name));
 
 await copyFile(resolve(root, 'src/seakeeping/hull-panel-kernel.wasm'), resolve(dist, 'hull-panel-kernel.wasm'));
+await copyFile(resolve(root, 'src/sea/wake-fft.wasm'), resolve(dist, 'wake-fft.wasm'));
 for (const name of ['loads-kernel.wasm', 'loads-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/loads', name), resolve(dist, name));
 

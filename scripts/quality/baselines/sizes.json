@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21034259,
+  "total": 21036325,
   "history": [
     {
       "date": "2026-10-24",
@@ -14753,6 +14753,11 @@
       "commit": "a6614c4320",
       "reason": "@margoengine/vfx/fire to 2292 B gzip (ceiling 2208 to 2548): KB-FAULD-FIREDIM1, the keyDistance option passed to the flame and its check. The option belongs to the one call",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-04-simd-rain-bathymetry",
+      "reason": "Physics/sea grows from 9129 to 11134 B gzip and its ceiling from 9403 to 11469 B for the optional SIMD loader, rain pulse adapter and per-step work receipt. The separate Wasm asset is 10832 B gzip. Both paths share the live wake grid, source quadrature and replay state. Splitting the TypeScript binding would require a second setup entry for the same class; the Wasm stays lazy. Physics/loads grows from 63109 to 63177 B gzip to report the local wet depth, within its current 63248 B ceiling. Core and stage are unchanged."
     }
   ],
   "items": {
@@ -15633,7 +15638,7 @@
     "@margoengine/physics/room-sound": 5606,
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
-    "@margoengine/physics/sea": 9403,
+    "@margoengine/physics/sea": 11469,
     "@margoengine/physics/seakeeping": 43883,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,

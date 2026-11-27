@@ -12715,6 +12715,34 @@ oblique wave phase and attenuation, and exact rerun and seek. At the seven measu
 Scott reports faster observed propagation in these short-period tests, possibly from tank drift.
 No measured wavelength was used to choose the model inputs.
 
+#### SEA-04 bathymetry, rain impulses and native transforms
+
+The finite volume query reports the first solid depth in each wet surface column. A stepped
+tank verifies the long-wave free-surface reflection and transmission coefficients from continuity
+of height and depth-integrated flow. With speeds `c = sqrt(g D)`, these are
+`(c1 - c2)/(c1 + c2)` and `2 c1/(c1 + c2)`, respectively.
+The test separates the incident and reflected waves at upstream gauges and confirms that the
+flow below the shallow bed is dry. [Lamb, Hydrodynamics, 1932](https://beckassets.blob.core.windows.net/product/toc/344665/9780521458689_toc_001.pdf)
+
+A supplied rain drop adds its sphere volume and normal momentum to the local wave solver.
+The raised-cosine pressure profile has the same integrated impulse at a grid centre and between
+cells. Schreck et al. and Le Méhauté model small-drop gravity–capillary waves by linear momentum
+forcing. The adapter uses the solver's existing spatial quadrature and holds the impulse over
+one physical tick. For a supplied contact the ATMO-04 equivalent drop preserves per-impact
+liquid volume and kinetic energy from the measured flux contracts. The production test compares
+against a direct Fourier sum and time integration.
+[Le Méhauté, 1988](https://doi.org/10.1017/S0022112088003301)
+[Schreck, Hafner and Wojtan, 2019](https://doi.org/10.1145/3306346.3323002)
+
+The native transform uses a Stockham mixed-radix plan with pinned twiddles and the same
+sum order as the TypeScript implementation. Each complex product uses two f64x2 products
+and one f64x2 sum. Integer twiddle indices are prepared once per plan. The private-memory
+plan copies one spatial and one spectral buffer per transform, in either direction.
+The production coupling and depth outputs reproduce the same bytes across both backends,
+and the same asset draws on WebGPU and WebGL2.
+[Stockham, 1966](https://doi.org/10.1145/1464182.1464209)
+[WebAssembly SIMD specification](https://www.w3.org/TR/2025/CRD-wasm-core-2-20250616/)
+
 ### The sea's surface and water (`@margoengine/physics/sea`, 2026-11-25, SEA-02)
 
 `packages/physics/src/sea/surface.ts` is written from:
