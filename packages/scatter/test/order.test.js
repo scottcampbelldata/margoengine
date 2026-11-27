@@ -7,13 +7,13 @@
 // and the same instances the atomic cull gives when its threads run in index order. With the atomic cull the reverse
 // run fills every ring backwards.
 import test from 'node:test';
-import { readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
 import { Scatter, scatterCullShader } from '../dist/index.js';
 import { ScatterTiles } from '../dist/tiles.js';
 import { runComputeOnCPU } from '../../webgl2-compat/dist/compute.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { compatChunk } from '../../../tests/support/compat-chunk.js';
 
 /**
  * WGSL the CPU tier runs (buffers only): flat ground at height 0 in place of the heightmap, and with `reverse` thread
@@ -165,9 +165,7 @@ test('ScatterTiles: a ring at its capacity keeps the first instances in record o
 // n[5u] and fails to compile ("index 5 out of bounds [0..3]"). A ring is 0, 1 or 2; anything else throws, and each
 // ring's kernel indexes the lanes vector within its four lanes.
 test('the ring compaction is built for the three LOD rings only, each within its lanes vector', async () => {
-  const dist = new URL('../dist/', import.meta.url),
-    chunk = readdirSync(dist).find((f) => /^compat-[\w-]+\.js$/.test(f)),
-    { compactShader } = await import(new URL(chunk, dist).href);
+  const { compactShader } = await compatChunk(new URL('../dist/', import.meta.url), 'compactShader');
   for (const ring of [0, 1, 2]) {
     const code = compactShader(ring),
       lanes = [...code.matchAll(/\bn\[(\d+)u\]/g)].map((m) => Number(m[1]));

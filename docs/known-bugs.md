@@ -21,6 +21,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/soft-volume.test.js` ("an impulse moves a soft volume at J / M") holds
   momentum to 1e-3 of the impulse, the measured loss, and `docs/limits.md` states it.
 
+### Fixed 2026-11-27: tests picked a build's compat-*.js chunk by listing order (KB-COMPAT-CHUNKPICK1, scatter, shadows tests)
+
+- **Repro:** a package build holds two `compat-*.js` chunks once two of its entries import `packages/shared/compat.js` (vfx,
+  culling and sky builds do); their content hashes decide which one `readdirSync` names first. Scatter's `order` and
+  `audit-132` tests and the shadows allocation probe imported the first one, and scatter's attributes check held every
+  `packages/shadows/dist/compat-*.js`, so a build that split the shared chunk out would give them the wrong module or
+  hold the package's own static import.
+- **Fix:** `tests/support/compat-chunk.js` gains `compatChunkFile`; the four pick the chunk by its export (`compatChunk`,
+  `compatChunkFile`). webgl2-compat's isolation and routes tests already kept only the chunk imported by `import()`.
+  Regression: `tests/compat-chunk.test.js`, the pick under a listing that names the shared chunk first, and a scan that
+  fails on any test that picks a `compat-*.js` by name alone or globs over all of them.
+
 ### Fixed 2026-11-27: a soft body on flat ground kept a face contact its corners already held (KB-SOFT-FACEROWS1, physics soft)
 
 - **Repro:** `SoftBodyDesc.volume(sphereGeometry(0.4, 16, 12))` dropped from 1.5 m on a box floor: 240 steps took about

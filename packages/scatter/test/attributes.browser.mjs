@@ -2,16 +2,19 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatChunkFile } from '../../../tests/support/compat-chunk.js';
 const page = '/packages/scatter/test/attributes.html',
   b = await openBrowser({ startPath: page, openPath: '/tools/shot/blank.html', port: 'free' }),
   errors = [];
 // The race of KB-SCATTER-ATTRCOMPAT1 on demand. The shadows compatibility route (fetched on the WebGL2 layer only) is
 // held until the first reference frame has been shown, as a loaded machine fetched it late: a page that draws before
 // Shadows.ready shows that reference without the route and its pair with it, so the pair differs every time. A page
-// that awaits ready cannot show the reference before the route, so the hold ends after 10 s.
+// that awaits ready cannot show the reference before the route, so the hold ends after 10 s. Only the route's chunk is
+// held: a shared compat-*.js chunk of the build loads with the package itself.
+const routeChunk = await compatChunkFile(new URL('../../shadows/dist/', import.meta.url), 'NearestRoute');
 let release;
 const released = new Promise((done) => (release = done));
-await b.page.route('**/packages/shadows/dist/compat-*.js', async (route) => {
+await b.page.route(`**/packages/shadows/dist/${routeChunk}`, async (route) => {
   await Promise.race([released, new Promise((done) => setTimeout(done, 10000))]);
   await route.continue();
 });

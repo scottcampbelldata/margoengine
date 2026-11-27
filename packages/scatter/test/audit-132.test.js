@@ -5,6 +5,7 @@ import { box } from '@margoengine/core';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { Scatter, ScatterInstances } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { compatChunk } from '../../../tests/support/compat-chunk.js';
 
 globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
 
@@ -44,9 +45,7 @@ for (const [label, make] of [
 // the route-wide owned list, so changing the cascade count left the old set alive until the scatter was released.
 test('ScatterRoute frees the previous shadow lists when the cascade count changes', async () => {
   // The route is a lazy chunk with a content hash in its name.
-  const { readdirSync } = await import('node:fs'),
-    chunk = readdirSync(new URL('../dist/', import.meta.url)).find((f) => /^compat-.*\.js$/.test(f)),
-    { ScatterRoute } = await import(`../dist/${chunk}`);
+  const { ScatterRoute } = await compatChunk(new URL('../dist/', import.meta.url), 'ScatterRoute');
   const h = optionalGPU(),
     d = h.engine.gpu,
     buffer = (size) => d.createBuffer({ size, usage: 128 }),

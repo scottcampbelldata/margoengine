@@ -3,13 +3,10 @@
 // into an encoder, on a stand-in device and encoder that keep nothing, so every byte left is the route's own.
 // Prints JSON { bytes: [heap bytes per call, five windows] }.
 import { heapWindows } from '../../../../tests/support/heap-windows.mjs';
-import { readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { compatChunk } from '../../../../tests/support/compat-chunk.js';
 
 // The route's chunk in dist (its file name carries a content hash).
-const dist = new URL('../../dist/', import.meta.url),
-  chunk = readdirSync(fileURLToPath(dist)).find((f) => /^compat-.*\.js$/.test(f));
-const { NearestRoute } = await import(new URL(chunk, dist).href);
+const { NearestRoute } = await compatChunk(new URL('../../dist/', import.meta.url), 'NearestRoute');
 
 globalThis.GPUTextureUsage = { STORAGE_BINDING: 8, TEXTURE_BINDING: 4 };
 const view = {},
