@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20704346,
+  "total": 20706873,
   "history": [
     {
       "date": "2026-10-24",
@@ -14245,6 +14245,12 @@
       "commit": "feat(physics) explosive source energy",
       "reason": "the explosive source entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) explosion solver",
+      "reason": "ExplosionSolver: placed charges as a framework solver and case fragments in flight; the solver needs the charge functions, so a split would only move them, and a world that places charges pays for both",
+      "grew": 1
     }
   ],
   "items": {
@@ -15081,7 +15087,7 @@
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9712,
-    "@margoengine/physics/explosive": 1149,
+    "@margoengine/physics/explosive": 3676,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,

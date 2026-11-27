@@ -6757,6 +6757,31 @@ console.log(fauld.tntEquivalent.toFixed(0), fauld.scaledDepth.toExponential(2), 
 console.log(metalSpeed(gurneyVelocity(EXPLOSIVES.tnt), 'cylinder', 2).toFixed(0), 'm/s');
 ```
 
+`ExplosionSolver` puts charges into a `PhysicsWorld` as placed events. Each detonates at its `time`. Its row of the
+`explosionsField` (`EXPLOSION_WORDS` f64 words: position, time, energy, air and ground energy, scaled depth, gas mass,
+detonated) is what the blast, crater and plume solvers read. A cased charge at or above the surface throws its `case`
+as fragments (`fragmentsField`, `FRAGMENT_WORDS` words: position, velocity, mass, state). They launch at Gurney's speed for
+the case to charge mass ratio, with masses drawn from Mott's distribution (N(>m) = N0 exp(-sqrt(m/mu))) and scaled to the
+case mass. They leave in opposite pairs of equal mass, so the launch adds no momentum. They fly under the world's gravity
+and quadratic air drag (`dragCoefficient`, default 1, on a sphere of the fragment's mass and `density`) until they reach
+`groundHeight`. `seed` breaks the same cases another way; `counts` gives the fragments in flight and the fragment steps
+taken. A buried charge (`depth` above 0) keeps its case in the ground.
+
+```ts
+import { ExplosionSolver } from '@margoengine/physics/explosive';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const solver = new ExplosionSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] }).add(solver, {
+  charges: [
+    { position: [0, 1, 0], time: 0.1, mass: 10, case: { mass: 20, fragments: 64 } },
+    { position: [40, -4, 0], time: 0.5, mass: 1000, depth: 4 },
+  ],
+});
+world.advance(60);
+console.log(solver.charge(1).air / solver.charge(1).energy, solver.counts.flying);
+```
+
 ## Natural lightning and thunder
 
 `LightningSolver` advances a single cloud-to-ground leader in the electric field above a flat plane or a sampled

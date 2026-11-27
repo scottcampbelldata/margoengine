@@ -16,3 +16,13 @@ export {
   TNT_JOULES_PER_KG,
   tntEquivalent,
 } from './charge.js';
+export {
+  type ChargeCase,
+  type ChargeOptions,
+  EXPLOSION_LAYOUT,
+  EXPLOSION_WORDS,
+  type ExplosionCounts,
+  type ExplosionParams,
+  ExplosionSolver,
+  FRAGMENT_WORDS,
+} from './solver.js';
