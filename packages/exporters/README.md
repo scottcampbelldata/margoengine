@@ -1455,7 +1455,7 @@ console.log(`${file.length} bytes`);
 | `thumbnail` | none | PNG or JPEG bytes, written as the package thumbnail. A CMYK JPEG is refused |
 | `displayProperties` | `true` | Writes how each material looks: metallic, specular or translucent display properties (below) |
 | `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `'components'` writes one object made of components that share meshes. `false` writes a build item for each node |
-| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber }` (below) |
+| `objectInfo` | every object a `model` | Called once for each node drawn, with the data node or engine mesh, for `{ type, partNumber, itemPartNumber, composite }` (below) |
 | `itemPartNumber` | none | The `partnumber` of the one build item of a scene written as one object. With `assembly: false`, give each node's through `objectInfo` |
 | `compress` | `true` | Deflates the package's parts. `false` stores them |
 | `onMeshCheck` | none | Called for each mesh written with `{ name, openEdges, nonManifoldEdges, flippedEdges, insideOut }` |
@@ -1513,6 +1513,30 @@ const file = await export3MF(
     itemPartNumber: 'KIT-7',
     objectInfo: (node) => (node.name === 'Prop' ? { type: 'support' } : { partNumber: 'BR-100' }),
   },
+);
+console.log(`${file.length} bytes`);
+```
+
+### Composite materials
+
+A printer that mixes filaments or resins takes a mixture of materials. `objectInfo`'s `composite` names two or more base materials (`name` and an sRGB `color`) and their `ratios`: one list for the node, or a function of each vertex's position in the geometry's own coordinates, which the printer interpolates across each triangle. Ratios are 0 to 1, not all 0, and a consumer divides each by their sum. The file holds them as the materials extension's `compositematerials` (chapter 4), nodes with the same constituents sharing one group. The mixture takes the place of the node's glTF material, so its colour, textures and display properties are not written, and a node with a texture or vertex colours gets an `onWarning`. `parse3MF` and `parse3MFMaterials` show the display colours mixed in linear light; `parse3MFLattice` also returns each group's constituents and fractions in `propertyResources`.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  normals: new Float32Array(12),
+  indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3],
+};
+const materials = [
+  { name: 'PLA red', color: '#FF0000' },
+  { name: 'PLA white', color: '#FFFFFF' },
+];
+// Red at the bed, white 40 mm up.
+const file = await export3MF(
+  { nodes: [{ name: 'Fade', geometry }] },
+  { objectInfo: () => ({ composite: { materials, ratios: ([, , z]) => [1 - z / 0.04, z / 0.04] } }) },
 );
 console.log(`${file.length} bytes`);
 ```

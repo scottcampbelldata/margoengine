@@ -21,6 +21,16 @@ export interface Export3MFOptions extends SceneOptions {
     signal?: AbortSignal;
 }
 
+export interface ThreeMFComposite {
+    materials: readonly ThreeMFConstituent[];
+    ratios: ThreeMFRatios | ((position: [number, number, number]) => ThreeMFRatios);
+}
+
+export interface ThreeMFConstituent {
+    name: string;
+    color: string;
+}
+
 export interface ThreeMFCustomMetadata {
     namespace: string;
     name: string;
@@ -52,9 +62,12 @@ export interface ThreeMFObjectInfo {
     type?: ThreeMFObjectType;
     partNumber?: string;
     itemPartNumber?: string;
+    composite?: ThreeMFComposite;
 }
 
 export type ThreeMFObjectType = (typeof TYPES)[number];
+
+export type ThreeMFRatios = readonly number[];
 
 export type ThreeMFUnit = keyof typeof UNITS;
 

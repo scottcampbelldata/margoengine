@@ -54,6 +54,34 @@ export interface ThreeMFObjectInfo {
   partNumber?: string;
   /** The `partnumber` of the node's own build item, an identifier of that item. Default none. */
   itemPartNumber?: string;
+  /**
+   * Prints the node as a mixture of base materials (the materials extension's composite materials, chapter 4). It
+   * takes the place of the node's glTF material: its colour, textures, vertex colours and display properties are not
+   * written. Default none.
+   */
+  composite?: ThreeMFComposite;
+}
+
+/** One material of a mixture, written as a `<base>` of a base material group. */
+export interface ThreeMFConstituent {
+  /** The material's name, which a printer matches to what it holds. */
+  name: string;
+  /** Its sRGB display colour, `'#RRGGBB'` or `'#RRGGBBAA'`. */
+  color: string;
+}
+
+/** The fraction of each material of a mixture, in the order of `materials`: 0 to 1 each, not all 0. */
+export type ThreeMFRatios = readonly number[];
+
+/** A mixture of two or more base materials. */
+export interface ThreeMFComposite {
+  materials: readonly ThreeMFConstituent[];
+  /**
+   * One mixture for the whole node, or a function that returns the mixture at a vertex, given its position in the
+   * geometry's own coordinates (before the node's transform): a graded part, which the printer interpolates across each
+   * triangle. Consumers divide each value by their sum.
+   */
+  ratios: ThreeMFRatios | ((position: [number, number, number]) => ThreeMFRatios);
 }
 
 /** One vendor `<metadata>` entry under its own XML namespace, as the core specification asks of names it does not define. */
@@ -178,6 +206,36 @@ const colorOf = (r: number, g: number, b: number, a: number): string => {
   const alpha = Math.round(Math.min(1, Math.max(0, a)) * 255);
   return `#${hex(byte(r))}${hex(byte(g))}${hex(byte(b))}${alpha === 255 ? '' : hex(alpha)}`;
 };
+
+const MIX_COLOR = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
+
+/** One mixture as the file writes it, checked. */
+function ratioRow(ratios: ThreeMFRatios, count: number): string {
+  if (!Array.isArray(ratios) || ratios.length !== count)
+    throw new RangeError(`3MF composite ratios need one number for each of its ${count} materials`);
+  let sum = 0;
+  for (const value of ratios) {
+    if (!(typeof value === 'number' && value >= 0 && value <= 1))
+      throw new RangeError('3MF composite ratios must be numbers from 0 to 1');
+    sum += value;
+  }
+  if (!sum) throw new RangeError('3MF composite ratios must not all be 0');
+  return ratios.map(num).join(' ');
+}
+
+/** A composite checked, and its constant ratios too. */
+function checkComposite({ materials, ratios }: ThreeMFComposite): ThreeMFComposite {
+  if (!Array.isArray(materials) || materials.length < 2)
+    throw new RangeError('3MF composite materials mix two or more materials');
+  const checked = (materials as readonly ThreeMFConstituent[]).map(({ name, color }) => {
+    if (typeof name !== 'string' || !name) throw new TypeError('3MF composite materials each need a name');
+    if (typeof color !== 'string' || !MIX_COLOR.test(color))
+      throw new RangeError("3MF composite material colours are '#RRGGBB' or '#RRGGBBAA'");
+    return { name, color: color.toUpperCase() };
+  });
+  if (typeof ratios !== 'function') ratioRow(ratios, checked.length);
+  return { materials: checked, ratios };
+}
 
 /** A base material: its group's resource id and its index there. */
 interface Base {
@@ -701,6 +759,8 @@ export async function export3MF(
     /** The object types the build references, for the format's rule about support. */
     printed: { type: ThreeMFObjectType; alone: boolean }[] = [],
     shared = new Map<string, number>(),
+    /** A composite material group for each list of constituents, with the mixtures its triangles use. */
+    mixtures = new Map<string, { base: number; id: number; rows: Map<string, number> }>(),
     seen = new Map<object, number>(),
     numbered = (value: object): number => {
       let at = seen.get(value);
@@ -798,6 +858,23 @@ export async function export3MF(
     let found = group.entries.get(key);
     if (!found) group.entries.set(key, (found = { index: group.entries.size, color, material }));
     return { group: group.id, index: found.index };
+  };
+  /** The composite group of a node's constituents, which gives each mixture its index there. */
+  const mixtureOf = ({ materials }: ThreeMFComposite) => {
+    const key = JSON.stringify(materials);
+    let found = mixtures.get(key);
+    if (!found) mixtures.set(key, (found = { base: id++, id: id++, rows: new Map() }));
+    const { rows } = found;
+    return {
+      key,
+      group: found.id,
+      row: (ratios: ThreeMFRatios): number => {
+        const text = ratioRow(ratios, materials.length);
+        let at = rows.get(text);
+        if (at === undefined) rows.set(text, (at = rows.size));
+        return at;
+      },
+    };
   };
   const addTexture = (image: Uint8Array, mimeType: TextureData['mimeType'], attributes: string): number => {
     const at = id++,
@@ -931,6 +1008,8 @@ export async function export3MF(
     colors?: (vertex: number) => string;
     textured: boolean;
     base: Base;
+    /** For a graded mixture, the composite group that `colors` indexes. */
+    mixture?: number;
   }
   type Welded = { part: Part; shape: Shape }[];
   /**
@@ -962,7 +1041,8 @@ export async function export3MF(
         }
       }
       let group = 0;
-      if (palette)
+      if (part.mixture !== undefined) group = part.mixture;
+      else if (palette)
         group = part.textured
           ? textureGroup(palette, part.material, part.base)
           : look(part.material).kind === 'translucent'
@@ -970,9 +1050,11 @@ export async function export3MF(
             : colorGroup(palette, part.material);
       const { base } = part,
         plain = base.group === own.group && base.index === own.index ? '' : ` pid="${base.group}" p1="${base.index}"`;
+      // A graded mixture's palette holds indices in its composite group; any other group is the palette, in order.
+      const entry = (corner: number): number | string => (part.mixture === undefined ? corner : palette![corner]);
       for (let t = 0; t < triangles.length; t += 3) {
         const colour = corners
-          ? ` pid="${group}" p1="${corners[t]}" p2="${corners[t + 1]}" p3="${corners[t + 2]}"`
+          ? ` pid="${group}" p1="${entry(corners[t])}" p2="${entry(corners[t + 1])}" p3="${entry(corners[t + 2])}"`
           : plain;
         faces.push(
           `<triangle v1="${triangles[t] + first}" v2="${triangles[t + 1] + first}" v3="${triangles[t + 2] + first}"${colour}/>`,
@@ -1016,6 +1098,7 @@ export async function export3MF(
         type,
         partNumber: partText(given.partNumber, 'partNumber'),
         itemPartNumber: partText(given.itemPartNumber, 'itemPartNumber'),
+        composite: given.composite && checkComposite(given.composite),
       };
     if (!TYPES.includes(type)) throw new RangeError(`3MF object type must be one of ${TYPES.join(', ')}`);
     if (info.itemPartNumber !== undefined) {
@@ -1053,7 +1136,37 @@ export async function export3MF(
       parts = drawn.map((item): Part => {
         const { geometry } = item,
           material = item.material ?? fallback,
-          coordinates = textureCoordinates(geometry, material),
+          positions = together
+            ? moved(geometry.positions, upright(matrix, zUp))
+            : mirrored
+              ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+              : geometry.positions;
+        if (info.composite) {
+          const { ratios } = info.composite,
+            mixture = mixtureOf(info.composite),
+            at = geometry.positions;
+          if (textureCoordinates(geometry, material) || vertexColors(geometry, material))
+            warn('3MF writes a composite node as its mixture alone, without its texture or vertex colours');
+          const graded =
+              typeof ratios === 'function'
+                ? (vertex: number): string =>
+                    String(mixture.row(ratios([at[vertex * 3], at[vertex * 3 + 1], at[vertex * 3 + 2]])))
+                : undefined,
+            index = typeof ratios === 'function' ? Number(graded!(geometry.indices[0])) : mixture.row(ratios),
+            base = { group: mixture.group, index };
+          // A shared object holds one geometry under one mixture, or one function of its vertices.
+          keys.push(`${numbered(geometry)} ${mixture.key} ${typeof ratios === 'function' ? numbered(ratios) : index}`);
+          return {
+            geometry,
+            material,
+            positions,
+            colors: graded,
+            textured: false,
+            base,
+            mixture: graded && mixture.group,
+          };
+        }
+        const coordinates = textureCoordinates(geometry, material),
           tint = coordinates && tintOf(geometry, material),
           colors = coordinates
             ? (vertex: number) => `${coordinates(vertex)} ${tint!(vertex)}`
@@ -1066,11 +1179,6 @@ export async function export3MF(
         keys.push(
           `${numbered(geometry)} ${base.group} ${base.index} ${coordinates ? `${textureId(material.baseColorTexture!)} ${JSON.stringify(material.baseColorTextureTransform ?? null)} ${map ? numbered(map.image) : map} ${sampled.map((t) => t && numbered(t.image))}` : ''}`,
         );
-        const positions = together
-          ? moved(geometry.positions, upright(matrix, zUp))
-          : mirrored
-            ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
-            : geometry.positions;
         return { geometry, material, positions, colors, textured: !!coordinates, base };
       });
     if (together) {
@@ -1151,12 +1259,24 @@ export async function export3MF(
       );
     })
     .join('');
-  const model =
+  const mixtureXml = [...mixtures]
+      .map(([key, { base, id: group, rows }]) => {
+        const materials = JSON.parse(key) as ThreeMFConstituent[];
+        return (
+          `<basematerials id="${base}">${materials
+            .map(({ name, color }) => `<base name="${escaped(name)}" displaycolor="${color}"/>`)
+            .join('')}</basematerials>` +
+          `<m:compositematerials id="${group}" matid="${base}" matindices="${materials.map((_, i) => i).join(' ')}">` +
+          `${[...rows.keys()].map((values) => `<m:composite values="${values}"/>`).join('')}</m:compositematerials>`
+        );
+      })
+      .join(''),
+    model =
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
       `<model unit="${unit}" xml:lang="en-US" xmlns="${CORE}" xmlns:m="${MATERIAL}"${described.namespaces}>` +
       described.xml +
       // Textures first: display properties of base materials never sample one, those of texture groups do.
-      `<resources>${baseXml}${textureXml.join('')}${groups.join('')}${objects.join('')}</resources>` +
+      `<resources>${baseXml}${textureXml.join('')}${groups.join('')}${mixtureXml}${objects.join('')}</resources>` +
       `<build>${build.join('')}</build></model>\n`,
     encoder = new TextEncoder(),
     relationships = (entries: readonly (readonly [string, string])[]): Uint8Array =>
