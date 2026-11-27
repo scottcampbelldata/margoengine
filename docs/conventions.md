@@ -35,10 +35,11 @@ Rules:
   holds one copy of math, and one `MargoError` class, however many packages it imports (KB-INL1; before 2026-11-26
   post, shadows, taa, creative, dof, tonemap and others kept math under `devDependencies` and each bundled its own copy).
 - The packages on `SHARED_HELPERS` (`scripts/support/math-external.mjs`: controls, environment, shadows) also import
-  `packages/shared/errors.js` and `hypot.js` from `@margoengine/math/helpers` instead of bundling them (KB-INL1 part
-  B): the build's `sharedHelpers` plugin turns those imports into the external entry, so such a package may import
-  only the names the entry exports, and `tests/no-inlined-margo-error.test.js` fails on a copy or on any other name.
-  Core and the stage keep their copy: math depends on core, so core cannot import it.
+  `packages/shared/errors.js` and `hypot.js` from core's `@margoengine/core/extension` (`HELPERS_ENTRY`) instead of
+  bundling them (KB-INL1 part B, Scott 2026-11-26): the build's `sharedHelpers` plugin turns those imports into the
+  external entry, so the app holds one copy, core's. Such a package must declare core, and
+  `tests/no-inlined-margo-error.test.js` fails on a copy or on a name core/extension does not export.
+  `@margoengine/math/helpers` exports the same seven helpers for code that does not build on core.
   Module workers still bundle what they use: a worker reads no import map. `tests/no-inlined-margo-error.test.js`
   fails on a package dist that carries the class, or a package that imports math without declaring it.
 - A private alias that shows up in a published `.d.ts` (`type Context = Extract<PassContext, {backend: 'webgpu'}>`)

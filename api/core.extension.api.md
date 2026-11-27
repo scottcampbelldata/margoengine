@@ -193,6 +193,8 @@ export interface Lighting {
     ambient?: Float32Array;
 }
 
+export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed' | 'timeout' | 'version';
+
 export class Mesh {
     readonly engine: Engine;
     readonly id: number;
@@ -393,7 +395,21 @@ export function coreRequirement(version?: string, source?: string): CoreRequirem
 
 export const engineRuntime: (engine: EngineKernel, version?: string, source?: string) => Engine;
 
+export function fault(code: MargoErrorCode, message: string, anchor?: string): Error & { code: MargoErrorCode };
+
+export function hypot(count: number, a: number, b: number, c?: number, d?: number): number;
+
+export function hypotOf(count: number): void;
+
+export const hypotTerms: Float64Array;
+
+export function margoError(code: MargoErrorCode, message: string): Error & { code: MargoErrorCode };
+
 export const meshRuntime: (mesh: MeshHandle) => Mesh;
+
+export function rangeError(message: string, anchor: string): RangeError;
+
+export function typeError(message: string, anchor: string): TypeError;
 
 export function uploadRows(queue: GPUQueue, buffer: GPUBuffer, batch: Batch, all?: boolean): void;
 

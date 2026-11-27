@@ -21,3 +21,7 @@ export const engineRuntime = (engine: EngineKernel, version = CORE_VERSION, sour
 };
 /** Type-only view of a public mesh handle as its runtime `Mesh` (no check or copy; same object). */
 export const meshRuntime = (mesh: MeshHandle): Mesh => mesh as unknown as Mesh;
+// The shared error and hypot helpers, so an optional package that builds on core takes core's copy (KB-INL1).
+export { fault, margoError, rangeError, typeError } from '../../shared/errors.js';
+export type { MargoErrorCode } from '../../shared/errors.js';
+export { hypot, hypotOf, hypotTerms } from '../../shared/hypot.js';

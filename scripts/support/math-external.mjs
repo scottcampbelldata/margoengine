@@ -45,8 +45,9 @@ export const packageExternal = (root, external) =>
   withMathExternal(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')), external);
 
 /**
- * Packages whose dists import `@margoengine/math/helpers` for the shared error and hypot helpers instead of bundling a
- * copy of packages/shared/errors.js and hypot.js (KB-INL1 part B). errors.js is redirected whole, so a package here
+ * Packages whose dists import HELPERS_ENTRY for the shared error and hypot helpers instead of bundling a
+ * copy of packages/shared/errors.js and hypot.js (KB-INL1 part B). Since Scott's 2026-11-26 ruling the entry is
+ * core's own: `@margoengine/core/extension` exports the same seven helpers, so the app holds one copy, core's. errors.js is redirected whole, so a package here
  * may import only the names the entry exports (fault, margoError, rangeError, typeError; tests/no-inlined-margo-error.test.js
  * checks every dist import). Adding a package here needs its GPU checks run.
  */
@@ -56,17 +57,23 @@ export const SHARED_HELPERS = Object.freeze([
   '@margoengine/shadows',
 ]);
 
+/** Where the SHARED_HELPERS packages take the shared helpers from; `@margoengine/math/helpers` exports the same names. */
+export const HELPERS_ENTRY = '@margoengine/core/extension';
+const CORE = '@margoengine/core';
+/** Whether a manifest lists `@margoengine/core` as a dependency or peer dependency. */
+export const declaresCore = (manifest) => Boolean({ ...manifest.dependencies, ...manifest.peerDependencies }[CORE]);
+
 const SHARED = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/shared');
 const HELPER_FILES = new Set(['errors.js', 'hypot.js'].map((file) => join(SHARED, file)));
 
 /**
- * Vite plugin for a package on SHARED_HELPERS that declares math: an import that resolves to packages/shared/errors.js
- * or hypot.js becomes the external `@margoengine/math/helpers`. Any other package, or one without math, gets a plugin that changes
+ * Vite plugin for a package on SHARED_HELPERS that declares core: an import that resolves to packages/shared/errors.js
+ * or hypot.js becomes the external HELPERS_ENTRY. Any other package, or one without core, gets a plugin that changes
  * nothing. Never for module workers (build-workers.js): a worker reads no import map.
  * @param {{ name?: string, dependencies?: Record<string, string>, peerDependencies?: Record<string, string> }} manifest
  */
 export function sharedHelpers(manifest) {
-  const on = SHARED_HELPERS.includes(manifest.name) && declaresMath(manifest);
+  const on = SHARED_HELPERS.includes(manifest.name) && declaresCore(manifest);
   return {
     name: 'margo-shared-helpers',
     enforce: 'pre',
@@ -74,7 +81,7 @@ export function sharedHelpers(manifest) {
       if (!on || !importer || !/^\.{1,2}\//.test(source)) return null;
       const target = resolve(dirname(importer.split('?')[0]), source);
       // Side-effect free, as the entry is: a module that imports nothing from it then keeps no bare import of it.
-      return HELPER_FILES.has(target) ? { id: `${MATH}/helpers`, external: true, moduleSideEffects: false } : null;
+      return HELPER_FILES.has(target) ? { id: HELPERS_ENTRY, external: true, moduleSideEffects: false } : null;
     },
   };
 }

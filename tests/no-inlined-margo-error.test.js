@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import {
   declaresMath,
   mathExternal,
+  HELPERS_ENTRY,
   SHARED_HELPERS,
   sharedHelpers,
   withMathExternal,
@@ -107,14 +108,19 @@ test('every package that imports @margoengine/math declares it', () => {
   assert.deepEqual(undeclared, [], 'these packages import @margoengine/math without declaring it');
 });
 
-// KB-INL1 part B: the packages on SHARED_HELPERS import the shared error and hypot helpers from
-// @margoengine/math/helpers instead of bundling a copy. The copies as the builds emit them, minified or not:
+// KB-INL1 part B: the packages on SHARED_HELPERS import the shared error and hypot helpers from HELPERS_ENTRY
+// (@margoengine/core/extension, Scott 2026-11-26) instead of bundling a copy. The copies as the builds emit them:
 const HELPER_COPIES = {
   margoError: /Object\.assign\(\s*(?:new\s+)?Error\([^()]*\)\s*,\s*\{\s*name:\s*[`"']MargoError[`"']/,
   linked: /; see https:\/\/margoengine\.com\/errors#\$\{/,
   hypot: /Math\.sqrt\(\s*\w+\[4\]\s*\)\s*\*\s*\w+/,
 };
 const HELPER_NAMES = ['fault', 'hypot', 'hypotOf', 'hypotTerms', 'margoError', 'rangeError', 'typeError'];
+const exportsOf = async (path) => {
+  const entry = join(root, path);
+  assert.ok(existsSync(entry), `${path} missing: run npm run build:packages first`);
+  return Object.keys(await import(pathToFileURL(entry).href));
+};
 
 test('the helper-copy detectors find each copy as Vite emits it, minified and not', () => {
   assert.match('var e=(e,t)=>Object.assign(Error(t),{name:`MargoError`,code:e})', HELPER_COPIES.margoError);
@@ -125,39 +131,41 @@ test('the helper-copy detectors find each copy as Vite emits it, minified and no
   assert.match('t=(e,t)=>`${e}; see https://margoengine.com/errors#${t}`', HELPER_COPIES.linked);
   assert.match('n[4]=n[4],n[4]=Math.sqrt(n[4])*t', HELPER_COPIES.hypot);
   assert.match('terms[4] = Math.sqrt(terms[4]) * max;', HELPER_COPIES.hypot);
-  assert.doesNotMatch("import { fault as e, hypot as t } from '@margoengine/math/helpers';", HELPER_COPIES.margoError);
+  assert.doesNotMatch(
+    "import { fault as e, hypot as t } from '@margoengine/core/extension';",
+    HELPER_COPIES.margoError,
+  );
   for (const re of Object.values(HELPER_COPIES))
-    assert.doesNotMatch("import{rangeError as e}from'@margoengine/math/helpers'", re);
+    assert.doesNotMatch("import{rangeError as e}from'@margoengine/core/extension'", re);
 });
 
-test('sharedHelpers redirects packages/shared/errors.js and hypot.js only for a listed package that declares math', () => {
+test('sharedHelpers redirects packages/shared/errors.js and hypot.js only for a listed package that declares core', () => {
   const importer = join(root, 'packages/shadows/src/index.ts').replaceAll('\\', '/'),
-    math = { dependencies: { '@margoengine/math': '^1.0.0' } },
-    on = sharedHelpers({ name: '@margoengine/shadows', ...math });
-  assert.deepEqual(on.resolveId('../../shared/hypot.js', importer), {
-    id: '@margoengine/math/helpers',
-    external: true,
-    moduleSideEffects: false,
-  });
-  assert.deepEqual(on.resolveId('../../shared/errors.js', importer), {
-    id: '@margoengine/math/helpers',
-    external: true,
-    moduleSideEffects: false,
-  });
+    core = { peerDependencies: { '@margoengine/core': '^1.0.0' } },
+    on = sharedHelpers({ name: '@margoengine/shadows', ...core }),
+    redirected = { id: HELPERS_ENTRY, external: true, moduleSideEffects: false };
+  assert.equal(HELPERS_ENTRY, '@margoengine/core/extension');
+  assert.deepEqual(on.resolveId('../../shared/hypot.js', importer), redirected);
+  assert.deepEqual(on.resolveId('../../shared/errors.js', importer), redirected);
   assert.equal(on.resolveId('../../shared/finite.js', importer), null);
   assert.equal(on.resolveId('@margoengine/core', importer), null);
   assert.equal(sharedHelpers({ name: '@margoengine/shadows' }).resolveId('../../shared/hypot.js', importer), null);
-  assert.equal(sharedHelpers({ name: '@margoengine/sky', ...math }).resolveId('../../shared/hypot.js', importer), null);
+  assert.equal(sharedHelpers({ name: '@margoengine/sky', ...core }).resolveId('../../shared/hypot.js', importer), null);
 });
 
-test('@margoengine/math/helpers exports exactly the shared helpers', async () => {
-  const entry = join(root, 'packages/math/dist/helpers.js');
-  assert.ok(existsSync(entry), 'run npm run build:packages first');
-  assert.deepEqual(Object.keys(await import(pathToFileURL(entry).href)).sort(), HELPER_NAMES);
+test('@margoengine/math/helpers exports exactly the shared helpers, and core/extension exports each of them', async () => {
+  assert.deepEqual((await exportsOf('packages/math/dist/helpers.js')).sort(), HELPER_NAMES);
+  const extension = await exportsOf('packages/core/dist/extension.js');
+  assert.deepEqual(
+    HELPER_NAMES.filter((name) => !extension.includes(name)),
+    [],
+    'core/extension lacks these helpers',
+  );
 });
 
-test('the SHARED_HELPERS packages ship no copy of the shared helpers and import only names the entry has', () => {
-  const copies = [],
+test('the SHARED_HELPERS packages ship no copy of the shared helpers and import only names core/extension has', async () => {
+  const extension = await exportsOf('packages/core/dist/extension.js'),
+    copies = [],
     unknown = [];
   let importing = 0;
   for (const name of SHARED_HELPERS) {
@@ -167,20 +175,16 @@ test('the SHARED_HELPERS packages ship no copy of the shared helpers and import 
       const text = readFileSync(file, 'utf8'),
         at = file.slice(root.length + 1).replaceAll('\\', '/');
       for (const [kind, re] of Object.entries(HELPER_COPIES)) if (re.test(text)) copies.push(`${at}: ${kind}`);
-      for (const [, list] of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']@margoengine\/math\/helpers["']/g)) {
-        importing++;
+      for (const [, list] of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']@margoengine\/core\/extension["']/g)) {
         for (const part of list.split(',')) {
           const imported = part.trim().split(/\s+as\s+/)[0];
-          if (imported && !HELPER_NAMES.includes(imported)) unknown.push(`${at}: ${imported}`);
+          if (HELPER_NAMES.includes(imported)) importing++;
+          if (imported && !extension.includes(imported)) unknown.push(`${at}: ${imported}`);
         }
       }
     }
   }
-  assert.ok(importing >= 3, `only ${importing} imports of @margoengine/math/helpers: the redirect did not run`);
-  assert.deepEqual(
-    copies,
-    [],
-    'these dist files bundle a shared helper instead of importing @margoengine/math/helpers',
-  );
-  assert.deepEqual(unknown, [], 'these dist files import a name @margoengine/math/helpers does not export');
+  assert.ok(importing >= 3, `only ${importing} helper imports of ${HELPERS_ENTRY}: the redirect did not run`);
+  assert.deepEqual(copies, [], `these dist files bundle a shared helper instead of importing ${HELPERS_ENTRY}`);
+  assert.deepEqual(unknown, [], `these dist files import a name ${HELPERS_ENTRY} does not export`);
 });

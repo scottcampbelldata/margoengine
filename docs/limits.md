@@ -7654,8 +7654,10 @@ before it: the instanced cascade fit (KB-SHADOW-INSTFIT1, b6781020ba) costs 456 
 (KB-LOOK-TV-PENUMBRA1, 5feaab3d71) 122 B. The instanced fit's minified code holds no duplication; its bounds walk was
 rewritten with one reused key array and the same arithmetic (60b48b6d68, -40 B). The starter measured 85,479 B after
 it. Controls, environment and shadows then took the shared error and hypot helpers from `@margoengine/math/helpers`
-(KB-INL1 part B): 85,408 B (-71 B), core + stage unchanged at 24,892 B gzip. Core keeps its own copy (math depends on
-core), so the planned 190 B is not reachable that way; code that does the same work still cannot reach 85,000 B. The increase from 83,000 B to 85,000 B was approved on 2026-11-21. The starter measures 84,025 B on public main at 5ff5dc647f and after this budget correction.
+(KB-INL1 part B): 85,408 B (-71 B), core + stage unchanged at 24,892 B gzip. Core's `@margoengine/core/extension` then exported the same helpers
+and the three packages took them from there, so the app holds core's copy only: 85,171 B, core + stage unchanged at
+24,905 B gzip (main's figure before and after the change; Scott's 2026-11-26 ruling, zero-byte rule). Code that does the same work still
+cannot reach 85,000 B. The increase from 83,000 B to 85,000 B was approved on 2026-11-21. The starter measures 84,025 B on public main at 5ff5dc647f and after this budget correction.
 The current Environment module graph accounts for 11,659 B of lazy loader code in the measured bundle. The starter
 does not load Water, and this correction changes no runtime code or core and stage size. It measured 82,837 B on
 09a33b8dd9.
