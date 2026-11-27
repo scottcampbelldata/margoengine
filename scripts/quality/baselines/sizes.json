@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21071601,
+  "total": 21072421,
   "history": [
     {
       "date": "2026-10-24",
@@ -14845,6 +14845,12 @@
       "commit": "hdr-flip",
       "reason": "Limits gap HDR-FLIP: headless/look gains hdrFlip (Andersson, Nilsson, Shirley and Akenine-Moller 2021), 16,982 to 18,045 B gzip measured (limit 17419 to 18587). It is the 8-bit FLIP run once per exposure and shares its colour and feature planes, the pooling and the error helpers; a separate entry would carry a second copy of FLIP (about 2 KB) or import look whole.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "exr-zip",
+      "reason": "EXRExporter parity: encodeEXR writes ZIPS and ZIP, environment/exr-write 2,084 to 2,648 B gzip measured: the byte split and predictor, chunked zlib through CompressionStream and the compressed offset table in the one writer; a separate entry would repeat the header and sample loops",
+      "grew": 1
     }
   ],
   "items": {
@@ -15188,7 +15194,7 @@
     "@margoengine/environment/encoded-hdr": 3409,
     "@margoengine/environment/exr-codecs": 1699,
     "@margoengine/environment/exr-tiled": 8357,
-    "@margoengine/environment/exr-write": 2084,
+    "@margoengine/environment/exr-write": 2904,
     "@margoengine/environment/fog-volumes": 2499,
     "@margoengine/environment/gi": 19000,
     "@margoengine/environment/ground": 5064,

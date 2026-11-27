@@ -20,6 +20,7 @@ export interface EXRWriteImage {
 }
 
 export interface EXRWriteOptions {
+    compression?: 'NONE' | 'ZIPS' | 'ZIP';
     nonFinite?: 'reject' | 'preserve';
     maxBytes?: number;
     signal?: AbortSignal;

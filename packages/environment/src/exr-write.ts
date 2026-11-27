@@ -1,6 +1,11 @@
-// OpenEXR writer: single-part, uncompressed (NONE), increasing-Y scanline files with any named channels.
+// OpenEXR writer: single-part, increasing-Y scanline files with any named channels, uncompressed (NONE) or
+// compressed with ZIPS (one line a chunk) or ZIP (16 lines a chunk).
+// Format: OpenEXR File Layout, https://openexr.com/en/latest/OpenEXRFileLayout.html, and Technical Introduction,
+// "Data Compression", https://openexr.com/en/latest/TechnicalIntroduction.html (Kainz, Bogart and Hess, Industrial
+// Light & Magic); zlib streams are RFC 1950 (Deutsch and Gailly, 1996, https://www.rfc-editor.org/rfc/rfc1950).
 import { floatToHalf } from './half.js';
-import { EXR_MAGIC, TYPE_NAMES, TYPE_SIZE, type EXRChannel } from './exr.js';
+import { EXR_MAGIC, LINES_PER_BLOCK, TYPE_NAMES, TYPE_SIZE, type EXRChannel } from './exr.js';
+import { MargoError } from '@margoengine/math/errors';
 
 /** One channel to write: every pixel of the image, row 0 at the top. */
 export interface EXRWriteChannel {
@@ -35,6 +40,11 @@ export interface EXRWriteImage {
 
 /** Options for {@link encodeEXR}. */
 export interface EXRWriteOptions {
+  /**
+   * Lossless chunk compression: 'NONE' (default), 'ZIPS' (zlib, one line a chunk) or 'ZIP' (zlib, 16 lines a chunk,
+   * usually the smallest). ZIPS and ZIP need `CompressionStream`. A chunk that does not shrink is stored raw.
+   */
+  compression?: 'NONE' | 'ZIPS' | 'ZIP';
   /** 'reject' (default) throws on NaN or infinity in HALF and FLOAT channels; 'preserve' writes them. */
   nonFinite?: 'reject' | 'preserve';
   /** Largest file to produce, in bytes, at most 2^29. Default 2^28. */
@@ -61,22 +71,39 @@ const chars = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
 const i32 = (...values: number[]) =>
   values.flatMap((v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255]);
 const ONE = 0x3f800000; // 1.0 as float32 bits
+// The compression attribute's byte, by name.
+const CODES = { NONE: 0, ZIPS: 2, ZIP: 3 } as const;
+// What ZIP and ZIPS apply before deflate: the even-indexed bytes, then the odd-indexed ones, each byte after the first
+// stored as its difference from the one before, biased by 128.
+const predict = (raw: Uint8Array): Uint8Array<ArrayBuffer> => {
+  const n = raw.length,
+    out = new Uint8Array(n),
+    half = (n + 1) >> 1;
+  for (let i = 0; i < n; i++) out[(i >> 1) + (i & 1) * half] = raw[i];
+  for (let i = n - 1; i > 0; i--) out[i] = out[i] - out[i - 1] + 128;
+  return out;
+};
+const deflate = async (bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array> =>
+  new Uint8Array(
+    await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer(),
+  );
 const whole = (value: number, min: number, max: number, label: string) => {
   if (!Number.isSafeInteger(value) || value < min || value > max)
     throw new RangeError(`EXR ${label} is ${value}; pass a whole number from ${min} to ${max}`);
 };
 
 /**
- * Encodes named channels as an uncompressed scanline OpenEXR file that {@link parseEXR} and OpenEXR read.
+ * Encodes named channels as a scanline OpenEXR file (uncompressed, ZIPS or ZIP) that {@link parseEXR} and OpenEXR read.
  * Data and display windows are `[0, 0, width - 1, height - 1]`. Yields to the event loop (`scheduler.yield()` where
  * the runtime has it, else `setTimeout`) after about 10 ms of encoding and after the last row.
+ * ZIPS and ZIP files are bounded by `maxBytes` too, checked as chunks are written.
  * @throws TypeError for a bad name, type or array; RangeError for a size or offset out of range, a file over
  * `maxBytes`, a nonfinite sample under `nonFinite: 'reject'` or a finite value too large for HALF; the signal's reason
- * when aborted.
+ * when aborted; MargoError `'unsupported'` for ZIPS or ZIP without `CompressionStream`.
  */
 export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions = {}): Promise<Uint8Array> {
   const { width, height, channels, colorInteropID, chromaticities } = image,
-    { nonFinite = 'reject', maxBytes = 1 << 28, signal, onProgress } = options;
+    { compression = 'NONE', nonFinite = 'reject', maxBytes = 1 << 28, signal, onProgress } = options;
   signal?.throwIfAborted();
   whole(width, 1, 16384, 'width');
   whole(height, 1, 16384, 'height');
@@ -85,6 +112,12 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
   whole(maxBytes, 1, 1 << 29, 'maxBytes');
   if (nonFinite !== 'reject' && nonFinite !== 'preserve')
     throw new TypeError("EXR nonFinite: pass 'reject' or 'preserve'");
+  if (!Object.hasOwn(CODES, compression)) throw new TypeError("EXR compression: pass 'NONE', 'ZIPS' or 'ZIP'");
+  if (compression !== 'NONE' && typeof CompressionStream !== 'function')
+    throw new MargoError(
+      'unsupported',
+      `EXR ${compression} needs CompressionStream; pass compression: 'NONE' or use a current browser or Node 18+`,
+    );
   if (
     chromaticities !== undefined &&
     !(
@@ -123,7 +156,7 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
   if (chromaticities !== undefined)
     attribute('chromaticities', 'chromaticities', Array.from(new Uint8Array(Float32Array.from(chromaticities).buffer)));
   if (colorInteropID !== undefined) attribute('colorInteropID', 'string', chars(colorInteropID));
-  attribute('compression', 'compression', [0]); // NONE
+  attribute('compression', 'compression', [CODES[compression]]);
   attribute('dataWindow', 'box2i', window);
   attribute('displayWindow', 'box2i', window);
   attribute('lineOrder', 'lineOrder', [0]); // increasing Y
@@ -132,20 +165,34 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
   attribute('screenWindowWidth', 'float', i32(ONE));
   head.push(0);
   const lineBytes = width * pixelBytes,
-    total = head.length + height * (16 + lineBytes);
-  if (total > maxBytes)
-    throw new RangeError(`EXR file needs ${total} bytes, over maxBytes ${maxBytes}; raise maxBytes`);
+    blockLines = LINES_PER_BLOCK[compression],
+    blocks = Math.ceil(height / blockLines),
+    stored = compression === 'NONE',
+    first = head.length + 8 * blocks; // past the offset table: one 64-bit file offset per chunk
+  const within = (total: number) => {
+    if (total > maxBytes)
+      throw new RangeError(`EXR file needs ${total} bytes, over maxBytes ${maxBytes}; raise maxBytes`);
+  };
+  // An uncompressed file's size is known now; a compressed one's is checked chunk by chunk.
+  const total = stored ? first + height * (8 + lineBytes) : first;
+  within(total);
+  // NONE writes every row straight into the file; ZIPS and ZIP fill a chunk buffer and keep the compressed chunks.
   const out = new Uint8Array(total),
-    view = new DataView(out.buffer);
+    buffer = stored ? out : new Uint8Array(Math.min(blockLines, height) * lineBytes),
+    view = new DataView(buffer.buffer),
+    chunks: Uint8Array[] = [];
   out.set(head);
-  let at = head.length + 8 * height; // past the offset table: one 64-bit file offset per row
+  let at = first,
+    size = first;
   const words = planes.map((c) => new Uint32Array(c.data.buffer, c.data.byteOffset, c.data.length)),
     samples = width * height * planes.length;
   for (let y = 0, last = now(); y < height; y++) {
-    view.setBigUint64(head.length + 8 * y, BigInt(at), true);
-    view.setInt32(at, y, true);
-    view.setInt32(at + 4, lineBytes, true);
-    at += 8;
+    if (stored) {
+      view.setBigUint64(head.length + 8 * y, BigInt(at), true);
+      view.setInt32(at, y, true);
+      view.setInt32(at + 4, lineBytes, true);
+      at += 8;
+    } else at = (y % blockLines) * lineBytes;
     planes.forEach(({ name, type, data, offset = 0, stride = 1 }, p) => {
       for (let x = 0, i = offset + y * width * stride; x < width; x++, i += stride) {
         const word = words[p][i],
@@ -165,6 +212,20 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
         }
       }
     });
+    if (!stored && (y === height - 1 || (y + 1) % blockLines === 0)) {
+      const raw = buffer.subarray(0, at),
+        packed = await deflate(predict(raw)),
+        // A reader takes a chunk of exactly the uncompressed size as raw lines.
+        body = packed.length < raw.length ? packed : raw,
+        chunk = new Uint8Array(8 + body.length),
+        header = new DataView(chunk.buffer);
+      signal?.throwIfAborted();
+      header.setInt32(0, y - (y % blockLines), true);
+      header.setInt32(4, body.length, true);
+      chunk.set(body, 8);
+      chunks.push(chunk);
+      within((size += chunk.length));
+    }
     if (y === height - 1 || now() - last >= YIELD_MS) {
       onProgress?.((y + 1) * width * planes.length, samples);
       await yieldTurn();
@@ -172,5 +233,14 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
       last = now();
     }
   }
-  return out;
+  if (stored) return out;
+  const file = new Uint8Array(size),
+    offsets = new DataView(file.buffer);
+  file.set(out);
+  chunks.reduce((position, chunk, block) => {
+    offsets.setBigUint64(head.length + 8 * block, BigInt(position), true);
+    file.set(chunk, position);
+    return position + chunk.length;
+  }, first);
+  return file;
 }

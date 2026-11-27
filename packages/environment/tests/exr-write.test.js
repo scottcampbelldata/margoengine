@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { inflateSync } from 'node:zlib';
 import { encodeEXR } from '../dist/exr-write.js';
 import { parseEXR } from '../dist/index.js';
 
@@ -183,4 +184,91 @@ test('yields follow encoding time, not a sample count (a browser clamps each set
   );
   assert.equal(calls.length, Math.ceil(height / 10));
   assert.deepEqual(ticking, still);
+});
+
+test('ZIPS and ZIP chunks are zlib streams of the split and predicted lines, and parseEXR reads them back', async () => {
+  const width = 31, // odd: the even-indexed half is one byte longer
+    height = 37, // 16 + 16 + 5 lines under ZIP
+    rgba = new Float32Array(width * height * 4).map((_, i) => ((i >> 4) % 9) / 8),
+    ids = new Uint32Array(width * height).map((_, i) => i >> 5),
+    channels = [
+      ...['R', 'G', 'B', 'A'].map((name, offset) => ({ name, type: 'HALF', data: rgba, offset, stride: 4 })),
+      { name: 'id', type: 'UINT', data: ids },
+    ];
+  const plain = await encodeEXR({ width, height, channels }),
+    lineBytes = width * 12,
+    // The uncompressed file's lines are the reference bytes every compressed chunk must give back.
+    lines = Buffer.concat(
+      Array.from({ length: height }, (_, y) => {
+        const at = plain.length - (height - y) * (8 + lineBytes) + 8;
+        return plain.subarray(at, at + lineBytes);
+      }),
+    );
+  for (const [compression, code, perChunk] of [
+    ['ZIPS', 2, 1],
+    ['ZIP', 3, 16],
+  ]) {
+    const bytes = await encodeEXR({ width, height, channels }, { compression }),
+      view = new DataView(bytes.buffer),
+      file = Buffer.from(bytes.buffer),
+      attribute = file.indexOf('compression\0compression\0') + 'compression\0compression\0'.length;
+    assert.deepEqual([view.getInt32(attribute, true), bytes[attribute + 4]], [1, code]);
+    assert.ok(bytes.length < plain.length / 2, `${compression} ${bytes.length} of ${plain.length}`);
+    // The offset table follows the last attribute (a 4-byte float) and the header's closing zero.
+    const chunks = Math.ceil(height / perChunk),
+      table = file.indexOf('screenWindowWidth\0float\0') + 'screenWindowWidth\0float\0'.length + 4 + 4 + 1;
+    let end = table + 8 * chunks;
+    for (let i = 0; i < chunks; i++) {
+      const at = Number(view.getBigUint64(table + 8 * i, true)),
+        size = view.getInt32(at + 4, true),
+        expected = lines.subarray(i * perChunk * lineBytes, Math.min(height, (i + 1) * perChunk) * lineBytes);
+      assert.equal(at, end);
+      assert.equal(view.getInt32(at, true), i * perChunk);
+      assert.ok(size < expected.length);
+      // Undone here with node:zlib and the format's two steps, not with the package's decoder.
+      const stored = inflateSync(bytes.subarray(at + 8, at + 8 + size));
+      for (let k = 1; k < stored.length; k++) stored[k] = stored[k - 1] + stored[k] - 128;
+      const half = (stored.length + 1) >> 1,
+        raw = Buffer.from(stored.map((_, k) => stored[(k >> 1) + (k & 1) * half]));
+      assert.deepEqual(raw, Buffer.from(expected));
+      end = at + 8 + size;
+    }
+    assert.equal(end, bytes.length);
+    const image = parseEXR(bytes);
+    assert.equal(image.compression, compression);
+    assert.deepEqual(image.data, parseEXR(plain).data);
+  }
+});
+
+test('a chunk that does not shrink is stored raw; compressed files obey maxBytes, signal and the option', async () => {
+  // Pseudo-random 32-bit words do not deflate.
+  const data = new Uint32Array(64);
+  for (let i = 0, s = 1; i < data.length; i++) data[i] = s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+  const image = { width: 64, height: 1, channels: [{ name: 'Y', type: 'UINT', data }] };
+  for (const compression of ['ZIPS', 'ZIP']) {
+    const bytes = await encodeEXR(image, { compression }),
+      raw = new Uint8Array(data.buffer);
+    assert.deepEqual(bytes.subarray(bytes.length - raw.length), raw);
+    assert.deepEqual([...parseEXR(bytes).data.filter((_, i) => i % 4 === 0)], [...Float32Array.from(data)]);
+    await assert.rejects(encodeEXR(image, { compression, maxBytes: bytes.length - 1 }), {
+      name: 'RangeError',
+      message: new RegExp(`needs ${bytes.length} bytes`),
+    });
+    assert.equal((await encodeEXR(image, { compression, maxBytes: bytes.length })).length, bytes.length);
+    const controller = new AbortController(),
+      reason = new Error('stop');
+    await assert.rejects(
+      encodeEXR(image, { compression, signal: controller.signal, onProgress: () => controller.abort(reason) }),
+      (e) => e === reason,
+    );
+  }
+  await assert.rejects(encodeEXR(image, { compression: 'PIZ' }), { name: 'TypeError', message: /'NONE', 'ZIPS'/ });
+  const real = globalThis.CompressionStream;
+  globalThis.CompressionStream = undefined;
+  try {
+    await assert.rejects(encodeEXR(image, { compression: 'ZIP' }), { code: 'unsupported' });
+    assert.equal(parseEXR(await encodeEXR(image)).compression, 'NONE');
+  } finally {
+    globalThis.CompressionStream = real;
+  }
 });

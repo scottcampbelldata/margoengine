@@ -1030,8 +1030,10 @@ decoder) reads those and the full-resolution level of tiled files.
 
 ### Writing EXR
 
-`encodeEXR` (from `@margoengine/environment/exr-write`, CPU only, Node or browser) writes any named channels as an
-uncompressed single-part scanline EXR, row 0 at the top. HALF and FLOAT take a `Float32Array`, UINT a `Uint32Array`;
+`encodeEXR` (from `@margoengine/environment/exr-write`, CPU only, Node or browser) writes any named channels as a
+single-part scanline EXR, row 0 at the top. `compression` is `'NONE'` (default), `'ZIPS'` (zlib, one line a chunk) or
+`'ZIP'` (zlib, 16 lines a chunk, usually the smallest); all three are lossless, and the zlib ones need
+`CompressionStream` (current browsers, Node 18+). HALF and FLOAT take a `Float32Array`, UINT a `Uint32Array`;
 `offset` and `stride` pick one lane of interleaved data. Channels are stored in name order; dotted names are layers.
 
 ```ts
@@ -1046,13 +1048,14 @@ const exr = await encodeEXR({width, height, channels: [
   {name: 'B', type: 'HALF', data: rgb, offset: 2, stride: 3},
   {name: 'depth.Z', type: 'FLOAT', data: depth},
   {name: 'id', type: 'UINT', data: ids},
-]}, {nonFinite: 'preserve', signal});
+]}, {compression: 'ZIP', nonFinite: 'preserve', signal});
 ```
 
 FLOAT and UINT keep their exact bits; HALF rounds to nearest even and refuses finite values above 65504 (use FLOAT).
 NaN or infinity throws unless `nonFinite: 'preserve'`. Limits: 16,384 pixels a side, 2^26 pixels, 64 channels,
-names of 1 to 31 printable ASCII characters, and `maxBytes` (default 256 MiB, at most 512 MiB) for the whole file.
-It yields to the event loop every 65,536 samples, reports `onProgress(done, total)` and stops on `signal`.
+names of 1 to 31 printable ASCII characters, and `maxBytes` (default 256 MiB, at most 512 MiB) for the whole file
+(a compressed file is checked as its chunks are written; a chunk that does not shrink is stored raw).
+It yields to the event loop after about 10 ms of encoding, reports `onProgress(done, total)` and stops on `signal`.
 
 ### Bounded Radiance HDR import
 

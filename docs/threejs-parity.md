@@ -8,8 +8,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 189 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 4 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 190 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 3 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 0 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 2 | Out of scope by decision. The note says why and what to use instead. |
 
@@ -205,7 +205,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | GLTFExporter | COVERED | exporters `exportModel` (`packages/exporters/src/model.ts`, also `@margoengine/exporters/model`) for gltf/pbr models and materials meshes; `exportGLB`, `exportGLTF` (`gltf.ts`) for engine and data scenes | | `exportModel`: options `binary`, `animations`, `onlyVisible`, `embedImages`, `maxTextureSize`; skins, morph targets and weights, clips, `EXT_mesh_gpu_instancing`, metallic-roughness/normal/occlusion/emissive maps, `KHR_texture_transform`, alpha modes and the `KHR_materials_*` gltf/pbr draws. Loaded perspective/orthographic cameras and existing directional/point/spot lights retain live values, node attachments and transforms in GLB/JSON. Round-trip tested through gltf/pbr (SciFiHelmet, RobotExpressive, instanced grids, DirectionalLight, Cameras, PointLightIntensityTest and camera/light-free Box) and the Khronos validator. Data-scene writers also write `CameraData` cameras and `LightData` lights (`KHR_lights_punctual`), with multi-material meshes, extras, lightmaps, skins and animations; engine-scene `exportGLB(engine)` writes neither, and `flatten: true` rejects them. Data scenes also write `materialAnimations`: STEP base-colour UV offset and scale clips as `KHR_animation_pointer` channels. No Draco/meshopt output. |
 | OBJExporter, STLExporter, PLYExporter | COVERED † | exporters `exportOBJ` (with MTL), `exportSTL`, `exportPLY` | | |
 | USDZExporter | COVERED | exporters `exportUSDZ` (`packages/exporters/src/usdz.ts`), re-exported by usdz-export; skins and clips in `exportAnimatedUSDZ` (`packages/exporters/src/usdz-anim.ts`) | | UsdPreviewSurface with textures: base colour (with alpha to opacity, `opacityThreshold` for masks), metal-rough channels, normal, occlusion and emissive maps, `st`/`st1` texcoords with the V flip, base-colour texture transform and wrap modes; images stored unchanged and 64-byte aligned. Round-trip tested through `@margoengine/usdz`. Every mesh sits in its own space under its node's matrix, and a geometry two or more nodes draw is written once and referenced, as three shares its geometries; mirrored nodes share one reflected shape, and parents are folded into each node's matrix. Vertex colours together with a base-colour texture are rejected (UsdPreviewSurface cannot multiply them). Quick Look on a Mac draws the kit as intended apart from `normalScale` and vertex colours; no phone yet: see [known-bugs.md](known-bugs.md). |
-| EXRExporter | PARTIAL | environment `encodeEXR` (`@margoengine/environment/exr-write`, `packages/environment/src/exr-write.ts`) | | Scanline OpenEXR with named HALF, FLOAT or UINT channels, the format `parseEXR` reads, uncompressed only (the header's compression is NONE); three.js's EXRExporter also writes ZIP and ZIPS. |
+| EXRExporter | COVERED | environment `encodeEXR` (`@margoengine/environment/exr-write`, `packages/environment/src/exr-write.ts`) | | Scanline OpenEXR with named HALF, FLOAT or UINT channels, uncompressed, ZIPS or ZIP, the format `parseEXR` reads. |
 | DRACOExporter | COVERED | exporters `compressDraco` (`@margoengine/exporters/draco`, `packages/exporters/src/draco.ts`) | | Writes Draco into a GLB as KHR_draco_mesh_compression, with Google's encoder; three's exporter writes a bare `.drc` file. |
 | KTX2Exporter | COVERED | exporters `encodeKTX2`, `compressTextures` (`@margoengine/exporters/ktx2`, `packages/exporters/src/ktx2.ts`) | | Encodes with Binomial's Basis Universal Wasm, in a worker in a browser, with no canvas or GPU, from a PNG, a JPEG or pixels; `compressTextures` does a whole GLB. A G-code writer is not planned. |
 
@@ -313,13 +313,12 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-27): 4 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-27): 3 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. The AR reflection cube map waits on a WebGPU form in the Lighting Estimation draft. | Test on a device first (`examples/xr-device-check`). |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel and mesh path tracers run on it (slow cold compiles on ANGLE Direct3D 11 are ANGLE's, KB-L5a-10). Measured: Firefox 157 and an AMD integrated GPU (95 browser-matrix rows each, 0 bugs, 2026-11-27), Safari 27.2 in part and an Android emulator (2026-11-15). Not measured: real phones, Safari's remaining rows and the iOS Simulator, XR (through `/xr`) on a headset, and the integrated-GPU frame budget (timing, deferred by the build phase). | See [the roadmap](webgl2-compat-roadmap.md) and the [browser matrix](limits.md#browser-matrix-batch-273-2026-11-15). |
-| EXRExporter | PARTIAL. `encodeEXR` writes uncompressed scanline files only. | Add ZIPS and ZIP (zlib deflate of the predicted, interleaved scanlines, as `parseEXR` already decodes) to `@margoengine/environment/exr-write`, tested by reading the files back with `parseEXR`. |
 
 ## Leave as the documented limit
 
