@@ -87,6 +87,10 @@ there, add a line below with the solver ID and what is needed, and build against
   linear inverse mass and reported world inverse inertia also omit the enabled-axes flags. Test the initial
   receipt on a rotated body with an eccentric centre and compare the effective mobility to one known impulse
   per axis. Retain the existing body layout for current consumers.
+- **SEA-12** also needs the setup-time accumulator allocation in the BIO-01 request below. A real
+  `HullSolver` and `RigidSolver` world starts with 368 snapshot regions and gains the `bodyForces` sum
+  on its first advance. Restoring the initial snapshot then sees 369 regions. Include `bodyForces`
+  in the frame-zero restore regression so coupled film seek can start from tick zero.
 
 - **FLUID-01:** Connect SEA-04 and general HYDRO-01 cells to the optional DFSPH layout-1 parcel requests and
   receipts. The real HYDRO-01 wet-cell test settles signed depth and both horizontal momentum components in

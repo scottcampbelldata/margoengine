@@ -17769,6 +17769,10 @@ accumulator's sum region on first use. A snapshot taken after the first step cap
 regression in `packages/physics/tests/coupling/vegetation.test.js` restores a frame-two snapshot, taken before the
 hit and before either body changes its enabled flag. See BIO-01 in [Framework requests](physics-work-queue.md#framework-requests).
 
+The First Wake diagnostic reproduces the same defect with `HullSolver` and `RigidSolver`. The
+tick-zero snapshot contains 368 regions. The first advance creates the `bodyForces` sum, after
+which restore expects 369 regions. The same setup-time allocation fixes both repros.
+
 ## Open: LIFE-03 swimmer wake and contact consumers in Barrier Bay
 
 The engine's swimmer produces the field data for a pectoral bed jet (BB-7) and the tail wake (BB-8/9).

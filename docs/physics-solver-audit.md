@@ -1217,7 +1217,14 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   16.331 mm depth change with a draw residual below 0.086 μm and verify the associated rigid
   pressure impulse, volume and replay. `water/test/flood-rigid-drag.browser.mjs` exercises the standalone
   Flood's reciprocal horizontal drag with one free body on both renderers. It checks stored momentum,
-  dry and locked-body cases, and paired recovery after abort. The original films still need playback checks.
+  dry and locked-body cases, and paired recovery after abort.
+
+  A local First Wake diagnostic used the archived camera and assets at 71 s with a closed hull proxy.
+  Turning on the reciprocal wake changed solved heave by 0.139 m, sampled quay crest by 0.564 m,
+  and sampled peak wash by 0.022 m/s. The rig held the authored horizontal track and attitude.
+  Its hull dimensions came from the scene and the proxy mass from displacement. These are paired
+  simulation results. Production wall reflection, splash and foam still need their surface bindings.
+  Cyprus playback also remains open.
 
 **Commit and test receipts on public main**
 
