@@ -1,5 +1,6 @@
 // Aseprite files and JSON sheets, written only from the public .ase file format specification document. Pure CPU code:
 // no GPU or DOM, so it runs in Node.
+import { concatBytes } from '../../shared/bytes.js';
 import { margoError } from '../../shared/errors.js';
 import type { SpriteClip, SpriteFrame, SpriteRect } from './animation.js';
 
@@ -537,17 +538,8 @@ class Writer {
   }
 }
 
-const join = (parts: readonly Uint8Array[]): Uint8Array => {
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let at = 0;
-  for (const part of parts) {
-    out.set(part, at);
-    at += part.length;
-  }
-  return out;
-};
 const chunk = (type: number, body: Uint8Array): Uint8Array =>
-  join([
+  concatBytes([
     new Writer()
       .u32(body.length + 6)
       .u16(type)
@@ -649,10 +641,13 @@ export async function encodeAseprite(source: AsepriteSource): Promise<Uint8Array
     chunks.push(
       chunk(
         0x2005,
-        join([new Writer().u16(0).u16(0).u16(0).u8(255).u16(2).u16(0).zeros(5).u16(width).u16(height).done(), zlib]),
+        concatBytes([
+          new Writer().u16(0).u16(0).u16(0).u8(255).u16(2).u16(0).zeros(5).u16(width).u16(height).done(),
+          zlib,
+        ]),
       ),
     );
-    const body = join(chunks);
+    const body = concatBytes(chunks);
     parts.push(
       new Writer()
         .u32(body.length + 16)
@@ -684,7 +679,7 @@ export async function encodeAseprite(source: AsepriteSource): Promise<Uint8Array
     .u16(16)
     .u16(16)
     .zeros(84);
-  return join([header.done(), ...parts]);
+  return concatBytes([header.done(), ...parts]);
 }
 
 /** A frame entry of an Aseprite JSON sheet. */

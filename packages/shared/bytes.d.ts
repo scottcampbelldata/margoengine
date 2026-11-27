@@ -2,6 +2,8 @@
 export function zigzag(n: number): number;
 /** The inverse of {@link zigzag}. */
 export function unzigzag(z: number): number;
+/** The parts laid end to end in one new array. */
+export function concatBytes(parts: readonly Uint8Array[]): Uint8Array<ArrayBuffer>;
 /** A growing little-endian byte buffer. */
 export class ByteWriter {
   bytes: Uint8Array;

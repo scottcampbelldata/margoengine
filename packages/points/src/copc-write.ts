@@ -5,6 +5,7 @@
 // so only the nodes being built are in memory (a top-down form of the octrees of M. Schütz, S. Ohrhallinger and M.
 // Wimmer, "Fast out-of-core octree generation for massive point clouds", Computer Graphics Forum 39(7), 2020,
 // https://doi.org/10.1111/cgf.14134). No source code of PDAL, Untwine, Entwine or any other writer was read.
+import { concatBytes } from '../../shared/bytes.js';
 import { LAS_RECORD_SIZES, type LASRecord, type LASWriteInput, readLASHeader, writeLAS } from './las.js';
 import { chunk, chunkTable, itemsOf, lazRecord } from './laz-encode.js';
 
@@ -284,16 +285,6 @@ function recordHeader(user: string, id: number, size: number, extended = false):
   return out;
 }
 
-const join = (parts: readonly Uint8Array[]): Uint8Array => {
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let at = 0;
-  for (const part of parts) {
-    out.set(part, at);
-    at += part.length;
-  }
-  return out;
-};
-
 /**
  * The hierarchy as pages, each of at most `limit` entries: a node's subtree stays in its page while it fits, and
  * otherwise becomes a page of its own. Returns the pages, children before the page that points to them, with the place
@@ -498,7 +489,7 @@ async function build(sink: CopcSink, source: CopcPoints, options: CopcWriteOptio
       for (const child of below) await child?.blocks.flush();
 
       // Points in time order compress best; the order within a node is free.
-      const unsorted = join(kept),
+      const unsorted = concatBytes(kept),
         count = mine.count,
         times = new Float64Array(count),
         unsortedView = new DataView(unsorted.buffer);
@@ -530,7 +521,7 @@ async function build(sink: CopcSink, source: CopcPoints, options: CopcWriteOptio
     for (const part of chunkTable(sizes, counts)) await write(part);
     const evlr = position,
       hierarchy = pages(root, pageEntries, evlr + 60),
-      entries = join(hierarchy.bytes);
+      entries = concatBytes(hierarchy.bytes);
     await write(recordHeader('copc', 1000, entries.length, true));
     await write(entries);
     for (const r of long) {
@@ -571,7 +562,7 @@ async function build(sink: CopcSink, source: CopcPoints, options: CopcWriteOptio
     h.setUint32(243, 1 + long.length, true);
     h.setBigUint64(247, BigInt(total), true);
     for (let r = 0; r < 15; r++) h.setBigUint64(255 + r * 8, BigInt(byReturn[r]), true);
-    await sink(join([header, ...records]), 0);
+    await sink(concatBytes([header, ...records]), 0);
     return { points: total, nodes, depth, bytes: position };
   } finally {
     // After an abort or a failure the store holds nothing of this file.

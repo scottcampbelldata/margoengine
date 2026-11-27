@@ -6,6 +6,17 @@ export const zigzag = (n) => (n < 0 ? -2 * n - 1 : 2 * n);
 /** The inverse of {@link zigzag}. */
 export const unzigzag = (z) => (z % 2 ? -(z + 1) / 2 : z / 2);
 
+/** The parts laid end to end in one new array. */
+export function concatBytes(parts) {
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let at = 0;
+  for (const part of parts) {
+    out.set(part, at);
+    at += part.length;
+  }
+  return out;
+}
+
 /** A growing little-endian byte buffer. */
 export class ByteWriter {
   at = 0;
