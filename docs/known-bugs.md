@@ -1059,12 +1059,47 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   fails `penumbra`, the same noise on the plants fails `penumbraPlants` and not `penumbra`; and "T1 penumbra and
   penumbraPlants need PENUMBRA_MIN_PIXELS".
 
+### Fixed 2026-11-27: a wind field's turbulence swept past a point at kilometres a second half an hour in (KB-WEATHER-WINDDRIFT1, weather)
+
+- **Repro:** `new WindField({speed: 20, direction: 0.6, gust: 0.8, turbulence: 0.44})`, sampled at one point every
+  1/30 s from t = 1800 s: steps of up to 6.07 m/s a frame (9.1 during a machine's blend), against a few tenths at t = 0.
+  In the timber-valley rail-line shot, the scatter wind read from it swung strength 0.86 to 0.61 and turned 9 degrees in
+  40 ms, and every plant shook.
+- **Cause:** `sample` carried the noise by `directionAt(t) x speed x t`, the gusting direction times the whole elapsed
+  time, so a wobble of 0.06 rad/s moved the pattern 36,000 x 0.06 m a second. `WeatherMachine` also changed the mean
+  wind under a pattern placed by `speed x t`, so a blend made it jump.
+- **Fix:** the pattern is carried by the integral of the mean wind (Taylor 1938): `drift(t)`, `set(options, at)`
+  rebases it at the machine's time, and `resetTime` calls `resetDrift()`. Sources in docs/clean-room.md.
+- **Regression:** `packages/weather/tests/wind-drift.test.js`.
+
+### Fixed 2026-11-27: the timber-valley shot page ran the weather and the fire at twice the shot's speed (KB-SCENES-TVCLOCK1, scenes, weather, vfx)
+
+- **Repro:** the rail-line shot: the weather clock moved 0.00417 s per 0.00208 s sub-frame.
+- **Cause:** the page's `apply` called `scene.advanceTime` each sub-frame, while the engine, on the shot clock, also
+  stepped the WeatherDrive, the FireFront and the sky as plugins.
+- **Fix:** the page leaves them to the engine and throws when a clock moves other than once with the shot. The class is
+  caught in the packages: a WeatherDrive or FireFront run by an engine and stepped with `advanceTime` between two
+  frames in a row throws MargoError `'state'`. One burst (a fire's past rolled) and a seek after `resetTime` pass.
+- **Regression:** `packages/weather/tests/drive-double-step.test.js` and `packages/vfx/test/fire-front-double-step.test.js`
+  (both fail on the parent). On the old page, the page's own check fails the shot (`the weather clock moved 0.00417 s in
+  0.00313 s of shot time`).
+
 ### Open 2026-11-26: the rail-line shot still shimmers 5.7 to 9.2 percent after the plants' sway was bounded (KB-LOOK-TV-SHIMMER2, BIO-01)
 
 - **Repro:** rail-line shot `--once --seconds 1.1` after KB-LOOK-TV-SHIMMER1 (1d1729c194): shimmerMoving 5.71 percent
   early and 7.25 mid at blowup, 6.22 and 9.18 calm (bound 0.5), down from 16.8 to 19.1. Measurement only.
 - **Owner:** plant motion and wind sway belong to BIO-01 (scatter, physics/vegetation); no plant-motion change was made
   here. Candidates named by the SHIMMER1 work: impostor switches and the fire front.
+- **Found 2026-11-27 (lane A), fixed:** the wind every plant read jumped from frame to frame (KB-WEATHER-WINDDRIFT1 and
+  KB-SCENES-TVCLOCK1 below). Grass and trees no longer jitter: over the shot's first 8 frames the change between
+  neighbours grows smoothly with the camera (2.0 to 12.9 percent of the grass band), where with the camera held still
+  it swung between 0.3 and 4 percent. shimmerMoving after both fixes: 5.09 early and 8.48 mid (was 5.98 and 7.63).
+- **Still open, measured at mid:** about half the off pixels are tree and grass edges where a nearer plant covers or
+  uncovers what is behind it in the next frame (occluded 3.4 and depth edge 3.4 percent of the frame), which a
+  camera-only warp cannot match. Inside the plants 2.4 percent and inside the sky 1.0 percent change on their own (sway
+  and smoke). The impostors switch hard (`lodFade: 0` in biomes objects.ts), but no switch was seen in these frames.
+  Next: decide with the manager whether T4 should warp by each pixel's real motion (a velocity mask for the scattered
+  plants) and leave out pixels hidden in the next frame, as optical-flow benchmarks do. The bound stays 0.5.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 

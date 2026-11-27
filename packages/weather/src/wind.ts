@@ -1,5 +1,15 @@
 // A wind field: a mean wind that gusts and shifts over time, plus turbulence that differs from place to place. Pure and
-// deterministic: the same options and the same (position, time) give the same vector, so replays and tests agree.
+// deterministic: the same options (and the same `set` calls) and the same (position, time) give the same vector, so
+// replays and tests agree.
+//
+// The turbulence is frozen and carried downwind by the mean wind (Taylor's hypothesis: G. I. Taylor, "The spectrum of
+// turbulence", Proc. R. Soc. Lond. A 164, 476-490, 1938, https://doi.org/10.1098/rspa.1938.0032; the same advection of a
+// noise field by the mean flow as J. Stam and E. Fiume, "Turbulent wind fields for gaseous phenomena", SIGGRAPH 1993,
+// https://doi.org/10.1145/166117.166163). Its offset is the integral of the mean velocity over time: speed x t along the
+// mean direction while those hold, rebased by `set(options, at)` when they change, so the pattern never jumps. The
+// gusting direction turns the wind at a point; it does not move the pattern (KB-LOOK-TV-SHIMMER2: carried by the
+// wobbling direction times the whole elapsed time, the pattern swept past a point at kilometres a second half an hour
+// in, and every plant fed by it shook from frame to frame).
 
 /** Settings of a {@link WindField}. */
 export interface WindOptions {
@@ -62,6 +72,8 @@ export function valueNoise(x: number, y: number, z: number, w: number, seed = 0)
 /** Wind as a function of place and time. */
 export class WindField {
   private o: Required<WindOptions>;
+  /** Where the frozen turbulence pattern was carried at time 0 (metres along x and z): 0 until `set` rebases it. */
+  private origin: [number, number] = [0, 0];
 
   constructor(options: WindOptions = {}) {
     this.o = {
@@ -93,8 +105,16 @@ export class WindField {
     return { ...this.o };
   }
 
-  /** Changes settings. Throws RangeError for a bad value and keeps the old settings. */
-  set(options: WindOptions): this {
+  /**
+   * Changes settings. Throws RangeError for a bad value and keeps the old settings. With `at` (seconds, the field's time
+   * of the change), a new mean speed or direction carries the turbulence on from where the old one had it at `at`, so
+   * the pattern a point feels goes on without a jump, as the air would; without it the pattern is placed as if the new
+   * mean wind had always blown (fine before time starts, or for a wind that never changes). `WeatherMachine` passes its
+   * own time.
+   */
+  set(options: WindOptions, at?: number): this {
+    if (at !== undefined && (typeof at !== 'number' || !Number.isFinite(at)))
+      throw new RangeError(`Wind set time must be a finite number of seconds; got ${String(at)}`);
     const before = this.o;
     this.o = { ...before, ...options };
     try {
@@ -103,7 +123,31 @@ export class WindField {
       this.o = before;
       throw error;
     }
+    if (at !== undefined && (before.speed !== this.o.speed || before.direction !== this.o.direction)) {
+      const [ax, az] = this.carried(before, at),
+        [bx, bz] = this.carried(this.o, at);
+      this.origin = [this.origin[0] + ax - bx, this.origin[1] + az - bz];
+    }
     return this;
+  }
+
+  /** How far the mean wind of `o` carries the pattern in `t` seconds (metres along x and z), origin excluded. */
+  private carried(o: Required<WindOptions>, t: number): [number, number] {
+    return [Math.sin(o.direction) * o.speed * t, Math.cos(o.direction) * o.speed * t];
+  }
+
+  /**
+   * Where the frozen turbulence has been carried by time `t` (metres along x and z): the integral of the mean wind's
+   * velocity since time 0. A point at `x, z` at time `t` feels the pattern that sat at `x - drift[0], z - drift[1]`.
+   */
+  drift(t: number): [number, number] {
+    const [x, z] = this.carried(this.o, t);
+    return [this.origin[0] + x, this.origin[1] + z];
+  }
+
+  /** Back to the pattern's place at time 0 with no rebase, as a fresh field with the same options. */
+  resetDrift(): void {
+    this.origin = [0, 0];
   }
 
   /** Speed multiplier from gusts at time `t` seconds, between `1 - gust` and `1 + gust` (it is the same everywhere). */
@@ -139,9 +183,11 @@ export class WindField {
       direction = this.directionAt(t),
       dx = Math.sin(direction),
       dz = Math.cos(direction);
-    // The noise pattern travels with the mean wind (at its mean speed), so turbulence blows past like real air.
-    const px = (x - dx * o.speed * t) / o.scale,
-      pz = (z - dz * o.speed * t) / o.scale,
+    // The noise pattern travels with the mean wind (its mean speed and mean direction, not the gust's), so turbulence
+    // blows past like real air.
+    const [cx, cz] = this.drift(t),
+      px = (x - cx) / o.scale,
+      pz = (z - cz) / o.scale,
       py = y / o.scale,
       pt = t / (o.gustPeriod * 2);
     const along = valueNoise(px, py, pz, pt, s ^ 0x68e31da4),

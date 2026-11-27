@@ -44,7 +44,16 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 
 ## Wind
 
-`machine.wind` is a `WindField`, kept in step with the state; make your own with `new WindField({speed, direction, gust, turbulence, gustPeriod, scale, seed})`. `sample(x, y, z, t)` returns a velocity: the mean wind scaled by a gust factor (between `1 - gust` and `1 + gust`), a direction that wobbles up to `0.5 * gust` radians, and turbulence that differs from place to place and blows downwind with the mean. It is a pure function of its arguments, so the same call gives the same vector, and its length never exceeds `speed * (1 + gust + turbulence)`. Use it for rain slant, sway of trees and cloth, or a sound's wind layer.
+`machine.wind` is a `WindField`, kept in step with the state; make your own with `new WindField({speed, direction, gust, turbulence, gustPeriod, scale, seed})`. `sample(x, y, z, t)` returns a velocity: the mean wind scaled by a gust factor (between `1 - gust` and `1 + gust`), a direction that wobbles up to `0.5 * gust` radians, and turbulence that differs from place to place and blows downwind with the mean: the pattern is frozen and carried by the mean speed and mean direction (Taylor's hypothesis), never by the gusting direction, so the wind at a point changes as slowly an hour in as at the start. `drift(t)` is how far it has been carried (metres along x and z). `set(options, at)` changes settings at the field's time `at` and carries the turbulence on from where it was, so a weather blend's changing mean wind never makes it jump; `WeatherMachine` passes its own time, and `resetDrift()` puts the pattern back where a fresh field has it. It is a pure function of its arguments and its `set` calls, so the same calls give the same vector, and its length never exceeds `speed * (1 + gust + turbulence)`. Use it for rain slant, sway of trees and cloth, or a sound's wind layer.
+
+```js
+import { WindField } from 'margoengine/weather';
+
+const field = new WindField({ speed: 20, direction: 0.6, gust: 0.8 });
+const [vx, vy, vz] = field.sample(0, 2, 0, 1800); // half an hour in
+field.set({ speed: 24 }, 1800); // the turbulence goes on from where it was
+const [dx, dz] = field.drift(1810); // where the pattern has been carried
+```
 
 ## Wet and snowy surfaces
 

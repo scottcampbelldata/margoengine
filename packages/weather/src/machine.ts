@@ -166,7 +166,11 @@ export class WeatherMachine implements Disposable {
 
   private syncWind(): void {
     const s = this.current;
-    this.wind.set({ speed: s.wind, direction: s.windDirection, gust: s.gust, turbulence: 0.2 + 0.3 * s.gust });
+    // At the machine's own time, so a changing mean wind carries the turbulence on without a jump (KB-LOOK-TV-SHIMMER2).
+    this.wind.set(
+      { speed: s.wind, direction: s.windDirection, gust: s.gust, turbulence: 0.2 + 0.3 * s.gust },
+      this.clock,
+    );
   }
 
   /** The current blended state. A fresh copy each read, so changing it changes nothing. */
@@ -452,6 +456,8 @@ export class WeatherMachine implements Disposable {
     if (this.clock > 0) Object.assign(this, this.start);
     this.start = {};
     this.clock = 0;
+    // The turbulence back where a fresh machine's is: no rebase from the run that is being undone.
+    this.wind.resetDrift();
     this.syncWind();
   }
 

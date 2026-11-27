@@ -45,7 +45,9 @@ interface WeatherState {
 class WindField {
     constructor(options?: WindOptions);
     get options(): Readonly<Required<WindOptions>>;
-    set(options: WindOptions): this;
+    set(options: WindOptions, at?: number): this;
+    drift(t: number): [number, number];
+    resetDrift(): void;
     gustFactor(t: number): number;
     directionAt(t: number): number;
     sample(x: number, y: number, z: number, t: number, out?: [number, number, number]): [number, number, number];

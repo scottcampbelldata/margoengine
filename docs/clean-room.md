@@ -18650,3 +18650,19 @@ No paper's companion code and no other engine's source was read.
   appendix A table 1 (measured wave speeds of dominoes standing on end) and the survey of section 5 (0.9 to 1.7 sqrt(g H)),
   read in full; W. J. Stronge and D. Shu, "The domino effect: successive destabilization by cooperative neighbours",
   Proc. R. Soc. Lond. A 418 (1988) 155-163, cited there for the limit speed set by inter-domino friction (not read).
+
+## weather wind field advected by the mean wind (KB-LOOK-TV-SHIMMER2, 2026-11-27)
+
+`WindField.sample`, `drift`, `set(options, at)` and `resetDrift` in `@margoengine/weather`; no paper's companion code and
+no other engine's source was read.
+
+- G. I. Taylor, "The spectrum of turbulence", Proc. R. Soc. Lond. A 164 (1938) 476-490,
+  https://doi.org/10.1098/rspa.1938.0032: the frozen-turbulence hypothesis; the eddies a fixed point feels are a pattern
+  carried past it by the mean velocity, so the pattern's offset is the integral of the mean wind over time.
+- J. Stam and E. Fiume, "Turbulent wind fields for gaseous phenomena", SIGGRAPH 1993,
+  https://doi.org/10.1145/166117.166163: a small-scale turbulent field advected by the large-scale mean flow; the gusting
+  of the large scale changes the velocity at a point, not where the small-scale pattern sits.
+- The offset is a phase: carried by the instantaneous direction times the whole elapsed time (the defect), its rate is
+  speed x (1 + t x d direction / dt), which half an hour into a 20 m/s gale is kilometres a second. The integral of the
+  mean velocity is exact for a mean held between `set` calls, and `set(options, at)` rebases it so the integral stays
+  continuous across a change.
