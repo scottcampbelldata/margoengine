@@ -208,15 +208,25 @@ impl World {
                     before[2] += weights[k] * self.pz[i];
                 }
                 let v = [self.fc_vx[f], self.fc_vy[f], self.fc_vz[f]];
-                let mut u = [now[0] - before[0] - v[0] * h, now[1] - before[1] - v[1] * h, now[2] - before[2] - v[2] * h];
+                // Against the body's point, which this piece's corrections may have moved (world.rs, `resolve`).
+                let corrected = self.correction_at(c, q);
+                let mut u = [
+                    now[0] - before[0] - v[0] * h - corrected[0],
+                    now[1] - before[1] - v[1] * h - corrected[1],
+                    now[2] - before[2] - v[2] * h - corrected[2],
+                ];
                 let un = u[0] * n[0] + u[1] * n[1] + u[2] * n[2];
                 u = [u[0] - n[0] * un, u[1] - n[1] * un, u[2] - n[2] * un];
                 let slide = sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
                 if slide > 1e-12 {
                     let limit = self.fc_f[f] * -d;
                     let keep = if slide < limit { 1.0 } else { limit / slide };
-                    let share = wt / (wt + wb);
-                    moved = [-u[0] * keep * share, -u[1] * keep * share, -u[2] * keep * share];
+                    // Shared by the inverse masses along the slide, the body taking the reaction at its point: a slide taken off
+                    // the triangle alone left its momentum nowhere (KB-SOFT-LASHCONTACT1).
+                    let along = self.body_inverse_mass(c, q, [u[0] / slide, u[1] / slide, u[2] / slide]);
+                    let share = keep / (wt + along);
+                    moved = [-u[0] * share * wt, -u[1] * share * wt, -u[2] * share * wt];
+                    self.correct_body(c, [u[0] * share, u[1] * share, u[2] * share], q, h);
                 }
                 // A move of the point by `moved` is each corner by its weight over its mass, over the triangle's inverse mass.
                 for k in 0..3 {

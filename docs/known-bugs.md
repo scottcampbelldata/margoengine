@@ -1142,20 +1142,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/netcode/tests/browser/media.mjs` (the untouched listener, strict autoplay policy) and
   `packages/netcode/tests/media.test.js` "KB-NETCODE-VOICEGESTURE1".
 
-### Open 2026-11-27: a cloth pressing on the body it is lashed to loses linear momentum (KB-SOFT-LASHCONTACT1, physics soft)
+### Fixed 2026-11-27: a cloth pressing on the body it is lashed to lost linear momentum (KB-SOFT-LASHCONTACT1, physics soft)
 
-- **Repro:** no gravity; a 4 by 7 sail of `FABRICS.sailcloth` (1 m by 6 m, from [0, 1, 0]) with a `SailForce` in a 10 m/s
-  wind, its seven luff particles tied by `attachParticle` to a free 200 kg box hull at [0, 0.5, 3] (half extents
-  [0.5, 0.25, 3.5]), 60 steps: the hull's and the sail's linear momentum is [27.22, -13.96, -0.85] N s where the summed
-  impulse of the sail's load is [27.58, -13.79, -1.07] (1.3 percent). The same with the hull at [0, -1, 3], clear of the
-  sail, matches to 2e-4 N s (`packages/physics/tests/sail.test.js` "a sail lashed along its luff to a free hull drives the
-  hull", PA-29). Passing the hull's collider `collisionGroups: 0` changes nothing.
-- **Cause:** the sail's particles lie 0.08 m above the hull's top face, inside their contact radius (the circumradius of
-  the widest triangle, 0.24 m on these 0.33 m cells), so the soft kernel's particle and face contacts with the hull run in
-  the same solve as the lashings to that hull; the impulses those contacts give the particles are not all handed back to
-  the hull. Which row drops them (the face contact's share by inverse mass, or the contact solved against the hull's
-  velocity before the lashings move it) is not yet traced. Owner: SOFT-01 soft kernel (`packages/physics/soft-kernel`).
-- **Kept honest by:** the PA-29 test keeps its hull clear of the sail; nothing else is loosened.
+- **Repro (before):** no gravity; a 4 by 7 sail of `FABRICS.sailcloth` (1 m by 6 m, from [0, 1, 0]) with a `SailForce` in a
+  10 m/s wind, its seven luff particles tied by `attachParticle` to a free 200 kg box hull at [0, 0.5, 3] (half extents
+  [0.5, 0.25, 3.5]), 60 steps: the hull's and the sail's linear momentum was [27.22, -13.96, -0.85] N s where the summed
+  impulse of the sail's load was [27.58, -13.79, -1.07] (1.3 percent). With the hull clear of the sail it matched.
+- **Cause:** two leaks. (1) The contact passes after the exact solve (`apply_contacts` in soft-kernel/src/world.rs and
+  `apply_faces` in face.rs) held a particle's or a face's slide back by friction as a displacement of the cloth alone: the
+  body was never given the reaction (a comment still said the velocity pass gave it, which stopped when friction moved into
+  the exact solve). The sail's particles start 0.08 m over the hull, inside their 0.53 m contact radius (the circumradius
+  of a 0.33 by 1 m cell's triangle), so the contacts that thrust them off the hull ran in those passes with full friction.
+  (2) The exact solve added each Newton step's body impulse to the body's f32 total; contacts of that thrown sail asking
+  for what no motion gives ran it for hundreds of small steps, and each one's impulse below the total's f32 spacing was dropped.
+- **Fix:** the passes' friction is a positional constraint along the slide, shared by the cloth's and the body's
+  generalized inverse masses along it, the body taking the reaction at the contact point (Mueller et al. 2020, section
+  3.5), measured against the body's point as this piece's corrections have moved it (so a light body that follows the
+  slide is not pushed again for it); the exact solve sums each body's impulse in f64 and hands it over once a piece. The sail on its hull now matches
+  its impulse to 1e-5 of it.
+- **Regression:** `packages/physics/tests/sail.test.js` "a sail lashed to its hull and pressing on it keeps the momentum
+  its contacts trade with the hull (KB-SOFT-LASHCONTACT1)" (1.3 percent before, against a bound of 0.1 percent).
 
 ### Open 2026-11-27: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
 

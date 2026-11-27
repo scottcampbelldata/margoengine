@@ -896,28 +896,37 @@ impl World {
         self.y[i] += ny * push * share;
         self.z[i] += nz * push * share;
         // Friction as a bounded displacement across the surface (Macklin et al. 2014, "Unified Particle Physics").
+        // The slide against the body's point: the surface's own motion over the piece and what this piece's corrections moved
+        // the point by, so a body that takes the friction's reaction is not pushed again for a slide it has already followed.
+        let moved = self.correction_at(c, [qx, qy, qz]);
         let (sx, sy, sz) = (surface[0], surface[1], surface[2]);
-        let mut ux = self.x[i] - self.px[i] - sx * h;
-        let mut uy = self.y[i] - self.py[i] - sy * h;
-        let mut uz = self.z[i] - self.pz[i] - sz * h;
+        let mut ux = self.x[i] - self.px[i] - sx * h - moved[0];
+        let mut uy = self.y[i] - self.py[i] - sy * h - moved[1];
+        let mut uz = self.z[i] - self.pz[i] - sz * h - moved[2];
         let un = ux * nx + uy * ny + uz * nz;
         ux -= nx * un;
         uy -= ny * un;
         uz -= nz * un;
-        let tl = sqrt(ux * ux + uy * uy + uz * uz);
-        if tl > 1e-12 {
-            let limit = friction * push;
-            let k = if tl < limit { 1.0 } else { limit / tl };
-            self.x[i] -= ux * k * share;
-            self.y[i] -= uy * k * share;
-            self.z[i] -= uz * k * share;
-        }
         // The body takes the opposite correction, shared by inverse mass at the contact point, and moves on with it.
-        // (The friction's reaction is a velocity impulse, given after the piece: see `contact_velocities`.)
         let lambda = m * share;
         self.correct_body(c, [-nx * push * lambda, -ny * push * lambda, -nz * push * lambda], [qx, qy, qz], h);
         if slot != usize::MAX {
             self.kj[slot] += push * lambda / h;
+        }
+        let tl = sqrt(ux * ux + uy * uy + uz * uz);
+        if tl > 1e-12 {
+            let limit = friction * push;
+            let k = if tl < limit { 1.0 } else { limit / tl };
+            // The slide is shared by the generalized inverse masses along it (Mueller et al. 2020, section 3.5: friction is a
+            // positional constraint of its own along the slide), and the body takes the reaction at the contact point: a slide
+            // taken off the particle alone left its momentum nowhere (KB-SOFT-LASHCONTACT1).
+            let t = [ux / tl, uy / tl, uz / tl];
+            let wt = self.body_inverse_mass(c, [qx, qy, qz], t);
+            let f = k / (self.w[i] + wt);
+            self.x[i] -= ux * f * self.w[i];
+            self.y[i] -= uy * f * self.w[i];
+            self.z[i] -= uz * f * self.w[i];
+            self.correct_body(c, [ux * f, uy * f, uz * f], [qx, qy, qz], h);
         }
     }
 
@@ -952,6 +961,13 @@ impl World {
             self.tqz[c] = nz / len;
             self.tqw[c] = ns / len;
         }
+    }
+
+    /// How far this piece's corrections moved body row `c`'s point that is at `q` from its centre now: its centre's move and
+    /// the turn that took the point there.
+    pub(crate) fn correction_at(&self, c: usize, q: [f32; 3]) -> [f32; 3] {
+        let back = rotate(conj([self.tqx[c], self.tqy[c], self.tqz[c], self.tqw[c]]), q[0], q[1], q[2]);
+        [self.dmx[c] + q[0] - back.0, self.dmy[c] + q[1] - back.1, self.dmz[c] + q[2] - back.2]
     }
 
     /// No correction yet this piece: the body row is where its velocity takes it, unturned.

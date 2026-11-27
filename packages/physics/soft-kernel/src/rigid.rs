@@ -83,6 +83,10 @@ pub struct Rigid {
     bf: Col<f64>,
     ii: Col<f64>,
     saved: Col<f32>,
+    // Per body, its impulse this solve (linear then angular), summed in f64 and handed to the rigid world once at the end: a
+    // solve that takes hundreds of small Newton steps added each step's impulse to the body's f32 total, which dropped the
+    // part of every step under its spacing (KB-SOFT-LASHCONTACT1).
+    owed: Col<f64>,
     // Which edges the system holds (`find_held`), and the union-find of the rigid edges' components.
     tree: Col<u32>,
     parent: Col<u32>,
@@ -136,6 +140,7 @@ impl Rigid {
             bf: Col::new(),
             ii: Col::new(),
             saved: Col::new(),
+            owed: Col::new(),
             tree: Col::new(),
             parent: Col::new(),
             count: Col::new(),
@@ -1124,15 +1129,9 @@ impl World {
         let u = core::mem::replace(&mut self.rg.u, Col::new());
         self.spread(&u);
         self.rg.u = u;
-        for c in 0..self.colliders {
-            let bf = &self.rg.bf[6 * c..6 * c + 6];
-            let k = alpha * inv;
-            self.jx[c] += (bf[0] * k) as f32;
-            self.jy[c] += (bf[1] * k) as f32;
-            self.jz[c] += (bf[2] * k) as f32;
-            self.kx[c] += (bf[3] * k) as f32;
-            self.ky[c] += (bf[4] * k) as f32;
-            self.kz[c] += (bf[5] * k) as f32;
+        let k = alpha * inv;
+        for j in 0..6 * self.colliders {
+            self.rg.owed[j] += self.rg.bf[j] * k;
         }
     }
 
@@ -1160,6 +1159,12 @@ impl World {
         if self.rg.ii.len() < 6 * nc {
             self.rg.ii.resize(6 * nc);
         }
+        if self.rg.owed.len() < 6 * nc {
+            self.rg.owed.resize(6 * nc);
+        }
+        for j in 0..6 * nc {
+            self.rg.owed[j] = 0.0;
+        }
         self.pieces += 1;
         let tau = h * self.pieces as f32;
         loop {
@@ -1185,6 +1190,15 @@ impl World {
             self.book(alpha, h);
         }
         self.friction_solve(h, tau);
+        for c in 0..nc {
+            let o = &self.rg.owed[6 * c..6 * c + 6];
+            self.jx[c] += o[0] as f32;
+            self.jy[c] += o[1] as f32;
+            self.jz[c] += o[2] as f32;
+            self.kx[c] += o[3] as f32;
+            self.ky[c] += o[4] as f32;
+            self.kz[c] += o[5] as f32;
+        }
     }
 
     /// Two friction rows across each contact the solve pushed this piece, along the slide and across it: the move that undoes
