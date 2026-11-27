@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: ambient occlusion draws a fine pattern over distant flat sand (KB-POST-GTAOFAR1, post; was KB-WATER-FARGRID-KH1's sand half)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --shots=<file> --out=<folder>` with the
+  query `cam=880,30,-450&aim=600,3,300&fov=35`: the sand some hundreds of metres out carries one-pixel rows and a
+  checker. With `&occlusion=0` it is gone: the mean second difference between pixel rows over (500, 560) to (760, 700)
+  falls from 11.5 to 0.55 (RTX A6000, WebGPU).
+- **Cause (narrowed, not traced in the shader):** the scene's `GTAO` pass; its per-pixel sample pattern shows where the
+  ground is far and flat.
+- **The report's other half**, a stair-stepped water edge, does not show in the same frame on this main: the edge is an
+  irregular swash line.
+
 ### Fixed 2026-11-27: timber-valley's cumulus showed as flat white blobs on the mountain slopes (KB-SKY-CLOUDBLOB1; scenes, sky docs)
 
 - **Repro:** timber-valley under cover 0.2 to 0.3, from the valley floor toward the ridges: a smooth white patch lies
