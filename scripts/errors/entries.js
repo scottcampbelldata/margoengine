@@ -2943,6 +2943,15 @@ export const entries = [
     fix: 'Read the code and the block id in the error. Give every block a unique id, wire only to blocks that output what the input needs, keep literals finite and in the range the option documents, break loops, and give sub-emitter children only creation blocks.',
   },
   {
+    id: 'flocking',
+    title: '@margoengine/vfx/flocking: GPU flocks of birds and fish',
+    kind: 'family',
+    messages: [],
+    cause:
+      'GPUFlock, stepFlockCPU or a helper of the flocking entry was given something it cannot use: a count outside 1 to 262,144, a seed that is not a 32-bit integer, a preset other than bird or fish, bounds without a positive size, a radius, speed, force or weight out of its range (maxSpeed below minSpeed), more than 16 attractors or predators or 32 obstacles, a position that is not three finite numbers, a colour it cannot read, a mesh without whole triangles or with indices past its vertices, a step dt outside 0 to 1 s, or a snapshot of a flock of another size. The message names the value.',
+    fix: 'Pass the value the message names within the range the README lists for it: positions as [x, y, z], radii and speeds above 0, an obstacle radius, a mesh facing +Z of 1 to 16,384 triangles (a glTF mesh geometry passes as it is), a dt of at most 1 s (call step again for more), and to restore only a snapshot this flock took.',
+  },
+  {
     id: 'points',
     title: '@margoengine/points: octree cloud options',
     kind: 'family',

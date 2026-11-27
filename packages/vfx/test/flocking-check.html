@@ -1,0 +1,136 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>GPU flocking check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body>
+<script type="module">
+import { Engine } from '/packages/core/dist/index.js';
+import { GPUFlock, createFlockState, flockStateHash, stepFlockCPU, FLOCK_BOID_FLOATS as F } from '/packages/vfx/dist/flocking.js';
+import { isCompatDevice } from '/packages/webgl2-compat/dist/device.js';
+
+const W = 320, H = 240;
+window.check = async () => {
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  document.body.append(c);
+  const engine = await Engine.create(c, {
+    backend: 'webgpu',
+    camera: { position: [0, 6, 30], target: [0, 0, 0], near: 0.5, far: 150 },
+  });
+  engine.stop();
+  engine.scene.background = '#0a101a';
+  const errors = [];
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+
+  const compat = isCompatDevice(engine.gpu);
+  // 16,384 boids on WebGPU (docs/physics-parity-bar.md P14: thousands of agents); the CPU twin flies 1,536.
+  const count = compat ? 1536 : 16384;
+  const options = {
+    count,
+    seed: 7,
+    bounds: { shape: 'box', center: [0, 0, 0], halfSize: [14, 8, 14] },
+    scale: 0.55,
+    predators: [{ position: [0, 0, 0], radius: 6, strength: 14 }],
+    obstacles: [{ position: [6, 0, 0], radius: 2.5 }],
+  };
+  const flock = GPUFlock.attach(engine, options);
+  const hash = async () => flockStateHash((await flock.snapshot()).boids);
+
+  // Determinism: the same 60 steps from the seed give the same hash; a snapshot restored repeats the rest exactly.
+  for (let k = 0; k < 60; k++) flock.step(1 / 60);
+  const runA = await hash();
+  flock.reset();
+  for (let k = 0; k < 30; k++) flock.step(1 / 60);
+  const mid = await flock.snapshot();
+  for (let k = 0; k < 30; k++) flock.step(1 / 60);
+  const runB = await hash();
+  flock.restore(mid);
+  for (let k = 0; k < 30; k++) flock.step(1 / 60);
+  const runC = await hash();
+
+  // The GPU step against its CPU twin, one step from the same state.
+  flock.reset();
+  flock.step(1 / 60);
+  const gpu = (await flock.snapshot()).boids;
+  const twin = createFlockState(flock.options);
+  stepFlockCPU(twin, flock.options, 1 / 60);
+  let worstPos = 0, worstVel = 0, offPos = 0;
+  for (let i = 0; i < count; i++) {
+    let dp = 0, dv = 0;
+    for (let a = 0; a < 3; a++) {
+      dp = Math.max(dp, Math.abs(gpu[i * F + a] - twin.boids[i * F + a]));
+      dv = Math.max(dv, Math.abs(gpu[i * F + 4 + a] - twin.boids[i * F + 4 + a]));
+    }
+    worstPos = Math.max(worstPos, dp);
+    worstVel = Math.max(worstVel, dv);
+    if (dp > 1e-4) offPos++;
+  }
+  flock.reset();
+
+  const shot = new OffscreenCanvas(W, H);
+  const ctx = shot.getContext('2d', { willReadFrequently: true });
+  const grab = async (delta = 1 / 60) => {
+    engine.render({ delta });
+    // Read the canvas in the task that drew it: a WebGPU canvas is cleared once presented. The WebGL2 layer draws late.
+    if (compat) await engine.gpu.queue.onSubmittedWorkDone();
+    ctx.drawImage(c, 0, 0);
+    return ctx.getImageData(0, 0, W, H).data;
+  };
+  const nonBg = (px) => {
+    let n = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i] > 28 || px[i + 1] > 32 || px[i + 2] > 44) n++;
+    return n;
+  };
+  const diffCount = (a, b) => {
+    let n = 0;
+    for (let i = 0; i < a.length; i += 4)
+      if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 18) n++;
+    return n;
+  };
+
+  const stepsBefore = flock.stats.steps;
+  const frame1 = await grab(1 / 60);
+  for (let k = 0; k < 8; k++) engine.render({ delta: 1 / 60 });
+  const frame2 = await grab(1 / 60);
+  const frameSteps = flock.stats.steps - stepsBefore;
+  // A paused flock draws the same frame twice.
+  flock.options.paused = true;
+  const pausedA = await grab(1 / 60);
+  const pausedB = await grab(1 / 60);
+  flock.options.paused = false;
+
+  flock.setDebug({ enabled: true, velocities: false, selectedIndex: 0 });
+  const frameInspect = await grab(0);
+  flock.setDebug({ velocities: true, grid: false, perception: false, vectors: false });
+  const frameVelocity = await grab(0);
+  flock.setDebug({ enabled: false });
+  const frameNoDebug = await grab(0);
+  const drawCalls = flock.stats.drawCalls;
+
+  flock.setPreset('fish');
+  const frameFish = await grab(1 / 60);
+
+  const stats = { ...flock.stats };
+  flock.dispose();
+  const frameAfterDispose = await grab(1 / 60);
+  engine.dispose();
+
+  return {
+    compat,
+    count,
+    errors,
+    stats,
+    hashes: [runA, runB, runC],
+    worstPos,
+    worstVel,
+    offPos,
+    frameSteps,
+    drawCalls,
+    litFrame1: nonBg(frame1),
+    movedPixels: diffCount(frame1, frame2),
+    pausedDiff: diffCount(pausedA, pausedB),
+    inspectDiff: diffCount(frameNoDebug, frameInspect),
+    velocityDiff: diffCount(frameNoDebug, frameVelocity),
+    fishLit: nonBg(frameFish),
+    afterDisposeLit: nonBg(frameAfterDispose),
+  };
+};
+window.ready = true;
+</script></body></html>

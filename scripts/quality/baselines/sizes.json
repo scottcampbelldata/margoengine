@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20857032,
+  "total": 20874192,
   "history": [
     {
       "date": "2026-10-24",
@@ -14383,6 +14383,12 @@
       "commit": "1a1b54e5d7",
       "reason": "COLLADA kinematics: new optional entry loaders/dae-kinematics, 0 to 18959 B gzip (the DAE parser it extends included; ceiling 19528 B). A split from parseDAE would copy the parser; core plus stage unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "1e1f51c75",
+      "reason": "vfx/flocking 16,660 B new (LIFE-04 P14: GPU boids, separation, alignment and cohesion with a vision cone, predators, attractors, obstacles and bounds in eight compute passes, the instanced bird and fish draw, the debug overlay, snapshots and the CPU twin for the WebGL2 layer), a lazy entry. A split of the CPU twin would save the WebGPU path little and cost the WebGL2 route an extra import; the game and margoengine wrappers re-export it",
+      "grew": 1
     }
   ],
   "items": {
@@ -15904,6 +15910,7 @@
     "@margoengine/vfx/fire-front": 9841,
     "@margoengine/vfx/flame": 12357,
     "@margoengine/vfx/flipbook": 1167,
+    "@margoengine/vfx/flocking": 17160,
     "@margoengine/vfx/gunfire": 12137,
     "@margoengine/vfx/json": 2860,
     "@margoengine/vfx/lit": 2369,

@@ -38,6 +38,7 @@ backend can run it.
 | [clipping-planes.html](clipping-planes.html) | Section planes on every material |
 | [depth-texture.html](depth-texture.html) | A depth texture that any material can sample |
 | [flight-helmet.html](flight-helmet.html) | The Khronos Flight Helmet with PBR materials |
+| [gpu-flocking.html](gpu-flocking.html) | 16,384 GPU birds or fish fleeing the pointer, live flocking rules and the flock's debug view |
 | [khronos-gallery.html](khronos-gallery.html) | Khronos glTF sample assets |
 | [gallery/](gallery/index.html) | The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md)) |
 | [kinematics-constraints.html](kinematics-constraints.html) | Arm clearance check with the kinematics package |
