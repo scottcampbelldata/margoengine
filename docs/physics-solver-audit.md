@@ -248,6 +248,36 @@ measured, not landed (the upgrade moved to Codex). What it did, in body axes (x 
   needs the drift angle). Radiated waves to SEA-04 were not started: `WakeSolver` reads layout-1 `seaSource` rows (x, z,
   radius, pressure, volume pushed over the step), so the hull would write one row a station.
 
+### SOFT-01 handoff (2026-11-27)
+
+SOFT-01 passes to the session that owns cloth (the work queue's P6 owner). Landed on `main`, each with its tests and docs:
+
+- Tethers, long range attachments (X-30): PR #842.
+- Skinned cloth with max distance and backstop, `skinVertices` (X-31), with the fix that a hand-torn edge is announced and
+  splits: PR #847.
+- Lift, stall and skin friction on every cloth face, validated against Torres and Mueller's (2004) measured plates
+  (X-28): PR #856.
+- Whole soft-world snapshots across spawn, despawn and split, and the clock in rigid snapshots (PA-05, soft part): PR #862.
+- Adaptive tearing of sheets through their faces (Pfaff et al. 2014): PR #872.
+- Vertex block descent for cloth, Irvine's cable sag within 0.1 percent at any pass count (X-27): PR #880.
+
+Not landed: soft work counts (`SoftBodies.work`), commit `38d50f0e7` on branch `item4`, unpushed. With it, the
+`soft.test.js` test "a contact is stable at a mass ratio of a thousand either way, and a cloth holds a body or tears,
+never lets it through" failed: the body ended 82 m below the cloth. The cause is not found; `7cf7419e0` (coded refusals,
+face contacts dropped only against fixed colliders) landed on `main` since and may bear on it, so rerun the test on the
+rebased commit first.
+
+Still open against the eight points:
+
+- Coded errors: done on `main` by `7cf7419e0` for the soft entry; `sail.ts` still throws five bare errors.
+- Bending from measured data: quadratic bending (Bergou et al. 2006) in the soft kernel, KES-FB2 bending rigidity in the
+  `FABRICS` presets, and checks against the ASTM D1388 cantilever bending length and the Cusick drape coefficient.
+- Film controls for cloth.
+- Sail thrust reacting on the hull (PA-29), with a coupling test.
+- GPU cloth (`@margoengine/physics/gpu-cloth`): two-way ties to rigid bodies and the full per-face air (lift, stall,
+  skin friction) on the GPU path.
+- Speed against the rival's demo: waits for the quiet speed phase.
+
 ### Notes on the open Claude rows (2026-11-26)
 
 Progress and research for the reopened rows above, for whoever builds the upgrade next.
