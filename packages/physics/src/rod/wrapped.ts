@@ -75,7 +75,7 @@ const cross = (a: readonly number[], b: readonly number[]): V => [
 const norm = (a: readonly number[]): number => Math.sqrt(dot(a, a));
 
 /** A wrap's plane: its centre, the axis, and two unit vectors e1, e2 square to it with e1 x e2 = axis. */
-interface Frame {
+export interface Frame {
   c: V;
   n: V;
   e1: V;
@@ -88,7 +88,7 @@ interface Frame {
 }
 
 /** Where a point's span meets the circle, its angle there and the span's length; the point outside the circle. */
-function tangent(f: Frame, p: V, side: 1 | -1): { angle: number; length: number; at: V } {
+export function tangent(f: Frame, p: V, side: 1 | -1): { angle: number; length: number; at: V } {
   const d = sub(p, f.c),
     x = dot(d, f.e1),
     y = dot(d, f.e2),
@@ -104,7 +104,7 @@ function tangent(f: Frame, p: V, side: 1 | -1): { angle: number; length: number;
 }
 
 /** The signed sweep from angle a to angle b the `turn` way round, in [0, 2 pi). */
-function sweep(a: number, b: number, turn: 1 | -1): number {
+export function sweep(a: number, b: number, turn: 1 | -1): number {
   let s = turn * (b - a);
   const tau = 2 * Math.PI;
   s -= tau * Math.floor(s / tau);

@@ -440,6 +440,36 @@ const [cleat, load] = line.tension(0);
 console.log(Math.round(load), Math.round(cleat)); // 491 191: the bollard takes the rest
 ```
 
+On bodies that move, `WrappedRopeSolver` is the same rope as a solver of the physics framework, coupled both ways to the
+rigid world: a node is a free mass or a point on a body (`{body: row, point}`, a boat's fairlead), and a wrap's cylinder may
+ride on a body (`body`, with its centre and axis in the body's frame): a winch's drum, a bollard on a ship. Each side's
+stretch is measured against the drum's surface where the rope leaves it, so a turning drum winds the rope in or slips
+under it, and each pull on a node is matched on the drum at that point, so the rope hands the bodies its tension
+(`bodyForces`) with momentum and angular momentum kept. Couple it before the rigid solver. `tension(i)`, `holding(i)` and
+`read(k)` (a free node's position and velocity) read it.
+
+```ts
+import {Physics} from '@margoengine/physics';
+import {WrappedRopeSolver} from '@margoengine/physics/rod';
+import {PhysicsWorld, RigidSolver} from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, -9.81, 0]});
+// A winch drum of 0.2 m turning on a deck, a 2 kg and a 1 kg load on a line over its top.
+const drum = physics.addBody(null, {type: 'kinematicVelocity', angularVelocity: [0, 0, -25], colliders: []});
+const line = new WrappedRopeSolver();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}, gravity: [0, -9.81, 0]})
+  .add(new RigidSolver(), {physics})
+  .add(line, {
+    nodes: [{position: [-0.2, -1, 0], mass: 2}, {position: [0.2, -1, 0], mass: 1}],
+    wraps: [{body: drum.row, center: [0, 0, 0], axis: [0, 0, 1], radius: 0.2, friction: 0.3, turn: -1}],
+  })
+  .couple(['wrappedRope', 'rigid'], 'staggered');
+world.advance(60);
+const [lifting, paying] = line.tension(0);
+console.log((lifting / paying).toFixed(3), line.holding(0)); // 2.566 false: the drum slips under the line at e^(0.3 pi)
+```
+
 ## Loose props on a moving deck
 
 Props resting on a moving body (cups, plates and chairs in a ship's saloon, crates in a lift) stick, slide and tip as its

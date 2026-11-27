@@ -84,6 +84,49 @@ export interface WrappedRopeOptions {
     readonly passes?: number;
 }
 
+export class WrappedRopeSolver implements Solver<WrappedRopeSolverParams> {
+    readonly id: string;
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: WrappedRopeSolverParams): void;
+    step({ inputs }: StepContext, dt: number): void;
+    read(k: number): {
+        position: Vec3;
+        velocity: Vec3;
+    };
+    tension(i: number): readonly [number, number];
+    holding(i: number): boolean;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export type WrappedRopeSolverNode = {
+    readonly position: Vec3;
+    readonly mass: number;
+    readonly velocity?: Vec3;
+} | {
+    readonly body: number;
+    readonly point?: Vec3;
+};
+
+export interface WrappedRopeSolverParams {
+    readonly nodes: readonly WrappedRopeSolverNode[];
+    readonly wraps?: readonly (WrappedRopeSolverWrap | null)[];
+    readonly passes?: number;
+    readonly rate?: RateLevel;
+}
+
+export interface WrappedRopeSolverWrap {
+    readonly body?: number;
+    readonly center: Vec3;
+    readonly axis: Vec3;
+    readonly radius: number;
+    readonly friction?: number;
+    readonly turn: 1 | -1;
+}
+
 export interface WrappedRopeWrap {
     readonly center: Vec3;
     readonly axis: Vec3;
@@ -143,6 +186,10 @@ interface BodyOwner {
 }
 
 type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
+
+type Cell = readonly [number, number, number];
+
+type Centring = 'cell' | 'face' | 'vertex' | 'particle';
 
 interface CharacterCollision {
     collider: PhysicsCollider;
@@ -505,6 +552,24 @@ interface DynamicCharacterOptions {
 type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
+
+type FieldAccess = 'read' | 'write' | 'accumulate';
+
+interface FieldDescriptor {
+    readonly name: string;
+    readonly kind: FieldKind;
+    readonly quantity: string;
+    readonly unit: string;
+    readonly centring: Centring;
+}
+
+type FieldKind = 'uniformGrid' | 'sparseGrid' | 'heightfield' | 'particleSet' | 'meshVertexSet' | 'surfaceSampleSet' | 'bodySet' | 'scalarSeries';
+
+interface FieldUse {
+    readonly field: FieldDescriptor;
+    readonly access: FieldAccess;
+    readonly optional?: boolean;
+}
 
 interface HalfEdgeTopology {
     vertex: Uint32Array;
@@ -1685,6 +1750,13 @@ interface PointProjection {
     readonly featureId: number | undefined;
 }
 
+interface Port {
+    readonly field: string;
+    readonly region: Region;
+    readonly tick: number;
+    readonly cell: Cell;
+}
+
 interface QuarantineEvent {
     type: 'quarantine';
     body: PhysicsBody;
@@ -1706,6 +1778,8 @@ interface QueryFilter {
     onlyFixed?: boolean;
     predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
 }
+
+type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 interface RaycastHit {
     body: PhysicsBody;
@@ -1895,6 +1969,44 @@ type ShapeOptions = {
     shape: 'halfSpace';
     normal?: Vec3;
 };
+
+interface Solver<Params = unknown> {
+    describe(): SolverDescription;
+    init(host: SolverHost, params: Params): void;
+    step(context: StepContext, dt: number): void;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(tick: number): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+    iterate?(context: StepContext, dt: number): void;
+    rollback?(): void;
+}
+
+interface SolverDescription {
+    readonly id: string;
+    readonly fields: readonly FieldUse[];
+    readonly rate: RateLevel;
+    stableRate(): RateLevel;
+    timeScale?(): number;
+}
+
+interface SolverHost {
+    readonly memory: WebAssembly.Memory;
+    readonly gravity: readonly [number, number, number];
+    allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
+    resize(region: Region, byteLength: number): Region;
+    free(region: Region): void;
+    bodyRows(atLeast?: number): number;
+    port(field: string): Port | undefined;
+}
+
+interface StepContext {
+    readonly tick: number;
+    readonly level: RateLevel;
+    readonly seed: number;
+    readonly inputs: ReadonlyMap<string, Port>;
+    readonly cell: Cell;
+}
 
 type Vec3 = readonly [number, number, number];
 ```

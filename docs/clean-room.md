@@ -17293,3 +17293,20 @@ Files: `packages/physics/src/rod/wrapped.ts` (`WrappedRope`). No rival engine so
   by the capstan ratio, T_A' = (rate + T_A0 w_A + T_B0 w_B) / (w_A + k w_B); a fixed node holds whatever the load unless a
   winch draws its side past its rope, when the rope slides toward it; for an Atwood machine over a capstan one step gives
   a = g (m2 - k m1) / (m2 + k m1) exactly.
+
+## physics wrapped rope on moving bodies (2026-11-27)
+
+Files: `packages/physics/src/rod/wrapped-solver.ts` (`WrappedRopeSolver`). No rival engine source and no paper's companion
+code was read. Sources as for `WrappedRope` above (Sueda, Jones, Levin and Pai 2011; Euler 1762 and Eytelwein 1808), and
+the staggered partitioned coupling of the physics framework (C. A. Felippa, K. C. Park and C. Farhat, "Partitioned
+analysis of coupled mechanical systems", CMAME 190, 2001, https://doi.org/10.1016/S0045-7825(00)00391-1).
+
+- Own derivations: on a drum that moves and turns, each side's stretch rate is u . (v_node - v_drum(T)), T the tangent
+  point and u the span's unit vector, exact for the drum's rigid motion: a node carried with the drum moves from T at omega x
+  (A - T), square to u as A - T lies along u, so it stretches nothing; the effective inverse mass of a side is the node's plus the drum's at T along u;
+  each pull T u on a node toward T is matched by - T u on the drum at T, and as the node and T lie on one line along u the
+  pair keeps angular momentum about any point, so the drum's torque R (T_high - T_low) comes from the two pulls; the
+  anchor of a wrap's material is put back at the middle of the touching arc each step, the shift moved from one side's
+  count to the other's, so a turning drum never carries it off the arc; for a winch drum slipping under the rope, the side
+  the surface comes from is the tight one, T_A = k T_B, so A rises at a = g (k m_B - m_A) / (m_A + k m_B) whatever the drum's
+  speed while it slips and whatever the deck's steady speed.

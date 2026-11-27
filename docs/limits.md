@@ -8925,8 +8925,21 @@ Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
   cylinders, the rope across each axis in the plane through its centre; a node reaching its cylinder stops the rope with a
   `state` error; a fixed node holds whatever its side needs, and its reported tension is the least that holds (the load over
   the capstan ratio). Exact for the capstan Atwood machine; between two wraps an inextensible rope's middle tension is not
-  fixed by statics, so it first slips at one wrap until the middle carries what the other needs. It is not coupled to the
-  rigid world or the framework yet.
+  fixed by statics, so it first slips at one wrap until the middle carries what the other needs. On moving bodies, use
+  `WrappedRopeSolver`.
+- `WrappedRopeSolver` (2026-11-27), the same rope coupled both ways to the rigid world through the physics framework:
+  - nodes are free masses or points on bodies; wraps on fixed or moving, turning cylinders; the rope's pulls go to the
+    bodies as `bodyForces`, held over the next rigid step (staggered: the rope sees the bodies a step behind, as every
+    staggered coupling does);
+  - one wrap at most between two nodes, as above: a span straight from one cylinder to the next, with no node between, is
+    not built (it needs the tangent line between two circles and a contact arc at each end), so put a light node between;
+  - a drum turns less than half a turn a step (each step's anchor is put back at the middle of the touching arc);
+  - measured (`packages/physics/tests/coupling/wrapped-rope.test.js`): a winch drum turning at 25 rad/s on a deck heaving at
+    0.5 m/s, a 2 kg and a 1 kg load slipping over it, within 3.4e-6 m/s and 2.1e-4 N of the closed form a = g (k m_B -
+    m_A) / (m_A + k m_B) over 0.5 s and the tensions at the capstan ratio to 1.2e-7. What is left is the kernel's f32 drum
+    pose (its centre about 1e-7 m off, its rotation about 1.5e-7 rad), taken out by the stretch correction, so it stays
+    bounded. Between a free drum, a boat and a mass, linear and angular momentum are kept within 4e-7 of the start, the
+    kernel's f32 velocities; the same state at 24, 30 and 60 frames a second, and a seek replays to the bit.
 - Measured (`packages/physics/tests/rod.test.js`):
   - a cantilever in a current within 0.03 % of its springs and 0.06 % of the continuous beam at 32 links;
   - a line between pins within 0.007 % of its chain and 0.03 % of the catenary;

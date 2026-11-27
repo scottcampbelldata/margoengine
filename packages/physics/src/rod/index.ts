@@ -689,3 +689,9 @@ export class Rod implements PhysicsAttachment {
   }
 }
 export { WrappedRope, type WrappedRopeNode, type WrappedRopeOptions, type WrappedRopeWrap } from './wrapped.js';
+export {
+  WrappedRopeSolver,
+  type WrappedRopeSolverNode,
+  type WrappedRopeSolverParams,
+  type WrappedRopeSolverWrap,
+} from './wrapped-solver.js';
