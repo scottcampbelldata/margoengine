@@ -2,7 +2,9 @@
 // image stacks, functions, volume data and level set objects, beside the meshes the core reader gives.
 import { LoaderError } from './types.js';
 import { read3MF, type ThreeMFModel, type ThreeMFOptions, type ThreeMFResult } from './threemf.js';
-import type { BinaryInput } from './util.js';
+import { meshLevelSet, MAX_CELLS } from './threemf-levelset.js';
+import type { FieldScope, Voxels } from './threemf-functions.js';
+import { limits, type BinaryInput } from './util.js';
 
 const F = '3MF';
 const MAX_SHEETS = 65_536;
@@ -96,12 +98,27 @@ export interface ThreeMFVolumetricObject {
     boundingBoxOnly: boolean;
     /** That mesh, in its own coordinates. */
     domain: { positions: Float32Array; indices: Uint32Array };
+    /** The grid spacing the level set was meshed at, in the object's units. */
+    cellSize?: number;
+    /** The grid is too coarse for `minFeatureSize`: smaller features may be missing. */
+    unresolved?: boolean;
   };
   /**
    * Each place the build puts the object: twelve numbers as a 3MF transform writes them, from the object's coordinates
    * to the result's units.
    */
   instances: Float64Array[];
+}
+
+/** Options of {@link parse3MFVolumetric}. */
+export interface ThreeMFVolumetricOptions extends ThreeMFOptions {
+  /** Evaluate each built level set and add its surface to the result. Default true. */
+  meshLevelSets?: boolean;
+  /**
+   * Grid cells along the longest side of a level set's domain: 2 to 512, default 64. A `minfeaturesize` in the file
+   * asks for more, up to 512. The spacing is rounded down to a power of two.
+   */
+  levelSetResolution?: number;
 }
 
 /** The result of {@link parse3MFVolumetric}. */
@@ -152,17 +169,78 @@ interface Part {
 }
 
 /**
- * Parses a 3MF package with the volumetric and implicit extensions. The meshes come as {@link ThreeMFResult} gives
- * them; the volumetric resources and the built objects that use them are returned beside them. Functions are not
- * evaluated and level sets are not meshed: a level set object adds no triangles.
+ * What one part's functions read: its image stacks, decoded by `@margoengine/decoders`, and distances to its meshes
+ * from `@margoengine/bvh`, both loaded only for a package that has a level set.
+ */
+async function fieldScope(model: ThreeMFModel, part: Part): Promise<FieldScope> {
+  const [{ decodePNG }, { MeshBVH }, { pointInside }] = await Promise.all([
+      import('@margoengine/decoders/png'),
+      import('@margoengine/bvh'),
+      import('@margoengine/bvh/inside'),
+    ]),
+    voxels = new Map<string, Voxels>();
+  for (const f of part.functions.values()) {
+    if (f.kind !== 'image' || voxels.has(f.imageId)) continue;
+    const { rows, columns, sheets, id } = part.images.get(f.imageId)!;
+    if (rows * columns * sheets.length > 2 ** 27)
+      throw new LoaderError(F, 'limit', `image3d ${id.slice(0, 32)} holds more than ${2 ** 27} voxels`);
+    const data = new Uint16Array(rows * columns * sheets.length * 4);
+    sheets.forEach((sheet, i) => {
+      let picture;
+      try {
+        picture = decodePNG(sheet.data, { bitDepth: 16, maxPixels: rows * columns });
+      } catch (error) {
+        bad(`${sheet.path.slice(0, 128)}: ${(error as Error).message}`);
+      }
+      if (picture!.width !== columns || picture!.height !== rows)
+        bad(`${sheet.path.slice(0, 128)} is not ${columns} x ${rows} pixels`);
+      data.set(picture!.data, i * rows * columns * 4);
+    });
+    voxels.set(f.imageId, { rows, columns, sheets: sheets.length, data });
+  }
+  const distances = new Map<string, (x: number, y: number, z: number) => number>();
+  return {
+    functions: part.functions,
+    voxels: (imageId) => voxels.get(imageId)!,
+    distance(objectId, signed) {
+      const key = `${signed} ${objectId}`;
+      let found = distances.get(key);
+      if (!found) {
+        const mesh = model.objects.get(objectId)?.mesh;
+        if (!mesh?.triangles.length) bad(`a distance needs a mesh object ${objectId.slice(0, 32)}`);
+        const bvh = MeshBVH.build({ positions: mesh!.vertices.result(), stride: 3, indices: mesh!.triangles.result() }),
+          at = [0, 0, 0];
+        found = (x, y, z) => {
+          at[0] = x;
+          at[1] = y;
+          at[2] = z;
+          const { distance } = bvh.closestPointToPoint(at)!;
+          return signed && pointInside(bvh, at) ? -distance : distance;
+        };
+        distances.set(key, found);
+      }
+      return found;
+    },
+  };
+}
+
+/**
+ * Parses a 3MF package with the volumetric and implicit extensions. Each built level set is evaluated inside its domain
+ * mesh (or that mesh's box) and its surface joins the result's triangles, in object coordinates placed by the build.
+ * The volumetric resources and the built objects that use them are returned beside them. Volume data (colour,
+ * composites, properties) is not sampled onto the triangles, and the `beamlattice` node is not evaluated.
  *
  * @throws LoaderError for a reference to a resource the package does not define, a graph that reads a later node, an
- * output of another type or itself, a sheet part that is missing, and what `parse3MF` throws.
+ * output of another type or itself, a sheet part that is missing, a level set over `maxTriangles` or with a node that
+ * is not evaluated, and what `parse3MF` throws.
  */
 export async function parse3MFVolumetric(
   input: BinaryInput,
-  options: ThreeMFOptions = {},
+  options: ThreeMFVolumetricOptions = {},
 ): Promise<ThreeMFVolumetricResult> {
+  const { levelSetResolution = 64 } = options;
+  if (!(Number.isInteger(levelSetResolution) && levelSetResolution >= 2 && levelSetResolution <= MAX_CELLS))
+    throw new LoaderError(F, 'range', `levelSetResolution must be an integer from 2 to ${MAX_CELLS}`);
   const parts = new Map<ThreeMFModel, Part>(),
     /** Each object the result lists, by its model part and id. */
     listed = new Map<ThreeMFModel, Map<string, ThreeMFVolumetricObject>>(),
@@ -353,6 +431,7 @@ export async function parse3MFVolumetric(
   };
   const read = await read3MF(input, options, {
     levelSets: true,
+    welded: true,
     field: { open, close },
     element(model, name, a) {
       const p = part(model);
@@ -452,6 +531,21 @@ export async function parse3MFVolumetric(
           };
           own.set(objectId, object);
           result.objects.push(object);
+        }
+        if (options.meshLevelSets === false) continue;
+        let scope: FieldScope | undefined;
+        for (const object of own.values()) {
+          const { levelSet, objectId } = object;
+          if (!levelSet) continue;
+          scope ??= await fieldScope(model, p);
+          const { mesh, cell, coarse } = await meshLevelSet(scope, levelSet, levelSet.domain.positions, {
+            resolution: levelSetResolution,
+            maxTriangles: limits(options, F).maxTriangles,
+            signal: options.signal,
+          });
+          levelSet.cellSize = cell;
+          levelSet.unresolved = coarse;
+          model.objects.get(objectId)!.mesh = mesh;
         }
       }
     },

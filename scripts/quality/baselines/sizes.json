@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21416775,
+  "total": 21421609,
   "history": [
     {
       "date": "2026-10-24",
@@ -15103,6 +15103,12 @@
       "commit": "building-joins",
       "reason": "Joined plans with unequal floors (KB-PROC-JOINLEVEL1): doorways, code flights of steps, sunk wells and walls at the join: procedural/building-plans 25,876 to 29,214 B gzip measured. generateBuildingPlan is synchronous and an unjoined floor is a defect, so a split entry would need a second import before a split-level house could be walked.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e",
+      "reason": "parse3MFVolumetric evaluates the extension functions (image stacks and every native node but beamlattice) and meshes level sets: loaders/threemf-volumetric 13,980 to 18,748 B gzip; marching cubes, the BVH and the PNG reader stay optional peers behind import(). A separate entry would move the evaluator behind a second import that this entry needs by default.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15752,7 +15758,7 @@
     "@margoengine/loaders/threemf-materials": 15403,
     "@margoengine/loaders/threemf-mesh": 4316,
     "@margoengine/loaders/threemf-secure": 8938,
-    "@margoengine/loaders/threemf-volumetric": 14477,
+    "@margoengine/loaders/threemf-volumetric": 19311,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,
     "@margoengine/loaders/vdb": 6406,

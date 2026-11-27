@@ -85,8 +85,15 @@ export interface ThreeMFVolumetricObject {
             positions: Float32Array;
             indices: Uint32Array;
         };
+        cellSize?: number;
+        unresolved?: boolean;
     };
     instances: Float64Array[];
+}
+
+export interface ThreeMFVolumetricOptions extends ThreeMFOptions {
+    meshLevelSets?: boolean;
+    levelSetResolution?: number;
 }
 
 export interface ThreeMFVolumetricResult extends ThreeMFResult {
@@ -96,7 +103,7 @@ export interface ThreeMFVolumetricResult extends ThreeMFResult {
     objects: ThreeMFVolumetricObject[];
 }
 
-export function parse3MFVolumetric(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFVolumetricResult>;
+export function parse3MFVolumetric(input: BinaryInput, options?: ThreeMFVolumetricOptions): Promise<ThreeMFVolumetricResult>;
 
 // Not exported from this entry, but used by the exports above:
 
