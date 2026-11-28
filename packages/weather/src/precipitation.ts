@@ -32,16 +32,19 @@
 // (the land slope of Dai, GRL 35, 2008), so the snow line follows the air's temperature with height.
 //
 // Where: a uniform rate and exponential rain cells that move, both given at cloud base; what reaches a point fell from the
-// cloud base upwind of it, carried by the wind at the middle of its fall for the time it took to fall, so a rain shaft
-// slants with the wind, is anchored in the world and drifts with its cell.
+// cloud base upwind of it. Each quadrature size has its own fall time and samples the wind along its midpoint ray.
+// Rain and snow share reference water-equivalent bins, and rimed particles each use their own size density.
 //
 // Accepted differences: no evaporation below cloud base, no aggregation or breakup on the way down, hail and graupel do not
-// melt, one fall speed (the median drop's) carries the whole shaft sideways, and a raindrop takes the air's temperature.
+// melt, bulk spectral moments use an exponential reconstructed at the transported rate, and drops take the air's temperature.
 
 import { airDensity, SEA_LEVEL_TEMPERATURE, standardAtmosphere } from '@margoengine/math/atmosphere';
 import type { FlowSample, HydrometeorSample, Precipitation, PrecipitationSample, Wind } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
-import { exp, ln, pow } from '@margoengine/math/pinned';
+import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
+import { precipitationError } from './precipitation-errors.js';
+
+export { rainSphere, type RainSphereOptions } from './rain-physics.js';
 
 /** Density of liquid water, kg/m^3; 1 mm of rain on a square metre is 1 kg. */
 export const WATER_DENSITY = 1000;
@@ -71,18 +74,24 @@ interface Air {
   surfaceTension: number;
 }
 
+const WATER_CRITICAL_TEMPERATURE = 647.096;
+
 function airOf(air: FallingAir = {}): Air {
   const { density = 1.225, temperature = SEA_LEVEL_TEMPERATURE, gravity = gravityMagnitude(DEFAULT_GRAVITY) } = air;
-  if (!(density > 0 && Number.isFinite(density)))
-    throw new RangeError(
-      `Air density is a finite number of kg/m^3 above 0 (got ${density}); pass one, or leave it unset for 1.225.`,
+  return checkedAir(density, temperature, gravity);
+}
+
+function checkedAir(density: number, temperature: number, gravity: number): Air {
+  if (!(density > 0 && density < WATER_DENSITY))
+    throw precipitationError(
+      `Air density is in (0, 1000) kg/m^3 (got ${density}); pass one, or leave it unset for 1.225.`,
     );
-  if (!(temperature > 0 && Number.isFinite(temperature)))
-    throw new RangeError(
-      `Air temperature is a finite number of kelvin above 0 (got ${temperature}); pass one, or leave it unset for 288.15.`,
+  if (!(temperature > 0 && temperature < WATER_CRITICAL_TEMPERATURE))
+    throw precipitationError(
+      `Air temperature is in (0, 647.096) K (got ${temperature}); pass one, or leave it unset for 288.15.`,
     );
   if (!(gravity > 0 && Number.isFinite(gravity)))
-    throw new RangeError(
+    throw precipitationError(
       `Gravity's magnitude is a finite number of m/s^2 above 0 (got ${gravity}); pass one, or leave it unset.`,
     );
   return {
@@ -101,7 +110,7 @@ export function airViscosity(temperature: number): number {
 
 /** Surface tension of water against air at `temperature` K, N/m (IAPWS 2014; 248 K to 647 K). */
 export function waterSurfaceTension(temperature: number): number {
-  const tau = 1 - temperature / 647.096;
+  const tau = 1 - temperature / WATER_CRITICAL_TEMPERATURE;
   return 0.2358 * pow(tau, 1.256) * (1 - 0.625 * tau);
 }
 
@@ -160,7 +169,7 @@ function largestDrop(air: Air): number {
 /** Terminal speed of a raindrop of equivalent diameter `diameter` m through `air`, m/s (Loftus and Wordsworth 2021). */
 export function rainFallSpeed(diameter: number, air?: FallingAir): number {
   if (!(diameter > 0 && Number.isFinite(diameter)))
-    throw new RangeError(`A drop's diameter is a finite number of metres above 0 (got ${diameter}); pass one.`);
+    throw precipitationError(`A drop's diameter is a finite number of metres above 0 (got ${diameter}); pass one.`);
   const state = airOf(air);
   return rainSpeed(diameter, state, capillaryLength(state));
 }
@@ -219,7 +228,7 @@ const SNOW_AREA_RATIO = 0.24;
 /** Terminal speed of a snow aggregate of maximum dimension `diameter` m through `air`, m/s (Heymsfield and Westbrook 2010). */
 export function snowFallSpeed(diameter: number, air?: FallingAir): number {
   if (!(diameter > 0 && Number.isFinite(diameter)))
-    throw new RangeError(`A snowflake's size is a finite number of metres above 0 (got ${diameter}); pass one.`);
+    throw precipitationError(`A snowflake's size is a finite number of metres above 0 (got ${diameter}); pass one.`);
   return snowSpeed(diameter, airOf(air));
 }
 
@@ -247,7 +256,7 @@ function rimedSpeed(d: number, density: number, air: Air): number {
 /** Terminal speed of graupel of diameter `diameter` m through `air`, m/s (Heymsfield and Wright 2014). */
 export function graupelFallSpeed(diameter: number, air?: FallingAir): number {
   if (!(diameter > 0 && Number.isFinite(diameter)))
-    throw new RangeError(
+    throw precipitationError(
       `A graupel pellet's diameter is a finite number of metres above 0 (got ${diameter}); pass one.`,
     );
   return rimedSpeed(diameter, graupelDensity(diameter), airOf(air));
@@ -256,9 +265,11 @@ export function graupelFallSpeed(diameter: number, air?: FallingAir): number {
 /** Terminal speed of a hailstone of diameter `diameter` m and bulk `density` kg/m^3 through `air`, m/s (Heymsfield and Wright 2014). */
 export function hailFallSpeed(diameter: number, air?: FallingAir, density = HAIL_DENSITY): number {
   if (!(diameter > 0 && Number.isFinite(diameter)))
-    throw new RangeError(`A hailstone's diameter is a finite number of metres above 0 (got ${diameter}); pass one.`);
+    throw precipitationError(
+      `A hailstone's diameter is a finite number of metres above 0 (got ${diameter}); pass one.`,
+    );
   if (!(density > 0 && density <= 917))
-    throw new RangeError(
+    throw precipitationError(
       `A hailstone's density lies in (0, 917] kg/m^3, solid ice at most (got ${density}); pass one in that range.`,
     );
   return rimedSpeed(diameter, density, airOf(air));
@@ -281,21 +292,31 @@ const GL_W = [
   0.2223810344533745, 0.1012285362903763,
 ];
 const PANELS = 8;
-const NODES = PANELS * GL_X.length;
+const TRANSPORT_PANELS = 3 * PANELS;
 /** How far past the smallest size the integrals run, in units of 1 / slope: exp(-48) is below 1e-20. */
 const SPAN = 48;
 
 /** Nodes and weights for integrals of f(D) exp(-slope D) dD over [d0, d1] (the weights hold the exponential). */
 class Quadrature {
-  readonly d = new Float64Array(NODES);
-  readonly w = new Float64Array(NODES);
+  readonly d: Float64Array;
+  readonly w: Float64Array;
+  readonly speeds: Float64Array;
+  readonly masses: Float64Array;
+
+  constructor(private readonly panels = PANELS) {
+    const count = panels * GL_X.length;
+    this.d = new Float64Array(count);
+    this.w = new Float64Array(count);
+    this.speeds = new Float64Array(count);
+    this.masses = new Float64Array(count);
+  }
 
   set(slope: number, d0: number, d1: number): void {
     const x0 = slope * d0,
       x1 = Math.min(slope * d1, x0 + SPAN),
-      h = (x1 - x0) / PANELS;
+      h = (x1 - x0) / this.panels;
     let k = 0;
-    for (let p = 0; p < PANELS; p++)
+    for (let p = 0; p < this.panels; p++)
       for (let j = 0; j < GL_X.length; j++, k++) {
         const x = x0 + h * (p + 0.5 * (GL_X[j]! + 1));
         this.d[k] = x / slope;
@@ -306,6 +327,29 @@ class Quadrature {
 
 function emptyHydrometeor(): HydrometeorSample {
   return { rate: 0, intercept: 0, slope: 0, fallSpeed: 0, impactRate: 0, energyFlux: 0, waterContent: 0 };
+}
+
+function emptyPrecipitation(): PrecipitationSample {
+  return {
+    rate: 0,
+    rain: emptyHydrometeor(),
+    snow: emptyHydrometeor(),
+    graupel: emptyHydrometeor(),
+    hail: emptyHydrometeor(),
+    velocity: [0, 0, 0],
+  };
+}
+
+function finiteMoments(s: HydrometeorSample): boolean {
+  return (
+    Number.isFinite(s.rate) &&
+    Number.isFinite(s.intercept) &&
+    Number.isFinite(s.slope) &&
+    Number.isFinite(s.fallSpeed) &&
+    Number.isFinite(s.impactRate) &&
+    Number.isFinite(s.energyFlux) &&
+    Number.isFinite(s.waterContent)
+  );
 }
 
 function clear(out: HydrometeorSample): HydrometeorSample {
@@ -329,7 +373,7 @@ export interface RainCell {
 export interface RainSource {
   /** The rate at (x, z) at time `t`, mm/h of liquid water, 0 or more. */
   rate(x: number, z: number, t: number): number;
-  /** Its strongest rate now, mm/h: the field carries the falling water sideways at that rain's median drop speed. */
+  /** Its strongest rate now, mm/h, used as a reference size distribution for transport. */
   readonly peak: number;
 }
 
@@ -360,6 +404,8 @@ export interface PrecipitationFieldOptions {
   altitude?: number;
   /** Sea-level temperature of the standard atmosphere, K (default 288.15); unused when `wind` gives temperatures. */
   seaLevelTemperature?: number;
+  /** World origin cell width in metres (default 4096). Match the PhysicsWorld cell size when using shifted wind. */
+  cellSize?: number;
   /** The wind that carries the falling water and whose air (density, temperature) it falls through (default still air). */
   wind?: Wind;
   /** The temperature at which half the precipitation falls as snow, K (default 274.15, 1.0 C). */
@@ -375,6 +421,14 @@ export interface PrecipitationFieldOptions {
 }
 
 const GRAUPEL_LARGEST = HAIL_SMALLEST;
+
+interface RainQuery {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly t: number;
+  readonly fall: number;
+}
 
 /** Precipitation anywhere: rain, snow, graupel and hail with their sizes, speeds and energy, on the world clock. */
 export class PrecipitationField implements Precipitation {
@@ -392,15 +446,20 @@ export class PrecipitationField implements Precipitation {
   private readonly graupel: Required<RimedIce>;
   private readonly hail: Required<RimedIce> & { density: number };
   private readonly gravity: number;
-  /** The rate whose median drop sets how far the wind carries the falling water. */
+  /** The rain rate setting the reference sizes used to transport a varying source. */
   private readonly driftRate: number;
+  private readonly advects: boolean;
+  private readonly cellSize: number;
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly q = new Quadrature();
-  private readonly speeds = new Float64Array(NODES);
-  private readonly masses = new Float64Array(NODES);
+  private readonly transport = new Quadrature(TRANSPORT_PANELS);
+  private readonly trial = emptyPrecipitation();
+  private sampling = false;
 
-  /** @throws RangeError for a rate, size, height, share or temperature that is out of range or not finite. */
+  /** @throws MargoError for a rate, size, height, share or temperature outside the supported range. */
   constructor(options: PrecipitationFieldOptions = {}) {
+    if (!options || typeof options !== 'object')
+      throw precipitationError('Precipitation options must be an object. Pass supported options or omit the argument.');
     const {
       cells = [],
       source,
@@ -409,6 +468,7 @@ export class PrecipitationField implements Precipitation {
       ground = 0,
       altitude = 0,
       seaLevelTemperature = SEA_LEVEL_TEMPERATURE,
+      cellSize = 4096,
       wind,
       snowTemperature = 274.15,
       snowSharpness = 0.7,
@@ -417,25 +477,43 @@ export class PrecipitationField implements Precipitation {
       gravity = gravityMagnitude(DEFAULT_GRAVITY),
     } = options;
     nonNegative(rate, 'rate', 'mm/h');
+    positive(cellSize, 'origin cell size', 'm');
+    if (
+      wind &&
+      !(
+        wind.medium === 'air' &&
+        wind.cell?.length === 3 &&
+        wind.cell.every(Number.isSafeInteger) &&
+        typeof wind.sample === 'function'
+      )
+    )
+      throw precipitationError(
+        'The precipitation wind is not an air field. Supply Wind with a valid origin cell and sample method.',
+      );
     positive(base, 'cloud base', 'm');
     for (const [name, v] of [
       ['ground', ground],
       ['altitude', altitude],
     ] as const)
       if (!Number.isFinite(v))
-        throw new RangeError(`A precipitation field's ${name} is a finite number of metres (got ${v}); pass one.`);
-    positive(seaLevelTemperature, 'sea-level temperature', 'K');
+        throw precipitationError(`A precipitation field's ${name} is a finite number of metres (got ${v}); pass one.`);
+    checkedAir(1.225, seaLevelTemperature, gravity);
     positive(snowTemperature, 'snow temperature', 'K');
     positive(snowSharpness, 'snow sharpness', 'per K');
-    positive(gravity, 'gravity', 'm/s^2');
-    this.cells = cells.map((c, i) => {
-      if (!(c.centre.length === 2 && c.centre.every(Number.isFinite)))
-        throw new RangeError(`Rain cell ${i}'s centre must be two finite numbers [x, z] (got ${c.centre}).`);
+    if (!Array.isArray(cells))
+      throw precipitationError('Rain cells must be an array. Pass a list of rain cell options.');
+    this.cells = cells.map((c: RainCell, i) => {
+      if (!(c?.centre?.length === 2 && c.centre.every(Number.isFinite)))
+        throw precipitationError(
+          `Rain cell ${i}'s centre must be two finite numbers [x, z] (got ${c?.centre}); pass [x, z] in metres.`,
+        );
       positive(c.radius, `rain cell ${i}'s radius`, 'm');
       nonNegative(c.rate, `rain cell ${i}'s rate`, 'mm/h');
       const velocity = c.velocity ?? [0, 0];
       if (!(velocity.length === 2 && velocity.every(Number.isFinite)))
-        throw new RangeError(`Rain cell ${i}'s velocity must be two finite numbers [x, z] m/s (got ${velocity}).`);
+        throw precipitationError(
+          `Rain cell ${i}'s velocity must be two finite numbers [x, z] m/s (got ${velocity}); pass [vx, vz] in m/s.`,
+        );
       return {
         centre: [c.centre[0], c.centre[1]],
         radius: c.radius,
@@ -450,20 +528,21 @@ export class PrecipitationField implements Precipitation {
       ['hail', h],
     ] as const) {
       if (!(v.fraction >= 0 && v.fraction <= 1))
-        throw new RangeError(`The ${name} fraction lies in [0, 1] (got ${v.fraction}); pass one in that range.`);
+        throw precipitationError(`The ${name} fraction lies in [0, 1] (got ${v.fraction}); pass one in that range.`);
       positive(v.scale, `${name} scale`, 'm');
     }
     if (g.fraction + h.fraction > 1)
-      throw new RangeError(
+      throw precipitationError(
         `Graupel and hail together carry at most all the precipitation (got ${g.fraction + h.fraction}); reduce their fractions.`,
       );
     if (!(h.density > 0 && h.density <= 917))
-      throw new RangeError(
+      throw precipitationError(
         `A hailstone's density lies in (0, 917] kg/m^3, solid ice at most (got ${h.density}); pass one in that range.`,
       );
-    if (source !== undefined && !(typeof source.rate === 'function' && 'peak' in source))
-      throw new TypeError('A rain source has rate(x, z, t) and peak; pass one such as CloudSolver.rainSource().');
+    if (source !== undefined && !(source && typeof source.rate === 'function' && 'peak' in source))
+      throw precipitationError('A rain source has rate(x, z, t) and peak; pass one such as CloudSolver.rainSource().');
     this.source = source;
+    this.cellSize = cellSize;
     this.rate = rate;
     this.base = base;
     this.ground = ground;
@@ -475,32 +554,77 @@ export class PrecipitationField implements Precipitation {
     this.graupel = g;
     this.hail = h;
     this.gravity = gravity;
-    this.driftRate = Math.max(rate, ...this.cells.map((c) => c.rate));
+    this.driftRate = this.cells.reduce((largest, cell) => Math.max(largest, cell.rate), rate);
+    this.advects = !!source || this.cells.some((c) => !!wind || c.velocity[0] !== 0 || c.velocity[1] !== 0);
   }
 
   /** The rate at cloud base above (x, z) at time `t`, mm/h. */
   sourceRate(x: number, z: number, t: number): number {
+    if (!(Number.isFinite(x) && Number.isFinite(z) && Number.isFinite(t)))
+      throw precipitationError('Rain source coordinates and time must be finite. Pass metres and seconds in range.');
     let rate = this.rate;
     for (const c of this.cells) {
       const dx = x - (c.centre[0] + c.velocity[0] * t),
         dz = z - (c.centre[1] + c.velocity[1] * t);
-      rate += c.rate * exp(-Math.sqrt(dx * dx + dz * dz) / c.radius);
+      rate += c.rate * exp(-hypot(dx, dz) / c.radius);
     }
     if (this.source) {
-      const extra = this.source.rate(x, z, t);
+      let extra: number;
+      try {
+        extra = this.source.rate(x, z, t);
+      } catch (cause) {
+        throw precipitationError(
+          'The rain source did not return its rate. Fix its callback to return a finite mm/h value.',
+          'failed',
+          cause,
+        );
+      }
       if (!(extra >= 0 && Number.isFinite(extra)))
-        throw new RangeError(
+        throw precipitationError(
           `A rain source gave ${extra} mm/h at (${x}, ${z}); its rate must be a finite number, 0 or more.`,
         );
       rate += extra;
     }
+    if (!Number.isFinite(rate))
+      throw precipitationError('Rain rates overflowed. Reduce the source and overlapping cell rates.');
     return rate;
   }
 
   /** The air at (x, y, z) at time t: the wind's, or the standard atmosphere's with no wind. */
   private airAt(x: number, y: number, z: number, t: number): FlowSample {
     const flow = this.flow;
-    if (this.wind) return this.wind.sample(x, y, z, t, flow);
+    if (this.wind) {
+      let sample: FlowSample;
+      const cell = this.wind.cell;
+      try {
+        sample = this.wind.sample(
+          x + (this.cell[0] - cell[0]) * this.cellSize,
+          y + (this.cell[1] - cell[1]) * this.cellSize,
+          z + (this.cell[2] - cell[2]) * this.cellSize,
+          t,
+          flow,
+        );
+      } catch (cause) {
+        throw precipitationError(
+          'The precipitation wind sample failed. Supply a wind that covers the requested position and time.',
+          'failed',
+          cause,
+        );
+      }
+      const velocity = sample?.velocity;
+      if (
+        !(
+          velocity?.length === 3 &&
+          Number.isFinite(velocity[0]) &&
+          Number.isFinite(velocity[1]) &&
+          Number.isFinite(velocity[2])
+        )
+      )
+        throw precipitationError(
+          'The precipitation wind returned an invalid velocity. Return three finite velocity components in m/s.',
+        );
+      return sample;
+    }
     const [temperature, pressure] = standardAtmosphere(this.altitude + y - this.ground, this.seaLevel);
     flow.velocity[0] = flow.velocity[1] = flow.velocity[2] = 0;
     flow.temperature = temperature;
@@ -510,66 +634,147 @@ export class PrecipitationField implements Precipitation {
 
   /** The precipitation at (x, y, z) at time `t` (the {@link Precipitation} contract). */
   sample(x: number, y: number, z: number, t: number, out?: PrecipitationSample): PrecipitationSample {
-    const sample = out ?? {
-        rate: 0,
-        rain: emptyHydrometeor(),
-        snow: emptyHydrometeor(),
-        graupel: emptyHydrometeor(),
-        hail: emptyHydrometeor(),
-        velocity: [0, 0, 0],
-      },
-      fall = Math.max(0, this.base - (y - this.ground));
-    // How far the wind carries what falls here: the median drop of the strongest rain, at the middle of its fall.
-    let sx = x,
-      sz = z,
-      st = t;
-    const driftRate = this.source ? Math.max(this.driftRate, this.source.peak) : this.driftRate;
-    if (fall > 0 && driftRate > 0) {
-      const mid = this.airAt(x, y + fall / 2, z, t),
-        air = this.air(mid),
-        snowShare = snowFraction(mid.temperature, this.snowTemperature, this.snowSharpness),
-        median = 3.67 / (4100 * pow(driftRate, -0.21)),
-        speed =
-          (1 - snowShare) * rainSpeed(median, air, capillaryLength(air)) +
-          snowShare * snowSpeed(this.snowSize(median), air),
-        time = fall / speed;
-      // The wind at the middle of the fall, at the middle of its time.
-      const drift = this.wind ? this.wind.sample(x, y + fall / 2, z, t - time / 2, this.flow).velocity : [0, 0, 0];
-      sx = x - drift[0]! * time;
-      sz = z - drift[2]! * time;
-      st = t - time;
+    if (!(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) && Number.isFinite(t)))
+      throw precipitationError('Precipitation coordinates and time must be finite. Pass metres and seconds in range.');
+    if (this.sampling)
+      throw precipitationError(
+        'A precipitation callback sampled the same field. Read its source or a separate field in the callback.',
+      );
+    this.sampling = true;
+    try {
+      const trial = this.trial;
+      this.sampleInto(x, y, z, t, trial);
+      if (
+        !(
+          finiteMoments(trial.rain) &&
+          finiteMoments(trial.snow) &&
+          finiteMoments(trial.graupel) &&
+          finiteMoments(trial.hail)
+        )
+      )
+        throw precipitationError(
+          'The precipitation moments exceeded the finite range. Use physical rates, sizes and air properties.',
+        );
+      if (!(Number.isFinite(trial.rate) && trial.velocity.every(Number.isFinite)))
+        throw precipitationError(
+          'The total precipitation or velocity exceeded the finite range. Reduce rates or wind speed.',
+        );
+      const accepted = out ?? emptyPrecipitation();
+      accepted.rate = trial.rate;
+      Object.assign(accepted.rain, trial.rain);
+      Object.assign(accepted.snow, trial.snow);
+      Object.assign(accepted.graupel, trial.graupel);
+      Object.assign(accepted.hail, trial.hail);
+      accepted.velocity[0] = trial.velocity[0];
+      accepted.velocity[1] = trial.velocity[1];
+      accepted.velocity[2] = trial.velocity[2];
+      return accepted;
+    } finally {
+      this.sampling = false;
     }
-    const total = this.sourceRate(sx, sz, st),
-      local = this.airAt(x, y, z, t),
-      air = this.air(local),
-      snowShare = snowFraction(local.temperature, this.snowTemperature, this.snowSharpness),
-      hailRate = total * this.hail.fraction,
-      graupelRate = total * this.graupel.fraction,
-      liquid = total - hailRate - graupelRate;
+  }
+
+  private sampleInto(x: number, y: number, z: number, t: number, sample: PrecipitationSample): void {
+    const fall = Math.max(0, this.base - (y - this.ground));
+    const local = this.airAt(x, y, z, t);
+    const [u, v, w] = local.velocity;
+    const air = this.air(local);
+    const snowShare = snowFraction(air.temperature, this.snowTemperature, this.snowSharpness);
+    const rainShare = 1 - this.hail.fraction - this.graupel.fraction;
+    const graupelSlope = 1 / this.graupel.scale;
+    const hailSlope = 1 / this.hail.scale;
+    const cloudRate = this.sourceRate(x, z, t);
+    let rainRate = cloudRate * rainShare * (1 - snowShare);
+    let snowRate = cloudRate * rainShare * snowShare;
+    let graupelRate = cloudRate * this.graupel.fraction;
+    let hailRate = cloudRate * this.hail.fraction;
+    let total = cloudRate;
+
+    if (fall > 0 && this.advects) {
+      const sourcePeak = this.source?.peak ?? 0;
+      nonNegative(sourcePeak, 'rain source peak', 'mm/h');
+      const referenceRate = Math.max(this.driftRate, sourcePeak, cloudRate);
+      if (referenceRate > 0) {
+        const query = { x, y: y + fall / 2, z, t, fall };
+        const middle = this.airAt(query.x, query.y, query.z, query.t);
+        const midAir = this.air(middle);
+        const [midX, midY, midZ] = middle.velocity;
+        const layerWind = [midX, midY, midZ] as const;
+        if (rainShare > 0) this.rainNodes(referenceRate, midAir, this.transport);
+        if (rainShare * (1 - snowShare) > 0)
+          rainRate = rainShare * (1 - snowShare) * this.transportRate(query, layerWind);
+        if (rainShare * snowShare > 0) {
+          // Equivalent water mass bins preserve the same reference flux fractions through the phase split.
+          snowRate = rainShare * snowShare * this.transportRate(query, layerWind, midAir);
+        }
+        if (this.graupel.fraction > 0) {
+          this.rimedNodes(graupelSlope, 0, GRAUPEL_LARGEST, 0, midAir, this.transport);
+          graupelRate = this.graupel.fraction * this.transportRate(query, layerWind);
+        }
+        if (this.hail.fraction > 0) {
+          this.rimedNodes(hailSlope, HAIL_SMALLEST, HAIL_LARGEST, this.hail.density, midAir, this.transport);
+          hailRate = this.hail.fraction * this.transportRate(query, layerWind);
+        }
+        total = rainRate + snowRate + graupelRate + hailRate;
+      }
+    }
+
     sample.rate = total;
-    this.rain(liquid * (1 - snowShare), air, sample.rain);
-    this.snow(liquid * snowShare, air, sample.snow);
-    this.rimed(graupelRate, 1 / this.graupel.scale, 0, GRAUPEL_LARGEST, 0, air, sample.graupel);
-    this.rimed(hailRate, 1 / this.hail.scale, HAIL_SMALLEST, HAIL_LARGEST, this.hail.density, air, sample.hail);
+    this.rain(rainRate, air, sample.rain);
+    this.snow(snowRate, air, sample.snow);
+    this.rimed(graupelRate, graupelSlope, 0, GRAUPEL_LARGEST, 0, air, sample.graupel);
+    this.rimed(hailRate, hailSlope, HAIL_SMALLEST, HAIL_LARGEST, this.hail.density, air, sample.hail);
     const flux =
       sample.rain.rate * sample.rain.fallSpeed +
       sample.snow.rate * sample.snow.fallSpeed +
       sample.graupel.rate * sample.graupel.fallSpeed +
       sample.hail.rate * sample.hail.fallSpeed;
-    sample.velocity[0] = local.velocity[0];
-    sample.velocity[1] = local.velocity[1] - (total > 0 ? flux / total : 0);
-    sample.velocity[2] = local.velocity[2];
-    return sample;
+    sample.velocity[0] = u;
+    sample.velocity[1] = v - (total > 0 ? flux / total : 0);
+    sample.velocity[2] = w;
+  }
+
+  // A backwards midpoint characteristic uses each bin's relative terminal speed and its own elapsed time.
+  private transportRate(
+    { x, y, z, t, fall }: RainQuery,
+    layerWind: readonly [number, number, number],
+    snowAir?: Air,
+  ): number {
+    const [u, v, w] = layerWind;
+    const { d, w: weights, speeds, masses } = this.transport;
+    let mass = 0;
+    let carried = 0;
+    let firstRate: number | undefined;
+    let uniform = true;
+    for (let i = 0; i < d.length; i++) {
+      const weight = weights[i]! * masses[i]! * speeds[i]!;
+      if (weight === 0) continue;
+      mass += weight;
+      const speed = snowAir ? snowSpeed(this.snowSize(d[i]!), snowAir) : speeds[i]!;
+      let rate = 0;
+      if (speed > v) {
+        const time = fall / (speed - v);
+        const midpoint = this.wind && this.airAt(x - 0.5 * time * u, y, z - 0.5 * time * w, t - time / 2);
+        const drift = midpoint ? midpoint.velocity : layerWind;
+        // A bin with zero or upward net velocity cannot reach this level along a descending midpoint ray.
+        if (speed > drift[1]!) {
+          const travel = fall / (speed - drift[1]!);
+          rate = this.sourceRate(x - travel * drift[0]!, z - travel * drift[2]!, t - travel);
+        }
+      }
+      firstRate ??= rate;
+      uniform &&= rate === firstRate;
+      carried += weight * rate;
+    }
+    if (!(mass > 0 && Number.isFinite(mass) && Number.isFinite(carried)))
+      throw precipitationError(
+        'Rain transport weights exceeded their finite range. Use physical rates, sizes and air properties.',
+      );
+    return uniform ? firstRate! : carried / mass;
   }
 
   private air(flow: FlowSample): Air {
-    return {
-      density: flow.density,
-      temperature: flow.temperature,
-      gravity: this.gravity,
-      viscosity: airViscosity(flow.temperature),
-      surfaceTension: waterSurfaceTension(flow.temperature),
-    };
+    return checkedAir(flow.density, flow.temperature, this.gravity);
   }
 
   /** The maximum dimension of the snowflake that melts into a drop of diameter `d`. */
@@ -579,14 +784,14 @@ export class PrecipitationField implements Precipitation {
 
   /** Fill `out` from the nodes, speeds and masses for a rate of `rate` mm/h; the intercept makes the mass flux the rate. */
   private fill(rate: number, slope: number, out: HydrometeorSample): HydrometeorSample {
-    const { w } = this.q;
+    const { w, speeds, masses } = this.q;
     let massFlux = 0,
       numberFlux = 0,
       energy = 0,
       content = 0;
-    for (let i = 0; i < NODES; i++) {
-      const v = this.speeds[i]!,
-        m = this.masses[i]!,
+    for (let i = 0; i < w.length; i++) {
+      const v = speeds[i]!,
+        m = masses[i]!,
         wi = w[i]!;
       massFlux += wi * m * v;
       numberFlux += wi * v;
@@ -604,14 +809,14 @@ export class PrecipitationField implements Precipitation {
     return out;
   }
 
-  private rainNodes(rate: number, air: Air): number {
+  private rainNodes(rate: number, air: Air, rule = this.q): number {
     const slope = 4100 * pow(rate, -0.21),
       lc = capillaryLength(air);
-    this.q.set(slope, 0, largestDrop(air));
-    for (let i = 0; i < NODES; i++) {
-      const d = this.q.d[i]!;
-      this.speeds[i] = rainSpeed(d, air, lc);
-      this.masses[i] = (WATER_DENSITY * PI * d * d * d) / 6;
+    rule.set(slope, 0, largestDrop(air));
+    for (let i = 0; i < rule.d.length; i++) {
+      const d = rule.d[i]!;
+      rule.speeds[i] = rainSpeed(d, air, lc);
+      rule.masses[i] = (WATER_DENSITY * PI * d * d * d) / 6;
     }
     return slope;
   }
@@ -635,9 +840,10 @@ export class PrecipitationField implements Precipitation {
       this.snowNodes(exp(mid), largest, air);
       let mass = 0,
         number = 0;
-      for (let k = 0; k < NODES; k++) {
-        mass += this.q.w[k]! * this.masses[k]! * this.speeds[k]!;
-        number += this.q.w[k]! * this.speeds[k]!;
+      const { w, masses, speeds } = this.q;
+      for (let k = 0; k < w.length; k++) {
+        mass += w[k]! * masses[k]! * speeds[k]!;
+        number += w[k]! * speeds[k]!;
       }
       if (mass / number > meanMass) lo = mid;
       else hi = mid;
@@ -649,10 +855,11 @@ export class PrecipitationField implements Precipitation {
 
   private snowNodes(slope: number, largest: number, air: Air): void {
     this.q.set(slope, 0, largest);
-    for (let i = 0; i < NODES; i++) {
-      const d = this.q.d[i]!;
-      this.speeds[i] = snowSpeed(d, air);
-      this.masses[i] = snowMass(d);
+    const { d, speeds, masses } = this.q;
+    for (let i = 0; i < d.length; i++) {
+      const diameter = d[i]!;
+      speeds[i] = snowSpeed(diameter, air);
+      masses[i] = snowMass(diameter);
     }
   }
 
@@ -667,23 +874,27 @@ export class PrecipitationField implements Precipitation {
     out: HydrometeorSample,
   ): HydrometeorSample {
     if (!(rate > 0)) return clear(out);
-    this.q.set(slope, d0, d1);
-    for (let i = 0; i < NODES; i++) {
-      const d = this.q.d[i]!,
-        rho = density > 0 ? density : graupelDensity(d);
-      this.speeds[i] = rimedSpeed(d, rho, air);
-      this.masses[i] = (rho * PI * d * d * d) / 6;
-    }
+    this.rimedNodes(slope, d0, d1, density, air);
     return this.fill(rate, slope, out);
+  }
+
+  private rimedNodes(slope: number, d0: number, d1: number, density: number, air: Air, rule = this.q): void {
+    rule.set(slope, d0, d1);
+    for (let i = 0; i < rule.d.length; i++) {
+      const d = rule.d[i]!,
+        rho = density > 0 ? density : graupelDensity(d);
+      rule.speeds[i] = rimedSpeed(d, rho, air);
+      rule.masses[i] = (rho * PI * d * d * d) / 6;
+    }
   }
 }
 
 function positive(v: number, name: string, unit: string): void {
   if (!(v > 0 && Number.isFinite(v)))
-    throw new RangeError(`A ${name} is a finite number of ${unit} above 0 (got ${v}); pass one.`);
+    throw precipitationError(`A ${name} is a finite number of ${unit} above 0 (got ${v}); pass one.`);
 }
 
 function nonNegative(v: number, name: string, unit: string): void {
   if (!(v >= 0 && Number.isFinite(v)))
-    throw new RangeError(`A ${name} is a finite number of ${unit}, 0 or more (got ${v}); pass one.`);
+    throw precipitationError(`A ${name} is a finite number of ${unit}, 0 or more (got ${v}); pass one.`);
 }

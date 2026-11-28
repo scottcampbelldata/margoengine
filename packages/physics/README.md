@@ -6767,7 +6767,7 @@ scene's fixed, nonsensor colliders.
 
 Pass a `Wind` and use `cellSize: world.cellSize` with a custom world cell size. With no wind source,
 the solver uses motionless standard sea-level air. A wind with zero density gives a vacuum.
-`FallingSolver.load({ id, rate, signal })` loads the Wasm on demand. Rate 2 (240 Hz) is the default.
+`FallingSolver.load({ id, rate, signal, threads })` loads Wasm on demand. Rate 2 (240 Hz) and one participant are the defaults. Set `threads` to 2 or 4 in Node or an isolated browser worker with shared world memory. Each worker owns contiguous body rows. The solver joins the rows before running contacts in body order. `readNativeWork()` reports body rows, RK4 evaluations and SIMD state pairs for the last accepted step. Dispose the solver to release its worker pool.
 `falling.poseField` publishes layout-1 f64 rows in input order, in the solver's origin cell.
 Each row holds position xyz, quaternion xyzw, linear velocity xyz and angular velocity xyz.
 `falling.pose(index)` copies a row. `writeSpheres` writes the positions, radii and velocities of rounded

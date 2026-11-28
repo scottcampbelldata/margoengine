@@ -180,8 +180,8 @@
 <tr><th scope="row"><code>room-sound-kernel-shared.wasm</code></th><td>Rust SIMD room acoustic pressure waves, shared world memory</td><td class="num">2,717</td><td class="num">1,393</td><td class="num">1,242</td><td>RoomSoundSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>modal-sound-kernel.wasm</code></th><td>Rust SIMD modal audio synthesis</td><td class="num">1,567</td><td class="num">919</td><td class="num">816</td><td>ModalSoundSolver.load() from the optional /modal-sound entry</td></tr>
 <tr><th scope="row"><code>modal-sound-kernel-shared.wasm</code></th><td>Rust SIMD modal audio synthesis, shared world memory</td><td class="num">1,567</td><td class="num">919</td><td class="num">816</td><td>ModalSoundSolver.load() from the optional /modal-sound entry with shared memory support</td></tr>
-<tr><th scope="row"><code>falling-kernel.wasm</code></th><td>Rust SIMD plate and grain dynamics</td><td class="num">10,109</td><td class="num">4,273</td><td class="num">3,824</td><td>FallingSolver.load() from the optional /falling entry</td></tr>
-<tr><th scope="row"><code>falling-kernel-shared.wasm</code></th><td>Rust SIMD plate and grain dynamics, shared world memory</td><td class="num">10,109</td><td class="num">4,273</td><td class="num">3,824</td><td>FallingSolver.load() from the optional /falling entry with shared memory support</td></tr>
+<tr><th scope="row"><code>falling-kernel.wasm</code></th><td>Rust SIMD plate and grain dynamics</td><td class="num">10,501</td><td class="num">4,498</td><td class="num">4,044</td><td>FallingSolver.load() from the optional /falling entry</td></tr>
+<tr><th scope="row"><code>falling-kernel-shared.wasm</code></th><td>Rust SIMD plate and grain dynamics, shared world memory</td><td class="num">10,501</td><td class="num">4,498</td><td class="num">4,044</td><td>FallingSolver.load() from the optional /falling entry with shared memory support</td></tr>
 <tr><th scope="row"><code>sediment-kernel.wasm</code></th><td>Rust SIMD sediment transport</td><td class="num">19,505</td><td class="num">7,606</td><td class="num">6,633</td><td>SedimentTransport.load(), only from the optional /sediment entry</td></tr>
 <tr><th scope="row"><code>sediment-kernel-shared.wasm</code></th><td>Rust SIMD sediment transport, shared world memory</td><td class="num">19,596</td><td class="num">7,667</td><td class="num">6,712</td><td>SedimentTransport.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>boundary-layer-kernel.wasm</code></th><td>Rust SIMD boundary-layer sampling</td><td class="num">11,852</td><td class="num">4,483</td><td class="num">3,982</td><td>BoundaryLayerSolver.load(), only from the optional /boundary-layer entry</td></tr>
@@ -4051,7 +4051,7 @@
 <tr><td><code>./eruption</code></td><td class="num">24,673</td><td class="num">10,138</td></tr>
 <tr><td><code>./turbulence</code></td><td class="num">13,442</td><td class="num">5,597</td></tr>
 <tr><td><code>./boundary-layer</code></td><td class="num">15,471</td><td class="num">6,278</td></tr>
-<tr><td><code>./precipitation</code></td><td class="num">10,030</td><td class="num">3,852</td></tr>
+<tr><td><code>./precipitation</code></td><td class="num">15,029</td><td class="num">5,702</td></tr>
 <tr><td><code>./surface-energy</code></td><td class="num">18,727</td><td class="num">7,459</td></tr>
 <tr><td><code>./lava</code></td><td class="num">38,994</td><td class="num">15,364</td></tr>
 <tr><td><code>./lava-settings</code></td><td class="num">8,873</td><td class="num">3,790</td></tr>
@@ -5013,7 +5013,7 @@
 <tr><td><code>./room-sound</code></td><td class="num">23,677</td><td class="num">9,137</td></tr>
 <tr><td><code>./modal-sound</code></td><td class="num">23,950</td><td class="num">9,212</td></tr>
 <tr><td><code>./outdoor-sound</code></td><td class="num">22,064</td><td class="num">8,601</td></tr>
-<tr><td><code>./falling</code></td><td class="num">13,550</td><td class="num">5,907</td></tr>
+<tr><td><code>./falling</code></td><td class="num">19,562</td><td class="num">8,015</td></tr>
 <tr><td><code>./flight</code></td><td class="num">33,768</td><td class="num">12,799</td></tr>
 <tr><td><code>./waves</code></td><td class="num">32,458</td><td class="num">12,962</td></tr>
 <tr><td><code>./bubbles</code></td><td class="num">6,520</td><td class="num">3,033</td></tr>

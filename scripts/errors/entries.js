@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'precipitation',
+    title: '@margoengine/weather/precipitation rates, winds and rain trajectories',
+    kind: 'family',
+    messages: [],
+    cause: 'A precipitation setting, rain source, wind sample or falling drop exceeded its supported finite SI range.',
+    fix: 'Pass nonnegative finite rain rates in mm/h, valid sizes in metres and an air field with positive density and temperature and three finite velocity components. Use the world cell width with shifted wind and fix callbacks to return valid values at the requested time. Read a separate field inside a source or wind callback.',
+  },
+  {
     id: 'storm-surge',
     title: '@margoengine/physics/surge surge and tidal potential',
     kind: 'family',

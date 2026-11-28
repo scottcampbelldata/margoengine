@@ -41,6 +41,7 @@ export interface FallingLoadOptions {
     readonly id?: string;
     readonly rate?: RateLevel;
     readonly signal?: AbortSignal;
+    readonly threads?: number;
 }
 
 export interface FallingParams {
@@ -94,9 +95,11 @@ export class FallingSolver implements Solver<FallingParams> {
     readonly poseField: FieldDescriptor;
     private constructor();
     static load(options?: FallingLoadOptions): Promise<FallingSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: FallingParams): void;
     step(context: StepContext, dt: number): void;
+    readNativeWork(): FallingWorkCounts | undefined;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -111,6 +114,17 @@ export interface FallingSphere extends FallingInitialState {
     readonly diameter: number;
     readonly drag?: number | ((air: FallingDragSample) => number);
     readonly restitution?: number;
+}
+
+export interface FallingWorkCounts extends FallingWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly FallingWorkerWork[];
+}
+
+export interface FallingWorkerWork {
+    readonly bodies: number;
+    readonly rk4Evaluations: number;
+    readonly simdStatePairs: number;
 }
 
 export function fallingBoundaryFromPhysics(physics: Physics, cell?: Vector): FallingBoundary;

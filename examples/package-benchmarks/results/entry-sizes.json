@@ -15658,8 +15658,8 @@
         "gzip": 8601
       },
       "./falling": {
-        "raw": 13550,
-        "gzip": 5907
+        "raw": 19562,
+        "gzip": 8015
       },
       "./flight": {
         "raw": 33768,
@@ -19050,8 +19050,8 @@
         "gzip": 6278
       },
       "./precipitation": {
-        "raw": 10030,
-        "gzip": 3852
+        "raw": 15029,
+        "gzip": 5702
       },
       "./surface-energy": {
         "raw": 18727,
@@ -19685,14 +19685,14 @@
       "brotli": 816
     },
     "packages/physics/dist/falling-kernel.wasm": {
-      "raw": 10109,
-      "gzip": 4273,
-      "brotli": 3824
+      "raw": 10501,
+      "gzip": 4498,
+      "brotli": 4044
     },
     "packages/physics/dist/falling-kernel-shared.wasm": {
-      "raw": 10109,
-      "gzip": 4273,
-      "brotli": 3824
+      "raw": 10501,
+      "gzip": 4498,
+      "brotli": 4044
     },
     "packages/physics/dist/sediment-kernel.wasm": {
       "raw": 19505,

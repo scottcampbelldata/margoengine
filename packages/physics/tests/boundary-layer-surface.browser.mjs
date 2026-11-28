@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { airDensity, standardAtmosphere } from '@margoengine/math/atmosphere';
+import { largestRaindrop, rainFallSpeed, snowFraction } from '@margoengine/weather/precipitation';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
@@ -35,6 +37,38 @@ function changed(before, after, pixels = [0, 0, before.width, before.height]) {
 function nearPixels(before, after, pixel) {
   const [x, y] = pixel.map(Math.round);
   return changed(before, after, [x - 5, y - 5, x + 6, y + 6]);
+}
+
+function exactAir(y) {
+  const [temperature, pressure] = standardAtmosphere(y);
+  return { density: airDensity(temperature, pressure), temperature };
+}
+
+// At z=0 the steady neutral wind retards each size by (base−y)/v(D) seconds. Its moving exponential source is centred
+// at the resulting downwind offset. Integrate that source against the Marshall–Palmer liquid volume flux, using a
+// uniform midpoint rule independent of Weather's Gauss–Legendre bins. This exercises transport with a shared drag law.
+function referenceRow(setup, y, time, xs, speedAt, bins) {
+  const sourceX = setup.cloudX + setup.cellSpeed * time;
+  const phase = 1 - snowFraction(exactAir(y).temperature);
+  const rainAt = (x, centre) => phase * setup.rate * Math.exp(-Math.abs(x - centre) / setup.radius);
+  const fall = setup.base - y;
+  if (fall === 0) return xs.map((x) => rainAt(x, sourceX));
+  const midpoint = y + fall / 2;
+  const air = exactAir(midpoint);
+  const relativeWind = speedAt(midpoint) - setup.cellSpeed;
+  const slope = 4100 * setup.rate ** -0.21;
+  const step = largestRaindrop(air) / bins;
+  const values = new Float64Array(xs.length);
+  let massFlux = 0;
+  for (let i = 0; i < bins; i++) {
+    const d = (i + 0.5) * step;
+    const terminal = rainFallSpeed(d, air);
+    const weight = Math.exp(-slope * d) * d ** 3 * terminal;
+    const centre = sourceX + (relativeWind * fall) / terminal;
+    massFlux += weight;
+    for (const [j, x] of xs.entries()) values[j] += weight * rainAt(x, centre);
+  }
+  return Array.from(values, (value) => value / massFlux);
 }
 
 try {
@@ -176,13 +210,13 @@ try {
       const points = [];
       const colors = [];
       const peaks = [];
-      const clear = [];
+      const rainRates = [];
       for (const [j, y] of rows.entries()) {
         const values = [];
         for (let i = 0; i < columns; i++) {
           const x = firstX + i * spacing;
-          const { rate: localRate, velocity } = rain.sample(x, y, 0, time, rainSample);
-          values.push(localRate);
+          const { rate: localRate, velocity, rain: liquid } = rain.sample(x, y, 0, time, rainSample);
+          values.push(liquid.rate);
           if (localRate < 0.11 * rate) continue;
           const duration = 0.27;
           points.push(x, y, 0, x + duration * velocity[0], y + duration * velocity[1], duration * velocity[2]);
@@ -193,12 +227,10 @@ try {
         const peak = Math.max(...values);
         const i = values.indexOf(peak);
         if (i === 0 || i === columns - 1) throw new Error('Keep the whole simulated peak in the fixed transect.');
-        // On either side of a centred exponential, ln(rate) has known slope of magnitude 1/radius.
-        const offset = (radius / 2) * Math.log(values[i + 1] / values[i - 1]);
-        peaks.push(firstX + i * spacing + offset);
-        clear.push(Math.max(values[0], values[columns - 1]));
+        peaks.push(firstX + i * spacing);
+        rainRates.push(values);
       }
-      return { points, colors, peaks, clear };
+      return { points, colors, peaks, rainRates };
     }
 
     function pixel(x, y) {
@@ -220,7 +252,7 @@ try {
         world.advance(physicalFrame);
         const time = wind.elapsedSeconds;
         const accepted = readField(physicalFrame);
-        const { points, colors, peaks, clear } = transect(time);
+        const { points, colors, peaks, rainRates } = transect(time);
         const snapshot = world.takeSnapshot();
         if (action === 'save') checkpoint = snapshot;
         shaft.setPositions(points, colors);
@@ -231,7 +263,7 @@ try {
           hash: snapshot.hash,
           accepted,
           peaks,
-          clear,
+          rainRates,
           pixels: peaks.map((x, i) => pixel(x, levels[i] - 0.8)),
           lines: { ...lines.stats },
           meshDraws: engine.stats.drawCalls,
@@ -250,7 +282,7 @@ try {
         return { validation, gpuErrors };
       },
     };
-    return { start, end, base, cloudX, cellSpeed, rate, levels, profile, grid };
+    return { start, end, base, cloudX, cellSpeed, radius, rate, spacing, firstX, levels, profile, grid };
   });
 
   const render = (frame, action) => page.evaluate(([f, a]) => window.boundaryLayerShot.at(f, a), [frame, action]);
@@ -284,28 +316,42 @@ try {
   assert.notEqual(initial.hash, end.hash);
   assert.equal(initial.peaks.length, setup.levels.length);
 
-  // A moving exponential source gives x_peak = x_cloud(t) + (U_mid - U_cloud) * fall/c.
-  // The authored rate's Marshall-Palmer mass-median diameter lies between 1.8 and 2.2 mm.
-  // Gunn and Kinzer (1949) measured 6.09 and 6.90 m/s there, as reprinted by Christensen and Frost (1979), table 3-1.
-  // Allow 0.7% laboratory uncertainty and 1% for the square-root density correction from 20 C to the sea-level profile.
-  // https://ntrs.nasa.gov/api/citations/19790017494/downloads/19790017494.pdf
-  const medianMm = (3.67 * Math.pow(setup.rate, 0.21)) / 4.1;
-  assert(medianMm > 1.8 && medianMm < 2.2);
-  const terminalRange = [6.09 * (1 - 0.017), 6.9 * (1 + 0.017)];
   const sourceX = setup.cloudX + setup.cellSpeed * end.time;
-  const inferred = [];
+  const shift = (setup.cellSpeed * end.time) / setup.spacing;
+  assert(Number.isInteger(shift));
+  const xs = end.rainRates[0].map((_, j) => setup.firstX + j * setup.spacing);
+  const edgeRain = [];
   for (const [i, y] of setup.levels.entries()) {
-    assert(Math.abs(end.peaks[i] - initial.peaks[i] - setup.cellSpeed * end.time) < 1e-8);
-    assert(end.clear[i] < 0.1 * setup.rate);
-    if (y === setup.base) {
-      assert(Math.abs(end.peaks[i] - sourceX) < 1e-8);
-    } else {
-      assert(end.peaks[i] > end.peaks[i + 1]);
-      const midWind = speedAt((setup.base + y) / 2);
-      const terminal = ((midWind - setup.cellSpeed) * (setup.base - y)) / (end.peaks[i] - sourceX);
-      assert(terminal > terminalRange[0] && terminal < terminalRange[1], `At ${y} m inferred terminal ${terminal} m/s`);
-      inferred.push(terminal);
+    const actual = end.rainRates[i];
+    const coarse = referenceRow(setup, y, end.time, xs, speedAt, 2048);
+    const fine = referenceRow(setup, y, end.time, xs, speedAt, 4096);
+    const peak = xs[fine.indexOf(Math.max(...fine))];
+    assert.equal(end.peaks[i] - initial.peaks[i], shift * setup.spacing);
+    if (y === setup.base) assert.equal(end.peaks[i], sourceX);
+    else assert(end.peaks[i] > end.peaks[i + 1]);
+    assert(Math.abs(end.peaks[i] - peak) <= setup.spacing, `At ${y} m: grid peak ${end.peaks[i]}, reference ${peak}`);
+
+    // A weighted sum of exponentials is log-Lipschitz with constant 1/radius. Half a 3 m transect interval therefore
+    // bounds rate variation inside each sampled band. The independent diameter integral must refine within that band.
+    const pixelBand = Math.exp(setup.spacing / (2 * setup.radius));
+    for (const [j, rate] of actual.entries()) {
+      const convergence = Math.abs(fine[j] - coarse[j]);
+      const resolved = fine[j] - fine[j] / pixelBand;
+      assert(
+        convergence < resolved / 16,
+        `The diameter integral has not resolved the sample band at ${xs[j]}, ${y} m.`,
+      );
+      assert(
+        rate >= fine[j] / pixelBand - convergence && rate <= fine[j] * pixelBand + convergence,
+        `At ${xs[j]}, ${y} m: ${rate} mm/h, reference ${fine[j]} mm/h.`,
+      );
+      if (j >= shift)
+        assert(
+          Math.abs(rate - initial.rainRates[i][j - shift]) < 1e-8,
+          `At ${xs[j]}, ${y} m: rain translated by 30 m.`,
+        );
     }
+    edgeRain.push(Math.max(actual[0], actual.at(-1)));
   }
   const motionPixels = changed(initialPixels, endPixels);
   const rainPixels = changed(direct, endPixels);
@@ -316,7 +362,7 @@ try {
     assert(nearPixels(direct, endPixels, pixel) >= 4, `Rain failed to draw near its physical peak at ${pixel}`);
   }
   console.log(
-    `  ${backend} rain shaft: ${(end.peaks[0] - sourceX).toFixed(2)} m surfaceward offset, drift ${(sourceX - setup.cloudX).toFixed(2)} m, inferred fall speed ${Math.min(...inferred).toFixed(2)}–${Math.max(...inferred).toFixed(2)} m/s, ${motionPixels} moving pixels, ${rainPixels} rain pixels, replay ${end.hash}`,
+    `  ${backend} rain shaft: ${(end.peaks[0] - sourceX).toFixed(2)} m surfaceward offset, drift ${(sourceX - setup.cloudX).toFixed(2)} m, widest edge ${Math.max(...edgeRain).toFixed(2)} mm/h, ${motionPixels} moving pixels, ${rainPixels} rain pixels, replay ${end.hash}`,
   );
 } finally {
   await close();

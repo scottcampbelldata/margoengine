@@ -149,35 +149,101 @@ test('the snow line follows the air: snow above it, rain below (RITS-8, RITS-9)'
   assert.ok(warm.sample(0, line, 0, 0).rain.rate > 4.9);
 });
 
-test('a rain shaft slants downwind, is anchored in the world and drifts with its cell (RITS-5)', () => {
-  const u = 10,
-    field = new PrecipitationField({
-      cells: [{ centre: [0, 0], radius: 300, rate: 20 }],
-      base: 1500,
-      wind: steadyWind([u, 0, 0]),
-    }),
-    top = field.sample(0, 1500, 0, 0);
-  assert.equal(top.rate, 20, 'at cloud base the cell is where it is');
-  // At the ground the core lies downwind by the wind times the fall time of the median drop: find it.
-  let best = -Infinity,
-    where = 0;
-  for (let x = 0; x <= 6000; x += 10) {
-    const rate = field.sample(x, 0, 0, 0).rate;
-    if (rate > best) [best, where] = [rate, x];
-  }
-  assert.ok(where > 1000 && where < 4000 && Math.abs(best - 20) < 0.7, `core at ${where} m with ${best} mm/h`);
-  // A moving cell over a place on the ground: it is overhead at 200 s, and its rain lands there one fall time (about five
-  // minutes from 1,500 m) later.
-  const moving = new PrecipitationField({ cells: [{ centre: [-3000, 0], radius: 300, rate: 20, velocity: [15, 0] }] }),
-    series = Array.from({ length: 801 }, (_, i) => moving.sample(0, 0, 0, i).rate),
-    peak = series.indexOf(Math.max(...series)),
-    // Drops falling 1,500 m at 4 to 7 m/s take 214 to 375 s.
-    lag = peak - 200;
-  assert.ok(lag > 214 && lag < 375 && series[peak] > 19, `peak ${series[peak]} mm/h at ${peak} s`);
-  assert.ok(series[0] < 1e-6 && series[800] < 1e-6, 'dry before the cell comes and after it has gone');
-  // Still air: straight down, the same place.
-  const still = new PrecipitationField({ cells: [{ centre: [0, 0], radius: 300, rate: 20 }] });
-  assert.equal(still.sample(0, 0, 0, 0).rate, 20);
+test('a rain shaft spreads by size downwind and keeps arriving after its source passes (RITS-5)', () => {
+  const base = 1500;
+  const source = { centre: [0, 0], radius: 300, rate: 20 };
+  const air = { density: 1.1, temperature: 303.15 };
+  const wind = (u) => ({
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample: () => ({ ...air, velocity: [u, 0, 0] }),
+  });
+  const field = new PrecipitationField({ base, cells: [source], wind: wind(10) });
+  assert.equal(field.sample(0, base, 0, 0).rate, source.rate, 'at cloud base the cell is where it is');
+
+  // In uniform air the flux fraction of a size is proportional to D³ exp(-lambda D) v(D).
+  // Evaluate the exact characteristic dX = u*base/v at independent midpoint nodes. At x=0
+  // every backtracked ray is on the smooth upstream side of the exponential cell.
+  const reference = (steps) => {
+    const dD = largestRaindrop(air) / steps;
+    const slope = 4100 * source.rate ** -0.21;
+    let total = 0;
+    let throughOrigin = 0;
+    for (let i = 0; i < steps; i++) {
+      const d = (i + 0.5) * dD;
+      const speed = rainFallSpeed(d, air);
+      const flux = d ** 3 * Math.exp(-slope * d) * speed;
+      total += flux;
+      throughOrigin += flux * Math.exp((-10 * base) / (speed * source.radius));
+    }
+    return (source.rate * throughOrigin) / total;
+  };
+  const medium = reference(2048);
+  const fine = reference(4096);
+  const origin = field.sample(0, 0, 0, 0).rate;
+  // The measured fine/medium separation bounds the smooth midpoint integral error (order 2).
+  assert.ok(Math.abs(origin - fine) <= 4 * Math.abs(medium - fine), `origin ${origin}, reference ${fine}`);
+  const fartherUpwind = field.sample(-source.radius, 0, 0, 0).rate;
+  assert.ok(Math.abs(fartherUpwind / origin - Math.exp(-1)) < 4e-15);
+  const downwind = field.sample(2100, 0, 0, 0).rate;
+  assert.ok(downwind > origin && downwind < source.rate);
+
+  const moving = new PrecipitationField({
+    base,
+    cells: [{ ...source, centre: [-3000, 0], velocity: [15, 0] }],
+    wind: wind(0),
+  });
+  const early = moving.sample(0, 0, 0, 200).rate;
+  const core = moving.sample(0, 0, 0, 400).rate;
+  const late = moving.sample(0, 0, 0, 800).rate;
+  assert.ok(core > early && late > early && late < core, `${early}, ${core}, ${late} mm/h`);
+  const still = new PrecipitationField({ cells: [source] });
+  assert.equal(still.sample(0, 0, 0, 0).rate, source.rate);
+});
+
+test('size-dependent rain transport and local velocity agree over signed wind origin shifts', () => {
+  const windAt = (cell) => ({
+    medium: 'air',
+    cell,
+    sample(x, y, z, t) {
+      const worldX = x + cell[0] * 16;
+      const worldZ = z + cell[2] * 16;
+      return { density: 1.1, temperature: 303.15, velocity: [7 + 0.001 * (worldX + worldZ), 0.12, 0.01 * (y - t)] };
+    },
+  });
+  const options = { base: 120, cells: [{ centre: [-4, 3], radius: 70, rate: 12 }], cellSize: 16 };
+  const reference = new PrecipitationField({ ...options, wind: windAt([0, 0, 0]) });
+  const shifted = new PrecipitationField({ ...options, wind: windAt([-2, 0, 3]) });
+  const a = reference.sample(128, 0, 32, 5);
+  const b = shifted.sample(128, 0, 32, 5);
+  assert.ok(a.rain.rate > 0);
+  assert.ok(Math.abs(a.rain.rate - b.rain.rate) < 2e-13);
+  assert.deepEqual(a.velocity, b.velocity);
+});
+
+test('a late invalid rain source preserves supplied output and corrected replay', () => {
+  let fail = false;
+  let calls = 0;
+  const make = () =>
+    new PrecipitationField({
+      base: 100,
+      seaLevelTemperature: 303.15,
+      source: { peak: 5, rate: (_x, _z, t) => (fail && ++calls === 9 ? -3 : 4 + Math.cos(t / 10)) },
+    });
+  const field = make();
+  const sample = field.sample(-4, 16, 7, 4);
+  const accepted = structuredClone(sample);
+  fail = true;
+  assert.throws(
+    () => field.sample(-4, 16, 7, 4, sample),
+    (error) =>
+      error.name === 'MargoError' && error.code === 'state' && /0 or more.*errors#precipitation/.test(error.message),
+  );
+  assert.equal(calls, 9);
+  assert.deepEqual(sample, accepted);
+  fail = false;
+  assert.equal(field.sample(-4, 16, 7, 4, sample), sample);
+  assert.deepEqual(sample, make().sample(-4, 16, 7, 4));
 });
 
 test('rain varies from place to place and gusts bend its streaks (EF-7)', () => {

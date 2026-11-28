@@ -686,3 +686,9 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### Lake Superior November 1975 forcing and observations (SEA-07)
 
 `packages/physics/scripts/sea07-superior-measured.mjs` retrieves published [NOAA CO-OPS gauge observations](https://api.tidesandcurrents.noaa.gov/api/dev/) and the [NOAA NCEI Great Lakes bathymetry](https://www.ncei.noaa.gov/products/great-lakes-bathymetry). Atmospheric forcing is adapted from [Copernicus Climate Change Service and ECMWF ERA5](https://doi.org/10.24381/cds.adbb2d47), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), accessed through [Open-Meteo](https://open-meteo.com/en/docs/historical-weather-api). The script resamples the independent forcing onto the model grid. Downloaded inputs are kept in its local cache.
+
+### ATMO-04 measured precipitation
+
+- Gires, Tchiguirinskaia and Schertzer, *Two months of disdrometer data in the Paris area* (2018), data archive [10.5281/zenodo.1240168](https://doi.org/10.5281/zenodo.1240168), CC BY 4.0. The diagnostic reads synchronized PWS100 forcing and independently observed Parsivel2 size and speed bins.
+- Kuhn and Vázquez-Martín, *Dual Ice Crystal Imager (D-ICI) data*, version 1 (2021), [10.5878/dgak-p185](https://doi.org/10.5878/dgak-p185), CC BY 4.0. The diagnostic reads the 94 explicit aggregate records and applies the published instrument allowance.
+- Locatelli and Hobbs (1974), [Fall speeds and masses of solid precipitation particles](https://doi.org/10.1029/JC079i015p02185). The diagnostic transcribes sparse observed Fig. 20 coordinates and notes their overlapping model lineage. The archive payloads are downloaded separately.

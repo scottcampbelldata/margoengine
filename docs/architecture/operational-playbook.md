@@ -12244,3 +12244,7 @@ The surf solver computes native directional moments in canonical order, then syn
 ### SEA-07 native head composition and accepted tide
 
 The optional surge workers evaluate the rationalized Sun and Moon tide terms and the pressure head in separate phases, with the wet pressure and tide totals reduced in canonical cell order. The surge publishes only after both phases succeed. Scalar and native tests exercise the same accepted shallow-water and geocentric state at signed origins. [Evidence and commands](../whitepaper/reproduce.md#sea-07-tide-replay-and-lake-superior)
+
+### ATMO-04 size-resolved falling contacts
+
+The existing falling Rust kernel partitions its RK4 body rows in shared memory and joins before ordered collision. The caller's accepted state and work receipt are written only after all contacts succeed. The precipitation scene renders accepted drop and snow positions and uses first water crossings to drive actual capillary pulses. WebGPU and WebGL2 independently pass full-frame and snapshot replay. The Paris disdrometer and shared-lineage snow comparisons define the remaining fidelity gaps in the limits record.

@@ -148,7 +148,9 @@
     "test:gpu:lava-surface": "cd ../.. && node packages/weather/tests/lava-surface.browser.mjs && node packages/weather/tests/lava-surface.browser.mjs --compat",
     "test:gpu:material-wet": "cd ../.. && node packages/weather/tests/material-wet-browser.mjs && node packages/weather/tests/material-wet-browser.mjs --compat",
     "test:gpu:mann-fft": "cd ../.. && node packages/weather/tests/mann-fft.browser.mjs",
+    "test:gpu:rain-flight-workers": "cd ../.. && node packages/weather/tests/rain-flight-workers.browser.mjs",
     "test:gpu:surface-energy-workers": "cd ../.. && node packages/weather/tests/surface-energy-workers.browser.mjs",
+    "test:gpu:precipitation-film": "cd ../.. && node packages/weather/tests/precipitation-film.browser.mjs && node packages/weather/tests/precipitation-film.browser.mjs --compat",
     "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs && node packages/weather/tests/seek-check.mjs && node packages/weather/tests/settings-check.mjs && node packages/weather/tests/snowpack-check.mjs && node packages/weather/tests/snowpack-check.mjs --compat",
     "prepack": "npm run build",
     "test:browser:parity": "cd ../.. && node packages/weather/tests/parity-browser.mjs gltf && node packages/weather/tests/parity-browser.mjs gltf --compat && node packages/weather/tests/parity-browser.mjs cover && node packages/weather/tests/parity-browser.mjs cover --compat && node packages/weather/tests/parity-browser.mjs lens && node packages/weather/tests/parity-browser.mjs lens --compat"

@@ -344,6 +344,7 @@ fn advance(
     sections: &[Section],
     air: &Air,
     dt: f64,
+    rk4_evaluations: &mut f64,
 ) -> Option<State> {
     let c = coefficients(model, air);
     if ![
@@ -368,6 +369,7 @@ fn advance(
     let mut remaining = dt;
     let mut step = dt;
     while remaining > 0.0 {
+        *rk4_evaluations += 3.0;
         let middle = rk4(state, model, sections, air, &c, step * 0.5);
         let half = rk4(middle, model, sections, air, &c, step * 0.5);
         if acceptable(rk4(state, model, sections, air, &c, step), half) {
@@ -386,9 +388,68 @@ fn advance(
     Some(state)
 }
 
+#[repr(C)]
+struct Job {
+    models: *const Model,
+    sections: *const Section,
+    air: *const Air,
+    current: *const State,
+    next: *mut State,
+    work: *mut Work,
+    count: u32,
+    reserved: u32,
+    dt: f64,
+}
+
+#[repr(C)]
+struct Work {
+    bodies: f64,
+    rk4_evaluations: f64,
+    simd_state_pairs: f64,
+}
+
+const _: [(); 40] = [(); core::mem::size_of::<Job>()];
+const _: [(); 24] = [(); core::mem::size_of::<Work>()];
+
+impl Job {
+    unsafe fn advance_rows(&self, first: u32, end: u32, part: usize) -> u32 {
+        let mut rk4_evaluations = 0.0;
+        for index in first as usize..end as usize {
+            unsafe {
+                let model = &*self.models.add(index);
+                let blade = core::slice::from_raw_parts(
+                    self.sections.add(model.section_start as usize),
+                    model.section_count as usize,
+                );
+                let Some(value) = advance(
+                    *self.current.add(index),
+                    model,
+                    blade,
+                    &*self.air.add(index),
+                    self.dt,
+                    &mut rk4_evaluations,
+                ) else {
+                    return index as u32 + 1;
+                };
+                self.next.add(index).write(value);
+            }
+        }
+        if !self.work.is_null() {
+            // Seven offsets per RK4 evaluation, with four f64x2 state pairs each.
+            unsafe {
+                self.work.add(part).write(Work {
+                    bodies: f64::from(end - first),
+                    rk4_evaluations,
+                    simd_state_pairs: 28.0 * rk4_evaluations,
+                })
+            };
+        }
+        0
+    }
+}
+
 /// Returns the first failed row plus one, or zero after a complete batch.
-/// Inputs and output are distinct arena regions. The caller only commits a
-/// completed batch and validates the flow samples before this call.
+/// Inputs and output are distinct arena regions. The caller validates flow samples.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn falling_step(
     models: *const Model,
@@ -398,20 +459,36 @@ unsafe extern "C" fn falling_step(
     next: *mut State,
     count: u32,
     dt: f64,
+    work: *mut Work,
 ) -> u32 {
-    for index in 0..count as usize {
-        unsafe {
-            let model = &*models.add(index);
-            let blade = core::slice::from_raw_parts(
-                sections.add(model.section_start as usize),
-                model.section_count as usize,
-            );
-            let Some(value) = advance(*current.add(index), model, blade, &*air.add(index), dt)
-            else {
-                return index as u32 + 1;
-            };
-            next.add(index).write(value);
+    unsafe {
+        Job {
+            models,
+            sections,
+            air,
+            current,
+            next,
+            work,
+            count,
+            reserved: 0,
+            dt,
         }
+        .advance_rows(0, count, 0)
     }
-    0
+}
+
+/// Safety: the arena bridge joins all parts before any contact or output publication. Each part
+/// reads common immutable rows and writes its own contiguous trial range and work receipt.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn falling_thread_phase(job: &Job, stage: u32, part: u32, parts: u32) -> u32 {
+    let Some(divisor) = core::num::NonZeroU64::new(u64::from(parts)) else {
+        return 1;
+    };
+    if stage != 0 || !matches!(parts, 1 | 2 | 4) || part >= parts {
+        return 1;
+    }
+    let count = u64::from(job.count);
+    let first = (count * u64::from(part) / divisor) as u32;
+    let end = (count * u64::from(part + 1) / divisor) as u32;
+    unsafe { job.advance_rows(first, end, part as usize) }
 }

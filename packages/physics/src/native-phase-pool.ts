@@ -105,6 +105,11 @@ type NativePhaseSolver =
       readonly subject: 'Surge potential';
       readonly phaseExport: 'surge_potential_thread_phase';
       readonly phase: 'tides and inverse barometer';
+    }
+  | {
+      readonly subject: 'Falling bodies';
+      readonly phaseExport: 'falling_thread_phase';
+      readonly phase: 'Runge–Kutta flight';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

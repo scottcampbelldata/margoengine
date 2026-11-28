@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22031240,
+  "total": 22035383,
   "history": [
     {
       "date": "2026-10-24",
@@ -15839,6 +15839,12 @@
       "commit": "sea-07-native-tide-pressure",
       "reason": "SEA-07 @margoengine/physics/surge 4428 to 9078 B gzip, ceiling 4689 to 9351 B. The surge owns the geometric grid, stored pressure and tidal terms and coupled head. A separate entry would duplicate cell and pressure state. Native modules and helpers load only when used. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo-04-size-resolved-rain",
+      "reason": "ATMO-04 @margoengine/weather/precipitation 3852 to 5702 B gzip, ceiling 3923 to 5958 B. @margoengine/physics/falling 5907 to 8015 B gzip, ceiling 6163 to 8271 B. Precipitation owns terminal speed, source sampling and public moments. A separate entry would duplicate the field model. K23 uses the same integration for every falling body and publishes states and collisions in order after joining optional workers. Core and stage receive zero bytes.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16719,7 +16725,7 @@
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 14608,
     "@margoengine/physics/explosive": 16052,
-    "@margoengine/physics/falling": 6163,
+    "@margoengine/physics/falling": 8271,
     "@margoengine/physics/flight": 12898,
     "@margoengine/physics/flip": 14295,
     "@margoengine/physics/foam": 14188,
@@ -17578,7 +17584,7 @@
     "@margoengine/weather/lava": 15750,
     "@margoengine/weather/lava-settings": 4046,
     "@margoengine/weather/lens": 4654,
-    "@margoengine/weather/precipitation": 3923,
+    "@margoengine/weather/precipitation": 5958,
     "@margoengine/weather/puddles": 4873,
     "@margoengine/weather/regions": 2864,
     "@margoengine/weather/settings": 9476,

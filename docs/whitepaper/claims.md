@@ -7092,3 +7092,9 @@ Native radiation moments and divergence reproduce scalar forcing in signed coupl
 The optional native tide and pressure evaluator reproduces the scalar shallow-water result exactly at 1, 2 and 4 participants, including signed origins, coupled restore and rejected inputs. Three real Chromium helpers process 153 cells in each native phase. Each phase uses 152 SIMD lanes, and the wet reductions retain their original order. The live tide raises the west sill and then the east, while both stay dry in the tide-off control. WebGPU and WebGL2 each reproduce complete accepted snapshots and their own full RGBA frames on hold, restore, re-advance and rewind.
 
 The archived 1975 surge is an independent measurement comparison. Peak level at Point Iroquois is 0.671 m in the fine run versus 0.971 m observed, an hour later. The 0.300 m miss exceeds the 0.047 m numerical spread. [Tests, observations and limits](reproduce.md#sea-07-tide-replay-and-lake-superior)
+
+### ATMO-04 size-dependent fallout and accepted aqueous contacts
+
+In a fixed-camera flume, the travelling gust adds 3.29 mm of downwind motion for a 1 mm drop and 1.22 mm for a 4.8 mm drop after 29.17 ms. Forty-eight actual simulated crossings deposit 1,303.69 µL to the water grid by 70.83 ms. Visible capillary rings disappear when the same contacts are withheld. The cold take draws 44 simulated compact snow aggregates. Accepted snapshots and complete RGBA replay exactly on each renderer.
+
+The optional K23 participants match the plain result byte for byte with signed origins, snapshot restore and contacts. An isolated Chromium worker starts three native helpers. A 769-drop tick records 2,307 RK4 evaluations and 64,596 f64x2 state updates. An invalid contact preserves accepted solver state and the previous receipt. [Reproduce](reproduce.md#atmo-04-size-resolved-rain-flight-and-field-measurements)

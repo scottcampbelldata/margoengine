@@ -24319,3 +24319,7 @@ The surf previously changed step memory before validating its shallow-water samp
 ### Fixed: SEA-07 could overwrite pressure and tidal terms before validating the forcing
 
 A nonfinite pressure in a later grid cell previously left some of the surge's saved pressure and tide terms updated, while its output potential still described the previous step. The solver now stages the wet mask, raw terms and potential, validates the full Earth-fixed celestial port and publishes both regions together. It copies the six body coordinates before sampling callbacks. The regression in `packages/physics/tests/coupling/surge.test.js` checks late pressure failure, malformed celestial layout and exact corrected replay.
+
+### Fixed: ATMO-04 rain transport used one arrival path for the whole shaft
+
+A narrow moving rain cell kept its cloud-base peak below the cloud even though large and small drops arrive from different places and times. Precipitation now transports 192 mass-weighted size nodes per active species through the layer wind and uses local temperature for the phase share. A late invalid source or wind sample fails before copying any moments to the caller. The uniform-air characteristic and invalid-source replay regressions are in `packages/weather/tests/precipitation.test.js`.

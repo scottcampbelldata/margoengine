@@ -4,6 +4,7 @@
 
 ```ts
 import { Precipitation, PrecipitationSample, Wind } from "@margoengine/math/fields";
+import { FallingSphere } from "@margoengine/physics/falling";
 
 export interface FallingAir {
     density?: number;
@@ -31,6 +32,7 @@ export interface PrecipitationFieldOptions {
     ground?: number;
     altitude?: number;
     seaLevelTemperature?: number;
+    cellSize?: number;
     wind?: Wind;
     snowTemperature?: number;
     snowSharpness?: number;
@@ -53,6 +55,13 @@ export interface RainSource {
     readonly peak: number;
 }
 
+export interface RainSphereOptions {
+    readonly diameter: number;
+    readonly position?: FallingSphere['position'];
+    readonly velocity?: FallingSphere['velocity'];
+    readonly restitution?: number;
+}
+
 export interface RimedIce {
     fraction: number;
     scale?: number;
@@ -71,6 +80,8 @@ export function hailFallSpeed(diameter: number, air?: FallingAir, density?: numb
 export function largestRaindrop(air?: FallingAir): number;
 
 export function rainFallSpeed(diameter: number, air?: FallingAir): number;
+
+export function rainSphere(options: RainSphereOptions): FallingSphere;
 
 export function snowFallSpeed(diameter: number, air?: FallingAir): number;
 

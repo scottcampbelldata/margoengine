@@ -3,7 +3,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, Wind } from '@margoengine/math/fields';
 import { hypot } from '@margoengine/math/pinned';
 import { collideSphere, type FallingBoundary } from './falling/boundary.js';
-import { type FallingBuilds, fallingStep, loadFallingBuilds } from './falling/kernel.js';
+import { type FallingBuilds, type FallingWorkCounts, fallingStep, loadFallingBuilds } from './falling/kernel.js';
 import {
   AIR_WORDS,
   dot,
@@ -34,6 +34,7 @@ import {
 } from './world/solver.js';
 
 export { type FallingBoundary, type FallingHit, fallingBoundaryFromPhysics } from './falling/boundary.js';
+export type { FallingWorkCounts, FallingWorkerWork } from './falling/kernel.js';
 export type {
   FallingBladeSection,
   FallingBody,
@@ -57,6 +58,8 @@ export interface FallingLoadOptions {
   readonly rate?: RateLevel;
   /** Cancels fetching or compiling the Wasm assets. */
   readonly signal?: AbortSignal;
+  /** Actual native participants, including the caller. Choose 1 (default), 2 or 4. */
+  readonly threads?: number;
 }
 
 /** Falling body setup. Body indices and field rows share the input array's order. */
@@ -81,7 +84,7 @@ export interface FallingPose {
 
 interface Data {
   readonly host: SolverHost;
-  readonly run: ReturnType<typeof fallingStep>;
+  readonly native: ReturnType<typeof fallingStep>;
   readonly dynamic: Region;
   readonly trial: Region;
   readonly models: Region;
@@ -137,6 +140,8 @@ export class FallingSolver implements Solver<FallingParams> {
   readonly #sample: FlowSample = { velocity: [0, 0, 0], temperature: SEA_LEVEL_TEMPERATURE, density: STILL };
   readonly #dragAir = { temperature: SEA_LEVEL_TEMPERATURE, density: STILL, gravity: 0 };
   #data?: Data;
+  #nativeWork?: FallingWorkCounts;
+  #disposed = false;
 
   private constructor(id: string, rate: RateLevel, builds: FallingBuilds) {
     this.id = id;
@@ -159,7 +164,14 @@ export class FallingSolver implements Solver<FallingParams> {
       throw new TypeError('Falling solver ID is empty. Provide a nonempty ID.');
     if (!Number.isInteger(rate) || rate < 0 || rate >= RATE_LEVELS)
       throw new RangeError('Falling solver rate is invalid. Pass one of the world rate levels 0 to 7.');
-    return new FallingSolver(id, rate, await loadFallingBuilds(options.signal));
+    return new FallingSolver(id, rate, await loadFallingBuilds(options.signal, options.threads));
+  }
+
+  /** Releases native helpers after the containing world finishes using this solver. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#builds[Symbol.dispose]();
   }
 
   describe(): SolverDescription {
@@ -172,7 +184,17 @@ export class FallingSolver implements Solver<FallingParams> {
   }
 
   init(host: SolverHost, params: FallingParams): void {
+    if (this.#disposed) throw new MargoError('disposed', 'This falling solver was disposed. Load a new instance.');
     if (this.#data) throw new MargoError('state', 'This falling solver belongs to a world. Load a new instance.');
+    try {
+      this.#initialize(host, params);
+    } catch (cause) {
+      if (this.#builds.pool) this[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  #initialize(host: SolverHost, params: FallingParams): void {
     const { bodies, wind, boundary, cellSize = 4096 } = params;
     if (!Array.isArray(bodies) || bodies.length === 0)
       throw new RangeError('There are no falling bodies. Supply an array with at least one body.');
@@ -199,7 +221,6 @@ export class FallingSolver implements Solver<FallingParams> {
       sectionWords += model.sections.length;
       return model;
     });
-    const run = fallingStep(host, this.#builds);
     const make = (name: string, width: number) => host.allocate(name, width * prepared.length * F64, 'f64', LAYOUT);
     const dynamic = make('falling-state', STATE_WORDS);
     const trial = make('falling-next', STATE_WORDS);
@@ -207,6 +228,7 @@ export class FallingSolver implements Solver<FallingParams> {
     const samples = make('falling-air', AIR_WORDS);
     const poses = make('falling-poses', FALLING_BODY_WORDS);
     const bladeGeometry = host.allocate('falling-blades', sectionWords * F64, 'f64', LAYOUT);
+    const native = fallingStep(host, this.#builds);
     const state = words(host, dynamic);
     const model = words(host, models);
     const air = words(host, samples);
@@ -228,7 +250,7 @@ export class FallingSolver implements Solver<FallingParams> {
     const gravity = hypot(...host.gravity);
     this.#data = {
       host,
-      run,
+      native,
       dynamic,
       trial,
       models,
@@ -337,10 +359,11 @@ export class FallingSolver implements Solver<FallingParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    if (this.#disposed) throw new MargoError('disposed', 'This falling solver was disposed. Load a new instance.');
     const data = this.#ready();
     this.#sampleAir(data, context, dt);
     const { host, dynamic, trial, models, bladeGeometry, samples, poses, frames } = data;
-    const code = data.run(
+    const code = data.native.run(
       models.byteOffset,
       bladeGeometry.byteOffset,
       samples.byteOffset,
@@ -354,6 +377,13 @@ export class FallingSolver implements Solver<FallingParams> {
     const next = words(host, trial);
     publishPoses(next, frames, words(host, poses));
     words(host, dynamic).set(next);
+    this.#nativeWork = data.native.workCounts();
+  }
+
+  /** Copies actual native work from the last accepted step. A receipt is not part of a physics snapshot. */
+  readNativeWork(): FallingWorkCounts | undefined {
+    const work = this.#nativeWork;
+    return work && { ...work, workers: work.workers.map((part) => ({ ...part })) };
   }
 
   importPorts(_tick: number): void {}
