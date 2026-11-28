@@ -2639,41 +2639,78 @@ function brim(m: Mesh, c: V3, inner: Float64Array, width: number, t: number) {
 // Closest points on a triangle mesh.
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** Closest point on triangle abc to p (Ericson 2005, 5.1.5): barycentric weights into `out`. */
-function closestOnTriangle(p: V3, a: V3, b: V3, c: V3, out: Float64Array) {
-  const ab = sub(b, a),
-    ac = sub(c, a),
-    ap = sub(p, a),
-    d1 = dot3(ab, ap),
-    d2 = dot3(ac, ap);
-  if (d1 <= 0 && d2 <= 0) return out.set([1, 0, 0]);
-  const bp = sub(p, b),
-    d3 = dot3(ab, bp),
-    d4 = dot3(ac, bp);
-  if (d3 >= 0 && d4 <= d3) return out.set([0, 1, 0]);
+/**
+ * Closest point on triangle abc to p (Ericson 2005, 5.1.5): barycentric weights into `out`. The corners are read from
+ * `pos` at vertex indices a, b and c, and the sums run in the order of the vector form (ab . ap and so on), with no
+ * arrays made: a fitting or penetration pass runs it some ten million times.
+ */
+function closestOnTriangle(
+  px: number,
+  py: number,
+  pz: number,
+  pos: ArrayLike<number>,
+  a: number,
+  b: number,
+  c: number,
+  out: Float64Array,
+) {
+  const ax = pos[a * 3],
+    ay = pos[a * 3 + 1],
+    az = pos[a * 3 + 2],
+    bx = pos[b * 3],
+    by = pos[b * 3 + 1],
+    bz = pos[b * 3 + 2],
+    cx = pos[c * 3],
+    cy = pos[c * 3 + 1],
+    cz = pos[c * 3 + 2],
+    abx = bx - ax,
+    aby = by - ay,
+    abz = bz - az,
+    acx = cx - ax,
+    acy = cy - ay,
+    acz = cz - az,
+    apx = px - ax,
+    apy = py - ay,
+    apz = pz - az,
+    d1 = abx * apx + aby * apy + abz * apz,
+    d2 = acx * apx + acy * apy + acz * apz;
+  const set = (u: number, v: number, w: number) => {
+    out[0] = u;
+    out[1] = v;
+    out[2] = w;
+  };
+  if (d1 <= 0 && d2 <= 0) return set(1, 0, 0);
+  const bpx = px - bx,
+    bpy = py - by,
+    bpz = pz - bz,
+    d3 = abx * bpx + aby * bpy + abz * bpz,
+    d4 = acx * bpx + acy * bpy + acz * bpz;
+  if (d3 >= 0 && d4 <= d3) return set(0, 1, 0);
   const vc = d1 * d4 - d3 * d2;
   if (vc <= 0 && d1 >= 0 && d3 <= 0) {
     const v = d1 / (d1 - d3);
-    return out.set([1 - v, v, 0]);
+    return set(1 - v, v, 0);
   }
-  const cp = sub(p, c),
-    d5 = dot3(ab, cp),
-    d6 = dot3(ac, cp);
-  if (d6 >= 0 && d5 <= d6) return out.set([0, 0, 1]);
+  const cpx = px - cx,
+    cpy = py - cy,
+    cpz = pz - cz,
+    d5 = abx * cpx + aby * cpy + abz * cpz,
+    d6 = acx * cpx + acy * cpy + acz * cpz;
+  if (d6 >= 0 && d5 <= d6) return set(0, 0, 1);
   const vb = d5 * d2 - d1 * d6;
   if (vb <= 0 && d2 >= 0 && d6 <= 0) {
     const w = d2 / (d2 - d6);
-    return out.set([1 - w, 0, w]);
+    return set(1 - w, 0, w);
   }
   const va = d3 * d6 - d5 * d4;
   if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
     const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
-    return out.set([0, 1 - w, w]);
+    return set(0, 1 - w, w);
   }
   const den = 1 / (va + vb + vc),
     v = vb * den,
     w = vc * den;
-  out.set([1 - v - w, v, w]);
+  set(1 - v - w, v, w);
 }
 /** A uniform grid over a triangle mesh's triangles for closest-point queries. */
 class TriangleGrid {
@@ -2683,6 +2720,10 @@ class TriangleGrid {
   start: Uint32Array;
   items: Uint32Array;
   stamp: Uint32Array;
+  /** Each listed triangle's box, 6 numbers (low x y z, high x y z) a triangle, padded by a billionth of a cell. */
+  boxes: Float64Array;
+  /** Triangles measured exactly (closest point found) over every query so far: the grid's work count. */
+  tested = 0;
   query = 0;
   tmp = new Float64Array(3);
   constructor(
@@ -2726,6 +2767,20 @@ class TriangleGrid {
     this.start = counts.slice();
     this.items = new Uint32Array(counts[counts.length - 1]);
     this.stamp = new Uint32Array(tris.length / 3);
+    // A triangle whose box lies further from the query than the best found cannot be closer: it is passed over. The pad
+    // keeps rounding in the closest point (a weighted sum of the corners) from ever reading closer than its box.
+    this.boxes = new Float64Array((tris.length / 3) * 6);
+    const pad = cell * 1e-9;
+    for (let i = 0; i < list.length; i++) {
+      const t = list[i];
+      for (let d = 0; d < 3; d++) {
+        const a = pos[tris[t * 3] * 3 + d],
+          b = pos[tris[t * 3 + 1] * 3 + d],
+          c = pos[tris[t * 3 + 2] * 3 + d];
+        this.boxes[t * 6 + d] = Math.min(a, b, c) - pad;
+        this.boxes[t * 6 + 3 + d] = Math.max(a, b, c) + pad;
+      }
+    }
     const fill = counts.slice();
     for (let i = 0; i < list.length; i++) {
       const box = boxes.slice(i * 6, i * 6 + 6);
@@ -2768,18 +2823,22 @@ class TriangleGrid {
               const t = this.items[i];
               if (stamp[t] === query) continue;
               stamp[t] = query;
+              const box = this.boxes,
+                ex = Math.max(box[t * 6] - p[0], 0, p[0] - box[t * 6 + 3]),
+                ey = Math.max(box[t * 6 + 1] - p[1], 0, p[1] - box[t * 6 + 4]),
+                ez = Math.max(box[t * 6 + 2] - p[2], 0, p[2] - box[t * 6 + 5]);
+              if (ex * ex + ey * ey + ez * ez > bestD2) continue;
               const P = this.pos,
                 T = this.tris,
-                A: V3 = [P[T[t * 3] * 3], P[T[t * 3] * 3 + 1], P[T[t * 3] * 3 + 2]],
-                B: V3 = [P[T[t * 3 + 1] * 3], P[T[t * 3 + 1] * 3 + 1], P[T[t * 3 + 1] * 3 + 2]],
-                C: V3 = [P[T[t * 3 + 2] * 3], P[T[t * 3 + 2] * 3 + 1], P[T[t * 3 + 2] * 3 + 2]];
-              closestOnTriangle(p, A, B, C, tmp);
-              const q: V3 = [
-                  A[0] * tmp[0] + B[0] * tmp[1] + C[0] * tmp[2],
-                  A[1] * tmp[0] + B[1] * tmp[1] + C[1] * tmp[2],
-                  A[2] * tmp[0] + B[2] * tmp[1] + C[2] * tmp[2],
-                ],
-                d2 = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2;
+                ia = T[t * 3],
+                ib = T[t * 3 + 1],
+                ic = T[t * 3 + 2];
+              closestOnTriangle(p[0], p[1], p[2], P, ia, ib, ic, tmp);
+              this.tested++;
+              const qx = P[ia * 3] * tmp[0] + P[ib * 3] * tmp[1] + P[ic * 3] * tmp[2],
+                qy = P[ia * 3 + 1] * tmp[0] + P[ib * 3 + 1] * tmp[1] + P[ic * 3 + 1] * tmp[2],
+                qz = P[ia * 3 + 2] * tmp[0] + P[ib * 3 + 2] * tmp[1] + P[ic * 3 + 2] * tmp[2],
+                d2 = (qx - p[0]) ** 2 + (qy - p[1]) ** 2 + (qz - p[2]) ** 2;
               if (d2 < bestD2) {
                 bestD2 = d2;
                 best = t;
@@ -3152,6 +3211,11 @@ export interface FitPenetration {
   readonly body: number;
   /** Deepest vertex of one garment through another (an outer layer under an inner one, or the reverse). */
   readonly layers: number;
+  /**
+   * The work count: triangles measured exactly, a closest point found on each. A triangle whose bounding box lies
+   * further from a vertex than the closest point already found is passed over without one.
+   */
+  readonly triangleTests: number;
   /** Which garment reaches deepest into the body and where (body space), and which pair crosses deepest and where. */
   readonly worst: {
     readonly body: string;
@@ -3302,6 +3366,10 @@ export function fitPenetration(body: RiggedBody, fit: FittedOutfit, skin?: Array
   return {
     body: deepBody * unit,
     layers: deepLayers * unit,
+    triangleTests: [...grids, ...posed.flatMap((x) => [...x.grids.values()])].reduce(
+      (sum, grid) => sum + grid.tested,
+      0,
+    ),
     worst: { body: worstBody, bodyAt, layers: worstLayers, layersAt },
   };
 }

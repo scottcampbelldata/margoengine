@@ -143,7 +143,7 @@ console.log(body, layers); // 0 when nothing is inside the body or another layer
 | `dressPerson(engine, person, outfit, options?)` | One call: fit, GLB, gltf/pbr, cloth materials, skinning to the person's skeleton, shadows. The outfit joins the person's own scene, whichever scene is active. Returns `{model, fit, animation, dispose}`. |
 | `riggedBody(model, materials?)` | The skinned body of a loaded model as data (skin material names: `BODY_MATERIALS`, Character Creator's `Std_Skin_*` included). A body split over several skins, as an FBX conversion gives one per mesh, is read as one skeleton, with unweighted bones above the joints (Character Creator's `CC_Base_Hip`) included. |
 | `fitOutfit(body, outfit, options?)` | The garments cut and skinned as data: positions, normals, uvs, joints, weights, face kinds, seams; `measures` the body (the neck girth square to the neck, its narrowest ring between the clavicle line and the jaw). |
-| `fitPenetration(body, fit, skin?)` | The deepest garment point inside the body and inside another layer, at rest or under joint matrices. |
+| `fitPenetration(body, fit, skin?)` | The deepest garment point inside the body and inside another layer, at rest or under joint matrices; `triangleTests` counts the closest points it measured (its work count). |
 | `fittedOutfitGLB(model, fit, materials?)` | The fitted outfit as a GLB skinned to the model's own bones. |
 | `FIT_SETTINGS`, `applyFitSettings` | Slider rows: `fit` (ease scale, default 1), `ease` (over the body, default 3 mm), `layerGap` (between layers, default 2 mm). |
 

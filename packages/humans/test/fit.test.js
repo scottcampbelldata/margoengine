@@ -111,6 +111,17 @@ test('the rest pose skinned reads the same as no pose: triangles with no area ar
   }
 });
 
+// This file once ran 357 s on one core and, its tests being synchronous, said nothing until the end: CI's hang watch
+// stopped it at 360 s of silence. Every grid query measured every triangle in the cells it searched (41.2 million
+// closest points for the townsman at rest); a triangle whose box lies further off than the closest point found is now
+// passed over, with the same result (1.73 million).
+test('the penetration measure passes over triangles whose box lies further off than the closest point found', () => {
+  const r = F.fitPenetration(T, F.fitOutfit(T, 'townsman-1910'));
+  assert.ok(r.triangleTests > 0 && r.triangleTests < 4e6, `${r.triangleTests} triangles measured`);
+  assert.equal(r.body, 0);
+  assert.equal(r.layers, 0);
+});
+
 test('a 20 mm life jacket meets an A-pose arm brought 10 degrees in: the measured press stays under 12.5 mm', () => {
   // The fit skins the clothes; it does not push cloth aside where the body meets it (docs/limits.md).
   const fit = F.fitOutfit(A, 'fisherman-2011'),

@@ -49,6 +49,7 @@ export interface FitOptions {
 export interface FitPenetration {
     readonly body: number;
     readonly layers: number;
+    readonly triangleTests: number;
     readonly worst: {
         readonly body: string;
         readonly bodyAt: readonly number[];
