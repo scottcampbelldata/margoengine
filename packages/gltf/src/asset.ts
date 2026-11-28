@@ -1052,6 +1052,10 @@ export async function decodeKTX2Images(
       decoded[source] = await decoder.decode(data);
     }
     return decoded;
+  } catch (error) {
+    // The images this call decoded close with the failure; the caller's stay the caller's (KB-GLTFA A9).
+    closeImages(decoded.filter((image, i) => image && image !== images[i]));
+    throw error;
   } finally {
     decoder.close();
   }

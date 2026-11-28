@@ -456,3 +456,38 @@ test('KB-GLTFA A7: the light loader lists model.nodes and model.meshes depth fir
     engine.dispose();
   }
 });
+
+test('KB-GLTFA A9: a gltf/pbr parse that throws closes the images it was given, wherever it failed', async (t) => {
+  const pbrModule = await import('../dist/pbr.js');
+  const pbr = await gpuEngine(t);
+  const bitmaps = () => {
+    const record = { closed: 0 };
+    return { record, images: [{ width: 4, height: 4, close: () => record.closed++ }] };
+  };
+  const { doc, bytes } = triangle();
+  const cases = [
+    // container: not glTF at all
+    ['parseGLTF, bad JSON', (images) => pbrModule.parseGLTF(pbr.engine, '{not json', [], images)],
+    // GLTFAsset: a major version the loader does not read
+    ['parseGLTF, glTF 3.0', (images) => pbrModule.parseGLTF(pbr.engine, { ...doc, asset: { version: '3.0' } }, [bytes], images)],
+    // the model constructor: an image that is neither a bitmap nor valid RGBA pixels
+    [
+      'parseGLTF, bad pixels',
+      (images) =>
+        pbrModule.parseGLTF(pbr.engine, doc, [bytes], [...images, { width: 2, height: 2, data: new Uint8Array(3) }]),
+    ],
+    ['parsePreparedPBR, not static', (images) => pbrModule.parsePreparedPBR(pbr.engine, doc, [], images)],
+    ['parseGLTFAsync, bad JSON', (images) => pbrModule.parseGLTFAsync(pbr.engine, '{not json', [], images)],
+  ];
+  for (const [label, run] of cases) {
+    const { record, images } = bitmaps();
+    await assert.rejects(async () => run(images), label);
+    assert.equal(record.closed, 1, `${label}: the caller's bitmap is closed once`);
+  }
+  // A parse that succeeds holds the bitmap until dispose.
+  const { record, images } = bitmaps();
+  const model = pbrModule.parseGLTF(pbr.engine, doc, [bytes], images);
+  assert.equal(record.closed, 0);
+  model.dispose();
+  assert.equal(record.closed, 1);
+});

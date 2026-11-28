@@ -561,6 +561,12 @@ uncompressed assets, and for meshopt assets when you pass the decoder as
 Both async APIs accept `{signal}`, an optional reusable `draco` decoder with a
 `decode` method, and an optional `ktx2` decoder with a `transcode` method. A supplied decoder stays owned by its caller. The default Draco
 decoder requires browser module workers; server callers can supply a decoder.
+
+Images passed to `parseGLTF(engine, input, buffers, images)`, `parsePreparedPBR` or the positional
+`parseGLTFAsync(engine, input, buffers, images)` belong to the call from then on: the model closes each
+`ImageBitmap` at `dispose()`, and a call that throws closes them before it throws, whatever failed. To keep using a
+bitmap after the model, pass a model's `shareImages()` or a fresh `createImageBitmap` copy.
+
 Draco attributes and indices populate the original accessors, preserving skin and
 morph data and leaving attributes outside the compression map on the usual path.
 Normalized integer UVs, colors and extra channels are converted once according to

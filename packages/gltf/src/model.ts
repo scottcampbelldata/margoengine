@@ -6112,7 +6112,11 @@ function capturePublicShadowGetter(model: typeof PBRModel): () => unknown {
   return Object.getOwnPropertyDescriptor(model.prototype, 'shadowPrimitives')!.get!;
 }
 const publicShadowGetter = /* @__PURE__ */ capturePublicShadowGetter(PBRModel);
-/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader, `meshopt` decoder, `materials` shaders and `transmission` pass; `maxNodes` and `maxPartVertices` as for loadGLTF. */
+/**
+ * Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader, `meshopt` decoder, `materials` shaders and `transmission` pass; `maxNodes` and `maxPartVertices` as for loadGLTF.
+ * The call takes `images` (KB-GLTFA A9): the model closes each `ImageBitmap` at `dispose()`, and a parse that throws
+ * closes them before it throws, whatever failed. Pass `model.shareImages()` or bitmaps you will not use again.
+ */
 export function parseGLTF(
   instance: EngineKernel,
   input: string | object | ArrayBuffer | ArrayBufferView,
@@ -6121,16 +6125,19 @@ export function parseGLTF(
   decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt' | 'transmission'> = {},
   { maxNodes, maxPartVertices }: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'> = {},
 ): PBRModel {
-  const partVertices = partLimit(maxPartVertices);
-  const { doc, binary } = container(input),
-    asset = new GLTFAsset(doc, buffers, binary, decoders, undefined, maxNodes);
-  asset.partVertices = partVertices;
-  const model = new PBRModel(instance, asset, images);
+  let model: PBRModel | undefined;
   try {
+    const partVertices = partLimit(maxPartVertices);
+    const { doc, binary } = container(input),
+      asset = new GLTFAsset(doc, buffers, binary, decoders, undefined, maxNodes);
+    asset.partVertices = partVertices;
+    model = new PBRModel(instance, asset, images);
     engineRuntime(instance).use(model);
     return model;
   } catch (error) {
-    model.dispose();
+    // The model holds the images once made; before that the call still owns them, so it closes them (A9).
+    if (model) model.dispose();
+    else closeImages(images);
     throw error;
   }
 }
@@ -6142,25 +6149,27 @@ export function parsePreparedPBR(
   images: readonly GLTFImage[] = [],
   { maxNodes, maxPartVertices }: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'> = {},
 ): PBRModel {
-  const partVertices = partLimit(maxPartVertices);
-  checkDocument(doc);
-  if (
-    doc.buffers?.length ||
-    doc.skins?.length ||
-    doc.animations?.length ||
-    doc.nodes?.some((n) => n.skin !== undefined) ||
-    !Array.isArray(geometry) ||
-    geometry.length !== doc.meshes?.length
-  )
-    throw new TypeError('Prepared PBR requires a static scene');
-  const asset = new GLTFAsset(doc, [], undefined, {}, undefined, maxNodes);
-  asset.partVertices = partVertices;
-  const model = new PBRModel(instance, asset, images, geometry);
+  let model: PBRModel | undefined;
   try {
+    const partVertices = partLimit(maxPartVertices);
+    checkDocument(doc);
+    if (
+      doc.buffers?.length ||
+      doc.skins?.length ||
+      doc.animations?.length ||
+      doc.nodes?.some((n) => n.skin !== undefined) ||
+      !Array.isArray(geometry) ||
+      geometry.length !== doc.meshes?.length
+    )
+      throw new TypeError('Prepared PBR requires a static scene');
+    const asset = new GLTFAsset(doc, [], undefined, {}, undefined, maxNodes);
+    asset.partVertices = partVertices;
+    model = new PBRModel(instance, asset, images, geometry);
     engineRuntime(instance).use(model);
     return model;
   } catch (error) {
-    model.dispose();
+    if (model) model.dispose();
+    else closeImages(images);
     throw error;
   }
 }
@@ -6227,8 +6236,11 @@ export async function parseGLTFAsync(
       scope,
     );
   }
-  options.signal?.throwIfAborted();
-  const { doc, binary } = container(input, downloadLimit(options.maxDownloadBytes)),
+  // The call takes positional `images`: a failure before the model holds them closes them (KB-GLTFA A9).
+  let asset: GLTFAsset, decodedImages: GLTFImage[];
+  try {
+    options.signal?.throwIfAborted();
+    const { doc, binary } = container(input, downloadLimit(options.maxDownloadBytes));
     asset = new GLTFAsset(
       doc,
       buffersOrOptions ?? [],
@@ -6237,23 +6249,27 @@ export async function parseGLTFAsync(
       options.maxDownloadBytes,
       options.maxNodes,
     );
-  asset.partVertices = partLimit(options.maxPartVertices);
-  await addTransmission(asset);
-  if (options.optimize) asset.reorder = await triangleOrder();
-  await asset.prepareMeshopt();
-  // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
-  if (hasDraco(asset))
-    await (await import('./compression.js')).decompressPrimitives(asset, {
+    asset.partVertices = partLimit(options.maxPartVertices);
+    await addTransmission(asset);
+    if (options.optimize) asset.reorder = await triangleOrder();
+    await asset.prepareMeshopt();
+    // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
+    if (hasDraco(asset))
+      await (await import('./compression.js')).decompressPrimitives(asset, {
+        ...options,
+        draco: options.draco ?? options.decoders?.draco,
+      });
+    else options.signal?.throwIfAborted();
+    decodedImages = await decodeKTX2Images(asset, images ?? [], {
       ...options,
-      draco: options.draco ?? options.decoders?.draco,
+      ktx2: options.ktx2 ?? options.decoders?.ktx2,
+      device: engineRuntime(instance).gpu ?? undefined,
     });
-  else options.signal?.throwIfAborted();
-  images = await decodeKTX2Images(asset, images ?? [], {
-    ...options,
-    ktx2: options.ktx2 ?? options.decoders?.ktx2,
-    device: engineRuntime(instance).gpu ?? undefined,
-  });
-  return withSplats(instance, { asset, images: images as GLTFImage[] }, options.signal, scope);
+  } catch (error) {
+    closeImages(images ?? []);
+    throw error;
+  }
+  return withSplats(instance, { asset, images: decodedImages }, options.signal, scope);
 }
 const importedSun = new WeakMap<
   Engine,
@@ -6362,7 +6378,12 @@ async function withSplats(
   signal: AbortSignal | undefined,
   scope: SceneScope,
 ): Promise<PBRModel> {
-  await addTransmission(loaded.asset);
+  try {
+    await addTransmission(loaded.asset);
+  } catch (error) {
+    closeImages(loaded.images); // no model holds them yet (KB-GLTFA A9)
+    throw error;
+  }
   // Both steps run after the awaits of the load: they go in the scene the load started in.
   const model = scope.run(() => attach(instance, loaded, signal));
   try {
