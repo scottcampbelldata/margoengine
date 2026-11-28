@@ -17887,6 +17887,18 @@ Regression: packages/gltf/test/node-images.test.js, six PNG/JPEG source cases fa
 - **Repro:** the Seed-san rig of `packages/ragdoll/tests/balance.test.js`, its upper body set moving at 0.5 m/s to the left as the push tests there do, `roundDifferently(ragdoll, 16, 2)`, 8 passes. It falls inside two seconds.
 - **Cause:** not found. Read so far: a foot the controller counts as standing leaves the floor. On Seed-san pushed left at 0.5 m/s no step starts, while the right foot crosses 0.11 m and rises 0.015 m, and the figure tilts 0.82 rad by frame 78. On RiggedFigure pushed forward at 1 m/s both feet stand 0.1 m off the floor at frame 18 with no swing running. `RagdollBalance.landing` gives these two no step at all, as it takes the hips' height for the leg's: `room` reads 0 where Knight's reads 0.253 m. That is wrong, but it is not what throws them: reach from the true hip to ankle line, and reach from the friction cone, both read no better (at 1 m/s RiggedFigure falls in 57 and 58 of 64 against 31, Seed-san in 61 and 59 against 49). Ending a swing on foot contact, as SIMBICON does, and leaving a foot in the air out of the stance legs read worse over all seven figures: 964 and 926 pushes failed of 2,688, against 854.
 - **Needed to close:** the controller owns this, so it stays after the solver change. Remeasure on Margo's solver, then find why a standing foot leaves the floor.
+- **Remeasured on Margo's solver (lane P, 2026-11-28):** probe `.lane/kb2208-sweep.mjs` in the lane P worktree, seven figures, 1 m/s,
+  four directions, seeds 1 and 2, 240 frames: 18 of 56 pushes fall (RiggedFigure 8/8, Seed-san 6/8, Mage 2/8, Barbarian and
+  Ranger 1/8, Knight and Rogue 0/8). Every figure takes 0.10 s steps (`stepDuration` reach is 0 or near it, finding of handoff 6).
+  On RiggedFigure pushed forward the stance leg stays at bend 0.243 while the swing knee snaps from 0.60 to 0.87 rad and lifts
+  the swing foot 8 cm in 0.05 s; the body's centre of mass rises 3.3 cm at up to 0.48 m/s and carries the stance foot 4 cm off
+  the floor (frames 3 to 6), and after three such steps both feet stand 6 to 7 cm up with state 'standing'. So the stance foot
+  leaves the floor because the swing leg's upward momentum lifts the whole rigid body, not because the height hold uses it
+  (plants are projected to the floor). None of these, alone or together, changes the falls: hip height from the hip joint
+  (27 falls), a 0.998 extension in the reach (18), both (16), a swing lift capped so its sinusoid peaks at 1, 2 or 4 g
+  (17, 17, 19), half or a quarter of `stepTrigger` (16, 23), and the four together (18). Seed-san falls the same in every
+  variant, so its cause is elsewhere: next look at its stance foot's sole (contact points and the `room` ankle torque bound,
+  `carryWeight` around line 630) and at what the upper body does in the first 12 frames of a sideways push.
 
 ### Fixed 2026-11-11: npm run verify hung once in its unit test step
 
