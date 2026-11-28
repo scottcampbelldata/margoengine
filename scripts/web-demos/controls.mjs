@@ -374,6 +374,8 @@ function probe() {
     let up = el.parentElement;
     for (let i = 0; i < 2 && up && up !== document.body; i++, up = up.parentElement) {
       if (up.querySelectorAll(SEL).length > 1 || clean(up.textContent).length > 120) break;
+      // A button has no value label: a status line beside it ("Preparing the photon bake") is what it changes.
+      if (!el.matches('input,select,textarea,[role=slider],[role=spinbutton]') && [...up.querySelectorAll('[role=status],[role=alert],[aria-live],output')].some((s) => !roots.includes(s) && !el.contains(s))) break;
       roots.push(up);
     }
     return roots;
@@ -413,7 +415,9 @@ function probe() {
   };
   const regions = () => {
     const out = [];
-    for (const el of document.querySelectorAll('canvas,svg,video,[role=img]')) {
+    // Pictures first, then still images: a path-traced page shows a traced still until its live view starts, and a
+    // setting may swap one still for another.
+    for (const el of [...document.querySelectorAll('canvas,svg,video,[role=img]'), ...document.querySelectorAll('img')]) {
       if (el.tagName.toLowerCase() === 'svg' && el.parentElement?.closest('svg')) continue;
       if (el.closest(SEL)) continue;
       if (el.getAttribute('role') === 'img' && el.querySelector('canvas,svg')) continue;
@@ -665,7 +669,8 @@ class Session {
     const state = await page
       .waitForFunction(
         () => {
-          if (document.querySelector('[data-error], [data-state="error"]')) return 'error';
+          // data-error="false" (glsl-welcome's status line) means no error.
+          if (document.querySelector('[data-error]:not([data-error="false"]):not([data-error=""]), [data-state="error"]')) return 'error';
           return document.querySelector('[data-ready], [data-state="ready"]') ? 'ready' : false;
         },
         null,
@@ -677,7 +682,7 @@ class Session {
       state === 'error'
         ? await this.eval(
             () =>
-              document.querySelector('[data-error]')?.dataset.error ??
+              document.querySelector('[data-error]:not([data-error="false"]):not([data-error=""])')?.dataset.error ??
               document.querySelector('[role=alert]')?.textContent ??
               'error',
           )
@@ -871,17 +876,29 @@ async function faintChange(a, b, c) {
 // ---------------------------------------------------------------------------------------------------------------
 // Inputs per kind of control.
 async function setValue(s, p, v) {
-  await s.eval(
+  const entered = await s.eval(
     ([p, v]) => {
       const el = document.querySelector(p);
       el.focus({ preventScroll: true });
       el.value = v;
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
+      // A typed field in a form with a submit button ("Lower limit" then "Apply range") acts when Enter submits the
+      // form, as a visitor would press it. The page handles the submit; the window listener, last in line, only
+      // stops a form without a handler from leaving the page.
+      if (!el.form || !/^(number|text|search)$/.test(el.type) || !el.form.querySelector('[type=submit],button:not([type])')) return false;
+      const stay = (e) => e.preventDefault();
+      window.addEventListener('submit', stay);
+      try {
+        el.form.requestSubmit();
+      } finally {
+        window.removeEventListener('submit', stay);
+      }
+      return true;
     },
     [p, String(v)],
   );
-  return 'set';
+  return entered ? 'set, Enter' : 'set';
 }
 async function setIndex(s, p, i) {
   await s.eval(
@@ -1114,7 +1131,7 @@ function refine(c, d) {
   return c;
 }
 const START =
-  /\b(play|run|start|spin|release|drop|launch|fire|go|animate|tip|swing|pump|drive|wind|roll|pour|flow|turn on|switch on)\b/i;
+  /\b(play|run|start|spin|release|drop|launch|fire|go|animate|tip|swing|pump|drive|wind|roll|pour|flow|trigger|strike|flash|cast|turn on|switch on)\b/i;
 const GESTURE =
   /[^.]*\b(drag|tap|click)\b[^.]{0,60}\b(strokes?|draw(?!\s+order)|paint|recolou?r|brush|plant|place|erase|sculpt|carve|tap the map)\b[^.]*|[^.]*\bchoose a \w+, then (tap|click|drag)[^.]*/i;
 const pageTexts = new Map();
@@ -1139,7 +1156,9 @@ function pageText(slug) {
 const HANDLE = /^(drag|grab|move|reorder|resize)\b/i;
 /** A slider that turns something through whole turns: -180 and 180 degrees draw the same picture by design. */
 function periodOf(c) {
-  const span = Number(c.max) - Number(c.min);
+  // A live control carries min and max; a saved record keeps them only in its step names ("to max (360)").
+  const end = (which) => c[which] ?? /\(([-+\d.e]+)\)/.exec((c.steps ?? []).find((s) => s.action?.startsWith(`to ${which} `))?.action ?? '')?.[1];
+  const span = Number(end('max')) - Number(end('min'));
   if (Math.abs(span - 2 * Math.PI) < 1e-3) return 2 * Math.PI;
   return span >= 360 &&
     /°|\b(deg|degrees|turn|rotat\w*|angle|heading|yaw|bearing|azimuth|spin|hue|longitude)\b/i.test(c.label ?? '')
@@ -1172,7 +1191,7 @@ function alreadyHeld(c, d) {
   return own[2];
 }
 // "Draw" alone is a tool; "Reverse draw order" is a setting that should change the picture.
-const TOOL = /\b(brush|eraser|pen|pencil|paint|pick|tool|stamp|marker|lasso)\b|^draw$/i;
+const TOOL = /\b(brush|eraser?|pen|pencil|paint|pick|tool|stamp|marker|lasso)\b|^draw$/i;
 const PLAYBACK = /\b(speed|rate|tempo|time ?scale|playback|slow(er)?|fast(er)?)\b/i;
 /** A sound control that changed nothing to see may still change what is heard: unsure, never dead. */
 const soundAware = (verdict, label) => (verdict === 'dead' && SOUND.test(label) ? 'unsure' : verdict);
