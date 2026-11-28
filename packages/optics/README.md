@@ -16,7 +16,8 @@ nanometres unless a parameter says metres, and argument errors throw `RangeError
 | `@margoengine/optics/imaging` | `thinLens`, `pinholeImage`, `relativeIllumination`, `astigmaticFoci`, `astigmaticImage`, `designFresnelLens`, `cornerCubeReflect`, `airIndexTemperatureSlope`, `knifeEdgeTransmission` |
 | `@margoengine/optics/spectrum` | `cieXYZ`, `xyzToLinearSRGB`, `wavelengthToLinearSRGB`, `spectralColor`, `planckRelative`, `SpectralIntegrator` (`color`, `luminance`) |
 
-The root entry re-exports all six; import an entry to load only that topic.
+The root entry re-exports all six; import an entry to load only that topic. `@margoengine/optics/screens` (below) is
+the GPU side, drawn with `@margoengine/shader`, and is imported on its own.
 
 ## Refraction and dispersion
 
@@ -117,6 +118,47 @@ const kept = integrator.luminance((nm) => (nm < 500 ? 1 : 0)); // share of the b
 console.log(xyz, laserGreen, white, blueFilter, kept);
 ```
 
+## Bench screens (GPU)
+
+`@margoengine/optics/screens` draws what an optics bench shows: laser beams as crossed Gaussian tubes (core plus scatter
+halo, Kogelnik and Li), glass plates with a rim and a sheen band, glowing spots (soft or hard-cored), a two-beam
+interference detector whose field is `(1 + V cos(2 pi (u f + cycles))) / 2` under a Gaussian beam, and mirror facets that
+reflect a soft studio. Every part of one set shares one `RawShaderMaterial` (one pipeline per blend mode), follows a core
+mesh's transform, and takes its look as numbers, so a scene never writes shader text. Each part's `set(look)` changes
+the look live (it rewrites only the values that changed); `part.mesh.visible` hides it. It runs on WebGPU and on the
+WebGL2 compatibility layer (`npm run test:gpu:screens` in this package checks both). It needs `@margoengine/shader`; the
+root entry does not re-export it.
+
+| Part | Call | Look fields (defaults in the type docs) |
+| --- | --- | --- |
+| Laser beam | `beam(parent, look)`: along the parent's +z from 0 to 1, scale the parent to width and length | `edge`, `core`, `coreMix`, `colorFalloff`, `coreFalloff`, `coreWeight`, `haloFalloff`, `haloWeight`, `lengthBase`, `lengthSlope`, `lengthTaper`, `opacity` |
+| Glass plate | `plate(parent, halfWidth, halfHeight, look)` | `tint`, `sheen`, `sheenMix`, `sheenFalloff`, `bandX`, `bandY`, `bandOffset`, `rimStart`, `base`, `rimWeight`, `bandWeight`, `bandFalloff`, `shape` (`'rect'` or `'disc'`) |
+| Spot | `spot(parent, halfWidth, halfHeight, look)` | `edge`, `core`, `coreMix`, `colorFalloff`, `innerFalloff`, `innerWeight`, `outerFalloff`, `outerWeight`, `fade`, `opacity`, `hardCore` |
+| Fringe detector | `fringes(parent, radius, look)` | `frequency`, `cycles`, `visibility`, `waist`, `edge`, `core`, `gamma`, `gain`, `body`, `glow`, `markWeight` |
+| Mirror facet | `facet(parent, [p0, p1, p2], normal, look)` | `dark`, `panelColor`, `panelFalloff`, `panelHeight`, `tint`, `highlightFalloff`, `highlightTilt`, `highlightOffset`, `base`, `highlightWeight` |
+
+`OpticsScreens.attach(engine, {blending})` takes `'normal'` (default) or `'additive'` for glowing parts drawn after the
+opaque scene, or `'none'` for opaque parts that write depth (facets); every set on an engine draws through one
+`RawShaders` plugin.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { michelsonFringes } from '@margoengine/optics/interference';
+import { OpticsScreens } from '@margoengine/optics/screens';
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [0, 0, 3], target: [0, 0, 0] } });
+const screens = OpticsScreens.attach(engine);
+// A red He-Ne beam 2 units long along +x, 0.05 wide.
+const anchor = engine.createMesh().setPosition([-1, 0.5, 0]).setQuaternion([0, Math.SQRT1_2, 0, Math.SQRT1_2]).setScale([0.05, 0.05, 2]);
+screens.beam(anchor);
+const splitter = screens.plate(engine.createMesh().setPosition([-0.8, -0.4, 0]), 0.3, 0.25);
+const detector = screens.fringes(engine.createMesh().setPosition([0.6, -0.4, 0]), 0.5, { frequency: 3 });
+await screens.ready();
+// Move the mirror 200 nm: the fringes slide by 2d / wavelength cycles.
+detector.set({ cycles: michelsonFringes(200, 632.8) % 1 });
+splitter.set({ tint: [0.2, 0.5, 0.4] });
+engine.render();
+```
+
 ## Sources
 
 Written clean room from these publications; no other engine's or paper's code was read.
@@ -150,3 +192,11 @@ Written clean room from these publications; no other engine's or paper's code wa
 - C. Wyman, P.-P. Sloan and P. Shirley, "Simple Analytic Approximations to the CIE XYZ Color Matching Functions",
   JCGT 2(2), 1-11, 2013. https://jcgt.org/published/0002/02/01/
 - IEC 61966-2-1:1999, sRGB (XYZ to linear sRGB matrix).
+- H. Kogelnik and T. Li, "Laser Beams and Resonators", Applied Optics 5(10), 1550-1567, 1966.
+  https://doi.org/10.1364/AO.5.001550 (Gaussian beam profile of the screens' beams).
+- A. E. Siegman, *Lasers*, University Science Books, 1986 (beam profile and scatter halo).
+- P. Hariharan, *Basics of Interferometry*, 2nd ed., Academic Press, 2007 (tilted-mirror fringes on the detector).
+- C. Schlick, "An Inexpensive BRDF Model for Physically-based Rendering", Computer Graphics Forum 13(3), 233-246, 1994.
+  https://doi.org/10.1111/1467-8659.1330233 (grazing-angle rim of the glass plates).
+- J. F. Blinn and M. E. Newell, "Texture and Reflection in Computer Generated Images", CACM 19(10), 542-547, 1976.
+  https://doi.org/10.1145/360349.360353 (mirror facets reflecting a studio along the reflected view ray).

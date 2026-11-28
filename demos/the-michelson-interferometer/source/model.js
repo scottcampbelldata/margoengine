@@ -92,7 +92,7 @@ export function createInterferometer(engine,shadows){
   ring(.017,.029,.006,.0018,warm,[0,h,.330],{rotation:alignZ});
   disc(.020,.008,seal,[0,h,.333],{rotation:alignZ});
   const lamp=engine.createMesh().setPosition([0,h,.327]);
-  light.plate(lamp,.018,.018,5);
+  light.lamp(lamp,.018);
 
   // Two mirror cells share a family, with different adjustment housings.
   function mirror(parent,color,x,z,theta,tilt,isStatic){
@@ -143,10 +143,10 @@ export function createInterferometer(engine,shadows){
   for(const deg of [0,90,180,270]){
     const rotation=deg*Math.PI/180;
     const glass=engine.createMesh().setPosition([.061*Math.sin(rotation),h,.061*Math.cos(rotation)]).setQuaternion(yaw(rotation));
-    light.plate(glass,.060,.061,2);
+    light.glass(glass,.060,.061);
   }
   const diagonal=engine.createMesh().setPosition([0,h,0]).setQuaternion(yaw(-Math.PI/4));
-  light.plate(diagonal,.085,.060,3);
+  light.splitter(diagonal,.085,.060);
 
   // Circular receiver with a fixed top fiducial and a physical housing behind the image.
   box([.135,.036,.193],.013,obsidian,[outputCell+.038,.083,0],fixed);
@@ -165,7 +165,7 @@ export function createInterferometer(engine,shadows){
   box([.014,.004,.020],.001,marks,[outputCell+.001,h+.117,0],{rotation:axisAngleToQuaternion([1,0,0],.14)});
 
   const inBeam=engine.createMesh(),fixedBeam=engine.createMesh(),movingBeam=engine.createMesh(),outBeam=engine.createMesh();
-  const guides=[light.beam(inBeam,0),light.beam(fixedBeam,1),light.beam(movingBeam,1),light.beam(outBeam,0)];
+  const guides=[light.beam(inBeam,false),light.beam(fixedBeam,true),light.beam(movingBeam,true),light.beam(outBeam,false)];
   function beam(anchor,from,to,width,rotation){
     anchor.setPosition(from).setQuaternion(rotation).setScale([width,width,Math.hypot(to[0]-from[0],to[2]-from[2])]);
   }

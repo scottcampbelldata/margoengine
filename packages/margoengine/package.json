@@ -3347,6 +3347,10 @@
       "types": "./dist/optics/spectrum.d.ts",
       "import": "./dist/optics/spectrum.js"
     },
+    "./optics/screens": {
+      "types": "./dist/optics/screens.d.ts",
+      "import": "./dist/optics/screens.js"
+    },
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"

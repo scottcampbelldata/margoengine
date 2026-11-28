@@ -97,7 +97,7 @@ export function createSplitter(engine,shadows){
   box([.063,.030,.047],.009,marine,[0,-.108,0],{parent:frame});
   box([.032,.009,.009],.003,rust,[0,.100,.004],{parent:frame});
   const coating=engine.createMesh(frame).setPosition([0,0,.002]);
-  glass.panel(coating,.079,.080,3);
+  glass.coating(coating,.079,.080);
 
   // White collimator at the front of the optical axis.
   box([.207,.024,.231],.009,gray,[0,.084,.373],fixed);
@@ -123,7 +123,7 @@ export function createSplitter(engine,shadows){
     box([.131,.124,.008],.005,polished,[0,height,-.001],{parent:support});
     box([.115,.103,.008],.004,detector,[0,height,.004],{parent:support});
     const screen=engine.createMesh(support).setPosition([0,height,.009]);
-    glass.panel(screen,.055,.049,kind);
+    glass.receiver(screen,.055,.049,kind===5);
     box([.071,.008,.010],.0025,bronze,[0,height-.057,.008],{parent:support});
     return support;
   }

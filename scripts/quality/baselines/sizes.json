@@ -15278,6 +15278,12 @@
     },
     {
       "date": "2026-11-27",
+      "commit": "optics-screens-1",
+      "reason": "new entry @margoengine/optics/screens at 3141 B gzip (ceiling 3397 B): the GPU screens of an optics bench (Gaussian laser beams, glass plates, spots, a two-beam fringe detector, mirror facets) as one RawShaderMaterial fed by flat per-vertex looks, so optics demos carry no WGSL. @margoengine/shader is a peer and is not counted. The root and the other entries are unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-27",
       "commit": "lane-e-instanced-flow",
       "reason": "materials gains the instanced-curve-flow entry (many instances along curves, 18,332 B); shader editor-pass grows 114 B of NodeMaterial caster renewal after a texture or buffer is rebuilt (KB-SHADOW-STALEMOVE1).",
       "grew": 2
@@ -16194,6 +16200,7 @@
     "@margoengine/optics/interference": 2668,
     "@margoengine/optics/polarization": 2210,
     "@margoengine/optics/refraction": 3268,
+    "@margoengine/optics/screens": 3397,
     "@margoengine/optics/spectrum": 1478,
     "@margoengine/physics": 945858,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 104696,

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/optics",
   "version": "1.0.0",
-  "description": "Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour.",
+  "description": "Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour; plus the GPU screens of an optics bench.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -11,7 +11,8 @@
     "polarization",
     "interference",
     "diffraction",
-    "spectrum"
+    "spectrum",
+    "laser"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -54,6 +55,10 @@
     "./spectrum": {
       "types": "./dist/spectrum.d.ts",
       "import": "./dist/spectrum.js"
+    },
+    "./screens": {
+      "types": "./dist/screens.d.ts",
+      "import": "./dist/screens.js"
     }
   },
   "files": [
@@ -67,6 +72,19 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js optics",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:screens": "cd ../.. && node scripts/run-with-timeout.mjs -- node packages/optics/tests/screens-browser.mjs"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/shader": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/shader": {
+      "optional": true
+    }
   }
 }

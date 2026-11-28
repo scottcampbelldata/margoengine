@@ -1,74 +1,40 @@
-import { RawMesh, RawShaderMaterial, RawShaders } from '@margoengine/shader/raw';
+import { OpticsScreens } from '@margoengine/optics/screens';
+import { lerp } from '@margoengine/math/mathutils';
 
-// The guides and illuminated areas share a material so each renderer compiles one optics pipeline.
-const vertex=`
-struct Varying {
-  @builtin(position) clip:vec4f,
-  @location(0) coordinate:vec2f,
-  @location(1) usage:f32,
-}
-@vertex fn vertex(a:Attributes)->Varying {
-  return Varying(camera.viewProjection * mesh.world * vec4f(a.position,1.0),a.coordinate,a.usage);
-}`;
-const fragment=`
-struct Varying {
-  @builtin(position) clip:vec4f,
-  @location(0) coordinate:vec2f,
-  @location(1) usage:f32,
-}
-@fragment fn fragment(i:Varying)->@location(0) vec4f {
-  var color=vec3f(0.94,0.96,1.0);
-  if ((i.usage > 0.5 && i.usage < 1.5) || (i.usage > 3.5 && i.usage < 4.5)) {
-    color=uniforms.transmitted;
-  }
-  if ((i.usage > 1.5 && i.usage < 3.5) || i.usage > 4.5) { color=uniforms.reflected; }
-  let uv=i.coordinate;
-  var opacity=0.0;
-  if (i.usage < 2.5) {
-    let width=uv.x*uv.x;
-    opacity=exp(-22.0*width)*0.78+exp(-5.8*width)*0.28;
-  } else if (i.usage < 3.5) {
-    color=mix(vec3f(0.11,0.18,0.25),color,0.58);
-    let rim=smoothstep(0.70,1.0,max(abs(uv.x),abs(uv.y)));
-    let sheen=uv.x+uv.y*0.7;
-    opacity=0.14+0.20*rim+0.07*exp(-14.0*sheen*sheen);
-  } else {
-    let d=dot(uv,uv);
-    opacity=0.98*exp(-7.0*d)+0.26*exp(-2.6*d);
-  }
-  let brightness=clamp(color,vec3f(0.0),vec3f(1.0));
-  return vec4f(margoEncode(vec4f(brightness,1.0)).rgb,min(1.0,opacity));
-}`;
+// The guides, the coating and the lit receivers share one additive optics-screens set (one pipeline).
+const white=[.94,.96,1];
+const beamLook={coreMix:0,coreFalloff:22,coreWeight:.78,haloFalloff:5.8,haloWeight:.28,lengthTaper:0};
+const coatingLook={sheenMix:0,bandY:.7,bandOffset:0,rimStart:.70,base:.14,rimWeight:.20,bandWeight:.07,bandFalloff:14};
+const spotLook={coreMix:0,innerFalloff:7,innerWeight:.98,outerFalloff:2.6,outerWeight:.26,fade:1};
+const coated=(color)=>{const tint=color.map((c,i)=>lerp([.11,.18,.25][i],c,.58));return {tint,sheen:tint};};
+const lit=(color)=>({edge:color,core:color});
 
 export function installLight(engine) {
-  const material=new RawShaderMaterial({
-    vertexShader:vertex,fragmentShader:fragment,
-    uniforms:{reflected:{value:[.05,.8,1]},transmitted:{value:[1,.20,.04]}},
-    blending:'additive',transparent:true,depthWrite:false,cull:'none',
-  });
-  const raw=RawShaders.attach(engine);
-  function mount(parent,points,coords,usage,indices){
-    raw.add(new RawMesh({
-      mesh:parent,material,
-      attributes:{position:{data:new Float32Array(points),type:'vec3f'},
-        coordinate:{data:new Float32Array(coords),type:'vec2f'},
-        usage:{data:new Float32Array(points.length/3).fill(usage),type:'f32'}},
-      index:indices,
-    }));
-  }
+  const screens=OpticsScreens.attach(engine,{blending:'additive'});
+  const reflected=[],transmitted=[],coatings=[];
+  let colors={reflected:[.05,.8,1],transmitted:[1,.20,.04]};
   return {
-    async ready(){await raw.ready();if(material.error)throw material.error;},
-    update({reflected,transmitted}){
-      material.uniforms.reflected.value=reflected;
-      material.uniforms.transmitted.value=transmitted;
+    ready:()=>screens.ready(),
+    update(next){
+      colors=next;
+      for(const part of reflected)part.set(lit(next.reflected));
+      for(const part of coatings)part.set(coated(next.reflected));
+      for(const part of transmitted)part.set(lit(next.transmitted));
     },
+    // Guide 0 is the white input, 1 the transmitted and 2 the reflected beam.
     beam(parent,usage){
-      mount(parent,[-1,0,0,1,0,0,1,0,1,-1,0,1,0,-1,0,0,1,0,0,1,1,0,-1,1],
-        [-1,0,1,0,1,1,-1,1,-1,0,1,0,1,1,-1,1],usage,[0,1,2,0,2,3,4,5,6,4,6,7]);
+      const color=[white,colors.transmitted,colors.reflected][usage];
+      const part=screens.beam(parent,{...beamLook,...lit(color)});
+      if(usage===1)transmitted.push(part);
+      if(usage===2)reflected.push(part);
     },
-    panel(parent,width,height,usage){
-      mount(parent,[-width,-height,0,width,-height,0,width,height,0,-width,height,0],
-        [-1,-1,1,-1,1,1,-1,1],usage,[0,1,2,0,2,3]);
+    coating(parent,width,height){
+      const part=screens.plate(parent,width,height,{...coatingLook,...coated(colors.reflected)});
+      coatings.push(part);
+    },
+    receiver(parent,width,height,isReflected){
+      const part=screens.spot(parent,width,height,{...spotLook,...lit(isReflected?colors.reflected:colors.transmitted)});
+      (isReflected?reflected:transmitted).push(part);
     },
   };
 }

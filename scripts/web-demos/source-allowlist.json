@@ -475,8 +475,7 @@
    "R5": 362
   },
   "the-dichroic-splitter": {
-   "R1": 3,
-   "R5": 338
+   "R5": 337
   },
   "the-differential": {
    "R2": 1,
@@ -713,8 +712,7 @@
    "R5": 400
   },
   "the-michelson-interferometer": {
-   "R1": 3,
-   "R5": 365
+   "R5": 342
   },
   "the-mirror-hall": {
    "R1": 28,
@@ -828,8 +826,7 @@
    "R5": 625
   },
   "the-retroreflector": {
-   "R1": 4,
-   "R5": 444
+   "R5": 426
   },
   "the-reuleaux-drive": {
    "R3": 4,
