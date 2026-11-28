@@ -335,6 +335,14 @@ All core exports are also available from this package. React applications can us
 
 Run `npm run modern:dev` and open `/quickstart.html` for the five-line demo. Verification: `npm test` and `npm run modern:test:wrapper` after building packages; `npm run test:gpu --workspace packages/stage` runs the model viewer and a saved scene with a real model on real WebGPU; `test:gpu:lights` and `test:gpu:viewer-extras` in the same workspace run the lights and viewer extras entries.
 
+`npm run test:gpu:viewer-extras --workspace packages/stage` (after a build) opens
+`packages/stage/test/gpu/viewer-extras.html` twice, on native WebGPU and then with `?compat` on the WebGL2
+compatibility layer. On each it loads four Khronos models (BoxTextured, RiggedFigure, MorphStressTest,
+MaterialsVariantsShoe) and checks that `addViewerExtras` draws the same pixels as the plain viewer, that animation
+clips play, that material variants change the picture, that picking hits the model and misses beside it, that a
+hotspot follows its node on screen, that disposing the extras puts the hotspot element back in its own container and leaves no poster image, that the `margo-viewer` element
+works, that the AR button is disabled with a reason where WebXR AR is missing, and that the page logs no errors.
+
 ## Content Security Policy
 
 Creating the engine compiles core's embedded Rust transform kernel, so restricted pages need `'wasm-unsafe-eval'` in `script-src`. A stage creates that same engine. Every Margo engine page under a strict CSP needs this permission. A blocked compile or instantiate rejects with MargoError code `failed`, its original cause and a link to the CSP docs. Imports alone do not compile Wasm. See [the exact header and package requirements](../../docs/csp.md).
