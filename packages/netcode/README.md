@@ -1023,6 +1023,56 @@ await serving;
   never sent again, since it may have reached the owner; its seat then frees itself when the reservation expires.
 - The directory is trusted server code. Authenticate the HTTP endpoints that call `list` and `reserve`.
 
+Processes on one host share a SQLite file; several hosts share your own database through a `PresenceStore`. The
+store's records are strings with a Unix-millisecond expiry, and `take` must remove a record atomically across every
+process (a `DELETE ... RETURNING` or a compare-and-delete):
+
+```ts
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openSqlitePresence, StorePresence, type PresenceStore } from '@margoengine/netcode/presence';
+
+// One host: every server process opens the same local file (not a network share).
+using local = await openSqlitePresence(join(tmpdir(), `presence-${process.pid}.db`), { namespace: 'arena' });
+
+// Several hosts: the five calls on your database. A Map stands in for it here.
+class MyStore implements PresenceStore {
+  private rows = new Map<string, { value: string; expiresAt: number }>();
+  private live(key: string) {
+    const row = this.rows.get(key);
+    return row && row.expiresAt > Date.now() ? row : undefined;
+  }
+  async set(key: string, value: string, expiresAt: number) {
+    this.rows.set(key, { value, expiresAt });
+  }
+  async get(key: string) {
+    return this.live(key)?.value;
+  }
+  async keys(prefix: string) {
+    return [...this.rows.keys()].filter((k) => k.startsWith(prefix) && this.live(k)).sort();
+  }
+  async take(key: string) {
+    const row = this.live(key);
+    this.rows.delete(key);
+    return row?.value;
+  }
+  async delete(key: string) {
+    this.rows.delete(key);
+  }
+  [Symbol.dispose]() {
+    this.rows.clear();
+  }
+}
+using shared = new StorePresence(new MyStore(), { namespace: 'arena', requestTimeout: 5000, pollInterval: 20 });
+console.log(local instanceof StorePresence, shared instanceof StorePresence); // true true: pass either to RoomNode
+```
+
+- `StorePresence` takes ownership of its store and disposes it. `namespace` (default `margo-netcode`) keeps games on
+  one database apart; `requestTimeout` (default 5,000 ms) bounds a routed reservation and `pollInterval` (default
+  20 ms) is how often a waiting request reads its reply.
+- `openSqlitePresence` loads Node's built-in `node:sqlite` only when called, opens the file in WAL mode, and takes the
+  same options plus a `signal`. SQLite errors propagate as they are, without retries.
+
 ### Peer-to-peer host migration
 
 `@margoengine/netcode/migrate` keeps a peer-to-peer game going when its host leaves. Every peer makes a
@@ -1062,6 +1112,36 @@ c.close();
 - Up to 64 peers; checkpoints up to `maxSnapshotBytes` (default 1 MiB, at most 16 MiB). Peers are trusted and the
   surviving mesh must stay connected: this is not consensus, so a split network or a lying peer needs your own
   membership and fencing. A peer cannot join a live session; start a new one.
+
+A planned handoff, and the limits every operation runs under:
+
+```ts
+import { defineSchema, LoopbackNetwork } from '@margoengine/netcode';
+import { HostMigration } from '@margoengine/netcode/migrate';
+
+const schema = defineSchema({ types: { State: { score: 'uint' } } } as const);
+const network = new LoopbackNetwork({ latency: 10 });
+const [ab, ba] = network.pair();
+const options = { schema, stateType: 'State', initial: { score: 0 }, timeout: 2000 };
+using a = new HostMigration({ ...options, local: 1, peers: new Map([[2, ab]]) });
+using b = new HostMigration({ ...options, local: 2, peers: new Map([[1, ba]]) });
+
+const moved = a.handoff(2, { signal: AbortSignal.timeout(5000) }); // the host gives authority to peer 2
+network.advance(5000);
+await moved;
+console.log(a.isHost, b.isHost, a.epoch, b.epoch); // false true 1 1
+const resumed = await b.waitForHost();
+console.log(resumed.host, resumed.epoch, resumed.frame); // 2 1 0
+```
+
+- `epoch` counts authority generations: each handoff and each recovery adds one, and a peer ignores checkpoints and
+  status from an older epoch, so a host that left cannot overwrite the new one.
+- The session owns the links in `peers`: `close()` (or `using`) closes them and puts back their previous `onmessage`
+  and `onclose`. Leaving rejects every pending `confirm`, `handoff` and `waitForHost` with a `MargoError` `disposed`.
+- `confirm`, `handoff`, recovery and `waitForHost` each end after `timeout` milliseconds (default 10,000) or when their
+  `signal` aborts. A `confirm` or `handoff` that ends that way closes the session and its links, since some peers may
+  hold the checkpoint and others not; build a new session from the last `confirmed` state.
+- `host` (default the lowest id) and `frame` (default 0) start the session; every peer passes the same values.
 
 ## Signalling for WebRTC
 
