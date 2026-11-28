@@ -8476,7 +8476,7 @@ each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surfac
   the rest of its divergence (`stats.pressureResidual`). The Jacobi preconditioner converges slowly on the grid's
   long-wave and checkerboard-like modes: still water converges within the cap, but a column falling round a sphere in a
   0.8 m tank (32,768 particles, about 26 cells a side) reaches the cap with 6.4e-4 of its divergence left on the GPU
-  (4.5e-4 with free-slip walls); a multigrid preconditioner would converge in far fewer iterations and is not built. A cell is liquid at half its rest density or more (the free surface lies within a cell of
+  (4.5e-4 with free-slip walls); a multigrid preconditioner cuts the iterations by 2.5 to 3 but not the work, because of the pressure pair's null modes (KB-LIQUID-MGPCG1). A cell is liquid at half its rest density or more (the free surface lies within a cell of
   the particles' edge, first order) and solid when all its corners lie inside colliders, so a collider's surface is
   placed to the grid's nodes. Measured on the CPU twin (`gpu-liquid.test.js`): a 0.2 m layer on a floor collider holds
   its centroid within a quarter particle spacing over 1.5 s, its cell pressure is rho g d within rho g h, and the floor

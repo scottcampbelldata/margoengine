@@ -341,8 +341,9 @@ the scatter of Cross's five measured bounces (2002), and a solid ball rolls down
   traction condition; `'slip'` per axis for symmetry planes), which slows the late run-out to the runs (table 1 to
   Z = 13, table 2 to Z = 12; past that table 2's front lags by a little more than the bound, docs/limits.md) and brings
   both profiles inside Lobovsky's measured front speeds (the fast one read 1.758 at 300 mm with free-slip walls, 1.672
-  now). Open on point 2: the far-wall impact pressures (a sensor is a tenth of a cell); on point 6: a multigrid
-  preconditioner for the accurate profile's pressure solve.
+  now). Open on point 2: the far-wall impact pressures (a sensor is a tenth of a cell); on point 6: the accurate profile's
+  pressure solve (a multigrid preconditioner does more work than Jacobi on its Q1-P0 pressure pair, KB-LIQUID-MGPCG1); on
+  point 5: KB-LIQUID-SURFMOM1 (the projection's velocity extrapolation moves momentum at a free surface).
 
 ### P14. LIFE-04 Flocking
 

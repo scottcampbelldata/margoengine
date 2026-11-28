@@ -749,12 +749,38 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   cells deep and 32 long sliding at 1 m/s in a tank of 2 cm cells (as the slab of `gpu-liquid.test.js`, "smooth
   walls"): over 12 substeps (0.05 s) its mean speed drops by 6.2e-4 m/s with nothing to take it; the fast profile keeps
   it to 4e-9.
-- **Cause:** the projection adds W (P D^T x) to each node's velocity, which moves the node's momentum by rest density
-  times (D^T x) whatever its mass, so each cell's pressure pushes its eight corners with forces that sum to zero. A
-  liquid cell at the free surface has corners with no mass (W = 0) that take no push, so the pushes on its other
-  corners no longer cancel: the surface cells' pressure is a net force on the liquid. A first-order free surface (the
-  pressure is zero in the air cells, not at the surface itself); a ghost-fluid surface (Gibou et al. 2002) would place
-  the zero pressure at the surface and shrink it.
+- **Cause:** after the projection, `project` (liquid-mpm-sim.ts, and the GPU's extend passes) carries the projected
+  velocity out to the nodes that hold mass but touch no liquid cell (LIQUID_EXTRAPOLATION layers, Bridson 2015): it
+  overwrites their own velocity, and with it their momentum, with the mean of their projected neighbours'. With the
+  extrapolation off the same slab loses 2.2e-6 m/s (the rounding); with the node-mass floor of W off as well it loses
+  3.8e-4, so the floor is not the cause. The extrapolation is what holds a still surface up (those nodes carry the
+  particles' gravity step, which no pressure answers because their cells count as air), so it cannot simply go: the fix
+  is to bring those nodes into the projection, a free surface whose zero pressure lies at the liquid's edge rather than
+  in the cells under half rest density (a ghost-fluid surface, Gibou et al. 2002), and check the accurate profile's dam
+  breaks and still water against it again.
+
+### Open: a multigrid preconditioner does more work than Jacobi in GPULiquid's accurate pressure solve (KB-LIQUID-MGPCG1, water)
+
+- **Repro:** a geometric multigrid V-cycle as the conjugate gradients' preconditioner (McAdams, Sifakis and Teran 2010:
+  coarse cells liquid when any child is, air as zero pressure in restriction and prolongation, piecewise-constant
+  transfers, seven-point Galerkin-scaled coarse operators, damped Jacobi smoothing, the solve's own operator A smoothed
+  twice before and after the coarse correction), on the CPU twin, on the falling column of `gpu-liquid-check.html`
+  (32,768 particles, 0.8 m tank, 30 cells a side), to the default residual 1e-4: Jacobi takes 135 to 159 iterations a
+  substep, one application of A each; the multigrid 54 to 64, five applications of A each plus the coarse levels,
+  about 300 against 155 (1.9 times the work). At 45 cells a side (131,072 particles) Jacobi 66 to 111, multigrid 22 to
+  39 (180 against 110, 1.6 times). Variants: one smoothing step (85 to 92 iterations), three with the coarse correction
+  halved (87 to 1e-8), the coarse operators scaled by 0.5 or 0.25 (slower), McAdams' extra smoothing on the coarse
+  levels' interface cells (4 or 12 sweeps: 59 to 64, no change). None beats Jacobi's work at the same answer, so none
+  landed; the conjugate gradients stay Jacobi-preconditioned.
+- **Cause:** the trilinear-velocity, constant-pressure pair (Q1-P0) has whole families of exact null pressure modes,
+  not only the checkerboard: A's symbol, the sum over axes a of 4 sin^2(theta_a / 2) cos^2(theta_b / 2)
+  cos^2(theta_c / 2) / h^2, vanishes on the lines theta = (pi, any, pi) and its two turns and at (pi, pi, pi), so every
+  f(j) (-1)^(i+k) and its kin carries no velocity. At a free surface and the walls these become near-null modes with
+  a share of the right-hand side; a smoother cannot damp them (their eigenvalues are small) and a geometric coarse grid
+  cannot represent them (they oscillate cell to cell), so the conjugate gradients spend their iterations there whatever
+  the preconditioner. In a closed tank with no free surface the same multigrid converged to 3e-9 in 10 iterations. The
+  route is a pressure discretization without these modes (a staggered grid, as `physics/flip` has, or a stabilized
+  Q1-P0), which changes the answer, so it is the pressure pair's change, not the preconditioner's.
 
 ### Open 2026-11-28: a rung under its own weight no longer cracks in the remeshing test (KB-SOFT-LADDERCRACKS1, physics soft tests)
 
