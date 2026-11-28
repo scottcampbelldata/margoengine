@@ -15350,6 +15350,36 @@
         "gzip": 4352
       }
     },
+    "@margoengine/optics": {
+      ".": {
+        "raw": 16211,
+        "gzip": 6996
+      },
+      "./refraction": {
+        "raw": 4423,
+        "gzip": 2138
+      },
+      "./polarization": {
+        "raw": 4186,
+        "gzip": 1954
+      },
+      "./interference": {
+        "raw": 5002,
+        "gzip": 2412
+      },
+      "./diffraction": {
+        "raw": 2588,
+        "gzip": 1219
+      },
+      "./imaging": {
+        "raw": 3391,
+        "gzip": 1619
+      },
+      "./spectrum": {
+        "raw": 2359,
+        "gzip": 1222
+      }
+    },
     "@margoengine/physics": {
       ".": {
         "raw": 1464091,
