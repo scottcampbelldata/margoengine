@@ -12,6 +12,35 @@ const TABLE_TOLERANCE = 0.005;
 const SHEET_STEPS_MAX = 0.0015;
 const SHEET_SPREAD_MIN = 0.48;
 const checks = {
+  // Low scud under a rain deck (type 'scud' with above; scud-check.html).
+  async scud(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.validation, null);
+    assert.deepEqual(r.errors, []);
+    const s = JSON.stringify(r);
+    // From the gap between the layers looking up, the scud under the camera leaves the deck's frame bit for bit.
+    assert.ok(r.gap.deck > 0.1, `the deck is in the view (${s})`);
+    assert.equal(r.gap.differing, 0, `the deck alone and with scud under the camera, bit for bit (${s})`);
+    assert.equal(r.gap.mistDiffering, 0, `the same with the deck's mist (${s})`);
+    // Looking down from the gap the scud is there, the deck alone draws nothing below the camera.
+    assert.equal(r.down.deck, 0, `the deck draws nothing below the camera (${s})`);
+    assert.ok(r.down.share > 0.1, `the scud shows in its altitude band (${s})`);
+    // The covered share (opacity over 0.1) follows coverage, and the torn edges: per covered pixel at least twice the
+    // edge of a cumulus layer at the same height and scale covering no more of the sky.
+    for (const c of r.cover.scud) assert.ok(Math.abs(c.share - c.coverage) < 0.1, `covered share follows coverage (${s})`);
+    assert.ok(r.cover.cumulus[0].share <= r.cover.scud[0].share + 0.02, `matched shares (${s})`);
+    assert.ok(r.cover.scud[0].edge >= 2 * r.cover.cumulus[0].edge, `ragged edges at cover 0.2 (${s})`);
+    assert.ok(r.cover.scud[1].edge >= 2 * r.cover.cumulus[1].edge, `ragged edges at cover 0.35 (${s})`);
+    // The scud moves with its wind: the time-0 frame from a camera moved by wind times time matches best.
+    assert.ok(r.drift.wind < r.drift.half && r.drift.wind < r.drift.double, `the shapes move at the wind (${s})`);
+    assert.ok(r.drift.wind < 0.6 * r.drift.still, `the shapes moved (${s})`);
+    assert.ok(r.lamps.toward > 3 * r.lamps.away, `by night the scud is brightest toward the city (${s})`);
+    assert.ok(r.pannus.pixels > 1000 && r.pannus.scud < 0.95 * r.pannus.deck, `pannus is darker than the base (${s})`);
+    // In the mist each scud pixel is its clear-air light times exp(-k s) to its base.
+    assert.ok(r.mist.pixels > 1000 && r.mist.meanError < 0.01 && r.mist.worst < 0.02, `mist dims the scud (${s})`);
+    console.log(`ok scud ${samples}x: ${s}`);
+    return r;
+  },
   // The cloud base lit from below by lit ground and the mist under it (groundLights and mist; ground-light-check.html).
   async 'ground-light'(page, samples) {
     const r = await page.evaluate(() => window.check.run());

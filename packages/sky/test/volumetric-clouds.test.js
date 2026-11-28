@@ -181,7 +181,7 @@ test('the coverage map drifts on without a jump where the shapes wrap', () => {
       assert.ok(Math.abs(map - Math.round(map)) < 1e-6, `coverage map ${map} at ${seconds} s`);
     }
   }
-  assert.match(code(h), /vec3f\(\(p\.xz\+c\.flags\.zw\)\*c\.shape\.x\*0\.17,0\.37\)/);
+  assert.match(code(h), /vec3f\(\(p\.xz\+c\.flags\.zw\+lean\.xz\)\*c\.shape\.x\*0\.17,0\.37\)/);
   clouds.dispose();
 });
 
@@ -263,7 +263,7 @@ test("the fires' light on the layer is in front of the clouds, as of the dome", 
   const c = code(h);
   assert.match(
     c,
-    /fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f\}/,
+    /fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f,lift:vec4f,link:vec4f,linkGlow:vec4f\}/,
     'the uniform holds the spots',
   );
   assert.ok(c.includes('fn fireLayer(w:vec3f)->vec3f'), "the dome's fire term");

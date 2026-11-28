@@ -149,6 +149,14 @@ test('the drive finds every cloud layer by the name prefix (KB-SKY-CLOUDTWO1)', 
   assert.equal(deck.options.coverage, weather.state.cloud);
   assert.equal(scud.options.coverage, weather.state.cloud);
   assert.equal(stranger.options.coverage, 0);
+  // A scud layer (type 'scud') takes its cover from the weather's rain by its type: the drive gives it the weather and
+  // the wind at its height only.
+  const fractus = { name: 'sky:volumetric-clouds:fractus', options: { type: 'scud', bottom: 260, coverage: 0.2 } };
+  WeatherDrive.attach(sceneWith(fractus), { weather }).update(0);
+  assert.deepEqual(fractus.options.weather, weather.state);
+  assert.equal(fractus.options.coverage, 0.2);
+  assert.equal(fractus.options.density, undefined);
+  assert.ok(Math.hypot(...fractus.options.wind) > 0);
   // Each layer drifts at the wind of its own base: the low one slower than the deck in a power-law profile.
   assert.ok(Math.hypot(...scud.options.wind) < Math.hypot(...deck.options.wind));
 });

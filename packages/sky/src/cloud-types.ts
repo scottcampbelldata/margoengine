@@ -21,7 +21,7 @@ export interface CloudWeather {
  * A cloud type to force: fair-weather cumulus, stratus, the storm's cumulonimbus, or a hurricane's deck (eyewall, bands
  * and canopy, 500 to 15,000 m, shaped by `VolumetricClouds`' `hurricane` option; see {@link cloudLayerFor}).
  */
-export type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
+export type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane' | 'scud';
 /** The layer values a weather gives: the {@link VolumetricCloudOptions} `coverage`, `bottom`, `top` and `density`. */
 export interface CloudLayer {
   readonly coverage: number;
@@ -89,8 +89,9 @@ export type MutableCloudLayer = { -readonly [K in keyof CloudLayer]: CloudLayer[
  * `out`, when given, receives the values and is returned (no allocation). `type` forces one type whatever the weather
  * says (its `cloud` still sets the stratus cover and caps the cumulus cover at a half).
  * `'hurricane'` gives the hurricane deck: all cover, 500 to 15,000 m, 0.1 a metre (the storm field draws the eye and
- * bands inside it).
- * @throws RangeError for a `cloud`, `rain` or `lightning` outside 0 to 1, or a `type` that is not one of the four.
+ * bands inside it). `'scud'` gives fractus under a rain deck (WMO pannus): cover 0.35 times `rain` (none when dry),
+ * 300 to 500 m, 0.03 a metre (a layer's `above` moves it to 0.4 of the deck's base).
+ * @throws RangeError for a `cloud`, `rain` or `lightning` outside 0 to 1, or a `type` that is not one of the five.
  * @example cloudLayerFor({ cloud: 1, rain: 0.9, lightning: 0.8 }); // the storm deck, 600 to 8,000 m
  * @example cloudLayerFor({ cloud: 0.7 }, undefined, 'storm'); // a storm deck under a part-cloudy forecast
  */
@@ -99,8 +100,30 @@ export function cloudLayerFor(
   out: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
   type?: CloudType,
 ): CloudLayer {
-  if (type !== undefined && type !== 'cumulus' && type !== 'stratus' && type !== 'storm' && type !== 'hurricane')
-    throw new RangeError(`Invalid cloud type ${String(type)}; pass 'cumulus', 'stratus', 'storm' or 'hurricane'.`);
+  if (
+    type !== undefined &&
+    type !== 'cumulus' &&
+    type !== 'stratus' &&
+    type !== 'storm' &&
+    type !== 'hurricane' &&
+    type !== 'scud'
+  )
+    throw new RangeError(
+      `Invalid cloud type ${String(type)}; pass 'cumulus', 'stratus', 'storm', 'hurricane' or 'scud'.`,
+    );
+  if (type === 'scud') {
+    unit(weather.cloud, 'cloud');
+    const rain = unit(weather.rain, 'rain');
+    unit(weather.lightning, 'lightning');
+    // Fractus under a rain deck (WMO pannus): none in dry air, ragged shreds over about a third of the sky in rain, a
+    // few hundred metres up (the layer's `above` moves the base to 0.4 of the deck's); fractus water is that of
+    // stratus, a little thinner.
+    out.coverage = 0.35 * rain;
+    out.bottom = 300;
+    out.top = 500;
+    out.density = 0.03;
+    return out;
+  }
   if (type === 'hurricane') {
     unit(weather.cloud, 'cloud');
     unit(weather.rain, 'rain');

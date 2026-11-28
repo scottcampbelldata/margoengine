@@ -86,6 +86,8 @@ export interface VolumetricCloudOptions {
     temporal?: boolean | 'auto';
     groundLights?: readonly CloudGroundLight[];
     mist?: CloudMist;
+    above?: VolumetricClouds;
+    shear?: number;
 }
 
 export interface VolumetricCloudSky {
@@ -270,7 +272,7 @@ export function thunderDelay(distance: number, speed?: number): number;
 
 // Not exported from this entry, but used by the exports above:
 
-type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
+type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane' | 'scud';
 
 interface CloudWeather {
     readonly cloud: number;

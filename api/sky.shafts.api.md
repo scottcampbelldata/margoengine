@@ -64,7 +64,7 @@ interface CloudMist {
     visibility: number;
 }
 
-type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
+type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane' | 'scud';
 
 interface CloudWeather {
     readonly cloud: number;
@@ -231,6 +231,8 @@ interface VolumetricCloudOptions {
     temporal?: boolean | 'auto';
     groundLights?: readonly CloudGroundLight[];
     mist?: CloudMist;
+    above?: VolumetricClouds;
+    shear?: number;
 }
 
 interface VolumetricCloudSky {
@@ -264,5 +266,23 @@ interface VolumetricCloudSky {
     environmentLayer?: GPUTexture | undefined;
     environmentLightLayer?: GPUTexture | undefined;
     deck?: ((up: number) => number) | undefined;
+}
+
+class VolumetricClouds implements EnginePlugin {
+    readonly options: VolumetricCloudOptions;
+    readonly name: string;
+    readonly drift: Float64Array<ArrayBuffer>;
+    constructor(options?: VolumetricCloudOptions);
+    static attach(engine: EngineKernel, options?: VolumetricCloudOptions): VolumetricClouds;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    get ready(): Promise<void>;
+    get time(): number;
+    onPreUpdate(delta: number): void;
+    resetTime(): void;
+    advanceTime(delta: number): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 ```

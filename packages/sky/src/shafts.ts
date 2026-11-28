@@ -20,6 +20,7 @@ import {
   CLOUD_FLOATS,
   CloudVolumes,
   cloudField,
+  scudFieldFor,
   stormFieldFor,
   wantsStorm,
   withStorm,
@@ -306,9 +307,10 @@ export class LightShafts implements EnginePlugin {
       clouds = this.options.clouds,
       width = Math.max(1, Math.ceil(c.width / 2)),
       height = Math.max(1, Math.ceil(c.height / 2)),
-      field = clouds ? stormFieldFor(clouds.options) : undefined;
-    // A storm's code loads on first use; the shafts wait for it (`VolumetricClouds.ready`).
-    if (clouds && wantsStorm(clouds.options) && !field) return;
+      field = clouds ? stormFieldFor(clouds.options) : undefined,
+      scud = clouds?.options.type === 'scud' ? scudFieldFor(clouds.options) : undefined;
+    // A storm's or scud's code loads on first use; the shafts wait for it (`VolumetricClouds.ready`).
+    if (clouds && ((wantsStorm(clouds.options) && !field) || (clouds.options.type === 'scud' && !scud))) return;
     if (clouds) this.writeClouds(c, clouds);
     if (!this.mask || this.mask.width !== width || this.mask.height !== height) {
       this.mask?.destroy();
@@ -320,10 +322,10 @@ export class LightShafts implements EnginePlugin {
       this.blurGroup = undefined;
       this.bound = undefined;
     }
-    const maskKey = `${depth.samples}:${!!clouds}:${!!field}`;
+    const maskKey = `${depth.samples}:${!!clouds}:${!!field}:${!!scud}`;
     if (this.maskKey !== maskKey) {
       const module = d.createShaderModule({
-        code: withStorm(maskShader(depthWGSL(1, depth.samples), !!clouds), field),
+        code: withStorm(maskShader(depthWGSL(1, depth.samples), !!clouds), field, scud),
       });
       this.maskPipeline = d.createRenderPipeline({
         layout: 'auto',

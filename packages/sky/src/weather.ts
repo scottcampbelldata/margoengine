@@ -1422,7 +1422,7 @@ export class Weather implements EnginePlugin {
         const deck = o as {
           flash?: unknown;
           weather?: { cloud: number };
-          type?: 'cumulus' | 'stratus' | 'storm';
+          type?: 'cumulus' | 'stratus' | 'storm' | 'scud';
           bottom?: number;
           top?: number;
         };
@@ -1432,7 +1432,8 @@ export class Weather implements EnginePlugin {
         } else if (!wantClouds && this.linkedClouds.delete(deck)) {
           if (deck.flash === this.cloudFlash) delete deck.flash;
         } else if (this.linkedClouds.has(deck) && deck.flash !== this.cloudFlash) this.linkedClouds.delete(deck);
-        if (this.linkedClouds.has(deck)) {
+        // Scud under the deck takes the flash too, but the bolt leaves the deck's base, not the shreds under it.
+        if (this.linkedClouds.has(deck) && deck.type !== 'scud') {
           const layer =
               deck.weather || deck.type
                 ? cloudLayerFor(deck.weather ?? { cloud: 0.5 }, this.deckScratch, deck.type)

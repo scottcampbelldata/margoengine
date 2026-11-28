@@ -10665,6 +10665,28 @@ base-shape samples per lit cloud sample (frame times diagnostic only: 373, 7.8 a
 against 354, 10.3 and 11.0 before, on a loaded machine). Missing: 3D transport (side leakage from finite clouds), a
 reference renderer or photograph, and one unit for the sky map and the engine sun (KB-SKY-SUNUNITS1).
 
+## Scud under a rain deck: two linked cloud layers (section 5 evidence, 2026-11-28)
+
+GPU maths change in `packages/sky/src/volumetric-clouds.ts` and the lazy `packages/sky/src/scud-field.ts`, both
+backends from one WGSL source. The `Clouds` uniform grows from 300 to 312 floats (`lift`: the `shear` lean and the scud
+flag; `link` and `linkGlow`: the upper deck's transmittance of the sun, the moon and the sky light, the environment-map
+order, the upper base's height and reflectance). `shear` adds a lean along the wind times height to every lookup of the
+shared field (0 by default, so old pictures hold). A layer with `above` takes the sun, moon and sky light through the
+upper deck's `cloudDeckTransmittance` and the upper base's reflectance of the ground lights back down; the upper layer
+takes its ground lights through the lower layer's mean transmittance and draws its mist from the lower layer's tops up
+(`cloudMistBand`). The upper layer's frame-graph pass draws both, in the camera's order (the upper first from under the
+lower layer's tops). The scud shape is a lens profile on the unsharpened base with a calibrated cover map, shapes and
+erosion stretched along the wind and the erosion warped by the shape volume. `volumetricCloudShadows` and `LightShafts`
+take the scud shape with the layer. Evidence: `features-check.mjs scud` (RTX A6000, WebGPU and `MARGO_COMPAT=1` agree):
+from between the layers looking up the frame is the deck's alone bit for bit, with and without mist; covered share
+within 0.05 of `coverage` at 0.2, 0.35 and 0.6; edge per covered pixel 2.5 to 4 times a cumulus layer's at the same
+share; the shapes move at the wind (the time-0 frame from a camera moved by wind x time matches best of 0, 0.5, 1 and
+2 times); 7.6 times brighter toward a city than away; darker than the deck base with the sun up; in the mist each scud
+pixel is its clear light times exp(-k s) to 0.1 percent. `cloud-layers.test.js` covers the link, names, deck product
+and overlap; `cloud-shadows` and `shafts` checks still pass. Cost: no second layer, no added texture read; a scud layer
+is one more march of 24 steps and 2 light steps. Missing: no mist inside the scud slab, the link is the decks' means
+(no gap of the deck lights a shred more), and no photograph comparison is automated.
+
 ## Cloud base lit from below: ground lights and mist (section 5 evidence, 2026-11-28)
 
 GPU maths change in `packages/sky/src/volumetric-clouds.ts`, both backends from one WGSL source. `groundLights` (at

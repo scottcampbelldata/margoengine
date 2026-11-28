@@ -895,6 +895,13 @@ export class WeatherDrive {
             : s.cloudWind;
       // A storm's layer (a hurricane) owns its cover, density and turning cloud: the drive gives it the weather only, and
       // takes back the coverage, density and drift it wrote before the storm came (a value held by hand stays).
+      // Scud (fractus under the deck) takes its cover from the weather's rain by its type: the drive gives it the weather
+      // and the wind at its own height only, and leaves its coverage and density as they are set.
+      if (layer.options.type === 'scud') {
+        put(layer.options, 'weather', state);
+        put(layer.options, 'wind', drift);
+        continue;
+      }
       if (layer.options.hurricane !== undefined || layer.options.type === 'hurricane') {
         put(layer.options, 'weather', state);
         for (const key of ['coverage', 'density', 'wind'] as const)

@@ -92,7 +92,7 @@ test('the uniform holds the lights and the mist after the haze, and nothing with
   );
   writeGround(v, deck);
   assert.ok(
-    v.subarray(232).every((x) => x === 0),
+    v.subarray(232, 300).every((x) => x === 0),
     'no lights, no mist',
   );
 });
@@ -109,7 +109,7 @@ test('the march takes the ground lights from below and the picture draws the mis
   h.context.bindings = [];
   h.engine.frameGraph.execute(h.context);
   const code = [...h.shaders.values()].join('\n');
-  assert.match(code, /let sky=cloudSkyScatter\(above,below\+cloudGround\(p\.xz,bottom\),aUp,below0,nuUp\);/);
+  assert.match(code, /let sky=cloudSkyScatter\(top,below\+cloudGround\(p\.xz,bottom\),aUp,below0,nuUp\);/);
   assert.match(code, /if\(open&&clouds\.mist\.x>0\.0\)\{let air=cloudMist\(d\);/);
   assert.equal(
     clouds['values'][232],

@@ -445,7 +445,9 @@ over the empty sky.
 | `name` | `'sky:volumetric-clouds'` | the layer's plugin name, fixed for its life; each layer on one engine needs its own. `Weather`'s flash and `WeatherDrive` reach every layer named `'sky:volumetric-clouds'` or `'sky:volumetric-clouds:<name>'` (`isCloudLayerName`), so a second layer is `{name: 'sky:volumetric-clouds:low'}` |
 | `sky` | none | the `Sky` that lights the clouds |
 | `weather` | none | a weather state `{cloud, rain?, lightning?}` (0 to 1 each): its cloud type gives `coverage`, `bottom`, `top` and `density` for each left unset (below); the weather drive writes it |
-| `type` | none | `'cumulus'`, `'stratus'` or `'storm'` forces that type's base, tops and density whatever the `weather` says (with no weather its `cloud` is 0.5); `'hurricane'` is the hurricane deck, 500 to 15,000 m, drawing the default storm at the origin; `cloudLayerFor(weather, out, type)` gives the same layer |
+| `type` | none | `'cumulus'`, `'stratus'` or `'storm'` forces that type's base, tops and density whatever the `weather` says (with no weather its `cloud` is 0.5); `'hurricane'` is the hurricane deck, 500 to 15,000 m, drawing the default storm at the origin; `'scud'` is ragged low cloud under a rain deck (below); `cloudLayerFor(weather, out, type)` gives the same layer |
+| `above` | none | the layer over this one (scud under a rain deck): linked light, one sky deck and environment map, air bands and draw order (below); this layer's tops must be at or below its base (`RangeError`) |
+| `shear` | 0 (1.5 x thickness for scud) | metres the tops lead the base along the wind, so the shapes lean downwind as wind shear tilts real cloud (-20,000 to 20,000); live |
 | `hurricane` | none | a `Hurricane` (or its options) shaping the layer: eye, eyewall, moat, bands, shield and canopy, turning and moving with the storm (below); `coverage` then scales its cover, and the weather drive leaves the layer's coverage, density and drift to it |
 | `coverage` | 0.5 | share of the sky covered, 0 to 1; 0 draws nothing |
 | `bottom`, `top` | 1500, 4000 | the layer's base and tops in metres above the ground (100 to 20,000) |
@@ -553,6 +555,54 @@ const clouds = VolumetricClouds.attach(engine, {
 });
 console.log(cloudGroundLight(clouds.options, 0, 0)); // the light from below on the base over the camera
 ```
+
+### Low scud under a rain deck
+
+Under a rain deck the lowest cloud is scud: ragged dark shreds well below the base, racing along the wind (fractus as
+the accessory cloud pannus, WMO International Cloud Atlas; "scud", AMS Glossary of Meteorology). `type: 'scud'` draws
+it as a second layer: no flat base (a lens profile, thickest at mid height), edges torn at every height by an erosion
+lookup warped by the shape volume's own low channels and stretched 2:1 along the wind, the shapes stretched the same
+way, and `shear` leaning the tops downwind. Its defaults: `scale` 2,200, `erosion` 1.8, `evolution` 10, `steps` 24,
+`lightSteps` 2, density 0.03, cover 0.35 times the weather's `rain` (none when dry), and the name
+`'sky:volumetric-clouds:scud'`. `coverage` is the share of the sky the scud covers: from below, the pixels over opacity
+0.1 cover 0.24, 0.40 and 0.62 of the sky at `coverage` 0.2, 0.35 and 0.6, and per covered pixel its edges are 2.5 to 4
+times as long as a cumulus layer's covering as much (`features-check.mjs scud`). Its shape loads by `import()` on
+first use (a few hundred bytes); `await clouds.ready` before a frame you keep.
+
+Link it with `above: deck` and the two layers act as one sky, in closed form with no second march. The sun, moon and
+sky light reach the scud through the deck (`cloudDeckTransmittance` of the deck at each light's height); the deck base
+sends its reflectance of the ground lights back down onto the scud; the deck takes the ground lights through the
+scud's mean transmittance. So scud is darker than the base behind it by day (in the check, 0.91 against 1.20) and
+takes a city's light from below by night (7.6 times brighter toward it than away). With `above` and no `bottom` the scud
+sits at 0.4 of the deck's base (150 to 450 m) and 200 m thick. The sky's `deck` becomes the product of both, the sky's
+environment map shows the scud over the deck, each layer draws the air from its base down to the next layer's top
+(the scud's to the ground) and takes the deck's `mist` unless it has its own, and the draw follows the camera: under
+the scud's tops the deck draws first, above them the scud. From a camera between the layers looking up, the frame is
+the deck's alone bit for bit; in the mist every scud pixel is its clear-air light times exp(-k s) to its base, to 0.1
+percent (WebGPU and the WebGL2 layer alike). `volumetricCloudShadows` and `LightShafts` take the scud shape too.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {VolumetricClouds} from 'margoengine/sky/volumetric-clouds';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0, 1.6, 0], target: [0, 1.9, -1], far: 200},
+});
+// A rain deck at 650 to 1,300 m and scud racing under it on a 14 m/s wind, by night over a lit town.
+const city = {color: [0.6, 0.33, 0.18] as [number, number, number], x: -3200, z: 3200, radius: 4200};
+const night = {sunDirection: [0, -1, 0] as [number, number, number], ambient: [[0.0004, 0.0005, 0.0008], [0.0025, 0.0018, 0.0012]] as [[number, number, number], [number, number, number]]};
+const deck = VolumetricClouds.attach(engine, {
+  ...night, coverage: 0.9, bottom: 650, top: 1300, density: 0.06, wind: [9, 3],
+  groundLights: [city], mist: {visibility: 6000},
+});
+const scud = VolumetricClouds.attach(engine, {...night, type: 'scud', above: deck, coverage: 0.3, wind: [14, 5], groundLights: [city]});
+await scud.ready;
+console.log(scud.name, scud.options.above === deck); // 'sky:volumetric-clouds:scud' true
+```
+
+Sources: WMO International Cloud Atlas, "Pannus", https://cloudatlas.wmo.int/en/clouds-accessory-pannus.html; American
+Meteorological Society, Glossary of Meteorology, "scud", https://glossary.ametsoc.org/wiki/Scud; A. Schneider and N.
+Vos, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH Advances in Real-Time Rendering 2015,
+https://www.advances.realtimerendering.com/s2015/index.html (the noise shape and erosion the scud reshapes).
 
 ### Hurricanes: the eye, the eyewall and the rain bands
 

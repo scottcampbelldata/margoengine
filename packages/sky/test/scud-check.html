@@ -1,0 +1,118 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky scud check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas width="320" height="240"></canvas>
+<script type="module">
+// Low scud under a rain deck (VolumetricClouds type 'scud' with `above`) on a real GPU, read back from a PostStack's
+// linear HDR scene target with no sky behind the clouds (black). A deck at 1000 to 2000 m; the scud under it takes its
+// own height from the deck (0.4 of the base: 400 to 600 m). Driven by features-check.mjs (scud).
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {VolumetricClouds,PLANET_RADIUS} from '/packages/sky/dist/volumetric-clouds.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const FOV=50,engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.6,0],target:[0,1.6,-1],fov:FOV,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();engine.scene.background='#000000';
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function scene(){
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();return {w,h,v};
+}
+const lum=(v,i)=>0.2126*v[i]+0.7152*v[i+1]+0.0722*v[i+2];
+const sun=[0.3,0.8,0.2],night={sunDirection:[0,-1,0],ambient:[[0,0,0],[0,0,0]]};
+const deckBase={sunDirection:sun,coverage:0.9,bottom:1000,top:2000,density:0.03,wind:[12,0],evolution:0,temporal:false};
+const scudBase={type:'scud',coverage:0.35,wind:[12,0],evolution:0,temporal:false,sunDirection:sun};
+// One frame from `position` at yaw (from north, -z, toward east, +x) and pitch in degrees, with the layers `make`
+// attaches (each disposed after); `before` runs on the layers before the frame (a clock step).
+async function frame(make,position,yaw,pitch,before){
+ const y=yaw*Math.PI/180,p=pitch*Math.PI/180;
+ engine.camera.position=position;
+ engine.camera.target=[position[0]+Math.sin(y)*Math.cos(p),position[1]+Math.sin(p),position[2]-Math.cos(y)*Math.cos(p)];
+ const layers=make();await Promise.all(layers.map(l=>l.ready));before?.(layers);
+ engine.render({delta:0});engine.render({delta:0});const out=await scene();for(const l of layers.slice().reverse())l.dispose();
+ return out;
+}
+const deck=(o={})=>()=>[VolumetricClouds.attach(engine,{...deckBase,...o})];
+const linked=(d={},s={})=>()=>{const upper=VolumetricClouds.attach(engine,{...deckBase,...d});return [upper,VolumetricClouds.attach(engine,{...scudBase,above:upper,...s})];};
+const alone=(o={})=>()=>[VolumetricClouds.attach(engine,{...scudBase,...o})];
+const differing=(a,b)=>{let n=0;for(let i=0;i<a.v.length;i++)if(a.v[i]!==b.v[i])n++;return n;};
+// The covered mask (luminance over `floor`), its share of the frame and its edge length per covered pixel: the pixel
+// sides between a covered and an open pixel, over the covered count (a ragged mask has more edge per area).
+function mask({w,h,v},floor){
+ const m=new Uint8Array(w*h);let n=0,edges=0;
+ for(let i=0;i<w*h;i++)if(lum(v,4*i)>floor){m[i]=1;n++;}
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(x+1<w&&m[i]!==m[i+1])edges++;if(y+1<h&&m[i]!==m[i+w])edges++;}
+ return {share:n/(w*h),edge:edges/Math.max(n,1),m};
+}
+const mean=({v},pick)=>{let s=0,n=0;for(let i=0;i<v.length/4;i++)if(!pick||pick(i)){s+=lum(v,4*i);n++;}return n?s/n:0;};
+const peak=({v})=>{let m=0;for(let i=0;i<v.length;i+=4)m=Math.max(m,lum(v,i));return m;};
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const gap=[0,800,0],ground=[0,1.6,0],r={};
+  // From the gap between the layers, looking up, the scud under the camera changes nothing: the deck's frame bit for
+  // bit, with and without the mist.
+  const up=await frame(deck(),gap,0,35),upLinked=await frame(linked(),gap,0,35);
+  const mistUp=await frame(deck({mist:{visibility:3000}}),gap,0,35),mistUpLinked=await frame(linked({mist:{visibility:3000}}),gap,0,35);
+  r.gap={differing:differing(up,upLinked),mistDiffering:differing(mistUp,mistUpLinked),floats:up.v.length,deck:mean(up)};
+  // Looking down from the gap: the scud is there, the deck alone shows nothing below.
+  const down=await frame(deck(),gap,0,-35),downLinked=await frame(linked(),gap,0,-35);
+  r.down={deck:peak(down),share:mask(downLinked,1e-4*peak(downLinked)).share};
+  // Opacity from the ground straight up, at night (no light of their own) over a white backdrop, so a pixel is the
+  // layer's transmittance: the scud alone at its own cover over nine places 3 km apart, and a cumulus layer at the same
+  // height, cover and scale (rounded billows) to measure the torn edges against.
+  async function opacity(make){
+   engine.scene.background='#ffffff';let n=0,covered=0,sum=0,edges=0;
+   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){
+    const {w,h,v}=await frame(make,[3000*a,1.6,3000*b],0,89.9),m=new Uint8Array(w*h);
+    for(let i=0;i<w*h;i++){const o=1-lum(v,4*i);sum+=o;if(o>0.1){m[i]=1;covered++;}}
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(x+1<w&&m[i]!==m[i+1])edges++;if(y+1<h&&m[i]!==m[i+w])edges++;}
+    n+=w*h;
+   }
+   engine.scene.background='#000000';
+   return {share:covered/n,mean:sum/n,edge:edges/Math.max(covered,1)};
+  }
+  const shade={...night,bottom:400,top:600};
+  r.cover={scud:[],cumulus:[]};
+  for(const coverage of [0.5,0.6,0.7])r.cover.cumulus.push({coverage,...await opacity(alone({...shade,type:'cumulus',coverage,scale:2200,erosion:1,evolution:0}))});
+  for(const coverage of [0.2,0.35,0.6])r.cover.scud.push({coverage,...await opacity(alone({...shade,coverage}))});
+  // Drift: after 30 s in a 12 m/s wind the scud is the time-0 scud seen from a camera 360 m along the wind.
+  const still=await frame(alone({bottom:400,top:600}),ground,90,40),later=await frame(alone({bottom:400,top:600}),ground,90,40,(l)=>l[0].advanceTime(30));
+  const gaps=async(x)=>{const f=await frame(alone({bottom:400,top:600}),[x,1.6,0],90,40);let d=0;for(let i=0;i<f.v.length;i+=4)d+=Math.abs(lum(later.v,i)-lum(f.v,i));return d/(f.v.length/4);};
+  r.drift={still:await gaps(0),half:await gaps(180),wind:await gaps(360),double:await gaps(720),mean:mean(still)};
+  // By night the scud takes a city's light from below: brighter toward the city than away from it.
+  const city={color:[1,0.55,0.25],x:-3000*Math.SQRT1_2,z:3000*Math.SQRT1_2,radius:2500};
+  const lit={...night,bottom:400,top:600,groundLights:[city]};
+  r.lamps={toward:mean(await frame(alone(lit),ground,225,25)),away:mean(await frame(alone(lit),ground,45,25))};
+  // With the sun up the scud is darker than the deck base behind it (pannus): where it covers the deck (opacity over
+  // 0.3, read at night over white), the frame is darker than the deck's alone.
+  const base=await frame(deck(),ground,0,60),under=await frame(linked(),ground,0,60);
+  engine.scene.background='#ffffff';const scudOnly=await frame(alone(shade),ground,0,60);engine.scene.background='#000000';
+  const cover=new Uint8Array(scudOnly.w*scudOnly.h);for(let i=0;i<cover.length;i++)cover[i]=+(lum(scudOnly.v,4*i)<0.7);
+  r.pannus={scud:mean(under,(i)=>cover[i]===1),deck:mean(base,(i)=>cover[i]===1),pixels:cover.reduce((a,b)=>a+b,0)};
+  // In the mist (the deck's, which the scud takes) with no sky light, so the air adds no light of its own, each scud
+  // pixel is its clear-air light times exp(-k s), s the ray's length to the scud base.
+  const dark={ambient:[[0,0,0],[0,0,0]]},k=3.912/3000;
+  const misty=await frame(linked({...dark,mist:{visibility:3000},coverage:0.001,density:1e-6},{...dark,bottom:400,top:600}),ground,0,20);
+  const clear=await frame(linked({...dark,coverage:0.001,density:1e-6},{...dark,bottom:400,top:600}),ground,0,20),clearUnder=clear;
+  const t=Math.tan(FOV*Math.PI/360),aspect=clear.w/clear.h,pitch=20*Math.PI/180,R=PLANET_RADIUS,floor=0.05*peak(clearUnder);
+  const bins=Array.from({length:10},()=>[]);let err=0,worst=0,n=0,near=0,far=0,nearN=0,farN=0;
+  for(let y=0;y<clear.h;y++)for(let x=0;x<clear.w;x++){
+   const i=4*(y*clear.w+x),a=lum(clearUnder.v,i);if(a<floor)continue;
+   const cx=((x+0.5)/clear.w*2-1)*t*aspect,cy=(1-(y+0.5)/clear.h*2)*t;
+   const dy=cy*Math.cos(pitch)+Math.sin(pitch),dz=-(Math.cos(pitch)-cy*Math.sin(pitch)),l=Math.hypot(cx,dy,dz),sinE=dy/l;
+   // The ray from 1.6 m to the sphere 400 m over the planet.
+   const r0=R+1.6,r1=R+400,s=-r0*sinE+Math.sqrt(r0*r0*sinE*sinE+r1*r1-r0*r0),want=Math.exp(-k*s),got=lum(misty.v,i)/a;
+   if(want<0.02)continue;bins[Math.min(9,Math.floor(s/300))].push(got/want);
+   err+=Math.abs(got/want-1);worst=Math.max(worst,Math.abs(got/want-1));n++;
+   if(s<1200){near+=got;nearN++;}else if(s>1800){far+=got;farN++;}
+  }
+  r.mist={pixels:n,meanError:err/Math.max(n,1),worst,near:near/Math.max(nearN,1),far:far/Math.max(farN,1),bins:bins.map(b=>b.length?[b.length,+(b.reduce((x,y)=>x+y,0)/b.length).toFixed(4),+Math.min(...b).toFixed(3),+Math.max(...b).toFixed(3)]:0)};
+  return {validation:(await device.popErrorScope())?.message??null,errors,...r};
+ }};
+window.ready=true;
+</script></body></html>

@@ -6,7 +6,7 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
-export const CLOUD_FLOATS = 300;
+export const CLOUD_FLOATS = 312;
 
 export const CLOUD_LAYER_NAME = "sky:volumetric-clouds";
 
@@ -28,7 +28,7 @@ export interface CloudMist {
     visibility: number;
 }
 
-export type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
+export type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane' | 'scud';
 
 export interface CloudTypeWeights {
     readonly cumulus: number;
@@ -93,6 +93,8 @@ export interface VolumetricCloudOptions {
     temporal?: boolean | 'auto';
     groundLights?: readonly CloudGroundLight[];
     mist?: CloudMist;
+    above?: VolumetricClouds;
+    shear?: number;
 }
 
 export interface VolumetricCloudSky {
@@ -148,7 +150,7 @@ export class VolumetricClouds implements EnginePlugin {
 
 export function cloudDeckTransmittance(layer: CloudLayer, up: number): number;
 
-export const cloudField = "\nstruct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f}\nfn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}\nfn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}\nfn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}\n//[storm-fns]\nfn cloudDensityAt(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,erode:bool)->f32 {\n let h=(cloudAltitude(c,p)-c.layer.x)/(c.layer.y-c.layer.x);if(h<=0.0||h>=1.0){return 0.0;}\n//[storm-branch]\n let q=(p+vec3f(c.wind.x,c.wind.z,c.wind.y))*c.shape.x;\n let s=textureSampleLevel(shape,smp,q.xzy,0.0);\n let weather=textureSampleLevel(shape,smp,vec3f((p.xz+c.flags.zw)*c.shape.x*0.17,0.37),0.0).g;\n let cover=clamp(c.layer.z*(1.0+2.5*(weather-0.48)),0.0,1.0);\n let low=s.g*0.625+s.b*0.25+s.a*0.125;\n let base=clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);\n let profile=smoothstep(0.0,0.12,h)*smoothstep(1.0,0.45,h);\n let cloud=clamp(cloudRemap(base*profile,1.0-cover,1.0),0.0,1.0)*cover;\n if(cloud<=0.0||!erode){return cloud;}\n let e=textureSampleLevel(detail,smp,((p+vec3f(c.wind.x,c.wind.z*2.0,c.wind.y)*1.5)*c.shape.y).xzy,0.0).rgb;\n let high=e.r*0.625+e.g*0.25+e.b*0.125;\n return clamp(cloudRemap(cloud,mix(high,1.0-high,clamp(h*4.0,0.0,1.0))*0.35*c.look.x,1.0),0.0,1.0);\n}\nfn cloudLightDepth(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,l:vec3f,n:u32)->f32 {\n let reach=(c.layer.y-c.layer.x)*0.75/max(l.y,0.25);var od=0.0;var previous=0.0;\n for(var i=0u;i<n;i++){let f=(f32(i)+1.0)/f32(n);let t=reach*f*f;od+=cloudDensityAt(c,shape,detail,smp,p+l*(0.5*(t+previous)),false)*(t-previous);previous=t;}\n return od*c.layer.w;\n}\n";
+export const cloudField = "\nstruct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f,lift:vec4f,link:vec4f,linkGlow:vec4f}\nfn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}\nfn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}\nfn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}\n//[storm-fns]\n//[scud-fns]\nfn cloudDensityAt(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,erode:bool)->f32 {\n let h=(cloudAltitude(c,p)-c.layer.x)/(c.layer.y-c.layer.x);if(h<=0.0||h>=1.0){return 0.0;}\n//[storm-branch]\n//[scud-branch]\n let lean=vec3f(c.lift.x,0.0,c.lift.y)*h;\n let q=(p+vec3f(c.wind.x,c.wind.z,c.wind.y)+lean)*c.shape.x;\n let s=textureSampleLevel(shape,smp,q.xzy,0.0);\n let weather=textureSampleLevel(shape,smp,vec3f((p.xz+c.flags.zw+lean.xz)*c.shape.x*0.17,0.37),0.0).g;\n let cover=clamp(c.layer.z*(1.0+2.5*(weather-0.48)),0.0,1.0);\n let low=s.g*0.625+s.b*0.25+s.a*0.125;\n let base=clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);\n let profile=smoothstep(0.0,0.12,h)*smoothstep(1.0,0.45,h);\n let cloud=clamp(cloudRemap(base*profile,1.0-cover,1.0),0.0,1.0)*cover;\n if(cloud<=0.0||!erode){return cloud;}\n let e=textureSampleLevel(detail,smp,((p+vec3f(c.wind.x,c.wind.z*2.0,c.wind.y)*1.5+lean)*c.shape.y).xzy,0.0).rgb;\n let high=e.r*0.625+e.g*0.25+e.b*0.125;\n return clamp(cloudRemap(cloud,mix(high,1.0-high,clamp(h*4.0,0.0,1.0))*0.35*c.look.x,1.0),0.0,1.0);\n}\nfn cloudLightDepth(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,l:vec3f,n:u32)->f32 {\n let reach=(c.layer.y-c.layer.x)*0.75/max(l.y,0.25);var od=0.0;var previous=0.0;\n for(var i=0u;i<n;i++){let f=(f32(i)+1.0)/f32(n);let t=reach*f*f;od+=cloudDensityAt(c,shape,detail,smp,p+l*(0.5*(t+previous)),false)*(t-previous);previous=t;}\n return od*c.layer.w;\n}\n";
 
 export function cloudGroundLight(options: VolumetricCloudOptions, x: number, z: number, out?: [number, number, number]): [number, number, number];
 
@@ -162,13 +164,17 @@ export const isCloudLayerName: (name: string) => boolean;
 
 export function layerOf(options: VolumetricCloudOptions, out?: MutableCloudLayer): CloudLayer;
 
+export function loadScudField(): Promise<ScudField>;
+
 export function loadStormField(): Promise<StormField>;
+
+export function scudFieldFor(options: VolumetricCloudOptions): ScudField | undefined;
 
 export function stormFieldFor(options: VolumetricCloudOptions): StormField | undefined;
 
 export const wantsStorm: (options: VolumetricCloudOptions) => boolean;
 
-export const withStorm: (code: string, field?: StormField) => string;
+export const withStorm: (code: string, field?: StormField, scud?: ScudField) => string;
 
 export function writeGround(v: Float32Array, options: VolumetricCloudOptions, layer?: CloudLayer): void;
 
@@ -292,6 +298,11 @@ interface ResolvedHurricane {
     rainExtent: number;
     flowPeriod: number;
     swirl: number;
+}
+
+interface ScudField {
+    readonly fns: string;
+    readonly branch: string;
 }
 
 interface SkyFireSpot {

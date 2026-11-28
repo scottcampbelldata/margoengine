@@ -21,6 +21,7 @@ import { fireSkyWgsl, writeFireSpots, writeHazeFires } from './fire-spots.js';
 import type { SkyFireSpot } from './base.js';
 import {
   CLOUD_LAYER_NAME,
+  isCloudLayerName,
   cloudDeckTransmittance,
   cloudLayerFor,
   type CloudLayer,
@@ -30,6 +31,7 @@ import {
 } from './cloud-types.js';
 import type { Hurricane, HurricaneOptions } from './hurricane.js';
 import type { StormField } from './storm-field.js';
+import type { ScudField } from './scud-field.js';
 export {
   CLOUD_LAYER_NAME,
   isCloudLayerName,
@@ -128,8 +130,12 @@ export interface VolumetricCloudOptions {
   weather?: CloudWeather;
   /**
    * Forces the cloud type whatever the `weather` says: `'cumulus'`, `'stratus'` or `'storm'` give their own
-   * `bottom`, `top` and `density` (and the stratus cover of the weather's `cloud`, 0.5 without a weather). Default unset:
-   * the weather picks the type.
+   * `bottom`, `top` and `density` (and the stratus cover of the weather's `cloud`, 0.5 without a weather). `'scud'` is
+   * fractus under a rain deck: ragged low shreds with no flat base, torn along the wind, cover 0.35 times the weather's
+   * `rain` (none when dry), 300 to 500 m (with `above`, 0.4 of the deck's base and 200 m thick), and its own defaults
+   * `scale` 2,200, `erosion` 1.8, `evolution` 10, `steps` 24, `lightSteps` 2, `shear` 1.5 times its thickness and
+   * `name` `'sky:volumetric-clouds:scud'`; its shape loads by `import()` on first use (`ready`). Default unset: the
+   * weather picks the type.
    */
   type?: CloudType;
   /**
@@ -249,6 +255,25 @@ export interface VolumetricCloudOptions {
    * horizon. Only while the camera is under the deck. Read every frame; default none.
    */
   mist?: CloudMist;
+  /**
+   * The layer over this one, for a second layer under a deck (low scud under a rain deck): this layer's tops must be at
+   * or below its base (RangeError). The link is closed form, with no second march: the sun, moon and sky light reach
+   * this layer through the upper deck (`cloudDeckTransmittance` of its layer at each light's height, the sky's at the
+   * two-stream's mean slant), the upper base sends back down its reflectance of the ground lights' light at its height,
+   * and the upper deck takes the ground lights through this layer's mean transmittance. So scud is dark against a
+   * lighter base by day (WMO pannus) and takes the lamps more strongly near them by night. The sky's `deck` becomes the
+   * product of both, the sky's environment map shows this layer over the upper's (or under it, from a camera above this
+   * layer's tops), and each layer draws the air band from its base down to the next layer's top (the lowest one to the
+   * ground) with its own cloud at its depth, in the camera's order: under this layer's tops the upper draws first. A
+   * layer without its own `mist` takes the upper's. With `type: 'scud'` the base defaults to 0.4 of the upper's
+   * (150 to 450 m) and the tops 200 m over it. Default none.
+   */
+  above?: VolumetricClouds;
+  /**
+   * Metres the tops lead the base along the wind (the shapes lean downwind with height, as wind shear tilts real
+   * cloud), -20,000 to 20,000. Live. Default 0, or 1.5 times the layer's thickness for `type: 'scud'`.
+   */
+  shear?: number;
 }
 /** {@link VolumetricCloudOptions.groundLights}: one disc of lit ground that lights the cloud base from below. */
 export interface CloudGroundLight {
@@ -291,6 +316,13 @@ const defaults = {
   stepCap: 150,
   groundAlbedo: 0.2,
 } as const;
+// What `type: 'scud'` changes of the defaults: fine shapes (fractus shreds are tens to hundreds of metres across), more
+// erosion at every height, fast change, and fewer samples through a thin layer.
+const scudDefaults = { scale: 2200, erosion: 1.8, evolution: 10, steps: 24, lightSteps: 2 } as const;
+type TypedSetting = keyof typeof scudDefaults;
+/** The option `key` as set, else the default of the layer's type. */
+const setting = (o: VolumetricCloudOptions, key: TypedSetting): number =>
+  o[key] ?? (o.type === 'scud' ? scudDefaults[key] : key === 'erosion' ? 1 : defaults[key]);
 const defaultSun: Vec3 = [0.3, 0.6, 0.4];
 // The coverage map's frequency against the shapes': it repeats every scale / 0.17 metres.
 const WEATHER = 0.17;
@@ -364,24 +396,27 @@ fn perlinFbm(p:vec3f,period:i32)->f32 {
 // three quarters of the layer's slant depth, of the base shape only.
 /** WGSL of the cloud uniform and its density field, shared with `@margoengine/sky/cloud-shadows`. */
 export const cloudField = /* wgsl */ `
-struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f}
+struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f,lift:vec4f,link:vec4f,linkGlow:vec4f}
 fn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}
 fn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}
 fn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}
 //[storm-fns]
+//[scud-fns]
 fn cloudDensityAt(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,erode:bool)->f32 {
  let h=(cloudAltitude(c,p)-c.layer.x)/(c.layer.y-c.layer.x);if(h<=0.0||h>=1.0){return 0.0;}
 //[storm-branch]
- let q=(p+vec3f(c.wind.x,c.wind.z,c.wind.y))*c.shape.x;
+//[scud-branch]
+ let lean=vec3f(c.lift.x,0.0,c.lift.y)*h;
+ let q=(p+vec3f(c.wind.x,c.wind.z,c.wind.y)+lean)*c.shape.x;
  let s=textureSampleLevel(shape,smp,q.xzy,0.0);
- let weather=textureSampleLevel(shape,smp,vec3f((p.xz+c.flags.zw)*c.shape.x*${WEATHER},0.37),0.0).g;
+ let weather=textureSampleLevel(shape,smp,vec3f((p.xz+c.flags.zw+lean.xz)*c.shape.x*${WEATHER},0.37),0.0).g;
  let cover=clamp(c.layer.z*(1.0+2.5*(weather-0.48)),0.0,1.0);
  let low=s.g*0.625+s.b*0.25+s.a*0.125;
  let base=clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);
  let profile=smoothstep(0.0,0.12,h)*smoothstep(1.0,0.45,h);
  let cloud=clamp(cloudRemap(base*profile,1.0-cover,1.0),0.0,1.0)*cover;
  if(cloud<=0.0||!erode){return cloud;}
- let e=textureSampleLevel(detail,smp,((p+vec3f(c.wind.x,c.wind.z*2.0,c.wind.y)*1.5)*c.shape.y).xzy,0.0).rgb;
+ let e=textureSampleLevel(detail,smp,((p+vec3f(c.wind.x,c.wind.z*2.0,c.wind.y)*1.5+lean)*c.shape.y).xzy,0.0).rgb;
  let high=e.r*0.625+e.g*0.25+e.b*0.125;
  return clamp(cloudRemap(cloud,mix(high,1.0-high,clamp(h*4.0,0.0,1.0))*0.35*c.look.x,1.0),0.0,1.0);
 }
@@ -515,11 +550,13 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32,glow:f32)->CloudLight {
  let bottom=clouds.layer.x;let top=clouds.layer.y;
  let span=end-start;let nf=f32(n);let power=cloudStepPower(span,nf,clouds.moonColor.w);let s=clouds.sun.xyz;let nu=dot(d,s);
  let lit=max(clouds.sunColor.r,max(clouds.sunColor.g,clouds.sunColor.b))>0.0;
- let above=textureLoad(skyLight,vec2i(0,0),0).rgb;let below=textureLoad(skyLight,vec2i(1,0),0).rgb+clouds.look.w*above;
+ var above=textureLoad(skyLight,vec2i(0,0),0).rgb;let below=textureLoad(skyLight,vec2i(1,0),0).rgb+clouds.look.w*above;
+ above*=clouds.link.z;
  let m=clouds.moon.xyz;let nuMoon=dot(d,m);let moonLit=clouds.moon.w>0.0&&max(clouds.moonColor.r,max(clouds.moonColor.g,clouds.moonColor.b))>0.0;
  let lightN=u32(clouds.wind.w);let columnN=max(1u,(lightN+1u)/2u);let eyeHeight=max(cloudAltitude(clouds,clouds.eye.xyz),0.0);
  // The ground lit by the sun under the deck, as cloud-sun units (E / pi = 4k): look.w is the albedo times the deck's share.
- let ground=clouds.sunColor.rgb*clouds.sun.w*4.0*clouds.look.w*max(s.y,0.0);
+ let sunW=clouds.sun.w*clouds.link.x;let moonW=clouds.moon.w*clouds.link.y;
+ let ground=clouds.sunColor.rgb*sunW*4.0*clouds.look.w*max(s.y,0.0);
  var t=start+span*pow(jitter/nf,power);
  var transmittance=1.0;var light=vec3f(0);var scene=vec3f(0);var opacity=0.0;
  for(var k=0u;k<n;k++){
@@ -533,16 +570,17 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32,glow:f32)->CloudLight {
    var sun=vec3f(0);var aUp=-1.0;
    if(lit){
     let a=cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,s,lightN);let slant=max(s.y,0.25);aUp=a*slant;
-    sun=clouds.sunColor.rgb*clouds.sun.w*cloudScatter(a,below0/slant,nu)+cloudSkyScatter(vec3f(0),ground,aUp,below0,nuUp);
+    sun=clouds.sunColor.rgb*sunW*cloudScatter(a,below0/slant,nu)+cloudSkyScatter(vec3f(0),ground,aUp,below0,nuUp);
    }
    var moon=vec3f(0);
    if(moonLit){
     let od=cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,m,lightN);let slant=max(m.y,0.25);
     if(aUp<0.0){aUp=od*slant;}
-    moon=clouds.moonColor.rgb*clouds.moon.w*0.15*(cloudScatter(od,below0/slant,nuMoon)+0.5*(cloudHG(nuMoon,glow)-cloudPhaseK(nuMoon,1.0))*exp(-0.15*od));
+    moon=clouds.moonColor.rgb*moonW*0.15*(cloudScatter(od,below0/slant,nuMoon)+0.5*(cloudHG(nuMoon,glow)-cloudPhaseK(nuMoon,1.0))*exp(-0.15*od));
    }
    if(aUp<0.0){aUp=cloudColumn(p,up,max(top-altitude,0.0),columnN);}
-   let sky=cloudSkyScatter(above,below+cloudGround(p.xz,bottom),aUp,below0,nuUp);
+   var top=above;if(clouds.linkGlow.y>0.0){top+=clouds.linkGlow.y*cloudGround(p.xz,clouds.linkGlow.x);}
+   let sky=cloudSkyScatter(top,below+cloudGround(p.xz,bottom),aUp,below0,nuUp);
    var flash=vec3f(0);
    if(clouds.flash.w>0.0){
     let toward=clouds.flash.xyz-p;let r2=dot(toward,toward);var od=0.0;
@@ -570,8 +608,21 @@ ${fireSkyWgsl('clouds')}fn cloudVeiled(light:vec3f,opacity:f32,d:vec3f)->vec3f {
  let t=pow(max(clouds.veil.rgb,vec3f(1e-30)),vec3f(1.0/max(d.y/max(length(d),1e-6),0.052336)));
  return light*t*clouds.veil.w+opacity*(clouds.glow.rgb+fireSky(d,t));
 }
+fn cloudMistBand(d:vec3f)->vec4f {
+ let e=clouds.eye.xyz;let k=clouds.mist.x;let floor=clouds.lift.w;let base=clouds.layer.x;let altitude=cloudAltitude(clouds,e);
+ if(altitude>=base){return vec4f(0,0,0,1);}
+ let up=dot(d,normalize(vec3f(e.x,e.y+clouds.eye.w,e.z)))>0.0;var start=0.0;var end=0.0;
+ if(altitude<floor){if(!up){return vec4f(0,0,0,1);}start=cloudShell(d,floor).y;end=cloudShell(d,base).y;}
+ else {let low=cloudShell(d,floor);end=select(cloudShell(d,base).y,low.x,low.x>0.0);}
+ end=min(end,start+clouds.shape.z);let s=max(end-start,0.0);let t=exp(-k*s);
+ let above=textureLoad(skyLight,vec2i(0,0),0).rgb*clouds.link.z;
+ let foot=e.xz+d.xz*start;
+ let below=textureLoad(skyLight,vec2i(1,0),0).rgb+clouds.look.w*above+cloudGroundTrack(foot,foot+d.xz*min(s,2.0/k),clouds.mist.w);
+ return vec4f(0.5*((1.0+clouds.mist.y)*below+clouds.mist.z*above)*(1.0-t),t);
+}
 fn cloudMist(d:vec3f)->vec4f {
  let e=clouds.eye.xyz;let k=clouds.mist.x;
+ if(k>0.0&&clouds.lift.w>0.0){return cloudMistBand(d);}
  if(k<=0.0||cloudAltitude(clouds,e)>=clouds.layer.x){return vec4f(0,0,0,1);}
  let up=normalize(vec3f(e.x,e.y+clouds.eye.w,e.z));
  let s=select(clouds.shape.z,min(clouds.shape.z,cloudShell(d,clouds.layer.x).y),dot(d,up)>0.0);let t=exp(-k*s);
@@ -610,9 +661,15 @@ ${depthBinding}
 // second map (Sky.environmentLightLayer) is the same deck as the scene's light takes it: its sky light, its bounce of
 // the sky off the ground and its flash, and its sun and moon light only as `look.y` and `look.z` say (0 under
 // dimLight, whose engine lights already carry them; else matched to the engine lights' units).
-const deckShader = /* wgsl */ `${march}
+const deckShader = (linked: boolean) => /* wgsl */ `${march}
 @group(0) @binding(5) var deck:texture_storage_2d<rgba16float,write>;
 @group(0) @binding(6) var deckLight:texture_storage_2d<rgba16float,write>;
+${linked ? '@group(0) @binding(7) var upperDeck:texture_2d<f32>;\n@group(0) @binding(8) var upperDeckLight:texture_2d<f32>;' : ''}
+fn deckOver(own:vec4f,other:vec4f)->vec4f {
+ if(clouds.link.w<0.5){return own;}
+ if(clouds.link.w<1.5){return own+other*(1.0-own.a);}
+ return other+own*(1.0-other.a);
+}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
  if(any(id.xy>=vec2u(64,32))){return;}
  var light=vec3f(0);var scene=vec3f(0);var opacity=0.0;
@@ -626,8 +683,10 @@ const deckShader = /* wgsl */ `${march}
  let k=0.25*clouds.sunColor.w;
  let mid=(vec2f(id.xy)+0.5)/vec2f(64,32);let mp=(mid.x-0.5)*6.2831853;let mt=mid.y*3.14159265;
  let dir=vec3f(sin(mt)*cos(mp),cos(mt),sin(mt)*sin(mp));
- textureStore(deck,vec2i(id.xy),vec4f(cloudVeiled(light,opacity,dir)*k,opacity*0.25));
- textureStore(deckLight,vec2i(id.xy),vec4f(cloudVeiled(scene,opacity,dir)*k,opacity*0.25));
+ var view=vec4f(cloudVeiled(light,opacity,dir)*k,opacity*0.25);var lit=vec4f(cloudVeiled(scene,opacity,dir)*k,opacity*0.25);
+ ${linked ? 'view=deckOver(view,textureLoad(upperDeck,vec2i(id.xy),0));lit=deckOver(lit,textureLoad(upperDeckLight,vec2i(id.xy),0));' : ''}
+ textureStore(deck,vec2i(id.xy),view);
+ textureStore(deckLight,vec2i(id.xy),lit);
 }
 `;
 // The sky light the clouds receive, from the sky's 64 x 32 reflection map: the cosine-weighted mean radiance of the upper
@@ -711,7 +770,9 @@ export class CloudVolumes {
 // What a forced type sees as its weather when no `weather` is given: half the sky under cloud.
 const typeWeather: CloudWeather = { cloud: 0.5 },
   weatherLayer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
-  writeScratch: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 };
+  writeScratch: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
+  aboveLayer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
+  linkLayer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 };
 /**
  * The layer the options give: each of `coverage`, `bottom`, `top` and `density` as set, else the `weather`'s type
  * (`cloudLayerFor`), else the default. `out`, when given, receives the values and is returned (no allocation).
@@ -727,6 +788,13 @@ export function layerOf(
   out.bottom = options.bottom ?? w?.bottom ?? defaults.bottom;
   out.top = options.top ?? w?.top ?? defaults.top;
   out.density = options.density ?? w?.density ?? defaults.density;
+  const upper = options.above?.options;
+  if (type === 'scud' && upper && options.bottom === undefined) {
+    // Fractus forms in the moist air under the rain deck, well below its base (WMO pannus; AMS Glossary, "scud").
+    const deck = layerOf(upper, upper.above ? undefined : aboveLayer);
+    out.bottom = Math.min(450, Math.max(150, 0.4 * deck.bottom));
+    if (options.top === undefined) out.top = out.bottom + 200;
+  }
   return out;
 }
 /**
@@ -785,9 +853,10 @@ export function writeGround(
     v[o + 4] = g.x;
     v[o + 6] = g.z;
   });
-  if (options.mist) {
+  const mist = options.mist ?? options.above?.options.mist;
+  if (mist) {
     const r = deckReflectance(layer);
-    v[296] = 3.912 / options.mist.visibility;
+    v[296] = 3.912 / mist.visibility;
     v[297] = r;
     v[298] = 1 - r;
     v[299] = 0.25 * layer.bottom;
@@ -821,7 +890,7 @@ export function cloudGroundLight(
   return out;
 }
 /** Floats in the `Clouds` uniform ({@link cloudField}): the buffers of the clouds, their shadows and shafts hold this many. */
-export const CLOUD_FLOATS = 300;
+export const CLOUD_FLOATS = 312;
 
 let loadedStorm: StormField | undefined, loading: Promise<StormField> | undefined, loadError: unknown;
 /** Whether the options draw a storm: a `hurricane`, or `type: 'hurricane'`. */
@@ -843,9 +912,33 @@ export function stormFieldFor(options: VolumetricCloudOptions): StormField | und
     loadStormField().catch((e: unknown) => (loadError = e ?? new Error('storm field failed to load')));
   return loadedStorm;
 }
-/** The cloud field's WGSL (or any shader holding it) with the storm's functions when `field` is given. */
-export const withStorm = (code: string, field?: StormField): string =>
-  field ? code.replace('//[storm-fns]', field.fns).replace('//[storm-branch]', field.branch) : code;
+let loadedScud: ScudField | undefined, scudLoading: Promise<ScudField> | undefined, scudError: unknown;
+/**
+ * Loads the scud shape's WGSL (`type: 'scud'`; about 0.6 kB, kept out of other clouds). `VolumetricClouds` starts it
+ * itself for a scud layer; its `ready` resolves once it is in.
+ */
+export function loadScudField(): Promise<ScudField> {
+  return (scudLoading ??= import('./scud-field.js').then((m) => (loadedScud = m.scudField(WEATHER))));
+}
+/** The scud field once loaded, else undefined (starting the load when `options` are a scud layer's). */
+export function scudFieldFor(options: VolumetricCloudOptions): ScudField | undefined {
+  if (scudError !== undefined) throw scudError;
+  if (!loadedScud && options.type === 'scud')
+    loadScudField().catch((e: unknown) => (scudError = e ?? new Error('scud field failed to load')));
+  return loadedScud;
+}
+/**
+ * The cloud field's WGSL (or any shader holding it) with the storm's functions when `field` is given, and the scud
+ * shape's when `scud` is.
+ */
+export const withStorm = (code: string, field?: StormField, scud?: ScudField): string => {
+  const stormed = field ? code.replace('//[storm-fns]', field.fns).replace('//[storm-branch]', field.branch) : code;
+  return scud ? stormed.replace('//[scud-fns]', scud.fns).replace('//[scud-branch]', scud.branch) : stormed;
+};
+/** Height of a world point over the planet's surface, metres (the field's `cloudAltitude`, in double precision). */
+const cameraAltitude = (p: ArrayLike<number>): number =>
+  (p[0] * p[0] + p[1] * p[1] + p[2] * p[2] + 2 * PLANET_RADIUS * p[1]) /
+  (Math.hypot(p[0], p[1] + PLANET_RADIUS, p[2]) + PLANET_RADIUS);
 /**
  * Writes the layer's fields of the `Clouds` uniform ({@link cloudField}) into `v` ({@link CLOUD_FLOATS} long): the
  * planet radius, base and tops, coverage, density, the noise scales, the drift and the storm at `seconds` on the layer's
@@ -857,7 +950,7 @@ export function writeLayer(
   drift: ArrayLike<number>,
   seconds = 0,
 ): void {
-  const scale = options.scale ?? defaults.scale,
+  const scale = setting(options, 'scale'),
     layer = layerOf(options, writeScratch);
   v[19] = PLANET_RADIUS;
   v[28] = layer.bottom;
@@ -871,9 +964,16 @@ export function writeLayer(
   v[38] = drift[2];
   v[42] = drift[3] ?? 0;
   v[43] = drift[4] ?? 0;
-  v[60] = options.erosion ?? 1;
+  v[60] = setting(options, 'erosion');
   if (loadedStorm) loadedStorm.write(v, options, seconds, scale);
   else v.fill(0, 64, 96);
+  // The lean along the wind (`shear`, metres over the layer's height) and the scud shape's branch.
+  const wind = options.wind ?? [10, 3],
+    speed = Math.hypot(wind[0], wind[1]),
+    shear = options.shear ?? (options.type === 'scud' ? 1.5 * (layer.top - layer.bottom) : 0);
+  v[300] = speed > 0 ? (wind[0] / speed) * shear : 0;
+  v[301] = speed > 0 ? (wind[1] / speed) * shear : 0;
+  v[302] = options.type === 'scud' ? 1 : 0;
 }
 const inRange = (value: number, low: number, high: number) => Number.isFinite(value) && value >= low && value <= high;
 /**
@@ -918,8 +1018,13 @@ export class VolumetricClouds implements EnginePlugin {
   // The layer the options give this frame (layerOf), and the sky whose sun and moon the deck dims (Sky.deck).
   private readonly layer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 };
   private decked: VolumetricCloudSky | undefined;
-  // The storm field the pipelines were built with (undefined: without one).
+  // The storm field the pipelines were built with (undefined: without one), and the scud shape likewise.
   private built: StormField | undefined;
+  private builtScud: ScudField | undefined;
+  // Whether the environment map was marched this frame (the layer under this one lays its map over it).
+  private mapped = false;
+  // The upper deck's maps the linked deck pipeline's bind group reads (rebuilt when they change).
+  private deckOver?: GPUTexture;
   /**
    * The share of a light at elevation sine `up` the deck passes (`cloudDeckTransmittance` of the options' layer), or 1
    * with `dimLight: false`. Handed to the sky as its `deck`.
@@ -933,7 +1038,9 @@ export class VolumetricClouds implements EnginePlugin {
       const p = this.engine?.camera.position ?? [0, 0, 0];
       layer.coverage *= Math.min(1, loadedStorm!.coverOver(storm, p[0], p[2], this.seconds, layer.top - layer.bottom));
     }
-    return cloudDeckTransmittance(layer, up);
+    const own = cloudDeckTransmittance(layer, up),
+      upper = this.upper();
+    return upper ? own * upper.deckOf(up) : own;
   };
   /**
    * Metres the shapes have moved along X and Z with the wind and risen through themselves, each wrapped at the shapes'
@@ -942,7 +1049,7 @@ export class VolumetricClouds implements EnginePlugin {
   readonly drift = new Float64Array(5);
   constructor(readonly options: VolumetricCloudOptions = {}) {
     this.validate();
-    const name = options.name ?? CLOUD_LAYER_NAME;
+    const name = options.name ?? (options.type === 'scud' ? `${CLOUD_LAYER_NAME}:scud` : CLOUD_LAYER_NAME);
     if (typeof name !== 'string' || name.length === 0 || name.length > 200)
       throw new TypeError('VolumetricClouds name must be a non-empty string of at most 200 characters');
     this.name = name;
@@ -1011,25 +1118,35 @@ export class VolumetricClouds implements EnginePlugin {
     if (o.mist !== undefined && (typeof o.mist !== 'object' || o.mist === null || !inRange(o.mist.visibility, 10, 1e6)))
       throw new RangeError('Invalid VolumetricClouds mist; give {visibility: 10 to 1000000 metres}');
     const { coverage, bottom, top, density } = layerOf(o, this.layer);
+    if (o.above !== undefined) {
+      if (!(o.above instanceof VolumetricClouds) || o.above === this)
+        throw new TypeError('VolumetricClouds above must be the other VolumetricClouds layer, the one over this one');
+      const upper = layerOf(o.above.options, linkLayer);
+      if (top > upper.bottom)
+        throw new RangeError(
+          `Invalid VolumetricClouds above; this layer's tops (${top} m) must be at or below the base of the layer above (${upper.bottom} m)`,
+        );
+    }
     if (
       !inRange(coverage, 0, 1) ||
       !inRange(bottom, 100, 20000) ||
       !inRange(top, bottom + 1, 20000) ||
       !inRange(density, 1e-6, 1) ||
       !inRange(o.stepCap ?? defaults.stepCap, 10, 10000) ||
-      !inRange(o.erosion ?? 1, 0, 2) ||
+      !inRange(setting(o, 'erosion'), 0, 2) ||
       !inRange(o.groundAlbedo ?? defaults.groundAlbedo, 0, 1) ||
-      !inRange(o.scale ?? defaults.scale, 1000, 200000) ||
-      !inRange(o.evolution ?? defaults.evolution, 0, 50) ||
-      !Number.isInteger(o.steps ?? defaults.steps) ||
-      !inRange(o.steps ?? defaults.steps, 8, 256) ||
-      !Number.isInteger(o.lightSteps ?? defaults.lightSteps) ||
-      !inRange(o.lightSteps ?? defaults.lightSteps, 1, 16) ||
+      !inRange(setting(o, 'scale'), 1000, 200000) ||
+      !inRange(setting(o, 'evolution'), 0, 50) ||
+      !Number.isInteger(setting(o, 'steps')) ||
+      !inRange(setting(o, 'steps'), 8, 256) ||
+      !Number.isInteger(setting(o, 'lightSteps')) ||
+      !inRange(setting(o, 'lightSteps'), 1, 16) ||
+      !inRange(o.shear ?? 0, -20000, 20000) ||
       !inRange(o.maxDistance ?? defaults.maxDistance, 1000, 400000) ||
       !inRange(o.sunIntensity ?? defaults.sunIntensity, 0, 1000)
     )
       throw new RangeError(
-        'Invalid VolumetricClouds options; keep coverage 0 to 1, bottom 100 to 20000 below top (at most 20000), density above 0 to 1, scale 1000 to 200000, evolution 0 to 50, integer steps 8 to 256 and lightSteps 1 to 16, maxDistance 1000 to 400000, stepCap 10 to 10000, groundAlbedo 0 to 1 and sunIntensity 0 or more.',
+        'Invalid VolumetricClouds options; keep coverage 0 to 1, bottom 100 to 20000 below top (at most 20000), density above 0 to 1, scale 1000 to 200000, evolution 0 to 50, integer steps 8 to 256 and lightSteps 1 to 16, shear -20000 to 20000, maxDistance 1000 to 400000, stepCap 10 to 10000, groundAlbedo 0 to 1 and sunIntensity 0 or more.',
       );
   }
   setup(engine: Engine): void {
@@ -1067,7 +1184,7 @@ export class VolumetricClouds implements EnginePlugin {
       name: this.name,
       order: 3,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
+        if (c.backend === 'webgpu') this.run(c);
       },
     });
   }
@@ -1078,7 +1195,38 @@ export class VolumetricClouds implements EnginePlugin {
    */
   get ready(): Promise<void> {
     // The storm's options are checked once its code is in; a bad one rejects here and throws in the next draw.
-    return wantsStorm(this.options) ? loadStormField().then((f) => void f.of(this.options)) : Promise.resolve();
+    const storm = wantsStorm(this.options) ? loadStormField().then((f) => void f.of(this.options)) : undefined,
+      scud = this.options.type === 'scud' ? loadScudField().then(() => undefined) : undefined;
+    return Promise.all([storm, scud]).then(() => undefined);
+  }
+  // The layer over this one when both draw on one engine, else undefined.
+  private upper(): VolumetricClouds | undefined {
+    const above = this.options.above;
+    return above && above.engine && above.engine === this.engine && !above.disposed ? above : undefined;
+  }
+  // The layer under this one: an attached layer on this engine whose `above` is this one.
+  private lower(): VolumetricClouds | undefined {
+    const plugins = this.engine?.plugins as ReadonlyMap<string, unknown> | undefined;
+    if (!plugins) return undefined;
+    for (const [name, plugin] of plugins)
+      if (isCloudLayerName(name) && plugin instanceof VolumetricClouds && plugin.upper() === this) return plugin;
+    return undefined;
+  }
+  // One frame of this layer, or of it and the layer under it in the camera's order: from under the lower layer's tops
+  // the upper deck is the farther, so it draws first and the lower over it; from above them the lower draws first.
+  private run(c: Context): void {
+    if (this.upper()) return;
+    const lower = this.lower();
+    if (!lower) {
+      if (this.prepare(c)) this.paint(c);
+      return;
+    }
+    const mine = this.prepare(c),
+      theirs = lower.prepare(c),
+      p = c.camera.position,
+      below = cameraAltitude(p) < layerOf(lower.options, linkLayer).top,
+      order = below ? [mine && this, theirs && lower] : [theirs && lower, mine && this];
+    for (const layer of order) if (layer) layer.paint(c);
   }
   /** Seconds on this layer's clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
   get time(): number {
@@ -1123,14 +1271,14 @@ export class VolumetricClouds implements EnginePlugin {
     this.extra = 0;
     this.pending = false;
     const wind = this.options.wind ?? [10, 3],
-      scale = this.options.scale ?? defaults.scale;
+      scale = setting(this.options, 'scale');
     // The shapes repeat every `scale` metres and the coverage map every scale / 0.17, so each drift wraps at its own
     // repeat in double precision and stays exact in f32. Until 2026-11-14 the coverage map took the shapes' wrap, 0.17
     // of its own repeat, and the whole sky's cloud cover jumped there (every 23 minutes in the default wind).
     const map = scale / WEATHER;
     this.drift[0] = (this.drift[0] + wind[0] * delta) % scale;
     this.drift[1] = (this.drift[1] + wind[1] * delta) % scale;
-    this.drift[2] = (this.drift[2] + (this.options.evolution ?? defaults.evolution) * delta) % scale;
+    this.drift[2] = (this.drift[2] + setting(this.options, 'evolution') * delta) % scale;
     this.drift[3] = (this.drift[3] + wind[0] * delta) % map;
     this.drift[4] = (this.drift[4] + wind[1] * delta) % map;
   }
@@ -1155,8 +1303,8 @@ export class VolumetricClouds implements EnginePlugin {
     // the sky's picture units, and its reading of the sky's map takes both back out.
     v[27] = 2 ** (sky?.options.exposure ?? 0) * (sky?.pictureScale ?? 1);
     v[34] = o.maxDistance ?? defaults.maxDistance;
-    v[35] = o.steps ?? defaults.steps;
-    v[39] = o.lightSteps ?? defaults.lightSteps;
+    v[35] = setting(o, 'steps');
+    v[39] = setting(o, 'lightSteps');
     v[40] = +!linearHdr(c.format);
     // The march start's offset this frame (`temporal`): the golden ratio's fraction, f32 exact within 1024 frames. The
     // counter moves once per timed update, in advanceTime (until 2026-11-16 once per draw, so a seek could not move
@@ -1191,6 +1339,28 @@ export class VolumetricClouds implements EnginePlugin {
     v[63] = (o.groundAlbedo ?? defaults.groundAlbedo) * cloudDeckTransmittance(layer, Math.max(v[21], 0.1));
     writeVeil(v, sky);
     writeGround(v, o, layer);
+    // The layers linked to this one (`above`): the share of each light the upper deck passes, its base's glow back down,
+    // and the floor of this layer's air band (the lower layer's tops); without them 1, 0 and the ground, as before.
+    v[303] = 0;
+    v[304] = v[305] = v[306] = 1;
+    v[307] = v[308] = v[309] = v[310] = v[311] = 0;
+    const upper = this.upper(),
+      lower = upper ? undefined : this.lower();
+    if (upper) {
+      const deck = layerOf(upper.options, linkLayer);
+      v[304] = cloudDeckTransmittance(deck, Math.max(v[21], 0.1));
+      v[305] = cloudDeckTransmittance(deck, Math.max(v[45], 0.1));
+      v[306] = cloudDeckTransmittance(deck, 0.6);
+      // The environment map: this layer's in front from under its tops, else the upper's (0: the upper drew none).
+      v[307] = upper.mapped ? (cameraAltitude(c.camera.position) < layer.top ? 1 : 2) : 0;
+      v[308] = deck.bottom;
+      v[309] = deckReflectance(deck);
+    } else if (lower) {
+      const scud = layerOf(lower.options, linkLayer),
+        through = cloudDeckTransmittance(scud, 0.6);
+      v[303] = scud.top;
+      for (let i = 0; i < 8; i++) for (let k = 0; k < 3; k++) v[232 + 8 * i + k] *= through;
+    }
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     return v[30] > 0 || v[296] > 0;
   }
@@ -1202,7 +1372,7 @@ export class VolumetricClouds implements EnginePlugin {
         this.lightPipeline ??= c.device.createComputePipeline({
           layout: 'auto',
           compute: {
-            module: c.device.createShaderModule({ code: withStorm(skyLightShader, this.built) }),
+            module: c.device.createShaderModule({ code: withStorm(skyLightShader, this.built, this.builtScud) }),
             entryPoint: 'main',
           },
         });
@@ -1240,14 +1410,18 @@ export class VolumetricClouds implements EnginePlugin {
     const sky = this.options.sky;
     if (this.layered !== sky) this.unlayer();
     if (!sky || !('environmentLayer' in sky)) return;
+    const upper = this.upper(),
+      over = upper?.mapped ? upper.deck : undefined;
+    if (this.deckGroup && over !== this.deckOver) this.deckPipeline = this.deckGroup = undefined;
     if (!this.deckGroup) {
       this.deckPipeline ??= c.device.createComputePipeline({
         layout: 'auto',
         compute: {
-          module: c.device.createShaderModule({ code: withStorm(deckShader, this.built) }),
+          module: c.device.createShaderModule({ code: withStorm(deckShader(!!over), this.built, this.builtScud) }),
           entryPoint: 'main',
         },
       });
+      this.deckOver = over;
       this.deckGroup = c.device.createBindGroup({
         layout: this.deckPipeline.getBindGroupLayout(0),
         entries: [
@@ -1258,6 +1432,12 @@ export class VolumetricClouds implements EnginePlugin {
           { binding: 4, resource: this.light!.createView() },
           { binding: 5, resource: this.deck!.createView() },
           { binding: 6, resource: this.deckLight!.createView() },
+          ...(over
+            ? [
+                { binding: 7, resource: over.createView() },
+                { binding: 8, resource: upper!.deckLight!.createView() },
+              ]
+            : []),
         ],
       });
     }
@@ -1269,18 +1449,27 @@ export class VolumetricClouds implements EnginePlugin {
     sky.environmentLayer = this.deck;
     if ('environmentLightLayer' in sky) sky.environmentLightLayer = this.deckLight;
     this.layered = sky;
+    this.mapped = true;
   }
   // Takes the deck back from the sky it was given to: nothing drawn, another sky, or released.
   // Hands the deck to the options' sky (Sky.deck), taking it back from a sky it was given to before.
   private hookDeck(): void {
     const sky = this.engine ? this.options.sky : undefined;
-    if (this.decked === sky) return;
+    if (this.decked === sky) {
+      // A layer under this one holds the sky's deck (the product of both); a layer above gives way to it.
+      const upper = this.upper();
+      if (sky && upper && sky.deck === upper.deckOf) sky.deck = this.deckOf;
+      return;
+    }
     this.unhookDeck();
     if (sky) sky.deck = this.deckOf;
     this.decked = sky;
   }
   private unhookDeck(): void {
-    if (this.decked?.deck === this.deckOf) this.decked.deck = undefined;
+    if (this.decked?.deck === this.deckOf) {
+      const upper = this.options.above;
+      this.decked.deck = upper && upper.decked === this.decked && !upper.disposed ? upper.deckOf : undefined;
+    }
     this.decked = undefined;
   }
   private unlayer(): void {
@@ -1289,31 +1478,38 @@ export class VolumetricClouds implements EnginePlugin {
       this.layered.environmentLightLayer = undefined;
     this.layered = undefined;
   }
-  private draw(c: Context): void {
-    if (!this.uniform) return;
-    // A storm's code loads on first use; until it has the layer draws nothing (`ready`).
-    const field = stormFieldFor(this.options);
-    if (wantsStorm(this.options) && !field) return;
-    if (field !== this.built) {
+  // The frame's uniform, sky light and environment map; false when the layer draws nothing this frame.
+  private prepare(c: Context): boolean {
+    this.mapped = false;
+    if (!this.uniform) return false;
+    // A storm's or scud's code loads on first use; until it has the layer draws nothing (`ready`).
+    const field = stormFieldFor(this.options),
+      scud = scudFieldFor(this.options);
+    if ((wantsStorm(this.options) && !field) || (this.options.type === 'scud' && !scud)) return false;
+    if (field !== this.built || scud !== this.builtScud) {
       // The field arrived (or changed): the shaders are made again with it.
       this.lightPipeline = this.lightGroup = this.deckPipeline = this.deckGroup = this.lightSource = undefined;
       this.key = '';
       this.built = field;
+      this.builtScud = scud;
     }
     this.hookDeck();
     if (!this.write(c)) {
       this.unlayer();
-      return;
+      return false;
     }
     this.volumes!.fill(c.device, c.encoder);
     this.skyLight(c);
     this.environment(c);
+    return true;
+  }
+  private paint(c: Context): void {
     const depth = sceneDepth(c, this.options.depth, 'VolumetricClouds'),
       samples = c.descriptor.multisample?.count ?? 1,
       key = `${c.format}:${samples}:${depth?.samples ?? 0}:${c.descriptor.depthStencil?.format}`;
     if (this.key !== key) {
       const module = c.device.createShaderModule({
-        code: withStorm(shader(depth ? depthWGSL(5, depth.samples) : ''), this.built),
+        code: withStorm(shader(depth ? depthWGSL(5, depth.samples) : ''), this.built, this.builtScud),
       });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -1351,7 +1547,7 @@ export class VolumetricClouds implements EnginePlugin {
       this.bind = c.device.createBindGroup({
         layout: this.pipeline!.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: { buffer: this.uniform } },
+          { binding: 0, resource: { buffer: this.uniform! } },
           { binding: 1, resource: this.volumes!.shape.createView() },
           { binding: 2, resource: this.volumes!.erosion.createView() },
           { binding: 3, resource: this.volumes!.sampler },
@@ -1381,7 +1577,7 @@ export class VolumetricClouds implements EnginePlugin {
     this.deckLight?.destroy();
     this.uniform = this.volumes = this.light = this.deck = this.deckLight = undefined;
     this.pipeline = this.bind = this.lightPipeline = this.lightGroup = this.deckPipeline = this.deckGroup = undefined;
-    this.bound = this.lightSource = undefined;
+    this.bound = this.lightSource = this.deckOver = undefined;
     this.key = '';
   }
   onDeviceRestored(engine: Engine): void {
