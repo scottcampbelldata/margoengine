@@ -13,6 +13,7 @@ import { HairCardOptions, HairOptions } from "@margoengine/materials/hair";
 import { SkinOptions } from "@margoengine/materials/skin";
 import { AnatomicalRig, ClampIssue, Tier } from "@margoengine/rigging/anatomy";
 import { FitHumanOptions } from "@margoengine/rigging/anatomy/human";
+import { CouplingOptions } from "@margoengine/rigging/coupling";
 import { Hands, HandsOptions } from "@margoengine/rigging/hands";
 
 export interface EyeBall {
@@ -58,6 +59,7 @@ export interface PersonAnatomyOptions extends FitHumanOptions {
     tier?: Tier;
     calibrate?: boolean;
     onClamp?: (issues: readonly ClampIssue[]) => void;
+    coupling?: CouplingOptions | false;
 }
 
 export type PersonLook = 'skin' | 'eyes' | 'hair';

@@ -17,6 +17,7 @@
   import { addIKChain } from '/packages/rigging/dist/ik.js';
   import { addRootMotion, rootMotionJoint } from '/packages/animator/dist/index.js';
   import { clampPose, jointAngles, poseFromAngles } from '/packages/rigging/dist/anatomy.js';
+  import { couplePose } from '/packages/rigging/dist/coupling.js';
   import { checkClip, checkPose, checkProportions, formatPoseReport } from '/packages/rigging/dist/validate.js';
   import { isCompatDevice } from '/packages/webgl2-compat/dist/device.js';
   import { riggedTestBody } from '/packages/humans/test/rigged-body.js';
@@ -85,17 +86,18 @@
   window.renderSheet = async ({ model = null } = {}) => {
     const { engine, errors: gpuErrors, person } = await makePerson(model, {}),
       body = person.body, nodes = person.model.nodes, io = poseIO(engine, person),
-      { forward, left, up } = body.frame, h = body.stature,
+      { forward, left, up, vertical } = body.frame, h = body.stature,
       joint = (id) => body.joints.find((j) => j.id === id);
     person.playing = false;
     // The ground: the rest pose stands on it, a little below its lowest joint (a toe joint sits inside the shoe).
-    const restHeights = body.joints.map((j) => io.world(j.bone)).map((p) => p[0] * up[0] + p[1] * up[1] + p[2] * up[2]),
+    const restHeights = body.joints.map((j) => io.world(j.bone)).map((p) => p[0] * vertical[0] + p[1] * vertical[1] + p[2] * vertical[2]),
       ground = Math.min(...restHeights) - 0.01 * h;
     // Each row: a name and a function that leaves the pose in the transform store, written after the Animator.
     let held = null, removers = [];
     engine.use({ name: 'pose-sheet', setup() {}, onPreUpdate() { if (held) io.write(held); } });
     const animate = (clip, at) => { held = null; person.play(clip, { fade: 0, at }); person.animator.onPreUpdate(0); person.playing = false; };
-    const hold = (pose) => { if (body.limits) clampPose(body, pose); held = pose; io.write(pose); };
+    // A held pose goes through what playback does to a clip: coupled, then held inside the stops.
+    const hold = (pose) => { couplePose(body, pose); if (body.limits) clampPose(body, pose); held = pose; io.write(pose); };
     const walk = person.clips.find((c) => /walk/i.test(c)) ?? person.clips[0],
       idle = person.clips.find((c) => /idle|rest|stand/i.test(c)) ?? person.clips[0],
       walkLength = person.animation.clips.find((c) => c.name === walk)?.duration ?? 1;
@@ -133,6 +135,11 @@
       ['seated (hips and knees 90)', () => hold(poseFromAngles(body, { l_hip: { flexion: 90 }, r_hip: { flexion: 90 }, l_knee: { flexion: 90 }, r_knee: { flexion: 90 }, l_elbow: { flexion: 60 }, r_elbow: { flexion: 60 } }, body.neutral))],
       ['elbows and knees at full flexion', stops('bent')],
       ['elbows and knees at their extension stops', stops('straight')],
+      // The girdle rides on the arm: left out to the side 90, right raised overhead 170, both with the palms in.
+      ['arms raised: left 90 to the side, right 170 overhead', () => hold(poseFromAngles(body, { l_shoulder: { abduction: 90 }, r_shoulder: { abduction: 170 } }, body.neutral))],
+      ['arms raised forward overhead (flexion 170, both)', () => hold(poseFromAngles(body, { l_shoulder: { flexion: 170 }, r_shoulder: { flexion: 170 } }, body.neutral))],
+      // Forearm twist: the left hand turned palm back (pronation 80), the right palm forward (supination 80), elbows bent 90.
+      ['forearms turned: left pronated 80, right supinated 80, elbows 90', () => hold(poseFromAngles(body, { l_elbow: { flexion: 90 }, r_elbow: { flexion: 90 }, l_radiocarpal: { rotation: 80 }, r_radiocarpal: { rotation: -80 } }, body.neutral))],
     ];
     // A walk travels on the bone the clips move farthest: the hips of a Mixamo rig, CC_Base_BoneRoot (above the hips) of a
     // Character Creator one (KB-HUM-SKINDRIFT1). Root motion that only reports keeps that bone in place, so every row is

@@ -20,6 +20,7 @@ import { hair, hairCards, type HairCardOptions, type HairOptions } from '@margoe
 import type { Hands, HandsOptions } from '@margoengine/rigging/hands';
 import type { AnatomicalRig, ClampIssue, Tier } from '@margoengine/rigging/anatomy';
 import type { FitHumanOptions } from '@margoengine/rigging/anatomy/human';
+import type { CouplingOptions } from '@margoengine/rigging/coupling';
 import { MargoError } from '@margoengine/math/errors';
 import { setAnatomy } from '@margoengine/animator';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
@@ -79,6 +80,14 @@ export interface PersonAnatomyOptions extends FitHumanOptions {
   calibrate?: boolean;
   /** Called on a frame whose pose needed bringing back into range, with what was brought back. Default none. */
   onClamp?: (issues: readonly ClampIssue[]) => void;
+  /**
+   * Coupled motion (`addCoupling` from `@margoengine/rigging/coupling`) every frame, before the ranges are held: the
+   * collarbone and shoulder blade ride on the arm, twist bones carry their share of a limb's twist, the last finger
+   * joint follows the middle one, a bend one spine level holds is shared by the run, and the knee screws home. A
+   * follower a clip moves itself keeps the clip's motion. Default `{}`; its options turn single rules off, false turns
+   * it off.
+   */
+  coupling?: CouplingOptions | false;
 }
 
 /** Options of {@link addPerson}. Every one is optional; the defaults give a finished person. */
@@ -124,7 +133,8 @@ export interface PersonOptions {
    * naming knows (Character Creator, Mixamo, VRM humanoid, H-Anim and the other namings of
    * `@margoengine/rigging/anatomy/human`) is fitted with the human table, its arm and leg rolls read from its clips;
    * the Animator's IK solvers and foot IK then bend each joint the anatomical way (`setAnatomy`), and every frame's
-   * pose is held inside the joints' stops (`addAnatomyLimits`), so no clip or solver folds an elbow or knee backwards.
+   * pose is coupled (`addCoupling`: the collarbone rides on the arm, twist bones carry their share) and held inside
+   * the joints' stops (`addAnatomyLimits`), so no clip or solver folds an elbow or knee backwards.
    * A model whose bones no naming knows gets no body; name its joints with `anatomy: {map}`. `anatomy: {limits:
    * false}` fits the body and holds nothing.
    */
@@ -500,7 +510,11 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
   const anatomyModules: AnatomyModules | undefined =
     options.anatomy === false
       ? undefined
-      : await Promise.all([import('@margoengine/rigging/anatomy'), import('@margoengine/rigging/anatomy/human')]);
+      : await Promise.all([
+          import('@margoengine/rigging/anatomy'),
+          import('@margoengine/rigging/anatomy/human'),
+          (options.anatomy || {}).coupling === false ? null : import('@margoengine/rigging/coupling'),
+        ]);
 
   // Everything is built and checked before anything is attached, so bad options leave the model as it was.
   const animation = new Animation(model, options.skinning === 'linear' ? {} : { skinning: dualQuaternionSkinning }),
@@ -545,9 +559,10 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
     if (body) {
       // The solvers bend each joint the anatomical way, and after them every frame's pose is held inside the stops.
       // Solvers added later obey the body themselves (setAnatomy).
-      const { tier, onClamp } = options.anatomy || {};
+      const { tier, onClamp, coupling } = options.anatomy || {};
       setAnatomy(animator, body);
       cleanups.push(() => setAnatomy(animator, null));
+      if (anatomyModules![2]) cleanups.push(anatomyModules![2].addCoupling(animator, body, coupling || {}));
       cleanups.push(anatomyModules![0].addAnatomyLimits(animator, body, { tier, onClamp }));
     }
   }
@@ -638,6 +653,7 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
 type AnatomyModules = [
   typeof import('@margoengine/rigging/anatomy'),
   typeof import('@margoengine/rigging/anatomy/human'),
+  typeof import('@margoengine/rigging/coupling') | null,
 ];
 
 /** The model's nodes as a rig: names, parents and their local transforms now (the rest pose, before any clip plays). */
@@ -678,7 +694,9 @@ function personBody(
   [anatomy, humans]: AnatomyModules,
   options: PersonAnatomyOptions,
 ): AnatomicalRig | undefined {
-  const { tier, calibrate = true, onClamp, ...fit } = options;
+  const { tier, calibrate = true, onClamp, coupling, ...fit } = options;
+  if (coupling !== undefined && coupling !== false && (typeof coupling !== 'object' || !coupling))
+    throw new TypeError('addPerson anatomy.coupling must be an options object or false');
   if (tier !== undefined && tier !== 'normal' && tier !== 'structural')
     throw new RangeError("addPerson anatomy.tier must be 'normal' or 'structural'");
   if (onClamp !== undefined && typeof onClamp !== 'function')

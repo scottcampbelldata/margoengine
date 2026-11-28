@@ -57,6 +57,10 @@
       "types": "./dist/validate.d.ts",
       "import": "./dist/validate.js"
     },
+    "./coupling": {
+      "types": "./dist/coupling.d.ts",
+      "import": "./dist/coupling.js"
+    },
     "./swim": {
       "types": "./dist/swim.d.ts",
       "import": "./dist/swim.js"

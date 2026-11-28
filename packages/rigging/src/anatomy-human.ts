@@ -72,7 +72,9 @@ const HENDRIKS = 'https://cdn-links.lww.com/permalink/prsgo/b/prsgo_8_6_2020_04_
   LUMBAR_TABLE = 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3699246/table/TB04006-3/',
   THORACIC_TABLE = 'https://musculoskeletalkey.com/of-the-spine/',
   PUBMED = 'https://pubmed.ncbi.nlm.nih.gov/',
-  WINTER = 'https://courses.grainger.illinois.edu/me481/sp2021/Anthro-Winter.pdf';
+  WINTER = 'https://courses.grainger.illinois.edu/me481/sp2021/Anthro-Winter.pdf',
+  LUDEWIG = 'https://pmc.ncbi.nlm.nih.gov/articles/PMC2657311/',
+  KIM = 'https://pmc.ncbi.nlm.nih.gov/articles/PMC4553277/';
 
 const SOURCES: Readonly<Record<string, SourceEntry>> = {
   hanim: {
@@ -135,6 +137,10 @@ const SOURCES: Readonly<Record<string, SourceEntry>> = {
   kapandji: { cite: 'Kapandji IA, The Physiology of the Joints, vols 1 to 3 (print)' },
   bennell1998: {
     cite: 'Bennell K et al. 1998, Intra-rater and inter-rater reliability of a weight-bearing lunge measure of ankle dorsiflexion, Aust J Physiother 44(3):175-180 (print)',
+  },
+  kim2015: {
+    cite: 'Kim HY, Kim KJ, Yang DS, Jeung SW, Choi HG, Choy WS 2015, Screw-home movement of the tibiofemoral joint during normal gait: three-dimensional analysis, Clin Orthop Surg 7(3):303-309; it reports the RSA range of Karrholm et al. in its discussion',
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC4553277/',
   },
   rijpkema1991: {
     cite: 'Rijpkema H, Girard M 1991, Computer animation of knowledge-based human grasping, SIGGRAPH 91 (print)',
@@ -1252,7 +1258,20 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
       kind: 'ratio',
       joints: ['r_shoulder', 'r_sternoclavicular', 'r_acromioclavicular'],
       note: 'Raising the arm turns the shoulder blade and collarbone with it: about two degrees at the shoulder joint for each degree of the shoulder blade, after a setting phase of the first 30 degrees of abduction or 60 of flexion. The collarbone rolls backward mostly past 90 degrees. The same holds on the left.',
-      values: { glenohumeral: 2, scapulothoracic: 1, settingAbduction: 30, settingFlexion: 60, clavicleRollFrom: 90 },
+      values: {
+        glenohumeral: 2,
+        scapulothoracic: 1,
+        settingAbduction: 30,
+        settingFlexion: 60,
+        clavicleRollFrom: 90,
+        clavicleRollTo: 180,
+        clavicleRoll: 31,
+        scapulaFrom: 30,
+        scapulaTo: 120,
+        scapulaUpward: 11,
+        scapulaInternal: 8,
+        scapulaTilt: 19,
+      },
       rows: [
         row('inman1944', 2, 'glenohumeral elevation for each degree of scapular upward rotation', 'online', MCCLURE),
         row(
@@ -1270,6 +1289,11 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
           'https://pmc.ncbi.nlm.nih.gov/articles/PMC2841046/',
         ),
         row('inman1944', 90, 'humeral elevation past which the clavicle mostly rotates', 'online', MCCLURE),
+        row('ludewig2009', 31, 'sternoclavicular posterior rotation gained over elevation, 0 to 31', 'online', LUDEWIG),
+        row('ludewig2009', 11, 'acromioclavicular upward rotation gained over elevation, 5 to 16', 'online', LUDEWIG),
+        row('ludewig2009', 8, 'acromioclavicular internal rotation gained over elevation, 57 to 65', 'online', LUDEWIG),
+        row('ludewig2009', 19, 'acromioclavicular posterior tilt gained over elevation, -4 to 15', 'online', LUDEWIG),
+        row('ludewig2009', 2.1, 'glenohumeral elevation to scapular upward rotation, abduction (2.4 flexion)', 'online', LUDEWIG),
       ],
     },
     {
@@ -1304,9 +1328,41 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
       rows: [recalled('kapandji', 90, 'knee flexion at which tibial rotation is widest')],
     },
     {
+      id: 'screw-home',
+      kind: 'screw',
+      joints: ['r_knee'],
+      note: 'Over the last degrees of extension the tibia turns outward on the femur and locks the knee; bending it again turns the tibia inward by the same amount. The same holds on the left.',
+      values: { rotation: 11.5, over: 20 },
+      rows: [
+        row('kim2015', 15, 'tibial external rotation over the last 20 degrees of extension, as the introduction states it', 'online', KIM),
+        row('kim2015', 20, 'knee flexion over which the screw-home turn happens, degrees', 'online', KIM),
+        row('kim2015', 11.5, 'tibial rotation range in active extension by RSA (Karrholm et al.: 9.9 internal to 1.6 external), as the discussion reports it', 'online', KIM),
+        row('kim2015', 17, 'tibial external rotation reaching full extension in late swing of gait', 'online', KIM),
+      ],
+    },
+    {
+      id: 'spine-share',
+      kind: 'share',
+      joints: [],
+      note: 'A bend of the trunk or neck is shared by its levels in proportion to the range of each level: no single level takes the whole bend.',
+      values: {},
+      rows: [recalled('white1990', 1, 'segmental motion shares follow the range of each level (the level weights of the trunk and neck regions)')],
+    },
+    {
+      id: 'limb-twist',
+      kind: 'spread',
+      joints: ['r_shoulder', 'r_elbow', 'r_hip', 'r_knee'],
+      note: 'The twist of a limb segment spreads along its skin: a forearm turned by its hand twists from none at the elbow to all of it at the wrist, as the radius rolls over the ulna; an upper arm or thigh turned at its root twists from none at the root to all of it at the far end. The twist bones of a rig carry the share of their place along the segment.',
+      values: { spread: 1 },
+      rows: [recalled('kapandji', 1, 'forearm rotation is the radius turning about the ulna, the whole length of the forearm')],
+    },
+    {
       id: 'finger-curl',
       kind: 'follow',
-      joints: ['r_carpal_proximal_interphalangeal_2', 'r_carpal_distal_interphalangeal_2'],
+      joints: [2, 3, 4, 5].flatMap((n) => [
+        `r_carpal_proximal_interphalangeal_${n}`,
+        `r_carpal_distal_interphalangeal_${n}`,
+      ]),
       note: 'The last joint of a finger bends with the middle one, at about two thirds of its angle; the same holds for fingers 3 to 5 and the left hand.',
       values: { ratio: 2 / 3 },
       rows: [

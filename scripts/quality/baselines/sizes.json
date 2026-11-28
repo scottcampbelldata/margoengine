@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22053128,
+  "total": 22059801,
   "history": [
     {
       "date": "2026-10-24",
@@ -15863,6 +15863,12 @@
       "commit": "ice-01-native-snow-columns",
       "reason": "ICE-01 @margoengine/physics/snowpack 4916 to 8220 B gzip, ceiling 5172 to 8476 B. Snowpack stages its native candidate snow, cover, enthalpy and discharge as one state. Splitting would duplicate column and phase coupling. Optional helpers evolve disjoint columns after ordered drift and preserve the deterministic solver. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "437b388a0d",
+      "reason": "rigging group 6, coupled motion, measured with the change on 437b388a0d after npm run build:packages: new optional entry @margoengine/rigging/coupling 4,632 B gzip (couplePose, addCoupling, twistBones: the shoulder girdle rhythm, limb twist, finger curl, spine share and knee screw-home); @margoengine/rigging/anatomy/human 24,565 B (ceiling 23,517) as the human table gains the coupling numbers with their source rows (Ludewig 2009, Kim 2015) and the frame fit gains the body vertical (KB-RIG-FRAMEUP1). The table is the one source the fit, the limits and the coupling read; moving the coupling rows to an entry of their own would load a second copy of the row and citation helpers for under 1 kB.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16978,10 +16984,11 @@
     "@margoengine/react/xr-pointer": 1516,
     "@margoengine/rigging": 8361,
     "@margoengine/rigging/anatomy": 10807,
-    "@margoengine/rigging/anatomy/human": 23517,
+    "@margoengine/rigging/anatomy/human": 25302,
     "@margoengine/rigging/autorig": 11019,
     "@margoengine/rigging/contact": 13563,
     "@margoengine/rigging/correctives": 2242,
+    "@margoengine/rigging/coupling": 4888,
     "@margoengine/rigging/face": 2363,
     "@margoengine/rigging/hands": 5966,
     "@margoengine/rigging/hulls": 2759,

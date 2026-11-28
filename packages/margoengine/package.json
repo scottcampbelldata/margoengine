@@ -4395,6 +4395,10 @@
       "types": "./dist/rigging/validate.d.ts",
       "import": "./dist/rigging/validate.js"
     },
+    "./rigging/coupling": {
+      "types": "./dist/rigging/coupling.d.ts",
+      "import": "./dist/rigging/coupling.js"
+    },
     "./rigging/swim": {
       "types": "./dist/rigging/swim.d.ts",
       "import": "./dist/rigging/swim.js"

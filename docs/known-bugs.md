@@ -1060,6 +1060,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   against ranges measured from a thumb lying beside the index. The CMC1 joint needs a zero for an opposed rest thumb.
 - **Until then:** `anatomy: {map}` can leave the thumbs out, or `roll` can turn them by hand.
 
+### Open 2026-11-28: the coupling solver has no wrist and finger tenodesis (KB-RIG-TENODESIS1, rigging)
+- **Repro:** `couplePose(body, poseFromAngles(body, { l_radiocarpal: { flexion: -60 } }))` on any fitted human: the
+  fingers stay where the pose holds them. In a relaxed real hand they curl as the wrist extends and open as it flexes.
+- **Cause:** no measured ratio of finger flexion to wrist extension for a relaxed hand was found in an open source
+  (two searches, 2026-11-28: the tenodesis literature found describes the effect and its surgical use, not a joint
+  curve). Building it from a guessed ratio would break the table's rule that every number has a source row.
+- **Next:** a measured source (a motion capture study of the relaxed hand through wrist range, or a cadaver study of
+  passive finger excursion), then a `tenodesis` coupling in `human.couplings` and a rule in
+  `packages/rigging/src/coupling.ts` with the same fill semantics as `finger-curl`.
+
+### Open 2026-11-28: an arm raised past 120 degrees draws the collarbone back past its clinical retraction (KB-RIG-GIRDLEELLIPSE1, rigging)
+- **Repro:** `test/pose-sheet.browser.mjs` in `packages/humans`, the rows "arms raised" and "arms raised forward
+  overhead", on the code-built body and the Fauld old man: `sternoclavicular retraction -19.8 deg, 1.1 past its
+  clinical range of -18.7 (kapandji)`, a warning. The pose looks right from the front, three-quarter and side
+  (`private/handoffs/rigging-frames/g6`).
+- **Cause:** the coupling drives the collarbone by Ludewig et al. 2009's bone-pin means (11.1 up and 19.8 back from an
+  arm at the side at 120 degrees of elevation), while the clinical range is Kapandji's recalled retraction, read on an
+  ellipse with elevation. The measured motion of a real collarbone sits just outside the recalled range, so one of the
+  two numbers is wrong for a raised arm.
+- **Next:** take the sternoclavicular retraction range from a measured source (Ludewig 2009's ranges, or a range of
+  motion study of the sternoclavicular joint), with its source row, instead of the recalled one.
+
 ### Open 2026-11-28: a Character Creator collarbone is held up to 11 degrees off the walk clip (KB-RIG-CLAVICLE1, rigging)
 - **Learned 2026-11-28:** on the old man's raw walk the collarbone reads depression -13.0 to -13.5, protraction up to
   9.1 and anterior rotation -5.1 to -5.8 from its A pose rest, all three what a rest collarbone raised and drawn back

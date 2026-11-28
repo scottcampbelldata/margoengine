@@ -357,6 +357,17 @@ const CITED = {
     ['acromioclavicular posterior tilt, average', 19, o],
     ['scapular upward rotation on the clavicle, average', 11, r],
     ['scapular internal rotation on the clavicle, average', 8, r],
+    ['sternoclavicular posterior rotation gained over elevation, 0 to 31', 31, o],
+    ['acromioclavicular upward rotation gained over elevation, 5 to 16', 11, o],
+    ['acromioclavicular internal rotation gained over elevation, 57 to 65', 8, o],
+    ['acromioclavicular posterior tilt gained over elevation, -4 to 15', 19, o],
+    ['glenohumeral elevation to scapular upward rotation, abduction (2.4 flexion)', 2.1, o],
+  ],
+  kim2015: [
+    ['tibial external rotation over the last 20 degrees of extension, as the introduction states it', 15, o],
+    ['knee flexion over which the screw-home turn happens, degrees', 20, o],
+    ['tibial rotation range in active extension by RSA (Karrholm et al.: 9.9 internal to 1.6 external), as the discussion reports it', 11.5, o],
+    ['tibial external rotation reaching full extension in late swing of gait', 17, o],
   ],
   kapandji: [
     ['tibial internal rotation, knee flexed 90 degrees', 30, r],
@@ -374,6 +385,7 @@ const CITED = {
     ['fourth carpometacarpal flexion', 15, r],
     ['fifth carpometacarpal flexion', 25, r],
     ['finger MCP abduction, each way', 20, r],
+    ['forearm rotation is the radius turning about the ulna, the whole length of the forearm', 1, r],
   ],
   bennell1998: [['ankle dorsiflexion bearing weight in a lunge, about', 45, r]],
   rijpkema1991: [['distal interphalangeal flexion as a fraction of proximal interphalangeal flexion', 2 / 3, r]],
@@ -394,6 +406,7 @@ const CITED = {
     ['thoracic spine flexion plus extension, total', 62, o],
     ['thoracic spine side bend to one side, total', 36, o],
     ['thoracic spine rotation to one side, total', 32.5, o],
+    ['segmental motion shares follow the range of each level (the level weights of the trunk and neck regions)', 1, r],
   ],
   pearcy1984: [],
 };
@@ -502,7 +515,7 @@ test('every number is the one its source gives', () => {
   assert.deepEqual(counts, PROVENANCE, 'distinct source numbers by how they were checked');
 });
 /** Distinct source numbers of the table by how they were checked. */
-const PROVENANCE = { dataset: 98, print: 0, online: 136, recalled: 90 };
+const PROVENANCE = { dataset: 98, print: 0, online: 145, recalled: 92 };
 
 test('ranges follow from their rows by the stated rule', () => {
   for (const [row, where, end] of everyRow(human)) {
@@ -738,6 +751,9 @@ test('proportions, segment masses and coupled motions carry their sources', () =
       ['carrying-angle', 'offset'],
       ['forearm-rotation', 'spill'],
       ['knee-rotation', 'gate'],
+      ['screw-home', 'screw'],
+      ['spine-share', 'share'],
+      ['limb-twist', 'spread'],
       ['finger-curl', 'follow'],
       ['head-rotation', 'share'],
     ],

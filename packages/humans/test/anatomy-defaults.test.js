@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseGLTFAsync } from '../../gltf/dist/pbr.js';
 import { anatomyOf } from '../../animator/dist/index.js';
+import { jointAngles } from '../../rigging/dist/anatomy.js';
 import { addPerson } from '../dist/index.js';
 import { quat, riggedTestGLB } from './rigged-body.js';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
@@ -81,9 +82,37 @@ test('addPerson checks its anatomy options and names a rig it cannot read', asyn
   await assert.rejects(addPerson(engine, model, { anatomy: 'on' }), TypeError);
   await assert.rejects(addPerson(engine, model, { anatomy: { tier: 'loose' } }), RangeError);
   await assert.rejects(addPerson(engine, model, { anatomy: { onClamp: 1 } }), TypeError);
+  await assert.rejects(addPerson(engine, model, { anatomy: { coupling: 'on' } }), TypeError);
   await assert.rejects(addPerson(engine, model, { anatomy: { map: { l_elbow: 'nowhere' } } }), (error) => {
     assert.equal(error.code, 'unsupported');
     return true;
   });
   model.dispose();
+});
+
+test('addPerson couples the collarbone to a raised arm by default; coupling: false leaves it', async (t) => {
+  // The clip raises the left arm from the T pose to overhead and leaves the collarbone where it is.
+  const raise = { leftUpperArm: quat([0, 0, 1], 80) },
+    on = await person(t, {}, raise),
+    off = await person(t, { anatomy: { coupling: false } }, raise);
+  for (const x of [on, off]) {
+    x.p.time = 0.999;
+    x.p.animator.onPreUpdate(0);
+  }
+  const read = (x) => {
+      const tr = x.engine.store.transforms,
+        pose = x.p.body.rest.slice();
+      x.model.nodes.forEach((node, i) =>
+        pose.set([tr.qx[node.id], tr.qy[node.id], tr.qz[node.id], tr.qw[node.id]], i * 10 + 3),
+      );
+      return jointAngles(x.p.body, pose);
+    },
+    coupled = read(on),
+    free = read(off);
+  assert.ok(Math.abs(free.l_sternoclavicular.flexion) < 1e-6, `free ${free.l_sternoclavicular.flexion}`);
+  assert.ok(coupled.l_sternoclavicular.flexion > 5, `coupled ${coupled.l_sternoclavicular.flexion}`);
+  // The arm points where the clip put it, against the thorax.
+  for (const key of ['flexion', 'abduction'])
+    assert.ok(Math.abs(coupled.l_shoulder[key] - free.l_shoulder[key]) < 0.01, `${key}`);
+  assert.ok(Math.hypot(coupled.l_shoulder.flexion, coupled.l_shoulder.abduction) > 150);
 });

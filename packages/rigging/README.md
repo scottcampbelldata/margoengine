@@ -1055,7 +1055,7 @@ console.log(girl.joints.find((joint) => joint.id === 'l_elbow')!.dofs![0].min.no
 
 Where the numbers come from. Every number is a row with its source, the page it was read on, and how it was checked:
 `dataset` (read from a measured dataset held in a data file of this repository), `online` (read on the page named),
-`recalled` (from memory, to be confirmed in print) or `print`. Today 98 numbers are `dataset`, 136 `online`, 90
+`recalled` (from memory, to be confirmed in print) or `print`. Today 98 numbers are `dataset`, 145 `online`, 92
 `recalled` and none `print`; `packages/rigging/tests/anatomy-human.test.js` holds a second copy of each.
 
 - The limb motions the CDC Normal Joint Range of Motion Study measured (hip, knee, ankle, shoulder flexion, elbow,
@@ -1067,14 +1067,14 @@ Where the numbers come from. Every number is a row with its source, the page it 
   the straight side of a hinge.
 - A spine region's clinical range is shared among its levels by per-level weights: lumbar levels from Pearcy and
   Tibrewal 1984 and White and Panjabi 1990 as open pages give them; thoracic and cervical levels are White and
-  Panjabi's representative values from recall (61 of the 90 recalled numbers), with the thoracic levels scaled to that
+  Panjabi's representative values from recall (61 of the 92 recalled numbers), with the thoracic levels scaled to that
   book's thoracic totals. The other recalled numbers are toe joints, the collarbone's split, knee rotation, the wrist's
   own twist, the thumb's base and the small joints of the palm.
 - Proportions (`human.proportions`) are shares of stature from the ANSUR II summary statistics, both sexes
   (`anatomy-data-ansur2.ts`), with the Drillis and Contini figure beside them. Segment masses and centres of mass
   (`human.segments`) are de Leva 1996 (`anatomy-data-deleva.ts`). `human.couplings` lists the motions joints share
-  (shoulder girdle rhythm, carrying angle, forearm rotation, knee rotation, finger curl, head rotation) with their
-  numbers and sources, for the coupling solver.
+  (shoulder girdle rhythm, carrying angle, forearm rotation, knee rotation, knee screw-home, spine share, limb twist,
+  finger curl, head rotation) with their numbers and sources, for the coupling solver (`margoengine/rigging/coupling`).
 
 Bones are found by name under these conventions, the best match winning: `hanim` (the standard's own names and the
 HAnim 1.x names of renamed joints), `segments` (Mixamo style, and the BVH form of the CMU captures), `joints` (the
@@ -1216,6 +1216,65 @@ Limits of the checks, stated plainly:
 Sources: Gordon et al., ANSUR II (girths, depths and breadths); Ericson 2005, section 5.1.9 (segment closest points);
 Kovar, Schreiner and Gleicher 2002 (footskate); Fleisig et al. 2017 (peak joint speeds); and the anatomy table's
 sources above. Full citations are in [docs/clean-room.md](../../docs/clean-room.md).
+
+## Coupled motion (`margoengine/rigging/coupling`)
+
+In a real body some joints move with another one. The collarbone and shoulder blade rise with the arm (the
+scapulohumeral rhythm), the skin of the forearm twists along its length with the hand, the last joint of a finger
+curls with the middle one, a trunk or neck bend is shared by its levels, and a straightening knee screws home.
+`couplePose` drives those followers on any fitted body from the numbers in the species table (`human.couplings`), so
+a clip, an IK solve or a retarget that only turns the arm still gets a moving shoulder girdle.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { jointAngles, poseFromAngles } from 'margoengine/rigging/anatomy';
+import { fitHuman } from 'margoengine/rigging/anatomy/human';
+import { type CouplingIssue, couplePose, twistBones } from 'margoengine/rigging/coupling';
+
+const rig: RigJoint[] = [
+  { name: 'Hips', parent: -1, position: [0, 1, 0] },
+  { name: 'Spine', parent: 0, position: [0, 1.1, 0] },
+  { name: 'Neck', parent: 1, position: [0, 1.5, 0] },
+  { name: 'Head', parent: 2, position: [0, 1.6, 0] },
+  { name: 'LeftUpLeg', parent: 0, position: [0.1, 0.95, 0] },
+  { name: 'RightUpLeg', parent: 0, position: [-0.1, 0.95, 0] },
+  { name: 'LeftShoulder', parent: 1, position: [0.03, 1.44, 0.02] },
+  { name: 'LeftArm', parent: 6, position: [0.2, 1.45, 0] },
+  { name: 'LeftForeArm', parent: 7, position: [0.48, 1.45, 0] },
+  { name: 'LeftHand', parent: 8, position: [0.74, 1.45, 0] },
+];
+const body = fitHuman(rig);
+// The arm raised 170 degrees to the side; the collarbone is left where the pose had it.
+const pose = poseFromAngles(body, { l_shoulder: { abduction: 170 } });
+const driven: CouplingIssue[] = [];
+couplePose(body, pose, {}, driven);
+const angles = jointAngles(body, pose);
+// The collarbone has risen about 11 degrees, drawn back about 20 and turned back about 28; the arm still reads 170.
+console.log(driven, angles.l_sternoclavicular, angles.l_shoulder.abduction);
+console.log(twistBones(body)); // this rig has no twist bones
+```
+
+A rule fills in only what the pose leaves out: a follower the pose holds at its rest or at its anatomical neutral is
+driven by its driver's change from the same base, so the rest pose stays the rest pose, and a clip that animates the
+collarbone or a finger tip itself keeps its own motion. The shoulder's angles are read against the thorax, so the arm
+points where the pose put it while the girdle under it moves. `CouplingOptions` switches each rule off on its own:
+`girdle`, `twist`, `fingers`, `spine` and `knee`, all `true` by default.
+
+| Rule | Follower | Numbers and source |
+| --- | --- | --- |
+| `shoulder-girdle` | collarbone, then shoulder blade | Elevation and retraction from Ludewig 2009 (bone pins) at 0, 30 and 120 degrees of arm elevation, held past 120; 31 degrees of posterior clavicle rotation from 90 to 180 degrees (Ludewig 2009, the late turn Inman 1944 describes); the scapula's 11 degrees of upward rotation, 8 of internal rotation and 19 of posterior tilt on the clavicle from 30 to 120 degrees (Ludewig 2009, McClure 2001) |
+| `limb-twist` | twist bones of the upper arm, forearm, thigh and shin | Each carries the share of its place along the segment (Kapandji); found from the rig, no naming needed (`twistBones`) |
+| `finger-curl` | distal finger joints | Two thirds of the middle joint (Rijpkema and Girard 1991) |
+| `spine-share` | the trunk and neck levels | A bend one level holds is shared by every level by the table's level weights (White and Panjabi 1990); the top of the run keeps its world turn |
+| `screw-home` | the knee's axial turn | The tibia turns out 11.5 degrees over the last 20 degrees of extension (the RSA range Kim 2015 reports) |
+
+`addCoupling(animator, body, options)` runs `couplePose` on an Animator every frame, after its clips and the solvers
+added before it, and returns the remover. `addPerson` in `@margoengine/humans` adds it by default before the anatomy
+limits (`anatomy: {coupling: false}` leaves it off). An IK solver added after it moves the arm after the coupling, so
+the collarbone follows the clip's arm, not the IK's.
+
+Wrist and finger tenodesis (fingers that curl as the wrist extends) is not coupled: no measured open source for its
+ratio was found, see `KB-RIG-TENODESIS1` in `docs/known-bugs.md`.
 
 ## Swimming (`margoengine/rigging/swim`)
 
