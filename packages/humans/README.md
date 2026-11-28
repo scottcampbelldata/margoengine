@@ -269,7 +269,7 @@ layers, IK and look-at. A model with no clips gets no Animator.
 ## Imported clothing and the Character Creator workflow
 
 Use `@margoengine/humans/wardrobe` for mesh construction and offline checks on clothing made in Blender or
-generated in Tripo. Existing procedural outfits use the [fit entry](#fit-outfits-to-a-rig). A finished GLB
+generated in Tripo. Existing procedural outfits use the [fit entry](#dressing-a-loaded-person-fit). A finished GLB
 uses `addPerson` for playback in Margo.
 
 1. **Export a matching body.** In Character Creator, export the character as FBX for Blender in its
