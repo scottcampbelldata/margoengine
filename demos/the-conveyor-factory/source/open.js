@@ -1,7 +1,6 @@
-import {autoEngine} from '@margoengine/webgl2-compat/auto';
+import {openBench} from '@margoengine/studio/bench';
 
 const life=new AbortController(),{signal}=life;
-const forced=new URLSearchParams(location.search).get('backend')==='webgl2';
 const loaded=import('./physics.js').then(async api=>{
   await api.loadPhysics(signal);
   performance.mark('factory-physics');
@@ -10,7 +9,7 @@ const loaded=import('./physics.js').then(async api=>{
 loaded.catch(()=>{});
 const view=import('./scene.js');
 const element=id=>document.getElementById(id);
-let engine,exhibit;
+let exhibit,resized=()=>{};
 
 function fail(error){
   if(signal.aborted)return;
@@ -22,17 +21,20 @@ function fail(error){
   console.error(error);
 }
 async function start(){
-  await autoEngine(element('stage'),async target=>{
-    engine=target;engine.onError=fail;
-    performance.mark('factory-device');
-    exhibit=await (await view).connect(engine,engine.canvas,loaded,signal,fail);
-  },{backend:forced?'webgl2':undefined,signal,exactSize:true,antialias:true,capacity:650,startupTimeout:12000,
-    camera:{position:[3.05,6.10,8.35],target:[.075,.97,0],near:.09,far:40}});
+  // The bench opens WebGPU or the WebGL2 layer (?backend=webgl2 forces it), sizes the backbuffer and disposes on pagehide.
+  const bench=await openBench(element('stage'),{
+    signal,pixelRatio:2,maxWidth:4096,capacity:650,startupTimeout:12000,
+    camera:{position:[3.05,6.10,8.35],target:[.075,.97,0],near:.09,far:40},
+    background:'#344c5b',backdrop:false,contact:false,environment:false,shadows:false,
+    light:{direction:[-4,7,5],intensity:2.75,color:[1,.93,.80],ambient:.96,ambientColor:[.74,.88,.99]},
+    onError:fail,onResize:()=>resized(),
+  });
+  performance.mark('factory-device');
+  exhibit=await (await view).connect(bench,loaded,signal,fail,hook=>{resized=hook;});
 }
 start().catch(fail);
 addEventListener('pagehide',event=>{
   if(event.persisted)return;
   life.abort();
   exhibit?.dispose();
-  engine?.dispose();
 });

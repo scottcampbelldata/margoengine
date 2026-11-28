@@ -2,12 +2,8 @@ import {createAisle} from './art.js';
 import {fixedDelta,approvedLimit} from './layout.js';
 
 const el=id=>document.getElementById(id);
-export async function connect(engine,canvas,source,signal,fail){
-  const data=document.body.dataset;
-  engine.scene.background='#344c5b';
-  engine.lighting.direction.set([-4,7,5,2.75]);
-  engine.lighting.radiance.set([1,.93,.80,.96]);
-  engine.lighting.ambient.set([.74,.88,.99]);
+export async function connect(bench,source,signal,fail,onResize){
+  const {engine,canvas}=bench,renderer=bench.renderer==='compatibility'?'webgl2':'webgpu',data=document.body.dataset;
   engine.camera.project=(m,aspect,webgpu)=>{
     const span=Math.max(4.22,7.8/aspect),{near,far}=engine.camera,r=far-near;
     m[0]=2/(span*aspect);m[5]=2/span;
@@ -17,14 +13,8 @@ export async function connect(engine,canvas,source,signal,fail){
   const art=createAisle(engine);
   const motor=el('motor'),gear=el('speed'),feed=el('feed'),status=el('status');
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let rig,format,phase=0,frame=0,last=0,carry=0,pausedFor=0,resize,receipt=null;
+  let rig,format,phase=0,frame=0,last=0,carry=0,pausedFor=0,receipt=null;
   let reported='',pieceCount=0,queuedStart=false;
-  function fit(){
-    const dpr=Math.min(devicePixelRatio,2);
-    const width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);
-    if(canvas.width!==width)canvas.width=width;
-    if(canvas.height!==height)canvas.height=height;
-  }
   function report(){
     if(!rig)return;
     const state=rig.state(),list=state.counters.join(',');
@@ -48,7 +38,6 @@ export async function connect(engine,canvas,source,signal,fail){
   }
   function paint(){
     signal.throwIfAborted();
-    fit();
     if(rig)art.sync(rig.parcels,phase);
     engine.render({delta:0});
     report();
@@ -131,7 +120,7 @@ export async function connect(engine,canvas,source,signal,fail){
     else if(rig?.state().active)schedule();
   },bound);
   paint();
-  data.renderer=engine.backend;
+  data.renderer=renderer;
   data.motorReady='true';
   motor.disabled=false;
   format=await source;
@@ -141,10 +130,9 @@ export async function connect(engine,canvas,source,signal,fail){
   paint();
   await fence();
   signal.throwIfAborted();
-  data.renderer=engine.backend;data.ready='true';
+  data.renderer=renderer;data.ready='true';
   performance.mark('margo-first-usable-frame');
   el('loading').hidden=true;motor.disabled=false;el('secondary').inert=false;
-  resize=new ResizeObserver(()=>{if(!frame&&!signal.aborted)paint();});
-  resize.observe(canvas);
-  return {dispose(){cancelAnimationFrame(frame);resize.disconnect();rig.dispose();}};
+  onResize(()=>{if(!frame&&!signal.aborted)paint();});
+  return {dispose(){cancelAnimationFrame(frame);rig.dispose();}};
 }
