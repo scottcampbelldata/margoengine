@@ -16,6 +16,10 @@ const NOT_FEATURES = new Map([
   ['SoftBodyMesh', 'created by gltf/soft-mesh drawSoftBody(engine, body)'],
   ['OverlayEffect', 'abstract base; Ramp, Grid, DepthView and TextureOverlay each have static attach'],
   ['AssetContainer', 'a holder of meshes, models and plugins; it adds no plugin of its own to the engine'],
+  [
+    'IBLShadows',
+    'a PostStack stage from shadows, which does not depend on post: PostStack.attach(engine, [new IBLShadows(...)])',
+  ],
 ]);
 
 const isClass = (value) => typeof value === 'function' && /^class\b/.test(Function.prototype.toString.call(value));
