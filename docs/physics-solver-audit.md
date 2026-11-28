@@ -52,22 +52,22 @@ them; the rest is a record of what a stronger solver would need.
 
 ### SOUND-03 four-point pass
 
-- Point 5. `underwater.test.js` verifies coded errors for malformed launches and beams, 33,554,432
+- Point 5. `115c72d0be` and `85765e0ef8`. `underwater.test.js` verifies coded errors for malformed launches and beams, 33,554,432
   reflections in one folded tick, overflow-resistant beam phase and width, and unchanged accepted
   state when the new reflection count would exceed the largest exact integer.
-- Point 6. `underwater-threads.test.js` and `underwater-threads.browser.mjs` compare the accepted
+- Point 6. `85765e0ef8`. `underwater-threads.test.js` and `underwater-threads.browser.mjs` compare the accepted
   JavaScript and Rust/Wasm SIMD ray, delay and pressure state across plain memory and 1, 2 and 4 native
   threads with exact snapshots, origin-cell shifts and worker receipts. Chromium uses three real helpers.
   At the endpoint of its stratified case, 11 rays execute 18 drift integrals and 7 crossings. Each axis in
   the uniform 33,554,432-crossing Node control completes one drift. Failed aggregate receipts preserve
   the previous accepted rows and counts.
-- Point 7. `underwater-surface.browser.mjs` renders an authored 200 ms pulse in a fixed cutaway.
+- Point 7. `115c72d0be`. `underwater-surface.browser.mjs` renders an authored 200 ms pulse in a fixed cutaway.
   Three actual boundary reflections, 39 accepted ray segments and live pressure and delay produce
   4,894 changed pixels on each renderer. The analytic folded paths and beam envelope agree, and
   pre-trigger and after-stop holds, rewind and replay are exact.
-- Point 8. The Physics README and `docs/limits.md` describe the fixed horizontal boundaries, relative
+- Point 8. `115c72d0be` and `85765e0ef8`. The Physics README and `docs/limits.md` describe the fixed horizontal boundaries, relative
   per-beam pressure, fixed attenuation, exact count range and omitted receiver field.
-- Point 2 remains open. `sound03-arrival-measured.mjs` compares independent reported arrival times
+- Point 2 remains open. `115c72d0be`. `sound03-arrival-measured.mjs` compares independent reported arrival times
   with the production world. The ocean timing passes one of four measured delays at published resolution
   and three within observed arrival spread. The tank delays differ by 0.033 and 0.197 ms with nominal sound
   speed and unknown placement uncertainty. Neither comparison validates pressure or transmission loss.
