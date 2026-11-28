@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Al061C9_.js"><script src="./assets/webgl2-preload-5adb9bb6.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Pilot a courier through six orbital gates on a simulated CRT, rendered live in Margo Engine.">
+  <meta name="theme-color" content="#18191f">
+  <link rel="icon" href="data:,">
+  <title>The CRT Arcade · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-C4irGWpb.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D-2g4tAN.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery navigation"><a href="../">← Margo Web Demos</a><span>Terminal Vela</span></nav>
+    <header>
+      <h1>The CRT Arcade</h1>
+      <p>Fly the courier through six inspection rings. Match the lit lane before each crossing.</p>
+    </header>
+    <section id="exhibit" aria-label="Orbital courier game">
+      <div class="display">
+        <canvas id="canvas" aria-label="A three-dimensional spacecraft aligned with illuminated gates on an orbital deck"></canvas>
+        <div class="readings">
+          <output id="callout" aria-live="polite">Gate 1 · Center</output>
+          <output class="score" aria-label="Rings cleared"><span id="score">0 / 6</span></output>
+        </div>
+        <p id="status" role="status">Opening the flight deck…</p>
+      </div>
+      <div class="controls">
+        <button id="play" disabled>Launch</button>
+        <div class="channels" role="group" aria-label="Select a flight lane">
+          <button id="left" aria-label="Left lane" aria-pressed="false" disabled>←</button>
+          <button id="middle" aria-label="Center lane" aria-pressed="true" disabled>↑</button>
+          <button id="right" aria-label="Right lane" aria-pressed="false" disabled>→</button>
+        </div>
+        <p class="keys">Arrow keys steer · Space pauses</p>
+      </div>
+    </section>
+    <div class="display-controls">
+      <label>Display<select id="display" disabled><option value="crt">CRT</option><option value="plain">Plain pixels</option></select></label>
+      <label>Palette<select id="palette" disabled><option value="color">Color</option><option value="green">Green phosphor</option></select></label>
+      <label>Dither<select id="dither" disabled><option value="bayer4">Bayer 4</option><option value="none">Off</option></select></label>
+    </div>
+  </main>
+</body>
+</html>

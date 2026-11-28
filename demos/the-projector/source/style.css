@@ -1,0 +1,37 @@
+@charset "UTF-8";
+:root{color-scheme:dark;background:#171719;color:#f5ead8;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(calc(100% - 64px),1300px);margin:auto;padding:22px 0 25px}
+nav{display:flex;gap:.64rem;align-items:center;color:#8d8583;font-size:.75rem}
+nav a,footer a{color:#c7b6a5;text-decoration:none}
+nav a:hover,footer a:hover{text-decoration:underline}
+header{margin:24px 0 18px}
+h1{font-family:Georgia,serif;font-weight:400;letter-spacing:-.052em;font-size:clamp(3rem,6.4vw,5.4rem);line-height:.94;margin:0 0 12px}
+header p,.description p{margin:0;color:#cec0b2;line-height:1.46}
+figure{margin:0;position:relative;overflow:hidden;background:#211e20;border:1px solid #64524c}
+canvas{display:block;width:100%;height:clamp(385px,51vw,620px)}
+#loading,#error{position:absolute;left:14px;bottom:13px;margin:0;background:#19181a;padding:.66rem .8rem;border:1px solid #76635b;max-width:calc(100% - 28px);font-size:.82rem}
+#error{color:#ffd6cd}
+.controls{display:flex;justify-content:space-between;align-items:end;gap:18px;padding:13px 0 14px;border-bottom:1px solid #4e423d}
+fieldset{min-width:0;margin:0;padding:0;border:0}
+legend{margin:0 0 6px;padding:0;color:#ac9b8f;font-size:.77rem}
+.choice{display:flex;gap:7px;flex-wrap:wrap}
+button{font:600 .86rem system-ui,sans-serif;min-height:44px;padding:0 14px;border:1px solid #66544c;border-radius:3px;background:#262121;color:#eadbce;cursor:pointer;white-space:nowrap}
+button[aria-pressed=true]{border-color:#e4ad72;background:#e4ad72;color:#281c16}
+button:hover:not(:disabled){border-color:#ffd9a2}
+button:disabled{opacity:.69;cursor:default}
+button:focus-visible,a:focus-visible{outline:2px solid #f8c785;outline-offset:3px}
+.description{font-size:.82rem;text-align:right}
+#current{font-family:Georgia,serif;font-size:1.12rem;color:#f0c58e;margin-bottom:2px}
+footer{display:flex;flex-wrap:wrap;gap:8px 16px;color:#ac9b8f;font-size:.75rem;padding-top:13px}
+@media(max-width:700px){
+  main{width:calc(100% - 28px);padding:17px 0 18px}
+  header{margin:22px 0 15px}
+  h1{font-size:clamp(3rem,12vw,4.8rem);margin-bottom:8px}
+  header p{font-size:.9rem}
+  canvas{height:clamp(369px,54svh,550px)}
+  .controls{display:block;padding:10px 0 11px}
+  .description{text-align:left;margin-top:9px}
+  button{padding:0 11px}
+}

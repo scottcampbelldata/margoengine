@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-f803162f.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#132733">
+  <link rel="icon" href="data:,">
+  <title>Wind and Flow Painting · Margo Engine</title>
+  <link rel="preload" href="./assets/velocity-TAyaFBmb.webp" as="image">
+  <script type="module" crossorigin src="./assets/index-iII3KU6P.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/version-YYhCZP03.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-n8Lw0uYC.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>Wind and Flow Painting</h1><p>Release dye into three synthetic eddies. Tap the field to move the source and watch the water carry it away.</p></header>
+    <section class="bench" aria-label="Moving flow exhibit">
+      <figure>
+        <div class="cap"><span>Mixing layer</span><span id="field-note">Velocity texture at 0.0 s</span></div>
+        <div class="surface">
+          <canvas id="view" aria-label="Velocity texture with a moving dye streak from the marked source" tabindex="0"></canvas>
+          <canvas id="overlay" aria-hidden="true"></canvas>
+          <p id="status" role="status">Opening the flow field…</p>
+          <p id="error" role="alert" hidden></p>
+        </div>
+        <figcaption>
+          <span>Velocity magnitude</span>
+          <div class="gradient"><span>0</span><span>1.4</span><span>2.75 m/s</span></div>
+        </figcaption>
+      </figure>
+      <aside>
+        <fieldset id="tools" disabled>
+          <legend>Dye release</legend>
+          <div class="actions">
+            <button type="button" id="play" aria-pressed="false">Release dye</button>
+            <button type="button" id="reset">Reset</button>
+          </div>
+          <div class="range"><label for="time">Observation time</label><output id="clock" for="time">0.0 s</output>
+            <input type="range" id="time" min="0" max="72" value="0" step="1"></div>
+          <div class="checks">
+            <label><input type="checkbox" id="texture" checked>Velocity texture</label>
+            <label><input type="checkbox" id="streak" checked>Streakline from repeated releases</label>
+            <label><input type="checkbox" id="path" checked>Path of the first release</label>
+          </div>
+        </fieldset>
+        <dl>
+          <div><dt>Dye source</dt><dd><output id="source">—</output></dd></div>
+          <div><dt>Released parcels in view</dt><dd><output id="parcels">0</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Field and numerical method</a></footer>
+  </main>
+</body>
+</html>

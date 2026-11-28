@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DoIyiUqo.js"><script src="./assets/webgl2-preload-1873a142.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#191c21">
+<link rel="icon" href="data:,">
+<link rel="modulepreload" href="./assets/cluster-CRw-RAM8.js">
+<title>The Meshlet Statue · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-B9HuUix4.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cw3cdufs.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Meshlet Statue</h1>
+    <p>Slide the gallery wall across a bronze sculpture and see how many triangles Margo submits for the same scene.</p>
+  </header>
+  <section aria-label="Sculpture and visibility">
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Ribbed bronze spiral sculpture with a moving slate wall in front" aria-describedby="support"></canvas>
+        <div id="notice"><p id="status" role="status">Preparing the sculpture…</p><p id="error" role="alert"></p></div>
+        <span class="name">Meridian</span>
+      </div>
+      <figcaption><span id="method">Meshlet culling</span><span id="route">Margo Engine</span></figcaption>
+    </figure>
+    <div class="inspection">
+      <div class="controls">
+        <label class="slider">Wall position <output id="wall-value" for="wall">16%</output>
+          <input type="range" id="wall" min="0" max="100" step="1" value="16" disabled>
+        </label>
+        <label class="check"><input type="checkbox" id="occluder" checked disabled> Use wall for Hi-Z</label>
+        <p id="support">Compare at the same wall position. Hi-Z skips clusters behind the wall.</p>
+      </div>
+      <dl>
+        <div><dt>Drawn</dt><dd id="drawn">—</dd></div>
+        <div><dt>Triangles</dt><dd id="total">—</dd></div>
+        <div><dt>Meshlets</dt><dd id="meshlets">—</dd></div>
+      </dl>
+    </div>
+  </section>
+</main>
+</body>
+</html>

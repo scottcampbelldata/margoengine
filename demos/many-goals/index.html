@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eae2df">
+  <meta name="description" content="Give one robot arm three contacts at once. Change their priorities and measure where each one lands.">
+  <title>Many Goals · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DFTBW7Au.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DHi4oe_n.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Web Demos"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Many Goals</h1>
+      <p>One arm has three contacts to line up. Give one more weight and watch which gaps close.</p>
+    </header>
+    <section class="exhibit" aria-label="Robot arm with three competing targets">
+      <figure>
+        <canvas aria-label="Articulated robot arm with a brace, a gauge and a probe facing three calibration targets"></canvas>
+        <div class="target-labels" aria-hidden="true"><span>A</span><span>B</span><span>C</span></div>
+        <figcaption>Hollow rings mark targets. Solid tips show the arm’s contacts.</figcaption>
+        <p role="status" id="loading">Opening the inspection cell…</p>
+        <p role="alert" id="error" hidden></p>
+      </figure>
+      <aside class="controls">
+        <fieldset id="priority" disabled>
+          <legend>Contact priority</legend>
+          <div class="choices">
+            <button type="button" data-rank="0" aria-pressed="true">Brace</button>
+            <button type="button" data-rank="1" aria-pressed="false">Gauge</button>
+            <button type="button" data-rank="2" aria-pressed="false">Probe</button>
+            <button type="button" data-rank="3" aria-pressed="false">Equal</button>
+          </div>
+        </fieldset>
+        <div class="range">
+          <div class="line"><label for="spread">Fixture spread</label><output id="percent" for="spread">75%</output></div>
+          <input id="spread" type="range" min="0" max="100" value="75" step="1" disabled>
+          <div class="ends"><span>Aligned</span><span>Shifted</span></div>
+        </div>
+        <table>
+          <thead><tr><th scope="col">Contact</th><th scope="col">Weight</th><th scope="col">Gap</th></tr></thead>
+          <tbody>
+            <tr class="brace"><th scope="row"><span>A</span> Brace</th><td><output id="weight-0">28×</output></td><td><output id="gap-0">—</output></td></tr>
+            <tr class="gauge"><th scope="row"><span>B</span> Gauge</th><td><output id="weight-1">5×</output></td><td><output id="gap-1">—</output></td></tr>
+            <tr class="probe"><th scope="row"><span>C</span> Probe</th><td><output id="weight-2">1×</output></td><td><output id="gap-2">—</output></td></tr>
+          </tbody>
+        </table>
+        <p id="motion-status" class="result">Finding the weighted pose…</p>
+      </aside>
+    </section>
+    <footer>
+      <p>Weights steer the compromise when the contacts compete.</p>
+      <a href="./source/README.md">Model and methods</a>
+    </footer>
+  </main>
+</body>
+</html>

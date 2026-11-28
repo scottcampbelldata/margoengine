@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101b1a">
+  <meta name="description" content="Shift a stepping stone and watch a digital human shift his weight and plant each foot across the creek.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/walker-sQFywNwq.glb" as="fetch" type="model/gltf-binary" crossorigin>
+  <title>The Stepping Stones · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Bd8B_KrP.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dbj_W8ge.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Stepping Stones</h1>
+      <p>Move the marked stone. Watch the surveyor adjust his stride, plant his feet and shift his weight across the stream.</p>
+    </header>
+    <section class="exhibit" aria-label="Live stepping-stone crossing">
+      <canvas id="crossing" role="img" aria-label="A surveyor walking across basalt stepping stones in a shaded creek"></canvas>
+      <p id="loading" role="status">Opening the crossing…</p>
+    </section>
+    <section class="controls" aria-label="Crossing controls and measurements">
+      <div class="actions">
+        <button type="button" id="cross" disabled>Cross the stream</button>
+        <button type="button" id="reset" disabled>Reset</button>
+      </div>
+      <div class="position">
+        <label for="shift">Shift the marked stone</label>
+        <output id="offset" for="shift">0 cm</output>
+        <input id="shift" type="range" min="-28" max="38" value="0" step="1" disabled>
+      </div>
+      <dl>
+        <div><dt>Approach span</dt><dd id="span">—</dd></div>
+        <div><dt>Step</dt><dd id="progress">—</dd></div>
+        <div><dt>Feet planted</dt><dd id="support">—</dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/walker.js">View motion source</a><p id="status" role="status"></p></footer>
+  </main>
+</body>
+</html>

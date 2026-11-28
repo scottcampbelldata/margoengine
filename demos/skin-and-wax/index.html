@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DH4l1LDw.js"><script src="./assets/inline-3154e8ea.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b1a">
+  <meta name="description" content="Move a light over a wax votive, a carved marble cup and a jade cicada to compare subsurface scattering.">
+  <title>Skin and Wax | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DODwEmvA.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-RLt5kG21.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Skin and Wax</h1>
+      <p>Move the light from front to back to see how three solid materials carry light beneath the surface.</p>
+    </header>
+    <section aria-label="Subsurface scattering exhibit">
+      <figure id="viewport">
+        <canvas id="scene" aria-label="A carved ochre wax votive, veined marble cup and green jade cicada in a dark specimen gallery"></canvas>
+        <p id="loading" role="status">Lighting the specimens…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <div class="workbench">
+        <fieldset id="control" disabled>
+          <legend>Specimen</legend>
+          <div class="specimens">
+            <button type="button" data-sample="wax" aria-pressed="true">Wax</button>
+            <button type="button" data-sample="marble" aria-pressed="false">Marble</button>
+            <button type="button" data-sample="jade" aria-pressed="false">Jade</button>
+          </div>
+        </fieldset>
+        <fieldset id="light-control" disabled>
+          <legend>Light angle <output id="angle" for="light">103°</output></legend>
+          <input id="light" type="range" min="0" max="180" step="1" value="103" aria-label="Light angle from the front">
+          <div class="axis" aria-hidden="true"><span>Front</span><span>Back</span></div>
+        </fieldset>
+        <div class="aux">
+          <label><input id="sss" type="checkbox" checked disabled> Scatter light</label>
+          <p id="sample-description" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+    <footer><a href="https://graphics.stanford.edu/~srm/publications/SG01-subsurf-abstract.html">Subsurface-light study</a><a href="./source/README.md">Scene notes</a></footer>
+  </main>
+</body>
+</html>

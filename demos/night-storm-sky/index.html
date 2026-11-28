@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-d643cae2.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c101b">
+  <meta name="description" content="Trigger a single lightning strike across a rocky inlet and see it light the storm from within.">
+  <title>Night Storm Sky | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/storm-plates-DMlFP_KE.webp" as="image">
+  <script type="module" crossorigin src="./assets/index-CupNV4bY.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CzkTMVL3.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Night Storm Sky</h1>
+      <p>Off the headland, a single bolt lights the clouds from within.</p>
+    </header>
+    <section aria-label="Night storm exhibit">
+      <figure id="viewport">
+        <canvas id="storm" aria-label="A dark coastal inlet with a lighthouse and a branching lightning channel over the sea"></canvas>
+        <p id="loading" role="status">Opening the storm sky…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <div class="controls">
+        <div class="act">
+          <button id="strike" type="button" disabled>Trigger a strike</button>
+          <label><input id="hold" type="checkbox" disabled> Hold for inspection</label>
+        </div>
+        <div class="notes">
+          <p>One flash per press. The hold option freezes the illuminated frame.</p>
+          <p id="state" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <span>Rendered illustration</span>
+      <a href="https://www.weather.gov/safety/lightning-science-slow-motion-flashes">NOAA lightning footage</a>
+      <a href="./source/README.md">Scene notes</a>
+    </footer>
+  </main>
+</body>
+</html>

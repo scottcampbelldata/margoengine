@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-MTbHTKi5.js"><script src="./assets/webgl2-preload-846d76fa.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#172930">
+  <meta name="description" content="Fly across a district and watch Margo Engine stream real 3D Tiles city geometry.">
+  <link rel="icon" href="data:,">
+  <title>The Streaming City · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Cg5zclnH.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DVSL5Bq7.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>3D Tiles survey</span></nav>
+    <header>
+      <h1>The Streaming City</h1>
+      <p>Fly across a four-sector district and watch building tiles load as they come into view.</p>
+    </header>
+    <section id="exhibit" aria-label="Live streaming survey">
+      <div class="flightbar">
+        <div class="destination"><span class="signal" aria-hidden="true"></span><span id="sector">Southwest sector</span></div>
+        <button type="button" id="flight" disabled>Fly to southeast <span aria-hidden="true">↗</span></button>
+      </div>
+      <div class="view">
+        <canvas id="canvas" role="img" aria-label="Three-dimensional geospatial survey of the currently visible tile sectors"></canvas>
+        <p id="status" role="status">Loading the first sector…</p>
+      </div>
+      <div class="telemetry">
+        <div class="sectors" role="group" aria-label="Fly to a sector">
+          <button type="button" data-sector="ul" aria-label="Fly northwest" disabled>NW</button>
+          <button type="button" data-sector="ur" aria-label="Fly northeast" disabled>NE</button>
+          <button type="button" data-sector="ll" aria-label="Fly southwest" aria-pressed="true" disabled>SW</button>
+          <button type="button" data-sector="lr" aria-label="Fly southeast" disabled>SE</button>
+          <button type="button" data-sector="overview" aria-label="Fly to the district overview" disabled>Overview</button>
+        </div>
+        <dl aria-label="Tile measurements">
+          <div><dt>Visible tiles</dt><dd id="visible">—</dd></div>
+          <div><dt>Fetched tiles</dt><dd id="loaded">—</dd></div>
+          <div><dt>Eye altitude</dt><dd id="altitude">—</dd></div>
+        </dl>
+      </div>
+    </section>
+    <details>
+      <summary>Tile source and flight controls</summary>
+      <p>Choose sectors with the buttons, or drag the map. A sector is requested when it enters the camera’s view. Each sector holds ten sample buildings. Fetched tiles can be reused on the return flight.</p>
+      <p>The district geometry comes from Cesium’s <a href="https://github.com/CesiumGS/3d-tiles-samples/tree/a30bfdf2d6cc55f4c3078e8aea3a793af6ebfd56/1.0/TilesetWithRequestVolume/city">Tileset with request volume</a> city sample, licensed under <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>. This exhibit gives the sample a survey presentation and lighting.</p>
+    </details>
+  </main>
+</body>
+</html>

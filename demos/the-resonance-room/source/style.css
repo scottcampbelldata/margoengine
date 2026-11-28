@@ -1,0 +1,85 @@
+:root {
+  color-scheme: dark;
+  --ground: #191817;
+  --ink: #f2ebdd;
+  --muted: #b9b1a5;
+  --faint: #958d83;
+  --line: #49413a;
+  --panel: #24201e;
+  --amber: #f6a87b;
+  --cyan: #80d2ef;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; color: var(--ink); background: var(--ground); font: 1rem/1.45 system-ui, sans-serif; }
+main { width: min(100% - clamp(2rem, 9vw, 10rem), 83.5rem); margin: auto; padding: clamp(1.3rem, 3.5vh, 2.6rem) 0 1.25rem; }
+a { color: inherit; }
+.brand { display: inline-flex; align-items: center; gap: .85rem; text-decoration: none; font-size: .8rem; font-weight: 750; letter-spacing: .085em; }
+.brand span { color: var(--muted); font-weight: 500; letter-spacing: .06em; border-left: 1px solid var(--line); padding-left: .85rem; }
+header { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin: clamp(1.15rem, 3.65vh, 2.6rem) 0 clamp(1.1rem, 3vh, 2.1rem); }
+h1 { margin: 0; font: 400 clamp(2.55rem, 6.35vw, 6.2rem)/.95 Georgia, serif; letter-spacing: -.065em; }
+header p { color: var(--muted); margin: 0 0 .25rem; width: 26ch; font-size: clamp(.96rem, 1.2vw, 1.08rem); }
+.instrument { display: grid; grid-template-columns: minmax(0,1fr) minmax(15.8rem, 22%); border: 1px solid var(--line); }
+.view { position: relative; height: clamp(24rem, 62vh, 42rem); margin: 0; overflow: hidden; background: #23232a; }
+canvas { display: block; width: 100%; height: 100%; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 1.25rem; color: var(--muted); background: #23232a; text-align: center; }
+.stage-bar { display: flex; position: absolute; inset: .95rem .95rem auto; align-items: center; justify-content: space-between; gap: .55rem; }
+.stage-bar > span { color: var(--muted); font-size: .75rem; letter-spacing: .035em; }
+.stage-bar > div { display: inline-flex; }
+button { font: inherit; color: var(--ink); cursor: pointer; }
+button:disabled { cursor: default; }
+.stage-bar button { background: #201b19; border: 1px solid #65534a; padding: .45rem .65rem; font-size: .75rem; min-height: 2.4rem; }
+.stage-bar button + button { margin-left: -1px; }
+.stage-bar button[aria-pressed="true"] { background: #4a3a33; border-color: #a58475; z-index: 1; }
+button:focus-visible, a:focus-visible, input:focus-visible { position: relative; z-index: 2; outline: 2px solid var(--amber); outline-offset: 3px; }
+figcaption { display: flex; position: absolute; inset: auto 1rem 1rem; justify-content: center; align-items: center; gap: .55rem; color: var(--muted); font-size: .75rem; }
+figcaption i { width: clamp(.75rem, 2.2vw, 2rem); height: 2px; background: var(--cyan); }
+figcaption i:nth-of-type(2) { background: var(--amber); }
+.phase-negative { color: var(--cyan); }
+.phase-positive { color: var(--amber); }
+.controls { display:flex; flex-direction: column; justify-content: center; gap: .9rem; padding: clamp(1.1rem, 2.1vw, 1.65rem); background: var(--panel); border-left: 1px solid var(--line); }
+.frequency { display: flex; flex-direction: column; gap: .25rem; }
+.frequency label, dt { color: var(--muted); font-size: .84rem; }
+.frequency output { color: var(--amber); font: 400 clamp(2.65rem, 3.7vw, 3.9rem)/1 Georgia, serif; font-variant-numeric: lining-nums tabular-nums; letter-spacing: -.065em; white-space: nowrap; }
+.frequency output span { font: 550 .96rem/1 system-ui,sans-serif; letter-spacing: .02em; color: var(--ink); }
+input[type="range"] { width: 100%; height: 2.75rem; margin: -.2rem 0 -.65rem; accent-color: var(--amber); cursor: ew-resize; }
+.range-ticks { display: flex; margin-top: -.35rem; justify-content: space-between; color: var(--faint); font: .72rem/1.2 ui-monospace,monospace; }
+.notes-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: .55rem 0 .2rem; }
+.notes-grid button { display: flex; flex-direction: column; align-items: start; justify-content: center; gap: .15rem; min-height: 3.5rem; text-align: left; padding: .55rem .6rem; background: var(--panel); border: 0; }
+.notes-grid button strong { font: 600 .82rem/1.2 ui-monospace,monospace; }
+.notes-grid button span { color: var(--muted); font-size: .73rem; }
+.notes-grid button:hover, .notes-grid button[aria-pressed="true"] { background: #49352e; }
+.notes-grid button[aria-pressed="true"] strong { color: var(--amber); }
+dl { display: grid; gap: .55rem; margin: .15rem 0; }
+dl div { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+dd { margin: 0; font: 500 .77rem/1.4 ui-monospace,monospace; white-space: nowrap; }
+#listen { min-height: 2.75rem; background: #312824; border: 1px solid #75594b; color: var(--ink); font-size: .86rem; text-align: left; padding: .5rem .7rem; }
+#listen:hover, #listen[aria-pressed="true"] { background: #54382c; }
+#listen span { margin-right: .3rem; color: var(--amber); }
+#audio-status { margin: 0; font-size: .8rem; color: var(--muted); }
+footer { display: flex; justify-content: space-between; gap: 1.25rem; color: var(--muted); padding: .8rem 0; font-size: .82rem; }
+footer p { margin: 0; }
+footer a { text-decoration-color: #9d7d6e; text-underline-offset: .22em; white-space: nowrap; }
+@media (max-width: 54rem) {
+  header { align-items: start; flex-direction: column; gap: .7rem; }
+  header p { width: min(100%, 56ch); }
+  .instrument { grid-template-columns: minmax(0,1fr); }
+  .view { height: clamp(19rem, 46vh, 27rem); }
+  .controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: .55rem; border-left: 0; border-top: 1px solid var(--line); padding: .8rem .95rem 1rem; }
+  .frequency { flex-direction: row; align-items: baseline; justify-content: space-between; }
+  .frequency output { font-size: 2.55rem; }
+  .notes-grid { grid-template-columns: repeat(4,minmax(0,1fr)); margin-top: .3rem; }
+  .notes-grid button { padding: .35rem .42rem; min-height: 3.25rem; }
+  .notes-grid button strong { font-size: .73rem; }
+  .notes-grid button span { font-size: .67rem; }
+}
+@media (max-width: 29rem) {
+  main { width: calc(100% - 1.5rem); }
+  header { margin: 1.05rem 0 .95rem; }
+  header p { font-size: .88rem; }
+  .view { height: clamp(17rem, 39vh, 25rem); }
+  .stage-bar { inset: .55rem .55rem auto; }
+  .stage-bar button { min-height: 2.4rem; padding: .45rem .5rem; }
+  figcaption { bottom: .55rem; }
+  footer { flex-direction: column; gap: .45rem; }
+}

@@ -1,0 +1,10 @@
+export const camera={position:[21.5,18.4,27.4],target:[0,3.55,.45],near:.3,far:180};
+const cross=([a,b,c],[x,y,z])=>[b*z-c*y,c*x-a*z,a*y-b*x];
+const normalize=v=>{const length=Math.hypot(...v);return v.map(n=>n/length);};
+export const dot=(a,b)=>a.reduce((sum,v,i)=>sum+v*b[i],0);
+export const forward=normalize(camera.target.map((v,i)=>v-camera.position[i]));
+export const right=normalize(cross(forward,[0,1,0]));
+export const up=cross(right,forward);
+export const range=aspect=>Math.max(24.8,34.7/aspect);
+export const origin=(dx,dy)=>camera.position.map((value,i)=>value+dx*right[i]+dy*up[i]);
+export const pace=45;

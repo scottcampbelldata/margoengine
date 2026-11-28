@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Cd8dQQmK.js"><script src="./assets/inline-8f477ed2.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#24221f">
+<link rel="icon" href="data:,">
+<title>Ray-Traced Shadows · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-BymTvFcq.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CgI-c4tS.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>Ray-Traced Shadows</h1>
+    <p>Follow the thin shadows cast by a bronze grille as you change the method.</p>
+  </header>
+  <section aria-label="Shadow comparison">
+    <div class="controls">
+      <fieldset>
+        <legend>Method</legend>
+        <button type="button" data-mode="map" aria-pressed="true" disabled>Shadow map</button>
+        <button type="button" data-mode="trace" aria-pressed="false" disabled>Ray tracing</button>
+      </fieldset>
+      <div class="size-control">
+        <label for="resolution">Map size</label>
+        <select id="resolution" disabled>
+          <option value="64">64 × 64</option>
+          <option value="128" selected>128 × 128</option>
+          <option value="256">256 × 256</option>
+          <option value="512">512 × 512</option>
+        </select>
+      </div>
+      <div class="angle-control">
+        <label for="angle">Turn light</label>
+        <input id="angle" type="range" min="-22" max="45" value="0" step="1" disabled>
+        <output id="bearing" for="angle">0°</output>
+      </div>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="table" aria-label="A circular bronze grille casting a fine pattern of shadows across a cream stone surface." aria-describedby="explanation"></canvas>
+        <div id="notice"><p id="status" role="status">Building the shadow comparison…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p id="explanation">A depth map stores occluders on a grid. Its resolution changes how much of the grille survives in the shadow.</p>
+        <span id="current">128 × 128 depth map</span>
+      </figcaption>
+    </figure>
+  </section>
+  <footer><span>Fixed light elevation and exposure</span><span id="renderer">Margo Engine</span></footer>
+</main>
+</body>
+</html>

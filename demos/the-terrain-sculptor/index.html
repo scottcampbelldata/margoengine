@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CeUDiJ-H.js"><script src="./assets/webgl2-preload-8ce59d06.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171d1d">
+<link rel="icon" href="data:,">
+<title>The Terrain Sculptor · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-CeHN9f03.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CeRp0MPX.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Terrain Sculptor</h1>
+    <p>Shape a volcanic basin. Raise the ground, paint a mineral layer, or open the lava tube beneath it.</p>
+  </header>
+  <section aria-label="Terrain editing">
+    <div class="tools">
+      <fieldset aria-label="Terrain brush">
+        <label><input type="radio" name="brush" value="raise" checked disabled> Raise</label>
+        <label><input type="radio" name="brush" value="lower" disabled> Lower</label>
+        <label><input type="radio" name="brush" value="smooth" disabled> Smooth</label>
+        <label><input type="radio" name="brush" value="paint" disabled> Paint ochre</label>
+      </fieldset>
+      <button type="button" id="cave" aria-pressed="false" disabled>Cut cave</button>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" tabindex="0" aria-label="Editable 3D volcanic basin and lava tube" aria-describedby="guide"></canvas>
+        <span id="cursor" hidden aria-hidden="true"></span>
+        <div id="notice"><p id="status" role="status">Opening the terrain…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption><p id="guide">Drag on the ground to build up relief.</p><button id="inspect" type="button" hidden>Inspect shaft</button><span id="renderer">Margo Engine</span></figcaption>
+    </figure>
+    <div class="adjust">
+      <label for="radius">Brush radius <output id="metres" for="radius">36 m</output>
+        <input id="radius" type="range" min="16" max="76" value="36" step="4" disabled>
+      </label>
+      <label for="survey">Survey angle <output id="angle" for="survey">0°</output>
+        <input id="survey" type="range" min="-42" max="45" value="0" step="1" disabled>
+      </label>
+      <label for="material">Surface
+        <select id="material" disabled>
+          <option value="direct">Terrain layers</option>
+          <option value="pbr">PBR layers</option>
+          <option value="cache">Virtual texture</option>
+        </select>
+      </label>
+      <div class="history"><button id="undo" type="button" disabled>Undo</button><button id="redo" type="button" disabled>Redo</button></div>
+    </div>
+    <p id="statistics" aria-live="polite">2,048 m × 2,048 m · 7 geometry clipmap levels</p>
+  </section>
+</main>
+</body>
+</html>

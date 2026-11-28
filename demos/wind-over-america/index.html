@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BA6gIAgr.js"><script src="./assets/inline-01643208.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0b151c">
+  <meta name="description" content="Explore eight NOAA daily wind fields over North America in Margo Engine.">
+
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="image" href="./assets/atlas-DUBsSUu0.png">
+  <link rel="preload" as="fetch" href="./assets/wind-BNCj4qzi.bin" crossorigin="anonymous">
+  <title>Wind Over America · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-5wC5ep--.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CfFNEJuf.css">
+</head>
+<body>
+  <main class="exhibit">
+    <nav aria-label="Showcase"><a href="../">Margo Engine / Web demos</a></nav>
+    <header class="intro">
+      <h1>Wind Over America</h1>
+      <p>Follow eight days of NOAA wind across the continent. The lines trace the flow, and the arrows point downwind.</p>
+    </header>
+    <section class="instrument" aria-label="Wind map and date controls">
+      <div class="frame">
+        <canvas id="map" aria-label="Wind streamlines and directional arrows across North America"></canvas>
+        <div class="frame-top">
+          <p>Daily mean near-surface wind</p>
+          <span class="compass" aria-label="North is up">↑ N</span>
+        </div>
+        <div class="key">
+          <span>Wind speed</span>
+          <div class="scale"><i></i><p><span>0</span><span>5</span><span>10</span><span>15</span><span>20 m/s</span></p></div>
+        </div>
+        <p class="state" id="status" role="status">Loading the wind archive…</p>
+        <div id="error" class="error" hidden>
+          <p id="message" role="alert"></p>
+          <a id="help" href="https://margoengine.com/errors#compatibility-layer" hidden>See renderer requirements</a>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="date-panel">
+          <label for="day">Archive date</label>
+          <output id="date" for="day">January 4, 2024</output>
+        </div>
+        <div class="timeline">
+          <input id="day" type="range" min="0" max="7" step="1" value="3" disabled>
+          <div class="dates" aria-hidden="true"><span>01</span><span>02</span><span>03</span><span>04</span><span>05</span><span>06</span><span>07</span><span>08</span></div>
+        </div>
+        <button id="play" type="button" aria-pressed="false" disabled>Play dates</button>
+        <div class="metric">
+          <span>Grid peak</span>
+          <output id="peak" for="day">—</output>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL · NCEP/NCAR Reanalysis 1</a>
+      <span>2.5° grid · 0.995 sigma level</span>
+      <a href="./source/README.md">Data and method</a>
+    </footer>
+  </main>
+
+</body>
+</html>
+

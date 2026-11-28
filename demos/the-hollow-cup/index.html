@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-e4554293.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e9e0">
+  <meta name="description" content="Change a cast cup’s wall thickness and mould draft, with exact B-rep validation.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/cup-12-CZ5P6GQj.bin" as="fetch" crossorigin fetchpriority="high">
+  <title>The Hollow Cup · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-B4irNneq.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-PKi3BD9Z.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web Demos</span></a></nav>
+    <header>
+      <h1>The Hollow Cup</h1>
+      <p>Hollow a blank and taper its walls for the mould. Change either dimension and inspect the solid.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive B-rep shell and draft">
+      <figure>
+        <canvas id="part" aria-label="Open cast cup on a display bed. Drag to rotate."></canvas>
+        <p id="status" role="status">Preparing the cup…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="stage-tools"><span>Drag to rotate</span><button id="reset" type="button" disabled>Reset view</button></div>
+      </figure>
+      <aside aria-label="Modelling steps and measurements">
+        <fieldset id="operations" disabled>
+          <legend>Casting dimensions</legend>
+          <label for="wall">Wall thickness <output id="wall-value" for="wall">4 mm</output></label>
+          <input type="range" id="wall" min="2" max="6" step="1" value="4">
+          <label for="draft">Mould draft <output id="draft-value" for="draft">4°</output></label>
+          <input type="range" id="draft" min="0" max="8" step="2" value="4">
+        </fieldset>
+        <p id="feature">Draft · 4° toward the opening</p>
+        <dl>
+          <div><dt>Exact volume</dt><dd><output id="volume">—</output></dd></div>
+          <div><dt>Body check</dt><dd><output id="check">—</output></dd></div>
+          <div><dt>B-rep faces</dt><dd><output id="faces">—</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

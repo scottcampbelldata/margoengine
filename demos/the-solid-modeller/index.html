@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-52463e13.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e9e0">
+  <meta name="description" content="Build a mounting bracket from an exact B-rep profile and measure what each operation removes.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/bracket-XFOBiL64.bin" as="fetch" crossorigin fetchpriority="high">
+  <title>The Solid Modeller · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-s-GqBOvJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-28_OffQn.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web Demos</span></a></nav>
+    <header>
+      <h1>The Solid Modeller</h1>
+      <p>Make an aluminium mounting bracket from a single profile. See what each machining step removes.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive B-rep bracket">
+      <figure>
+        <canvas id="part" aria-label="Mounting bracket on a machined display bed. Drag to rotate."></canvas>
+        <p id="status" role="status">Preparing the bracket…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="stage-tools"><span>Drag to rotate</span><button id="reset" type="button" disabled>Reset view</button></div>
+      </figure>
+      <aside aria-label="Modelling steps and measurements">
+        <fieldset id="operations" disabled>
+          <legend>Modelling steps</legend>
+          <button type="button" data-step="0" aria-pressed="true">Extrude</button>
+          <button type="button" data-step="1" aria-pressed="false">Fillet</button>
+          <button type="button" data-step="2" aria-pressed="false">Shell</button>
+          <button type="button" data-step="3" aria-pressed="false">Drill</button>
+        </fieldset>
+        <p id="feature">Extrude the profile 132 mm.</p>
+        <dl>
+          <div><dt>Exact volume</dt><dd><output id="volume">—</output></dd></div>
+          <div><dt>Mass in aluminium</dt><dd><output id="mass">—</output></dd></div>
+          <div><dt>B-rep faces</dt><dd><output id="faces">—</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

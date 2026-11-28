@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-B1j8d0Pg.js"><script src="./assets/inline-8ddb4d7f.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e5e6dc">
+  <meta name="description" content="Eight hundred wooden blocks and ceramic spheres fall over a sculpted basin in a live Margo Engine physics exhibit.">
+  <link rel="icon" href="data:,">
+  <title>The Rigid Body Rain · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-D-t4xnHL.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DWAKzd9c.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Rigid body study</span></nav>
+    <header>
+      <h1>The Rigid Body Rain</h1>
+      <p>Eight hundred blocks and spheres fall into a sculpted basin. Tap any piece to push it.</p>
+    </header>
+    <section id="exhibit" aria-label="Interactive rigid body rain">
+      <div class="controls">
+        <span id="activity">Preparing the rain</span>
+        <div>
+          <button type="button" id="push" disabled>Push a piece <span aria-hidden="true">↗</span></button>
+          <button type="button" id="drop" disabled>Drop again</button>
+        </div>
+      </div>
+      <div class="scene">
+        <canvas id="canvas" role="img" aria-label="Ochre timber cubes and blue ceramic spheres dropping onto a terraced stone basin"></canvas>
+        <p id="status" role="status">Preparing the 800 bodies…</p>
+      </div>
+      <dl class="readouts" aria-label="Simulation readouts">
+        <div><dt>Bodies</dt><dd id="bodies">800</dd></div>
+        <div><dt>Awake</dt><dd id="awake">—</dd></div>
+        <div><dt>Last push</dt><dd id="last-hit">—</dd></div>
+      </dl>
+    </section>
+    <details>
+      <summary>How the ray works</summary>
+      <p>A tap casts a ray through the scene and pushes the first body it meets. The button aims toward the nearest piece in the center of the view. Drop again starts the same arrangement with 400 boxes and 400 spheres.</p>
+    </details>
+  </main>
+</body>
+</html>

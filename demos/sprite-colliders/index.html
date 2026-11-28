@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-b5cf193f.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#231f1d">
+  <title>Sprite Colliders · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="modulepreload" href="./assets/physics-D19pUqk0.js">
+  <script type="module" crossorigin src="./assets/index-BcgefG9M.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CpxPBEwX.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>Sprite Colliders</h1>
+      <p>Draw a cutout, then drop it. The press traces the solid pixels, including any holes you erase.</p>
+    </header>
+    <div class="console">
+      <section class="tools" aria-label="Cutout editor">
+        <div class="primary">
+          <button id="drop" type="button" disabled>Drop cutout</button>
+          <button id="outline" type="button" aria-pressed="true" disabled>Show collider</button>
+        </div>
+        <div class="ink" aria-label="Brush tools">
+          <button id="draw" type="button" aria-pressed="true" disabled>Draw</button>
+          <button id="erase" type="button" aria-pressed="false" disabled>Erase</button>
+          <button id="undo" type="button" disabled>Undo</button>
+          <button id="blank" type="button" disabled>Blank</button>
+        </div>
+        <div class="presets" aria-label="Sample cutouts">
+          <button id="scoop" type="button" disabled>Scoop</button>
+          <button id="ring" type="button" disabled>Ring</button>
+          <button id="fork" type="button" disabled>Fork</button>
+        </div>
+      </section>
+      <figure id="viewport" aria-label="The ink plate and working drop chamber">
+        <canvas id="scene" tabindex="0" aria-label="Draw on the gridded ink plate. Keyboard arrows move the cursor and Space stamps the brush."></canvas>
+        <span id="loading" role="status">Opening the press…</span>
+        <span id="error" role="alert" hidden></span>
+      </figure>
+      <section class="readouts" aria-label="Collider diagnostics">
+        <dl>
+          <div><dt>Trace vertices</dt><dd><output id="vertices">—</output></dd></div>
+          <div><dt>Holes</dt><dd><output id="holes">—</output></dd></div>
+          <div><dt>Convex pieces</dt><dd><output id="pieces">—</output></dd></div>
+          <div><dt>Contact starts</dt><dd><output id="contacts">0</output></dd></div>
+        </dl>
+        <button id="clear" type="button" disabled>Clear chamber</button>
+        <p id="notice" role="status"></p>
+      </section>
+    </div>
+    <footer><a href="https://www2.ipcku.kansai-u.ac.jp/~yasumuro/M_InfoMedia/paper/Suzuki85.pdf">Tracing boundaries and holes</a></footer>
+  </main>
+</body>
+</html>

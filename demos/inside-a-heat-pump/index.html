@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101820">
+<meta name="description" content="Reverse the refrigerant circuit, explore the heat exchangers and take apart a heat pump in Margo Engine.">
+<link rel="icon" href="data:,">
+<title>Inside a Heat Pump · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BGebhGAN.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="modulepreload" crossorigin href="./assets/errors-DkwPZuAq.js">
+  <link rel="modulepreload" crossorigin href="./assets/color-CMZXT1qw-BRZziLoe.js">
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-1b8ejkZX-KONmyKcE.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-DMy5JAkb.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header><h1>Inside a Heat Pump</h1><p>Switch between heating and cooling. Follow the refrigerant as the two coils trade jobs.</p></header>
+  <section class="stage" aria-label="Interactive heat pump">
+    <canvas id="scene" tabindex="0" aria-label="Cutaway of the heat pump. Drag or use the arrow keys to orbit."></canvas>
+    <p role="status" id="loading">Starting the heat pump…</p>
+    <button class="annotation" id="outdoor" type="button" aria-pressed="false" disabled>Outdoor coil</button>
+    <button class="annotation" id="valve" type="button" aria-pressed="false" disabled>Reversing valve</button>
+    <button class="annotation" id="indoor" type="button" aria-pressed="false" disabled>Indoor coil</button>
+    <div class="view-tools">
+      <button id="trace" type="button" aria-pressed="false" disabled>Trace refrigerant</button>
+      <button id="reset-view" type="button" disabled>Reset view</button>
+    </div>
+  </section>
+  <div class="panel">
+    <fieldset class="mode"><legend>Operating mode</legend><div>
+      <button type="button" data-mode="heating" aria-pressed="true" disabled>Heating</button>
+      <button type="button" data-mode="cooling" aria-pressed="false" disabled>Cooling</button>
+    </div></fieldset>
+    <div class="assembly">
+      <div><label for="explode">Explode assembly</label><output id="amount" for="explode">0%</output></div>
+      <input type="range" id="explode" min="0" max="100" value="0" disabled>
+    </div>
+    <div class="legend" aria-label="Refrigerant legend"><span><i class="hot"></i>High pressure</span><span><i class="cold"></i>Low pressure</span></div>
+  </div>
+  <div class="notes"><p id="cycle" aria-live="polite">In heating mode, the indoor coil releases heat and the outdoor coil absorbs it.</p><a href="./source/scene.js">View scene source</a></div>
+</main>
+</body>
+</html>
+
+

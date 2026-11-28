@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-DFi8EVOO.js"><link rel="modulepreload" crossorigin href="./assets/scene-Btn32OWT.js">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#151923"><link rel="icon" href="data:,">
+<title>Shape Casts · Margo Engine</title>  <script type="module" crossorigin src="./assets/index-BffbUEb-.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DJTDpNA-.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Query setup</a></nav>
+<header><h1>Shape Casts</h1><p>Sweep a probe across four fittings. Inspect every contacted surface, its distance along the sweep, and the direction it faces.</p></header>
+<section class="bench" aria-label="Interactive convex shape cast">
+<figure><div class="stage"><canvas id="view" aria-label="Four material test fittings on a dark laboratory bench with a mint inspection probe"></canvas>
+<p class="overlay" id="loading" role="status">Starting the shape query solver…</p><p class="overlay" id="error" role="alert" hidden></p></div>
+<figcaption><span>Convex inspection bench</span><span id="summary">Ready to test</span></figcaption></figure>
+<aside><fieldset id="controls"><legend>Probe controls</legend>
+<button type="button" id="cast" class="primary" disabled>Cast probe <span aria-hidden="true">⟶</span></button>
+<div id="options" inert>
+<div class="line"><label for="shape">Probe</label><select id="shape"><option value="sphere">Sphere</option><option value="box">Box</option><option value="capsule">Capsule</option></select></div>
+<label for="yaw" class="dial">Sweep direction <output id="yaw-value">0°</output></label>
+<input id="yaw" type="range" min="-18" max="18" step="1" value="0">
+<label for="height" class="dial">Probe height <output id="height-value">1.07 m</output></label>
+<input id="height" type="range" min=".72" max="1.60" step=".01" value="1.07">
+<label class="normals"><input id="normals" type="checkbox" checked> Show surface normals</label>
+<ol id="hits" aria-label="Contacts from nearest to farthest"></ol>
+<p id="status" role="status">Cast the probe to inspect its contacts.</p>
+</div></fieldset></aside></section></main></body></html>

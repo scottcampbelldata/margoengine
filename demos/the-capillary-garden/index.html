@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ecebdd">
+  <meta name="description" content="Watch liquid rise into five glass capillaries and change the wetting angle to see how high each column can climb.">
+  <title>The Capillary Garden | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BFxiP0FQ.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CWqCfJdC.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Capillary Garden</h1>
+      <p>Liquid climbs five glass tubes from a shared bath. Wider bores fill first, while narrower bores can lift the liquid higher.</p>
+    </header>
+    <section class="rig" aria-label="Working capillary exhibit">
+      <figure>
+        <canvas id="scene" aria-label="Five graded glass tubes drawing rising blue liquid out of a ceramic trough in a small iron and glass conservatory"></canvas>
+        <p id="loading" role="status">Preparing the glasshouse…</p>
+        <div class="riser" id="tube-a" aria-hidden="true">0.15</div>
+        <div class="riser" id="tube-b" aria-hidden="true">0.21</div>
+        <div class="riser" id="tube-c" aria-hidden="true">0.29</div>
+        <div class="riser" id="tube-d" aria-hidden="true">0.40</div>
+        <div class="riser" id="tube-e" aria-hidden="true">0.59</div>
+      </figure>
+      <aside aria-label="Wetting angle and capillary readings">
+        <div class="control">
+          <div class="row"><label for="wetting">Contact angle</label><output for="wetting" id="angle">34°</output></div>
+          <input id="wetting" type="range" min="12" max="70" step="1" value="34" disabled>
+          <div class="limits"><span>Better wetting</span><span>Poorer wetting</span></div>
+        </div>
+        <dl>
+          <div><dt>Final rise · narrowest</dt><dd><output id="narrow">—</output><small>mm</small></dd></div>
+          <div><dt>Final rise · widest</dt><dd><output id="wide">—</output><small>mm</small></dd></div>
+        </dl>
+        <p class="time"><span>Model time</span><output id="clock">32.0 s</output></p>
+        <div class="actions"><button id="replay" type="button" disabled>Replay rise</button><button id="pause" type="button" disabled>Pause</button></div>
+      </aside>
+    </section>
+    <footer><span>Riser labels show radius in mm · Bores enlarged · 5× time</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

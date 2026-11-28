@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./dist-DjMWGbrl.js","./index-B77p1dg3.js","./version-YYhCZP03.js","./index-QuefGE10.css"])))=>i.map(i=>d[i]);
+import{g as e}from"./index-B77p1dg3.js";async function t(t){let{install:n}=await e(async()=>{let{install:e}=await import(`./dist-DjMWGbrl.js`);return{install:e}},__vite__mapDeps([0,1,2,3]),import.meta.url);await n({force:!0,signal:t})}export{t as installCompatibility};

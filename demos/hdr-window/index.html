@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-NvvX7uqE.js"><script src="./assets/inline-364ca748.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#161b1e">
+  <meta name="description" content="Compare standard and extended highlights in a live EXR-lit gallery rendered by Margo Engine.">
+  <link rel="icon" href="data:,">
+  <link id="native-light" rel="preload" as="fetch" href="./assets/atrium-BXTKvFhk.exr" crossorigin media="not all">
+  <link id="compat-light" rel="preload" as="fetch" href="./assets/atrium-ibl-packed-B30r-sfe.bin" crossorigin media="not all">
+  <script src="./assets/inline-52282983.js"></script>
+
+  <title>HDR Window · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CzDouns0.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dx_JYbZv.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Light &amp; colour</span></nav>
+    <header>
+      <h1>HDR Window</h1>
+      <p>Watch the same sunlit gallery through two display grades.</p>
+    </header>
+    <figure id="instrument">
+      <div id="stage">
+        <canvas id="view" role="img" aria-label="A reflective optical sculpture standing before a window onto a layered sunset"></canvas>
+        <p id="status" role="status">Opening the gallery…</p>
+        <p id="view-label" aria-hidden="true">SDR</p>
+      </div>
+      <figcaption class="control-panel">
+        <div class="grade">
+          <span class="label" id="grade-label">Display grade</span>
+          <div class="switch" role="group" aria-labelledby="grade-label">
+            <button id="sdr" type="button" aria-pressed="true" disabled>SDR</button>
+            <button id="extended" type="button" aria-pressed="false" disabled>Highlight detail</button>
+          </div>
+        </div>
+        <div class="source">
+          <label for="source">Environment</label>
+          <select id="source" disabled>
+            <option value="exr">OpenEXR</option>
+            <option value="ultra">Ultra HDR JPEG</option>
+          </select>
+        </div>
+      </figcaption>
+    </figure>
+    <section class="notes" aria-label="Display information">
+      <div>
+        <p id="display" aria-live="polite">Checking display support…</p>
+        <p id="source-note" aria-live="polite"></p>
+      </div>
+      <details>
+        <summary>How the comparison works</summary>
+        <p>Both grades start with the same linear light. SDR compresses highlights into the normal white range. HDR can make the brightest parts of the sky and reflections brighter than SDR white. On an SDR screen, Highlight detail lowers exposure so you can inspect those parts.</p>
+      </details>
+    </section>
+  </main>
+
+</body>
+</html>

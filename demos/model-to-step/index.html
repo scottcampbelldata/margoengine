@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Model a precision indexing flange, export its solid to STEP, and inspect the solid returned by the file.">
+  <meta name="theme-color" content="#e9e7dd">
+  <title>Model to STEP · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/aster-flange-QNQvnDyE.mesh" crossorigin>
+  <script type="module" crossorigin src="./assets/index-VlS36si5.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B7V_ttJs.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Web Demos"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Model to STEP</h1>
+      <p>Set the spindle bore, save the solid, then open the STEP file to check the round trip.</p>
+    </header>
+    <section class="workbench" aria-label="Model and compare an indexing flange">
+      <figure>
+        <canvas id="part" aria-label="Three-dimensional Aster indexing flange with a central bore and four counterbored mounting holes"></canvas>
+        <figcaption><span id="part-label">Aster indexing flange</span><button id="reset" type="button" disabled>Reset view</button></figcaption>
+        <p id="loading" role="status">Opening the flange…</p>
+        <p id="render-error" role="alert" hidden></p>
+      </figure>
+      <div class="work">
+        <div class="measurement">
+          <div class="head"><label for="diameter">Spindle bore</label><output id="bore" for="diameter">Ø 28 mm</output></div>
+          <input type="range" id="diameter" min="22" max="40" value="28" step="1" disabled>
+          <div class="bounds"><span>Ø22</span><span>Ø40</span></div>
+          <dl>
+            <div><dt>Flange diameter</dt><dd>108 mm</dd></div>
+            <div><dt>Solid volume</dt><dd id="volume">134.21 cm³</dd></div>
+            <div><dt>Boundary faces</dt><dd id="faces">23</dd></div>
+          </dl>
+        </div>
+        <div class="exchange">
+          <button id="export" type="button" disabled>Download STEP<span aria-hidden="true">↓</span></button>
+          <button id="drop" type="button" disabled>Drop a STEP file or browse<span aria-hidden="true">↗</span></button>
+          <input type="file" id="file" accept=".step,.stp,.p21" hidden>
+          <p id="exchange-status" role="status" hidden></p>
+          <div id="views" role="group" aria-label="Displayed solid" hidden>
+            <button id="show-model" type="button" aria-pressed="true">Model</button>
+            <button id="show-import" type="button" aria-pressed="false">Imported</button>
+          </div>
+          <dl id="comparison" hidden>
+            <div><dt>Volume difference</dt><dd id="delta-volume"></dd></div>
+            <div><dt>Surface area difference</dt><dd id="delta-area"></dd></div>
+            <div><dt>Centroid shift</dt><dd id="delta-center"></dd></div>
+            <div><dt>Sampled surface</dt><dd id="delta-surface"></dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <p>Original flange design. Margo writes an AP214 boundary representation in metres.</p>
+      <a href="https://www.nist.gov/services-resources/software/step-file-analyzer-and-viewer">STEP and geometric checks</a>
+      <a href="./source/README.md">Method and sources</a>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1b2028">
+  <meta name="description" content="Turn a crank and watch its roller drive a piston through a straight slot. A live mechanical exhibit built with Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Scotch Yoke · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CJYifm2c.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DOUArgvV.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Scotch Yoke</h1>
+    <p>Turn the crank. The roller moves up and down the slot while the piston follows its horizontal motion.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="A steel flywheel drives a roller in a red vertical slot connected to a piston inside a cutaway blue cylinder"></canvas>
+      <p id="loading" role="status">Starting the Scotch yoke…</p>
+      <button type="button" id="front" disabled>Front view</button>
+    </figure>
+    <section class="controls" aria-label="Crank and piston controls">
+      <div class="dial"><label for="angle">Crank angle</label><output id="degrees" for="angle">112°</output></div>
+      <input id="angle" type="range" min="0" max="360" step="1" value="112" disabled>
+      <div class="ticks" aria-hidden="true"><span>0°</span><span>90°</span><span>180°</span><span>270°</span><span>360°</span></div>
+      <button type="button" id="play" disabled>Run crank<span aria-hidden="true">▷</span></button>
+      <dl>
+        <div><dt>Piston offset</dt><dd id="piston">—</dd></div>
+        <div><dt>Roller height in slot</dt><dd id="roller">—</dd></div>
+        <div><dt>Full piston stroke</dt><dd>284 mm</dd></div>
+      </dl>
+      <p class="caption">At constant crank speed, the piston moves fastest at mid-stroke and stops at each end before reversing.</p>
+    </section>
+  </article>
+  <footer><p>Ideal motion with a 142 mm crank radius.</p><a href="./source/README.md">Model and sources</a></footer>
+</main>
+</body>
+</html>

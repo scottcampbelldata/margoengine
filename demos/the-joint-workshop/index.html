@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-B5CqMF5U.js"><link rel="modulepreload" crossorigin href="./assets/scene-DH8fwE-h.js">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#141b23"><link rel="icon" href="data:,">
+<title>The Joint Workshop · Margo Engine</title>
+
+
+  <script type="module" crossorigin src="./assets/index-DqhHZ-DA.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-Cflq5QlV.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Rig notes</a></nav>
+<header><h1>The Joint Workshop</h1><p>Drive two cabinet doors into their mechanical stops and set a jointed pendulum swinging. Show the joint frames to inspect each limit.</p></header>
+<section class="exhibit" aria-label="Interactive exhibit of hinge motors and ball joints">
+<figure><div class="viewport"><canvas id="view" aria-label="Two wood and brass cabinet doors on the left, jointed pendulum on the right"></canvas>
+<p id="loading" class="overlay" role="status">Loading the joint solver…</p><p id="error" class="overlay" role="alert" hidden></p></div>
+<figcaption><span>Motorized hinges</span><span>Limited ball joints</span></figcaption></figure>
+<aside><fieldset id="controls">
+<legend>Workshop controls</legend>
+<button id="drive" class="primary" type="button" disabled>Open both doors <span aria-hidden="true">↗</span></button>
+<div id="secondary" inert><div class="pair"><button id="left" type="button">Open left</button><button id="right" type="button">Open right</button></div>
+<dl><div><dt>Left door</dt><dd><output id="angle-left">0.0°</output></dd></div><div><dt>Right door</dt><dd><output id="angle-right">0.0°</output></dd></div></dl>
+<button id="tap" class="tap" type="button">Tap the pendulum <span aria-hidden="true">→</span></button>
+<div class="chain-read"><span>Swing displacement</span><output id="swing">0 mm</output></div>
+<label class="debug"><input type="checkbox" id="debug"> Show joint frames and limits</label>
+<button id="reset" class="reset" type="button">Reset workshop</button>
+<p id="status" role="status">The hinge stops are at 64.2°.</p></div>
+</fieldset></aside>
+</section></main></body></html>

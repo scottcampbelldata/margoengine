@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b1b">
+  <meta name="description" content="Move a Foucault pendulum from one hemisphere to the other and watch its swing turn with Earth's rotation.">
+  <link rel="icon" href="data:,">
+  <title>The Foucault Pendulum · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DUSgM_Nd.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bj4GQJc5.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Foucault Pendulum</h1><p>Set the latitude and advance time. Earth turns beneath the swing, and the floor marks reveal by how much.</p></header>
+    <section class="exhibit" aria-label="Foucault pendulum in a stone rotunda">
+      <figure>
+        <canvas id="scene" aria-label="A brass bob suspended over a sundial-like compass in a limestone rotunda"></canvas>
+        <p id="loading" role="status">Opening the rotunda…</p>
+        <button type="button" id="view" aria-pressed="false" disabled>Overhead</button>
+      </figure>
+      <aside aria-label="Latitude and precession controls">
+        <div class="control">
+          <label for="latitude">Latitude <output id="latitude-label" for="latitude">48.9° N</output></label>
+          <input id="latitude" type="range" min="-90" max="90" step=".1" value="48.9" disabled>
+        </div>
+        <div class="places" aria-label="Select a latitude">
+          <button type="button" data-latitude="48.9" disabled>Paris</button>
+          <button type="button" data-latitude="0" disabled>Equator</button>
+          <button type="button" data-latitude="-33.9" disabled>Sydney</button>
+        </div>
+        <div class="control">
+          <label for="hours">Elapsed time <output id="hours-label" for="hours">0.0 h</output></label>
+          <input id="hours" type="range" min="0" max="24" step=".1" value="0" disabled>
+        </div>
+        <button type="button" id="play" aria-pressed="false" disabled>Advance time</button>
+        <dl>
+          <div><dt>Swing direction from start</dt><dd id="angle">—</dd></div>
+          <div><dt>Precession per hour</dt><dd id="rate">—</dd></div>
+        </dl>
+        <p class="legend"><span>Start</span><span>Current swing</span></p>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#121a20">
+  <meta name="description" content="Tilt a precision gyroscope and see what its gimbals do. Built in Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Gimbal · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Cbj8vQrl.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DR20K5I7.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Gimbal</h1>
+    <p>Tilt the mount, then lock the pivots. Watch whether the spinning rotor still points at the same target.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="A gyroscope with concentric brass and blue gimbals, an amber rotor axis, and a fixed blue target"></canvas>
+      <p id="loading" role="status">Starting the gyroscope…</p>
+      <div class="view-controls">
+        <button type="button" id="guide" aria-pressed="true" disabled>Axis guides</button>
+      </div>
+      <figcaption>
+        <span><i class="warm" aria-hidden="true"></i> Rotor axis</span>
+        <span><i class="cool" aria-hidden="true"></i> Fixed target</span>
+      </figcaption>
+    </figure>
+    <section class="controls" aria-label="Gyroscope controls">
+      <div class="tilt">
+        <label for="angle">Mount tilt</label>
+        <output id="tilt-value" for="angle">+22°</output>
+      </div>
+      <input id="angle" type="range" min="-44" max="44" step="1" value="22" disabled>
+      <div class="ticks" aria-hidden="true"><span>−44°</span><span>0°</span><span>+44°</span></div>
+      <fieldset>
+        <legend>Pivot mode</legend>
+        <div class="modes">
+          <button type="button" data-mode="free" aria-pressed="true" disabled>Free</button>
+          <button type="button" data-mode="locked" aria-pressed="false" disabled>Locked</button>
+        </div>
+      </fieldset>
+      <dl>
+        <div><dt>Rotor drift from target</dt><dd id="drift">0.0°</dd></div>
+        <div><dt>Outer pivot</dt><dd id="outer">—</dd></div>
+        <div><dt>Inner pivot</dt><dd id="inner">—</dd></div>
+      </dl>
+      <p id="explanation" aria-live="polite">The rings move around the rotor. Its axis stays on target.</p>
+    </section>
+  </article>
+  <footer>
+    <p>Ideal gyroscope with frictionless pivots. Spin is slowed for visibility.</p>
+    <a href="./source/kinematics.js">View the kinematics</a>
+  </footer>
+</main>
+</body>
+</html>

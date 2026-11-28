@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-a58c8be3.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#1c1b24">
+  <link rel="icon" href="data:,">
+  <title>Candlelight · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-D4EjJ5Tw.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DeAvmf5V.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine / Web demos</a></nav>
+    <header><h1>Candlelight</h1><p>Five flames light a night archive. Share a shadow budget between them and watch the silhouettes sharpen around the desk.</p></header>
+    <section class="exhibit" aria-label="Candlelit archive and local shadow controls">
+      <figure>
+        <div class="view">
+          <canvas id="view" aria-label="Night archive with five flickering candles and a brass armillary sphere" tabindex="0"></canvas>
+          <p id="status" role="status">Lighting the archive…</p>
+          <p id="error" role="alert" hidden></p>
+        </div>
+        <figcaption><span>Night archive</span><span>Meter-scale model</span></figcaption>
+      </figure>
+      <aside>
+        <fieldset id="tools" disabled>
+          <legend>Shadow budget</legend>
+          <div class="budget" aria-label="Maximum number of shadow-casting flames">
+            <button type="button" data-budget="0" aria-pressed="false">None</button>
+            <button type="button" data-budget="1" aria-pressed="true">1 flame</button>
+            <button type="button" data-budget="3" aria-pressed="false">3 flames</button>
+          </div>
+          <div class="buttons">
+            <button type="button" id="flicker" aria-pressed="true">Pause flicker</button>
+            <button type="button" id="reset">Reset view</button>
+          </div>
+        </fieldset>
+        <dl>
+          <div><dt>Flames contributing light</dt><dd id="count">5</dd></div>
+          <div><dt>Active shadow maps</dt><dd id="maps">—</dd></div>
+          <div><dt>Allocated map texels</dt><dd id="allocation">—</dd></div>
+        </dl>
+        <p class="tip">Every flame keeps lighting the room as the shadow allocation changes. Drag to turn the view.</p>
+      </aside>
+    </section>
+    <footer>Original archive scene · <a href="./source/README.md">Flame and shadow model</a></footer>
+  </main>
+</body>
+</html>

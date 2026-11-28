@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-98ec9e9a.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e9e3d6">
+  <link rel="icon" href="data:,">
+  <title>The Print Shop · Margo Engine</title>
+  <link rel="preload" href="./assets/paths--oWwAmNS.bin" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-BTNNW9vu.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BjFi6-J-.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>The Print Shop</h1><p>Choose the jig’s bore, then scrub the printer’s actual toolpath one layer at a time.</p></header>
+    <section class="exhibit" aria-label="3D printer and model preview">
+      <figure>
+        <canvas id="scene" aria-label="Layered print toolpath viewed beside the machined jig model"></canvas>
+        <p id="status" role="status">Loading the printer and the sliced part…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="overlay"><span>Finished model</span><span>Printer bed</span></div>
+      </figure>
+      <aside>
+        <fieldset id="sizes" disabled>
+          <legend>Jig bore</legend>
+          <button data-part="0" type="button" aria-pressed="true">8 mm</button>
+          <button data-part="1" type="button" aria-pressed="false">11 mm</button>
+          <button data-part="2" type="button" aria-pressed="false">14 mm</button>
+        </fieldset>
+        <div class="range">
+          <label for="layer">Print layer</label><output id="layer-readout" for="layer">1 / 30</output>
+          <input type="range" id="layer" min="1" max="30" value="1" step="1" disabled>
+        </div>
+        <div class="playback">
+          <button id="play" type="button" aria-pressed="false" disabled>Play layers</button>
+          <label><input id="travel" type="checkbox" disabled> Show travel</label>
+        </div>
+        <dl>
+          <div><dt>Layer elevation</dt><dd><output id="height">—</output></dd></div>
+          <div><dt>Extrusion moves in layer</dt><dd><output id="moves">—</output></dd></div>
+          <div><dt>Total filament</dt><dd><output id="filament">—</output></dd></div>
+        </dl>
+        <div class="downloads">
+          <a id="download-model" download>Download 3MF</a>
+          <a id="download-gcode" download>Download G-code</a>
+        </div>
+      </aside>
+    </section>
+    <footer>The G-code contains the displayed paths and needs your printer’s setup instructions. <a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

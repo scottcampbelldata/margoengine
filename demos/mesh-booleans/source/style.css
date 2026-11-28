@@ -1,0 +1,53 @@
+@charset "UTF-8";
+:root{color-scheme:light;--paper:#ebe6d9;--ink:#252b30;--muted:#565c62;--line:#aaa79a;--panel:#f1ecdf;--action:#24455b}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,sans-serif}
+main{width:min(100%,1460px);margin:auto;padding:24px clamp(14px,4vw,58px) 24px}
+nav{display:flex;align-items:center;padding:0 0 14px;gap:11px;border-bottom:1px solid var(--line);font-size:.84rem}
+nav a{font-weight:720;text-decoration:none}
+nav span{width:15px;height:1px;background:var(--line)}
+a{color:var(--action);text-underline-offset:.19em}
+header{padding:clamp(22px,3.5vw,46px) 0 clamp(17px,2.3vw,29px)}
+h1{font:500 clamp(3.2rem,7.7vw,7rem)/.9 Georgia,serif;letter-spacing:-.075em;margin:0}
+header p{margin:.84rem 0 0;font-size:clamp(.94rem,1.45vw,1.1rem);line-height:1.45;color:var(--muted)}
+.exhibit{display:grid;grid-template-columns:minmax(0,1fr) clamp(276px,29vw,352px);border:1px solid var(--line);background:var(--panel)}
+figure{position:relative;display:block;isolation:isolate;margin:0;background:#19232c;overflow:hidden;min-height:clamp(460px,43vw,590px)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+figcaption{position:absolute;pointer-events:none;bottom:15px;left:15px;max-width:calc(100% - 30px);padding:.44rem .65rem;color:#f8eee0;background:#1b252ceb;font-size:.75rem}
+#status{position:absolute;inset:auto 10px 52px;margin:auto;width:fit-content;max-width:calc(100% - 20px);padding:.58rem .75rem;background:#16202a;color:#fff2df;font-size:.83rem}
+#status span,#status a{display:block;color:inherit}
+aside{display:flex;flex-direction:column;justify-content:center;gap:20px;padding:clamp(15px,2.3vw,33px);min-width:0;border-left:1px solid var(--line)}
+fieldset{margin:0;padding:0;border:0;min-width:0}
+legend{font-size:.93rem;font-weight:720}
+.depths,.inspect{display:grid;margin-top:7px;gap:5px}
+.depths{grid-template-columns:1fr 1.25fr 1fr}
+.inspect{grid-template-columns:1fr 1fr;margin-top:13px}
+button{min-height:42px;padding:7px 5px;border:1px solid #a7ada8;background:#f8f4e9;color:var(--ink);font:640 .8rem system-ui,sans-serif;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--action)}
+button[aria-pressed=true]{background:#dee9ea;border-color:#628193;color:#15384a}
+button:disabled{opacity:.61;cursor:default}
+button.primary{min-height:45px;margin-top:8px;width:100%;background:var(--action);border-color:var(--action);color:#fff2dc}
+:where(a,button):focus-visible{outline:2px solid #a46639;outline-offset:2px}
+.explain{margin:8px 0 0;font-size:.77rem;color:var(--muted);line-height:1.4;min-height:2.15em}
+dl{margin:0;font-size:.79rem;border-top:1px solid var(--line)}
+dl div{display:flex;justify-content:space-between;gap:5px;align-items:center;padding:8px 0;border-bottom:1px solid #ccc7bb}
+dt{color:var(--muted)}
+dd{margin:0;font:640 .83rem "Cascadia Mono",Consolas,monospace;color:#224654}
+.key{display:flex;align-items:center;gap:.9rem;font-size:.71rem;color:var(--muted);flex-wrap:wrap}
+.key span{display:flex;align-items:center;gap:.31rem}
+.key i{width:.70rem;height:.65rem;border-radius:2px}
+.key .stock{background:#356686}
+.key .cut{background:#7da6aa}
+footer{display:flex;justify-content:space-between;gap:.4rem 1rem;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:.81rem;line-height:1.45}
+footer p{margin:0}
+footer details{max-width:29rem}
+summary{cursor:pointer}
+@media(max-width:745px){
+  main{padding-top:14px}
+  .exhibit{grid-template-columns:1fr}
+  figure{min-height:clamp(280px,87vw,390px)}
+  figcaption{bottom:9px;left:9px;font-size:.69rem;padding:.35rem .49rem}
+  aside{border-left:0;border-top:1px solid var(--line);gap:16px}
+  button{min-height:44px}
+}

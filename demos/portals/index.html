@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-pntrM9w8.js"><script src="./assets/inline-b607910e.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#29252d">
+  <meta name="description" content="Look into two intersecting 3D chambers through Margo Engine's stencil portals.">
+  <link rel="icon" href="data:,">
+  <title>Portals · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DwY1sxDR.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C6HMrHaY.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Stencil rendering</span></nav>
+    <header>
+      <h1>Portals</h1>
+      <p>Two chambers meet behind a single wall.</p>
+    </header>
+    <figure id="exhibit">
+      <div id="stage">
+        <canvas id="view" role="img" aria-label="Two bronze arches look into a copper vault and a blue meridian chamber"></canvas>
+        <p id="status" role="status">Opening the chambers…</p>
+      </div>
+      <figcaption class="controls">
+        <div class="read">
+          <label for="eye">Move viewpoint</label>
+          <output id="eye-value" for="eye">Centred</output>
+        </div>
+        <input id="eye" type="range" min="-110" max="110" step="1" value="0" disabled>
+        <div class="ends" aria-hidden="true"><span>Left</span><span>Right</span></div>
+      </figcaption>
+    </figure>
+    <section class="notes">
+      <p>Watch the bronze instrument and blue tower shift behind the arches. The brass post in front can block the view.</p>
+      <details>
+        <summary>How the openings work</summary>
+        <p>Each arch writes a different stencil value where the camera can see it. Margo renders both 3D chambers in the same scene and draws each one through its matching arch. The two chambers angle toward one another behind the wall.</p>
+      </details>
+    </section>
+  </main>
+</body>
+</html>

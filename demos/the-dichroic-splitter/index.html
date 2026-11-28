@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e7e9e4">
+  <meta name="description" content="Tilt a thin-film dichroic plate and see how it divides white light between two optical paths.">
+  <title>The Dichroic Splitter · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-Dy4Y7Yai.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-eAXm6hiL.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Dichroic Splitter</h1>
+      <p>Tilt the coated plate to change which wavelengths it reflects and which pass through.</p>
+    </header>
+    <section class="stage" aria-label="Interactive dichroic splitter">
+      <canvas id="scene" aria-label="A coated glass plate dividing a white beam between a fixed and a moving receiver"></canvas>
+      <p id="loading" role="status">Preparing the splitter…</p>
+      <button type="button" id="view" aria-pressed="false" disabled>Trace the paths</button>
+    </section>
+    <section class="panel" aria-label="Dichroic plate controls">
+      <div class="field">
+        <label for="incidence">Incidence angle</label><output id="angle-output" for="incidence">45°</output>
+        <input id="incidence" type="range" min="20" max="65" step="1" value="45" disabled>
+        <div class="marks" aria-hidden="true"><span>20°</span><span>65°</span></div>
+      </div>
+      <dl class="readings" aria-label="Share of visible brightness">
+        <div><dt id="reflection-label">Reflected</dt><dd><output id="reflection" aria-labelledby="reflection-label">—</output></dd></div>
+        <div><dt id="transmission-label">Transmitted</dt><dd><output id="transmission" aria-labelledby="transmission-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Lossless dielectric stack · visible brightness</span></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Dx5gc00z.js"><script src="./assets/webgl2-preload-8745dfc3.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#071221">
+<link rel="icon" href="data:,">
+<link rel="preload" as="image" href="./assets/earth-start-Cxe08ysM.webp" crossorigin>
+<title>Globe Flight · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DSU6OVFJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Coob6XXI.css">
+</head>
+<body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Data &amp; flight model</a></nav>
+<header><div><p class="kicker">Pacific Flight Observatory</p><h1>Globe Flight</h1></div><p>From the Earth’s limb to the summit of Mauna Kea. Fly the descent, then turn the island to follow its volcanic ridges.</p></header>
+<section class="observe" aria-label="Earth and Hawaiʻi flight exhibit">
+<figure class="display">
+<div class="lens"><canvas id="view" tabindex="0" aria-label="Interactive Earth globe and measured elevation relief of Hawaiʻi Island"></canvas>
+<p id="loading" role="status">Opening the orbital view…</p><p id="error" role="alert" hidden></p>
+<div class="reticle" id="reticle" hidden><span></span><span>Mauna Kea</span></div>
+<div class="scope"><small id="mode">ORBIT</small><output id="altitude">—</output></div>
+</div>
+<figcaption><span id="coordinates">WGS 84</span><span id="dataset">NASA Blue Marble</span></figcaption>
+</figure>
+<aside>
+<fieldset id="controls" disabled>
+<legend>Flight deck</legend>
+<button id="fly" type="button">Fly to Mauna Kea <span aria-hidden="true">↘</span></button>
+<div class="stations" aria-label="Camera stations">
+<button data-stop="orbit" type="button" aria-current="true">Orbit</button>
+<button data-stop="island" type="button">Island</button>
+<button data-stop="summit" type="button">Summit</button>
+</div>
+<label class="relief"><input id="contours" type="checkbox" disabled> Show 250 m contours</label>
+<p id="footnote">Drag the globe to turn it. Scroll or pinch to zoom.</p>
+</fieldset>
+</aside>
+</section>
+</main></body></html>

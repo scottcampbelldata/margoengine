@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-5CiqiudF.js"><script src="./assets/inline-93577916.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#eae7db">
+  <link rel="icon" href="data:,">
+  <title>The CAD Format Shelf · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DlXvvI60.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BFdJ5GI0.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine / Web demos</a></nav>
+    <header class="intro">
+      <h1>The CAD Format Shelf</h1>
+      <p>Open STEP and IGES samples side by side. Select an entry to highlight its geometry and see how the file organizes it.</p>
+    </header>
+    <section id="laboratory" aria-label="CAD sample comparison">
+      <div class="sample-bar">
+        <div><label for="step-sample">STEP sample</label><select id="step-sample" disabled></select></div>
+        <div><label for="iges-sample">IGES sample</label><select id="iges-sample" disabled></select></div>
+      </div>
+      <div class="stage">
+        <canvas id="shelf" aria-label="Actual STEP and IGES geometry on two display plinths"></canvas>
+        <p class="stage-detail">Samples fitted to each plinth</p>
+        <p class="status" id="status" role="status">Reading the exchange files…</p>
+        <div class="error" id="error" hidden>
+          <p id="message" role="alert"></p>
+          <a id="help" href="https://margoengine.com/errors#compatibility-layer" hidden>Renderer requirements</a>
+        </div>
+      </div>
+      <div class="trees">
+        <section id="step" aria-labelledby="step-label">
+          <div class="tree-head"><h2 id="step-label">Product tree</h2><p class="format" id="step-format">STEP</p></div>
+          <p class="extent" id="step-extent"></p>
+          <ul class="tree" id="step-tree" aria-label="STEP products"></ul>
+          <p class="counts" id="step-counts"></p>
+        </section>
+        <section id="iges" aria-labelledby="iges-label">
+          <div class="tree-head"><h2 id="iges-label">Imported tree</h2><p class="format" id="iges-format">IGES</p></div>
+          <p class="extent" id="iges-extent"></p>
+          <ul class="tree" id="iges-tree" aria-label="IGES imported products"></ul>
+          <p class="counts" id="iges-counts"></p>
+          <details><summary>Original IGES directory</summary><ul id="directory"></ul></details>
+        </section>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Sample provenance and format notes</a></footer>
+  </main>
+</body>
+</html>

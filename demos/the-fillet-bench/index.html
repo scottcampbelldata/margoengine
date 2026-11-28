@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a80b1f8e.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e9e0">
+  <meta name="description" content="Compare exact rolling-ball fillets and planar chamfers on the same stock.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/blends-TswTtxZN.bin" as="fetch" crossorigin fetchpriority="high">
+  <title>The Fillet Bench · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-_3Jm4WQc.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DYJsSYPp.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web Demos</span></a></nav>
+    <header>
+      <h1>The Fillet Bench</h1>
+      <p>Round or bevel the same twelve edges. Drag the part to see the difference at a corner.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive B-rep fillet and chamfer">
+      <figure>
+        <canvas id="part" aria-label="Machined block with rounded or bevelled edges. Drag to rotate."></canvas>
+        <p id="status" role="status">Preparing the edge samples…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="stage-tools"><span>Drag to rotate</span><button id="reset" type="button" disabled>Reset view</button></div>
+      </figure>
+      <aside aria-label="Modelling steps and measurements">
+        <fieldset id="operations" disabled>
+          <legend>Edge treatments</legend>
+          <label for="radius">Fillet radius <output id="radius-value" for="radius">8 mm</output></label>
+          <input type="range" id="radius" min="2" max="18" step="2" value="8" data-operation="round">
+          <label for="distance">Chamfer distance <output id="distance-value" for="distance">8 mm</output></label>
+          <input type="range" id="distance" min="2" max="18" step="2" value="8" data-operation="bevel">
+        </fieldset>
+        <p id="feature">Fillet · 8 mm tangent radius</p>
+        <dl>
+          <div><dt>Exact volume</dt><dd><output id="volume">—</output></dd></div>
+          <div><dt>Removed volume</dt><dd><output id="removed">—</output></dd></div>
+          <div><dt>B-rep faces</dt><dd><output id="faces">—</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

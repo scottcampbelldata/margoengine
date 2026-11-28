@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-g3oXH8Kd.js"><script src="./assets/webgl2-preload-704ed0a3.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ece0c8">
+<link rel="icon" href="data:,">
+<title>Pattern Copier · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-CCzimiyJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CGs3_bqe.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>Pattern Copier</h1>
+    <p>Draw a swatch. The overlapping model grows it into a woven field by matching 3 × 3 neighbourhoods.</p>
+  </header>
+  <div class="studio">
+    <section class="editor" aria-labelledby="editor-title">
+      <div class="label">
+        <h2 id="editor-title">Sample swatch</h2>
+        <label for="preset" class="visually-hidden">Sample preset</label>
+        <select id="preset" disabled>
+          <option value="ledger">Ledger</option>
+          <option value="selvedge">Selvedge</option>
+          <option value="basket">Basket</option>
+          <option value="blank">Blank</option>
+        </select>
+      </div>
+      <div id="sample" role="grid" aria-rowcount="12" aria-colcount="12" aria-label="12 by 12 editable sample" aria-describedby="drawing-help"></div>
+      <fieldset id="palette" aria-label="Thread colour"></fieldset>
+      <p id="drawing-help">Tap or drag to draw. Use arrow keys and Space from the keyboard.</p>
+    </section>
+    <section class="result" aria-labelledby="result-title">
+      <div class="label">
+        <h2 id="result-title">Woven field</h2>
+        <div class="seed-controls">
+          <label for="seed">Seed</label>
+          <input id="seed" aria-label="Seed" type="number" inputmode="numeric" min="1" max="999999999" step="1" value="41" disabled>
+          <button type="button" id="next" disabled>New seed</button>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="view" aria-label="Large woven pattern generated from the current sample"></canvas>
+        <div id="notice"><span id="status" role="status">Opening the loom…</span><span id="error" role="alert"></span></div>
+      </div>
+      <footer>
+        <span id="detail" role="status" aria-live="polite">48 × 36 cells</span>
+        <span id="route">Margo Engine</span>
+      </footer>
+    </section>
+  </div>
+</main>
+</body>
+</html>

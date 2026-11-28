@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-ceaa803a.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Move a cutting plane through a shaft seal assembly and expose its hidden edges.">
+  <meta name="theme-color" content="#e9e7df">
+  <title>The Section Saw · Margo Engine</title>
+  <link rel="icon" href="data:,">
+
+  <script type="module" crossorigin src="./assets/index-CHvXDynu.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Ufh735qV.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Section Saw</h1>
+      <p>Slice through a sealed shaft cartridge. The hatched faces show what the plane cuts. Turn on hidden lines to trace the edges behind them.</p>
+    </header>
+    <section aria-label="Interactive cut through a sealed shaft cartridge">
+      <figure>
+        <canvas id="view" aria-label="Sectioned shaft cartridge with a movable cutting plane"></canvas>
+        <figcaption><span>Shaft cartridge</span><span id="cut-label">Along the shaft</span></figcaption>
+        <div id="status" role="status"><strong>Opening the cartridge…</strong><span id="detail"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="plate">
+        <div class="axis" role="group" aria-label="Cut direction">
+          <button id="along" type="button" aria-pressed="true" disabled>Along the shaft</button>
+          <button id="through" type="button" aria-pressed="false" disabled>Across the shaft</button>
+        </div>
+        <div class="scrub">
+          <div class="labels"><label for="cut">Cut position</label><output id="position" for="cut">0 mm</output></div>
+          <input type="range" id="cut" min="-82" max="82" step=".1" value="0" disabled>
+        </div>
+        <div class="details"><label class="tick"><input id="hidden" type="checkbox" disabled> Hidden edges</label>
+          <p><output id="sections">0</output> parts cut</p>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <p>Original cartridge model with a steel shaft, bronze bushings and two elastomer seals.</p>
+      <details><summary>How the section is drawn</summary>
+        <p>The same cutting plane clips the visible surfaces and the edges. Margo uses the solid's stencil winding to fill its section and tests dashed edges against the depth of the remaining assembly.</p>
+        <ul>
+          <li><a href="https://www.asme.org/codes-standards/find-codes-standards/orthographic-and-pictorial-views">ASME Y14.3 sectional and pictorial views</a></li>
+          <li><a href="https://www.parker.com/content/dam/Parker-com/Literature/O-Ring-Division-Literature/ORD-5700.pdf">Parker O-Ring Handbook</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+
+</body>
+</html>

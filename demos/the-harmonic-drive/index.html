@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A working strain-wave gear cutaway in Margo Engine.">
+  <meta name="theme-color" content="#0c1721">
+  <title>The Harmonic Drive · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-By1l07hK.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-EQ8nbCDL.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Harmonic Drive</h1>
+      <p>Turn the oval generator. It presses the copper gear into the fixed ring on two opposite sides. The copper gear turns slowly in reverse.</p>
+    </header>
+    <section class="assembly" aria-label="Strain-wave gear exhibit">
+      <figure aria-label="Interactive cutaway of a strain-wave gear">
+        <canvas id="scene" aria-label="Copper flexspline and oval wave generator in a cutaway gear housing"></canvas>
+        <p id="loading" role="status">Opening the cutaway…</p>
+        <button id="view" type="button" aria-pressed="false" disabled>Front view</button>
+      </figure>
+      <aside aria-label="Strain-wave gear controls">
+        <div class="heading">
+          <label for="turns">Wave generator</label>
+          <output id="input" for="turns">0.08 turns</output>
+        </div>
+        <input id="turns" type="range" value="0.08" min="0" max="30" step="0.01" disabled>
+        <div class="scale" aria-hidden="true"><span>0</span><span>30 turns</span></div>
+        <div class="actions">
+          <button id="step" type="button" disabled>Advance 1 turn</button>
+          <button id="run" type="button" disabled>Run</button>
+        </div>
+        <div class="result">
+          <span id="output-label">Flexspline rotation</span>
+          <output id="output" aria-labelledby="output-label" aria-live="off">−0.96°</output>
+        </div>
+        <div class="facts">
+          <span>Tooth count</span><span>60 flex · 62 fixed</span>
+          <span>Output / input</span><span>−1 / 30</span>
+        </div>
+        <p class="witness">The copper index on the rear flange shows how far the output has turned.</p>
+      </aside>
+    </section>
+    <footer>
+      <p>The two blue marks point to the moving tooth-engagement zones.</p>
+      <details>
+        <summary>Model and sources</summary>
+        <p>The 62-tooth circular spline stays fixed. Every turn of the generator moves the 60-tooth flexspline backward by two of its own teeth, or 12°. The cutaway uses an ideal elliptical deformation and simplified tooth flanks.</p>
+        <ul>
+          <li><a href="https://patents.google.com/patent/US2906143A/en">C. Walton Musser’s original strain-wave gearing patent</a></li>
+          <li><a href="https://www.harmonicdrive.net/technology">Harmonic Drive LLC’s operating principle</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

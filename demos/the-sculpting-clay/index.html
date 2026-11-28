@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sculpt a clay study by hand and transfer its surface into a normal map on a lighter mesh.">
+  <meta name="theme-color" content="#e9e0d3">
+  <link rel="icon" href="data:,">
+  <title>The Sculpting Clay · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-lbWqX7ih.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cz-JRW_Z.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine</a><span></span>Web demos</nav>
+    <header>
+      <h1>The Sculpting Clay</h1>
+      <p>Shape the clay, then see how much detail a normal map can carry onto a lighter mesh.</p>
+    </header>
+    <section class="studio" aria-label="Clay studio">
+      <figure>
+        <canvas id="clay" tabindex="0" aria-label="Clay on a turntable. Drag over the clay to sculpt. Press Enter to apply the brush at the center." aria-describedby="instruction"></canvas>
+        <div class="view-legend"><span id="view-name">Original clay</span><span id="mesh-count">…</span></div>
+        <div id="brush-cursor" aria-hidden="true" hidden></div>
+        <div id="status" role="status"><strong>Opening the studio…</strong><span id="error"></span><a id="requirements" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Sculpting and baking controls">
+        <fieldset id="tools" disabled>
+          <legend>Brush</legend>
+          <div class="choices">
+            <button type="button" data-brush="draw" aria-pressed="true">Raise</button>
+            <button type="button" data-brush="carve" aria-pressed="false">Carve</button>
+            <button type="button" data-brush="smooth" aria-pressed="false">Smooth</button>
+          </div>
+          <label class="line" for="size">Brush diameter <output id="diameter" for="size">25%</output></label>
+          <input id="size" type="range" min="12" max="46" value="25" aria-label="Brush diameter as percentage of the clay diameter">
+          <div class="actions"><button type="button" id="undo" disabled>Undo stroke</button><button type="button" id="turn">Turn clay ↻</button></div>
+          <p class="hint" id="instruction">Drag over the clay to make a stroke.</p>
+        </fieldset>
+        <fieldset id="baking" disabled>
+          <legend>Surface transfer</legend>
+          <div class="choices" id="views">
+            <button type="button" data-view="high" aria-pressed="true">Sculpt</button>
+            <button type="button" data-view="low" aria-pressed="false">Low poly</button>
+            <button type="button" data-view="baked" aria-pressed="false" disabled>Baked</button>
+          </div>
+          <div id="result">
+            <canvas id="normal" width="256" height="128" aria-label="Tangent-space normal map" hidden></canvas>
+            <div><button type="button" id="bake">Bake normal map</button><p class="hint" id="bake-readout" role="status">256 × 128 pixels</p><a id="download" download="sculpting-clay-normal.png" hidden>Download PNG</a></div>
+          </div>
+        </fieldset>
+      </aside>
+    </section>
+    <footer>
+      <p>Normal maps keep the low-poly outline and change how its surface catches the light.</p>
+      <details><summary>How the bake works</summary><p>Margo casts rays along the lighter mesh’s normals and finds the nearest detail on the clay. It writes the sampled directions into a texture that the lighter mesh can use to shade.</p><p><a href="https://page.mi.fu-berlin.de/block/htw-lehre/wise2012_2013/bel_und_rend/skripte/mikkelsen2008.pdf">Morten Mikkelsen on tangent-space normal maps</a>.</p></details>
+    </footer>
+  </main>
+</body>
+</html>

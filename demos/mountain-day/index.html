@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Scrub a full day of changing sun, clouds and stars over an alpine range in Margo Engine.">
+  <meta name="theme-color" content="#e7ebe5">
+  <title>Mountain Day · Margo Engine</title>
+  <link rel="icon" href="data:,">
+
+  <link rel="preload" as="fetch" href="./assets/silverpass-opening-cibFPNps.height" crossorigin>
+  <script type="module" crossorigin src="./assets/index-v-sVMjRu.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DMWsLGY7.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>Mountain Day</h1>
+      <p>One day above Silverpass. Scrub from first light through the afternoon clouds to a sky full of stars.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive time over the Silverpass range">
+      <figure>
+        <canvas id="opening-canvas" aria-label="Alpine peaks and glacial valley under a changing sky"></canvas>
+        <canvas id="full-canvas" aria-label="Alpine peaks, glacial valley and forest under a changing sky" aria-hidden="true"></canvas>
+        <figcaption><span>Silverpass Range</span><span id="phase">Dawn</span></figcaption>
+        <div id="status" role="status"><strong id="status-title">Opening Silverpass…</strong><span id="error-reason"></span><a id="webgpu-help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="timeline">
+        <div class="play"><button type="button" id="play" disabled>Play 40-second day</button></div>
+        <div class="scrub">
+          <div class="row"><label for="time">Local solar time</label><output id="clock" for="time">06:55</output></div>
+          <input id="time" type="range" min="0" max="40" step=".01" value="3.55" disabled>
+          <div class="beats" aria-label="Jump to time of day">
+            <button type="button" data-phase="dawn" disabled>Dawn</button>
+            <button type="button" data-phase="clouds" disabled>Cumulus</button>
+            <button type="button" data-phase="sunset" disabled>Sunset</button>
+            <button type="button" data-phase="stars" disabled>Stars</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <footer>
+      <div><p>Silverpass is a fictional range at 44.4° north. The sun follows an equinox day.</p><p id="detail-status" role="status" hidden>Finishing the clouds, haze and forest detail…</p></div>
+      <details>
+        <summary>Landscape and sky model</summary>
+        <p>The mountains and conifers were built in code. Margo renders the terrain, volumetric clouds and distance haze in real time. Cloud growth is a designed daily cycle.</p>
+        <ul>
+          <li><a href="https://www.usgs.gov/geology-and-ecology-of-national-parks/geology-grand-teton-national-park">USGS Teton geology and glacial forms</a></li>
+          <li><a href="https://doi.org/10.1111/cgf.14050">Hillaire’s atmosphere rendering paper</a></li>
+          <li><a href="https://gml.noaa.gov/grad/solcalc/solareqns.PDF">NOAA solar position equations</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+
+</body>
+</html>

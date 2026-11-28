@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-DjWs8I95.js"><link rel="modulepreload" crossorigin href="./assets/scene-DmbpRe7b.js">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e9e6dd">
+  <meta name="description" content="Drop two odd shapes onto a ramp and inspect the mass their compound colliders compute.">
+  <link rel="icon" href="data:,">
+  <title>Compound Shapes · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BPhuf7bH.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BVGTuae9.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Mass properties</span></nav>
+    <header>
+      <h1>Compound Shapes</h1>
+      <p>Release two built-up shapes and watch how their mass and shape affect the tumble.</p>
+    </header>
+    <section id="exhibit" aria-label="Interactive compound collider study">
+      <div class="controls">
+        <span id="motion">Preparing the ramp…</span>
+        <div>
+          <button type="button" id="release" disabled>Release both <span aria-hidden="true">↘</span></button>
+          <button type="button" id="reset" disabled>Reset</button>
+        </div>
+      </div>
+      <div class="stage">
+        <canvas id="canvas" role="img" aria-label="Two sculptural metal forms above a sloping industrial test deck. A gold cross marks the selected center of mass."></canvas>
+        <p id="status" role="status">Loading the compound colliders…</p>
+      </div>
+      <div class="measurement">
+        <div class="choices" role="group" aria-label="Inspect a shape">
+          <button type="button" id="fork" aria-pressed="true" disabled>Fork</button>
+          <button type="button" id="elbow" aria-pressed="false" disabled>Elbow</button>
+        </div>
+        <dl aria-label="Selected compound measurements">
+          <div><dt>Mass</dt><dd id="mass">—</dd></div>
+          <div><dt>Center of mass X/Y/Z</dt><dd id="center">—</dd></div>
+          <div><dt>Principal moments</dt><dd id="inertia">—</dd></div>
+        </dl>
+      </div>
+    </section>
+    <details>
+      <summary>How the masses are computed</summary>
+      <p>Each object joins seven solid pieces into one rigid collider. The solver uses the size, density and offset of each piece to compute its whole mass, center of mass and resistance to turning. Both receive the same initial twist and fall onto the same ramp.</p>
+    </details>
+  </main>
+</body>
+</html>

@@ -1,0 +1,60 @@
+export const aperture=.144;
+export const arcRadius=.89;
+export const rise=.094;
+export const minAngle=-25;
+export const maxAngle=25;
+export const entry=Object.freeze([.238,.318,.444].map((fraction)=>aperture*fraction));
+export const mirrorCenter=Object.freeze([0,.570,-.486]);
+
+const root2=Math.sqrt(2),root3=Math.sqrt(3),root6=Math.sqrt(6);
+export const axes=Object.freeze([
+  Object.freeze([1/root2,-1/root2,0]),
+  Object.freeze([1/root6,1/root6,-2/root6]),
+  Object.freeze([1/root3,1/root3,1/root3]),
+]);
+export const dot=(a,b)=>a.reduce((sum,part,i)=>sum+part*b[i],0);
+export const subtract=(a,b)=>a.map((part,i)=>part-b[i]);
+export const add=(a,b)=>a.map((part,i)=>part+b[i]);
+export const scale=(a,b)=>a.map((part)=>part*b);
+export const unit=(a)=>scale(a,1/Math.hypot(...a));
+export const addScaled=(a,b,t)=>a.map((part,i)=>part+b[i]*t);
+const sum=(a)=>a[0]+a[1]+a[2];
+
+export function directionToWorld(local){
+  return axes.map((axis)=>dot(axis,local));
+}
+function directionToLocal([x,y,z]){
+  return axes[0].map((a,i)=>x*a+y*axes[1][i]+z*axes[2][i]);
+}
+export function pointToWorld(local){
+  return addScaled(add(mirrorCenter,directionToWorld(local)),[0,0,1],-aperture/root3);
+}
+
+export function traceRetroreflector(degrees){
+  const azimuth=degrees*Math.PI/180;
+  const relative=[arcRadius*Math.sin(azimuth),rise,arcRadius*Math.cos(azimuth)];
+  const lamp=add(pointToWorld(entry),relative);
+  const incoming=scale(unit(directionToLocal(relative)),-1);
+  let position=entry;
+  const direction=[...incoming],hits=[];
+  for(let step=0;step<=3;step++){
+    const along=sum(direction);
+    const apertureTime=along>0?(aperture-sum(position))/along:Infinity;
+    const times=direction.map((part,axis)=>part<0?-position[axis]/part:Infinity);
+    const time=Math.min(...times);
+    if(apertureTime<time){
+      const exit=addScaled(position,direction,apertureTime);
+      const outgoing=directionToWorld(direction);
+      const exitWorld=pointToWorld(exit);
+      const receiver=addScaled(exitWorld,outgoing,dot(subtract(lamp,exitWorld),outgoing));
+      return {lamp,incoming,hits,exit,direction,outgoing,receiver,offset:Math.hypot(...subtract(receiver,lamp))};
+    }
+    if(!Number.isFinite(time))break;
+    const axis=times.indexOf(time);
+    position=addScaled(position,direction,time);
+    position[axis]=0;
+    direction[axis]=-direction[axis];
+    hits.push({axis,position,direction:[...direction]});
+  }
+  throw new Error('Ray did not reach the entrance plane');
+}

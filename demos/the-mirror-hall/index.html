@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-m4ZNgt2Z.js"><script src="./assets/inline-f6f154ab.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#141919">
+<meta name="description" content="Compare screen-space and ray-traced reflections in a live Margo Engine gallery.">
+<link rel="icon" href="data:,">
+<title>The Mirror Hall · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-D6Eev6O6.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CBiAK2fc.css">
+</head>
+<body>
+<main>
+  <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Reflection study</span></nav>
+  <header><h1>The Mirror Hall</h1><p>Tilt the camera until the red sculpture leaves the frame. Watch what happens in the floor.</p></header>
+  <figure id="hall">
+    <div class="stage">
+      <canvas id="view" role="img" aria-label="Two synchronized views of a travertine gallery with a suspended red sculpture over a mirror floor"></canvas>
+      <div class="labels" aria-hidden="true"><span>Screen-space</span><span>Ray-traced</span></div>
+      <p id="status" role="status">Opening the gallery…</p>
+    </div>
+    <figcaption>
+      <div class="topline"><label for="tilt">Camera tilt <output id="angle" for="tilt">9°</output></label><p id="visibility">Sculpture in frame</p></div>
+      <input id="tilt" type="range" min="7" max="34" step="1" value="9" disabled>
+      <div class="ends" aria-hidden="true"><span>Look ahead</span><span>Look down</span></div>
+    </figcaption>
+  </figure>
+  <section class="methods" aria-label="Reflection methods">
+    <div><h2>Screen-space</h2><p>Searches the image that the camera already sees.</p></div>
+    <div><h2>Ray-traced</h2><p>Traces rays against the gallery geometry, including objects outside the camera’s view.</p></div>
+  </section>
+  <details><summary>About the comparison</summary><p>Both sides use the same camera, materials and lighting. The ray-traced view uses a single reflection bounce. On WebGPU it fills gaps in the screen-space result. On WebGL2 it traces one ray from each visible mirror point.</p></details>
+</main>
+</body>
+</html>

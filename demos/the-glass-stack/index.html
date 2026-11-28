@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><script src="./assets/inline-0afa3fe2.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#22252c">
+<link rel="icon" href="data:,">
+<title>The Glass Stack · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CBrTRTUH.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DC55gL7Y.css">
+</head>
+<body><main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>The Glass Stack</h1><p>Turn an installation of crossed glass panes and colored smoke. Compare how three transparency methods handle the overlapping layers.</p></header>
+<section class="exhibit" aria-label="Glass and smoke transparency exhibit">
+  <figure>
+    <div class="view">
+      <canvas id="art" aria-label="Intersecting amber, rose and cyan glass panes with translucent smoke on a circular platform" tabindex="0"></canvas>
+      <p id="loading" role="status">Opening the glass gallery…</p><p id="error" role="alert" hidden></p>
+    </div>
+    <figcaption><span>Crossed panes</span><span>4 glass panes · 8 smoke sheets</span></figcaption>
+  </figure>
+  <aside>
+    <fieldset id="controls" disabled>
+      <legend>Transparency method</legend>
+      <div class="modes"><button type="button" data-mode="weighted" aria-pressed="true">Weighted</button><button type="button" data-mode="moments" aria-pressed="false">Moment</button><button type="button" data-mode="exact" aria-pressed="false">Exact</button></div>
+      <label for="angle"><span>Turntable angle</span><output id="angle-value" for="angle">16°</output></label>
+      <input id="angle" type="range" min="-105" max="105" step="1" value="16">
+      <div class="switches">
+        <label><input id="smoke" type="checkbox" checked> Colored smoke</label>
+        <label><input id="reverse" type="checkbox"> Reverse draw order</label>
+      </div>
+    </fieldset>
+    <p id="method">Weighted blending accumulates transparent color and coverage without sorting the panes.</p>
+    <p class="tip">Drag the artwork to turn it, or reverse the draw order without moving anything.</p>
+  </aside>
+</section>
+<footer><a href="./source/README.md">Transparency methods</a></footer>
+</main></body></html>

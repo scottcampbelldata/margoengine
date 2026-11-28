@@ -1,0 +1,55 @@
+@charset "UTF-8";
+:root{color-scheme:dark;background:#22231f;color:#f2eadb;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(calc(100% - 64px),1340px);margin:auto;padding:21px 0 23px}
+nav{display:flex;gap:.57rem;color:#9d9a87;font-size:.76rem}
+nav a,footer a{color:#cbc0a8;text-decoration:none}
+nav a:hover,footer a:hover{text-decoration:underline}
+header{margin:21px 0 20px}
+header h1{font:400 clamp(3rem,5.95vw,5.27rem)/.98 Georgia,serif;letter-spacing:-.048em;margin:0 0 10px}
+header p{margin:0;color:#d6cbb8;max-width:70ch;line-height:1.48}
+.workshop{display:grid;grid-template-columns:minmax(0,1.015fr) minmax(0,1fr);gap:22px}
+figure{margin:0;position:relative;overflow:hidden;border:1px solid #7d705e;background:#605649}
+canvas{width:100%;height:clamp(445px,43vw,600px);display:block}
+#loading,#error{position:absolute;left:11px;bottom:11px;margin:0;max-width:calc(100% - 22px);background:#34342c;padding:.66rem .8rem;border:1px solid #8f846c;font-size:.81rem}
+#error{color:#ffd7c1}
+fieldset{border:0;min-width:0;padding:0;margin:10px 0 0}
+legend{padding:0;color:#c9c1af;font-size:.82rem}
+legend output{color:#f5d6a0;margin-left:6px;font-variant-numeric:tabular-nums}
+#roughness{height:30px;width:100%;margin:0;accent-color:#dec18b}
+.scale{display:flex;justify-content:space-between;color:#c7bba6;font-size:.75rem;margin-top:1px}
+.specimen-actions{display:flex;align-items:center;gap:10px;margin-top:9px}
+.specimen-actions span{color:#ccc3b1;font-size:.74rem}
+button{min-height:42px;padding:6px 12px;color:#f1e6d2;border:1px solid #85765d;background:#393a31;border-radius:2px;font:600 .82rem system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+button[aria-pressed=true]{background:#d9bb86;border-color:#d9bb86;color:#29291f}
+button:disabled{cursor:default;opacity:.62}
+button:not(:disabled):hover{background:#514e3d}
+button[aria-pressed=true]:not(:disabled):hover{background:#ecd5ad}
+button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #e2c189;outline-offset:2px}
+.graph-header{display:flex;align-items:center;justify-content:space-between;min-height:37px;gap:8px}
+.graph-header h2{margin:0;font:400 1.49rem Georgia,serif;white-space:nowrap}
+.graph-header button{min-height:35px}
+.connection-help{margin:5px 0 9px;color:#c3baa6;font-size:.76rem;line-height:1.36}
+#graph{height:clamp(480px,42vw,605px);overflow:hidden;position:relative;border:1px solid #756a55;background:#2a2a25}
+#graph>[data-margo-node-editor]{height:100%}
+details{margin-top:8px;border-top:1px solid #575044;border-bottom:1px solid #575044}
+summary{padding:10px 0;color:#e9d3a8;font-size:.80rem;cursor:pointer}
+pre{margin:0 0 10px;padding:12px;max-height:310px;overflow:auto;background:#1b1d1a;color:#e3d5b5;border:1px solid #4c4639;font:12px/1.45 ui-monospace,monospace;tab-size:2;}
+footer{display:flex;flex-wrap:wrap;gap:7px 15px;margin-top:13px;padding-top:11px;border-top:1px solid #554f42;font-size:.74rem}
+@media(max-width:960px){
+  main{width:calc(100% - 26px);padding:16px 0}
+  header{margin:17px 0 14px}
+  header h1{font-size:clamp(2.7rem,9.95vw,4.75rem);margin-bottom:7px}
+  header p{font-size:.89rem}
+  .workshop{display:block}
+  .workbench{margin-top:17px}
+  canvas{height:clamp(325px,48svh,540px)}
+  #graph{height:575px}
+  .specimen-actions{margin-top:6px}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+}
+@media(max-width:405px){
+  .graph-header h2{font-size:1.35rem}
+  .specimen-actions span{font-size:.70rem}
+}

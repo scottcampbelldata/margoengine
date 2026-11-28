@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-C6KxAl5L.js"><script src="./assets/webgl2-preload-711297fb.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14282e">
+<link rel="icon" href="data:,">
+<title>The Hex Map · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-09lOxzes.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CMAXCFJT.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Hex Map</h1>
+    <p>Lead a survey team through a coastal range. Ridges block sight, and every new route fills in the chart.</p>
+  </header>
+  <section aria-label="Survey map">
+    <div class="actions">
+      <button id="beacon" type="button" disabled>West Beacon</button>
+      <button id="summit" type="button" disabled>Observatory</button>
+      <button id="reset" type="button" disabled>Reset survey</button>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Three-dimensional field map of a coast, mountain range and survey routes" aria-describedby="note"></canvas>
+        <div id="notice">
+          <p id="status" role="status">Opening the survey chart…</p><p id="error" role="alert"></p>
+        </div>
+      </div>
+      <figcaption>
+        <p id="note">Choose a landmark or tap a land tile to chart a route.</p>
+        <span id="route">Margo Engine</span>
+      </figcaption>
+    </figure>
+    <div class="index">
+      <dl>
+        <div><dt>In sight</dt><dd id="visible">—</dd></div>
+        <div><dt>Surveyed</dt><dd id="surveyed">—</dd></div>
+        <div><dt>Route cost</dt><dd id="cost">—</dd></div>
+      </dl>
+      <ul aria-label="Fog of war legend">
+        <li><i></i> In sight</li><li><i></i> Previously seen</li><li><i></i> Unseen</li>
+      </ul>
+    </div>
+    <p class="terms">Trail costs 1 to cross, meadow 2 and woods 3. Water and ridges are impassable.</p>
+    <p id="announcement" class="visually-hidden" role="status"></p>
+  </section>
+</main>
+</body>
+</html>

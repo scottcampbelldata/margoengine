@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-79624bb3.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e7e6db">
+  <link rel="icon" href="data:,">
+  <title>The Measuring Room · Margo Engine</title>
+  <link rel="preload" href="./assets/coupon-DKYM0nWL.bin" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-Bgnq-vQE.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D37aKLwS.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header>
+      <h1>The Measuring Room</h1>
+      <p>Take dimensions from a machined gauge block. A leader line follows each point as you turn the part.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive measuring station">
+      <figure>
+        <canvas id="part" aria-label="Machined gauge block with two bored holes and a sloped face"></canvas>
+        <p id="status" role="status">Preparing the gauge block…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="overlay"><span>Tap to measure · drag to turn</span><button id="reset" type="button" disabled>Reset view</button></div>
+      </figure>
+      <aside>
+        <fieldset id="tools" disabled>
+          <legend>Measure</legend>
+          <button data-tool="distance" type="button" aria-pressed="true">Distance</button>
+          <button data-tool="angle" type="button" aria-pressed="false">Angle</button>
+          <button data-tool="radius" type="button" aria-pressed="false">Radius</button>
+        </fieldset>
+        <p id="guide">Pick two points. Nearby edges and corners are used when available.</p>
+        <div class="reading">
+          <span id="kind">Distance</span>
+          <output id="measure" aria-live="polite">—</output>
+        </div>
+        <button id="reference" type="button" disabled>Measure block width</button>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

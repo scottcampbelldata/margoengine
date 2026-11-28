@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-_jdgY9YU.js"><script src="./assets/inline-08fe1aa6.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#191d26">
+<link rel="icon" href="data:,">
+<title>The Lens Kit · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-DnlcD-sa.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DCR9zAx6.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>The Lens Kit</h1>
+    <p>Look down the ferry pier after dark. Change the lens and follow the lights across the image.</p>
+  </header>
+  <section aria-label="Camera lens comparison">
+    <div class="controls">
+      <fieldset>
+        <legend>Lens</legend>
+        <button type="button" data-look="clear" aria-pressed="true" disabled>Clear</button>
+        <button type="button" data-look="flare" aria-pressed="false" disabled>Flare</button>
+        <button type="button" data-look="streak" aria-pressed="false" disabled>Streak</button>
+        <button type="button" data-look="vintage" aria-pressed="false" disabled>Vintage</button>
+      </fieldset>
+      <label class="pan">
+        <span>Pan camera</span>
+        <input id="pan" type="range" min="-11" max="11" value="0" step="1" disabled>
+        <output id="bearing" for="pan">0°</output>
+      </label>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="A deserted ferry pier at night with bright pier lights and amber ticket windows." aria-describedby="explanation"></canvas>
+        <div id="notice"><p id="status" role="status">Setting up the camera…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p id="explanation">The reference view shows the lights with the lens effects off.</p>
+        <span id="setting">Reference image</span>
+      </figcaption>
+    </figure>
+  </section>
+  <footer><span>Fixed exposure · AgX</span><span id="renderer">Margo Engine</span></footer>
+</main>
+</body>
+</html>

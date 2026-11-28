@@ -1,0 +1,1 @@
+async function e(e){let[t]=await Promise.all([import(`./dist-sX70Q7RI.js`),import(`./device-B9Upwluw.js`).then(e=>e.t)]);return t.install({force:!0,signal:e})}export{e as installCompatibility};

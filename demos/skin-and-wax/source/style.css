@@ -1,0 +1,42 @@
+@charset "UTF-8";
+:root{color-scheme:dark;background:#171b1a;color:#f4eee1;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(calc(100% - 64px),1318px);margin:auto;padding:22px 0 25px}
+nav{display:flex;gap:.65rem;align-items:center;color:#8d9c94;font-size:.75rem}
+nav a,footer a{color:#bacec0;text-decoration:none}
+nav a:hover,footer a:hover{text-decoration:underline}
+header{margin:23px 0 18px}
+h1{font:400 clamp(3rem,6.5vw,5.35rem)/.97 Georgia,serif;letter-spacing:-.055em;margin:0 0 12px}
+header p{margin:0;color:#c9cec4;line-height:1.45}
+figure{position:relative;overflow:hidden;margin:0;border:1px solid #637368;background:#1f2625}
+canvas{width:100%;height:clamp(380px,50vw,614px);display:block}
+#loading,#error{position:absolute;left:13px;bottom:13px;max-width:calc(100% - 26px);margin:0;background:#161e1b;padding:.67rem .8rem;border:1px solid #64766c;font-size:.82rem}
+#error{color:#ffd9d2}
+.workbench{display:grid;grid-template-columns:auto minmax(220px,1fr) minmax(175px,1fr);align-items:start;gap:21px;padding:13px 0;border-bottom:1px solid #47564c}
+fieldset{padding:0;margin:0;border:0;min-width:0}
+legend{margin:0 0 7px;padding:0;color:#b0bdb2;font-size:.77rem}
+output{font-variant-numeric:tabular-nums;margin-left:8px;color:#e1d5a0}
+.specimens{display:flex;gap:8px;flex-wrap:wrap}
+button{min-height:44px;padding:0 14px;border:1px solid #526a5d;border-radius:3px;background:#27352e;color:#edf3ed;font:600 .84rem system-ui,sans-serif;cursor:pointer}
+button[aria-pressed=true]{background:#d8e1cb;color:#202c23;border-color:#d8e1cb}
+button:disabled{opacity:.63;cursor:default}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #edcd92;outline-offset:3px}
+input{accent-color:#d9e4c7}
+#light{width:100%;margin:0;height:25px}
+.axis{display:flex;justify-content:space-between;font-size:.69rem;color:#adbaaf}
+.aux{padding-top:7px}
+label{display:flex;align-items:center;gap:7px;min-height:34px;font:600 .84rem system-ui,sans-serif}
+label input{width:17px;height:17px;margin:0}
+#sample-description{margin:0;font-size:.75rem;line-height:1.4;color:#b1beb1}
+footer{padding-top:12px;display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.75rem}
+@media(max-width:760px){
+  main{width:calc(100% - 28px);padding:17px 0 20px}
+  header{margin:19px 0 15px}
+  h1{font-size:clamp(3rem,12vw,4.8rem)}
+  header p{font-size:.9rem}
+  canvas{height:clamp(348px,47svh,500px)}
+  .workbench{grid-template-columns:1fr;gap:10px;padding:10px 0}
+  .aux{display:flex;align-items:center;gap:12px;padding-top:0}
+  .aux label{white-space:nowrap}
+}

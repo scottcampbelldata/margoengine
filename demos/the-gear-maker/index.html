@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><link rel="modulepreload" crossorigin href="./assets/scene-CMYA2iEm.js"><script src="./assets/webgl2-preload-768dc889.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#252b30">
+<link rel="icon" href="data:,">
+<title>The Gear Maker · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Bnb4Ehjp.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bhfs6T2X.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>The Gear Maker</h1><p>Cut a fresh set of involute wheels by changing the tooth counts. Turn the input and see both stages mesh at the correct ratio.</p></header>
+<section class="exhibit" aria-label="Interactive compound spur gear train">
+<figure><div class="view"><canvas id="bench" aria-label="Four generated spur gears on three shafts in a machined fixture" tabindex="0"></canvas>
+<p id="loading" role="status">Fitting the gear train…</p><p id="error" role="alert" hidden></p></div>
+<figcaption><span>Two meshes · One compound shaft</span><a href="./source/README.md">Tooth geometry</a></figcaption>
+</figure>
+<aside><fieldset id="controls" disabled>
+<legend>Compound train</legend>
+<button type="button" id="alternate">Fit a closer ratio</button>
+<div class="counts">
+<label>Input A<input type="number" min="18" max="38" step="1" id="a" value="20"></label>
+<label>Driven B<input type="number" min="23" max="52" step="1" id="b" value="39"></label>
+<label>Stud C<input type="number" min="18" max="36" step="1" id="c" value="23"></label>
+<label>Output D<input type="number" min="25" max="53" step="1" id="d" value="48"></label>
+</div>
+<dl><div><dt>Output per input turn</dt><dd id="ratio">–</dd></div><div><dt>Gear reduction</dt><dd id="reduction">–</dd></div></dl>
+<div class="modes"><button data-mode="all" aria-pressed="true" type="button">Both</button><button data-mode="first" aria-pressed="false" type="button">First mesh</button><button data-mode="second" aria-pressed="false" type="button">Second mesh</button></div>
+<label for="rotation">Input rotation <output id="rotation-value" for="rotation">0°</output></label>
+<input type="range" id="rotation" min="0" max="360" step="1" value="0">
+<label class="motion"><input type="checkbox" id="running" checked> Run the train</label>
+<p id="status" role="status">Both meshes drive from the same compound shaft.</p>
+</fieldset></aside>
+</section>
+</main></body></html>

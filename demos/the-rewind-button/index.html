@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/solver-CdpdeVA4.js"><link rel="modulepreload" crossorigin href="./assets/scene-Blu-881l.js">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#211e1e">
+<link rel="icon" href="data:,">
+<link rel="modulepreload" href="./assets/solver-BxU8e-qZ.js">
+<title>The Rewind Button · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-D6zmlzJD.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-XvKA_Rky.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Rewind Button</h1>
+    <p>Roll a brass drum into a stack of ceramic crates. Slide back through the pile-up using the physics engine’s saved state.</p>
+  </header>
+  <section aria-label="Physics rewind">
+    <div class="actions"><button id="run" type="button" disabled>Run pile-up</button><span id="route">Margo Engine</span></div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Brass roller and stacked ceramic crates in a kiln transfer yard" aria-describedby="hint"></canvas>
+        <div id="notice"><p id="status" role="status">Opening the transfer yard…</p><p id="error" role="alert"></p></div>
+      </div>
+    </figure>
+    <div class="panel">
+      <label>Timeline <output id="time" for="timeline">0.00 s</output>
+        <input type="range" min="0" max="168" step="1" id="timeline" value="0" disabled>
+      </label>
+      <dl>
+        <div><dt>Rigid bodies</dt><dd id="bodies">—</dd></div>
+        <div><dt>Saved checkpoints</dt><dd id="checkpoints">—</dd></div>
+      </dl>
+    </div>
+    <p id="hint">Start the roller to record the pile-up.</p>
+  </section>
+</main>
+</body>
+</html>

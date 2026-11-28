@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DEYPhxET.js"><script src="./assets/inline-878e6448.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e7e9df">
+  <meta name="description" content="Move the climate controls and watch four biomes redistribute across a 3D atlas.">
+  <link rel="icon" href="data:,">
+  <title>The Biome Map · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-D2FInvMT.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cuk-rJU_.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Climate atlas</span></nav>
+    <header>
+      <h1>The Biome Map</h1>
+      <p>Change temperature and rainfall. Watch forests, grasslands, tundra and desert shift across the land.</p>
+    </header>
+    <section id="exhibit" aria-label="Climate model">
+      <div class="visual">
+        <canvas id="view" role="img" aria-label="Relief atlas of a fictional continent, colored by biome"></canvas>
+        <div class="direction" aria-label="North indicated on the map"><span aria-hidden="true">↑</span> N</div>
+        <p id="status" role="status">Classifying the landscape…</p>
+      </div>
+      <div class="adjustments">
+        <div class="control">
+          <div><label for="temp">Sea-level temperature</label><output id="temp-value" for="temp">13 °C</output></div>
+          <input id="temp" type="range" min="-3" max="27" step="1" value="13" disabled>
+        </div>
+        <div class="control">
+          <div><label for="rain">Baseline annual rainfall</label><output id="rain-value" for="rain">790 mm</output></div>
+          <input id="rain" type="range" min="120" max="1540" step="10" value="790" disabled>
+        </div>
+      </div>
+      <dl class="legend" aria-label="Share of total land by biome">
+        <div class="forest"><dt>Forest</dt><dd id="share-0">—</dd></div>
+        <div class="grass"><dt>Grassland</dt><dd id="share-1">—</dd></div>
+        <div class="tundra"><dt>Tundra</dt><dd id="share-2">—</dd></div>
+        <div class="desert"><dt>Desert</dt><dd id="share-3">—</dd></div>
+      </dl>
+    </section>
+    <details>
+      <summary>How the map works</summary>
+      <p>The climate model cools high ground and moves moisture from west to east. Elevation and the downwind rain shadow make local conditions differ from the two controls. The percentages represent blended shares of land on this fictional atlas.</p>
+    </details>
+  </main>
+</body>
+</html>

@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./dist-DDVdCfjj.js","./index-BXMXV5Zn.js","./index-BiNab-5B.css"])))=>i.map(i=>d[i]);
+import{t as e}from"./index-BXMXV5Zn.js";async function t(){let{install:t}=await e(async()=>{let{install:e}=await import(`./dist-DDVdCfjj.js`);return{install:e}},__vite__mapDeps([0,1,2]),import.meta.url);await t({force:!0})}export{t as enableCompatibility};

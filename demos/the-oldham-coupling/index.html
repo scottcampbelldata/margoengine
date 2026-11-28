@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e4e9eb">
+<meta name="description" content="Offset two parallel shafts and watch an Oldham coupling transmit the same rotation as its middle disk orbits.">
+<link rel="icon" href="data:,">
+<title>The Oldham Coupling · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Br_YWTAU.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cna9Y8d9.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Oldham Coupling</h1>
+    <p>Raise one shaft and turn the other. Two crossed sliding joints let both shafts turn together while the copper disk orbits.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="An Oldham coupling with two offset parallel shafts, machined silver hubs, and a copper center disk with perpendicular tongues"></canvas>
+      <p id="loading" role="status">Starting the coupling…</p>
+      <div class="view">
+        <button type="button" id="explode" aria-pressed="false" disabled>Exploded view</button>
+        <button type="button" id="reverse" aria-pressed="false" hidden disabled>Other side</button>
+      </div>
+      <figcaption id="legend"><span><i aria-hidden="true"></i> Disk center orbit</span></figcaption>
+    </figure>
+    <section class="controls" aria-label="Coupling controls">
+      <div class="dial"><label for="offset">Shaft offset</label><output id="offset-value" for="offset">84 mm</output></div>
+      <input id="offset" type="range" min="0" max="104" step="1" value="84" disabled>
+      <div class="ticks" aria-hidden="true"><span>Aligned</span><span>104 mm</span></div>
+      <div class="second"><label for="turn">Input rotation</label><output id="input-turn" for="turn">35°</output></div>
+      <input id="turn" type="range" min="0" max="360" step="1" value="35" disabled>
+      <div class="ticks" aria-hidden="true"><span>0°</span><span>360°</span></div>
+      <button type="button" id="play" disabled>Play a turn<span aria-hidden="true">▷</span></button>
+      <dl>
+        <div><dt>Output rotation</dt><dd id="output-turn">—</dd></div>
+        <div><dt>Disk orbit radius</dt><dd id="orbit">—</dd></div>
+      </dl>
+      <p class="caption">The disk center makes two circuits for each turn of the shafts.</p>
+    </section>
+  </article>
+  <footer><p>Parallel shafts with an ideal 1:1 angular ratio.</p><a href="./source/README.md">Model and sources</a></footer>
+</main>
+</body>
+</html>

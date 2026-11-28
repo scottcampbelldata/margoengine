@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-acecf014.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18272e">
+  <meta name="description" content="Pull apart a precision eight-leaf optical iris and identify every part.">
+  <title>The Exploded Assembly · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/iris-DFaLbUDW.mesh" as="fetch" crossorigin>
+
+  <script type="module" crossorigin src="./assets/index-NvphH0U7.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B3-PnDTx.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Exploded Assembly</h1>
+      <p>Pull an eight-leaf optical iris apart. Hover or tap a component to see where it fits.</p>
+    </header>
+    <section aria-label="Exploded optical iris assembly">
+      <figure>
+        <canvas id="view" aria-label="Optical iris assembly with individually selectable parts"></canvas>
+        <figcaption><span>Optical iris</span><span id="name">Move over a part</span></figcaption>
+        <div id="status" role="status"><strong>Opening the iris…</strong><span id="detail"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="controls">
+        <div class="slider">
+          <div class="row"><label for="spread">Assembly spread</label><output id="distance" for="spread">0.0 mm</output></div>
+          <input id="spread" type="range" min="0" max="100" value="16" step=".1" disabled>
+        </div>
+        <div class="buttons" role="group" aria-label="Assembly positions">
+          <button type="button" id="explode" disabled>Explode</button>
+          <button type="button" id="assemble" disabled>Assemble</button>
+        </div>
+        <label class="part">Part<select id="part" disabled><option value="">Select a part</option></select></label>
+      </div>
+    </section>
+    <footer>
+      <p>Eight overlapping leaves create the iris opening. Each component follows its own direction as the assembly opens.</p>
+      <details><summary>Model and drawing references</summary>
+        <p>All parts are exact solids tessellated from original CAD profiles. The iris opening stays fixed while the components separate along their authored assembly axes.</p>
+        <ul><li><a href="https://patents.google.com/patent/US6912097B2/en">Iris diaphragm and overlapping optical leaves</a></li>
+        <li><a href="https://grail.cs.washington.edu/projects/exview3D/">Research on interactive exploded views</a></li></ul>
+      </details>
+    </footer>
+  </main>
+
+</body>
+</html>

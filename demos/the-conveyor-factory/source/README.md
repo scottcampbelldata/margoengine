@@ -1,0 +1,9 @@
+# The Conveyor Factory
+
+Start the belts, select a speed, and feed individual parcels. All three chutes and collection bays use physical colliders. Each bay increments once when a live parcel enters its sensor. Pausing the belt leaves gravity active for parcels in flight. Reset restores the nine starting parcels, three empty bins and the stopped 1.35 m/s setting.
+
+The installation is 6.75 m wide. The belt speed is requested as a surface velocity on the stock Margo contact modifier. Friction drives the parcel, then gravity carries it down a fixed chute. The hardware geometry and rigid shapes share the authored positions. Each parcel is a physical box with a mass derived from its dimensions. Rounded art corners and tape are display detail. The three counters use actual `intersectionstart` events with a unique parcel identifier.
+
+Margo's native Rust/Wasm solver advances at 120 fixed steps per simulated second. The paired displays use identical geometry, belt slats, collider poses and PBR colors. WebGPU is attempted first. The official direct Margo WebGL2 route uses the same solver and art. A frame-paced visualization moves the belt markings and reads parcel transforms from the physics world. The markings remain still with reduced motion enabled. The controls and physical response stay available.
+
+The mechanics check verifies motion from a stopped belt, four/three/three deliveries, and the actual resting boxes inside the three bins. The browser check measures a trusted start to a submitted frame with at least 12 mm of parcel movement, then exercises feed, speed, pile counts, pause and reset through the exhibit. [Verified Margo public main revision](https://github.com/scottcampbelldata/margoengine/tree/0efd9cff8230507a32deb49907ecd499d46925f5). [David Baraff, Fast Contact Force Computation for Nonpenetrating Rigid Bodies, 1994](https://publications.ri.cmu.edu/fast-contact-force-computation-for-nonpenetrating-rigid-bodies).

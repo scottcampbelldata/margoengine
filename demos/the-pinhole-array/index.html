@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e7e9dd">
+  <meta name="description" content="Change three circular pinholes and compare the resolution of their lensless images.">
+  <title>The Pinhole Array · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-lfggIZ-J.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BOg9hIGu.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Pinhole Array</h1><p>Size three pinholes together. Which one separates the paired lights?</p></header>
+    <section class="stage" aria-label="Interactive three-channel pinhole instrument">
+      <canvas id="scene" aria-label="Three phosphor monitors display the inverted images formed by small, middle and large pinholes"></canvas>
+      <div class="stage-top">
+        <button type="button" id="view" aria-pressed="false" disabled>Inspect images</button>
+      </div>
+      <p id="loading" role="status">Preparing the array…</p>
+    </section>
+    <section class="panel" aria-label="Pinhole aperture and readings">
+      <div class="field">
+        <label for="aperture">Aperture scale</label><output id="aperture-value" for="aperture">100%</output>
+        <input id="aperture" type="range" min="65" max="145" step="1" value="100" disabled>
+      </div>
+      <div>
+        <p id="spread-label">Diameter containing 80% of a point’s light</p>
+        <dl class="readings" aria-labelledby="spread-label">
+          <div><dt id="small-label">Small</dt><dd><output id="small" aria-labelledby="small-label spread-label">—</output><span class="hole-size"></span></dd></div>
+          <div><dt id="medium-label">Middle</dt><dd><output id="medium" aria-labelledby="medium-label spread-label">—</output><span class="hole-size"></span></dd></div>
+          <div><dt id="large-label">Large</dt><dd><output id="large" aria-labelledby="large-label spread-label">—</output><span class="hole-size"></span></dd></div>
+        </dl>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>532 nm · Magnified images, equalized peak brightness</span></footer>
+  </main>
+</body>
+</html>

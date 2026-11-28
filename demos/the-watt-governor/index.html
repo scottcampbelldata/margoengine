@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#211916">
+  <meta name="description" content="Change the spindle speed to see how a Watt governor uses two spinning weights to close a steam valve.">
+  <link rel="icon" href="data:,">
+  <title>The Watt Governor · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CqUGKOAM.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B1adApCK.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Watt Governor</h1>
+    <p>Speed up the spindle. The brass weights swing out, lifting a sleeve that closes the steam valve.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="A brass flyball governor with two polished rotating weights, a lifting sleeve, a rack, and a butterfly valve with a red disc"></canvas>
+      <p id="loading" role="status">Starting the governor…</p>
+    </figure>
+    <section class="controls" aria-label="Governor controls">
+      <div class="speed"><label for="rpm">Spindle speed</label><output id="speed" for="rpm">68 rpm</output></div>
+      <input id="rpm" type="range" min="58" max="112" step="1" value="68" disabled>
+      <div class="ticks" aria-hidden="true"><span>58</span><span>112 rpm</span></div>
+      <button type="button" id="spin" disabled>Hold rotation</button>
+      <dl>
+        <div><dt>Sleeve rise</dt><dd id="rise">—</dd></div>
+        <div><dt>Valve opening</dt><dd id="opening">—</dd></div>
+        <div><dt>Flyball radius</dt><dd id="radius">—</dd></div>
+      </dl>
+      <p class="caption">The valve opening is the projected clear bore area. The steam engine would slow as the valve closes.</p>
+    </section>
+  </article>
+  <footer><p>Ideal equilibrium at each speed. The engine and steam flow are outside the model.</p><a href="./source/README.md">Model and sources</a></footer>
+</main>
+</body>
+</html>

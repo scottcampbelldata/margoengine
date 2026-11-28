@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#241d28">
+  <meta name="description" content="Sample a turning rotor and see it slow, stop or appear to spin backward.">
+  <title>The Stroboscope · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CdNZwvg0.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-KT0LA6L8.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Stroboscope</h1>
+      <p>Change how often you sample a spinning rotor. Watch its twin seem to slow, stop, or run backward.</p>
+    </header>
+    <section class="exhibit" aria-label="Continuous and sampled rotors">
+      <figure>
+        <canvas id="scene" aria-label="Two matching six-sector brass rotors, the continuous view on the left and sampled view on the right"></canvas>
+        <div class="captions"><span>Continuous view</span><span>Sampled view</span></div>
+        <p id="loading" role="status">Preparing the rotors…</p>
+      </figure>
+      <aside aria-label="Frame sampling controls">
+        <div class="control">
+          <div><label for="sampling">Sampling rate</label><output id="rate" for="sampling">14.0 Hz</output></div>
+          <input id="sampling" type="range" min="8" max="20" value="14" step=".1" disabled>
+        </div>
+        <dl>
+          <div><dt>True speed</dt><dd>120<small>rpm</small></dd></div>
+          <div><dt>Apparent motion</dt><dd><output id="motion">Reverse</output></dd></div>
+          <div><dt>Apparent speed</dt><dd><output id="apparent">20</output><small>rpm</small></dd></div>
+        </dl>
+        <div class="transport">
+          <button id="play" type="button" disabled>Pause</button>
+          <button id="step" type="button" disabled>Next sample</button>
+        </div>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>
+

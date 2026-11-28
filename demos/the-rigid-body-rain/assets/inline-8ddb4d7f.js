@@ -1,0 +1,1 @@
+globalThis.__margoRainWorker=new Worker("./assets/physics-worker-3Km4hQ7P.js",{type:"module"});

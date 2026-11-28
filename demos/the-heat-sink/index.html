@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171c23">
+  <meta name="description" content="Turn on a fan and follow heat through a working model of an electronics heat sink.">
+  <title>The Heat Sink · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-D9Cadz58.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CgMGGx1W.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Heat Sink</h1>
+      <p>Turn up the fan and watch heat leave the chip. Follow the temperature from the copper base to the tips of the aluminium fins.</p>
+    </header>
+    <section class="instrument" aria-label="Interactive heat sink">
+      <figure>
+        <canvas id="scene" aria-label="An aluminium fin stack and industrial fan on a green circuit board"></canvas>
+        <p id="loading" role="status">Preparing the thermal bench…</p>
+        <button type="button" id="view" aria-pressed="true" disabled>Thermal view</button>
+        <div class="scale" id="scale"><span>24 °C</span><i></i><span>110 °C</span></div>
+      </figure>
+      <aside aria-label="Cooling controls and temperatures">
+        <div class="fan">
+          <div><label for="fan">Fan speed</label><output id="fan-value" for="fan">Off</output></div>
+          <input id="fan" type="range" min="0" max="100" step="1" value="0" disabled>
+          <div class="ends"><span>Off</span><span>Full</span></div>
+        </div>
+        <div class="loads">
+          <h2>Chip power</h2>
+          <div role="group" aria-label="Chip power">
+            <button type="button" data-watts="25" aria-pressed="false" disabled>25 W</button>
+            <button type="button" data-watts="45" aria-pressed="false" disabled>45 W</button>
+            <button type="button" data-watts="65" aria-pressed="true" disabled>65 W</button>
+          </div>
+        </div>
+        <dl>
+          <div><dt>Chip</dt><dd><output id="chip">—</output><small>°C</small></dd></div>
+          <div><dt>Fin tip</dt><dd><output id="tip">—</output><small>°C</small></dd></div>
+          <div><dt>Heat leaving</dt><dd><output id="heat">—</output><small>W</small></dd></div>
+        </dl>
+        <p class="caption">Room air 24 °C · Thermal time ×20</p>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>

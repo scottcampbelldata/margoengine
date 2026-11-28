@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eee7d9">
+  <meta name="description" content="Move a lighthouse lamp behind a stepped Fresnel lens to see when its rays emerge parallel.">
+  <title>The Fresnel Lens · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CjmA6cVs.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-DZQb47zG.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Fresnel Lens</h1><p>Move the lamp to send a parallel beam through the stepped glass.</p></header>
+    <section class="stage" aria-label="Interactive lighthouse lens and lamp">
+      <canvas id="scene" aria-label="A marine lamp projects rays through a circular stepped glass lens"></canvas>
+      <button id="view" type="button" aria-pressed="false" disabled>Look down on the beam</button>
+      <p id="loading" role="status">Lighting the lantern…</p>
+    </section>
+    <section class="panel" aria-label="Lamp and beam controls">
+      <div class="field">
+        <label for="distance">Lamp distance</label><output for="distance" id="distance-value">368 mm</output>
+        <input id="distance" type="range" min="300" max="650" step="1" value="368" disabled>
+      </div>
+      <button id="focus" type="button" disabled>Set to focus</button>
+      <dl class="readings">
+        <div><dt id="angle-label">Beam angle</dt><dd><output id="angle" aria-labelledby="angle-label">—</output></dd></div>
+        <div><dt id="shape-label">Beam shape</dt><dd><output id="shape" aria-labelledby="shape-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>450 mm focus · Ten refracting rings</span></footer>
+  </main>
+</body>
+</html>

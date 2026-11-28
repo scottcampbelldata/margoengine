@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-47a3f739.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f0eee7">
+  <meta name="description" content="Explore three decades of exoplanet discoveries in live date and logarithmic charts. Export your view as vector artwork.">
+  <title>The Chart Wall · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CYstsKZ5.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/version-YYhCZP03.js">
+  <link rel="modulepreload" crossorigin href="./assets/extension-B3SnASoc.js">
+  <link rel="modulepreload" crossorigin href="./assets/errors-DkwPZuAq.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CIQ85dI9.css">
+</head>
+<body>
+  <main id="wall">
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a><a href="#sources">Data &amp; notes</a></nav>
+    <header>
+      <h1>The Chart Wall</h1>
+      <p>Three decades of exoplanet discovery in two charts. Move through the archive to compare discovery years with orbital periods and planet sizes.</p>
+    </header>
+    <section class="console" aria-label="Archive cutoff">
+      <div class="readout">
+        <output id="count" for="cutoff">5,844</output>
+        <span>catalogued discoveries</span>
+      </div>
+      <div class="year">
+        <label for="cutoff">Archive through <output id="year" for="cutoff">2024</output></label>
+        <input id="cutoff" type="range" min="2005" max="2024" value="2024" step="1" disabled>
+        <div aria-hidden="true"><span>2005</span><span>2024</span></div>
+      </div>
+    </section>
+    <section class="gallery" aria-label="Exoplanet charts">
+      <article>
+        <div class="chart-heading">
+          <div><h2>Discovery by year</h2><p>One count per planet, grouped by the archive’s discovery method.</p></div>
+          <button type="button" id="save-history" aria-label="Download Discovery by year as SVG" disabled>SVG ↓</button>
+        </div>
+        <figure class="chart" id="history-frame">
+          <canvas id="history" aria-label="Annual exoplanet discoveries by discovery method, on a date axis"></canvas>
+        </figure>
+        <p class="caption" id="history-caption">Years after the selected cutoff are left open.</p>
+      </article>
+      <article>
+        <div class="chart-heading">
+          <div><h2>Orbits and sizes</h2><p>Each mark is a planet with both values available.</p></div>
+          <button type="button" id="save-orbit" aria-label="Download Orbits and sizes as SVG" disabled>SVG ↓</button>
+        </div>
+        <figure class="chart" id="orbit-frame">
+          <canvas id="orbits" aria-label="Exoplanet radii and orbital periods, with a logarithmic period axis"></canvas>
+          <div id="orbit-status" class="plot-status" role="status">Preparing the orbit plot…</div>
+        </figure>
+        <p class="caption" id="orbit-caption">Period 0.1–10,000 days and radius at most 24 Earth radii.</p>
+      </article>
+      <div id="status" role="status"><strong>Opening the charts…</strong><span id="reason"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+    </section>
+    <footer id="sources">
+      <details>
+        <summary>Source and chart definitions</summary>
+        <p>The NASA Exoplanet Archive snapshot groups planets by discovery year and the archive’s recorded discovery method. Its composite table brings together values from multiple references. The orbital comparison uses the published radius and period fields within the labelled window. Values with missing fields or outside that window still count in the chronology.</p>
+        <p>The snapshot is from 27 November 2026. NASA funds the Exoplanet Archive through its Exoplanet Exploration Program, with Caltech operating the archive under contract.</p>
+        <p>This record reflects which planets were discovered and catalogued. Different detection methods find planets with different characteristics.</p>
+        <p><a href="https://exoplanetarchive.ipac.caltech.edu/docs/API_TD_columns.html">NASA Exoplanet Archive field definitions</a> · <a href="https://doi.org/10.26133/NEA13">Dataset DOI</a> · <a href="https://science.nasa.gov/exoplanets/how-we-find-and-characterize/">NASA guide to detection methods</a></p>
+      </details>
+    </footer>
+    <p id="download-status" role="status" class="sr-only"></p>
+  </main>
+</body>
+</html>

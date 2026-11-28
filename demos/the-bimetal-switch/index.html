@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#182225">
+  <meta name="description" content="Warm two bonded metals and watch their different expansion open an electrical contact.">
+  <title>The Bimetal Switch · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-Bmm_i4ji.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BR54xTqW.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Bimetal Switch</h1>
+      <p>Warm the strip. Brass expands faster than steel, bending the pair until a lever opens the contact.</p>
+    </header>
+    <section class="instrument" aria-label="Bimetal thermal switch">
+      <figure>
+        <canvas id="scene" aria-label="A laminated brass and steel strip under a moving switch arm, with a green circuit lamp"></canvas>
+        <button id="view" type="button" aria-pressed="false" disabled>Close-up</button>
+        <p id="loading" role="status">Preparing the switch…</p>
+      </figure>
+      <aside aria-label="Temperature control and switch readings">
+        <div class="heat">
+          <div><label for="temperature">Strip temperature</label><output id="degrees" for="temperature">24 °C</output></div>
+          <input id="temperature" type="range" min="20" max="100" value="24" step="1" disabled>
+          <div class="bounds" aria-hidden="true"><span>20 °C</span><span>100 °C</span></div>
+        </div>
+        <dl>
+          <div><dt>Contact</dt><dd id="contact">Closed</dd></div>
+          <div><dt>Strip tip rise</dt><dd><output id="rise">0.00</output><small>mm</small></dd></div>
+          <div><dt>Trip temperature</dt><dd><output id="trip">—</output><small>°C</small></dd></div>
+        </dl>
+        <button id="reset" type="button" disabled>Return to room temperature</button>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>

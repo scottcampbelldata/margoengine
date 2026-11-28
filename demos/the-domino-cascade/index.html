@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172426">
+  <meta name="description" content="Tip one domino and follow the chain through a spiral, up a staircase and across a bridge.">
+  <title>The Domino Cascade · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DOK9bOEC.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-DkwPZuAq.js">
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-DSQn7yhw.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../" class="brand">Margo Engine <span>Web demos</span></a></nav>
+    <header><h1>The Domino Cascade</h1><p>Tip the first of 2,000 dominoes. Follow the fall through the spiral, up the steps and across the bridge.</p></header>
+    <section class="stage" aria-label="A museum installation with a domino course">
+      <canvas id="scene" aria-label="Two thousand enamelled dominoes on a winding museum installation"></canvas>
+      <button id="view" type="button" class="view" aria-pressed="false" disabled>Follow wave</button>
+      <p id="status" class="notice" role="status">Setting up the dominoes…</p>
+      <div id="error" class="notice" role="alert" hidden><p id="message"></p><a id="help" href="https://margoengine.com/errors#webgpu" hidden>WebGPU support</a></div>
+    </section>
+    <section class="panel" aria-label="Cascade controls">
+      <div class="actions">
+        <button type="button" class="trigger" id="start" disabled>Tip the first domino</button>
+        <button type="button" id="reset" disabled>Reset</button>
+        <label class="pace" for="speed"><span>Speed</span>
+          <select id="speed" disabled><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+        </label>
+      </div>
+      <dl class="readings">
+        <div><dt id="tipped-label">Toppled</dt><dd><output id="tipped" aria-labelledby="tipped-label">0 / 2,000</output></dd></div>
+        <div><dt id="velocity-label">Wave speed</dt><dd><output id="velocity" aria-labelledby="velocity-label">—</output></dd></div>
+        <div><dt id="section-label">Course section</dt><dd><output id="section" aria-labelledby="section-label">Spiral</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span id="route-length">2,000 rigid-body dominoes</span></footer>
+    <p id="run-status" class="screen-reader" role="status"></p>
+  </main>
+</body>
+</html>

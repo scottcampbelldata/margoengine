@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-277ce63e.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#202a36">
+  <title>The Flow Field · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-B1MYCOiJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dcr8R8N1.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>The Flow Field</h1>
+      <p>Tap open terrain to move the destination. Twelve thousand moving lights find their way around the ridges.</p>
+    </header>
+    <div class="instrument">
+      <div class="controls" aria-label="Flow controls">
+        <button type="button" id="target" disabled>Next target</button>
+        <button type="button" id="vectors" aria-pressed="false" disabled>Show directions</button>
+        <button type="button" id="pause" aria-pressed="false" disabled>Pause</button>
+        <button type="button" id="reset" disabled>Reset</button>
+      </div>
+      <figure id="viewport" aria-label="A relief model with two streams of light">
+        <canvas id="scene" tabindex="0" aria-label="Tap open terrain to move the destination, or focus here and press an arrow key."></canvas>
+        <span id="loading" role="status">Opening the relief model…</span>
+        <span id="error" role="alert" hidden></span>
+        <span id="destination"><b aria-hidden="true"></b><output id="place">East landing</output></span>
+        <span id="hint" aria-live="polite"></span>
+      </figure>
+      <section class="results" aria-label="Live flow measurements">
+        <dl>
+          <div><dt>Units</dt><dd id="units">—</dd></div>
+          <div><dt>Arrivals</dt><dd id="arrivals">—</dd></div>
+          <div><dt>Reachable cells</dt><dd id="reachable">—</dd></div>
+        </dl>
+        <div class="legend">
+          <span><i aria-hidden="true"></i> Higher travel cost</span>
+          <span><i aria-hidden="true"></i> Blocked terrain</span>
+        </div>
+      </section>
+    </div>
+    <footer><a href="https://graphics.cs.cmu.edu/?p=375">Continuum Crowds</a><a href="https://www.gameaipro.com/GameAIPro/GameAIPro_Chapter23_Crowd_Pathfinding_and_Steering_Using_Flow_Field_Tiles.pdf">Flow-field navigation</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e6ece7">
+  <meta name="description" content="Send water through a transparent Venturi meter. Watch the flow accelerate while the throat pressure falls.">
+  <title>The Venturi Meter | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DZPLknCg.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-Bjt0RoVu.css">
+</head>
+<body data-state="loading">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header><h1>The Venturi Meter</h1><p>Send water through the glass throat. The flow speeds up in the constriction, and the shorter water column shows the drop in pressure.</p></header>
+    <section class="bench" aria-label="Working Venturi meter">
+      <figure>
+        <canvas id="scene" aria-label="A transparent Venturi tube with moving dye and separate upstream and throat pressure columns"></canvas>
+        <p id="loading" role="status">Preparing the flow bench…</p>
+        <div class="marker" id="upstream" aria-hidden="true"><i></i>Upstream tap</div>
+        <div class="marker" id="neck" aria-hidden="true"><i></i>Throat tap</div>
+        <div class="caption" id="head-layer" hidden>Water-column difference</div>
+      </figure>
+      <aside aria-label="Flow controls and measurements">
+        <div class="control">
+          <div class="label"><label for="rate">Water flow</label><output for="rate" id="rate-value">31 L/min</output></div>
+          <input id="rate" type="range" min="0" max="50" step="1" value="31" disabled>
+          <div class="limits"><span>No flow</span><span>50 L/min</span></div>
+        </div>
+        <dl>
+          <div class="measure primary"><dt>Pressure difference</dt><dd><output id="pressure">—</output><small>Pa</small></dd><p><output id="head">—</output> cm of water</p></div>
+          <div class="measure"><dt>Upstream speed</dt><dd><output id="inlet-speed">—</output><small>m/s</small></dd></div>
+          <div class="measure"><dt>Throat speed</dt><dd><output id="throat-speed">—</output><small>m/s</small></dd></div>
+        </dl>
+        <button id="show-head" type="button" aria-pressed="false" disabled><i aria-hidden="true"></i>Show water head</button>
+      </aside>
+    </section>
+    <footer><span>53 mm inlet · 26 mm throat · Ideal steady flow</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

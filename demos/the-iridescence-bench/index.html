@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e7e8e5">
+  <meta name="description" content="Tune the thickness and angle of a thin film and see white light separate into structural color.">
+  <title>The Iridescence Bench · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-D_o7Ws_p.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-D-yuHP1y.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Iridescence Bench</h1>
+      <p>Change the coating by nanometers and watch the reflector change color. Tilting it changes the color again.</p>
+    </header>
+    <section class="stage" aria-label="Interactive thin-film reflector">
+      <canvas id="film" aria-label="Iridescent coating on a curved reflector, held in a precision tilt mount"></canvas>
+      <p id="loading" role="status">Preparing the reflector…</p>
+      <button type="button" id="view" aria-pressed="false" disabled>Coating close-up</button>
+    </section>
+    <section class="panel" aria-label="Film and angle controls">
+      <div class="field">
+        <label for="thickness">Center film thickness</label><output id="film-output" for="thickness">172 nm</output>
+        <input id="thickness" type="range" min="75" max="425" step="1" value="172" disabled>
+        <div class="marks" aria-hidden="true"><span>75 nm</span><span>425 nm</span></div>
+      </div>
+      <div class="field">
+        <label for="tilt">Reflector tilt</label><output id="tilt-output" for="tilt">18°</output>
+        <input id="tilt" type="range" min="0" max="60" step="1" value="18" disabled>
+        <div class="marks" aria-hidden="true"><span>Face-on</span><span>60°</span></div>
+      </div>
+      <div class="presets" role="group" aria-label="Coating presets">
+        <button type="button" data-thickness="172" aria-pressed="true" disabled>172 nm</button>
+        <button type="button" data-thickness="250" aria-pressed="false" disabled>250 nm</button>
+        <button type="button" data-thickness="340" aria-pressed="false" disabled>340 nm</button>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Dielectric film on glass</span></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Margo skybox cubeface bake</title>
+<body style="margin:0;background:#000"><canvas width="768" height="768" style="display:block"></canvas>
+<script type="module">
+import {Engine} from '@margoengine/core';
+import {Sky} from '@margoengine/sky/base';
+import {preetham} from '@margoengine/sky/preetham';
+import {clouds} from '@margoengine/sky/clouds';
+import {look} from '@margoengine/sky/look';
+import {dayPreset} from '@margoengine/sky/day-presets';
+import {modes} from '../presets.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,antialias:false,
+ camera:{position:[26,162,1010],target:[26,162,10],fov:90,near:4,far:12000}});
+engine.onError=error=>{window.problem=error.message};
+const sky=Sky.attach(engine,{...dayPreset(modes.golden.preset.day),model:'preetham',look:{},lighting:undefined},{preetham,clouds,look});
+let time=0;
+window.bake=async key=>{
+ const {preset,skyLook}=modes[key];
+ const options=dayPreset(preset.day);
+ delete options.lighting;
+ sky.options.sunDirection=options.sunDirection;
+ sky.options.turbidity=options.turbidity;
+ sky.options.exposure=options.exposure;
+ sky.options.clouds={coverage:preset.day.clouds,height:1350,depth:14,speed:0};
+ sky.options.look=skyLook;
+ engine.render(time++);
+ await engine.gpu.queue.onSubmittedWorkDone();
+ await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+};
+</script>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191813">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:,">
+  <title>The Path-Traced Glasshouse · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DnDPJz6O.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BBN70yMA.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine / Web demos</a></nav>
+    <header>
+      <h1>The Path-Traced Glasshouse</h1>
+      <p>A flint-glass prism separates wavelengths of white light. Curved glass concentrates light onto the workbench.</p>
+    </header>
+    <figure id="exhibit">
+      <div class="viewport">
+        <canvas id="glasshouse" aria-label="Live path-traced flint prism and optical glass on a walnut bench"></canvas>
+        <img id="opening" alt="A Margo path-traced still showing a flint-glass prism and optical glass on a walnut bench" hidden>
+        <img id="fixed" alt="The same Margo-traced bench with the flint prism held at a fixed refractive index" hidden>
+        <canvas id="diagram" aria-label="Live diagram of wavelength rays bending through two prism faces" hidden></canvas>
+        <p id="status" role="status">Loading the opening render…</p>
+      </div>
+      <div class="choices">
+        <div role="group" aria-label="Prism material">
+          <button id="flint-control" aria-pressed="true" type="button" disabled>Dispersive flint</button>
+          <button id="fixed-control" aria-pressed="false" type="button" disabled>Fixed index</button>
+        </div>
+        <button id="view-rays" aria-pressed="false" type="button" disabled>Ray study</button>
+      </div>
+      <figcaption>
+        <div>
+          <p id="mode">Spectral comparison</p>
+          <p id="progress" role="status"></p>
+          <a id="help" href="https://margoengine.com/errors#compatibility-layer" hidden>Renderer requirements</a>
+        </div>
+        <button id="save" type="button" disabled>Save PNG</button>
+      </figcaption>
+    </figure>
+    <footer><a href="./source/README.md">Scene notes and sources</a></footer>
+  </main>
+</body>
+</html>

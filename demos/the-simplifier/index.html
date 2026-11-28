@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CqcNTc1A.js"><script src="./assets/inline-f839a655.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ede6d7">
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/statue-DtEE6CeM.bin" crossorigin="anonymous">
+  <title>The Simplifier · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-7hnJr1TK.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BKLZ0gfl.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine / Web demos</a></nav>
+    <article>
+      <header>
+        <h1>The<br class="desktop-break"> Simplifier</h1>
+        <p>Remove triangles from a carved stone owl. Watch what happens to its feathers and silhouette.</p>
+      </header>
+      <figure aria-labelledby="object-name">
+        <canvas id="statue" aria-label="Live three-dimensional limestone owl"></canvas>
+        <p class="notice" id="status" role="status">Unveiling the sculpture…</p>
+        <div class="notice" id="error" hidden><p id="message" role="alert"></p><a id="help" href="https://margoengine.com/errors#compatibility-layer" hidden>Renderer requirements</a></div>
+        <figcaption><span id="object-name">Night Herald</span><span>Carved limestone</span></figcaption>
+      </figure>
+      <section class="bench" aria-label="Sculpture controls">
+        <div class="count" aria-live="polite"><output id="triangles">—</output><span>triangles</span></div>
+        <p class="change"><output id="remaining">—</output> <span>of <output id="total">—</output> original triangles</span></p>
+        <div class="adjust">
+          <div class="adjust-head"><label for="level">Level of detail</label><output id="measure" for="level">Original</output></div>
+          <input id="level" type="range" min="0" max="4" step="1" value="0" disabled>
+        </div>
+        <div class="modes" role="group" aria-label="Sculpture view">
+          <button id="smooth" type="button" aria-pressed="true" disabled>Surface</button>
+          <button id="facets" type="button" aria-pressed="false" disabled>Facets</button>
+          <button id="auto" type="button" aria-pressed="false" disabled>Auto LOD</button>
+        </div>
+      </section>
+    </article>
+    <footer><a href="./source/README.md">Scene notes and sources</a></footer>
+  </main>
+</body>
+</html>

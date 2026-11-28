@@ -1,0 +1,1 @@
+var e=.25,t=2.9,n=[19,47,77,110,139];function r(e){return e<0?4.1:4.1+Math.min(1,e/7)*Math.max(0,Math.min(1,(143-e)/10))*(.82*Math.sin(e*.246)+.49*Math.sin(e*.463+.45)+.82*Math.sin(e*.099-1))}var i=Array.from({length:Math.round(160/e)+1},(t,n)=>{let i=-14+n*e;return[i,r(i)]}),a=.4,o=2.1,s=1/120;export{t as a,r as i,s as n,i as o,a as r,o as s,n as t};

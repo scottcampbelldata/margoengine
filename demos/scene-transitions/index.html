@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-hFd8C1UQ.js"><script src="./assets/inline-63d58e1e.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#151c22">
+<link rel="icon" href="data:,">
+<title>Scene Transitions · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-BbY97TdB.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index--8UolwtS.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>Scene Transitions</h1>
+    <p>Cut from a desert listening station to a relay in the ice. Scrub the blend or play it through.</p>
+  </header>
+  <section aria-label="Scene transition controls">
+    <div class="tools">
+      <fieldset aria-label="Transition type">
+        <label><input name="effect" type="radio" value="wipe" checked disabled> Wipe</label>
+        <label><input name="effect" type="radio" value="dissolve" disabled> Noise dissolve</label>
+        <label><input name="effect" type="radio" value="chromatic" disabled> Chromatic swipe</label>
+      </fieldset>
+      <button type="button" id="play" disabled>Play</button>
+    </div>
+    <div class="scrub">
+      <label for="progress">Transition</label>
+      <input type="range" id="progress" min="0" max="100" value="0" step="1" aria-valuetext="0 percent" disabled>
+      <output id="amount" for="progress">0%</output>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Two original 3D scenes, a desert listening station and a relay in the ice."></canvas>
+        <div id="notice"><p id="status" role="status">Opening the two scenes…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p><span>Dune Station</span><span class="arrow" aria-hidden="true">→</span><span>Glacier Relay</span></p>
+        <span id="renderer">Margo Engine</span>
+      </figcaption>
+    </figure>
+  </section>
+</main>
+</body>
+</html>

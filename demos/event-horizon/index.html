@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0d0d11">
+  <meta name="description" content="Orbit a spinning black hole and see light from its accretion disk bend around the shadow.">
+  <link rel="icon" href="data:,">
+  <title>Event Horizon · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-r2Z1Gsuo.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DGXNV-eG.css">
+</head>
+<body><main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header><h1>Event Horizon</h1><p>Orbit a spinning black hole. Light from the far side of its disk bends into view above and below the dark shadow.</p></header>
+  <section id="exhibit" aria-label="Black hole observatory">
+    <figure>
+      <canvas id="sky" tabindex="0" aria-label="A black hole and its gravitationally lensed accretion disk. Drag to orbit or use the arrow keys."></canvas>
+      <p id="status" role="status">Tracing light around the black hole…</p>
+    </figure>
+    <aside aria-label="Observer controls">
+      <div class="field">
+        <label for="brightness">Disk brightness <output id="brightness-label" for="brightness">1.00×</output></label>
+        <input id="brightness" type="range" min="0" max="2" value="1" step=".01" disabled>
+      </div>
+      <div class="field">
+        <label for="radius">Camera distance <output id="radius-label" for="radius">13.6 M</output></label>
+        <input id="radius" type="range" min="8" max="34" value="13.6" step=".1" disabled>
+      </div>
+      <div class="views">
+        <button id="edge" type="button" disabled>Edge-on</button>
+        <button id="above" type="button" disabled>From above</button>
+      </div>
+      <dl>
+        <div><dt>Elevation above disk</dt><dd id="elevation">—</dd></div>
+        <div><dt>Event horizon radius</dt><dd id="horizon">—</dd></div>
+        <div><dt>Closest stable orbit</dt><dd id="isco">—</dd></div>
+      </dl>
+      <p class="unit">Distances are in gravitational radii, M = GM/c².</p>
+    </aside>
+  </section>
+  <footer><a href="./source/README.md">Model notes and sources</a><a href="https://arxiv.org/abs/1502.03808">Kerr lensing reference</a></footer>
+</main></body>
+</html>

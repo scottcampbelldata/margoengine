@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light;
+  --ink: #242e2e; --quiet: #536460; --canvas: #d8ded6; --paper: #f1eee5;
+  --line: #b8bcb1; --attention: #922d18; --pale: #f3e2d2;
+  background: var(--paper); color: var(--ink);
+  font: 16px/1.5 "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { width: min(92%, 86rem); margin: auto; padding-bottom: 2.75rem; }
+nav { border-bottom: 1px solid var(--line); padding: .85rem 0 .68rem; }
+a { color: #195e51; font-weight: 650; text-underline-offset: .18em; }
+nav a { font-size: .875rem; text-decoration: none; }
+nav span { margin-left: .48rem; color: var(--quiet); font-weight: 500; }
+header { padding: clamp(1.45rem, 3.9vw, 3.3rem) 0 clamp(1rem, 2.1vw, 1.8rem); }
+h1 { margin: 0; font: 400 clamp(2.85rem, 7.65vw, 7.1rem)/.94 "Baskerville", Georgia, serif; letter-spacing: -.073em; }
+header p { margin: .85rem 0 0; color: var(--quiet); font-size: clamp(.96rem, 1.35vw, 1.25rem); }
+.exhibit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem); border: 1px solid var(--line); background: #e9e8de; }
+figure { position: relative; margin: 0; min-height: 0; background: var(--canvas); }
+canvas { display: block; width: 100%; height: clamp(32rem, 48vw, 43rem); }
+figcaption { position: absolute; display: flex; flex-wrap: wrap; gap: .35rem .75rem; bottom: 1rem; left: 1rem; padding-right: 1rem; color: #263d38; font: 650 .72rem/1.26 "Cascadia Mono", Consolas, monospace; }
+figcaption span { padding: .31rem .42rem; background: #e8ece2e8; }
+.archive-name { text-transform: uppercase; letter-spacing: .08em; }
+#status { position: absolute; display: grid; place-content: center; inset: 0; padding: 1.5rem; text-align: center; background: #d8ded6; }
+#status strong { font: 400 1.55rem/1.18 Georgia, serif; }
+#status span { font-size: .85rem; margin-top: .5rem; }
+[hidden] { display: none !important; }
+aside { border-left: 1px solid var(--line); padding: 1.15rem; }
+.summary { display: flex; gap: .6rem; align-items: baseline; justify-content: space-between; margin-bottom: .75rem; }
+.summary h2 { margin: 0; white-space: nowrap; font: 400 1.6rem/1.1 Georgia, serif; letter-spacing: -.03em; }
+.summary span { text-align: right; font: 650 .7rem/1.4 "Cascadia Mono", Consolas, monospace; color: var(--attention); }
+#issues { display: grid; gap: .35rem; }
+button { font: 650 .84rem/1.35 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #e6ebe2; border: 1px solid var(--line); padding: .62rem .73rem; min-height: 2.7rem; text-align: left; cursor: pointer; }
+button:disabled { cursor: default; opacity: .65; }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid #113d60; outline-offset: 3px; }
+button:not(:disabled):hover { border-color: #4c655f; }
+button.issue { display: grid; min-width: 0; gap: .12rem; background: #f2f0e6; }
+.issue span { color: var(--quiet); font-size: .76rem; }
+.issue[aria-pressed="true"] { background: var(--pale); border-color: #9c523b; color: var(--attention); }
+.issue[aria-pressed="true"] span { color: inherit; }
+#finding, #audit { margin: .8rem 0; font-size: .82rem; color: var(--quiet); }
+#finding { min-height: 4.65em; }
+#audit { margin-bottom: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+#run { background: #245b50; border-color: #245b50; color: #f5f7ec; font-weight: 650; }
+.sources { display: flex; justify-content: space-between; gap: .55rem 1.25rem; margin-top: .85rem; font-size: .8rem; color: var(--quiet); }
+.sources p { margin: 0; }
+.sources details { min-width: max-content; }
+details[open] { min-width: 0; }
+details p { padding-top: .4rem; }
+summary { cursor: pointer; color: #245b50; font-weight: 650; }
+@media(max-width: 700px) {
+  .exhibit { grid-template-columns: 1fr; }
+  canvas { height: clamp(17rem, 73vw, 27rem); }
+  aside { border-left: 0; border-top: 1px solid var(--line); padding: .78rem; }
+  #issues { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .summary { margin-bottom: .55rem; }
+  .summary h2 { font-size: 1.39rem; }
+  #finding { min-height: 2.48em; margin: .6rem 0; }
+  #audit { margin-top: .5rem; }
+  figcaption { left: .65rem; bottom: .6rem; font-size: .62rem; }
+  .sources { display: grid; }
+  .sources details { min-width: 0; }
+}

@@ -1,0 +1,9 @@
+# Pinball
+
+The Aurora cabinet is an original single-table game. Launch a ball by touching Launch or pressing Space. Hold the left and right flipper buttons or the corresponding arrow keys, then release to lower the bats. A bumper contact scores 100 or 150. A drain consumes one of the three balls. New game clears the score and restores all three balls.
+
+The playfield measures 0.589 × 1.15 m. The cabinet frame, shooter rails, turn and sling guides share the positions used by the rigid colliders. The pinned Margo physics solver advances 180 fixed steps per simulated second. Its gravity is tilted 6.1 degrees toward the player in playfield coordinates. The ball uses continuous collision detection. Two limited revolute motors act on the actual flipper bodies. Bumper switches and contacts deliver real collision events, add score, and apply a short outward impulse. A left-side kickback can return the ball once per launch. The solver advances each ball pose.
+
+The optional audio control synthesizes short mechanical cues and plays them through Margo spatial voices. It starts only when enabled. The same PBR meshes, solver and game rules are used on WebGPU and the direct Margo WebGL2 renderer. The cabinet and all graphics were made for this exhibit. [Verified public Margo main revision](https://github.com/scottcampbelldata/margoengine/tree/0efd9cff8230507a32deb49907ecd499d46925f5). [Historical mechanism context, United States Patent 4,109,916](https://patents.google.com/patent/US4109916A/en).
+
+The browser audit waits for an actual rendered ball displacement after a trusted launch. It verifies a bumper score, a drain, left and right hinge motion, optional audio, and a clean reset. A numerical replay compares two launches from the same state and measures how a timed motor press changes the ball path.

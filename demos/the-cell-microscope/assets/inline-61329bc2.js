@@ -1,0 +1,1 @@
+if(!navigator.gpu||new URLSearchParams(location.search).get("backend")==="webgl2"){const l=document.createElement("link");l.rel="preload";l.as="fetch";l.crossOrigin="anonymous";l.href="./assets/fallback-Bxxk6pRw.wasm";document.head.append(l);}

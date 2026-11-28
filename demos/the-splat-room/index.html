@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-4cef7abc.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151619">
+  <meta name="description" content="Explore the real captured cabin of Apollo 11. Recolor and erase Gaussian splats in a working copy of Columbia’s interior scan.">
+  <title>The Splat Room | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/columbia-opening.splat-Df6cVuIM.gz" as="fetch" crossorigin fetchpriority="high">
+
+  <script type="module" crossorigin src="./assets/index-BHMq8Zp0.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DvxYSerl.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Web Demos"><a href="../">Margo Engine</a><span>/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Splat Room</h1>
+      <p>Step inside Apollo 11’s Columbia. Brush a copy of its real interior scan.</p>
+    </header>
+    <section class="exhibit" aria-label="Columbia scan and edit tools">
+      <figure>
+        <canvas id="scene" tabindex="0" aria-label="Apollo 11 interior scan. Enter applies the active brush at the center."></canvas>
+        <div id="cursor" hidden aria-hidden="true"></div>
+        <figcaption><span>Columbia · Apollo 11</span><output id="mode-description">Drag to recolor</output></figcaption>
+        <p id="loading" role="status">Opening Columbia’s cabin…</p>
+        <p id="error" role="alert" hidden></p>
+      </figure>
+      <aside aria-label="Scan editing and camera">
+        <fieldset id="tools" disabled>
+          <legend class="sr-only">Scan tools</legend>
+          <div class="tools" role="group" aria-label="Active tool">
+            <button type="button" data-mode="look" aria-pressed="false">Look</button>
+            <button type="button" data-mode="paint" aria-pressed="true">Paint</button>
+            <button type="button" data-mode="erase" aria-pressed="false">Erase</button>
+          </div>
+          <div id="brush-options">
+            <div class="brush">
+              <label for="radius">Brush width</label><output id="radius-value" for="radius">16%</output>
+            </div>
+            <input type="range" id="radius" min="7" max="34" value="16" aria-label="Brush diameter as percentage of the shorter canvas side">
+            <div id="colors" class="colors" role="group" aria-label="Paint color">
+              <button type="button" class="cyan" data-ink="cyan" aria-label="Cyan" aria-pressed="true"></button>
+              <button type="button" class="orange" data-ink="orange" aria-label="Amber" aria-pressed="false"></button>
+              <button type="button" class="rose" data-ink="rose" aria-label="Rose" aria-pressed="false"></button>
+            </div>
+          </div>
+          <div class="views">
+            <label for="view">Cabin view</label>
+            <select id="view">
+              <option value="front">Flight deck</option>
+              <option value="controls">Instrument panel</option>
+              <option value="couches">Crew couches</option>
+              <option value="cutaway">Side cutaway</option>
+            </select>
+          </div>
+          <div class="reset">
+            <button type="button" id="undo" disabled>Undo stroke</button>
+            <button type="button" id="reset" disabled>Restore scan</button>
+          </div>
+        </fieldset>
+        <dl>
+          <div><dt>Gaussians loaded</dt><dd><output id="count">—</output></dd></div>
+          <div><dt>Brush strokes</dt><dd><output id="strokes">0</output></dd></div>
+        </dl>
+        <p id="stream" role="status">Opening scan</p>
+      </aside>
+    </section>
+    <footer>
+      <span>Captured by the Smithsonian Institution</span>
+      <a href="https://www.si.edu/object/3d/command-module-apollo-11%3Ad8c63e8a-4ebc-11ea-b77f-2e728ce88125">Columbia interior</a>
+      <a href="./source/README.md">Method and source</a>
+    </footer>
+  </main>
+
+</body>
+</html>

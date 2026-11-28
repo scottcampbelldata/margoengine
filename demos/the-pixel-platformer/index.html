@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/physics-BKZ9eUug.js"><link rel="modulepreload" crossorigin href="./assets/scene-B8d8dBpz.js"><script src="./assets/webgl2-preload-5554bbf2.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Cross a twilight coast, collect three prisms and relight its beacon in a playable pixel-art level.">
+  <meta name="theme-color" content="#eee9e1">
+  <link rel="icon" href="data:,">
+  <title>The Pixel Platformer · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-IHSUUkom.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DHAiCsPj.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery navigation"><a href="../">← Margo Web Demos</a><span>Signal Coast</span></nav>
+    <header><h1>The Pixel Platformer</h1>
+      <p>Cross the headland. Collect three prisms and relight the beacon.</p></header>
+    <section id="exhibit" aria-label="Signal Coast platform game">
+      <div class="frame">
+        <canvas id="canvas" aria-label="A pixel-art coast at dusk with an explorer, rocky platforms and a lighthouse"></canvas>
+        <p id="status" role="status">Opening Signal Coast…</p>
+      </div>
+      <div class="controls">
+        <div class="move" role="group" aria-label="Move the keeper">
+          <button id="left" data-direction="-1" aria-label="Move left" disabled>←</button>
+          <button id="right" data-direction="1" aria-label="Move right" disabled>→</button>
+          <button id="jump" aria-label="Jump" disabled>Jump <span aria-hidden="true">↑</span></button>
+        </div>
+        <div class="monitor">
+          <output id="mission" aria-live="polite"><strong>0 / 3</strong> prisms</output>
+          <button id="reset" disabled>Restart</button>
+        </div>
+      </div>
+    </section>
+    <div class="review">
+      <p>Arrow keys move. Space jumps.</p>
+      <label for="lighting">Lighting
+        <select id="lighting" disabled>
+          <option value="soft">Soft shadows</option>
+          <option value="hard">Hard shadows</option>
+          <option value="flat">Flat normals</option>
+        </select>
+      </label>
+    </div>
+  </main>
+</body>
+</html>

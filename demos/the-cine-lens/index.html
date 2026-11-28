@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-C8AySYNv.js"><script src="./assets/inline-77d0d33c.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12181a">
+<link rel="icon" href="data:,">
+<title>The Cine Lens · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-CEIUBCBa.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CeAjat88.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Cine Lens</h1>
+    <p>Pull focus across a projection room. Watch the pin lights take the shape of the aperture.</p>
+  </header>
+  <section aria-label="Lens controls">
+    <div class="focus">
+      <div class="focus-label">Autofocus</div>
+      <button type="button" data-focus="front" aria-pressed="false" disabled>Film tin</button>
+      <button type="button" data-focus="projector" aria-pressed="true" disabled>Projector</button>
+      <button type="button" data-focus="wall" aria-pressed="false" disabled>Back wall</button>
+      <output id="distance">Opening lens</output>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Projection-room view. Tap an object to focus on its surface." aria-describedby="guide"></canvas>
+        <div id="notice"><p id="status" role="status">Opening the optics…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption><p id="guide">Tap an object in the frame or choose an autofocus target.</p><span id="route">Margo Engine</span></figcaption>
+    </figure>
+    <div class="optics">
+      <fieldset>
+        <legend>Bokeh shape</legend>
+        <div class="shapes">
+          <label><input type="radio" name="shape" value="round" checked disabled> Round</label>
+          <label><input type="radio" name="shape" value="hex" disabled> Six blades</label>
+          <label><input type="radio" name="shape" value="cat" disabled> Cat’s eye</label>
+        </div>
+      </fieldset>
+      <label class="range">Aperture <output for="iris" id="iris-value">f/1.0</output>
+        <input type="range" id="iris" min="0" max="6" value="0" step="1" disabled>
+      </label>
+      <label class="range">Focus tilt <output for="tilt" id="tilt-value">0°</output>
+        <input type="range" id="tilt" min="-26" max="26" value="0" step="1" disabled>
+      </label>
+      <label class="range">Lens shift <output for="shift" id="shift-value">0 mm</output>
+        <input type="range" id="shift" min="-8" max="8" value="0" step="1" disabled>
+      </label>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BBsR1Au_.js"><script src="./assets/inline-c9c6be15.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#202027">
+  <meta name="description" content="Compare tone curves and grade an original coast signal room live.">
+  <link rel="icon" href="data:,">
+  <title>The Colour Grader · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BW6ENx0D.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DDQORSTl.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Colour grading</span></nav>
+    <header>
+      <h1>The Colour Grader</h1>
+      <p>Find the colour in the beacon and the detail in the shadows.</p>
+    </header>
+    <figure id="instrument">
+      <div id="stage">
+        <canvas id="view" role="img" aria-label="A glowing annular signal lamp in a blue-hour coastal lookout"></canvas>
+        <p id="status" role="status">Opening the signal house…</p>
+      </div>
+      <figcaption class="controls">
+        <div class="curve">
+          <span id="curve-label">Tone curve</span>
+          <div class="switch" role="group" aria-labelledby="curve-label">
+            <button type="button" id="neutral" aria-pressed="true" disabled>PBR Neutral</button>
+            <button type="button" id="agx" aria-pressed="false" disabled>AgX</button>
+            <button type="button" id="acescg" aria-pressed="false" disabled>ACES fit</button>
+          </div>
+        </div>
+        <div class="readouts">
+          <div class="setting">
+            <label for="tint">Warm highlights</label>
+            <output for="tint" id="tint-value">0%</output>
+            <input type="range" id="tint" value="0" min="0" max="100" step="1" disabled>
+          </div>
+          <div class="setting">
+            <label for="local">Local exposure</label>
+            <output for="local" id="local-value">0%</output>
+            <input type="range" id="local" value="0" min="0" max="100" step="1" disabled>
+          </div>
+        </div>
+      </figcaption>
+    </figure>
+    <section class="files" aria-label="Colour lookup table controls">
+      <div class="file-actions">
+        <button id="upload" type="button" disabled>Open .cube LUT</button>
+        <input id="lut" class="hidden" type="file" accept=".cube,text/plain">
+        <button id="remove" type="button" disabled>Clear LUT</button>
+        <button id="save" type="button" disabled>Save grade as .cube</button>
+      </div>
+      <p id="file-status" aria-live="polite">No LUT loaded. Use a 3D LUT for display-linear RGB.</p>
+    </section>
+    <section class="notes">
+      <p>Local exposure lifts dark parts of the room and holds back the brightest parts of the signal.</p>
+      <details>
+        <summary>How the controls interact</summary>
+        <p>Margo applies local exposure before the curve. The colour grade and a loaded .cube LUT follow the curve. Save grade exports the highlight and shadow grade as a .cube file. It leaves out the selected curve and local exposure.</p>
+      </details>
+    </section>
+  </main>
+</body>
+</html>

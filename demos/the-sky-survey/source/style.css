@@ -1,0 +1,65 @@
+:root {
+  background:#161724;
+  color:#f3e9d9;
+  color-scheme:dark;
+  font-family:system-ui,sans-serif;
+  --ink:#101422;
+  --line:#474256;
+  --quiet:#b8b5c9;
+  --accent:#efd2a7;
+  --mono:"IBM Plex Mono",Consolas,monospace;
+}
+* { box-sizing:border-box; }
+body { margin:0; }
+[hidden] { display:none !important; }
+main { width:min(1132px,calc(100% - 44px)); margin:auto; padding:17px 0 24px; }
+a { color:var(--accent); text-underline-offset:.22em; }
+nav { font:.72rem var(--mono); letter-spacing:.045em; border-bottom:1px solid var(--line); padding-bottom:13px; }
+header { display:grid; grid-template-columns:1fr minmax(245px,302px); gap:20px; align-items:end; padding:25px 0 19px; }
+.instrument { margin:0 0 8px; color:#e8be98; font:.69rem var(--mono); letter-spacing:.09em; text-transform:uppercase; }
+h1 { margin:0; font:500 clamp(3.5rem,8vw,7rem)/.91 Georgia,serif; letter-spacing:-.067em; }
+.lede { font:.92rem/1.56 system-ui,sans-serif; color:#d8d4e4; margin:0; }
+.controls { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+.controls [role=group], .views { display:flex; gap:5px; }
+.sources { display:flex; align-items:baseline; gap:8px; margin:0; }
+.sources output { font:1.62rem Georgia,serif; font-variant-numeric:tabular-nums; color:#f6dcae; }
+.sources span { font:.69rem var(--mono); color:var(--quiet); white-space:nowrap; }
+button { border:1px solid #565064; color:#efdfc5; font:.77rem var(--mono); background:#242436; white-space:nowrap; padding:0 12px; min-height:42px; border-radius:2px; cursor:pointer; }
+button[aria-pressed=true] { background:#ead0a8; border-color:#ead0a8; color:#242133; }
+button:not(:disabled):hover { border-color:#f4dbb7; }
+button:disabled { opacity:.47; cursor:default; }
+:focus-visible { outline:2px solid #f3d5a8; outline-offset:3px; }
+figure { margin:0; border:1px solid var(--line); background:#1b1c2b; }
+#stage { position:relative; background:var(--ink); height:clamp(380px,48vw,496px); isolation:isolate; overflow:hidden; }
+canvas { display:block; width:100%; height:100%; cursor:grab; touch-action:none; }
+canvas:active { cursor:grabbing; }
+canvas:focus-visible { outline-offset:-3px; }
+.labels { position:absolute; inset:0; pointer-events:none; font:.69rem var(--mono); letter-spacing:.015em; color:#f3dcc0; }
+.labels span { position:absolute; transform:translate(8px,-50%); white-space:nowrap; text-shadow:0 1px 4px #111420,0 0 5px #111420; }
+.labels span::before { display:inline-block; width:5px; height:5px; border:1px solid currentColor; transform:rotate(45deg); margin-right:5px; content:""; }
+.labels #source-marker { transform:translate(-50%,-50%); width:18px; height:18px; border:1px solid #ffe3ae; border-radius:50%; }
+.labels #source-marker::before { display:none; }
+.coordinates { position:absolute; left:13px; top:12px; display:flex; gap:10px; font:.71rem var(--mono); color:#c1c0d6; pointer-events:none; }
+.coordinates abbr { color:#e1bb89; text-decoration:none; }
+.notice { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); padding:12px 15px; margin:0; width:max-content; max-width:calc(100% - 26px); background:#262637; border:1px solid var(--line); font-size:.89rem; }
+.notice p { margin:0 0 5px; }
+figcaption { display:flex; gap:14px; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding:10px 12px; }
+figcaption p { margin:0; font:.74rem/1.38 var(--mono); color:var(--quiet); overflow-wrap:anywhere; }
+figcaption #selection { color:#efdfc5; margin-bottom:4px; }
+footer { display:flex; justify-content:space-between; gap:7px; padding-top:13px; color:var(--quiet); font:.69rem var(--mono); }
+@media(max-width:650px) {
+  main { width:calc(100% - 24px); padding-top:11px; }
+  header { display:block; padding:19px 0 12px; }
+  h1 { font-size:clamp(3rem,11.6vw,4rem); margin-bottom:8px; }
+  .instrument { font-size:.61rem; margin-bottom:5px; }
+  .lede { font-size:.82rem; }
+  .controls { display:grid; gap:5px; margin-bottom:5px; }
+  button { font-size:.68rem; min-height:44px; padding-inline:10px; }
+  .sources { gap:5px; }
+  .sources output { font-size:1.27rem; }
+  .sources span { font-size:.63rem; }
+  #stage { height:clamp(324px,96vw,388px); }
+  .labels { font-size:.53rem; }
+  figcaption { align-items:start; flex-direction:column; gap:8px; }
+  figcaption p { font-size:.66rem; }
+}

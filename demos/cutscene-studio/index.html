@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#171d29"><link rel="icon" href="data:,"><title>Cutscene Studio · Margo Engine</title>  <script type="module" crossorigin src="./assets/index-I8wDjO60.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bz0s8ku_.css">
+</head>
+<body><main>
+<nav aria-label="Exhibit links"><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Film notes</a></nav>
+<header><h1>Cutscene Studio</h1><p>Edit a lighthouse scene in three shots. Move a cut, scrub the dialogue or render the sequence to a video file.</p></header>
+<section class="studio" aria-label="Cutscene editor">
+<div class="transport">
+<button id="play" class="primary" type="button" disabled>Play cut</button>
+<button id="captions" type="button" aria-pressed="true" disabled>Captions</button>
+<button id="audio" type="button" aria-pressed="true" disabled>Sound</button>
+<button id="export" type="button" disabled>Render video</button>
+</div>
+<figure><div class="monitor">
+<canvas id="picture" aria-label="Rendered lighthouse scene"></canvas>
+<p id="loading" role="status">Preparing the lantern room…</p>
+<div id="caption" class="caption" hidden></div>
+<div id="titles" hidden><strong>Bring the Light Around</strong><span>Made with Margo Engine</span><span>Please subscribe</span></div>
+</div><figcaption><strong id="shot">The lens</strong><output id="clock">00:00.00</output></figcaption></figure>
+<div class="timeline">
+<label for="time" class="track-title">Sequence</label>
+<input id="time" type="range" min="0" max="11.8" step=".01" value="0" disabled>
+<div id="shots" role="group" aria-label="Camera shots">
+<button id="lens" type="button" disabled aria-pressed="true">The lens</button>
+<button id="keeper" type="button" disabled aria-pressed="false">The keeper</button>
+<button id="channel" type="button" disabled aria-pressed="false">The channel</button>
+</div>
+<div id="captions-track" aria-label="Dialogue clips"></div>
+</div>
+<div class="trim">
+<label>Cut to the keeper <output id="first-value">2.15 s</output><input id="first" type="range" min="1.55" max="2.42" value="2.15" step=".01" disabled></label>
+<label>Cut to the channel <output id="second-value">6.36 s</output><input id="second" type="range" min="6" max="7.35" value="6.36" step=".01" disabled></label>
+</div>
+<p id="status" role="status"></p>
+</section>
+</main></body></html>

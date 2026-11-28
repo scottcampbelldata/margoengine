@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ede9df">
+  <meta name="description" content="Release one or two polished steel balls and watch a contact pulse cross Newton’s cradle.">
+  <title>Newton’s Cradle · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-0Lq9tio_.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DwceeMlz.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>Newton’s Cradle</h1>
+      <p>Release one or two balls. Watch the impulse travel through the row and send the far end swinging.</p>
+    </header>
+    <section class="instrument" aria-label="Newton’s cradle experiment">
+      <figure>
+        <canvas id="scene" aria-label="Five polished steel spheres hung from brass rails over an inlaid walnut base"></canvas>
+        <p id="loading" role="status">Preparing the cradle…</p>
+      </figure>
+      <aside aria-label="Cradle controls">
+        <div class="counts">
+          <h2>Balls to lift</h2>
+          <div role="group" aria-label="Balls to lift">
+            <button type="button" data-count="1" aria-pressed="true" disabled>One ball</button>
+            <button type="button" data-count="2" aria-pressed="false" disabled>Two balls</button>
+          </div>
+        </div>
+        <button type="button" id="release" disabled>Release</button>
+        <button type="button" id="slow" aria-pressed="false" disabled>Slow motion</button>
+        <dl>
+          <div><dt>Energy remaining</dt><dd><output id="energy">100</output><small>%</small></dd></div>
+          <div><dt>Fastest ball</dt><dd><output id="speed">0.00</output><small>m/s</small></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>

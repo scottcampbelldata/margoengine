@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3efe4">
+  <meta name="description" content="Pick a junction in Washington, D.C. and trace the shortest legal road path through a directed graph.">
+  <link rel="icon" href="data:,">
+  <title>Shortest Paths · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-XyYuc47R.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DNOiYfm3.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine</a><span></span>Web demos</nav>
+    <header>
+      <h1>Shortest Paths</h1>
+      <p>Choose a starting junction in central Washington, D.C. and trace the shortest route along the city’s one-way and two-way streets.</p>
+    </header>
+    <section class="exhibit" aria-label="Directed road routing atlas">
+      <figure>
+        <canvas id="streets" aria-label="Washington road map. Tap a junction to set the start or destination. The junction selectors offer the same controls."></canvas>
+        <div class="map-title"><strong>WASHINGTON, D.C.</strong><span>Downtown to Southwest</span></div>
+        <div class="north" aria-label="Grid north is up"><span>N</span><i></i></div>
+        <div id="origin-pin" class="pin origin" aria-hidden="true" hidden>A</div>
+        <div id="destination-pin" class="pin destination" aria-hidden="true" hidden>B</div>
+        <div class="scale" aria-label="Scale bar 500 meters"><i></i><span>500 m</span></div>
+        <div id="status" role="status"><strong>Opening the street graph…</strong><span id="error"></span><a id="requirements" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside>
+        <fieldset id="controls" disabled>
+          <legend>Plan a route</legend>
+          <div class="pick" aria-label="Map tap sets the selected endpoint">
+            <button id="pick-start" type="button" aria-pressed="true">Pick start</button>
+            <button id="pick-end" type="button" aria-pressed="false">Pick destination</button>
+          </div>
+          <label class="select-label" for="origin"><i>A</i> Start</label>
+          <select id="origin"></select>
+          <label class="select-label" for="destination"><i>B</i> Destination</label>
+          <select id="destination"></select>
+          <div class="row">
+            <button id="swap" type="button">Swap ends</button>
+            <label for="oneways"><input id="oneways" type="checkbox"> One-way arrows</label>
+          </div>
+        </fieldset>
+        <section id="result" aria-live="polite">
+          <div class="distance"><strong id="distance">—</strong><span id="route-label">Shortest distance</span></div>
+          <p id="reachable">—</p>
+          <ol id="route-streets" aria-label="Streets along route"></ol>
+        </section>
+        <div class="map-key">
+          <div><i></i> Selected route</div>
+          <div class="ramp"><span>Near start</span><i></i><span>Farther</span></div>
+        </div>
+        <p class="backend">Search runs on <span id="backend">—</span></p>
+      </aside>
+    </section>
+    <footer>
+      <p>Routing study for the mapped area. Distances use centerline lengths and recorded street direction. Turn restrictions and live conditions are outside the model.</p>
+      <p>Adapted from the District of Columbia’s road and water data. <a href="https://catalog.data.gov/dataset/roadway-centerlines">DDOT Roadway Centerlines</a> · <a href="https://catalog.data.gov/dataset/waterbodies-2021">DC GIS Waterbodies</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
+    </footer>
+  </main>
+</body>
+</html>

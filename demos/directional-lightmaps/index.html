@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-ClpP2YBs.js"><script src="./assets/webgl2-preload-39cb657f.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17282a">
+  <meta name="description" content="Compare a directional lightmap with the same bake storing light intensity alone.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/tide-register-CmjIuzL1.bin" crossorigin>
+
+  <title>Directional Lightmaps · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Od61mPeD.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BSwdVlql.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Surface &amp; light</span></nav>
+    <header>
+      <div>
+        <h1>Directional<br> Lightmaps</h1>
+      </div>
+      <p>See what a baked light direction reveals in a relief.</p>
+    </header>
+    <figure id="exhibit">
+      <div id="stage">
+        <canvas id="view" role="img" aria-label="An enamel frieze of tides and contour lines in a bronze exhibit frame"></canvas>
+        <p id="status" role="status">Opening the exhibit…</p>
+      </div>
+      <figcaption class="controls">
+        <div>
+          <span id="group-label">Baked lighting</span>
+          <div class="switch" role="group" aria-labelledby="group-label">
+            <button type="button" id="directional" aria-pressed="true" disabled>Directional</button>
+            <button type="button" id="flat" aria-pressed="false" disabled>Intensity only</button>
+          </div>
+        </div>
+        <p id="summary" aria-live="polite">Tide Register · glazed relief study</p>
+      </figcaption>
+    </figure>
+    <section class="notes" aria-label="Baking information">
+      <p>The panel stays flat. Its normal map gives each ridge and groove a direction. Enable Directional to let those slopes respond to the baked light.</p>
+      <details>
+        <summary>How it was baked</summary>
+        <p>The same fixed lamp feeds both modes. The intensity map stores the light that reaches the flat panel. The directional maps also store where that light came from, so Margo can shade each mapped slope. The light stays fixed while you compare.</p>
+      </details>
+    </section>
+  </main>
+
+</body>
+</html>

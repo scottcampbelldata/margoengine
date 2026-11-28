@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Dgoc8069.js"><script src="./assets/inline-e9f6e896.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1b252a">
+  <meta name="description" content="Move three MRI slices through a real head scan and compare them with bone from the registered CT.">
+  <title>The Brain Scan · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" crossorigin="anonymous" href="./assets/mri-opening-B_eKpq4y.bin">
+  <script type="module" crossorigin src="./assets/index-CSavOTtn.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="modulepreload" crossorigin href="./assets/geometry-BT3MG39c.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-gyFnpvUx.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../" class="brand">Margo Engine <span>Web demos</span></a></nav>
+    <header><h1>The Brain Scan</h1><p>Move three slices through a real MRI. Switch to its paired CT to see where bone surrounds the same anatomy.</p></header>
+    <section class="stage" aria-label="Three-dimensional scan viewer">
+      <canvas id="viewer" tabindex="0" aria-label="Registered MRI and CT viewer. Drag or use arrow keys to rotate."></canvas>
+      <div class="stage-top">
+        <p id="modality">MRI <span>·</span> T1-weighted</p>
+        <div class="views" role="group" aria-label="Image modality">
+          <button id="mri" type="button" aria-pressed="true" disabled>MRI</button>
+          <button id="bone" type="button" aria-pressed="false" disabled>CT bone</button>
+        </div>
+      </div>
+      <p id="gesture">Drag to rotate</p>
+      <p id="busy" role="status" hidden></p>
+      <p id="status" class="notice" role="status">Opening the MRI…</p>
+      <div id="error" class="notice" role="alert" hidden><p id="message"></p><a id="help" href="https://margoengine.com/errors#webgpu" hidden>WebGPU support</a></div>
+    </section>
+    <div class="panel" id="mri-controls" aria-label="MRI slice controls">
+      <div class="field axial">
+        <label for="axial">Axial</label><output id="axial-value" for="axial">—</output>
+        <input id="axial" type="range" min="0" max="100" step="1" disabled>
+        <button type="button" class="inspect" data-inspect="axial" aria-pressed="false" disabled>View axial</button>
+      </div>
+      <div class="field coronal">
+        <label for="coronal">Coronal</label><output id="coronal-value" for="coronal">—</output>
+        <input id="coronal" type="range" min="0" max="100" step="1" disabled>
+        <button type="button" class="inspect" data-inspect="coronal" aria-pressed="false" disabled>View coronal</button>
+      </div>
+      <div class="field sagittal">
+        <label for="sagittal">Sagittal</label><output id="sagittal-value" for="sagittal">—</output>
+        <input id="sagittal" type="range" min="0" max="100" step="1" disabled>
+        <button type="button" class="inspect" data-inspect="sagittal" aria-pressed="false" disabled>View sagittal</button>
+      </div>
+    </div>
+    <div class="panel ct-panel" id="ct-controls" aria-label="CT density threshold" hidden>
+      <div class="field density">
+        <label for="threshold">CT surface threshold</label><output id="threshold-value" for="threshold">460 HU</output>
+        <input id="threshold" type="range" min="240" max="940" step="20" value="460" disabled>
+      </div>
+      <dl><div><dt id="count-label">Surface triangles</dt><dd><output id="count" aria-labelledby="count-label">—</output></dd></div></dl>
+    </div>
+    <div class="tools">
+      <button id="cut" type="button" aria-pressed="true" disabled>Cutaway</button>
+      <button id="reset" type="button" disabled>Reset view</button>
+      <span id="basis">Coordinates from scan center</span>
+    </div>
+    <footer><a href="./source/README.md">Scene notes and source</a><a href="https://doi.org/10.5281/zenodo.17486320">Scan data · CC BY 4.0</a></footer>
+  </main>
+</body>
+</html>

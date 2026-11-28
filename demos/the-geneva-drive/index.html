@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#efede3">
+  <meta name="description" content="Turn the crank of a four-slot Geneva drive and watch a continuous turn become one precise step. Built in Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Geneva Drive · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BtobrULO.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dnbby4OG.css">
+</head>
+<body>
+<main>
+  <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+  <header>
+    <h1>The Geneva Drive</h1>
+    <p>Turn the crank one revolution. Its roller moves the bronze wheel a quarter turn, then the locking cam holds it still.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="A cream and green mechanism exhibit. A red roller on the input crank enters a slot on the bronze wheel."></canvas>
+      <p id="loading" role="status">Starting the drive…</p>
+      <figcaption><span><i class="driver" aria-hidden="true"></i> Drive roller</span><span><i class="wheel" aria-hidden="true"></i> Geneva wheel</span></figcaption>
+    </figure>
+    <section class="controls" aria-label="Crank controls">
+      <div class="turn"><label for="angle">Crank rotation</label><output id="crank" for="angle">183°</output></div>
+      <input id="angle" type="range" min="0" max="360" step="1" value="183" disabled>
+      <div class="scale" aria-hidden="true"><span>0°</span><span>360°</span></div>
+      <div class="trace" aria-label="The wheel indexes between 150 and 240 degrees of crank rotation">
+        <div class="span"><i></i><i></i><i></i><b id="marker"></b></div>
+        <div class="trace-labels" aria-hidden="true"><span>Dwell</span><span>Index</span><span>Dwell</span></div>
+      </div>
+      <button type="button" id="play" aria-pressed="false" disabled>Play the turn<span aria-hidden="true">↗</span></button>
+      <dl><div><dt>Wheel rotation</dt><dd id="wheel">—</dd></div><div><dt>Mechanism</dt><dd id="phase">—</dd></div></dl>
+      <p id="explanation">The roller is inside a slot and drives the wheel.</p>
+    </section>
+  </article>
+  <footer><p>A four-slot external Geneva mechanism. The shafts turn in opposite directions.</p><a href="./source/kinematics.js">View the kinematics</a></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,75 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  --bg: #1a2420; --panel: #25322b; --rule: #535f50; --muted: #bdc5af;
+  --ink: #efeade; --gold: #e4c88e;
+  background: var(--bg); color: var(--ink);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { width: min(100% - 52px, 1120px); margin: auto; padding-bottom: 40px; }
+nav {
+  min-height: 56px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--rule); color: var(--muted); font-size: .81rem;
+}
+nav a { color: inherit; font-weight: 650; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; gap: .5em; }
+nav a:hover { text-decoration: underline; text-underline-offset: 3px; }
+header { padding: clamp(21px, 3.4vw, 42px) 0 clamp(14px, 2.1vw, 25px); }
+h1 { font: 400 clamp(3.3rem, 7.1vw, 6.0rem)/.95 Georgia, serif; margin: 0; letter-spacing: -.068em; }
+header p { margin: 13px 0 0; font-size: clamp(.95rem, 1.35vw, 1.09rem); color: var(--muted); line-height: 1.35; }
+#exhibit { border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.runbar { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; background: var(--panel); border-bottom: 1px solid var(--rule); }
+.mode { display: flex; align-items: center; gap: 8px; font-size: .89rem; font-weight: 650; }
+.lamp { width: 8px; height: 8px; border-radius: 50%; background: #94ad79; }
+[data-blocked=true] .lamp { background: #db9a68; }
+button {
+  background: var(--gold); color: #30271b; border-radius: 3px; padding: 0 12px; min-height: 44px; border: 1px solid var(--gold);
+  white-space: nowrap; font: 700 .87rem "Segoe UI", system-ui, sans-serif; cursor: pointer;
+}
+button[aria-pressed=true] { background: transparent; color: var(--gold); }
+button:disabled { opacity: .5; cursor: default; }
+button:hover:not(:disabled) { background: #f8dfaa; color: #271c11; }
+.chamber { position: relative; aspect-ratio: 1.67; background: #192b27; }
+canvas { display: block; width: 100%; height: 100%; }
+.chamber > span {
+  position: absolute; left: 16px; font: .74rem ui-monospace, Consolas, monospace; letter-spacing: .14em;
+  color: #e8d7a8;
+}
+.chamber .air { top: 25%; }.chamber .soil { top: 76%; }
+.actions { display: flex; gap: 7px; justify-content: flex-end; }
+#angle { color: var(--ink); border-color: #95967c; background: #2c3e35; }
+#angle:hover:not(:disabled) { background: #ded1aa; color: #30271b; }
+#status {
+  position: absolute; left: 14px; top: 12px; margin: 0; padding: 7px 9px; max-width: min(64%,460px);
+  color: #f7ebd4; background: #293a30; border: 1px solid var(--rule); border-radius: 3px; font-size: .79rem;
+}
+#status:empty { display: none; }
+.controls { display: grid; grid-template-columns: 1fr 1fr; background: var(--panel); border-top: 1px solid var(--rule); }
+.replay { display: grid; grid-template-columns: 1fr auto; padding: 10px 13px 1px; align-items: center; gap: 2px 11px; }
+label { font-size: .87rem; font-weight: 650; }
+output { font: .84rem ui-monospace, Consolas, monospace; color: var(--gold); }
+input { margin: 0; width: 100%; height: 44px; accent-color: var(--gold); grid-column: 1/-1; cursor: pointer; }
+input:disabled { cursor: default; }
+dl { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin: 0; border-left: 1px solid var(--rule); }
+dl div { padding: 10px 11px; }
+dl div + div { border-left: 1px solid var(--rule); }
+dt { font-size: .74rem; color: var(--muted); font-weight: 650; }
+dd { margin: 4px 0 0; color: var(--ink); font: .94rem ui-monospace, Consolas, monospace; }
+details { margin-top: 15px; max-width: 740px; border-bottom: 1px solid var(--rule); }
+summary { min-height: 44px; padding-top: 11px; cursor: pointer; font-size: .88rem; font-weight: 650; }
+details p { font-size: .92rem; line-height: 1.55; color: var(--muted); margin: 5px 0 14px; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+@media (max-width: 740px) {
+  main { width: calc(100% - 28px); }
+  nav { min-height: 49px; }
+  header { padding: 20px 0 15px; }
+  h1 { font-size: clamp(2.65rem, 11.5vw, 5.5rem); }
+  header p { margin-top: 10px; }
+  .runbar { padding: 6px 9px; gap: 5px; }
+  .actions button { padding-inline: 8px; font-size: .8rem; }
+  .chamber { aspect-ratio: .93;}
+  .chamber > span { left: 9px; font-size: .64rem; }
+  .chamber .air { top: auto; bottom: 48%; }.chamber .soil { top: auto; bottom: 7%; }
+  .controls { grid-template-columns: 1fr; }
+  dl { border-left: 0; border-top: 1px solid var(--rule); }
+}

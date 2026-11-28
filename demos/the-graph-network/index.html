@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102724">
+  <meta name="description" content="Explore the ferry routes of an invented archipelago. Tap any port to trace its direct connections in Margo’s GPU graph.">
+  <title>The Graph Network · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-B77p1dg3.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/version-YYhCZP03.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-QuefGE10.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine</a><span></span>Web demos</nav>
+    <header>
+      <h1>The Graph Network</h1>
+      <p>Read the ferry routes of a fictional archipelago. Tap a port to trace where it can take you.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive ferry network">
+      <figure>
+        <canvas id="chart" aria-label="Ferry-route network. Tap a colored dot to inspect a port. Use the port selector to browse with a keyboard."></canvas>
+        <div class="chart-title"><strong>THE OUTER STRAITS</strong><span id="inventory">Ferry network</span></div>
+        <div class="chart-key" aria-label="Chart key"><span><i class="dot"></i>Port</span><span><i class="route"></i>Inter-island crossing</span></div>
+        <div id="marker" class="marker" hidden aria-hidden="true"></div>
+        <div id="status" role="status"><strong>Opening the route chart…</strong><span id="error"></span><a id="requirements" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <aside aria-label="Port and graph controls">
+        <fieldset id="controls" disabled>
+          <legend>Port inspector</legend>
+          <div class="selection">
+            <label for="port">Port of departure</label>
+            <select id="port"><option value="">Choose a port</option></select>
+          </div>
+          <section id="inspection" aria-live="polite">
+            <div class="direct"><strong id="from">Trace a connection</strong><output id="degree"></output></div>
+            <p id="message">Select any colored dot to reveal its direct ferry routes.</p>
+            <ul id="connections" aria-label="Ports with direct ferries"></ul>
+            <p id="indirect" hidden></p>
+          </section>
+          <div class="layout">
+            <button type="button" id="relax">Run layout</button>
+            <output id="iterations" aria-label="GPU layout passes">—</output>
+          </div>
+          <p id="live-requirements" hidden><a href="https://margoengine.com/webgpu.html">Graphics requirements for live layout</a></p>
+        </fieldset>
+      </aside>
+    </section>
+    <footer>
+      <p>Invented ports and bidirectional routes. Position shows network structure in graph units.</p>
+      <details><summary>About the layout</summary><p>Connected ports attract and all ports repel. Eight island hubs hold their positions. Each highlighted line is one direct route. The two-ferry tally counts the ports whose shortest route needs exactly two crossings.</p><p><a href="https://doi.org/10.1002/spe.4380211102">Fruchterman and Reingold’s force-directed layout</a></p></details>
+    </footer>
+  </main>
+</body>
+</html>

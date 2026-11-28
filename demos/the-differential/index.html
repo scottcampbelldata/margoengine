@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#181e21">
+  <meta name="description" content="See how an open differential lets its wheels turn at different speeds.">
+  <title>The Differential · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BJohqy_b.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CO_O9tZH.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Differential</h1>
+      <p>Steer into a turn. The outside wheel speeds up and the inside wheel slows down, even as the carrier holds its speed.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive differential cutaway">
+      <canvas id="scene" aria-label="Open differential cutaway with two opposed output shafts, bevel gears and their carrier"></canvas>
+      <p id="loading" role="status">Preparing the gear assembly…</p>
+      <button id="view" type="button" aria-pressed="false" disabled>Gear close-up</button>
+    </section>
+    <section class="control-panel" aria-label="Differential controls">
+      <div class="steering">
+        <div class="label"><label for="turn">Steering</label><output id="turn-value" for="turn">Straight</output></div>
+        <input id="turn" type="range" min="-100" max="100" step="1" value="0" disabled>
+        <div class="ends" aria-hidden="true"><span>Left turn</span><span>Straight</span><span>Right turn</span></div>
+      </div>
+      <button id="pause" type="button" aria-pressed="false" disabled>Pause</button>
+      <dl class="rates">
+        <div><dt>Left axle</dt><dd><output id="left" for="turn">60</output><small>rpm</small></dd></div>
+        <div><dt>Carrier</dt><dd><output id="carrier">60</output><small>rpm</small></dd></div>
+        <div><dt>Right axle</dt><dd><output id="right" for="turn">60</output><small>rpm</small></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

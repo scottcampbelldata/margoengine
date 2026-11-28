@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#28211e">
+  <meta name="description" content="Add odd harmonics to a tone and watch a sine wave take on the shape of a square wave.">
+  <title>The Fourier Organ · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CVrFNXJ3.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BXnhLDrO.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Fourier Organ</h1>
+      <p>Add harmonics to a single tone. See its wave take shape, then listen to the same mix.</p>
+    </header>
+    <section class="exhibit" aria-label="Additive synthesis and waveform instrument">
+      <figure>
+        <canvas id="scene" aria-label="Seven brass organ pipes above a dark glass oscilloscope plotting the summed wave"></canvas>
+        <p id="loading" role="status">Preparing the organ…</p>
+      </figure>
+      <aside aria-label="Harmonic count and optional audio">
+        <div class="control">
+          <div><label for="partials">Odd harmonics</label><output id="partial-count" for="partials">2</output></div>
+          <input id="partials" type="range" min="1" max="7" value="2" step="1" disabled>
+        </div>
+        <dl>
+          <div><dt>Fundamental</dt><dd>174<small>Hz</small></dd></div>
+          <div><dt>Highest harmonic</dt><dd><output id="highest">522</output><small>Hz</small></dd></div>
+          <div><dt>Partial frequencies</dt><dd><output id="frequencies">174 · 522</output></dd></div>
+        </dl>
+        <button id="listen" type="button" aria-pressed="false" disabled>Listen</button>
+        <p id="audio-status" role="status" hidden>Audio is unavailable in this browser.</p>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>
+

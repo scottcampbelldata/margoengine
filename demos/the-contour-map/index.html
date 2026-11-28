@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-556fb238.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#192a29">
+  <link rel="icon" href="data:,">
+  <title>The Contour Map · Margo Engine</title>
+  <link rel="preload" href="./assets/dem-helens-SU6ahIA-.dat" as="fetch" crossorigin>
+  <link rel="preload" href="./assets/contour-200-BGWAKPF9.paths" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-BIsk4TT7.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DYlRbvaP.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header><h1>The Contour Map</h1><p>Read Mount St. Helens in layers. Change the interval between contours or tilt the terrain to see the crater in relief.</p></header>
+    <section class="work" aria-label="Mount St. Helens contour exhibit">
+      <figure>
+        <div class="caption"><span>Mount St. Helens</span><span id="mode-label">Topographic map</span></div>
+        <div class="plate">
+          <canvas id="view" aria-label="Model of Mount St. Helens with contour bands"></canvas>
+          <canvas id="labels" aria-hidden="true"></canvas>
+          <p id="status" role="status">Opening the elevation grid…</p>
+          <p id="error" role="alert" hidden></p>
+        </div>
+      </figure>
+      <aside>
+        <fieldset id="tools" disabled>
+          <legend>Contour interval</legend>
+          <div class="actions">
+            <button type="button" data-interval="100" aria-pressed="false">100 m</button>
+            <button type="button" data-interval="200" aria-pressed="true">200 m</button>
+            <button type="button" data-interval="400" aria-pressed="false">400 m</button>
+          </div>
+          <div class="views">
+            <button type="button" id="map" aria-pressed="true">Map</button>
+            <button type="button" id="relief" aria-pressed="false">Relief</button>
+          </div>
+          <div class="toggles">
+            <label><input type="checkbox" id="show-lines" checked>Contour lines</label>
+            <label><input type="checkbox" id="show-labels" checked>Elevation labels</label>
+          </div>
+        </fieldset>
+        <div class="scale"><span>575 m</span><span>1,550 m</span><span>2,509 m</span></div>
+        <dl>
+          <div><dt>Contour paths</dt><dd><output id="path-count">—</output></dd></div>
+          <div><dt>Filled elevation bands</dt><dd><output id="band-count">—</output></dd></div>
+          <div><dt>Point elevation</dt><dd><output id="probe">Tap the map</output></dd></div>
+        </dl>
+        <p id="message" role="status"></p>
+      </aside>
+    </section>
+    <footer>USGS 3DEP bare-earth elevation · 15.2 km square · WGS 84 / UTM 10N<br><a href="./source/README.md">Elevation data and method</a></footer>
+  </main>
+</body>
+</html>

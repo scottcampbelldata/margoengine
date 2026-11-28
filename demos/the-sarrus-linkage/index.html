@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A fold-out field platform demonstrating a Sarrus linkage in Margo Engine.">
+  <meta name="theme-color" content="#eee8db">
+  <title>The Sarrus Linkage · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-keii6Pb5.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BkdxRDx_.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Sarrus Linkage</h1>
+      <p>Raise the survey deck. Its two hinge sets fold at right angles, so the deck stays level and rises straight up.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive field platform">
+      <figure aria-label="Fold-out survey platform viewed in the field">
+        <canvas id="scene" aria-label="A survey platform with teal and orange hinges and a green center reference"></canvas>
+        <p id="loading" role="status">Opening the platform…</p>
+        <button id="view" type="button" aria-pressed="false" disabled>Top view</button>
+      </figure>
+      <aside aria-label="Platform controls">
+        <div class="slider-label">
+          <label for="angle">Hinge angle</label>
+          <output id="degrees" for="angle">48°</output>
+        </div>
+        <input id="angle" type="range" min="16" max="73" value="48" step=".1" disabled>
+        <div class="range" aria-hidden="true"><span>16°</span><span>73°</span></div>
+        <button id="cycle" type="button" disabled>Raise and lower</button>
+        <div class="measures">
+          <div>
+            <span id="height-label">Hinge separation</span>
+            <output id="height" aria-labelledby="height-label" aria-live="off">1.189 m</output>
+          </div>
+          <div>
+            <span id="drift-label">Sideways drift</span>
+            <output id="drift" aria-labelledby="drift-label" aria-live="off">0.0 mm</output>
+          </div>
+        </div>
+        <p class="note">The green post is a fixed reference. The deck opening clears it throughout the lift.</p>
+      </aside>
+    </section>
+    <footer>
+      <p>The teal and orange hinge axes are perpendicular. Each arm spans 800 mm between pins.</p>
+      <details>
+        <summary>Model and sources</summary>
+        <p>With two equal-length arms per hinge set, the rise above the lower hinges is 1.60 m × sin(hinge angle). The two hinge sets constrain the deck to the vertical intersection of their motion planes. The model uses rigid links and ideal pins.</p>
+        <ul>
+          <li><a href="https://dingler.bbaw.de/articles/ar129072.html">1853 report on Sarrus’s mechanism</a></li>
+          <li><a href="https://www.jstage.jst.go.jp/article/jsmec1993/39/4/39_4_790/_article">Chung-Ching Lee’s kinematic analysis</a></li>
+          <li><a href="https://pure.hw.ac.uk/ws/portalfiles/portal/142859647/Kong_JMR2024_Pure.pdf">Kong, He, and Kostalas on 6R translation</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

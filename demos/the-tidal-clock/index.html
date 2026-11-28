@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e6eeed">
+  <meta name="description" content="Scrub a day of tides in a miniature harbor and compare the changing waterline on spring and neap tides.">
+  <title>The Tidal Clock | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-fNbQHq12.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-Dj8wjpS2.css">
+</head>
+<body data-state="loading" data-mode="spring">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header><h1>The Tidal Clock</h1><p>Scrub through a day in the harbor. Compare how far the water climbs when the Moon’s tide and the Sun’s tide line up or pull against each other.</p></header>
+    <section class="exhibit" aria-label="Harbor tide model">
+      <figure>
+        <canvas id="scene" aria-label="Circular 3D harbor with a lighthouse, a tide staff, wet and dry sand flats, and a floating buoy"></canvas>
+        <p id="loading" role="status">Opening the harbor…</p>
+        <div class="figure-note"><i></i>Illustrative harbor</div>
+      </figure>
+      <aside aria-label="Tide controls and measurements">
+        <div class="mode" aria-label="Tide pattern" role="group">
+          <button id="spring" type="button" aria-pressed="true" disabled>Spring tide</button>
+          <button id="neap" type="button" aria-pressed="false" disabled>Neap tide</button>
+        </div>
+        <p id="behavior">Lunar and solar tides mostly reinforce each other.</p>
+        <div class="time">
+          <div class="label"><label for="hour">Model time</label><output id="clock" for="hour">02:00</output></div>
+          <input id="hour" type="range" min="0" max="1440" step="5" value="120" disabled>
+          <div class="limits"><span>00:00</span><span>12:00</span><span>24:00</span></div>
+        </div>
+        <dl>
+          <div class="major">
+            <dt>Water level</dt>
+            <dd><output id="water">—</output><small>m</small></dd>
+            <p id="trend">Falling</p>
+          </div>
+          <div class="minor"><dt>Range this day</dt><dd><output id="amplitude">—</output><small>m</small></dd></div>
+        </dl>
+        <button id="play" type="button" disabled>Play the day</button>
+      </aside>
+    </section>
+    <footer><span>Heights relative to mean water · Two-constituent model</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

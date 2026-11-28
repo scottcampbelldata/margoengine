@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BmbGq7X7.js"><script src="./assets/inline-6ffa24c7.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#24251e">
+<link rel="icon" href="data:,">
+<title>The Baked Room · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-B4BAb-Fl.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BSVb5k0l.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>The Baked Room</h1>
+    <p>Watch sampled sunlight settle onto clay, plaster and oak. Then filter the grain from the same lightmap.</p>
+  </header>
+  <section aria-label="Lightmap baking controls">
+    <div class="controls">
+      <button type="button" id="bake" disabled>Start live bake</button>
+      <button type="button" id="denoise" aria-pressed="false" disabled>Denoise</button>
+      <output id="passes">Loading lightmap</output>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="room" aria-label="A plaster room with oak fins, terracotta wall panels and three handmade ceramic vessels." aria-describedby="guide"></canvas>
+        <div id="notice"><p id="status" role="status">Opening the lighting study…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p id="guide">Start a fresh bake to watch the light accumulate one pass at a time.</p>
+        <span id="route">Margo Engine</span>
+      </figcaption>
+    </figure>
+  </section>
+</main>
+</body>
+</html>

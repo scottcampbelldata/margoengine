@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#182329">
+  <meta name="description" content="Move a survey lamp at night and follow the three reflections that send the beam back.">
+  <title>The Retroreflector · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-aSvYxNk1.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CvB40RtU.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header><h1>The Retroreflector</h1><p>Move the survey lamp. Three mirrors send its light back in the opposite direction.</p></header>
+    <section class="stage" aria-label="Interactive night survey scene">
+      <canvas id="scene" aria-label="A light and receiver on a survey tripod trace beams to and from a roadside corner cube"></canvas>
+      <button type="button" id="view" aria-pressed="false" disabled>Trace three reflections</button>
+      <p id="loading" role="status">Setting up the survey…</p>
+    </section>
+    <section class="panel" aria-label="Survey lamp and return measurements">
+      <div class="field">
+        <label for="azimuth">Lamp azimuth</label><output for="azimuth" id="azimuth-value">−15°</output>
+        <input id="azimuth" type="range" min="-25" max="25" step="1" value="-15" disabled>
+      </div>
+      <dl class="readings">
+        <div><dt id="route-label">Mirror order</dt><dd><output id="route" aria-labelledby="route-label">—</output></dd></div>
+        <div><dt id="offset-label">Return offset</dt><dd><output id="offset" aria-labelledby="offset-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Corner cube · 180° direction reversal</span></footer>
+  </main>
+</body>
+</html>

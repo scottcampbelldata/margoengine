@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Bop66Mxz.js"><script src="./assets/webgl2-preload-bdd3ba9d.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#252e34">
+  <title>Height Streaming · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-mWlGnQQG.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BrVzw5Or.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>Height Streaming</h1>
+      <p>Fly the bends of Utah’s Green River. Margo loads the measured terrain around you as the survey window moves.</p>
+    </header>
+    <div class="station">
+      <figure id="viewport" aria-label="Live terrain over Canyonlands National Park">
+        <canvas id="scene" aria-label="3D aerial view of layered cliffs and a winding river"></canvas>
+        <span id="loading" role="status">Loading the first survey tiles…</span>
+        <span id="error" role="alert" hidden></span>
+      </figure>
+      <aside class="instrument" aria-label="Flight and tile telemetry">
+        <div class="track">
+          <span class="eyebrow">Canyonlands, Utah</span>
+          <h2>Survey window</h2>
+          <p><output id="resident">0 / 36</output> tiles resident</p>
+        </div>
+        <div class="grid-frame"><div id="tile-map" aria-label="Six by six tile residency" aria-hidden="true"></div></div>
+        <div class="key"><span><i></i> Resident</span><span><i></i> Loading</span><span><i></i> Aircraft</span></div>
+        <dl class="reading">
+          <div><dt>Heading</dt><dd><output id="heading">224° SW</output></dd></div>
+          <div><dt>Elevation</dt><dd><output id="altitude">2,245 m</output></dd></div>
+          <div><dt>Survey tile</dt><dd><output id="position">08 E · 07 S</output></dd></div>
+          <div><dt>Travel</dt><dd><output id="travel">0.00 km</output></dd></div>
+        </dl>
+      </aside>
+    </div>
+    <div class="controls">
+      <button id="flight" type="button" aria-pressed="false" disabled>Start survey</button>
+      <button id="left" type="button" aria-label="Hold to steer left" disabled><span aria-hidden="true">←</span></button>
+      <button id="right" type="button" aria-label="Hold to steer right" disabled><span aria-hidden="true">→</span></button>
+      <button id="return" type="button" disabled>Return to start</button>
+      <span class="assist">Hold an arrow to steer. On desktop use WASD and the arrow keys.</span>
+    </div>
+    <footer class="source">
+      <span>28 × 28 km survey · 2 km tiles · 15.625 m samples · 25 m contours</span>
+      <a href="https://www.usgs.gov/3d-elevation-program">USGS 3DEP</a>
+      <a href="https://www.usgs.gov/national-hydrography/national-hydrography-dataset">USGS hydrography</a>
+    </footer>
+  </main>
+</body>
+</html>

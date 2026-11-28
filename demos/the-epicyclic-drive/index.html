@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#172623">
+<meta name="description" content="Hold the sun, carrier, or ring and watch three planet gears change motion in a true tooth-count gear train.">
+<link rel="icon" href="data:,">
+<title>The Epicyclic Drive · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BY0HCzW7.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-aGQgu-KO.css">
+</head>
+<body>
+<main>
+  <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+  <header>
+    <h1>The Epicyclic Drive</h1>
+    <p>Hold one member and turn the input. The same three planet gears can reduce speed or reverse direction.</p>
+  </header>
+  <article class="exhibit">
+    <figure>
+      <canvas id="scene" aria-label="An exposed planetary gearbox with a gold sun gear, three bronze planet gears, a teal carrier and a steel ring"></canvas>
+      <p id="loading" role="status">Starting the gearbox…</p>
+      <button type="button" id="front" disabled>Face-on view</button>
+    </figure>
+    <section class="controls" aria-label="Planetary gear controls">
+      <fieldset>
+        <legend>Hold stationary</legend>
+        <div class="choices">
+          <button type="button" data-hold="ring" aria-pressed="true" disabled>Ring</button>
+          <button type="button" data-hold="carrier" aria-pressed="false" disabled>Carrier</button>
+          <button type="button" data-hold="sun" aria-pressed="false" disabled>Sun</button>
+        </div>
+      </fieldset>
+      <div class="dial"><label for="angle"><span id="input-name">Sun</span> input</label><output id="amount" for="angle">126°</output></div>
+      <input id="angle" type="range" min="0" max="360" step="1" value="126" disabled>
+      <div class="ticks" aria-hidden="true"><span>0°</span><span>360°</span></div>
+      <button type="button" id="play" disabled>Play one turn<span aria-hidden="true">▷</span></button>
+      <dl>
+        <div><dt><i class="sun" aria-hidden="true"></i> Sun</dt><dd id="sun">—</dd></div>
+        <div><dt><i class="ring" aria-hidden="true"></i> Ring</dt><dd id="ring">—</dd></div>
+        <div><dt><i class="carrier" aria-hidden="true"></i> Carrier</dt><dd id="carrier">—</dd></div>
+      </dl>
+      <p id="note">With the ring fixed, the carrier follows the sun at 7/26 of its speed.</p>
+    </section>
+  </article>
+  <footer><p>21 sun teeth, 18 on each planet, 57 inside the ring.</p><a href="./source/README.md">Model and sources</a></footer>
+</main>
+</body>
+</html>

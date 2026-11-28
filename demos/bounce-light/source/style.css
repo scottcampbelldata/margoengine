@@ -1,0 +1,40 @@
+@charset "UTF-8";
+:root{color-scheme:dark;background:#12191b;color:#f5eee0;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(calc(100% - 64px),1336px);margin:auto;padding:22px 0 25px}
+nav{display:flex;gap:.65rem;align-items:center;color:#839396;font-size:.75rem}
+nav a,footer a{color:#a9bdbc;text-decoration:none}
+nav a:hover,footer a:hover{text-decoration:underline}
+header{margin:22px 0 18px}
+h1{font-family:Georgia,serif;font-weight:400;letter-spacing:-.055em;font-size:clamp(3rem,6.4vw,5.4rem);line-height:1;margin:0 0 10px}
+header p,#details{margin:0;color:#c2cecd;line-height:1.46}
+figure{position:relative;overflow:hidden;margin:0;background:#242829;border:1px solid #5e716e}
+canvas{display:block;width:100%;height:var(--frame-height);margin:0 auto}
+figure{--frame-height:clamp(375px,52vw,655px)}
+#loading,#error{position:absolute;left:13px;bottom:13px;margin:0;background:#11191a;border:1px solid #677774;padding:.7rem .8rem;font-size:.82rem;max-width:calc(100% - 26px)}
+#error{color:#ffd4c5}
+.controls{display:flex;justify-content:space-between;align-items:end;gap:12px;padding:12px 0 14px;border-bottom:1px solid #3c514e}
+fieldset{padding:0;margin:0;border:0;min-width:0}
+legend{padding:0;margin:0 0 6px;color:#aabbb8;font-size:.77rem}
+.methods{display:flex;gap:7px;flex-wrap:wrap}
+button{font:600 .85rem system-ui,sans-serif;min-height:44px;padding:0 13px;border:1px solid #57716e;border-radius:3px;background:#202c2d;color:#e7eeeb;cursor:pointer;white-space:nowrap}
+button[aria-pressed=true]{background:#d7e7de;color:#172825;border-color:#d7e7de}
+button:not(:disabled):hover{border-color:#e6f9ef}
+button:disabled{opacity:.62;cursor:default}
+button:focus-visible,a:focus-visible{outline:2px solid #f6b58a;outline-offset:3px}
+.test {display:flex;justify-content:flex-end;align-items:center;gap:13px;max-width:640px}
+#details{font-size:.78rem;text-align:right;max-width:342px}
+footer{font-size:.75rem;display:flex;flex-wrap:wrap;gap:8px 16px;padding-top:13px}
+@media(max-width:760px){
+  main{width:calc(100% - 28px);padding:17px 0 20px}
+  header{margin:20px 0 15px}
+  header p{font-size:.9rem}
+  h1{font-size:clamp(3rem,12vw,4.8rem);margin-bottom:7px}
+  figure{--frame-height:clamp(355px,49svh,500px)}
+  .controls{display:block;padding:10px 0 12px}
+  .test{justify-content:flex-start;margin-top:8px}
+  #details{text-align:left}
+  .methods button{padding:0 11px}
+}
+#viewport[data-crop-frame=true] canvas{width:min(100%,calc(var(--frame-height) * 1.28))}

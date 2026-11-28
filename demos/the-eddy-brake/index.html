@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a1c1b">
+  <meta name="description" content="Spin a copper rotor and watch a magnetic field slow it through eddy currents.">
+  <title>The Eddy Brake · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-D1MoxPEK.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BRZTPPIu.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Eddy Brake</h1>
+      <p>Spin the copper disc. Turn up the electromagnet and watch it slow the rotor without touching it.</p>
+    </header>
+    <section class="experiment" aria-label="Eddy current brake test">
+      <figure>
+        <canvas id="machine" aria-label="A circular copper rotor with a steel electromagnet and exposed copper windings at its edge"></canvas>
+        <p id="loading" role="status">Preparing the rotor…</p>
+        <button id="trace" class="trace" type="button" aria-pressed="true" disabled>Current lines</button>
+      </figure>
+      <aside aria-label="Brake controls and readings">
+        <button id="spin" type="button" disabled>Spin the rotor</button>
+        <div class="field">
+          <div><label for="current">Coil current</label><output id="level" for="current">55%</output></div>
+          <input id="current" type="range" min="0" max="100" value="55" step="1" disabled>
+          <div class="range" aria-hidden="true"><span>Off</span><span>Full</span></div>
+        </div>
+        <dl class="readout">
+          <div><dt>Rotor speed</dt><dd><output id="speed">0</output><small>rpm</small></dd></div>
+          <div><dt>Heat in disc</dt><dd><output id="heat">0.0</output><small>J</small></dd></div>
+        </dl>
+        <section class="graph" aria-labelledby="graph-title">
+          <h2 id="graph-title">Speed after release</h2>
+          <canvas id="plot" width="320" height="118" aria-label="Speed during the run compared with an unbraked rotor"></canvas>
+          <div class="legend"><span>Rotor</span><span>Field off</span></div>
+        </section>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and scene notes</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# The Laser Scan
+
+Explore real airborne laser returns from the Glacier Peak summit district in Washington. Drag the scan to rotate it and advance the zoom slider to load finer octree nodes. Tap two returns to read their elevations, their difference and straight-line distance. Measure summit span selects two real root-level returns near the ridge so you can make a measurement as soon as the scan opens.
+
+The USGS 3DEP survey was acquired in 2014–2015 and published through NOAA Digital Coast. The original EPT nodes are LASzip files. The pinned public Margo LAS decoder read the source nodes, discarded the provider's noise classes and projected the positions onto a north-oriented, locally scaled WGS84 grid. Elevation is taken from the source values. The published xyz locations are encoded to 0.125 m steps. Distances use the local planar approximation and are intended for the exhibit. Colours render elevation and neighbouring relief, with brightness varying by return intensity.
+
+The Margo octree holds disjoint layers of the same real returns. The viewer loads its root first and fetches child tiles on demand. Both renderers use the same data, bounds, projected colours and measurement logic. [Original survey record](https://www.fisheries.noaa.gov/inport/item/58960) · [USGS EPT source](https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_WA_GlacierPeak_2014_LAS_2016/ept.json) · [USGS National Map license](https://www.usgs.gov/faqs/what-are-terms-use-licensing-map-services-and-data-national-map).

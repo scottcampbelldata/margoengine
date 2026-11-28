@@ -1,0 +1,56 @@
+@charset "UTF-8";
+:root{color-scheme:light;--paper:#e9e7dd;--ink:#202b25;--caption:#46544b;--rule:#b3b9aa;--forest:#233831;--warm:#d7ad7b}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,sans-serif}
+main{max-width:1500px;margin:auto;padding:24px clamp(15px,4.1vw,62px) 34px}
+nav{display:flex;gap:12px;align-items:center;padding-bottom:14px;border-bottom:1px solid var(--rule);font-size:.84rem}
+nav span{width:15px;height:1px;background:#728174}
+a{color:#2c4d42;text-underline-offset:.2em}
+nav a:first-child{font-weight:700;text-decoration:none}
+header{padding:clamp(22px,4.3vw,55px) 0 clamp(15px,2.25vw,29px)}
+h1{font:500 clamp(3.1rem,7vw,7rem)/.88 Georgia,serif;letter-spacing:-.075em;margin:0}
+header p{margin:.75rem 0 0;line-height:1.45;color:var(--caption);font-size:clamp(.94rem,1.45vw,1.14rem)}
+.workbench{display:grid;grid-template-columns:minmax(0,1fr) clamp(282px,29vw,365px);border:1px solid var(--rule);background:#f1efe6}
+figure{margin:0;position:relative;min-height:440px;overflow:hidden;background:#253630;isolation:isolate}
+canvas{width:100%;height:100%;position:absolute;inset:0;display:block;touch-action:pan-y;cursor:grab}
+canvas:active{cursor:grabbing}
+figcaption{position:absolute;inset:auto 16px 15px;display:flex;justify-content:space-between;align-items:center;gap:8px;font:500 .72rem/1.3 "Cascadia Mono",Consolas,monospace;color:#eee8d9;pointer-events:none}
+figcaption span,figcaption button{padding:.54rem .69rem;background:#182720eb;border:1px solid #738478;color:inherit}
+figcaption button{pointer-events:auto;white-space:nowrap}
+#loading,#render-error{position:absolute;inset:auto 18px 72px;margin:0 auto;padding:.8rem 1rem;width:fit-content;max-width:calc(100% - 36px);color:#f2e9d3;background:#17241c;border:1px solid #859382}
+.work{padding:clamp(19px,3.2vw,40px);display:flex;flex-direction:column;justify-content:center;gap:24px}
+.head,.bounds,dl div{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+label{font-weight:680}
+#bore{color:#754615;font-size:1.36rem;font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+#diameter{margin:5px 0 0;width:100%;height:44px;accent-color:#56766b;cursor:ew-resize}
+.bounds{font:500 .74rem/1 "Cascadia Mono",Consolas,monospace;color:#57675a}
+dl{margin:16px 0 0;padding:10px 0 0;border-top:1px solid #bec3b5;color:#405046;font-size:.81rem}
+dl div{line-height:1.45;padding:.22rem 0}
+dd{margin:0;text-align:right;font:550 .78rem/1.45 "Cascadia Mono",Consolas,monospace;color:#263b32}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #98671f;outline-offset:3px}
+button:disabled{opacity:.57;cursor:default}
+.exchange button{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--forest);background:#ecebe1;border:1px solid #819287;font-weight:620;font-size:.85rem;width:100%;min-height:44px;padding:.62rem .72rem;text-align:left}
+.exchange button span{margin-left:auto}
+#export{background:#344f43;color:#faf2dd;border-color:#344f43}
+#export:hover:enabled{background:#486457}
+#drop{margin-top:7px}
+#drop:hover:enabled,#drop.dragging{background:#dedfd0}
+#exchange-status{margin:13px 0 0;font-size:.8rem;line-height:1.45;overflow-wrap:anywhere}
+#exchange-status[data-tone="pass"]{color:#284e38}
+#exchange-status[data-tone="error"]{color:#854920}
+#views{display:flex;gap:5px;margin:10px 0 0}
+#views button{justify-content:center;padding:.36rem;font-weight:580}
+#views [aria-pressed="true"]{background:#d2daca}
+footer{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 18px;margin-top:15px;font-size:.82rem;color:var(--caption);line-height:1.55}
+footer p{margin:0 auto 0 0}
+@media(max-width:780px){
+  main{padding-top:16px}
+  h1{font-size:clamp(2.85rem,11vw,4.6rem)}
+  .workbench{grid-template-columns:minmax(0,1fr)}
+  figure{min-height:clamp(285px,77vw,435px)}
+  figcaption{inset:auto 10px 9px;font-size:.65rem}
+  .work{padding:16px;gap:16px}
+  .measurement dl{margin-top:13px}
+}

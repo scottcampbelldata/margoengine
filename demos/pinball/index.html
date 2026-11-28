@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-C3FJyriR.js"><link rel="modulepreload" crossorigin href="./assets/scene-X6l52ftG.js"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#191b2b"><link rel="icon" href="data:,">
+<title>Pinball · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BPAtY2Dc.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-Bmdc-f74.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Cabinet &amp; score rules</a></nav>
+<header><h1>Pinball</h1><p>Launch a steel ball into the Aurora cabinet. Strike the bumpers and work both flippers to keep it on the table.</p></header>
+<section class="arcade" aria-label="Playable interactive pinball machine">
+<figure><div class="table"><canvas id="view" aria-label="Aurora pinball table with three bumpers and two motorized flippers"></canvas>
+<p id="loading" class="overlay" role="status">Opening the Aurora cabinet…</p><p id="error" class="overlay" role="alert" hidden></p></div>
+<figcaption><span>Aurora cabinet</span><span id="play-state">Awaiting ball</span></figcaption></figure>
+<aside><fieldset id="controls"><legend>Machine controls</legend>
+<div class="score"><div><span>Score</span><output id="score">000000</output></div><div><span>Balls</span><output id="balls">3</output></div></div>
+<button id="launch" type="button" class="primary" disabled>Launch ball <span aria-hidden="true">↑</span></button>
+<div id="details" inert>
+<div class="flips" aria-label="Flipper switches">
+<button id="left" type="button" aria-pressed="false">Left flipper</button><button id="right" type="button" aria-pressed="false">Right flipper</button></div>
+<div class="switches"><button id="sound" type="button" aria-pressed="false">Sound off</button><button id="reset" type="button">New game</button></div>
+<p id="status" role="status">Use the flipper buttons or the arrow keys. Space launches a ball.</p>
+</div></fieldset></aside></section></main></body></html>

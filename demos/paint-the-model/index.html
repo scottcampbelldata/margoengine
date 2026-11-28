@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-0FTz2ex-.js"><script src="./assets/inline-96864d7b.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171918">
+<link rel="icon" href="data:,">
+<title>Paint the Model · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-D3aqMLOQ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-JofRzD8S.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>Paint the Model</h1>
+    <p>Lay down your own livery on the Kestrel helmet. Drag a brush directly over the enamel shell.</p>
+  </header>
+  <section aria-label="Texture painting tools">
+    <div class="tools">
+      <fieldset aria-label="Brush pigment">
+        <label title="Deep blue"><input type="radio" name="pigment" value="blue" aria-label="Deep blue" checked disabled style="--pigment:#2757a5"></label>
+        <label title="Jade"><input type="radio" name="pigment" value="jade" aria-label="Jade" disabled style="--pigment:#2d8778"></label>
+        <label title="Coral"><input type="radio" name="pigment" value="coral" aria-label="Coral" disabled style="--pigment:#e06347"></label>
+        <label title="Ivory"><input type="radio" name="pigment" value="ivory" aria-label="Ivory" disabled style="--pigment:#e3c7a3"></label>
+        <label title="Graphite"><input type="radio" name="pigment" value="graphite" aria-label="Graphite" disabled style="--pigment:#33383c"></label>
+      </fieldset>
+      <div class="actions">
+        <button type="button" id="erase" aria-pressed="false" disabled>Eraser</button>
+        <button type="button" id="undo" disabled>Undo</button>
+        <button type="button" id="reset" disabled>Reset</button>
+      </div>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" tabindex="0" aria-label="Kestrel helmet painting surface" aria-describedby="guide"></canvas>
+        <span id="cursor" hidden aria-hidden="true"></span>
+        <div id="notice"><p id="status" role="status">Opening the paint bench…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption><p id="guide">Paint the shell. Turn the model to work around it.</p><span id="route">Margo Engine</span></figcaption>
+    </figure>
+    <div class="adjust">
+      <label>Brush diameter <output id="diameter-value" for="diameter">38 px</output>
+        <input id="diameter" type="range" min="10" max="66" value="38" step="2" disabled>
+      </label>
+      <label>Turn model <output id="rotation-value" for="rotation">0°</output>
+        <input id="rotation" type="range" min="-180" max="180" value="0" step="1" disabled>
+      </label>
+    </div>
+  </section>
+</main>
+</body>
+</html>

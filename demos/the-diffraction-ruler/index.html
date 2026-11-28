@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#272325">
+  <meta name="description" content="Change the wavelength or groove density to move the diffraction orders across a precision angle scale.">
+  <title>The Diffraction Ruler · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DFTEij4d.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-Cq7nNUPy.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Diffraction Ruler</h1>
+      <p>Tune the light and watch the spots spread along the ruler. The middle spot stays at zero.</p>
+    </header>
+    <section class="stage" aria-label="Interactive diffraction grating and angular ruler">
+      <canvas id="scene" aria-label="An optical bench with a grating, fan of light paths, and spots on a curved angular ruler"></canvas>
+      <p id="loading" role="status">Preparing the grating…</p>
+      <button type="button" id="view" aria-pressed="false" disabled>View from above</button>
+    </section>
+    <section class="panel" aria-label="Grating controls">
+      <div class="field">
+        <label for="wavelength">Wavelength</label><output id="wavelength-output" for="wavelength">530 nm</output>
+        <input id="wavelength" type="range" min="420" max="680" step="5" value="530" disabled>
+        <div class="marks" aria-hidden="true"><span>420 nm</span><span>680 nm</span></div>
+      </div>
+      <div class="density-field">
+        <label for="density">Groove density</label>
+        <select id="density" disabled>
+          <option value="450">450 lines/mm</option>
+          <option value="650" selected>650 lines/mm</option>
+          <option value="900">900 lines/mm</option>
+        </select>
+      </div>
+      <div class="readout">
+        <label for="first">First orders</label><output id="first" for="wavelength density">±20.2°</output>
+        <span id="order-count">5 spots on the ruler</span>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Normal incidence · 140° ruler</span></footer>
+  </main>
+</body>
+</html>

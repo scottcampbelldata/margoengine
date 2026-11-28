@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Cupwezqa.js"><script src="./assets/webgl2-preload-f92767f0.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1c2a30">
+<link rel="icon" href="data:,">
+
+<title>The Changing Maze · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-J85O_Q6a.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D-Us2GzA.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Changing Maze</h1>
+    <p>Slide either wall on the routing table. Only the tiles it touches rebuild, then the shuttle takes the new route.</p>
+  </header>
+  <div class="controls" aria-label="Maze controls">
+    <button id="copper" type="button" aria-label="Slide copper wall" disabled>Slide copper</button>
+    <button id="jade" type="button" aria-label="Slide jade wall" disabled>Slide jade</button>
+    <button id="dispatch" type="button" disabled>Dispatch</button>
+    <button id="home" type="button" disabled>Dock</button>
+  </div>
+  <figure>
+    <div class="stage">
+      <canvas id="view" aria-label="Three-dimensional maze in an enamel and bronze cabinet with two sliding walls and a brass shuttle"></canvas>
+      <div id="notice"><p id="status" role="status">Opening the routing table…</p><p id="error" role="alert"></p></div>
+    </div>
+    <figcaption><strong id="activity">Route ready</strong><span id="renderer">Margo Engine</span></figcaption>
+  </figure>
+  <section class="readout" aria-label="Navigation data">
+    <dl>
+      <div><dt>Route length</dt><dd id="distance">—</dd></div>
+      <div><dt>Rebuilt tiles</dt><dd id="tiles">—</dd></div>
+      <div><dt>Mesh polygons</dt><dd id="polygons">—</dd></div>
+    </dl>
+    <label class="mesh-control"><input id="mesh" type="checkbox" disabled> Show navmesh</label>
+  </section>
+  <p id="announcement" class="sr" role="status"></p>
+</main>
+
+</body>
+</html>

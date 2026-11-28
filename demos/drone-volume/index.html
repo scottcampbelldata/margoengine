@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#273630">
+  <title>Drone Volume · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BL35oBDG.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BdkafpFY.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>Drone Volume</h1>
+      <p>Send three inspection drones through a conservatory. Their routes can curve around the racks or climb above them.</p>
+    </header>
+    <div class="instrument">
+      <div class="tools" aria-label="Flight controls">
+        <label>Destination
+          <select id="site" disabled><option value="0">Upper canopy</option><option value="1">Lower intake</option><option value="2">Launch bay</option></select>
+        </label>
+        <button id="dispatch" type="button" disabled>Send drones</button>
+        <button id="routes" type="button" aria-pressed="true" disabled>Hide routes</button>
+        <button id="view" type="button" aria-pressed="false" disabled>Side view</button>
+        <button id="track" type="button" aria-pressed="false" disabled>Follow A</button>
+        <button id="reset" type="button" disabled>Reset</button>
+      </div>
+      <figure id="viewport" aria-label="Three inspection drones and their paths through the Seed Conservatory">
+        <canvas id="scene"></canvas>
+        <span id="loading" role="status">Opening the conservatory…</span>
+        <span id="error" role="alert" hidden></span>
+        <span id="stage-name">Seed Conservatory</span>
+        <output id="flight-state" aria-live="polite">Plan ready</output>
+      </figure>
+      <section class="readout" aria-label="Live flight measurements">
+        <dl>
+          <div><dt>Total route</dt><dd id="distance">—</dd></div>
+          <div><dt>Min clearance</dt><dd id="clearance">—</dd></div>
+          <div><dt>Drone heights</dt><dd id="elevation">—</dd></div>
+        </dl>
+        <div class="tints" aria-label="Aircraft">
+          <span><i aria-hidden="true"></i>A</span><span><i aria-hidden="true"></i>B</span><span><i aria-hidden="true"></i>C</span>
+        </div>
+      </section>
+      <p id="note" role="status">The dashes show the planned paths.</p>
+    </div>
+    <footer><a href="https://idm-lab.org/project-o-content.html">Any-angle navigation</a></footer>
+  </main>
+</body>
+</html>

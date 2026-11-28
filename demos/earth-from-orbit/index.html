@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1019">
+  <meta name="description" content="Move through a day in UTC and watch sunlight cross the real geography of Earth.">
+  <title>Earth From Orbit | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-DjMDteOA.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dxet5vz5.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span>/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>Earth From Orbit</h1>
+      <p>Follow the line between daylight and the cities coming on below.</p>
+    </header>
+    <section class="exhibit" aria-label="Earth in sunlight">
+      <figure>
+        <canvas id="scene" aria-label="Earth from orbit with daylight, city lights and the Milky Way. Drag or press the left and right arrow keys to orbit." tabindex="0"></canvas>
+        <p class="guide">Drag to orbit</p>
+        <div id="solar-bearing" class="solar-bearing" hidden aria-hidden="true">
+          <span id="solar-arrow">↑</span> Sunward
+        </div>
+        <p id="loading" role="status">Opening the orbital view…</p>
+        <p id="error" role="alert" hidden></p>
+        <figcaption><span>North up</span><output id="view-origin">28° S · 66° W</output></figcaption>
+      </figure>
+      <aside aria-label="Orbital time and solar coordinates">
+        <fieldset id="controls" disabled>
+          <legend class="visually-hidden">Orbital time controls</legend>
+          <div class="time-head"><label for="time">Time in UTC</label><output for="time" id="time-value">10:20</output></div>
+          <input id="time" type="range" min="0" max="1439" step="1" value="620" aria-label="Time in UTC">
+          <div class="range-ticks"><span>00:00</span><span>12:00</span><span>23:59</span></div>
+          <label class="date-label" for="date">Date in UTC</label>
+          <input type="date" id="date" min="1900-01-01" max="2100-12-31" value="2027-03-20">
+          <button id="reset-view" type="button">Reset view <span aria-hidden="true">↺</span></button>
+        </fieldset>
+        <section class="reading" aria-labelledby="solar-title">
+          <h2 id="solar-title">Sun directly overhead</h2>
+          <p>The latitude and longitude receiving vertical sunlight.</p>
+          <dl>
+            <div><dt>Latitude</dt><dd><output id="latitude">—</output></dd></div>
+            <div><dt>Longitude</dt><dd><output id="longitude">—</output></dd></div>
+          </dl>
+        </section>
+      </aside>
+    </section>
+    <footer>
+      <span>Imagery and model sources</span>
+      <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/">NASA Earth Observatory</a>
+      <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>
+      <a href="https://aa.usno.navy.mil/faq/sun_approx">USNO</a>
+      <a href="https://cdsarc.cds.unistra.fr/viz-bin/cat/V/50">Bright Star Catalogue</a>
+      <a href="https://arxiv.org/abs/0908.4360">Milky Way survey</a>
+      <a href="./source/README.md">Model and source</a>
+    </footer>
+  </main>
+</body>
+</html>

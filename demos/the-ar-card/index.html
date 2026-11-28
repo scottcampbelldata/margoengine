@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BBbvb6gT.js"><script src="./assets/inline-dbf16748.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eae1d3">
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/vela-17-bThTVeJs.bin" crossorigin="anonymous">
+  <title>The AR Card · Vela 17 · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-OFSBlPzs.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/version-YYhCZP03.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-6yj-eXhI.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine / Web demos</a><span>The AR Card</span></nav>
+    <div class="product">
+      <header>
+        <h1>Vela 17</h1>
+        <p>A portable radio in fired red enamel with a knurled brass tuning wheel.</p>
+      </header>
+      <figure>
+        <canvas id="radio" aria-label="Rotatable 3D model of the Vela 17 radio"></canvas>
+        <p id="status" class="message" role="status">Opening the 3D model…</p>
+        <div id="error" class="message" hidden>
+          <p id="message" role="alert"></p>
+          <a id="help" href="https://margoengine.com/errors#compatibility-layer" hidden>Renderer requirements</a>
+        </div>
+      </figure>
+      <section class="control" aria-label="Product controls">
+        <div class="orbit">
+          <label for="angle">Viewing angle</label>
+          <input id="angle" type="range" min="-155" max="205" value="28" step="1" disabled>
+          <output id="degrees" for="angle">28°</output>
+        </div>
+        <div class="placement">
+          <div>
+            <p>22.4 × 16.0 × 12.0 cm</p>
+            <p id="ar-help">Use Quick Look to place the radio at its actual size.</p>
+          </div>
+          <a id="ar" data-label="Download USDZ" hidden><img src="./assets/vela-thumb-BrUnufFi.webp" width="44" height="44" alt=""></a>
+        </div>
+      </section>
+    </div>
+    <footer><a href="./source/README.md">Scene notes and sources</a><a id="save-model" download="Vela-17.usdz" hidden>Download USDZ</a></footer>
+  </main>
+</body>
+</html>

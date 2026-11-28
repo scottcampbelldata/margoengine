@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a9bef2b4.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#202629">
+  <link rel="icon" href="data:,">
+  <title>The UV Unwrapper · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-Dtvso-TJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C3biD25e.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header>
+      <h1>The UV Unwrapper</h1>
+      <p>Open a checker-wrapped manifold into flat texture islands. Change the cuts to see how the checker stretches around the bend.</p>
+    </header>
+    <section class="workspace" aria-label="Texture unwrap workspace">
+      <figure class="specimen">
+        <div class="plate"><span>Manifold</span><span id="view-label">Draft UVs</span></div>
+        <canvas id="view" aria-label="3D manifold with a checker texture"></canvas>
+        <p id="status" role="status">Opening the manifold…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="hint">Drag to rotate</div>
+      </figure>
+      <aside>
+        <div class="controls">
+          <fieldset id="cuts" disabled>
+            <legend>Seam layout</legend>
+            <div class="options">
+              <button data-cut="front" aria-pressed="true" type="button">Front cut</button>
+              <button data-cut="side" aria-pressed="false" type="button">Back cut</button>
+              <button data-cut="panels" aria-pressed="false" type="button">Four panels</button>
+            </div>
+          </fieldset>
+          <div class="actions">
+            <button id="unwrap" type="button" disabled>Unwrap mesh</button>
+            <button id="lightmap" aria-pressed="false" type="button" disabled>Lightmap UVs</button>
+          </div>
+        </div>
+        <section class="sheet" aria-label="Texture atlas">
+          <div class="plate"><span>UV atlas</span><output id="atlasSize">Draft</output></div>
+          <canvas width="360" height="360" id="atlas" aria-label="Flat UV chart with checker pattern and seam outlines"></canvas>
+        </section>
+        <dl>
+          <div><dt>Islands</dt><dd><output id="islands">—</output></dd></div>
+          <div><dt>Cut edges</dt><dd><output id="seams">—</output></dd></div>
+          <div><dt>Peak stretch</dt><dd><output id="stretch">—</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Model and method</a></footer>
+  </main>
+</body>
+</html>

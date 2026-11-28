@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11181b">
+  <meta name="description" content="Turn a slotted steel mask and watch a spotlight carve through a plaster sculpture.">
+  <title>The Light Bench · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CV6nUrDh.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-XvWJ8_kz.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Light Bench</h1>
+      <p>Turn the steel mask to rake light across the plaster. Open the beam to see how the mask changes the shape of the light.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive light bench">
+      <canvas id="scene" aria-label="A copper spotlight, a slotted mask and a folded plaster sculpture on a dark studio bench"></canvas>
+      <p id="loading" role="status">Setting the lights…</p>
+      <button id="view" class="view" type="button" aria-pressed="false" disabled>Close-up</button>
+    </section>
+    <section class="controls" aria-label="Spotlight controls">
+      <div class="rotation">
+        <div><label for="angle">Mask angle</label><output id="angle-value" for="angle">24°</output></div>
+        <input id="angle" type="range" min="0" max="180" step="1" value="24" aria-valuetext="24 degrees" disabled>
+      </div>
+      <div class="beam" role="group" aria-label="Steel mask position">
+        <button id="open-beam" type="button" aria-pressed="false" disabled>Open beam</button>
+        <button id="reset" type="button" disabled>Reset</button>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A working wheel-and-disk integrator in Margo Engine.">
+  <meta name="theme-color" content="#e9e8dc">
+  <title>The Analog Integrator · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BSzf9PYy.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-49Z1PtKH.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Analog<br class="desktop"> Integrator</h1>
+      <p>Move the amber roller across the spinning disk. At the center the output stops. Cross the center and it turns the other way.</p>
+    </header>
+    <section aria-label="Interactive integrator" class="machine">
+      <figure aria-label="Animated wheel-and-disk integrator">
+        <canvas id="scene" aria-label="An amber roller traverses a metal disk and drives a striped output wheel"></canvas>
+        <p id="loading" role="status">Opening the integrator…</p>
+      </figure>
+      <aside aria-label="Integrator controls">
+        <div class="reading">
+          <span id="total-label">Accumulated output</span>
+          <output id="total" aria-labelledby="total-label" aria-live="off">0.00</output>
+          <span class="unit">wheel turns</span>
+        </div>
+        <div class="slider-heading">
+          <label for="radius">Roller position</label>
+          <output id="position" for="radius">+110 mm</output>
+        </div>
+        <input id="radius" type="range" min="-195" max="195" value="110" step="5" disabled>
+        <div class="range-scale" aria-hidden="true"><span>−195 mm</span><span>Center</span><span>+195 mm</span></div>
+        <div class="transport">
+          <button id="motor" type="button" disabled>Pause disk</button>
+          <button id="zero" type="button" disabled>Zero output</button>
+        </div>
+        <div class="rates">
+          <span>Output speed</span><output id="speed">+0.96 turns/s</output>
+          <span>Output direction</span><output id="direction">Forward</output>
+        </div>
+      </aside>
+    </section>
+    <footer>
+      <p>The striped wheel on the right shares the roller’s output shaft.</p>
+      <details id="method">
+        <summary>Model and sources</summary>
+        <p>The disk runs at 0.40 turns per second. The roller radius is 46 mm. At a signed distance <var>r</var> from the middle, each disk turn drives <var>r</var>/46 mm wheel turns. The wheel adds that signed motion over time. The model assumes ideal point contact and ignores slip, torque and inertia.</p>
+        <ul>
+          <li><a href="https://www.sciencedirect.com/science/article/abs/pii/S0016003231906169">Vannevar Bush’s 1931 differential analyzer paper</a></li>
+          <li><a href="https://collection.sciencemuseumgroup.org.uk/objects/co59975/manchester-university-differential-analyser-analogue-computer-differential-analyser">Manchester University Differential Analyser, 1935</a></li>
+          <li><a href="https://www.si.edu/object/ucla-differential-analyzer-components-two-wheel-and-disc-integrators-1-and-2%3Anmah_689956">Smithsonian wheel-and-disk integrator units</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#292425">
+  <meta name="description" content="Lift and lower the walnut handle. See the leather bellows fold and its two check valves send air one way.">
+  <title>The Bellows | Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BVh6iYRq.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="modulepreload" crossorigin href="./assets/asset-kdVsQo5B-PFH8mser.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CLJ8Wufd.css">
+</head>
+<body data-state="loading" data-valve="closed">
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span></span><a href="../">Web demos</a></nav>
+    <header><h1>The Bellows</h1><p>Lift the walnut handle to draw air in. Press it down to send that air through the brass nozzle. The leather chamber changes volume between two one-way valves.</p></header>
+    <section class="exhibit" aria-label="Working bellows">
+      <figure>
+        <canvas id="scene" aria-label="Working wood and leather bellows with a moving handle and two one-way valves"></canvas>
+        <p id="loading" role="status">Opening the workshop…</p>
+        <div id="intake-pin" aria-hidden="true"><i></i>Intake valve</div>
+        <div id="nozzle-pin" aria-hidden="true"><i></i>Outlet valve</div>
+      </figure>
+      <aside aria-label="Bellows controls and measurements">
+        <div class="handle">
+          <div class="label"><label for="stroke">Handle lift</label><output id="lift" for="stroke">55%</output></div>
+          <input id="stroke" type="range" min="0" max="100" step="1" value="55" disabled>
+          <div class="ends"><span>Pressed down</span><span>Lifted up</span></div>
+        </div>
+        <dl>
+          <div class="quantity volume"><dt>Chamber volume</dt><dd><output id="liters">—</output><small>L</small></dd></div>
+          <div class="quantity"><dt>Airflow</dt><dd><output id="air">0.0</output><small>L/s</small></dd>
+            <p id="valve-status" role="status">Both valves closed</p>
+          </div>
+        </dl>
+        <button id="pump" type="button" disabled>Pump one cycle</button>
+      </aside>
+    </section>
+    <footer><span>Ideal one-way valves · Air traces are illustrative</span><a href="./source/README.md">Model and source</a></footer>
+  </main>
+</body>
+</html>

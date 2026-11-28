@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Btt9K7cf.js"><script src="./assets/inline-78359ff2.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#19171d">
+<link rel="icon" href="data:,">
+<title>The Neural Playground · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-CdswjOny.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DLrNsXoC.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="../">← Margo Web Demos</a>
+    <h1>The Neural Playground</h1>
+    <p class="intro">Train a two-class network and watch a line learn to bend.</p>
+  </header>
+  <div class="exhibit">
+    <section class="instrument" aria-label="Training controls">
+      <div class="readout" aria-label="Training metrics">
+        <div><span>Training steps</span><output id="steps">0</output></div>
+        <div><span>Samples correct</span><output id="correct">—</output></div>
+        <div><span>Training loss</span><output id="loss">—</output></div>
+      </div>
+      <div class="train-actions">
+        <button id="run" class="primary" disabled>Train</button>
+        <button id="step" disabled>Step</button>
+        <button id="reset" disabled>Reset</button>
+      </div>
+      <fieldset class="patterns">
+        <legend>Training set</legend>
+        <button data-pattern="crescents" aria-pressed="true" disabled>Crescents</button>
+        <button data-pattern="rings" aria-pressed="false" disabled>Rings</button>
+      </fieldset>
+      <fieldset>
+        <legend>Plant a point</legend>
+        <div class="classes">
+          <button data-class="0" aria-pressed="true" disabled><i class="circle" aria-hidden="true"></i> Class A</button>
+          <button data-class="1" aria-pressed="false" disabled><i class="diamond" aria-hidden="true"></i> Class B</button>
+        </div>
+        <p id="map-help">Choose a class, then tap the map. With a keyboard, focus the map and move the marker with the arrow keys.</p>
+      </fieldset>
+    </section>
+    <figure>
+      <div class="plot-head">
+        <span>Decision map</span>
+        <span id="sample-count">76 labeled points</span>
+      </div>
+      <div class="atlas">
+        <canvas id="plot" tabindex="0" aria-label="Decision map. Press enter to plant the selected class at the keyboard marker." aria-describedby="map-help"></canvas>
+        <div id="notice"><p id="status" role="status">Preparing the classifier…</p><p id="error" role="alert"></p></div>
+      </div>
+      <div class="scale" aria-label="Class probability legend">
+        <span>Class A</span><i class="gradient" aria-hidden="true"></i><span>Class B</span>
+      </div>
+      <figcaption>The cream line marks equal probability. Richer colors show greater model confidence.</figcaption>
+    </figure>
+  </div>
+  <footer>
+    <p><strong>2 inputs → 10 hidden units → 1 output</strong> <span> · </span> <span id="backend">Margo Compute</span></p>
+    <p>Learning uses only the points on this map. Training accuracy measures those same points.</p>
+  </footer>
+</main>
+</body>
+</html>

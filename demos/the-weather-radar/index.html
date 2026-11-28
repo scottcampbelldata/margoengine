@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-D9evxDAT.js"><script src="./assets/inline-e697fc91.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a21">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:,">
+  <title>The Weather Radar · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-C9snx5r7.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="modulepreload" crossorigin href="./assets/radar-data-DIZX_zhY.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BvHtyzR3.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine / Web demos</a></nav>
+    <header class="masthead">
+      <div>
+        <p class="source">NEXRAD Level II · KTLX</p>
+        <h1>The Weather Radar</h1>
+      </div>
+      <div class="intro">
+        <p>Follow a radar beam through the Moore supercell as the antenna climbs from one sweep to the next.</p>
+        <time datetime="2013-05-20">Central Oklahoma · 20 May 2013</time>
+      </div>
+    </header>
+    <figure aria-label="Measured radar reflectivity">
+      <div id="stage">
+        <canvas id="radar" tabindex="0" aria-label="Interactive curved grid of radar reflectivity. Change elevation with the controls below. Use arrow keys to move the sample probe in plan view."></canvas>
+        <div class="coordinates" aria-hidden="true"><span>N</span><span>W</span><span>E</span><span>S</span></div>
+        <div class="map-annotations" aria-hidden="true">
+          <span id="station"><i></i>KTLX</span>
+          <span id="moore"><i></i>Moore</span>
+          <span id="city"><i></i>Oklahoma City</span>
+          <span class="ring-label" data-range="10">10 km</span><span class="ring-label" data-range="20">20</span><span class="ring-label" data-range="30">30</span><span class="ring-label" data-range="40">40</span><span id="probe-label" hidden><i></i></span>
+        </div>
+        <p class="notice" id="status" role="status">Opening the archived sweeps…</p>
+        <div class="notice" id="error" hidden><p id="message" role="alert"></p><a id="help" href="https://margoengine.com/errors#compatibility-layer" hidden>Renderer requirements</a></div>
+      </div>
+      <figcaption>
+        <div class="readout">
+          <div class="reading"><output id="elevation">0.53°</output><span>Antenna elevation</span></div>
+          <div class="sample">
+            <span id="observed">20:08:11–20:08:28 UTC</span>
+            <output id="return">Tap a return to inspect it</output>
+          </div>
+        </div>
+        <div class="legend" aria-label="Reflectivity scale from 5 to 70 dBZ">
+          <span>Reflectivity <abbr title="Decibels of reflectivity">dBZ</abbr></span>
+          <div class="ramp"></div>
+          <div class="ticks" aria-hidden="true"><span>5</span><span>20</span><span>35</span><span>50</span><span>70</span></div>
+        </div>
+      </figcaption>
+    </figure>
+    <section class="controls" aria-label="Radar sweep controls">
+      <div class="selectors">
+        <h2 id="tilt-title">Antenna elevation</h2>
+        <div id="angles" role="group" aria-labelledby="tilt-title">
+          <button type="button" data-cut="1" aria-pressed="true" disabled>0.53°</button>
+          <button type="button" data-cut="3" aria-pressed="false" disabled>0.92°</button>
+          <button type="button" data-cut="5" aria-pressed="false" disabled>1.36°</button>
+          <button type="button" data-cut="8" aria-pressed="false" disabled>2.46°</button>
+          <button type="button" data-cut="10" aria-pressed="false" disabled>4.04°</button>
+          <button type="button" data-cut="12" aria-pressed="false" disabled>6.46°</button>
+          <button type="button" data-cut="14" aria-pressed="false" disabled>10.06°</button>
+          <button type="button" data-cut="17" aria-pressed="false" disabled>19.56°</button>
+        </div>
+      </div>
+      <div class="view-group">
+        <h2 id="view-title">View</h2>
+        <div role="group" aria-labelledby="view-title">
+          <button type="button" data-view="plan" aria-pressed="true" disabled>Plan</button>
+          <button type="button" data-view="tilt" aria-pressed="false" disabled>Oblique</button>
+          <button type="button" data-view="grid" aria-pressed="false" disabled>Scan grid</button>
+        </div>
+      </div>
+    </section>
+    <footer><a href="./source/README.md">Data, units and sources</a><span>Archived observation</span></footer>
+  </main>
+</body>
+</html>

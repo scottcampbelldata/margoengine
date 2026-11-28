@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-84cc59a7.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1420">
+  <meta name="description" content="Watch the northern lights dance above a frozen lake and scrub through three hours of the Arctic sky.">
+  <title>The Aurora | Margo Engine</title>
+  <link rel="icon" href="data:,">
+
+  <script type="module" crossorigin src="./assets/index-B6HT2y-e.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DKLC5clB.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Margo Engine"><a href="../">Margo Engine</a><span>/</span><a href="../">Web demos</a></nav>
+    <header>
+      <h1>The Aurora</h1>
+      <p>From a frozen lake, watch the curtains fold and the Moon move across the northern sky.</p>
+    </header>
+    <section class="exhibit" aria-label="Northern sky and night controls">
+      <figure>
+        <canvas id="scene" aria-label="Green and red aurora, stars and a textured Moon above a snowy frozen lake and northern fells"></canvas>
+        <div class="bearing" aria-hidden="true">Looking north-northwest</div>
+        <p id="loading" role="status">Opening the winter sky…</p>
+        <p id="error" role="alert" hidden></p>
+        <figcaption><span>69.72° N · 23.59° E</span><span>15 February 2027</span></figcaption>
+      </figure>
+      <aside aria-label="Night chronology and sky readings">
+        <fieldset id="controls" disabled>
+          <legend class="sr-only">Night chronology</legend>
+          <div class="time-head"><label for="night">Night time</label><output id="time" for="night">02:00 UTC</output></div>
+          <input type="range" id="night" min="0" max="180" step="1" value="120" aria-label="Simulation time in UTC">
+          <div class="ticks" aria-hidden="true"><span>00:00</span><span>01:30</span><span>03:00</span></div>
+          <button type="button" id="play">Play night <span aria-hidden="true">▶</span></button>
+        </fieldset>
+        <dl>
+          <div><dt>Moon elevation</dt><dd><output id="elevation">—</output></dd></div>
+          <div><dt>Moon illuminated</dt><dd><output id="phase">—</output></dd></div>
+        </dl>
+        <p class="note">The Moon and stars follow the date. Aurora activity is illustrative.</p>
+      </aside>
+    </section>
+    <footer>
+      <span>Sky model and imagery</span>
+      <a href="https://www.spaceweather.gov/phenomena/aurora">NOAA Space Weather</a>
+      <a href="https://svs.gsfc.nasa.gov/4720/">NASA lunar atlas</a>
+      <a href="./source/README.md">Model and source</a>
+    </footer>
+  </main>
+
+</body>
+</html>

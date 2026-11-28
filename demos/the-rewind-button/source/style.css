@@ -1,0 +1,36 @@
+*{box-sizing:border-box}
+:root{color-scheme:dark;background:#211e1e;color:#ece8df;font-family:system-ui,sans-serif;--line:#504b49;--muted:#b9b1aa;--ivory:#efdaba}
+body{margin:0}
+main{width:min(1220px,calc(100% - 64px));margin:auto;padding:23px 0 30px}
+header a{min-height:34px;display:inline-flex;align-items:center;color:#c8bfb1;font-size:.82rem;text-decoration:none}
+header a:hover{text-decoration:underline}
+h1{font:500 clamp(3rem,7.3vw,5.7rem)/.96 Georgia,serif;letter-spacing:-.064em;margin:8px 0;color:#ece0d1}
+header p{font-size:clamp(.98rem,1.76vw,1.10rem);line-height:1.46;color:var(--muted);max-width:49ch;margin:12px 0 20px}
+.actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 9px}
+button{min-height:44px;min-width:130px;border:1px solid #e0c9a7;border-radius:3px;padding:0 15px;background:var(--ivory);color:#322626;font:650 .88rem system-ui;cursor:pointer}
+button:disabled{background:#cfbca4;color:#48413b;cursor:default}
+:where(a,button,input):focus-visible{outline:2px solid #e4ab85;outline-offset:3px}
+#route{font-size:.73rem;color:#b1aba2}
+figure{margin:0}
+.stage{position:relative;background:#263039;overflow:hidden;border:1px solid #5a5550;border-radius:3px}
+canvas{width:100%;height:clamp(334px,44vw,469px);display:block}
+#notice{position:absolute;inset:0;display:grid;place-content:center;padding:14px;text-align:center;background:#252c32ec}
+#notice[hidden]{display:none}
+#notice p{margin:4px}#error{color:#ffc39f}
+.panel{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1.8fr) minmax(0,1fr);gap:21px}
+.panel label{font-size:.89rem;display:grid;grid-template-columns:1fr auto;align-items:center;gap:0 7px}
+output{font:12px ui-monospace,monospace;color:var(--ivory)}
+input[type=range]{grid-column:1/-1;margin:0;width:100%;height:42px;accent-color:#edc9ac;cursor:pointer}
+input:disabled{cursor:default}
+dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
+dl div{border-left:1px solid var(--line);padding:0 0 0 9px}
+dt{color:var(--muted);font-size:.72rem;margin:2px 0 4px}
+dd{font:1.03rem ui-monospace,monospace;color:var(--ivory);margin:0}
+#hint{color:var(--muted);font-size:.79rem;line-height:1.46;margin:9px 0 0}
+@media(max-width:650px){
+  main{width:calc(100% - 32px);padding:12px 0 26px}
+  h1{font-size:clamp(2.68rem,10.5vw,4rem);margin-top:7px}
+  header p{font-size:.91rem;margin:10px 0 16px}
+  canvas{height:clamp(295px,84vw,414px)}
+  .panel{grid-template-columns:1fr;gap:7px}
+}

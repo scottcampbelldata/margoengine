@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CiiHmr-b.js"><script src="./assets/webgl2-preload-f92767f0.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#211d2b">
+<link rel="icon" href="data:,">
+<link rel="modulepreload" href="./assets/solver-eAdXchzA.js">
+<title>The 2D Sandbox · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-BB5mWhHO.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D1f4moFJ.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The 2D Sandbox</h1>
+    <p>Stack crates at the quarry crossing, build a hinged bridge, then unpin a bank and watch the span fall.</p>
+  </header>
+  <section aria-label="Quarry crossing">
+    <div class="actions">
+      <button id="crate" type="button" disabled>Add crate</button>
+      <button id="bridge" type="button" disabled>Build bridge</button>
+      <button id="knock" type="button" disabled>Knock down</button>
+      <button id="reset" type="button" disabled>Reset</button>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Illustrated quarry with a hinged bridge and ceramic crates" aria-describedby="hint"></canvas>
+        <div id="notice"><p id="status" role="status">Opening the quarry…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <p id="hint">Tap open air to add a crate. Release the right pin to collapse the span.</p>
+        <span id="route">Margo Engine</span>
+      </figcaption>
+    </figure>
+    <dl>
+      <div><dt>Crates</dt><dd id="crates">—</dd></div>
+      <div><dt>Hinges</dt><dd id="joints">—</dd></div>
+    </dl>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eee8df">
+  <meta name="description" content="Slide the image plane of an astigmatic lens and see its spot turn from one line into another.">
+  <title>The Astigmatism Bench · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CkEiOtvW.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BcVzxmjg.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../">Margo Engine <span>Web demos</span></a>
+    <header>
+      <h1>The Astigmatism Bench</h1>
+      <p>Slide the ground-glass screen between the lens’s two line foci.</p>
+    </header>
+    <section class="stage" aria-label="Interactive astigmatism bench">
+      <canvas id="scene" aria-label="Four rays in each of two perpendicular fans show how a lens draws a spot on a movable glass screen"></canvas>
+      <p id="loading" role="status">Opening the bench…</p>
+      <button type="button" id="view" aria-pressed="false" disabled>Inspect the spot</button>
+    </section>
+    <section class="panel" aria-label="Astigmatism controls">
+      <div class="field">
+        <label for="distance">Image plane distance</label><output id="distance-value" for="distance">365.0 mm</output>
+        <input id="distance" type="range" min="280" max="560" value="365" step=".1" disabled>
+      </div>
+      <div class="field">
+        <label for="separation">Focal separation</label><output id="separation-value" for="separation">120 mm</output>
+        <input id="separation" type="range" min="0" max="160" value="120" step="1" disabled>
+      </div>
+      <div class="stations" role="group" aria-label="Move to a focal station">
+        <button type="button" data-station="tangential" disabled>Tangential</button>
+        <button type="button" data-station="circle" disabled>Least blur</button>
+        <button type="button" data-station="sagittal" disabled>Sagittal</button>
+      </div>
+      <dl class="readings">
+        <div><dt id="spot-label">Spot width × height</dt><dd><output id="spot-value" aria-labelledby="spot-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Paraxial ray model</span></footer>
+  </main>
+</body>
+</html>

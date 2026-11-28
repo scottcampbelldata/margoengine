@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-14a98aa7.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#161721">
+  <meta name="description" content="Run array expressions, Fourier transforms, sorts and matrix products with Margo Compute.">
+  <title>GPU NumPy · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CcRgN2bv.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-rt3K-FBH.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine</a><span></span>Web demos</nav>
+    <header>
+      <h1>GPU NumPy</h1>
+      <p>Edit an array expression and see what the device returns. Try a matrix product, Fourier transform, or sort.</p>
+    </header>
+    <section class="workbench" aria-label="Array expression workbench">
+      <form id="compute-form">
+        <fieldset id="controls" disabled>
+          <legend>Expression</legend>
+          <div class="expression-field">
+            <label class="hidden" for="expression">Array expression</label>
+            <span aria-hidden="true">›</span>
+            <input id="expression" type="text" value="A @ B" maxlength="1000" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="run-error">
+          </div>
+          <div class="execute"><button id="run" type="submit">Run expression</button><kbd>Enter</kbd></div>
+          <p id="run-error" aria-live="polite" hidden></p>
+          <div class="examples" aria-label="Example expressions">
+            <button type="button" data-example="0">Matrix multiply</button>
+            <button type="button" data-example="1">FFT</button>
+            <button type="button" data-example="2">Sort</button>
+          </div>
+        </fieldset>
+        <div id="status" role="status"><span id="status-text">Starting Margo Compute…</span><span id="fatal"></span></div>
+        <dl class="device">
+          <div><dt>Backend</dt><dd id="backend">—</dd></div>
+          <div><dt>Elapsed incl. readback</dt><dd id="elapsed">—</dd></div>
+          <div><dt>Result shape</dt><dd id="shape">—</dd></div>
+          <div id="dispatches" hidden><dt>Translated dispatches</dt><dd id="dispatch-count">—</dd></div>
+        </dl>
+        <details class="notation"><summary>Arrays and operations</summary>
+          <p><code>A</code> and <code>B</code> are 24 × 24 matrices. <code>signal</code> and <code>samples</code> each contain 128 values.</p>
+          <p>Use <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>@</code>, parentheses, and numeric lists such as <code>[4, 1, 3]</code> or <code>[[1, 2], [3, 4]]</code>.</p>
+          <p><code>fft</code>, <code>ifft</code>, <code>magnitude</code>, <code>matmul</code>, <code>sort</code>, <code>transpose</code>, <code>sum</code>, <code>mean</code>, <code>min</code>, <code>max</code>, <code>abs</code>, <code>square</code>, <code>sqrt</code>, <code>sin</code>, <code>cos</code>, <code>log</code></p>
+        </details>
+      </form>
+      <figure>
+        <figcaption><div><span id="result-format">Array output</span><strong id="result-title">Result</strong></div><code id="result-expression">A @ B</code></figcaption>
+        <div class="plotstage" id="plotstage" role="img" aria-label="Computed array visualization">
+          <div class="plot" id="plot"></div>
+        </div>
+        <div id="plot-axis" class="plot-axis" hidden></div>
+        <div class="scale" id="color-scale" hidden><span id="lo">—</span><i></i><span id="hi">—</span></div>
+        <div class="inspector">
+          <label for="inspect">Inspect value</label>
+          <input id="inspect" type="range" min="0" max="0" value="0" disabled>
+          <output id="value" for="inspect" aria-live="polite">—</output>
+        </div>
+      </figure>
+    </section>
+    <footer>
+      <p>Margo Compute uses float32 arrays. Time includes execution, transfers, and result readback.</p>
+      <p><a href="https://numpy.org/doc/stable/reference/generated/numpy.matmul.html">NumPy matrix product</a> · <a href="https://numpy.org/doc/stable/reference/routines.fft.html">Fourier transform conventions</a></p>
+    </footer>
+  </main>
+</body>
+</html>

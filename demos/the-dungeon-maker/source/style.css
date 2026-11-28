@@ -1,0 +1,32 @@
+:root{color-scheme:dark;background:#272830;color:#eee3ce;--muted:#ccc3b0;--line:#6b6972;--brass:#d7b589;font-family:Georgia,serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{max-width:1500px;margin:auto;padding:20px clamp(13px,3.5vw,52px) 38px}
+nav,figcaption{font:650 12px/1.4 system-ui,sans-serif}
+nav{border-bottom:1px solid var(--line);padding-bottom:12px}
+a{color:inherit;text-underline-offset:4px}
+header{display:flex;align-items:end;justify-content:space-between;gap:22px;margin:23px 0 18px}
+h1{font:400 clamp(57px,8.05vw,113px)/.83 Georgia,serif;letter-spacing:-.069em;margin:0}
+header p{margin:0 0 3px;font-size:16px;line-height:1.45;color:var(--muted);max-width:35ch}
+.exhibit{display:grid;grid-template-columns:minmax(0,1fr) 290px;border:1px solid var(--line)}
+figure{margin:0;min-width:0}
+.view{position:relative;aspect-ratio:1.65;overflow:hidden;background:#211e26}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+figcaption{display:flex;gap:9px;justify-content:space-between;border-top:1px solid var(--line);padding:10px 12px;color:var(--muted)}
+aside{padding:15px;background:#36343d;border-left:1px solid var(--line)}
+fieldset{margin:0;padding:0;border:0;min-width:0}
+legend{font-size:22px;padding:0;margin-bottom:10px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+button{font:650 13px/1.15 system-ui,sans-serif;background:#45444d;color:inherit;border:1px solid #817979;border-radius:3px;min-height:44px;padding:5px;cursor:pointer;touch-action:manipulation}
+#next,button[aria-pressed=true]{background:var(--brass);border-color:var(--brass);color:#2f2931}
+button:active{filter:brightness(1.18)}
+dl{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-block:1px solid var(--line);padding:11px 0;margin:14px 0}
+dt{font:650 11px system-ui,sans-serif;color:var(--muted)}
+dd{font:650 16px Consolas,monospace;color:var(--brass);margin:5px 0 0}
+.walk-controls{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.walk-controls button{font-size:21px}
+fieldset p{color:var(--muted);font-size:14px;line-height:1.45;margin:10px 0 0}
+#loading,#error{position:absolute;inset:auto 10px 10px;padding:8px 10px;margin:0;background:#403845;font:650 13px/1.4 system-ui,sans-serif}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid #ebc88e;outline-offset:3px}
+@media(max-width:805px){header{display:block;margin:21px 0 13px}h1{font-size:clamp(48px,11.4vw,86px)}header p{font-size:14px;margin:9px 0 0}.exhibit{grid-template-columns:1fr}.view{aspect-ratio:1.13}aside{border-left:0;border-top:1px solid var(--line);padding:11px 12px}legend{font-size:19px}dl{margin:9px 0;padding:7px 0}}

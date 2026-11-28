@@ -1,0 +1,1 @@
+export{n as Lighting2D}from"./scene-Du7DDViW.js";

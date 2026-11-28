@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a1c21">
+  <meta name="description" content="Move the sun through an autumn day and watch its light cross a Gothic nave.">
+  <title>Cathedral Light · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-1o7PEbFp.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-DkwPZuAq.js">
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-CRzLMJPS.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-DSE1T-Kb.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../" class="brand">Margo Engine <span>Web demos</span></a></nav>
+    <header><h1>Cathedral Light</h1><p>Move the sun through an autumn day and watch the windows cast changing shapes on the stone.</p></header>
+    <section class="stage" aria-label="Gothic nave lit by the moving sun">
+      <canvas id="nave" aria-label="A ribbed limestone nave with sunlight passing through stained-glass windows"></canvas>
+      <p id="status" class="notice" role="status">Opening the nave…</p>
+      <div id="error" class="notice" role="alert" hidden><p id="message"></p><a id="help" href="https://margoengine.com/errors#webgpu" hidden>WebGPU support</a></div>
+    </section>
+    <section class="panel" aria-label="Solar time controls">
+      <div class="field">
+        <label for="hour">Local solar time</label><output id="clock" for="hour">09:38</output>
+        <input id="hour" type="range" min="480" max="1020" value="578" step="1" disabled>
+      </div>
+      <div class="presets" role="group" aria-label="Jump to time">
+        <button type="button" data-minute="600" disabled>10:00</button>
+        <button type="button" data-minute="720" disabled>Noon</button>
+        <button type="button" data-minute="930" disabled>15:30</button>
+      </div>
+      <dl class="readings">
+        <div><dt id="altitude-label">Sun elevation</dt><dd><output id="altitude" aria-labelledby="altitude-label">—</output></dd></div>
+        <div><dt id="azimuth-label">Sun bearing</dt><dd><output id="azimuth" aria-labelledby="azimuth-label">—</output></dd></div>
+      </dl>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a><span>Autumn sun · Latitude 48.2° N</span></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BvrlAlsQ.js"><script src="./assets/inline-feb9a6c7.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1e2228">
+  <meta name="description" content="Step into an evening museum and watch a guard patrol, notice you and search when you leave sight.">
+  <title>The Living Museum · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/opening-actors-7BMo0KEh.mesh" as="fetch" crossorigin>
+
+  <script type="module" crossorigin src="./assets/index-BLGaq8GJ.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/version-YYhCZP03.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-VncAfRXj.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web demos</span></a></nav>
+    <header>
+      <h1>The Living Museum</h1>
+      <p>Visitors drift between sculptures after dark. Tap the floor to walk, and watch what the guard does when you pass out of sight.</p>
+    </header>
+    <section aria-label="Interactive museum after dark">
+      <figure>
+        <canvas id="museum" aria-label="Museum gallery with walking visitors and a guard"></canvas>
+        <figcaption><span>West gallery</span><span id="scene-mode">Patrol</span></figcaption>
+        <div id="status" role="status"><strong>Opening the gallery…</strong><span id="detail"></span><a id="help" href="https://margoengine.com/webgpu.html" hidden>Browser graphics requirements</a></div>
+      </figure>
+      <div class="desk">
+        <div class="controls" role="group" aria-label="Walk to a part of the gallery">
+          <button id="cross" disabled type="button">Cross gallery</button>
+          <button id="recess" disabled type="button">Enter alcove</button>
+          <button id="reset" disabled type="button">Reset</button>
+        </div>
+        <dl><div><dt>Guard</dt><dd id="guard">Patrolling</dd></div><div><dt>Awareness</dt><dd id="awareness">Unseen</dd></div></dl>
+      </div>
+    </section>
+    <footer>
+      <p>The guard remembers where it last saw you. The display follows that memory as the guard searches.</p>
+      <details><summary>Navigation and perception model</summary>
+        <p>Visitors choose destinations on a shared navigation mesh. Margo calculates reciprocal avoidance, and a behavior tree drives the guard from what it can see.</p>
+        <ul><li><a href="https://gamma.cs.unc.edu/ORCA/publications/ORCA.pdf">Reciprocal collision avoidance</a></li>
+        <li><a href="https://arxiv.org/abs/1709.00084">Behavior trees in robotics and AI</a></li></ul>
+      </details>
+    </footer>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-06301fbe.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e9e0">
+  <meta name="description" content="Build a bottle from stacked profiles and a duct along a curved path.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./assets/sweep-loft-BxI3wpAq.bin" as="fetch" crossorigin fetchpriority="high">
+  <title>Sweep and Loft · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BXvh1sLy.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-p5o207Ou.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../">Margo Engine <span>Web Demos</span></a></nav>
+    <header>
+      <h1>Sweep and Loft</h1>
+      <p>One form follows a path. The other joins a sequence of sections. Inspect the two solids and how they were built.</p>
+    </header>
+    <section class="exhibit" aria-label="Interactive B-rep sweep and loft">
+      <figure>
+        <canvas id="part" aria-label="Lofted bottle or swept duct on an inspection bed. Drag to rotate."></canvas>
+        <p id="status" role="status">Preparing the two forms…</p>
+        <p id="error" role="alert" hidden></p>
+        <div class="stage-tools"><span>Drag to rotate</span><button id="reset" type="button" disabled>Reset view</button></div>
+      </figure>
+      <aside aria-label="Model operation and measurements">
+        <fieldset id="operations" disabled>
+          <legend>Modelling steps</legend>
+          <button type="button" data-step="0" aria-pressed="true">Bottle loft</button>
+          <button type="button" data-step="1" aria-pressed="false">Duct sweep</button>
+        </fieldset>
+        <p id="feature">Join seven circular sections into a solid bottle blank.</p>
+        <dl>
+          <div><dt>Exact volume</dt><dd><output id="volume">—</output></dd></div>
+          <div><dt>Profiles or path segments</dt><dd><output id="pieces">—</output></dd></div>
+          <div><dt>B-rep faces</dt><dd><output id="faces">—</output></dd></div>
+        </dl>
+      </aside>
+    </section>
+    <footer><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>

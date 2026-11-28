@@ -1,0 +1,42 @@
+*{box-sizing:border-box}
+:root{color-scheme:dark;background:#151c22;color:#f1e8d7;--accent:#eebe95;--rule:#495151;--muted:#b3bdbd;font-family:system-ui,sans-serif}
+body{margin:0}
+main{width:min(1150px,92vw);margin:auto;padding:24px 0 45px}
+header a{color:var(--accent);text-decoration:none;font-size:.875rem}
+header a:hover{text-decoration:underline}
+h1{font:400 clamp(3.15rem,7.6vw,7.0rem)/.965 Georgia,serif;letter-spacing:-.066em;margin:.12em 0 .10em}
+header p{color:var(--muted);line-height:1.43;margin:13px 0 19px;max-width:53ch}
+.tools,.scrub{display:flex;align-items:center;justify-content:space-between;border-block-start:1px solid var(--rule);gap:10px}
+.tools{padding:6px 0}
+fieldset{border:0;margin:0;padding:0;display:flex;gap:13px;min-width:0}
+fieldset label{display:flex;align-items:center;gap:5px;min-height:43px;white-space:nowrap;font-size:.84rem}
+input{accent-color:#edbd8e;margin:0}
+button{background:#252e32;color:#f0c89f;border:1px solid #656760;border-radius:3px;padding:0 14px;min-height:44px;font:650 .83rem system-ui}
+button:disabled,input:disabled{opacity:.58}
+:where(a,button,input):focus-visible{outline:2px solid #ffd2a4;outline-offset:3px}
+.scrub{font-size:.83rem;color:#c5caca;gap:12px}
+.scrub input{flex:1;min-width:0;height:42px}
+.scrub output{color:#f4c08e;min-width:4ch;text-align:right;font:.84rem ui-monospace,monospace}
+figure{margin:2px 0 0}
+.stage{position:relative;border:1px solid #5e6260;background:#19272f}
+canvas{width:100%;height:auto;aspect-ratio:1.96;display:block}
+#notice{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#20292c;padding:12px}
+#notice[hidden]{display:none}
+#notice p{margin:0}
+#error{color:#ffcb9f}
+figcaption{border-bottom:1px solid var(--rule);padding:8px 0;display:flex;justify-content:space-between;gap:10px;font-size:.84rem;line-height:1.38;color:var(--muted)}
+figcaption p{margin:0;display:flex;align-items:center;gap:9px}
+figcaption p span:first-child{color:#f0bc91}
+figcaption p span:last-child{color:#a2cee0}
+@media(max-width:650px){
+  main{padding-top:21px}
+  h1{font-size:clamp(2.8rem,11vw,4.7rem)}
+  header p{font-size:.94rem;margin:10px 0 15px}
+  fieldset{gap:6px;flex-wrap:wrap}
+  fieldset label{gap:3px;font-size:.74rem}
+  fieldset input{width:13px;height:13px}
+  .tools{gap:4px}
+  button{padding:0 7px}
+  canvas{aspect-ratio:1.08}
+  figcaption{font-size:.77rem;gap:4px;flex-wrap:wrap}
+}

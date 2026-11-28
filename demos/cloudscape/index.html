@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/webgl2-preload-b5b3aa7a.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#13242c">
+  <link rel="icon" href="data:,">
+  <title>Cloudscape · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CU-znA48.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CjynyWOE.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine / Web demos</a></nav>
+    <header><h1>Cloudscape</h1><p>Climb from the coast into a layer of cumulus, then break into clear air above it. Watch the sunlight and ground shadows change along the way.</p></header>
+    <section class="flight" aria-label="Volumetric cloud flight">
+      <fieldset id="tools" disabled>
+        <legend>Flight altitude</legend>
+        <div class="measure"><label for="altitude">Above sea level</label><output id="metres" for="altitude">455 m</output></div>
+        <input type="range" id="altitude" min="450" max="4850" step="5" value="455">
+        <div class="presets">
+          <button type="button" data-altitude="455" aria-pressed="true">Below the deck</button>
+          <button type="button" data-altitude="1790" aria-pressed="false">Inside the deck</button>
+          <button type="button" data-altitude="4550" aria-pressed="false">Above the deck</button>
+        </div>
+      </fieldset>
+      <figure>
+        <figcaption><span>Coastal flight</span><span id="region">Below cloud base</span></figcaption>
+        <div class="view">
+          <canvas id="view" aria-label="Coastal landscape with volumetric clouds, sun shafts and ground shadows" tabindex="0"></canvas>
+          <p id="status" role="status">Opening the cloud field…</p>
+          <p id="error" hidden role="alert"></p>
+        </div>
+      </figure>
+      <aside>
+        <h2>Atmosphere</h2>
+        <p id="effects-status" role="status">Opening shafts and ground shadows…</p><fieldset id="effects" disabled>
+          <label>Cloud cover <output id="amount" for="cover">49%</output><input type="range" id="cover" min="15" max="82" step="1" value="49"></label>
+          <label class="check"><input type="checkbox" id="shadows" checked disabled>Ground cloud shadows</label>
+          <label class="check"><input type="checkbox" id="shafts" checked disabled>Sun shafts</label>
+          <button type="button" id="autopilot" aria-pressed="false">Fly route</button><button type="button" id="center">Reset view</button>
+        </fieldset>
+        <dl>
+          <div><dt>Cloud base</dt><dd>940 m</dd></div>
+          <div><dt>Cloud top</dt><dd>3,340 m</dd></div>
+        </dl>
+        <p class="hint">Drag the view to look around or use its arrow keys.</p>
+      </aside>
+    </section>
+    <footer>Original coastal terrain · <a href="./source/README.md">Cloud model and sources</a></footer>
+  </main>
+</body>
+</html>

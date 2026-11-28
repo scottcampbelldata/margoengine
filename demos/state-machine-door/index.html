@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171f25">
+<link rel="icon" href="data:,">
+<title>State Machine Door · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-BaMxnCPp.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C9ffQrRY.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>State Machine Door</h1>
+    <p>Open the vault and switch on the inspection lamp. Hold midway, then resume to see where both states return.</p>
+  </header>
+  <div class="exhibit">
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Bronze and steel vault door inside a stone portal, with moving bolts, a swinging hinge and an inspection lamp"></canvas>
+        <div id="notice"><p id="status" role="status">Preparing the vault…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <span><b id="angle">0°</b> swing</span>
+        <span><b id="bolts">100%</b> bolt extension</span>
+        <span id="renderer">Margo Engine</span>
+      </figcaption>
+    </figure>
+    <section class="console" aria-label="Vault controls and live states">
+      <div class="controls">
+        <button id="command" type="button" disabled>Open vault</button>
+        <button id="lamp" type="button" aria-pressed="false" disabled>Inspection lamp</button>
+        <button id="hold" type="button" disabled>Hold</button>
+      </div>
+      <div class="chart">
+        <div class="root">
+          <h2>Live statechart</h2>
+          <strong id="mode">Operating</strong>
+        </div>
+        <p class="ancestors" id="ancestors">Service <span>›</span> Mechanism <span>›</span> Operating</p>
+        <div class="regions" id="regions">
+          <div class="lanes">
+            <div class="lane"><span>Door drive</span><output id="drive">Sealed</output></div>
+            <div class="lane"><span>Inspection lamp</span><output id="lamp-state">Off</output></div>
+          </div>
+          <p id="history" class="history">Two regions run in parallel inside Operating.</p>
+        </div>
+        <ol class="sequence" aria-label="Door drive cycle">
+          <li data-drive="sealed">Sealed</li><li data-drive="withdraw">Retract</li><li data-drive="swingOut">Swing open</li>
+          <li data-drive="open">Open</li><li data-drive="swingIn">Swing closed</li><li data-drive="extend">Extend</li>
+        </ol>
+      </div>
+      <details class="journal">
+        <summary>Transition log</summary>
+        <ol id="journal-list"></ol>
+      </details>
+      <p id="announcement" class="sr" role="status"></p>
+    </section>
+  </div>
+</main>
+</body>
+</html>

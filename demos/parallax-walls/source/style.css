@@ -1,0 +1,31 @@
+:root{color-scheme:dark;background:#242520;color:#eee3cf;--line:#6e6757;--soft:#d8c8ae;font-family:Georgia,serif}
+*{box-sizing:border-box}
+body{margin:0}
+main{max-width:1500px;margin:auto;padding:20px clamp(14px,3.5vw,54px) 40px}
+nav,figcaption{font:650 12px/1.4 system-ui,sans-serif}
+nav{border-bottom:1px solid var(--line);padding-bottom:13px}
+a{color:inherit;text-underline-offset:4px}
+header{display:flex;justify-content:space-between;align-items:end;gap:24px;margin:22px 0 18px}
+h1{font-size:clamp(63px,9.5vw,136px);line-height:.83;letter-spacing:-.074em;font-weight:400;margin:0}
+header p{color:var(--soft);max-width:36ch;margin:0 0 4px;font-size:16px;line-height:1.45}
+.exhibit{display:grid;grid-template-columns:minmax(0,1fr) 270px;border:1px solid var(--line)}
+figure{margin:0;min-width:0}
+.frame{position:relative;aspect-ratio:1.68;background:#423a30}
+canvas{display:block;width:100%;height:100%}
+figcaption{display:flex;gap:10px;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--line);color:var(--soft)}
+#loading,#error{position:absolute;inset:auto 11px 11px;margin:0;padding:9px 11px;background:#3b3430;color:#f9ebd3;font:650 13px system-ui,sans-serif}
+[hidden]{display:none!important}
+fieldset{min-width:0;border:0;border-left:1px solid var(--line);background:#36342b;padding:16px;margin:0}
+legend{position:absolute;margin-top:0;font-size:20px;padding:0}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:33px}
+button{font:650 14px/1.1 system-ui,sans-serif;min-height:44px;color:inherit;background:#464337;border:1px solid #888277;border-radius:2px;cursor:pointer}
+button[aria-pressed=true]{background:#e2bd8c;color:#332617;border-color:#e2bd8c}
+label,output{font:650 12px/1.3 system-ui,sans-serif}
+label[for]{display:flex;justify-content:space-between;margin-top:13px}
+input{accent-color:#d9b684}
+input[type=range]{width:100%;height:30px;margin:4px 0 0}
+.option{display:flex;align-items:center;gap:7px;margin-top:6px;min-height:35px;color:var(--soft)}
+.option input{width:16px;height:16px}
+fieldset p{border-top:1px solid var(--line);padding-top:9px;margin:8px 0 0;color:var(--soft);font-size:14px;line-height:1.43}
+:focus-visible{outline:2px solid #fcce92;outline-offset:3px}
+@media(max-width:770px){header{display:block;margin:20px 0 13px}h1{font-size:clamp(49px,12.1vw,96px)}header p{font-size:14px;margin:8px 0 0}.exhibit{grid-template-columns:1fr}.frame{aspect-ratio:1.29}fieldset{border-left:0;border-top:1px solid var(--line);padding:10px 12px}.modes{margin-top:27px}legend{font-size:18px}}

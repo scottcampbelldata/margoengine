@@ -1,0 +1,7 @@
+# The Weigh Station
+
+Choose an exact flywheel, eccentric cam or lugged yoke. The balance reads mass for the selected nominal density. An amber cross shows the horizontal projection of the body’s centre of mass. The full symmetric inertia matrix is about that centre. The marked axes are the part's fixed modelling axes. Readouts remain in millimetres, cubic centimetres, kilograms and kilogram-centimetres squared. All three exhibit solids are original.
+
+The public Margo B-rep kernel models, checks, measures and tessellates the parts in `generate.mjs`. Volumes, centroids and unit-density inertia come from the exact boundary integration. The browser multiplies the inertias and volume by the current metal density. The generator cross-checks the concentric flywheel’s volume and axial moment against their independent annular-cylinder formulas. WebGPU and WebGL2 draw the same solids and same machined instrument finish.
+
+Reference material: [Brian Mirtich, Fast and Accurate Computation of Polyhedral Mass Properties, 1996](https://doi.org/10.1080/10867651.1996.10487458), [Open CASCADE, BRepGProp global properties reference](https://www.occt3d.com/dev/doc/refman/html/class_b_rep_g_prop.html), and [MIT OCW, Representative Material Densities, 2009](https://ocw.mit.edu/courses/res-6-003-electromechanical-dynamics-spring-2009/2450e437051f303d9d3418d16989f89e_app_g_emd.pdf). The nominal material figures represent typical grades and are rounded for display. This exhibit does not use files or algorithms copied from other repositories.

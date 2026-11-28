@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a1d335e4.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ede9de">
+  <link rel="icon" href="data:,">
+  <title>The BIM House · Margo Engine</title>
+  <link rel="preload" href="./assets/house-CpSn89_E.bin" as="fetch" crossorigin>
+  <script type="module" crossorigin src="./assets/index-B2LzEBBJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-4kQNZ-yk.css">
+</head>
+<body>
+  <main>
+    <nav><a href="../">Margo Engine</a><span>Web Demos</span></nav>
+    <header>
+      <h1>The BIM House</h1>
+      <p>Open the floors of Rain Courtyard House. Select a wall to read the materials and dimensions recorded in its IFC model.</p>
+    </header>
+    <section class="exhibit" aria-label="Rain Courtyard House interactive model">
+      <figure>
+        <canvas id="house" aria-label="Three-level Rain Courtyard House model"></canvas>
+        <p id="status" role="status">Opening the IFC model…</p><p id="error" role="alert" hidden></p>
+        <div class="view-caption"><span>Rain Courtyard House</span><output id="view-floor">Whole house</output></div>
+      </figure>
+      <aside>
+        <fieldset id="levels" disabled>
+          <legend>Explore a floor</legend>
+          <button data-floor="-1" aria-pressed="true">Whole house</button>
+          <button data-floor="0" aria-pressed="false">Entry</button>
+          <button data-floor="1" aria-pressed="false">Gallery</button>
+          <button data-floor="2" aria-pressed="false">Roof studio</button>
+        </fieldset>
+        <button id="walk" type="button" disabled>Walk on this floor</button>
+        <p id="help">Turn the model with a drag. Tap a wall to inspect it.</p>
+        <section class="wall" aria-label="Selected IFC wall">
+          <h2 id="wall-name">Select a wall</h2>
+          <label for="pick-wall">Wall on this floor</label>
+          <select id="pick-wall" disabled><option value="">Choose a wall</option></select>
+          <dl>
+            <div><dt>Material</dt><dd id="material">—</dd></div>
+            <div><dt>Length</dt><dd id="length">—</dd></div>
+            <div><dt>Thickness</dt><dd id="thickness">—</dd></div>
+            <div><dt>Net wall area</dt><dd id="surface">—</dd></div>
+            <div><dt>Net wall volume</dt><dd id="volume">—</dd></div>
+          </dl>
+        </section>
+      </aside>
+    </section>
+    <footer><a id="download" download="rain-courtyard.ifc">Download the IFC4 model</a><a href="./source/README.md">Scene notes and source</a></footer>
+  </main>
+</body>
+</html>
