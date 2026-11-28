@@ -1,6 +1,6 @@
 // Guard: a web demo's source/ never carries its own engine code (Scott, 2026-11-27: "All 236 demos must only use Margo
 // solvers and packages otherwise they are not demos showing off the engine's capabilities"; "Nothing should be in a demo
-// directly ever."). Plan: private/handoffs/web-demos-migration-plan.md section 5.
+// directly ever."). Plan: the web demos migration plan, section 5 (untracked private notes).
 //
 //   R1  shader text or raw GPU use (WGSL/GLSL, createShaderModule, shader/raw imports, engine.gpu)
 //   R2  solvers (time-step updates, step/advance/integrate/simulate/solve functions, physical constants)

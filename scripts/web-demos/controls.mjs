@@ -15,7 +15,7 @@
 // longer wait, then once more after the page's start button, before they are reported.
 //
 // Results go to demos/.reports/controls.json (merged per demo, so a partial run updates only its demos; WebGL2
-// results are filed as <demo>@webgl2) and a short list to private/handoffs/dead-controls.md. Exit code 1 when a page
+// results are filed as <demo>@webgl2) and a short list to demos/.reports/dead-controls.md. Exit code 1 when a page
 // checked fails to start, logs an error or has a dead or broken control. Options: --backends=webgpu,webgl2 (default
 // both), --timeout=<ms> to load a page (default 60000), --budget=<ms> per page (default: 90 s plus 30 s per control,
 // at most 15 min), --wait=<ms> after an input (default 600), --confirm-wait=<ms> (default 1500), --no-confirm,
@@ -59,7 +59,7 @@ const CONFIRM_WAIT = Number(option('confirm-wait', 1500));
 // Each demo runs on WebGPU and again on the WebGL2 layer (`?backend=webgl2`); a WebGL2 result is filed as <demo>@webgl2.
 const backends = option('backends', 'webgpu,webgl2').split(',').filter(Boolean);
 const saveFrames = flag('save-frames') ? 'all' : option('save-frames', null); // 'all' or 'flagged'
-const mdFile = path.resolve(option('md', path.join(root, 'private/handoffs/dead-controls.md')));
+const mdFile = path.resolve(option('md', path.join(root, 'demos/.reports/dead-controls.md')));
 const DESKTOP = { width: 1440, height: 900 },
   MOBILE = { width: 390, height: 844 };
 const WORK = 320; // working width of a compared picture, in pixels
