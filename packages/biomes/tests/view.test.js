@@ -991,3 +991,59 @@ test('a ground material draws its photographed texture at its colour and repeat;
   );
   assert.throws(() => checkMaterialImage('x', { ...look, repeat: 0.1 }), /repeat/);
 });
+
+// Above the Treeline round 11: July snow lay only by height and slope, as small flecks on sunny crests. A ground layer
+// ruled by `shelter` lies where late snow survives: north-facing (away from the warm SW aspect), lee and hollow ground.
+test('a shelter ground rule puts firn on north-facing slopes and none on south-facing ones', async () => {
+  const alpine = defineBiome({
+      id: 'alpine',
+      climate: {},
+      ground: [{ material: 'scree' }, { material: 'firn', shelter: [0.56, null] }],
+    }),
+    // An east-west ridge 400 m high across the middle of the world: z < 0 faces north (-Z), z > 0 faces south.
+    world = await BiomeWorld.create({
+      size: [512, 512],
+      biomes: [alpine],
+      height: { field: (x, z) => 2000 + 400 * Math.max(0, 1 - Math.abs(z) / 220) },
+      climate: { latitude: 47, rainfall: 1000 },
+    }),
+    keys = groundMaterials(world.biomes),
+    firn = keys.indexOf('firn');
+  let north = 0,
+    south = 0,
+    cells = 0;
+  for (const [x, z] of [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [1, 1],
+  ]) {
+    const tile = await world.tile(x, z),
+      w = groundWeights(world, tile, keys),
+      n = tile.cells;
+    for (let j = 8; j < n - 8; j += 16)
+      for (let i = 8; i < n - 8; i += 16) {
+        const wz = -256 + z * n + j;
+        if (Math.abs(wz) < 40 || Math.abs(wz) > 200) continue;
+        if (wz < 0) north += w[(j * n + i) * 16 + firn];
+        else south += w[(j * n + i) * 16 + firn];
+        cells++;
+      }
+  }
+  assert.ok(cells > 100, `cells sampled: ${cells}`);
+  // Scree has no rule, so firn takes half of each cell where its rule holds in full (127 or 128 of 255).
+  assert.ok(north > 110 * (cells / 2), `north-facing slopes carry firn (${north} over ${cells / 2} cells)`);
+  assert.equal(south, 0, 'south-facing slopes carry none');
+  // The overview (region grid) reads the same rule: firn north of the ridge, none south of it.
+  const o = overviewWeights(world, keys, 16),
+    at = (wx, wz) => {
+      const u = Math.round((wx + 256) / 16),
+        v = Math.round((wz + 256) / 16);
+      return o.weights[firn >> 2][(v * o.width + u) * 4 + (firn & 3)];
+    };
+  assert.ok(at(0, -120) > 110, `overview: firn on the north slope (${at(0, -120)})`);
+  assert.equal(at(0, 120), 0, 'overview: none on the south slope');
+  // Exposure is a ground rule too (validated, read from the tile's layer).
+  assert.doesNotThrow(() => defineBiome({ id: 'lee', climate: {}, ground: [{ material: 'firn', exposure: [null, 0.45] }] }));
+  assert.throws(() => defineBiome({ id: 'bad', climate: {}, ground: [{ material: 'firn', shelter: [0.8, 0.2] }] }), RangeError);
+});

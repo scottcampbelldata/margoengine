@@ -55,8 +55,18 @@ export interface GroundLayer {
   readonly slope?: Range;
   readonly height?: Range;
   readonly moisture?: Range;
-  /** General curvature, 1/m. */
+  /** General curvature, 1/m (positive on convex ground, negative in hollows). */
   readonly curvature?: Range;
+  /** Wind exposure 0..1 (Winstral Sx): 0.5 on flat ground, lower in the lee of ridges, higher on windward crests. */
+  readonly exposure?: Range;
+  /**
+   * Snow shelter 0..1, where late-lying snow survives the summer: the mean of three terms, each 0.5 on flat open
+   * ground. Facing away from the sun (1 on slopes of 30 degrees or more turned from the warmest aspect, SW in the north,
+   * 0 facing it), the lee (1 - `exposure`) and hollows (1 at a curvature of -0.02 per m, 0 at +0.02). For example
+   * `{ material: 'firn', height: [3200, null], shelter: [0.6, null] }` lays July snowfields on north-facing benches,
+   * lee slopes and gullies and leaves sunny, wind-scoured ridges bare.
+   */
+  readonly shelter?: Range;
   /** Mean annual, coldest-month and warmest-month temperature, C (snow where it is cold, for example). */
   readonly temperature?: Range;
   readonly coldest?: Range;
@@ -220,6 +230,8 @@ const FIELDS: Readonly<Record<string, readonly [layer: string, toStored: number 
   soil: ['soil', 100, 0.1],
   waterDistance: ['waterDistance', 10, 20],
   curvature: ['curvature', 10000, 0.01],
+  // Ground rules only: the view derives it per cell from slope, aspect, exposure and curvature (no tile layer).
+  shelter: ['shelter', 255, 0.06],
 };
 
 /** One quantised envelope dimension: stored-unit bounds (open sides are +-2^31) and blend width (at least 1). */
@@ -276,7 +288,7 @@ export function envelopeOf(definition: BiomeDefinition): readonly Dimension[] {
     blend = c.blend ?? 0.15,
     dims: Dimension[] = [];
   for (const field of Object.keys(FIELDS))
-    if (field !== 'curvature' && c[field as keyof ClimateEnvelope] !== undefined)
+    if (field !== 'curvature' && field !== 'shelter' && c[field as keyof ClimateEnvelope] !== undefined)
       dims.push(dimension(field, c[field as keyof ClimateEnvelope] as Range, blend));
   for (const [field, range] of Object.entries(c.custom ?? {})) dims.push(dimension(field, range, blend));
   return dims;
@@ -294,6 +306,8 @@ const GROUND_FIELDS = Object.freeze([
   'temperature',
   'coldest',
   'warmest',
+  'exposure',
+  'shelter',
 ] as const);
 
 function deepFreeze<T>(value: T): T {

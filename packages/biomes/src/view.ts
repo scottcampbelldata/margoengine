@@ -20,7 +20,7 @@ import { drawCapture, shareCapture } from '../../shared/capture.js';
 import type { PassContext } from '@margoengine/core/extension';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
-import { clampInt, divFloor, hash3, imod, ONE, wendland } from '@margoengine/biomes/toolkit';
+import { clampInt, divFloor, hash3, imod, ONE, sincos, wendland } from '@margoengine/biomes/toolkit';
 import type { BiomeViewOptions, BiomeDisturbanceSettings, BiomeViewRock, BiomeWaterSettings } from './view-options.js';
 export type {
   BiomeViewOptions,
@@ -159,11 +159,61 @@ export function viewTile(world: BiomeWorld, tile: BiomeTile, materials: readonly
   return { x: tile.x, z: tile.z, count, heights, weights: textures };
 }
 
-/** Fields a ground layer rule can test (`GroundLayer`), each a tile layer of the same name. */
-const RULE_FIELDS = ['slope', 'height', 'moisture', 'curvature', 'temperature', 'coldest', 'warmest'] as const;
+/**
+ * Fields a ground layer rule can test (`GroundLayer`): each a tile layer of the same name but `shelter`, which
+ * `shelterInto` derives from slope, aspect, exposure and curvature.
+ */
+const RULE_FIELDS = [
+  'slope',
+  'height',
+  'moisture',
+  'curvature',
+  'temperature',
+  'coldest',
+  'warmest',
+  'exposure',
+  'shelter',
+] as const;
 
 /** Layers a view tile reads. */
-export const VIEW_LAYERS = Object.freeze([...RULE_FIELDS, 'biome', 'biomeWeight']);
+export const VIEW_LAYERS = Object.freeze([
+  ...RULE_FIELDS.filter((k) => k !== 'shelter'),
+  'aspect',
+  'biome',
+  'biomeWeight',
+]);
+
+/**
+ * Snow shelter (`GroundLayer.shelter`) in stored units, 0..255, from stored slope (Q8.8 tan), aspect (65,536 a turn,
+ * clockwise from north, the downslope direction), exposure (0..255) and curvature (1e-4 per m), given the climate's
+ * warmest aspect `warm` (Q16 north and east components). The mean of three terms, each 0.5 on flat open ground: away
+ * from the sun, (1 - heat load) / 2 with the heat load of McCune and Keon 2002 as the climate computes it
+ * (cos(aspect - warmest aspect) x min(1, tan slope / tan 30 degrees)); the lee, 1 - exposure (Winstral, Elder and Davis
+ * 2002, the Sx upwind slope index); hollows, 0.5 - curvature / 0.04 per m, clamped. Summer snow lies on as these three
+ * say (Grunewald et al. 2013 and Revuelto et al. 2014 find northness, Sx and curvature the strongest terrain
+ * predictors of late snow depth, after elevation). Integer only.
+ */
+function shelterOf(slope: number, aspect: number, exposure: number, curvature: number, warm: readonly number[]): number {
+  const sc = sincos(aspect * 65536, [0, 0]),
+    c = clampInt(Math.floor((sc[0] * warm[0] + sc[1] * warm[1]) / ONE), -ONE, ONE),
+    heat = Math.floor((c * Math.min(ONE, divFloor(Math.max(0, slope) * ONE, 148))) / ONE), // tan 30 = 148 / 256
+    sun = (ONE - heat) >> 1,
+    lee = divFloor((255 - clampInt(exposure, 0, 255)) * ONE, 255),
+    hollow = clampInt((ONE >> 1) - divFloor(curvature * ONE, 400), 0, ONE);
+  return clampInt(divFloor((sun + lee + hollow) * 255, 3 * ONE), 0, 255);
+}
+
+/** `shelterOf` for every cell of the stored layers into `out`. */
+function shelterInto(
+  data: Readonly<Record<string, ArrayLike<number>>>,
+  aspect: ArrayLike<number>,
+  warm: readonly number[],
+  out: Int32Array,
+): Int32Array {
+  for (let k = 0; k < out.length; k++)
+    out[k] = shelterOf(data.slope[k], aspect[k], data.exposure[k], data.curvature[k], warm);
+  return out;
+}
 
 /**
  * The number of clipmap rings a view needs. The terrain's ring `i` has cells of `cellSize * 2^i` and `resolution` of
@@ -272,6 +322,8 @@ function weightsInto(world: BiomeWorld, tile: BiomeTile, materials: readonly str
   if (!ids || !weights) throw typeError('groundWeights needs a tile with the biome and biomeWeight layers', 'biomes');
   const data: Record<string, ArrayLike<number>> = {};
   for (const name of RULE_FIELDS) data[name] = tile.layer(name)?.data ?? new Int32Array(n);
+  if (rules.some((b) => b.some((g) => g.dims.some((d) => d.layer === 'shelter'))))
+    data.shelter = shelterInto(data, tile.layer('aspect')?.data ?? new Int32Array(n), world.climate.warm, new Int32Array(n));
   const sums = new Int32Array(STRIDE),
     share = new Int32Array(STRIDE);
   for (let k = 0; k < n; k++) {
@@ -381,6 +433,7 @@ export function overviewRows(
     sums = new Int32Array(STRIDE),
     share = new Int32Array(STRIDE);
   for (const name of RULE_FIELDS) data[name] = new Int32Array(1);
+  const warm = world.climate.warm;
   let s: BiomeSample | undefined;
   for (let j = j0; j <= j1; j++)
     for (let i = 0; i < o.width; i++) {
@@ -395,6 +448,8 @@ export function overviewRows(
       data.temperature[0] = Math.round(s.temperature * 100);
       data.coldest[0] = Math.round(s.coldest * 100);
       data.warmest[0] = Math.round(s.warmest * 100);
+      data.exposure[0] = Math.round(s.exposure * 255);
+      data.shelter[0] = shelterOf(data.slope[0], Math.round((s.aspect * 65536) / 360) << 16 >> 16, data.exposure[0], 0, warm); // float division: degrees to stored
       sums.fill(0);
       for (let b = 0; b < s.biomes.length; b++)
         addBiome(rules[ids.indexOf(s.biomes[b])], data, 0, Math.round(s.weights[b] * ONE), sums, share);

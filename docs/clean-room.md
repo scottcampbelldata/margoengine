@@ -20559,3 +20559,25 @@ flow travel faster without a per-fragment shader; each stroke led by one invisib
 golden-ratio phase within the dash period; trace cuts at a time with the crossing interpolated. Tests: sciviz
 tests/flow-ink.test.js (breaks at NaN, cut at until, ramp end colours, band speeds and spacer phase, highlight blend,
 validation, the engine plugin's dash offsets and disposal).
+## Snow shelter and wind exposure as ground rules (2026-11-28, Above the Treeline round 11)
+
+Problem: a summer snowfield (`firn`) could be ruled only by height, slope, curvature and temperature, so it lay as
+small flecks on the gentle, sunny, wind-scoured tops where real July snow is gone first.
+
+Sources read (papers only, no code):
+- B. McCune and D. Keon, "Equations for potential annual direct incident radiation and heat load", Journal of
+  Vegetation Science 13(4), 2002, https://doi.org/10.1111/j.1654-1103.2002.tb02087.x (the folded-aspect heat load the
+  biomes climate already uses).
+- A. Winstral, K. Elder and R. E. Davis, "Spatial snow modeling of wind-redistributed snow using terrain-based
+  parameters", Journal of Hydrometeorology 3(5), 2002, https://doi.org/10.1175/1525-7541(2002)003<0524:SSMOWR>2.0.CO;2
+  (the Sx upwind exposure the world's `exposure` layer holds; drifts in the lee).
+- T. Grunewald, J. Stotter, J. W. Pomeroy and others, "Statistical modelling of the snow depth distribution in open
+  alpine terrain", Hydrology and Earth System Sciences 17, 2013, https://doi.org/10.5194/hess-17-3005-2013 (northness,
+  Sx and curvature as predictors of snow depth after elevation).
+- J. Revuelto, J. I. Lopez-Moreno, C. Azorin-Molina and S. M. Vicente-Serrano, "Topographic control of snowpack
+  distribution in a small catchment in the central Spanish Pyrenees", The Cryosphere 8, 2014,
+  https://doi.org/10.5194/tc-8-1989-2014 (the same predictors near the melt-out, when patches are what remains).
+
+Margo's own: `GroundLayer.exposure` reads the existing layer; `GroundLayer.shelter` is derived per cell in integers
+from slope, aspect, exposure and curvature as the mean of three terms each 0.5 on flat open ground (away from the
+sun, lee, hollow), on the tiles and the overview alike (biomes tests/view.test.js).

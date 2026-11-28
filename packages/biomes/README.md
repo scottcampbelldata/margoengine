@@ -389,6 +389,29 @@ const tundra = defineBiome({
 console.log(tundra.ground[1].material); // firn
 ```
 
+Two ground rules place it the way real July snow lies. `exposure` (0..1, Winstral's Sx wind exposure, 0.5 on flat
+ground) is low in the lee of ridges, where drifts build. `shelter` (0..1) is the mean of three terms that are each 0.5
+on flat open ground: facing away from the sun (1 on slopes of 30 degrees or more turned from the warmest aspect, SW in
+the northern hemisphere; McCune and Keon 2002's heat load), the lee (1 - exposure; Winstral, Elder and Davis 2002) and
+hollows (1 at a curvature of -0.02 per m). Late snow depth follows northness, Sx and curvature most closely after
+elevation (Grunewald et al. 2013, https://doi.org/10.5194/hess-17-3005-2013; Revuelto et al. 2014,
+https://doi.org/10.5194/tc-8-1989-2014). A north face of 30 degrees or more on open ground scores 0.62, a south face
+0.38. The view reads both rules on the 1 m tiles and on the far overview (which has no curvature: 0.5 there).
+
+```js
+import { defineBiome } from '@margoengine/biomes';
+
+const summit = defineBiome({
+  id: 'summit-scree',
+  climate: { height: [3600, null] },
+  ground: [
+    { material: 'scree' },
+    { material: 'firn', height: [3700, null], shelter: [0.56, null] },
+  ],
+});
+console.log(summit.ground[1].shelter); // [ 0.56, null ]
+```
+
 ```js
 import { biomeMaterials } from '@margoengine/biomes/view';
 
