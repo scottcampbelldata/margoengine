@@ -46,6 +46,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/physics/tests/rigid-validation.test.js`, the three "hung" cradle tests at both tiers (all six
   fail without the fix).
 
+### Fixed 2026-11-27: the stepping-stones walker crouched, knees near 50 degrees standing and past 100 walking (KB-STEP-CROUCH1, animator)
+
+- **Repro:** the-stepping-stones before this fix: knees 49 to 56 degrees standing, a single-support median of 50,
+  peaks of 101 (stance) and 106 (swing), and about 12 cm of pelvis travel on a level 0.62 m stride; Scott saw a deep
+  lunge. The planning lived in the demo (`source/gait.js`, `walker.js`).
+- **Cause:** the pelvis plan held the root 4.2 cm below standing, modelled each leg 3.1 cm shorter than it is, took a
+  rounded minimum that dropped another 9 mm where limits met and subtracted the smoothing filter's worst-case rise
+  (about 4 cm) at every sample. Near straight the knee is very sensitive: 3 mm of slack bends it 10 degrees, 3 cm
+  bends it 30. The swing foot also held the pelvis down, the trailing heel stayed flat until the other foot had landed,
+  and the hips stood over the footfall middle instead of the ankles, so staggered feet left one knee bent.
+- **Fix:** `@margoengine/animator/stepping` (`createStepper`, `upperBodyMotion`): the ceiling is the reach of each
+  planted leg at an 8 degree loaded knee, the smoothing is lowered only by the filtered window maximum of its own
+  excess, the swing leg never limits the body, the trailing heel rises in terminal stance and the foot leaves at a
+  steep toe-off pitch, standing hips sit over the ankles and the pelvis lists up to 0.12 rad on uneven ground. The
+  demo keeps only wiring; its full-body IK plans for the whole leg (`reach: 1`).
+- **Regression:** `tests/modern-animator-stepping.test.js` (level walk: standing knees under 15 degrees, single-support
+  median 5 to 22, swing peak 45 to 72, pelvis travel 2.5 to 6 cm; stones: standing under 20, median under 25, peak
+  under 85; planted legs never over-extended).
+
 ### Fixed 2026-11-27: IK elbows folded sideways or backward when the pole swung the bend plane (KB-RIG-IKHINGE1, rigging)
 
 - **Repro:** the planner demo's workers at idle, chop or cook: `solveSkeletonIK` on each arm with the pole

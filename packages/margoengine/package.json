@@ -163,6 +163,10 @@
       "types": "./dist/animator/masks.d.ts",
       "import": "./dist/animator/masks.js"
     },
+    "./animator/stepping": {
+      "types": "./dist/animator/stepping.d.ts",
+      "import": "./dist/animator/stepping.js"
+    },
     "./armies": {
       "types": "./dist/armies.d.ts",
       "import": "./dist/armies.js"

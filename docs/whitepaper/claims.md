@@ -6850,3 +6850,7 @@ Proof: `packages/sky/test/lightning-glow.test.js` (CPU integral against a fine n
 percent over 60 rays, worst 7.0 at anisotropy up to 0.7) and `node packages/sky/test/features-check.mjs lightning-glow`,
 also with `MARGO_COMPAT=1` (RTX A6000, worst of 117 pixels 2.7 percent). Not claimed: multiple scattering, forks, cloud,
 dimming of the core, any speed figure.
+
+### Stepping (2026-11-27, KB-STEP-CROUCH1)
+
+A biped walking planned footfalls with `@margoengine/animator/stepping` keeps its loaded knee near straight and its pelvis travel near human values: on level 0.62 m strides a single-support knee median of 17 degrees, a swing peak of 66 and 4.7 cm of vertical travel. Proof: tests/modern-animator-stepping.test.js bounds these against Perry and Burnfield 2010 and Gard, Miff and Kuo 2004, and the stepping stones against stair data; reproduce with `node --test tests/modern-animator-stepping.test.js`. Kinematic only; no claim about dynamics or speed.

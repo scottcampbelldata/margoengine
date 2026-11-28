@@ -1,28 +1,23 @@
 import { Animation } from '@margoengine/animation';
 import { Animator } from '@margoengine/animator';
 import { addFullBodyIK } from '@margoengine/animator/fbik';
+import { createStepper, upperBodyMotion } from '@margoengine/animator/stepping';
 import {
   axisAngleToQuaternion, conjugateQuaternion, multiplyQuaternions,
   normalizeQuaternion, rotateByQuaternion, rotationToQuaternion,
 } from '@margoengine/math/quat';
 import { landHeight, movableStone, stones } from './creek.js';
-import { clamp, createCrossing, initialFootfalls, planPelvis, sampleGait } from './gait.js';
 
-const settleTime = .58;
 const sides = ['Left', 'Right'];
 const X = [1, 0, 0], Y = [0, 1, 0], Z = [0, 0, 1];
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const point = (node) => Array.from(node.matrix.subarray(12, 15));
 
+// Standing spots on the banks, chosen where the ground under both boots is close to level.
 function ground(x, z) { return [x, landHeight(x, z), z]; }
-const startFeet = [ground(.154, -2.22), ground(-.150, -1.97)];
-const endFeet = [ground(.21, 2.02), ground(-.18, 2.27)];
+const startFeet = [ground(.174, -2.15), ground(-.170, -1.94)];
+const endFeet = [ground(.23, 1.94), ground(-.20, 2.19)];
 const stepCount = stones.length + endFeet.length;
-
-function roundedMinimum(a, b, radius = .036) {
-  const gap = Math.max(0, radius - Math.abs(a - b));
-  return Math.min(a, b) - gap * gap / (4 * radius);
-}
 
 function nodeRotation(node) {
   const m = node.matrix;
@@ -48,16 +43,16 @@ export function choreograph(model, movableRange) {
     const base = nodeRotation(model.nodes[end]);
     return {
       upper, lower, end, base, rotation: base,
-      hipOffset: hip.map((value, axis) => value - rootPosition[axis]),
-      reach: distance(hip, knee) + distance(knee, ankle) - .031,
+      hip: hip.map((value, axis) => value - rootPosition[axis]),
+      thigh: distance(hip, knee), shin: distance(knee, ankle),
       target: [0, 0, 0], pole: [0, 0, 0], support: true,
       sole: null,
     };
   });
-  // The path and reference pose already account for weight transfer and reach.
-  // Solve the foot contacts with the spine out of the stationary balance solve.
+  // Margo Animator's stepper plans the footfalls, boot contacts and pelvis height; the full-body solve only bends
+  // the legs to its targets, so its torso reach is the whole leg.
   const ik = addFullBodyIK(animator, {
-    pelvis, spine: [], legs, balance: false, reach: .995, iterations: 1, tolerance: .003,
+    pelvis, spine: [], legs, balance: false, reach: 1, iterations: 1, tolerance: .003,
   });
 
   function poseAxis(name, axis) {
@@ -89,35 +84,26 @@ export function choreograph(model, movableRange) {
   }
 
   const centeredRoute = [...stones.map(({ x, top, z }) => [x, top, z]), ...endFeet];
-  const path = createCrossing(startFeet, centeredRoute);
   const routes = [movableRange[0], 0, movableRange[1]].map((offset) => centeredRoute.map((foot, index) =>
     index === movableStone ? [foot[0] + offset, foot[1], foot[2]] : foot));
-  const pelvisHeight = planPelvis(path, startFeet, routes, settleTime, (pose) =>
-    roundedMinimum(pose.y, roundedMinimum(...legs.map((leg, i) => reachHeight(leg, pose, pose.feet[i].ankle)))));
-  const position = [0, 0, 0];
-  let placed = initialFootfalls(startFeet), pathOffset = 0, elapsed = 0, step = 0, time = 0;
-  let moving = false, completed = false, phase = 0;
-  let gait = sampleGait(path, placed, null, 0, 0);
+  let pathOffset = 0;
+  const stepper = createStepper({ legs, start: startFeet, routes, footfall: goal });
   const removeBodyPose = animator.addPoseStep((_, rotations) => {
-    const { activity, sway, rhythm, brace, lean, absorb, coming, anticipation, settling } = gait;
-    const settle = Math.sin(Math.PI * settling) ** 2;
-    turn(rotations, pelvisYaw, -.060 * sway);
-    turn(rotations, pelvisRoll, -.16 * lean);
-    turn(rotations, lumbar, .043 + .088 * brace + .041 * absorb - .021 * settle);
-    turn(rotations, chestYaw, .101 * sway - .056 * coming * anticipation);
-    turn(rotations, chestRoll, .34 * lean - .018 * Math.sin(rhythm) * activity);
-    turn(rotations, headPitch, .019 + .11 * anticipation - .038 * absorb - .035 * settle);
-    turn(rotations, headYaw, .135 * coming * anticipation - .040 * sway);
+    const body = upperBodyMotion(stepper.motion);
+    turn(rotations, pelvisYaw, body.pelvisYaw);
+    turn(rotations, pelvisRoll, body.pelvisRoll);
+    turn(rotations, lumbar, body.lumbar);
+    turn(rotations, chestYaw, body.chestYaw);
+    turn(rotations, chestRoll, body.chestRoll);
+    turn(rotations, headPitch, body.headPitch);
+    turn(rotations, headYaw, body.headYaw);
     for (let i = 0; i < 2; i++) {
-      const side = i === 0 ? 1 : -1, arm = arms[i];
-      const stroke = -side * Math.cos(rhythm - (i === 0 ? .18 : .33)) * activity;
-      const follow = -side * Math.cos(rhythm - (i === 0 ? .47 : .63)) * activity;
-      turn(rotations, arm.swing, (i === 0 ? .244 : .218) * stroke - .048 * brace - .031 * settle);
-      turn(rotations, arm.spread, side * (-.036 + .115 * brace + .11 * Math.max(0, side * lean)));
-      turn(rotations, arm.elbow, -.079 + .087 * follow - .122 * brace - .025 * settle);
-      turn(rotations, arm.wrist, .032 * follow + .028 * absorb);
-      for (const finger of arm.curl)
-        turn(rotations, finger, finger.bend * (1 + .21 * follow - .14 * brace));
+      const arm = arms[i], angles = body.arms[i];
+      turn(rotations, arm.swing, angles.swing);
+      turn(rotations, arm.spread, angles.spread);
+      turn(rotations, arm.elbow, angles.elbow);
+      turn(rotations, arm.wrist, angles.wrist);
+      for (const finger of arm.curl) turn(rotations, finger, finger.bend * angles.curl);
     }
   });
 
@@ -127,61 +113,38 @@ export function choreograph(model, movableRange) {
     return [x + (index === movableStone ? pathOffset : 0), top, z];
   }
 
-  function reachHeight(leg, pose, target) {
-    const [x, y, z] = leg.hipOffset;
-    const gap = Math.hypot(pose.x + x - target[0], pose.z + z - target[2]);
-    return target[1] - y + Math.sqrt(Math.max(0, leg.reach ** 2 - gap ** 2));
-  }
-
   function pose(dt) {
-    if (moving) {
-      elapsed += dt;
-      time += dt;
-    }
-    while (moving && step < stepCount && elapsed >= path.durations[step]) {
-      elapsed -= path.durations[step];
-      placed[step % 2] = sampleGait(path, placed, goal(step), step, 1).next;
-      step++;
-    }
-    if (moving && step === stepCount && elapsed >= settleTime) {
-      moving = false;
-      completed = true;
-    }
-    const stepping = moving && step < stepCount;
-    const settling = step === stepCount ? clamp(elapsed / settleTime) : 0;
-    phase = stepping ? elapsed / path.durations[step] : settling;
-    gait = sampleGait(path, placed, stepping ? goal(step) : null, step, phase, settling);
-    position[0] = gait.x;
-    position[2] = gait.z;
+    stepper.update(dt);
+    const position = stepper.root;
     for (const [index, leg] of legs.entries()) {
-      const foot = gait.feet[index];
+      const foot = stepper.feet[index];
       leg.sole = foot;
       leg.target = foot.ankle;
       leg.support = foot.pin !== null;
-      leg.pole[0] = position[0] + leg.hipOffset[0] * 1.22;
-      leg.pole[1] = gait.y + .60;
+      leg.pole[0] = position[0] + leg.hip[0] * 1.22;
+      leg.pole[1] = position[1] + .60;
       leg.pole[2] = position[2] + 1.35;
       const roll = multiplyQuaternions(axisAngleToQuaternion(Y, foot.yaw), axisAngleToQuaternion(X, foot.pitch));
       leg.rotation = multiplyQuaternions(roll, leg.base);
     }
-    position[1] = pelvisHeight(time);
     model.root.setPosition(position);
   }
 
   pose(0);
   return {
-    position, stepCount,
-    get moving() { return moving; },
-    get completed() { return completed; },
-    get index() { return step; },
-    get phase() { return phase; },
-    get time() { return time; },
+    position: stepper.root, stepCount,
+    get moving() { return stepper.moving; },
+    get completed() { return stepper.completed; },
+    get index() { return stepper.step; },
+    get phase() { return stepper.phase; },
+    get time() { return stepper.time; },
     get contact() { return sides.filter((_, index) => legs[index].support).join(' + '); },
     get fit() { return ik.result; },
     get swingLift() {
-      if (!moving || step >= stepCount) return 0;
-      const foot = gait.feet[step % 2];
-      return Math.max(0, foot.ankle[1] - .074 - Math.max(placed[step % 2].location[1], gait.next.location[1]));
+      const step = stepper.step;
+      if (!stepper.moving || step >= stepCount) return 0;
+      const left = step < 2 ? startFeet[step] : goal(step - 2);
+      return Math.max(0, stepper.feet[step % 2].ankle[1] - .074 - Math.max(left[1], goal(step)[1]));
     },
     get leftAnkleX() { return model.nodes[legs[0].end].matrix[12]; },
     get posture() {
@@ -209,18 +172,9 @@ export function choreograph(model, movableRange) {
       return Math.hypot(a[0] - b[0], a[2] - b[2]);
     },
     offset(value) { pathOffset = value; },
-    start() {
-      if (moving) return;
-      if (completed) this.reset();
-      moving = true;
-    },
+    start() { stepper.start(); },
     reset() {
-      placed = initialFootfalls(startFeet);
-      elapsed = 0;
-      step = 0;
-      time = 0;
-      moving = false;
-      completed = false;
+      stepper.reset();
       pose(0);
     },
     update: pose,

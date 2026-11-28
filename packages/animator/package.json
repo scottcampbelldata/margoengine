@@ -82,6 +82,10 @@
     "./masks": {
       "types": "./dist/masks.d.ts",
       "import": "./dist/masks.js"
+    },
+    "./stepping": {
+      "types": "./dist/stepping.d.ts",
+      "import": "./dist/stepping.js"
     }
   },
   "files": [

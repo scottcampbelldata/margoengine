@@ -440,6 +440,45 @@ roll.distance = 3.5;                        // what is left to the mark, written
 - **Motion capture.** Proved on CMU takes with contacts found from the data: at speeds from 0.7 to 3 m/s on a 1.31 m/s walk a planted foot slides 24 to 50 mm, against 21 mm in the take itself and 48 to 564 mm with no warp. Pass `smoothing: 0.5` to `addRootMotion`, or the hips' surge shows as foot slide.
 - **Distance.** `addDistanceWarp` stands a clip where the travel of `joint` matches `distance`: `mode: 'stop'` reads what is left, `'start'` what has been covered. Time only runs forward, and a distance longer than the clip holds its first frame. The state must play one clip. An export with root motion on (such as Quaternius' `_RM` files) keeps the travel on its root bone: pass that bone as `joint` here and as `speedJoint` to `addWarping`.
 
+## Stepping (`margoengine/animator/stepping`)
+
+A biped that has to put its feet on given spots (stepping stones, a path, a stair) walks them with `createStepper`. Each frame it gives the character root position, each ankle's target, rotation and planted heel or toe, and gait signals for the upper body. The pelvis is planned ahead over every route the footfalls may take: loaded knees stay near straight (`kneeFlexion`, default 8 degrees), the trailing heel rises in terminal stance, and the hips lower only where a long or high step needs it, so the body rises and falls about 4 to 5 cm on level ground as a person's does (Perry and Burnfield 2010; Gard, Miff and Kuo 2004). Hand the targets to full-body IK with `reach: 1` (the plan already keeps the knees off their stop); `upperBodyMotion` turns the signals into pelvis, chest, head and arm angles.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {Animator} from 'margoengine/animator';
+import {addFullBodyIK, type FullBodyLimb} from 'margoengine/animator/fbik';
+import {createStepper, upperBodyMotion} from 'margoengine/animator/stepping';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
+const animator = Animator.attach(Animation.attach(model), {initial:'idle', states:{idle:'Idle_Loop'}});
+const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
+const at = (name: string) => Array.from(model.nodes[joint(name)]!.matrix.subarray(12, 15));
+const gap = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+const limb = (side: string): FullBodyLimb => ({upper: joint('thigh_' + side), lower: joint('calf_' + side), end: joint('foot_' + side)});
+const leg = (side: string) => ({ // hip offset from the root and bone lengths, read from the rest pose
+  hip: at('thigh_' + side) as [number, number, number],
+  thigh: gap(at('thigh_' + side), at('calf_' + side)), shin: gap(at('calf_' + side), at('foot_' + side)),
+});
+const feet = [limb('l'), limb('r')];
+addFullBodyIK(animator, {pelvis: joint('pelvis'), spine: [], legs: feet, balance: false, reach: 1});
+const stones: [number, number, number][] = [[0.15, 0.1, 0.6], [-0.15, 0.14, 1.2], [0.15, 0.08, 1.8], [-0.15, 0.08, 2.05]];
+const walker = createStepper({legs: [leg('l'), leg('r')], start: [[0.15, 0, 0], [-0.15, 0, 0.2]], routes: [stones]});
+walker.start();
+engine.onFrame((_, dt) => {
+  walker.update(dt);
+  model.root.setPosition(walker.root);
+  walker.feet.forEach((foot, i) => { feet[i]!.target = foot.ankle; feet[i]!.support = foot.pin !== null; });
+  const body = upperBodyMotion(walker.motion); // radians for the pelvis, chest, head and arms: turn your joints by them
+  void body.arms[0].swing;
+});
+engine.start();
+```
+
+`routes` lists every footfall row the walk may take (each as long as the first); `footfall(step)` returns the live spot when a footfall can move while walking, as the stepping-stones demo's movable stone does. `kneeFlexion`, `liftRate` (default 0.64 m/s) and `settle` (default 0.58 s) tune the plan; `foot` sets the ankle, heel and toe contact offsets. `legReach` and `kneeFlexionAt` convert between hip-to-ankle distance and knee bend. The gait is kinematic: no ground forces are computed.
+
 ## Full-body IK (`margoengine/animator/fbik`)
 
 `addFullBodyIK(animator, rig)` reaches hands, feet and head together, for reaching, climbing and interactions. One solve moves and turns the pelvis and bends the spine only as far as the targets need: a hand in reach moves the arm alone, a far one bends the body, and a pinned foot stops the pelvis going further than the leg allows. The centre of mass stays over what bears weight, so a long reach pushes the hips back. Each limb is finished by the two-bone solver, so bones keep their lengths.
