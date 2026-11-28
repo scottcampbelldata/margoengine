@@ -41,10 +41,12 @@ for(let j=0;j<m;j++)for(let i=0;i<n;i++){
 // sRGB luma of pixel (x, y) of kept RGBA bytes.
 const luma=(d,x,y)=>{const k=(y*W+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];};
 window.check={
-  // Attaches the crest terrain with `layer` options on every layer (by `rules` or painted `weights`), renders it and
+  // Attaches the crest terrain with `layer` options on every layer (by `rules` or painted `weights`), renders it from
+  // `view` ({position, target}, shot 05's camera by default) and
   // returns the dark specks: pixels under 0.4 of their 5 x 5 neighbourhood's mean luma where that mean is over 40.
   // `uncapped` patches in Mikkelsen's listing 1 as published (no slope cap), to show the scene has edge-on slivers.
-  async show(layer,weighted,uncapped=false){
+  async show(layer,weighted,uncapped=false,view=meta.camera){
+    engine.camera.position=[...view.position];engine.camera.target=[...view.target];
     device.pushErrorScope('validation');
     const terrain=Terrain.attach(engine,{origin:meta.origin,size:[(n-1)*step,(m-1)*step],heightScale:1,cellSize:1,resolution:64,levels:6,
       layers:rules.map(r=>({...r,scale:0.25,...layer})),
