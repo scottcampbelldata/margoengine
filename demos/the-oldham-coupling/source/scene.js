@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { couplingPose } from './mechanism.js';
+import { openCoupling } from './mechanism.js';
 import { prepareCoupling } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -10,6 +10,7 @@ const turn=document.querySelector('#turn');
 const inputTurn=document.querySelector('#input-turn');
 const outputTurn=document.querySelector('#output-turn');
 const orbit=document.querySelector('#orbit');
+const gap=document.querySelector('#check');
 const explode=document.querySelector('#explode');
 const reverse=document.querySelector('#reverse');
 const play=document.querySelector('#play');
@@ -18,7 +19,7 @@ const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=32;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,model,observer,frame,fitDirty=true,poseDirty=true,exploded=false,otherSide=false,playing=null;
+let engine,mechanism,model,observer,frame,fitDirty=true,poseDirty=true,exploded=false,otherSide=false,playing=null;
 let lastOffset=-1,lastTurn=-1;
 
 function fit() {
@@ -52,7 +53,7 @@ function update() {
   const changed=separation!==lastOffset||angle!==lastTurn;
   if(!fitDirty&&!poseDirty&&!changed) return;
   if(fitDirty) fit();
-  const pose=changed||poseDirty?couplingPose(angle,separation/1000):null;
+  const pose=changed||poseDirty?mechanism.pose(angle,separation/1000):null;
   if(pose) model(pose,separation/1000,exploded);
   engine.render({delta:0});
   if(pose) {
@@ -66,6 +67,8 @@ function update() {
     document.body.dataset.angle=String(angle);
     document.body.dataset.center=pose.center.map((value)=>value.toFixed(7)).join(',');
     document.body.dataset.view=exploded?'exploded':'assembly';
+    gap.textContent=pose.check;
+    document.body.dataset.check=pose.check;
   }
   if(fitDirty) document.body.dataset.side=otherSide?'reverse':'default';
   lastOffset=separation;
@@ -130,6 +133,7 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined) cancelAnimationFrame(frame);
   engine?.dispose();
+  mechanism?.dispose();
 }
 
 function fail(error) {
@@ -158,7 +162,9 @@ async function open() {
   }
   const opening=create();
   const assemble=prepareCoupling();
+  const solving=openCoupling();
   const [device,renderer]=await opening;
+  mechanism=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#4d5a6d';

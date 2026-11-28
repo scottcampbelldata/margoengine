@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { yokePose } from './mechanism.js';
+import { openYoke } from './mechanism.js';
 import { prepareYoke } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -8,6 +8,7 @@ const angle=document.querySelector('#angle');
 const degrees=document.querySelector('#degrees');
 const piston=document.querySelector('#piston');
 const roller=document.querySelector('#roller');
+const gap=document.querySelector('#check');
 const front=document.querySelector('#front');
 const play=document.querySelector('#play');
 const loading=document.querySelector('#loading');
@@ -15,7 +16,7 @@ const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=33;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,model,observer,frame,viewDirty=true,prior=-1,frontView=false,running=null;
+let engine,model,mechanism,observer,frame,viewDirty=true,prior=-1,frontView=false,running=null;
 
 function fit() {
   const width=Math.max(1,canvas.clientWidth);
@@ -59,6 +60,8 @@ function show(value,pose) {
   document.body.dataset.angle=String(value);
   document.body.dataset.offset=(pose.x*1000).toFixed(6);
   document.body.dataset.height=(pose.y*1000).toFixed(6);
+  gap.textContent=pose.check;
+  document.body.dataset.check=pose.check;
 }
 
 function setRun(value) {
@@ -71,7 +74,7 @@ function update() {
   const value=Number(angle.value);
   if(!viewDirty&&value===prior) return;
   if(viewDirty) fit();
-  const pose=yokePose(value);
+  const pose=mechanism.pose(value);
   if(value!==prior) model(pose);
   engine.render({delta:0});
   if(value!==prior) show(value,pose);
@@ -118,6 +121,7 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined) cancelAnimationFrame(frame);
   engine?.dispose();
+  mechanism?.dispose();
 }
 
 function fail(error) {
@@ -146,7 +150,9 @@ async function open() {
   }
   const opening=create();
   const assemble=prepareYoke();
+  const solving=openYoke(Number(angle.value));
   const [device,renderer]=await opening;
+  mechanism=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#4e575f';

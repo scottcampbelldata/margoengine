@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { genevaPose } from './mechanism.js';
+import { openDrive } from './mechanism.js';
 import { prepareDrive } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -8,6 +8,7 @@ const angle=document.querySelector('#angle');
 const crank=document.querySelector('#crank');
 const wheel=document.querySelector('#wheel');
 const phase=document.querySelector('#phase');
+const gap=document.querySelector('#check');
 const marker=document.querySelector('#marker');
 const play=document.querySelector('#play');
 const explanation=document.querySelector('#explanation');
@@ -16,7 +17,7 @@ const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=32;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,move,frame,observer,fitDirty=true,previous=-1,playing=null;
+let engine,mechanism,move,frame,observer,fitDirty=true,previous=-1,playing=null;
 
 function fit() {
   const width=Math.max(1,canvas.clientWidth);
@@ -53,14 +54,15 @@ function update() {
   const value=Number(angle.value);
   if(!fitDirty&&value===previous) return;
   if(fitDirty) fit();
-  const pose=genevaPose(value);
+  const pose=mechanism.pose(value);
   move(pose);
   engine.render({delta:0});
   if(value!==previous) {
     const degrees=-pose.wheel*180/Math.PI;
     const state=pose.indexing?'index':'dwell';
     crank.textContent=value+'°';
-    wheel.textContent=(degrees>0?'−':'')+degrees.toFixed(1)+'°';
+    const shown=Math.round(degrees*10)/10;
+    wheel.textContent=(shown>0?'−':'')+shown.toFixed(1)+'°';
     marker.style.left=value/3.6+'%';
     if(document.body.dataset.phase!==state) {
       phase.textContent=pose.indexing?'Indexing':'Dwell';
@@ -71,6 +73,8 @@ function update() {
     document.body.dataset.phase=state;
     document.body.dataset.angle=String(value);
     document.body.dataset.output=degrees.toFixed(6);
+    gap.textContent=pose.check;
+    document.body.dataset.check=pose.check;
   }
   previous=value;
   fitDirty=false;
@@ -112,6 +116,7 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined) cancelAnimationFrame(frame);
   engine?.dispose();
+  mechanism?.dispose();
 }
 
 function fail(error) {
@@ -140,7 +145,9 @@ async function open() {
   }
   const opening=create();
   const assemble=prepareDrive();
+  const solving=openDrive(Number(angle.value));
   const [device,renderer]=await opening;
+  mechanism=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#b4bda5';

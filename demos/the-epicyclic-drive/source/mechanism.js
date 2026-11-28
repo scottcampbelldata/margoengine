@@ -1,5 +1,6 @@
-// This demo's mechanism: its dimensions, and its pose from @margoengine/machinery/mechanisms.
-import { epicyclicSpeeds } from '@margoengine/machinery/mechanisms';
+// This demo's mechanism: its dimensions, and its motion from a stepped @margoengine/physics world
+// (@margoengine/machinery/rigs), checked every step against Willis's relation in @margoengine/machinery/mechanisms.
+import { loadRigs, epicyclicRig, describeCheck } from '@margoengine/machinery/rigs';
 
 export const teeth={sun:21,planet:18,ring:57};
 export const moduleSize=.009;
@@ -7,9 +8,16 @@ export const pressureAngle=20*Math.PI/180;
 export const orbitRadius=(teeth.sun+teeth.planet)*moduleSize/2;
 export const assemblyAngles=[0,2*Math.PI/3,4*Math.PI/3];
 
-/** The train with `held` still and the input member turned `degrees`. */
-export function drivePose(degrees,held) {
-  const turn=degrees*Math.PI/180;
-  const known=held==='carrier'?{sun:turn,carrier:0}:held==='sun'?{ring:turn,sun:0}:{sun:turn,ring:0};
-  return epicyclicSpeeds(teeth,known);
+/** Loads the solver; the returned function turns the input member `degrees` with `held` still and reads the train. */
+export async function openTrain() {
+  await loadRigs();
+  let rig=null,rigHeld=null;
+  return {
+    pose(degrees,held) {
+      const turn=degrees*Math.PI/180;
+      if(held!==rigHeld) { rig?.dispose(); rig=epicyclicRig(teeth,{held,angle:turn}); rigHeld=held; }
+      return {...rig.drive(turn,false),check:describeCheck(rig.check)};
+    },
+    dispose:()=>rig?.dispose(),
+  };
 }

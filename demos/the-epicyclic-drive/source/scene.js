@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { drivePose } from './mechanism.js';
+import { openTrain } from './mechanism.js';
 import { prepareDrive } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -17,6 +17,8 @@ const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=33;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const gap=document.querySelector('#check');
+let mechanism;
 let engine,model,observer,frame,fitDirty=true,previous=-1,previousHold='';
 let held='ring',faceOn=false,playing=null;
 
@@ -64,7 +66,7 @@ function update() {
   const changed=value!==previous||held!==previousHold;
   if(!fitDirty&&!changed) return;
   if(fitDirty) fit();
-  const pose=changed?drivePose(value,held):null;
+  const pose=changed?mechanism.pose(value,held):null;
   if(pose) model(pose);
   engine.render({delta:0});
   if(pose) {
@@ -76,6 +78,8 @@ function update() {
     }
     document.body.dataset.angle=String(value);
     document.body.dataset.held=held;
+    gap.textContent=pose.check;
+    document.body.dataset.check=pose.check;
   }
   if(fitDirty) document.body.dataset.view=faceOn?'face':'exhibit';
   previous=value;
@@ -141,6 +145,7 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined) cancelAnimationFrame(frame);
   engine?.dispose();
+  mechanism?.dispose();
 }
 
 function fail(error) {
@@ -169,7 +174,9 @@ async function open() {
   }
   const opening=create();
   const assemble=prepareDrive();
+  const solving=openTrain();
   const [device,renderer]=await opening;
+  mechanism=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#5a6a61';
