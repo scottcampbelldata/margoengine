@@ -6302,6 +6302,10 @@
       "./stage": {
         "raw": 32,
         "gzip": 52
+      },
+      "./water/foam-surface": {
+        "raw": 45,
+        "gzip": 65
       }
     },
     "@margoengine/geometry": {
@@ -15538,8 +15542,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1535210,
-        "gzip": 993705
+        "raw": 1534715,
+        "gzip": 993424
       },
       "./decomposition": {
         "raw": 26988,
@@ -15714,8 +15718,8 @@
         "gzip": 22362
       },
       "./foam": {
-        "raw": 18612,
-        "gzip": 7870
+        "raw": 36300,
+        "gzip": 13774
       },
       "./surf": {
         "raw": 18940,
@@ -18880,8 +18884,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 125739,
-        "gzip": 39897
+        "raw": 125760,
+        "gzip": 39924
       },
       "./fft": {
         "raw": 32501,
@@ -18974,6 +18978,10 @@
       "./splash": {
         "raw": 14004,
         "gzip": 5893
+      },
+      "./foam-surface": {
+        "raw": 4735,
+        "gzip": 2094
       }
     },
     "@margoengine/weather": {
@@ -20211,6 +20219,16 @@
       "raw": 4374,
       "gzip": 2078,
       "brotli": 1914
+    },
+    "packages/physics/dist/foam-transport-kernel.wasm": {
+      "raw": 2236,
+      "gzip": 1170,
+      "brotli": 1078
+    },
+    "packages/physics/dist/foam-transport-kernel-shared.wasm": {
+      "raw": 2236,
+      "gzip": 1169,
+      "brotli": 1093
     }
   },
   "splits": {
@@ -20309,8 +20327,8 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 333891,
-        "gzip": 107334
+        "raw": 333396,
+        "gzip": 107013
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",

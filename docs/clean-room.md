@@ -14118,6 +14118,31 @@ rise, the events' space-time window with amplitudes that vary over it, the rate 
 wavelength squared per zero-crossing period times the crest chance with the full kurtosis less that with the bound kurtosis),
 the skewness as the kernels' sum over the spectrum's bins and the pressure's second-order rise taken as hydrostatic are this
 package's own arrangement. Proof: `packages/physics/tests/rogue.test.js`.
+### Accepted whitewater grid and native transport (SEA-13)
+
+Bram van Leer, *Towards the ultimate conservative difference scheme IV. A new approach to numerical
+convection* (1977), §§2 and 5 equations 14–16 and 66 derive the upwind linear face reconstruction and
+monotonized centered slope. For matching signs the scalar slope is the signed minimum of the centered
+and twice the two one-sided differences. The SIMD lanes compute the existing coverage and its weighted
+decay independently. Each directional sweep joins before the orthogonal one starts. The candidate solver
+state publishes after the worst face and final derived coverage are checked. [Van Leer](https://doi.org/10.1016/0021-9991(77)90095-X).
+
+Adrian Callaghan, Gerrit de Leeuw, Leo Cohen and Colin D. O’Dowd, *Relationship of oceanic whitecap coverage
+to wind speed and wind history* (2008), measured North Atlantic whitecaps with a ship camera. The author
+archive supplies total observed coverage, collocated retrospective neutral wind and wave age. The diagnostic
+uses a fixed wind-only spin-up and selects low, middle and high input winds within three wave-age groups.
+The measured coverage and the authors’ fitted curve are held out. The image-threshold sensitivity of
+Callaghan and White (2009), §3f, is a component of uncertainty. The paper archive lacks complete per-row
+uncertainty and realized spectra. [2008 experiment](https://doi.org/10.1029/2008GL036165),
+[figure data](https://doi.org/10.6084/m9.figshare.25460128.v1), [image processing](https://doi.org/10.1175/2008JTECHO634.1).
+
+Grant B. Deane and M. Dale Stokes, *Scale dependence of bubble creation mechanisms in breaking waves*
+(2002), identify distinct size spectra above and below the Hinze scale. Edgar L. Andreas, *A New Sea Spray
+Generation Function for Wind Speeds up to 32 m s⁻¹* (1998), treats spume separately from spray by bubble
+bursting. These motivate the remaining air entrainment and spray work. This surface transport preserves
+the existing spectral foam and plume models. [Deane and Stokes](https://doi.org/10.1038/nature00967),
+[Andreas](https://doi.org/10.1175/1520-0485%281998%29028%3C2175%3AANSSGF%3E2.0.CO%3B2).
+
 ### Whitecaps, foam and spray (SEA-13, `@margoengine/physics/foam`, 2026-11-26)
 
 `packages/physics/src/foam/breaking.ts` (breaking statistics of a spectrum), `foam/spray.ts` (spray source functions) and

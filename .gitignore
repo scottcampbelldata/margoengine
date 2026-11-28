@@ -19,6 +19,7 @@ packages/weather/surface-energy-kernel/target/
 packages/physics/wind-traction-kernel/target/
 packages/physics/wing-lattice-kernel/target/
 packages/physics/outdoor-sound-kernel/target/
+packages/physics/foam-transport-kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/
 packages/sciviz/kernel/target/

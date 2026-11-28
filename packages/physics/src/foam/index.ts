@@ -54,7 +54,10 @@ import { ACTIVE_PERIODS, ACTIVE_SHARE, type BreakingStatistics, breakingStatisti
 import { bagBreakups, sprayFlux } from './spray.js';
 import { bubblePlume, surfaceCurrent } from './plume.js';
 import { HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
-import { MargoError } from '@margoengine/math/errors';
+import { foamError } from './errors.js';
+import type { FoamTransportKernel, FoamTransportWorkCounts } from './kernel.js';
+
+export type { FoamTransportWorkCounts, FoamTransportWorkerWork } from './kernel.js';
 import {
   WAKE_BREAKING_FIELD,
   WAKE_BREAKING_HEADER_WORDS,
@@ -146,6 +149,8 @@ export interface FoamParams {
   readonly cells?: readonly [number, number];
   /** Cell size, m (default 2). */
   readonly cellSize?: number;
+  /** Side length of each world origin cell, m. Pass PhysicsWorld.cellSize when different from 4096. */
+  readonly originCellSize?: number;
   /** The grid's centre, [x, z] m (default [0, 0]). */
   readonly centre?: readonly [number, number];
   /** Spacing of the breaking statistics, m: the spectrum is sampled this far apart (default 64). */
@@ -177,6 +182,44 @@ export interface FoamParams {
 }
 
 const ORIGIN: Cell = [0, 0, 0];
+const WIDTH_LIMIT = 4096;
+
+function extent(value: number, label: string): number {
+  if (!Number.isFinite(value))
+    throw foamError('failed', label + ' exceeds numeric range. Reduce the scene extent or use local origin cells.');
+  return value;
+}
+
+function relocate(from: Cell, to: Cell | undefined, size: number, out: [number, number, number]): void {
+  const target = to ?? ORIGIN;
+  if (
+    target.length !== 3 ||
+    !Number.isSafeInteger(target[0]) ||
+    !Number.isSafeInteger(target[1]) ||
+    !Number.isSafeInteger(target[2])
+  )
+    throw foamError('unsupported', 'A foam input has an invalid origin cell. Supply three signed integer coordinates.');
+  for (let axis = 0; axis < 3; axis++) out[axis] = extent((from[axis]! - target[axis]!) * size, 'Foam origin offset');
+}
+
+function waveSample(sample: WaveSpectrumSample): WaveSpectrumSample {
+  if (
+    !sample ||
+    !(sample.frequencies instanceof Float64Array) ||
+    !(sample.directions instanceof Float64Array) ||
+    !(sample.energy instanceof Float64Array) ||
+    sample.frequencies.length === 0 ||
+    sample.directions.length === 0 ||
+    sample.energy.length !== sample.frequencies.length * sample.directions.length ||
+    !(sample.density > 0 && Number.isFinite(sample.density)) ||
+    !(Number.isFinite(sample.depth) || sample.depth === Infinity)
+  )
+    throw foamError(
+      'unsupported',
+      'Foam needs finite wave energy bins, positive water density and a valid depth. Return a shaped spectrum.',
+    );
+  return sample;
+}
 
 /** The sea's foam, a framework solver. `id` is `'foam'` unless a world holds more. */
 export class FoamSolver implements Solver<FoamParams> {
@@ -189,6 +232,10 @@ export class FoamSolver implements Solver<FoamParams> {
   private nx = 0;
   private nz = 0;
   private h = 0;
+  private originCellSize = 4096;
+  private readonly waveOffset: [number, number, number] = [0, 0, 0];
+  private readonly windOffset: [number, number, number] = [0, 0, 0];
+  private readonly currentOffset: [number, number, number] = [0, 0, 0];
   private x0 = 0;
   private z0 = 0;
   private g = 9.80665;
@@ -211,6 +258,49 @@ export class FoamSolver implements Solver<FoamParams> {
   private published!: Region;
   private spectrum: WaveSpectrumSample | undefined;
   private stats: BreakingStatistics[] = [];
+  private nextStats: BreakingStatistics[] = [];
+  private frequencies = new Float64Array(0);
+  private directions = new Float64Array(0);
+  private nextFoam = new Float64Array(0);
+  private nextBreakers = new Float64Array(0);
+  private nextClock = new Float64Array(0);
+  private active = new Float32Array(0);
+  private nextPublished = new Float32Array(0);
+  private xFaces = new Float64Array(0);
+  private zFaces = new Float64Array(0);
+  private stepping = false;
+  private native: FoamTransportKernel | null = null;
+  private acceptedWork: FoamTransportWorkCounts | undefined;
+
+  /** Loads the native SIMD transport. The caller counts as one thread. Two or four need Node or an isolated worker. */
+  static async load({
+    id,
+    wakeBreaking,
+    threads,
+    signal,
+  }: {
+    readonly id?: string;
+    readonly wakeBreaking?: FieldDescriptor;
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
+  } = {}): Promise<FoamSolver> {
+    const solver = new FoamSolver(id, wakeBreaking);
+    const { loadFoamKernel } = await import('./kernel.js');
+    solver.native = await loadFoamKernel({ threads, signal });
+    return solver;
+  }
+
+  /** Actual native transport work of the last accepted step that advected foam. Undefined for scalar or still flow. */
+  workCounts(): FoamTransportWorkCounts | undefined {
+    return this.acceptedWork;
+  }
+
+  /** Releases this solver's transport workers. */
+  dispose(): void {
+    if (this.stepping) throw foamError('state', 'Wait for the foam step to finish before disposing its workers.');
+    this.native?.close();
+    this.native = null;
+  }
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
   /** @param id The solver's id (default `'foam'`). */
@@ -222,7 +312,7 @@ export class FoamSolver implements Solver<FoamParams> {
         wakeBreaking.kind !== WAKE_BREAKING_FIELD.kind ||
         wakeBreaking.unit !== 'SI'
       )
-        throw new MargoError('state', 'Connect the wake’s SI breaking crest field to FoamSolver.');
+        throw foamError('state', 'Connect the wake’s SI breaking crest field to FoamSolver.');
       this.wakeBreaking = Object.freeze({ ...wakeBreaking });
     }
   }
@@ -248,77 +338,132 @@ export class FoamSolver implements Solver<FoamParams> {
         ? (waves as WaveSpectrumField)
         : (waves as { field?: WaveSpectrumField } | undefined)?.field;
     if (!field || typeof field.sample !== 'function')
-      throw new TypeError(
+      throw foamError(
+        'unsupported',
         'Foam needs a sea: pass {waves}, a wave spectrum field (WaveSolver.field) or the WaveSolver itself.',
       );
     this.field = field;
     const solverLike = waves as { frictionVelocity?(x: number, z: number): number };
     this.friction =
       typeof solverLike.frictionVelocity === 'function' ? (x, z) => solverLike.frictionVelocity!(x, z) : undefined;
-    const [nx, nz] = params.cells ?? [128, 128],
+    const cells = params.cells ?? [128, 128];
+    const centre = params.centre ?? [0, 0];
+    if (cells.length !== 2 || centre.length !== 2 || !(Number.isFinite(centre[0]) && Number.isFinite(centre[1])))
+      throw foamError(
+        'unsupported',
+        'Foam needs two grid dimensions and a finite centre. Pass cells [nx, nz] and centre [x, z].',
+      );
+    const [nx, nz] = cells,
       h = params.cellSize ?? 2,
-      [cx, cz] = params.centre ?? [0, 0];
-    if (!(Number.isInteger(nx) && Number.isInteger(nz) && nx >= 1 && nz >= 1 && nx <= 4096 && nz <= 4096))
-      throw new RangeError(`Foam cells are 1 to 4096 a side, whole numbers (got ${nx} by ${nz}); pass [nx, nz].`);
+      [cx, cz] = centre;
+    const originCellSize = params.originCellSize ?? 4096;
+    if (!(originCellSize > 0 && Number.isFinite(originCellSize)))
+      throw foamError('unsupported', 'Foam origin cell size must be finite and positive. Pass PhysicsWorld.cellSize.');
+    if (!(Number.isInteger(nx) && Number.isInteger(nz) && nx >= 1 && nz >= 1 && nx <= WIDTH_LIMIT && nz <= WIDTH_LIMIT))
+      throw foamError(
+        'unsupported',
+        `Foam cells are 1 to 4096 a side, whole numbers (got ${nx} by ${nz}); pass [nx, nz].`,
+      );
     if (!(h > 0 && Number.isFinite(h)))
-      throw new RangeError(`A foam cell's size is a finite number of metres above 0 (got ${h}); pass one.`);
+      throw foamError('unsupported', `A foam cell's size is a finite number of metres above 0 (got ${h}); pass one.`);
     const statistics = params.statistics ?? 64;
     if (!(statistics > 0 && Number.isFinite(statistics)))
-      throw new RangeError(
+      throw foamError(
+        'unsupported',
         `The breaking statistics' spacing is a finite number of metres above 0 (got ${statistics}); pass one.`,
       );
     this.nx = nx;
     this.nz = nz;
     this.h = h;
-    this.x0 = cx - (nx * h) / 2;
-    this.z0 = cz - (nz * h) / 2;
-    this.sx = Math.max(1, Math.ceil((nx * h) / statistics));
-    this.sz = Math.max(1, Math.ceil((nz * h) / statistics));
+    this.originCellSize = originCellSize;
+    const width = extent(nx * h, 'Foam grid width'),
+      depth = extent(nz * h, 'Foam grid depth');
+    this.x0 = extent(cx - width / 2, 'Foam corner x');
+    this.z0 = extent(cz - depth / 2, 'Foam corner z');
+    extent(cx + width / 2, 'Foam end x');
+    extent(cz + depth / 2, 'Foam end z');
+    this.sx = Math.max(1, Math.ceil(width / statistics));
+    this.sz = Math.max(1, Math.ceil(depth / statistics));
+    if (!Number.isSafeInteger(this.sx * this.sz))
+      throw foamError(
+        'unsupported',
+        'The statistics grid is unrepresentable. Use more metres between spectrum samples.',
+      );
     this.host = host;
     const [gx, gy, gz] = host.gravity;
     this.g = Math.sqrt(gx * gx + gy * gy + gz * gz);
+    if (!(this.g > 0 && Number.isFinite(this.g)))
+      throw foamError(
+        'unsupported',
+        'Foam requires finite positive gravity for breaking waves. Set the world gravity.',
+      );
+    if (params.wind !== undefined && typeof params.wind?.sample !== 'function')
+      throw foamError('unsupported', 'Foam wind needs a sampler. Supply a Wind field or omit wind.');
+    if (params.current !== undefined && typeof params.current?.sample !== 'function')
+      throw foamError('unsupported', 'Foam current needs a sampler. Supply a water FlowField or omit current.');
     this.wind = params.wind;
     this.current = params.current;
-    this.spectrum = field.sample(cx, cz);
+    this.cell = host.cell;
+    relocate(host.cell, field.cell, originCellSize, this.waveOffset);
+    const initial = waveSample(
+      field.sample(extent(cx + this.waveOffset[0], 'Wave sample x'), extent(cz + this.waveOffset[2], 'Wave sample z')),
+    );
+    this.frequencies = initial.frequencies.slice();
+    this.directions = initial.directions.slice();
+    this.spectrum = { ...initial, energy: new Float64Array(initial.energy.length) };
     const decay = params.decay ?? (this.spectrum.density < 1010 ? FRESH_FOAM_DECAY : SALT_FOAM_DECAY);
-    if (!(decay > 0 && Number.isFinite(decay)))
-      throw new RangeError(`Foam's decay time is a finite number of seconds above 0 (got ${decay}); pass one.`);
+    if (!(decay > 0 && Number.isFinite(decay) && Number.isFinite(1 / decay)))
+      throw foamError(
+        'unsupported',
+        `Foam's decay time is a finite number of seconds above 0 (got ${decay}); pass one.`,
+      );
     this.decay = decay;
     const windDrift = params.windDrift ?? 0.006;
     if (!(windDrift >= 0 && windDrift < 0.1))
-      throw new RangeError(`The wind drift is a share of U10 from 0 to 0.1 (got ${windDrift}); pass one, or 0.006.`);
+      throw foamError(
+        'unsupported',
+        `The wind drift is a share of U10 from 0 to 0.1 (got ${windDrift}); pass one, or 0.006.`,
+      );
     this.windDrift = windDrift;
     if (params.windrows !== false) {
       const { spacing = 30, speed = 0.01, spinUp = 300 } = params.windrows ?? {};
       if (!(spacing > 0 && speed >= 0 && speed < 0.1 && spinUp > 0) || ![spacing, speed, spinUp].every(Number.isFinite))
-        throw new RangeError(
+        throw foamError(
+          'unsupported',
           `Windrows have a spacing above 0 m, a speed from 0 to 0.1 of U10 and a spin-up above 0 s (got ${spacing}, ${speed}, ${spinUp}); pass them, or false for none.`,
         );
       this.rows = { spacing, speed, spinUp };
     }
     this.ships = params.ships ?? [];
+    if (!Array.isArray(this.ships))
+      throw foamError('unsupported', 'Foam ships must be a list. Pass a list of hulls or tracks.');
     for (const ship of this.ships) {
       if (!ship || (!ship.body && typeof ship.track !== 'function'))
-        throw new TypeError('A ship is {body, length, beam} or {track(t), length, beam}; pass one of them.');
+        throw foamError('unsupported', 'A ship is {body, length, beam} or {track(t), length, beam}; pass one of them.');
       if (!(ship.length > 0 && ship.beam > 0 && Number.isFinite(ship.length) && Number.isFinite(ship.beam)))
-        throw new RangeError(
+        throw foamError(
+          'unsupported',
           `A ship's length and beam are finite metres above 0 (got ${ship.length} and ${ship.beam}); pass both.`,
         );
     }
     const persistence = params.wakePersistence ?? 150;
-    if (!(persistence > 0 && Number.isFinite(persistence)))
-      throw new RangeError(
+    if (!(persistence > 0 && Number.isFinite(persistence) && Number.isFinite(1 / persistence)))
+      throw foamError(
+        'unsupported',
         `Wake foam's persistence is a finite number of seconds above 0 (got ${persistence}); pass one.`,
       );
     this.wakeRate = 1 / persistence;
     this.bubbles = params.bubbles ?? true;
     const capacity = params.capacity ?? 8192;
     if (!(Number.isInteger(capacity) && capacity >= 1 && capacity <= 1 << 22))
-      throw new RangeError(`A foam solver holds 1 to 4194304 breakers (got ${capacity}); pass a whole number.`);
+      throw foamError(
+        'unsupported',
+        `A foam solver holds 1 to 4194304 breakers (got ${capacity}); pass a whole number.`,
+      );
     this.capacity = capacity;
     const rate = params.rate ?? 0;
     if (!(Number.isInteger(rate) && rate >= 0 && rate <= 7))
-      throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${rate}); pass one.`);
+      throw foamError('unsupported', `A rate level is a whole number from 0 to 7 (got ${rate}); pass one.`);
     this.level = rate as RateLevel;
     this.random = new RandomStream(0, solverNumber(this.id));
     const count = nx * nz;
@@ -329,6 +474,19 @@ export class FoamSolver implements Solver<FoamParams> {
     this.clock = host.allocate('clock', (this.wakeBreaking ? 3 : 2) * 8, 'f64', SEA_FOAM_LAYOUT);
     if (this.wakeBreaking) this.words(this.clock)[2] = -1;
     this.published = host.allocate('published', count * 2 * 4, 'f32', SEA_FOAM_LAYOUT);
+    try {
+      this.nextFoam = new Float64Array(count * 2);
+      this.nextBreakers = new Float64Array(capacity * BREAKER);
+      this.nextClock = new Float64Array(this.wakeBreaking ? 3 : 2);
+      this.active = new Float32Array(count);
+      this.nextPublished = new Float32Array(count * 2);
+      this.xFaces = new Float64Array((nx + 1) * nz);
+      this.zFaces = new Float64Array(nx * (nz + 1));
+    } catch (cause) {
+      throw Object.assign(foamError('failed', 'Foam scratch could not be allocated. Use fewer cells or breakers.'), {
+        cause,
+      });
+    }
   }
 
   private words(region: Region): Float64Array {
@@ -336,45 +494,93 @@ export class FoamSolver implements Solver<FoamParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    if (this.stepping)
+      throw foamError(
+        'state',
+        'The foam step is already running. Sample its accepted coverage without advancing again.',
+      );
+    this.stepping = true;
+    try {
+      this.advance(context, dt);
+    } finally {
+      this.stepping = false;
+    }
+  }
+
+  private advance(context: StepContext, dt: number): void {
     if (this.random.seed !== context.seed) this.random = new RandomStream(context.seed, solverNumber(this.id));
-    this.cell = context.cell;
-    const time = context.tick / rateOf(context.level),
-      foam = this.words(this.foam),
-      clock = this.words(this.clock),
-      { nx, nz } = this,
-      n = nx * nz,
-      active = new Float32Array(n);
+    const cell = context.cell,
+      time = context.tick / rateOf(context.level);
+    const { nx, nz, h, active, nextFoam: foam, nextBreakers: breakers, nextClock: clock } = this;
+    relocate(cell, this.field.cell, this.originCellSize, this.waveOffset);
+    if (this.wind) relocate(cell, this.wind.cell, this.originCellSize, this.windOffset);
+    if (this.current) relocate(cell, this.current.cell, this.originCellSize, this.currentOffset);
+    foam.set(this.words(this.foam));
+    breakers.set(this.words(this.breakers));
+    clock.set(this.words(this.clock));
+    active.fill(0);
     this.statistics();
-    // The wind at the grid's centre: the windrows' direction and the wind drift.
+    // The centre wind sets windrow orientation and the surface wind drift.
     let ux = 0,
       uz = 0;
     if (this.wind) {
-      const v = this.wind.sample(
-        this.x0 + (nx * this.h) / 2,
-        10,
-        this.z0 + (nz * this.h) / 2,
-        time,
-        this.flow,
-      ).velocity;
-      ux = v[0];
-      uz = v[2];
+      [ux, uz] = this.flowAt(this.wind, this.windOffset, this.x0 + (nx * h) / 2, 10, this.z0 + (nz * h) / 2, time);
     }
-    const u10 = Math.sqrt(ux * ux + uz * uz);
-    clock[1] = u10 >= 3 ? clock[1]! + dt : 0;
-    this.spawn(context.tick, dt);
-    this.sweep(dt, foam, active);
+    const u10 = extent(Math.sqrt(ux * ux + uz * uz), 'Foam wind speed');
+    clock[1] = u10 >= 3 ? extent(clock[1]! + dt, 'Windrow age') : 0;
+    this.spawn(context.tick, dt, breakers, clock);
+    this.sweep(dt, foam, active, breakers, clock);
     this.wakes(time, dt, foam);
-    if (this.wakeBreaking) this.localBreakers(context, foam, active);
+    if (this.wakeBreaking) this.localBreakers(context, foam, active, clock);
     if (this.bubbles) this.boils(context, foam);
-    this.transport(time, dt, foam, ux, uz, u10, clock[1]!);
+    const work = this.transport(time, dt, foam, ux, uz, u10, clock[1]!);
     this.fade(dt, foam);
-    const p = regionWords(this.host.memory, this.published) as Float32Array;
-    for (let k = 0; k < n; k++) {
-      const a = active[k]!,
-        w = foam[2 * k]!;
-      p[2 * k] = w > a ? w : a;
-      p[2 * k + 1] = a;
+    const p = this.nextPublished;
+    for (let k = 0; k < nx * nz; k++) {
+      const activeWhite = active[k]!,
+        white = foam[2 * k]!,
+        weight = foam[2 * k + 1]!;
+      if (!(white >= 0 && white <= 1 && weight >= 0 && Number.isFinite(weight)))
+        throw foamError(
+          'failed',
+          'Foam transport produced invalid coverage. Reduce the flow speed or use a finer time step.',
+        );
+      p[2 * k] = white > activeWhite ? white : activeWhite;
+      p[2 * k + 1] = activeWhite;
     }
+    // Acquire fresh arena views after all field callbacks and native allocations succeeded.
+    this.words(this.foam).set(foam);
+    this.words(this.breakers).set(breakers);
+    this.words(this.clock).set(clock);
+    (regionWords(this.host.memory, this.published) as Float32Array).set(p);
+    [this.stats, this.nextStats] = [this.nextStats, this.stats];
+    this.cell = cell;
+    this.acceptedWork = work;
+  }
+
+  private flowAt(
+    field: FlowField,
+    offset: readonly [number, number, number],
+    x: number,
+    y: number,
+    z: number,
+    time: number,
+  ): [number, number] {
+    const velocity = field.sample(
+      extent(x + offset[0], 'Foam flow sample x'),
+      extent(y + offset[1], 'Foam flow sample y'),
+      extent(z + offset[2], 'Foam flow sample z'),
+      time,
+      this.flow,
+    )?.velocity;
+    if (
+      velocity?.length !== 3 ||
+      !Number.isFinite(velocity[0]) ||
+      !Number.isFinite(velocity[1]) ||
+      !Number.isFinite(velocity[2])
+    )
+      throw foamError('unsupported', 'A foam flow sample is invalid. Return three finite velocity components in m/s.');
+    return [velocity[0], velocity[2]];
   }
 
   /** The breaking statistics at each statistics cell, from the sea's spectrum there now. */
@@ -384,28 +590,41 @@ export class FoamSolver implements Solver<FoamParams> {
       for (let i = 0; i < sx; i++) {
         const x = this.x0 + (i + 0.5) * ((this.nx * this.h) / sx),
           z = this.z0 + (j + 0.5) * ((this.nz * this.h) / sz),
-          spectrum = this.field.sample(x, z, this.spectrum),
+          spectrum = waveSample(
+            this.field.sample(
+              extent(x + this.waveOffset[0], 'Wave sample x'),
+              extent(z + this.waveOffset[2], 'Wave sample z'),
+              this.spectrum,
+            ),
+          ),
           at = i + sx * j;
-        this.spectrum = spectrum;
-        this.stats[at] = breakingStatistics(spectrum, this.g, this.stats[at]);
+        const { frequencies, directions } = this;
+        if (
+          spectrum.frequencies.length !== frequencies.length ||
+          spectrum.directions.length !== directions.length ||
+          !spectrum.frequencies.every((frequency, index) => frequency === frequencies[index]) ||
+          !spectrum.directions.every((direction, index) => direction === directions[index])
+        )
+          throw foamError(
+            'unsupported',
+            'The spectrum bins changed within the foam grid. Use a wave field with one fixed frequency and direction layout.',
+          );
+        this.nextStats[at] = breakingStatistics(spectrum, this.g, this.nextStats[at]);
       }
   }
 
   /** The statistics cell of (x, z). */
-  private statsAt(x: number, z: number): BreakingStatistics {
+  private statsAt(x: number, z: number, stats: readonly BreakingStatistics[]): BreakingStatistics {
     const wx = (this.nx * this.h) / this.sx,
       wz = (this.nz * this.h) / this.sz,
       i = Math.min(this.sx - 1, Math.max(0, Math.floor((x - this.x0) / wx))),
       j = Math.min(this.sz - 1, Math.max(0, Math.floor((z - this.z0) / wz)));
-    return this.stats[i + this.sx * j]!;
+    return stats[i + this.sx * j]!;
   }
 
   /** New breakers this step: a Poisson draw per statistics cell and bin, at the rate the spectrum breaks there. */
-  private spawn(tick: number, dt: number): void {
-    const b = this.words(this.breakers),
-      clock = this.words(this.clock),
-      spectrum = this.spectrum!,
-      { frequencies: fs, directions: ds } = spectrum,
+  private spawn(tick: number, dt: number, b: Float64Array, clock: Float64Array): void {
+    const { frequencies: fs, directions: ds } = this,
       nf = fs.length,
       nd = ds.length,
       wx = (this.nx * this.h) / this.sx,
@@ -414,7 +633,7 @@ export class FoamSolver implements Solver<FoamParams> {
       draw = 0;
     const uniform = (): [number, number] => this.random.unitF64(tick, draw++, 1);
     for (let s = 0; s < this.sx * this.sz; s++) {
-      const stats = this.stats[s]!,
+      const stats = this.nextStats[s]!,
         si = s % this.sx,
         sj = (s - si) / this.sx;
       for (let bin = 0; bin < nf * nd; bin++) {
@@ -425,16 +644,27 @@ export class FoamSolver implements Solver<FoamParams> {
           right = si === this.sx - 1 ? reach : 0,
           below = sj === 0 ? reach : 0,
           above = sj === this.sz - 1 ? reach : 0,
-          mean = stats.events[bin]! * (wx + left + right) * (wz + below + above) * dt;
+          mean = extent(stats.events[bin]! * (wx + left + right) * (wz + below + above) * dt, 'Breaker event rate');
         // Poisson by inversion of its distribution, one uniform number a draw (mean well under 1 per step and bin).
         let [u] = uniform(),
           count = 0,
           p = exp(-mean),
           sum = p;
-        while (u > sum && count < 64) {
+        if (p === 0)
+          throw foamError(
+            'failed',
+            'The breaker draw is too dense for one tick. Shorten the tick or use smaller statistics cells.',
+          );
+        while (u > sum) {
           count++;
           p *= mean / count;
-          sum += p;
+          const next = sum + p;
+          if (next === sum && count > mean)
+            throw foamError(
+              'failed',
+              'The breaker probability lost resolution. Shorten the tick or use smaller statistics cells.',
+            );
+          sum = next;
         }
         const i = (bin - (bin % nd)) / nd,
           k = stats.wavenumbers[i]!,
@@ -473,9 +703,7 @@ export class FoamSolver implements Solver<FoamParams> {
    * has just left behind (and under the whole patch when it ends), so the active stage and the residual one follow each
    * other; retires the finished breakers.
    */
-  private sweep(dt: number, foam: Float64Array, active: Float32Array): void {
-    const b = this.words(this.breakers),
-      clock = this.words(this.clock);
+  private sweep(dt: number, foam: Float64Array, active: Float32Array, b: Float64Array, clock: Float64Array): void {
     let live = clock[0]!,
       at = 0;
     while (at < live) {
@@ -485,8 +713,8 @@ export class FoamSolver implements Solver<FoamParams> {
         half = b[o + 5]!,
         depth = b[o + 6]!,
         travel = b[o + 4]! * dt,
-        x = b[o]! + dx * travel,
-        z = b[o + 1]! + dz * travel,
+        x = extent(b[o]! + dx * travel, 'Breaker position x'),
+        z = extent(b[o + 1]! + dz * travel, 'Breaker position z'),
         whiteness = b[o + 9]!,
         rate = b[o + 10]!,
         done = b[o + 7]! + dt >= b[o + 8]!;
@@ -511,7 +739,7 @@ export class FoamSolver implements Solver<FoamParams> {
     clock[0] = live;
   }
 
-  private localBreakers(context: StepContext, foam: Float64Array, active: Float32Array): void {
+  private localBreakers(context: StepContext, foam: Float64Array, active: Float32Array, clock: Float64Array): void {
     const port = context.inputs.get(this.wakeBreaking!.name);
     if (!port) return;
     const { region } = port;
@@ -524,7 +752,7 @@ export class FoamSolver implements Solver<FoamParams> {
       capacity < 0 ||
       context.cell.some((value, i) => value !== port.cell[i])
     )
-      throw new MargoError('state', 'Connect the layout-1 f64 breaking crest field in the foam grid’s world cell.');
+      throw foamError('state', 'Connect the layout-1 f64 breaking crest field in the foam grid’s world cell.');
     const crest = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
     const [written, detected, spacing] = crest;
     if (
@@ -535,13 +763,12 @@ export class FoamSolver implements Solver<FoamParams> {
       detected! < written! ||
       !(spacing! > 0 && Number.isFinite(spacing))
     )
-      throw new MargoError('state', 'Connect a breaking crest producer with valid row counts and finite cell spacing.');
+      throw foamError('state', 'Connect a breaking crest producer with valid row counts and finite cell spacing.');
     const fraction = Math.min(1, (spacing! / this.h) * (spacing! / this.h));
-    const clock = this.words(this.clock);
     const newTick = clock[2] !== port.tick;
     for (let row = 0; row < written!; row++) {
       const at = WAKE_BREAKING_HEADER_WORDS + row * WAKE_BREAKING_WORDS;
-      const cell = this.cellOf(crest[at]!, crest[at + 1]!);
+      const cell = this.cellOf(extent(crest[at]!, 'Crest x'), extent(crest[at + 1]!, 'Crest z'));
       if (cell < 0) continue;
       active[cell] = Math.min(1, active[cell]! + fraction);
       if (newTick) deposit(foam, cell, fraction, 1 / this.decay);
@@ -561,10 +788,10 @@ export class FoamSolver implements Solver<FoamParams> {
     visit: (cell: number, along: number) => void,
   ): void {
     const { nx, nz, h } = this,
-      reach = Math.max(-back, front),
+      reach = extent(Math.max(-back, front), 'Breaker sweep reach'),
       reachX = Math.abs(dz) * half + Math.abs(dx) * reach,
       reachZ = Math.abs(dx) * half + Math.abs(dz) * reach,
-      i0 = Math.max(0, Math.floor((x - reachX - this.x0) / h)),
+      i0 = Math.max(0, Math.floor((extent(x - reachX, 'Breaker bounds') - this.x0) / h)),
       i1 = Math.min(nx - 1, Math.floor((x + reachX - this.x0) / h)),
       j0 = Math.max(0, Math.floor((z - reachZ - this.z0) / h)),
       j1 = Math.min(nz - 1, Math.floor((z + reachZ - this.z0) / h));
@@ -587,10 +814,10 @@ export class FoamSolver implements Solver<FoamParams> {
     const port = context.inputs.get(HULL_BREACHES_FIELD.name);
     if (!port) return;
     const c = port.cell;
-    if (c[0] !== this.cell[0] || c[1] !== this.cell[1] || c[2] !== this.cell[2])
-      throw new MargoError(
+    if (c[0] !== context.cell[0] || c[1] !== context.cell[1] || c[2] !== context.cell[2])
+      throw foamError(
         'state',
-        `The hull breaches come from origin cell [${c.join(', ')}] and the foam steps in [${this.cell.join(', ')}]; step the hull solver and the foam in one cell.`,
+        `The hull breaches come from origin cell [${c.join(', ')}] and the foam steps in [${context.cell.join(', ')}]; step the hull solver and the foam in one cell.`,
       );
     const memory = port.region.memory ?? this.host.memory,
       rec = new Float64Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 8),
@@ -651,7 +878,22 @@ export class FoamSolver implements Solver<FoamParams> {
     for (const ship of this.ships) {
       // The races' boil: white where a race breaks the surface, as fast as its water moves there, spreading and fading as
       // the established jet does (2.6 D / X): its whiteness falls as start / (start + s) along it.
-      for (const patch of ship.wash?.(time) ?? []) {
+      const wash = ship.wash?.(time) ?? [];
+      if (!Array.isArray(wash))
+        throw foamError('unsupported', 'Ship wash needs patch rows. Return a list of wash patches.');
+      for (const patch of wash) {
+        if (
+          !patch ||
+          patch.position?.length !== 2 ||
+          patch.direction?.length !== 2 ||
+          !patch.position.every(Number.isFinite) ||
+          !patch.direction.every(Number.isFinite) ||
+          !(Number.isFinite(patch.speed) && Number.isFinite(patch.radius) && Number.isFinite(patch.reach))
+        )
+          throw foamError(
+            'unsupported',
+            'A wash patch is invalid. Return finite position, direction, speed, radius and reach.',
+          );
         const white = Math.min(1, patch.speed / WASH_SPEED),
           { radius, reach } = patch;
         if (!(white > 0 && radius > 0 && reach > 0)) continue;
@@ -678,10 +920,17 @@ export class FoamSolver implements Solver<FoamParams> {
         vz = v[2];
       } else {
         const t = ship.track!(time);
+        if (!t || t.position?.length !== 2 || t.velocity?.length !== 2)
+          throw foamError('unsupported', 'A foam ship track needs position and velocity [x, z]. Return both pairs.');
         [px, pz] = t.position;
         [vx, vz] = t.velocity;
       }
-      const speed = Math.sqrt(vx * vx + vz * vz);
+      if (!(Number.isFinite(px) && Number.isFinite(pz) && Number.isFinite(vx) && Number.isFinite(vz)))
+        throw foamError(
+          'unsupported',
+          'A foam ship track has non-finite components. Return finite positions and velocities.',
+        );
+      const speed = extent(Math.sqrt(vx * vx + vz * vz), 'Ship speed');
       if (!(speed > 0.2)) continue;
       const fx = vx / speed,
         fz = vz / speed,
@@ -735,7 +984,7 @@ export class FoamSolver implements Solver<FoamParams> {
   ): void {
     const { nx, nz, h } = this,
       [widest] = shape(reach),
-      r = reach + widest,
+      r = extent(reach + widest, 'Wake foam extent'),
       i0 = Math.max(0, Math.floor((x - r - this.x0) / h)),
       i1 = Math.min(nx - 1, Math.floor((x + r - this.x0) / h)),
       j0 = Math.max(0, Math.floor((z - r - this.z0) / h)),
@@ -770,11 +1019,9 @@ export class FoamSolver implements Solver<FoamParams> {
     let vx = 0,
       vz = 0;
     if (this.current) {
-      const v = this.current.sample(x, 0, z, time, this.flow).velocity;
-      vx = v[0];
-      vz = v[2];
+      [vx, vz] = this.flowAt(this.current, this.currentOffset, x, 0, z, time);
     }
-    const stokes = this.statsAt(x, z).stokes;
+    const stokes = this.statsAt(x, z, this.nextStats).stokes;
     vx += stokes[0] + this.windDrift * ux;
     vz += stokes[1] + this.windDrift * uz;
     if (this.rows && u10 >= 3) {
@@ -789,7 +1036,7 @@ export class FoamSolver implements Solver<FoamParams> {
       vx += -ez * across;
       vz += ex * across;
     }
-    return [vx, vz];
+    return [extent(vx, 'Foam face velocity x'), extent(vz, 'Foam face velocity z')];
   }
 
   /** Carries the foam over `dt` in flux form, along x then z, with the MC-limited upwind face values; substeps keep the Courant number at 1/2. */
@@ -801,12 +1048,9 @@ export class FoamSolver implements Solver<FoamParams> {
     uz: number,
     u10: number,
     age: number,
-  ): void {
-    const { nx, nz, h } = this,
-      n = nx * nz,
-      // Face velocities: x faces (nx + 1 by nz), z faces (nx by nz + 1).
-      fx = new Float64Array((nx + 1) * nz),
-      fz = new Float64Array(nx * (nz + 1));
+  ): FoamTransportWorkCounts | undefined {
+    const { nx, nz, h, xFaces: fx, zFaces: fz } = this;
+    const n = nx * nz;
     let fastest = 0;
     for (let j = 0; j < nz; j++)
       for (let i = 0; i <= nx; i++) {
@@ -821,8 +1065,17 @@ export class FoamSolver implements Solver<FoamParams> {
         if (Math.abs(vz) > fastest) fastest = Math.abs(vz);
       }
     if (!(fastest > 0)) return;
-    const steps = Math.max(1, Math.ceil((2 * fastest * dt) / h)),
-      sub = dt / steps,
+    const steps = Math.max(1, Math.ceil((2 * fastest * dt) / h));
+    if (!Number.isSafeInteger(steps))
+      throw foamError(
+        'failed',
+        'Foam CFL substeps exceed representable range. Use a slower flow, a larger cell or a finer time step.',
+      );
+    if (this.native) {
+      this.native.transport(foam, fx, fz, nx, nz, h, dt, steps);
+      return this.native.workCounts();
+    }
+    const sub = dt / steps,
       w = new Float64Array(n),
       q = new Float64Array(n);
     for (let s = 0; s < steps; s++) {
@@ -840,6 +1093,7 @@ export class FoamSolver implements Solver<FoamParams> {
         foam[2 * k + 1] = (q[k]! > 0 ? q[k]! : 0) * scale;
       }
     }
+    return undefined;
   }
 
   /** One direction of the flux-form transport of the whiteness `w` and its rate-weighted share `q` (they move together). */
@@ -889,7 +1143,7 @@ export class FoamSolver implements Solver<FoamParams> {
     for (let k = 0; k < this.nx * this.nz; k++) {
       const w = foam[2 * k]!;
       if (!(w > 0)) continue;
-      const rate = foam[2 * k + 1]! / w,
+      const rate = extent(foam[2 * k + 1]! / w, 'Foam decay rate'),
         f = exp(-rate * dt);
       foam[2 * k] = w * f;
       foam[2 * k + 1] = foam[2 * k + 1]! * f;
@@ -920,7 +1174,7 @@ export class FoamSolver implements Solver<FoamParams> {
    * Lays foam over the box from `min` to `max` [x, z] m: a splash, an impact, a breaking wave of another solver's. Its
    * `whiteness` (0 to 1, default 1) joins what is there as independent overlap, and fades with e-folding `persistence` s
    * (default the solver's residual decay). It shows from the next step.
-   * @throws RangeError for a box that is not min below max, or a whiteness or persistence out of range.
+   * @throws MargoError for a box that is not min below max, or a whiteness or persistence out of range.
    */
   addFoam(
     min: readonly [number, number],
@@ -928,12 +1182,31 @@ export class FoamSolver implements Solver<FoamParams> {
     whiteness = 1,
     persistence = this.decay,
   ): void {
-    if (!(min?.length === 2 && max?.length === 2 && min[0] < max[0] && min[1] < max[1]))
-      throw new RangeError('Foam goes in a box [x, z] from min to max, min below max on both axes; pass two corners.');
+    if (!this.host || this.stepping)
+      throw foamError('state', 'Add FoamSolver to a world and wait until its step finishes before depositing foam.');
+    if (
+      !(
+        min?.length === 2 &&
+        max?.length === 2 &&
+        min[0] < max[0] &&
+        min[1] < max[1] &&
+        Number.isFinite(min[0]) &&
+        Number.isFinite(min[1]) &&
+        Number.isFinite(max[0]) &&
+        Number.isFinite(max[1])
+      )
+    )
+      throw foamError(
+        'unsupported',
+        'Foam goes in a box [x, z] from min to max, min below max on both axes; pass two corners.',
+      );
     if (!(whiteness >= 0 && whiteness <= 1))
-      throw new RangeError(`Foam's whiteness is 0 to 1 (got ${whiteness}); pass one.`);
-    if (!(persistence > 0 && Number.isFinite(persistence)))
-      throw new RangeError(`Foam's persistence is a finite number of seconds above 0 (got ${persistence}); pass one.`);
+      throw foamError('unsupported', `Foam's whiteness is 0 to 1 (got ${whiteness}); pass one.`);
+    if (!(persistence > 0 && Number.isFinite(persistence) && Number.isFinite(1 / persistence)))
+      throw foamError(
+        'unsupported',
+        `Foam's persistence is a finite number of seconds above 0 (got ${persistence}); pass one.`,
+      );
     const foam = this.words(this.foam),
       { nx, nz, h } = this,
       i0 = Math.max(0, Math.ceil((min[0] - this.x0) / h - 0.5)),
@@ -965,7 +1238,12 @@ export class FoamSolver implements Solver<FoamParams> {
 
   /** The whitecap coverage the sea's breakers give at (x, z) on average (Leckler et al.), 0 to 1. */
   expectedCoverage(x: number, z: number): number {
-    return this.statsAt(x, z).coverage;
+    if (this.stats.length === 0)
+      throw foamError(
+        'state',
+        'Foam has no accepted spectrum yet. Advance its world before reading estimated coverage.',
+      );
+    return this.statsAt(x, z, this.stats).coverage;
   }
 
   /** The breakers alive now. */
@@ -983,7 +1261,10 @@ export class FoamSolver implements Solver<FoamParams> {
 
   /** Bag-breakup spume events per m^2 per s at (x, z) (Troitskaya et al. 2017), from the waves' friction velocity. */
   bagBreakups(x: number, z: number): number {
-    return this.friction ? bagBreakups(this.friction(x, z)) : 0;
+    if (!this.friction) return 0;
+    const offset: [number, number, number] = [0, 0, 0];
+    relocate(this.host.cell, this.field.cell, this.originCellSize, offset);
+    return bagBreakups(this.friction(x + offset[0], z + offset[2]));
   }
 }
 

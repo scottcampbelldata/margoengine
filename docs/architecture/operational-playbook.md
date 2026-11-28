@@ -11460,6 +11460,14 @@ the field registry. A production Vite build preserves both lazy Wasm files.
 
 The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.
 
+### SEA-13 accepted surface foam
+
+The foam solver stages coverage, breaker records and the clock before publishing the accepted fields. A Rust
+module advances disjoint grid lines in each direction with f64x2 coverage and decay-weight updates. The
+caller joins the lines between sweeps and saturation. 39 × 31 and 71 × 37 scalar and threaded checkpoints
+remain byte exact after signed relocation. An optional Water surface effect reads the accepted coverage
+without accumulating it in Water’s own history. The fixed-camera cutaway checks both renderer backends.
+
 ### Native outdoor path integration (SOUND-01)
 
 One solver tick samples the actual Wind and TerrainBed in their signed cells. The optional native module

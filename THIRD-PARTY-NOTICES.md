@@ -621,3 +621,12 @@ published group values read on 2026-11-28; no file of another party is redistrib
 - **Taken:** the mean and 95 % confidence bounds of the normalized measured heave (`*_CI95_Normalized.txt`) for the 0.1 D,
   0.3 D and 0.5 D drops, every tenth sample from t = 0 to 8 Te0, as `packages/physics/tests/data/kramer-2021-sphere-decay.json`.
   Data only; no code.
+
+## North Atlantic whitecap coverage (SEA-13)
+
+Adrian Callaghan, Jean-Raymond Bidlot, Gerrit de Leeuw and Colin O’Dowd (2025), *Figure Data for Comparing Estimates
+of Whitecap Coverage From a Spectral Wave Model With Oceanic Observations*, fig1Data.mat,
+https://doi.org/10.6084/m9.figshare.25460128.v1. Licensed CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/). The diagnostic packages/physics/scripts/sea13-whitecaps-measured.mjs
+contains nine selected observational coverage, neutral wind and wave-age tuples with their original units.
+The selection uses input wind and wave age. No archive, photograph or model code is bundled.

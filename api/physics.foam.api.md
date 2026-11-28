@@ -45,6 +45,7 @@ export interface FoamParams {
     };
     readonly cells?: readonly [number, number];
     readonly cellSize?: number;
+    readonly originCellSize?: number;
     readonly centre?: readonly [number, number];
     readonly statistics?: number;
     readonly wind?: Wind;
@@ -81,6 +82,14 @@ export interface FoamShip {
 }
 
 export class FoamSolver implements Solver<FoamParams> {
+    static load({ id, wakeBreaking, threads, signal }?: {
+        readonly id?: string;
+        readonly wakeBreaking?: FieldDescriptor;
+        readonly threads?: number;
+        readonly signal?: AbortSignal;
+    }): Promise<FoamSolver>;
+    workCounts(): FoamTransportWorkCounts | undefined;
+    dispose(): void;
     constructor(id?: string, wakeBreaking?: FieldDescriptor);
     describe(): SolverDescription;
     init(host: SolverHost, params: FoamParams): void;
@@ -97,6 +106,21 @@ export class FoamSolver implements Solver<FoamParams> {
     get breakerCount(): number;
     spray(x: number, z: number, r80: number): number;
     bagBreakups(x: number, z: number): number;
+}
+
+export interface FoamTransportWorkCounts extends FoamTransportWorkerWork {
+    readonly threads: number;
+    readonly substeps: number;
+    readonly workers: readonly FoamTransportWorkerWork[];
+}
+
+export interface FoamTransportWorkerWork {
+    readonly xLines: number;
+    readonly zLines: number;
+    readonly xFacePairs: number;
+    readonly zFacePairs: number;
+    readonly cellPairs: number;
+    readonly clampPairs: number;
 }
 
 export const PLUME_ENTRAINMENT = 0.055;

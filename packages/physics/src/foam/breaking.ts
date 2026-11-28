@@ -15,6 +15,7 @@
 import { cos, exp as expOf, sin } from '@margoengine/math/pinned';
 import type { WaveSpectrumSample } from '@margoengine/math/fields';
 import { bandWidth, wavenumber } from '../waves/spectral.js';
+import { foamError } from './errors.js';
 
 /** ST4's saturation threshold B_r (TEST471). */
 export const SATURATION_THRESHOLD = 0.0009;
@@ -57,8 +58,42 @@ export function breakingStatistics(
   g: number,
   out?: BreakingStatistics,
 ): BreakingStatistics {
-  const { frequencies: fs, directions: ds, energy, depth } = spectrum,
-    nf = fs.length,
+  if (!spectrum || !(g > 0 && Number.isFinite(g)))
+    throw foamError(
+      'unsupported',
+      'Breaking waves need a spectrum and finite positive gravity. Pass both to breakingStatistics.',
+    );
+  const { frequencies: fs, directions: ds, energy, depth } = spectrum;
+  if (
+    !(
+      fs instanceof Float64Array &&
+      ds instanceof Float64Array &&
+      energy instanceof Float64Array &&
+      fs.length > 0 &&
+      ds.length > 0 &&
+      energy.length === fs.length * ds.length &&
+      (Number.isFinite(depth) || depth === Infinity)
+    )
+  )
+    throw foamError(
+      'unsupported',
+      'Breaking-wave spectrum shape or depth is invalid. Use matching f64 bins and a valid depth.',
+    );
+  if (
+    !fs.every((frequency, i) => frequency > 0 && Number.isFinite(frequency) && (i === 0 || frequency > fs[i - 1]!)) ||
+    !ds.every(Number.isFinite) ||
+    !energy.every((value) => value >= 0 && Number.isFinite(value))
+  )
+    throw foamError(
+      'unsupported',
+      'Breaking waves need increasing positive frequencies and finite energy and directions. Correct the spectrum bins.',
+    );
+  if (out && (out.events.length !== energy.length || out.wavenumbers.length !== fs.length))
+    throw foamError(
+      'unsupported',
+      'The reused breaking statistics arrays do not fit the spectrum. Resize them or omit out.',
+    );
+  const nf = fs.length,
     nd = ds.length,
     dtheta = TWO_PI / nd,
     s = out ?? {
@@ -124,6 +159,20 @@ export function breakingStatistics(
       s.stokes[1] += u * sin(ds[j]!);
     }
   }
+  if (
+    !(
+      Number.isFinite(s.coverage) &&
+      Number.isFinite(s.turnover) &&
+      Number.isFinite(s.crestLength) &&
+      s.stokes.every(Number.isFinite)
+    ) ||
+    !s.wavenumbers.every(Number.isFinite) ||
+    !s.events.every(Number.isFinite)
+  )
+    throw foamError(
+      'failed',
+      'Breaking statistics exceed numeric range. Reduce wave energy, use finite wet depth and rescale frequencies.',
+    );
   if (s.coverage > 1) s.coverage = 1;
   s.active = ACTIVE_SHARE * s.coverage;
   return s;

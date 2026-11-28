@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'sea-foam',
+    title: '@margoengine/physics/foam breaking waves and surface transport',
+    kind: 'family',
+    messages: [],
+    cause: 'The foam grid, wave spectrum, current, ship wash, deposit settings or computed transport is invalid.',
+    fix: 'Use finite signed-cell coordinates, a fixed directional spectrum layout, finite positive decay and finite wind and current samples. Use a coarser mesh, a finer time step or less extreme values if the numerical range is exceeded.',
+  },
+  {
     id: 'outdoor-sound',
     title: 'Outdoor sound paths and positional audio',
     kind: 'family',

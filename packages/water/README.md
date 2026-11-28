@@ -524,6 +524,56 @@ engine.render({delta: 0});
 console.log(sea.sample(0, 0, 12).height.toFixed(2)); // the height the camera sees at the origin
 ```
 
+### Accepted sea foam
+
+`SeaFoamSurface` lights an existing Water surface with the latest cell-centred coverage from a solver such as
+`FoamSolver`. It bilinearly reconstructs fractions from X-fast rows, with zero-valued neighbours beyond the grid, then
+uses Water's bubble-layer optics. Pass the lower X/Z corner and spacing in metres in the same coordinate frame as the
+Water mesh. With a floating origin, translate the grid corner by the solver cell minus the render cell, times the world
+cell size.
+
+Keep the grid dimensions and coverage callback in agreement. The adapter recreates its texture when dimensions or
+device change. Advance or restore the producer before drawing. The adapter keeps no frame history of its own, so a
+snapshot restore redraws the accepted footprint immediately. Dispose the adapter to remove its contribution and
+release its resources. Disposing Water also releases it.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { FoamSolver } from '@margoengine/physics/foam';
+import { SpectralSea } from '@margoengine/physics/sea';
+import { WaveSolver } from '@margoengine/physics/waves';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { Water } from '@margoengine/water';
+import { SeaFoamSurface } from '@margoengine/water/foam-surface';
+
+const canvas = document.createElement('canvas');
+const engine = await Engine.create(canvas);
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const waves = new WaveSolver();
+world.add(waves, { start: { height: 4, period: 6, direction: 0 } });
+const foam = await FoamSolver.load();
+const cells = [64, 64] as const;
+const origin = [-32, -32] as const;
+world.add(foam, { waves, cells, cellSize: 1 });
+const surface = Water.attach(engine, { sea: new SpectralSea({ waves: waves.field }), whitecaps: 0 });
+SeaFoamSurface.attach(engine, {
+  surface,
+  source: {
+    cells, origin, spacing: 1,
+    copyCoverage(out) {
+      for (let i = 0; i < out.length; i++) {
+        const x = origin[0] + i % cells[0] + 0.5;
+        const z = origin[1] + Math.floor(i / cells[0]) + 0.5;
+        out[i] = foam.coverage(x, z);
+      }
+    },
+  },
+});
+world.advance(60);
+surface.setTime(world.time);
+engine.render({ delta: 0 });
+```
+
 ### A physics wake, drawn: `WaterWake` (`@margoengine/water/wake`)
 
 `WaterWake.attach(engine, {surface: water, wake})` draws a physics wake (`WakeSolver` of `@margoengine/physics/sea`, or

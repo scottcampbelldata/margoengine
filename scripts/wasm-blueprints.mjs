@@ -642,6 +642,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'foam-transport-kernel',
+    crate: 'packages/physics/foam-transport-kernel',
+    blueprint: 'packages/physics/src/foam/foam-transport-kernel.wasm',
+    script: 'packages/physics/scripts/build-foam-transport-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'foam-transport-kernel-shared',
+    crate: 'packages/physics/foam-transport-kernel',
+    blueprint: 'packages/physics/src/foam/foam-transport-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-foam-transport-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'outdoor-sound-kernel-shared',
     crate: 'packages/physics/outdoor-sound-kernel',
     blueprint: 'packages/physics/src/outdoor-sound/outdoor-sound-kernel-shared.wasm',

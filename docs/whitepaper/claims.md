@@ -6970,6 +6970,14 @@ shifts and exact seek. The largest Node case applies 171 stencils covering 3,276
 SIMD-paired visits. `cloud-surface.browser.mjs` renders the live condensate and its wind advection on WebGPU and
 WebGL2. The closed cube is analytical numerical evidence. Independent field validation remains open.
 
+### Native foam transport and accepted water coverage (SEA-13)
+
+The 71 × 37 native foam run counts 15,762 paired cell updates in three CFL substeps. The
+39 × 31 and 71 × 37 cases match scalar coverage and replay byte for byte across 1, 2 and 4 participants.
+The real Water material displays 3.43 m² of accepted foam early and 20.37 m² late, including 11.37 m² of residual
+coverage. The area centroid moves 8.41 m. Both renderers repeat full frames after rewind. Tests are
+`packages/physics/tests/coupling/foam-transport-workers.test.js` and `packages/water/test/sea-foam-surface.browser.mjs`.
+
 ### Native environmental parcels and field-driven sea-spray optics (ATMO-06)
 
 `packages/physics/tests/airborne-acceptance.test.js` checks that a bad Wind sample leaves accepted state and

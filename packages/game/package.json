@@ -4343,6 +4343,10 @@
       "types": "./dist/water/shallow-surface.d.ts",
       "import": "./dist/water/shallow-surface.js"
     },
+    "./water/foam-surface": {
+      "types": "./dist/water/foam-surface.d.ts",
+      "import": "./dist/water/foam-surface.js"
+    },
     "./water/flood-bake": {
       "types": "./dist/water/flood-bake.d.ts",
       "import": "./dist/water/flood-bake.js"

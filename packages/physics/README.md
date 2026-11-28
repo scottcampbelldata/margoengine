@@ -4980,17 +4980,23 @@ On average the foam covers what Leckler et al.'s ST4 whitecap law gives. 16 perc
 - the waves' Stokes drift;
 - 0.6 percent of the wind.
 
-Above 3 m/s Langmuir windrows sweep long-lived foam into lines along the wind. The transport conserves foam and stretches it with the flow's shear instead of smearing it. Ships lay wakes: white water two beams long at the stern, a turbulent wake widening as x^(1/5) for a ship length, and the bow waves' arms at Kelvin's angle once the hull is fast enough. A wake's foam lasts minutes. The spray the whitecaps throw into the air follows Gong's (2003) flux by the whitecap method, with Troitskaya's bag breakup at strong winds.
+Above 3 m/s Langmuir windrows sweep long-lived foam into lines along the wind. The bounded flux transport stretches a patch under shear. It conserves the unsaturated interior field, with open-domain outflow and explicit saturation at full coverage. Ships lay wakes: white water two beams long at the stern, a turbulent wake widening as x^(1/5) for a ship length, and the bow waves' arms at Kelvin's angle once the hull is fast enough. A wake's foam lasts minutes. The spray the whitecaps throw into the air follows Gong's (2003) flux by the whitecap method, with Troitskaya's bag breakup at strong winds.
 
 Its settings:
 - `waves`: the sea, a `WaveSolver` (its `field`, and its friction velocity for the spray) or any `WaveSpectrumField`;
 - the grid: `cells` (default 128 by 128) of `cellSize` metres (default 2), about `centre`; `statistics`, the spacing at which the spectrum is read for the breakers (default 64 m);
+- `originCellSize`, the world cell size in metres (default 4,096), for relocating sampled wave, current and wind cells;
 - `wind`, a framework `Wind`, for the wind drift and the windrows; `current`, a water `FlowField` (a river's or a tide's);
 - `decay`, residual foam's e-folding time (default 3.8 s in sea water, 2.5 s in fresh, from the sea's density);
 - `windDrift` (default 0.006 of U10); `windrows` (`{spacing = 30, speed = 0.01, spinUp = 300}` or `false`);
 - `ships`: `{body, length, beam}` or `{track(t), length, beam}`; `wakePersistence` (default 150 s);
 - `bubbles` (default true): the air a damaged hull lets out under water (the `hullBreaches` port of a `HullSolver` with compartments, in the foam's cell) rises as a bubble plume (`bubblePlume`: the integral round plume, entraining at 0.055 with millimetre bubbles slipping at 0.23 m/s and the gas expanding as it rises) and boils at the surface, whitening the water as a propeller race does out to where its radial current (`surfaceCurrent`, Fannelop and Sjoen's, from twice the plume's radius) falls to a twentieth of `WASH_SPEED`;
 - `capacity` (breakers alive at once, default 8192) and `rate` (its rate level).
+
+`new FoamSolver()` uses TypeScript transport. `FoamSolver.load()` lazily loads the Rust SIMD flux loop.
+Pass `{threads: 2}` or `{threads: 4}` in Node or in a cross-origin-isolated browser worker.
+The default is one participant. `signal` cancels loading. Call `dispose()` to release its workers.
+`workCounts()` reports the latest accepted transport work and is undefined on a still or scalar tick.
 
 It publishes the field `seaFoam`: per cell, the foam coverage and the active whitecap coverage, 0 to 1, as f32.
 - `coverage(x, z)` and `activeCoverage(x, z)` read one cell; `meanCoverage()` the whole grid; `expectedCoverage(x, z)` is Leckler's law for the sea there.
@@ -5007,7 +5013,7 @@ import {BoundaryLayerWind} from 'margoengine/weather/boundary-layer';
 // A 13 m/s wind on a sea that has blown for a day, and a coaster steaming through at 6 m/s.
 const wind = new BoundaryLayerWind({speed: 13, turbulence: false});
 const waves = new WaveSolver();
-const foam = new FoamSolver();
+const foam = await FoamSolver.load();
 const world = new PhysicsWorld({rate: {num: 30, den: 1}})
   .add(waves, {cells: [1, 1], cellSize: 1e7, periodic: ['x', 'z'], wind, warmUp: 24 * 3600})
   .add(foam, {
@@ -5020,6 +5026,7 @@ const world = new PhysicsWorld({rate: {num: 30, den: 1}})
 world.advance(30 * 20); // twenty seconds
 console.log(foam.expectedCoverage(0, 0) > 0.005); // true: whitecaps on about 1 percent of the sea
 console.log(foam.coverage(-12, 0) > 0.5); // true: the wake behind the coaster's stern
+foam.dispose();
 console.log(foam.spray(0, 0, 1) >= 0); // true: droplets per m^2 s um where the foam is
 ```
 

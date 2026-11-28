@@ -519,6 +519,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/foam-transport-kernel.wasm',
+    label: 'foam-transport-kernel.wasm',
+    kind: 'Rust SIMD conservative foam transport',
+    measure: 'file',
+    when: 'FoamSolver.load() from the optional /foam entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/foam-transport-kernel-shared.wasm',
+    label: 'foam-transport-kernel-shared.wasm',
+    kind: 'Rust SIMD foam transport with private shared worker scratch',
+    measure: 'file',
+    when: 'FoamSolver.load() with more than one participant',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/wing-lattice-kernel.wasm',
     label: 'wing-lattice-kernel.wasm',
     kind: 'Rust SIMD wing lattice influence, circulation and induced velocity',

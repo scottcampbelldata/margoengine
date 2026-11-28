@@ -86,6 +86,10 @@
       "types": "./dist/shallow-surface.d.ts",
       "import": "./dist/shallow-surface.js"
     },
+    "./foam-surface": {
+      "types": "./dist/foam-surface.d.ts",
+      "import": "./dist/foam-surface.js"
+    },
     "./flood-bake": {
       "types": "./dist/flood-bake.d.ts",
       "import": "./dist/flood-bake.js"
@@ -137,6 +141,7 @@
     "@margoengine/materials": "^1.0.0"
   },
   "scripts": {
+    "test:gpu:sea-foam-surface": "cd ../.. && node packages/water/test/sea-foam-surface.browser.mjs && node packages/water/test/sea-foam-surface.browser.mjs --compat",
     "build": "node ../../scripts/build-optional.js water",
     "test": "npm run build && node --test test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:gpu": "npm run build && node test/rivers.browser.mjs && node test/flood.browser.mjs && node test/flood-edge.browser.mjs && node test/flood-rigid-drag.browser.mjs && node test/flood-mud.browser.mjs && node test/flood-film.browser.mjs && node test/flood-sea.browser.mjs && node test/flood-far.browser.mjs && node test/flood-settings.browser.mjs && node test/flood-foam.browser.mjs && node test/flood-sediment.browser.mjs && node test/sediment-source.browser.mjs && node test/shallow-surface.browser.mjs && node test/tsunami-surface.browser.mjs && node test/buoyancy-example.browser.mjs && node test/flood-bake.browser.mjs && node test/breaking.browser.mjs && node test/flood-waves.browser.mjs && node test/bodies.browser.mjs && node test/scatter.browser.mjs && node test/sea-agreement.browser.mjs && node test/wake-agreement.browser.mjs && node test/wake-agreement.browser.mjs --panel-hull && node test/wake-agreement.browser.mjs --lateral-course && node test/loads-quay.browser.mjs && node test/film-clock.browser.mjs && node test/rain.browser.mjs && node test/banks.browser.mjs && node test/banks.browser.mjs --compat && node test/underwater.browser.mjs && node test/underwater.browser.mjs --single && node test/underwater-optics.browser.mjs && node test/reflector.browser.mjs && node test/reflector-cone.browser.mjs",

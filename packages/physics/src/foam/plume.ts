@@ -23,6 +23,7 @@
 // with depth).
 
 import { pow } from '@margoengine/math/pinned';
+import { foamError } from './errors.js';
 
 /** Socolofsky et al.'s (2008) entrainment coefficient of a bubble plume's inner plume (top-hat). */
 export const PLUME_ENTRAINMENT = 0.055;
@@ -74,9 +75,24 @@ export function bubblePlume(depth: number, gas: number, options: BubblePlumeOpti
     steps = 400,
     visit,
   } = options;
-  if (!(depth > 0 && gas > 0 && source > 0 && alpha > 0 && slip >= 0 && g > 0 && Number.isFinite(depth + gas)))
-    throw new RangeError(
-      `A bubble plume needs a depth, a gas rate, a source radius, an entrainment and gravity above 0 and a slip of 0 or more (got depth ${depth} m, gas ${gas} m^3/s).`,
+  if (
+    !(
+      depth > 0 &&
+      gas > 0 &&
+      source > 0 &&
+      alpha > 0 &&
+      slip >= 0 &&
+      g > 0 &&
+      atmosphere > 0 &&
+      density > 0 &&
+      Number.isSafeInteger(steps) &&
+      steps > 0 &&
+      [depth, gas, source, alpha, slip, g, atmosphere, density].every(Number.isFinite)
+    )
+  )
+    throw foamError(
+      'unsupported',
+      `A bubble plume needs a depth, a gas rate, a source radius, an entrainment and gravity above 0 and a slip of 0 or more. Pass finite SI values and a positive whole step count (got depth ${depth} m, gas ${gas} m^3/s).`,
     );
   // The gas's volume flux at height z above the source (its pressure falls as it rises).
   const gasAt = (z: number) =>
@@ -109,7 +125,13 @@ export function bubblePlume(depth: number, gas: number, options: BubblePlumeOpti
     }
   }
   const speed = m / q;
-  return { radius: Math.sqrt(q / (Math.PI * speed)), speed, flux: q };
+  const radius = Math.sqrt(q / (Math.PI * speed));
+  if (!(radius > 0 && speed > 0 && q > 0 && [radius, speed, q].every(Number.isFinite)))
+    throw foamError(
+      'failed',
+      'The plume is outside its numerical range. Rescale the source or increase the RK4 steps.',
+    );
+  return { radius, speed, flux: q };
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21886812,
+  "total": 21895224,
   "history": [
     {
       "date": "2026-10-24",
@@ -15665,6 +15665,12 @@
       "commit": "KB-BIOMES-SPARSEGRASS1",
       "reason": "@margoengine/biomes/objects 5,962 B (measured before 408de742ec's rock rings) to 6,227 B gzip with them (ceiling 6,081 to 6,469): BiomeObjects draws procedural:grass as GrassScatter tussocks in two layers (a dense 20 m layer and the field fading in behind it), so a meadow covers 98.6 percent of the ground from eye height instead of 11.3. GrassScatter itself loads lazily from @margoengine/scatter/grass only when a detail draws grass; the 251 B measured on the parent are the layer setup, the shared options and the lazy load. A separate entry would duplicate the detail-map and streaming code it reads.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-13-native-foam",
+      "reason": "SEA-13 @margoengine/physics/foam 7870 to 13774 B gzip, @margoengine/physics 993705 to 993424 B gzip, @margoengine/water/foam-surface 0 to 2094 B gzip, @margoengine/water 39897 to 39924 B gzip, @margoengine/game/water/foam-surface 0 to 65 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107334 to 107013 B gzip, @margoengine/physics/foam 8126 to 14188 B ceiling, @margoengine/water/foam-surface 0 to 2350 B ceiling. The foam entry keeps rollback-safe body-relative fields, finite spectral statistics, and dispatch to the optional SIMD transport. The Water adapter is an independent subpath sharing the existing material effect hook. Splitting the physics entry further would duplicate the candidate grid, wind and current sampling. Core and stage are unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16544,7 +16550,7 @@
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 13184,
     "@margoengine/physics/flip": 14295,
-    "@margoengine/physics/foam": 8126,
+    "@margoengine/physics/foam": 14188,
     "@margoengine/physics/glacier": 3740,
     "@margoengine/physics/gpu-cloth": 16899,
     "@margoengine/physics/granular-flow": 5830,
@@ -17361,6 +17367,7 @@
     "@margoengine/water/flood": 17569,
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
+    "@margoengine/water/foam-surface": 2350,
     "@margoengine/water/ice": 13364,
     "@margoengine/water/liquid": 48716,
     "@margoengine/water/query": 4677,
