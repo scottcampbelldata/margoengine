@@ -29,7 +29,7 @@
     "build": "node ../../scripts/build-optional.js humans",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/humans/test/person-still.mjs && node packages/humans/test/cast-still.mjs && node packages/humans/test/fit-still.mjs && node packages/humans/test/pose-frames.browser.mjs"
+    "test:gpu": "cd ../.. && node packages/humans/test/person-still.mjs && node packages/humans/test/cast-still.mjs && node packages/humans/test/fit-still.mjs && node packages/humans/test/pose-frames.browser.mjs && node packages/humans/test/pose-sheet.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
