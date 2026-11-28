@@ -20,6 +20,10 @@ North Yard's service depot and four neighboring industrial buildings use the CC0
 
 The approach to the yard is lined with four brick buildings (a substation, two warehouses and a shed), a palisade fence and a yard of pallets, drums and a works trailer. They are built in Blender from CC0 Poly Haven textures by `build_approach_buildings.py` and `build_yard_props.py` in the asset library's `showcase-films/north-yard/` folder, whose `LABEL.md` names each texture and its source. Six cabin lamps light the saloon through the windows.
 
+The lineside furniture is built by `build_lineside.py` in the same folder: tubular overhead line masts on concrete foundations with cantilevers, silicone insulators, registration and steady arms; sodium lamp columns with swan-neck arms and glowing lanterns; hooded two-aspect tram signals; the terminal's glazed shelter with its gutter, downpipes, run-off, screens, timetable case and perch benches; and a brick viaduct with the far edge of town that closes the horizon on the yard's open side. The tram's articulation bellows are ten pleats each, which the film lays every frame along the curve from one body's end to the next, so they bend with the bogies. The ballast stones are dense and detailed only on the approach where the low cameras look; the track drew 6.35 million triangles from 202,048 instances and now draws 2.44 million from 83,481 (the GLB went from 29.3 MB to 24.7 MB).
+
+A film that is shot outdoors passes `look.sky` (`zenith`, `horizon` and `ground` colours, linear RGB) to `openFilm`, so its environment light is its own sky; without it the models reflect the workshop's three soft panels, which showed on Last Tram's wet tops as pale grey-blue patches.
+
 ## Above the Treeline
 
 A single rising camera move starts in bunchgrass and pulls back to show the forest thinning above a Rocky Mountain valley. The Biomes alpine placement graph brings shorter firs into sheltered pockets. The fixed terrain anchor holds the ridges through the pullback, and the far forest takes its height from the rendered terrain triangles. The volumetric clouds and aerial haze are rendered with the terrain.

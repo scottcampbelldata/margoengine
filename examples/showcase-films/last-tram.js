@@ -17,6 +17,7 @@ const trackRadius = 34;
 const wheelRadius = 0.33;
 const stop = 22;
 const length = 6.92;
+const folds = 10;
 
 function route(s) {
   const arc = Math.min(0, Math.max(-45, s));
@@ -49,7 +50,7 @@ function frontPosition(t) {
 }
 
 export async function buildDepot(engine, shop, cluster) {
-  const { box, ring, beam, sign } = shop;
+  const { box, beam, sign } = shop;
   const depot = await loadGLTF(engine, libraryAsset('north-yard/industrial-buildings.glb'), {
     decoders: { instancing },
   });
@@ -87,19 +88,9 @@ export async function buildDepot(engine, shop, cluster) {
   const look = (color, roughness, metalness = 0, roughnessMap) =>
     new Material({ color, roughness, metalness, roughnessMap });
   const railSide = look('#423a33', 0.49, 0.72, brushed);
-  const structure = look('#34424b', 0.61, 0.49, grit),
-    steel = look('#646e71', 0.34, 0.74, brushed);
-  const shelter = look('#6e7472', 0.7, 0.15, grit);
-  const dark = look('#172127', 0.52, 0.24),
-    offWhite = look('#bcb5a4', 0.35, 0.36, grit);
-  const rubber = look('#17191c', 0.78, 0.09);
-  const yellow = look('#ae8848', 0.59, 0.17, grit);
-  const grayPanel = look('#535456', 0.42, 0.46, brushed);
+  const steel = look('#646e71', 0.34, 0.74, brushed);
   const emit = (color, intensity) =>
     new Material({ color, roughness: 0.43, emissive: color, emissiveIntensity: intensity });
-  const warm = emit('#ffddb3', 2.8);
-  const red = emit('#ef321c', 3.2),
-    green = emit('#65db97', 3.6);
   const wet = new WeatherMachine('rain', { seed: 41 });
   wet.update(140);
   const weather = Weather.attach(engine, {
@@ -174,18 +165,24 @@ export async function buildDepot(engine, shop, cluster) {
     ),
   );
 
-  // Catenary span, track signals and depot building.
+  // Lineside furniture built in Blender (north-yard/build_lineside.py): overhead line masts with their cantilevers and
+  // insulators, sodium lamp columns, hooded tram signals and the terminal's glazed shelter. Each stands at its foot.
+  const lineside = [];
+  const stand = async (name, position, turn) => {
+    const model = await loadGLTF(engine, libraryAsset('north-yard/' + name + '.glb'));
+    model.root.setPosition(position).setRotation([0, turn, 0]);
+    lineside.push(model);
+    return model;
+  };
+  const standing = [];
+  // Catenary span: masts with cantilevers from the Blender model, the wires and droppers here.
   for (let s = -66; s < 51; s += 13) {
-    const { heading } = frame(s),
-      p = along(s, 3.36);
-    ring([0.122, 0.167, 5.32], structure, [p[0], 2.52, p[2]], undefined, undefined, 14);
-    beam(along(s, 3.36, 4.65), along(s, -0.35, 4.65), 0.065, steel, undefined, true);
-    beam(along(s, 3.36, 5.07), along(s, 0.33, 4.65), 0.028, steel, undefined, true);
-    ring([0.058, 0.058, 0.117], offWhite, along(s, 2.65, 4.65), [0, 0, quarter], undefined, 16);
+    // Masts on the terminal platform stand on its deck (the platforms model leaves their footings, s -1, 12, 25).
+    const deck = s > -4 && s < 36;
+    standing.push(stand(deck ? 'ole-mast-deck' : 'ole-mast', along(s, 3.36, -0.1), frame(s).heading));
     for (const offset of [0, 2.8, 5.6, 8.4, 11.2]) {
       beam(along(s + offset, 0.05, 4.37), along(s + offset, 0.05, 4.61), 0.008, steel, undefined, true);
     }
-    box([0.12, 0.155, 0.07], yellow, [p[0], 1.36, p[2] - 0.181], [0, heading, 0], undefined, 0.008);
   }
   for (let s = -79; s < 58; s += 1.4)
     for (const height of [4.38, 4.62]) {
@@ -209,11 +206,7 @@ export async function buildDepot(engine, shop, cluster) {
     [5.9, -23],
     [4.35, 46],
   ]) {
-    box([0.27, 0.14, 0.28], shelter, [x, -0.03, z], undefined, undefined, 0.014);
-    ring([0.055, 0.09, 5.76], structure, [x, 2.75, z], undefined, undefined, 17);
-    beam([x, 5.47, z], [x + 0.56, 5.71, z], 0.063, structure, undefined, true);
-    box([0.62, 0.113, 0.255], steel, [x + 0.64, 5.72, z], undefined, undefined, 0.043);
-    box([0.51, 0.018, 0.213], warm, [x + 0.665, 5.656, z], undefined, undefined, 0.006);
+    standing.push(stand('lamp-sodium', [x, -0.1, z], 0));
     lights.push({
       position: [x + 0.65, 5.64, z],
       direction: [0.17, -1, 0],
@@ -224,15 +217,8 @@ export async function buildDepot(engine, shop, cluster) {
       intensity: 136,
     });
   }
-  for (const z of [-37, -17, 40]) {
-    const [x] = along(z, -1.96);
-    const p = along(z, -1.96);
-    ring([0.043, 0.062, 2.11], steel, [x, 0.94, p[2]], undefined, undefined, 17);
-    box([0.177, 0.274, 0.132], dark, [x, 1.98, p[2]], undefined, undefined, 0.023);
-    box([0.158, 0.064, 0.118], rubber, [x, 2.106, p[2] - 0.05], [0.15, 0, 0], undefined, 0.018);
-    ring([0.034, 0.037, 0.021], z < 0 ? green : red, [x, 2.029, p[2] - 0.076], [quarter, 0, 0]);
-    ring([0.034, 0.037, 0.021], z < 0 ? green : red, [x, 2.029, p[2] + 0.077], [quarter, 0, 0]);
-  }
+  for (const z of [-37, -17, 40])
+    standing.push(stand(z < 0 ? 'signal-green' : 'signal-red', along(z, -1.96, -0.1), frame(z).heading));
   const roomGlow = emit('#ffcc95', 0.95);
   for (const z of [3.5, 18.5, 36.5, 39.5])
     box([0.035, 1.68, 2.23], roomGlow, [9.205, 4.337, z], undefined, undefined, 0.008);
@@ -245,9 +231,7 @@ export async function buildDepot(engine, shop, cluster) {
     const { heading } = frame(s);
     // The yard's palisade and buildings (approach above) stand here.
     if (s < -42 && Math.round(s) % 2 === 0) {
-      box([1.3, 0.17, 0.37], structure, along(s, 6.8, 3.66), [0, heading, 0], undefined, 0.041);
-      ring([0.079, 0.094, 3.63], structure, along(s, 7.32, 1.65), undefined, undefined, 16);
-      box([1.11, 0.021, 0.218], warm, along(s, 6.8, 3.564), [0, heading, 0], undefined, 0.008);
+      standing.push(stand('lamp-sodium-low', along(s, 7.32, -0.1), heading + Math.PI));
       lights.push({
         position: along(s, 6.73, 3.547),
         direction: [-0.35, -1, 0],
@@ -259,14 +243,9 @@ export async function buildDepot(engine, shop, cluster) {
       });
     }
   }
-  // Platform shelter and tactile stopping marker.
-  for (const z of [8.7, 15.5, 22.3, 29.1]) {
-    for (const x of [2.17, 3.69]) {
-      box([0.116, 2.11, 0.141], structure, [x, 2.344, z], undefined, undefined, 0.011);
-      box([0.203, 0.065, 0.203], shelter, [x, 1.3095, z], undefined, undefined, 0.013);
-    }
-    box([2.15, 0.1, 0.16], structure, [2.97, 3.39, z]);
-    box([1.44, 0.041, 0.111], warm, [2.9, 3.326, z], undefined, undefined, 0.008);
+  // Platform shelter (Blender, in film coordinates): columns, glazed canopy, gutter and downpipes, screens and benches.
+  standing.push(stand('platform-shelter', [0, 0, 0], 0));
+  for (const z of [8.7, 15.5, 22.3, 29.1])
     lights.push({
       position: [2.9, 3.3, z],
       direction: [-0.2, -1, 0],
@@ -276,22 +255,6 @@ export async function buildDepot(engine, shop, cluster) {
       color: [1, 0.76, 0.47],
       intensity: 36,
     });
-  }
-  box([2.528, 0.156, 24.3], structure, [2.94, 3.54, 18.8], undefined, undefined, 0.041);
-  for (let i = 0; i < 32; i++) box([2.56, 0.027, 0.025], grayPanel, [2.935, 3.628, 6.9 + i * 0.759]);
-  const platformDeck = 1.277;
-  for (const z of [13.1, 22.6, 27.6]) {
-    box([0.47, 0.054, 1.38], grayPanel, [3.57, 1.77, z], undefined, undefined, 0.022);
-    box([0.044, 0.333, 1.38], structure, [3.765, 1.955, z], undefined, undefined, 0.016);
-    for (const dz of [-0.51, 0.51]) {
-      for (const x of [3.412, 3.728]) {
-        box([0.102, 0.015, 0.108], structure, [x, platformDeck + 0.007, z + dz], undefined, undefined, 0.009);
-        beam([x, platformDeck + 0.014, z + dz], [x, 1.754, z + dz], 0.061, steel);
-      }
-      box([0.354, 0.045, 0.064], steel, [3.57, 1.728, z + dz], undefined, undefined, 0.009);
-      beam([3.728, 1.738, z + dz], [3.758, 2.108, z + dz], 0.042, steel);
-    }
-  }
   sign(['03   NORTH YARD', 'TERMINAL'], [1.58, 0.45], [2.098, 2.96, 21.8], [0, -quarter, 0], undefined, {
     background: '#1c2934',
     foreground: '#eaddc5',
@@ -306,15 +269,19 @@ export async function buildDepot(engine, shop, cluster) {
     load('tram-middle'),
     load('tram-cab-tail'),
     ...Array.from({ length: 6 }, () => load('tram-wheelset')),
-    load('tram-bellows'),
-    load('tram-bellows'),
+    ...Array.from({ length: 2 * folds }, () => load('tram-bellows-fold')),
+    ...Array.from({ length: 4 }, () => load('tram-bellows-frame')),
     load('tram-door-leaf'),
     load('tram-door-leaf'),
   ]);
   const modules = [cab, middle, tail];
   const wheelsets = parts.slice(0, 6);
-  const bellows = parts.slice(6, 8);
-  const leaves = parts.slice(8, 10);
+  // Each articulation is ten pleats and two mounting frames, set every frame along the curve from one body's end to the
+  // next, so the bellows bends with the bogies instead of staying a straight box (north-yard/build_tram.py).
+  const pleats = parts.slice(6, 6 + 2 * folds);
+  const frames = parts.slice(6 + 2 * folds, 10 + 2 * folds);
+  const bellows = [...pleats, ...frames];
+  const leaves = parts.slice(10 + 2 * folds, 12 + 2 * folds);
   const wheels = [];
   for (const [i, module] of modules.entries())
     for (const [k, z] of [-0.9, 0.9].entries()) {
@@ -334,7 +301,12 @@ export async function buildDepot(engine, shop, cluster) {
   const tram = [...modules, ...wheelsets, ...bellows, ...leaves];
   // GLTFWeather wets the imported models; the film's own Material meshes join Puddles by themselves.
   for (const model of yard) modelWeather.add(model);
-  for (const model of [depot, ...approach, ...tram]) propWeather.add(model);
+  // The ground's clutter (cones, barriers, ladder, kerbs, cable drums) sheds water like the other props.
+  standing.push(stand('yard-clutter', [0, 0, 0], 0));
+  // The open side's horizon: a brick viaduct 45 m out and the far edge of town behind it, along the approach.
+  standing.push(stand('far-skyline', along(-70, 0, -0.1), frame(-70).heading));
+  await Promise.all(standing);
+  for (const model of [depot, ...approach, ...lineside, ...tram]) propWeather.add(model);
 
   const heads = [-0.738, 0.738].map(() => ({
     position: [0, 1.188, 0],
@@ -392,6 +364,32 @@ export async function buildDepot(engine, shop, cluster) {
     [62.0, 67.3, 'Braking into the terminal'],
     [70.85, 75.75, 'The doors release at the stop.'],
   ];
+  // A cubic Hermite from the rear end of body j to the front end of body j + 1, each end tangent to its body, carries
+  // the pleats; their heading turns evenly from one body's to the other's.
+  const reach = length / 2 - 0.09;
+  function articulate(j, frontS, rearS) {
+    const a = frame(frontS),
+      b = frame(rearS);
+    const ha = a.heading,
+      hb = b.heading;
+    const pa = [a.center[0] - a.forward[0] * reach, 0, a.center[2] - a.forward[2] * reach];
+    const pb = [b.center[0] + b.forward[0] * reach, 0, b.center[2] + b.forward[2] * reach];
+    const span = Math.hypot(pb[0] - pa[0], pb[2] - pa[2]);
+    const at = (t) => {
+      const h00 = 2 * t ** 3 - 3 * t ** 2 + 1,
+        h10 = t ** 3 - 2 * t ** 2 + t,
+        h01 = -2 * t ** 3 + 3 * t ** 2,
+        h11 = t ** 3 - t ** 2;
+      return [0, 2].map((k) => h00 * pa[k] - h10 * span * a.forward[k] + h01 * pb[k] - h11 * span * b.forward[k]);
+    };
+    for (let k = 0; k < folds; k++) {
+      const t = (k + 0.5) / folds,
+        [x, z] = at(t);
+      pleats[j * folds + k].root.setPosition([x, 0, z]).setRotation([0, ha + (hb - ha) * t, 0]);
+    }
+    frames[2 * j].root.setPosition(pa).setRotation([0, ha, 0]);
+    frames[2 * j + 1].root.setPosition(pb).setRotation([0, hb + Math.PI, 0]);
+  }
   function apply(time) {
     const s = frontPosition(time);
     for (const [i, module] of modules.entries()) {
@@ -399,11 +397,8 @@ export async function buildDepot(engine, shop, cluster) {
       const { center, heading } = frame(bodyS);
       module.root.setPosition(center).setRotation([0, heading + (i === 2 ? Math.PI : 0), 0]);
       for (const k of [0, 1]) cabin[i * 2 + k].position = chase(bodyS, 0, 2.42, k ? 1.65 : -1.65);
-      if (i < bellows.length) {
-        const joint = frame(bodyS - (length + 0.37) / 2);
-        bellows[i].root.setPosition(joint.center).setRotation([0, joint.heading, 0]);
-      }
     }
+    for (let j = 0; j < 2; j++) articulate(j, s - 3.95 - j * (length + 0.37), s - 3.95 - (j + 1) * (length + 0.37));
     for (const { node, sign } of wheels) node.setRotation([(sign * (s + 52)) / wheelRadius, 0, 0]);
     const open = ramp(time, 70.78, 73.35);
     for (const { leaf, x, z, direction } of sliding)
@@ -510,7 +505,7 @@ export async function buildDepot(engine, shop, cluster) {
   return {
     apply,
     cues,
-    models: [depot, ...approach, ...yard, ...tram],
+    models: [depot, ...approach, ...lineside, ...yard, ...tram],
     effects: [ssr],
     receivers: [fog, ssr],
     dispose() {
@@ -519,7 +514,7 @@ export async function buildDepot(engine, shop, cluster) {
       brushed.dispose();
       clouds.dispose();
       depot.dispose();
-      for (const model of [...approach, ...yard, ...tram]) model.dispose();
+      for (const model of [...approach, ...lineside, ...yard, ...tram]) model.dispose();
     },
     inspection: { frontPosition },
   };
