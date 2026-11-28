@@ -15404,13 +15404,16 @@ These are this package's own:
 - **The implicit damping**: -c p / (1 + dt c / I), backward Euler on the damping alone.
 - **The axis held at most 0.95 d deep**, the formula's range.
 
-Validation on data nothing was fitted to: the box of Jung, Chang and Jo, "Viscous effect on the roll motion of a
-rectangular structure", J. Eng. Mech. 132(2), 190-200, 2006, as Gu, Day and others report it (STAB 2015,
-https://strathprints.strath.ac.uk/53608/): 0.3 m by 0.1 m at 0.05 m draft, roll inertia 0.236 kg m^2/m, natural period
-0.93 s, added roll inertia 0.124 kg m^2/m, equivalent damping 0.519 N m s/m from 15 degrees. Its centre of gravity is
-not published; it is the one the measured period gives (KG 0.0625 m). The solver gives a decay coefficient 7.7 percent
-under the measured and a period 3.2 percent short (`tests/coupling/seakeeping.test.js`). No constant is calibrated: every
-coefficient is the procedure's.
+Held-out roll decay uses the one-degree-of-freedom apparatus of [Kwang Hyo Jung, Kuang-An Chang and Hyo Jae Jo,
+2006, *Viscous Effect on the Roll Motion of a Rectangular Structure*](https://doi.org/10.1061/(ASCE)0733-9399(2006)132:2(190)).
+[Jung’s dissertation, 2004, chapter VI, §§6.1 and 6.3](https://hdl.handle.net/1969.1/2249) gives the hinge
+and its constraints. [Jung, Suh and Chun, 2007, §2 and Figure 2](https://kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001064432)
+distinguish the 0.05 m draft from the acrylic box’s 0.10 m total height with 0.90 m span and 0.30 m beam.
+The reported 0.236 kg m² dry inertia and 0.519 N m s
+equivalent damping apply to the entire box. Geometry fixes GM at 0.125 m. The 60 Hz solver gives extinction
+slope 0.35051 versus 0.33271 measured and period 0.89340 s versus 0.930 s. At 240 Hz these become
+0.34851 and 0.89470 s. The tank depth was 0.90 m (kh ≈ 4.2). The strip calculation uses deep water. The
+separate unconstrained control loses roll more slowly with sway enabled. No outcome sets a parameter.
 
 The load point in the step is this package's own: a restoring load -k x taken at x + theta v dt, held through a rigid
 step of s symplectic-Euler substeps, has the update's determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), so
@@ -18178,6 +18181,18 @@ Manon Robbe-Saule, Cyprien Morize, Robin Henaff, Yann Berthol, Alban Sauret and 
 P. Poulain, A. Le Friant, A. Mangeney, S. Viroulet, E. Fernandez-Nieto, M. Castro Diaz, M. Peruzzetto, G. Grandjean, F. Bouchut, R. Pedreros and J-C. Komorowski (2023), *Performance and limits of a shallow-water model for landslide-generated tsunamis: from laboratory experiments to simulations of flank collapses at Montagne Pelée (Martinique)*, compare bathymetry, topography and dispersive effects in depth-integrated models. The current witness validates the signed volume balance on the actual water receiver, including a crest caused by passage over a shoreline and a negative volume from submerged compaction. Water back-reaction and near-impact crest calibration require the full two-layer terms. [Poulain et al. 2023](https://doi.org/10.1093/gji/ggac482)
 
 For ground shaking, the reference-frame inertial acceleration acts opposite the published horizontal support acceleration. The vertical support acceleration adds to the effective downward gravity, so the material shear threshold changes with the contact load. Nathan M. Newmark (1965), *Effects of Earthquakes on Dams and Embankments*, established the critical-acceleration concept. Jacques Ingles, José Darrozes and Jean-Claude Soula (2006), *Effects of the vertical component of ground shaking on earthquake-induced landslide displacements using generalized Newmark analysis*, show why horizontal and vertical support accelerations need separate components. The optional EARTH-08 edge puts the support force into the same apparent-step projection as slope and pressure. The flat wide-layer test checks both directions and the contact-load threshold against force balance with a derived first-order error in reconstruction. [Newmark 1965](https://doi.org/10.1680/geot.1965.15.2.139), [Ingles et al. 2006](https://doi.org/10.1016/j.enggeo.2006.02.018)
+
+### SEA-08 ordered panel workers
+
+The three-dimensional panel response retains the original boundary-integral kernels and linearized reference
+geometry. Each frequency system uses the same partial pivots and column order, with two complex row updates
+per f64x2 calculation and an unpaired scalar tail. Participants solve independently with private Wasm heaps.
+The caller joins them in frequency order. Runtime `HullSolver` continues to use the accepted radiation
+table and finite memory over fixed ticks. The panel formulation references
+[Aurélien Babarit and Gérard Delhommeau, 2015, *Theoretical and numerical aspects of the open source BEM solver NEMOH*](https://hal.science/hal-01198800),
+and [William E. Cummins, 1962, *The Impulse Response Function and Ship Motions*](https://dome.mit.edu/handle/1721.3/49049).
+The packaged browser and live world tests compare the coefficient tables and signed-origin replay. This change
+distributes independent frequency solves and preserves the model’s limitations.
 
 ### SEA-08 ordinary-strip forward speed
 

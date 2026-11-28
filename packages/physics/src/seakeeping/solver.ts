@@ -15,7 +15,6 @@
 //
 // State: the hulls' motion histories (the radiation's memory). Each step's load and added mass otherwise come from where
 // the bodies are and the sea at that time.
-import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, SeaSurface, SeaSurfaceSample, SeaWater } from '@margoengine/math/fields';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
 import {
@@ -49,6 +48,7 @@ import { atan2 } from '../ship/propeller.js';
 import { regionWords } from '../world/memory.js';
 import {
   type FieldDescriptor,
+  isRateLevel,
   type Port,
   type RateLevel,
   type Region,
@@ -58,7 +58,7 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
 import {
   addBilgeKeelInertia,
@@ -72,6 +72,7 @@ import { courseLoad, courseSpeedLimit, courseWords, lateralCourseLoad, type Hull
 import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { courseWaveCorrection } from './excitation.js';
+import { hullError } from './errors.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
 import {
   AIR_DENSITY,
@@ -91,6 +92,7 @@ import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { isShellApertureField, panelAperture, type ShellAperture, shellApertureRows } from './shell-opening.js';
 import { SHELL_PRESSURE_LAYOUT, SHELL_PRESSURE_WORDS, shellPressureField } from '../crush/shell-aperture.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
+import { HullStepJournal } from './step-journal.js';
 import { submergedWakeNodes, type SubmergedWakeNode } from './submerged-wake.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
 import type { WakeAdvancePoints } from './wake-advance-points.js';
@@ -173,6 +175,8 @@ export interface HullParams {
   readonly sea: SeaSurface | SeaQuery;
   /** The solver's rate level, 60 * 2^level steps a second (default 0); step with the rigid solver. */
   readonly level?: RateLevel;
+  /** Side length of an origin cell, m (default 4096). Match PhysicsWorld.cellSize for a separate rigid origin. */
+  readonly originCellSize?: number;
   /**
    * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
    * given, it must be the same.
@@ -270,7 +274,11 @@ export class HullSolver implements Solver<HullParams> {
   private host: SolverHost | null = null;
   private hulls: readonly Hull[] = [];
   private sea: SeaQuery | null = null;
+  private checkedSea: SeaQuery | null = null;
   private level: RateLevel = 0;
+  private originCellSize = 4096;
+  private readonly journal = new HullStepJournal();
+  private updating = false;
   private forces: Region | null = null;
   private capacity = 0;
   private readonly loads: WettedLoads & { surfacePiercing?: boolean } = {
@@ -391,13 +399,13 @@ export class HullSolver implements Solver<HullParams> {
   ) {
     const radius = wake?.minimumRadius ?? 0;
     if (!(Number.isFinite(radius) && radius >= 0))
-      throw new MargoError('state', 'Invalid hull wake patch radius. Use a finite nonnegative radius in metres.');
+      throw hullError('state', 'Invalid hull wake patch radius. Use a finite nonnegative radius in metres.');
     this.wakeRadius = wake ? radius : null;
     this.wakeAdvance = wake?.advance ?? false;
     if (wake?.pointAdvance !== undefined) {
       const points = wake.pointAdvance;
       if (this.wakeAdvance || wake.submergedAdvance !== undefined)
-        throw new MargoError('state', 'Choose one advancing wake mode: pointAdvance, submergedAdvance or advance.');
+        throw hullError('state', 'Choose one advancing wake mode: pointAdvance, submergedAdvance or advance.');
       if (
         points?.kind !== 'surfaceSampleSet' ||
         points.quantity !== 'submergedPointSeaSource' ||
@@ -406,12 +414,12 @@ export class HullSolver implements Solver<HullParams> {
         typeof points.name !== 'string' ||
         !points.name.trim()
       )
-        throw new MargoError('state', 'Pass finiteQuayPointSource as the HullSolver pointAdvance descriptor.');
+        throw hullError('state', 'Pass finiteQuayPointSource as the HullSolver pointAdvance descriptor.');
       this.pointWakeSource = points;
     }
     if (wake?.submergedAdvance !== undefined) {
       if (this.wakeAdvance)
-        throw new MargoError(
+        throw hullError(
           'state',
           'A hull needs one advancing wake source; set submergedAdvance or advance, not both.',
         );
@@ -427,9 +435,9 @@ export class HullSolver implements Solver<HullParams> {
       });
     }
     if (crushDamage && (crushDamage.kind !== 'surfaceSampleSet' || crushDamage.quantity !== CRUSH_DAMAGE_QUANTITY))
-      throw new MargoError('state', 'Pass CrushSolver.damageField to link structural seal damage to a hull.');
+      throw hullError('state', 'Pass CrushSolver.damageField to link structural seal damage to a hull.');
     if (girderSeams && (girderSeams.kind !== 'surfaceSampleSet' || girderSeams.quantity !== GIRDER_SEAM_QUANTITY))
-      throw new MargoError('state', 'Pass GirderJointSolver.seamField to link a failed girder to a hull opening.');
+      throw hullError('state', 'Pass GirderJointSolver.seamField to link a failed girder to a hull opening.');
     this.wakeSourceField = Object.freeze({
       name: id + '.wakeSources',
       kind: 'surfaceSampleSet',
@@ -451,10 +459,10 @@ export class HullSolver implements Solver<HullParams> {
     } = {},
   ): HullSolver {
     if (!isShellApertureField(field))
-      throw new MargoError('state', 'Pass CrushShellSolver.apertureField to link live shell seams.');
+      throw hullError('state', 'Pass CrushShellSolver.apertureField to link live shell seams.');
     const { id, wake, crushDamage, girderSeams, cellSize } = options;
     if (cellSize !== undefined && !(cellSize > 0 && Number.isFinite(cellSize)))
-      throw new MargoError('state', 'Use a positive finite world cell size when connecting shell apertures.');
+      throw hullError('state', 'Use a positive finite world cell size when connecting shell apertures.');
     const hull = new HullSolver(id, wake, crushDamage, girderSeams);
     hull.shellApertures = { field, cellSize };
     return hull;
@@ -475,7 +483,7 @@ export class HullSolver implements Solver<HullParams> {
       pressure.unit !== expected.unit ||
       pressure.centring !== expected.centring
     )
-      throw new MargoError('state', 'Pass the matching CrushShellSolver.aperturePressureField.');
+      throw hullError('state', 'Pass the matching CrushShellSolver.aperturePressureField.');
     hull.shellPressureField = pressure;
     return hull;
   }
@@ -501,9 +509,9 @@ export class HullSolver implements Solver<HullParams> {
 
   /** Uses the wet side of each open entry cavity for this hull's pressure and form drag. */
   connectEntryCavity(field: FieldDescriptor): this {
-    if (this.host) throw new MargoError('state', 'Connect an entry cavity before adding the hull to the world.');
+    if (this.host) throw hullError('state', 'Connect an entry cavity before adding the hull to the world.');
     if (!isEntryCavityField(field))
-      throw new MargoError('state', 'Pass EntrySolver.cavityPressureField to connect open entry cavities.');
+      throw hullError('state', 'Pass EntrySolver.cavityPressureField to connect open entry cavities.');
     this.entryCavity = field;
     return this;
   }
@@ -543,21 +551,35 @@ export class HullSolver implements Solver<HullParams> {
   init(host: SolverHost, params: HullParams): void {
     const { hulls, sea, level = 0 } = params ?? ({} as HullParams);
     if (!Array.isArray(hulls) || hulls.length === 0)
-      throw new TypeError(
+      throw hullError(
+        'unsupported',
         'A HullSolver floats one or more hulls; pass them: world.add(new HullSolver(), {hulls: [{row, mesh}], sea}).',
       );
     if (!sea || typeof sea.elevation !== 'function')
-      throw new TypeError('A HullSolver needs a sea with elevation(x, z, t): pass {sea}.');
+      throw hullError('unsupported', 'A HullSolver needs a sea with elevation(x, z, t): pass {sea}.');
+    if (!isRateLevel(level))
+      throw hullError('unsupported', 'The hull rate level is invalid. Use an integer from 0 to 7 matching the rigid solver.');
+    const originCellSize = params.originCellSize ?? 4096;
+    if (!(originCellSize > 0 && Number.isFinite(originCellSize)))
+      throw hullError('unsupported', 'The hull origin cell size is invalid. Use the world’s positive cellSize in metres.');
+    if (sea.density !== undefined && !(sea.density > 0 && Number.isFinite(sea.density)))
+      throw hullError('unsupported', 'Sea density is invalid. Use a positive finite density in kilograms per cubic metre.');
+    if (sea.pressure !== undefined && typeof sea.pressure !== 'function')
+      throw hullError('unsupported', 'The sea pressure query is invalid. Supply a pressure function or omit it.');
     let lastCrushPatch = -1;
     let lastGirderJoint = -1;
     let lastShellSeam = -1;
     const pressureSeams = new Set<number>();
+    const seen = new Set<number>();
     for (const hull of hulls) {
+      if (!hull || !(Number.isSafeInteger(hull.row) && hull.row >= 0) || seen.has(hull.row))
+        throw hullError('unsupported', `Hull body row ${hull?.row} is invalid or repeated. Supply one hull per rigid row.`);
+      seen.add(hull.row);
       if (hull.bilgeKeels !== undefined) validateBilgeKeels(hull.bilgeKeels);
       for (const { crushPatch, girderJoint, shellSeam, to } of hull.openings ?? []) {
         if (crushPatch !== undefined) {
           if (!this.crushDamage || !Number.isSafeInteger(crushPatch) || crushPatch < 0)
-            throw new MargoError(
+            throw hullError(
               'state',
               'Pass CrushSolver.damageField and a nonnegative crushPatch index for the hull opening.',
             );
@@ -565,7 +587,7 @@ export class HullSolver implements Solver<HullParams> {
         }
         if (girderJoint !== undefined) {
           if (!this.girderSeams || !Number.isSafeInteger(girderJoint) || girderJoint < 0)
-            throw new MargoError(
+            throw hullError(
               'state',
               'Pass GirderJointSolver.seamField and a nonnegative girderJoint index for the hull opening.',
             );
@@ -573,36 +595,37 @@ export class HullSolver implements Solver<HullParams> {
         }
         if (shellSeam !== undefined) {
           if (!this.shellApertures || !Number.isSafeInteger(shellSeam) || shellSeam < 0)
-            throw new MargoError('state', 'Use HullSolver.withShellApertures and a nonnegative shellSeam index.');
+            throw hullError('state', 'Use HullSolver.withShellApertures and a nonnegative shellSeam index.');
           if (this.shellPressureField) {
             if (to !== 'outside' || pressureSeams.has(shellSeam))
-              throw new MargoError('state', 'Use one opening to the outside per pressure seam.');
+              throw hullError('state', 'Use one opening to the outside per pressure seam.');
             pressureSeams.add(shellSeam);
           }
           lastShellSeam = Math.max(lastShellSeam, shellSeam);
         }
       }
-      if (!(Number.isInteger(hull.row) && hull.row >= 0))
-        throw new RangeError(
-          `A hull's row is a kernel body row (got ${hull.row}); pass the body's row, a whole number of 0 or more.`,
-        );
       const { vertices, indices } = hull.mesh ?? {};
       if (!vertices || !indices || vertices.length % 3 !== 0 || indices.length % 3 !== 0 || indices.length === 0)
-        throw new RangeError(
+        throw hullError(
+          'unsupported',
           'A hull mesh is not whole; pass vertices (three numbers each) and triangles (three indices each, wound outward).',
         );
+      for (let word = 0; word < vertices.length; word++)
+        if (!Number.isFinite(vertices[word]))
+          throw hullError('unsupported', `Hull vertex word ${word} is invalid. Supply finite body-local metres.`);
       for (let k = 0; k < indices.length; k++)
         if (!(Number.isInteger(indices[k]) && indices[k]! >= 0 && indices[k]! < vertices.length / 3))
-          throw new RangeError(
+          throw hullError(
+            'unsupported',
             `Hull triangle index ${indices[k]} names no vertex of the ${vertices.length / 3}; keep each index under the vertex count.`,
           );
     }
-    const capacity = bodyRowsOf(
-      host,
-      'A HullSolver',
-      hulls.map((h) => h.row),
-      params.capacity,
-    );
+    const capacity = host.bodyRows();
+    if (params.capacity !== undefined && params.capacity !== capacity)
+      throw hullError('unsupported', `Hull capacity differs from the world's ${capacity} rows. Omit capacity or match the world.`);
+    for (const row of seen)
+      if (row >= capacity)
+        throw hullError('unsupported', `Hull body row ${row} exceeds the world's ${capacity} rows. Use a rigid body in this world.`);
     this.capacity = capacity;
     this.hulls = hulls;
     this.courseLimits.clear();
@@ -612,15 +635,15 @@ export class HullSolver implements Solver<HullParams> {
       if (!course) return null;
       const trim = course.trim ?? 0;
       if (!(Number.isFinite(trim) && Math.abs(trim) < Math.PI / 2))
-        throw new MargoError(
+        throw hullError(
           'state',
           'The steady hull trim is invalid. Use finite radians below 90 degrees in magnitude.',
         );
       if (course.speed !== undefined && !Number.isFinite(course.speed))
-        throw new MargoError('state', 'The hull course speed is invalid. Use finite metres per second.');
+        throw hullError('state', 'The hull course speed is invalid. Use finite metres per second.');
       const heading = course.lateralHeading;
       if (heading !== undefined && !Number.isFinite(heading))
-        throw new MargoError('state', 'Pass a finite course direction in radians for lateralHeading.');
+        throw hullError('state', 'Pass a finite course direction in radians for lateralHeading.');
       return {
         speed: course.speed,
         trimSine: sin(trim),
@@ -629,22 +652,26 @@ export class HullSolver implements Solver<HullParams> {
       };
     });
     this.sea = sea;
+    this.checkedSea = checkedHullSea(sea);
     this.level = level;
+    this.originCellSize = originCellSize;
     this.gravity = params.gravity ?? [0, -GRAVITY, 0];
+    if (this.gravity.length !== 3 || !this.gravity.every(Number.isFinite))
+      throw hullError('unsupported', 'Hull gravity is invalid. Supply three finite SI components.');
     this.addedMass = params.addedMass ?? true;
     this.stations = params.stations ?? 24;
-    if (!(Number.isInteger(this.stations) && this.stations >= 2))
-      throw new RangeError(`A hull's stations are ${this.stations}; pass a whole number of 2 or more.`);
+    if (!(Number.isSafeInteger(this.stations) && this.stations >= 2))
+      throw hullError('unsupported', `A hull's stations are ${this.stations}; pass a whole number of 2 or more.`);
     this.host = host;
     this.lastCrushPatch = lastCrushPatch;
     this.lastGirderJoint = lastGirderJoint;
     this.lastShellSeam = lastShellSeam;
     if (this.shellPressureField) {
       if (lastShellSeam < 0)
-        throw new MargoError('state', 'Give the pressure-enabled hull at least one shellSeam opening.');
+        throw hullError('state', 'Give the pressure-enabled hull at least one shellSeam opening.');
       const [gx, gy, gz] = this.gravity;
       if (gx !== 0 || gz !== 0 || !(gy < 0 && Number.isFinite(gy)))
-        throw new MargoError('state', 'Use downward Y gravity when linking shell aperture pressure.');
+        throw hullError('state', 'Use downward Y gravity when linking shell aperture pressure.');
       this.shellPressure = host.allocate(
         'shell-pressure',
         (lastShellSeam + 1) * SHELL_PRESSURE_WORDS * 8,
@@ -662,9 +689,9 @@ export class HullSolver implements Solver<HullParams> {
       if (wakeWaterplane === undefined) return undefined;
       const { plane, radius } = wakeWaterplane ?? {};
       if (this.wakeRadius === null)
-        throw new MargoError('state', 'Enable the HullSolver wake option before assigning a baked waterplane.');
+        throw hullError('state', 'Enable the HullSolver wake option before assigning a baked waterplane.');
       if (!(radius > 0 && Number.isFinite(radius)))
-        throw new MargoError('state', 'Set the baked waterplane projection radius to positive finite metres.');
+        throw hullError('state', 'Set the baked waterplane projection radius to positive finite metres.');
       const nodes = plane?.nodes;
       if (
         !(nodes instanceof Float64Array) ||
@@ -673,7 +700,7 @@ export class HullSolver implements Solver<HullParams> {
         !Number.isFinite(plane.waterline) ||
         nodes.some((value, i) => !Number.isFinite(value) || (i % 3 === 2 && !(value > 0)))
       )
-        throw new MargoError(
+        throw hullError(
           'state',
           'You must bake a nonempty reference waterplane with finite XZ coordinates and positive areas.',
         );
@@ -684,7 +711,7 @@ export class HullSolver implements Solver<HullParams> {
     else delete this.loads.surfacePiercing;
     if (this.wakeRadius !== null) {
       if (level !== 0)
-        throw new MargoError('state', 'Hull wake sources use the world base rate. Set the hull and wake to level 0.');
+        throw hullError('state', 'Hull wake sources use the world base rate. Set the hull and wake to level 0.');
       let rows = 0;
       this.wakeOffsets = this.wakeWaterplanes.map((baked) => {
         const start = rows;
@@ -693,7 +720,7 @@ export class HullSolver implements Solver<HullParams> {
       });
       const bytes = rows * WAKE_SOURCE_WORDS * Float64Array.BYTES_PER_ELEMENT;
       if (bytes > 0xffffffff)
-        throw new MargoError(
+        throw hullError(
           'state',
           'Reduce the number of hulls or bake fewer waterplane rows to fit in the wake field.',
         );
@@ -706,7 +733,7 @@ export class HullSolver implements Solver<HullParams> {
         if (wakeAdvancePoints === undefined) return undefined;
         const { geometry, radius } = wakeAdvancePoints ?? {};
         if (!(radius > 0 && Number.isFinite(radius)))
-          throw new MargoError('state', 'Set the point wake projection radius to positive finite metres.');
+          throw hullError('state', 'Set the point wake projection radius to positive finite metres.');
         const nodes = geometry?.nodes;
         if (
           !(nodes instanceof Float64Array) ||
@@ -717,7 +744,7 @@ export class HullSolver implements Solver<HullParams> {
             (value, i) => !Number.isFinite(value) || (i % 4 === 2 && value < 0) || (i % 4 === 3 && value === 0),
           )
         )
-          throw new MargoError(
+          throw hullError(
             'state',
             'You must bake nonempty finite wake points with nonnegative depths and nonzero signed areas.',
           );
@@ -726,19 +753,19 @@ export class HullSolver implements Solver<HullParams> {
         return { geometry: { waterline: geometry.waterline, nodes: nodes.slice() }, radius, row };
       });
       if (rows === 0)
-        throw new MargoError(
+        throw hullError(
           'state',
           'Give at least one hull baked wakeAdvancePoints for the pointAdvance descriptor.',
         );
       const bytes = rows * SUBMERGED_WAKE_WORDS * Float64Array.BYTES_PER_ELEMENT;
       if (bytes > 0xffffffff)
-        throw new MargoError(
+        throw hullError(
           'state',
           'Reduce the number of hulls or bake fewer point sources before allocating the wake field.',
         );
       this.submergedWakeSources = host.allocate('pointWakeSources', bytes, 'f64', SUBMERGED_WAKE_LAYOUT);
     } else if (hulls.some(({ wakeAdvancePoints }) => wakeAdvancePoints !== undefined)) {
-      throw new MargoError(
+      throw hullError(
         'state',
         'Pass the finite pointAdvance descriptor before assigning baked wakeAdvancePoints.',
       );
@@ -747,7 +774,7 @@ export class HullSolver implements Solver<HullParams> {
       this.submergedWakeRowsPerHull = 4 * (this.stations + 1) * (this.submergedWakeSource.depths.length - 1);
       const rows = hulls.length * this.submergedWakeRowsPerHull;
       if (rows > SUBMERGED_WAKE_MAX_ROWS)
-        throw new MargoError(
+        throw hullError(
           'state',
           'A projected wake field supports up to 16,384 rows; reduce the number of hulls, stations or depth bands.',
         );
@@ -762,23 +789,23 @@ export class HullSolver implements Solver<HullParams> {
     this.rollDamping = params.rollDamping ?? true;
     this.viscosity = params.viscosity ?? SEA_VISCOSITY;
     if (!(this.viscosity > 0 && Number.isFinite(this.viscosity)))
-      throw new RangeError(`A sea's viscosity is ${this.viscosity} m^2/s; pass a finite number above 0.`);
+      throw hullError('unsupported', `A sea's viscosity is ${this.viscosity} m^2/s; pass a finite number above 0.`);
     const window = params.memory ?? 20;
     if (!(window > 0 && Number.isFinite(window)))
-      throw new RangeError(`A hull's radiation memory is ${window} s; pass a finite number of seconds above 0.`);
+      throw hullError('unsupported', `A hull's radiation memory is ${window} s; pass a finite number of seconds above 0.`);
     // Each hull's velocity (linear then angular), in its body's frame, at each of the last `lags` steps (by tick).
     this.lags = Math.ceil(window * rateOf(level));
     this.courseHistory = null;
     if (courseCount > 0) {
       if (!this.radiation || !this.addedMass)
-        throw new MargoError(
+        throw hullError(
           'state',
           'Hull course loads need radiation and added mass. Enable both on the HullSolver.',
         );
-      this.courseHistory = host.allocate('course', courseCount * courseWords(this.lags) * 8, 'f64', HULL_LAYOUT);
+      this.courseHistory = host.allocate('course', hullHistoryBytes(courseCount * courseWords(this.lags)), 'f64', HULL_LAYOUT);
     }
     if (this.radiation) {
-      this.history = host.allocate('history', hulls.length * this.lags * 6 * 8, 'f64', HULL_LAYOUT);
+      this.history = host.allocate('history', hullHistoryBytes(hulls.length * this.lags * 6), 'f64', HULL_LAYOUT);
       this.radiated = host.allocate('radiated', hulls.length * 7 * 8, 'f64', HULL_LAYOUT);
     }
     // Internal floodwater contributes inertia even when the exterior hydrodynamic added mass is disabled.
@@ -791,13 +818,13 @@ export class HullSolver implements Solver<HullParams> {
       const table = hull.panels;
       if (!table) continue;
       if (hull.surgeAddedMass)
-        throw new MargoError('state', 'Choose either bakeHullPanels or surgeAddedMass for this hull.');
+        throw hullError('state', 'Choose either bakeHullPanels or surgeAddedMass for this hull.');
       if (table.density !== (sea.density ?? SEA_WATER) || table.gravity !== -this.gravity[1] ||
         (seaDepth !== undefined && seaDepth !== table.depth))
-        throw new MargoError('state', 'Use the same density, gravity and still depth as the world when baking hull panels.');
+        throw hullError('state', 'Use the same density, gravity and still depth as the world when baking hull panels.');
       const top = 2 * table.frequencies.at(-1)! - table.frequencies.at(-2)!;
       if (!(top < Math.PI * rateOf(level)))
-        throw new MargoError('state', 'Choose panel frequencies below the hull tick rate’s Nyquist frequency or increase its rate.');
+        throw hullError('state', 'Choose panel frequencies below the hull tick rate’s Nyquist frequency or increase its rate.');
     }
     this.drift = (params.drift ?? true) && this.wavesOf() !== null;
     this.greenWater = params.greenWater ?? true;
@@ -805,12 +832,12 @@ export class HullSolver implements Solver<HullParams> {
     this.drag = params.drag ?? true;
     this.dragCoefficient = params.dragCoefficient ?? FORM_DRAG;
     if (!(this.dragCoefficient >= 0 && Number.isFinite(this.dragCoefficient)))
-      throw new RangeError(`A hull's drag coefficient is ${this.dragCoefficient}; pass a finite number of 0 or more.`);
+      throw hullError('unsupported', `A hull's drag coefficient is ${this.dragCoefficient}; pass a finite number of 0 or more.`);
     if (this.slamming) this.slam = host.allocate('slam', hulls.length * (this.stations + 1) * 8, 'f64', HULL_LAYOUT);
     this.deckCells = params.deckCells ?? [32, 12];
     const [cx, cz] = this.deckCells;
     if (!(Number.isInteger(cx) && Number.isInteger(cz) && cx >= 2 && cz >= 2 && cx * cz <= 65536))
-      throw new RangeError(`A deck's cells are ${cx} by ${cz}; pass whole numbers of 2 or more, at most 65,536 cells.`);
+      throw hullError('unsupported', `A deck's cells are ${cx} by ${cz}; pass whole numbers of 2 or more, at most 65,536 cells.`);
     this.inflowRecords = 4 * (cx + cz);
     this.inflow = host.allocate(
       'deckInflow',
@@ -821,7 +848,7 @@ export class HullSolver implements Solver<HullParams> {
     if (this.greenWater)
       this.deckWater = host.allocate('deckWater', hulls.length * (3 * cx * cz + 4) * 8, 'f64', HULL_LAYOUT);
     if (this.diffraction)
-      this.waves = host.allocate('waves', hulls.length * this.stations * this.lags * 2 * 8, 'f64', HULL_LAYOUT);
+      this.waves = host.allocate('waves', hullHistoryBytes(hulls.length * this.stations * this.lags * 2), 'f64', HULL_LAYOUT);
     // Flooding: each hull's compartments' water, air and cargo, and its openings' state; one breach record an opening to
     // the outside.
     let words = 0,
@@ -829,7 +856,8 @@ export class HullSolver implements Solver<HullParams> {
     for (const hull of hulls) {
       if (!hull.compartments?.length) {
         if (hull.openings?.length)
-          throw new RangeError(
+          throw hullError(
+            'unsupported',
             `Hull ${hull.row} has openings but no compartments; pass the compartments they open from.`,
           );
         continue;
@@ -878,11 +906,11 @@ export class HullSolver implements Solver<HullParams> {
       whole = volumeBelow(hull.mesh, [0, 1, 0], Infinity);
       this.volumes.set(hull, whole);
     }
-    const under = volumeBelow(hull.mesh, up, this.sea!.elevation(centre[0], centre[2], t) - pose.position[1]),
+    const under = volumeBelow(hull.mesh, up, this.checkedSea!.elevation(centre[0], centre[2], t) - pose.position[1]),
       share = whole > floating ? Math.min(1, Math.max(0, (under - floating) / (whole - floating))) : 1;
     if (!(share > 0)) return undefined;
     const water = this.waterOf(),
-      flow = water ? water.sample(centre[0], centre[1], centre[2], t, this.flow).velocity : [0, 0, 0],
+      flow = water ? hullWaterVelocity(water, centre[0], centre[1], centre[2], t, this.flow) : [0, 0, 0],
       w = [spin[0]!, spin[1]!, spin[2]!];
     if (this.rollDamping) {
       const x = rotate(rotation, [1, 0, 0]),
@@ -911,6 +939,19 @@ export class HullSolver implements Solver<HullParams> {
       : null;
   }
 
+  private readWaves(sea: SeaWaves, time: number): number {
+    const words = 4 * sea.waveCount;
+    if (!Number.isSafeInteger(words) || words < 0 || words > 0x1_0000_0000)
+      throw hullError('failed', 'The sea wave count is unrepresentable. Return a finite nonnegative wave count.');
+    if (this.waves32.length < words) this.waves32 = new Float32Array(words);
+    this.waves32.fill(NaN, 0, words);
+    const count = sea.waveComponents(time, this.waves32);
+    if (!Number.isSafeInteger(count) || count < 0 || count > sea.waveCount ||
+      !this.waves32.subarray(0, 4 * count).every(Number.isFinite))
+      throw hullError('failed', 'The sea wave components are invalid. Write four finite words per reported wave.');
+    return count;
+  }
+
   /** The water under the sea's surface, when the sea gives it. */
   private waterOf(): SeaWater | null {
     const water = (this.sea as Partial<SeaSurface>).water;
@@ -928,7 +969,9 @@ export class HullSolver implements Solver<HullParams> {
     if (horizontal === 0) return 0;
     const sea = this.sea as Partial<SeaSurface>;
     const current =
-      typeof sea.sample === 'function' ? sea.sample(centre[0], centre[2], t, this.surfaceSample).current : undefined;
+      typeof sea.sample === 'function' ? sea.sample(centre[0], centre[2], t, this.surfaceSample)?.current : undefined;
+    if (typeof sea.sample === 'function' && !finiteHullVector(current))
+      throw hullError('failed', 'The sea returned an invalid surface current. Write three finite metres-per-second components.');
     const vx = velocity[0]! - (current?.[0] ?? 0);
     const vz = velocity[2]! - (current?.[2] ?? 0);
     return (vx * forward[0] + vz * forward[2]) / horizontal;
@@ -937,8 +980,30 @@ export class HullSolver implements Solver<HullParams> {
   step(context: StepContext, dt: number): void {
     const host = this.host;
     if (!host || !this.sea || !this.forces)
-      throw new MargoError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
-    const out = new Float64Array(host.memory.buffer, this.forces.byteOffset, this.capacity * FORCE_WORDS),
+      throw hullError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
+    if (this.updating)
+      throw hullError('state', 'HullSolver is already stepping. Make the sea and water samples pure synchronous queries.');
+    this.updating = true;
+    try {
+      // Motion and diffraction histories are long rings. Their writers capture the slots they change.
+      for (const region of [
+        this.forces, this.inflow, this.breaches, this.wakeSources, this.submergedWakeSources, this.radiated,
+        this.carry, this.deckWater, this.slam, this.flood, this.wetMobility, this.shellPressure,
+      ]) {
+        if (region) this.journal.capture(host.memory, region.byteOffset, region.byteLength / Float64Array.BYTES_PER_ELEMENT);
+      }
+      this.stepHulls(host, context, dt);
+      this.journal.accept(host.memory);
+    } catch (cause) {
+      this.journal.reject(host.memory);
+      throw cause;
+    } finally {
+      this.updating = false;
+    }
+  }
+
+  private stepHulls(host: SolverHost, context: StepContext, dt: number): void {
+    const out = new Float64Array(host.memory.buffer, this.forces!.byteOffset, this.capacity * FORCE_WORDS),
       records = new Float64Array(host.memory.buffer, this.inflow!.byteOffset, this.inflow!.byteLength / 8),
       breaches = new Float64Array(host.memory.buffer, this.breaches!.byteOffset, this.breaches!.byteLength / 8);
     records.fill(0);
@@ -954,7 +1019,7 @@ export class HullSolver implements Solver<HullParams> {
     submergedWake?.fill(0);
     const cell = (this.sea as Partial<SeaSurface>).cell;
     if (cell && (cell[0] !== context.cell[0] || cell[1] !== context.cell[1] || cell[2] !== context.cell[2]))
-      throw new MargoError(
+      throw hullError(
         'state',
         `The sea's origin cell is [${cell.join(', ')}] and the HullSolver's is [${context.cell.join(', ')}]; make the sea in the hull's cell (a SpectralSea's positions are offsets from its cell).`,
       );
@@ -967,10 +1032,10 @@ export class HullSolver implements Solver<HullParams> {
         crush.region.layout !== CRUSH_LAYOUT ||
         crush.region.byteLength % (CRUSH_WORDS * Float64Array.BYTES_PER_ELEMENT) !== 0)
     )
-      throw new MargoError('state', 'Use the layout-1 f64 CrushSolver damage port to connect the hull.');
+      throw hullError('state', 'Use the layout-1 f64 CrushSolver damage port to connect the hull.');
     const damage = crush && (regionWords(crush.region.memory ?? host.memory, crush.region) as Float64Array);
     if (damage && this.lastCrushPatch * CRUSH_WORDS >= damage.length)
-      throw new MargoError('state', 'Choose a hull opening crushPatch within the connected damage port.');
+      throw hullError('state', 'Choose a hull opening crushPatch within the connected damage port.');
     const girder = this.girderSeams && context.inputs.get(this.girderSeams.name);
     const girderRowBytes = GIRDER_SEAM_WORDS * Float64Array.BYTES_PER_ELEMENT;
     if (
@@ -979,16 +1044,16 @@ export class HullSolver implements Solver<HullParams> {
         girder.region.layout !== GIRDER_SEAM_LAYOUT ||
         girder.region.byteLength % girderRowBytes !== 0)
     )
-      throw new MargoError('state', 'Use the layout-1 f64 GirderJointSolver seam port to connect the hull.');
+      throw hullError('state', 'Use the layout-1 f64 GirderJointSolver seam port to connect the hull.');
     const seams = girder && (regionWords(girder.region.memory ?? host.memory, girder.region) as Float64Array);
     if (seams && this.lastGirderJoint * GIRDER_SEAM_WORDS >= seams.length)
-      throw new MargoError('state', 'Choose a hull opening girderJoint within the connected seam port.');
+      throw hullError('state', 'Choose a hull opening girderJoint within the connected seam port.');
     const aperturePort = this.shellApertures && context.inputs.get(this.shellApertures.field.name);
     const shellPressure = this.shellPressure
       ? (regionWords(host.memory, this.shellPressure) as Float64Array)
       : undefined;
     if (shellPressure && (aperturePort?.tick !== context.tick || port.tick !== context.tick - 1))
-      throw new MargoError('state', 'Use the same rate and the order shell, hull, rigid for aperture pressure.');
+      throw hullError('state', 'Use the same rate and the order shell, hull, rigid for aperture pressure.');
     shellPressure?.fill(0);
     let shellInput: { rows: Float64Array; offset: Vec3 } | undefined;
     if (aperturePort && this.lastShellSeam >= 0) {
@@ -996,10 +1061,10 @@ export class HullSolver implements Solver<HullParams> {
       const delta = [cell[0] - context.cell[0], cell[1] - context.cell[1], cell[2] - context.cell[2]] as const;
       const size = this.shellApertures?.cellSize;
       if (size === undefined && delta.some((value) => value !== 0))
-        throw new MargoError('state', 'Set the common cellSize for shell apertures and hulls in different cells.');
+        throw hullError('state', 'Set the common cellSize for shell apertures and hulls in different cells.');
       const offset = [delta[0] * (size ?? 1), delta[1] * (size ?? 1), delta[2] * (size ?? 1)] as const;
       if (!offset.every(Number.isFinite))
-        throw new MargoError('state', 'Use a finite metre offset between the hull and shell cells.');
+        throw hullError('state', 'Use a finite metre offset between the hull and shell cells.');
       shellInput = {
         rows: shellApertureRows(host.memory, aperturePort, this.lastShellSeam),
         offset,
@@ -1011,15 +1076,20 @@ export class HullSolver implements Solver<HullParams> {
     if (this.wetChannel) {
       const receipt = context.inputs.get(this.wetChannel.receipt.name);
       if (!receipt || receipt.tick !== context.tick - 1 || port.tick !== context.tick - 1)
-        throw new MargoError('state', 'Use the solver order hull, crush and rigid at the same rate.');
+        throw hullError('state', 'Use the solver order hull, crush and rigid at the same rate.');
       received = wetInertiaWords(host.memory, receipt, this.capacity, WET_IMPULSE_WORDS);
     }
     const cavityPort = this.entryCavity && context.inputs.get(this.entryCavity.name);
     if (this.entryCavity && (cavityPort?.tick !== context.tick || port.tick !== context.tick - 1))
-      throw new MargoError('state', 'Use the solver order entry, hull and rigid at the same rate for cavity pressure.');
+      throw hullError('state', 'Use the solver order entry, hull and rigid at the same rate for cavity pressure.');
     const cavity = cavityPort && entryCavityRows(host.memory, cavityPort, this.capacity);
     const memory = port.region.memory ?? host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
+      rigidOffset: Vec3 = [
+        (port.cell[0] - context.cell[0]) * this.originCellSize,
+        (port.cell[1] - context.cell[1]) * this.originCellSize,
+        (port.cell[2] - context.cell[2]) * this.originCellSize,
+      ],
       // The middle of the step the load is held over.
       t = (context.tick + 0.5) / rateOf(context.level),
       // A ship solver's manoeuvring model owns its hull's surge, sway and yaw damping, and their added mass unless told not to.
@@ -1043,7 +1113,7 @@ export class HullSolver implements Solver<HullParams> {
           rotation.every((component) => component === 0) ||
           port.cell.some((cell, axis) => cell !== context.cell[axis])
         )
-          throw new MargoError(
+          throw hullError(
             'state',
             'Use a live, stationary fixed hull in its rigid origin cell for shell pressure.',
           );
@@ -1064,6 +1134,8 @@ export class HullSolver implements Solver<HullParams> {
         continue;
       }
       if (bodies[at + 23] !== 1) continue;
+      if (!bodies.subarray(at, at + 17).every(Number.isFinite) || !rigidOffset.every(Number.isFinite))
+        throw hullError('failed', 'An active hull pose or offset is invalid. Supply a finite rigid pose in a local cell.');
       const cavityAt = hull.row * ENTRY_CAVITY_WORDS,
         cavityNormal: Vec3 | undefined =
           cavity?.[cavityAt] === 1 ? [cavity[cavityAt + 1]!, cavity[cavityAt + 2]!, cavity[cavityAt + 3]!] : undefined;
@@ -1081,9 +1153,9 @@ export class HullSolver implements Solver<HullParams> {
         start = [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!] as const,
         turned = turn(start, spin, ahead),
         centre = [
-          bodies[at + 7]! + v[0]! * ahead,
-          bodies[at + 8]! + v[1]! * ahead,
-          bodies[at + 9]! + v[2]! * ahead,
+          bodies[at + 7]! + rigidOffset[0] + v[0]! * ahead,
+          bodies[at + 8]! + rigidOffset[1] + v[1]! * ahead,
+          bodies[at + 9]! + rigidOffset[2] + v[2]! * ahead,
         ] as const,
         // The origin rides with the centre of mass and turns about it.
         offset = rotate(
@@ -1100,7 +1172,7 @@ export class HullSolver implements Solver<HullParams> {
         loads = wettedLoads(
           this.greenWater ? this.deckFor(hull, bodies, at, pose, centre, 1 / rateOf(context.level)).wet : hull.mesh,
           pose,
-          this.sea,
+          this.checkedSea!,
           t,
           centre,
           this.loads,
@@ -1172,6 +1244,8 @@ export class HullSolver implements Solver<HullParams> {
           this.addedMass || points.length > 0
             ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads, points, wet, received)
             : [...loads.force, ...loads.torque];
+      if (!held.every((force) => Number.isFinite(Math.fround(force))))
+        throw hullError('failed', 'A hull force exceeds the rigid columns. Reduce hull scale, pressure or relative speed.');
       for (let k = 0; k < 6; k++) out[w + k]! += held[k]!;
     }
   }
@@ -1201,8 +1275,7 @@ export class HullSolver implements Solver<HullParams> {
     }
     const { beam, length, draft } = waterline;
     if (!(beam > 0 && length > 0 && draft > 0)) return;
-    if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
-    const count = sea.waveComponents(t, this.waves32);
+    const count = this.readWaves(sea, t);
     const depth = sea.stillDepth ?? Infinity;
     const forwardX = axis[0] / heading;
     const forwardZ = axis[2] / heading;
@@ -1253,12 +1326,12 @@ export class HullSolver implements Solver<HullParams> {
     if (!plane || ((baked || points) && (plane.mass !== mass || plane.density !== density))) {
       const waterline = stillWaterline(hull.mesh, mass, density);
       if (baked && Math.abs(baked.plane.waterline - waterline) > 2e-6 * Math.max(1, Math.abs(waterline)))
-        throw new MargoError(
+        throw hullError(
           'state',
           'You must rebake the wake waterplane for the hull’s current reference mass and sea density.',
         );
       if (points && Math.abs(points.geometry.waterline - waterline) > 2e-6 * Math.max(1, Math.abs(waterline)))
-        throw new MargoError(
+        throw hullError(
           'state',
           'You must rebake the point wake panels for the hull’s current reference mass and sea density.',
         );
@@ -1389,8 +1462,7 @@ export class HullSolver implements Solver<HullParams> {
     loads: WettedLoads,
   ): void {
     const sea = this.wavesOf()!;
-    if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
-    const count = sea.waveComponents(t, this.waves32);
+    const count = this.readWaves(sea, t);
     const q = pose.rotation;
     const forward = rotate(q, [1, 0, 0]);
     const across = rotate(q, [0, 0, 1]);
@@ -1446,8 +1518,7 @@ export class HullSolver implements Solver<HullParams> {
       // The water's velocity in the body's axes at body point (x, 0, z) on the still-water plane, `depth` under it.
       motion = (x: number, depth: number, time: number) => {
         const p = rotate(q, [x, 0, local[2]]);
-        water.sample(pose.position[0] + p[0], -depth, pose.position[2] + p[2], time, flow);
-        return rotate(conjugate, flow.velocity);
+        return rotate(conjugate, hullWaterVelocity(water, pose.position[0] + p[0], -depth, pose.position[2] + p[2], time, flow));
       },
       body = [0, 0, 0, 0, 0, 0];
     memory.strips.forEach((strip, s) => {
@@ -1458,6 +1529,7 @@ export class HullSolver implements Solver<HullParams> {
         heaveRate = (motion(x, strip.heaveDepth, t + dt / 2)[1] - motion(x, strip.heaveDepth, t - dt / 2)[1]) / dt,
         swayRate = (motion(x, strip.swayDepth, t + dt / 2)[2] - motion(x, strip.swayDepth, t - dt / 2)[2]) / dt,
         base = s * lags * 2;
+      this.journal.capture(this.host!.memory, ring.byteOffset + (base + 2 * slot) * 8, 2);
       ring[base + 2 * slot] = heave;
       ring[base + 2 * slot + 1] = sway;
       let k33 = 0,
@@ -1488,8 +1560,7 @@ export class HullSolver implements Solver<HullParams> {
       const vx = bodies[at + 10]!;
       const vz = bodies[at + 12]!;
       if (speed !== 0) {
-        if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
-        const count = sea.waveComponents(t, this.waves32);
+        const count = this.readWaves(sea, t);
         if (this.courseWaveScratch.length < 3 * memory.stripForms.length)
           this.courseWaveScratch = new Float64Array(3 * memory.stripForms.length);
         const [force, moment] = courseWaveCorrection(
@@ -1550,8 +1621,7 @@ export class HullSolver implements Solver<HullParams> {
       table = this.driftOf(hull, bodies, at, q, local, memory);
       this.drifts.set(hull, table);
     }
-    if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
-    const n = sea.waveComponents(t, this.waves32),
+    const n = this.readWaves(sea, t),
       w = this.waves32,
       g = -this.gravity[1],
       depth = sea.stillDepth ?? Infinity;
@@ -1821,18 +1891,14 @@ export class HullSolver implements Solver<HullParams> {
       gravity = rotate(conjugate, [g[0] - a[0], g[1] - a[1], g[2] - a[2]]),
       water3 = this.waterOf(),
       flow = this.flow,
-      sea = this.sea!,
+      sea = this.checkedSea!,
       outside = (x: number, z: number, b: number): readonly [number, number, number] => {
         const r = rotate(q, [x, b, z]),
           p: Vec3 = [pose.position[0] + r[0], pose.position[1] + r[1], pose.position[2] + r[2]],
           height = sea.elevation(p[0], p[2], t) - p[1];
         if (!(height > 0)) return [0, 0, 0];
         // The water's velocity there (its orbital motion, where the sea gives it) less the deck's, in the body's axes.
-        let u: Vec3 = [0, 0, 0];
-        if (water3) {
-          water3.sample(p[0], p[1], p[2], t, flow);
-          u = [flow.velocity[0], flow.velocity[1], flow.velocity[2]];
-        }
+        const u: Vec3 = water3 ? hullWaterVelocity(water3, p[0], p[1], p[2], t, flow) : [0, 0, 0];
         const arm: Vec3 = [p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]],
           deckVelocity: Vec3 = [
             v[0] + spin[1] * arm[2] - spin[2] * arm[1],
@@ -1945,7 +2011,7 @@ export class HullSolver implements Solver<HullParams> {
     stations.forEach((station, s) => {
       const r = rotate(q, [station.x, station.keel, local[2]]),
         p: Vec3 = [pose.position[0] + r[0], pose.position[1] + r[1], pose.position[2] + r[2]],
-        h = this.sea!.elevation(p[0], p[2], t) - p[1],
+        h = this.checkedSea!.elevation(p[0], p[2], t) - p[1],
         rate = seen ? (h - state[1 + s]!) / dt : 0;
       state[1 + s] = h;
       if (!(rate > 0)) return;
@@ -2022,7 +2088,7 @@ export class HullSolver implements Solver<HullParams> {
     const density = this.sea!.density ?? SEA_WATER,
       g = this.gravity,
       magnitude = hypot(g[0], g[1], g[2]),
-      r = flooding.stepWithShellApertures(state, pose, this.sea!, t, dt, density, magnitude, live),
+      r = flooding.stepWithShellApertures(state, pose, this.checkedSea!, t, dt, density, magnitude, live),
       points: number[] = [],
       add = (m: number, x: number, y: number, z: number) => {
         if (m === 0 || !loads) return;
@@ -2056,12 +2122,12 @@ export class HullSolver implements Solver<HullParams> {
         cargo = flooding.compartments[o.from]!.cargo,
         w = 1 + n * HULL_BREACH_WORDS;
       if (shellPressure && o.shellSeam !== undefined) {
-        const exterior = this.sea!.elevation(x, z, t);
+        const exterior = this.checkedSea!.elevation(x, z, t);
         const interior = r.level[o.from]!;
         const air = r.pressure[o.from]! - ATMOSPHERE;
         const waterWeight = density * magnitude;
         if (![exterior, interior, air, waterWeight].every(Number.isFinite) || waterWeight <= 0)
-          throw new MargoError(
+          throw hullError(
             'state',
             'Provide finite water levels, positive density and a finite compartment pressure.',
           );
@@ -2083,7 +2149,7 @@ export class HullSolver implements Solver<HullParams> {
           r.air[k]! / AIR_DENSITY,
           r.cargo[k]!,
           cargo ? BREACH_CARGO.indexOf(cargo.material) : 0,
-          this.sea!.elevation(x, z, t) - y,
+          this.checkedSea!.elevation(x, z, t) - y,
           tick,
         ],
         w,
@@ -2245,7 +2311,10 @@ export class HullSolver implements Solver<HullParams> {
       slot = tick % lags;
     const last = new Float64Array(this.host!.memory.buffer, this.radiated!.byteOffset + index * 7 * 8, 7);
     if (hull.panels && loads.area === 0) {
-      if (last[0] === 1) ring.fill(0);
+      if (last[0] === 1) {
+        this.journal.capture(this.host!.memory, ring.byteOffset, ring.length);
+        ring.fill(0);
+      }
       last.fill(0);
       return;
     }
@@ -2268,7 +2337,7 @@ export class HullSolver implements Solver<HullParams> {
         this.courseLimits.set(hull, limit);
       }
       if (!(Math.abs(speed) < limit) && speed !== 0)
-        throw new MargoError(
+        throw hullError(
           'state',
           `Course speed ${speed} m/s exceeds this hull's ordinary-strip pitch stability range. Use a speed below ${limit} m/s or choose a hull with stronger longitudinal restoring.`,
         );
@@ -2281,6 +2350,8 @@ export class HullSolver implements Solver<HullParams> {
         this.courseHistory!.byteOffset + course.historyIndex * words * 8,
         words,
       );
+      this.journal.capture(this.host!.memory, history.byteOffset, 1);
+      this.journal.capture(this.host!.memory, history.byteOffset + (1 + 2 * slot) * 8, 2);
       [force[1], force[5]] = courseLoad(
         history,
         lags,
@@ -2304,6 +2375,7 @@ export class HullSolver implements Solver<HullParams> {
         courseRoll = atan2(-across[1], up[1]);
       }
     }
+    this.journal.capture(this.host!.memory, ring.byteOffset + 6 * slot * 8, 6);
     ring.set([...velocity, ...spin], 6 * slot);
     if (course?.heading && memory && speed !== 0) {
       const sway = memory.pairs.find(({ i, j }) => i === 2 && j === 2);
@@ -2385,7 +2457,7 @@ export class HullSolver implements Solver<HullParams> {
       local = toBody([centre[0] - pose.position[0], centre[1] - pose.position[1], centre[2] - pose.position[2]]),
       // The mean waterline in the body's frame: the surface over the centre of mass (small heel and trim, as linear
       // seakeeping takes it).
-      level = this.sea!.elevation(centre[0], centre[2], t),
+      level = this.checkedSea!.elevation(centre[0], centre[2], t),
       waterline = toBody([0, level - pose.position[1], 0])[1],
       density = this.sea!.density ?? SEA_WATER,
       body = this.addedMass && hull.panels && loads.area > 0
@@ -2398,7 +2470,7 @@ export class HullSolver implements Solver<HullParams> {
         : null;
     if (hull.panels && hypot(local[0] - hull.panels.centre[0], local[1] - hull.panels.centre[1],
       local[2] - hull.panels.centre[2]) > 1e-4)
-      throw new MargoError('state', 'Use the rigid body’s local centre of mass when baking hull panels.');
+      throw hullError('state', 'Use the rigid body’s local centre of mass when baking hull panels.');
     // The lateral block (sway, roll, yaw), from the radiation at the still-water draft.
     if (memory && !hull.panels) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
     if (memory && hull.surgeAddedMass && loads.area > 0 && !(this.claim & CLAIM_ADDED_MASS)) {
@@ -2416,7 +2488,7 @@ export class HullSolver implements Solver<HullParams> {
       const across = rotate(q, [0, 0, 1]);
       addBilgeKeelInertia(body, roll.keels!, p, atan2(-across[1], up[1]), roll.natural, density, local, (point) => {
         const r = rotate(q, point);
-        return this.sea!.elevation(pose.position[0] + r[0], pose.position[2] + r[2], t) - pose.position[1] - r[1];
+        return this.checkedSea!.elevation(pose.position[0] + r[0], pose.position[2] + r[2], t) - pose.position[1] - r[1];
       });
     }
     // Surge, sway and yaw added mass a manoeuvring model claims are its: their rows and columns leave the hull's.
@@ -2513,7 +2585,7 @@ export class HullSolver implements Solver<HullParams> {
 
   exportPorts(tick: number): readonly Port[] {
     if (!this.forces)
-      throw new MargoError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
+      throw hullError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
     return [
       { field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] },
       { field: DECK_INFLOW_FIELD.name, region: this.inflow!, tick, cell: [0, 0, 0] },
@@ -2566,6 +2638,47 @@ export class HullSolver implements Solver<HullParams> {
   extraState(): readonly Region[] {
     return [];
   }
+}
+
+function finiteHullVector(value: readonly number[] | undefined): value is Vec3 {
+  return value?.length === 3 && Number.isFinite(value[0]) && Number.isFinite(value[1]) && Number.isFinite(value[2]);
+}
+
+function hullHistoryBytes(words: number): number {
+  const bytes = words * Float64Array.BYTES_PER_ELEMENT;
+  if (!Number.isSafeInteger(bytes) || bytes > 0x1_0000_0000)
+    throw hullError('unsupported', 'Hull wave history exceeds Wasm memory. Reduce the history span or station count.');
+  return bytes;
+}
+
+function checkedHullSea(sea: SeaQuery): SeaQuery {
+  return {
+    get density() {
+      const density = sea.density;
+      if (density !== undefined && !(density > 0 && Number.isFinite(density)))
+        throw hullError('failed', 'The sea density is invalid. Return positive finite kilograms per cubic metre.');
+      return density;
+    },
+    elevation: (x, z, time) => {
+      const height = sea.elevation(x, z, time);
+      if (!Number.isFinite(height))
+        throw hullError('failed', 'The sea elevation is invalid. Return finite local metres for each hull query.');
+      return height;
+    },
+    pressure: sea.pressure && ((x, y, z, time) => {
+      const pressure = sea.pressure!(x, y, z, time);
+      if (!Number.isFinite(pressure))
+        throw hullError('failed', 'The sea pressure is invalid. Return finite gauge pascals for each hull query.');
+      return pressure;
+    }),
+  };
+}
+
+function hullWaterVelocity(water: SeaWater, x: number, y: number, z: number, t: number, out: FlowSample): Vec3 {
+  const velocity = water.sample(x, y, z, t, out)?.velocity;
+  if (!finiteHullVector(velocity))
+    throw hullError('failed', 'Water velocity at the hull is invalid. Return three finite metres-per-second components.');
+  return velocity;
 }
 
 function rotate(q: readonly [number, number, number, number], v: Vec3): [number, number, number] {
@@ -2640,7 +2753,7 @@ function writeWetMobility(out: Float64Array, row: number, dry: Float64Array, sys
     const columnMobility = solve6(system, basis);
     basis[column] = 0;
     if (!(columnMobility[column]! > 0 && columnMobility.every(Number.isFinite)))
-      throw new MargoError('failed', 'Use a hull with finite positive effective rigid and water inertia.');
+      throw hullError('failed', 'Use a hull with finite positive effective rigid and water inertia.');
     for (let i = 0; i < 6; i++) {
       let mapped = 0;
       for (let j = 0; j < 6; j++) mapped += dry[i * 6 + j]! * columnMobility[j]!;

@@ -17,7 +17,26 @@ export interface HullPanelOptions {
   readonly frequencies: ArrayLike<number>;
   /** Evenly spaced incident headings starting at +X. Default 16. Use 0 for radiation alone. */
   readonly headings?: number;
+  /** Caller plus up to three independent frequency helpers. Default 1. */
+  readonly threads?: 1 | 2 | 4;
   readonly signal?: AbortSignal;
+}
+
+/** Executed factorization work on one participant. */
+export interface HullPanelWorkerWork {
+  /** All systems, including the infinite-frequency mass where assigned. */
+  readonly systems: number;
+  readonly frequencySolves: number;
+  /** Two complex pivot updates executed together in the native SIMD loop. */
+  readonly eliminationPairs: number;
+  /** Single complex updates left over after pairing. */
+  readonly eliminationTail: number;
+}
+
+/** Actual work partition, with the caller first and no idle helpers. */
+export interface HullPanelWorkCounts extends HullPanelWorkerWork {
+  readonly threads: number;
+  readonly workers: readonly HullPanelWorkerWork[];
 }
 
 /** Hydrodynamic coefficients at one intrinsic angular frequency. */
@@ -42,6 +61,8 @@ export interface HullPanelResponse {
   readonly frequencies: readonly number[];
   readonly samples: readonly HullPanelSample[];
   readonly infiniteMass: readonly number[];
+  /** Native work receipt when threads was explicitly provided. */
+  readonly work?: HullPanelWorkCounts;
 }
 
 /** Lazily bakes the linear water response on the hull's reference geometry with the optional panel Wasm. */

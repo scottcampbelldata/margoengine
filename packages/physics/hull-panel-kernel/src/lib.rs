@@ -14,12 +14,74 @@ const MATRIX: usize = AXES * AXES;
 const MAX_PANELS: usize = 768;
 const MAX_HEADINGS: usize = 64;
 
+#[derive(Default)]
+struct EliminationWork {
+    pairs: u32,
+    tail: u32,
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+fn reduce_pair(target: &mut [Complex], pivot: &[Complex], factor: Complex) {
+    use core::arch::wasm32::{
+        f64x2, f64x2_add, f64x2_extract_lane, f64x2_mul, f64x2_splat, f64x2_sub,
+    };
+
+    let re = f64x2(pivot[0].re, pivot[1].re);
+    let im = f64x2(pivot[0].im, pivot[1].im);
+    let factor_re = f64x2_splat(factor.re);
+    let factor_im = f64x2_splat(factor.im);
+    let re_delta = f64x2_sub(f64x2_mul(factor_re, re), f64x2_mul(factor_im, im));
+    let im_delta = f64x2_add(f64x2_mul(factor_re, im), f64x2_mul(factor_im, re));
+    let re_next = f64x2_sub(f64x2(target[0].re, target[1].re), re_delta);
+    let im_next = f64x2_sub(f64x2(target[0].im, target[1].im), im_delta);
+    target[0] = Complex::new(
+        f64x2_extract_lane::<0>(re_next),
+        f64x2_extract_lane::<0>(im_next),
+    );
+    target[1] = Complex::new(
+        f64x2_extract_lane::<1>(re_next),
+        f64x2_extract_lane::<1>(im_next),
+    );
+}
+
+fn reduce_row(
+    target: &mut [Complex],
+    pivot: &[Complex],
+    factor: Complex,
+    work: &mut EliminationWork,
+) {
+    #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
+    let leader = 0;
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    let leader = target.len() & !1;
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        for (pair, source) in target[..leader]
+            .chunks_exact_mut(2)
+            .zip(pivot[..leader].chunks_exact(2))
+        {
+            reduce_pair(pair, source, factor);
+        }
+        work.pairs += (leader / 2) as u32;
+    }
+    for (value, source) in target[leader..].iter_mut().zip(&pivot[leader..]) {
+        *value -= factor * *source;
+    }
+    work.tail += (target.len() - leader) as u32;
+}
+
 fn coordinates(words: &[f64]) -> Vector {
     Vector(words[0], words[1], words[2])
 }
 
 /// A single partial-pivot factorization applied to the radiation and incident-wave columns.
-fn solve(matrix: &mut [Complex], right: &mut [Complex], n: usize, columns: usize) -> bool {
+fn solve(
+    matrix: &mut [Complex],
+    right: &mut [Complex],
+    n: usize,
+    columns: usize,
+    work: &mut EliminationWork,
+) -> bool {
     for k in 0..n {
         let mut pivot = k;
         for row in k + 1..n {
@@ -41,14 +103,20 @@ fn solve(matrix: &mut [Complex], right: &mut [Complex], n: usize, columns: usize
         }
         for row in k + 1..n {
             let factor = matrix[row * n + k] * inverse;
-            for col in k + 1..n {
-                let reduction = factor * matrix[k * n + col];
-                matrix[row * n + col] -= reduction;
-            }
-            for col in 0..columns {
-                let reduction = factor * right[k * columns + col];
-                right[row * columns + col] -= reduction;
-            }
+            let (earlier, current) = matrix.split_at_mut(row * n);
+            reduce_row(
+                &mut current[k + 1..n],
+                &earlier[k * n + k + 1..(k + 1) * n],
+                factor,
+                work,
+            );
+            let (earlier, current) = right.split_at_mut(row * columns);
+            reduce_row(
+                &mut current[..columns],
+                &earlier[k * columns..(k + 1) * columns],
+                factor,
+                work,
+            );
         }
     }
     for row in (0..n).rev() {
@@ -97,6 +165,7 @@ fn coefficients(
     depth: f64,
     directions: &[f64],
     output: &mut [f64],
+    work: &mut EliminationWork,
 ) -> bool {
     let n = vertices.len() / 9;
     let mut panels = Vec::with_capacity(n);
@@ -145,7 +214,7 @@ fn coefficients(
             }
         }
     }
-    if !solve(&mut matrix, &mut right, n, columns) {
+    if !solve(&mut matrix, &mut right, n, columns, work) {
         return false;
     }
     output.fill(0.0);
@@ -209,20 +278,63 @@ pub unsafe extern "C" fn hull_panel_coefficients(
     headings: usize,
     output: *mut f64,
 ) -> bool {
+    unsafe {
+        hull_panel_coefficients_with_work(
+            points,
+            panels,
+            centre_x,
+            centre_y,
+            centre_z,
+            wavenumber,
+            depth,
+            directions,
+            headings,
+            output,
+            std::ptr::null_mut(),
+        )
+    }
+}
+
+/// # Safety
+/// The coefficient buffers must meet `hull_panel_coefficients`' requirements. If present,
+/// `work` must allow two f64 writes disjoint from all other buffers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hull_panel_coefficients_with_work(
+    points: *const f64,
+    panels: usize,
+    centre_x: f64,
+    centre_y: f64,
+    centre_z: f64,
+    wavenumber: f64,
+    depth: f64,
+    directions: *const f64,
+    headings: usize,
+    output: *mut f64,
+    work: *mut f64,
+) -> bool {
     if panels == 0 || panels > MAX_PANELS || headings > MAX_HEADINGS || !wavenumber.is_finite() {
         return false;
     }
     let vertices = unsafe { std::slice::from_raw_parts(points, panels * 9) };
     let heading_angles = unsafe { std::slice::from_raw_parts(directions, headings) };
     let result = unsafe { std::slice::from_raw_parts_mut(output, 2 * (MATRIX + AXES * headings)) };
-    coefficients(
+    let mut count = EliminationWork::default();
+    let accepted = coefficients(
         vertices,
         Vector(centre_x, centre_y, centre_z),
         wavenumber,
         depth,
         heading_angles,
         result,
-    )
+        &mut count,
+    );
+    if accepted && !work.is_null() {
+        unsafe {
+            *work = f64::from(count.pairs);
+            *work.add(1) = f64::from(count.tail);
+        }
+    }
+    accepted
 }
 
 #[cfg(test)]
@@ -268,7 +380,8 @@ mod tests {
             k,
             depth,
             headings,
-            &mut result
+            &mut result,
+            &mut EliminationWork::default(),
         ));
         result
     }

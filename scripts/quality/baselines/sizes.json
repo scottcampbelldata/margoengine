@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21937221,
+  "total": 21939889,
   "history": [
     {
       "date": "2026-10-24",
@@ -15707,6 +15707,12 @@
       "commit": "67b180f9fe",
       "reason": "humans/fit 31,219 to 31,573 B gzip (ceiling 31,398 to 32,521): TriangleGrid keeps each triangle's padded box and skips a triangle whose box lies past the closest point found, and closestOnTriangle reads its corners by index and makes no arrays (2f71e99f4f). The same results bit for bit, 1.73 million closest points instead of 41.2 million for the townsman at rest, and fit.test.js runs in 94 s instead of 357 s, which CI's hang watch had been stopping; the 354 B are that pruning, and a split would put the grid in a second file for every fitOutfit and fitPenetration caller. machinery/bench is a new entry, 2,253 B gzip (ceiling 2,509). Its edge to @margoengine/lines is deliberate: CadBench draws feature edges and its datum marks as Lines, attaches the Lines plugin when it is made, and CadBench.attach and show() are synchronous, so a lazy import() would make both asynchronous for an entry whose whole job is those lines. machinery/dimensions carries the same recorded edge.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-08-guarded-hull-panel-workers",
+      "reason": "SEA-08 @margoengine/physics/seakeeping 42698 to 45195 B gzip, @margoengine/physics 993414 to 993422 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107005 to 107013 B gzip, @margoengine/physics/seakeeping 43883 to 46551 B ceiling. The seakeeping entry keeps step rollback, signed rigid origins, and the optional frequency dispatch. A separate solver entry would duplicate the live hull API and data conversion. The Wasm asset and worker are requested only by the optional bake. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16622,7 +16628,7 @@
     "@margoengine/physics/runoff": 7192,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 14609,
-    "@margoengine/physics/seakeeping": 43883,
+    "@margoengine/physics/seakeeping": 46551,
     "@margoengine/physics/sediment": 8101,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,

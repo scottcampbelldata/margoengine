@@ -147,6 +147,7 @@ export interface HullPanelOptions {
     readonly gravity?: number;
     readonly frequencies: ArrayLike<number>;
     readonly headings?: number;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -161,6 +162,7 @@ export interface HullPanelResponse {
     readonly frequencies: readonly number[];
     readonly samples: readonly HullPanelSample[];
     readonly infiniteMass: readonly number[];
+    readonly work?: HullPanelWorkCounts;
 }
 
 export interface HullPanelSample {
@@ -169,10 +171,23 @@ export interface HullPanelSample {
     readonly diffraction: readonly number[];
 }
 
+export interface HullPanelWorkCounts extends HullPanelWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly HullPanelWorkerWork[];
+}
+
+export interface HullPanelWorkerWork {
+    readonly systems: number;
+    readonly frequencySolves: number;
+    readonly eliminationPairs: number;
+    readonly eliminationTail: number;
+}
+
 export interface HullParams {
     readonly hulls: readonly Hull[];
     readonly sea: SeaSurface | SeaQuery;
     readonly level?: RateLevel;
+    readonly originCellSize?: number;
     readonly capacity?: number;
     readonly gravity?: Vec3;
     readonly addedMass?: boolean;

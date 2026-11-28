@@ -3806,6 +3806,10 @@ console.log(wake.hullExchange()?.joules);
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
 
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.
+Keep the sea in the hull solver's origin cell. If the rigid solver uses a different cell in a world with a nondefault
+cell size, pass that size in metres as `originCellSize` (default 4096). If a sea query fails or a load would overflow
+the rigid body's force columns, the step throws a [coded error](https://margoengine.com/errors#ship-seakeeping) and
+leaves the accepted loads, wake sources and histories intact.
 - **Each step:** it reads where each hull's body is from the `bodies` port, and integrates the water's pressure over the wetted part of the hull's surface, taken where the held load neither feeds the motion nor drains it (see **The load each step**). It then holds the body with that force, and its moment about the centre of mass, over the rigid step through `bodyForces`.
 - **The hull** is a closed triangle mesh in the body's frame, wound outward. Each triangle is cut where the sea's surface crosses it (the linear cut, then two secant steps on the surface). The wet pieces are integrated by Dunavant's six-point rule, which is exact for the hydrostatic force and moment.
 - **The sea** is the framework's sea surface, `SpectralSea` from `@margoengine/physics/sea` (the wave solver's spectrum as a sum of waves; measured: in its long swell a box rides up and down within 0.04 percent of the frequency-domain answer), made in the hull solver's origin cell (another cell is refused, naming the fix); or anything with `elevation(x, z, t)`, and optionally `pressure(x, y, z, t)`: the hydrostatic pressure plus the waves' dynamic pressure, stretched to 0 at the surface (Wheeler). Without it, the water is still to its local surface, rho g (eta - y). The pressure over the instantaneous wetted surface is the nonlinear Froude-Krylov load. `density` is the sea's, default sea water.
@@ -3821,7 +3825,7 @@ console.log(wake.hullExchange()?.joules);
   - driven sideways, a box sways and rolls within 1.1 percent of the coupled frequency-domain answer at 60 steps a second;
   - on a hull uneven fore and aft, heave drives pitch with the phase the strips' coupling gives it, within 1.2 percent;
   - held up by its buoyancy alone, a hull heaves and rolls on at the amplitude it was let go at (within 1 percent over 8 cycles);
-  - let go heeled 15 degrees, the box Jung, Chang and Jo measured (2006) rolls down with a decay coefficient 7.7 percent under theirs and a period 3.2 percent short (its added roll inertia from potential flow is less than the measured), nothing fitted.
+  - when released from 15 degrees about the experiment’s roll-only hinge, Jung, Chang and Jo’s box gives a decay coefficient of 0.351 against 0.333 measured (5.3 percent high), and a period of 0.893 s against 0.930 s (3.9 percent short). No outcome sets a model parameter.
 - **The water a hull carries:** its added mass at infinite frequency, from its sections under the waterline it floats at each step (strip theory). Each section is mapped to its Lewis form, and its heave added mass is integrated to the hull's heave and pitch; its sway and roll added mass at infinite frequency come from the radiation solution below (the free surface makes it smaller than the rigid-lid value `swayAddedMassRigidLid`, which is the zero-frequency limit). The solver holds M (M + A)^-1 (F + W + E) - W - E, so the body moves as hull and water together, stable even when the water outweighs a light hull. E is every other load on the body (a tow, the wind, a sail, a contact), seen from its last two steps. `addedMass: false` leaves it out; where a ship solver's manoeuvring model claims a hull (`manoeuvringClaims`), the surge, sway and yaw rows of the added mass and of the radiation below are the ship's and left out; `stations` sets the sections (default 24); `gravity` must be the rigid world's. `hullSections`, `lewisForm` and `addedMassInfinite` are exported to inspect it.
 - **The waves a hull makes:** its heave, pitch, sway, roll and yaw damping and their couplings, with memory (Cummins 1962).
   - Each section's damping at each frequency comes from Ursell-Tasai's multipole solution on its Lewis form: `heaveSection` in heave, `lateralSection` in sway and roll about the centre of mass (and their coupling). The damping is computed twice, once from the pressure on the hull and once from the energy of the waves it sends out, and the two agree.
@@ -3960,7 +3964,7 @@ console.log(highest > 0.8); // true: it rides the swell's crests
 
 #### Three-dimensional hull panels
 
-`bakeHullPanels(mesh, options)` lazily loads a Rust Wasm solver and bakes coupled radiation and diffraction at the reference waterline. Give the returned table to `Hull.panels`. HullSolver uses its six-axis added mass and radiation kernels, and its heading-dependent diffraction with a `SpectralSea`. The hull's immersed pressure still supplies the incident-wave load. A table can be reused for identical hulls. Use a closed outward-wound mesh, 2 to 64 increasing angular frequencies in rad/s, and wetted edges at most one eighth of the shortest baked wavelength. Set `waterline` and `centre` in body coordinates. `depth`, `density` and `gravity` must match the sea and world. The default is deep water, seawater at 1025 kg/m³, gravity of 9.81 m/s², and 16 evenly spaced diffraction headings. Use `headings: 0` for radiation alone. An `AbortSignal` cancels downloading and can stop the bake between frequencies.
+`bakeHullPanels(mesh, options)` lazily loads a Rust Wasm solver and bakes coupled radiation and diffraction at the reference waterline. Give the returned table to `Hull.panels`. HullSolver uses its six-axis added mass and radiation kernels, and its heading-dependent diffraction with a `SpectralSea`. The hull's immersed pressure still supplies the incident-wave load. A table can be reused for identical hulls. Use a closed outward-wound mesh, 2 to 64 increasing angular frequencies in rad/s, and wetted edges at most one eighth of the shortest baked wavelength. Set `waterline` and `centre` in body coordinates. `depth`, `density` and `gravity` must match the sea and world. The default is deep water, seawater at 1025 kg/m³, gravity of 9.81 m/s², and 16 evenly spaced diffraction headings. Use `headings: 0` for radiation alone. Set `threads: 2` or `threads: 4` to bake independent frequencies in the caller and up to three workers. One participant is the default. An explicit thread count adds a `work` receipt to the table. An `AbortSignal` cancels the download and worker batch. The retained frequency order and computed coefficients are identical across participant counts.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -3974,7 +3978,7 @@ const mesh = {
   indices: Uint32Array.of(0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,1,5, 0,5,4,
     2,3,7, 2,7,6, 1,2,6, 1,6,5, 0,4,7, 0,7,3),
 };
-const panels = await bakeHullPanels(mesh, {frequencies: [0.6, 1.2, 1.8], depth: 3, headings: 0});
+const panels = await bakeHullPanels(mesh, {frequencies: [0.6, 1.2, 1.8], depth: 3, headings: 0, threads: 2});
 const world = new PhysicsWorld({rate: {num: 60, den: 1}, memory: worldMemory(false)});
 using physics = new Physics(null, {fixedTimestep: 1 / 60, arena: world.arena});
 const hull = physics.addBody(null, {

@@ -21,7 +21,8 @@ const exposeOptionalUrls = {
       !code.includes('-kernel.wasm') &&
       !code.includes('-kernel-shared.wasm') &&
       !code.includes('wake-fft.wasm') &&
-      !code.includes('solver-phase-thread.js')
+      !code.includes('solver-phase-thread.js') &&
+      !code.includes('hull-panel-thread.js')
     )
       return null;
     return {
@@ -31,7 +32,7 @@ const exposeOptionalUrls = {
           '',
         )
         .replace(
-          /(new Worker\s*\(\s*new URL\(\s*)\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/solver-phase-thread\.js["'])/g,
+          /(new Worker\s*\(\s*new URL\(\s*)\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:solver-phase|hull-panel)-thread\.js["'])/g,
           '$1',
         ),
       map: null,
@@ -58,6 +59,7 @@ await build({
         'explosive-thread': resolve(root, 'src/explosive/thread.ts'),
         'cloth-thread': resolve(root, 'src/cloth/thread.ts'),
         'solver-phase-thread': resolve(root, 'src/native-phase-worker.ts'),
+        'hull-panel-thread': resolve(root, 'src/seakeeping/panel-bake-worker.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
         tissue: resolve(root, 'src/tissue.ts'),

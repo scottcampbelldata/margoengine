@@ -15542,8 +15542,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1534541,
-        "gzip": 993414
+        "raw": 1534607,
+        "gzip": 993422
       },
       "./decomposition": {
         "raw": 26988,
@@ -15674,8 +15674,8 @@
         "gzip": 14183
       },
       "./seakeeping": {
-        "raw": 113171,
-        "gzip": 42698
+        "raw": 120721,
+        "gzip": 45195
       },
       "./celestial": {
         "raw": 20227,
@@ -19331,9 +19331,14 @@
       "brotli": 9407
     },
     "packages/physics/dist/hull-panel-kernel.wasm": {
-      "raw": 50232,
-      "gzip": 22012,
-      "brotli": 19191
+      "raw": 52774,
+      "gzip": 23275,
+      "brotli": 20324
+    },
+    "packages/physics/dist/hull-panel-thread.js": {
+      "raw": 1099,
+      "gzip": 630,
+      "brotli": 543
     },
     "packages/physics/dist/loads-kernel.wasm": {
       "raw": 7761,
@@ -20337,8 +20342,8 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 333222,
-        "gzip": 107005
+        "raw": 333288,
+        "gzip": 107013
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",

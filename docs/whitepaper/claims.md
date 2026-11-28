@@ -6791,6 +6791,16 @@ At `λ/L = 0.5` and `Fn = 0.142`, the independently measured KVLCC2 normalized m
 
 `MorphedCrowd` draws any number of skinned characters in one instanced call with live morph weights per member, on native WebGPU and on the WebGL2 compatibility layer. Proof: `packages/animation/tests/instanced-morph-browser.mjs` runs the vertex stage's own `morphed` and `skinned` functions from a compute shader over all 66 vertices of 48 members with their own weights (zero, one, between, negative and above one), two clips and a blend: 9,504 coordinates match the CPU twin `poseMorphedBones` within 9.6e-7 on both backends. A member drawn at three sets of weights differs from the model itself at those weights on 0 of 829, 967 and 1,376 covered pixels, and two members at different weights in the one draw cover 1,708 pixels against 898 for one. The CPU test checks the twin against the analytic strip, the baked offsets, the 64-target limit and every bound. No speed claim.
 
+### SEA-08 panel workers and seakeeping replay
+
+Nine independent panel systems in packaged Chromium use three real helpers plus the caller. The native
+kernel executes 73,032 f64x2 complex update pairs and 6,528 scalar tail updates. Its previous single-worker
+model and the new one yield the same coefficient bytes on the comparison systems. Native 1/2/4 outputs
+retain the same live hull snapshot over signed-origin replay. Both renderers show model-driven heave, pitch,
+roll and displacement wake on one technical lake scene, with exact same-backend frame replay.
+The measured Jung hinge and KVLCC2 cases pass; the Wigley bow elevations still miss. See
+[the limits and methods](../limits.md#ship-seakeeping-evidence-and-limits-sea-08).
+
 ### SEA-08 three-dimensional radiation and diffraction
 
 The optional native panel solve returns six-axis radiation on a hull in deep water and over a flat bed. The refined hemisphere matches Hulme's analytical surge and heave coefficients within 4 percent, and its combined incident and scattered heave load meets Haskind reciprocity within 0.02 percent at ka = 0.5. The time-stepped hull loses energy to its radiation. A rendered finite-depth hull and wake reproduce on WebGPU and WebGL2. [Clean-room record](../clean-room.md#sea-08-three-dimensional-radiation-and-diffraction-at-finite-frequency)

@@ -11498,6 +11498,14 @@ the field registry. A production Vite build preserves both lazy Wasm files.
 
 The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.
 
+### SEA-08 guarded hull publication and native panel workers
+
+HullSolver bounds live sea samples and the force columns. Its transaction restores any force, wake,
+deck, flood and memory writes of a failed step. In each long radiation and diffraction ring it saves
+the writes for the current tick. Independent panel systems run on optional private Wasm workers and join
+in reference-frequency order, with f64x2 row updates. Fixed-camera Water tests draw the accepted hull and
+displacement wake on both renderers. The original lake footage and large-amplitude regimes remain open.
+
 ### SEA-14 native water-entry section profiles
 
 The optional Physics entry profiler loads Rust Wasm with one participant by default, or uses the native worker

@@ -511,12 +511,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   set down inside the slop and past it: at rest within 1e-7 m of the slop plus g / omega^2), and the case above in
   `next-parameters.test.js`, now run at 9.81, 9.80665 and 9.82 (it fails at 9.80665 without the fix).
 
-### Open 2026-11-28: HullSolver's heeled box loses roll 13 percent slower than Jung, Chang and Jo measured (KB-SEA-HEELDECAY1, physics seakeeping)
+### Fixed 2026-11-28: the roll-decay test used a free hull for a hinged box (KB-SEA-HEELDECAY1, physics seakeeping)
 
-- **Repro:** `node --test --test-name-pattern="let go heeled" packages/physics/tests/coupling/seakeeping.test.js`: the
-  roll decay coefficient K is 0.288 against the measured 0.333 (the test's bar is 12 percent). Red on main at bfb7d64cd8.
-- **Cause:** not traced yet. The test and the hull solver last changed in the wake-source commits of 2026-11-27
-  (dea79afb78, 2414f3724d); the decay comes from the eddy, skin-friction and form-drag damping on the swing.
+- **Repro:** `node --test --test-name-pattern="let go heeled" packages/physics/tests/coupling/seakeeping.test.js`.
+  The earlier experiment setup reported 0.288 versus 0.333 measured.
+- **Cause and fix:** the earlier fixture allowed sway and heave and used a one-metre span and a centre inferred
+  from the target period. The experiment constrained everything except rotation about the still-water hinge.
+  The matching 0.90 m span and measured dry inertia give 0.351 and 0.893 s versus 0.333 and 0.930 s.
+  The existing 12 percent and 5 percent comparison intervals are preserved. The free-sway control remains checked.
 
 ### Open 2026-11-28: a tissue's sliding attachment misses the analytic normal response by 1.6 times its rounding bound (KB-SOFT-SLIDEATTACH1, physics soft, SOFT-05)
 

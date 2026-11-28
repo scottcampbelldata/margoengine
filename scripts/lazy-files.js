@@ -97,9 +97,19 @@ export const LAZY_FILES = [
     package: '@margoengine/physics',
     file: 'packages/physics/dist/hull-panel-kernel.wasm',
     label: 'hull-panel-kernel.wasm',
-    kind: 'Rust three-dimensional hull radiation and diffraction',
+    kind: 'Rust SIMD three-dimensional hull radiation and diffraction',
     measure: 'file',
     when: 'bakeHullPanels() from the optional /seakeeping entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/hull-panel-thread.js',
+    label: 'hull-panel-thread.js',
+    kind: 'Private hull frequency solve helper',
+    // Measure the helper with its private Wasm binding chunk.
+    measure: 'bundle',
+    external: [],
+    when: 'bakeHullPanels() with threads: 2 or 4 from the optional /seakeeping entry',
   },
   {
     package: '@margoengine/physics',

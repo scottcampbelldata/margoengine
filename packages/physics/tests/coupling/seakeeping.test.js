@@ -1719,40 +1719,49 @@ test('HullSolver: held up by its buoyancy alone, a hull heaves and rolls on at t
 });
 
 test("HullSolver: a box let go heeled rolls down as Jung, Chang and Jo's measured box did", () => {
-  // Jung, Chang and Jo, "Viscous effect on the roll motion of a rectangular structure", J. Eng. Mech. 132(2), 2006, as Gu et
-  // al. report it (STAB 2015): a box 0.3 m wide, 0.1 m high, at 0.05 m draft in fresh water, let go at 15 degrees, measured
-  // a natural period of 0.93 s, an added roll inertia of 0.124 kg m^2/m and an equivalent linear damping b = 0.519 N m s/m
-  // from the trendline of its decay, d(phi) a swing = K phi_m (Bhattacharyya 1978; b = K T Delta GM / pi^2). Gu et al. give
-  // its roll inertia, 0.236 kg m^2/m; its centre of gravity is not published, so it is the one the measured period gives
-  // (GM = w^2 I' / (m g) = 0.1125 m, KG = 0.0625 m). Nothing here is fitted to the decay: the damping is the radiation
-  // memory and Ikeda's eddy and Kato's friction components (ITTC 7.5-02-07-04.5), from the box's shape alone.
-  // Measured here: K 0.307 against the box's 0.333 (7.7 percent less; Ikeda's eddy formula is an empirical fit to 2-D
-  // models, and Standing 1991 found it low on barges) and a period of 0.900 s (potential flow gives the box 0.097 kg m^2/m
-  // of added roll inertia, the experiment 0.124, Gu et al.'s viscous flow 0.128), so bounds of 12 and 5 percent. Without
-  // the viscous part the box rolls on with K 0.095, under a third of what was measured.
-  const [l, d, b, t] = [1, 0.1, 0.3, 0.05],
-    m = 1000 * l * b * t,
-    gm = 0.1125,
-    mass = {
-      mass: m,
-      centerOfMass: [0, 0.0625 - d / 2, 0],
-      principalInertia: [0.236 * l, (m * (l * l + b * b)) / 12, (m * (l * l + d * d)) / 12],
-    },
+  // Jung, Chang and Jo (2006), https://doi.org/10.1061/(ASCE)0733-9399(2006)132:2(190), and Jung, Suh and Chun (2007,
+  // sections 2–3), https://scispace.com/pdf/experimental-study-on-the-eddy-making-damping-effect-at-the-2e3kf1qo6d.pdf.
+  // The nominal 0.90 m span box is 0.30 m wide and 0.10 m high. The hinge through its centre of gravity is 0.05 m above
+  // the keel at still water level, with roll as the sole free axis. The dry inertia of 0.236 kg m² is for the whole box.
+  // Displaced mass defines strip draft. The strips assume deep water. At the reported roll frequency k times the tank
+  // depth is 4.2, with k the gravity-wave number.
+  const [l, d, b, t] = [0.9, 0.1, 0.3, 0.05],
+    density = 1000,
+    gm = b * b / (12 * t) - t / 2,
+    mass = density * l * b * t,
     angle = (15 * Math.PI) / 180,
-    decay = (options) => {
-      const { world, box } = released(
-          [l, d, b],
-          mass,
-          [0, d / 2 - t, 0],
-          [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)],
-          { viscosity: 1.0e-6, ...options },
-          1000,
-        ),
+    decay = (hinged, options) => {
+      using physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -GRAVITY, 0] });
+      const box = physics.addBody(null, {
+          position: [0, d / 2 - t, 0],
+          rotation: [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)],
+          enabledTranslations: [!hinged, !hinged, !hinged],
+          enabledRotations: [true, !hinged, !hinged],
+          colliders: {
+            shape: 'box',
+            halfExtents: [l / 2, d / 2, b / 2],
+            massProperties: {
+              mass,
+              centerOfMass: [0, 0, 0],
+              principalInertia: [0.236, (mass * (l * l + b * b)) / 12, (mass * (l * l + d * d)) / 12],
+            },
+          },
+        }),
+        world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+          .add(new RigidSolver(), { physics })
+          .add(new HullSolver(), {
+            hulls: [{ row: box.row, mesh: boxMesh([l, d, b]) }],
+            sea: { density, elevation: () => 0 },
+            viscosity: 1e-6,
+            ...options,
+          })
+          .couple(['hull', 'rigid'], 'staggered'),
         roll = [],
         times = [];
       let last = 0;
       for (let f = 1; f <= 8 * 60; f++) {
         world.advance(f);
+        if (hinged) assert.equal(Math.hypot(...box.position, box.rotation[1], box.rotation[2]), 0);
         const now = 2 * Math.asin(box.rotation[0]);
         if (last > 0 && now <= 0) times.push(f - now / (now - last));
         last = now;
@@ -1769,13 +1778,19 @@ test("HullSolver: a box let go heeled rolls down as Jung, Chang and Jo's measure
       }
       return { K: xy / xx, period: (times.at(-1) - times[0]) / (times.length - 1) / 60 };
     },
-    measured = (0.519 * Math.PI * Math.PI) / (0.93 * m * GRAVITY * gm),
-    full = decay({}),
-    // Potential flow alone: no eddies or skin friction, and no form drag (which takes the roll where the eddies do not).
-    potential = decay({ rollDamping: false, drag: false });
+    // Convert the measured equivalent linear damping (0.519 N m s for the whole box) to the half-cycle extinction slope
+    // using the measured period, b = K T ΔGM / π². GM comes from the actual hinge and sectional geometry.
+    measured = (0.519 * Math.PI * Math.PI) / (0.93 * mass * GRAVITY * gm),
+    full = decay(true, {}),
+    potentialOnly = { rollDamping: false, drag: false },
+    hingedPotential = decay(true, potentialOnly),
+    // Open the constraints on the same hull to isolate the radiation effect of letting it sway.
+    freePotential = decay(false, potentialOnly);
   assert.ok(Math.abs(full.K - measured) <= 0.12 * measured, `K ${full.K} against the measured ${measured}`);
   assert.ok(Math.abs(full.period - 0.93) <= 0.05 * 0.93, `period ${full.period} s against the measured 0.93 s`);
-  assert.ok(potential.K < measured / 3, `without its eddies and friction: K ${potential.K}`);
+  assert.ok(freePotential.K < measured / 3, `free radiation-only box: K ${freePotential.K}`);
+  assert.ok(hingedPotential.K > freePotential.K, `hinged radiation-only box: K ${hingedPotential.K}`);
+  assert.ok(hingedPotential.K < full.K / 2, `viscous damping should dominate the hinged box: K ${hingedPotential.K}`);
 });
 
 test("HullSolver: on a SpectralSea's long swell, a box rides up and down as its frequency-domain response says", () => {

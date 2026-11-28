@@ -14,7 +14,14 @@ export {
   wettedLoads,
 } from './wetted.js';
 export { type Hull, type HullParams, type HullWake, HullSolver, SEA_VISCOSITY } from './solver.js';
-export { bakeHullPanels, type HullPanelOptions, type HullPanelResponse, type HullPanelSample } from './panels.js';
+export {
+  bakeHullPanels,
+  type HullPanelOptions,
+  type HullPanelResponse,
+  type HullPanelSample,
+  type HullPanelWorkCounts,
+  type HullPanelWorkerWork,
+} from './panels.js';
 export type { HullBilgeKeel } from './bilge-keel.js';
 export type { HullCourse } from './course.js';
 export { type Deck, deckOf, stepDeck } from './deck.js';
