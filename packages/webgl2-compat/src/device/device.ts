@@ -286,6 +286,8 @@ export class CompatAdapter {
 
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
 type CompatError = CompatValidationError | CompatOutOfMemoryError | CompatInternalError;
+/** An error scope: open on the device's stack, or popped and still resolving. */
+type ErrorScopeRecord = { filter: ErrorFilter; error: CompatError | null };
 /** The base of the layer's error objects (GPUError's shape: `message`); install() names it GPUError. */
 export class CompatGPUError extends Error {}
 /** The error object of a validation error (GPUValidationError's shape: `message`). */
@@ -378,7 +380,13 @@ export class CompatDevice extends EventTarget {
   /** Removes the canvas's context-loss listener; called once, when the device is lost or destroyed. */
   private readonly unlisten: () => void;
   private resolveLost!: (info: { reason: 'destroyed' | 'unknown'; message: string }) => void;
-  private readonly scopes: { filter: ErrorFilter; error: CompatError | null }[] = [];
+  private readonly scopes: ErrorScopeRecord[] = [];
+  /**
+   * @internal Render pipelines made with the synchronous createRenderPipeline whose link the driver still runs on its
+   * own threads (KHR_parallel_shader_compile; see {@link deferLink}).
+   */
+  readonly linking = new Set<CompatRenderPipeline>();
+  private linkTimer: ReturnType<typeof setTimeout> | 0 = 0;
   /** Cached framebuffers by attachment key, with how to attach them again and the frame they were last attached in. */
   private readonly framebuffers = new Map<string, FramebufferRecord>();
   /**
@@ -521,13 +529,15 @@ export class CompatDevice extends EventTarget {
     if (top && top.filter !== 'validation') this.checkAllocations(false);
     const scope = this.scopes.pop();
     if (!scope) return Promise.reject(new DOMException('No error scope to pop', 'OperationError'));
+    // A pipeline made in the scope whose link the driver still runs reports to it once that link is known, as WebGPU
+    // reports a pipeline's errors to the scope it was made in: the pop waits for it without blocking (see deferLink).
+    const links = this.linking.size ? [...this.linking].filter((p) => p.scope === scope) : [];
     // An error is judged in a later task (see reportable): a lost device's scopes resolve null, as WebGPU's do. Each pop
     // resolves after the one before it, as WebGPU resolves them in order.
-    const error = scope.error;
-    if (!error && !this.popping) return Promise.resolve(null);
-    const popped = (this.popping ?? new Promise<void>((resolve) => setTimeout(resolve, 0))).then(() =>
-      error && this.reportable() ? error : null,
-    );
+    if (!scope.error && !this.popping && !links.length) return Promise.resolve(null);
+    const before = this.popping ?? new Promise<void>((resolve) => setTimeout(resolve, 0)),
+      linked = links.length ? Promise.all([before, this.linksKnown(links)]) : before;
+    const popped = linked.then(() => (scope.error && this.reportable() ? scope.error : null));
     const settled = (this.popping = popped.then(() => {
       if (this.popping === settled) this.popping = null;
     }));
@@ -564,6 +574,44 @@ export class CompatDevice extends EventTarget {
   /** Reports a validation error to the innermost validation scope, else as `uncapturederror`. */
   validationError(message: string): void {
     this.report('validation', new CompatValidationError(message));
+  }
+  /**
+   * @internal Leaves a synchronous createRenderPipeline's link to the driver's own threads (KHR_parallel_shader_compile)
+   * instead of reading its LINK_STATUS at once. That read waits until the program has linked, so a page that made many
+   * pipelines at once linked them one at a time: in demos/ten-thousand-trees on ANGLE Direct3D 11 the GPU process's
+   * worker threads ran one HLSL compile at a time for 15 s while the page waited in getProgramParameter
+   * (KB-COMPAT-SYNCLINK1). The link is checked at the pipeline's first draw, by the pop of the validation scope open when
+   * it was made (which waits for it without blocking, and gets its error), or, if neither comes first, a few
+   * milliseconds after the driver reports the link done (an uncaptured error then, as WebGPU reports one).
+   */
+  deferLink(pipeline: CompatRenderPipeline): ErrorScopeRecord | null {
+    let scope: ErrorScopeRecord | null = null;
+    for (let i = this.scopes.length - 1; i >= 0 && !scope; i--)
+      if (this.scopes[i].filter === 'validation') scope = this.scopes[i];
+    this.linking.add(pipeline);
+    this.linkTimer ||= setTimeout(this.checkLinks, 2);
+    return scope;
+  }
+  /** Checks every deferred link the driver reports done (see deferLink), and polls again while any is left. */
+  private readonly checkLinks = (): void => {
+    this.linkTimer = 0;
+    for (const p of this.linking) if (this.destroyed || p.linkKnown()) p.finish();
+    if (this.linking.size) this.linkTimer = setTimeout(this.checkLinks, 2);
+  };
+  /** Resolves once each of `pipelines` has its link checked, polling the driver without blocking (see deferLink). */
+  private linksKnown(pipelines: readonly CompatRenderPipeline[]): Promise<void> {
+    return new Promise((resolve) => {
+      const poll = () => {
+        for (const p of pipelines) if (this.destroyed || p.linkKnown()) p.finish();
+        if (pipelines.every((p) => !this.linking.has(p))) resolve();
+        else setTimeout(poll, 2);
+      };
+      poll();
+    });
+  }
+  /** @internal A deferred link's failure (see deferLink): to the validation scope open when the pipeline was made. */
+  linkError(scope: ErrorScopeRecord | null, message: string): void {
+    this.report('validation', new CompatValidationError(message), false, scope);
   }
   /** Reports an internal error (a CPU-tier dispatch over its work budget) the same way, to an 'internal' scope. */
   internalError(message: string): void {
@@ -608,18 +656,24 @@ export class CompatDevice extends EventTarget {
       else return;
     }
   }
-  private report(filter: ErrorFilter, error: CompatError, now = false): void {
+  /** `scope`: the scope the error belongs to (null: none, uncaptured), when not the innermost open one of `filter`. */
+  private report(filter: ErrorFilter, error: CompatError, now = false, scope?: ErrorScopeRecord | null): void {
     // On a lost context every link fails and every framebuffer is incomplete: that is the device's loss (its
     // webglcontextlost event comes in a later task), and a lost device raises no errors, as WebGPU's does. A loss the
     // context does not show yet is judged when the error is delivered (see reportable).
     if (!this.reportable()) return;
     // An allocation made before the call that raised this error reports first.
     this.checkAllocations(false);
-    for (let i = this.scopes.length - 1; i >= 0; i--)
-      if (this.scopes[i].filter === filter) {
-        this.scopes[i].error ??= error;
-        return;
-      }
+    if (scope) {
+      scope.error ??= error;
+      return;
+    }
+    if (scope === undefined)
+      for (let i = this.scopes.length - 1; i >= 0; i--)
+        if (this.scopes[i].filter === filter) {
+          this.scopes[i].error ??= error;
+          return;
+        }
     // As WebGPU does, in a task of its own, never inside the call that failed, and not once the device is gone: so a
     // failed allocation's error, raised first, reaches listeners before the errors of later calls that used the object.
     const dispatch = () => {
@@ -640,6 +694,8 @@ export class CompatDevice extends EventTarget {
     if (this.destroyed) return;
     this.destroyed = true;
     this.lostMessage = message;
+    // A lost device reports no link failure; its pipelines draw nothing.
+    this.linking.clear();
     this.unlisten();
     this.resolveLost({ reason, message });
   }

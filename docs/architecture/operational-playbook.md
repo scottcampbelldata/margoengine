@@ -1198,6 +1198,20 @@ Sources: Microsoft, "for Statement" (HLSL reference; the compiler simulates loop
 https://learn.microsoft.com/windows/win32/direct3dhlsl/dx-graphics-hlsl-for ; John Amanatides and Andrew Woo, "A
 Fast Voxel Traversal Algorithm for Ray Tracing", Eurographics 1987, https://www.cse.yorku.ca/~amana/research/grid.pdf .
 
+### Section 5 evidence: synchronous pipelines link side by side on the WebGL2 layer (KB-COMPAT-SYNCLINK1, 2026-11-28)
+
+With `KHR_parallel_shader_compile` the layer no longer reads `LINK_STATUS` inside a synchronous `createRenderPipeline`
+or `createComputePipeline`: the link is checked at the pipeline's first draw or dispatch, by the pop of the validation
+scope it was made in (which polls `COMPLETION_STATUS_KHR` without blocking and takes its error), or a few milliseconds
+after the driver reports it done (uncaptured). A frame that makes many pipelines now hands the driver all their links
+before it waits on any. Evidence: `packages/webgl2-compat/test/sync-link.test.js` (CPU, a stand-in WebGL2 that counts
+`LINK_STATUS` reads); `demos/ten-thousand-trees` on the layer, Chrome over ANGLE Direct3D 11 on an RTX A6000 (loaded
+workstation, old and new builds taking turns): ready in 21.2 and 22.0 s against 30.9 and 33.3 s, link waits 2.6 to
+3.2 s against 14.1 to 14.3 s, and the same frame byte for byte with the clock stopped on WebGPU and on the layer; the
+layer's browser checks (compat, first draw, compute, lost context, device churn, destroy, idle fence, framebuffers),
+materials and post-processing `--compat` pass. Missing: other GPUs, drivers and browsers (the gain needs a driver
+that links on its own threads), quiet-machine seconds.
+
 ### Section 5 evidence: the staged programs' draw-time compile on Direct3D 11 (KB-COMPAT-LOSTWHY1, 2026-11-28)
 
 ANGLE's Direct3D 11 back end links a program with more than one colour output against a one-output layout and

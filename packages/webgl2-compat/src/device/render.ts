@@ -692,7 +692,22 @@ export class CompatRenderPipeline {
       textures: e.textures,
       storage: e.storage,
     });
-    if (!deferLink) this.finish();
+    if (deferLink) return;
+    // A program already checked (a pipeline made again) costs no wait; any other link runs on the driver's threads
+    // while the page goes on, and is checked when the pipeline is first used (CompatDevice.deferLink, KB-COMPAT-SYNCLINK1).
+    if (e.refusal === null && device.ext.parallel) this.scope = device.deferLink(this);
+    else this.finish();
+  }
+
+  /**
+   * @internal The validation scope open when this synchronous pipeline was made, while the driver links it on its own
+   * threads (null: none was open); undefined once its link is checked, or when it was never deferred.
+   */
+  scope?: Parameters<CompatDevice['linkError']>[0];
+
+  /** @internal True once the driver knows the link status and reading it waits behind no other program's warm draw. */
+  linkKnown(): boolean {
+    return !this.linked || (this.linked.done() && !this.linked.waiting());
   }
 
   /**
@@ -721,10 +736,14 @@ export class CompatRenderPipeline {
     const e = this.linked;
     if (this.done || !e || this.failure) return;
     this.done = true;
+    const scope = this.scope;
+    this.scope = undefined;
+    this.device.linking.delete(this);
     e.finish();
     if (e.refusal) {
       this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: WebGL2 refused the translated program: ${e.refusal}`;
-      if (!this.deferLink) this.device.validationError(this.failure);
+      if (scope !== undefined) this.device.linkError(scope, this.failure);
+      else if (!this.deferLink) this.device.validationError(this.failure);
       return;
     }
     if (e.units > this.device.limits.maxSampledTexturesPerShaderStage)

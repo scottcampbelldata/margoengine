@@ -6,6 +6,40 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: on the WebGL2 layer a page linked its synchronous pipelines one at a time (KB-COMPAT-SYNCLINK1, webgl2-compat)
+
+- **Repro (before):** `demos/ten-thousand-trees/?backend=webgl2` on Chrome, ANGLE over Direct3D 11 (RTX A6000, loaded
+  workstation): 31 and 33 s to `data-ready`, against about 38 s for the whole `controls.mjs` run on WebGPU. A Chrome
+  trace of the page (`devtools.timeline`, `gpu`, `gpu.angle`) shows the GPU process's worker threads running one
+  `D3DCompile` at a time for 15 s (11 to 26 s), the GPU main thread in `Program::MainLinkLoadEvent::wait` for the same
+  15 s and the page in `getProgramParameter(LINK_STATUS)` for 14 s of a 19 s animation frame. Page JavaScript was under
+  2 s; the terrain and tree generation took 6 s on four workers before it, with the GPU idle.
+- **Cause:** `createRenderPipeline` (synchronous) read the program's `LINK_STATUS` and binding table in the call, and the
+  compute tiers did the same for a synchronous `createComputePipeline`. That read waits until the program has linked,
+  so a frame that made 50 pipelines handed the driver one link, waited for it, and only then handed it the next:
+  `KHR_parallel_shader_compile` never had two links to run side by side. WebGPU reports a pipeline's errors
+  asynchronously, so nothing required the read there.
+- **Fix:** with `KHR_parallel_shader_compile` a synchronous render pipeline leaves its link to the driver's threads
+  (`CompatDevice.deferLink`) and is checked at its first draw, by the pop of the validation scope open when it was made
+  (the pop waits for the link by polling `COMPLETION_STATUS_KHR`, without blocking, and gets its error), or by itself a
+  few milliseconds after the driver reports it done (an uncaptured error then). A synchronous compute pipeline's
+  programs are checked at its first dispatch. Without the extension, and for a program already checked, nothing
+  changes. The same draws and the same GL calls are made; only when the link status is read moves.
+- **Numbers (before and after builds taking turns, two rounds, loaded workstation, `private/tools/profile.mjs`):**
+  ready 30.9 and 33.3 s before, 21.2 and 22.0 s after; time in `LINK_STATUS` 14.1 and 14.3 s before, 3.2 and 2.6 s
+  after; longest task 19.0 and 19.2 s before, 9.7 and 9.2 s after. The trace after shows six compiles side by side in
+  the first second of the frame.
+- **Same output:** the demo with its clock stopped (`performance.now`, `Date.now` and animation frame times frozen,
+  reduced motion) draws the same frame byte for byte with the old and new builds on the WebGL2 layer and on WebGPU.
+- **Still open:** the rest of the first frame is the water surface program, the largest (66,747 GLSL characters): its
+  link (about 3.8 s on one worker) and, as it writes three colour outputs, its compile again at its first draw on the GPU
+  main thread (3.0 s, KB-COMPAT-LOSTWHY1), one after the other. The pipelines are made at the first frame, after the
+  6 s of generation in which the GPU is idle; making them before (async creation at attach) would hide both.
+- **Regression:** `packages/webgl2-compat/test/sync-link.test.js` (a stand-in WebGL2 whose links finish on command:
+  no `LINK_STATUS` read while the driver links, four reads once it is done, a refused program reported to the scope it
+  was made in or as an uncaptured error, no read when a compute pipeline is made, and the old check without the
+  extension).
+
 ### Fixed 2026-11-28: 17 README examples failed their type check, two of them on real API defects (KB1867b; shader, materials, sky, READMEs)
 
 - **Repro:** `npm run build:packages`, then `node scripts/check-readme-types.mjs`: 17 new errors in the cameras,
@@ -215,7 +249,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Same output:** three scenes (an HDR-sky sea, a plain sea, a refracting beach with surf) rendered with the old and
   new builds on one page are byte for byte the same on WebGPU and on the WebGL2 layer over ANGLE Direct3D 11 (RTX
   A6000); the old build against a copy of itself is also identical on both, so the check is deterministic.
-- **Still open:** Water creates its pipeline with the synchronous `createRenderPipeline`, so the link blocks the page;
+- **Still open:** Water creates its pipeline with the synchronous `createRenderPipeline`, so the link blocks the page
+  (since KB-COMPAT-SYNCLINK1 only at its first draw, and side by side with the other links of the frame);
   the surface writes three colour outputs, so ANGLE's Direct3D 11 back end compiles it again at its first draw
   (KB-COMPAT-LOSTWHY1) and LINK_STATUS shows about half the cost. Async readiness (`createRenderPipelineAsync`, on the
   layer `KHR_parallel_shader_compile`) is not done.
@@ -2321,6 +2356,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   6.94 s) show only the load (operational playbook, section 5, KB-COMPAT-LOSTWHY1). Still open: those two programs'
   own 5 to 7 s compiles, quiet-machine seconds, and a rerun of the WebKit matrix row, so whether every wait now stays
   under 15 s is not shown; the upstream report waits on Scott.
+- **Seen in Chrome too, 2026-11-28:** in `demos/ten-thousand-trees` on the layer the water surface (three outputs)
+  compiles again at its first draw for 3.0 s on Chrome's GPU main thread (`D3DCompile` there, one call), after its 3.8 s
+  link on a worker; the page waits for it in the next framebuffer status check. Chrome keeps the context; it is the
+  largest single wait left on that page's start after KB-COMPAT-SYNCLINK1.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 

@@ -198,8 +198,10 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   draw into 1 x 1 throwaway copies of a pipeline's own colour targets, or a 1 x 1 depth-stencil buffer when it has
   none: that back end compiles the pixel shader at the first draw that rasterizes, so a first frame would otherwise
   wait for it; while one pipeline's warm draw is on the GPU, the next linked program waits to read its link status and
-  bindings, synchronous calls that would hold the page's thread until the GPU thread finished that compile), render
-  passes with clears,
+  bindings, synchronous calls that would hold the page's thread until the GPU thread finished that compile; a
+  synchronous `createRenderPipeline` or `createComputePipeline` with that extension reads no link status in the call,
+  so pipelines made together link side by side, and is checked at its first draw or dispatch, by the pop of the
+  validation scope it was made in, or once the driver reports the link done), render passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, `onSubmittedWorkDone` (a fence that signals on the next poll, also when no frame
   is shown; each poll yields a port task and a 1 ms timer, about 2 ms in Chrome), error scopes, `uncapturederror` and `device.lost`. A buffer, texture or

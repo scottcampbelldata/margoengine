@@ -866,6 +866,22 @@ Only synthetic geometric inputs are proven; authored mesh placement and spectral
 Every public number should come from one of the commands below. Run them from the repository root on the commit you
 want to check. Status of each claim and which command backs it: [claims.md](claims.md).
 
+## WebGL2 layer synchronous links (2026-11-28)
+
+Build a demo twice, with the layer before and after the change, into two folders that each hold `<demo>/`
+(`node scripts/web-demos/build.mjs <demo> --no-zip`, then copy `demos/<demo>`). Then, taking turns:
+
+```sh
+node scripts/run-with-timeout.mjs --max=8 -- node scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2 --root=<folder>
+node scripts/run-with-timeout.mjs --max=8 -- node scripts/web-demos/still-frame.mjs ten-thousand-trees webgl2 <folder> frame.raw
+```
+
+`startup-profile.mjs` prints the seconds to `data-ready`, the time and count of every WebGL2 call that can wait on the
+GPU process (`getProgramParameter:35714` is `LINK_STATUS`), long tasks, and with `--trace=<file>` writes a Chrome trace
+with the GPU process (`D3DCompile` on its worker threads and main thread). `still-frame.mjs` stops the page's clock and
+prints the SHA-256 of the canvas 20 frames after ready, the same for both builds when the output is unchanged. The
+stand-in test `packages/webgl2-compat/test/sync-link.test.js` counts the `LINK_STATUS` reads with no GPU.
+
 ## WebGL2 layer waits (2026-11-18)
 
 `node scripts/run-with-timeout.mjs --max=10 -- npm run check:owners -- --packages=water` prints each entry's seconds on

@@ -336,6 +336,7 @@ class CompatDevice extends EventTarget {
     lostMessage: string;
     onuncapturederror: ((event: Event) => void) | null;
     readonly loadSampler: WebGLSampler;
+    readonly linking: Set<CompatRenderPipeline>;
     frame: number;
     readonly presents: {
         present(): void;
@@ -356,6 +357,8 @@ class CompatDevice extends EventTarget {
     popErrorScope(): Promise<CompatError | null>;
     settlePipeline<T>(pipeline: T, failure: string | null): Promise<T>;
     validationError(message: string): void;
+    deferLink(pipeline: CompatRenderPipeline): ErrorScopeRecord | null;
+    linkError(scope: ErrorScopeRecord | null, message: string): void;
     internalError(message: string): void;
     allocated(what: string): void;
     lose(reason: 'destroyed' | 'unknown', message: string): void;
@@ -517,6 +520,8 @@ class CompatRenderPipeline {
     readonly splits: number[][] | null;
     onDraw: (() => void) | null;
     constructor(device: CompatDevice, descriptor: GPURenderPipelineDescriptor, deferLink?: boolean, prebuilt?: GLSLProgram);
+    scope?: Parameters<CompatDevice['linkError']>[0];
+    linkKnown(): boolean;
     whenLinked(): Promise<void>;
     finish(): void;
     getBindGroupLayout(index: number): CompatBindGroupLayout;
@@ -654,6 +659,11 @@ class DrawRecorder {
 }
 
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
+
+type ErrorScopeRecord = {
+    filter: ErrorFilter;
+    error: CompatError | null;
+};
 
 interface Extensions {
     readonly clipControl: {

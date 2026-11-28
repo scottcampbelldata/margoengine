@@ -1,5 +1,18 @@
 # Performance history: losses, causes and fixes
 
+## WebGL2 layer: synchronous pipelines linked one at a time (2026-11-28, fixed)
+
+- **Loss:** `demos/ten-thousand-trees` took 31 to 33 s to start on the WebGL2 layer (Chrome, ANGLE Direct3D 11, RTX
+  A6000, loaded workstation), 14 s of it in `getProgramParameter(LINK_STATUS)` inside one 19 s animation frame.
+- **Cause:** a synchronous `createRenderPipeline` read its link status in the call, which waits for the link, so the
+  driver's worker threads compiled one program at a time (Chrome trace: one `D3DCompile` at a time for 15 s).
+- **Fix:** with `KHR_parallel_shader_compile` the read waits for the first draw, the scope's pop or the driver's
+  completion status; the same GL calls and the same pixels (a frame with the clock stopped is byte for byte the same on
+  both backends). Start 21.2 and 22.0 s, link waits 2.6 to 3.2 s, longest task 9.2 to 9.7 s (old and new builds taking
+  turns; loaded machine, so the seconds are rough). Remaining: the water surface's own link and its compile again at
+  its first draw (3.8 s and 3.0 s, KB-COMPAT-LOSTWHY1). Known bug KB-COMPAT-SYNCLINK1; tool and method in
+  [reproduce.md](reproduce.md#webgl2-layer-synchronous-links-2026-11-28).
+
 ## WebGL2 layer: fence polls and allocation checks waited on Windows Chrome (2026-11-18, fixed)
 
 - **Loss:** water's owner/lifetime cases took 2.9 times as long on the WebGL2 layer as on native WebGPU (354 s against

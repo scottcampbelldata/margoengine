@@ -213,7 +213,8 @@ class Runtime implements ComputeRuntime {
         draws,
         linked: Promise.all(draws.map((d) => d.pipeline.whenLinked().then(() => this.settle(d)))).then(() => undefined),
       } as GPUBuilt;
-    for (const d of draws) this.settle(d);
+    // A synchronous pipeline is checked at its first dispatch (runGPU), so the programs of pipelines made together
+    // link side by side on the driver's threads instead of one after another (KB-COMPAT-SYNCLINK1).
     return { tier: plan.tier, plan, draws } as GPUBuilt;
   }
 
@@ -336,6 +337,8 @@ class Runtime implements ComputeRuntime {
       ny = count[1],
       nz = count[2],
       draws = built.draws;
+    // A synchronous pipeline's programs are checked at its first dispatch (see buildGPU).
+    for (let i = 0; i < draws.length; i++) if (!draws[i].fire) this.settle(draws[i]);
     // Storage textures the program both reads and writes are read from a copy taken before the dispatch.
     let used = groups,
       temporary: CompatTexture[] | null = null;
