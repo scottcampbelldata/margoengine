@@ -466,7 +466,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | HYDRO-05 | Dam and levee breach | stand-in | Claude | CLAIMED (Fauld film) |
 | HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed b6e01ceb4c |
 | ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80aa218baa |
-| ATMO-06 | Airborne particle transport | stand-in | Codex | BUILDING (codex/physics-atmo-06-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing 965fab2df7 |
+| ATMO-06 | Airborne particle transport | physics/airborne and environment/density-volume | Codex | REOPENED (4/8 at a65111cd3a, points 5–8, [evidence](physics-solver-audit.md#atmo-06-four-point-pass)), prior landing 965fab2df7 |
 | ATMO-07 | Lightning and atmospheric electricity | physics/lightning and Sky LightningBolt | Codex | REOPENED (4/8 at 6bcaf278f3, points 5–8, [evidence](physics-solver-audit.md#atmo-07-four-point-pass)), prior landing 51ccc096bc |
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80679b25b4 |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 93bf3f2435 |

@@ -6197,7 +6197,7 @@ FXAA a depthless line's one-pixel rim is partly covered, colour and alpha alike,
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
 | Mechanism poses (`@margoengine/machinery/mechanisms`, 2026-11-27) (LIM-679) | Enforced by method: each function is the rigid, frictionless, backlash-free closed form of its mechanism. The Geneva drive is external with tangential pin entry; the harmonic drive ratio assumes a two-lobe wave generator and `flexsplinePoint` is a drawing aid, not an elastic flexspline; the Watt governor is Maxwell's conical-pendulum equilibrium (massless arms, no sleeve load, no hunting dynamics); the Archimedes screw bucket is a 1,600-slice integral (within 1e-7 m^3 of 6,400 slices on the demo screw). Entry 3,864 B gzip. | Closed forms are the exact solution a joint model tracks and a readout shows. | The physics-joint models in `tests/machinery-mechanisms-physics.test.js` (a hinge motor, sliders, a pin in a slot, a gear joint) follow the poses to 2e-4 m and 2e-3 rad at 60 Hz. | For loads, friction, backlash or governor dynamics, build the mechanism from `@margoengine/physics` joints and step it. |
-| Mechanism rigs on physics (`@margoengine/machinery/rigs`, 2026-11-27) (LIM-680) | Enforced by method: fourteen rigs (Scotch yoke, Geneva, Oldham, epicyclic, harmonic drive, ball-and-disk integrator, Archimedes screw, stroboscope, toggle press, gimbal, differential, Watt governor, rose engine, Reuleaux drive) on `@margoengine/physics` joints, with no gravity, friction or load but the governor's gravity and hinge drag; the input is a position-driven body stepped at most 2 degrees per 60 Hz step. Measured gaps against the closed forms: 1.4 µm (yoke), 0.004 degrees (Geneva), 2 µm (Oldham), 0.0003 degrees (epicyclic), 0.00002 degrees (harmonic), 0.0002 degrees (integrator), 2.3 µm over 4.7 turns (screw; the gear and rack rows read their error from the poses since 2026-11-28, so a rack driven 100 turns holds the exact travel to 3.7 µm from z 0 and 9.8 µm from z 50 m, `packages/physics/kernel/tests/coupling_exact.rs`), 0.0004 degrees (stroboscope), 4.4 µm (toggle press), 0.0001 degrees (gimbal), 0.005 degrees over 14 turns (differential), and the governor's arms settled within 0.001 degrees of Maxwell's balance about 4 s after a speed change (at 32 substeps; at 8 they settle 0.04 to 0.1 degrees off, KB-PHYS-SPINBIAS1), 41 µm (rose engine: a follower held 0.2 m off its centre in the groove of a rosette, the path row's steady lag a h^2 / 2c) and 0.7 mm of a 456 mm width (Reuleaux drive: a hull triangle between four fixed walls, the contacts' softness), tested to 2e-5 m and 5e-4 rad (`packages/machinery/test/rigs.test.js`). A demo that loads a rig carries the physics solver: the four mechanism demo zips grew from about 0.32 MB to 1.25 MB. | The solver holding the exact pose is the claim; loads are not modelled yet. | `packages/machinery/test/rigs.test.js` | The Sarrus rig, whose overconstrained loop the solver holds only to about 1 mm so far, is still to build (a physics helper is fixing the loop drift). A follower in a three-lobed groove sits a h^2 / (2 c) from the exact pose over 50 turns, 17 µm at the default share c of 0.2 and 3.5 µm at 1 (KB-PHYS-PATHMOVINGBASE1 fixed). |
+| Mechanism rigs on physics (`@margoengine/machinery/rigs`, 2026-11-27) (LIM-680) | Enforced by method: fourteen rigs (Scotch yoke, Geneva, Oldham, epicyclic, harmonic drive, ball-and-disk integrator, Archimedes screw, stroboscope, toggle press, gimbal, differential, Watt governor, rose engine, Reuleaux drive) on `@margoengine/physics` joints, with no gravity, friction or load but the governor's gravity and hinge drag; the input is a position-driven body stepped at most 2 degrees per 60 Hz step. Measured gaps against the closed forms: 1.4 µm (yoke), 0.004 degrees (Geneva), 2 µm (Oldham), 0.0003 degrees (epicyclic), 0.00002 degrees (harmonic), 0.0002 degrees (integrator), 2.3 µm over 4.7 turns (screw; the gear and rack rows read their error from the poses since 2026-11-28, so a rack driven 100 turns holds the exact travel to 3.7 µm from z 0 and 9.8 µm from z 50 m, `packages/physics/kernel/tests/coupling_exact.rs`), 0.0004 degrees (stroboscope), 4.4 µm (toggle press), 0.0001 degrees (gimbal), 0.005 degrees over 14 turns (differential), and the governor's arms settled within 0.001 degrees of Maxwell's balance about 4 s after a speed change (at 32 substeps; at 8 they settle 0.04 to 0.1 degrees off, KB-PHYS-SPINBIAS1), 41 µm (rose engine: a follower held 0.2 m off its centre in the groove of a rosette, the path row's steady lag a h^2 / 2c) and 0.7 mm of a 456 mm width (Reuleaux drive: a hull triangle between four fixed walls, the contacts' softness), tested to 2e-5 m and 5e-4 rad (`packages/machinery/test/rigs.test.js`). A demo that loads a rig carries the physics solver: the four mechanism demo zips grew from about 0.32 MB to 1.25 MB. | The solver holding the exact pose is the claim; loads are not modelled yet. | `packages/machinery/test/rigs.test.js` | The Sarrus rig, whose overconstrained loop the solver holds only to about 1 mm so far, is still to build (KB-PHYS-SARRUSLOOP1, cause found, open). A follower in a three-lobed groove sits a h^2 / (2 c) from the exact pose over 50 turns, 17 µm at the default share c of 0.2 and 3.5 µm at 1 (KB-PHYS-PATHMOVINGBASE1 fixed). |
 | NURBS surfaces (`@margoengine/geometry/nurbs`) | Enforced by method: no trimming curves, knot insertion or degree elevation; `NurbsCurve.tessellate` halves a span at most 12 times. | Trimming needs a boundary representation, which this engine does not carry; revolves, control nets and whole patches do not. | A trimmed patch meshes untrimmed. | Cut the mesh with `@margoengine/mesh-edit`. |
 | Mesh surface sampler (`@margoengine/geometry/sample`) | Enforced by method: points are independent random draws, so they can clump; there is no minimum spacing. Vertex weights are linear across each triangle. | Independent draws cost one search each and need no neighbour lookups. | Two points can land close together. | `@margoengine/scatter` for spaced placement on terrain. |
 | Mesh optimisation (`@margoengine/geometry/optimize`) | Enforced by test ([optimize.test.js](../packages/geometry/tests/optimize.test.js)): shuffled grids, spheres and knots end under 0.8 cache misses per triangle on a 16-vertex first-in first-out cache (3 before); nested shells lose over 40 percent of their overdraw while the miss ratio stays within 6 percent. Those are stand-ins for a GPU: frame time on a real one is not measured. | The cache model is a simulation; real GPUs differ in cache size and batching. | Triangle order changes, so a transparent mesh that relied on it can look different. | `overdraw: false` keeps the sort off; leave the mesh out to keep its order. |
@@ -16450,6 +16450,34 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   loops, so the program grows many times over before it links. Not yet traced to the WGSL loop that costs most.
 - **For:** the water lane (`packages/water`, GLSL emitted by `packages/webgl2-compat`).
 
+### Open 2026-11-28: a reuleaux drive rig sits 0.6 to 0.7 mm off its exact centre (KB-PHYS-REULEAUXWALLS1, physics solver)
+
+- **Repro:** `reuleauxRig` of `@margoengine/machinery/rigs` (landed in 267729b7bd): a convex-hull Reuleaux triangle of 64
+  points per arc between four fixed walls at zero clearance, its turn locked to the input, sits 0.6 to 0.7 mm off the
+  exact centre over a 456 mm travel. More substeps, more iterations, the high-fidelity tier and zero friction gave at best
+  0.52 mm; a 24-point hull measured 0.16 mm.
+- **Cause:** not found yet. The leads are the four walls at zero clearance, a contact set that holds more rows than the
+  triangle has freedoms, and how a hull's face count moves where its contact points sit (a finer hull reads worse).
+  Physics lane.
+
+### Open 2026-11-28: a Sarrus linkage's loop error grows as it moves and stays when it stops (KB-PHYS-SARRUSLOOP1, physics solver)
+
+- **Repro:** the parked rig `sarrus-rig.ts` (links 0.8 m, four 1 kg point links of radius 0.02 m, five hinges from a
+  fixed base and a position-driven crank, no gravity, 2 degree 60 Hz steps from 48 degrees). The deck's gap from
+  `sarrusPose` reads 2.2e-5 m at 49 degrees, 3.4e-4 at 56, 2.1e-3 after 73 and back to 30, 3.4e-3 back at 48, and holds
+  each figure unchanged for 300 steps at rest. The error is four of the five hinges pulled apart along their links by the
+  same amount (2.6 mm each at the end), with every turning row within 2e-7 rad.
+- **Cause (found 2026-11-28, not fixed):** the loop runs from the fixed base to the kinematic crank, so it is one path
+  of five joints, 25 lock rows on 24 freedoms, solved exactly (share 1). Higham's stop drops one row, always the same one:
+  axis 4 of the base hinge, the last joint of the path, as pivoting only chooses among a joint's own columns. What is left
+  is still close to singular in the loop's direction, so the pushing pass asks for turns far past what it closes: the
+  push asked up to 4.2 (the sum of the largest rows) and `push_share` (Buss and Kim 2005's clamp, TURN) cut it to as
+  little as 7e-7 of itself. Cutting the whole push also cuts the part of it that would close the links, so the stretch made by
+  each move (second order in the step, as the rows turn) is never taken back. The fix is the one Buss and Kim name for
+  this: damp each singular direction apart (selectively damped least squares, or damped least squares on the path's
+  factors, Wampler 1986, Nakamura and Hanafusa 1986), so a near dependent direction asks little and the rest closes whole.
+  Physics lane.
+
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
 - **Repro:** a position-driven spindle turned about z at 68 rpm (`setNextRotation` each 60 Hz step), gravity -9.80665 z, a
@@ -16459,10 +16487,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   same with a dynamic spindle or a `Multibody` tree. A drag on the ball's speed (`linearDamping`) in place of the hinge drag
   moves it too, in proportion (0.17 degrees at 3/s, 0.32 at 6/s). Finer steps shrink it slowly (1/60 s: 0.113 degrees at
   I = 3.6e-4, 1/480 s: 0.064).
-- **Cause:** not found yet. An isotropic ball's spin cannot move the balance (its angular momentum `I w z` is constant), so
-  the shift is the solver's. It looks first order in the substep, as an impulse along a direction fixed at a substep's
-  start while the arm turns `w h` within it would push steadily outward. The Watt governor rig of
-  `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which settle within 0.001 degrees.
+- **Cause (found 2026-11-28, not fixed):** the substep takes its forces before the poses move and the joints' centripetal
+  turn after. Gravity is a full kick of h in `integrate_velocities`; the passes then solve rows read at the substep's
+  start pose, where the spin carries no swing; the poses move along those rows' tangent, which flings the ball out by
+  R (w h)^2 / 2, half a substep of the centrifugal pull; and the relaxing pass, on rows from the new pose, gives the whole
+  centrifugal swing speed at the end. At the balance the two pulls cancel over the substep, but the speed reads +p h / 2
+  of swing inward in the passes and -p h / 2 outward at the substep's end, p = g sin(a) / L the swing pull: measured
+  7.66e-3 m/s against p h L / 2 = 7.66e-3 m/s at 8 substeps, halving with each doubling of the substeps. A hinge drag
+  solved in the passes reads the inward half and pushes the arm out; a `linearDamping` reads the body's speed after the
+  kick and pushes it out too (0.32 degrees at 6/s, the same at I = 1e-6 and 1e-2). The inertia enters through how much of
+  that speed one motor row takes: on the free body alone its effective mass is I, not the swing's I + m L^2, so a light
+  ball's drag acts on almost none of it. Repro test (not landed, as it fails): a 68 rpm `KINEMATIC_POSITION` spindle,
+  a 1 kg ball 0.292 m out on a hinge started on the balance with w x r and w z, axis-3 force motor of damping 2, 600
+  steps; 0.806 degrees at I = 1e-2 and 8 substeps, 0.464 at 16, 0.252 at 32, 0.132 at 64.
+- **Tried:** (1) both of RATTLE's halves (Andersen 1983; Hairer, Lubich and Wanner 2006, section VII.1.4): gravity and
+  forces half before the passes and half after the poses move, and the passes' rows read at the substep's midpoint (each
+  body turned on by its spin for h / 2). Every reading then sits on the balance, within 7e-4 degrees for every inertia,
+  drag and substep count, and second order (1.7e-4 at 16). It cannot land as it stands: the midpoint rows project the
+  speed twice a substep on two different poses, which takes kinetic energy out (the double pendulum of tests/joints.rs
+  lost 4.7 J against its 0.098 J bar, the bob at 90 degrees ran 1.3 percent short), and the split kick moves every
+  contact figure of tests/solver.rs and tests/block_solver.rs (bounce heights, the slope hold, pyramid settling), 17 kernel
+  tests in all and every replay hash. Either half alone does not move the balance. (2) Solving the motors after the
+  locks' push in the pushing pass: worse (12 degrees). A fix has to give the centripetal turn to the speed before the poses
+  move without projecting on two poses, a rows-turn-with-the-bodies step, which is integrator work for the physics lane.
+  The Watt governor rig of `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which
+  settle within 0.001 degrees.
   Physics lane.
 ### Checked 2026-11-28, no engine defect: the Arms-wide walk's side view shows the capture's own low, locked arms (KB-RIG-ARMS2, rigging, animation, demo take)
 
@@ -18347,11 +18396,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Margo, 2026-11-28:** that compile cut in part, with the same output bit for bit (30 images of eight cases on
   WebGPU and on the layer over Direct3D 11): the camera ray takes its sines and cosines from two reductions instead
   of six (`preciseSinCos`), and the voxel walk records its hit in one `found()` instead of ten. Paired offline fxc
-  compiles on a loaded machine: start 5.40 to 4.16 s and hit 7.11 to 5.84 s, but shadow 5.27 to 5.89 s and the last
-  loop program 6.45 to 6.94 s, about 6 percent off the five measured programs in all (operational playbook, section
-  5, KB-COMPAT-LOSTWHY1). Still open: why fxc takes longer on shadow and the last loop program, quiet-machine
-  seconds, and a rerun of the WebKit matrix row, so whether every wait now stays under 15 s is not shown; the
-  upstream report waits on Scott.
+  compiles on a loaded machine: start 5.40 to 4.16 s and hit 7.11 to 5.84 s. The shadow and last loop programs hold
+  neither function and their HLSL is the same byte for byte, so their paired times (5.27 against 5.89 s, 6.45 against
+  6.94 s) show only the load (operational playbook, section 5, KB-COMPAT-LOSTWHY1). Still open: those two programs'
+  own 5 to 7 s compiles, quiet-machine seconds, and a rerun of the WebKit matrix row, so whether every wait now stays
+  under 15 s is not shown; the upstream report waits on Scott.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -32475,6 +32524,23 @@ voxel path tracer is excluded on this hardware (hardware check).
 
 ## Open defects
 
+### Open 2026-11-28: the WGSL corpus cannot name optics, and water's new shaders inline past the Direct3D limit (KB-CORPUS-OPTICS1)
+
+- **Repro:** `node --test packages/webgl2-compat/test/corpus.test.js` fails "not covered: optics" on main. Recording
+  optics and water alone (`node scripts/record-wgsl-corpus.mjs --no-build "--suites=check:gpu-packages -- --no-build
+  --only=optics"`, then `--merge-only --add`) still leaves optics uncovered, and `corpus-inline.test.js` (KB-COMPAT-FXCTIME1)
+  then fails on 11 water fragment modules from `water test:gpu:optics`: 251,507 to 263,801 characters inlined, over
+  250,000.
+- **Cause, optics:** `optics/screens` draws through `RawShaderMaterial` (`@margoengine/shader/raw`), which creates its
+  modules at the first draw inside core's frame; the recorder names a module's packages from the call stack at
+  `createShaderModule` (`scripts/support/wgsl-corpus.mjs`, `origin`), so the three modules are attributed to `shader`
+  and `core` (label `shader:raw:optics screens:*`). Any package that draws only through `RawShaderMaterial` is
+  uncovered the same way. Fix belongs in the recorder (an attribution that survives the lazy compile), with a test.
+- **Cause, water:** not traced. The corpus on disk (recorded 2026-11-27) holds water modules under the bound; the
+  modules water creates today are new sources over it, so a water shader change since then grew the fragment's inlined
+  call tree past the bound.
+- **Left:** both fixes, then `npm run record:wgsl-corpus` in full. Found by lane A, 2026-11-28; not fixed.
+
 ### Open 2026-11-28: nine browser GPU checks fail on main (KB-GPUMAIN1)
 
 Found by running the voxel and root GPU suites on the Ubuntu server, then each failing check on the workstation (Windows
@@ -32487,7 +32553,7 @@ suspect from its date and subject and was not tested.
 | `node scripts/modern-browser-tests.js` (also `--pipeline-delay=300` on Linux) | `Moon not visible over the base engine: 0` | none |
 | `node scripts/modern-xr-tests.js` | `AR alpha`: `wrong` 1,337 pixels (1,328 on Linux). `tests/modern-xr-passes.ts` still requires alpha to equal the brightest channel where nothing wrote depth | **Fixed 2026-11-28.** cee7c8b46a (KB-XR-ARNODEPTH1) is the first commit that fails (its parent passes); the check held the rule from before it. The depthless line is now opaque (alpha 255 over green 247) and a glow pixel's alpha is its brightest channel before Bloom's dither, which lowers the colour by up to one 8-bit step. The check now reads the same AR frame without Bloom (A0, the coverage) and requires max(A0, m) <= alpha <= max(A0, m + 1), m the brightest channel, and every line pixel opaque: 0 wrong and 480 of 480 on WebGPU and the WebGL2 layer; on cee7c8b46a's parent it fails with the 480 line pixels |
 | `node scripts/lifecycle-browser-tests.mjs`, scenario D, stage loop | the first frame after a 30 s background tab runs physics steps (1 on the workstation, 2 on Linux), 0 required | physics lane; the late physics step (KB-PHYS-FRAMEORDER1) |
-| `node scripts/modern-domain-tests.js` | `mid-encoding device loss`: `recreated` false (9 recovery frames of 21) | none |
+| `node scripts/modern-domain-tests.js` | `mid-encoding device loss`: `recreated` false (9 recovery frames of 21) | **Fixed 2026-11-28.** 5ffd9e6da6 is the first commit that fails (its parent passes). It moved PostProcessing's uniform buffer and resolve bind group into per-view slots, so the check's `fx.uniform` and `fx.resolveGroup` read undefined before and after the loss and counted as kept; the plugin does drop its slots on restore and build new ones. The check now names `fx.slot.buffer` and `fx.slot.group` and fails on any listed resource missing on either side; every resource is new on WebGPU and the WebGL2 layer |
 | `node scripts/modern-game-tests.js` | `History did not follow motion-vector reprojection: 0.2496337890625 vs 0.170196533203125` (same values on both) | **Fixed 2026-11-28.** Not f2f994fb19: reverting it, or TAA's resolve to before 3f37931ace, gives the same values. The check's expected point left out the jitter difference the resolve takes out of every vector (`TAAVelocity.jitter`, KB-TAA-CLAMP1); TAA's phase follows frame updates and is not restarted by `reset()`, so this frame pair's jitter moved x by -0.625 px, and the gradient's step made that 0.0036 off where 0.003 is allowed (a quarter pixel stayed under). With the jitter the expected history is 0.16627, the value the GPU reads; the check passes on WebGPU and `MARGO_COMPAT=1` |
 | `node scripts/modern-sky-fog-tests.js` | `bruneton/12` render with 4 samples and legacy fog rejected: buffer binding of 32 B below the pipeline's minimum 320 B | none |
 | `node scripts/frame-alloc-browser.mjs`, `post` | 1,588 B a steady frame, floor 1,528 B | none |
