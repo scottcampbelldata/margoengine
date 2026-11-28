@@ -24,7 +24,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, extname, join, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
 import { noFileWatcher } from './support/no-file-watcher.js';
@@ -207,9 +207,14 @@ async function staticModel(file) {
   return file;
 }
 
-/** Fox.glb with its first clip under every name of {@link CLIPS}: only the JSON chunk changes. */
-function modelWithClips(file) {
-  const bytes = readFileSync(join(root, 'examples/assets/khronos/Fox/Fox.glb')),
+/**
+ * Fox.glb with its first clip under every name of {@link CLIPS}: only the JSON chunk changes. A Fox.glb still a Git LFS
+ * pointer is refused by name, so a checkout without its LFS files fails with the fix rather than a parse error.
+ */
+export function modelWithClips(file, source = join(root, 'examples/assets/khronos/Fox/Fox.glb')) {
+  if (isLfsPointer(source))
+    throw new Error(`${relative(root, source)} is a Git LFS pointer, not the model: run git lfs checkout first`);
+  const bytes = readFileSync(source),
     length = bytes.readUInt32LE(12),
     json = JSON.parse(bytes.subarray(20, 20 + length).toString()),
     [clip] = json.animations;

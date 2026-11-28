@@ -23,6 +23,7 @@ import {
   loadedByAnother,
   usesMinimalGLTF,
   writePageExample,
+  modelWithClips,
 } from '../scripts/run-readme-examples.mjs';
 import { workspacePackages } from '../scripts/check-readme-types.mjs';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -624,4 +625,16 @@ test('browser preprocessing covers CommonJS React imports reached by every publi
       readmeReactDependencies.includes(dependency),
       `${dependency} must be converted before native browser import`,
     );
+});
+
+test('the clip model refuses a Fox.glb left as a Git LFS pointer, and names the fix', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'readme-lfs-'));
+  try {
+    const pointer = join(dir, 'Fox.glb');
+    writeFileSync(pointer, 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '0'.repeat(64) + '\nsize 162852\n');
+    assert.throws(() => modelWithClips(join(dir, 'clips.glb'), pointer), /Git LFS pointer.*git lfs checkout/);
+    assert.equal(existsSync(join(dir, 'clips.glb')), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
