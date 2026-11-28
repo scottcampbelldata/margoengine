@@ -1348,3 +1348,34 @@ test('T8 motionBlur fails a stepped trail: eight sharp copies over a 180 degree 
     assert.ok(smooth.value === 0 && smooth.pass, `${bar} px smeared: ${smooth.value} of ${smooth.detail.edges}`);
   }
 });
+
+// KB-LOOK-TV-MBNARROW1: a mover narrower than its smear ramps over its own width however well it is blurred, so a
+// 12 px bar smeared correctly over a 180 degree shutter at 64 px a frame read 100 percent sharp. Its ramp plus the
+// plateau it holds spans the smear; the check now judges that. A sharp bar and a half-length smear still fail.
+test('T8 motionBlur passes a correctly smeared mover narrower than its smear, not a sharp or half-smeared one (KB-LOOK-TV-MBNARROW1)', () => {
+  const width = 256,
+    height = 8,
+    bar = 12,
+    travel = 64,
+    motion = { width, height, data: new Float32Array(width * height * 2) };
+  for (let i = 0; i < width * height; i++) motion.data[i * 2] = travel;
+  // The bar's coverage of each pixel, the mean of `copies` positions spread over `length` of its travel.
+  const exposed = (copies, length) =>
+    image(width, height, (x) => {
+      let cover = 0;
+      for (let k = 0; k < copies; k++) {
+        const o = ((k + 0.5) / copies) * length;
+        cover += Math.max(0, Math.min(x + 1, 60 + bar + o) - Math.max(x, 60 + o));
+      }
+      return Math.round(20 + 235 * (cover / copies));
+    });
+  const good = motionBlur(exposed(256, travel / 2), motion),
+    sharp = motionBlur(exposed(1, 0), motion),
+    half = motionBlur(exposed(256, travel / 4), motion),
+    // Eight sharp copies over the shutter: a staircase of three jumps up the bar's 12 px ramp (KB-LOOK-TV-SUBSTEP1).
+    trail = motionBlur(exposed(8, travel / 2), motion);
+  assert.ok(good.detail.edges > 0 && good.value === 0 && good.pass !== false, `smeared: ${good.value} of ${good.detail.edges}`);
+  assert.ok(sharp.detail.edges > 0 && sharp.value === 100, `sharp: ${sharp.value} of ${sharp.detail.edges}`);
+  assert.ok(half.detail.edges > 0 && half.value === 100, `half smear: ${half.value} of ${half.detail.edges}`);
+  assert.ok(trail.detail.edges > 0 && trail.value === 100, `8 copies: ${trail.value} of ${trail.detail.edges}`);
+});

@@ -2848,8 +2848,10 @@ export function depthFromDistance(
  * next frame: half the travel at 180 degrees, and the check calls an edge sharp under a quarter of it
  * (KB-LOOK-TV-MOTIONBLUR1: the whole travel was taken as the smear, so a correct 180 degree frame read as sharp).
  * An edge centre is a pixel whose luma profile along its motion (one travel wide, centred on it, spanning over 24 codes)
- * crosses the middle value within one pixel of the pixel itself; the edge's width is the part of the profile between 10
- * and 90 percent of its range. A hard edge is under a pixel wide, a blurred one as wide as its smear.
+ * crosses the middle value within one pixel of the pixel itself; the edge's width is the run of the profile round that
+ * crossing between 10 and 90 percent of its range. A hard edge is under a pixel wide, a blurred one as wide as its smear.
+ * A mover narrower than its smear ramps over its own width however well it is blurred, so for one the ramp plus the
+ * plateau it holds before coming back is its smear, judged at the same share (`edgeSpan`, KB-LOOK-TV-MBNARROW1).
  * With `velocity` (the engine's own motion of each pixel, as `MovingFrames.velocity`) each pixel's travel is its
  * surface's real motion, not the camera's alone: a leaf swaying against the camera's sweep moves less than the camera
  * moves the place it covers, and is smeared by what it moves (KB-LOOK-TV-MBVEL1).
@@ -2907,10 +2909,57 @@ export function motionBlur(
       edges++;
       const from = low + 0.1 * (high - low),
         to = high - 0.1 * (high - low),
-        between = profile.filter((v) => v > from && v < to).length;
-      if (between * spacing < (travel * smear) / 2 || stepped(profile, spacing, from, to, cross)) sharp++;
+        { ramp, span } = edgeSpan(profile, spacing, from, to, cross);
+      // A wide edge's 10 to 90 percent ramp is 0.8 of its smear and is sharp under half of it; a mover narrower than
+      // its smear ramps over its own width and holds a plateau, its ramp plus plateau spanning the whole smear, so it is
+      // sharp under 0.625 of it, the same share (KB-LOOK-TV-MBNARROW1).
+      const length = travel * smear,
+        short = ramp < length / 2 && span < length * 0.625;
+      if (short || stepped(profile, spacing, from, to, cross)) sharp++;
     }
   return result('motionBlur', percent(sharp, edges), bound, { edges, sharp });
+}
+
+/**
+ * The edge's own 10 to 90 percent ramp (the run of the profile between `from` and `to` round its crossing at `cross`;
+ * a short mover's far edge in the same profile is not this edge's, KB-LOOK-TV-MBNARROW1), and the smear of a mover
+ * narrower than its smear, or 0 when the profile is not one. A bar of width w
+ * smeared over a length L > w (the sub-frames' travel over the open shutter) climbs over w, holds a plateau of L - w at
+ * w / L of its contrast and comes back: its 10 to 90 percent ramp is 0.8 w, however well it is blurred, and its ramp
+ * plus the plateau beyond 90 percent is L (0.8 w + L - w + 0.2 w). So the edge's ramp around its crossing at `cross`
+ * plus the run past `to` (or under `from`) that comes back toward the middle inside the profile is the smear. A ramp
+ * under 1.6 pixels (a climb of under 2 pixels) is a sharp edge, whatever lies behind it: a sharp bar is a hard climb
+ * and its own width of plateau, and a mover under 2 pixels wide smeared into a streak cannot be told from a sharp
+ * line of the same length, so neither counts as smeared here and both are judged by their ramp.
+ */
+function edgeSpan(
+  profile: number[],
+  spacing: number,
+  from: number,
+  to: number,
+  cross: number,
+): { ramp: number; span: number } {
+  const within = (k: number) => profile[k] > from && profile[k] < to;
+  let first = within(cross) ? cross : cross - 1,
+    last = first;
+  // A hard edge: the crossing falls between two samples, neither inside the band.
+  if (!within(first)) return { ramp: 0, span: 0 };
+  while (first > 0 && within(first - 1)) first--;
+  while (last < profile.length - 1 && within(last + 1)) last++;
+  const ramp = (last - first + 1) * spacing;
+  if (ramp < 1.6) return { ramp, span: 0 };
+  // The run outside the ramp on one side, and whether the profile comes back toward the middle after it.
+  const plateau = (start: number, step: number): number => {
+    if (start < 0 || start >= profile.length) return 0;
+    const high = profile[start] >= to;
+    let k = start;
+    while (k + step >= 0 && k + step < profile.length && profile[k + step] >= to === high && !within(k + step))
+      k += step;
+    const after = k + step;
+    return after >= 0 && after < profile.length ? (Math.abs(k - start) + 1) * spacing : 0;
+  };
+  const held = Math.max(plateau(last + 1, 1), plateau(first - 1, -1));
+  return { ramp, span: held > 0 ? ramp + held : 0 };
 }
 
 /**
@@ -2918,7 +2967,7 @@ export function motionBlur(
  * (KB-LOOK-TV-SUBSTEP1). Over the ramp (the run of the profile between `from` and `to` around the edge's crossing at
  * `cross`, at least 8 pixels long) a smear climbs evenly, or steepest once in its middle; a staircase climbs in separate jumps with flat
  * steps between, all one way (a fall of over 12 codes against the ramp's way makes it texture or a thin object, not
- * one edge). Read one pixel apart, a jump is a climb over 12 codes and over twice the ramp's mean climb (its 10 to
+ * one edge). Read one pixel apart at every sample, a jump is a climb over 12 codes and over twice the ramp's mean climb (its 10 to
  * 90 percent span over its length), and jumps are separate when a climb under the mean lies between them. Three or more
  * is a staircase.
  */
@@ -2929,14 +2978,16 @@ function stepped(profile: number[], spacing: number, from: number, to: number, c
   if (!within(first)) return false;
   while (first > 0 && within(first - 1)) first--;
   while (last < profile.length - 1 && within(last + 1)) last++;
-  const length = (last - first) * spacing;
+  // The ramp's length counts its end samples, as `edgeSpan` does (a narrow mover's 8 px ramp read 7.5 px).
+  const length = (last - first + 1) * spacing;
   if (length < 8) return false;
   const per = Math.max(1, Math.round(1 / spacing)),
     mean = (to - from) / length;
   const sign = Math.sign(profile[last] - profile[first]);
   let jumps = 0,
     flat = true;
-  for (let k = Math.max(0, first - per); k + per <= Math.min(profile.length - 1, last + per); k += per) {
+  // Slid one sample at a time: a jump that falls between two pixel-apart reads is two half jumps, neither counted.
+  for (let k = Math.max(0, first - per); k + per <= Math.min(profile.length - 1, last + per); k++) {
     const climb = sign * (profile[k + per] - profile[k]);
     if (climb < -12) return false;
     if (climb > 12 && climb > 2 * mean) {
