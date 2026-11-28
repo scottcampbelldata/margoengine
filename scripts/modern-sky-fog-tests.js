@@ -38,6 +38,13 @@ for (const [model, other] of [
   assert.ok(singleShaders[model].includes(dayCalls[model]), `${model} reference shader lacks its day model`);
   assert.ok(!singleShaders[model].includes(dayCalls[other]), `${model} reference shader also calls ${other}`);
 }
+// The reference binds its own fog uniform, sized from the shader's declaration: the fog feature grew it from 2 to 20
+// vec4 (scaleHeight, fire spots, light decay), and a fixed 32 B buffer then failed the 4x legacy render's validation.
+const fogVec4s = Object.values(singleShaders).map(
+  (code) => +/var<uniform>\s*fog\s*:\s*array<vec4f,\s*(\d+)>/.exec(code)?.[1],
+);
+assert.ok(fogVec4s[0] > 0 && fogVec4s.every((n) => n === fogVec4s[0]), `fog uniform sizes ${fogVec4s}`);
+const fogBytes = fogVec4s[0] * 16;
 // This reference seeds individual samples using native sample_index. The layer's resolved frames are checked by
 // packages/sky/test/browser-check.mjs, since WebGL2 exposes no sample_index for this fixture to write.
 const browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5198, compat: false }),
@@ -47,7 +54,7 @@ browser.page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
 try {
-  const result = await browser.page.evaluate(async (singleShaders) => {
+  const result = await browser.page.evaluate(async ({ singleShaders, fogBytes }) => {
     const { Sky } = await import('/packages/sky/dist/index.js'),
       { Camera } = await import('/packages/core/dist/index.js');
     const assert = (condition, message) => {
@@ -138,9 +145,12 @@ try {
           multisample: { count: 4 },
         }));
       };
-      // The fog uniform is private to the fog feature since 3bab400; this is its packing for the options above (exp2, no colour).
-      const fogValues = buffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      d.queue.writeBuffer(fogValues, 0, new Float32Array([0.008, 45, 0, 0, 0, 0, 0, 0]));
+      // The fog uniform is private to the fog feature since 3bab400; this is its packing for the options above (exp2, no
+      // colour, no height falloff, fire spots or light decay: zeros past density and start).
+      const fogValues = buffer({ size: fogBytes, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        fogPacking = new Float32Array(fogBytes / 4);
+      fogPacking.set([0.008, 45]);
+      d.queue.writeBuffer(fogValues, 0, fogPacking);
       const render = async (samples, { reference = false, legacyFog = false, singleDepth = false } = {}) => {
         // A render the device rejects reads back zero-initialized memory, which must fail here by name, never pass or
         // fail as a pixel difference.
@@ -389,7 +399,7 @@ try {
         d.destroy();
       }
     }
-  }, singleShaders);
+  }, { singleShaders, fogBytes });
   assert.deepEqual(errors, []);
   await writeFile('test-results/sky-fog.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log(JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
