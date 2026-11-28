@@ -1,5 +1,6 @@
 // A WebGPU binding with no GPU, in the shape of a Node binding (`create`, no getPreferredCanvasFormat): real engine code
 // runs against it, and it records what was asked. `--gpu tests/support/fake-webgpu.mjs` in margo-convert's tests.
+import { assertWgslDeclaredOnce } from './wgsl-redeclared.js';
 export const record = { adapters: 0, draws: 0, submits: 0, copies: 0, deviceDestroyed: 0, textureUploads: [] };
 
 /** Any object nothing reads back: pipelines, layouts, views, bind groups, samplers. */
@@ -65,7 +66,9 @@ function device() {
       });
       return texture;
     },
-    createShaderModule: () => stub({ getCompilationInfo: async () => ({ messages: [] }) }),
+    createShaderModule: (d) => (
+      assertWgslDeclaredOnce(d?.code), stub({ getCompilationInfo: async () => ({ messages: [] }) })
+    ),
     createRenderPipeline: () => stub(),
     createRenderPipelineAsync: async () => stub(),
     createComputePipeline: () => stub(),

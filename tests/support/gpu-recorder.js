@@ -3,6 +3,7 @@
 // call with resource identities, deep-copied descriptors and the exact bytes of each buffer write.
 // `installWebGPU(gpu)` also stubs `navigator.gpu` and a canvas so the public `Engine.create(canvas, { backend: 'webgpu' })`
 // runs on the mock with no real GPU.
+import { assertWgslDeclaredOnce } from './wgsl-redeclared.js';
 Object.assign(globalThis, {
   GPUBufferUsage: {
     MAP_READ: 1,
@@ -128,7 +129,7 @@ export function mockGPU() {
       destroy,
     })),
     createSampler: create('sampler'),
-    createShaderModule: create('module'),
+    createShaderModule: create('module', (d) => (assertWgslDeclaredOnce(d?.code), {})),
     createBindGroup: create('group'),
     createBindGroupLayout: create('layout'),
     createPipelineLayout: create('pipelineLayout'),

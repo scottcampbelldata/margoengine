@@ -1,4 +1,5 @@
 import { FrameGraph } from '../../packages/core/dist/extension.js';
+import { assertWgslDeclaredOnce } from './wgsl-redeclared.js';
 export function gpuHarness() {
   globalThis.GPUBufferUsage = { UNIFORM: 64, COPY_DST: 8 };
   globalThis.GPUTextureUsage = {
@@ -48,6 +49,7 @@ export function gpuHarness() {
       return r;
     },
     createShaderModule(descriptor) {
+      assertWgslDeclaredOnce(descriptor?.code);
       return descriptor;
     },
     createSampler(descriptor = {}) {
