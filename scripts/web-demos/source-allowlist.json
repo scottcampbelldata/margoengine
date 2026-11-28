@@ -264,10 +264,6 @@
    "R3": 8,
    "R5": 543
   },
-  "sweep-and-loft": {
-   "R1": 3,
-   "R3": 1
-  },
   "temporal-upscaling": {
    "R1": 1,
    "R3": 4,
