@@ -234,9 +234,248 @@ tick();
 
 - Bindings: `{type: 'control', id: 'pen', axis}` with `axis` `'pressure'` (0 to 1), `'tiltX'` and `'tiltY'` (-1 to 1, a share of 90 degrees), `'altitude'` (0 flat to 1 upright), `'azimuth'` and `'twist'` (share of a full turn), `'tangential'` (-1 to 1), or `'down'`, `'barrel'`, `'eraser'` and `'hover'` (0 or 1). Tilt reads while hovering, for a brush preview.
 - `pen.take()` returns every sample since the last call at the pen's own rate, unpacking the browser's coalesced events, so a fast stroke keeps its points. A sample with `down` false after true ends a stroke. `pen.latest` is the newest sample and `pen.inRange` says whether the pen is near.
-- Tilt and altitude with azimuth are both filled in, whichever the browser gives.
+- Tilt and altitude with azimuth are both filled in, whichever the browser gives, by the Pointer Events conversion.
+  Directions are the screen's: `tiltX` is positive leaning right (+x), `tiltY` leaning down the screen (+y), and
+  `azimuth` turns from +x toward +y (0.25 of a turn is straight down the screen). When the browser sends altitude and
+  azimuth they are kept as sent, and tilt is computed from them only when both tilts arrive as 0.
+- A pen lying flat is ambiguous: from tilt, a flat lean straight along one axis (90 degrees on one tilt, 0 on the other)
+  gives altitude 0 and that axis's azimuth, while a flat lean on both axes gives altitude 0 and azimuth 0, the
+  specification's fallback. From altitude 0, tilt takes 90 degrees toward each axis the azimuth leans to, and exactly 0
+  on the other axis when the azimuth lies on one.
 - A dab between two updates still reads `down` for one update.
 - Options: `curve` (shapes pressure within 0 to 1, default none) and `maxSamples` (kept between `take` calls, oldest dropped, default 4096).
+
+## Sticks from keys and axes (`margoengine/input/vector`)
+
+`VectorInput` is an `Input` with named two-axis actions: movement from WASD, a gamepad stick, or both. Each vector sums
+its `x` and `y` bindings, then applies one radial deadzone to the pair, so a diagonal is as long as a straight push
+and the stick has no square corners. Positive `y` is down, as on gamepads.
+
+```ts
+import { VectorInput, wasd } from 'margoengine/input/vector';
+
+const input = new VectorInput(
+  {
+    move: { ...wasd(), x: [...wasd().x, { type: 'gamepad-axis', index: 0 }], y: [...wasd().y, { type: 'gamepad-axis', index: 1 }] },
+    aim: { x: [{ type: 'key', code: 'ArrowRight' }], y: [{ type: 'key', code: 'ArrowDown' }], normalize: true, deadzone: 0.2 },
+  },
+  { actions: { jump: [{ type: 'key', code: 'Space' }] } }, // ordinary actions alongside
+);
+const key = (type: string, code: string) => window.dispatchEvent(new KeyboardEvent(type, { code }));
+key('keydown', 'KeyD'); // stands in for the player's keys
+key('keydown', 'KeyW');
+input.update();
+const move = input.vector('move'); // the same object every tick
+console.log(move.x.toFixed(3), move.y.toFixed(3), move.magnitude, move.pressed); // '0.707' '-0.707' 1 true
+key('keydown', 'KeyA'); // A against D cancels
+input.update();
+console.log(move.x, move.y, move.magnitude); // 0 -1 1
+console.log(Object.keys(input.actions)); // ['jump', 'move.x', 'move.y', 'aim.x', 'aim.y']
+for (const code of ['KeyA', 'KeyD', 'KeyW']) key('keyup', code);
+input.update();
+console.log(move.released, move.down); // true false
+input.dispose();
+```
+
+- A vector's state is `{ x, y, magnitude, down, pressed, released }`. `magnitude` is 0 inside `deadzone` (default
+  0.15), then rises from 0 to 1 between the deadzone and the unit circle, `(min(1, length) - deadzone) /
+  (1 - deadzone)`, so a stick has no jump at the deadzone edge; `x` and `y` keep the push's direction.
+  `normalize: true` makes every push outside the deadzone length 1 (eight-way keys, or a menu cursor). `down` is any
+  magnitude above zero.
+- Each vector becomes two scalar actions, `<name>.x` and `<name>.y`, so `contexts`, `rebind`, `exportBindings`,
+  `InputRecorder` and `InputReplay` work with them unchanged; rebind `move.x` to move the horizontal axis. The `Input`
+  axis deadzone is not used: each vector's radial one replaces it.
+- An empty name, an empty axis, or a name whose `.x` or `.y` clashes with another action throws a `TypeError`; a
+  deadzone outside 0 (inclusive) to 1 throws a `RangeError`. `reset()` (also on window blur) zeroes vectors at once
+  and reports `released` for those that were down.
+
+## XR controllers and hands (`margoengine/input/xr`)
+
+`XRBindings` turns a WebXR session's controllers and hands into ordinary `Input` controls: buttons (analogue value,
+pressed or touched), thumbstick axes, select and squeeze, a hand pinch, and the grip pose. Mix them with keys and
+gamepads in one action map; recording and replay need no headset.
+
+```ts
+import { Input } from 'margoengine/input';
+import { XRBindings } from 'margoengine/input/xr';
+
+// A stand-in session; pass the real XRSession, and call update(frame, referenceSpace) in its frame loop.
+const right = {
+  handedness: 'right' as const,
+  gamepad: { axes: [0, 0, 0.5, -1], buttons: [{ value: 0.8, pressed: true, touched: true }] },
+  gripSpace: {},
+};
+const left = { handedness: 'left' as const, hand: { get: (joint: string) => ({ joint }) } };
+const session = Object.assign(new EventTarget(), { inputSources: [left, right] });
+let gap = 0.015; // metres between thumb and index tips
+const frame = {
+  getJointPose: (joint: object) => ({ transform: { position: { x: (joint as { joint: string }).joint === 'thumb-tip' ? 0 : gap, y: 0, z: 0 } } }),
+  getPose: () => ({ transform: { position: { x: 0, y: 1.4, z: -0.3 }, orientation: { x: 0, y: 0, z: 0, w: 1 } } }),
+};
+const space = {};
+
+const xr = new XRBindings(session);
+const input = new Input(
+  xr.map({
+    fire: [{ type: 'xr-button', hand: 'right', index: 0 }, { type: 'key', code: 'Space' }],
+    turn: [{ type: 'xr-axis', hand: 'right', index: 2 }],
+    select: [{ type: 'xr-select', hand: 'right' }],
+    pinch: [{ type: 'xr-pinch', hand: 'left' }],
+    gripY: [{ type: 'xr-grip-pose', hand: 'right', component: 'y' }],
+  }),
+);
+xr.attach(input);
+const select = (type: string) => session.dispatchEvent(Object.assign(new Event(type), { inputSource: right }));
+select('selectstart'); // a tap: start and end before the next frame
+select('selectend');
+
+xr.update(frame, space); // first, then input.update()
+input.update();
+console.log(input.state('fire').value, input.state('turn').value, input.state('select').pressed); // 0.8 0.5 true: the tap still counts once
+console.log(input.state('pinch').down, input.state('gripY').value, input.bindingValue('gripY', 0)); // true 1 1.4: actions clamp
+gap = 0.025; // between pinchStart and pinchEnd: the pinch holds
+xr.update(frame, space);
+input.update();
+console.log(input.state('select').down, input.state('pinch').down); // false true
+gap = 0.035;
+xr.update(frame, space);
+input.update();
+console.log(input.state('pinch').down); // false
+xr.dispose(); // removes its listeners and controls
+```
+
+| Descriptor | Reads |
+| --- | --- |
+| `{ type: 'xr-button', index, value }` | `gamepad.buttons[index]`: `'value'` (default, 0 to 1), `'pressed'` or `'touched'` (0 or 1) |
+| `{ type: 'xr-axis', index }` | `gamepad.axes[index]`, -1 to 1 (2 and 3 are the thumbstick on the xr-standard mapping) |
+| `{ type: 'xr-select' }`, `{ type: 'xr-grip' }` | 1 while the session's select or squeeze is held, and for one update after a tap shorter than a frame |
+| `{ type: 'xr-pinch' }` | 1 while the thumb and index tips are within `pinchStart` (default 0.02 m), until they part past `pinchEnd` (0.03 m) |
+| `{ type: 'xr-grip-pose', component }` | the grip pose in the reference space: `'x'`, `'y'`, `'z'` (metres), `'qx'` to `'qw'`, or `'tracked'` (0 or 1) |
+
+- Every descriptor also takes `hand` (`'left'`, `'right'` or `'none'`; default any), `source` (the nth matching source
+  in session order, default 0) and `scale` (default 1). An invalid one throws a `TypeError`.
+- `map(actions)` converts the XR descriptors in a mixed map and passes native bindings through; `binding(descriptor)`
+  converts one. `attach(input)` publishes to an `Input` or `VectorInput` once and returns a detach function. Several
+  `XRBindings` need distinct `id`s (default `'xr'`).
+- A missing, untracked or disconnected source reads 0, and the session's `end` zeroes everything. An action clamps to
+  -1 to 1, so read a grip position beyond a metre with `input.bindingValue(action, index)`, which is not clamped.
+  `update` after `dispose()` throws a `MargoError` with code `'disposed'`.
+
+## Pointer lock (`margoengine/input/lock`)
+
+`PointerLock` asks for pointer lock on an element, with raw mouse movement (no operating-system acceleration) where
+the browser offers it, and hands each tick's relative mouse counts to an `Input` as control `'lock'`, axes `'x'` and
+`'y'`. It is separate from camera controls, so any look or aim code can use it.
+
+```ts
+import { Input } from 'margoengine/input';
+import { PointerLock } from 'margoengine/input/lock';
+
+const canvas = document.createElement('canvas');
+document.body.append(canvas);
+const lock = new PointerLock(canvas); // listens on canvas.ownerDocument; requests nothing yet
+const input = new Input({ lookX: [{ type: 'control', id: 'lock', axis: 'x', scale: 0.01 }] });
+lock.attach(input);
+console.log(lock.supported, lock.locked); // true false in a browser with the Pointer Lock API
+
+canvas.addEventListener('click', async () => {
+  try {
+    await lock.request({ timeout: 5000 }); // from the click: browsers need a user gesture
+    console.log(lock.locked, lock.raw); // true, and true for raw movement (false adjusted, null unknown)
+  } catch (error) {
+    console.log((error as Error).name); // 'OperationError' refused, 'TimeoutError', 'AbortError', ...
+  }
+});
+function tick() {
+  lock.update(); // before input.update(): this tick's counts
+  input.update();
+  console.log(lock.x, lock.y, input.state('lookX').value); // counts, and the action after scale and clamp
+}
+tick();
+lock.dispose(); // or `using`: releases the lock, cancels a wait, removes listeners and the control
+```
+
+- `request({ unadjustedMovement, fallback, signal, timeout })`: `unadjustedMovement` (default true) asks for raw
+  movement, and `fallback` (default true) asks again without it when the browser answers `NotSupportedError`.
+  `timeout` (default 5000 ms, positive) bounds the whole request; `signal` cancels it, and a lock granted after the
+  cancel is released at once. A second request while one waits throws `InvalidStateError`; no Pointer Lock API
+  throws `NotSupportedError`. Older browsers whose `requestPointerLock` returns nothing work too, with `raw` null.
+- `x` and `y` are the mouse counts summed since the last `update()`, unbounded; they read 0 while this element does
+  not hold the lock, and losing the lock (Escape) clears them. `release()` exits only this element's lock.
+- `attach(input, id)` publishes to one `Input` per call (default id `'lock'`) and returns a detach function.
+
+## Layout-aware key prompts (`margoengine/input/layout`)
+
+Bindings use physical key codes, so `KeyW` is the key above Tab on every layout. `KeyboardLabels` reads the browser's
+Keyboard Map to show what that key is labelled on the player's keyboard: Z on AZERTY, for example. The binding never
+changes; only the prompt does.
+
+```ts
+import { KeyboardLabels, layoutBindingLabel } from 'margoengine/input/layout';
+
+// A stand-in for navigator.keyboard (the default) on a French AZERTY layout.
+const azerty = new Map([['KeyQ', 'a'], ['KeyW', 'z'], ['KeyA', 'q'], ['Digit2', 'é']]);
+const keyboard = Object.assign(new EventTarget(), { getLayoutMap: async () => azerty });
+
+const labels = new KeyboardLabels({ keyboard });
+labels.addEventListener('change', () => console.log('redraw prompts')); // also after a layout change
+console.log(labels.label({ type: 'key', code: 'KeyW' })); // 'W': no map yet, the standard label
+console.log(await labels.refresh()); // logs 'redraw prompts', then true
+console.log(labels.label({ type: 'key', code: 'KeyW' }), labels.label({ type: 'key', code: 'KeyQ', modifiers: ['ctrl'] })); // 'Z' 'Ctrl+A'
+console.log(labels.label({ type: 'key', code: 'Digit2' }), labels.label({ type: 'key', code: 'Space' })); // 'é' 'Space'
+console.log(layoutBindingLabel({ type: 'key', code: 'KeyW' }, labels.map)); // 'Z': the same, with a map you hold
+labels.dispose();
+```
+
+- `refresh({ signal })` loads the map and returns true, or false when the browser has no Keyboard Map (Firefox and
+  Safari), the page may not read it (`SecurityError`, `NotAllowedError`, a frame without permission), or a newer
+  refresh started; the labels then fall back to `bindingLabel`. A wait past `timeout` (default 5000 ms) rejects with
+  `TimeoutError`, `signal` with its reason, and any other error is thrown and kept in `lastError`.
+- Where the browser fires `layoutchange`, the labels refresh by themselves: `change` on success, `error` (with
+  `lastError`) on failure. `supported` says whether the API exists, `available` whether a map was read, and `map` is
+  the snapshot or null.
+- Letters are shown in capitals, other glyphs as the map gives them; a blank or control-character glyph falls back.
+  Modifiers, mouse and gamepad labels are unchanged (pass the gamepad layout, `'xbox'` by default).
+- `keyboard: null` turns the lookup off. After `dispose()`, `label` and `refresh` throw a `MargoError` with code
+  `'disposed'`.
+
+## Trigger rumble (`margoengine/input/haptics`)
+
+`triggerRumble(gamepad, options)` plays the browser's trigger-rumble effect: the motors in each trigger (as on Xbox
+Wireless Controllers) and the two handle motors, each with its own strength. It never stands in a plain dual rumble
+where triggers are missing.
+
+```ts
+import { supportsTriggerRumble, triggerRumble } from 'margoengine/input/haptics';
+
+// A stand-in pad; pass navigator.getGamepads()[0].
+const played: object[] = [];
+const pad = {
+  connected: true,
+  vibrationActuator: {
+    effects: ['dual-rumble', 'trigger-rumble'],
+    playEffect: async (_type: 'trigger-rumble', effect: object) => (played.push(effect), 'complete' as const),
+    reset: async () => 'complete' as const,
+  },
+};
+console.log(supportsTriggerRumble(pad), supportsTriggerRumble(null)); // true false
+console.log(await triggerRumble(pad, { duration: 120, leftTrigger: 0, rightTrigger: 0.6 })); // true: played to the end
+console.log(played[0]); // { duration: 120, startDelay: 0, strongMagnitude: 0, weakMagnitude: 0, leftTrigger: 0, rightTrigger: 0.6 }
+
+const controller = new AbortController();
+const kick = triggerRumble(pad, { duration: 2000, strongMagnitude: 1, signal: controller.signal });
+controller.abort(); // stops the effect if it is still this call's
+await kick.catch((error) => console.log((error as Error).name)); // 'AbortError'
+```
+
+- Options and defaults: `duration` 100 ms, `startDelay` 0 (whole milliseconds, 0 or more), `strongMagnitude` and
+  `weakMagnitude` 0, `leftTrigger` and `rightTrigger` 1 (each 0 to 1), `timeout` 6000 ms (raise it for longer effects)
+  and `signal`. A value out of range throws a `RangeError`.
+- The promise gives true when the effect ran to the end, false when the pad has no trigger motors, is disconnected,
+  or a newer effect took over (`'preempted'`). `supportsTriggerRumble` is true or false from the actuator's `effects`,
+  or undefined for an older actuator with no list, which `triggerRumble` then just tries.
+- An abort or timeout stops the effect with `reset()` (or a zero effect) only when it is still this call's, bounded at
+  1000 ms; if stopping fails too you get an `AggregateError` with both errors. Browsers may cap `duration`.
 
 ## Gestures
 
