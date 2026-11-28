@@ -82,10 +82,12 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `GeometryGenerator`, `GpuGeometry`, `GpuPath`, `gridIndices` from `@margoengine/geometry/gpu` |
 | `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
+| `GeometryBuilder`, `placeGeometry`, `tintGeometry`, `placementMatrix`, `parseColor` from `@margoengine/geometry/builder` |
+| `turnedGeometry`, `pipeGeometry`, `helixGeometry`, `ribbonGeometry`, `prismGeometry`, `chamferBoxGeometry`, `ringSectorGeometry`, `scaleMarksGeometry`, `strokeGeometry`, `arrowGeometry`, `gridSheetGeometry`, `rotationMinimizingFrames` from `@margoengine/geometry/parts` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep, tessellate, gpu), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep, tessellate, gpu, builder, parts), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -693,6 +695,110 @@ const {position, tangent, up, side} = flow.getFrame(12.5);
   defaults to even over the curve. `flow.matrixAt(distance, axis = 'x', target?)` is one matrix, and `target` skips the
   allocation.
 
+## Building meshes by hand
+
+`@margoengine/geometry/builder` collects faces, strips, parametric patches and placed copies of other geometry into one
+`GeometryData`, with linear rgba vertex colours, UVs and creased smooth normals. Use it wherever you would otherwise push
+positions, normals and indices into arrays yourself.
+
+```ts
+import {GeometryBuilder, placeGeometry, tintGeometry} from 'margoengine/geometry/builder';
+import {chamferBoxGeometry} from 'margoengine/geometry/parts';
+
+const builder = new GeometryBuilder({colors: true, smooth: 30});
+// Faces are counter-clockwise from the front; their normal comes from the winding.
+builder.triangle([0, 0, 0], [1, 0, 0], [0, 1, 0], {color: '#c79554'});
+builder.quad([0, 0, -1], [1, 0, -1], [1, 0, -2], [0, 0, -2], {color: [0.2, 0.4, 0.6]});
+// Any planar polygon, with holes, triangulated by ear clipping.
+builder.polygon([[2, 0, 0], [3, 0, 0], [3, 1, 0], [2.5, 1.5, 0], [2, 1, 0]]);
+// Two rows joined by quads, and a parametric patch with normals from its derivatives.
+builder.strip([[0, 0, 1], [1, 0, 1], [2, 0, 1]], [[0, 0.2, 1.2], [1, 0.3, 1.2], [2, 0.2, 1.2]]);
+builder.grid(16, 8, (u, v) => [4 + u, Math.sin(u * Math.PI) * 0.3, -v]);
+// Copies of other geometry, placed and coloured.
+const post = chamferBoxGeometry(0.1, 1, 0.1);
+for (let i = 0; i < 4; i++) builder.append(post, {position: [i * 0.5, 0.5, 3], yaw: i * 0.2, color: '#394748'});
+
+const data = builder.data(); // GeometryData with colors
+const geometry = builder.geometry(); // a core Geometry
+const moved = placeGeometry(post, {position: [0, 1, 0], pitch: Math.PI / 2, scale: [1, 2, 1]});
+const red = tintGeometry(post, '#b3402a');
+```
+
+- `new GeometryBuilder({colors = false, color = white, smooth = false, weld = true})`. `smooth` is a crease angle in
+  degrees (true is 180): faces added by `triangle`, `quad`, `polygon` and `strip` that meet at a smaller angle share
+  normals, each face weighted by its corner angle (Thurmer and Wuthrich 1998, Max 1999); sharper edges stay sharp.
+  `grid` and `append` keep their own normals. `weld` merges vertices whose every attribute matches in `data()`.
+- Colours are `#rgb`, `#rrggbb` or `#rrggbbaa` in sRGB (decoded to linear) or linear `[r, g, b]` / `[r, g, b, a]`, stored
+  as linear rgba in `colors`. `mergeGeometries` (white for inputs without), `mergeVertices`, `toNonIndexed`, `applyMatrix4`,
+  `extractGroups` and the normal and tangent helpers keep them.
+- `vertex(position, normal, uv?, color?)` returns an index for `index(a, b, c)`, for meshes that share vertices.
+- `placementMatrix({position, yaw, pitch, roll, scale, matrix})` is `matrix * translate * Ry * Rx * Rz * scale`, column
+  major; `placeGeometry` and `append` use it.
+- `extractGroups(data, materialIndex)` in `@margoengine/geometry/utils` takes one material's triangles out as a mesh of
+  their own, for example the caps (0) or walls (1) of an extrusion.
+
+## Parts
+
+`@margoengine/geometry/parts` builds the shapes props, instruments and machines are made of. Each returns
+`GeometryData` with outward normals that keep a crease where the surface turns sharply.
+
+```ts
+import {
+  arrowGeometry, chamferBoxGeometry, gridSheetGeometry, helixGeometry, pipeGeometry, prismGeometry, ribbonGeometry,
+  ringSectorGeometry, scaleMarksGeometry, strokeGeometry, turnedGeometry,
+} from 'margoengine/geometry/parts';
+
+// A turned knob: [radius, height] pairs; corners sharper than 30 degrees stay sharp.
+const knob = turnedGeometry([[0, 0], [0.02, 0], [0.024, 0.004], [0.024, 0.012], [0.018, 0.016], [0, 0.016]], {segments: 32});
+// The same profile turned around +z, and half a turn with end caps.
+const bushing = turnedGeometry([[0.01, -0.01], [0.02, -0.01], [0.02, 0.01], [0.01, 0.01], [0.01, -0.01]], {axis: 'z'});
+const half = turnedGeometry([[0, 0], [0.1, 0], [0.1, 0.05], [0, 0.05]], {sweep: Math.PI});
+// A bent handrail, a coil spring and a strap.
+const rail = pipeGeometry([[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 1, 1]], 0.02, {bend: 0.15});
+const spring = helixGeometry({radius: 0.05, pitch: 0.02, turns: 8, wire: 0.004});
+const strap = ribbonGeometry([[0, 0, 0], [1, 0, 0.3], [2, 0, 0]], 0.1, {thickness: 0.004});
+// Extruded outlines: a plate with a hole and chamfered edges, a tray with rounded corners.
+const plate = prismGeometry([[-1, -0.5], [1, -0.5], [1, 0.5], [-1, 0.5]], 0.1, {
+  bevel: 0.01,
+  holes: [[[-0.2, -0.2], [0.2, -0.2], [0.2, 0.2], [-0.2, 0.2]]],
+});
+const tray = chamferBoxGeometry(1.2, 0.08, 0.6, {chamfer: 0.012, radius: 0.06});
+// Dial bands, washers, discs; a squarish bezel with exponent 4.
+const band = ringSectorGeometry(0.8, 0.9, {start: -Math.PI / 4, sweep: (3 * Math.PI) / 2});
+const washer = ringSectorGeometry(0.01, 0.02, {depth: 0.002});
+const bezel = ringSectorGeometry(0.9, 1, {exponent: 4});
+// Ruler and dial marks, drafting strokes, an arrow and a parametric sheet.
+const ruler = scaleMarksGeometry({count: 49, spacing: 0.01, major: 10, length: 0.004});
+const dial = scaleMarksGeometry({kind: 'radial', count: 41, radius: 0.1, sweep: 1.5 * Math.PI, major: 5});
+const lines = strokeGeometry([[[-1, 0], [1, 0]], [[0, -1], [0, 1]]], 0.004, {axis: 'z'});
+const arrow = arrowGeometry({length: 0.5});
+const dune = gridSheetGeometry(64, 64, (u, v) => [u * 10 - 5, Math.sin(u * 6) * 0.3, v * 10 - 5]);
+```
+
+- `turnedGeometry(profile, {segments = 48, start = 0, sweep = 2 pi, caps = true, crease = 30, axis = 'y'})`: a profile
+  running up at positive radius faces outward; a loop (last point equal to the first) makes a ring; ends off the axis
+  get flat caps, and a partial sweep closes its sides. `latheGeometry` is the same surface with fully smooth normals and
+  no caps.
+- `pipeGeometry(points, radius, {sides = 16, bend = 0, bendSegments = 8, caps = true, closed = false, up, section, crease, taper})`
+  sweeps a circle, or any `section` loop, along a polyline on rotation-minimizing frames (double reflection, Wang,
+  Juttler, Zheng and Liu 2008), so it never flips at straight runs or inflections; a closed loop spreads its leftover twist
+  evenly. `bend` rounds corners with circular arcs (rational quadratic, Piegl and Tiller 1997, 7.3). `taper(t)` scales
+  the section along the length.
+- `helixGeometry({radius = 0.5, pitch = 0.2, turns = 5, wire = 0.04, sides = 12, segmentsPerTurn = 48, section, leftHanded, caps, axis})`:
+  the wire's frame starts pointing away from the axis, so a thread `section` keeps its outer side out.
+- `ribbonGeometry(points, width, {thickness = 0, up = +y, closed})`: a sheet facing `up` at the start, or with `thickness`
+  a solid band.
+- `prismGeometry(outline, height, {bevel = 0, bevelHeight = bevel, holes, axis = 'y', crease = 30})`: any simple outline,
+  either winding, centred on the origin. Points are `[x, z]` for `'y'`, `[x, y]` for `'z'` and `[y, z]` for `'x'`.
+- `chamferBoxGeometry(width, height, depth, {chamfer, radius, segments})`: chamfered top and bottom edges, upright corners
+  chamfered (default) or rounded by `radius`.
+- `ringSectorGeometry(inner, outer, {start = 0, sweep = 2 pi, segments = 64, exponent = 2, depth = 0, bevel = 0})`: in the XZ
+  plane facing +y; inner 0 is a disc or pie slice; `exponent` makes superellipse (Lame) rings; `depth` makes a solid.
+- `scaleMarksGeometry({kind = 'linear', count = 11, start = 0, spacing = 0.1, sweep, radius = 1, major = 5, marks = 'all', length, majorLength, width, majorWidth, align = 'start'})`:
+  flat marks facing +y. Linear marks step along +x and run toward -z from `align`; radial marks run inward from `radius`.
+- `strokeGeometry(segments, width, {axis = 'y'})`: one flat band per `[from, to]` pair.
+- `rotationMinimizingFrames(points, {closed, up})` returns the tangents, normals and binormals the sweeps use.
+
 ## How it works
 
 - **Tested from first principles.** Primitive parameters, defaults, segment clamping, UV conventions and groups are pinned by `tests/primitives.test.js`: closed solids have no boundary edges and face outward, normals are unit length, areas and volumes match the analytic shapes, and recorded counts, areas and volumes hold to 1e-5. Vertex order inside a primitive is not part of the API.
@@ -736,6 +842,8 @@ component, for matching positions) are the other options. Zero-area triangles ar
 it works on `GeometryData` and on any `{positions, indices?}` mesh.
 
 ```ts
+import {boxGeometry, creasedNormals, toNonIndexed} from 'margoengine/geometry';
+
 const tiles = toNonIndexed(boxGeometry(1, 1, 1));
 const tileGroups = Array.from({length: tiles.positions.length / 9}, (_, triangle) => triangle >> 1); // one id per triangle
 tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups});

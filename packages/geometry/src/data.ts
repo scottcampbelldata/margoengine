@@ -18,6 +18,8 @@ export interface GeometryData {
   indices: Uint32Array;
   /** xyzw per vertex, w is the bitangent sign. Present after `computeTangents`. */
   tangents?: Float32Array;
+  /** Linear rgba per vertex (0 to 1). Kept by `mergeGeometries`, `mergeVertices`, `toNonIndexed` and `applyMatrix4`. */
+  colors?: Float32Array;
   groups?: GeometryGroup[];
 }
 

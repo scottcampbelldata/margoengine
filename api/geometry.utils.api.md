@@ -19,6 +19,7 @@ export interface GeometryData {
     uvs: Float32Array;
     indices: Uint32Array;
     tangents?: Float32Array;
+    colors?: Float32Array;
     groups?: GeometryGroup[];
 }
 
@@ -102,6 +103,8 @@ export function deinterleaveAttributes(buffer: ArrayLike<number>, sizes: readonl
 export function edgesGeometry(data: GeometryData, thresholdAngle?: number): Uint32Array;
 
 export function estimateMemory(data: GeometryData): MemoryEstimate;
+
+export function extractGroups(data: GeometryData, materialIndex: number): GeometryData;
 
 export function footprintRadius(data: GeometryData): number;
 

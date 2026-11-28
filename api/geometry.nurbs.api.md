@@ -94,6 +94,7 @@ interface GeometryData {
     uvs: Float32Array;
     indices: Uint32Array;
     tangents?: Float32Array;
+    colors?: Float32Array;
     groups?: GeometryGroup[];
 }
 

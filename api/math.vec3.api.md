@@ -11,6 +11,8 @@ export const dot: (a: In, b: In) => number;
 
 export const length: (a: In) => number;
 
+export const lerp: (a: In, b: In, t: number) => MutableVec3;
+
 export const normalize: (a: In) => MutableVec3;
 
 export const scale: (a: In, s: number) => MutableVec3;

@@ -18,6 +18,12 @@ export const cross = (a: In, b: In): MutableVec3 => [
   a[2] * b[0] - a[0] * b[2],
   a[0] * b[1] - a[1] * b[0],
 ];
+/** a + (b - a) * t as a new array: t = 0 gives a, t = 1 gives b. */
+export const lerp = (a: In, b: In, t: number): MutableVec3 => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
 /** Euclidean length |a| (`Math.hypot`, so no overflow for large components). */
 export const length = (a: In): number => Math.hypot(a[0], a[1], a[2]);
 /** Unit vector, or [0, 0, 0] when the length is 0 or NaN. */

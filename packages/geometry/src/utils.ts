@@ -12,14 +12,16 @@ const clone = (data: GeometryData, changes: Partial<GeometryData>): GeometryData
   };
   if (!('tangents' in changes) && data.tangents) out.tangents = data.tangents;
   if (!('groups' in changes) && data.groups) out.groups = data.groups.map((g) => ({ ...g }));
+  if (!('colors' in changes) && data.colors) out.colors = data.colors;
   if (!out.tangents) delete out.tangents;
+  if (!out.colors) delete out.colors;
   if (!out.groups) delete out.groups;
   return out;
 };
 
 /**
  * Concatenates geometries. Tangents survive only when every input
- * has them. With `useGroups`, each input becomes one group whose `materialIndex` is its position in the list;
+ * has them. Vertex colours survive when any input has them; inputs without colours add opaque white. With `useGroups`, each input becomes one group whose `materialIndex` is its position in the list;
  * otherwise input groups are kept with their offsets shifted.
  */
 export function mergeGeometries(list: readonly GeometryData[], useGroups = false): GeometryData {
@@ -35,6 +37,7 @@ export function mergeGeometries(list: readonly GeometryData[], useGroups = false
     uvs = new Float32Array(vertices * 2),
     indices = new Uint32Array(indexCount);
   const tangents = withTangents ? new Float32Array(vertices * 4) : undefined;
+  const colors = list.some((g) => g.colors) ? new Float32Array(vertices * 4).fill(1) : undefined;
   const groups: GeometryGroup[] = [];
   let v = 0,
     i = 0;
@@ -43,6 +46,7 @@ export function mergeGeometries(list: readonly GeometryData[], useGroups = false
     normals.set(g.normals, v * 3);
     uvs.set(g.uvs, v * 2);
     if (tangents) tangents.set(g.tangents!, v * 4);
+    if (colors && g.colors) colors.set(g.colors, v * 4);
     for (let k = 0; k < g.indices.length; k++) indices[i + k] = g.indices[k] + v;
     if (useGroups) groups.push({ start: i, count: g.indices.length, materialIndex: n });
     else for (const group of g.groups ?? []) groups.push({ ...group, start: group.start + i });
@@ -51,6 +55,7 @@ export function mergeGeometries(list: readonly GeometryData[], useGroups = false
   });
   const out: GeometryData = { positions, normals, uvs, indices };
   if (tangents) out.tangents = tangents;
+  if (colors) out.colors = colors;
   if (groups.length) out.groups = groups;
   return out;
 }
@@ -77,7 +82,8 @@ export function mergeVertices(data: GeometryData, options: MergeVerticesOptions 
   const P = data.positions,
     N = data.normals,
     UV = data.uvs,
-    T = data.tangents;
+    T = data.tangents,
+    C = data.colors;
   // Buckets are keyed by an integer hash of the cell. Each kept vertex remembers its exact cell, so vertices from
   // other cells that share a hash are skipped and the candidates seen are the same as with one bucket per cell.
   const buckets = new Map<number, number[]>(),
@@ -124,7 +130,10 @@ export function mergeVertices(data: GeometryData, options: MergeVerticesOptions 
               continue;
             if (
               !positionOnly &&
-              (!near(N, i, original, 3) || !near(UV, i, original, 2) || (T && !near(T, i, original, 4)))
+              (!near(N, i, original, 3) ||
+                !near(UV, i, original, 2) ||
+                (T && !near(T, i, original, 4)) ||
+                (C && !near(C, i, original, 4)))
             )
               continue;
             match = j;
@@ -184,6 +193,7 @@ export function mergeVertices(data: GeometryData, options: MergeVerticesOptions 
   }
   const out: GeometryData = { positions: pick(P, 3), normals: pick(N, 3), uvs: pick(UV, 2), indices };
   if (T) out.tangents = pick(T, 4);
+  if (C) out.colors = pick(C, 4);
   if (groups) out.groups = groups;
   return out;
 }
@@ -196,16 +206,19 @@ export function toNonIndexed(data: GeometryData): GeometryData {
     uvs = new Float32Array(n * 2),
     indices = new Uint32Array(n);
   const tangents = data.tangents ? new Float32Array(n * 4) : undefined;
+  const colors = data.colors ? new Float32Array(n * 4) : undefined;
   const P = data.positions,
     N = data.normals,
     UV = data.uvs,
-    T = data.tangents;
+    T = data.tangents,
+    C = data.colors;
   // Vertices every attribute fully covers are copied element by element; an index past the end keeps the partial-copy path.
   const covered = Math.min(
     Math.floor(P.length / 3),
     Math.floor(N.length / 3),
     Math.floor(UV.length / 2),
     T ? Math.floor(T.length / 4) : Infinity,
+    C ? Math.floor(C.length / 4) : Infinity,
   );
   for (let i = 0; i < n; i++) {
     const v = data.indices[i],
@@ -227,14 +240,16 @@ export function toNonIndexed(data: GeometryData): GeometryData {
         tangents[i * 4 + 2] = T![v * 4 + 2];
         tangents[i * 4 + 3] = T![v * 4 + 3];
       }
+      if (colors) colors.set(C!.subarray(v * 4, v * 4 + 4), i * 4);
       continue;
     }
     positions.set(P.subarray(s, s + 3), d);
     normals.set(N.subarray(s, s + 3), d);
     uvs.set(UV.subarray(v * 2, v * 2 + 2), i * 2);
     if (tangents) tangents.set(T!.subarray(v * 4, v * 4 + 4), i * 4);
+    if (colors) colors.set(C!.subarray(v * 4, v * 4 + 4), i * 4);
   }
-  return clone(data, { positions, normals, uvs, indices, tangents });
+  return clone(data, { positions, normals, uvs, indices, tangents, colors });
 }
 
 const angles = new Float64Array(3);
@@ -442,6 +457,7 @@ export {
   estimateMemory,
   interleaveAttributes,
   mergeGroups,
+  extractGroups,
   triangleFanToTriangles,
   triangleStripToTriangles,
   type InterleavedBuffer,

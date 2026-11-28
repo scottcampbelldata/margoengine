@@ -110,6 +110,14 @@
     "./hull": {
       "types": "./dist/hull.d.ts",
       "import": "./dist/hull.js"
+    },
+    "./builder": {
+      "types": "./dist/builder.d.ts",
+      "import": "./dist/builder.js"
+    },
+    "./parts": {
+      "types": "./dist/parts.d.ts",
+      "import": "./dist/parts.js"
     }
   },
   "files": [

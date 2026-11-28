@@ -1451,6 +1451,14 @@
       "types": "./dist/geometry/hull.d.ts",
       "import": "./dist/geometry/hull.js"
     },
+    "./geometry/builder": {
+      "types": "./dist/geometry/builder.d.ts",
+      "import": "./dist/geometry/builder.js"
+    },
+    "./geometry/parts": {
+      "types": "./dist/geometry/parts.d.ts",
+      "import": "./dist/geometry/parts.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

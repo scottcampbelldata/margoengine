@@ -125,6 +125,7 @@ export interface GeometryData {
     uvs: Float32Array;
     indices: Uint32Array;
     tangents?: Float32Array;
+    colors?: Float32Array;
     groups?: GeometryGroup[];
 }
 
@@ -239,6 +240,8 @@ export function dodecahedronGeometry(radius?: number, detail?: number, smooth?: 
 export function edgesGeometry(data: GeometryData, thresholdAngle?: number): Uint32Array;
 
 export function estimateMemory(data: GeometryData): MemoryEstimate;
+
+export function extractGroups(data: GeometryData, materialIndex: number): GeometryData;
 
 export function extrudeGeometry(shapes: Shape | readonly Shape[], options?: ExtrudeOptions): GeometryData;
 

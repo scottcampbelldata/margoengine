@@ -3277,6 +3277,7 @@
       "dodecahedronGeometry",
       "edgesGeometry",
       "estimateMemory",
+      "extractGroups",
       "extrudeGeometry",
       "footprintRadius",
       "geometryData",

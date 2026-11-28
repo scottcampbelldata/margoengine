@@ -55,6 +55,7 @@ export {
   estimateMemory,
   interleaveAttributes,
   mergeGroups,
+  extractGroups,
   triangleFanToTriangles,
   triangleStripToTriangles,
   splitTangents,

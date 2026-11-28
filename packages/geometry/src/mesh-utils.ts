@@ -245,6 +245,39 @@ export function mergeGroups(data: GeometryData): GeometryData {
 }
 
 /**
+ * The triangles of the groups drawn with `materialIndex` as a mesh of their own (for example the caps or the walls of
+ * an `extrudeGeometry`): only the vertices they use, every attribute kept, no groups. Without groups, index 0 is the
+ * whole mesh and any other index gives an empty one. The input is left alone.
+ */
+export function extractGroups(data: GeometryData, materialIndex: number): GeometryData {
+  const groups = data.groups?.length ? data.groups : [{ start: 0, count: data.indices.length, materialIndex: 0 }];
+  const picked: number[] = [];
+  for (const g of groups)
+    if (g.materialIndex === materialIndex)
+      for (let i = g.start; i < g.start + g.count && i < data.indices.length; i++) picked.push(data.indices[i]);
+  const remap = new Map<number, number>();
+  for (const v of picked) if (!remap.has(v)) remap.set(v, remap.size);
+  const order = [...remap.keys()],
+    pick = (a: Float32Array | undefined, size: number) => {
+      if (!a) return undefined;
+      const out = new Float32Array(order.length * size);
+      order.forEach((v, n) => out.set(a.subarray(v * size, v * size + size), n * size));
+      return out;
+    };
+  const out: GeometryData = {
+    positions: pick(data.positions, 3)!,
+    normals: pick(data.normals, 3)!,
+    uvs: pick(data.uvs, 2)!,
+    indices: Uint32Array.from(picked, (v) => remap.get(v)!),
+  };
+  const tangents = pick(data.tangents, 4),
+    colors = pick(data.colors, 4);
+  if (tangents) out.tangents = tangents;
+  if (colors) out.colors = colors;
+  return out;
+}
+
+/**
  * Packs attributes into one buffer, vertex after vertex, which is what a single vertex buffer binding wants.
  *
  * @param attributes - The attributes, in the order they sit inside a vertex.
