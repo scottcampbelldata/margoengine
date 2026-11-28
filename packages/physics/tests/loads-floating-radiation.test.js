@@ -11,6 +11,7 @@
 // B33 / (2 (m + A33)) = 0.695 1/s, which with the linear Cummins models tracked the measured H0 = 0.1 D decay within
 // about 1 mm (3 % of H0). Nothing here is fitted to the test: the body is its collider, its mass and its centre of mass.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { floating, LoadSolver } from '../dist/loads.js';
@@ -263,4 +264,33 @@ test('SEA-12 floating radiation refuses what it cannot bake, naming the fix', as
   });
   await assert.rejects(floating(physics, body, { signal: AbortSignal.abort() }), { name: 'AbortError' });
   physics[Symbol.dispose]();
+});
+
+test("SEA-12 floating radiation, fast tier: Kramer's sphere let go from 0.1 D follows the measured heave time series", async () => {
+  // The measured mean of Kramer et al.'s four 0.1 D drops (Supplementary Materials, CC BY 4.0; tests/data, every 10th
+  // sample to t = 8 Te0), the sphere's heave over its drop. Their linear potential-flow models came within about 1 mm
+  // (0.033 H0) of it at the troughs and crests; this one is held to that over the whole record, root mean square, and to
+  // 0.1 H0 at worst (its first descent leads the measured one by about 0.02 Te0, the fast tier's 3 % in added mass).
+  const data = JSON.parse(readFileSync(new URL('./data/kramer-2021-sphere-decay.json', import.meta.url), 'utf8')),
+    h0 = 0.1 * 2 * R,
+    run = await sphere(h0),
+    ys = [1];
+  for (let f = 1; f <= RATE * 6.2; f++) {
+    run.world.advance(f);
+    ys.push(run.body.position[1] / h0);
+  }
+  let squared = 0,
+    worst = 0;
+  for (const [t, mean] of data.drops['01D']) {
+    const s = t * data.Te0 * RATE,
+      i = Math.floor(s),
+      y = ys[i] + (ys[i + 1] - ys[i]) * (s - i),
+      e = Math.abs(y - mean);
+    squared += e * e;
+    worst = Math.max(worst, e);
+  }
+  const rms = Math.sqrt(squared / data.drops['01D'].length);
+  assert.ok(rms <= 0.033, `root mean square ${rms} H0 from the measured mean`);
+  assert.ok(worst <= 0.1, `worst ${worst} H0 from the measured mean`);
+  run.physics[Symbol.dispose]();
 });

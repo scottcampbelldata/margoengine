@@ -610,3 +610,13 @@ published group values read on 2026-11-28; no file of another party is redistrib
   "Adjustments to Zatsiorsky-Seluyanov's segment inertia parameters", Journal of Biomechanics 29(9):1223-1230, 1996,
   https://doi.org/10.1016/0021-9290(95)00178-6 . The paper is copyright Elsevier; only the table's measured values are
   cited, with credit, and none of its text or figures.
+
+## Kramer et al. (2021) floating-sphere heave decay measurements
+
+- **Source:** M. B. Kramer, J. Andersen, S. Thomas et al., "Highly Accurate Experimental Heave Decay Tests with a
+  Floating Sphere: A Public Benchmark Dataset for Model Validation of Fluid-Structure Interaction", Energies 14(2), 269
+  (2021), https://doi.org/10.3390/en14020269, Supplementary Materials (energies-14-00269-s001.zip).
+- **Licence:** Creative Commons Attribution 4.0 International (CC BY 4.0).
+- **Taken:** the mean and 95 % confidence bounds of the normalized measured heave (`*_CI95_Normalized.txt`) for the 0.1 D,
+  0.3 D and 0.5 D drops, every tenth sample from t = 0 to 8 Te0, as `packages/physics/tests/data/kramer-2021-sphere-decay.json`.
+  Data only; no code.
