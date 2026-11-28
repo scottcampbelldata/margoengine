@@ -1,20 +1,37 @@
 # The Aurora
 
-Scrub from 00:00 to 03:00 UTC at an imagined northern-fells overlook. The date and coordinates anchor the Moon and stars. The luminous curtain varies with the night scrub in an illustrative sequence. Play advances the same timeline and can be paused. The scene opens on a still frame.
+A winter night above a frozen lake in northern Norway, 69.72° N, 23.59° E, on 15 February 2027. Drag the night slider
+from 00:00 to 03:00 UTC, or press Play night to run it at two minutes a second: the Moon and stars move to their
+places for that minute and the aurora's curtains fold as the night passes. The readouts give the Moon's elevation
+and how much of it is lit.
 
-## Land and sky
+Everything on screen is drawn by Margo Engine packages; this folder holds only the wiring, the page and its data.
 
-The camera is set on a snowy shore above solid lake ice. The layered terrain, tree silhouettes, ice and frost geometry are original and procedural. Coordinates select a sightline for the sky calculation. The land is an invented Arctic landscape. A directional light follows the computed Moon and soft ambient fill keeps the ice legible. Ice is opaque geometry with shallow relief, wind-raked frost and thermal cracks.
+## What draws what
 
-Margo's astronomical model positions the Moon and the catalogue stars for 69.72° N, 23.59° E on 15 February 2027. The Moon's illuminated fraction and elevation are the model's topocentric readouts. The lunar texture is turned north-up in the sky layer, without libration. The display enlarges the angular diameter by 2.9× so its textured surface can be seen. The solar direction toward the Moon defines the lit limb. [U.S. Naval Observatory Sun and Moon service](https://aa.usno.navy.mil/data/AltAz).
+- **Night sky.** `@margoengine/sky` (`Sky` with the Preetham, night and lighting features) draws the sky and lights
+  the land with the Moon it computes; `sky/astro` places the Moon, the planets and the catalogue stars for the date
+  and place; `sky/milky-way` draws the galaxy band; `sky/moon` draws the textured lunar disc, lit from the Sun's side.
+- **Aurora.** `sky/aurora` draws three arcs of curtains over a curved shell: oxygen green at 557.7 nm, oxygen red at
+  630.0 nm and nitrogen blue near 427.8 nm. Its brightness and folds are illustrative, not a space-weather forecast.
+- **Land.** `@margoengine/terrain` builds the 3.6 km fells and shore from `@margoengine/procedural/noise` heights;
+  `procedural/conifers` grows the grand and Douglas firs; `@margoengine/weather/snow` lays snow on every surface by
+  its slope.
+- **Lake.** `environment/reflector-pbr` is the black ice: a planar mirror with contact-hardened blur that shows the
+  fells, the Moon and the curtains. The page renders frames itself, so it asks the ice to capture before each one.
+- **Light and lens.** `@margoengine/shadows` casts the Moon's shadows (cascades near the shore, and
+  `shadows/distance` marching the height field for the fells), then `post/stack` applies bloom and the AgX tone curve
+  from `@margoengine/tonemap`.
 
-The aurora pass models ribbons and folds over a curved atmospheric shell, with green oxygen emission at 557.7 nm, red oxygen at 630.0 nm and nitrogen emission near 427.8 nm. The demo controls the layer's clock and illustrative intensity. It carries no space-weather observations or forecast. [NOAA Space Weather Prediction Center](https://www.spaceweather.gov/phenomena/aurora), [NOAA calibration center](https://ncc.nesdis.noaa.gov/VIIRS/SWX/Aurora.php).
+The Moon disc is drawn 2.9 times its true size so the maria read at this field of view. The page runs on WebGPU and
+falls back to Margo's WebGL2 compatibility layer; `?backend=webgl2` forces the fallback.
 
-The textured Moon, aurora and terrain open together. The star catalogue, Milky Way and bloom follow after the night controls become available. Both renderers and screen sizes use the same opening and full-detail scenes, including the same assets using public Margo Engine at `0efd9cff8230507a32deb49907ecd499d46925f5`. Sky, terrain, bloom and core supply the visuals. The app uses WebGPU first and Margo's automatic full WebGL2 compatibility path. `?backend=webgl2` forces a compatibility check. The app shows the engine's own reason when the required tier is unavailable.
+## Data
 
-## Visual sources
-
-- **Moon** — Ernie Wright and Noah Petro, *CGI Moon Kit*, NASA Scientific Visualization Studio, 2019. The 192 × 96 grayscale WebP is reduced from the public engine's 1024 × 512 LROC WAC Hapke-normalized lunar albedo fixture with LOLA polar fill. [NASA SVS](https://svs.gsfc.nasa.gov/4720/), [NASA imagery guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/).
-- **Stars** — Dorrit Hoffleit and W. H. Warren Jr., *The Bright Star Catalogue, Fifth Revised Edition*, 1991. The included record keeps the useful fields for stars to visual magnitude 5.6 from the Centre de Données astronomiques de Strasbourg CDS V/50 catalogue. [CDS catalogue](https://cdsarc.cds.unistra.fr/viz-bin/cat/V/50).
-- **Milky Way** — Axel Mellinger, *A Color All-Sky Panorama Image of the Milky Way*, PASP 121, 2009, supplies photometry and a visual reference for Margo's procedural Milky Way. [Paper](https://arxiv.org/abs/0908.4360).
-- **Landscape and curtains** — NASA's photographed aurora colors and NOAA's observed folded arcs informed the composition. The terrain, lake, vegetation and ice surface are original. [NASA Science aurora photographs](https://science.nasa.gov/sun/auroras/).
+- **Moon albedo** (`moon.jpg`): Ernie Wright and Noah Petro, *CGI Moon Kit*, NASA Scientific Visualization Studio,
+  2019, LROC WAC albedo with LOLA polar fill. [NASA SVS 4720](https://svs.gsfc.nasa.gov/4720/)
+- **Stars** (`bright-stars.gz`): Dorrit Hoffleit and W. H. Warren Jr., *The Bright Star Catalogue, 5th Revised
+  Edition*, 1991, CDS V/50. [CDS V/50](https://cdsarc.cds.unistra.fr/viz-bin/cat/V/50)
+- **Aurora lines and forms**: [NOAA Space Weather Prediction Center](https://www.spaceweather.gov/phenomena/aurora).
+- **Moon and star places**: compare with the [U.S. Naval Observatory's Sun and Moon service](https://aa.usno.navy.mil/data/AltAz)
+  for the same place and times.
