@@ -239,9 +239,10 @@ test('keys, forms and errors', () => {
     age: 'mature',
     condition: 'bare',
   });
+  // The generic key is the biome reference size, the pole oak (KB-BIOMES-BROADLEAFSIZE1).
   assert.deepEqual(parseBroadleafKey('procedural:broadleaf'), {
     species: 'english-oak',
-    age: 'mature',
+    age: 'pole',
     condition: 'live',
   });
   for (const k of [

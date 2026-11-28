@@ -268,13 +268,15 @@ export interface BroadleafKey {
 /**
  * Reads a broadleaf mesh key, with or without its `procedural:` prefix: `<species>` (mature, leafed),
  * `<species>/<age>` (sapling, pole, mature or old), `<species>/bare` (mature, leafless) and the generic `broadleaf`
- * (a mature English oak). Undefined for any other key.
+ * (an English oak at pole age, 40 years: the reference size that a biome's reverse-J sizes scale from about a third to
+ * 2.4 times, as the conifer presets name `/pole`, so the largest stays under the oak's forest-grown height of 28 m; a
+ * mature oak there would reach 45 m). Undefined for any other key.
  * @example parseBroadleafKey('procedural:european-beech/old'); // { species: 'european-beech', age: 'old', condition: 'live' }
  */
 export function parseBroadleafKey(key: string): BroadleafKey | undefined {
   if (typeof key !== 'string') return undefined;
   const name = key.startsWith('procedural:') ? key.slice(11) : key;
-  if (name === 'broadleaf') return { species: 'english-oak', age: 'mature', condition: 'live' };
+  if (name === 'broadleaf') return { species: 'english-oak', age: 'pole', condition: 'live' };
   const [species, rest, extra] = name.split('/');
   if (extra !== undefined || !Object.hasOwn(BROADLEAF_SPECIES, species)) return undefined;
   if (rest === undefined) return { species: species as BroadleafSpecies, age: 'mature', condition: 'live' };

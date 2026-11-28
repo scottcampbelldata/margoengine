@@ -93,10 +93,11 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
     );
     return { trunk, canopy };
   };
-  // procedural:broadleaf is the grown English oak (KB-PROCEDURAL-OAKBLOB1): its levels, near and middle meshes and the
-  // imposter cards, the canopy white over its leaf atlas with an alpha cut-out.
+  // procedural:broadleaf is the grown English oak (KB-PROCEDURAL-OAKBLOB1) at pole age, the reference size the
+  // reverse-J sizes scale (KB-BIOMES-BROADLEAFSIZE1): its levels, near and middle meshes and the imposter cards, the
+  // canopy white over its leaf atlas with an alpha cut-out.
   const { broadleafLevels } = await import('@margoengine/procedural/broadleaves'),
-    oak = broadleafLevels('english-oak'),
+    oak = broadleafLevels('english-oak', { age: 'pole' }),
     broadleaf = { trunk: byMesh.get('broadleaf')[0], canopy: byMesh.get('broadleaf')[1] };
   assert.deepEqual(
     triangles(broadleaf.trunk),
@@ -541,7 +542,10 @@ test('with lodPixels, trees with foliage rings switch ring by their sprays proje
     );
   };
   const plain = await make();
-  assert.ok(plain.casters.every((c) => c.options.lodSize === undefined), 'distance rings without lodPixels');
+  assert.ok(
+    plain.casters.every((c) => c.options.lodSize === undefined),
+    'distance rings without lodPixels',
+  );
   plain.dispose();
   const objects = await make({ lodPixels: 1 }),
     [firBark, firNeedles, deadBark, rock] = objects.casters,

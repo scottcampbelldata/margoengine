@@ -1638,7 +1638,9 @@ band; of seeds 1 to 10, 7 are, and seeds 5, 6 and 9 show 0.206 to 0.217 of sky i
 - `broadleafLevels(species, options)`: the three scatter rings, near, middle and imposter, with the shared `textures`
   (draw the canopy white: its colour is in the image). Bare trees draw their wood at three coarseness levels.
 - `parseBroadleafKey(key)`: what a biome mesh key names: `procedural:<species>`, `procedural:<species>/<age>`,
-  `procedural:<species>/bare` and `procedural:broadleaf` (a mature English oak).
+  `procedural:<species>/bare` and `procedural:broadleaf` (an English oak at pole age, 9.9 m: the reference size a
+  biome's reverse-J sizes scale from about a third to 2.4 times, so its largest trees stay under the 28 m of a
+  forest-grown oak).
 
 ```ts
 import {broadleafLevels, generateBroadleafMesh, parseBroadleafKey} from 'margoengine/procedural/broadleaves';

@@ -272,6 +272,11 @@ whichever is nearer, so no spray draws thinner than that before the next level t
 spray width is `foliageWidth` of the near and middle foliage meshes: the area-weighted tenth percentile of each
 triangle's narrowest width. Rocks and bare stems keep distance rings. Default none (distance rings).
 
+A species mesh is the reference size its plant's reverse-J `size` scales, from about a third of it to `size.max` (2.4
+in a forest preset), so presets name a species at pole age (`procedural:douglas-fir/pole`), and the generic
+`procedural:broadleaf` is the pole English oak, 9.9 m tall (KB-BIOMES-BROADLEAFSIZE1: a mature oak there grew a
+forest's largest oaks to 45 m and ran their crowns together). `tests/tree-reference-size.test.js` checks every preset.
+
 ```js
 import { foliageWidth } from '@margoengine/biomes/objects';
 import { coniferLevels } from '@margoengine/procedural/conifers';
