@@ -553,7 +553,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 
 Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wakes, spray, wind, rain) and the rigid core. Do not start these.
 
-KB2161 (docs/known-bugs.md, "a chain laid out level under a 1000:1 end mass stretched once it was taut, and opened at every snap"): fixed 2026-11-28 (Claude, workstation, on Scott's order). The stretch landed 2026-11-27 (the geometric stiffness of the joint locks, `taut_inertia`); the snaps on 2026-11-28 (locks closed at the end pose on each path's Newton matrix, the midpoint rule, damping of a taut lock's free motion past h^2 k = 4 m, `packages/physics/kernel/src/joints.rs`, clean-room PK67). The 100,000:1 chain is a separate open entry in docs/known-bugs.md and is not claimed.
+KB2161 (docs/known-bugs.md, "a chain laid out level under a 1000:1 end mass stretched once it was taut, and opened at every snap"): fixed 2026-11-28 (Claude, workstation, on Scott's order). The stretch landed 2026-11-27 (the geometric stiffness of the joint locks, `taut_inertia`); the snaps on 2026-11-28 (locks closed at the end pose on each path's Newton matrix, the midpoint rule, damping of a taut lock's free motion past h^2 k = 4 m, `packages/physics/kernel/src/joints.rs`, clean-room PK68). The 100,000:1 chain is a separate open entry in docs/known-bugs.md and is not claimed.
 
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
