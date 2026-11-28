@@ -283,11 +283,7 @@ test('thick upper arms keep both shoulder balls beside the chest', async () => {
     ]) {
       for (let i = 0; i < sides; i++) {
         const angle = (i / sides) * Math.PI * 2;
-        positions.push(
-          x,
-          y + Math.cos(angle) * radius,
-          z + Math.sin(angle) * radius,
-        );
+        positions.push(x, y + Math.cos(angle) * radius, z + Math.sin(angle) * radius);
       }
     }
     for (let i = 0; i < sides; i++) {
@@ -296,14 +292,7 @@ test('thick upper arms keep both shoulder balls beside the chest', async () => {
       indices.push(a, b, a + sides, b, b + sides, a + sides);
     }
     for (let i = 1; i + 1 < sides; i++) {
-      indices.push(
-        first,
-        first + i + 1,
-        first + i,
-        first + sides,
-        first + sides + i,
-        first + sides + i + 1,
-      );
+      indices.push(first, first + i + 1, first + i, first + sides, first + sides + i, first + sides + i + 1);
     }
   };
   const chestEdge = 0.188;
@@ -322,28 +311,16 @@ test('thick upper arms keep both shoulder balls beside the chest', async () => {
       limb(0.151, 0.48, 1.395, -0.004, 0.085, 0.061);
       limb(0.46, 0.751, 1.389, 0.005, 0.061, 0.042);
     }
-    box(
-      side < 0 ? -0.835 : 0.735,
-      1.353,
-      -0.041,
-      side < 0 ? -0.735 : 0.835,
-      1.414,
-      0.048,
-    );
+    box(side < 0 ? -0.835 : 0.735, 1.353, -0.041, side < 0 ? -0.735 : 0.835, 1.414, 0.048);
   }
   for (const resolution of [64, 96]) {
-    const rig = await autoRig(
-      { positions, indices },
-      { resolution, weights: 'none' },
-    );
+    const rig = await autoRig({ positions, indices }, { resolution, weights: 'none' });
     // Allow one voxel either side of the chest edge, plus one voxel outside to clear the thick sleeve.
     const voxel = 1.79 / resolution;
     for (const key of ['leftUpperArm', 'rightUpperArm']) {
       const [x, y] = rig.joints[rig.humanoid[key]].position;
       assert.ok(
-        Math.abs(x) >= chestEdge - voxel &&
-          Math.abs(x) <= chestEdge + 2 * voxel &&
-          Math.abs(y - 1.395) < voxel,
+        Math.abs(x) >= chestEdge - voxel && Math.abs(x) <= chestEdge + 2 * voxel && Math.abs(y - 1.395) < voxel,
         `${key} at resolution ${resolution} fit to [${x}, ${y}]`,
       );
     }

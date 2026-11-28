@@ -549,14 +549,9 @@ function place(solid: Solid, body: Body, forwardHint: Vec3 | null) {
       if (!ended) {
         // A thick sleeve can make the nominal inset cross from the shoulder into the chest.
         const inwardRate = -inward * dot(axis, side),
-          space =
-            across(add(from, axis, run)) * inward -
-            (MIN_SHOULDER * height + radius),
+          space = across(add(from, axis, run)) * inward - (MIN_SHOULDER * height + radius),
           inset = IN_SHOULDER * radius;
-        run +=
-          inwardRate > 0
-            ? Math.min(inset, Math.max(0, space / inwardRate))
-            : inset;
+        run += inwardRate > 0 ? Math.min(inset, Math.max(0, space / inwardRate)) : inset;
       }
       const ball = add(from, axis, run);
       root = root * 0.5 + run;
