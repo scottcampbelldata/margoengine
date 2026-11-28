@@ -1872,7 +1872,7 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
 8. Add a coupling test with a floating-body return (SEA-04 or SEA-12) that accounts for energy or momentum exchange with the sea.
 9. Film controls: placed swell events, storm targets and a look parameter set (steepness, choppiness, whitecap seed) for EF-5, RITS-2, OO-2.
 
-### SEA-15 Tracers and slicks in water (`@margoengine/physics/tracers`, commits ccbc86285 to 03332d94c, 28 SEA-15 commits since 2026-11-25), owner Codex: not VERIFIED, status left BUILDING
+### SEA-15 Tracers and slicks in water (`@margoengine/physics/tracers`, commits ccbc86285 to 03332d94c, 28 SEA-15 commits since 2026-11-25), owner Codex: REOPENED
 
 **Checked.** Read docs/physics-solvers.md row, the audit rows and "film upgrade progress" notes, docs/limits.md tracer sections, packages/physics/src/tracers.ts plus tracer-bed, tracer-bed-wash, tracer-wall-jet, tracer-fay, tracer-wax, tracer-evaporation, tracer-oil-dispersion, tracer-stokes, tracer-floc, tracer-diffusion, and the test files. Under run-with-timeout: `node --test` on tests/tracers.test.js, tests/coupling/tracers.test.js, coupling/breaches.test.js and coupling/swim.test.js: 66 tests, 66 pass, 0 fail. `packages/environment/tests/swim-sediment.browser.mjs` on WebGPU (1994 sand pixels at lift, 17.1 px downstream, clears after settling, 674.8 um bed relief) and on `--compat` (2023 px, same 17.1 px): both ran and passed.
 
@@ -1916,6 +1916,15 @@ Missing: measured ray or propeller lifted mass, field oil spreading, absolute en
 4. Reduce the 5.01x floc and 3.59x wax errors or derive and state their bounds.
 5. Hot loops for many parcels in Rust/Wasm SIMD with recorded work counts.
 6. Bind the original BB-7 and EF-11 shots and render real frames.
+
+#### SEA-15 four-point pass
+
+- Point 5 (3809dc24da). `packages/physics/tests/coupling/tracers.test.js` rejects the second live water sample after an earlier parcel moves. It checks all owned bytes, balances, exported port metadata and exact retry against a continuous run. The signed cell test checks offset field queries and replay. Source, field and range failures name the fix and help page.
+- Point 6 and audit item 5 (3809dc24da). `packages/physics/tests/coupling/tracer-random-workers.test.js` confirms exact 1, 2 and 4 participant Box–Muller draws, sparse high counters, real dye, slick and sediment replay with exact callback order, and atomic recovery. `packages/physics/tests/tracer-random-workers.browser.mjs` starts and stops all three helpers and records 107,450 paired Philox rounds, with hash `2424abc9c94278c9`. Native output preserves the signed origin snapshot.
+- Point 7 and audit item 6 technical cutaways (3809dc24da). `packages/environment/tests/breach-ore.browser.mjs` compares a sealed hold and a 131.09 kg live release on both renderers. At 4.2 s it draws 25.85 kg of suspended fine ore and 104.50 kg of accepted pellets on the bed. Full same-backend RGBA and snapshots replay exactly. `packages/environment/tests/swim-sediment.browser.mjs` verifies the moving ray, sediment plume and accepted downstream bed relief on both renderers. The original cuts are open.
+- Point 8 and audit item 1 measured comparison (3809dc24da). `packages/physics/scripts/sea15-jet-scour-measured.mjs` compares two held-out ultrasonic static crater volumes using source nozzle and grains, two engine resolutions and the instrument readout interval. The 5 mm engine gives 1.29 and 1.00 cm³ against observed 57.49 and 116.47 cm³. Both miss. The static tank profiles do not constrain the cumulative, repeat-counting lifted-mass ledger. [Evidence and limits](limits.md#accepted-parcels-and-independent-jet-scour-sea-15)
+
+Direct lifted-mass validation, evolving jet recirculation, multi-writer bed acceptance, the open accuracy and weathering regimes, and original BB-7 and EF-11 integration remain open. The row is REOPENED at four points.
 
 ### SEA-14 Water entry and exit (`physics/entry`, commits 89bec7f16, b890b38ad, 12b84154b, c002e262b), owner Codex: REOPENED
 
