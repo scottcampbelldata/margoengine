@@ -1,4 +1,6 @@
-import {Geometry,PbrMaterial,box} from '@margoengine/core';
+import {PbrMaterial,box} from '@margoengine/core';
+import {pipeGeometry} from '@margoengine/geometry/parts';
+import {toGeometry} from '@margoengine/geometry/utils';
 import {autoEngine} from '@margoengine/webgl2-compat/auto';
 import {applyQualityTier} from '@margoengine/quality';
 import {demoStatus} from 'margo-demo-status';
@@ -69,25 +71,11 @@ function setCamera(){
   engine.camera.target=[0,.24,0];
   state.orbit=yaw.toFixed(3)+','+pitch.toFixed(3);
 }
+// The centre line: a thin rod 0.159 above the bent curve, on the flow's own frames.
 function line(flow){
-  const positions=[], normals=[], indices=[];
-  const m=81, radius=.013;
-  for(let i=0;i<m;i++){
-    const {position,up,side}=flow.getFrame(i*flow.length/(m-1));
-    for(let j=0;j<4;j++){
-      const angle=j*Math.PI/2;
-      for(let k=0;k<3;k++){
-        const n=up[k]*Math.cos(angle)+side[k]*Math.sin(angle);
-        positions.push(position[k]+.159*up[k]+radius*n);
-        normals.push(n);
-      }
-      if(i){
-        const p=i*4+j, q=i*4+(j+1)%4;
-        indices.push(p-4,q,p,q-4,q,p-4);
-      }
-    }
-  }
-  return new Geometry(positions,normals,indices);
+  const frames=Array.from({length:81},(_,i)=>flow.getFrame(i*flow.length/80));
+  const path=frames.map(({position,up})=>position.map((v,k)=>v+.159*up[k]));
+  return toGeometry(pipeGeometry(path,.013,{sides:4,up:frames[0].up}));
 }
 function planMap(){
   const scale=Math.min(2,devicePixelRatio||1);
@@ -152,7 +140,7 @@ function apply(action){
   if(action!=='camera'&&action!=='guides'){
     knots=guide(+bend.value/100,+rise.value/100,offsets);
     model=construct(knots);
-    model.meshes.forEach((g,i)=>deck[i].setGeometry(new Geometry(g.positions,g.normals,g.indices)));
+    model.meshes.forEach((g,i)=>deck[i].setGeometry(toGeometry(g)));
     const visible=guides.checked;
     if(visible)centerLine.setGeometry(line(model.flow));
     centerLine.visible=visible;

@@ -1,5 +1,9 @@
 
-import {Geometry,PbrMaterial,box} from '@margoengine/core';
+import {PbrMaterial,box} from '@margoengine/core';
+import {GeometryBuilder} from '@margoengine/geometry/builder';
+import {turnedGeometry} from '@margoengine/geometry/parts';
+import {toGeometry} from '@margoengine/geometry/utils';
+import {lerp} from '@margoengine/math/mathutils';
 
 const tau=2*Math.PI,end=10.91;
 const paint=(color,roughness=.61,metalness=0)=>new PbrMaterial({color,roughness,metalness});
@@ -8,27 +12,15 @@ const shellWhite=paint('#d5bfa2',.7),shellInterior=paint('#ae906f',.8),partition
   footing=paint('#64645c',.77),wall=paint('#394d56',.9),floor=paint('#666a62',.9),bronze=paint('#927451',.48,.72);
 const pose=[-.08,1.38,-.14];
 
+// One band per material: parametric patches whose normals the builder takes from the surface derivatives.
 function band(){
-  const positions=[],normals=[],indices=[];
-  function patch(sample,along,across,reverse=false){
-    const base=positions.length/3,small=.0007,row=across+1;
-    for(let j=0;j<=along;j++)for(let k=0;k<=across;k++){
-      const u=j/along,v=k/across,p=sample(u,v);
-      const au=sample(u-small,v),bu=sample(u+small,v),av=sample(u,v-small),bv=sample(u,v+small);
-      const a=bu.map((x,i)=>x-au[i]),b=bv.map((x,i)=>x-av[i]);
-      const n=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-      const length=Math.hypot(...n)||1,s=reverse?-1:1;
-      positions.push(...p);normals.push(n[0]*s/length,n[1]*s/length,n[2]*s/length);
-      if(j&&k){
-        const d=base+j*row+k,c=d-1,b=d-row,a=b-1;
-        if(reverse)indices.push(a,b,c,c,b,d);
-        else indices.push(a,c,b,c,d,b);
-      }
-    }
-  }
-  return {patch,toMesh(engine,material){
-    return engine.createMesh().setGeometry(new Geometry(positions,normals,indices)).setMaterial(material).setPosition(pose);
-  }};
+  const builder=new GeometryBuilder();
+  return {
+    patch(sample,along,across,reverse=false){builder.grid(along,across,sample,{flip:reverse});},
+    toMesh(engine,material){
+      return engine.createMesh().setGeometry(builder.geometry()).setMaterial(material).setPosition(pose);
+    },
+  };
 }
 const radius=t=>.104*Math.exp(.228*t);
 const twist=t=>t+.71;
@@ -37,7 +29,6 @@ const outer=t=>radius(t)*(1+.027*Math.cos(16.5*t));
 const inner=t=>Math.max(.027,radius(t-.67*tau));
 const mouth=t=>.05+radius(t)*.14;
 const depth=t=>.023+radius(t)*.20;
-const mix=(a,b,v)=>a+(b-a)*v;
 
 function shell(engine){
   const wall=band(),rear=band(),rims=band(),septa=band(),detail=band();
@@ -46,7 +37,7 @@ function shell(engine){
     return vector(twist(t),r,mouth(t)-v*depth(t)*1.58);
   },205,11);
   rear.patch((u,v)=>{
-    const t=end*u,r=mix(inner(t),outer(t),v);
+    const t=end*u,r=lerp(inner(t),outer(t),v);
     return vector(twist(t),r,mouth(t)-depth(t)*1.52-.045*Math.sin(Math.PI*v)**2);
   },196,10,true);
   rims.patch((u,v)=>{
@@ -60,13 +51,13 @@ function shell(engine){
   for(let t=.22;t<end+.001;t+=.278+radius(t)*.063){
     const s=t;
     septa.patch((u,v)=>{
-      const r=mix(inner(s),outer(s),u),bow=.115*Math.sin(Math.PI*u)*(.7-.3*u);
+      const r=lerp(inner(s),outer(s),u),bow=.115*Math.sin(Math.PI*u)*(.7-.3*u);
       const f=s-bow+(v-.5)*(.039+.010*Math.sin(7*s));
       return vector(twist(f),r,mouth(s)-depth(s)*1.36+
         depth(s)*(1.31-.30*Math.sin(Math.PI*u))*v);
     },15,7);
     detail.patch((u,v)=>{
-      const r=mix(inner(s),outer(s),u),bow=.115*Math.sin(Math.PI*u)*(.7-.3*u);
+      const r=lerp(inner(s),outer(s),u),bow=.115*Math.sin(Math.PI*u)*(.7-.3*u);
       const f=s-bow+(v-.5)*.025;
       return vector(twist(f),r,mouth(s)-.258*depth(s)*Math.sin(Math.PI*u)+.010*Math.sin(v*Math.PI));
     },14,4);
@@ -83,28 +74,20 @@ function shell(engine){
   septa.toMesh(engine,partition);detail.toMesh(engine,inclusion);
 }
 
-function cylinder(profile,sectors){
-  const b=band();
-  b.patch((u,v)=>{
-    const scaled=v*(profile.length-1);
-    const i=Math.max(0,Math.min(profile.length-2,Math.floor(scaled))),t=scaled-i;
-    const [y,r]=profile[i],next=profile[i+1],theta=tau*u,outer=mix(r,next[1],t);
-    return [outer*Math.cos(theta),mix(y,next[0],t),outer*Math.sin(theta)];
-  },sectors,profile.length-1,true);
-  return b;
+// Turned plinth parts, profiles [radius, height] from the floor up.
+function turned(engine,profile,segments,material,position){
+  const geometry=toGeometry(turnedGeometry(profile,{segments}));
+  return engine.createMesh().setGeometry(geometry).setMaterial(material).setPosition(position);
 }
 
 export function installSculpture(engine){
   const block=(x,y,z,w,h,d,mat)=>engine.createMesh().setGeometry(box(w,h,d)).setPosition([x,y,z]).setMaterial(mat);
   block(0,-.12,0,15,.2,14,floor);
   block(0,2.6,-3.1,15,6,.13,wall);
-  const podium=cylinder([[0,.79],[0,.81],[.027,.84],[.055,.84],[.078,.83],[.26,.82],[.284,.80],[.294,.77],[.294,0]],64);
-  podium.toMesh(engine,slate).setPosition([0,-.018,.03]);
-  const brass=cylinder([[0,.71],[0,.73],[.017,.73],[.023,.69],[.023,0]],60);
-  brass.toMesh(engine,bronze).setPosition([0,.28,.03]);
-  const inset=cylinder([[0,.675],[.012,.689],[.034,.689],[.04,.658],[.04,0]],60);
-  inset.toMesh(engine,footing).setPosition([0,.303,.03]);
-  const mount=cylinder([[0,.048],[.016,.052],[.036,.042],[.26,.030],[.287,.034],[.294,.028],[.294,0]],18);
-  for(const x of [-.38,.40])mount.toMesh(engine,bronze).setPosition([x,.34,.02]);
+  turned(engine,[[.79,0],[.81,0],[.84,.027],[.84,.055],[.83,.078],[.82,.26],[.80,.284],[.77,.294],[0,.294]],64,slate,[0,-.018,.03]);
+  turned(engine,[[.71,0],[.73,0],[.73,.017],[.69,.023],[0,.023]],60,bronze,[0,.28,.03]);
+  turned(engine,[[.675,0],[.689,.012],[.689,.034],[.658,.04],[0,.04]],60,footing,[0,.303,.03]);
+  const mount=toGeometry(turnedGeometry([[.048,0],[.052,.016],[.042,.036],[.030,.26],[.034,.287],[.028,.294],[0,.294]],{segments:18}));
+  for(const x of [-.38,.40])engine.createMesh().setGeometry(mount).setMaterial(bronze).setPosition([x,.34,.02]);
   shell(engine);
 }

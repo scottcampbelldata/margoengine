@@ -11,17 +11,11 @@
    "R3": 5,
    "R5": 517
   },
-  "ambient-occlusion": {
-   "R3": 4,
-   "R4": 1
-  },
   "area-lights": {
-   "R3": 4,
-   "R5": 412
+   "R5": 318
   },
   "bend-it": {
-   "R3": 4,
-   "R5": 364
+   "R5": 351
   },
   "big-data-points": {
    "R3": 1

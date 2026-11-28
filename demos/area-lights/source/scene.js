@@ -4,7 +4,7 @@ import {Clustered} from '@margoengine/clustered';
 import {AreaLights} from '@margoengine/clustered/area';
 import {lineLights} from '@margoengine/clustered/line';
 import {lumensToCandela} from '@margoengine/clustered/units';
-import {sphere,ringProfile,tray,capsule,cyclorama} from './geometry.js';
+import {sphere,turned,tray,capsule,cyclorama,cycloramaPosition} from './geometry.js';
 
 const sourceOutput=520, exposure=.0038;
 const warm=[1,.91,.77];
@@ -37,7 +37,7 @@ export function prepareBench(){
     return item;
   }
 
-  part('Continuous studio sweep',cyclorama(),slate);
+  part('Continuous studio sweep',cyclorama(),slate,cycloramaPosition);
   part('Teknik pedestal',tray(2.10,.228,1.38,.131,.026),charcoal,[0,.034,0]);
   part('Bronze accent at the pedestal bevel',tray(2.075,.023,1.35,.127,.009),bronze,[0,.157,0]);
   part('Dark anodized working surface',tray(2.03,.071,1.31,.11,.017),ink,[0,.193,0]);
@@ -46,11 +46,11 @@ export function prepareBench(){
   part('Front datum plate',lowerPlate,darkSteel,[0,.032,.693]);
   part('Copper datum inset',box(.145,.007,.005),bronze,[0,.039,.708]);
 
-  const bearing=ringProfile([
-    [0,0],[0,.177],[.009,.196],[.019,.198],[.033,.191],[.046,.167],
-    [.058,.160],[.063,.145],[.061,.126],[.047,.122],[.040,0],
+  const bearing=turned([
+    [0,0],[.177,0],[.196,.009],[.198,.019],[.191,.033],[.167,.046],
+    [.160,.058],[.145,.063],[.126,.061],[.122,.047],[0,.040],
   ],52);
-  const brassLiner=ringProfile([[.007,.162],[.007,.178],[.012,.180],[.017,.176],[.018,.163],[.015,.161],[.007,.162]],52);
+  const brassLiner=turned([[.162,.007],[.178,.007],[.180,.012],[.176,.017],[.163,.018],[.161,.015],[.162,.007]],52);
   const plate=tray(.372,.021,.118,.026,.007);
   const vessel=sphere(.181,64,32);
   const grades=[
@@ -97,14 +97,14 @@ export function prepareBench(){
   moving('Suspension extrusion',tray(.092,.081,1.04,.029,.014),darkSteel,[0,1.237,-.018]);
   moving('Bronze rim of extrusion',box(.034,.004,.730),bronze,[0,1.281,-.002]);
   moving('Emitter yoke',tray(.147,.109,.144,.034,.014),charcoal,[0,1.168,.511]);
-  moving('Machined emitter neck',ringProfile([[0,0],[0,.036],[.009,.043],[.074,.043],[.081,.033],[.081,0]],28),
+  moving('Machined emitter neck',turned([[0,0],[.036,0],[.043,.009],[.043,.074],[.033,.081],[0,.081]],28),
     bronze,[0,1.065,mountDepth]);
   const fixture=moving('Emitter lens',null,cream,[0,mountHeight,mountDepth]);
   const housing=moving('Emitter retaining ring',null,darkSteel,[0,mountHeight,mountDepth]);
 
   const sphereShell=sphere(types.sphere.radius,49,27);
-  const discLens=ringProfile([[-.009,0],[-.009,.159],[-.004,.167],[.003,.166],[.007,.151],[.007,0]],58);
-  const discBody=ringProfile([[.005,0],[.005,.168],[.017,.184],[.041,.183],[.053,.164],[.055,0]],58);
+  const discLens=turned([[0,-.009],[.159,-.009],[.167,-.004],[.166,.003],[.151,.007],[0,.007]],58);
+  const discBody=turned([[0,.005],[.168,.005],[.184,.017],[.183,.041],[.164,.053],[0,.055]],58);
   const tubeShell=capsule(types.tube.radius,types.tube.halfLength);
   const lineShell=capsule(types.line.radius,types.line.halfLength);
   const tubeClip=tray(.080,.075,.057,.022,.009),lineClip=tray(.044,.090,.036,.014,.009);
