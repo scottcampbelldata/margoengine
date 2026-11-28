@@ -34,7 +34,8 @@ test('SOFT-02 to DYN-01: a rope thrown at a free box hands it momentum, and rope
   const after = momentum();
   assert.ok(box.linearVelocity[0] < -0.5, `the box was pushed (${box.linearVelocity[0]} m/s)`);
   // f32 particle speeds summed over the rope: a few parts in 1e5 of the 1.8 kg m/s.
-  for (let a = 0; a < 3; a++) assert.ok(Math.abs(after[a] - before[a]) < 1e-4, `momentum ${a}: ${after[a]} against ${before[a]}`);
+  for (let a = 0; a < 3; a++)
+    assert.ok(Math.abs(after[a] - before[a]) < 1e-4, `momentum ${a}: ${after[a]} against ${before[a]}`);
 });
 
 test('DYN-04 to DYN-01: a car driving off on a free deck pushes the deck back, car plus deck keeping zero momentum', () => {

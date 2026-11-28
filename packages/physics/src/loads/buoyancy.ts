@@ -68,7 +68,14 @@ export function meshBuoyancyCentre(
   const volume = linear.force[1];
   out[0] = out[1] = out[2] = 0;
   if (!(volume > 0)) return out;
-  wettedLoads(mesh, pose, { elevation, pressure: (_x, y) => 0.5 * Math.max(0, depth - y) * Math.max(0, depth - y) }, 0, [0, 0, 0], square);
+  wettedLoads(
+    mesh,
+    pose,
+    { elevation, pressure: (_x, y) => 0.5 * Math.max(0, depth - y) * Math.max(0, depth - y) },
+    0,
+    [0, 0, 0],
+    square,
+  );
   out[0] = linear.torque[2] / volume;
   out[1] = depth - square.force[1] / volume;
   out[2] = -linear.torque[0] / volume;

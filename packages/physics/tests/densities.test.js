@@ -22,8 +22,14 @@ test('a named material gives the density of its number, at creation and through 
 test('a material name that is not in densities is refused with a coded error that lists them', () => {
   const physics = new Physics(null),
     coded = (error) =>
-      error.name === 'MargoError' && error.code === 'unsupported' && /steel/.test(error.message) && /errors#physics-bodies/.test(error.message);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'sphere', radius: 1, density: 'unobtainium' } }), coded);
+      error.name === 'MargoError' &&
+      error.code === 'unsupported' &&
+      /steel/.test(error.message) &&
+      /errors#physics-bodies/.test(error.message);
+  assert.throws(
+    () => physics.addBody(null, { colliders: { shape: 'sphere', radius: 1, density: 'unobtainium' } }),
+    coded,
+  );
   assert.throws(() => densityOf('toString'), coded);
   assert.equal(physics.bodyCount, 0, 'a refused body leaves nothing behind');
 });

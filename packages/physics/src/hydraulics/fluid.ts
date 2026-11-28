@@ -101,7 +101,8 @@ export const WATER: Water = water(20);
 
 /** Argument checks shared by the hydraulics modules. */
 export function positive(name: string, value: number): number {
-  if (!(value > 0) || !Number.isFinite(value)) throw new RangeError(`${name} must be a positive finite number; got ${value}.`);
+  if (!(value > 0) || !Number.isFinite(value))
+    throw new RangeError(`${name} must be a positive finite number; got ${value}.`);
   return value;
 }
 

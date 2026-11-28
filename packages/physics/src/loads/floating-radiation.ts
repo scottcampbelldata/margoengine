@@ -389,11 +389,7 @@ function refinedMesh(mesh: { vertices: ArrayLike<number>; indices: ArrayLike<num
           b = 3 * indices[t + ((k + 1) % 3)]!;
         longest = Math.max(
           longest,
-          hypot(
-            vertices[a]! - vertices[b]!,
-            vertices[a + 1]! - vertices[b + 1]!,
-            vertices[a + 2]! - vertices[b + 2]!,
-          ),
+          hypot(vertices[a]! - vertices[b]!, vertices[a + 1]! - vertices[b + 1]!, vertices[a + 2]! - vertices[b + 2]!),
         );
       }
     if (longest <= edge || (indices.length / 3) * 4 > budget) break;
@@ -467,10 +463,7 @@ function starMesh(mesh: { vertices: ArrayLike<number>; indices: ArrayLike<number
 /** A unit sphere of `rings` rings, closed, poles as single vertices. */
 function sphereGrid(rings: number) {
   return revolve(
-    Array.from(
-      { length: rings + 1 },
-      (_, i) => [sin((Math.PI * i) / rings), -cos((Math.PI * i) / rings)] as const,
-    ),
+    Array.from({ length: rings + 1 }, (_, i) => [sin((Math.PI * i) / rings), -cos((Math.PI * i) / rings)] as const),
     2 * rings,
   );
 }

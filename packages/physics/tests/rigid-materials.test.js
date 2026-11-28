@@ -13,9 +13,9 @@
 // leaves rolling with vx2 = vx1 / (1 + alpha), 0.645 vx1, whatever the friction. Wood at 20 degrees slides; the other five
 // grip. What a rigid ball does not do, Cross measured too: a real ball stores some energy in shear and comes off spinning 17
 // to 41 percent faster than rolling, steeper by up to 3.7 degrees on emery at 20 (docs/limits.md, "Oblique bounce").
-import assert from "node:assert/strict";
-import test from "node:test";
-import { Physics } from "../dist/index.js";
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { Physics } from '../dist/index.js';
 
 await Physics.load();
 const m = 0.057,
@@ -28,12 +28,12 @@ const m = 0.057,
 const friction = { wood: 0.23, reboundAce: 0.6, emery: 0.67 };
 // Table II: surface, incidence above the surface, v1, vx2 / vx1, rebound angle, mu_A.
 const tableII = [
-  ["wood", 20, 3.72, 0.84, 19.2, 0.25],
-  ["wood", 45, 3.8, 0.6, 50.4, 0.23],
-  ["emery", 20, 3.53, 0.6, 27.2, 0.59],
-  ["emery", 45, 3.7, 0.63, 51.3, 0.2],
-  ["reboundAce", 20, 3.35, 0.62, 23.4, 0.6],
-  ["reboundAce", 45, 3.6, 0.68, 49.3, 0.18],
+  ['wood', 20, 3.72, 0.84, 19.2, 0.25],
+  ['wood', 45, 3.8, 0.6, 50.4, 0.23],
+  ['emery', 20, 3.53, 0.6, 27.2, 0.59],
+  ['emery', 45, 3.7, 0.63, 51.3, 0.2],
+  ['reboundAce', 20, 3.35, 0.62, 23.4, 0.6],
+  ['reboundAce', 45, 3.6, 0.68, 49.3, 0.18],
 ];
 
 /**
@@ -44,13 +44,13 @@ function bounce(surface, angle, speed, fidelity) {
   const physics = new Physics(null, { gravity: [0, 0, 0], fidelity }),
     mu = friction[surface];
   physics.addBody(null, {
-    type: "fixed",
+    type: 'fixed',
     position: [0, -0.5, 0],
-    colliders: { shape: "box", halfExtents: [50, 0.5, 5], friction: mu, restitution: e },
+    colliders: { shape: 'box', halfExtents: [50, 0.5, 5], friction: mu, restitution: e },
   });
   const ball = physics.addBody(null, {
     position: [0, R + 0.002, 0],
-    colliders: { shape: "sphere", radius: R, friction: mu, restitution: e },
+    colliders: { shape: 'sphere', radius: R, friction: mu, restitution: e },
   });
   ball.setMassProperties({ mass: m, inertia: [I, I, I] });
   const t = angle * degrees,
@@ -70,17 +70,20 @@ function rigid(vx1, vy1, mu) {
   return { vx2: vx1 / (1 + alpha), spin: vx1 / (1 + alpha) };
 }
 
-for (const fidelity of ["standard", "high"]) {
+for (const fidelity of ['standard', 'high']) {
   test(`${fidelity}: an oblique bounce is the rigid ball's exact solution, sliding through it or gripping (Brody 1984)`, () => {
     // Regression: friction was held to the cone of the normal impulse before the bounce, mu vy1 where Coulomb's law gives
     // mu (1 + e) vy1, so wood at 20 degrees kept 0.92 of vx1 and every bounce slid. One substep's gravity is the only other
     // term, and there is none here: the bound is a thousandth of the speed, f32 rounding through the solver's passes.
-    for (const [surface, angle, speed] of [...tableII, ["emery", 20, 2.24]]) {
+    for (const [surface, angle, speed] of [...tableII, ['emery', 20, 2.24]]) {
       const got = bounce(surface, angle, speed, fidelity),
         want = rigid(got.vx1, got.vy1, got.mu),
         bound = 1e-3 * speed;
       assert.ok(Math.abs(got.vx2 - want.vx2) <= bound, `${surface} ${angle}: vx2 ${got.vx2} against ${want.vx2}`);
-      assert.ok(Math.abs(got.spin - want.spin) <= bound, `${surface} ${angle}: R omega2 ${got.spin} against ${want.spin}`);
+      assert.ok(
+        Math.abs(got.spin - want.spin) <= bound,
+        `${surface} ${angle}: R omega2 ${got.spin} against ${want.spin}`,
+      );
       assert.ok(Math.abs(got.vy2 - e * got.vy1) <= bound, `${surface} ${angle}: vy2 ${got.vy2} against ${e * got.vy1}`);
     }
   });
@@ -91,7 +94,7 @@ test("a tennis ball bounced on wood, Rebound Ace and emery matches Cross's measu
   // +- 0.05 (Table I); angles to +- 1.5 degrees (Table I). A gripping ball's vx2 / vx1 does not depend on the friction or the
   // bounce, so the five gripping bounces are held to their own scatter as well: twice the standard deviation of the five
   // measured ratios about their mean, 0.066, the convention of the domino test (tests/rigid-measured.test.js).
-  const gripped = tableII.filter(([surface, angle]) => !(surface === "wood" && angle === 20)).map((row) => row[3]),
+  const gripped = tableII.filter(([surface, angle]) => !(surface === 'wood' && angle === 20)).map((row) => row[3]),
     mean = gripped.reduce((sum, value) => sum + value, 0) / gripped.length,
     spread = 2 * Math.sqrt(gripped.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (gripped.length - 1));
   for (const [surface, angle, speed, ratio, rebound, average] of tableII) {
@@ -99,17 +102,24 @@ test("a tennis ball bounced on wood, Rebound Ace and emery matches Cross's measu
       kept = got.vx2 / got.vx1,
       muA = (got.vx1 - got.vx2) / ((1 + e) * got.vy1),
       slid = got.spin < got.vx2 - 1e-3 * speed;
-    assert.equal(slid, surface === "wood" && angle === 20, `${surface} ${angle}: slid ${slid}`);
+    assert.equal(slid, surface === 'wood' && angle === 20, `${surface} ${angle}: slid ${slid}`);
     assert.ok(Math.abs(muA - average) <= 0.05, `${surface} ${angle}: mu_A ${muA.toFixed(3)} against ${average}`);
     if (slid) {
       // The friction's own error moves the sliding ratio by (1 + e) tan(theta1) d mu = 0.013 on top of the 4 percent.
       const bound = 0.04 * ratio + (1 + e) * Math.tan(angle * degrees) * 0.02;
       assert.ok(Math.abs(kept - ratio) <= bound, `${surface} ${angle}: vx2/vx1 ${kept.toFixed(3)} against ${ratio}`);
-    } else assert.ok(Math.abs(kept - ratio) <= spread, `${surface} ${angle}: vx2/vx1 ${kept.toFixed(3)} against ${ratio} (bound ${spread.toFixed(3)})`);
+    } else
+      assert.ok(
+        Math.abs(kept - ratio) <= spread,
+        `${surface} ${angle}: vx2/vx1 ${kept.toFixed(3)} against ${ratio} (bound ${spread.toFixed(3)})`,
+      );
     // At 45 degrees the angle is the rolling ball's, tan(theta2) = e (1 + alpha) tan(theta1), on every surface.
     if (angle === 45) {
       const angleOut = Math.atan2(got.vy2, got.vx2) / degrees;
-      assert.ok(Math.abs(angleOut - rebound) <= 1.5, `${surface} ${angle}: rebound ${angleOut.toFixed(2)} against ${rebound}`);
+      assert.ok(
+        Math.abs(angleOut - rebound) <= 1.5,
+        `${surface} ${angle}: rebound ${angleOut.toFixed(2)} against ${rebound}`,
+      );
     }
   }
 });

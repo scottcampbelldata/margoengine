@@ -9,6 +9,8 @@ const rigidCoded = (error) =>
   error?.name === 'MargoError' &&
   error.code === 'unsupported' &&
   /See https:..margoengine.com.errors#physics-(bodies|meshes)$/.test(error.message);
+/** A coded refusal (rigidCoded) whose message matches `pattern`. */
+const refusal = (pattern) => (error) => rigidCoded(error) && pattern.test(error.message);
 
 const warn = console.warn;
 console.warn = () => {};
@@ -109,7 +111,7 @@ test('collisionGroups packs memberships and filters', () => {
   assert.equal(collisionGroups([0], [1, 2]), ((1 << 16) | 0b110) >>> 0);
   assert.equal(collisionGroups(0xffff, 0xffff), 0xffffffff);
   assert.equal(collisionGroups([15], 0), 0x80000000);
-  assert.throws(() => collisionGroups([16]), /from 0 to 15/);
+  assert.throws(() => collisionGroups([16]), refusal(/from 0 to 15/));
 });
 
 test('geometryPositions reads stride-6 core geometry and packed raw arrays', () => {
@@ -135,7 +137,7 @@ rtest('trimesh indices reject fractional or wrapped values before native constru
       assert.throws(
         () =>
           physics.addBody(null, { type: 'fixed', colliders: { shape: 'trimesh', vertices, indices: [0, 1, invalid] } }),
-        /Trimesh index/,
+        refusal(/Trimesh index/),
       );
       assert.equal(physics.bodyCount, 0, 'Rejected collider must roll back its body');
     }
@@ -151,7 +153,10 @@ rtest('trimesh indices reject fractional or wrapped values before native constru
 
 test('geometry positions reject fractional or nonfinite strides', () => {
   for (const stride of [3.5, 0, Infinity, NaN])
-    assert.throws(() => geometryPositions({ vertices: new Float32Array(stride === 3.5 ? 7 : 6), stride }), /stride/);
+    assert.throws(
+      () => geometryPositions({ vertices: new Float32Array(stride === 3.5 ? 7 : 6), stride }),
+      refusal(/stride/),
+    );
 });
 
 rtest(
@@ -524,13 +529,16 @@ rtest('trimesh, convex hull and heightfield colliders support resting bodies', (
     { type: 'fixed', colliders: { shape: 'trimesh' } },
   );
   assert.deepEqual([...body.colliders[0].vertices()], [0, 0, 0, 2, 0, 0, 0, 3, 0]);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'trimesh' } }), /needs a mesh with geometry/);
+  assert.throws(
+    () => physics.addBody(null, { colliders: { shape: 'trimesh' } }),
+    refusal(/needs a mesh with geometry/),
+  );
   assert.throws(
     () =>
       physics.addBody(null, {
         colliders: { shape: 'heightfield', rows: 2, columns: 2, heights: [0], scale: [1, 1, 1] },
       }),
-    /\(rows \+ 1\)/,
+    refusal(/\(rows \+ 1\)/),
   );
   assert.equal(physics.bodyCount, 1, 'a failed addBody leaves nothing behind');
   physics.dispose();

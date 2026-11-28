@@ -230,8 +230,14 @@ test('locked axes hold under impulses and torques, and per-axis freedom reads ba
   assert.ok(pinned.position[2] > 0.2, 'lockTranslations(false) frees the body');
   pinned.lockRotations();
   assert.deepEqual(pinned.enabledRotations, [false, false, false]);
-  assert.throws(() => (flat.enabledTranslations = [true, false]), { name: 'MargoError', message: /three booleans/ });
-  assert.throws(() => (flat.enabledRotations = [1, 0, 1]), { name: 'MargoError', message: /three booleans/ });
+  assert.throws(
+    () => (flat.enabledTranslations = [true, false]),
+    (error) => rigidCoded(error) && /three booleans/.test(error.message),
+  );
+  assert.throws(
+    () => (flat.enabledRotations = [1, 0, 1]),
+    (error) => rigidCoded(error) && /three booleans/.test(error.message),
+  );
   dispose(list);
 });
 

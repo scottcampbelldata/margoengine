@@ -22,7 +22,14 @@ test('a uniform Hele-Shaw channel carries the plane-Poiseuille flow exactly', ()
     dx = 0.01;
   const t = heleShawTransmissivity(gap, viscosity);
   assert.equal(t, gap ** 3 / (12 * viscosity));
-  const flow = solveConfinedFlow({ columns: nx, rows: nz, cellSize: dx, transmissivity: t, thickness: gap, sides: { minX: drop, maxX: 0 } });
+  const flow = solveConfinedFlow({
+    columns: nx,
+    rows: nz,
+    cellSize: dx,
+    transmissivity: t,
+    thickness: gap,
+    sides: { minX: drop, maxX: 0 },
+  });
   const width = nz * dx,
     length = nx * dx,
     q = (t * width * drop) / length;
@@ -42,7 +49,13 @@ test('cells in series add their resistances exactly', () => {
     dx = 0.5,
     t = new Float64Array(nx * nz);
   for (let i = 0; i < t.length; i++) t[i] = i % nx < 10 ? 2e-3 : 5e-4;
-  const flow = solveConfinedFlow({ columns: nx, rows: nz, cellSize: dx, transmissivity: t, sides: { minX: 3, maxX: 1 } });
+  const flow = solveConfinedFlow({
+    columns: nx,
+    rows: nz,
+    cellSize: dx,
+    transmissivity: t,
+    sides: { minX: 3, maxX: 1 },
+  });
   const width = nz * dx,
     q = (2 * width) / ((10 * dx) / 2e-3 + (20 * dx) / 5e-4);
   near(flow.inflow, q, 1e-12 * q);
@@ -59,7 +72,8 @@ test('the five-point solve is exact for a harmonic quadratic with a fixed bounda
       if (row === 0 || col === 0 || row === nz - 1 || col === nx - 1) fixed[col + row * nx] = exact(col, row);
   const flow = solveConfinedFlow({ columns: nx, rows: nz, cellSize: dx, transmissivity: 1, fixed });
   for (let row = 1; row < nz - 1; row++)
-    for (let col = 1; col < nx - 1; col++) near(flow.potential[col + row * nx], exact(col, row), 1e-10, `${col},${row}`);
+    for (let col = 1; col < nx - 1; col++)
+      near(flow.potential[col + row * nx], exact(col, row), 1e-10, `${col},${row}`);
   near(flow.inflow, flow.outflow, 1e-10);
 });
 
@@ -74,14 +88,26 @@ test('a plate-gap obstacle conserves the flow and its streamlines cross the cell
     for (let col = 0; col < nx; col++)
       active[col + row * nx] = +(Math.hypot((col + 0.5) * dx - length / 2, (row + 0.5) * dx - width / 2) >= 0.04);
   const t = heleShawTransmissivity(0.001, 0.08);
-  const input = { columns: nx, rows: nz, cellSize: dx, transmissivity: t, thickness: 0.001, active, sides: { minX: 420, maxX: 0 }, origin: [-length / 2, -width / 2] };
+  const input = {
+    columns: nx,
+    rows: nz,
+    cellSize: dx,
+    transmissivity: t,
+    thickness: 0.001,
+    active,
+    sides: { minX: 420, maxX: 0 },
+    origin: [-length / 2, -width / 2],
+  };
   const flow = solveConfinedFlow(input);
   near(flow.inflow, flow.outflow, 1e-11 * flow.inflow, 'balance');
   assert.ok(flow.maxResidual < 1e-10 * flow.inflow, 'cell balance within the solve tolerance');
   const open = solveConfinedFlow({ ...input, active: undefined });
   assert.ok(flow.inflow < open.inflow);
   // Hele-Shaw flow is a potential flow: speeding past the cylinder's flanks, about twice the free stream.
-  assert.ok(flow.maxSpeed > 1.8 * open.maxSpeed && flow.maxSpeed < 2.8 * open.maxSpeed, `${flow.maxSpeed / open.maxSpeed}`);
+  assert.ok(
+    flow.maxSpeed > 1.8 * open.maxSpeed && flow.maxSpeed < 2.8 * open.maxSpeed,
+    `${flow.maxSpeed / open.maxSpeed}`,
+  );
   const lanes = traceStreamlines(flow, { seeds: [0.05, 0.5, 0.95] });
   for (const lane of lanes) {
     near(lane.x[0], -length / 2, 1e-15);
@@ -99,10 +125,20 @@ test('a well draws its own extraction from the fixed sides, and bad grids are re
     nz = 21,
     sources = new Float64Array(nx * nz);
   sources[10 + 10 * nx] = -0.002;
-  const flow = solveConfinedFlow({ columns: nx, rows: nz, cellSize: 5, transmissivity: 1e-3, sources, sides: { minX: 10, maxX: 10, minZ: 10, maxZ: 10 } });
+  const flow = solveConfinedFlow({
+    columns: nx,
+    rows: nz,
+    cellSize: 5,
+    transmissivity: 1e-3,
+    sources,
+    sides: { minX: 10, maxX: 10, minZ: 10, maxZ: 10 },
+  });
   near(flow.inflow, 0.002, 1e-12);
   near(flow.outflow, 0.002, 1e-12);
   assert.ok(flow.potential[10 + 10 * nx] < 10);
   assert.throws(() => solveConfinedFlow({ columns: 2, rows: 2, cellSize: 1, transmissivity: [1, 1, 1] }), RangeError);
-  assert.throws(() => solveConfinedFlow({ columns: 2, rows: 2, cellSize: 1, transmissivity: 1 }), { name: 'MargoError', code: 'failed' });
+  assert.throws(() => solveConfinedFlow({ columns: 2, rows: 2, cellSize: 1, transmissivity: 1 }), {
+    name: 'MargoError',
+    code: 'failed',
+  });
 });

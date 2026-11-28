@@ -246,9 +246,7 @@ export function parseDAE(input: ArrayBuffer | Uint8Array | string): MeshFile {
 
 function finish(corners: number[], name: string): MeshFile {
   if (!corners.length || !corners.every(Number.isFinite))
-    throw meshInput(
-      `The ${name} file holds no triangle with finite vertices; pass a binary or ASCII ${name} file.`,
-    );
+    throw meshInput(`The ${name} file holds no triangle with finite vertices; pass a binary or ASCII ${name} file.`);
   return weld(corners);
 }
 

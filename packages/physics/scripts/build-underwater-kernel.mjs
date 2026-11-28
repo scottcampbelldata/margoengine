@@ -35,13 +35,9 @@ for (const shared of variant ? [variant === 'shared'] : [false, true]) {
   const problems = moduleProblems(linker, bytes, shared);
   const { active, exports } = inspectModule(bytes);
   if (active.length || exports.__data_end?.value !== globalBase(linker))
-    problems.push(
-      'The stateless underwater module must have an empty data section; move its state into world regions',
-    );
+    problems.push('The stateless underwater module must have an empty data section; move its state into world regions');
   if (problems.length)
-    throw new Error(
-      'Invalid underwater kernel placement. Use the arena for all mutable state. ' + problems.join('. '),
-    );
+    throw new Error('Invalid underwater kernel placement. Use the arena for all mutable state. ' + problems.join('. '));
   const memory = new WebAssembly.Memory({ initial: DYNAMIC_BASE / PAGE, maximum: MAX_MEMORY_PAGES, shared });
   const sentinel = new Uint8Array(memory.buffer).fill(0xd7);
   new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory } });

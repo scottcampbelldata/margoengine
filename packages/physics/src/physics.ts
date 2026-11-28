@@ -293,9 +293,7 @@ export class ContactModification {
    */
   point(k: number): ContactPointModification {
     if (!Number.isInteger(k) || k < 0 || k >= this.contactCount)
-      throw bodyInput(
-        `This pair has ${this.contactCount} contact points; pass k from 0 to ${this.contactCount - 1}.`,
-      );
+      throw bodyInput(`This pair has ${this.contactCount} contact points; pass k from 0 to ${this.contactCount - 1}.`);
     return new ContactPointModification(this.kernel, this.row, this.row * 4 + k);
   }
   /**
@@ -333,7 +331,12 @@ export interface PhysicsSnapshot {
  * Kind of collision event: `contactstart`, `contactcontinue` and `contactend` for solid contacts, `intersectionstart` and
  * `intersectionend` for sensors.
  */
-export type CollisionEventType = 'contactstart' | 'contactcontinue' | 'contactend' | 'intersectionstart' | 'intersectionend';
+export type CollisionEventType =
+  | 'contactstart'
+  | 'contactcontinue'
+  | 'contactend'
+  | 'intersectionstart'
+  | 'intersectionend';
 /** Two colliders began or stopped touching. */
 export interface CollisionEvent {
   type: CollisionEventType;
@@ -796,9 +799,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   set lengthUnit(unit: number) {
     if (!(unit > 0) || !Number.isFinite(unit))
-      throw bodyInput(
-        `lengthUnit must be a finite number above 0: 1 for metres, 100 for centimetres (got ${unit}).`,
-      );
+      throw bodyInput(`lengthUnit must be a finite number above 0: 1 for metres, 100 for centimetres (got ${unit}).`);
     const kernel = this.kernel,
       { solver, prediction, sleepEnergy, sleepTime } = this.unitBase;
     this.unit = unit;
@@ -924,8 +925,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Advances the accumulator by `delta` seconds, runs whole fixed steps, then writes interpolated poses to meshes. Returns the number of steps. */
   update(delta: number): number {
     if (this.disposed) return 0;
-    if (!Number.isFinite(delta) || delta < 0)
-      throw bodyInput('delta must be a finite, non-negative number of seconds');
+    if (!Number.isFinite(delta) || delta < 0) throw bodyInput('delta must be a finite, non-negative number of seconds');
     let steps = 0;
     if (!this.paused) {
       const dt = this.fixedTimestep;
@@ -1981,9 +1981,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     const center = motion.centerOfMass ?? [0, 0, 0];
     checkVec(center, 'Center of mass');
     if (!(endTime >= 0) || !Number.isFinite(endTime))
-      throw bodyInput(
-        `The end time is 0 or more seconds and finite (got ${endTime}); pass how long the shape moves.`,
-      );
+      throw bodyInput(`The end time is 0 or more seconds and finite (got ${endTime}); pass how long the shape moves.`);
     this.live();
     if (queryParts(shape) || options.predicate)
       throw new MargoError(
@@ -2457,9 +2455,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** A collider's row, for the kernel; refuses what is not this world's. */
   private rowOf(collider: PhysicsCollider): number {
     if (!collider.valid || this.byRow.get(collider.handle) !== collider)
-      throw bodyInput(
-        'That collider was removed or belongs to another world; pass a collider from body.colliders.',
-      );
+      throw bodyInput('That collider was removed or belongs to another world; pass a collider from body.colliders.');
     return collider.handle;
   }
   private bodiesOf(rows: readonly number[], predicate: QueryFilter['predicate']): PhysicsBody[] {

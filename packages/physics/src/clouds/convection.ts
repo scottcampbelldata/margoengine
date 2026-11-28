@@ -63,7 +63,7 @@ const REFERENCE_PRESSURE = 100000;
 const PROJECTION_RELATIVE_TOLERANCE = 1e-10;
 const PROJECTION_ITERATIONS = 400;
 const MAX_SUBSTEPS = 4096;
-const MAX_CELLS = 2 ** 21;
+const MAX_CELLS = 1 << 21;
 const SATURATION_MINIMUM_K = 273.15 - 243.5;
 const STATE_F32_MAX = 3.4028234663852886e38;
 const WATER_DENSITY = 1000;
@@ -1011,7 +1011,7 @@ export class CloudSolver implements Solver<CloudParams> {
       bSquared += rhs[c]! * rhs[c]!;
       rz += r[c]! * z[c]!;
     }
-    const toleranceSquared = PROJECTION_RELATIVE_TOLERANCE ** 2 * bSquared;
+    const toleranceSquared = PROJECTION_RELATIVE_TOLERANCE * PROJECTION_RELATIVE_TOLERANCE * bSquared;
     let residualSquared = bSquared,
       iterations = 0;
     while (residualSquared > toleranceSquared && iterations < PROJECTION_ITERATIONS) {

@@ -37,9 +37,7 @@ export function cleanTrimesh(
   const count = vertices.length / 3;
   for (let i = 0; i < indices.length; i++)
     if (indices[i]! >= count)
-      throw meshInput(
-        `Trimesh index ${indices[i]} is out of range; keep every index below the ${count} vertices.`,
-      );
+      throw meshInput(`Trimesh index ${indices[i]} is out of range; keep every index below the ${count} vertices.`);
   let points = vertices,
     triangles = Array.from(indices);
   if (options.mergeDuplicateVertices) {

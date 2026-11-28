@@ -99,7 +99,10 @@ export class CloudProjection {
     const [plain, shared] = await Promise.all([
       compile(new URL(/* @vite-ignore */ './cloud-projection-kernel.wasm?no-inline', import.meta.url), signal),
       canShareMemory()
-        ? compile(new URL(/* @vite-ignore */ './cloud-projection-kernel-shared.wasm?no-inline', import.meta.url), signal)
+        ? compile(
+            new URL(/* @vite-ignore */ './cloud-projection-kernel-shared.wasm?no-inline', import.meta.url),
+            signal,
+          )
         : undefined,
     ]);
     if (threads === 1) return new CloudProjection(plain, shared);

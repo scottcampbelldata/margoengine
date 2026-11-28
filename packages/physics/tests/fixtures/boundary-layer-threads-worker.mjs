@@ -153,7 +153,8 @@ export async function runWind(shared, threads, scalar) {
 
 async function chromium() {
   try {
-    if (!globalThis.crossOriginIsolated) throw new Error('Serve the boundary-layer worker with cross-origin isolation.');
+    if (!globalThis.crossOriginIsolated)
+      throw new Error('Serve the boundary-layer worker with cross-origin isolation.');
     const ActualWorker = globalThis.Worker;
     let helpers = 0;
     globalThis.Worker = class extends ActualWorker {
@@ -190,4 +191,5 @@ async function chromium() {
   }
 }
 
-if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope) await chromium();
+if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope)
+  await chromium();

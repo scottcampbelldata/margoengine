@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { FiniteQuayWake } from '../dist/loads.js';
 import { PhysicsWorld, worldMemory } from '../dist/world.js';
 
-const here = (name) => new URL(name, new URL("../../../test-results/sea04-measured/", import.meta.url));
+const here = (name) => new URL(name, new URL('../../../test-results/sea04-measured/', import.meta.url));
 const hash = (buffer) => createHash('sha256').update(buffer).digest('hex');
 const read = (name) => readFileSync(here(name));
 const json = (name) => JSON.parse(read(name));
@@ -17,8 +17,8 @@ const tag = variant ? `-${variant}` : '';
 const planFile = `sea04-measured-plan${tag}.json`;
 const plan = json(planFile);
 const planSha = hash(read(planFile));
-const loadSha = hash(readFileSync(new URL('../dist/loads.js',import.meta.url)));
-const worldSha = hash(readFileSync(new URL('../dist/world.js',import.meta.url)));
+const loadSha = hash(readFileSync(new URL('../dist/loads.js', import.meta.url)));
+const worldSha = hash(readFileSync(new URL('../dist/world.js', import.meta.url)));
 
 function makeGrid(preset) {
   const { dx, layers } = plan.grids[preset];
@@ -83,12 +83,12 @@ function initialState(grid) {
   const dt = 1 / plan.rate;
   const depth = plan.depth;
   const discreteFreq = (k) => {
-    const kx = (2 / h) * Math.sin(k * h / 2);
+    const kx = (2 / h) * Math.sin((k * h) / 2);
     const a = Math.acosh(1 + (kx * dz) ** 2 / 2);
-    return Math.sqrt((2 * plan.gravity / dz) * Math.tanh(a * depth / dz) * Math.tanh(a / 2));
+    return Math.sqrt(((2 * plan.gravity) / dz) * Math.tanh((a * depth) / dz) * Math.tanh(a / 2));
   };
   const mode = plan.modes.map(([omega, re, im]) => {
-    const f = (2 / dt) * Math.tan(omega * dt / 2);
+    const f = (2 / dt) * Math.tan((omega * dt) / 2);
     let lower = 0;
     let upper = Math.PI / h;
     assert.ok(discreteFreq(upper) > f);
@@ -101,7 +101,7 @@ function initialState(grid) {
   });
   const z0 = grid.origin[1];
   const bins = Array.from({ length: grid.cells[1] }, (_, j) => {
-    const z = z0 + (j + .5) * h;
+    const z = z0 + (j + 0.5) * h;
     let eta = 0;
     let phi = 0;
     for (const m of mode) {
@@ -117,7 +117,11 @@ function initialState(grid) {
 }
 
 function evolve(grid, obstacle) {
-  const world = new PhysicsWorld({ gravity: [0, -plan.gravity, 0], rate: { num: plan.rate, den: 1 }, memory: worldMemory(false) });
+  const world = new PhysicsWorld({
+    gravity: [0, -plan.gravity, 0],
+    rate: { num: plan.rate, den: 1 },
+    memory: worldMemory(false),
+  });
   const wave = new FiniteQuayWake();
   const geometry = obstacle ? waterGeometry(grid) : { params: {}, cellsBlocked: 0, binaryObstacleArea_m2: 0 };
   world.add(wave, { ...grid, ...geometry.params, initial: initialState(grid) });
@@ -149,7 +153,12 @@ if (command === 'predict') {
   const grid = makeGrid(selected);
   console.log('predict', selected, grid.cells, grid.depths.length - 1, 'layers', plan.time_s.length, 'samples');
   const open = evolve(grid, false);
-  console.log('open meter RMS against incident', Math.sqrt(open.height_m.reduce((s, a, i) => s + (a - plan.analytical_incident_m[i]) ** 2, 0) / open.height_m.length));
+  console.log(
+    'open meter RMS against incident',
+    Math.sqrt(
+      open.height_m.reduce((s, a, i) => s + (a - plan.analytical_incident_m[i]) ** 2, 0) / open.height_m.length,
+    ),
+  );
   const cylinder = evolve(grid, true);
   const output = `sea04-measured-prediction-${selected}${tag}.json`;
   write(output, {
@@ -163,18 +172,19 @@ if (command === 'predict') {
 } else if (command === 'freeze') {
   const gridNames = selected ? [selected] : Object.keys(plan.grids);
   const distFingerprints = new Set();
-  const packets = Object.fromEntries(gridNames.map((name) => {
-    const filename = `sea04-measured-prediction-${name}${tag}.json`;
-    const data = json(filename);
-    assert.equal(data.plan_sha256,planSha);
-    distFingerprints.add(`${data.loads_dist_sha256}/${data.world_dist_sha256}`);
-    assert.equal(Object.keys(data.results)[0], name);
-    return [filename, hash(read(filename))];
-  }));
+  const packets = Object.fromEntries(
+    gridNames.map((name) => {
+      const filename = `sea04-measured-prediction-${name}${tag}.json`;
+      const data = json(filename);
+      assert.equal(data.plan_sha256, planSha);
+      distFingerprints.add(`${data.loads_dist_sha256}/${data.world_dist_sha256}`);
+      assert.equal(Object.keys(data.results)[0], name);
+      return [filename, hash(read(filename))];
+    }),
+  );
   assert.equal(distFingerprints.size, 1, 'Grid pair must use identical imported production bundles.');
   const output = `sea04-measured-frozen-predictions${tag}.json`;
-  write(output, { plan_sha256: planSha, loaded_bundles_sha256: [...distFingerprints][0],
-    prediction_sha256: packets });
+  write(output, { plan_sha256: planSha, loaded_bundles_sha256: [...distFingerprints][0], prediction_sha256: packets });
   console.log('frozen predictions', hash(read(output)));
 } else {
   throw new Error('Pass predict coarse, predict fine, or freeze.');

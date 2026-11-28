@@ -73,9 +73,11 @@ const lifecycle = {
       body = world.addBody(stage.box({ position: [0, 5, 0] }), {});
       world.on('afterstep', () => steps++);
     }
-    // Registered after the physics plugin, so it sees the steps that frame ran.
+    // Late and registered after the physics plugin (itself late, KB-PHYS-FRAMEORDER1), so it runs after the frame's
+    // step and logs the steps that frame ran; a plugin without `late` would log the previous frame's (KB-GPUMAIN1).
     stage.engine.use({
       name: 'lifecycle-log',
+      late: true,
       setup() {},
       onPreUpdate(delta) {
         log.push((latest = { delta, steps, y: body?.position[1] ?? 0 }));

@@ -80,8 +80,11 @@ try {
     await t.run('frames', 2);
     const [slow] = await t.run('drain');
     assert.equal(slow.delta, 0.05, 'engine.maxDelta clamps a 1 s frame');
+    // A 0.05 s frame at the 60 Hz step runs 3 steps in that frame, logged on that frame: a log that ran before the late
+    // physics step read the previous frame's count, and the first frame back then read the last frame before (KB-GPUMAIN1).
+    assert.ok(slow.steps >= 3 && slow.steps <= 4, `the 0.05 s frame logs its own steps: ${slow.steps}`);
     await t.done('D stage');
-    return { back, slow: slow.delta };
+    return { back, slow: slow.delta, slowSteps: slow.steps };
   });
   for (const mode of ['always', 'demand'])
     await scenario(`D: React frameloop="${mode}" after a 30 s background tab`, async () => {

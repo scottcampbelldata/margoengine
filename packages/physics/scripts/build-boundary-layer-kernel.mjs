@@ -46,6 +46,8 @@ for (const shared of variant ? [variant === 'shared'] : [false, true]) {
   const sentinel = new Uint8Array(memory.buffer).fill(0xd7);
   new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory } });
   if (!sentinel.every((value) => value === 0xd7))
-    throw new Error('Boundary-layer wind initialization overwrote the world; put all working data in solver-owned regions.');
+    throw new Error(
+      'Boundary-layer wind initialization overwrote the world; put all working data in solver-owned regions.',
+    );
   copyFileSync(file, new URL(shared ? 'boundary-layer-kernel-shared.wasm' : 'boundary-layer-kernel.wasm', output));
 }

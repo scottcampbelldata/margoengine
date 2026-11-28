@@ -245,8 +245,7 @@ export function inverseOf(a: number[][]): number[][] {
 export function jacobian(kernel: KernelWorld, multibody: Multibody, link: PhysicsBody, point: Vec3): number[][] {
   const bodies = [multibody.root, ...multibody.links.map((l) => l.body)],
     at = bodies.indexOf(link);
-  if (at < 0)
-    throw bodyInput('That link is not in this tree; pass a body that was given to physics.addMultibody.');
+  if (at < 0) throw bodyInput('That link is not in this tree; pass a body that was given to physics.addMultibody.');
   const tree = read(kernel, multibody),
     pose = poseOf(kernel, link.row);
   return jacobianOf(tree, at, add(pose.p, qrot(pose.q, point)));

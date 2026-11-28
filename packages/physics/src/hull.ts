@@ -103,8 +103,7 @@ const degenerate = (): MargoError =>
  * @throws MargoError (code `unsupported`) for fewer than four points, points that are not finite, or points that span no volume.
  */
 export function buildHull(input: ArrayLike<number>): HullFaces {
-  if (input.length % 3)
-    throw meshInput(`A convex hull got ${input.length} numbers; pass three (x, y, z) per point.`);
+  if (input.length % 3) throw meshInput(`A convex hull got ${input.length} numbers; pass three (x, y, z) per point.`);
   const count = input.length / 3;
   if (count < 4) throw meshInput(`A convex hull got ${count} points; pass at least four that span a volume.`);
   const low = [Infinity, Infinity, Infinity],

@@ -40,7 +40,9 @@ export function densityOf(value: number | MaterialName): number {
   if (typeof value === 'number') return value;
   const found = (densities as Record<string, number>)[value];
   if (found === undefined || !Object.hasOwn(densities, value))
-    throw bodyInput(`Unknown material '${String(value)}'; pass kilograms a cubic metre or one of ${Object.keys(densities).join(', ')}.`);
+    throw bodyInput(
+      `Unknown material '${String(value)}'; pass kilograms a cubic metre or one of ${Object.keys(densities).join(', ')}.`,
+    );
   return found;
 }
 

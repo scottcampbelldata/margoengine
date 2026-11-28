@@ -18,9 +18,7 @@ export function meshPose(
 ): { position: Vec3; rotation: Quat; fitScale?: [number, number, number] } {
   mesh.check();
   if (mesh instanceof CoreMesh && engine && meshRuntime(mesh).engine !== engine)
-    throw bodyInput(
-      'Physics mesh belongs to another engine; add meshes from the engine this Physics is attached to.',
-    );
+    throw bodyInput('Physics mesh belongs to another engine; add meshes from the engine this Physics is attached to.');
   if (parentOf(mesh) === -1)
     return {
       position: [mesh.position.x, mesh.position.y, mesh.position.z],

@@ -228,9 +228,7 @@ export function planTriangleCut(
   const normal = cross(subtract(blade[1], blade[0]), subtract(blade[2], blade[0]));
   const scale = Math.max(...normal.map(Math.abs));
   if (!(scale > 0 && Number.isFinite(scale)))
-    throw softError(
-      'The blade triangle has no representable area. Supply three noncollinear world-space corners.',
-    );
+    throw softError('The blade triangle has no representable area. Supply three noncollinear world-space corners.');
   const n = vector((i) => normal[i] / scale);
   const planes = [
     { origin: blade[0], normal: n },

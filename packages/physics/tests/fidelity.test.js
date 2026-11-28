@@ -12,9 +12,19 @@ const G = 9.81;
 /** A 0.5 m box on the floor under a 1 m box of `ratio` times its mass; how far the light box sinks after ten seconds. */
 function sag(ratio, fidelity) {
   const physics = new Physics(null, { fidelity });
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
-  const light = physics.addBody(null, { position: [0, 0.25, 0], colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25], density: 1 } });
-  physics.addBody(null, { position: [0, 1, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: ratio / 8 } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
+  });
+  const light = physics.addBody(null, {
+    position: [0, 0.25, 0],
+    colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25], density: 1 },
+  });
+  physics.addBody(null, {
+    position: [0, 1, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: ratio / 8 },
+  });
   for (let i = 0; i < 600; i++) physics.step();
   return { depth: 0.25 - light.position[1], physics };
 }
@@ -29,7 +39,10 @@ test('each tier sinks a light box under a heavy one by the depth its contact fre
         slop = physics.kernel.solver.allowedPenetration,
         expected = slop + ((ratio + 1) * G) / (2 * Math.PI * hertz) ** 2;
       // The soft constraint is damped and solved in passes, so it rests within 10 percent of its spring's depth.
-      assert.ok(Math.abs(depth - expected) <= 0.1 * expected, `${fidelity} 1:${ratio}: ${depth} m against ${expected} m`);
+      assert.ok(
+        Math.abs(depth - expected) <= 0.1 * expected,
+        `${fidelity} 1:${ratio}: ${depth} m against ${expected} m`,
+      );
     }
   assert.ok(sag(1000, 'high').depth < 1.5e-3, 'a 1:1000 stack stands within 1.5 mm at the high tier');
 });
@@ -45,6 +58,7 @@ test('the tier sets its substeps and contact frequency, leaves later settings al
   assert.equal(standard.substeps, 8);
   assert.throws(
     () => new Physics(null, { fidelity: 'ultra' }),
-    (error) => error.name === 'MargoError' && error.code === 'unsupported' && /errors#physics-bodies/.test(error.message),
+    (error) =>
+      error.name === 'MargoError' && error.code === 'unsupported' && /errors#physics-bodies/.test(error.message),
   );
 });

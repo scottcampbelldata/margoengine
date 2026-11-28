@@ -111,10 +111,26 @@ test('pipe flow solves the energy equation exactly for laminar Hagen-Poiseuille 
 test('Torricelli efflux and basin equalisation follow their closed forms', () => {
   const free = orificeFlow({ area: 1e-3, head: 2, dischargeCoefficient: 1, gravity: g });
   rel(free.idealSpeed, Math.sqrt(2 * g * 2), 1e-15);
-  rel(orificeFlow({ area: 1e-3, pressureDifference: 2 * WATER.density * g, gravity: g }).flow, 0.61e-3 * free.idealSpeed, 1e-12);
-  rel(orificeConductance(1e-3, 0.61) * Math.sqrt(1e4), orificeFlow({ area: 1e-3, pressureDifference: 1e4 }).flow, 1e-12);
+  rel(
+    orificeFlow({ area: 1e-3, pressureDifference: 2 * WATER.density * g, gravity: g }).flow,
+    0.61e-3 * free.idealSpeed,
+    1e-12,
+  );
+  rel(
+    orificeConductance(1e-3, 0.61) * Math.sqrt(1e4),
+    orificeFlow({ area: 1e-3, pressureDifference: 1e4 }).flow,
+    1e-12,
+  );
   // Two finite basins integrated with RK4 against the closed form.
-  const input = { area: 50, otherArea: 120, level: 1, otherLevel: 3, openingArea: 0.4, dischargeCoefficient: 0.62, gravity: g };
+  const input = {
+    area: 50,
+    otherArea: 120,
+    level: 1,
+    otherLevel: 3,
+    openingArea: 0.4,
+    dischargeCoefficient: 0.62,
+    gravity: g,
+  };
   let d = 2;
   const k = 0.62 * 0.4 * Math.sqrt(2 * g) * (1 / 50 + 1 / 120),
     f = (x) => -k * Math.sqrt(Math.max(0, x)),
@@ -219,7 +235,14 @@ const RAM = {
   driveDiameter: 0.042,
   driveResistance: 1.14e10,
   compliance: 7.5e-10,
-  waste: { conductance: 1.9e-5, tripFlow: 0.000788, closeTime: 0.036, holdTime: 0.09, reopenPressure: 4900, reopenTime: 0.055 },
+  waste: {
+    conductance: 1.9e-5,
+    tripFlow: 0.000788,
+    closeTime: 0.036,
+    holdTime: 0.09,
+    reopenPressure: 4900,
+    reopenTime: 0.055,
+  },
   checkConductance: 5.05e-6,
   deliveryConductance: 3.55e-6,
   vessel: { volume: 0.0023, exponent: 1.24 },
@@ -286,7 +309,14 @@ test('Manning normal depth meets the wide-channel closed form', () => {
 });
 
 test('a Pelton runner peaks at half the jet speed with the momentum-theory efficiency', () => {
-  const base = { netHead: 8.6, nozzleDiameter: 0.017, pitchRadius: 0.167, nozzleCoefficient: 0.978, bucketRetention: 0.9, gravity: g };
+  const base = {
+    netHead: 8.6,
+    nozzleDiameter: 0.017,
+    pitchRadius: 0.167,
+    nozzleCoefficient: 0.978,
+    bucketRetention: 0.9,
+    gravity: g,
+  };
   const beta = (18 * Math.PI) / 180;
   const best = peltonRunner({ ...base, exitAngle: beta, rpm: 0 }).optimumRpm;
   const top = peltonRunner({ ...base, exitAngle: beta, rpm: best });
@@ -301,7 +331,15 @@ test('a Pelton runner peaks at half the jet speed with the momentum-theory effic
 
 test('a hinged bellows sweeps the exact ruled volume between its boards', () => {
   // Rectangle x in [0.1, 0.4], z in [-0.1, 0.1]: A = 0.06, M = 0.2 (0.4² - 0.1²)/2 = 0.015.
-  const b = hingedBellows({ outline: [[0.1, -0.1], [0.4, -0.1], [0.4, 0.1], [0.1, 0.1]], gap: 0.03 });
+  const b = hingedBellows({
+    outline: [
+      [0.1, -0.1],
+      [0.4, -0.1],
+      [0.4, 0.1],
+      [0.1, 0.1],
+    ],
+    gap: 0.03,
+  });
   rel(b.area, 0.06, 1e-14);
   rel(b.firstMoment, 0.015, 1e-14);
   // Midpoint quadrature of the ruled map's Jacobian, g((1-s) + s cos θ) + x sin θ, over s and the outline.
@@ -372,11 +410,7 @@ test('a pipe network meets an independent three-reservoir solution, a series pip
   rel(pump.flows.pump, Math.sqrt(20 / (2000 + k)), 1e-9, 'pump operating point');
   // A closed valve isolates a branch.
   const shut = solveNetwork({
-    nodes: [
-      { id: 'R', kind: 'reservoir', head: 10 },
-      { id: 'J' },
-      { id: 'S', kind: 'reservoir', head: 0 },
-    ],
+    nodes: [{ id: 'R', kind: 'reservoir', head: 10 }, { id: 'J' }, { id: 'S', kind: 'reservoir', head: 0 }],
     links: [
       { id: 'p', from: 'R', to: 'J', length: 10, diameter: 0.05 },
       { id: 'v', kind: 'valve', from: 'J', to: 'S', area: 0 },

@@ -53,9 +53,7 @@ export function bindTensileSeam(
     throw softError('A tensile seam needs a finite strain above zero. Pass a dimensionless openingStrain.');
   for (const limit of [slidingStrain, tearingStrain]) {
     if (limit !== undefined && (!Number.isFinite(limit) || limit <= 0))
-      throw softError(
-        'A seam shear limit needs a finite strain above zero. Pass a positive strain or omit the limit.',
-      );
+      throw softError('A seam shear limit needs a finite strain above zero. Pass a positive strain or omit the limit.');
   }
   if (!Array.isArray(triangle) || triangle.length !== 3)
     throw softError('A tensile seam is triangular. Pass three points in the tetrahedron in rest space.');

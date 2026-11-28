@@ -200,9 +200,7 @@ export function convexDecomposition(
 ): ConvexDecomposition {
   const threshold = options.concavity ?? 0.05;
   if (!(threshold > 0) || !Number.isFinite(threshold))
-    throw meshInput(
-      `concavity must be a positive share of the mesh size, such as 0.05 (got ${options.concavity}).`,
-    );
+    throw meshInput(`concavity must be a positive share of the mesh size, such as 0.05 (got ${options.concavity}).`);
   const border = options.borderRadius ?? 0;
   if (!(border >= 0) || !Number.isFinite(border))
     throw meshInput(`borderRadius is 0 or more metres and finite (got ${border}); pass 0 for sharp parts.`);

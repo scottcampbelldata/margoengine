@@ -108,7 +108,8 @@ export function solveNetwork(network: PipeNetwork, options: NetworkSolveOptions 
     index.set(node.id, i);
     if (node.kind === 'reservoir') fixed.push(i);
     else if (node.kind === undefined || node.kind === 'junction') unknown.push(i);
-    else throw new RangeError(`Network node '${node.id}' has unknown kind '${String((node as { kind: unknown }).kind)}'.`);
+    else
+      throw new RangeError(`Network node '${node.id}' has unknown kind '${String((node as { kind: unknown }).kind)}'.`);
   });
   if (fixed.length === 0) throw new RangeError('A pipe network needs at least one reservoir to fix its heads.');
   const n = network.nodes.length,
@@ -147,7 +148,8 @@ export function solveNetwork(network: PipeNetwork, options: NetworkSolveOptions 
       positive('length', link.length);
       positive('diameter', link.diameter);
       flow[l] = 1e-3 * circleArea(link.diameter);
-    } else throw new RangeError(`Network link '${link.id}' has unknown kind '${String((link as { kind: unknown }).kind)}'.`);
+    } else
+      throw new RangeError(`Network link '${link.id}' has unknown kind '${String((link as { kind: unknown }).kind)}'.`);
   });
 
   // Head loss along link l at flow q and its derivative dh/dq (Newton's linearisation, kept positive).
@@ -171,7 +173,8 @@ export function solveNetwork(network: PipeNetwork, options: NetworkSolveOptions 
       f =
         link.frictionFactor ??
         darcyFriction(re, nonNegative('roughness', link.roughness ?? 0) / link.diameter, network.friction);
-    const r = ((f * link.length) / link.diameter + nonNegative('minorLoss', link.minorLoss ?? 0)) / (2 * g * area * area);
+    const r =
+      ((f * link.length) / link.diameter + nonNegative('minorLoss', link.minorLoss ?? 0)) / (2 * g * area * area);
     // Laminar flow: f = 64/Re makes the friction part linear in q; its derivative is then r|q| rather than 2r|q|.
     const laminar = link.frictionFactor === undefined && re > 0 && re < 2000 && network.friction !== 'churchill';
     return [r * q * Math.abs(q), Math.max(MIN_GRADIENT, (laminar ? 1 : 2) * r * Math.abs(q))];
@@ -256,7 +259,10 @@ export function solveNetwork(network: PipeNetwork, options: NetworkSolveOptions 
     }
   }
   if (iterations >= maxIterations && continuity > tolerance * Math.max(1, m))
-    throw new MargoError('failed', `The pipe network did not converge in ${maxIterations} iterations; check it is connected.`);
+    throw new MargoError(
+      'failed',
+      `The pipe network did not converge in ${maxIterations} iterations; check it is connected.`,
+    );
   const heads: Record<string, number> = {},
     pressureHeads: Record<string, number> = {},
     flows: Record<string, number> = {},

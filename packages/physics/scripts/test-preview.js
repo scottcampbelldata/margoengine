@@ -1,4 +1,6 @@
 // The physics render check on the WebGL2 preview backend: `node scripts/test-preview.js` (build the packages first).
+// MARGO_COMPAT not applicable: the page creates its engine with backend 'webgl2' and the preview renderer
+// (tests/preview-browser.js), never navigator.gpu, so the WebGL2 layer's shim would switch nothing (KB-PHYS-PREVIEWCOMPAT1).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

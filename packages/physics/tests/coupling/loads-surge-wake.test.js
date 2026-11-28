@@ -116,7 +116,14 @@ function waveEnergy(world, wake) {
   return 0.5 * density * cellSize ** 2 * (potential + kinetic / (nx * nz));
 }
 
-function setup({ reaction = true, axis = 'x', initial, speed = 1.25, shared = false, rate = { num: 60, den: 1 } } = {}) {
+function setup({
+  reaction = true,
+  axis = 'x',
+  initial,
+  speed = 1.25,
+  shared = false,
+  rate = { num: 60, den: 1 },
+} = {}) {
   const world = new PhysicsWorld({ rate, gravity: [0, -gravity, 0], memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, substeps: 1, gravity: [0, -gravity, 0] });
   const along = axis === 'x' ? 0 : 2;

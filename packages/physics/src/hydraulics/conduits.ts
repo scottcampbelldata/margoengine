@@ -62,7 +62,10 @@ export function darcyFriction(reynolds: number, relativeRoughness = 0, law: Fric
     x -= dx;
     if (Math.abs(dx) <= 1e-15 * x) return 1 / (x * x);
   }
-  throw new MargoError('failed', `Colebrook did not converge at Re ${reynolds}; check the roughness and Reynolds number.`);
+  throw new MargoError(
+    'failed',
+    `Colebrook did not converge at Re ${reynolds}; check the roughness and Reynolds number.`,
+  );
 }
 
 /** A circular pipe run: friction over its length plus lumped fittings. */
@@ -144,7 +147,10 @@ export function pipeFlow(run: PipeRun & { readonly head: number; readonly exitLo
     while (total(high) < h) {
       high *= 2;
       if (!Number.isFinite(high) || high > 1e9)
-        throw new MargoError('failed', 'Pipe flow has no finite speed; give the run a length, an exit loss or a fitting loss.');
+        throw new MargoError(
+          'failed',
+          'Pipe flow has no finite speed; give the run a length, an exit loss or a fitting loss.',
+        );
     }
     for (let i = 0; i < 200 && high - low > 1e-15 * high; i++) {
       const mid = 0.5 * (low + high);
@@ -200,7 +206,9 @@ export function orificeFlow(input: OrificeInput): OrificeFlow {
  * {@link HydraulicRam} take their valves in this form.
  */
 export function orificeConductance(area: number, dischargeCoefficient = 0.61, liquid: Liquid = WATER): number {
-  return nonNegative('area', area) * positive('dischargeCoefficient', dischargeCoefficient) * Math.sqrt(2 / liquid.density);
+  return (
+    nonNegative('area', area) * positive('dischargeCoefficient', dischargeCoefficient) * Math.sqrt(2 / liquid.density)
+  );
 }
 
 /** Two basins joined by an opening below both surfaces, such as a lock chamber and its river through a sluice. */
@@ -243,7 +251,10 @@ export interface Equalization {
 export function equalize(input: EqualizeInput): Equalization {
   const g = positive('gravity', input.gravity ?? GRAVITY),
     area = positive('area', input.area),
-    otherArea = input.otherArea === undefined || input.otherArea === Number.POSITIVE_INFINITY ? Number.POSITIVE_INFINITY : positive('otherArea', input.otherArea),
+    otherArea =
+      input.otherArea === undefined || input.otherArea === Number.POSITIVE_INFINITY
+        ? Number.POSITIVE_INFINITY
+        : positive('otherArea', input.otherArea),
     opening = nonNegative('openingArea', input.openingArea),
     cd = positive('dischargeCoefficient', input.dischargeCoefficient ?? 0.61),
     level = finite('level', input.level),
@@ -361,7 +372,8 @@ export function plugTracer(areaAt: (x: number) => number, start: number, end: nu
   finite('start', start);
   finite('end', end);
   if (!(end > start)) throw new RangeError(`Tracer end ${end} must lie beyond its start ${start}.`);
-  if (!Number.isInteger(steps) || steps < 1) throw new RangeError(`Tracer steps must be a positive integer; got ${steps}.`);
+  if (!Number.isInteger(steps) || steps < 1)
+    throw new RangeError(`Tracer steps must be a positive integer; got ${steps}.`);
   const dx = (end - start) / steps,
     area = new Float64Array(steps + 1),
     table = new Float64Array(steps + 1);
@@ -479,11 +491,21 @@ export function pipeWaveSpeed(pipe: ElasticPipe): number {
     nu = finite('poissonRatio', pipe.poissonRatio ?? 0.3),
     restraint = pipe.restraint ?? 'expansion-joints';
   const c =
-    restraint === 'expansion-joints' ? 1 : restraint === 'anchored' ? 1 - nu * nu : restraint === 'anchored-upstream' ? 1 - nu / 2 : NaN;
+    restraint === 'expansion-joints'
+      ? 1
+      : restraint === 'anchored'
+        ? 1 - nu * nu
+        : restraint === 'anchored-upstream'
+          ? 1 - nu / 2
+          : NaN;
   if (Number.isNaN(c))
-    throw new RangeError(`Pipe restraint '${String(restraint)}' is unknown; use 'expansion-joints', 'anchored' or 'anchored-upstream'.`);
+    throw new RangeError(
+      `Pipe restraint '${String(restraint)}' is unknown; use 'expansion-joints', 'anchored' or 'anchored-upstream'.`,
+    );
   const k = liquid.bulkModulus,
-    ratio = (c * k * positive('diameter', pipe.diameter)) / (positive('youngsModulus', pipe.youngsModulus) * positive('wallThickness', pipe.wallThickness));
+    ratio =
+      (c * k * positive('diameter', pipe.diameter)) /
+      (positive('youngsModulus', pipe.youngsModulus) * positive('wallThickness', pipe.wallThickness));
   return Math.sqrt(k / liquid.density / (1 + ratio));
 }
 
@@ -523,4 +545,3 @@ export function jetPoint(
     origin[2] + velocity[2] * time,
   ];
 }
-

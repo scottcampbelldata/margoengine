@@ -6,10 +6,10 @@ const base = new URL('../../../test-results/sea04-stem/', import.meta.url);
 mkdirSync(base, { recursive: true });
 const [command, grid] = process.argv.slice(2);
 const dist = process.env.SEA04_STEM_SNAPSHOT ? new URL('built/', base) : new URL('../dist/', import.meta.url);
-const [ { Physics }, { WakeSolver }, { HullSolver, volumeBelow }, { PhysicsWorld, RigidSolver, worldMemory } ] =
-  command === 'predict' || command === 'source-control' ?
-    await Promise.all(['index.js', 'sea.js', 'seakeeping.js', 'world.js'].map((name) => import(new URL(name,dist))))
-    : [{},{},{},{}];
+const [{ Physics }, { WakeSolver }, { HullSolver, volumeBelow }, { PhysicsWorld, RigidSolver, worldMemory }] =
+  command === 'predict' || command === 'source-control'
+    ? await Promise.all(['index.js', 'sea.js', 'seakeeping.js', 'world.js'].map((name) => import(new URL(name, dist))))
+    : [{}, {}, {}, {}];
 const path = (name) => new URL(`sea04-stem-${name}.json`, base);
 const hash = (input) => createHash('sha256').update(input).digest('hex');
 const read = (name) => JSON.parse(readFileSync(path(name), 'utf8'));
@@ -27,7 +27,7 @@ const plan = {
   g_mps2: 9.8,
   density_kgm3: 1000,
   froude: [0.267, 0.316],
-  stations_2xOverL: [-1, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60],
+  stations_2xOverL: [-1, -0.95, -0.9, -0.85, -0.8, -0.75, -0.7, -0.65, -0.6],
   physicalTravelLengths: [1.5, 2, 2.5],
   selectedTravelLength: 2.5,
   startX_m: -4,
@@ -38,16 +38,18 @@ const plan = {
   meshDepthLevels: 24,
   gauges: 'Exact still-water beam contour at each Table I coordinate. Port/starboard average.',
   waterlineCondition: 'The hull is fixed in trim and sinkage and free only to travel at the prescribed speed along +X.',
-  geometryScope: 'Fixed absorbing grid. The 3.5 m reflective tank width, wall run-up and wet moving hull are outside this wake-grid model.',
+  geometryScope:
+    'Fixed absorbing grid. The 3.5 m reflective tank width, wall run-up and wet moving hull are outside this wake-grid model.',
   grids: { coarse: 0.05, fine: 0.025 },
   variants: ['surfaceAdvance', 'depthBanded'],
-  comparisonScope: 'The stem and the nine contiguous bow stations. Freeze bundle, plan and packet hashes before reading elevations.',
+  comparisonScope:
+    'The stem and the nine contiguous bow stations. Freeze bundle, plan and packet hashes before reading elevations.',
 };
 const planSha = hash(JSON.stringify(plan));
 const bundleHashes = () =>
-  Object.fromEntries(['index.js', 'world.js', 'sea.js', 'seakeeping.js'].map((name) =>
-    [name, hash(readFileSync(new URL(name, dist)))]
-  ));
+  Object.fromEntries(
+    ['index.js', 'world.js', 'sea.js', 'seakeeping.js'].map((name) => [name, hash(readFileSync(new URL(name, dist)))]),
+  );
 const heldout = new URL('sea04-stem-observations.json', import.meta.url);
 
 function meshWigley() {
@@ -57,7 +59,7 @@ function meshWigley() {
     return [y, 1 - (y / draft) ** 2];
   });
   // Surface-piercing parabolic hull with a dry vertical closure. The dry closure adds no displacement.
-  const section = [[-draft, 0], ...side, [0.1, 1], [0.1, -1], ...side.map(([y,z]) => [y, -z]).reverse()];
+  const section = [[-draft, 0], ...side, [0.1, 1], [0.1, -1], ...side.map(([y, z]) => [y, -z]).reverse()];
   const stride = section.length;
   const vertices = new Float64Array(3 * (stations + 1) * stride);
   const indices = [];
@@ -88,8 +90,8 @@ function readWaterline(wake, origin, speed) {
     // outward normal (-db/dx,0,1). Use the mirrored side at -Z.
     const scale = Math.hypot(dbdx, 1);
     const required = (-dbdx * speed) / scale;
-    const induced = (-dbdx * (starboard.velocity[0] + port.velocity[0])
-      + starboard.velocity[2] - port.velocity[2]) / (2 * scale);
+    const induced =
+      (-dbdx * (starboard.velocity[0] + port.velocity[0]) + starboard.velocity[2] - port.velocity[2]) / (2 * scale);
     return {
       station_2xOverL: station,
       bodyX_m: x,
@@ -109,25 +111,34 @@ function predict(grid, froude, variant, stations = 24) {
   const density = plan.density_kgm3;
   const speed = froude * Math.sqrt(g * plan.length_m);
   const dt = 1 / plan.rate_hz;
-  const world = new PhysicsWorld({ rate: { num: plan.rate_hz, den: 1 }, gravity: [0,-g,0], memory: worldMemory(false) });
-  using physics = new Physics(null, { arena: world.arena, gravity: [0,-g,0], fixedTimestep: dt, substeps: 1 });
-  const volume = volumeBelow(mesh, [0,1,0], 0);
+  const world = new PhysicsWorld({
+    rate: { num: plan.rate_hz, den: 1 },
+    gravity: [0, -g, 0],
+    memory: worldMemory(false),
+  });
+  using physics = new Physics(null, { arena: world.arena, gravity: [0, -g, 0], fixedTimestep: dt, substeps: 1 });
+  const volume = volumeBelow(mesh, [0, 1, 0], 0);
   assert.ok(Math.abs(volume / ((4 / 9) * plan.length_m * plan.beam_m * plan.draft_m) - 1) < 0.002);
   const body = physics.addBody(null, {
-    position: [plan.startX_m,0,0],
-    linearVelocity: [speed,0,0],
-    enabledTranslations: [true,false,false],
-    enabledRotations: [false,false,false],
-    colliders: { shape: 'box', halfExtents: [plan.length_m/2,plan.draft_m,plan.beam_m/2], mass: density * volume },
+    position: [plan.startX_m, 0, 0],
+    linearVelocity: [speed, 0, 0],
+    enabledTranslations: [true, false, false],
+    enabledRotations: [false, false, false],
+    colliders: {
+      shape: 'box',
+      halfExtents: [plan.length_m / 2, plan.draft_m, plan.beam_m / 2],
+      mass: density * volume,
+    },
   });
   const cellSize = plan.grids[grid];
-  const depthEdges = Array.from({ length: 5 }, (_, i) => plan.draft_m * i / 4);
+  const depthEdges = Array.from({ length: 5 }, (_, i) => (plan.draft_m * i) / 4);
   // Cover half the source's printed draft increment for the mass-derived
   // reference surface. The actual mesh and target draft stay untouched.
   depthEdges[4] += plan.finalDepthBandMargin_m;
-  const wakeOptions = variant === 'depthBanded'
-    ? { minimumRadius: cellSize / Math.sqrt(2), submergedAdvance: depthEdges }
-    : { minimumRadius: cellSize / Math.sqrt(2), advance: true };
+  const wakeOptions =
+    variant === 'depthBanded'
+      ? { minimumRadius: cellSize / Math.sqrt(2), submergedAdvance: depthEdges }
+      : { minimumRadius: cellSize / Math.sqrt(2), advance: true };
   const hull = new HullSolver('hull', wakeOptions);
   const wave = new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
   world
@@ -163,10 +174,25 @@ function predict(grid, froude, variant, stations = 24) {
     assert.equal(sway, 0);
     const rows = readWaterline(wave, origin, speed);
     assert.ok(rows.every((value) => Object.values(value).every(Number.isFinite)));
-    history.push({ targetTravelLengths: distance, tick, origin_m: origin, actualTravel_m: origin-plan.startX_m, stations: rows });
+    history.push({
+      targetTravelLengths: distance,
+      tick,
+      origin_m: origin,
+      actualTravel_m: origin - plan.startX_m,
+      stations: rows,
+    });
   }
-  assert.ok(history.at(-1).stations.some((row) => Math.abs(row.height_m)>0.005));
-  return { grid, spec: wakeOptions, sourceStations: stations, froude, variant, speed_mps: speed, volume_m3: volume, history };
+  assert.ok(history.at(-1).stations.some((row) => Math.abs(row.height_m) > 0.005));
+  return {
+    grid,
+    spec: wakeOptions,
+    sourceStations: stations,
+    froude,
+    variant,
+    speed_mps: speed,
+    volume_m3: volume,
+    history,
+  };
 }
 
 if (command === 'predict') {
@@ -221,62 +247,96 @@ if (command === 'predict') {
   const sourceData = readFileSync(heldout);
   assert.equal(frozen.planSha, planSha);
   assert.equal(hash(sourceData), frozen.sourceTranscriptionSha);
-  for (const [name, digest] of Object.entries(frozen.predictedSha)) assert.equal(hash(readFileSync(path(name))), digest);
+  for (const [name, digest] of Object.entries(frozen.predictedSha))
+    assert.equal(hash(readFileSync(path(name))), digest);
   const data = JSON.parse(sourceData);
   assert.deepEqual(data.froude_by_column, plan.froude);
-  assert.deepEqual(data.rows.map(([station]) => station), plan.stations_2xOverL);
-  const scores = Object.keys(frozen.predictedSha).flatMap((name) => read(name).forecasts.map((result) => {
-    const scale = result.speed_mps ** 2 / plan.g_mps2;
-    const index = 1 + plan.froude.indexOf(result.froude);
-    const observation = data.rows.map((measured) => scale * measured[index]);
-    const latest = result.history.find((snapshot) => snapshot.targetTravelLengths === plan.selectedTravelLength);
-    const middle = result.history.find((snapshot) => snapshot.targetTravelLengths === 2);
-    const stations = latest.stations.map((row,i) => ({
-      ...row, observed_m: observation[i], error_m: row.height_m-observation[i],
-    }));
-    const peak = stations.reduce((max,row) => row.height_m>max.height_m ? row : max);
-    return {
-      ...result, stations, sternExcluded: true,
-      stemError_m: stations[0].error_m,
-      observedStem_m: observation[0],
-      predictedStem_m: stations[0].height_m,
-      maximumPredicted_m: peak.height_m,
-      maximumPredicted_2xOverL: peak.station_2xOverL,
-      maximumObserved_m: Math.max(...observation),
-      maximumObserved_2xOverL: stations[observation.indexOf(Math.max(...observation))].station_2xOverL,
-      bowProfileRms_m: rms(stations.map((row) => row.error_m)),
-      profileChangeBetween2and2_5Lengths_m: rms(stations.map((row,i) => row.height_m-middle.stations[i].height_m)),
-      sideNormalRms_mps: rms(stations.slice(1).map((row) => row.side_normal_residual_mps)),
-      printedHalfIncrement_m: 0.5 * data.printed_ordinate_step * scale,
-    };
-  }));
-  const twoGrid = scores.filter((s) => s.grid==='fine').map((fine) => {
-    const coarse = scores.find((s) => s.grid==='coarse' && s.froude===fine.froude && s.variant===fine.variant);
-    return { froude: fine.froude, variant: fine.variant, sameStationDeltaRms_m: rms(fine.stations.map((row,i) =>
-      row.height_m-coarse.stations[i].height_m)),
-      stemDelta_m: fine.predictedStem_m-coarse.predictedStem_m };
-  });
+  assert.deepEqual(
+    data.rows.map(([station]) => station),
+    plan.stations_2xOverL,
+  );
+  const scores = Object.keys(frozen.predictedSha).flatMap((name) =>
+    read(name).forecasts.map((result) => {
+      const scale = result.speed_mps ** 2 / plan.g_mps2;
+      const index = 1 + plan.froude.indexOf(result.froude);
+      const observation = data.rows.map((measured) => scale * measured[index]);
+      const latest = result.history.find((snapshot) => snapshot.targetTravelLengths === plan.selectedTravelLength);
+      const middle = result.history.find((snapshot) => snapshot.targetTravelLengths === 2);
+      const stations = latest.stations.map((row, i) => ({
+        ...row,
+        observed_m: observation[i],
+        error_m: row.height_m - observation[i],
+      }));
+      const peak = stations.reduce((max, row) => (row.height_m > max.height_m ? row : max));
+      return {
+        ...result,
+        stations,
+        sternExcluded: true,
+        stemError_m: stations[0].error_m,
+        observedStem_m: observation[0],
+        predictedStem_m: stations[0].height_m,
+        maximumPredicted_m: peak.height_m,
+        maximumPredicted_2xOverL: peak.station_2xOverL,
+        maximumObserved_m: Math.max(...observation),
+        maximumObserved_2xOverL: stations[observation.indexOf(Math.max(...observation))].station_2xOverL,
+        bowProfileRms_m: rms(stations.map((row) => row.error_m)),
+        profileChangeBetween2and2_5Lengths_m: rms(stations.map((row, i) => row.height_m - middle.stations[i].height_m)),
+        sideNormalRms_mps: rms(stations.slice(1).map((row) => row.side_normal_residual_mps)),
+        printedHalfIncrement_m: 0.5 * data.printed_ordinate_step * scale,
+      };
+    }),
+  );
+  const twoGrid = scores
+    .filter((s) => s.grid === 'fine')
+    .map((fine) => {
+      const coarse = scores.find((s) => s.grid === 'coarse' && s.froude === fine.froude && s.variant === fine.variant);
+      return {
+        froude: fine.froude,
+        variant: fine.variant,
+        sameStationDeltaRms_m: rms(fine.stations.map((row, i) => row.height_m - coarse.stations[i].height_m)),
+        stemDelta_m: fine.predictedStem_m - coarse.predictedStem_m,
+      };
+    });
   let sourceControl;
   if (frozen.sourceControlSha) {
     assert.equal(hash(readFileSync(path('source-control'))), frozen.sourceControlSha);
     const control = read('source-control').result;
-    const baseline = scores.find((run) => run.grid==='fine' && run.froude===control.froude && run.variant===control.variant);
-    const stations = control.history.find((run) => run.targetTravelLengths===plan.selectedTravelLength).stations;
+    const baseline = scores.find(
+      (run) => run.grid === 'fine' && run.froude === control.froude && run.variant === control.variant,
+    );
+    const stations = control.history.find((run) => run.targetTravelLengths === plan.selectedTravelLength).stations;
     sourceControl = {
       stations: control.sourceStations,
       baselineStations: baseline.sourceStations,
-      sameStationDeltaRms_m: rms(stations.map((row,i) => row.height_m-baseline.stations[i].height_m)),
+      sameStationDeltaRms_m: rms(stations.map((row, i) => row.height_m - baseline.stations[i].height_m)),
       observedStem_m: baseline.observedStem_m,
       predictedStem_m: stations[0].height_m,
       sideNormalRms_mps: rms(stations.slice(1).map((row) => row.side_normal_residual_mps)),
     };
   }
-  write('score', { source: data.reference, sourcePdfSha: data.source_pdf_sha256, planSha, sourceControl,
-    scoreQualification: 'Measured diagnostic. Report source printing, travel sensitivity, grid changes and model residual separately. The source does not report WG uncertainty.',
-    twoGrid, scores });
+  write('score', {
+    source: data.reference,
+    sourcePdfSha: data.source_pdf_sha256,
+    planSha,
+    sourceControl,
+    scoreQualification:
+      'Measured diagnostic. Report source printing, travel sensitivity, grid changes and model residual separately. The source does not report WG uncertainty.',
+    twoGrid,
+    scores,
+  });
   for (const s of scores) {
-    console.log(s.grid,s.variant,s.froude, 'stem predicted/observed mm', 1000*s.predictedStem_m, 1000*s.observedStem_m,
-      'profile RMS mm', 1000*s.bowProfileRms_m, 'normal RMS m/s', s.sideNormalRms_mps);
+    console.log(
+      s.grid,
+      s.variant,
+      s.froude,
+      'stem predicted/observed mm',
+      1000 * s.predictedStem_m,
+      1000 * s.observedStem_m,
+      'profile RMS mm',
+      1000 * s.bowProfileRms_m,
+      'normal RMS m/s',
+      s.sideNormalRms_mps,
+    );
   }
   console.log('two-grid', JSON.stringify(twoGrid));
   if (sourceControl) console.log('source refinement', JSON.stringify(sourceControl));

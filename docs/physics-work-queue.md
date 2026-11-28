@@ -461,7 +461,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
 | FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | REOPENED (4/8 at e3bd12821b, points 5–8, [evidence](physics-solver-audit.md#fluid-06-four-point-pass)), prior landing a540dd915c |
 | FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 3cb9cb3ebc |
-| HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | REOPENED (4/8 at 58bd4188d0, points 5–8, [evidence](physics-solver-audit.md#hydro-02-four-point-pass)), prior landing 9f6f7e9004 |
+| HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | REOPENED (4/8 at 58bd4188d0, points 5–8, [evidence](physics-solver-audit.md#hydro-02-four-point-pass)), prior landing 9f6f7e9004. Note (Claude (Scott 2026-11-28), physics lane P): `runoff/index.ts` takes `hypot` from `@margoengine/math/pinned` where its reach length overflowed to `Math.hypot` (`check:pinned-math`); no other change |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | REOPENED (4/8 at 897e9aa010, points 5–8, [evidence](physics-solver-audit.md#hydro-04-four-point-pass)), prior landing dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Claude | CLAIMED (Fauld film) |
 | HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed b6e01ceb4c |
@@ -527,7 +527,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed f9161cc7e |
 | ATMO-01 | Boundary-layer wind field | physics/boundary-layer and weather/boundary-layer | Codex | REOPENED (4/8 at 9d7dd26bc5, points 5–8, [evidence](physics-solver-audit.md#atmo-01-four-point-pass)), prior landing c38c25d3d |
 | ATMO-02 | Atmospheric turbulence and gusts | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
-| ATMO-03 | Moist convection and cloud dynamics | physics/clouds and environment/density-volume | Codex | REOPENED (4/8 at 9622992eda, points 5–8, [evidence](physics-solver-audit.md#atmo-03-four-point-pass)), prior landing 8833dbf0c |
+| ATMO-03 | Moist convection and cloud dynamics | physics/clouds and environment/density-volume | Codex | REOPENED (4/8 at 9622992eda, points 5–8, [evidence](physics-solver-audit.md#atmo-03-four-point-pass)), prior landing 8833dbf0c. Note (Claude (Scott 2026-11-28), physics lane P): `clouds/convection.ts` writes its two `**` as `1 << 21` and a product (`check:pinned-math`), the same values |
 
 ## Taken
 

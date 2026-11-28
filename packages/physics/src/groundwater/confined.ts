@@ -208,7 +208,10 @@ export function solveConfinedFlow(input: ConfinedFlowInput): ConfinedFlow {
   }
   for (let i = 0; i < n; i++)
     if (free(i) && !reached[i])
-      throw new MargoError('failed', `Cell ${i} has no path to a fixed potential; open a side or fix a cell it reaches.`);
+      throw new MargoError(
+        'failed',
+        `Cell ${i} has no path to a fixed potential; open a side or fix a cell it reaches.`,
+      );
   const multiply = (v: Float64Array, out: Float64Array): void => {
     for (let i = 0; i < n; i++) {
       if (!free(i)) {
@@ -324,7 +327,8 @@ function assemble(
       flowZ[col + j * nx] = value;
     }
   const psi = new Float64Array(pitch * (nz + 1));
-  for (let j = 0; j < nz; j++) for (let f = 0; f <= nx; f++) psi[f + (j + 1) * pitch] = psi[f + j * pitch]! + flowX[f + j * pitch]!;
+  for (let j = 0; j < nz; j++)
+    for (let f = 0; f <= nx; f++) psi[f + (j + 1) * pitch] = psi[f + j * pitch]! + flowX[f + j * pitch]!;
   let maxSpeed = 0,
     maxResidual = 0,
     inflow = 0,

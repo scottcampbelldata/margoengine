@@ -250,7 +250,8 @@ export class HydraulicRam {
           storedEnd: this.#stored(frame),
           cycles,
         };
-      const settled = cycles >= minCycles && previous !== undefined && Math.abs(previous - frame.vesselWater) < tolerance;
+      const settled =
+        cycles >= minCycles && previous !== undefined && Math.abs(previous - frame.vesselWater) < tolerance;
       previous = frame.vesselWater;
       frames = [];
       mark = { ...total };
@@ -263,7 +264,10 @@ export class HydraulicRam {
     });
     signal?.throwIfAborted();
     if (!run.stopped || !found)
-      throw new MargoError('failed', `No settled ram cycle at a ${lift} m lift within ${maxSeconds} s; check the valve settings.`);
+      throw new MargoError(
+        'failed',
+        `No settled ram cycle at a ${lift} m lift within ${maxSeconds} s; check the valve settings.`,
+      );
     return found;
   }
 
@@ -313,7 +317,8 @@ export class HydraulicRam {
       phase: RamPhase = 0,
       inPhase = 0,
       peak = p;
-    if (!(water >= 0 && water < this.#vessel)) throw new RangeError(`Initial vessel water ${water} m³ must lie in [0, vessel volume).`);
+    if (!(water >= 0 && water < this.#vessel))
+      throw new RangeError(`Initial vessel water ${water} m³ must lie in [0, vessel volume).`);
     const total = { drive: 0, waste: 0, check: 0, delivered: 0 };
     const ticks = Math.floor(seconds / step);
     for (let tick = 0; tick < ticks; tick++) {

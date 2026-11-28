@@ -112,7 +112,8 @@ export async function runCloud(shared, threads) {
 
 async function chromium() {
   try {
-    if (!globalThis.crossOriginIsolated) throw new Error('Serve the cloud projection worker with cross-origin isolation.');
+    if (!globalThis.crossOriginIsolated)
+      throw new Error('Serve the cloud projection worker with cross-origin isolation.');
     const ActualWorker = globalThis.Worker;
     let helpers = 0;
     globalThis.Worker = class extends ActualWorker {
@@ -149,4 +150,5 @@ async function chromium() {
   }
 }
 
-if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope) await chromium();
+if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope)
+  await chromium();

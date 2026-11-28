@@ -51,7 +51,11 @@ const sphereGeometry = (r, w, h) => {
 };
 const lowest = (body) => Math.min(...body.particlePositions().filter((_, i) => i % 3 === 1));
 const ground = (physics) =>
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
+  });
 
 test('the quick start: a soft ball dropped on the ground bounces, then rests holding its volume', async () => {
   const physics = new Physics(null);
@@ -89,7 +93,10 @@ test('a ball on flat ground keeps no face contact its corners already hold (KB-S
   steps(physics, 240);
   const rows = soft.capacity[6];
   assert.ok(rows > 0, 'the rim still has its face contacts');
-  assert.ok(rows <= ball.sourceMesh.indices.length / 6, `at most ${ball.sourceMesh.indices.length / 6} face rows, not ${rows}`);
+  assert.ok(
+    rows <= ball.sourceMesh.indices.length / 6,
+    `at most ${ball.sourceMesh.indices.length / 6} face rows, not ${rows}`,
+  );
 });
 
 test('volume welds a mesh split at its seams into one closed surface of the right volume and mass', async () => {
@@ -109,7 +116,9 @@ test('volume welds a mesh split at its seams into one closed surface of the righ
     packed.set(mesh.uvs.slice(v * 2, v * 2 + 2), v * 20 + 12);
   }
   const primitive = soft.create(
-    SoftBodyDesc.volume({ vertices: packed, indices: Uint32Array.from(mesh.indices), definition: {} }).setTranslation([6, 0, 0]),
+    SoftBodyDesc.volume({ vertices: packed, indices: Uint32Array.from(mesh.indices), definition: {} }).setTranslation([
+      6, 0, 0,
+    ]),
   );
   assert.equal(primitive.numParticles(), ball.numParticles(), 'a glTF primitive is read at its 20-float stride');
   assert.deepEqual([...primitive.sourceMesh.uvs], [...ball.sourceMesh.uvs], 'and its TEXCOORD_0 kept');
@@ -136,7 +145,8 @@ test('volume welds a mesh split at its seams into one closed surface of the righ
     { particles } = brick.sourceMesh;
   const geometry = box(0.5, 0.2, 0.1);
   for (let v = 0; v < particles.length; v++)
-    for (let a = 0; a < 3; a++) near(p[particles[v] * 3 + a], geometry.vertices[v * 6 + a] + (a === 0 ? 3 : 0), 1e-6, 'vertex');
+    for (let a = 0; a < 3; a++)
+      near(p[particles[v] * 3 + a], geometry.vertices[v * 6 + a] + (a === 0 ? 3 : 0), 1e-6, 'vertex');
 });
 
 test('an impulse moves a soft volume at J / M, and its own forces, gas included, move it nowhere', async () => {
@@ -214,8 +224,12 @@ test('anchoring and stiffness: a pinned particle holds the ball up, and a softer
   // Particle 0 is the top pole of the sphere.
   const ball = soft.create(hung.setPinnedParticles([0]));
   const top = ball.particlePosition(0);
-  const softBall = soft.create(SoftBodyDesc.volume(sphereGeometry(0.3, 12, 8), { stiffness: 4 }).setTranslation([2, 0.4, 0]));
-  const firm = soft.create(SoftBodyDesc.volume(sphereGeometry(0.3, 12, 8), { stiffness: 40 }).setTranslation([-2, 0.4, 0]));
+  const softBall = soft.create(
+    SoftBodyDesc.volume(sphereGeometry(0.3, 12, 8), { stiffness: 4 }).setTranslation([2, 0.4, 0]),
+  );
+  const firm = soft.create(
+    SoftBodyDesc.volume(sphereGeometry(0.3, 12, 8), { stiffness: 40 }).setTranslation([-2, 0.4, 0]),
+  );
   steps(physics, 180);
   assert.deepEqual(ball.particlePosition(0), top, 'the pinned particle does not move');
   assert.ok(ball.centerOfMass()[1] < top[1] - 0.25, 'the ball hangs below its anchor');
@@ -227,7 +241,10 @@ test('a soft volume on a rigid box replays bit for bit after a snapshot and rest
   const make = async () => {
     const physics = new Physics(null, { fixedTimestep: 1 / 60 });
     ground(physics);
-    physics.addBody(null, { position: [0, 0.25, 0], colliders: { shape: 'box', halfExtents: [0.4, 0.25, 0.4], mass: 3 } });
+    physics.addBody(null, {
+      position: [0, 0.25, 0],
+      colliders: { shape: 'box', halfExtents: [0.4, 0.25, 0.4], mass: 3 },
+    });
     const soft = await SoftBodies.attach(physics);
     soft.create(SoftBodyDesc.volume(sphereGeometry(0.3, 12, 8)).setTranslation([0.1, 1.4, 0]));
     soft.create(SoftBodyDesc.volume(box(0.4, 0.4, 0.4), { pressure: 110_000 }).setTranslation([-1, 1, 0]));
@@ -261,14 +278,27 @@ test('the debug view draws a soft volume: its edges, contacts and a centre cross
   // 12 x 8 sphere: 12 * 7 + 12 * 8 - ... edges of the welded surface, plus the three lines of the cross.
   assert.equal(vertices.length / 6, ball.structuralEdges() + 3, 'one line an edge, three for the cross');
   assert.deepEqual([...colors.slice(-4)], [1, 1, 1, 1], 'white at its rest volume');
-  assert.throws(() => ball.debugRender({ stressRange: 0 }), (e) => e.name === 'MargoError' && /errors#soft-volumes/.test(e.message));
+  assert.throws(
+    () => ball.debugRender({ stressRange: 0 }),
+    (e) => e.name === 'MargoError' && /errors#soft-volumes/.test(e.message),
+  );
 });
 
 test('volume refuses a mesh it cannot use with a coded error naming the fix', async () => {
   const sphere = sphereGeometry(0.3, 12, 8);
   const coded = (fn, pattern) =>
-    assert.throws(fn, (e) => e.name === 'MargoError' && e.code === 'unsupported' && pattern.test(e.message) && /errors#soft-volumes/.test(e.message));
-  coded(() => SoftBodyDesc.volume({ positions: sphere.positions, indices: sphere.indices.slice(0, -3) }), /closed mesh/);
+    assert.throws(
+      fn,
+      (e) =>
+        e.name === 'MargoError' &&
+        e.code === 'unsupported' &&
+        pattern.test(e.message) &&
+        /errors#soft-volumes/.test(e.message),
+    );
+  coded(
+    () => SoftBodyDesc.volume({ positions: sphere.positions, indices: sphere.indices.slice(0, -3) }),
+    /closed mesh/,
+  );
   const inward = Array.from(sphere.indices);
   for (let t = 0; t < inward.length; t += 3) [inward[t + 1], inward[t + 2]] = [inward[t + 2], inward[t + 1]];
   coded(() => SoftBodyDesc.volume({ positions: sphere.positions, indices: inward }), /face inward/);
@@ -318,7 +348,9 @@ test('in water a soft volume floats where Archimedes says: the water it displace
     const soft = await SoftBodies.attach(physics);
     soft.water = { density: 1025 };
     const ball = soft.create(
-      SoftBodyDesc.volume(sphereGeometry(0.3, 24, 16), { density }).setTranslation([0, 0.1, 0]).setLinearDamping(3),
+      SoftBodyDesc.volume(sphereGeometry(0.3, 24, 16), { density })
+        .setTranslation([0, 0.1, 0])
+        .setLinearDamping(3),
     );
     const heights = [];
     for (let i = 0; i < 480; i++) {
@@ -347,5 +379,10 @@ test('a soft volume in a wind takes the push of the air on its windward side (AT
   const moved = ball.centerOfMass()[0] - start,
     force = (moved * ball.mass()) / (1 / 60) ** 2,
     expected = 0.5 * 1.225 * 0.525 * Math.PI * 0.25 * 100;
-  near(force, expected, 0.03 * expected, 'the wind force on the ball (32 x 24 facets: 2%; the implicit step and float32: 1%)');
+  near(
+    force,
+    expected,
+    0.03 * expected,
+    'the wind force on the ball (32 x 24 facets: 2%; the implicit step and float32: 1%)',
+  );
 });

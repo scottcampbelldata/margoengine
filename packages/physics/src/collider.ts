@@ -14,7 +14,14 @@ import {
   combineRule,
   combines,
 } from './kernel.js';
-import type { CollisionPairKind, CombineRule, ColliderOptions, InteractionGroups, MaterialName, ShapeOptions } from './shapes.js';
+import type {
+  CollisionPairKind,
+  CombineRule,
+  ColliderOptions,
+  InteractionGroups,
+  MaterialName,
+  ShapeOptions,
+} from './shapes.js';
 import { densityOf } from './shapes.js';
 import { readGroups, writeGroups } from './groups.js';
 import { meshConnectedComponents, meshHalfEdges, type HalfEdgeTopology } from './mesh-tools.js';
@@ -606,8 +613,7 @@ export class PhysicsCollider {
       this.kernel.setColliderBorder(h, border);
       // A round triangle meets what it touches through a skin of its border.
       if (this.shape === 'triangle') this.setContactSkin(c.colliderSkin[h] - before + border);
-    } else
-      throw bodyInput(`A ${this.shape} has no border radius; use a box, convexHull, triangle, cylinder or cone.`);
+    } else throw bodyInput(`A ${this.shape} has no border radius; use a box, convexHull, triangle, cylinder or cone.`);
     return this;
   }
   /**
@@ -651,9 +657,7 @@ export class PhysicsCollider {
       throw bodyInput(`A collider mass is 0 or more kilograms and finite (got ${mass}); pass a number such as 1.`);
     const volume = this.volume();
     if (!(volume > 0))
-      throw bodyInput(
-        'A collider with no volume has no mass to set; give the body its mass with setMassProperties.',
-      );
+      throw bodyInput('A collider with no volume has no mass to set; give the body its mass with setMassProperties.');
     return this.setDensity(mass / volume);
   }
   /** The friction combine rule: how this collider's friction mixes with another's (default 'average'; the higher rule of the two decides). */
@@ -762,8 +766,7 @@ export class PhysicsCollider {
     const c = this.columns(),
       first = c.meshFirstVertex[c.colliderHull[this.handle]] + start;
     for (let i = 0; i < heights.length; i++)
-      if (!Number.isFinite(heights[i]))
-        throw bodyInput(`Height ${start + i} is ${heights[i]}; pass finite heights.`);
+      if (!Number.isFinite(heights[i])) throw bodyInput(`Height ${start + i} is ${heights[i]}; pass finite heights.`);
     let farthest = 0;
     for (let i = 0; i < heights.length; i++) {
       const was = c.meshVertexY[first + i],

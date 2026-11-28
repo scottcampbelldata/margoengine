@@ -45,8 +45,7 @@ export function skinVertices(
     );
   if (normals !== null && normals.length !== 3 * n)
     throw softError(`Give three normal numbers a vertex: ${3 * n} (got ${normals.length}).`);
-  if (!Number.isInteger(jointCount))
-    throw softError(`Give sixteen numbers a joint matrix (got ${matrices.length}).`);
+  if (!Number.isInteger(jointCount)) throw softError(`Give sixteen numbers a joint matrix (got ${matrices.length}).`);
   const outP = target?.positions ?? new Float32Array(3 * n),
     outN = normals === null ? null : (target?.normals ?? new Float32Array(3 * n));
   if (outP.length !== 3 * n || (outN !== null && outN.length !== 3 * n))

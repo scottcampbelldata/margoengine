@@ -27,7 +27,10 @@ function predict(test) {
   const L = plan.hull_length_m;
   const U = test.froude * Math.sqrt(plan.gravity * L);
   const lambda = (2 * Math.PI * U ** 2) / plan.gravity;
-  const dx = Math.min(L * plan.coarse_max_grid_over_hull_length, lambda / plan.coarse_min_cells_per_transverse_wavelength);
+  const dx = Math.min(
+    L * plan.coarse_max_grid_over_hull_length,
+    lambda / plan.coarse_min_cells_per_transverse_wavelength,
+  );
   const nx = mixedLength((plan.relative_x_extent * lambda) / dx, true);
   const nz = mixedLength((plan.relative_z_extent * lambda) / dx, false);
   const sponge = Math.ceil((plan.sponge_width_over_wavelength * lambda) / dx);
@@ -37,7 +40,11 @@ function predict(test) {
   const density = 1025;
   const peakPressure = density * plan.gravity * L * plan.source_pressure_head_over_length;
   const radius = plan.source_radius_over_hull_length * L;
-  const world = new PhysicsWorld({ rate: { num: rate, den: 1 }, gravity: [0, -plan.gravity, 0], memory: worldMemory(false) });
+  const world = new PhysicsWorld({
+    rate: { num: rate, den: 1 },
+    gravity: [0, -plan.gravity, 0],
+    memory: worldMemory(false),
+  });
   const wake = new WakeSolver();
   let lastZ = zStart;
   let sourceTime = 0;
@@ -50,7 +57,7 @@ function predict(test) {
     sources(t) {
       sourceTime = t;
       lastZ = zStart + U * t;
-      const ramp = Math.min(1, U * t / (lambda * plan.source_ramp_over_wavelength));
+      const ramp = Math.min(1, (U * t) / (lambda * plan.source_ramp_over_wavelength));
       return [{ x: 0, z: lastZ, radius, pressure: (peakPressure / 2) * (1 - Math.cos(Math.PI * ramp)), volume: 0 }];
     },
   });
@@ -83,24 +90,39 @@ function predict(test) {
     assert.ok(best.crest_m > 0 && Number.isFinite(best.angle_deg));
     return { distance_over_lambda: distance, ...best, angularCrest_m };
   });
-  const [min,median,max] = windows.map((entry) => entry.angle_deg).sort((a,b) => a-b);
+  const [min, median, max] = windows.map((entry) => entry.angle_deg).sort((a, b) => a - b);
   return {
-    ...test, speed_mps: U, transverse_wavelength_m: lambda, dx, cells: [nx,nz],
-    sourceTime, ticks, sourceZ: lastZ, radius, sponge, windows,
-    predicted_angle_deg: median, radial_window_angles_deg: [min,max],
+    ...test,
+    speed_mps: U,
+    transverse_wavelength_m: lambda,
+    dx,
+    cells: [nx, nz],
+    sourceTime,
+    ticks,
+    sourceZ: lastZ,
+    radius,
+    sponge,
+    windows,
+    predicted_angle_deg: median,
+    radial_window_angles_deg: [min, max],
   };
 }
 
 if (process.argv[2] === 'predict') {
-  const bundleHashes = () => Object.fromEntries(['sea.js','world.js'].map((asset) => [
-    asset, digest(readFileSync(new URL(`../dist/${asset}`, import.meta.url))),
-  ]));
+  const bundleHashes = () =>
+    Object.fromEntries(
+      ['sea.js', 'world.js'].map((asset) => [
+        asset,
+        digest(readFileSync(new URL(`../dist/${asset}`, import.meta.url))),
+      ]),
+    );
   const bundles = bundleHashes();
   const predicted = plan.cases.map(predict);
   assert.deepEqual(bundleHashes(), bundles, 'The built solver changed during the comparison.');
   write('predicted', { plan_sha256: planSha, bundles, predictions: predicted });
   write('freeze', { plan_sha256: planSha, predicted_sha256: digest(read('predicted')) });
-  for (const data of predicted) console.log('predicted medians', data.froude, data.predicted_angle_deg, data.radial_window_angles_deg);
+  for (const data of predicted)
+    console.log('predicted medians', data.froude, data.predicted_angle_deg, data.radial_window_angles_deg);
 } else if (process.argv[2] === 'score') {
   const freeze = json('freeze');
   assert.equal(freeze.plan_sha256, planSha);
@@ -110,14 +132,27 @@ if (process.argv[2] === 'predict') {
     const holdout = markers.measured_markers.find((marker) => marker.plot_marker === data.plot_marker);
     assert.equal(holdout.froude, data.froude);
     const measurement = holdout.half_angle_deg;
-    return { ...data, digitized_measured_angle_deg: measurement,
+    return {
+      ...data,
+      digitized_measured_angle_deg: measurement,
       observed_angle_uncertainty_deg: markers.published_angle_uncertainty_deg,
-      signed_angle_error_deg: data.predicted_angle_deg - measurement };
+      signed_angle_error_deg: data.predicted_angle_deg - measurement,
+    };
   });
   write('score', { source_digitization_sha256: digest(read('markers')), freeze_sha256: digest(read('freeze')), score });
   for (const data of score) {
-    console.log('holdout', data.froude, 'measured', data.digitized_measured_angle_deg, 'prediction',
-      data.predicted_angle_deg, 'radial range', data.radial_window_angles_deg, 'signed error', data.signed_angle_error_deg);
+    console.log(
+      'holdout',
+      data.froude,
+      'measured',
+      data.digitized_measured_angle_deg,
+      'prediction',
+      data.predicted_angle_deg,
+      'radial range',
+      data.radial_window_angles_deg,
+      'signed error',
+      data.signed_angle_error_deg,
+    );
   }
 } else {
   throw new Error('Use predict or score on the fixed Rabaud–Moisy plan.');

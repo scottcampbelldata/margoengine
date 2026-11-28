@@ -84,7 +84,7 @@ export function hydraulicJump(input: HydraulicJumpInput): HydraulicJump {
   const f1 = froudeNumber(v1, y1, g);
   if (!(f1 > 1))
     throw new RangeError(`Approach Froude number ${f1} is not supercritical; a hydraulic jump needs F1 > 1.`);
-  const y2 = (0.5 * y1 * (Math.sqrt(1 + 8 * f1 * f1) - 1)),
+  const y2 = 0.5 * y1 * (Math.sqrt(1 + 8 * f1 * f1) - 1),
     q = y1 * Math.abs(v1),
     v2 = q / y2,
     height = y2 - y1,

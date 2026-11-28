@@ -81,9 +81,7 @@ export interface BodyOwner {
 const capOf = (stored: number): number => (stored > 0 ? stored : Infinity);
 function capIn(speed: number, name: string, unit: string): number {
   if (!(speed > 0))
-    throw bodyInput(
-      `${name} must be above 0, or Infinity for no cap; pass ${unit}. To stop a body, lock its axes.`,
-    );
+    throw bodyInput(`${name} must be above 0, or Infinity for no cap; pass ${unit}. To stop a body, lock its axes.`);
   return speed === Infinity ? 0 : speed;
 }
 
@@ -155,9 +153,7 @@ export class PhysicsBody {
   setType(type: BodyType, wakeUp = true): this {
     const kernel = this.world();
     if (typeof type !== 'string' || !['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
-      throw bodyInput(
-        `Unknown body type ${String(type)}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`,
-      );
+      throw bodyInput(`Unknown body type ${String(type)}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
     if (type === this.kind) return this;
     kernel.setKind(this.row, type, wakeUp !== false);
     this.kind = type;
@@ -431,9 +427,7 @@ export class PhysicsBody {
   setAdditionalMass(mass: number, inertia: Vec3 = [0, 0, 0]): this {
     checkVec(inertia, 'Inertia');
     if (!(mass >= 0) || mass === Infinity || inertia.some((value) => value < 0))
-      throw bodyInput(
-        'Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².',
-      );
+      throw bodyInput('Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².');
     this.world().setOwnSolid(this.row, mass, this.centerOfMass, inertia);
     return this;
   }
@@ -801,8 +795,7 @@ export class PhysicsBody {
     return own > 0 ? own : this.world().sleepTime;
   }
   set sleepTime(seconds: number) {
-    if (!(seconds > 0))
-      throw bodyInput('sleepTime must be above 0 seconds; use canSleep: false to keep a body awake.');
+    if (!(seconds > 0)) throw bodyInput('sleepTime must be above 0 seconds; use canSleep: false to keep a body awake.');
     this.columns.sleepAfter[this.row] = seconds === Infinity ? 0 : seconds;
   }
   /** Stops all turning, on every world axis, or frees it again. */

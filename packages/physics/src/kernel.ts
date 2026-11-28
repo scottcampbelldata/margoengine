@@ -1676,9 +1676,7 @@ export class KernelWorld {
   }
   set substeps(substeps: number) {
     if (!Number.isInteger(substeps) || substeps < 1 || substeps > 0xffff)
-      throw bodyInput(
-        `Substeps must be a whole number from 1 to 65535; use 8 unless you measured (got ${substeps}).`,
-      );
+      throw bodyInput(`Substeps must be a whole number from 1 to 65535; use 8 unless you measured (got ${substeps}).`);
     this.api.world_set_substeps(substeps);
   }
   /** Solver passes in each substep (default 2). More holds a tall stack stiffer, at that much more solver time. */
@@ -1960,9 +1958,7 @@ export class KernelWorld {
       c.faceEdge[f0 + f] = edge;
       for (const index of face) {
         if (!Number.isInteger(index) || index < 0)
-          throw bodyInput(
-            `A hull face index must be a whole number; use a place in the vertex list (got ${index}).`,
-          );
+          throw bodyInput(`A hull face index must be a whole number; use a place in the vertex list (got ${index}).`);
         c.edgeOrigin[e0 + edge++] = index;
       }
     });
@@ -2109,9 +2105,7 @@ export class KernelWorld {
           );
     }
     if (!api.mesh_begin(count, 0) || !api.voxels_begin(rows * columns))
-      throw bodyInput(
-        `Memory cannot hold a heightfield of ${count} points; free another world, or use fewer cells.`,
-      );
+      throw bodyInput(`Memory cannot hold a heightfield of ${count} points; free another world, or use fewer cells.`);
     if (api.world_layout() !== this.layout) this.bind();
     const c = this.columns,
       v0 = api.mesh_next(0),
@@ -2302,9 +2296,7 @@ export class KernelWorld {
         skip,
       );
       if (total < 0)
-        throw bodyInput(
-          'A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.',
-        );
+        throw bodyInput('A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.');
       const page = total - skip < QUERY_HITS ? total - skip : QUERY_HITS;
       for (let i = 0; i < page; i++) hits.push(this.readHit(i));
       skip += page;
@@ -2640,8 +2632,7 @@ export class KernelWorld {
       max,
       solid ? 1 : 0,
     );
-    if (found < 0)
-      throw bodyInput(`${PAIR_REFUSED} A ray also needs a finite origin and a finite nonzero direction.`);
+    if (found < 0) throw bodyInput(`${PAIR_REFUSED} A ray also needs a finite origin and a finite nonzero direction.`);
     return found ? this.readHit(0) : null;
   }
   /** The point of one collider nearest `point`: null when nothing can be projected. @throws MargoError (code `unsupported`) for a point that is not finite or a collider that is gone. */
@@ -2738,9 +2729,7 @@ export class KernelWorld {
   ): KernelManifold[] {
     const total = this.api.collider_shape_contacts(collider, ...this.shapeWords(shape, position, rotation), prediction);
     if (total < 0)
-      throw bodyInput(
-        `${PAIR_REFUSED} ${CAST_REFUSED} Pass a live collider row and a query shape the kernel holds.`,
-      );
+      throw bodyInput(`${PAIR_REFUSED} ${CAST_REFUSED} Pass a live collider row and a query shape the kernel holds.`);
     return this.readManifolds(total);
   }
   /** The first touch of collider `moving`, as it is, moving along `direction` with collider `target`, or null. @throws MargoError (code `unsupported`) for a collider that is gone. */
@@ -3002,9 +2991,7 @@ export class KernelWorld {
       ['groups words', groups],
     ] as const)
       if (value !== undefined && typeof value !== 'number' && value.length !== count)
-        throw bodyInput(
-          `softFaceContacts got ${value.length} ${name} for ${count} triangles; pass one or one each.`,
-        );
+        throw bodyInput(`softFaceContacts got ${value.length} ${name} for ${count} triangles; pass one or one each.`);
     if (this.api.world_layout() !== this.layout) this.bind();
     const depth = this.api.probe_depth();
     if (!Number.isInteger(k) || k < 1 || k > depth)
@@ -3391,8 +3378,7 @@ export class KernelWorld {
   /** What every step does last: fresh views, and the refusals of a world that could not step. */
   private afterStep(failed: number): this {
     if (this.api.world_layout() !== this.layout) this.bind();
-    if (failed)
-      throw bodyInput('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
+    if (failed) throw bodyInput('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
     const lost = this.api.world_lost();
     if (lost >= 0)
       throw new MargoError(
@@ -3419,8 +3405,7 @@ export class KernelWorld {
       this.stepping = false;
     }
     if (this.api.world_layout() !== this.layout) this.bind();
-    if (failed)
-      throw bodyInput('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
+    if (failed) throw bodyInput('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
     return this;
   }
   /**
@@ -3537,9 +3522,7 @@ export class KernelWorld {
     )
       throw bodyInput('These bytes are not a snapshot of this kernel; use what snapshot() returned.');
     if (!api.world_ensure(bytes))
-      throw bodyInput(
-        `Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`,
-      );
+      throw bodyInput(`Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`);
     // Making room may have moved the world's block: its start is read after.
     new Uint8Array(this.arena.memory.buffer, api.world_base(), bytes).set(snapshot);
     this.bind();

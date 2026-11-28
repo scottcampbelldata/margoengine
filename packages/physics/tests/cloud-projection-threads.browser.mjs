@@ -27,7 +27,9 @@ try {
       },
       (error) => ({ name: error.name, code: error.code, message: error.message }),
     );
-    const worker = new Worker('/packages/physics/tests/fixtures/cloud-projection-threads-worker.mjs', { type: 'module' });
+    const worker = new Worker('/packages/physics/tests/fixtures/cloud-projection-threads-worker.mjs', {
+      type: 'module',
+    });
     let timeout;
     try {
       const result = await new Promise((resolve, reject) => {

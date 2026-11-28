@@ -13,7 +13,10 @@ const world = () => {
     position: [0, -0.5, 0],
     colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
   });
-  const crate = physics.addBody(null, { position: [0, 0.6, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  const crate = physics.addBody(null, {
+    position: [0, 0.6, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+  });
   const sensor = physics.addBody(null, {
     type: 'fixed',
     position: [0, 0.5, 0],
@@ -42,7 +45,10 @@ test('a crate landing on a floor starts once, continues every later step it stay
     Array.from({ length: 60 - startStep }, (_, i) => startStep + 1 + i),
     'one continue a step after the start, none in the start step',
   );
-  assert.ok(continued.every(([, , mine]) => mine), 'the pair is the crate and the floor');
+  assert.ok(
+    continued.every(([, , mine]) => mine),
+    'the pair is the crate and the floor',
+  );
   crate.setPosition([0, 6, 0]).setLinearVelocity([0, 0, 0]);
   const before = log.length;
   physics.step();
@@ -59,7 +65,10 @@ test('a crate landing on a floor starts once, continues every later step it stay
 test('a sensor overlap never continues, and with no listener nothing is gathered', () => {
   const { physics, log } = world();
   for (let i = 0; i < 30; i++) physics.step();
-  assert.ok(log.some(([, type]) => type === 'intersectionstart'), 'the sensor saw the crate');
+  assert.ok(
+    log.some(([, type]) => type === 'intersectionstart'),
+    'the sensor saw the crate',
+  );
   const continued = log.filter(([, type]) => type === 'contactcontinue').length;
   assert.ok(continued > 0);
   // The sensor overlaps the crate and the floor all along; only the crate and the floor continue, one event a step.

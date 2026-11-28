@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CloudSolver } from '../../dist/clouds.js';
 import { PhysicsWorld, worldMemory } from '../../dist/world.js';
-import { cloudPort, expectedCloudWork, far, grid, makeCloud, runCloud } from '../fixtures/cloud-projection-threads-worker.mjs';
+import {
+  cloudPort,
+  expectedCloudWork,
+  far,
+  grid,
+  makeCloud,
+  runCloud,
+} from '../fixtures/cloud-projection-threads-worker.mjs';
 
 test('closed MAC cloud pressure matches scalar with real 1/2/4-thread execution through far-origin replay', async () => {
   const baseline = await runCloud(false, 0);
@@ -68,8 +75,9 @@ test('odd cloud volumes exercise measured SIMD pressure work on every participan
 
 test('cloud pressure threads give a coded remedy for a plain world', async () => {
   using cloud = await CloudSolver.load({ threads: 2 });
-  assert.throws(
-    () => new PhysicsWorld({ memory: worldMemory(false) }).add(cloud, { cells: [5, 3, 3] }),
-    { name: 'MargoError', code: 'unsupported', message: /worldMemory\(true\)|shared.*threads: 1/i },
-  );
+  assert.throws(() => new PhysicsWorld({ memory: worldMemory(false) }).add(cloud, { cells: [5, 3, 3] }), {
+    name: 'MargoError',
+    code: 'unsupported',
+    message: /worldMemory\(true\)|shared.*threads: 1/i,
+  });
 });

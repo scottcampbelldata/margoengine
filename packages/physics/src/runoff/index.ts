@@ -1,5 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Precipitation } from '@margoengine/math/fields';
+import { hypot } from '@margoengine/math/pinned';
 import type { NativePhasePool } from '../native-phase-pool.js';
 import { DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, STACK_BYTES } from '../world/memory.js';
 import type {
@@ -431,7 +432,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       if (slope) reachSlope = numberIn('slope', slope(i));
       else if (next >= 0 && options.elevation) {
         const squared = east * east + north * north;
-        const distance = squared > 0 && Number.isFinite(squared) ? Math.sqrt(squared) : Math.hypot(east, north);
+        const distance = squared > 0 && Number.isFinite(squared) ? Math.sqrt(squared) : hypot(east, north);
         const rise = heights[i]! - heights[next]!;
         const gradient = Number.isFinite(rise) ? rise / distance : heights[i]! / distance - heights[next]! / distance;
         reachSlope = numberIn('derived slope', Math.max(0, gradient));

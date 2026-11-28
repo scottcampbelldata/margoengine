@@ -2,20 +2,20 @@
 // sliding and sticking on an incline, a ball rolling without slipping (which checks the solver's inertia), Newton's
 // cradle, spaced and touching, and a tower of boxes. Each bound is derived in its test from the step, never fitted. The world runs at its
 // defaults: 60 steps a second, each of the tier's substeps (8 standard, 32 high; an island may take more).
-import assert from "node:assert/strict";
-import test from "node:test";
-import { Physics } from "../dist/index.js";
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { Physics } from '../dist/index.js';
 
 await Physics.load();
 const G = 9.81;
 
 // Both solver tiers (PhysicsOptions.fidelity) are held to the same exact solutions and bounds.
-for (const fidelity of ["standard", "high"]) {
+for (const fidelity of ['standard', 'high']) {
   const floor = (physics, options = {}) =>
     physics.addBody(null, {
-      type: "fixed",
+      type: 'fixed',
       position: [0, -0.5, 0],
-      colliders: { shape: "box", halfExtents: [50, 0.5, 50], ...options },
+      colliders: { shape: 'box', halfExtents: [50, 0.5, 50], ...options },
     });
 
   test(`${fidelity}: a ball dropped from 2 m rebounds to e² times the height (Newton's law of restitution)`, () => {
@@ -26,7 +26,7 @@ for (const fidelity of ["standard", "high"]) {
         drop = 2,
         ball = physics.addBody(null, {
           position: [0, drop + r, 0],
-          colliders: { shape: "sphere", radius: r, restitution: e },
+          colliders: { shape: 'sphere', radius: r, restitution: e },
         });
       let fell = false,
         rose = false,
@@ -59,9 +59,9 @@ for (const fidelity of ["standard", "high"]) {
       rotation = [0, 0, Math.sin(t / 2), Math.cos(t / 2)],
       up = [-Math.sin(t), Math.cos(t), 0];
     physics.addBody(null, {
-      type: "fixed",
+      type: 'fixed',
       rotation,
-      colliders: { shape: "box", halfExtents: [50, 0.5, 5], friction },
+      colliders: { shape: 'box', halfExtents: [50, 0.5, 5], friction },
     });
     const lift = 0.5 + (collider.radius ?? collider.halfExtents[1]);
     const body = physics.addBody(null, {
@@ -87,43 +87,34 @@ for (const fidelity of ["standard", "high"]) {
       [20, 0.1],
     ]) {
       const { physics, body, t } = slope(degrees, mu, {
-          shape: "box",
+          shape: 'box',
           halfExtents: [0.25, 0.25, 0.25],
         }),
         exact = G * (Math.sin(t) - mu * Math.cos(t));
       // Constant acceleration: the steps integrate it exactly but for f32 rounding of the speeds (a few ulp of 10 m/s).
-      assert.ok(
-        Math.abs(acceleration(physics, body) - exact) < 1e-3,
-        `${degrees} degrees, mu ${mu}`,
-      );
+      assert.ok(Math.abs(acceleration(physics, body) - exact) < 1e-3, `${degrees} degrees, mu ${mu}`);
     }
     for (const [degrees, mu] of [
       [30, 0.7],
       [10, 0.2],
     ]) {
       const { physics, body } = slope(degrees, mu, {
-        shape: "box",
+        shape: 'box',
         halfExtents: [0.25, 0.25, 0.25],
       });
-      assert.ok(
-        acceleration(physics, body) < 1e-3,
-        `${degrees} degrees, mu ${mu}: it sticks`,
-      );
+      assert.ok(acceleration(physics, body) < 1e-3, `${degrees} degrees, mu ${mu}: it sticks`);
     }
   });
 
   test(`${fidelity}: a ball rolls down an incline without slipping at 5/7 g sin t, from the inertia its shape gives (DYN-06)`, () => {
     for (const degrees of [10, 20]) {
       const { physics, body, t } = slope(degrees, 1, {
-          shape: "sphere",
+          shape: 'sphere',
           radius: 0.3,
         }),
         exact = (5 / 7) * G * Math.sin(t);
       // A sliding ball would gain g sin t; the 2/7 a solid sphere's inertia takes is 0.7 m/s² at 20 degrees.
-      assert.ok(
-        Math.abs(acceleration(physics, body) - exact) < 1e-3,
-        `${degrees} degrees`,
-      );
+      assert.ok(Math.abs(acceleration(physics, body) - exact) < 1e-3, `${degrees} degrees`);
     }
   });
 
@@ -138,7 +129,7 @@ for (const fidelity of ["standard", "high"]) {
         physics.addBody(null, {
           position: [i * (2 * r + gap) - (i < struck ? off : 0), 0, 0],
           colliders: {
-            shape: "sphere",
+            shape: 'sphere',
             radius: r,
             restitution: 1,
             friction: 0,
@@ -170,18 +161,11 @@ for (const fidelity of ["standard", "high"]) {
     ]) {
       const { v, momentum, energy } = cradle(gap, struck, off);
       for (let i = 0; i < 5 - struck; i++)
-        assert.ok(
-          Math.abs(v[i]) < 1e-3,
-          `gap ${gap}, ${struck} struck: ball ${i} stops (${v})`,
-        );
+        assert.ok(Math.abs(v[i]) < 1e-3, `gap ${gap}, ${struck} struck: ball ${i} stops (${v})`);
       for (let i = 5 - struck; i < 5; i++)
-        assert.ok(
-          Math.abs(v[i] - 1) < 1e-3,
-          `gap ${gap}, ${struck} struck: ball ${i} leaves at 1 m/s (${v})`,
-        );
+        assert.ok(Math.abs(v[i] - 1) < 1e-3, `gap ${gap}, ${struck} struck: ball ${i} leaves at 1 m/s (${v})`);
       assert.ok(
-        Math.abs(momentum - struck) < 1e-5 &&
-          energy <= 0.5 * struck * (1 + 1e-5),
+        Math.abs(momentum - struck) < 1e-5 && energy <= 0.5 * struck * (1 + 1e-5),
         `gap ${gap}: p ${momentum}, E ${energy}`,
       );
     }
@@ -198,7 +182,7 @@ for (const fidelity of ["standard", "high"]) {
       rest = 0.1,
       pivot = rest + arm,
       lift = (34 * Math.PI) / 180;
-    const frame = physics.addBody(null, { type: "fixed", position: [0, pivot, 0] });
+    const frame = physics.addBody(null, { type: 'fixed', position: [0, pivot, 0] });
     const balls = [];
     for (let i = 0; i < 5; i++) {
       const x = (i - 2) * 2 * r,
@@ -206,11 +190,11 @@ for (const fidelity of ["standard", "high"]) {
       balls.push(
         physics.addBody(null, {
           position: [x + arm * Math.sin(a), pivot - arm * Math.cos(a), 0],
-          colliders: { shape: "sphere", radius: r, restitution: e, friction: mu, density: "steel" },
+          colliders: { shape: 'sphere', radius: r, restitution: e, friction: mu, density: 'steel' },
         }),
       );
       physics.addJoint(frame, balls[i], {
-        type: "revolute",
+        type: 'revolute',
         axis: [0, 0, 1],
         anchorA: [x, 0, 0],
         anchorB: [-arm * Math.sin(a), arm * Math.cos(a), 0],
@@ -221,7 +205,7 @@ for (const fidelity of ["standard", "high"]) {
       physics.step();
       watch(step / 60, balls);
     }
-    return { r, arm, rest, pivot, start, substeps: fidelity === "high" ? 32 : 8 };
+    return { r, arm, rest, pivot, start, substeps: fidelity === 'high' ? 32 : 8 };
   }
 
   /**
@@ -264,7 +248,10 @@ for (const fidelity of ["standard", "high"]) {
       watch(t, balls) {
         watch(t, balls);
         for (let i = 1; i < 4; i++)
-          middle = Math.max(middle, Math.abs(Math.atan2(balls[i].position[0] - xs[i - 1], pivot - balls[i].position[1])));
+          middle = Math.max(
+            middle,
+            Math.abs(Math.atan2(balls[i].position[0] - xs[i - 1], pivot - balls[i].position[1])),
+          );
       },
     });
     const h = 1 / 60 / substeps,
@@ -274,7 +261,7 @@ for (const fidelity of ["standard", "high"]) {
     const last = heights[strikes - 1] / start,
       floor = 1 - strikes * ((2 * G * h * h) / arm);
     assert.ok(last >= floor && last <= 1 + 1e-4, `the swing keeps ${last} of its height, at least ${floor}`);
-    if (fidelity === "high") assert.ok(last >= 0.99, `within 1% at 60 s: ${last}`);
+    if (fidelity === 'high') assert.ok(last >= 0.99, `within 1% at 60 s: ${last}`);
   });
 
   test(`${fidelity}: a hung cradle at e = 0.995 hands on (1 + e) / 2 of the speed at each of its four pairs, and no less`, () => {
@@ -286,7 +273,10 @@ for (const fidelity of ["standard", "high"]) {
     const h = 1 / 60 / substeps,
       first = heights[0] / start,
       want = ((1 + e) / 2) ** 8;
-    assert.ok(Math.abs(first - want) <= (2 * G * h * h) / arm + 1e-4, `rose to ${first} of the height, (1 + e)^8 / 2^8 is ${want}`);
+    assert.ok(
+      Math.abs(first - want) <= (2 * G * h * h) / arm + 1e-4,
+      `rose to ${first} of the height, (1 + e)^8 / 2^8 is ${want}`,
+    );
   });
 
   test(`${fidelity}: a hung cradle's strike rubs with the joints holding the balls (Coulomb, mu = 0.1)`, () => {
@@ -305,7 +295,10 @@ for (const fidelity of ["standard", "high"]) {
       arm = 0.247,
       want = (1 - (mu * r) / arm) ** 4,
       got = speed(mu) / speed(0);
-    assert.ok(Math.abs(got - want) < 0.1 * (1 - want), `the end ball keeps ${got} of its speed, (1 - mu r / l)^4 is ${want}`);
+    assert.ok(
+      Math.abs(got - want) < 0.1 * (1 - want),
+      `the end ball keeps ${got} of its speed, (1 - mu r / l)^4 is ${want}`,
+    );
   });
 
   test(`${fidelity}: a ball struck sideways into a touching line slides under Coulomb friction through the strike`, () => {
@@ -322,7 +315,7 @@ for (const fidelity of ["standard", "high"]) {
       balls.push(
         physics.addBody(null, {
           position: [i * 2 * r - (i === 0 ? 0.001 : 0), 0, 0],
-          colliders: { shape: "sphere", radius: r, restitution: 1, friction: 0.1 },
+          colliders: { shape: 'sphere', radius: r, restitution: 1, friction: 0.1 },
         }),
       );
     balls[0].setLinearVelocity([1, 1, 0]);
@@ -346,7 +339,7 @@ for (const fidelity of ["standard", "high"]) {
           physics.addBody(null, {
             position: [0, 0.5 + i, 0],
             colliders: {
-              shape: "box",
+              shape: 'box',
               halfExtents: [0.5, 0.5, 0.5],
               restitution,
             },
@@ -355,10 +348,7 @@ for (const fidelity of ["standard", "high"]) {
       for (let i = 0; i < 600; i++) physics.step();
       const [x, y, z] = boxes[9].position;
       // Each of the ten contacts rests within the solver's slop of touching, under a millimetre each.
-      assert.ok(
-        Math.hypot(x, z) < 1e-3 && Math.abs(y - 9.5) < 1e-2,
-        `e ${restitution}: the top box at ${[x, y, z]}`,
-      );
+      assert.ok(Math.hypot(x, z) < 1e-3 && Math.abs(y - 9.5) < 1e-2, `e ${restitution}: the top box at ${[x, y, z]}`);
       assert.ok(
         boxes.every((b) => b.sleeping),
         `e ${restitution}: the tower sleeps`,
