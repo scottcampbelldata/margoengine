@@ -699,8 +699,16 @@ Since 2026-11-28 (KB-SCATTER-BLENDVEL1) each covered stage is drawn once more af
 single-velocity reconstruction filter needs (McGuire et al. 2012). Same proof at 256 x 256: 37,608 moving pixels
 against 35,899 with `coverage: false` (37,584 against 35,849 on the WebGL2 layer); a 1280 x 720 shot of 700,000 clumps
 with TAA and MotionBlur on a trucking camera renders with no GPU error. Missing: a pixel under the coverage share keeps
-the motion behind it; state and interaction changes between frames are not in the vector; the 700,000-clump field has
-not been judged against film references in a whole scene.
+the motion behind it; state and interaction changes between frames are not in the vector.
+Whole scene (2026-11-28, KB-BIOMES-SPARSEGRASS1): a BiomeView temperate meadow with its oaks, the Bruneton sky
+lighting the 17:00 sun, Shadows, TAA with a ScatterVelocity on every swaying scatter, MotionBlur and an auto-exposed
+Tonemap, judged at 1280 x 720 on a still eye-height shot, a slow push, a fast truck and a wide (RTX A6000, about 20 ms a
+frame). The worst thing was the grass itself: a three-blade clump mesh at 7 clumps a square metre covered 11.3 percent
+of the ground from 0.9 m, tufts over soil with a hard edge at `detailRadius`. BiomeObjects now draws it as GrassScatter
+tussocks, 120 clumps a square metre within 20 m and the field fading in behind, 98.6 percent covered
+(`packages/biomes/tests/meadow-grass-check.mjs`); the truck smears the near blades along the motion and the still
+shot keeps them sharp. Weak spots left in those frames: the oaks are low-poly blobs beside the grass, and the ground
+texture between far tussocks reads as a smear at grazing angles.
 
 ### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
 

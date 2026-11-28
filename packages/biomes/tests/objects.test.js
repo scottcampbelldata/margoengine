@@ -278,7 +278,8 @@ test('detail and far-forest density maps are made on the device drawing them, al
   const after = maps.map((read) => read());
   for (const t of after) assert.equal(t.device, second, 'made again on the restored device');
   for (const t of before) assert.ok(t.destroyed, "the lost device's copy is destroyed");
-  assert.ok(second.queue.writes >= after.length, 'each new copy is filled from the CPU data');
+  // The grass detail's near layer reads its field's map (KB-BIOMES-SPARSEGRASS1): one copy, one write.
+  assert.ok(second.queue.writes >= new Set(after).size, 'each new copy is filled from the CPU data');
   objects.dispose();
   for (const t of after) assert.ok(t.destroyed);
   world.dispose();

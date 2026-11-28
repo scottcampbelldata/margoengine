@@ -169,7 +169,13 @@ By default a `BiomeView` also draws the world's stored objects and detail: it at
 `BiomeObjects` (entry `@margoengine/biomes/objects`), which streams each tile's records into one
 `@margoengine/scatter/tiles` per species mesh (dead trees as snags) and draws every detail species (grass, ferns,
 reeds) with a camera-following scatter whose density map is the placement's. Meshes are the `procedural:<name>` keys
-of the presets, from `@margoengine/procedural`. Pass `objects: false` for terrain alone. `view.objects` is that
+of the presets, from `@margoengine/procedural`. Grass (`procedural:grass`, unless `meshes` replaces it) is
+`@margoengine/scatter/grass`'s `GrassScatter`, tussocks of eight GPU-built blades with cured leaves, in two layers: 3
+clumps a square metre per unit of the detail's `density` within 20 m of the camera (half `detailRadius` when that is
+smaller), and the field across `detailRadius`, which fades in over the near layer's outer fifth as the near layer
+shrinks out. The temperate preset's grass (density 40) gives 120 clumps a square metre near the camera; from eye
+height it covers 98.6 percent of the ground below the horizon, against 11.3 percent for the earlier three-blade clump
+mesh (`packages/biomes/tests/meadow-grass-check.mjs`, KB-BIOMES-SPARSEGRASS1). Both layers are in `view.objects.swaying`. Pass `objects: false` for terrain alone. `view.objects` is that
 `BiomeObjects` (`count` objects on the GPU, `gpuBytes`, `dropped`). Its detail density maps cover the world at
 `detailResolution` metres per texel, one byte per texel per detail species; `detailBudget` (default 128 MiB) caps their
 total and the device's largest texture caps each side, checked before anything is allocated:

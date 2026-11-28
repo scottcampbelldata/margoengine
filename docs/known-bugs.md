@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a BiomeView meadow drew its grass as sparse tufts on bare ground (KB-BIOMES-SPARSEGRASS1, biomes)
+
+- **Repro (before):** `node packages/biomes/tests/meadow-grass-check.mjs`: a temperate grassland from 0.9 m up, grass
+  covered 11.3 percent of the ground below the horizon; the FG-16 whole-scene frames (sky, sun, terrain, TAA, motion
+  blur) showed single tufts over soil and a hard edge where the grass ended.
+- **Cause:** `BiomeObjects` drew `procedural:grass` as a three-blade clump mesh through a plain `Scatter`, capped at
+  400,000 candidates over the 240 m detail square: about 7 clumps a square metre (`packages/biomes/src/objects.ts`).
+- **Fix:** that detail draws `GrassScatter` tussocks (`@margoengine/scatter/grass`, loaded only when used), a dense layer
+  of 3 clumps a square metre per unit of density within 20 m and the field across `detailRadius` fading in behind it
+  (`inner`, `innerFade`). 98.6 percent covered; the whole-scene frames read as a meadow.
+- **Regression:** `packages/biomes/tests/meadow-grass-check.mjs` (real GPU).
+
 ### Fixed 2026-11-28: liquid and underwater fog over the empty part of a transparent canvas were see-through (KB-WATER-LIQUIDALPHA1, water)
 
 - **Repro:** `packages/post/test/alpha-rim-browser.mjs` on a `TransparentCanvas`: through the middle of a dense 0.8 m

@@ -5,7 +5,7 @@
 // placement's detail map, so grass is drawn per frame and never stored. Meshes come from `@margoengine/procedural`
 // (the `procedural:<name>` keys of the presets). Scatter, its tiles entry, procedural and core are loaded on attach.
 import type { EngineKernel, Geometry, PbrMaterial } from '@margoengine/core';
-import type { Scatter, ScatterOptions } from '@margoengine/scatter';
+import type { Scatter } from '@margoengine/scatter';
 import type { ScatterTiles } from '@margoengine/scatter/tiles';
 import type { ScatterStateSource, ScatterTextures } from '@margoengine/scatter';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
@@ -232,11 +232,17 @@ type Part = {
 type Modules = {
   tiles: typeof import('@margoengine/scatter/tiles');
   scatter: typeof import('@margoengine/scatter');
+  /** Loaded only when a detail draws `procedural:grass` and the `meshes` registry does not replace it. */
+  grass?: typeof import('@margoengine/scatter/grass');
   procedural: Procedural;
   core: typeof import('@margoengine/core');
   /** Loaded only when a species, detail or snag key names a conifer of `@margoengine/procedural/conifers`. */
   conifers?: Conifers;
 };
+
+/** Whether a detail key draws as GrassScatter blades: `procedural:grass` that the `meshes` registry leaves alone. */
+const isBladeGrass = (key: string, own: Readonly<Record<string, unknown>>): boolean =>
+  key === 'procedural:grass' && !Object.hasOwn(own, key);
 
 /** Charred bark, linear RGB: a burnt conifer's stem. */
 const CHAR = [0.035, 0.03, 0.028] as const;
@@ -383,9 +389,15 @@ function partsOf(
   }
 }
 
-/** One detail kind: its scatter, its density map's CPU copy and the texture of the device it was last made on. */
 type ObjectsPassContext = Extract<PassContext, { backend: 'webgpu' }>;
-type Detail = { id: string; scatter: Scatter; texture?: GPUTexture; device?: GPUDevice; data: Uint8Array };
+/**
+ * One detail kind: its scatter (and, for blade grass, the dense layer near the camera), its density map's CPU copy and
+ * the texture of the device it was last made on.
+ */
+type Detail = { id: string; scatter: Scatter; near?: Scatter; texture?: GPUTexture; device?: GPUDevice; data: Uint8Array };
+
+/** Metres around the camera of blade grass's dense near layer, and its clumps a square metre per unit of density. */
+const NEAR_GRASS = { radius: 20, perDensity: 3 } as const;
 
 /**
  * The stored objects and detail of a biome placement, drawn through scatter around the camera. WebGPU only.
@@ -486,6 +498,9 @@ export class BiomeObjects implements Disposable {
       keys = [...placement.species.map((s) => s.mesh), ...placement.details.map((d) => d.mesh)],
       conifers = keys.some((k) => !Object.hasOwn(own, k) && parseConiferKey(k))
         ? await import('@margoengine/procedural/conifers')
+        : undefined,
+      grass = placement.details.some((d) => isBladeGrass(d.mesh, own))
+        ? await import('@margoengine/scatter/grass')
         : undefined;
     const objects = new BiomeObjects(engine, placement, options, {
       tiles,
@@ -493,6 +508,7 @@ export class BiomeObjects implements Disposable {
       procedural,
       core,
       ...(conifers ? { conifers } : {}),
+      ...(grass ? { grass } : {}),
     });
     held.run(() => objects.#build());
     if (objects.#seasonal.length) {
@@ -615,7 +631,10 @@ export class BiomeObjects implements Disposable {
       width = Math.ceil((x1 - x0) / detailResolution), // float division: view only
       depth = Math.ceil((z1 - z0) / detailResolution); // float division
     for (const d of this.#placement.details) {
-      const parts = partsOf(d.mesh, this.#modules.procedural, this.#make, this.#options.meshes, this.#modules.conifers),
+      const blades = this.#modules.grass && isBladeGrass(d.mesh, this.#options.meshes ?? {}),
+        parts: Part[] = blades
+          ? []
+          : partsOf(d.mesh, this.#modules.procedural, this.#make, this.#options.meshes, this.#modules.conifers),
         area = 2 * detailRadius,
         entry = {
           id: d.id,
@@ -623,27 +642,58 @@ export class BiomeObjects implements Disposable {
           texture: undefined as GPUTexture | undefined,
           device: undefined as GPUDevice | undefined,
           scatter: undefined as unknown as Scatter,
+          near: undefined as Scatter | undefined,
         };
-      const common: ScatterOptions = {
-        count: Math.min(400000, Math.max(1000, Math.round(d.density * area * area * 0.25))),
-        area: [area, area],
+      const seasonal = !!seasons?.world.biomes.some(
+          (b) => b.tint?.seasonal && b.details?.some((r) => r.id === d.id),
+        ),
+        shared = {
+        area: [area, area] as [number, number],
         follow: true,
         bounds,
         heightmap,
         densityMap: () => this.#detail(entry, width, depth),
-        lod: [detailRadius * 0.3, detailRadius * 0.6, detailRadius],
+        lod: [detailRadius * 0.3, detailRadius * 0.6, detailRadius] as [number, number, number],
         lodFade: 0,
         edgeShrink: detailRadius * 0.2,
-        material: this.#material(
-          parts[0].color,
-          !!seasons?.world.biomes.some((b) => b.tint?.seasonal && b.details?.some((r) => r.id === d.id)),
-        ),
         maxSlope: 60,
-        wind: [1, 0, 0.5],
-        ...(parts[0].blades ? { blades: {} } : {}),
-        ...this.#states(d.mesh, parts[0].kind),
+        wind: [1, 0, 0.5] as [number, number, number],
       };
-      entry.scatter = this.#modules.scatter.Scatter.attach(this.#engine, parts[0].geometry, common);
+      // Meadow grass is GrassScatter's GPU-built tussocks (KB-BIOMES-SPARSEGRASS1): eight blades a clump with cured
+      // leaves and a brightness spread. The three-blade clump mesh at the old 400,000 cap left about 20 blades a square
+      // metre, a field of tufts on bare ground. A dense layer of NEAR_GRASS.perDensity clumps a square metre per unit of
+      // density covers the ground within NEAR_GRASS.radius, where the eye sees single clumps; the field beyond fades in
+      // over its outer fifth (`inner`, `innerFade`) as the near layer shrinks out (`edgeShrink`), so neither ends in a
+      // line. The field keeps scatter's million candidates across `detailRadius`, where the blades merge into the sward.
+      const material = blades ? this.#material(GREEN_GRASS, seasonal) : this.#material(parts[0].color, seasonal),
+        nearR = Math.min(NEAR_GRASS.radius, detailRadius / 2);
+      entry.scatter = blades
+        ? this.#modules.grass!.GrassScatter.attach(this.#engine, {
+            ...shared,
+            count: Math.min(1_000_000, Math.max(1000, Math.round(d.density * area * area * 0.25))),
+            inner: nearR * 0.8,
+            innerFade: nearR * 0.2,
+            material,
+            ...this.#states(d.mesh, 'foliage'),
+          })
+        : this.#modules.scatter.Scatter.attach(this.#engine, parts[0].geometry, {
+            ...shared,
+            count: Math.min(400000, Math.max(1000, Math.round(d.density * area * area * 0.25))),
+            material,
+            ...(parts[0].blades ? { blades: {} } : {}),
+            ...this.#states(d.mesh, parts[0].kind),
+          });
+      if (blades)
+        entry.near = this.#modules.grass!.GrassScatter.attach(this.#engine, {
+          ...shared,
+          area: [2 * nearR, 2 * nearR],
+          count: Math.min(1_000_000, Math.max(1000, Math.round(d.density * NEAR_GRASS.perDensity * 4 * nearR * nearR))),
+          lod: [nearR * 0.3, nearR * 0.6, nearR],
+          edgeShrink: nearR * 0.2,
+          seed: 2,
+          material,
+          ...this.#states(d.mesh, 'foliage'),
+        });
       this.#details.push(entry);
     }
   }
@@ -729,7 +779,11 @@ export class BiomeObjects implements Disposable {
 
   /** Every scatter this draws: species parts, snags, detail and far stand-ins. */
   #scatters(): Scatter[] {
-    return [...this.casters, ...this.#details.map((d) => d.scatter), ...(this.#far?.scatters ?? [])];
+    return [
+      ...this.casters,
+      ...this.#details.flatMap((d) => (d.near ? [d.scatter, d.near] : [d.scatter])),
+      ...(this.#far?.scatters ?? []),
+    ];
   }
 
   /** Gives the children's hooks back. */
@@ -968,6 +1022,7 @@ export class BiomeObjects implements Disposable {
       for (const t of [...entry.tiles].reverse()) t.dispose();
     for (const d of this.#details) {
       d.scatter.dispose();
+      d.near?.dispose();
       d.texture?.destroy();
     }
     const listeners = [...this.#disposers];
