@@ -522,7 +522,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | FIRE-03 | Integral plume and thermal model | partial | Claude | CLAIMED (Fauld film) |
 | BIO-01 | Plant mechanics under wind and water | physics/vegetation and scatter/plant-motion | Codex | REOPENED (4/8 at a638e82e14, points 5–8, [evidence](physics-solver-audit.md#bio-01-four-point-pass)), prior landing a4d123a968 |
 | DYN-07 | Dynamic character, balance, push response | partial: shared debug view and character-ragdoll bridge landed | Claude (laptop), taken over from Gemini on Scott's order, 2026-11-27 | BUILDING |
-| AERO-01 | Aerodynamic loads on bodies | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
+| AERO-01 | Aerodynamic loads on bodies | stand-in | Codex | BUILDING (codex/physics-aero-01-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing 48b593a13 |
 | AERO-02 | Membrane aerodynamics (FSI) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 2f1860412 |
 | AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed f9161cc7e |
 | ATMO-01 | Boundary-layer wind field | physics/boundary-layer and weather/boundary-layer | Codex | REOPENED (4/8 at 9d7dd26bc5, points 5–8, [evidence](physics-solver-audit.md#atmo-01-four-point-pass)), prior landing c38c25d3d |
