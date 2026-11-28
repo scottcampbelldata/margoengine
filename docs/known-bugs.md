@@ -396,7 +396,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   standing calibration put a bend into "straight" cannot be told from the file.
 - **Now:** the take is held off the stage. `recordings.brisk.held` in the demo's captures.js names this entry, the page
   neither lists nor loads the take, and the file stays in source/ for the fix.
-- **Closes when** either holds, both need Scott's go: (a) a 100STYLE arms-out excerpt whose elbows stay within 2
+- **Closes when** either holds, both need a maintainer decision: (a) a 100STYLE arms-out excerpt whose elbows stay within 2
   degrees of straight replaces it (a dataset download); (b) `@margoengine/rigging/retarget` gains target joint limits,
   so a target's elbow or knee stops at straight when a capture passes it (a new option; joint limits in retargeting:
   Gleicher 1998, *Retargetting Motion to New Characters*, SIGGRAPH; Choi and Ko 2000, *Online Motion Retargetting*,
@@ -15738,7 +15738,7 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   0.99.7.2 win64 build named in `results/batch-99-parity-gamma-20261109.json` is on the workstation, and
   `packages/voxel-pathtracer/tests/magicavoxel/parity-fixtures.cjs` writes the scenes; the renders are made by hand
   in its Render view (docs/whitepaper/reproduce.md, "Batch 99 parity gamma regression"), not by any script here. With that
-  corpus the transport can be compared per setting; a zero-error match still needs Scott to state whether the oracle
+  corpus the transport can be compared per setting; a zero-error match still needs a maintainer decision on whether the oracle
   means equal expected values (a statistical bound against the reference's own noise) or equal pixels, which no
   renderer can give against another's samples. Job 2's bar, a noise-free disocclusion, asks a finite first-frame
   estimate to recover radiance it has not sampled; Schied et al. 2017 (section 6) report the same limit for SVGF. The
