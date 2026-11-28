@@ -938,6 +938,17 @@ grounded path is traced back to the cloud before the side branches are packed fo
 [Niemeyer et al.](https://doi.org/10.1103/PhysRevLett.52.1033),
 [Kim and Lin](https://www.cs.jhu.edu/~misha/ReadingSeminar/Papers/Kim04.pdf).
 
+Mansell, MacGorman, Ziegler and Straka, “Simulated three-dimensional branched lightning in a
+numerical thunderstorm model” (2002), §3.2.2, separates initiation and growth field thresholds.
+For an authored seed and our unipolar channel, the optional threshold is subtracted from the
+forward potential drop per metre before drawing a bond. This uses the magnitude of the configured
+cloud potential to convert V/m to the normalized drop. An exhausted bond set is a halted leader.
+The finite-difference Laplace field between planes and its discrete maximum principle determine
+the exact ignition and propagation bounds used in the regression. A nonfinite native correction
+rejects the trial, since a max that ignores NaN cannot establish convergence.
+[Mansell et al.](https://doi.org/10.1029/2000JD000244) ·
+[Long Chen, Finite Difference Methods for Poisson Equation, §3](https://www.math.uci.edu/~chenlong/226/FDM.pdf).
+
 Vladimir A. Rakov and Martin A. Uman, *Lightning: Physics and Effects* (2003), describes the downward leader and
 upward return stroke. James D. Hill, Martin A. Uman and Douglas M. Jordan, “High-speed video observations of
 a lightning stepped leader” (2011), gives the measured order of leader speed. J. Jerauld et al., “Electric and
@@ -950,6 +961,11 @@ relative, with propagation and arrival handled by the outdoor acoustics solver.
 [Hill et al.](https://doi.org/10.1029/2011JD015818),
 [Jerauld et al.](https://doi.org/10.1029/2008JD010171),
 [Few](https://doi.org/10.1029/JC074i028p06926).
+The relative leader light control defaults to 0.1, the mean optical ratio measured for triggered
+dart leaders near ground by Idone and Orville (1985). It sets the appearance of the seeded channel;
+photometric validation of a stepped leader remains open. The renderer consumes the accepted
+records at the simulation's world time, and leaves the Weather light schedule independent.
+[Idone and Orville](https://doi.org/10.1029/JD090iD04p06159).
 
 ### Cyclone and compact-vortex forcing (ATMO-05)
 

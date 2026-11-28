@@ -1798,6 +1798,26 @@ grounds. Pass `channel: strike => channels.get(strike.id)` to `LightningBolt.att
 stored under the corresponding Weather strike ID. The same channel drives the visible bolt and its lighting.
 If the callback returns `undefined`, Weather uses the usual procedural channel for that strike.
 
+For a live physical bolt, supply `field` instead of `channel`. The callback reads the solver's
+published channel and appearance for the current world time. Its optional origin-cell translation
+aligns the field to your renderer. Advance the world before drawing. A missing frame draws no bolt.
+
+<!-- example: live-lightning-field -->
+```ts
+import { Engine } from '@margoengine/core';
+import { LightningSolver } from '@margoengine/physics/lightning';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { LightningBolt } from '@margoengine/sky/lightning-bolt';
+import { Weather } from '@margoengine/sky/weather';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const weather = Weather.attach(engine, { lightning: { bolt: { glow: 120 } } });
+const solver = await LightningSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(solver, { start: 0.03 });
+LightningBolt.attach(engine, { weather, field: () => solver.boltSource(world.time) });
+world.advance(3);
+```
+
 - Shape: the channel grows a step at a time from the cloud base to the strike, each step picked among random
   candidates in a cone around the field (toward the ground, with a slow sideways drift) by its alignment with the
   field to the power `eta`, less the shielding of channel already grown beside it: the stochastic growth law of the

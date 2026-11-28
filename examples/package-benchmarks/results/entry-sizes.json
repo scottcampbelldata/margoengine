@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 10623,
-        "gzip": 4350
+        "raw": 16925,
+        "gzip": 6341
       },
       "./explosive": {
         "raw": 41750,
@@ -17302,8 +17302,8 @@
         "gzip": 1985
       },
       "./lightning-bolt": {
-        "raw": 12130,
-        "gzip": 5403
+        "raw": 13889,
+        "gzip": 6044
       },
       "./weather-fx": {
         "raw": 13878,
@@ -19282,14 +19282,14 @@
       "brotli": 637
     },
     "packages/physics/dist/lightning-kernel.wasm": {
-      "raw": 2357,
-      "gzip": 1155,
-      "brotli": 1048
+      "raw": 2491,
+      "gzip": 1200,
+      "brotli": 1095
     },
     "packages/physics/dist/lightning-kernel-shared.wasm": {
-      "raw": 2357,
-      "gzip": 1155,
-      "brotli": 1048
+      "raw": 2491,
+      "gzip": 1200,
+      "brotli": 1096
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,

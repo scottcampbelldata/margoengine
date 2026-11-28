@@ -309,12 +309,39 @@ export interface LightningBoltSource {
   channelSource?: LightningChannelSource;
 }
 
+/**
+ * One accepted physical lighting frame. The channel rows have {@link CHANNEL_STRIDE} f32 words
+ * each, with a leading header row whose first word is the live segment count. Segment slot words are zero.
+ */
+export interface LightningBoltFieldFrame {
+  /** Arena that holds the current published channel. The view is borrowed for the draw only. */
+  readonly memory: WebAssembly.Memory;
+  /** Layout-1 channel region in the arena. */
+  readonly channel: {
+    readonly type: string;
+    readonly layout: number;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+  };
+  /** Translation from the published cell into the camera's current coordinate frame, in metres. Defaults to zero. */
+  readonly offset?: Vec3;
+  /** Relative core radiance at the authored film time. */
+  readonly core: number;
+  /** Relative glow radiance at the authored film time. */
+  readonly glow: number;
+}
+
 /** Settings of {@link LightningBolt}. The bolt's look and shape are `weather.options.lightning.bolt` ({@link LightningBoltOptions}). */
 export interface LightningBoltAttachOptions {
-  /** The weather whose strikes are drawn. */
+  /** The weather whose strikes or authored bolt appearance are used. */
   weather: LightningBoltSource;
   /** Supply an immutable physical channel per strike. An absent channel uses procedural growth. */
   channel?: (strike: LightningStrike) => LightningChannel | undefined;
+  /**
+   * Reads the accepted physical channel and its light levels immediately before drawing.
+   * A missing frame draws no bolt. Omit the callback for weather-driven procedural strikes.
+   */
+  field?: () => LightningBoltFieldFrame | undefined;
   /** Radiance of the core at its peak, linear, before `bolt.scale`. Default 80. */
   coreRadiance?: number;
   /** Radiance of the glow at its peak, linear, before `bolt.scale`. Default 6. */
@@ -322,8 +349,47 @@ export interface LightningBoltAttachOptions {
 }
 
 const DEFAULT_TOP = 1500;
+
+function finiteF32(value: number): boolean {
+  return typeof value === 'number' && Number.isFinite(Math.fround(value));
+}
+
+function fieldSegments(frame: LightningBoltFieldFrame): Float32Array {
+  const { memory, channel, core, glow, offset } = frame;
+  const f32 = Float32Array.BYTES_PER_ELEMENT;
+  if (
+    !(memory instanceof WebAssembly.Memory) ||
+    channel?.type !== 'f32' ||
+    channel.layout !== 1 ||
+    !Number.isSafeInteger(channel.byteOffset) ||
+    channel.byteOffset < 0 ||
+    channel.byteOffset % f32 !== 0 ||
+    !Number.isSafeInteger(channel.byteLength) ||
+    channel.byteLength < CHANNEL_STRIDE * f32 ||
+    channel.byteLength % (CHANNEL_STRIDE * f32) !== 0 ||
+    channel.byteLength > memory.buffer.byteLength - channel.byteOffset
+  )
+    throw new MargoError('state', 'Read the live layout-1 f32 channel region from the lightning arena.');
+  if (!(finiteF32(core) && core >= 0 && finiteF32(glow) && glow >= 0))
+    throw new MargoError('state', 'Give physical lightning core and glow finite nonnegative radiance levels.');
+  if (
+    offset !== undefined &&
+    (!Array.isArray(offset) ||
+      offset.length !== 3 ||
+      !finiteF32(offset[0]) ||
+      !finiteF32(offset[1]) ||
+      !finiteF32(offset[2]))
+  )
+    throw new MargoError('state', 'Give physical lightning a three-component finite offset into the camera cell.');
+  const rows = new Float32Array(memory.buffer, channel.byteOffset, channel.byteLength / f32);
+  const count = rows[0];
+  if (!Number.isSafeInteger(count) || count < 0 || count >= rows.length / CHANNEL_STRIDE)
+    throw new MargoError('state', 'Read a lightning channel header with a live segment count within its region.');
+  return rows.subarray(CHANNEL_STRIDE, (count + 1) * CHANNEL_STRIDE);
+}
+
 const shader = `
-struct Bolt { camera:mat4x4f, eye:vec4f, screen:vec4f, look:vec4f, core:vec4f, glow:vec4f, levels:array<vec4f,${MAX_BOLTS}> }
+struct Bolt { camera:mat4x4f, offset:vec4f, screen:vec4f, look:vec4f, core:vec4f, glow:vec4f, levels:array<vec4f,${MAX_BOLTS}> }
 @group(0) @binding(0) var<uniform> b:Bolt;
 @group(0) @binding(1) var<storage,read> segs:array<vec4f>;
 struct Out {@builtin(position) position:vec4f,@location(0) @interpolate(flat) slot:f32,@location(1) across:f32,@location(2) inner:f32,@location(3) outer:f32,@location(4) @interpolate(flat) order:f32}
@@ -331,7 +397,7 @@ const corners=array<vec2f,6>(vec2f(0,-1),vec2f(1,-1),vec2f(0,1),vec2f(0,1),vec2f
 const culled=Out(vec4f(2,2,2,1),0.0,0.0,0.0,0.0,0.0);
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) ii:u32)->Out {
  let s0=segs[ii*2u];let s1=segs[ii*2u+1u];
- var ca=b.camera*vec4f(s0.xyz,1);var cb=b.camera*vec4f(s1.xyz,1);
+ var ca=b.camera*vec4f(s0.xyz+b.offset.xyz,1);var cb=b.camera*vec4f(s1.xyz+b.offset.xyz,1);
  let near=0.05;
  if(ca.w<near&&cb.w<near){return culled;}
  if(ca.w<near){ca=mix(ca,cb,(near-ca.w)/(cb.w-ca.w));}
@@ -379,7 +445,8 @@ const culled=Out(vec4f(2,2,2,1),0.0,0.0,0.0,0.0,0.0);
  * flash and the ground light the way the bolt runs. The channel is drawn as screen-facing ribbons, one instance a
  * segment from a storage buffer, over the frame with additive (maximum) blending and a read-only depth test: a bolt
  * behind a hill is hidden by it. The look is `weather.options.lightning.bolt` ({@link LightningBoltOptions}), whose
- * rows are `lightning.bolt.*` of `applySkySettings`.
+ * rows are `lightning.bolt.*` of `applySkySettings`. A physical `field` draws its accepted channel and authored film-time
+ * radiance directly, including a partial leader before the stroke.
  * @example
  * const weather = Weather.attach(engine, { intensity: 1, lightning: {} });
  * LightningBolt.attach(engine, { weather });
@@ -399,6 +466,7 @@ export class LightningBolt implements EnginePlugin {
   private readonly channels = new Map<number, { shape: string; channel: LightningChannel }>();
   private uploaded = '';
   private uploadedSegments: Float32Array[] = [];
+  private readonly channelSource?: LightningChannelSource;
 
   constructor(readonly options: LightningBoltAttachOptions) {
     if (
@@ -414,9 +482,18 @@ export class LightningBolt implements EnginePlugin {
     ] as const)
       if (v !== undefined && !(v >= 0 && Number.isFinite(v)))
         throw new RangeError(`LightningBolt ${k} must be a finite number of 0 or more`);
-    options.weather.channelSource = {
-      lights: (strike, count, decay) => channelLightPoints(this.channelOf(strike), count, decay),
-    };
+    if (options.field !== undefined) {
+      if (typeof options.field !== 'function' || options.channel !== undefined)
+        throw new MargoError(
+          'state',
+          'Give LightningBolt one physical field callback or one weather channel callback.',
+        );
+    } else {
+      this.channelSource = {
+        lights: (strike, count, decay) => channelLightPoints(this.channelOf(strike), count, decay),
+      };
+      options.weather.channelSource = this.channelSource;
+    }
   }
 
   static attach(engine: EngineKernel, options: LightningBoltAttachOptions): LightningBolt {
@@ -499,14 +576,18 @@ export class LightningBolt implements EnginePlugin {
     const w = this.options.weather,
       o = w.options.lightning,
       b = o?.bolt ?? {},
-      scale = b.scale ?? 1,
-      bolts = this.live();
-    if (!scale || !bolts.length || !this.uniform) return;
-    const channels = bolts.map((x) => this.channelOf(x.strike)),
-      total = channels.reduce((n, ch) => n + ch.count, 0);
-    if (!total) return;
+      scale = b.scale ?? 1;
+    if (!scale || !this.uniform) return;
+    const field = this.options.field?.(),
+      segments = field && fieldSegments(field),
+      bolts = this.options.field ? [] : this.live(),
+      channels = bolts.map((x) => this.channelOf(x.strike)),
+      total = segments ? segments.length / CHANNEL_STRIDE : channels.reduce((n, ch) => n + ch.count, 0);
+    if (!total || (field && field.core === 0 && field.glow === 0)) return;
     const device = c.device,
-      need = total * 2 * 16;
+      need = total * CHANNEL_STRIDE * Float32Array.BYTES_PER_ELEMENT;
+    if (need > Math.min(device.limits.maxBufferSize, device.limits.maxStorageBufferBindingSize))
+      throw new MargoError('state', 'The lightning channel exceeds device storage. Use a smaller lightning grid.');
     if (!this.storage || this.capacity < need) {
       this.storage?.destroy();
       this.capacity = Math.max(need, 2 * 16 * 512 * MAX_BOLTS);
@@ -517,24 +598,31 @@ export class LightningBolt implements EnginePlugin {
       this.bind = undefined;
       this.uploaded = '';
     }
-    // The segments only when the bolts drawn (or their channels) change: one upload for the whole flash.
-    const sig = bolts
-      .map((x, i) => x.strike.id + ':' + channels[i].count + ':' + (channels[i].segments[0] + channels[i].segments[5]))
-      .join('|');
-    if (
-      sig !== this.uploaded ||
-      (this.options.channel && channels.some((channel, index) => channel.segments !== this.uploadedSegments[index]))
-    ) {
-      const data = new Float32Array(total * CHANNEL_STRIDE);
-      let at = 0;
-      channels.forEach((ch, slot) => {
-        data.set(ch.segments.subarray(0, ch.count * CHANNEL_STRIDE), at);
-        for (let i = 0; i < ch.count; i++) data[at + i * CHANNEL_STRIDE + 7] = slot;
-        at += ch.count * CHANNEL_STRIDE;
-      });
-      device.queue.writeBuffer(this.storage, 0, data as Float32Array<ArrayBuffer>);
-      this.uploaded = sig;
-      this.uploadedSegments = channels.map((channel) => channel.segments);
+    if (segments) {
+      // Upload the live arena view in slot zero. A seek can replace rows even at the same film time.
+      device.queue.writeBuffer(this.storage, 0, segments);
+      this.uploaded = '';
+    } else {
+      const sig = bolts
+        .map(
+          (x, i) => x.strike.id + ':' + channels[i].count + ':' + (channels[i].segments[0] + channels[i].segments[5]),
+        )
+        .join('|');
+      if (
+        sig !== this.uploaded ||
+        (this.options.channel && channels.some((channel, index) => channel.segments !== this.uploadedSegments[index]))
+      ) {
+        const data = new Float32Array(total * CHANNEL_STRIDE);
+        let at = 0;
+        channels.forEach((ch, slot) => {
+          data.set(ch.segments.subarray(0, ch.count * CHANNEL_STRIDE), at);
+          for (let i = 0; i < ch.count; i++) data[at + i * CHANNEL_STRIDE + 7] = slot;
+          at += ch.count * CHANNEL_STRIDE;
+        });
+        device.queue.writeBuffer(this.storage, 0, data);
+        this.uploaded = sig;
+        this.uploadedSegments = channels.map((channel) => channel.segments);
+      }
     }
     const key = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil?.format;
     if (this.key !== key) {
@@ -579,8 +667,8 @@ export class LightningBolt implements EnginePlugin {
       coreColor = glowColor.map((x) => 0.4 + 0.6 * x),
       [width, height] = viewSize(c) as [number, number];
     v.set(c.camera.matrix, 0);
-    v.set(c.camera.position, 16);
-    v[19] = 1;
+    v.fill(0, 16, 20);
+    if (field?.offset) v.set(field.offset, 16);
     v[20] = width;
     v[21] = height;
     v[22] = height / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
@@ -594,7 +682,7 @@ export class LightningBolt implements EnginePlugin {
     v[31] = (this.options.coreRadiance ?? 80) * scale;
     v[35] = (this.options.glowRadiance ?? 6) * scale;
     v.fill(0, 36);
-    bolts.forEach((x, i) => {
+    (field ? [field] : bolts).forEach((x, i) => {
       v[36 + 4 * i] = x.core;
       v[37 + 4 * i] = x.glow;
     });
@@ -630,7 +718,7 @@ export class LightningBolt implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.options.weather.channelSource = undefined;
+    if (this.options.weather.channelSource === this.channelSource) this.options.weather.channelSource = undefined;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;

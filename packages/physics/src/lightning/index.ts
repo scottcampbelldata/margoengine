@@ -3,16 +3,19 @@ import { MargoError } from '@margoengine/math/errors';
 import type { Bed } from '@margoengine/math/fields';
 import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
-import { canShareMemory, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
+import { canShareMemory, DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type { Cell, FieldDescriptor, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
 
 const GROUND = 1;
 const CLOUD = 2;
 const LEADER = 3;
 const ELECTRIC_PERMITTIVITY = 8.8541878128e-12;
+// SI vacuum speed, BIPM 26th CGPM Resolution 1 (2018).
+const LIGHT_SPEED = 299_792_458;
 const ZERO: Cell = [0, 0, 0];
 const OPEN = -1;
 const SEED = -2;
+const HALTED = -3;
 
 /** A count row followed by channel rows [start xyz, order, end xyz, 0] or thunder rows [midpoint xyz, emission s, weight, length m]. */
 export const LIGHTNING_LAYOUT = 1;
@@ -20,6 +23,31 @@ export const LIGHTNING_CHANNEL_WORDS = 8;
 export const LIGHTNING_THUNDER_WORDS = 6;
 const STRIDE = LIGHTNING_CHANNEL_WORDS;
 const SOUND_WORDS = LIGHTNING_THUNDER_WORDS;
+
+/** Local forward electric fields required for seeded breakdown, in V/m. */
+export interface LightningBreakdown {
+  /** Threshold along the first bond, relative to the prescribed cloud potential. */
+  readonly initiation: number;
+  /** Threshold along each later bond after the electric field has relaxed. */
+  readonly propagation: number;
+}
+
+/** Current state of the single seeded discharge. */
+export type LightningStatus = 'pending' | 'growing' | 'halted' | 'grounded';
+
+/** One physical channel frame, borrowing the currently accepted layout-1 records. */
+export interface LightningBoltFrame {
+  /** World arena holding the accepted channel. */
+  readonly memory: WebAssembly.Memory;
+  /** Descriptor of the channel. Read the view only for the current draw. */
+  readonly channel: Readonly<Pick<Region, 'byteOffset' | 'byteLength' | 'type' | 'layout'>>;
+  /** Translation from the solver cell to the rendering cell, in metres. */
+  readonly offset: Vec3;
+  /** Relative hot core radiance at the requested time. */
+  readonly core: number;
+  /** Relative glow radiance at the requested time. */
+  readonly glow: number;
+}
 
 /** Grid and timing for a single natural cloud-to-ground flash. */
 export interface LightningParams {
@@ -47,8 +75,10 @@ export interface LightningParams {
   leaderSpeed?: number;
   /** Return-stroke speed along the channel, m/s. Default 100,000,000. */
   returnSpeed?: number;
-  /** Field power in the dielectric breakdown probability. Default 2. */
+  /** Field power in the growth probability. Defaults to 1 with breakdown and 2 otherwise. */
   exponent?: number;
+  /** Optional separate initiation and propagation thresholds. Defaults to unthresholded seeded growth. */
+  breakdown?: LightningBreakdown;
   /** Relative potential correction at which relaxation stops. Default 1e-6. */
   tolerance?: number;
   /** Maximum relaxation sweeps; default scales with the square of the longest grid axis. */
@@ -95,19 +125,53 @@ type Native = {
 };
 
 const SIZE_DEFAULT = [13, 19, 13] as const;
-function finite(value: number, label: string): number {
-  if (!Number.isFinite(value)) throw new RangeError(`Lightning ${label} must be finite. Pass a finite SI value.`);
+function finite(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    throw new MargoError('state', `Lightning ${label} must be finite. Use a finite SI value.`);
   return value;
 }
-function positive(value: number, label: string): number {
-  if (!(finite(value, label) > 0))
-    throw new RangeError(`Lightning ${label} must be positive. Pass a value above zero.`);
-  return value;
+
+function positive(value: unknown, label: string): number {
+  const checked = finite(value, label);
+  if (!(checked > 0)) throw new MargoError('state', `Lightning ${label} must be positive. Use a value above zero.`);
+  return checked;
 }
+
 function extent(value: number, label: string): number {
   if (!Number.isSafeInteger(value) || value < 3)
-    throw new RangeError(`Lightning ${label} needs at least three nodes. Pass a whole count above two.`);
+    throw new MargoError('state', `Lightning ${label} needs at least three nodes. Use a whole count above two.`);
   return value;
+}
+
+function speed(value: number, label: string): number {
+  const checked = positive(value, label);
+  if (checked > LIGHT_SPEED)
+    throw new MargoError('state', `Lightning ${label} exceeds light speed. Use at most ${LIGHT_SPEED} m/s.`);
+  return checked;
+}
+
+function checkedCell(value: Cell, label: string): Cell {
+  if (
+    value?.length !== 3 ||
+    !Number.isSafeInteger(value[0]) ||
+    !Number.isSafeInteger(value[1]) ||
+    !Number.isSafeInteger(value[2])
+  )
+    throw new MargoError('state', `Invalid lightning ${label}. Use three safe integer origin cells.`);
+  return [value[0], value[1], value[2]];
+}
+
+function packedSpacing(origin: number, spacing: number, count: number): void {
+  let previous = -Infinity;
+  for (let i = 0; i < count; i++) {
+    const coordinate = Math.fround(origin + i * spacing);
+    if (!Number.isFinite(coordinate) || coordinate <= previous)
+      throw new MargoError(
+        'state',
+        'Lightning nodes cannot be distinguished in the channel. Use a closer origin cell or wider node spacing.',
+      );
+    previous = coordinate;
+  }
 }
 
 async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
@@ -128,6 +192,7 @@ export class LightningSolver implements Solver<LightningParams> {
   readonly thunderField: FieldDescriptor;
   private host!: SolverHost;
   private native!: Native;
+  private initialized = false;
   private cell: Cell = ZERO;
   private origin: Vec3 = ZERO;
   private size: Vec3 = SIZE_DEFAULT;
@@ -135,14 +200,17 @@ export class LightningSolver implements Solver<LightningParams> {
   private slab = 0;
   private volume = 0;
   private spacing = 80;
+  private originCellSize = 4096;
   private voltage = -1e8;
   private start = 0;
   private leaderStep = 0;
   private returnSpeed = 1e8;
   private exponent = 2;
+  private thresholds?: readonly [number, number];
   private eps = 1e-6;
   private sweeps = 0;
   private potential!: Region;
+  private candidate!: Region;
   private scratch!: Region;
   private forcing!: Region;
   private mask!: Region;
@@ -202,41 +270,95 @@ export class LightningSolver implements Solver<LightningParams> {
   }
 
   init(host: SolverHost, params: LightningParams = {}): void {
+    if (this.initialized)
+      throw new MargoError('state', 'Lightning solver already belongs to a world. Load another solver.');
+    if (!params || typeof params !== 'object')
+      throw new MargoError('state', 'Invalid lightning configuration. Use an options object.');
     this.host = host;
-    const [nx, ny, nz] = params.size ?? SIZE_DEFAULT;
-    this.size = [extent(nx, 'x extent'), extent(ny, 'y extent'), extent(nz, 'z extent')];
+    const size = params.size ?? SIZE_DEFAULT;
+    if (size.length !== 3)
+      throw new MargoError('state', 'Lightning requires a three-dimensional grid. Use three whole node counts.');
+    const nx = extent(size[0], 'x extent');
+    const ny = extent(size[1], 'y extent');
+    const nz = extent(size[2], 'z extent');
+    this.size = [nx, ny, nz];
     this.pitch = nx + 2;
     this.slab = this.pitch * (ny + 2);
     this.volume = this.slab * (nz + 2);
     const count = nx * ny * nz;
-    // Three scalar grids, a boundary byte and a parent index per padded node. Both output fields have two registry mirrors.
-    const gridBytes = (3 * 8 + 1 + 4) * this.volume;
+    // Four scalar grids, a boundary byte and parent index per padded node.
+    // Each output field has two registry mirrors beyond its owned buffer.
+    const gridBytes = (4 * 8 + 1 + 4) * this.volume + 8 * nx * nz;
     const channelBytes = (4 + 3 * (STRIDE * 4 + SOUND_WORDS * 8)) * count;
-    if (gridBytes + channelBytes >= MAX_MEMORY_PAGES * 65536)
-      throw new RangeError('Lightning grid exceeds wasm32 memory. Pass smaller grid extents.');
+    if (gridBytes + channelBytes + STACK_BYTES + DYNAMIC_BASE + 128 >= MAX_MEMORY_PAGES * 65536)
+      throw new MargoError('state', 'Lightning grid exceeds wasm32 memory. Use smaller grid extents.');
     this.spacing = positive(params.spacing ?? 80, 'node spacing');
-    this.origin = [
-      finite(params.origin?.[0] ?? 0, 'origin x'),
-      finite(params.origin?.[1] ?? 0, 'origin y'),
-      finite(params.origin?.[2] ?? 0, 'origin z'),
-    ];
-    this.cell = params.cell ? [...params.cell] : ZERO;
+    const origin = params.origin ?? ZERO;
+    if (origin.length !== 3)
+      throw new MargoError('state', 'Invalid lightning origin. Use three finite local coordinates.');
+    this.origin = [finite(origin[0], 'origin x'), finite(origin[1], 'origin y'), finite(origin[2], 'origin z')];
+    for (let axis = 0; axis < 3; axis++) packedSpacing(this.origin[axis]!, this.spacing, this.size[axis]!);
+    this.cell = checkedCell(params.cell ?? ZERO, 'origin cell');
     this.voltage = finite(params.cloudPotential ?? -1e8, 'cloud potential');
     if (this.voltage === 0)
-      throw new RangeError('Lightning cloud potential equals ground. Supply a nonzero atmospheric voltage.');
+      throw new MargoError('state', 'Lightning cloud potential equals ground. Use a nonzero atmospheric voltage.');
     this.start = finite(params.start ?? 0, 'start time');
-    this.leaderStep = this.spacing / positive(params.leaderSpeed ?? 2e5, 'leader speed');
-    this.returnSpeed = positive(params.returnSpeed ?? 1e8, 'return speed');
-    this.exponent = positive(params.exponent ?? 2, 'field exponent');
+    this.leaderStep = this.spacing / speed(params.leaderSpeed ?? 2e5, 'leader speed');
+    this.returnSpeed = speed(params.returnSpeed ?? 1e8, 'return speed');
+    const lastEvent = this.start + (count - 1) * this.leaderStep;
+    const oneReturnStep = this.spacing / this.returnSpeed;
+    if (
+      !(this.start + this.leaderStep > this.start) ||
+      !Number.isFinite(lastEvent) ||
+      !(lastEvent > this.start + (count - 2) * this.leaderStep) ||
+      !(oneReturnStep > 0 && Number.isFinite(oneReturnStep))
+    )
+      throw new MargoError(
+        'state',
+        'Lightning timing exceeds numeric resolution. Use a nearer start time, a wider spacing or compatible propagation speeds.',
+      );
+    this.originCellSize = positive(params.cellSize ?? 4096, 'origin cell size');
+    const breakdown = params.breakdown;
+    this.thresholds = undefined;
+    if (breakdown !== undefined) {
+      if (!breakdown || typeof breakdown !== 'object')
+        throw new MargoError('state', 'Give lightning breakdown initiation and propagation fields in V/m.');
+      const fieldScale = positive(Math.abs(this.voltage) / this.spacing, 'normalized electric field scale');
+      this.thresholds = [
+        positive(
+          positive(breakdown.initiation, 'initiation threshold') / fieldScale,
+          'normalized initiation threshold',
+        ),
+        positive(
+          positive(breakdown.propagation, 'propagation threshold') / fieldScale,
+          'normalized propagation threshold',
+        ),
+      ];
+    }
+    this.exponent = positive(params.exponent ?? (breakdown ? 1 : 2), 'field exponent');
     this.eps = positive(params.tolerance ?? 1e-6, 'relaxation tolerance');
     if (this.eps >= 1)
-      throw new RangeError('Lightning tolerance must be below the unit potential difference. Use a smaller fraction.');
-    this.sweeps = params.sweeps ?? Math.ceil(2 * ny * ny * ln(1 / this.eps));
-    if (!Number.isSafeInteger(this.sweeps) || this.sweeps < 1)
-      throw new RangeError('Invalid lightning relaxation sweeps. Pass a positive whole count.');
-    const [x, z] = params.startColumn ?? [Math.floor(nx / 2), Math.floor(nz / 2)];
-    if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || x >= nx || z < 0 || z >= nz)
-      throw new RangeError('Lightning seed is off the cloud plane. Choose a column in the grid.');
+      throw new MargoError(
+        'state',
+        'Lightning tolerance must be below the unit potential difference. Use a smaller fraction.',
+      );
+    const reciprocal = 1 / this.eps;
+    this.sweeps =
+      params.sweeps ?? Math.ceil(2 * ny * ny * (Number.isFinite(reciprocal) ? ln(reciprocal) : -ln(this.eps)));
+    if (!Number.isInteger(this.sweeps) || this.sweeps < 1 || this.sweeps > 0xffff_ffff)
+      throw new MargoError(
+        'state',
+        'Invalid lightning relaxation sweeps. Use a positive whole count that fits wasm32.',
+      );
+    const start = params.startColumn ?? [Math.floor(nx / 2), Math.floor(nz / 2)];
+    const x = start[0];
+    const z = start[1];
+    if (start.length !== 2 || !Number.isInteger(x) || !Number.isInteger(z) || x < 0 || x >= nx || z < 0 || z >= nz)
+      throw new MargoError('state', 'Lightning seed is off the cloud plane. Use a column in the grid.');
+    if (params.charge !== undefined && typeof params.charge !== 'function')
+      throw new MargoError('state', 'Invalid lightning charge field. Use a function returning finite C/m³.');
+    if (params.bed !== undefined && typeof params.bed?.sample !== 'function')
+      throw new MargoError('state', 'Invalid lightning bed. Use a TerrainBed or a finite bed sampler.');
     const module =
       isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]'
         ? this.shared
@@ -253,6 +375,7 @@ export class LightningSolver implements Solver<LightningParams> {
     this.native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     const reserve = (name: string, words: number) => host.allocate(name, words * 8, 'f64', LIGHTNING_LAYOUT);
     this.potential = reserve('potential', this.volume);
+    this.candidate = reserve('candidate-potential', this.volume);
     this.scratch = reserve('relaxation-scratch', this.volume);
     this.forcing = reserve('charge', this.volume);
     this.mask = host.allocate('electrical-boundary', this.volume, 'u8', LIGHTNING_LAYOUT);
@@ -272,7 +395,9 @@ export class LightningSolver implements Solver<LightningParams> {
     const header = this.f64(this.header);
     header[0] = 1;
     header[1] = OPEN;
-    this.solvePotential();
+    this.f64(this.candidate).set(this.f64(this.potential));
+    this.acceptPotential(this.solvePotential());
+    this.initialized = true;
   }
 
   private index(x: number, y: number, z: number): number {
@@ -300,11 +425,17 @@ export class LightningSolver implements Solver<LightningParams> {
     const [nx, ny, nz] = this.size,
       d = this.spacing,
       [ox, oy, oz] = this.origin;
-    const bed = params.bed,
-      cellSize = positive(params.cellSize ?? 4096, 'origin cell size');
-    const bx = bed ? (this.cell[0] - bed.cell[0]) * cellSize : 0,
-      by = bed ? (this.cell[1] - bed.cell[1]) * cellSize : 0;
-    const bz = bed ? (this.cell[2] - bed.cell[2]) * cellSize : 0;
+    const bed = params.bed;
+    const bedCell = bed ? checkedCell(bed.cell, 'bed cell') : this.cell;
+    const offset = (axis: number) => {
+      const delta = this.cell[axis]! - bedCell[axis]!;
+      if (!Number.isSafeInteger(delta))
+        throw new MargoError('state', 'Lightning bed offset exceeds safe cells. Use neighbouring origin cells.');
+      return finite(delta * this.originCellSize, 'bed cell offset');
+    };
+    const bx = offset(0);
+    const by = offset(1);
+    const bz = offset(2);
     const ground = this.f64(this.ground),
       p = this.f64(this.potential),
       f = this.f64(this.forcing),
@@ -314,9 +445,18 @@ export class LightningSolver implements Solver<LightningParams> {
         const px = ox + x * d,
           pz = oz + z * d,
           top = oy + (ny - 1) * d;
-        const floor = Math.max(oy, (bed?.sample(px + bx, pz + bz).elevation ?? oy) - by);
+        const elevation = bed
+          ? finite(
+              bed.sample(finite(px + bx, 'bed sample x'), finite(pz + bz, 'bed sample z'))?.elevation,
+              'bed elevation',
+            )
+          : oy;
+        const floor = Math.max(oy, finite(elevation - by, 'local bed elevation'));
         if (!(floor < top))
-          throw new RangeError('Lightning grid ends below the bed. Raise the cloud plane above the terrain.');
+          throw new MargoError(
+            'state',
+            'Lightning cloud plane reaches the bed. Raise the cloud plane above the terrain.',
+          );
         ground[z * nx + x] = floor;
         for (let y = 0; y < ny; y++) {
           const node = this.index(x, y, z),
@@ -329,9 +469,18 @@ export class LightningSolver implements Solver<LightningParams> {
             p[node] = 1;
           } else {
             p[node] = (py - floor) / (top - floor);
-            f[node] =
-              (finite(params.charge?.(px, py, pz) ?? 0, 'space charge') * d * d) /
-              (ELECTRIC_PERMITTIVITY * this.voltage);
+            const charge = params.charge ? finite(params.charge(px, py, pz), 'space charge') : 0;
+            const normalized = (charge * d * d) / (ELECTRIC_PERMITTIVITY * this.voltage);
+            if (charge === 0 && !Number.isFinite(normalized)) {
+              f[node] = 0;
+            } else {
+              if (!Number.isFinite(normalized) || (normalized === 0 && charge !== 0))
+                throw new MargoError(
+                  'state',
+                  'Lightning space charge exceeds numeric resolution. Use compatible charge, grid spacing and cloud voltage.',
+                );
+              f[node] = normalized;
+            }
           }
         }
       }
@@ -347,11 +496,11 @@ export class LightningSolver implements Solver<LightningParams> {
     return regionWords(this.host.memory, region) as Uint8Array;
   }
 
-  private solvePotential(): void {
+  private solvePotential(): number {
     const [nx, ny, nz] = this.size;
     this.f64(this.scratch).fill(0);
-    this.f64(this.header)[3] = this.native.relax_potential(
-      this.potential.byteOffset,
+    const residual = this.native.relax_potential(
+      this.candidate.byteOffset,
       this.scratch.byteOffset,
       this.forcing.byteOffset,
       this.mask.byteOffset,
@@ -361,14 +510,37 @@ export class LightningSolver implements Solver<LightningParams> {
       this.eps,
       this.sweeps,
     );
+    if (!(Number.isFinite(residual) && residual >= 0))
+      throw new MargoError(
+        'failed',
+        'Lightning potential solve exceeded numeric range. Use smaller charge, voltage or grid spacing.',
+      );
+    const potential = this.f64(this.candidate);
+    const mask = this.u8(this.mask);
+    for (let i = 0; i < potential.length; i++) {
+      const value = potential[i]!;
+      const rail = mask[i]!;
+      if (!Number.isFinite(this.voltage * value) || (rail !== 0 && value !== (rail === GROUND ? 0 : 1)))
+        throw new MargoError(
+          'failed',
+          'Lightning potential or boundary rail is invalid. Use compatible charge, voltage and grounded geometry.',
+        );
+    }
+    return residual;
+  }
+
+  private acceptPotential(residual: number): void {
+    this.f64(this.potential).set(this.f64(this.candidate));
+    this.f64(this.header)[3] = residual;
   }
 
   private choose(random: RandomStream, count: number): [number, number] {
-    const p = this.f64(this.potential),
+    const p = this.f64(this.candidate),
       mask = this.u8(this.mask),
       ordered = this.i32(this.grown);
     const [nx, ny, nz] = this.size;
     const offsets = [-1, 1, -this.pitch, this.pitch, -this.slab, this.slab];
+    const threshold = this.thresholds?.[count === 1 ? 0 : 1] ?? 0;
     // Weighted reservoir sampling over bonds avoids a second scan or a candidate collection.
     let total = 0,
       scale = 0,
@@ -383,7 +555,7 @@ export class LightningSolver implements Solver<LightningParams> {
         const to = from + offsets[dir]!,
           boundary = mask[to]!;
         if (boundary === CLOUD || boundary === LEADER) continue;
-        const delta = 1 - p[to]!;
+        const delta = 1 - p[to]! - threshold;
         if (delta <= 0) continue;
         if (delta > scale) {
           total *= pow(scale / delta, this.exponent);
@@ -391,6 +563,11 @@ export class LightningSolver implements Solver<LightningParams> {
         }
         const weight = pow(delta / scale, this.exponent);
         total += weight;
+        if (!Number.isFinite(total))
+          throw new MargoError(
+            'failed',
+            'Lightning bond weights exceeded numeric range. Use a smaller field exponent.',
+          );
         const randomValue = random.block(count, i, dir)[0]!;
         if (((randomValue + 0.5) / 4294967296) * total < weight) {
           chosen = to;
@@ -402,8 +579,19 @@ export class LightningSolver implements Solver<LightningParams> {
   }
 
   private add(to: number, from: number, count: number, isGround: boolean): void {
-    const start = this.point(from),
-      end = this.point(to, isGround);
+    const start = this.point(from);
+    const end = this.point(to, isGround);
+    if (start.every((position, axis) => Math.fround(position) === Math.fround(end[axis]!)))
+      throw new MargoError(
+        'state',
+        'Lightning attachment is too short to pack. Move the terrain away from the node or use a closer origin.',
+      );
+    const duration = hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]) / LIGHT_SPEED;
+    if (duration > this.leaderStep * (1 + 8 * Number.EPSILON))
+      throw new MargoError(
+        'state',
+        'Lightning attachment would cross faster than light. Use a slower leader or resolve the terrain with the grid.',
+      );
     this.i32(this.parent)[to] = from;
     this.i32(this.grown)[count] = to;
     const at = count * STRIDE;
@@ -413,83 +601,132 @@ export class LightningSolver implements Solver<LightningParams> {
     this.f64(this.header)[0] = count + 1;
     if (!isGround) {
       this.u8(this.mask)[to] = LEADER;
-      this.f64(this.potential)[to] = 1;
+      this.f64(this.candidate)[to] = 1;
     }
   }
 
   private strike(tgt: number, seconds: number): void {
-    const header = this.f64(this.header),
-      p = this.i32(this.parent),
-      order = this.i32(this.grown);
-    const segments = regionWords(this.host.memory, this.segments) as Float32Array,
-      sonics = this.f64(this.sound);
-    header[1] = tgt;
-    header[2] = seconds;
+    const header = this.f64(this.header);
+    const parent = this.i32(this.parent);
+    const order = this.i32(this.grown);
+    const count = header[0]!;
+    // The stroke reorders existing segments. Stage its whole receipt before
+    // modifying any of the published rows.
+    const segments = new Float32Array(count * STRIDE);
+    const sonics = new Float64Array(count * SOUND_WORDS);
     const path = new Set<number>();
-    for (let point = tgt; point >= 0; point = p[point]!) path.add(point);
+    for (let point = tgt; point >= 0; point = parent[point]!) path.add(point);
     // Mark the return stroke and record the path distance from strike point to every other node.
     const distance = new Map<number, number>([[tgt, 0]]);
-    for (let point = tgt; p[point]! >= 0; point = p[point]!) {
-      const root = p[point]!,
-        a = this.point(point, point === tgt),
-        b = this.point(root);
-      distance.set(root, distance.get(point)! + hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]));
-      header[4] = distance.get(root)!;
+    let trunkLength = 0;
+    for (let point = tgt; parent[point]! >= 0; point = parent[point]!) {
+      const root = parent[point]!;
+      const a = this.point(point, point === tgt);
+      const b = this.point(root);
+      trunkLength += hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      distance.set(root, trunkLength);
     }
-    // Keep the connected cloud-to-ground polyline first, then list branches in growth order.
     let trunk = 0;
-    for (let i = 1; i < header[0]!; i++) {
+    for (let i = 1; i < count; i++) {
       if (path.has(order[i]!)) trunk++;
     }
+    segments[0] = count - 1;
     segments[1] = trunk;
-    sonics[0] = header[0]! - 1;
-    let nextTrunk = 0,
-      nextBranch = trunk;
-    for (let i = 1; i < header[0]!; i++) {
-      const to = order[i]!,
-        from = p[to]!,
-        a = this.point(from),
-        b = this.point(to, to === tgt);
-      const length = hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
-        main = path.has(to);
+    sonics[0] = count - 1;
+    let nextTrunk = 0;
+    let nextBranch = trunk;
+    for (let i = 1; i < count; i++) {
+      const to = order[i]!;
+      const from = parent[to]!;
+      const a = this.point(from);
+      const b = this.point(to, to === tgt);
+      const length = hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      const main = path.has(to);
       if (!main) distance.set(to, distance.get(from)! + length);
       const index = main ? nextTrunk++ : nextBranch++;
       segments.set([a[0], a[1], a[2], main ? 0 : 1, b[0], b[1], b[2], 0], (index + 1) * STRIDE);
-      const at = i * SOUND_WORDS,
-        arc = (distance.get(to)! + distance.get(from)!) * 0.5;
+      const arc = (distance.get(to)! + distance.get(from)!) * 0.5;
+      const emission = seconds + arc / this.returnSpeed;
+      if (!(Number.isFinite(emission) && emission > seconds))
+        throw new MargoError(
+          'state',
+          'Lightning return-stroke delay exceeds numeric resolution. Use a nearer start time or compatible return speed and spacing.',
+        );
       sonics.set(
-        [
-          (a[0] + b[0]) / 2,
-          (a[1] + b[1]) / 2,
-          (a[2] + b[2]) / 2,
-          seconds + arc / this.returnSpeed,
-          main ? 1 : 0.25,
-          length,
-        ],
-        at,
+        [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, emission, main ? 1 : 0.25, length],
+        i * SOUND_WORDS,
       );
     }
+    (regionWords(this.host.memory, this.segments) as Float32Array).set(segments);
+    this.f64(this.sound).set(sonics);
+    header[1] = tgt;
+    header[2] = seconds;
+    header[4] = trunkLength;
+  }
+
+  private discardGrowth(first: number): void {
+    const header = this.f64(this.header);
+    const parent = this.i32(this.parent);
+    const order = this.i32(this.grown);
+    const mask = this.u8(this.mask);
+    const count = header[0]!;
+    for (let i = first; i < count; i++) {
+      const node = order[i]!;
+      if (mask[node] === LEADER) mask[node] = 0;
+      parent[node] = OPEN;
+      order[i] = 0;
+    }
+    const segments = regionWords(this.host.memory, this.segments) as Float32Array;
+    segments.fill(0, first * STRIDE, count * STRIDE);
+    segments[0] = first - 1;
+    header[0] = first;
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
-    const elapsed = (context.tick + 1) * dt - this.start,
-      header = this.f64(this.header);
-    if (header[1]! >= 0 || elapsed < this.leaderStep) return;
-    const random = new RandomStream(context.seed, this.rngId);
-    const limit = Math.floor(elapsed / this.leaderStep),
-      capacity = this.i32(this.grown).length;
-    for (let n = header[0]!; n <= limit && n < capacity; n++) {
-      const [to, root] = this.choose(random, n);
-      if (to === OPEN) return;
-      const isGround = this.u8(this.mask)[to] === GROUND;
-      this.add(to, root, n, isGround);
-      if (isGround) {
-        this.strike(to, this.start + n * this.leaderStep);
-        return;
-      }
-      this.solvePotential();
+    const cell = checkedCell(context.cell, 'step cell');
+    const elapsed = finite((context.tick + 1) * positive(dt, 'step duration') - this.start, 'elapsed leader time');
+    const header = this.f64(this.header);
+    const first = header[0]!;
+    if (header[1] !== OPEN || elapsed / this.leaderStep < first) {
+      this.cell = cell;
+      return;
     }
+    const capacity = this.i32(this.grown).length;
+    const limit = Math.min(capacity - 1, Math.floor(elapsed / this.leaderStep));
+    if (first >= capacity)
+      throw new MargoError(
+        'failed',
+        'Lightning exhausted the channel grid before grounding. Use a grid that reaches the grounded surface.',
+      );
+    const random = new RandomStream(context.seed, this.rngId);
+    this.f64(this.candidate).set(this.f64(this.potential));
+    let residual = header[3]!;
+    try {
+      for (let n = first; n <= limit; n++) {
+        const [to, root] = this.choose(random, n);
+        if (to === OPEN) {
+          if (!this.thresholds)
+            throw new MargoError(
+              'failed',
+              'Lightning leader has no downhill electric bond. Use another start column or adjust charge and grounded geometry.',
+            );
+          header[1] = HALTED;
+          break;
+        }
+        const isGround = this.u8(this.mask)[to] === GROUND;
+        this.add(to, root, n, isGround);
+        if (isGround) {
+          this.strike(to, this.start + n * this.leaderStep);
+          break;
+        }
+        residual = this.solvePotential();
+      }
+    } catch (cause) {
+      this.discardGrowth(first);
+      throw cause;
+    }
+    this.acceptPotential(residual);
+    this.cell = cell;
   }
 
   exportPorts(tick: number): readonly Port[] {
@@ -519,25 +756,44 @@ export class LightningSolver implements Solver<LightningParams> {
     return [];
   }
 
+  private requireInitialized(): void {
+    if (!this.initialized)
+      throw new MargoError('state', 'Lightning solver is not initialized. Add it to a PhysicsWorld.');
+  }
+
   /** Electric potential in volts at a node. */
   potentialAt(x: number, y: number, z: number): number {
+    this.requireInitialized();
     if (![x, y, z].every((v, k) => Number.isInteger(v) && v >= 0 && v < this.size[k]!))
-      throw new RangeError('Lightning potential node is outside the grid. Pass valid x, y and z indices.');
+      throw new MargoError('state', 'Lightning potential node is outside the grid. Use valid x, y and z indices.');
     return this.voltage * this.f64(this.potential)[this.index(x, y, z)]!;
   }
 
   /** Maximum normalized potential correction in the last native sweep. */
   get residual(): number {
+    this.requireInitialized();
     return this.f64(this.header)[3]!;
   }
 
+  /** Lifecycle of the accepted channel in the current world state. */
+  get status(): LightningStatus {
+    this.requireInitialized();
+    const header = this.f64(this.header);
+    const contact = header[1]!;
+    if (contact >= 0) return 'grounded';
+    if (contact === HALTED) return 'halted';
+    return header[0]! > 1 ? 'growing' : 'pending';
+  }
+
   get flash(): LightningFlash | undefined {
+    this.requireInitialized();
     const record = this.f64(this.header);
     return record[1]! >= 0 ? { position: this.point(record[1]!, true), time: record[2]! } : undefined;
   }
 
   /** Copies the present channel. Main return path has branch order 0 after grounding. */
   channel(): SolvedLightningChannel {
+    this.requireInitialized();
     const header = this.f64(this.header),
       count = header[0]! - 1;
     const packed = regionWords(this.host.memory, this.segments) as Float32Array;
@@ -563,11 +819,50 @@ export class LightningSolver implements Solver<LightningParams> {
     });
   }
 
+  /**
+   * Reads the accepted channel in the rendering cell, at the specified world time.
+   * The leader's relative brightness is an appearance control, default 0.1.
+   */
+  boltSource(time: number, renderCell = this.host?.cell, leaderBrightness = 0.1): LightningBoltFrame | undefined {
+    this.requireInitialized();
+    const seconds = finite(time, 'render time');
+    const light = finite(leaderBrightness, 'leader brightness');
+    if (light < 0 || !Number.isFinite(Math.fround(light)))
+      throw new MargoError('state', 'Give the lightning leader a nonnegative float32 brightness.');
+    const header = this.f64(this.header);
+    const links = header[0]! - 1;
+    if (links === 0 || seconds < this.start + this.leaderStep) return undefined;
+    const sourceCell = this.host.cell;
+    const targetCell = checkedCell(renderCell, 'render cell');
+    const shift = (axis: number): number => {
+      const cells = sourceCell[axis]! - targetCell[axis]!;
+      const metres = cells * this.originCellSize;
+      if (!Number.isSafeInteger(cells) || !Number.isFinite(Math.fround(metres)))
+        throw new MargoError(
+          'state',
+          'Lightning render translation exceeds local precision. Use a nearer origin cell.',
+        );
+      return metres;
+    };
+    const offset: Vec3 = [shift(0), shift(1), shift(2)];
+    const contact = header[1]!;
+    const amplitude =
+      contact >= 0 && seconds >= header[2]!
+        ? this.brightness(seconds)
+        : contact === HALTED
+          ? light * exp(-Math.max(0, seconds - (this.start + links * this.leaderStep)) / 0.05)
+          : light;
+    return { memory: this.host.memory, channel: this.segments, offset, core: amplitude, glow: amplitude };
+  }
+
   /** Relative current-like light envelope after the first return stroke reaches the ground. */
   brightness(time: number, rise = 0.00001, fade = 0.05): number {
+    const seconds = finite(time, 'flash time');
+    const riseSeconds = positive(rise, 'return rise');
+    const fadeSeconds = positive(fade, 'return fade');
     const flash = this.flash;
-    if (!flash || time < flash.time) return 0;
-    const age = finite(time, 'flash time') - flash.time;
-    return (1 - exp(-age / positive(rise, 'return rise'))) * exp(-age / positive(fade, 'return fade'));
+    if (!flash || seconds < flash.time) return 0;
+    const age = finite(seconds - flash.time, 'flash age');
+    return (1 - exp(-age / riseSeconds)) * exp(-age / fadeSeconds);
   }
 }

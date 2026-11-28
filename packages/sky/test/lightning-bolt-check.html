@@ -42,30 +42,70 @@ const stats=img=>{let n=0,max=0,top=img.h,bottom=0,sum=0;for(let y=0;y<img.h;y++
 window.check={samples:sceneSamples,
  async runPhysical(){
   device.pushErrorScope('validation');
-  const [{ LightningSolver }, { PhysicsWorld, worldMemory }] = await Promise.all([
+  const [{ LightningSolver, LIGHTNING_CHANNEL_WORDS }, { PhysicsWorld, worldMemory }] = await Promise.all([
    import('/packages/physics/dist/lightning.js'), import('/packages/physics/dist/world.js')
   ]);
-  const simulate = async shared => {
+  // Render a fixed night shot at the solver's exact authored times. The channel is in the adjacent world cell.
+  const cameraCell = [400_000, 0, -700_000];
+  const cloudCell = [cameraCell[0], 0, cameraCell[2] - 1];
+  const launch = 2 / 60 - 0.0032;
+  const make = async shared => {
    const solver = await LightningSolver.load();
    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) }).add(solver, {
-    size: [7, 17, 7], spacing: 80, origin: [-240, 0, -3240],
-   });
-   world.advance(18);
-   return { channel: solver.channel(), flash: solver.flash, hash: world.hash() };
+    size: [7, 17, 7], spacing: 80, origin: [-240, 0, 856], start: launch,
+   }, cloudCell);
+   return { solver, world };
   };
-  const plain = await simulate(false), shared = await simulate(true);
-  const weather = new Weather({ intensity: 0, lightning: { strength: 0, hold: 0, cloud: { base: 1280 } } });
-  engine.use(weather);
-  const bolt = LightningBolt.attach(engine, { weather, channel: () => plain.channel });
-  weather.strike({ distance: 3000, azimuth: Math.PI, strength: 1 });
-  await shot();
-  const dark = stats(await shot());
-  weather.options.lightning.hold = 1;
-  await shot();
-  const lit = stats(await shot());
-  bolt.dispose(); weather.dispose();
+  const plain = await make(false), shared = await make(true);
+  const sample = () => shared.solver.boltSource(shared.world.time, cameraCell);
+  const accept = frame => { plain.world.advance(frame); shared.world.advance(frame); };
+  const record = ({world, solver}) => {
+   const field = solver.boltSource(world.time, cameraCell);
+   if (!field) throw new Error('Expected an accepted physical lightning field at the return stroke.');
+   const rows = new Float32Array(field.memory.buffer, field.channel.byteOffset, field.channel.byteLength / 4);
+   return {
+    hash: world.hash(), flash: solver.flash, count: rows[0], trunk: rows[1], offset: field.offset,
+    groundY: rows[rows[1] * LIGHTNING_CHANNEL_WORDS + 5],
+   };
+  };
+  const weather = new Weather({ intensity: 0, lightning: { strength: 0, cloud: { base: 1280 } } });
+  const bolt = LightningBolt.attach(engine, { weather, field: sample });
+  const measure = async () => { await shot(); return stats(await shot()); };
+  let result;
+  try {
+   accept(1);
+   const before = sample();
+   const dark = await measure();
+   accept(2);
+   const leaderField = sample();
+   const leader = await measure();
+   const checkpoint = shared.world.takeSnapshot();
+   let strokeFrame = 3;
+   for (; strokeFrame <= 18; strokeFrame++){
+    accept(strokeFrame);
+    if (shared.solver.flash) break;
+   }
+   const lit = await measure();
+   const plainFlash = record(plain), sharedFlash = record(shared);
+   const levels = {
+    before: before?.core ?? 0, leader: leaderField?.core ?? 0, stroke: sample()?.core ?? 0,
+   };
+   accept(120);
+   const faded = await measure();
+   shared.world.restoreSnapshot(checkpoint.bytes);
+   shared.world.advance(strokeFrame);
+   const replay = record(shared);
+   const replayLit = await measure();
+   result = {
+    dark, leader, lit, faded, replayLit, levels, launch, strokeFrame,
+    plain: plainFlash, shared: sharedFlash, replay, compat: globalThis.__margoCompat === true,
+   };
+  } finally {
+   bolt.dispose();
+   weather.dispose();
+  }
   const validation = (await device.popErrorScope())?.message ?? null;
-  return { plain, shared, lit, dark, validation, errors: errors.splice(0) };
+  return { ...result, validation, errors: errors.splice(0) };
  },
  async run(){
   const out={};device.pushErrorScope('validation');

@@ -4871,7 +4871,10 @@ imports the existing arena and has no initialized data or static slot. Channel a
 capacity; layout 1 carries active counts in their first rows. The world RNG controls stochastic growth and a
 snapshot recovers the same partially grown leader and final return path. A live TerrainBed terminates the return
 channel and the same path drives Sky's renderer and lights. The acoustic fixture checks segment emission and
-OutdoorSound travel time. Absolute acoustic pressure and evolving cloud fields still need separate models.
+OutdoorSound travel time. Optional initiation and growth thresholds gate each eligible bond in V/m.
+The candidate field and new segments are accepted only after native correction and timing checks.
+Both renderers use the accepted layout-1 channel directly, with the same origin offset and flash
+clock. Absolute acoustic pressure and evolving cloud fields still need separate models.
 
 ### Vortex wind and pressure (ATMO-05)
 

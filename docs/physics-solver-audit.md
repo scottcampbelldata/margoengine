@@ -73,6 +73,24 @@ them; the rest is a record of what a stronger solver would need.
   eigenmode sums over shallow, transitional and deep regimes. At 20 mm the closure meets four of six
   T20 camera bounds and one of six T30 bounds, so the coastal validation point remains open.
 
+### ATMO-07 four-point pass
+
+- Point 5. `lightning-extremes.test.js` checks independent leader and return speed limits, a terrain chord
+  that would travel faster than light, malformed spatial and electrical inputs, and transactional
+  rejection of a late return-time overflow in both Wasm memory modes. `lightning-native.test.js` checks
+  both SIMD lanes report an unrepresentable Poisson correction.
+- Point 7. `lightning.browser.mjs` compares a placed leader, the accepted return stroke, fade and
+  snapshot restore. WebGPU and WebGL2 each draw 455 bright pixels over 102 rows, with the channel
+  translated from the adjoining origin cell. The accepted flash and replay hash match.
+- Point 8. `docs/limits.md` records the finite-difference grid, fixed charge, one seeded channel,
+  relative optical and acoustic outputs, and unresolved storm and plasma dynamics.
+- Point 2 remains open. `lightning-breakdown.test.js` checks exact uniform-field initiation and a
+  bounded propagation halt. The independent return-stroke comparison uses base current as input and
+  reserves measured irradiance for scoring. The 62 m optical view rises in 0.70 μs and peaks 0.90 μs
+  after the base-current peak. The fixed-speed optical precursor predicts 0.40 μs and 0.245 μs.
+  Reproduce with `node packages/physics/scripts/atmo07-return-optical.mjs`.
+  [Quick and Krider (2017), Figures 5, 6 and 8](https://doi.org/10.1002/2017JD027363)
+
 ## Film set first: the underwater and boat films
 
 The solvers behind the Edmund Fitzgerald, First Wake, Below the Swell and Below the Blue Line films (problem rows EF,

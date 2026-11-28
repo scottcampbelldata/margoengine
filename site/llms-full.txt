@@ -15293,12 +15293,16 @@ These entries leave Core, Stage, Physics World and the Weather root unchanged.
 The optional lightning solver follows one natural strike in a homogeneous dielectric with insulating sides, a
 prescribed cloud plane and a grounded bed sampled at initialization. Resolve terrain and charge gradients with
 several lattice cells. The leader is voxelized, optical strength is relative, and the charge field is fixed for
-one flash. Use the electric potential and timed segment outputs for visualization and relative acoustic delays.
-Predicting strike locations, current waveforms and absolute sound pressure requires storm observations and
-additional plasma and atmospheric models. Grid capacity follows available wasm32 arena space, including each
-published field's two mirrors. The optional entry measures 5,861 B gzip within a 6,117 B ceiling. Both native
-modules measure 2,357 B raw and 1,155 B gzip and load only with that entry. Sky's bolt measures 5,403 B gzip within
-its existing 5,591 B ceiling. Core and Stage gain zero bytes.
+one flash. The optional initiation and propagation thresholds apply to forward grid bonds, with
+one authored seed on the cloud plane. They do not solve storm electrification, upward connecting leaders
+or the choice of a cloud-to-cloud initiation site. Use the electric potential and timed segment outputs
+for visualization and relative acoustic delays. Predicting strike locations, current waveforms and
+absolute sound pressure requires storm observations and additional plasma and atmospheric models.
+The live Sky field borrows accepted geometry and a relative radiance envelope at the requested world time.
+Points between accepted physics ticks use the last accepted geometry. Weather retains its own light schedule. Grid capacity follows available wasm32 arena space, including each
+published field's two mirrors. The optional entry measures 6,341 B gzip within a 6,597 B ceiling. Both native
+modules measure 2,491 B raw and 1,200 B gzip and load only with that entry. Sky's bolt measures 6,044 B gzip
+within a 6,300 B ceiling. Core and Stage gain zero bytes.
 
 ### Thermo-viscoplastic lava and nearshore occupancy (EARTH-10)
 

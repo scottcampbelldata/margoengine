@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21627784,
+  "total": 21630484,
   "history": [
     {
       "date": "2026-10-24",
@@ -15275,6 +15275,12 @@
       "commit": "lane-e-instanced-flow",
       "reason": "materials gains the instanced-curve-flow entry (many instances along curves, 18,332 B); shader editor-pass grows 114 B of NodeMaterial caster renewal after a texture or buffer is rebuilt (KB-SHADOW-STALEMOVE1).",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "atmo-07-bond-thresholds-and-live-channel",
+      "reason": "ATMO-07 physics/lightning grows from 4350 to 6341 B gzip, ceiling 4606 to 6597 B, for range checks, transactional publication and the two field thresholds. Sky lightning-bolt moves from 5403 to 6044 B, ceiling 5591 to 6300 B, for binding the accepted layout in both renderers. Splitting either entry would duplicate its registered state binding or bolt shader. Both lazy kernels move from 1155 to 1200 B gzip. Core and Stage are unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16158,7 +16164,7 @@
     "@margoengine/physics/lava": 6147,
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
-    "@margoengine/physics/lightning": 4606,
+    "@margoengine/physics/lightning": 6597,
     "@margoengine/physics/loads": 74232,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
@@ -16601,7 +16607,7 @@
     "@margoengine/sky/hillaire": 10843,
     "@margoengine/sky/hurricane": 2851,
     "@margoengine/sky/lighting": 5135,
-    "@margoengine/sky/lightning-bolt": 5591,
+    "@margoengine/sky/lightning-bolt": 6300,
     "@margoengine/sky/look": 4026,
     "@margoengine/sky/milky-way": 6589,
     "@margoengine/sky/moon": 3810,

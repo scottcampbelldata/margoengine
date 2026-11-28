@@ -8535,8 +8535,9 @@ console.log(lightning.flash, lightning.channel().trunk, Math.min(...arrivals));
 
 The default grid is `13 × 19 × 13` with 80 m spacing above the origin and an upper plane at −100 MV. The cloud seed
 starts at the centre of the top plane at world time zero. The default leader and return speeds are 200,000 and
-100,000,000 m/s. Growth weights scale with the square of the normalized voltage difference. `charge` samples a
-static free charge density in C/m³. The dimension-dependent default sweep count targets a normalized potential
+100,000,000 m/s. The default growth weight is the square of the normalized voltage difference.
+With `breakdown`, the thresholds reduce the eligible bond drops and the exponent defaults to one.
+Pass `exponent` to override either default. `charge` samples a static free charge density in C/m³. The dimension-dependent default sweep count targets a normalized potential
 correction of `1e-6`, exposed as `residual`. `brightness(time)` gives the relative return envelope with a 10 µs
 rise and a 50 ms fade by default. A `bed` in another cell uses `cell` and `cellSize` (default 4096 m) to align the
 samples. Pass the same initial `cell` to `world.add()` if the grid is outside the origin cell.
@@ -8545,6 +8546,17 @@ samples. Pass the same initial `cell` to `world.add()` if the grid is outside th
 the trunk polyline and branches. `thunderField` has one `LIGHTNING_THUNDER_WORDS` f64 header row with the source count,
 followed by source XYZ (m), emission time (s), relative weight and segment length (m). Apply source emission time
 before acoustic flight time. `channel()` and `thunder()` return copies of their active data.
+
+Set `breakdown: { initiation, propagation }` to gate the first link and subsequent links with electric
+fields in V/m. Both values are positive. A field below the relevant threshold can leave the flash
+`halted` without ground contact or thunder. Omit `breakdown` for the unthresholded seeded mode.
+The solver's `status` distinguishes a pending or growing leader, a halt and a grounded flash.
+
+Pass `field: () => lightning.boltSource(world.time, renderCell)` to Sky's `LightningBolt.attach`.
+Advance the world before drawing. The callback reads the accepted channel region directly, and
+`renderCell` translates it into the camera's origin cell. Omit the cell when the renderer uses the
+solver's origin cell. A third argument sets leader brightness relative to the return stroke; it
+defaults to 0.1. This is an appearance control. See the Sky README for a complete example.
 
 ## Natural lava flow and coastal displacement
 

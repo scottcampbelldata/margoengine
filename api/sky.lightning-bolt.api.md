@@ -24,8 +24,22 @@ export class LightningBolt implements EnginePlugin {
 export interface LightningBoltAttachOptions {
     weather: LightningBoltSource;
     channel?: (strike: LightningStrike) => LightningChannel | undefined;
+    field?: () => LightningBoltFieldFrame | undefined;
     coreRadiance?: number;
     glowRadiance?: number;
+}
+
+export interface LightningBoltFieldFrame {
+    readonly memory: WebAssembly.Memory;
+    readonly channel: {
+        readonly type: string;
+        readonly layout: number;
+        readonly byteOffset: number;
+        readonly byteLength: number;
+    };
+    readonly offset?: Vec3;
+    readonly core: number;
+    readonly glow: number;
 }
 
 export interface LightningBoltSource {

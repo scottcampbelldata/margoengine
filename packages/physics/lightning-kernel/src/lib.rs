@@ -10,6 +10,7 @@ fn abort(_: &core::panic::PanicInfo<'_>) -> ! {
 
 /// Solves the cubic finite-difference Poisson equation. Nonzero mask cells keep their Dirichlet value.
 /// The side halos mirror the nearest cell for insulation. The host supplies disjoint, padded columns.
+/// Returns positive infinity for an unrepresentable correction, and the host discards the candidate.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn relax_potential(
     potential: *mut f64,
@@ -62,16 +63,24 @@ pub unsafe extern "C" fn relax_potential(
                         } else {
                             v0
                         };
+                        let correction0 = (q0 - v0).abs();
+                        if !correction0.is_finite() {
+                            return f64::INFINITY;
+                        }
                         *b.add(at) = q0;
-                        residual = f64::max(residual, f64::abs(q0 - v0));
+                        residual = f64::max(residual, correction0);
                         if x < nx {
                             let q1 = if *mask.add(at + 1) == 0 {
                                 f64x2_extract_lane::<1>(trial)
                             } else {
                                 v1
                             };
+                            let correction1 = (q1 - v1).abs();
+                            if !correction1.is_finite() {
+                                return f64::INFINITY;
+                            }
                             *b.add(at + 1) = q1;
-                            residual = f64::max(residual, f64::abs(q1 - v1));
+                            residual = f64::max(residual, correction1);
                         }
                     }
                 }

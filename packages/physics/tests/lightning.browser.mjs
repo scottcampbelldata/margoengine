@@ -29,12 +29,31 @@ try {
   assert.deepEqual(errors, []);
   assert.equal(result.validation, null);
   assert.deepEqual(result.shared, result.plain);
+  assert.deepEqual(result.replay, result.shared);
   assert.deepEqual([...assets].sort(), ['lightning-kernel-shared.wasm', 'lightning-kernel.wasm']);
-  assert.equal(result.plain.channel.end[1], 0);
-  assert.ok(result.plain.channel.trunk > 0 && result.plain.channel.count > result.plain.channel.trunk);
-  assert.ok(result.dark.bright === 0 && result.lit.bright > 0 && result.lit.rows > 20, JSON.stringify(result.lit));
+  assert.equal(result.compat, process.argv.includes('--compat') || process.env.MARGO_COMPAT === '1');
+  assert.equal(result.plain.groundY, 0);
+  assert.deepEqual(result.plain.offset, [0, 0, -4096]);
+  assert.ok(result.plain.trunk > 0 && result.plain.count > result.plain.trunk);
+  assert.ok(result.plain.flash.time > result.launch);
+  assert.ok(
+    result.plain.flash.time > (result.strokeFrame - 1) / 60 && result.plain.flash.time <= result.strokeFrame / 60,
+  );
+  assert.equal(result.levels.before, 0);
+  assert.ok(result.levels.leader > 0 && result.levels.stroke > result.levels.leader, JSON.stringify(result.levels));
+  assert.equal(result.dark.bright, 0);
+  assert.ok(result.leader.max > result.dark.max && result.lit.max > result.leader.max);
+  assert.ok(result.lit.bright > 0 && result.lit.rows > 20, JSON.stringify(result.lit));
+  assert.equal(result.faded.bright, 0);
+  assert.deepEqual(
+    { bright: result.replayLit.bright, rows: result.replayLit.rows },
+    {
+      bright: result.lit.bright,
+      rows: result.lit.rows,
+    },
+  );
   console.log(
-    `ATMO-07 native parity ${result.plain.hash}, ${result.lit.bright} bright pixels over ${result.lit.rows} rows.`,
+    `ATMO-07 ${result.compat ? 'WebGL2' : 'WebGPU'} registered channel ${result.plain.hash}: ${result.lit.bright} bright pixels over ${result.lit.rows} rows at frame ${result.strokeFrame}.`,
   );
 } finally {
   await close();

@@ -129,8 +129,8 @@
 <tr><th scope="row"><code>dfsph-kernel-shared.wasm</code></th><td>Rust SIMD divergence-free particle liquid, shared world memory</td><td class="num">36,533</td><td class="num">14,802</td><td class="num">12,771</td><td>DfsphSolver.load(world.memory) from the optional /dfsph entry with shared memory</td></tr>
 <tr><th scope="row"><code>explosive-kernel.wasm</code></th><td>Rust SIMD fragment flight and landing on the terrain bed</td><td class="num">1,118</td><td class="num">678</td><td class="num">633</td><td>ExplosionSolver.load() from the optional /explosive entry</td></tr>
 <tr><th scope="row"><code>explosive-kernel-shared.wasm</code></th><td>Rust SIMD fragment flight and landing on the terrain bed, shared world memory</td><td class="num">1,118</td><td class="num">678</td><td class="num">637</td><td>ExplosionSolver.load() with shared world memory support</td></tr>
-<tr><th scope="row"><code>lightning-kernel.wasm</code></th><td>Rust SIMD electric potential relaxation</td><td class="num">2,357</td><td class="num">1,155</td><td class="num">1,048</td><td>LightningSolver.load() from the optional /lightning entry</td></tr>
-<tr><th scope="row"><code>lightning-kernel-shared.wasm</code></th><td>Rust SIMD electric potential relaxation, shared world memory</td><td class="num">2,357</td><td class="num">1,155</td><td class="num">1,048</td><td>LightningSolver.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>lightning-kernel.wasm</code></th><td>Rust SIMD electric potential relaxation</td><td class="num">2,491</td><td class="num">1,200</td><td class="num">1,095</td><td>LightningSolver.load() from the optional /lightning entry</td></tr>
+<tr><th scope="row"><code>lightning-kernel-shared.wasm</code></th><td>Rust SIMD electric potential relaxation, shared world memory</td><td class="num">2,491</td><td class="num">1,200</td><td class="num">1,096</td><td>LightningSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>cloth-kernel.wasm</code></th><td>Rust SIMD cloth step, the CPU route of the GPU cloth</td><td class="num">11,606</td><td class="num">5,308</td><td class="num">4,703</td><td>GPUCloth.load() from the optional /gpu-cloth entry</td></tr>
 <tr><th scope="row"><code>cloth-kernel-shared.wasm</code></th><td>Rust SIMD cloth step, the CPU route of the GPU cloth, shared memory for its threads</td><td class="num">11,567</td><td class="num">5,309</td><td class="num">4,720</td><td>GPUCloth.load(signal, { threads }) with threads above 1</td></tr>
 <tr><th scope="row"><code>rail-kernel.wasm</code></th><td>Rust SIMD tensioned contact-wire propagation</td><td class="num">571</td><td class="num">391</td><td class="num">356</td><td>RailSolver.load(world.memory) from the optional /rail entry</td></tr>
@@ -3948,7 +3948,7 @@
 <tr><td><code>./shafts</code></td><td class="num">32,966</td><td class="num">12,432</td></tr>
 <tr><td><code>./astro</code></td><td class="num">22,351</td><td class="num">10,246</td></tr>
 <tr><td><code>./ephemeris</code></td><td class="num">3,446</td><td class="num">1,985</td></tr>
-<tr><td><code>./lightning-bolt</code></td><td class="num">12,130</td><td class="num">5,403</td></tr>
+<tr><td><code>./lightning-bolt</code></td><td class="num">13,889</td><td class="num">6,044</td></tr>
 <tr><td><code>./weather-fx</code></td><td class="num">13,878</td><td class="num">5,383</td></tr>
 <tr><td><code>./presets</code></td><td class="num">3,686</td><td class="num">1,605</td></tr>
 <tr><td><code>./planet</code></td><td class="num">14,202</td><td class="num">4,888</td></tr>
@@ -4912,7 +4912,7 @@
 <tr><td><code>./terramechanics</code></td><td class="num">47,678</td><td class="num">16,106</td></tr>
 <tr><td><code>./rail</code></td><td class="num">20,545</td><td class="num">8,496</td></tr>
 <tr><td><code>./seismic</code></td><td class="num">12,828</td><td class="num">5,010</td></tr>
-<tr><td><code>./lightning</code></td><td class="num">10,623</td><td class="num">4,350</td></tr>
+<tr><td><code>./lightning</code></td><td class="num">16,925</td><td class="num">6,341</td></tr>
 <tr><td><code>./explosive</code></td><td class="num">41,750</td><td class="num">15,583</td></tr>
 <tr><td><code>./granular-mpm</code></td><td class="num">14,644</td><td class="num">5,824</td></tr>
 <tr><td><code>./strands</code></td><td class="num">14,451</td><td class="num">5,915</td></tr>

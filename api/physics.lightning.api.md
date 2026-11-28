@@ -12,6 +12,19 @@ export const LIGHTNING_LAYOUT = 1;
 
 export const LIGHTNING_THUNDER_WORDS = 6;
 
+export interface LightningBoltFrame {
+    readonly memory: WebAssembly.Memory;
+    readonly channel: Readonly<Pick<Region, 'byteOffset' | 'byteLength' | 'type' | 'layout'>>;
+    readonly offset: Vec3;
+    readonly core: number;
+    readonly glow: number;
+}
+
+export interface LightningBreakdown {
+    readonly initiation: number;
+    readonly propagation: number;
+}
+
 export interface LightningFlash {
     readonly position: Vec3;
     readonly time: number;
@@ -31,6 +44,7 @@ export interface LightningParams {
     leaderSpeed?: number;
     returnSpeed?: number;
     exponent?: number;
+    breakdown?: LightningBreakdown;
     tolerance?: number;
     sweeps?: number;
 }
@@ -61,9 +75,11 @@ export class LightningSolver implements Solver<LightningParams> {
     extraState(): readonly Region[];
     potentialAt(x: number, y: number, z: number): number;
     get residual(): number;
+    get status(): LightningStatus;
     get flash(): LightningFlash | undefined;
     channel(): SolvedLightningChannel;
     thunder(): LightningSoundSource[];
+    boltSource(time: number, renderCell?: Cell, leaderBrightness?: number): LightningBoltFrame | undefined;
     brightness(time: number, rise?: number, fade?: number): number;
 }
 
@@ -73,6 +89,8 @@ export interface LightningSoundSource {
     readonly weight: number;
     readonly length: number;
 }
+
+export type LightningStatus = 'pending' | 'growing' | 'halted' | 'grounded';
 
 export interface SolvedLightningChannel {
     readonly segments: Float32Array;
