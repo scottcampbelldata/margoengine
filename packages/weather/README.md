@@ -170,7 +170,9 @@ materials.
 import { dampRoughness, puddleFilm, puddleWaterRoughness } from 'margoengine/weather/puddles';
 const film = puddleFilm(2, 5, 1, 0.9); // 0 on a drained crest to 1 in a low spot
 console.log(dampRoughness(0.5, 0.9, film), puddleWaterRoughness(0.8)); // patchy damp gloss; rain-roughened water
-``` A bad option throws `RangeError` or `TypeError`; a
+```
+
+A bad option throws `RangeError` or `TypeError`; a
 replaced core shader throws `MargoError` `'unsupported'`.
 
 ### On Material meshes
