@@ -64,13 +64,9 @@ export interface IKSkeleton {
 
 export function addIKChain(animator: Animator, chain: AnimatorIKChain): () => void;
 
-export { anatomyOf } from "@margoengine/animator";
-
 export function elbowEvaluator(upperLength: number, lowerLength: number, pole: Vec3 | (() => Vec3)): ElbowEvaluator;
 
 export function rotationBetween(from: ArrayLike<number>, to: ArrayLike<number>): [number, number, number, number];
-
-export { setAnatomy } from "@margoengine/animator";
 
 export function solveFABRIK(points: Float64Array | number[], target: Vec3, options?: FABRIKOptions): FABRIKResult;
 

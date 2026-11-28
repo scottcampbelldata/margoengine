@@ -7,7 +7,8 @@ import { test } from 'node:test';
 import { clampTurn, jointOf, jointTurn, limitRotation, solveLimbIK, turnRotation } from '@margoengine/animator/ik';
 import { clampPose, fitAnatomy, jointAngles, poseFromAngles, readJointAngles } from '@margoengine/rigging/anatomy';
 import { human } from '@margoengine/rigging/anatomy/human';
-import { anatomyOf, setAnatomy, solvePoseIK, solveSkeletonIK } from '@margoengine/rigging/ik';
+import { anatomyOf, setAnatomy } from '@margoengine/animator/ik';
+import { solvePoseIK, solveSkeletonIK } from '@margoengine/rigging/ik';
 import { add, bodyRig, dot, forward, mul, random, rolled, sub, unit } from './anatomy-fixtures.js';
 
 /** A body, its fit and the bone indices of one arm and one leg. `seed` rolls every bone's axes. */

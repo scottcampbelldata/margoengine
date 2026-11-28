@@ -25,6 +25,7 @@
 import type { Animator } from '@margoengine/animator';
 import { rotateByQuaternion } from '@margoengine/math/quat';
 import type { CCDJointLimit } from '@margoengine/animator/ccd';
+import { clampTurn, jointTurn, turnRotation } from '@margoengine/animator/ik';
 import type { PoseJointLimit } from './joint-limits.js';
 import { checkRig, parentOrder, worldFrames, type RigJoint, type RigPose } from './rig.js';
 
@@ -771,6 +772,9 @@ interface Work {
   readonly stack: Int32Array;
   /** Scratch quaternions. */
   readonly q: Float64Array;
+  /** The first and second scratch quaternion, as views of `q`. */
+  readonly reference: Float64Array;
+  readonly bone: Float64Array;
   /** Scratch angles: measured, then the copy kept for the report. */
   readonly v: Float64Array;
   readonly w: Float64Array;
@@ -811,74 +815,19 @@ interface Span {
 
 /** The turn of `span.bone` against its reference, as swing and twist angles in degrees, into `out`. */
 function measure(body: AnatomicalRig, work: Work, pose: ArrayLike<number>, span: Span, out: Float64Array): void {
-  const q = work.q,
-    wb = worldOf(body, work, pose, span.bone),
+  const wb = worldOf(body, work, pose, span.bone),
     wr = worldOf(body, work, pose, span.reference);
-  mulAt(q, 0, work.world, wr, work.world, wb, true);
-  mulAt(q, 4, q, 0, span.frame, 0);
-  mulAt(q, 0, span.referenceFrame, 0, q, 4, true);
-  let x = q[0],
-    y = q[1],
-    z = q[2],
-    w = q[3];
-  if (w < 0) {
-    x = -x;
-    y = -y;
-    z = -z;
-    w = -w;
+  for (let i = 0; i < 4; i++) {
+    work.q[i] = work.world[wr + i];
+    work.q[4 + i] = work.world[wb + i];
   }
-  const [F, A, T] = span.axes,
-    p = x * T[0] + y * T[1] + z * T[2],
-    n = Math.sqrt(p * p + w * w);
-  let sx = x,
-    sy = y,
-    sz = z,
-    sw = w,
-    twist = 0;
-  if (n > 1e-12) {
-    // The twist is the part of the turn about the long axis; the swing is what is left: turn = swing * twist.
-    twist = 2 * Math.atan2(p, w);
-    const c = w / n,
-      bx = (-T[0] * p) / n,
-      by = (-T[1] * p) / n,
-      bz = (-T[2] * p) / n;
-    sx = w * bx + x * c + y * bz - z * by;
-    sy = w * by - x * bz + y * c + z * bx;
-    sz = w * bz + x * by - y * bx + z * c;
-    sw = w * c - x * bx - y * by - z * bz;
-  }
-  const m = Math.sqrt(sx * sx + sy * sy + sz * sz),
-    g = (m > 1e-12 ? (2 * Math.atan2(m, Math.abs(sw))) / m : 2) * DEG;
-  out[0] = (sx * F[0] + sy * F[1] + sz * F[2]) * g;
-  out[1] = (sx * A[0] + sy * A[1] + sz * A[2]) * g;
-  out[2] = twist * DEG;
+  jointTurn(span, work.reference, work.bone, out);
 }
 
 /** Sets `span.bone`'s local rotation in `pose` so its turn against its reference has the angles `v`. */
 function write(body: AnatomicalRig, work: Work, pose: Float64Array, span: Span, v: ArrayLike<number>): void {
-  const q = work.q,
-    [F, A, T] = span.axes,
-    f = v[0] * RAD,
-    a = v[1] * RAD,
-    sx = f * F[0] + a * A[0],
-    sy = f * F[1] + a * A[1],
-    sz = f * F[2] + a * A[2],
-    angle = Math.sqrt(sx * sx + sy * sy + sz * sz),
-    half = Math.min(angle, Math.PI) / 2,
-    k = angle > 1e-12 ? Math.sin(half) / angle : 0.5,
-    h = (v[2] * RAD) / 2,
-    s = Math.sin(h);
-  q[0] = sx * k;
-  q[1] = sy * k;
-  q[2] = sz * k;
-  q[3] = Math.cos(half);
-  q[4] = T[0] * s;
-  q[5] = T[1] * s;
-  q[6] = T[2] * s;
-  q[7] = Math.cos(h);
-  mulAt(q, 0, q, 0, q, 4);
-  mulAt(q, 0, span.referenceFrame, 0, q, 0);
-  mulAt(q, 0, q, 0, span.frame, 0, false, true);
+  const q = work.q;
+  turnRotation(span, v, work.reference);
   const wr = worldOf(body, work, pose, span.reference);
   mulAt(q, 0, work.world, wr, q, 0);
   const parent = body.parents[span.bone],
@@ -891,69 +840,6 @@ function write(body: AnatomicalRig, work: Work, pose: Float64Array, span: Span, 
     work.world[span.bone * 4 + i] = q[i];
   }
   work.stamp[span.bone] = work.tick;
-}
-
-/** The point of the ellipse with half axes a and b nearest to (p, q), all positive, into `near`. */
-const near2 = [0, 0];
-function nearestOnEllipse(p: number, q: number, a: number, b: number): void {
-  // At the nearest point (x, y) the offset is along the ellipse's normal: x = a^2 p / (t + a^2), y = b^2 q / (t + b^2)
-  // for one t >= 0, and (x/a)^2 + (y/b)^2 = 1 falls as t grows.
-  let low = 0,
-    high = Math.max(Math.SQRT2 * a * p - a * a, Math.SQRT2 * b * q - b * b, 0) + 1e-9;
-  for (let i = 0; i < 64; i++) {
-    const t = (low + high) / 2,
-      x = (a * p) / (t + a * a),
-      y = (b * q) / (t + b * b);
-    if (x * x + y * y > 1) low = t;
-    else high = t;
-  }
-  const t = (low + high) / 2;
-  near2[0] = (a * a * p) / (t + a * a);
-  near2[1] = (b * b * q) / (t + b * b);
-}
-
-/** Brings the angles `v` inside the range `r`; true when any changed. */
-function clampAngles(v: Float64Array, r: ArrayLike<number>, gate: Gate | null, slot: number): boolean {
-  let changed = false;
-  // The swing stays inside an ellipse whose half axes are the ranges of the quadrant it is in.
-  const f = v[0],
-    a = v[1],
-    rf = f >= 0 ? r[1] : -r[0],
-    ra = a >= 0 ? r[3] : -r[2];
-  let nf = f,
-    na = a;
-  if (rf <= 0 && ra <= 0) nf = na = 0;
-  else if (ra <= 0) {
-    na = 0;
-    nf = f < r[0] ? r[0] : f > r[1] ? r[1] : f;
-  } else if (rf <= 0) {
-    nf = 0;
-    na = a < r[2] ? r[2] : a > r[3] ? r[3] : a;
-  } else if ((f / rf) ** 2 + (a / ra) ** 2 > 1 + 1e-12) {
-    nearestOnEllipse(Math.abs(f), Math.abs(a), rf, ra);
-    nf = f < 0 ? -near2[0] : near2[0];
-    na = a < 0 ? -near2[1] : near2[1];
-  }
-  if (Math.abs(nf - f) > TOLERANCE || Math.abs(na - a) > TOLERANCE) {
-    v[0] = nf;
-    v[1] = na;
-    changed = true;
-  }
-  // The twist, by how far its gate is open at the swing just settled: a gate read before the swing was brought in
-  // would leave a twist that the next clamp narrows again.
-  let low = r[4],
-    high = r[5];
-  if (gate && slot === 2) {
-    const open = Math.min(1, Math.max(0, (v[gate.by] - gate.from) / (gate.to - gate.from)));
-    low = -Math.min(-low, Math.max(gate.floor, -low * open));
-    high = Math.min(high, Math.max(gate.floor, high * open));
-  }
-  const twist = v[2] < low ? low : v[2] > high ? high : v[2];
-  if (Math.abs(twist - v[2]) > TOLERANCE) {
-    v[2] = twist;
-    changed = true;
-  }
-  return changed;
 }
 
 /** The bones and rest pose of either rig form, copied and checked. */
@@ -1422,6 +1308,7 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
   const sorted = joints
     .map((joint, k) => [joint, k] as const)
     .sort((a, b) => depth[a[0].bone] - depth[b[0].bone] || a[1] - b[1]);
+  const scratch = new Float64Array(16);
   WORK.set(body, {
     order: sorted.map(([joint]) => joint),
     spills: joints.flatMap((joint, k) =>
@@ -1436,7 +1323,9 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
     world: new Float64Array(n * 4),
     stamp: new Uint32Array(n),
     stack: new Int32Array(n),
-    q: new Float64Array(16),
+    q: scratch,
+    reference: scratch.subarray(0, 4),
+    bone: scratch.subarray(4, 8),
     v: new Float64Array(3),
     w: new Float64Array(3),
     tick: 0,
@@ -1623,7 +1512,6 @@ export function poseFromAngles(
 
 const range = (item: AnatomicalJoint | AnatomicalRegion, tier: Tier): readonly number[] =>
   tier === 'normal' ? item.normal : item.structural;
-const gateOf = (joint: AnatomicalJoint): Gate | null => joint.spec.dofs?.[2].gate ?? null;
 
 /**
  * Brings a pose inside the body's ranges, in place: each joint's swing back inside its reach, its twist back inside its
@@ -1701,7 +1589,7 @@ export function clampPose(body: AnatomicalRig, pose: Float64Array, options: Clam
     if (!joint.limited) continue;
     measure(body, work, pose, joint, v);
     w.set(v);
-    if (!clampAngles(v, range(joint, tier), gateOf(joint), 2)) continue;
+    if (!clampTurn(joint, v, tier)) continue;
     write(body, work, pose, joint, v);
     report(joint, joint.bone, joint.spec.dofs);
   }
@@ -1713,7 +1601,7 @@ export function clampPose(body: AnatomicalRig, pose: Float64Array, options: Clam
       work.tick++;
       measure(body, work, pose, span, v);
       w.set(v);
-      if (!clampAngles(v, range(region, tier), null, 2)) break;
+      if (!clampTurn(region, v, tier)) break;
       if (pass === 0) report(region, -1, dofs);
       const ease = [0, 1, 2].map((s) => (Math.abs(w[s]) > 1e-9 ? v[s] / w[s] : 1));
       for (const k of region.joints) {

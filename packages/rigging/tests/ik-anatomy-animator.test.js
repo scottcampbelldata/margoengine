@@ -14,7 +14,8 @@ import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { clampPose, fitAnatomy, jointAngles, regionAngles } from '@margoengine/rigging/anatomy';
 import { human } from '@margoengine/rigging/anatomy/human';
 import { solveContactIK } from '@margoengine/rigging/contact';
-import { addIKChain, setAnatomy } from '@margoengine/rigging/ik';
+import { setAnatomy } from '@margoengine/animator/ik';
+import { addIKChain } from '@margoengine/rigging/ik';
 import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { bodyRig, sub } from './anatomy-fixtures.js';
 

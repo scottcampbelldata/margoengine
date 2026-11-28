@@ -39,7 +39,7 @@ import {
 } from '@margoengine/animator/ik';
 import { parentOrder } from './rig.js';
 
-export { anatomyOf, setAnatomy } from '@margoengine/animator/ik';
+// A fitted body is named with `setAnatomy` of `@margoengine/animator/ik`, which owns it; it is not exported again here.
 export type { Anatomy } from '@margoengine/animator/ik';
 
 /** Settings shared by every FABRIK solve. */
