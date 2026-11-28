@@ -8433,6 +8433,19 @@ each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surfac
   divergence of each cell's 8; the cells' density correction (half a cell's excess a substep) keeps the volume across
   that gap. Each substep costs 7 + 5 * pressureIterations dispatches (the ones past convergence have no workgroups);
   speed is measured in the speed phase.
+- Dam breaks against measurements (`gpu-liquid-dambreak.test.js`, the CPU twin, both profiles, nothing fitted): Martin
+  and Moyce's (1952) two-dimensional collapses, each station's T inside the spread of their own runs at that Z widened by
+  the timing errors of both sides (about 0.2 to 0.3 in T), in table 2 (n^2 = 2) to Z = 9 and, held out, table 1 (n^2 =
+  1) to Z = 9 and table 3 (n^2 = 4) to Z = 7.67, at a / 8 cells; and Lobovsky et al.'s (2014) three-dimensional tank,
+  the front's mean speed along the bed after t* = 1 inside the 1.14 to 1.74 sqrt(g H) their Table 1 gathers from the
+  measured dam breaks: the accurate profile reads 1.668 at H = 300 mm (3 cm cells; theirs 1.56) and, held out, 1.533 at
+  600 mm (4 cm; theirs 1.34); the fast profile reads 1.758 and 1.613, its 300 mm front just over that range, so that
+  check holds the accurate profile only. Both run ahead of the measured fronts late in the run-out: the walls are free
+  slip, with no bed or side-wall friction, and the thinning tongue of the experiments slows under it. At Z = 14 in table
+  2 the accurate profile reaches T = 8.88 (a / 12) and 8.79 (a / 16) where the runs read 9.26 to 9.36, and at Z = 13 in
+  table 1 7.57 (a / 12) against 9.21 to 9.72; the gap does not close as the cells shrink (it is the missing friction,
+  not the grid). The impact pressures Lobovsky et al. measured on the far wall (sensors 3 to 80 mm above the bed, 4.2 mm
+  across) are not checked: a sensor is a tenth of an interactive grid's cell.
 - The fast profile is weakly compressible: the Tait equation lets the liquid compress by about g d / c^2 at depth d. With
   the default speed of sound 2 sqrt(g H) a 0.6 m column in a 1 m tank reads 1.04 to 1.13 times rest density from its
   surface layer to its floor (CPU twin, 6,000 particles, 2.5 s), within 0.02 of the closed form (1 + 6 g d / c^2)^(1/6)

@@ -15437,6 +15437,15 @@ compute shaders), and no companion code of any paper was opened.
   constant-pressure pair (the Q1-P0 element of finite elements) has checkerboard pressure modes; the projected velocity,
   the least-kinetic-energy divergence-free field, is unique whatever the pressure's null modes, and the conjugate
   gradient solve converges on its consistent right-hand side. No companion code of any of them was read.
+- The dam-break checks (2026-11-27, `gpu-liquid-dambreak.test.js`). J. C. Martin and W. J. Moyce,
+  [An Experimental Study of the Collapse of Liquid Columns on a Rigid Horizontal Plane](https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf)
+  (Phil. Trans. R. Soc. A 244, 1952): read from the scanned pages as images, every run of tables 1 to 3 (Z against
+  T = n t sqrt(g / a), each run set to one T at Z = 1.44), section 3's 300 frames a second and section 4's reason for
+  the normalisation; the test copies each run it uses at each station. L. Lobovsky, E. Botia-Vera, F. Castellana,
+  J. Mas-Soler and A. Souto-Iglesias, [Experimental investigation of dynamic pressure loads during dam
+  break](https://arxiv.org/abs/1308.0115) (J. Fluids Struct. 48, 2014): the tank, the gate 0.6 m from its end, the front's
+  mean speed after t* = 1 at 300 and 600 mm (Table 1, with the other measured dam breaks it gathers) and the sensors'
+  size and heights (Fig. 3, Table 2).
 - W. Daniel Hillis and Guy L. Steele, [Data Parallel Algorithms](https://doi.org/10.1145/7902.7903) (CACM 29(12),
   1986), and Guy E. Blelloch, [Prefix Sums and Their Applications](https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf) (CMU
   technical report, 1990): the inclusive scan inside a workgroup and the per-block counts scanned once more, so the drains'
