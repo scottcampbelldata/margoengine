@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { gzipSync } from 'node:zlib';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -51,7 +50,19 @@ assert.ok(displayed.some(name=>name.includes('ramp')),displayed.join(', '));
 assert.ok(displayed.some(name=>name.includes('main bore')),displayed.join(', '));
 const widthPoints=[[ -half,.054,-.012],[half,.054,-.012]];
 assert.ok(Math.abs(widthPoints[1][0]-widthPoints[0][0]-.174)<1e-10);
-const modelData={parts,widthPoints,cutters:cutters.map(h=>({...h,top:.054})),datum:corners[2],ramp:corners[3]};
-const output=gzipSync(JSON.stringify(modelData),{level:9});
-await writeFile(new URL('./assets/coupon.bin', import.meta.url),output);
-console.log(JSON.stringify({bytes:output.length,faces:displayed,triangles:mesh.indices.length/3}));
+// One GLB node per B-rep face (named after it), so a pick names the face it hit. The coupon's sole is at y 0 and the
+// page keeps the plate's top at y 0, so positions stay unquantized and in the part's own millimetre-exact frame.
+const glbNodes=parts.map(face=>({name:face.name,geometry:{positions:face.position,normals:face.normal,indices:face.index}}));
+const {exportGLB}=await import(pathToFileURL(resolve(checkout,'packages/exporters/dist/gltf.js')));
+const {compressMeshopt}=await import(pathToFileURL(resolve(checkout,'packages/exporters/dist/meshopt.js')));
+const {glb:packed}=await compressMeshopt(exportGLB({nodes:glbNodes},{generator:'Margo Engine the-measuring-room'}),{quantize:false});
+const faces=parts.map(face=>{
+  const center=[0,0,0];
+  for(let i=0;i<face.position.length;i++)center[i%3]+=face.position[i]*3/face.position.length;
+  return {name:face.name,normal:face.normal.slice(0,3),center:center.map(v=>+v.toFixed(7))};
+});
+const facts={faces,widthPoints,cutters:cutters.map(h=>({...h,top:.054})),datum:corners[2],ramp:corners[3]};
+await mkdir(new URL('./assets/',import.meta.url),{recursive:true});
+await writeFile(new URL('./assets/coupon.glb',import.meta.url),packed);
+await writeFile(new URL('./facts.json',import.meta.url),JSON.stringify(facts,null,1)+String.fromCharCode(10));
+console.log(JSON.stringify({bytes:packed.byteLength,faces:displayed,triangles:mesh.indices.length/3}));
