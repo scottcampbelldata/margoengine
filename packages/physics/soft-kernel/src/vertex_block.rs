@@ -88,7 +88,7 @@ impl World {
     }
 
     /// Builds a deterministic incident-corner list. Rebuilding from live flags also handles tears and new body pieces.
-    pub(crate) fn prepare_vertex_blocks(&mut self) -> bool {
+    pub(crate) fn prepare_vertex_blocks(&mut self, h: f32, gravity: [f32; 3]) -> bool {
         if !(0..self.fem.count).any(|t| active_vertex_block(self.fem.flags[t])) {
             return false;
         }
@@ -110,7 +110,39 @@ impl World {
                 }
             }
         }
+        self.first_guess(h, gravity);
         true
+    }
+
+    /// The passes' first guess (Chen et al. 2024, section 3.6, adaptive initialization): the predicted move takes the piece's
+    /// accelerations (gravity and the forces put on the particle) only as far as the particle was last accelerating along them,
+    /// so a body at rest under a load starts the passes where it rests. The inertial target the passes minimize toward keeps the
+    /// whole acceleration; only where they start moves. Started from the full prediction, a pass count that leaves the sweep
+    /// unconverged put the fixed point a load's h^2 a over one minus the sweep's convergence off the equilibrium: a hemisphere
+    /// pressed on a floor at 8 pieces of 2 passes flattened (KB-SOFT-VBDGUESS1).
+    fn first_guess(&mut self, h: f32, gravity: [f32; 3]) {
+        for i in 0..self.particles {
+            if self.fem.vertex_block.head[i] == NONE || !(self.w[i] > 0.0) || self.bsleep[self.pbody[i] as usize] != 0 {
+                continue;
+            }
+            let scale = self.gravity_scale[self.pbody[i] as usize];
+            let a = [gravity[0] * scale + self.ax[i], gravity[1] * scale + self.ay[i], gravity[2] * scale + self.az[i]];
+            let a2 = a[0] * a[0] + a[1] * a[1] + a[2] * a[2];
+            let v = [self.vx[i] - h * a[0], self.vy[i] - h * a[1], self.vz[i] - h * a[2]];
+            let along = if a2 > 0.0 {
+                let last = [(v[0] - self.vbx[i]) / h, (v[1] - self.vby[i]) / h, (v[2] - self.vbz[i]) / h];
+                ((last[0] * a[0] + last[1] * a[1] + last[2] * a[2]) / a2).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let back = h * h * (1.0 - along);
+            self.x[i] -= back * a[0];
+            self.y[i] -= back * a[1];
+            self.z[i] -= back * a[2];
+            self.vbx[i] = v[0];
+            self.vby[i] = v[1];
+            self.vbz[i] = v[2];
+        }
     }
 
     /// D_s D_m^-1, computed with local f64 edges. Each entry in the result is a column.

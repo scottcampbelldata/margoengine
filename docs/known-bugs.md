@@ -6,6 +6,53 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: a rung under its own weight no longer cracks in the remeshing test (KB-SOFT-LADDERCRACKS1, physics soft tests)
+
+- **Repro:** `node --test packages/physics/tests/coupling/volumetric-solids.test.js`, "automatic cracks remain finite when
+  continued remeshing reaches the native geometry resolution": `tensileLadder(0, 0.005)` makes no crack in 18 steps (nor
+  in 60), where the test asks for more than 8. It fails the same with `soft.ts` and the soft kernel of d2709f264, before
+  the soft-volume fixes of 2026-11-28, so it is not theirs.
+- **Cause:** not traced. The rung's centre sags 0.99 mm against Euler-Bernoulli's 1.22 mm for a fixed-fixed beam (a 10 x 2
+  x 2 cell bar locks in bending), so its peak strain, about 0.0045, stays under the 0.005 the test nucleates at; at some
+  earlier commit the rung strained more.
+- **Next:** the volumetric-fracture owner drives the test past nucleation with a load the rung's own measured strain
+  exceeds, keeping its assertions.
+
+### Open 2026-11-28: the scoped API report rebuilds every stale package (KB-TOOL-APISCOPE1, scripts)
+
+- **Repro:** after a rebase onto a main 300 commits on, `node scripts/api-report.js --package=@margoengine/physics` began
+  rebuilding 108 packages, core to kit-react, before it wrote the one report asked for.
+- **Cause:** `scripts/api-report.js` calls `rebuildStalePackages` (`scripts/support/fresh-dist.mjs`) for the whole tree
+  before it reads the selector, because it loads every package's declarations, scoped or not, to resolve cross-package
+  imports; the script has no flag that limits the rebuild.
+- **Next:** rebuild only the selected package and the packages its declarations import, and load only those.
+
+### Open 2026-11-28: cells on the constraint solver are not converged under a static load at their passes (KB-SOFT-XPBDSTATIC1, physics soft)
+
+- **Repro:** a 10 cm cube of 100 kPa rubber on the default `'constraints'` solver, base pinned, its top pressed by 10 N
+  (1% unconfined): at 20 pieces of 20 passes it sinks 0.61%; at the default 8 x 2 it collapses (113%), as a 1 MPa cube
+  under gravity at 20 g does.
+- **Cause:** not traced to one line. XPBD's stiffness depends on its passes (`SoftSolver` says so), and the passes start
+  from each piece's full prediction, as the vertex-block passes did before KB-SOFT-VBDGUESS1; the vertex-block cure (a first
+  guess without the piece's acceleration) does not carry over, since XPBD's inertia is where its passes start.
+- **Kept honest by:** `SoftBodyDesc.volume`'s `'cells'` tier uses the vertex-block solver; `docs/limits.md` states it.
+
+### Fixed 2026-11-28: vertex-block and fem cells stopped short of their load at the default passes (KB-SOFT-VBDGUESS1, physics soft kernel)
+
+- **Repro:** a 1 MPa hemisphere of `SoftBodyDesc.volume(mesh, {tier: 'cells'})` pressed on a floor by 100 N at the default
+  8 pieces of 2 passes flattened (11 times Hertz's approach); at 20 x 20 it sank 3.2 times, at 80 x 20 0.97 times. On
+  `'fem'` at its default 20 linear iterations, 3.2 times.
+- **Cause:** the vertex-block passes started from each piece's full prediction, x + h v + h^2 a, and the fem solve's
+  unknowns from the velocity with the piece's acceleration in it; an unconverged sweep from there puts the fixed point the
+  load's h^2 a over one minus the sweep's convergence off the equilibrium, which for a body many cells across is most of it.
+- **Fix:** both start where Chen et al. (2024, "Vertex Block Descent", section 3.6) start: with the piece's acceleration only
+  as far as the particle was last accelerating along it (kept in new columns `vbx`, `vby`, `vbz`), so a body at rest under
+  a load starts at its answer; the inertial target keeps the whole acceleration. The hemisphere comes to 0.949 of Hertz
+  (vertex-block) and 1.091 (fem) at 8 x 2, the same as at 80 x 20. Chebyshev acceleration of the sweeps (Wang 2015) was
+  built and dropped: with the start fixed it has nothing to gain at rest, and at 2 passes it overshot the hemisphere into
+  inverted cells. Regression: `packages/physics/tests/soft-volume-cells.test.js` ("meets Hertz contact at the default
+  passes").
+
 ### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
 
 - **Repro:** a `ScatterTiles` scatter with `ScatterVelocity` added to TAA; stream a tile in with `setTile` so a ring
@@ -55,8 +102,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** `hold_still_contacts` holds each vertex off the still bodies it touches inside the vertex-block passes, right
   after its block update, booking the push as the contact's impulse (so friction and the velocity pass see it), and a
   body so held has no free translation, as a pinned one has none. Regression:
-  `packages/physics/tests/soft-cells.test.js` ("a body pressed on the ground comes to its static deflection"). The XPBD
-  and `'fem'` cell solvers still meet the floor after their passes (see `docs/limits.md`).
+  `packages/physics/tests/soft-cells.test.js` ("a body pressed on the ground comes to its static deflection"). Since
+  2026-11-28 (second change) the constraint solver's cells are held inside each pass too (`hold_constraint_cells`: a 100 kPa
+  cube pressed on the floor at 20 x 20 sank 45% before, 1.41% after; "a constraint-solved body pressed on the ground"),
+  and the `'fem'` solve holds a particle resting on a still body at zero normal velocity inside its conjugate gradients,
+  filtering the residual and search directions as Baraff and Witkin (1998, section 5.3) constrain particles, letting go
+  one the floor pulls at the next piece.
 
 ### Fixed 2026-11-28: a steady force on a soft body was a kick at the step's start (KB-SOFT-FORCEKICK1, physics soft)
 

@@ -1228,3 +1228,33 @@ test('a body pressed on the ground comes to its static deflection, not twice it 
   assert.ok(Math.abs(base) < 1e-5, `the base stays on the floor (${base})`);
   assert.ok(strain > 0.00743 && strain < 0.0102, `the top sank by a strain of ${strain}, between 0.743% and 1.02%`);
 });
+
+test('a constraint-solved body pressed on the ground is held by the ground inside its passes (KB-SOFT-CONTACTSPLIT1)', async () => {
+  // The cube of the test above in 100 kPa rubber on the default constraint solver, pressed by 10 N (1% unconfined): met after
+  // the passes, the floor let the passes squash it to 45% at 20 x 20; held inside them, it comes to 1.41%, the solver's own
+  // convergence error at those passes (pinned, it gives 0.61%: docs/limits.md). The bound is twice the unconfined strain.
+  const { physics, soft } = await create([0, 0, 0], 20, 20);
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5 - 1e-4, 0],
+    colliders: { shape: 'box', halfExtents: [1, 0.5, 1] },
+  });
+  const material = rubber({ youngsModulus: 1e5, poissonRatio: 0.3, elasticDampingRatio: 0.3 });
+  const desc = SoftBodyDesc.box([0, 0, 0], [0.1, 0.1, 0.1], [4, 4, 4], material)
+    .setCanSleep(false)
+    .setLinearDamping(30)
+    .setParticleRadius(1e-4);
+  const top = plane(desc, 1, 0.1),
+    edge = (v) => (Math.abs(v) < 1e-9 || Math.abs(v - 0.1) < 1e-9 ? 1 : 2),
+    share = top.map((i) => edge(desc.positions[i * 3]) * edge(desc.positions[i * 3 + 2])),
+    whole = share.reduce((s, w) => s + w, 0);
+  const body = soft.create(desc);
+  for (let s = 0; s < 90; s++) {
+    body.resetForces();
+    const ramp = Math.min(1, (s + 1) / 30);
+    top.forEach((i, k) => body.addParticleForce(i, [0, (-10 * ramp * share[k]) / whole, 0]));
+    physics.step();
+  }
+  const strain = top.reduce((s, i, k) => s + (0.1 - body.particlePosition(i)[1]) * share[k], 0) / whole / 0.1;
+  assert.ok(strain > 0 && strain < 0.02, `the top sank by a strain of ${strain}, under twice the unconfined 1%`);
+});

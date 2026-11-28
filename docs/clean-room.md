@@ -79,6 +79,14 @@ its range. Written from the papers; no mesher's source was read.
 [Si 2015](https://doi.org/10.1145/2629697),
 [Shewchuk 1998](https://doi.org/10.1145/276884.276899).
 
+The vertex-block and fem passes start from the adaptive first guess of Anka He Chen, Ziheng Liu, Yin Yang and Cem Yuksel,
+"Vertex Block Descent" (ACM Transactions on Graphics 43(4), SIGGRAPH 2024), section 3.6, and the fem solve holds a particle
+resting on a still body by the constraint filter of David Baraff and Andrew Witkin, "Large Steps in Cloth Simulation"
+(SIGGRAPH 1998), section 5.3. Huamin Wang, "A Chebyshev Semi-Iterative Approach for Accelerating Projective and
+Position-based Dynamics" (ACM Transactions on Graphics 34(6), SIGGRAPH Asia 2015) was built for the sweeps and dropped
+(KB-SOFT-VBDGUESS1). [Chen et al. 2024](https://doi.org/10.1145/3658179),
+[Baraff and Witkin 1998](https://doi.org/10.1145/280814.280821), [Wang 2015](https://doi.org/10.1145/2816795.2818063).
+
 ### Breakable objects and Voronoi fracture (BREAK-01)
 
 Saty Raghavachary, “Fracture Generation on Polygonal Meshes Using Voronoi Polygons” (ACM SIGGRAPH 2002 Conference

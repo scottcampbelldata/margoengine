@@ -248,9 +248,8 @@ default staying 1 kg/m³ and documented as Rapier's.
   targets and `attachParticle`, and draws through `drawSoftBody` with its own UVs; quick start, migration note,
   example page (`examples/test-pages/soft-volumes.html`) and debug view (`PhysicsDebugView.add(body)`) in
   `packages/physics/README.md`. (2026-11-28) The surface and cell tiers sit behind `volume(mesh, {tier})`, default `'surface'`; `'cells'` fills the
-  mesh by isosurface stuffing and meets Hertz contact within 4% at 80 x 20 passes (fixing KB-SOFT-FORCEKICK1 and
-  KB-SOFT-CONTACTSPLIT1 on the way). Open: the cells tier at the default passes (softer; no accelerated solve); a
-  membrane law for the shell and a pressurised ball's stiffness; a viscoelastic rubber's restitution against drop tests;
+  mesh by isosurface stuffing and meets Hertz contact within 6% at the default passes, on a held-out load too (fixing
+  KB-SOFT-FORCEKICK1, KB-SOFT-CONTACTSPLIT1 and KB-SOFT-VBDGUESS1 on the way). Open: a membrane law for the shell and a pressurised ball's stiffness; a viscoelastic rubber's restitution against drop tests;
   venting and bursting (SOFT-06's audit list); the float32 momentum loss (KB-SOFT-F32MOMENTUM1); threads; placed events.
 
 ### P9. BREAK-01 Breakable objects

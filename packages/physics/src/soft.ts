@@ -1084,8 +1084,7 @@ export interface SoftVolumeOptions {
    * edges springs of `stiffness` and `damping`, and it holds a volume or a gas. `'cells'` is the high-fidelity tier: the mesh is
    * filled with tetrahedra fitted to its surface (isosurface stuffing, Labelle and Shewchuk 2007), elastic by `material`, and the
    * mesh rides in them as a skin (`body.meshVertices()`), so its squash, bounce and contact follow a measured modulus. Its
-   * cells are on the `'vertex-block'` solver; its stiffness converges with the soft world's passes (`substeps` times
-   * `iterations`): Hertz contact is met within 4% at 80 x 20, and the default 8 x 2 is softer (docs/limits.md).
+   * cells are on the `'vertex-block'` solver, which meets Hertz contact within 6% at the soft world's default passes.
    */
   readonly tier?: 'surface' | 'cells';
   /** `'cells'` tier: the lattice spacing in metres (default an eighth of the mesh's smallest extent); smaller is finer. */
@@ -4841,6 +4840,9 @@ export class SoftBodies implements PhysicsAttachment {
         'cbx',
         'cby',
         'cbz',
+        'vbx',
+        'vby',
+        'vbz',
       ] as const,
       bcols = [
         'b_on',

@@ -291,6 +291,11 @@ pub struct World {
     pub az: Col<f32>,
     /// Per body row: whether a pass of this piece held one of its particles off a still body (`hold_still_contacts`).
     pub pressed: Col<u32>,
+    /// A vertex-block tetrahedron particle's velocity at the start of the last piece, before its accelerations (vertex_block.rs):
+    /// how far it was then accelerating along them decides how much of them the next piece's first guess takes.
+    pub vbx: Col<f32>,
+    pub vby: Col<f32>,
+    pub vbz: Col<f32>,
     pub cbx: Col<f32>,
     pub cby: Col<f32>,
     pub cbz: Col<f32>,
@@ -314,6 +319,9 @@ impl World {
             grow(v, particles);
         }
         for v in [&mut self.rx, &mut self.ry, &mut self.rz, &mut self.slx, &mut self.sly, &mut self.slz, &mut self.sw] {
+            grow(v, particles);
+        }
+        for v in [&mut self.vbx, &mut self.vby, &mut self.vbz] {
             grow(v, particles);
         }
         for v in [&mut self.ax, &mut self.ay, &mut self.az] {
@@ -475,9 +483,9 @@ impl World {
             self.lambda[e] = 0.0;
         }
         self.advance_skin(h);
-        self.fem_implicit(h);
+        self.fem_implicit(h, gravity);
         self.solve_projective(h, iterations);
-        let vertex_block = self.prepare_vertex_blocks();
+        let vertex_block = self.prepare_vertex_blocks(h, gravity);
         let cloth_block = self.prepare_cloth_blocks(h, gravity);
         self.shape_begin();
         self.fem_begin();
@@ -494,6 +502,7 @@ impl World {
             self.solve_skin();
             self.solve_shape(h);
             self.solve_fem(h);
+            self.hold_constraint_cells(h);
             if vertex_block {
                 self.solve_vertex_blocks(h);
             }
@@ -702,6 +711,21 @@ impl World {
                 self.z[i] -= n[2] * d;
                 self.kj[k] -= d / (self.w[i] * h);
                 self.pressed[self.pbody[i] as usize] = 1;
+            }
+        }
+    }
+
+    /// Holds the corners of the cells the constraints solve off the still bodies they touch, inside each pass, as the vertex-block
+    /// solve holds its vertices (KB-SOFT-CONTACTSPLIT1).
+    fn hold_constraint_cells(&mut self, h: f32) {
+        use crate::fem::{IMPLICIT_TET, PROJECTIVE_TET, TORN_TET, VERTEX_BLOCK_TET};
+        for t in 0..self.fem.count {
+            if self.fem.flags[t] & (TORN_TET | IMPLICIT_TET | VERTEX_BLOCK_TET | PROJECTIVE_TET) != 0 {
+                continue;
+            }
+            for k in 0..4 {
+                let i = self.fem.p[k][t] as usize;
+                self.hold_still_contacts(i, h);
             }
         }
     }

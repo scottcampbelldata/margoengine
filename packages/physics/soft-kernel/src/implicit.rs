@@ -45,6 +45,14 @@ pub struct Implicit {
     pub aq: [Col<f64>; 3],
     pub diag: Col<f64>,
     pub mass: Col<f64>,
+    /// Per particle, the unit normal of the still body it rests on, along which the solve holds its velocity at zero (zero: none),
+    /// and whether the floor pulled it at the last piece, so this piece lets it go (Baraff and Witkin 1998, section 5.3).
+    pub floor: [Col<f32>; 3],
+    pub lift: Col<u32>,
+    /// Per particle, whether this piece's first guess is made (fem_implicit).
+    pub guessed: Col<u32>,
+    /// Whether the solve under way filters by `floor` (the fem solve does; the projective one does not).
+    pub filtered: bool,
 }
 
 impl Implicit {
@@ -63,6 +71,10 @@ impl Implicit {
             aq: [D; 3],
             diag: D,
             mass: D,
+            floor: [F; 3],
+            lift: Col::new(),
+            guessed: Col::new(),
+            filtered: false,
         }
     }
 
@@ -79,6 +91,11 @@ impl Implicit {
         }
         self.diag.resize(particles);
         self.mass.resize(particles);
+        for c in self.floor.iter_mut() {
+            c.resize(particles);
+        }
+        self.lift.resize(particles);
+        self.guessed.resize(particles);
     }
 }
 
@@ -156,7 +173,7 @@ impl World {
     }
 
     /// Takes the cells with the implicit solver a substep: the new velocities and, from them, the positions.
-    pub(crate) fn fem_implicit(&mut self, h: f32) {
+    pub(crate) fn fem_implicit(&mut self, h: f32, gravity: [f32; 3]) {
         let mut any = false;
         for t in 0..self.fem.count {
             if self.implicit_cell(t) {
@@ -250,13 +267,78 @@ impl World {
                 self.fem.imp.diag[c[i]] += scale * (vol as f64) * ((lambda as f64 + mu as f64) * gg + 3.0 * mu as f64 * gg) / 3.0;
             }
         }
-        // The unknowns start at the velocities there are; the residual b - A v is left to the free particles.
+        // A particle resting on a still body is held there inside the solve, as Baraff and Witkin (1998, section 5) hold a
+        // constrained particle: its velocity along the floor's normal is held at zero by filtering the residual and the search
+        // directions, so the cells meet the floor in the same solve as their elasticity (KB-SOFT-CONTACTSPLIT1). Met only after
+        // the solve, the floor took the base back each piece while the rest of the body went on into it. One the floor pulled
+        // at the last piece is let go for this one.
+        for i in 0..n {
+            let normal = if self.fem.imp.mass[i] > 0.0 && self.fem.imp.lift[i] == 0 { self.resting_normal(i) } else { [0.0; 3] };
+            self.fem.imp.lift[i] = 0;
+            for a in 0..3 {
+                self.fem.imp.floor[a][i] = normal[a];
+            }
+        }
+        // The unknowns start at the velocities there are, a resting particle's without its part along the floor's normal; the
+        // residual b - A v is left to the free particles. A particle of a cell starts without this piece's accelerations, but
+        // as far as it was last accelerating along them (the first guess of Chen et al. 2024, section 3.6, as vertex_block.rs
+        // makes it): a body at rest under its load then starts at its answer, where a solve cut short at its iteration limit
+        // from the full prediction stopped a load's share off it (a hemisphere pressed on a floor sank by 3.2 times Hertz's
+        // approach at the default 20 iterations; KB-SOFT-VBDGUESS1).
         for i in 0..n {
             self.fem.imp.sol[0][i] = self.vx[i] as f64;
             self.fem.imp.sol[1][i] = self.vy[i] as f64;
             self.fem.imp.sol[2][i] = self.vz[i] as f64;
         }
+        for i in 0..n {
+            self.fem.imp.guessed[i] = 0;
+        }
+        for t in 0..self.fem.count {
+            if !self.implicit_cell(t) {
+                continue;
+            }
+            for k in 0..4 {
+                let i = self.fem.p[k][t] as usize;
+                if self.fem.imp.mass[i] == 0.0 || self.fem.imp.guessed[i] != 0 {
+                    continue;
+                }
+                self.fem.imp.guessed[i] = 1;
+                let scale = self.gravity_scale[self.pbody[i] as usize];
+                let a = [gravity[0] * scale + self.ax[i], gravity[1] * scale + self.ay[i], gravity[2] * scale + self.az[i]];
+                let a2 = a[0] * a[0] + a[1] * a[1] + a[2] * a[2];
+                let v = [self.vx[i] - h * a[0], self.vy[i] - h * a[1], self.vz[i] - h * a[2]];
+                let along = if a2 > 0.0 {
+                    let last = [(v[0] - self.vbx[i]) / h, (v[1] - self.vby[i]) / h, (v[2] - self.vbz[i]) / h];
+                    ((last[0] * a[0] + last[1] * a[1] + last[2] * a[2]) / a2).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                for d in 0..3 {
+                    self.fem.imp.sol[d][i] = (v[d] + h * a[d] * along) as f64;
+                }
+                self.vbx[i] = v[0];
+                self.vby[i] = v[1];
+                self.vbz[i] = v[2];
+            }
+        }
+        for i in 0..n {
+            self.filter_floor(i, 3);
+        }
+        self.fem.imp.filtered = true;
         self.solve_preconditioned(hh, Self::implicit_multiply);
+        self.fem.imp.filtered = false;
+        // The floor's push on each resting particle is A v - b along its normal: one it pulls is let go at the next piece.
+        Self::implicit_multiply(self, hh, 0);
+        for i in 0..n {
+            let normal = [self.fem.imp.floor[0][i] as f64, self.fem.imp.floor[1][i] as f64, self.fem.imp.floor[2][i] as f64];
+            if normal == [0.0; 3] {
+                continue;
+            }
+            let push: f64 = (0..3).map(|a| (self.fem.imp.aq[a][i] - self.fem.imp.rhs[a][i]) * normal[a]).sum();
+            if push < 0.0 {
+                self.fem.imp.lift[i] = 1;
+            }
+        }
         // The new velocities, and the particles carried by them from where the substep began.
         for i in 0..n {
             if self.fem.imp.mass[i] == 0.0 {
@@ -268,6 +350,45 @@ impl World {
             self.x[i] = self.px[i] + h * self.vx[i];
             self.y[i] = self.py[i] + h * self.vy[i];
             self.z[i] = self.pz[i] + h * self.vz[i];
+        }
+    }
+
+    /// The unit normal of a still body particle `i` rests on where the piece began (its gap within a micrometre), or zero.
+    fn resting_normal(&self, i: usize) -> [f32; 3] {
+        for s in 0..crate::world::SLOTS {
+            let k = i * crate::world::SLOTS + s;
+            let c = self.kc[k];
+            if c == crate::world::NONE {
+                continue;
+            }
+            let c = (c - 1) as usize;
+            if !self.still(c) || self.dom[c] > 0.0 || self.bmesh[c] > 0.0 || self.linked_to(i, c) {
+                continue;
+            }
+            let carried = [self.mx[c], self.my[c], self.mz[c]];
+            let spin = [self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]];
+            let (n, _, gap) = self.meet(k, c, 0.0, carried, spin, [0.0; 3], [0.0, 0.0, 0.0, 1.0], [self.px[i], self.py[i], self.pz[i]]);
+            if gap - self.radius[i] <= 1e-6 {
+                return n;
+            }
+        }
+        [0.0; 3]
+    }
+
+    /// Takes the part along the floor's normal out of particle `i`'s unknowns (`which` 3), residual (4) or direction (5).
+    fn filter_floor(&mut self, i: usize, which: u8) {
+        let n = [self.fem.imp.floor[0][i] as f64, self.fem.imp.floor[1][i] as f64, self.fem.imp.floor[2][i] as f64];
+        if n == [0.0; 3] {
+            return;
+        }
+        let v = match which {
+            3 => &mut self.fem.imp.sol,
+            4 => &mut self.fem.imp.res,
+            _ => &mut self.fem.imp.dir,
+        };
+        let along = v[0][i] * n[0] + v[1][i] * n[1] + v[2][i] * n[2];
+        for a in 0..3 {
+            v[a][i] -= along * n[a];
         }
     }
 
@@ -287,11 +408,16 @@ impl World {
             free += 1;
             let d = self.fem.imp.diag[i];
             for a in 0..3 {
-                let r = self.fem.imp.rhs[a][i] - self.fem.imp.aq[a][i];
-                self.fem.imp.res[a][i] = r;
+                self.fem.imp.res[a][i] = self.fem.imp.rhs[a][i] - self.fem.imp.aq[a][i];
+                bb += self.fem.imp.rhs[a][i] * self.fem.imp.rhs[a][i];
+            }
+            if self.fem.imp.filtered {
+                self.filter_floor(i, 4);
+            }
+            for a in 0..3 {
+                let r = self.fem.imp.res[a][i];
                 self.fem.imp.dir[a][i] = r / d;
                 rz += r * r / d;
-                bb += self.fem.imp.rhs[a][i] * self.fem.imp.rhs[a][i];
             }
         }
         let tolerance = (self.fem.imp.tolerance as f64) * (self.fem.imp.tolerance as f64);
@@ -328,8 +454,13 @@ impl World {
                 let d = self.fem.imp.diag[i];
                 for a in 0..3 {
                     self.fem.imp.sol[a][i] += alpha * self.fem.imp.dir[a][i];
-                    let r = self.fem.imp.res[a][i] - alpha * self.fem.imp.aq[a][i];
-                    self.fem.imp.res[a][i] = r;
+                    self.fem.imp.res[a][i] -= alpha * self.fem.imp.aq[a][i];
+                }
+                if self.fem.imp.filtered {
+                    self.filter_floor(i, 4);
+                }
+                for a in 0..3 {
+                    let r = self.fem.imp.res[a][i];
                     rz_next += r * r / d;
                     rr += r * r;
                 }

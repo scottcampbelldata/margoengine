@@ -1852,9 +1852,8 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   by `material` (a `CellMaterial`, default 100 kPa rubber; its density is `density`), solved by the vertex-block solver,
   and the source mesh rides in the cells as a skin (`body.meshVertices()`), drawn by `drawSoftBody` with its own uvs. Its
   squash and contact follow the measured modulus: a hemisphere of 1 MPa rubber pressed on the floor meets Hertz contact
-  within 4% at 80 pieces of 20 passes a step (`SoftBodies.attach(physics, {substeps: 80, iterations: 20})`); at the
-  default 8 x 2 it is softer, so give a measured body the passes. `stiffness`, `damping` and `pressure` are the surface
-  tier's (a gas needs a hollow shell).
+  within 6% at the default 8 pieces of 2 passes (`setSolver('fem')`: within 10%), and follows its 3/2 power on a held-out
+  load. `stiffness`, `damping` and `pressure` are the surface tier's (a gas needs a hollow shell).
 
   <!-- example:node -->
   ```js

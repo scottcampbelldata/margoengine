@@ -153,17 +153,12 @@ test("a 'cells' body rides its mesh as a skin, keeps its texture coordinates, an
   assert.throws(() => SoftBodyDesc.volume(mesh, { tier: 'cells', material: { youngsModulus: 1 } }), coded);
 });
 
-test("a 'cells' ball meets Hertz contact: force against indentation on a flat floor", async () => {
-  // A rubber hemisphere of R = 5 cm (E = 1 MPa, nu = 0.3), dome down on a fixed floor, its flat face pressed by 100 N spread by
-  // area and ramped in. The flat face is the mid-plane of a ball squeezed between two plates, which by symmetry stays plane and
-  // moves by one contact's approach, so Hertz (1882) gives F = 4/3 E* sqrt(R) delta^(3/2), E* = E / (1 - nu^2): delta 4.53 mm,
-  // a contact radius sqrt(R delta) of 15 mm, 1.8 lattice cells. The bound, 10%, is Hertz's own reach here: its small-strain
-  // half-space terms are good to the order of (a / R)^2 (Johnson, Contact Mechanics, 1985, ch. 4), 9% at a / R = 0.3. The
-  // stiffness converges with the passes (at 80 x 20 the approach is 0.965 of Hertz; 20 x 80, 1.19).
+/**
+ * A rubber hemisphere of R = 5 cm (E = 1 MPa, nu = 0.3), dome down on a fixed floor, its flat face pressed by `F` newtons spread
+ * by area and ramped in over a quarter second, at the soft world's default 8 pieces of 2 passes: the approach of the flat face.
+ */
+async function pressedHemisphere(F, solver) {
   const R = 0.05,
-    E = 1e6,
-    nu = 0.3,
-    F = 100,
     r = 1e-4;
   const physics = new Physics(null);
   physics.addBody(null, {
@@ -171,9 +166,14 @@ test("a 'cells' ball meets Hertz contact: force against indentation on a flat fl
     position: [0, -0.5, 0],
     colliders: { shape: 'box', halfExtents: [1, 0.5, 1] },
   });
-  const soft = await SoftBodies.attach(physics, { substeps: 80, iterations: 20 });
-  const material = Object.assign(new CellMaterial(), { youngsModulus: E, poissonRatio: nu, elasticDampingRatio: 0.3 });
+  const soft = await SoftBodies.attach(physics);
+  const material = Object.assign(new CellMaterial(), {
+    youngsModulus: 1e6,
+    poissonRatio: 0.3,
+    elasticDampingRatio: 0.3,
+  });
   const desc = SoftBodyDesc.volume(hemisphere(R, 64, 16), { tier: 'cells', cellSize: R / 6, material, radius: r })
+    .setSolver(solver)
     .setGravityScale(0)
     .setCanSleep(false)
     .setLinearDamping(30)
@@ -197,8 +197,32 @@ test("a 'cells' ball meets Hertz contact: force against indentation on a flat fl
     for (const [i, w] of share) body.addParticleForce(i, [0, (-Math.min(1, (s + 1) / 15) * F * w) / whole, 0]);
     physics.step();
   }
-  const delta = start - face(body.particlePositions()),
-    hertz = Math.pow((3 * F * (1 - nu * nu)) / (4 * E * Math.sqrt(R)), 2 / 3);
-  assert.ok(Math.abs(delta / hertz - 1) < 0.1, `approach ${delta} m against Hertz ${hertz} m (${delta / hertz})`);
   assert.ok(!body.particlePositions().some(Number.isNaN));
+  return start - face(body.particlePositions());
+}
+/** Hertz (1882): one contact's approach under F for a sphere of R = 5 cm, E* = E / (1 - nu^2). */
+const hertz = (F) => Math.pow((3 * F * (1 - 0.3 * 0.3)) / (4 * 1e6 * Math.sqrt(0.05)), 2 / 3);
+
+test("a 'cells' ball meets Hertz contact at the default passes, on the vertex-block and fem solvers", async () => {
+  // The flat face is the mid-plane of a ball squeezed between two plates, which by symmetry stays plane and moves by one
+  // contact's approach, so Hertz gives F = 4/3 E* sqrt(R) delta^(3/2): at 100 N, delta 4.53 mm and a contact radius
+  // sqrt(R delta) of 15 mm, 1.8 lattice cells. The bound, 10%, is Hertz's own reach here: its small-strain half-space terms
+  // are good to the order of (a / R)^2 (Johnson, Contact Mechanics, 1985, ch. 4), 9% at a / R = 0.3. Measured: 0.949
+  // (vertex-block) and 1.091 (fem), the same at 8 x 2 as at 80 x 20. The passes started from the full prediction of each
+  // piece and the fem solve's unknowns from the full velocity; cut short at the default passes, both stopped short of the
+  // load's answer and the hemisphere flattened (KB-SOFT-VBDGUESS1).
+  for (const solver of ['vertex-block', 'fem']) {
+    const delta = await pressedHemisphere(100, solver);
+    assert.ok(Math.abs(delta / hertz(100) - 1) < 0.1, `${solver}: approach ${delta} m against Hertz ${hertz(100)} m`);
+  }
+});
+
+test("a 'cells' ball follows Hertz's power 3/2 on a held-out load", async () => {
+  // A quarter of the load, not used to set anything above: Hertz's approach falls by 4^(2/3), to 1.80 mm, a contact radius of
+  // 9.5 mm, 1.1 cells; the bound is the 10% above, against the measured 100 N approach scaled by the power law.
+  const full = await pressedHemisphere(100, 'vertex-block'),
+    quarter = await pressedHemisphere(25, 'vertex-block');
+  assert.ok(Math.abs(quarter / hertz(25) - 1) < 0.1, `approach ${quarter} m against Hertz ${hertz(25)} m`);
+  const power = Math.log(4) / Math.log(full / quarter);
+  assert.ok(Math.abs(power - 1.5) < 0.15, `force grows as the approach to the power ${power}, Hertz's 1.5`);
 });
