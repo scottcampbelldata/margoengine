@@ -92,6 +92,12 @@ function clearView(device, view, clearValue) {
 }
 
 /** A drawing canvas: an OffscreenCanvas, or a detached <canvas> in a browser without one (old WebKit). */
+/** A probe's refusal to run where the browser lacks an API it builds its input with (not the layer's API). */
+function lacks(api) {
+  const e = new Error(api);
+  e.name = 'BrowserLacks';
+  return e;
+}
 function canvasOf(width, height) {
   if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(width, height);
   return Object.assign(document.createElement('canvas'), { width, height });
@@ -1157,6 +1163,8 @@ const D = array<vec3f, 8>(vec3f(1,0,0), vec3f(-1,0,0), vec3f(0,1,0), vec3f(0,-1,
       g.fillStyle = `rgb(${i * 30}, ${255 - i * 30}, ${(i * 70) % 256})`;
       g.fillRect(i % 4, i >> 2, 1, 1);
     }
+    // WebKit's Windows build has no VideoFrame (2026-11-27).
+    if (typeof VideoFrame !== 'function') throw lacks('VideoFrame');
     const frame = new VideoFrame(c, { timestamp: 0 });
     const prelude = '@group(0) @binding(0) var t: texture_external; @group(0) @binding(1) var s: sampler;';
     const code = `@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
@@ -1596,16 +1604,18 @@ async function run(device, name, options) {
   const errors = [];
   device.addEventListener?.('uncapturederror', (e) => errors.push(e.error.message));
   device.pushErrorScope('validation');
-  let result, thrown = null;
+  let result, thrown = null, missing = null;
   try {
     result = await cases[name](device, options);
   } catch (e) {
     thrown = `${e.name}: ${e.message}`;
+    // Still thrown, so features-browser.mjs fails on it; the browser matrix records the row as unmeasured.
+    if (e.name === 'BrowserLacks') missing = e.message;
   }
   const scope = await device.popErrorScope();
   if (scope) errors.push(scope.message);
   const gl = device.gl ? device.gl.getError() : 0;
-  return { result, errors, thrown, gl };
+  return { result, errors, thrown, gl, missing };
 }
 
 let native, compat;

@@ -29,6 +29,7 @@ import {
   refusalOf,
   NO_ADAPTER,
   UNSHOT,
+  lacking,
 } from '../scripts/browser-matrix.mjs';
 import { asyncScript, command, ELEMENT_KEY, openSession, revive, WebDriverError } from '../scripts/webdriver.mjs';
 
@@ -505,4 +506,59 @@ test('without a native adapter the layer feature probes run alone, judged by the
   assert.equal(layer.bitmapCopies.status, 'pass');
   assert.equal(layer.bundles.status, 'pass');
   assert.equal(layer.bundles.note, 'no native result to compare');
+});
+
+test('a probe or scenario whose input needs an API the browser lacks is unmeasured, naming it, not a bug', async () => {
+  // WebKit's Windows build has no VideoFrame and no canvas captureStream (2026-11-27): the matrix recorded the external
+  // probe and every materials row as bugs.
+  assert.deepEqual(lacking('VideoFrame'), {
+    status: 'unmeasured',
+    message: 'the browser has no VideoFrame, which the test needs',
+  });
+  const rows = [];
+  await CASES.features({
+    nativeAdapter: false,
+    shotsWork: true,
+    row: (item, mode, result) => rows.push({ item, mode, ...result }),
+    load: async () => ({}),
+    call: async (source) =>
+      /names/.test(source)
+        ? { ok: ['external'] }
+        : {
+            ok: {
+              native: null,
+              compat: { thrown: 'BrowserLacks: VideoFrame', missing: 'VideoFrame', errors: [], gl: 0 },
+            },
+          },
+  });
+  const external = rows.find((r) => r.mode === 'layer');
+  assert.equal(external.status, 'unmeasured');
+  assert.match(external.message, /VideoFrame/);
+  // An uncoded throw that is not a missing API stays a bug.
+  rows.length = 0;
+  await CASES.features({
+    nativeAdapter: false,
+    shotsWork: true,
+    row: (item, mode, result) => rows.push({ item, mode, ...result }),
+    load: async () => ({}),
+    call: async (source) =>
+      /names/.test(source)
+        ? { ok: ['external'] }
+        : { ok: { native: null, compat: { thrown: 'TypeError: boom', missing: null, errors: [], gl: 0 } } },
+  });
+  assert.equal(rows.find((r) => r.mode === 'layer').status, 'bug');
+  rows.length = 0;
+  await CASES.materials({
+    shotsWork: true,
+    row: (item, mode, result) => rows.push({ item, mode, ...result }),
+    load: async () => ({}),
+    call: async (source) => {
+      if (/lacks/.test(source)) return { ok: { basic: 'HTMLCanvasElement.captureStream' } };
+      if (/clear/.test(source)) return { ok: undefined };
+      return { ok: { error: null, errors: [] } };
+    },
+    shot: async () => ({ width: 1, height: 1, data: new Uint8Array([0, 255, 0, 255]) }),
+  });
+  const basic = rows.filter((r) => r.item === 'basic');
+  assert.ok(basic.length === 2 && basic.every((r) => r.status === 'unmeasured' && /captureStream/.test(r.message)));
 });

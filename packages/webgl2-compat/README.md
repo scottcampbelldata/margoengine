@@ -692,7 +692,8 @@ browsers' own WebGPU compilers, where it was recorded.
   or a refusal without a code is a bug and the script exits 1. A row the browser itself cannot measure is
   `unmeasured` with the reason: a native row where the browser has no WebGPU adapter (the layer's feature probes then
   run alone, against their own bars), or a picture row where the browser's screenshot shows no WebGL2 canvas at all
-  (checked first with a plain canvas cleared to red). Safari is driven by `safaridriver` (plain W3C WebDriver, no
+  (checked first with a plain canvas cleared to red), or a probe whose input needs an API the browser lacks
+  (`VideoFrame`, a canvas `captureStream`; WebKit's Windows build has neither), named in the row. Safari is driven by `safaridriver` (plain W3C WebDriver, no
   extra dependency), Android Chrome by Playwright over adb (on a user build, which ignores Playwright's command line,
   through Chrome's own DevTools socket), any other browser by the repository's harness. The measured results are in [docs/limits.md](../../docs/limits.md#browser-matrix-batch-273-2026-11-15).
   From the repository root, after `npm run build:packages`:

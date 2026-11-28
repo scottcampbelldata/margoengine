@@ -278,6 +278,12 @@ export const NO_ADAPTER = Object.freeze({
 });
 
 /**
+ * The row of a probe that cannot run because the browser lacks an API the test builds its input with (a features probe's
+ * `missing`, a materials scenario in `window.check.lacks`): unmeasured, naming the API, never a bug of the layer.
+ */
+export const lacking = (api) => ({ status: 'unmeasured', message: `the browser has no ${api}, which the test needs` });
+
+/**
  * A page's recorded error strings as one row: `refusal` when every one is a coded refusal with its help link (the
  * engine refusing, as on a browser without a WebGPU adapter), else null.
  */
@@ -408,7 +414,9 @@ export const CASES = {
           t.row(
             name,
             mode,
-            side.thrown && !side.errors?.length && !side.gl
+            side.missing && !side.errors?.length && !side.gl
+              ? lacking(side.missing)
+              : side.thrown && !side.errors?.length && !side.gl
               ? classifyError(thrownOf(side.thrown))
               : { status: 'bug', message: wrong.join('; ') },
           );
@@ -472,7 +480,12 @@ export const CASES = {
         t.row('unlit centres', mode, page.failed);
         continue;
       }
+      const lacks = (await t.call('() => window.check.lacks ?? {}')).ok ?? {};
       for (const [name, expected] of Object.entries(MATERIAL_CENTRES)) {
+        if (lacks[name]) {
+          t.row(name, mode, lacking(lacks[name]));
+          continue;
+        }
         const r = await t.call(`() => window.check.run(${JSON.stringify(name)})`);
         if (r.thrown) {
           t.row(name, mode, classifyError(r.thrown));
