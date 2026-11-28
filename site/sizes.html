@@ -110,7 +110,7 @@
 <tr><th scope="row"><code>underwater-kernel-shared.wasm</code></th><td>Rust SIMD underwater ray and Gaussian-beam tracing, shared world memory</td><td class="num">10,911</td><td class="num">4,846</td><td class="num">4,401</td><td>UnderwaterAcousticsSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>tsunami-kernel.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation</td><td class="num">23,068</td><td class="num">9,530</td><td class="num">8,475</td><td>TsunamiSolver.load() from the optional /tsunami entry</td></tr>
 <tr><th scope="row"><code>tsunami-kernel-shared.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation, shared world memory</td><td class="num">23,068</td><td class="num">9,530</td><td class="num">8,489</td><td>TsunamiSolver.load() with shared world memory support</td></tr>
-<tr><th scope="row"><code>solver-phase-thread.js</code></th><td>Worker for shared-memory SIMD coastal flux sweeps and lightning relaxation</td><td class="num">1,587</td><td class="num">767</td><td class="num">667</td><td>TsunamiSolver.load({ threads }) or LightningSolver.load({ threads }) with more than one thread</td></tr>
+<tr><th scope="row"><code>solver-phase-thread.js</code></th><td>Worker for shared-memory SIMD solver phases</td><td class="num">1,587</td><td class="num">766</td><td class="num">665</td><td>A supported solver such as AeolianTransport loads with more than one native participant</td></tr>
 <tr><th scope="row"><code>terramechanics-kernel.wasm</code></th><td>Rust SIMD soil footprint and conservative redistribution</td><td class="num">40,423</td><td class="num">16,491</td><td class="num">14,395</td><td>Terramechanics.load() from the optional /terramechanics entry</td></tr>
 <tr><th scope="row"><code>terramechanics-kernel-shared.wasm</code></th><td>Rust SIMD soil footprint and conservative redistribution, shared world memory</td><td class="num">40,423</td><td class="num">16,491</td><td class="num">14,345</td><td>Terramechanics.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>granular-flow-kernel.wasm</code></th><td>Rust SIMD depth-averaged conservative granular flow</td><td class="num">9,620</td><td class="num">4,255</td><td class="num">3,875</td><td>GranularFlowSolver.load() from the optional /granular-flow entry</td></tr>
@@ -123,8 +123,8 @@
 <tr><th scope="row"><code>glacier-kernel-shared.wasm</code></th><td>Rust SIMD shallow-ice flow and fracture, shared world memory</td><td class="num">15,525</td><td class="num">6,250</td><td class="num">5,583</td><td>GlacierSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>airborne-kernel.wasm</code></th><td>Rust SIMD environmental particle transport</td><td class="num">1,444</td><td class="num">918</td><td class="num">851</td><td>AirborneParticles.load() from the optional /airborne entry</td></tr>
 <tr><th scope="row"><code>airborne-kernel-shared.wasm</code></th><td>Rust SIMD environmental particle transport, shared world memory</td><td class="num">1,444</td><td class="num">918</td><td class="num">849</td><td>AirborneParticles.load() with shared world memory support</td></tr>
-<tr><th scope="row"><code>aeolian-kernel.wasm</code></th><td>Rust SIMD aeolian transport</td><td class="num">8,172</td><td class="num">3,574</td><td class="num">3,230</td><td>AeolianTransport.load() from the optional /aeolian entry</td></tr>
-<tr><th scope="row"><code>aeolian-kernel-shared.wasm</code></th><td>Rust SIMD aeolian transport, shared world memory</td><td class="num">8,172</td><td class="num">3,574</td><td class="num">3,228</td><td>AeolianTransport.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>aeolian-kernel.wasm</code></th><td>Rust SIMD aeolian transport</td><td class="num">14,142</td><td class="num">5,947</td><td class="num">5,277</td><td>AeolianTransport.load() from the optional /aeolian entry</td></tr>
+<tr><th scope="row"><code>aeolian-kernel-shared.wasm</code></th><td>Rust SIMD aeolian transport, shared world memory</td><td class="num">14,142</td><td class="num">5,947</td><td class="num">5,278</td><td>AeolianTransport.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>groundwater-kernel.wasm</code></th><td>Rust SIMD groundwater flow</td><td class="num">11,142</td><td class="num">3,356</td><td class="num">3,012</td><td>GroundwaterSolver.load() from the optional /groundwater entry</td></tr>
 <tr><th scope="row"><code>groundwater-kernel-shared.wasm</code></th><td>Rust SIMD groundwater flow, shared world memory</td><td class="num">11,142</td><td class="num">3,356</td><td class="num">3,012</td><td>GroundwaterSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>pbf-kernel.wasm</code></th><td>Rust SIMD position-based particle liquid</td><td class="num">18,143</td><td class="num">7,317</td><td class="num">6,413</td><td>PbfSolver.load(world.memory) from the optional /pbf entry with plain memory</td></tr>
@@ -364,7 +364,7 @@
 <tr><th scope="row"><code>@margoengine/sky/compat-clouds</code></th><td>Lazy: hurricane storm field</td><td class="num">10,591</td><td class="num">4,395</td><td>the first layer that draws a storm (<code>hurricane</code> option or the type hurricane; import() in volumetric-clouds.ts); its WGSL and maths load once, and every entry above reads the same copy</td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Base: everything a page reading a Tornado's wind and rain loads, without the lazy part</td><td class="num">19,037</td><td class="num">7,788</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Lazy: tornado shader</td><td class="num">5,724</td><td class="num">2,485</td><td>the first frame of a TornadoCloud (import() in tornado.ts)</td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">332,988</td><td class="num">106,970</td><td></td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">333,008</td><td class="num">106,982</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,194,310</td><td class="num">880,542</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Base: everything the entry loads before <code>SoftBodies.attach()</code>, without the lazy part</td><td class="num">180,148</td><td class="num">59,611</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Lazy: soft body kernel (deflated Wasm blueprint and its column table)</td><td class="num">155,807</td><td class="num">116,989</td><td><code>await SoftBodies.attach(physics)</code>, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
@@ -4912,7 +4912,7 @@
   <caption class="sr-only">Simulation and games: bytes per package entry</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Entry</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Peers on</th></tr></thead>
 <tbody data-package="@margoengine/physics">
-<tr><th scope="rowgroup" rowspan="76"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,527,299</td><td class="num">988,328</td><td rowspan="76"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="76"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,527,319</td><td class="num">988,337</td><td rowspan="76"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./decomposition</code></td><td class="num">26,988</td><td class="num">11,152</td></tr>
 <tr><td><code>./soft</code></td><td class="num">335,956</td><td class="num">177,421</td></tr>
 <tr><td><code>./tissue</code></td><td class="num">7,410</td><td class="num">3,154</td></tr>
@@ -4975,7 +4975,7 @@
 <tr><td><code>./snowpack</code></td><td class="num">11,964</td><td class="num">4,916</td></tr>
 <tr><td><code>./airborne</code></td><td class="num">28,072</td><td class="num">11,082</td></tr>
 <tr><td><code>./boundary-layer</code></td><td class="num">14,258</td><td class="num">5,640</td></tr>
-<tr><td><code>./aeolian</code></td><td class="num">11,986</td><td class="num">5,000</td></tr>
+<tr><td><code>./aeolian</code></td><td class="num">23,132</td><td class="num">8,936</td></tr>
 <tr><td><code>./groundwater</code></td><td class="num">9,310</td><td class="num">3,902</td></tr>
 <tr><td><code>./landscape</code></td><td class="num">19,776</td><td class="num">7,686</td></tr>
 <tr><td><code>./sediment</code></td><td class="num">21,451</td><td class="num">7,993</td></tr>

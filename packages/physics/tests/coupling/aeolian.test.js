@@ -76,7 +76,7 @@ test('a uniform interior patch follows the saltation quadratic, stress balance, 
   near(mass(transport), start);
 });
 
-test('snow at its measured equilibrium flux follows Pomeroy and Gray, equation 11', async () => {
+test('snow at its modeled equilibrium flux follows Pomeroy and Gray, equation 11', async () => {
   const wind = 0.36,
     critical = 0.2,
     speed = 2.8 * critical;
@@ -316,5 +316,85 @@ test('native Wasm loads without touching any byte in either populated memory var
     const { instance } = await WebAssembly.instantiate(words, { env: { memory } });
     assert.equal(instance.exports.__data_end.value, 0);
     assert.deepEqual(bytes, original);
+  }
+});
+
+test('signed cell offsets put wind samples at the same positions before and after a saved seek', async () => {
+  const transport = await AeolianTransport.load();
+  const cellSize = 128;
+  const points = [];
+  const wind = {
+    cell: [-3, 4, 2],
+    sample(x, y, z, time, out) {
+      points.push([x, y, z, time]);
+      out.velocity = [12 + x / 4096, 0, -3 + z / 4096];
+      out.density = density;
+      return out;
+    },
+  };
+  const { world } = create(transport, { wind, cellSize }, () => 2, { cellSize });
+  const cell = [-4, 5, -2];
+  world.shiftOrigin([4, -5, 2]);
+  const initial = world.takeSnapshot();
+  world.advance(1);
+  const hash = world.hash();
+  assert.deepEqual(points[0], [-132, 140, -514, 0]);
+  assert.deepEqual(points.at(-1), [-124, 140, -510, 0]);
+  assert.deepEqual(
+    transport.exportPorts(1).map(({ cell }) => cell),
+    Array(4).fill(cell),
+  );
+  const first = points.splice(0);
+  world.restoreSnapshot(initial.bytes);
+  world.advance(1);
+  assert.deepEqual(points, first);
+  assert.equal(world.hash(), hash);
+});
+
+test('invalid late wind, unrepresentable shear and CFL counts leave all accepted regions and diagnostics intact', async () => {
+  for (const threads of [1, 4]) {
+    using transport = await AeolianTransport.load({ threads });
+    let speed = 14;
+    let corrupt = false;
+    const wind = {
+      cell: [0, 0, 0],
+      sample(x, _y, z, _time, out) {
+        out.velocity = [corrupt && x === 4 && z === 2 ? NaN : speed, 0, 2];
+        out.density = density;
+        return out;
+      },
+    };
+    const { world, bed } = create(transport, { wind, initialSaltation: 0.03 }, () => 0, {
+      memory: worldMemory(threads > 1),
+    });
+    world.advance(4);
+    const context = {
+      tick: 4,
+      level: 0,
+      seed: 0,
+      cell: [0, 0, 0],
+      inputs: new Map(bed.exportPorts(4).map((port) => [port.field, port])),
+    };
+    const snapshot = () =>
+      transport.stateRegions().map((r) => new Uint8Array(world.memory.buffer, r.byteOffset, r.byteLength).slice());
+    const accepted = snapshot();
+    const work = transport.workCounts();
+    assert.ok(work);
+    const rejection = (step, description) => {
+      assert.throws(step, { name: 'MargoError', code: 'state', message: description });
+      assert.deepEqual(snapshot(), accepted);
+      assert.deepEqual(transport.workCounts(), work);
+      assert.equal(transport.revision, 4);
+    };
+    corrupt = true;
+    rejection(() => transport.step(context, dt), /friction X; pass a finite value/);
+    corrupt = false;
+    speed = 1e200;
+    rejection(() => transport.step(context, dt), /numeric range; reduce forcing/);
+    speed = 14;
+    rejection(() => transport.step(context, 1e20), /reduce the step or use coarser bed cells/);
+    transport.step(context, dt);
+    assert.equal(transport.revision, 5);
+    assert.notDeepEqual(snapshot(), accepted);
   }
 });

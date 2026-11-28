@@ -16,6 +16,7 @@ export interface AeolianLoadOptions {
     readonly id?: string;
     readonly frictionField?: FieldDescriptor;
     readonly erodibleField?: FieldDescriptor;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -79,6 +80,23 @@ export class AeolianTransport implements Solver<AeolianParams> {
     read(column: number, row: number): AeolianSample;
     sample(x: number, z: number): AeolianSample | undefined;
     get budget(): AeolianBudget;
+    workCounts(): AeolianWorkCounts | undefined;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface AeolianWorkCounts {
+    readonly substeps: number;
+    readonly workers: readonly AeolianWorkerWork[];
+}
+
+export interface AeolianWorkerWork {
+    readonly slopeRows: number;
+    readonly forcingRows: number;
+    readonly exchangeRows: number;
+    readonly publishedRows: number;
+    readonly forcingPairs: number;
+    readonly exchangePairs: number;
 }
 
 // Not exported from this entry, but used by the exports above:

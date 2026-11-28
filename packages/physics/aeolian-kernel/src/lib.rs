@@ -74,16 +74,21 @@ impl Grid {
         }
     }
 
-    fn active_faces(self, n: usize, mut visit: impl FnMut(usize, usize, bool, f64)) {
+    fn active_faces(
+        self,
+        n: usize,
+        mut visit: impl FnMut(usize, usize, bool, f64) -> bool,
+    ) -> bool {
         for i in 0..n {
             let (x, z) = self.coords(i);
-            if x + 1 < self.nx() {
-                visit(i, i + 1, true, self.x_width(z));
+            if x + 1 < self.nx() && !visit(i, i + 1, true, self.x_width(z)) {
+                return false;
             }
-            if z + 1 < self.nz {
-                visit(i, i + self.nx(), false, self.z_width(x));
+            if z + 1 < self.nz && !visit(i, i + self.nx(), false, self.z_width(x)) {
+                return false;
             }
         }
+        true
     }
 
     fn outward_rate(self, i: usize, vx: f64, vz: f64) -> f64 {
@@ -104,8 +109,12 @@ impl Grid {
         result
     }
 
+    fn outside(self, x: f64, z: f64) -> bool {
+        x < 0.0 || z < 0.0 || x > (self.nx() - 1) as f64 || z > (self.nz - 1) as f64
+    }
+
     fn sample(self, values: &[f64], x: f64, z: f64) -> f64 {
-        if x < 0.0 || z < 0.0 || x > (self.nx() - 1) as f64 || z > (self.nz - 1) as f64 {
+        if self.outside(x, z) {
             return 0.0;
         }
         let i = (x as usize).min(self.nx() - 2);
@@ -199,22 +208,39 @@ struct Settings {
     ripple_cotangent: f64,
 }
 
-fn relax(mass: f64, growth: f64, saturation: f64, source: f64, dt: f64) -> f64 {
+fn relax(mass: f64, growth: f64, saturation: f64, source: f64, dt: f64) -> Option<f64> {
     // Backward Euler of S + r m (1 - m/m_s), the positive root of the quadratic.
     let rhs = mass + dt * source;
     let a = 1.0 - dt * growth;
     let b = dt * growth / saturation;
     if b == 0.0 {
-        return rhs;
+        return rhs.is_finite().then_some(rhs);
     }
     let discriminant = sqrt(a * a + 4.0 * b * rhs);
-    if rhs == 0.0 {
+    if !discriminant.is_finite() {
+        return None;
+    }
+    let value = if rhs == 0.0 {
         0.0
     } else if a >= 0.0 {
-        2.0 * rhs / (discriminant + a)
+        let divisor = discriminant + a;
+        if !divisor.is_finite() {
+            return None;
+        }
+        2.0 * rhs / divisor
     } else {
-        (discriminant - a) / (2.0 * b)
-    }
+        let divisor = 2.0 * b;
+        if !divisor.is_finite() {
+            return None;
+        }
+        (discriminant - a) / divisor
+    };
+    value.is_finite().then_some(value)
+}
+
+enum HillError {
+    Range,
+    Fetch,
 }
 
 fn hill_multiplier(
@@ -225,29 +251,62 @@ fn hill_multiplier(
     ux: f64,
     uz: f64,
     p: &Settings,
-) -> f64 {
+) -> Result<f64, HillError> {
     if p.hill_strength == 0.0 {
-        return 1.0;
+        return Ok(1.0);
     }
     let (x, z) = grid.coords(i);
     let h = grid.dx.min(grid.dz);
     let width = (grid.nx() - 1) as f64 * grid.dx;
     let depth = (grid.nz - 1) as f64 * grid.dz;
     let diagonal = sqrt(width * width + depth * depth);
-    let samples = (p.hill_fetch.min(diagonal) / h) as usize;
+    let samples = p.hill_fetch.min(diagonal) / h;
+    if samples.is_nan() {
+        return Err(HillError::Range);
+    }
+    let displacement = |sample: f64| {
+        let distance = sample * h;
+        (ux * distance / grid.dx, uz * distance / grid.dz)
+    };
+    let outside = |ix, iz| {
+        grid.outside(x as f64 - ix, z as f64 - iz) && grid.outside(x as f64 + ix, z as f64 + iz)
+    };
+    // If the first index outside the native range still overlaps the bed, refuse before evaluating the ray.
+    let first_unrepresentable = usize::MAX as f64 + 1.0;
+    if samples >= first_unrepresentable {
+        let (ix, iz) = displacement(first_unrepresentable);
+        if !outside(ix, iz) {
+            return Err(HillError::Fetch);
+        }
+    }
     let mut hilbert = 0.0;
-    for k in 1..=samples {
-        let distance = k as f64 * h;
-        let ix = ux * distance / grid.dx;
-        let iz = uz * distance / grid.dz;
+    let mut k = 1usize;
+    while (k as f64) <= samples {
+        let (ix, iz) = displacement(k as f64);
+        if ix.is_nan() || iz.is_nan() {
+            return Err(HillError::Range);
+        }
+        // Both rays keep moving away from the cell, so their remaining out-of-grid samples are exactly zero.
+        if outside(ix, iz) {
+            break;
+        }
         let left = grid.sample(sx, x as f64 - ix, z as f64 - iz) * ux
             + grid.sample(sz, x as f64 - ix, z as f64 - iz) * uz;
         let right = grid.sample(sx, x as f64 + ix, z as f64 + iz) * ux
             + grid.sample(sz, x as f64 + ix, z as f64 + iz) * uz;
         hilbert += (left - right) / k as f64;
+        if k as f64 + 1.0 > samples || k == usize::MAX {
+            break;
+        }
+        k += 1;
     }
     let slope = word(sx, i) * ux + word(sz, i) * uz;
-    (1.0 + p.hill_strength * (hilbert / core::f64::consts::PI + p.hill_slope * slope)).max(0.0)
+    let multiplier =
+        1.0 + p.hill_strength * (hilbert / core::f64::consts::PI + p.hill_slope * slope);
+    if !multiplier.is_finite() {
+        return Err(HillError::Range);
+    }
+    Ok(multiplier.max(0.0))
 }
 
 unsafe fn read_col<'a>(base: *const f64, n: usize, column: usize) -> &'a [f64] {
@@ -258,245 +317,4 @@ unsafe fn write_col<'a>(base: *mut f64, n: usize, column: usize) -> &'a mut [f64
     unsafe { slice::from_raw_parts_mut(base.add(column * n), n) }
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn aeolian_step(
-    wind: *const f64,
-    controls: *const f64,
-    height: *const f64,
-    parameters: *const f64,
-    mass: *mut f64,
-    mobile: *mut f64,
-    bed_delta: *mut f64,
-    motion: *mut f64,
-    dust: *mut f64,
-    drag: *mut f64,
-    budget: *mut f64,
-    scratch: *mut f64,
-    nx: usize,
-    nz: usize,
-    dx: f64,
-    dz: f64,
-    open: u32,
-    dt: f64,
-    world_dt: f64,
-) {
-    let Some(width) = NonZeroUsize::new(nx) else {
-        return;
-    };
-    if nx < 2 || nz < 2 {
-        return;
-    }
-    let grid = Grid {
-        nx: width,
-        nz,
-        dx,
-        dz,
-        open,
-    };
-    let n = nx * nz;
-    let p = unsafe { &*parameters.cast::<Settings>() };
-    let area = unsafe { read_col(controls, n, 0) };
-    let cover = unsafe { read_col(controls, n, 1) };
-    let ux = unsafe { read_col(wind, n, 0) };
-    let uz = unsafe { read_col(wind, n, 1) };
-    let air = unsafe { read_col(wind, n, 2) };
-    let hop_tail = unsafe { read_col(wind, n, 3) };
-    let height = unsafe { read_col(height, n, 0) };
-    let mass = unsafe { write_col(mass, n, 0) };
-    let mobile = unsafe { write_col(mobile, n, 0) };
-    let bed_delta = unsafe { write_col(bed_delta, n, 0) };
-    let motion = unsafe { write_col(motion, 3 * n, 0) };
-    let dust = unsafe { write_col(dust, n, 0) };
-    let drag = unsafe { write_col(drag, 2 * n, 0) };
-    let budget = unsafe { write_col(budget, 2, 0) };
-    let sx = unsafe { write_col(scratch, n, 0) };
-    let sz = unsafe { write_col(scratch, n, 1) };
-    let vx = unsafe { write_col(scratch, n, 2) };
-    let vz = unsafe { write_col(scratch, n, 3) };
-    let tau = unsafe { write_col(scratch, n, 4) };
-    let threshold = unsafe { write_col(scratch, n, 5) };
-    let buffer = unsafe { write_col(scratch, n, 6) };
-    let out = unsafe { write_col(scratch, n, 7) };
-    let donor = unsafe { write_col(scratch, n, 8) };
-    let mut max_departure: f64 = 0.0;
-    let particle_mass =
-        p.grain_density * core::f64::consts::PI / 6.0 * p.diameter * p.diameter * p.diameter;
-    let birth_period = sqrt(p.diameter / p.gravity);
-
-    bed_delta.fill(0.0);
-    dust.fill(0.0);
-    for i in 0..n {
-        let (x, z) = grid.coords(i);
-        let left = if x > 0 { i - 1 } else { i };
-        let right = if x + 1 < nx { i + 1 } else { i };
-        let near = if z > 0 { i - nx } else { i };
-        let far = if z + 1 < nz { i + nx } else { i };
-        *word_mut(sx, i) =
-            (word(height, right) - word(height, left)) / ((right - left) as f64 * dx);
-        *word_mut(sz, i) =
-            (word(height, far) - word(height, near)) / ((far - near) as f64 / nx as f64 * dz);
-    }
-    for i in 0..n {
-        let (wx, wz, rho) = (word(ux, i), word(uz, i), word(air, i));
-        let speed = sqrt(wx * wx + wz * wz);
-        let (east, south) = if speed > 0.0 {
-            (wx / speed, wz / speed)
-        } else {
-            (0.0, 0.0)
-        };
-        let bed_shear = if rho > 0.0 && speed > 0.0 {
-            rho * speed * speed * word(cover, i) * hill_multiplier(grid, i, sx, sz, east, south, p)
-        } else {
-            0.0
-        };
-        *word_mut(tau, i) = bed_shear;
-        *word_mut(threshold, i) = if p.impact_threshold > 0.0 {
-            rho * p.impact_threshold * p.impact_threshold
-        } else {
-            0.0064 * (p.grain_density - rho).max(0.0) * p.gravity * p.diameter
-        };
-        *word_mut(vx, i) = east * p.grain_speed;
-        *word_mut(vz, i) = south * p.grain_speed;
-        max_departure = max_departure.max(6.0 * (word(vx, i).abs() / dx + word(vz, i).abs() / dz));
-    }
-    let crossings = dt * max_departure;
-    let whole = crossings as usize;
-    let count = (whole + usize::from((whole as f64) < crossings)).max(1);
-    let sub_dt = dt / count as f64;
-    let mass_to_shear = p.gravity / (2.0 * p.restitution);
-
-    for _ in 0..count {
-        for i in 0..n {
-            let m = word(mass, i);
-            let a = word(area, i);
-            let critical = word(threshold, i);
-            let local_shear = word(tau, i);
-            let target = if local_shear > critical && critical > 0.0 {
-                let excess = local_shear - critical;
-                let mut sat = excess / mass_to_shear;
-                if p.snow > 0.0 {
-                    let rho = word(air, i);
-                    let friction = sqrt(local_shear / (rho * word(cover, i)));
-                    let threshold_velocity = sqrt(critical / rho);
-                    // Pomeroy–Gray Eq. 11 removes vegetation stress in the numerator only.
-                    sat =
-                        0.68 * threshold_velocity * excess / (p.gravity * friction * p.grain_speed);
-                }
-                let growth = p.multiplication * mass_to_shear * excess / (p.grain_speed * critical);
-                let fluid_threshold = critical * p.initiation_ratio * p.initiation_ratio;
-                let birth = if local_shear > fluid_threshold {
-                    particle_mass / birth_period
-                } else {
-                    0.0
-                };
-                if sat > 0.0 {
-                    relax(m, growth, sat, birth, sub_dt)
-                } else {
-                    m
-                }
-            } else {
-                m * p.settling_time / (p.settling_time + sub_dt)
-            };
-            let pickup = ((target - m) * a).min(word(mobile, i));
-            let moving = (m + pickup / a).max(0.0);
-            *word_mut(mass, i) = moving;
-            *word_mut(mobile, i) -= pickup;
-            let speed = sqrt(word(vx, i) * word(vx, i) + word(vz, i) * word(vz, i));
-            let blown_dust = (p.dust_efficiency * moving * speed * word(cover, i) * a * sub_dt)
-                .min(word(mobile, i));
-            *word_mut(dust, i) += blown_dust;
-            *word_mut(mobile, i) -= blown_dust;
-            *word_mut(bed_delta, i) -= (pickup + blown_dust) / (a * p.bulk_density);
-            let open_out = grid.outward_rate(i, word(vx, i), word(vz, i)) * moving * sub_dt;
-            *word_mut(out, i) = open_out;
-            *word_mut(buffer, i) = moving * a;
-            *word_mut(donor, i) = open_out;
-        }
-        grid.active_faces(n, |i, j, east, face| {
-            let v = if east { vx as &[f64] } else { vz as &[f64] };
-            let speed = 0.5 * (word(v, i) + word(v, j));
-            let from = if speed >= 0.0 { i } else { j };
-            *word_mut(donor, from) += speed.abs() * face * sub_dt * word(mass, from);
-        });
-        for i in 0..n {
-            let scale = if word(donor, i) > word(buffer, i) {
-                word(buffer, i) / word(donor, i)
-            } else {
-                1.0
-            };
-            *word_mut(donor, i) = scale;
-            let export = scale * word(out, i);
-            *word_mut(buffer, i) -= export;
-            *word_mut(budget, 0) += export;
-        }
-        grid.active_faces(n, |i, j, east, face| {
-            let v = if east { vx as &[f64] } else { vz as &[f64] };
-            let speed = 0.5 * (word(v, i) + word(v, j));
-            let (from, to) = if speed >= 0.0 { (i, j) } else { (j, i) };
-            let moved = speed.abs() * face * sub_dt * word(mass, from) * word(donor, from);
-            *word_mut(buffer, from) -= moved;
-            *word_mut(buffer, to) += moved;
-        });
-        for i in 0..n {
-            *word_mut(mass, i) = (word(buffer, i) / word(area, i)).max(0.0);
-        }
-        if p.ripple_rate > 0.0 {
-            buffer.fill(0.0);
-            for i in 0..n {
-                let (vx, vz) = (word(vx, i), word(vz, i));
-                let crossing = (vx.abs() / dx).max(vz.abs() / dz);
-                let ejected = if crossing > 0.0 {
-                    let slope = (vx * word(sx, i) + vz * word(sz, i)) / p.grain_speed;
-                    let impacts = (1.0 + p.ripple_cotangent * slope).max(0.0);
-                    (sub_dt
-                        * p.ripple_rate
-                        * word(mass, i)
-                        * impacts
-                        * word(area, i)
-                        * word(cover, i))
-                    .min(word(mobile, i))
-                } else {
-                    0.0
-                };
-                *word_mut(out, i) = ejected;
-                if ejected > 0.0 {
-                    let delta = (vx / (dx * crossing), vz / (dz * crossing));
-                    *word_mut(budget, 0) += grid.hop(buffer, i, delta, word(hop_tail, i), ejected);
-                }
-            }
-            for i in 0..n {
-                let moved = word(buffer, i) - word(out, i);
-                *word_mut(mobile, i) += moved;
-                *word_mut(bed_delta, i) += moved / (p.bulk_density * word(area, i));
-            }
-        }
-        if p.avalanche_time > 0.0 {
-            grid.active_faces(n, |i, j, east, _| {
-                let difference =
-                    (word(height, i) - word(height, j)) + (word(bed_delta, i) - word(bed_delta, j));
-                let (up, down) = if difference >= 0.0 { (i, j) } else { (j, i) };
-                let distance = if east { dx } else { dz };
-                let excess = (difference.abs() - p.repose * distance).max(0.0);
-                let reduction = excess * sub_dt / (p.avalanche_time + sub_dt);
-                let mass = (reduction * p.bulk_density
-                    / (1.0 / word(area, up) + 1.0 / word(area, down)))
-                .min(word(mobile, up));
-                *word_mut(mobile, up) -= mass;
-                *word_mut(mobile, down) += mass;
-                *word_mut(bed_delta, up) -= mass / (p.bulk_density * word(area, up));
-                *word_mut(bed_delta, down) += mass / (p.bulk_density * word(area, down));
-            });
-        }
-    }
-    for i in 0..n {
-        let moving = word(mass, i);
-        *word_mut(motion, 3 * i) = moving;
-        *word_mut(motion, 3 * i + 1) = word(vx, i);
-        *word_mut(motion, 3 * i + 2) = word(vz, i);
-        let stress = (moving * mass_to_shear).min(word(tau, i)) / p.grain_speed;
-        *word_mut(drag, 2 * i) = -stress * word(vx, i);
-        *word_mut(drag, 2 * i + 1) = -stress * word(vz, i);
-        *word_mut(budget, 1) += word(dust, i);
-        *word_mut(dust, i) /= word(area, i) * world_dt;
-    }
-}
+mod step;

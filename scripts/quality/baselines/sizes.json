@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21798144,
+  "total": 21802093,
   "history": [
     {
       "date": "2026-10-24",
@@ -15581,6 +15581,12 @@
       "commit": "materials-measured-library",
       "reason": "Measured materials library in @margoengine/materials/presets: metal(), dielectric(), surface(), materials, materialInfo() and the METALS, DIELECTRICS, SURFACES and SOURCES tables, 81 rows (20 metals with F0, n and k; 16 dielectrics with IOR and Abbe number; 45 surfaces with albedo, roughness range, IOR and samples) and 22 citations; 278 to 7,532 B gzip, ceiling 532 to 7,788. The bytes are the data and its citations, which are what a preset is; a split per kind would make materials.gold and materialInfo() load three entries, and copper, iron and brick now read the library rows. The materials root and core + stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "earth07-threaded-aeolian-transport",
+      "reason": "EARTH-07: the aeolian entry grows from 5000 to 8936 B gzip (ceiling 5256 to 9205) for coded input and derived-state checks, transactional publication and optional native participants with work receipts. A separate entry would duplicate the world bindings and accepted state layout. Each lazy native variant is 14,142 B raw and 5,947 B gzip. The Physics base and the existing entries using the optional phase pool stay within their ceilings. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16441,7 +16447,7 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 110158,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 907344,
     "@margoengine/physics/accretion": 5366,
-    "@margoengine/physics/aeolian": 5256,
+    "@margoengine/physics/aeolian": 9205,
     "@margoengine/physics/ageing": 4384,
     "@margoengine/physics/airborne": 11319,
     "@margoengine/physics/boundary-layer": 5769,

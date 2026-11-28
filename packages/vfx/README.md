@@ -1630,6 +1630,12 @@ snow.time = 3;
 engine.render({ delta: 0 });
 ```
 
+The fixed-camera TREE-5 test runs with `node packages/vfx/test/blown-sand-check.mjs` from the repository root. Add
+`--compat` to run the WebGL2 path. A finite travelling gust
+in the live boundary layer lifts a resolved load of powder from the crest. The same `TerrainBed` controls particle
+height and draws the changing snow cover. The test compares moving mass with the accepted transport grid, checks the
+closed mass ledger and lee deposition, and captures held and replayed frames on WebGPU and WebGL2. [Mott et al. (2010)](https://doi.org/10.5194/tc-4-545-2010)
+
 ### Cannon fire and burning hulls
 
 `@margoengine/vfx/gunfire` fires muzzle-loading cannon for sea battle films: the muzzle flash and its light, the white

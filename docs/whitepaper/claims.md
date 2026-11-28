@@ -6142,6 +6142,11 @@ ledger. At a uniform interior vertex it reproduces the implicit saltation balanc
 snow flux, including exposure stress. A spaced slope settles toward repose while preserving its volume. Tests
 reproduce the quantities and exact clock and snapshot hashes in `packages/physics/tests/coupling/aeolian.test.js`.
 `packages/vfx/test/blown-sand-check.mjs` compares the simulated ridge plume and a mesh-only frame on both backends.
+The `aeolian-workers.test.js` coupling test also compares accepted world snapshots and active bed, motion,
+stress and dust ports with one, two and four native participants over signed-cell shifts. The solver's work
+receipts count the number of actual f64x2 pairs and record the scalar tail. An independent sand-tunnel holdout
+in `packages/physics/scripts/earth07-creyssels-measured.mjs` shows a 13.4–32.1% low bias, with four of six runs
+outside their uncertainty bands. The measured comparison leaves field dune, ripple and snow validation open.
 
 ### Water-table and spring conservation (HYDRO-06)
 

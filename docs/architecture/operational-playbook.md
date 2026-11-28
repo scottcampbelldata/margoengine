@@ -11274,6 +11274,14 @@ snapshot determinism with both memory variants. `blown-sand-check.mjs` renders a
 and on the WebGL2 compatibility layer. ATMO-01 and ATMO-06 registry readers are covered by coupling fixtures until
 those solvers accept the physical fields. TREE-5 still needs a filmed-scene integration.
 
+The native phases now batch slope, forcing, local source exchange and diagnostic work. Each helper has its
+own stack and disjoint vertex partitions. The caller joins each phase and routes faces, hops and avalanches
+in one order. Coded input and native status failures leave the accepted arrays and ports untouched.
+`aeolian-workers.test.js` tests exact 1/2/4 participant replay with signed origins and paired work counts.
+`aeolian-workers.browser.mjs` starts actual isolated Chromium helpers from the bundled package assets.
+The ridge test uses accepted snow transport to drive production BlownSand and checks exact playback on
+each renderer. ATMO-06 receives mineral dust on its compatible grid. ATMO-01 stress feedback remains open.
+
 ### Groundwater evidence (HYDRO-06)
 
 The optional Rust SIMD groundwater kernel imports world memory in both modes. It has an empty static data

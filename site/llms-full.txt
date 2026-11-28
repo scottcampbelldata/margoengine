@@ -14799,10 +14799,25 @@ may be in flight for one base step. Other contributors sharing the bed need to c
 
 Open sides export saltating grains and closed sides retain them. The mass ledger reports mobile bed, airborne grains,
 dust and open-boundary export. Snow uses a seasonal threshold and optional exposure. Wind stress and dust use exported
-surface fields. Atmosphere feedback needs an ATMO-01 momentum sink and ATMO-06 dust receiver on the matching grid.
+surface fields. ATMO-06 can consume mineral dust on the matching grid. ATMO-01 does not yet return a wind response
+to the exported opposing stress. Snow emits no mineral dust.
 The rendering entry uses the current ground and transport field, and maps moving mass to opacity with `referenceMass`.
-The optional physics entry is 5,633 B min+gzip. Its separate plain and shared Wasm variants are each 8,172 B raw.
-The rendering entry, with its live transport route, is 11,061 B min+gzip.
+
+The sand closure has a fixed 1.5 m/s default grain speed, a one-grain restart when the initiation threshold is
+exceeded, and a configurable dust efficiency. The wind-tunnel comparison in
+`packages/physics/scripts/earth07-creyssels-measured.mjs` underpredicts all six independent collected fluxes by
+13.4–32.1%. Four runs remain outside the reported 5% measurement bands after wind uncertainty is propagated
+separately. Settled sand tunnel flux is the only measured comparison here. Near-threshold snow, changing
+cohesion, field dune migration and ripple wavelength still need measured validation.
+
+Use a finite grid and a positive interval that a native CFL substep count can represent. If the interval,
+initial mass, forcing or material values exceed numeric range, the solver reports a coded error before
+publishing a new state. Lower the step, coarsen the grid or reduce the out-of-range inputs as indicated.
+Signed origins translate wind sampling using the configured world cell size. Thread counts of 2 or 4
+include the caller and require shared world memory and a blocking agent. Use one participant in a browser window.
+The face, bed-hop and avalanche writes stay ordered, so native helpers cover the independent vertex stages.
+The optional aeolian entry is 8,936 B min+gzip. Each separate Wasm variant is 14,142 B raw and 5,947 B gzip.
+The shared helper script is 779 B gzip when loaded. The visual entry remains 11,061 B min+gzip.
 
 ### Groundwater and springs (HYDRO-06)
 

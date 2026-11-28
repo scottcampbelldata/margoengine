@@ -15386,8 +15386,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1527299,
-        "gzip": 988328
+        "raw": 1527319,
+        "gzip": 988337
       },
       "./decomposition": {
         "raw": 26988,
@@ -15638,8 +15638,8 @@
         "gzip": 5640
       },
       "./aeolian": {
-        "raw": 11986,
-        "gzip": 5000
+        "raw": 23132,
+        "gzip": 8936
       },
       "./groundwater": {
         "raw": 9310,
@@ -19259,14 +19259,14 @@
       "brotli": 849
     },
     "packages/physics/dist/aeolian-kernel.wasm": {
-      "raw": 8172,
-      "gzip": 3574,
-      "brotli": 3230
+      "raw": 14142,
+      "gzip": 5947,
+      "brotli": 5277
     },
     "packages/physics/dist/aeolian-kernel-shared.wasm": {
-      "raw": 8172,
-      "gzip": 3574,
-      "brotli": 3228
+      "raw": 14142,
+      "gzip": 5947,
+      "brotli": 5278
     },
     "packages/physics/dist/groundwater-kernel.wasm": {
       "raw": 11142,
@@ -19320,8 +19320,8 @@
     },
     "packages/physics/dist/solver-phase-thread.js": {
       "raw": 1587,
-      "gzip": 767,
-      "brotli": 667
+      "gzip": 766,
+      "brotli": 665
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,
@@ -20090,8 +20090,8 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 332988,
-        "gzip": 106970
+        "raw": 333008,
+        "gzip": 106982
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",

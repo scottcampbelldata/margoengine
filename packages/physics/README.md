@@ -7075,6 +7075,17 @@ cover or wet areas. Start with `mobileDepth` matching the loose layer above bedr
 for this solver have X increasing fastest. `motionField` yields `[kg/m², m/s, m/s]`; `dustField` yields kg/(m² s)
 and `windDragField` yields `[Pa on X, Pa on Z]`, all f64 layout 1. The optional `vfx/blown-sand` entry can use the
 same solver as its `transport`, with a ground sampler from `terrain.bed`.
+Wind locations use the provider's signed cell origin. Set the transport's `cellSize` to the world's value
+when it differs from the 4,096 m default. Invalid positions, inputs or native intervals report a coded
+error before accepted mass, bed change or diagnostic ports are replaced.
+
+`load({ threads: 2 })` and `load({ threads: 4 })` divide slope, forcing, saltation and diagnostic vertices
+with native helpers. The count includes the caller. They require `worldMemory(true)` in Node or a
+cross-origin-isolated browser worker. The default of one participant also works with plain memory and in
+a browser window. Use one threaded instance per world and call `dispose()` after its final step.
+`workCounts()` reports substeps and per-participant work and SIMD pairs from the most recent step this
+instance computed, or `undefined` before it computes a step. The work report is independent of snapshots.
+
 On a fine sand grid, set `ripples: { meanHop }` to include short splash hops that amplify a bed perturbation into an
 impact ripple. `meanHop` is the mean hop length in metres. The other ripple coefficients default to an incident
 cotangent of 4 and an ejection rate of `grainSpeed / 0.3` per second.

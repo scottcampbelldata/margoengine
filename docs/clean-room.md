@@ -16488,6 +16488,19 @@ The Rust implementation and the renderer integration were written from these equ
 renderer samples moving mass and grain velocity at the emitter and maps the mass to opacity as `m / (m + referenceMass)`.
 This opacity function is a visualization setting. Terrain and transported mass are advanced on the physics clock.
 
+- M. Creyssels, P. Dupont, A. Ould El Moctar, A. Valance, I. Cantat, J. T. Jenkins, J. M. Pasini and
+  K. R. Rasmussen (2009), [Saltating particles in a turbulent boundary layer: experiment and theory](https://doi.org/10.1017/S0022112008005491).
+  Section 2 and Table 1 give independently measured wind shear and grain diameter and density as inputs.
+  The outlet collector weighings are the holdout. The comparison retains the defaults for impact threshold,
+  grain speed and splash. The unreported inlet feed is represented by sampling a settled, homogeneous patch
+  of the working section. The test propagates the reported 5% wind and collector uncertainties separately.
+
+The worker implementation partitions independent terrain slopes, air stress, local grain exchange and
+publishable diagnostics. Rust f64x2 vectors evaluate disjoint wind and grain speed pairs and adapters keep the
+unpaired tail. Source reactions preserve the positive backward-Euler root, and the face, splash-hop and
+avalanching writes stay in the original order to preserve their donor limits. Empty Hilbert-sum samples past
+both grid edges are zero. Skipping that suffix leaves the low-hill stress unchanged.
+
 ### Groundwater and springs (HYDRO-06)
 
 - Lorenzo A. Richards, [Capillary conduction of liquids through porous mediums](https://doi.org/10.1063/1.1745010),
