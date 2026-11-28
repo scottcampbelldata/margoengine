@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { captureClearColor, clearColorValue, defaultClear } from '../packages/shared/clear-color.js';
-import { gpuDrawHarness } from './support/core-draw-gpu.js';
+import { glDrawHarness, gpuDrawHarness } from './support/core-draw-gpu.js';
 
 const decode = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
   grey = 128 / 255,
@@ -136,4 +136,44 @@ test("core's drawn clear of a partial view writes the linear colour on a linear 
   assert.equal(writes.length, 4, JSON.stringify(writes));
   close(writes[2], defaultClear.map(Math.fround), 'unset: canvas');
   close(writes[3], linearDefault.map(Math.fround), 'unset: capture');
+});
+
+// KB-BIOMES-BLACKSKY1: a background that is not a string (an [r, g, b] array, a number, a colour object) drew core's
+// near-black clear colour with no error, so a page that set one saw a black sky.
+test('a clear colour that is not a #rgb or #rrggbb string is refused, not drawn as the default', (t) => {
+  const refused = [[0.42, 0.55, 0.75], 0x6b8cbf, 0, true, { r: 0.4, g: 0.5, b: 0.7 }, 'blue', ''];
+  for (const bad of refused) {
+    for (const capture of [undefined, 'rgba16float'])
+      assert.throws(() => captureClearColor(bad, capture), RangeError, JSON.stringify(bad));
+    assert.throws(() => clearColorValue(bad), RangeError, JSON.stringify(bad));
+  }
+  for (const unset of [undefined, null, false]) assert.equal(clearColorValue(unset), defaultClear, String(unset));
+  const h = gpuDrawHarness(t);
+  for (const bad of refused)
+    for (const index of [0, 1]) {
+      const view = (c) => ({ ...full(c), index, count: 2, clear: { color: bad } });
+      assert.throws(
+        () =>
+          h.frame((draw, c) => {
+            c.view = view(c);
+            draw();
+          }),
+        RangeError,
+        `view ${index}: ${JSON.stringify(bad)}`,
+      );
+    }
+  // The WebGL2 preview renderer takes the same values, and keeps its own colour for an unset one.
+  const preview = glDrawHarness(t),
+    colours = [],
+    clear = (color) =>
+      preview.frame((draw, c) => {
+        c.view = { ...full(c), clear: { color } };
+        draw();
+      });
+  preview.gl.clearColor = (...rgba) => colours.push(rgba);
+  for (const bad of refused) assert.throws(() => clear(bad), RangeError, `preview: ${JSON.stringify(bad)}`);
+  clear('#808080');
+  assert.deepEqual(colours.at(-1), bytes, 'preview: a hex colour');
+  clear(undefined);
+  assert.deepEqual(colours.at(-1), defaultClear, 'preview: unset');
 });

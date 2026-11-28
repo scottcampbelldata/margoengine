@@ -96,11 +96,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/procedural/test/foliage.test.js` "the sedge is a short tuft of narrow leaves and the lichen
   a low cushion (KB-TUNDRA-GRASS1)" and `packages/biomes/tests/placement.test.js` (the tundra preset's detail meshes).
 
-### Open 2026-11-28: a plain BiomeView page showed a black sky with `scene.background` set (KB-BIOMES-BLACKSKY1; biomes or the page)
+### Fixed 2026-11-28: a background that is not a colour string drew a near-black sky with no error (KB-BIOMES-BLACKSKY1; core)
 
 - **Repro:** a page that sets `engine.scene.background = [0.42, 0.55, 0.75]`, then `BiomeView.attach` on the tundra preset
-  world with `radius: 600`, camera 2 m over the ground looking at the horizon: the sky draws near black.
-- **Cause:** not traced (the page or the engine is not yet known).
+  world with `radius: 600`, camera 2 m over the ground looking at the horizon: the sky drew near black (5,6,9). The same
+  page with `'#6b8cbf'` draws that blue, so the biomes had no part in it.
+- **Cause:** a background is a `#rgb` or `#rrggbb` string. Core read any other value as no colour
+  (`packages/core/src/renderer.ts` passed only strings on, and `packages/shared/clear-color.js` took every non-string
+  as unset), so it cleared to its own near-black colour. The type refuses an array; plain JavaScript got no message.
+- **Fix:** only undefined, null and false are unset. Every other value reaches the colour check and throws
+  `RangeError: Invalid color; use #rrggbb` at the next render, as a malformed string already did; the WebGL2 preview
+  renderer does the same. Core + stage stays at 25,149 B gzip (raw 61,864 to 61,848).
+- **Test:** `tests/clear-capture.test.js`.
 
 ### Fixed 2026-11-28: terrain ground with `bump` drew as black and white speckle near the camera (KB-TUNDRA-GROUNDNOISE1; terrain)
 

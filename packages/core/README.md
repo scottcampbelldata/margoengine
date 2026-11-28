@@ -146,7 +146,8 @@ const hit = await engine.pick(400, 300);           // CSS pixel; picks through t
 - Scenes: `engine.createScene()` makes a scene with its own meshes (`scene.createMesh()`), lighting, `background` and
   plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is
   drawn or set up, `engine.lighting`, `plugins`, `stats` and `createMesh` are that scene's. `scene.dispose()` removes it.
-  A `background` is an sRGB colour (`#rgb` or `#rrggbb`). The canvas shows it as given. Under a post effect that
+  A `background` is an sRGB colour (`#rgb` or `#rrggbb`); any other value, such as an `[r, g, b]` array or a number,
+  makes the next render throw a `RangeError`. The canvas shows it as given. Under a post effect that
   captures the scene in linear light (tone mapping, bloom) it is light in the scene, tone-mapped with the meshes:
   `#808080` shows as 116 under the default tone map.
   With no `background` core clears to its own dark colour (5,6,9 on the canvas), which takes the same path: 0,1,4

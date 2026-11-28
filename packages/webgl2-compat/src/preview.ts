@@ -267,7 +267,9 @@ export class GLRenderer implements Renderer {
         started = true;
         const named = context.view?.clear?.color,
           clearColor = options.clear ?? (named === false ? false : typeof named === 'string' || !context.view?.index),
-          clearDepth = options.clearDepth ?? context.view?.clear?.depth ?? options.clear ?? true;
+          clearDepth = options.clearDepth ?? context.view?.clear?.depth ?? options.clear ?? true,
+          // The preview's own colour when the view names none; clearColorValue refuses what is not a hex string.
+          tint = named == null || named === false ? this.clear : clearColorValue(named);
         if (viewport) gl.viewport(viewport[0], height - viewport[1] - viewport[3], viewport[2], viewport[3]);
         else gl.viewport(0, 0, width, height);
         // Clear only the rectangle. WebGL clear ignores the viewport, so the scissor has to be on first.
@@ -277,10 +279,7 @@ export class GLRenderer implements Renderer {
         } else gl.disable(gl.SCISSOR_TEST);
         gl.enable(gl.DEPTH_TEST);
         gl.disable(gl.CULL_FACE);
-        if (clearColor)
-          gl.clearColor(
-            ...((typeof named === 'string' ? clearColorValue(named) : this.clear) as [number, number, number, number]),
-          );
+        if (clearColor) gl.clearColor(...(tint as [number, number, number, number]));
         if (clearColor || clearDepth)
           gl.clear((clearColor ? gl.COLOR_BUFFER_BIT : 0) | (clearDepth ? gl.DEPTH_BUFFER_BIT : 0));
         gl.useProgram(this.program);

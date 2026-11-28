@@ -10,10 +10,11 @@ export const hexColor = (color) =>
 
 /**
  * The clear value of a `#rgb` or `#rrggbb` colour for a display-encoded target (the canvas, a preview, a tile): its
- * sRGB bytes as given, or core's clear colour for any other value.
+ * sRGB bytes as given, or core's clear colour when unset (undefined, null or false). Any other value throws a
+ * RangeError: an `[r, g, b]` array or a number drew core's near-black colour with no error (KB-BIOMES-BLACKSKY1).
  */
 export function clearColorValue(color) {
-  if (typeof color !== 'string') return defaultClear;
+  if (color == null || color === false) return defaultClear;
   const n = hexColor(color);
   if (n < 0) throw new RangeError('Invalid color; use #rrggbb');
   return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
@@ -32,8 +33,8 @@ const byte = (v) => v / 255,
  * decoded with the sRGB transfer function (IEC 61966-2-1): a float format (a post effect's HDR capture), which the
  * display transform encodes later, and an `-srgb` format, whose clear value the device encodes on store (WebGPU,
  * GPURenderPassColorAttachment clearValue). Any other capture, and no capture (false or undefined: the frame's own
- * target, the canvas or a view's target), takes the bytes as given. Core's own clear colour (any other value of
- * `color`) takes the same path: display values as given, decoded for a linear capture, so an unset background shows as
+ * target, the canvas or a view's target), takes the bytes as given. Core's own clear colour (`color` unset) takes the
+ * same path: display values as given, decoded for a linear capture, so an unset background shows as
  * a background of the same colour does (KB-CLEAR-DEFAULT1; before, it was the same numbers on every target, 5,6,9 on
  * the canvas and 7,20,38 under a tone map). Before KB-CLEAR-CAPTURE1 every target took the bytes, so a linear capture
  * encoded them twice (#808080 drew 181 under a tone map). A function of its own, so a bundle that never clears a
@@ -41,7 +42,7 @@ const byte = (v) => v / 255,
  */
 export function captureClearColor(color, capture) {
   const f = linear.test(capture) ? toLinear : byte;
-  if (typeof color !== 'string') return f === byte ? defaultClear : linearClear;
+  if (color == null || color === false) return f === byte ? defaultClear : linearClear;
   const n = hexColor(color);
   if (n < 0) throw new RangeError('Invalid color; use #rrggbb');
   return [f(n >> 16), f((n >> 8) & 255), f(n & 255), 1];

@@ -11922,3 +11922,11 @@ reads the layer's 128-texel mip with a cubic B-spline over exact texel loads bel
 Evidence: `packages/terrain/test/bump.browser.mjs` on an RTX A6000, WebGPU and the WebGL2 layer; the shader variants
 (tint, floating origin) by `packages/terrain/test/surface.test.js`. Missing: no run on a mobile or integrated GPU, and
 no timing of the extra texel loads (build phase).
+
+## A clear colour is a string or unset (KB-BIOMES-BLACKSKY1, section 5 evidence, 2026-11-28)
+
+Both backends: core's WebGPU renderer and the WebGL2 preview renderer treat only undefined, null and false as no clear
+colour; every other value reaches the colour check and throws a RangeError at the next render. Before, an `[r, g, b]`
+background cleared to core's near-black colour with no error. Evidence: `tests/clear-capture.test.js` (attachment and
+drawn clears, first and later views, the preview renderer); `packages/post/test/scene-background-browser.mjs` on WebGPU
+and the WebGL2 layer (RTX A6000). Core + stage 25,149 B gzip before and after. Missing: other GPUs and browsers.
