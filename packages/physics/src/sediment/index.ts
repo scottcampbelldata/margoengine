@@ -349,6 +349,7 @@ export class SedimentTransport implements Solver<SedimentParams> {
       solver.pool = await createNativePhasePool(threads, {
         subject: 'Sediment',
         phaseExport: 'sediment_thread_phase',
+        phase: 'transport',
         signal,
       });
     }

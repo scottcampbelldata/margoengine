@@ -268,6 +268,7 @@ export class BoundaryLayerSolver implements Solver<BoundaryLayerOptions>, Wind {
       solver.pool = await createNativePhasePool(threads, {
         subject: 'Boundary-layer wind',
         phaseExport: 'boundary_layer_thread_phase',
+        phase: 'sampling',
         signal,
       });
     }

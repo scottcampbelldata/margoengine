@@ -305,6 +305,7 @@ export class LightningSolver implements Solver<LightningParams> {
       solver.threads = await createNativePhasePool(threads, {
         subject: 'Lightning',
         phaseExport: 'lightning_thread_phase',
+        phase: 'relaxation',
         signal,
       });
     }

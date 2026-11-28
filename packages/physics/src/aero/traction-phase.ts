@@ -144,6 +144,7 @@ export class WindTractionPhase {
     const pool = await createNativePhasePool(threads, {
       subject: 'Wind traction',
       phaseExport: 'wind_traction_thread_phase',
+      phase: 'surface load',
       signal,
     });
     try {

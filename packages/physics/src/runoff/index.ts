@@ -365,6 +365,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       solver.threads = await createNativePhasePool(threads, {
         subject: 'Runoff',
         phaseExport: 'runoff_thread_phase',
+        phase: 'soil',
         signal: options.signal,
       });
     }

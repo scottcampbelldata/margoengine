@@ -409,6 +409,7 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       solver.pool = await createNativePhasePool(threads, {
         subject: 'Drainage fog',
         phaseExport: 'fog_thread_phase',
+        phase: 'moist-air column',
         signal,
       });
     }

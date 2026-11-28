@@ -101,6 +101,7 @@ export async function loadOutdoorKernel({
     pool = await createNativePhasePool(threads, {
       subject: 'Outdoor sound',
       phaseExport: 'outdoor_sound_thread_phase',
+      phase: 'path quadrature',
       signal,
     });
     pool.init({

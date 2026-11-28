@@ -371,6 +371,7 @@ export class AeolianTransport implements Solver<AeolianParams> {
       solver.pool = await createNativePhasePool(threads, {
         subject: 'Aeolian',
         phaseExport: 'aeolian_thread_phase',
+        phase: 'saltation',
         signal,
       });
     }

@@ -114,6 +114,7 @@ export class AirbornePhase {
     const pool = await createNativePhasePool(threads, {
       subject: 'Airborne',
       phaseExport: 'airborne_thread_phase',
+      phase: 'parcel',
       signal,
     });
     return new AirbornePhase(plain, shared, pool);

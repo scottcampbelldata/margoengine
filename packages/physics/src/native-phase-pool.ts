@@ -4,28 +4,58 @@ import { canShareMemory, isShared } from './world/memory.js';
 /** Offsets in the shared i32 control region. Status has one word per worker, in partition order. */
 export const NATIVE_PHASE_CONTROL = { generation: 0, stage: 1, ready: 2, done: 3, fault: 4, status: 5 } as const;
 
+// Each solver names its own phase label here and passes it to createNativePhasePool, so an entry carries only its
+// own label; a shared label table made every pool user pay for every other solver's.
 type NativePhaseSolver =
-  | { readonly subject: 'Tsunami'; readonly phaseExport: 'tsunami_thread_phase' }
-  | { readonly subject: 'Lightning'; readonly phaseExport: 'lightning_thread_phase' }
-  | { readonly subject: 'Lava'; readonly phaseExport: 'lava_thread_phase' }
-  | { readonly subject: 'Viscoplastic'; readonly phaseExport: 'viscoplastic_thread_phase' }
-  | { readonly subject: 'Underwater'; readonly phaseExport: 'underwater_thread_phase' }
-  | { readonly subject: 'Orbit'; readonly phaseExport: 'orbit_thread_phase' }
-  | { readonly subject: 'Runoff'; readonly phaseExport: 'runoff_thread_phase' }
-  | { readonly subject: 'Landscape'; readonly phaseExport: 'landscape_thread_phase' }
-  | { readonly subject: 'Sediment'; readonly phaseExport: 'sediment_thread_phase' }
-  | { readonly subject: 'Boundary-layer wind'; readonly phaseExport: 'boundary_layer_thread_phase' }
-  | { readonly subject: 'Cloud projection'; readonly phaseExport: 'cloud_projection_thread_phase' }
-  | { readonly subject: 'Airborne'; readonly phaseExport: 'airborne_thread_phase' }
-  | { readonly subject: 'Swimmer'; readonly phaseExport: 'swim_thread_phase' }
-  | { readonly subject: 'Plant sway'; readonly phaseExport: 'vegetation_thread_phase' }
-  | { readonly subject: 'Wind traction'; readonly phaseExport: 'wind_traction_thread_phase' }
-  | { readonly subject: 'Drainage fog'; readonly phaseExport: 'fog_thread_phase' }
-  | { readonly subject: 'Aeolian'; readonly phaseExport: 'aeolian_thread_phase' }
-  | { readonly subject: 'Rail wire'; readonly phaseExport: 'rail_wire_thread_phase' }
-  | { readonly subject: 'Room acoustics'; readonly phaseExport: 'acoustic_wave_thread_phase' }
-  | { readonly subject: 'Wing lattice'; readonly phaseExport: 'flight_lattice_thread_phase' }
-  | { readonly subject: 'Outdoor sound'; readonly phaseExport: 'outdoor_sound_thread_phase' };
+  | { readonly subject: 'Tsunami'; readonly phaseExport: 'tsunami_thread_phase'; readonly phase: 'flux' }
+  | { readonly subject: 'Lightning'; readonly phaseExport: 'lightning_thread_phase'; readonly phase: 'relaxation' }
+  | { readonly subject: 'Lava'; readonly phaseExport: 'lava_thread_phase'; readonly phase: 'native' }
+  | { readonly subject: 'Viscoplastic'; readonly phaseExport: 'viscoplastic_thread_phase'; readonly phase: 'transfer' }
+  | { readonly subject: 'Underwater'; readonly phaseExport: 'underwater_thread_phase'; readonly phase: 'ray trace' }
+  | { readonly subject: 'Orbit'; readonly phaseExport: 'orbit_thread_phase'; readonly phase: 'gravity' }
+  | { readonly subject: 'Runoff'; readonly phaseExport: 'runoff_thread_phase'; readonly phase: 'soil' }
+  | { readonly subject: 'Landscape'; readonly phaseExport: 'landscape_thread_phase'; readonly phase: 'terrain' }
+  | { readonly subject: 'Sediment'; readonly phaseExport: 'sediment_thread_phase'; readonly phase: 'transport' }
+  | {
+      readonly subject: 'Boundary-layer wind';
+      readonly phaseExport: 'boundary_layer_thread_phase';
+      readonly phase: 'sampling';
+    }
+  | {
+      readonly subject: 'Cloud projection';
+      readonly phaseExport: 'cloud_projection_thread_phase';
+      readonly phase: 'matrix';
+    }
+  | { readonly subject: 'Airborne'; readonly phaseExport: 'airborne_thread_phase'; readonly phase: 'parcel' }
+  | { readonly subject: 'Swimmer'; readonly phaseExport: 'swim_thread_phase'; readonly phase: 'hydrodynamic' }
+  | {
+      readonly subject: 'Plant sway';
+      readonly phaseExport: 'vegetation_thread_phase';
+      readonly phase: 'modal response';
+    }
+  | {
+      readonly subject: 'Wind traction';
+      readonly phaseExport: 'wind_traction_thread_phase';
+      readonly phase: 'surface load';
+    }
+  | { readonly subject: 'Drainage fog'; readonly phaseExport: 'fog_thread_phase'; readonly phase: 'moist-air column' }
+  | { readonly subject: 'Aeolian'; readonly phaseExport: 'aeolian_thread_phase'; readonly phase: 'saltation' }
+  | { readonly subject: 'Rail wire'; readonly phaseExport: 'rail_wire_thread_phase'; readonly phase: 'catenary' }
+  | {
+      readonly subject: 'Room acoustics';
+      readonly phaseExport: 'acoustic_wave_thread_phase';
+      readonly phase: 'pressure stencil';
+    }
+  | {
+      readonly subject: 'Wing lattice';
+      readonly phaseExport: 'flight_lattice_thread_phase';
+      readonly phase: 'matrix and wake';
+    }
+  | {
+      readonly subject: 'Outdoor sound';
+      readonly phaseExport: 'outdoor_sound_thread_phase';
+      readonly phase: 'path quadrature';
+    };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 
@@ -58,29 +88,6 @@ interface ThreadWorker {
 // Deadlines bound transport failures. Once a phase joins, its numerical result has no wall-clock input.
 const DEADLINE_MS = 10_000;
 const slots = NATIVE_PHASE_CONTROL;
-const phaseLabel = {
-  Tsunami: 'flux',
-  Lightning: 'relaxation',
-  Lava: 'native',
-  Viscoplastic: 'transfer',
-  Underwater: 'ray trace',
-  Orbit: 'gravity',
-  Runoff: 'soil',
-  Landscape: 'terrain',
-  Sediment: 'transport',
-  'Boundary-layer wind': 'sampling',
-  'Cloud projection': 'matrix',
-  Airborne: 'parcel',
-  Swimmer: 'hydrodynamic',
-  'Plant sway': 'modal response',
-  'Wind traction': 'surface load',
-  'Drainage fog': 'moist-air column',
-  Aeolian: 'saltation',
-  'Rail wire': 'catenary',
-  'Room acoustics': 'pressure stencil',
-  'Wing lattice': 'matrix and wake',
-  'Outdoor sound': 'path quadrature',
-} as const;
 
 function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {
   return Object.assign(
@@ -241,8 +248,7 @@ export class NativePhasePool {
 
   /** Run native parts concurrently and return a native status in canonical part order. */
   phase(stage: number, leader: () => number): number {
-    const { subject } = this.solver;
-    const phase = phaseLabel[subject];
+    const { subject, phase } = this.solver;
     if (this.closed || !this.binding)
       throw new MargoError(
         'state',

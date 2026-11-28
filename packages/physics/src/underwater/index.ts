@@ -181,6 +181,7 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
       solver.#pool = await createNativePhasePool(threads, {
         subject: 'Underwater',
         phaseExport: 'underwater_thread_phase',
+        phase: 'ray trace',
         signal,
       });
     }

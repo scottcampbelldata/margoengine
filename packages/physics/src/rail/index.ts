@@ -209,6 +209,7 @@ export class RailSolver implements Solver<RailSolverParams> {
       solver.pool = await createNativePhasePool(solver.threads, {
         subject: 'Rail wire',
         phaseExport: 'rail_wire_thread_phase',
+        phase: 'catenary',
         signal,
       });
     }

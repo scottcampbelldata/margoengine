@@ -251,6 +251,7 @@ export class OrbitSolver implements Solver<OrbitOptions> {
       solver.#pool = await createNativePhasePool(threads, {
         subject: 'Orbit',
         phaseExport: 'orbit_thread_phase',
+        phase: 'gravity',
         signal,
       });
     }

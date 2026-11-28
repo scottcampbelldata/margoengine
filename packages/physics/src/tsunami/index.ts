@@ -346,6 +346,7 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
       solver.threads = await createNativePhasePool(threads, {
         subject: 'Tsunami',
         phaseExport: 'tsunami_thread_phase',
+        phase: 'flux',
         signal,
       });
     }

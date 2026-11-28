@@ -110,6 +110,7 @@ export class CloudProjection {
     const pool = await createNativePhasePool(threads, {
       subject: 'Cloud projection',
       phaseExport: 'cloud_projection_thread_phase',
+      phase: 'matrix',
       signal,
     });
     return new CloudProjection(plain, shared, pool);

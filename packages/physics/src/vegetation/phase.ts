@@ -107,6 +107,7 @@ export class PlantSwayPhase {
     const pool = await createNativePhasePool(threads, {
       subject: 'Plant sway',
       phaseExport: 'vegetation_thread_phase',
+      phase: 'modal response',
       signal,
     });
     return new PlantSwayPhase(plain, shared, pool);

@@ -93,7 +93,12 @@ export async function loadSwimKernel(signal?: AbortSignal, threads = 1): Promise
   ]);
   if (threads === 1) return { plain, shared };
   const { createNativePhasePool } = await import('../native-phase-pool.js');
-  const pool = await createNativePhasePool(threads, { subject: 'Swimmer', phaseExport: 'swim_thread_phase', signal });
+  const pool = await createNativePhasePool(threads, {
+    subject: 'Swimmer',
+    phaseExport: 'swim_thread_phase',
+    phase: 'hydrodynamic',
+    signal,
+  });
   return { plain, shared, pool };
 }
 

@@ -368,6 +368,7 @@ export class LavaSolver implements Solver<LavaOptions> {
       solver.threads = await createNativePhasePool(threads, {
         subject: 'Lava',
         phaseExport: 'lava_thread_phase',
+        phase: 'native',
         signal,
       });
     }

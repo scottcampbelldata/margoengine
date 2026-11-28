@@ -308,6 +308,7 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
       solver.threads = await createNativePhasePool(threads, {
         subject: 'Viscoplastic',
         phaseExport: 'viscoplastic_thread_phase',
+        phase: 'transfer',
         signal: options.signal,
       });
     }

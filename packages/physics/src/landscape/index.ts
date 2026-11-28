@@ -385,6 +385,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       solver.threads = await createNativePhasePool(threads, {
         subject: 'Landscape',
         phaseExport: 'landscape_thread_phase',
+        phase: 'terrain',
         signal,
       });
     }

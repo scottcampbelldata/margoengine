@@ -140,6 +140,7 @@ export async function loadWingLattice({
     pool = await createNativePhasePool(threads, {
       subject: 'Wing lattice',
       phaseExport: 'flight_lattice_thread_phase',
+      phase: 'matrix and wake',
       signal,
     });
     pool.init({

@@ -203,6 +203,7 @@ export class RoomSoundSolver implements Solver<RoomSoundParams> {
       solver.#pool = await createNativePhasePool(threads, {
         subject: 'Room acoustics',
         phaseExport: 'acoustic_wave_thread_phase',
+        phase: 'pressure stencil',
         signal,
       });
     }
