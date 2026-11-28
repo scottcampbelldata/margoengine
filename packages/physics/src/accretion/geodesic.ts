@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import { cos, exp, ln, pow, sin } from '@margoengine/math/pinned';
 import {
   isRateLevel,
@@ -12,12 +11,14 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/index.js';
+import { accretionError } from './errors.js';
 
 const G = 6.6743e-11;
 const C = 299_792_458;
 const LAYOUT = 1;
 const WORD = Float64Array.BYTES_PER_ELEMENT;
 const EQUATOR = Math.PI / 2;
+const MAX_GEODESIC_SUBSTEPS = 1 << 14;
 
 type Six = readonly [number, number, number, number, number, number];
 
@@ -112,12 +113,12 @@ interface OrbitState {
 }
 
 function spinValue(spin: number): number {
-  if (!(Math.abs(spin) <= 1)) throw new RangeError('Use a dimensionless Kerr spin from -1 through 1.');
+  if (!(Math.abs(spin) <= 1)) throw accretionError('Use a dimensionless Kerr spin from -1 through 1.');
   return spin;
 }
 
 function direction(value: number): number {
-  if (value !== -1 && value !== 1) throw new RangeError('Use +1 or -1 for an orbit direction.');
+  if (value !== -1 && value !== 1) throw accretionError('Use +1 or -1 for an orbit direction.');
   return value;
 }
 
@@ -130,13 +131,13 @@ export function kerrCircularOrbit(radius: number, spin = 0, sense: -1 | 1 = 1): 
   spinValue(spin);
   direction(sense);
   if (!(radius > horizon(spin) && Number.isFinite(radius)))
-    throw new RangeError('Choose a finite orbit outside the horizon.');
+    throw accretionError('Choose a finite orbit outside the horizon.');
   const root = Math.sqrt(radius);
   const r32 = radius * root;
   const a = sense * spin;
   const radicand = r32 - 3 * root + 2 * a;
   if (!(radicand > 0 && Number.isFinite(r32 * radicand)))
-    throw new RangeError('Choose a radius outside the equatorial photon orbit and within numeric range.');
+    throw accretionError('Choose a radius outside the equatorial photon orbit and within numeric range.');
   const scale = Math.sqrt(r32 * radicand);
   return {
     energy: (r32 - 2 * root + a) / scale,
@@ -160,11 +161,11 @@ function metric(params: KerrGeodesicParams): Metric {
   const spin = spinValue(params.spin ?? 0);
   const { centralMass, energy, axialAngularMomentum: momentum, carterConstant: q = 0, tracer = 'massive' } = params;
   if (tracer !== 'massive' && tracer !== 'light')
-    throw new RangeError('Use a massive or light tracer for the Kerr orbit.');
+    throw accretionError('Use a massive or light tracer for the Kerr orbit.');
   const rUnit = (G / (C * C)) * centralMass;
   const tUnit = rUnit / C;
   if (!(tUnit > 0 && Number.isFinite(rUnit) && Number.isFinite(energy * energy + momentum * momentum + Math.abs(q))))
-    throw new RangeError('Use a positive central mass and finite geometrized constants for the geodesic.');
+    throw accretionError('Use a positive central mass and finite geometrized constants for the geodesic.');
   const outer = horizon(spin);
   return {
     spin,
@@ -189,7 +190,7 @@ function roots(m: Metric, radius: number, theta: number): readonly [number, numb
   const sine = sin(theta);
   const cosine = theta === EQUATOR ? 0 : cos(theta);
   if (m.momentum !== 0 && sine === 0)
-    throw new RangeError('Choose a starting angle away from the axis when axial angular momentum is nonzero.');
+    throw accretionError('Choose a starting angle away from the axis when axial angular momentum is nonzero.');
   const radialFirst = p * p;
   const radialSecond = delta * (m.mass2 * r2 + m.k * m.k + m.q);
   const azimuth = m.momentum === 0 ? 0 : m.momentum / sine;
@@ -201,7 +202,7 @@ function rootDifference(a: number, b: number): number {
   const square = a - b;
   const noise = 16 * Number.EPSILON * (Math.abs(a) + Math.abs(b));
   if (!(square >= -noise && Number.isFinite(noise)))
-    throw new RangeError(
+    throw accretionError(
       'The starting point is outside the allowed Kerr potential. Set compatible energy and angular momentum.',
     );
   return square <= noise ? 0 : Math.sqrt(square);
@@ -222,7 +223,7 @@ function derivative(m: Metric, s: Six): Six {
   // Delta * dt/dlambda and its reciprocal factors. The log-radius removes the remaining horizon denominator.
   const time = (r2 + a * a) * p + a * (m.momentum - a * m.energy * sine2) * delta;
   if (!(time > 0 && Number.isFinite(time)))
-    throw new RangeError('Choose a future-directed orbit within the exterior coordinate range.');
+    throw accretionError('Choose a future-directed orbit within the exterior coordinate range.');
   const lapse = delta / time;
   const radial = 2 * r * m.energy * p - (r - 1) * (m.mass2 * r2 + m.k * m.k + m.q) - delta * m.mass2 * r;
   const polar =
@@ -259,7 +260,7 @@ function write(s: OrbitState, integrated: Six): void {
   const radius = (m.outer + offset) * m.rUnit;
   const proper = integrated[5] * m.tUnit;
   if (!integrated.every(Number.isFinite) || !Number.isFinite(radius + proper))
-    throw new RangeError(
+    throw accretionError(
       'The Kerr orbit exceeded its numeric range. Use a shorter step or consider intermediate initial data.',
     );
   words(s, s.integrated).set(integrated);
@@ -277,7 +278,7 @@ export class KerrGeodesicSolver implements Solver<KerrGeodesicParams> {
 
   constructor({ id = 'kerrGeodesic', rate = 0, maxPhaseStep = 1 / 32 }: KerrGeodesicOptions = {}) {
     if (!id || !isRateLevel(rate) || !(maxPhaseStep > 0 && Number.isFinite(maxPhaseStep)))
-      throw new RangeError('Use a nonempty Kerr id, a valid rate level and a positive finite phase increment.');
+      throw accretionError('Use a nonempty Kerr id, a valid rate level and a positive finite phase increment.');
     this.id = id;
     this.#rate = rate;
     this.#maxPhase = maxPhaseStep;
@@ -300,11 +301,11 @@ export class KerrGeodesicSolver implements Solver<KerrGeodesicParams> {
   }
 
   init(host: SolverHost, params: KerrGeodesicParams): void {
-    if (this.#state) throw new MargoError('state', 'Create a new Kerr geodesic solver for a second world.');
+    if (this.#state) throw accretionError('Create a new Kerr geodesic solver for a second world.', 'attached');
     const m = metric(params);
     const { radius, polarAngle = EQUATOR, azimuth = 0, radialDirection = -1, polarDirection = 1 } = params;
     if (!(radius > m.outer && Number.isFinite(radius + Math.abs(polarAngle) + Math.abs(azimuth))))
-      throw new RangeError('Start at a finite exterior radius and provide finite polar and azimuth angles.');
+      throw accretionError('Start at a finite exterior radius and provide finite polar and azimuth angles.');
     const [radial, polar] = roots(m, radius, polarAngle);
     const initial: Six = [
       ln(radius - m.outer),
@@ -327,6 +328,7 @@ export class KerrGeodesicSolver implements Solver<KerrGeodesicParams> {
 
   step(_context: StepContext, dt: number): void {
     const s = this.#live();
+    if (!(dt >= 0 && Number.isFinite(dt))) throw accretionError('Pass a finite, nonnegative Kerr step duration.');
     let state = Array.from(words(s, s.integrated)) as unknown as Six;
     const m = s.metric;
     const at = derivative(m, state);
@@ -335,9 +337,11 @@ export class KerrGeodesicSolver implements Solver<KerrGeodesicParams> {
     const seconds = dt / m.tUnit;
     let divisions = 1;
     while ((seconds / divisions) * phaseRate > this.#maxPhase) {
+      if (divisions === MAX_GEODESIC_SUBSTEPS)
+        throw accretionError(
+          'This observer step cannot resolve the orbit. Shorten the step or use a faster world rate.',
+        );
       divisions *= 2;
-      if (!Number.isSafeInteger(divisions))
-        throw new RangeError('This observer step cannot resolve the orbit. Increase mass or use a faster world rate.');
     }
     const step = seconds / divisions;
     for (let piece = 0; piece < divisions; piece++) state = rk4(m, state, step);
@@ -352,7 +356,7 @@ export class KerrGeodesicSolver implements Solver<KerrGeodesicParams> {
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.#live();
-    return [{ field: this.coordinatesField.name, region: s.coordinates, tick, cell: [0, 0, 0] }];
+    return [{ field: this.coordinatesField.name, region: s.coordinates, tick, cell: s.host.cell }];
   }
 
   importPorts(): void {}
@@ -367,8 +371,7 @@ export class KerrGeodesicSolver implements Solver<KerrGeodesicParams> {
   }
 
   #live(): OrbitState {
-    if (!this.#state)
-      throw new MargoError('state', 'Add the Kerr geodesic solver to a PhysicsWorld before reading it.');
+    if (!this.#state) throw accretionError('Add the Kerr geodesic solver to a PhysicsWorld before reading it.');
     return this.#state;
   }
 }

@@ -5,6 +5,7 @@ export {
   type AccretionDiskBudget,
   type AccretionRing,
 } from './disk.js';
+export { type AccretionWorkCounts, type AccretionWorkerWork } from './kernel.js';
 export {
   kerrCircularOrbit,
   kerrIsco,

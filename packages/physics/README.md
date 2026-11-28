@@ -8717,12 +8717,12 @@ edge defaults to zero torque and accretes gas. The outer edge defaults to sealed
 `ring(i)` reads its inward mass flow, orbital phase and one-face radiation flux. `budget()` reports kilograms
 and the total luminosity in watts. An optional external field can add a layout-1 f64 feed, in kg/s.
 
-```js
+```ts
 import { AccretionDiskSolver, KerrGeodesicSolver, kerrCircularOrbit } from '@margoengine/physics/accretion';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
 const centralMass = 2e35;
-const disk = await AccretionDiskSolver.load();
+using disk = await AccretionDiskSolver.load();
 const tracer = new KerrGeodesicSolver();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
   .add(disk, {
@@ -8740,7 +8740,17 @@ The disk uses Newtonian rotation and a prescribed viscosity. The independent rel
 exterior observer time. It supports Kerr, Schwarzschild, inclined and eccentric trajectories and `tracer: 'light'`
 for null geodesics. Its input radii use `GM/c²`. Output distances and proper time use metres and seconds. The
 options default to 60 physics updates per second and an RK4 phase increment of 1/32 at the start of each tick.
-The disk publishes density, heating and orbital phase in increasing radial order.
+Shorten the step or increase the world rate if it would require more than 16,384 subdivisions.
+
+The disk publishes density, heating and orbital phase in increasing radial order with the solver's signed cell.
+The values use absolute radial units. A world-origin shift leaves disk radii and exterior coordinates unchanged.
+An external feed may come from the world or the aligned f64 region in the memory named by its port. Invalid supply
+or a rejected trial leaves all published fields and the accepted budget unchanged.
+
+`load({ threads: 1 })` defaults to one native participant. Use two or four with shared world memory in Node or
+an isolated browser worker. The disk keeps viscous transport and its budget reductions in radial order and
+splits the independent density, phase and heating publication into SIMD-aligned ranges. `readNativeWork()`
+reports the accepted annuli and paired rows. Stop advancing the world before disposing the disk.
 
 ## Synoptic weather, fronts and mountain precipitation
 

@@ -1,8 +1,5 @@
-import { MargoError } from '@margoengine/math/errors';
 import {
-  canShareMemory,
   isRateLevel,
-  isShared,
   regionWords,
   type FieldDescriptor,
   type FieldUse,
@@ -17,6 +14,14 @@ import {
   MAX_MEMORY_PAGES,
   STACK_BYTES,
 } from '../world/index.js';
+import { accretionError } from './errors.js';
+import {
+  type AccretionKernel,
+  type AccretionKernelBuilds,
+  type AccretionWorkCounts,
+  bindAccretionDisk,
+  loadAccretionKernels,
+} from './kernel.js';
 
 const BYTES = Float64Array.BYTES_PER_ELEMENT;
 const LAYOUT = 1;
@@ -49,6 +54,8 @@ export interface AccretionDiskOptions {
   readonly rate?: RateLevel;
   /** An optional layout-1 f64 scalar external feed in kg/s. It is added to the steady feed. */
   readonly feedField?: FieldDescriptor;
+  /** Native participants for the independent annulus publication. Defaults to one. */
+  readonly threads?: 1 | 2 | 4;
   /** Cancels loading the native modules. */
   readonly signal?: AbortSignal;
 }
@@ -88,29 +95,11 @@ export interface AccretionDiskBudget {
   readonly luminosity: number;
 }
 
-interface Kernel extends WebAssembly.Exports {
-  readonly __stack_pointer: WebAssembly.Global;
-  readonly accretion_step: (
-    n: number,
-    config: number,
-    scratch: number,
-    mass: number,
-    density: number,
-    heat: number,
-    phase: number,
-    flux: number,
-    budget: number,
-    dt: number,
-    feed: number,
-  ) => void;
-}
-
 interface DiskState {
   readonly host: SolverHost;
-  readonly native: Kernel;
+  readonly kernel: AccretionKernel;
   readonly radii: Float64Array;
   readonly config: Region;
-  readonly scratch: Region;
   readonly mass: Region;
   readonly density: Region;
   readonly heat: Region;
@@ -123,17 +112,17 @@ interface DiskState {
 }
 
 function nonnegative(x: number, attribute: string): number {
-  if (!(x >= 0 && Number.isFinite(x))) throw new RangeError(`Use a finite, nonnegative ${attribute} for the disk.`);
+  if (!(x >= 0 && Number.isFinite(x))) throw accretionError(`Use a finite, nonnegative ${attribute} for the disk.`);
   return x;
 }
 
 function sample(value: number | ArrayLike<number>, i: number, n: number, attribute: string): number {
-  if (typeof value !== 'number' && value.length !== n) throw new RangeError(`Pass one ${attribute} per annulus.`);
+  if (typeof value !== 'number' && value?.length !== n) throw accretionError(`Pass one ${attribute} per annulus.`);
   return nonnegative(typeof value === 'number' ? value : value[i]!, attribute);
 }
 
 function boundary(value: AccretionDiskParams['innerBoundary']): boolean {
-  if (value !== 'zero-torque' && value !== 'sealed') throw new RangeError('Use a sealed or zero-torque disk boundary.');
+  if (value !== 'zero-torque' && value !== 'sealed') throw accretionError('Use a sealed or zero-torque disk boundary.');
   return value === 'zero-torque';
 }
 
@@ -150,42 +139,25 @@ function words(host: SolverHost, region: Region): Float64Array {
   return regionWords(host.memory, region) as Float64Array;
 }
 
-async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (url.protocol === 'file:') {
-    const fs = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ fs);
-    url.search = '';
-    return WebAssembly.compile(await readFile(url, { signal }));
-  }
-  const response = await fetch(url, { signal });
-  if (!response.ok)
-    throw new MargoError(
-      'failed',
-      `Accretion kernel HTTP ${response.status}. Use the Wasm asset shipped with this entry.`,
-    );
-  return WebAssembly.compile(await response.arrayBuffer());
+function readSupply(host: SolverHost, port: Port): number {
+  const region = port.region;
+  if (region.layout !== LAYOUT || region.type !== 'f64' || region.byteLength !== BYTES)
+    throw accretionError('Use one layout-1 f64 outer supply rate in kg/s.', 'version');
+  const memory = region.memory ?? host.memory;
+  const offset = region.byteOffset;
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset % BYTES !== 0 || offset > memory.buffer.byteLength - BYTES)
+    throw accretionError('Publish the outer supply rate at an aligned f64 offset within its owning memory.');
+  return nonnegative(new Float64Array(memory.buffer, offset, 1)[0]!, 'supplied mass rate');
 }
 
 function advance(s: DiskState, dt: number, feed: number): void {
   const available = words(s.host, s.budget);
   if (available[0]! + s.initial + dt * feed > s.massLimit)
-    throw new RangeError(
+    throw accretionError(
       'The disk mass or feed exceeds the numeric range for this mesh. Reduce the mass or supply rate.',
     );
-  s.native.accretion_step(
-    s.radii.length,
-    s.config.byteOffset,
-    s.scratch.byteOffset,
-    s.mass.byteOffset,
-    s.density.byteOffset,
-    s.heat.byteOffset,
-    s.phase.byteOffset,
-    s.flux.byteOffset,
-    s.budget.byteOffset,
-    dt,
-    feed,
-  );
+  s.kernel.run(dt, feed);
+  s.kernel.accept();
 }
 
 /** Conservative finite-volume viscosity, Keplerian phase and local heating for a thin disk. */
@@ -197,36 +169,43 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
   /** Layout-1 f64 orbital phase in radians, one element per ring. */
   readonly phaseField: FieldDescriptor;
   #state?: DiskState;
+  #disposed = false;
 
   private constructor(
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly builds: AccretionKernelBuilds,
     readonly id: string,
     private readonly rate: RateLevel,
     private readonly feedField?: FieldDescriptor,
   ) {
-    if (!id || !isRateLevel(rate))
-      throw new RangeError('Use a nonempty disk id and a world rate level from 0 through 7.');
     this.densityField = field(`${id}:density`, 'diskSurfaceMassDensity', 'kg/m²');
     this.heatingField = field(`${id}:heating`, 'diskRadiatedFlux', 'W/m²');
     this.phaseField = field(`${id}:phase`, 'diskOrbitalPhase', 'rad');
   }
 
   /** Loads the feature-local modules for supported world memory modes. */
+  static load({ id, rate, feedField, signal }?: AccretionDiskOptions): Promise<AccretionDiskSolver>;
   static async load({
     id = 'accretionDisk',
     rate = 0,
     feedField,
     signal,
+    threads = 1,
   }: AccretionDiskOptions = {}): Promise<AccretionDiskSolver> {
-    const [plain, shared] = await Promise.all([
-      compile(new URL(/* @vite-ignore */ './accretion-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? compile(new URL(/* @vite-ignore */ './accretion-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
-    return new AccretionDiskSolver(plain, shared, id, rate, feedField);
+    if (typeof id !== 'string' || !id || !isRateLevel(rate))
+      throw accretionError('Use a nonempty disk id and a world rate level from 0 through 7.');
+    return new AccretionDiskSolver(await loadAccretionKernels(signal, threads), id, rate, feedField);
+  }
+
+  /** Release the optional native helpers after the world has stopped stepping. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  /** Work for the most recent accepted annulus publication. */
+  readNativeWork(): AccretionWorkCounts | undefined {
+    return this.#state?.kernel.workCounts();
   }
 
   describe(): SolverDescription {
@@ -239,13 +218,16 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
   }
 
   init(host: SolverHost, params: AccretionDiskParams): void {
-    if (this.#state) throw new MargoError('state', 'A disk can join one world. Load a new solver for a second world.');
+    if (this.#disposed) throw accretionError('Load a new accretion disk after disposing its helpers.', 'disposed');
+    if (this.#state)
+      throw accretionError('A disk can join one world. Load a new solver for a second world.', 'attached');
     const { centralMass, edges, viscosity, initialDensity = 0, feed = 0 } = params;
-    const n = edges.length - 1;
-    if (!(Number.isSafeInteger(n) && n > 0 && (12 * n + 7) * BYTES < 65536 * MAX_MEMORY_PAGES))
-      throw new RangeError('Use at least two ordered disk edges and a mesh that fits in Wasm memory.');
+    const n = (edges?.length ?? 0) - 1;
+    const bytes = (17 * n + 13) * BYTES + (STACK_BYTES + 8) * this.builds.threads;
+    if (!(Number.isSafeInteger(n) && n > 0 && bytes < 65536 * MAX_MEMORY_PAGES))
+      throw accretionError('Use at least two ordered disk edges and a mesh that fits in Wasm memory.');
     if (!(centralMass > 0 && Number.isFinite(centralMass)))
-      throw new RangeError('Pass a positive finite central mass in kilograms.');
+      throw accretionError('Pass a positive finite central mass in kilograms.');
     nonnegative(feed, 'feed');
     const configValues = new Float64Array(5 * n + 1);
     const masses = new Float64Array(n);
@@ -256,7 +238,7 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
       const left = edges[i]!,
         right = edges[i + 1]!;
       if (!(left > 0 && right > left && Number.isFinite(right)))
-        throw new RangeError('Use positive disk edges in strictly increasing order.');
+        throw accretionError('Use positive disk edges in strictly increasing order.');
       const radius = left + (right - left) * 0.5;
       const area = Math.PI * (right - left) * (right + left);
       const nu = sample(viscosity, i, n, 'kinematic viscosity');
@@ -272,7 +254,7 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
       masses[i] = area * sample(initialDensity, i, n, 'initial density');
       total += masses[i]!;
       if (!(inverse > 0 && Number.isFinite(omega + heat + weight + inverse + total)))
-        throw new RangeError('The radius, density or viscosity exceeds the numeric range. Use smaller input values.');
+        throw accretionError('The radius, density or viscosity exceeds the numeric range. Use smaller input values.');
       scale = Math.max(scale, heat, inverse, heat * inverse);
     }
     const face = 4 * n;
@@ -285,30 +267,29 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
       const weight = configValues[i]!;
       const rank = (left + right) * weight;
       if (!Number.isFinite(rank + (left + right) / BASE_RATE))
-        throw new RangeError('Adjacent disk edges are too close for their viscosity. Use a resolvable radial spacing.');
+        throw accretionError('Adjacent disk edges are too close for their viscosity. Use a resolvable radial spacing.');
       scale = Math.max(scale, rank);
     }
     const massLimit = Number.MAX_VALUE / 16 / scale;
     if (!(total + feed / BASE_RATE <= massLimit))
-      throw new RangeError('Reduce the initial disk mass or feed to fit the numeric range.');
-    const built = isShared(host.memory) ? this.shared : this.plain;
-    if (!built) throw new MargoError('unsupported', 'Use plain world memory if shared accretion Wasm is unavailable.');
-    const native = new WebAssembly.Instance(built, { env: { memory: host.memory } }).exports as Kernel;
+      throw accretionError('Reduce the initial disk mass or feed to fit the numeric range.');
     const reserve = (name: string, count: number) => host.allocate(`accretion-${name}`, count * BYTES, 'f64', LAYOUT);
-    const stack = host.allocate('accretion-stack', STACK_BYTES + 8, 'u8', LAYOUT);
-    native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
-    const state: DiskState = {
-      host,
-      native,
-      radii,
-      config: reserve('geometry', configValues.length),
-      scratch: reserve('scratch', 2 * n),
+    const config = reserve('geometry', configValues.length);
+    const accepted = {
       mass: reserve('mass', n),
       density: reserve('density', n),
       heat: reserve('heating', n),
       phase: reserve('phase', n),
       flux: reserve('face-flow', n + 1),
       budget: reserve('budget', 5),
+    };
+    const kernel = bindAccretionDisk(host, this.builds, n, config, accepted);
+    const state: DiskState = {
+      host,
+      kernel,
+      radii,
+      config,
+      ...accepted,
       initial: total,
       feed,
       massLimit,
@@ -320,15 +301,13 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    if (this.#disposed)
+      throw accretionError('Use a live disk and dispose it after the world stops stepping.', 'disposed');
     const s = this.#live();
+    nonnegative(dt, 'step duration');
     let supply = s.feed;
     const input = this.feedField && context.inputs.get(this.feedField.name);
-    if (input) {
-      const r = input.region;
-      if (r.layout !== LAYOUT || r.type !== 'f64' || r.byteLength !== BYTES)
-        throw new RangeError('Use one layout-1 f64 outer supply rate in kg/s.');
-      supply += nonnegative(words(s.host, r)[0]!, 'supplied mass rate');
-    }
+    if (input) supply += readSupply(s.host, input);
     advance(s, dt, nonnegative(supply, 'total supply rate'));
   }
 
@@ -340,7 +319,7 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
   ring(index: number): AccretionRing {
     const s = this.#live();
     const n = s.radii.length;
-    if (!Number.isInteger(index) || index < 0 || index >= n) throw new RangeError('Choose a valid disk ring index.');
+    if (!Number.isInteger(index) || index < 0 || index >= n) throw accretionError('Choose a valid disk ring index.');
     const heating = words(s.host, s.heat)[index]!;
     return {
       radius: s.radii[index]!,
@@ -368,10 +347,11 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.#live();
+    const cell = s.host.cell;
     return [
-      { field: this.densityField.name, region: s.density, tick, cell: [0, 0, 0] },
-      { field: this.heatingField.name, region: s.heat, tick, cell: [0, 0, 0] },
-      { field: this.phaseField.name, region: s.phase, tick, cell: [0, 0, 0] },
+      { field: this.densityField.name, region: s.density, tick, cell },
+      { field: this.heatingField.name, region: s.heat, tick, cell },
+      { field: this.phaseField.name, region: s.phase, tick, cell },
     ];
   }
 
@@ -387,8 +367,7 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
   }
 
   #live(): DiskState {
-    if (!this.#state)
-      throw new MargoError('state', 'Add the accretion disk to a PhysicsWorld before reading its state.');
+    if (!this.#state) throw accretionError('Add the accretion disk to a PhysicsWorld before reading its state.');
     return this.#state;
   }
 }

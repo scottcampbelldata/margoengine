@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'accretion',
+    title: '@margoengine/physics/accretion annulus transport, supply and exterior Kerr orbits',
+    kind: 'family',
+    messages: [],
+    cause: 'A disk grid, supply port, native step or exterior orbit could not produce a finite accepted candidate.',
+    fix: 'Use ordered positive ring edges, finite nonnegative transport values and aligned f64 supply in the owning memory. Provide compatible Kerr constants outside the horizon. Reduce the step duration when the requested orbit cannot be resolved.',
+  },
+  {
     id: 'celestial',
     title: '@margoengine/physics/celestial orbit, Earth orientation and astronomical fields',
     kind: 'family',

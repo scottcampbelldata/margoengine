@@ -451,6 +451,8 @@ exact replay, and the geometric and barycentre bounds of a rotating equilateral 
 
 SPACE-03 now solves Keplerian shear, the inward viscous mass flux and local disk heating, with separate relativistic geodesics. `packages/physics/tests/accretion.test.js` compares shear and inward flow to a closed-form disk reference. Event Horizon still uses the SPACE-01 emitter path above. Connecting the new annulus fields to rendered transport and emissivity remains open.
 
+A separate fixed-camera SPACE-03 witness renders accepted annulus heat, density and phase beside a zero-viscosity control. A registered Kerr trajectory supplies the moving tracer. The viscous disk accretes 2.013% of its starting mass and radiates 1.658 × 10³¹ W over two faces in the reduced model. The inner and outer annuli wind by 2.888 rad relative to one another at the winding probe. Particle placement and false-colour local emission repeat with complete accepted state and raw RGBA on both renderers. The production Event Horizon binding and relativistic light transfer remain open. [Browser replay](../packages/physics/tests/accretion-film.browser.mjs)
+
 ### Inside a Meteorite (inside-a-meteorite)
 What it shows: a Mars meteorite (EET 79001,2) in a glass case, then an X-ray CT slice sweep and a 3D voxel scan whose brightness threshold is raised.
 | ID | Time | What is wrong (observed) | What real physics does | Solver | Solver state | Needed for AAA | Status |

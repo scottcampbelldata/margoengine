@@ -5506,3 +5506,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/celestial.test.js packages/physics/tests/coupling/celestial.test.js packages/physics/tests/coupling/celestial-workers.test.js packages/physics/tests/coupling/surge.test.js`.
 - Run `npm run test:gpu:celestial-workers -w @margoengine/physics` for packaged Chromium native participants and `npm run test:gpu:celestial-film -w @margoengine/physics` for the fixed-camera technical witness.
 - Run `node packages/physics/scripts/space02-celestial-measured.mjs` for independent eclipse contact and location sensitivity receipts.
+
+### SPACE-03 native annulus transport and exterior geodesics
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/accretion.test.js packages/physics/tests/coupling/accretion.test.js packages/physics/tests/coupling/accretion-workers.test.js`.
+- Run `npm run test:gpu:accretion-workers -w @margoengine/physics` for packaged Chromium native participants and `npm run test:gpu:accretion-film -w @margoengine/physics` for fixed-camera accepted field replay.
+- Run `node packages/physics/scripts/space03-accretion-measured.mjs` for signed light-tracer bracketing, launch radius and phase-step convergence, independent stellar angular scale, and the observed EHT emission diameter.

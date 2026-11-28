@@ -22,7 +22,8 @@ for (const shared of variant ? [variant === 'shared'] : [false, true]) {
   const memory = new WebAssembly.Memory({ initial: DYNAMIC_BASE / PAGE, maximum: MAX_MEMORY_PAGES, shared });
   const sentinel = new Uint8Array(memory.buffer).fill(0x4d);
   new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory } });
-  if (inspectModule(bytes).active.length || !sentinel.every((value) => value === 0x4d))
+  const { active, exports } = inspectModule(bytes);
+  if (active.length || exports.__data_end?.value !== 0 || !sentinel.every((value) => value === 0x4d))
     throw new Error(
       'The accretion kernel needs no static data. Its initialization must leave every arena byte intact.',
     );

@@ -24629,9 +24629,11 @@ clusters or separately bound meshes still needs their state transfer.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 
-The Event Horizon scene still uses its established SPACE-01 emitter paths. Bind its emissivity and radial transport
-to the new annulus fields to show heating and density. A disk crossing the strongly relativistic inner region needs
-a relativistic stress and heat equation. The test-geodesic solve covers that region in the exterior observer chart.
+The Event Horizon scene still uses its established SPACE-01 emitter paths. The fixed-camera technical witness
+now reads accepted annulus density, heat and phase and a registered Kerr tracer on both renderers. The original
+scene still needs those field bindings. A disk crossing the strongly relativistic inner region needs a
+relativistic stress and heat equation. Comparing its optical emission with the EHT ring also needs emission and
+light transfer. The separate test-geodesic solve covers exterior coordinates.
 
 ### Synoptic development and regional scene binding (ATMO-10)
 

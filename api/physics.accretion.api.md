@@ -16,6 +16,7 @@ export interface AccretionDiskOptions {
     readonly id?: string;
     readonly rate?: RateLevel;
     readonly feedField?: FieldDescriptor;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -36,6 +37,8 @@ export class AccretionDiskSolver implements Solver<AccretionDiskParams> {
     readonly phaseField: FieldDescriptor;
     private constructor();
     static load({ id, rate, feedField, signal }?: AccretionDiskOptions): Promise<AccretionDiskSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): AccretionWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, params: AccretionDiskParams): void;
     step(context: StepContext, dt: number): void;
@@ -56,6 +59,16 @@ export interface AccretionRing {
     readonly effectiveTemperature: number;
     readonly phase: number;
     readonly inwardFlow: number;
+}
+
+export interface AccretionWorkCounts extends AccretionWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly AccretionWorkerWork[];
+}
+
+export interface AccretionWorkerWork {
+    readonly annuli: number;
+    readonly pairedAnnuli: number;
 }
 
 export interface KerrCircularOrbit extends KerrConstants {

@@ -15642,8 +15642,8 @@
         "gzip": 8069
       },
       "./accretion": {
-        "raw": 12282,
-        "gzip": 5110
+        "raw": 20556,
+        "gzip": 8119
       },
       "./room-sound": {
         "raw": 23677,
@@ -19645,14 +19645,14 @@
       "brotli": 9828
     },
     "packages/physics/dist/accretion-kernel.wasm": {
-      "raw": 1657,
-      "gzip": 919,
-      "brotli": 857
+      "raw": 2753,
+      "gzip": 1331,
+      "brotli": 1219
     },
     "packages/physics/dist/accretion-kernel-shared.wasm": {
-      "raw": 1657,
-      "gzip": 919,
-      "brotli": 851
+      "raw": 2753,
+      "gzip": 1331,
+      "brotli": 1219
     },
     "packages/physics/dist/wing-lattice-kernel.wasm": {
       "raw": 6542,

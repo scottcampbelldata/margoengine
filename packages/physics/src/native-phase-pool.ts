@@ -177,6 +177,11 @@ type NativePhaseSolver =
       readonly phase: 'analytic planetary orbits';
     }
   | {
+      readonly subject: 'Accretion disk';
+      readonly phaseExport: 'accretion_thread_phase';
+      readonly phase: 'density, heating and orbital phase';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

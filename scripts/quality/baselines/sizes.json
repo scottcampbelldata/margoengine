@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22156267,
+  "total": 22159276,
   "history": [
     {
       "date": "2026-10-24",
@@ -16062,6 +16062,12 @@
       "commit": "space-02-celestial-native-orbits",
       "reason": "SPACE-02 @margoengine/physics/celestial 9486 to 13117 B gzip, ceiling 9756 to 13511 B. The celestial entry stages independent planetary orbit rows with optional SIMD workers. Splitting the native evaluation would duplicate the analytic clock, ephemeris dispatch and signed field publication. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "space-03-accretion-native-annuli",
+      "reason": "SPACE-03 @margoengine/physics/accretion 5110 to 8119 B gzip, ceiling 5366 to 8375 B. The accretion entry stages a complete disk trial and uses optional native workers for independent annulus publication. Splitting the workers from the entry would duplicate the accepted fields, budget and sparse disk layout. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16926,7 +16932,7 @@
     "@margoengine/physics": 1013233,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 110158,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 906959,
-    "@margoengine/physics/accretion": 5366,
+    "@margoengine/physics/accretion": 8375,
     "@margoengine/physics/aeolian": 8969,
     "@margoengine/physics/ageing": 8325,
     "@margoengine/physics/airborne": 11199,

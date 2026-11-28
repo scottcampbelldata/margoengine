@@ -11038,11 +11038,30 @@ self-gravity, radiative transport or the inner stress and plunge require additio
 
 The Kerr tracer uses the fixed test-particle metric in the exterior observer chart. The polar angle is unfolded at the
 pole for zero axial angular momentum. The horizon offset is a separate value while f64 can represent it. The tracer
-subdivides each world tick by a power of two chosen from its local phase rate. Rendering the disk with light bending
-requires a separate light-transport stage and an emissivity source.
+subdivides each world tick by a power of two chosen from its local phase rate. An observer step requiring more than
+16,384 subdivisions fails before it updates any accepted coordinates. Increase the rate or shorten the step.
+Rendering the disk with light bending requires a separate light-transport stage and an emissivity source.
 
-The optional TypeScript entry is 6,095 B gzip. Each Wasm variant is 1,657 B raw and 919 B gzip. Neither uses
-a shared static window. Core and stage add zero bytes.
+The optional TypeScript entry is 8,119 B gzip against an 8,375 B ceiling. Each lazy Wasm variant is 2,753 B raw
+and 1,331 B gzip. Neither uses a shared static window. Core and stage add zero bytes.
+
+The native disk's implicit tridiagonal solve and radial ledger sums are serial in index order. Density, one-face
+heating and phase use f64x2 pairs and can use up to four participants. An odd final annulus keeps the scalar tail.
+Accepted and trial regions, geometry and Thomas scratch take `(17n + 13) × 8` bytes for `n` annuli, before the
+56 B descriptor, 16 B per participant receipt, 65,544 B per participant stack, pool control and alignment.
+
+#### SPACE-03 observed Sagittarius A* emission and exterior geodesic widths
+
+The signed capture-or-return diagnostic launches light tracers at 40 and 80 gravitational radii, using the
+stellar mass-to-distance ratio published by GRAVITY in 2019. The resulting equatorial vacuum critical widths
+are 52.080, 51.288 and 48.494 µas for spins 0, 0.5 and 0.9. Halving the maximum phase increment moves a
+bracket by at most 5.96 × 10⁻⁷ gravitational radii. Independent double-root equations agree within
+2.67 × 10⁻⁷ gravitational radii. The EHT measures a 51.8 ± 2.3 µas emission ring at 230 GHz, with a
+68% credible interval. Its lensed plasma brightness and finite width differ from the vacuum critical curve,
+so this receipt makes no observational pass or spin inference. Predicting the measured observable requires
+relativistic emission and transfer. [GRAVITY stellar dynamics](https://doi.org/10.1051/0004-6361/201935656)
+[EHT image measurement](https://doi.org/10.3847/2041-8213/ac6674)
+[EHT imaging methods](https://doi.org/10.3847/2041-8213/ac6736)
 
 ### Regional rotating weather (ATMO-10)
 

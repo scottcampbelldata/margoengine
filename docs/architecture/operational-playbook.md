@@ -12464,3 +12464,8 @@ coatings and exact frame replay. Outdoor coupon losses quantify limits of the re
 ### SPACE-02 accepted celestial fields and optional native planet evaluation
 
 The celestial arena publishes the live signed world cell along with Earth-fixed coordinates. Borrowed field reads validate layout and bounds against the owning memory. Trial epochs calculate finite positions, rotated fields and clock privately, then publish the whole accepted state. The optional native path evaluates disjoint pairs of Table 1 planetary rows and leaves the frame and lunar series to the analytic layer. Exact scalar, native worker and renderer replay exercise the public entry. Independently observed grazing contacts quantify error in the bundled analytic model.
+
+
+### SPACE-03 native disk transport, signed fields and exterior trajectories
+
+The implicit disk solve and radial ledger sums retain fixed order. Native f64x2 publication can partition independent density, heating and phase across four participants. A private candidate includes the advected mass, phase and budget and all derived outputs. Finite validation completes before accepted publication. Density and phase describe absolute rings. Kerr coordinates also stay absolute across signed world-origin shifts and unresolved trial steps preserve the accepted frame. The technical replay binds both published fields to the renderers. The measured EHT ring diagnostic identifies the missing emission-transfer model.
