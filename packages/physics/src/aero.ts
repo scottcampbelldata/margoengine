@@ -15,9 +15,12 @@
 // drag coefficient of 0.78 here against about 0.47 measured below the drag crisis), no added mass, and lift only from
 // panels inclined to the flow (a flat plate's sin-law lift), not the circulation lift of a wing (AERO-03) or a sail
 // (AERO-02).
+import { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
 import type { PhysicsCollider } from './collider.js';
 import { buildHull } from './hull.js';
+import type { KernelWorld } from './kernel.js';
+import { rotateVec, type Vec3 } from './math.js';
 
 /** A surface as panels in its collider's frame: centres, unit outward normals (xyz each) and areas. */
 export interface Surface {
@@ -34,9 +37,9 @@ const TWO_PI = 6.283185307179586;
 
 /**
  * The surface of `collider` as panels in its frame. Boxes, balls, capsules, cylinders, cones, convex hulls and triangle
- * meshes take their own shape; any other shape takes the box of its bounds, in the body's frame.
+ * meshes take their own shape; any other shape takes the box of its local bounds.
  */
-export function colliderSurface(collider: PhysicsCollider): Surface {
+export function colliderSurface(collider: PhysicsCollider, kernel: KernelWorld): Surface {
   const out = new SurfaceBuilder();
   switch (collider.shape) {
     case 'box': {
@@ -81,9 +84,24 @@ export function colliderSurface(collider: PhysicsCollider): Surface {
       break;
     }
     default: {
-      // The box of the collider's bounds (world axes), about its centre.
-      const b = collider.aabb();
-      box(out, (b.max[0] - b.min[0]) / 2, (b.max[1] - b.min[1]) / 2, (b.max[2] - b.min[2]) / 2);
+      const t = collider.translationWrtParent();
+      const q = collider.rotationWrtParent();
+      // Ask the rigid kernel for bounds in the collider frame. Its query takes a body pose,
+      // so place and rotate the body to cancel this collider's local transform.
+      const inverse = [-q.x, -q.y, -q.z, q.w];
+      const offset = rotateVec(inverse, [-t.x, -t.y, -t.z]);
+      const bounds = kernel.colliderAabbAt(collider.handle, offset, inverse);
+      if (!bounds)
+        throw new MargoError(
+          'state',
+          'Wind collider has no local bounds. Keep it attached to a body before applying a wind load.',
+        );
+      const [low, high] = bounds;
+      box(out, (high[0] - low[0]) / 2, (high[1] - low[1]) / 2, (high[2] - low[2]) / 2, [
+        (high[0] + low[0]) / 2,
+        (high[1] + low[1]) / 2,
+        (high[2] + low[2]) / 2,
+      ]);
     }
   }
   return out.build();
@@ -118,7 +136,7 @@ class SurfaceBuilder {
 }
 
 /** A box of half extents x, y, z, each face in BOX_PANELS by BOX_PANELS squares. */
-function box(out: SurfaceBuilder, x: number, y: number, z: number): void {
+function box(out: SurfaceBuilder, x: number, y: number, z: number, center: Vec3 = [0, 0, 0]): void {
   const half = [x, y, z];
   for (let axis = 0; axis < 3; axis++)
     for (const side of [1, -1]) {
@@ -128,9 +146,9 @@ function box(out: SurfaceBuilder, x: number, y: number, z: number): void {
         for (let j = 0; j < BOX_PANELS; j++) {
           const corner = (a: number, b: number) => {
             const p = [0, 0, 0];
-            p[axis] = side * half[axis]!;
-            p[u] = half[u]! * (-1 + (2 * a) / BOX_PANELS);
-            p[v] = half[v]! * (-1 + (2 * b) / BOX_PANELS);
+            p[axis] = center[axis]! + side * half[axis]!;
+            p[u] = center[u]! + half[u]! * (-1 + (2 * a) / BOX_PANELS);
+            p[v] = center[v]! + half[v]! * (-1 + (2 * b) / BOX_PANELS);
             return p;
           };
           const p00 = corner(i, j),

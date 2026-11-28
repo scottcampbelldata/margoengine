@@ -116,8 +116,10 @@ export type {
   GravityFieldOptions,
   UpdraftOptions,
   VortexOptions,
+  WindForceFrame,
   WindOptions,
 } from "./fields.js";
+export type { WindTractionPhaseOptions, WindTractionWorkCounts, WindTractionWorkerWork } from "./aero/traction-phase.js";
 export { InstancedBodies } from "./instances.js";
 export type { InstancedBodiesOptions, InstancedTarget } from "./instances.js";
 export { DragJoint } from "./drag.js";

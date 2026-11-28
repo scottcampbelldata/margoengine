@@ -132,3 +132,68 @@ test('a light body in a strong wind stays stable at 60 steps a second (the load 
   assert.ok(fastest <= 10 + 1e-9, `never faster than the wind: ${fastest}`);
   assert.ok(sheet.linearVelocity[0] > 9, `carried along at nearly its speed: ${sheet.linearVelocity[0]}`);
 });
+
+test('a collider fallback uses its local asymmetric bounds under a rotated body and collider', () => {
+  const physics = new Physics(null);
+  const turn = [0, Math.SQRT1_2, 0, Math.SQRT1_2];
+  const halfExtents = [0.125, 0.75, 1.25];
+  const shape = { shape: 'compound', parts: [{ shape: 'box', halfExtents, offset: [0.25, 0, 0] }] };
+  const wind = new WindForce(physics, { velocity: [0, 0, 8] });
+  const body = physics.addBody(null, {
+    position: [34, -3, 6],
+    rotation: turn,
+    colliders: { ...shape, offset: [0, 0, 1], rotation: [Math.SQRT1_2, 0, 0, Math.SQRT1_2], mass: 100 },
+  });
+  const surface = wind.surfaceOf(body);
+  const area = surface.areas.reduce((sum, value) => sum + value, 0);
+  const exact =
+    8 * (halfExtents[0] * halfExtents[1] + halfExtents[0] * halfExtents[2] + halfExtents[1] * halfExtents[2]);
+  // The kernel reports the two corners as f32 after composing its two stored quaternions.
+  assert.ok(Math.abs(area - exact) <= 32 * 2 ** -23 * exact, `local area ${area} vs ${exact}`);
+  const center = [0, 0, 0];
+  for (let i = 0; i < surface.areas.length; i++)
+    for (let axis = 0; axis < 3; axis++) center[axis] += (surface.centres[3 * i + axis] * surface.areas[i]) / area;
+  assert.ok(Math.abs(center[0] - 0.25) + Math.abs(center[2] - 1) < 32 * 2 ** -23, `surface centre ${center}`);
+  const boxed = windLoad({ shape: 'box', halfExtents }, [0, 0, 10], turn, { friction: 0 });
+  const compound = windLoad({ shape: 'compound', parts: [{ shape: 'box', halfExtents }] }, [0, 0, 10], turn, {
+    friction: 0,
+  });
+  assert.ok(Math.abs(boxed.force[2] - compound.force[2]) <= 32 * 2 ** -23 * boxed.force[2]);
+});
+
+test('invalid wind at a later panel or oversized finite forces leave earlier bodies clean', () => {
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const first = physics.addBody(null, {
+    colliders: { shape: 'box', halfExtents: [0.125, 0.5, 0.5], mass: 50 },
+  });
+  const second = physics.addBody(null, {
+    position: [4, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.125, 0.5, 0.5], mass: 50 },
+  });
+  first.addForce([0.25, 0, 0]);
+  let failure = 'panel';
+  new WindForce(physics, {
+    velocity: {
+      medium: 'air',
+      cell: [0, 0, 0],
+      sample(x, y, _z, _t, out) {
+        out.velocity = [failure === 'force' && x > 3 ? 1e30 : 8, 0, 0];
+        out.density = failure === 'panel' && x > 3 && y > 0 ? Number.NaN : RHO;
+        out.temperature = 288;
+        return out;
+      },
+    },
+  });
+  assert.throws(() => physics.step(), { code: 'unsupported', message: /collider panel.*density/ });
+  assert.deepEqual(first.appliedForce, [0.25, 0, 0]);
+  assert.deepEqual(second.appliedForce, [0, 0, 0]);
+  failure = 'force';
+  assert.throws(() => physics.step(), { code: 'unsupported', message: /Reduce wind speed, density or collider scale/ });
+  assert.deepEqual(first.appliedForce, [0.25, 0, 0]);
+  assert.deepEqual(first.linearVelocity, [0, 0, 0]);
+  failure = null;
+  physics.step();
+  assert.ok(first.linearVelocity[0] > second.linearVelocity[0] && second.linearVelocity[0] > 0);
+  assert.deepEqual(first.appliedForce, [0.25, 0, 0]);
+});

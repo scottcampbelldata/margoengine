@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
-import { FlowField } from "@margoengine/math/fields";
+import { FlowCell, FlowField } from "@margoengine/math/fields";
 
 export interface AxleOptions {
     wheels: readonly [number, number];
@@ -2359,15 +2359,24 @@ export type WindField = WindForce;
 
 export class WindForce implements PhysicsAttachment, AirLoad {
     constructor(physics: Physics, options: WindOptions);
+    static create(physics: Physics, options: WindOptions, native?: WindTractionPhaseOptions): Promise<WindForce>;
+    workCounts(): WindTractionWorkCounts | undefined;
     beforeStep(dt: number): void;
     load(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface WindForceFrame {
+    readonly cell: FlowCell;
+    readonly cellSize: number;
 }
 
 export interface WindOptions {
     velocity: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
+    frame?: WindForceFrame;
     density?: number;
     drag?: number;
     friction?: number;
@@ -2376,6 +2385,22 @@ export interface WindOptions {
         max: Vec3;
     };
     filter?: QueryFilter;
+}
+
+export interface WindTractionPhaseOptions {
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
+}
+
+export interface WindTractionWorkCounts extends WindTractionWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly WindTractionWorkerWork[];
+}
+
+export interface WindTractionWorkerWork {
+    readonly probes: number;
+    readonly panels: number;
+    readonly simdPanelPairs: number;
 }
 
 export function addUniversalJoint(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options?: UniversalJointOptions): PhysicsJoint;

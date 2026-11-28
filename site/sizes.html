@@ -86,13 +86,10 @@
   <table>
   <caption class="sr-only">Files loaded after the entry, in bytes, with the call that loads each</caption>
   <thead><tr><th scope="col">File</th><th scope="col">Kind</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Gzip (B)</th><th scope="col" class="num">Brotli (B)</th><th scope="col">Loads when</th></tr></thead>
-<tbody data-lazy-package="@margoengine/weather">
-<tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/weather</code></th></tr>
-<tr><th scope="row"><code>mann-fft.wasm</code></th><td>Rust SIMD atmospheric turbulence FFT</td><td class="num">25,652</td><td class="num">10,306</td><td class="num">8,962</td><td>MannBox.create(), only from weather/turbulence; one private plan per participating thread</td></tr>
-<tr><th scope="row"><code>workers/mann-fft.js</code></th><td>Mann turbulence component FFT worker</td><td class="num">1,599</td><td class="num">832</td><td class="num">699</td><td>MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers</td></tr>
-</tbody>
 <tbody data-lazy-package="@margoengine/physics">
 <tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/physics</code></th></tr>
+<tr><th scope="row"><code>wind-traction-kernel.wasm</code></th><td>Rust SIMD wind traction and torque</td><td class="num">2,507</td><td class="num">1,165</td><td class="num">1,034</td><td>WindForce.create() with one thread; native panel loads for the implicit rigid-body wrench</td></tr>
+<tr><th scope="row"><code>wind-traction-kernel-shared.wasm</code></th><td>Shared Rust SIMD wind traction and torque</td><td class="num">2,507</td><td class="num">1,165</td><td class="num">1,034</td><td>WindForce.create() with multiple threads; independent native wrench probes</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage</td><td class="num">8,955</td><td class="num">3,273</td><td class="num">2,865</td><td>DrainageFog.load() from the optional /drainage-fog entry</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel-shared.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage, shared world memory</td><td class="num">8,955</td><td class="num">3,273</td><td class="num">2,870</td><td>DrainageFog.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>iceberg-kernel.wasm</code></th><td>Rust SIMD iceberg hydrostatics and rigid-body dynamics</td><td class="num">9,128</td><td class="num">4,318</td><td class="num">3,792</td><td>IcebergSolver.load() from the optional /iceberg entry</td></tr>
@@ -182,6 +179,11 @@
 <tr><th scope="row"><code>locomotion-kernel-shared.wasm</code></th><td>Shared locomotion gait geometry and contact kernel (Rust, SIMD)</td><td class="num">10,870</td><td class="num">4,937</td><td class="num">4,474</td><td>GroundLocomotion.load() in a runtime with shared world memory</td></tr>
 <tr><th scope="row"><code>pedestrian-kernel.wasm</code></th><td>Pedestrian contact and avoidance kernel (Rust, SIMD)</td><td class="num">12,041</td><td class="num">5,695</td><td class="num">5,142</td><td><code>await PedestrianCrowd.load()</code> (<code>@margoengine/physics/pedestrians</code>), on demand</td></tr>
 <tr><th scope="row"><code>pedestrian-kernel-shared.wasm</code></th><td>Shared pedestrian contact and avoidance kernel (Rust, SIMD)</td><td class="num">12,129</td><td class="num">5,757</td><td class="num">5,210</td><td>PedestrianCrowd.load() in a runtime with shared world memory</td></tr>
+</tbody>
+<tbody data-lazy-package="@margoengine/weather">
+<tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/weather</code></th></tr>
+<tr><th scope="row"><code>mann-fft.wasm</code></th><td>Rust SIMD atmospheric turbulence FFT</td><td class="num">25,652</td><td class="num">10,306</td><td class="num">8,962</td><td>MannBox.create(), only from weather/turbulence; one private plan per participating thread</td></tr>
+<tr><th scope="row"><code>workers/mann-fft.js</code></th><td>Mann turbulence component FFT worker</td><td class="num">1,599</td><td class="num">832</td><td class="num">699</td><td>MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers</td></tr>
 </tbody>
 <tbody data-lazy-package="@margoengine/compute">
 <tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/compute</code></th></tr>
@@ -362,8 +364,8 @@
 <tr><th scope="row"><code>@margoengine/sky/compat-clouds</code></th><td>Lazy: hurricane storm field</td><td class="num">10,591</td><td class="num">4,395</td><td>the first layer that draws a storm (<code>hurricane</code> option or the type hurricane; import() in volumetric-clouds.ts); its WGSL and maths load once, and every entry above reads the same copy</td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Base: everything a page reading a Tornado's wind and rain loads, without the lazy part</td><td class="num">19,037</td><td class="num">7,788</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Lazy: tornado shader</td><td class="num">5,724</td><td class="num">2,485</td><td>the first frame of a TornadoCloud (import() in tornado.ts)</td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">320,144</td><td class="num">102,162</td><td></td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,143,946</td><td class="num">842,715</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">332,954</td><td class="num">106,949</td><td></td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,194,858</td><td class="num">880,916</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Base: everything the entry loads before <code>SoftBodies.attach()</code>, without the lazy part</td><td class="num">180,148</td><td class="num">59,611</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Lazy: soft body kernel (deflated Wasm blueprint and its column table)</td><td class="num">155,807</td><td class="num">116,989</td><td><code>await SoftBodies.attach(physics)</code>, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics2d</code></th><td>Base: everything the entry loads before <code>Physics2D.load()</code>, without the lazy part</td><td class="num">66,511</td><td class="num">21,631</td><td></td></tr>
@@ -4910,7 +4912,7 @@
   <caption class="sr-only">Simulation and games: bytes per package entry</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Entry</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Peers on</th></tr></thead>
 <tbody data-package="@margoengine/physics">
-<tr><th scope="rowgroup" rowspan="76"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,464,091</td><td class="num">945,517</td><td rowspan="76"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="76"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,527,813</td><td class="num">988,651</td><td rowspan="76"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./decomposition</code></td><td class="num">26,988</td><td class="num">11,152</td></tr>
 <tr><td><code>./soft</code></td><td class="num">335,956</td><td class="num">177,421</td></tr>
 <tr><td><code>./tissue</code></td><td class="num">7,410</td><td class="num">3,154</td></tr>

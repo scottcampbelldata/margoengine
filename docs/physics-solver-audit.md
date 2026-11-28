@@ -50,6 +50,28 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### AERO-01 four-point pass
+
+- Point 5. `physics/tests/aero.test.js` compares a rotated compound's local bounding surface with the exact
+  rectangular area and face centres. It exercises malformed later-panel samples and finite velocities that overflow
+  the rigid force domain. Earlier bodies retain their accepted forces. `physics/tests/coupling/air.test.js` proves
+  local panel coordinates across distinct signed cells, rebasing and exact replay.
+- Point 6. `physics/tests/coupling/wind-traction-threads.test.js` checks Rust f64x2 panel pairs and an odd tail.
+  It compares all six accepted force and torque components and full rigid-world bytes across scalar and 1, 2 and 4
+  native participants in distinct signed cells. In five steps, 4,291 panels produce 65 probes, 278,915 panel evaluations
+  and 139,425 SIMD pair evaluations. `physics/tests/wind-traction-threads.browser.mjs` starts three actual helpers
+  from a production consumer and compares the emitted native assets byte for byte.
+- Point 7. `physics/tests/aero-mobile.browser.mjs` steps the live ATMO-02 field, AirSolver, WindForce and native rope
+  joints on a procedural paper mobile. It checks the force-and-torque port, a 0.02046 N thread load, 18.28 and 19.60 cm
+  downstream motion, rotation and visible displacement. Both renderers match held and replayed RGBA and world
+  snapshots byte for byte. Passing-flyer wake, paper flex and original AVIARY-5 integration remain open.
+- Point 8. `docs/limits.md` records the shape bounds, small relative-velocity cutoff, f32 load domain, worker setup
+  and known differences from measured round-body drag.
+- Point 2 stays open. `physics/scripts/aero01-sphere-measured.mjs` compares rigid impulses against Achenbach's
+  independent sphere measurements. All eleven plateau and recovery observations fall outside their readout bounds.
+  The model predicts a coefficient of 0.775 at Reynolds number 6 million versus the reported 0.19. The four
+  transition points are reported separately.
+
 ### ATMO-02 four-point pass
 
 - Point 5 (df2e11c99e). `weather/tests/turbulence.test.js` covers the continuous transverse-mode shear, far signed-periodic

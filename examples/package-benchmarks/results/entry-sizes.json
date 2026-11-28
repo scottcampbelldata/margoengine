@@ -15386,8 +15386,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1464091,
-        "gzip": 945517
+        "raw": 1527813,
+        "gzip": 988651
       },
       "./decomposition": {
         "raw": 26988,
@@ -19088,6 +19088,16 @@
     }
   },
   "lazyFiles": {
+    "packages/physics/dist/wind-traction-kernel.wasm": {
+      "raw": 2507,
+      "gzip": 1165,
+      "brotli": 1034
+    },
+    "packages/physics/dist/wind-traction-kernel-shared.wasm": {
+      "raw": 2507,
+      "gzip": 1165,
+      "brotli": 1034
+    },
     "packages/weather/dist/mann-fft.wasm": {
       "raw": 25652,
       "gzip": 10306,
@@ -20080,13 +20090,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 320144,
-        "gzip": 102162
+        "raw": 332954,
+        "gzip": 106949
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 1143946,
-        "gzip": 842715,
+        "raw": 1194858,
+        "gzip": 880916,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

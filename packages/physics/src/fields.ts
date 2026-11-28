@@ -4,8 +4,9 @@
 // bits on every engine (tests/step-path.test.js holds this file to it).
 import { standardDensity } from "@margoengine/math/atmosphere";
 import { hypot } from "@margoengine/math/pinned";
-import type { FlowField, FlowSample } from "@margoengine/math/fields";
+import type { FlowCell, FlowField, FlowSample } from "@margoengine/math/fields";
 import { colliderSurface, type Surface } from "./aero.js";
+import type { WindTractionPhase, WindTractionPhaseOptions, WindTractionWorkCounts } from "./aero/traction-phase.js";
 import type { PhysicsBody } from "./body.js";
 import { type AirHold, type AirLoad, airHoldOf } from "./air-hold.js";
 import { implicitWrench, type Wrench } from "./held.js";
@@ -84,14 +85,24 @@ export function explosion(
   return pushed;
 }
 
+/** Origin used by the rigid-body positions handed to a WindForce. */
+export interface WindForceFrame {
+  /** Current signed origin cell. A getter can follow a PhysicsWorld's rigid solver. */
+  readonly cell: FlowCell;
+  /** Side length of a world cell, in metres. */
+  readonly cellSize: number;
+}
+
 /** Options of {@link WindForce}. */
 export interface WindOptions {
   /**
    * The air: its velocity in m/s as a vector, a function of the point and the time in seconds (for gusts and swirls), or a
-   * flow field of `@margoengine/math/fields` (a `Wind`, such as the atmosphere's), sampled at each body's centre on the
-   * world's clock, whose density it also takes. A flow field's coordinates must be in the world's frame (cell [0, 0, 0]).
+   * flow field of `@margoengine/math/fields` (a `Wind`, such as the atmosphere's). Each panel samples at the world's
+   * time and can use the field's local density. Use `frame` if the field and body coordinates have different origins.
    */
   velocity: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
+  /** Rigid position origin. Defaults to cell [0, 0, 0] for a flow field in the same cell. */
+  frame?: WindForceFrame;
   /**
    * Air density in kg/m3 (default the flow field's at each body, or the standard atmosphere's at the body's height, y metres
    * above sea level: 1.225 at 0, ISO 2533).
@@ -111,13 +122,12 @@ export interface WindOptions {
 }
 
 /**
- * A wind force: every step each dynamic body in the field feels the drag of the air moving past it, F = 1/2 rho Cd A |u| u
- * for the air's velocity relative to the body u, with A the area the body presents, taken from the box of its colliders (the
- * faces of the box the wind meets, in proportion to how square they face it). The air is sampled at the body's centre at the
- * world's time (its steps times the fixed step), so a wind shared with the rest of a scene is felt where and when the rest
- * feels it. Sleeping bodies are woken only by a wind strong enough to move them.
+ * Loads each dynamic body's collider panels from the relative air velocity at their positions and the world step's time.
+ * The normal pressure and skin friction contribute force and torque about the centre of mass. The held RigidSolver load
+ * accounts for the change in linear and angular velocity through the step.
  */
 export class WindForce implements PhysicsAttachment, AirLoad {
+  private native?: WindTractionPhase;
   private released = false;
   private readonly hold: AirHold;
   private readonly sample: FlowSample = {
@@ -129,30 +139,42 @@ export class WindForce implements PhysicsAttachment, AirLoad {
     private readonly physics: Physics,
     private readonly options: WindOptions,
   ) {
-    const { density, drag = 1.17, friction = 0.004, velocity } = options;
+    if (!options || typeof options !== 'object')
+      throw fieldInput('WindForce needs options. Pass a velocity vector, callback or flow field.');
+    const { density, drag = 1.17, friction = 0.004, velocity, frame } = options;
+    if (frame !== undefined && (!frame || !(frame.cellSize > 0 && Number.isFinite(frame.cellSize))))
+      throw fieldInput("The wind frame needs a positive finite cell size in metres. Use the rigid world's cellSize.");
+    if (frame) checkedCell(frame.cell, 'Rigid frame');
     if (density !== undefined && !(density > 0 && Number.isFinite(density)))
-      throw fieldInput(
-        "Air density is a positive number of kg/m3; pass options.density above 0.",
-      );
+      throw fieldInput('Air density is a positive number of kg/m3; pass options.density above 0.');
     if (!(drag >= 0 && Number.isFinite(drag)))
-      throw fieldInput(
-        "Drag coefficient is 0 or more; pass options.drag of 0 or above.",
-      );
+      throw fieldInput('Drag coefficient is 0 or more; pass options.drag of 0 or above.');
     if (!(friction >= 0 && Number.isFinite(friction)))
-      throw fieldInput(
-        "Friction coefficient is 0 or more; pass options.friction of 0 or above.",
-      );
-    if (isFlow(velocity)) {
-      const c = velocity.cell;
-      if (!c || c[0] !== 0 || c[1] !== 0 || c[2] !== 0)
-        throw fieldInput(
-          "A wind force samples its flow field in the physics world's frame; pass a field whose cell is [0, 0, 0].",
-        );
-    } else if (typeof velocity !== "function")
-      fieldVec(velocity, "Wind velocity");
+      throw fieldInput('Friction coefficient is 0 or more; pass options.friction of 0 or above.');
+    if (isFlow(velocity)) windShift(velocity, frame);
+    else if (typeof velocity !== 'function') fieldVec(velocity, 'Wind velocity');
     this.hold = airHoldOf(physics);
     this.hold.loads.add(this);
     physics.attach(this);
+  }
+
+  /** Creates a wind load with lazy Wasm SIMD traction. Set threads to 1, 2 or 4. Default 1. */
+  static async create(physics: Physics, options: WindOptions, native?: WindTractionPhaseOptions): Promise<WindForce> {
+    const { WindTractionPhase } = await import('./aero/traction-phase.js');
+    const phase = await WindTractionPhase.load(native);
+    try {
+      const wind = new WindForce(physics, options);
+      wind.native = phase;
+      return wind;
+    } catch (cause) {
+      phase.dispose();
+      throw cause;
+    }
+  }
+
+  /** Traction work performed since this native load was created. Scalar loads return undefined. */
+  workCounts(): WindTractionWorkCounts | undefined {
+    return this.native?.workCounts();
   }
 
   /** @internal Stepped alone, the Physics's step computes the load; in a world, an `AirSolver` does. */
@@ -167,37 +189,33 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         drag: normalCoefficient = 1.17,
         friction: frictionCoefficient = 0.004,
         velocity,
+        frame,
         region,
         filter,
       } = this.options,
       min: Vec3 = region?.min ?? [-1e9, -1e9, -1e9],
       max: Vec3 = region?.max ?? [1e9, 1e9, 1e9],
       time = this.hold.now(),
-      flow = isFlow(velocity) ? velocity : undefined;
+      flow = isFlow(velocity) ? velocity : undefined,
+      shift = flow ? windShift(flow, frame) : null;
+    const loads: { body: PhysicsBody; force: Vec3; torque: Vec3 }[] = [];
     for (const body of this.physics.intersectAabb(min, max, filter)) {
-      if (body.type !== "dynamic") continue;
+      if (body.type !== 'dynamic') continue;
       const p = body.position;
       let air: Vec3, density: number;
-      if (flow) {
-        const s = flow.sample(p[0], p[1], p[2], time, this.sample);
+      if (flow && shift) {
+        const s = sampleWind(flow, this.sample, p[0], p[1], p[2], time, shift);
         air = s.velocity;
         density = this.options.density ?? s.density;
-        if (!(density > 0 && Number.isFinite(density)))
-          throw fieldInput(
-            `The wind's flow field gave a density of ${density} at (${p[0]}, ${p[1]}, ${p[2]}); a flow field's density is kg/m3 above 0.`,
-          );
       } else {
-        air =
-          typeof velocity === "function"
-            ? (velocity as (point: Vec3, time: number) => Vec3)(
-                [p[0], p[1], p[2]],
-                time,
-              )
-            : (velocity as Vec3);
-        density = this.options.density ?? standardDensity(p[1]);
+        air = typeof velocity === 'function' ? velocity([p[0], p[1], p[2]], time) : (velocity as Vec3);
+        const elevation = frame ? p[1] + frame.cell[1] * frame.cellSize : p[1];
+        density = this.options.density ?? standardDensity(elevation);
       }
+      fieldVec(air, 'Body wind velocity');
+      windDensity(density, "The wind at a body's centre");
       const surface = this.surfaceOf(body);
-      if (!surface) continue;
+      if (!surface?.areas.length) continue;
       const { centres, normals, areas } = surface,
         q = body.rotation,
         pos = body.position,
@@ -211,16 +229,8 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         winds = new Float64Array(3 * count),
         rhos = new Float64Array(count);
       for (let i = 0; i < count; i++) {
-        const local = rotateVec(q, [
-            centres[3 * i]!,
-            centres[3 * i + 1]!,
-            centres[3 * i + 2]!,
-          ]),
-          n = rotateVec(q, [
-            normals[3 * i]!,
-            normals[3 * i + 1]!,
-            normals[3 * i + 2]!,
-          ]),
+        const local = rotateVec(q, [centres[3 * i]!, centres[3 * i + 1]!, centres[3 * i + 2]!]),
+          n = rotateVec(q, [normals[3 * i]!, normals[3 * i + 1]!, normals[3 * i + 2]!]),
           px = pos[0] + local[0],
           py = pos[1] + local[1],
           pz = pos[2] + local[2];
@@ -231,26 +241,25 @@ export class WindForce implements PhysicsAttachment, AirLoad {
           ay = air[1],
           az = air[2],
           rho = density;
-        if (flow) {
-          const s = flow.sample(px, py, pz, time, this.sample);
+        if (flow && shift) {
+          const s = sampleWind(flow, this.sample, px, py, pz, time, shift);
+          fieldVec(s.velocity, 'Panel wind velocity');
           ax = s.velocity[0];
           ay = s.velocity[1];
           az = s.velocity[2];
           rho = this.options.density ?? s.density;
-        } else if (typeof velocity === "function") {
-          const at = (velocity as (point: Vec3, time: number) => Vec3)(
-            [px, py, pz],
-            time,
-          );
+        } else if (typeof velocity === 'function') {
+          const at = (velocity as (point: Vec3, time: number) => Vec3)([px, py, pz], time);
+          fieldVec(at, 'Panel wind velocity');
           ax = at[0];
           ay = at[1];
           az = at[2];
         }
         winds.set([ax, ay, az], 3 * i);
-        rhos[i] = rho;
+        rhos[i] = windDensity(rho, 'Wind at a collider panel');
       }
       // The load with the body's velocity and spin changed by dv and dw.
-      const wrench: Wrench = (dv, dw) => {
+      const scalar: Wrench = (dv, dw) => {
         const v: Vec3 = [v0[0] + dv[0], v0[1] + dv[1], v0[2] + dv[2]],
           w: Vec3 = [w0[0] + dw[0], w0[1] + dw[1], w0[2] + dw[2]];
         let fx = 0,
@@ -291,24 +300,31 @@ export class WindForce implements PhysicsAttachment, AirLoad {
           ty += rz * f0 - rx * f2;
           tz += rx * f1 - ry * f0;
         }
-        return [
+        return checkedWrench([
           [fx, fy, fz],
           [tx, ty, tz],
-        ];
+        ]);
       };
+      const native = this.native;
+      native?.prepare({
+        arms,
+        normals: outward,
+        winds,
+        densities: rhos,
+        areas,
+        normalCoefficient,
+        frictionCoefficient,
+      });
       // A sleeping body is woken only by a wind that would push it a tenth of a metre a second squared.
       if (body.sleeping) {
-        const [f] = wrench([0, 0, 0], [0, 0, 0]);
+        const [f] = (native?.evaluate(v0, w0, false) ?? scalar)([0, 0, 0], [0, 0, 0]);
         if (!(hypot(f[0], f[1], f[2]) >= 0.1 * body.mass)) continue;
       }
-      const [force, torque] = implicitWrench(
-        body,
-        wrench,
-        dt,
-        this.physics.gravity,
-      );
-      this.hold.hold(body, force, torque);
+      const wrench = native?.evaluate(v0, w0, dt > 0) ?? scalar;
+      const [force, torque] = checkedWrench(implicitWrench(body, wrench, dt, this.physics.gravity));
+      loads.push({ body, force, torque });
     }
+    for (const { body, force, torque } of loads) this.hold.hold(body, force, torque);
   }
 
   /** @internal */
@@ -317,10 +333,7 @@ export class WindForce implements PhysicsAttachment, AirLoad {
   }
 
   /** Each body's surface as panels in its frame, made again when its colliders change. */
-  private readonly surfaces = new Map<
-    PhysicsBody,
-    { key: string; surface: Surface }
-  >();
+  private readonly surfaces = new Map<PhysicsBody, { key: string; surface: Surface }>();
 
   private surfaceOf(body: PhysicsBody): Surface | undefined {
     const colliders = body.colliders.filter((c) => !c.isSensor()),
@@ -328,39 +341,29 @@ export class WindForce implements PhysicsAttachment, AirLoad {
         .map((c) => {
           const t = c.translationWrtParent(),
             r = c.rotationWrtParent();
-          return `${c.handle}:${c.shape}:${c.shape === "box" ? JSON.stringify(c.halfExtents()) : ""}:${c.shape === "sphere" || c.shape === "capsule" || c.shape === "cylinder" || c.shape === "cone" ? `${c.radius()},${c.halfHeight()}` : ""}:${t.x},${t.y},${t.z}:${r.x},${r.y},${r.z},${r.w}`;
+          return `${c.handle}:${c.shape}:${c.shape === 'box' ? JSON.stringify(c.halfExtents()) : ''}:${c.shape === 'sphere' || c.shape === 'capsule' || c.shape === 'cylinder' || c.shape === 'cone' ? `${c.radius()},${c.halfHeight()}` : ''}:${t.x},${t.y},${t.z}:${r.x},${r.y},${r.z},${r.w}`;
         })
-        .join("|");
+        .join('|');
     if (!colliders.length) return undefined;
     const cached = this.surfaces.get(body);
     if (cached?.key === key) return cached.surface;
     const parts = colliders.map((c) => {
-        const s = colliderSurface(c),
+        const s = colliderSurface(c, this.physics.kernel),
           t = c.translationWrtParent(),
           r = c.rotationWrtParent(),
           q = [r.x, r.y, r.z, r.w],
           centres = new Float64Array(s.centres.length),
           normals = new Float64Array(s.normals.length);
         for (let i = 0; i < s.areas.length; i++) {
-          const p = rotateVec(q, [
-              s.centres[3 * i]!,
-              s.centres[3 * i + 1]!,
-              s.centres[3 * i + 2]!,
-            ]),
-            n = rotateVec(q, [
-              s.normals[3 * i]!,
-              s.normals[3 * i + 1]!,
-              s.normals[3 * i + 2]!,
-            ]);
+          const p = rotateVec(q, [s.centres[3 * i]!, s.centres[3 * i + 1]!, s.centres[3 * i + 2]!]),
+            n = rotateVec(q, [s.normals[3 * i]!, s.normals[3 * i + 1]!, s.normals[3 * i + 2]!]);
           centres.set([p[0] + t.x, p[1] + t.y, p[2] + t.z], 3 * i);
           normals.set(n, 3 * i);
         }
         return { centres, normals, areas: s.areas };
       }),
       join = (pick: (p: Surface) => Float64Array) => {
-        const out = new Float64Array(
-          parts.reduce((n, p) => n + pick(p).length, 0),
-        );
+        const out = new Float64Array(parts.reduce((n, p) => n + pick(p).length, 0));
         let at = 0;
         for (const p of parts) {
           out.set(pick(p), at);
@@ -382,6 +385,7 @@ export class WindForce implements PhysicsAttachment, AirLoad {
     if (this.released) return;
     this.released = true;
     this.hold.loads.delete(this);
+    this.native?.dispose();
     this.physics.detach(this);
   }
 
@@ -389,6 +393,11 @@ export class WindForce implements PhysicsAttachment, AirLoad {
   dispose(): void {
     this.released = true;
     this.hold.loads.delete(this);
+    this.native?.dispose();
+  }
+
+  [Symbol.dispose](): void {
+    this.remove();
   }
 }
 
@@ -401,12 +410,76 @@ export const WindField = WindForce;
 /** @deprecated Use {@link WindForce}. */
 export type WindField = WindForce;
 
-function isFlow(velocity: WindOptions["velocity"]): velocity is FlowField {
-  return (
-    typeof velocity === "object" &&
-    velocity !== null &&
-    typeof (velocity as FlowField).sample === "function"
-  );
+function isFlow(velocity: WindOptions['velocity']): velocity is FlowField {
+  return typeof velocity === 'object' && velocity !== null && typeof (velocity as FlowField).sample === 'function';
+}
+
+function checkedCell(cell: FlowCell, label: string): FlowCell {
+  if (
+    !cell ||
+    cell.length !== 3 ||
+    !Number.isSafeInteger(cell[0]) ||
+    !Number.isSafeInteger(cell[1]) ||
+    !Number.isSafeInteger(cell[2])
+  )
+    throw fieldInput(`${label} requires three signed integer cell coordinates; pass the cell of the active solver.`);
+  return cell;
+}
+
+function windShift(flow: FlowField, frame?: WindForceFrame): Vec3 {
+  const windCell = checkedCell(flow.cell, 'Wind flow');
+  if (!frame) {
+    if (windCell[0] !== 0 || windCell[1] !== 0 || windCell[2] !== 0)
+      throw fieldInput(
+        "A wind force without a frame requires that the flow cell is [0, 0, 0]; pass options.frame with the rigid solver's cell and cell size.",
+      );
+    return [0, 0, 0];
+  }
+  const rigidCell = checkedCell(frame.cell, 'Rigid frame');
+  const { cellSize } = frame;
+  const shift: Vec3 = [
+    (rigidCell[0] - windCell[0]) * cellSize,
+    (rigidCell[1] - windCell[1]) * cellSize,
+    (rigidCell[2] - windCell[2]) * cellSize,
+  ];
+  fieldVec(shift, 'Wind origin conversion; keep origin and wind cells within numeric range');
+  return shift;
+}
+
+function sampleWind(
+  flow: FlowField,
+  sample: FlowSample,
+  x: number,
+  y: number,
+  z: number,
+  time: number,
+  shift: Vec3,
+): FlowSample {
+  const sx = x + shift[0];
+  const sy = y + shift[1];
+  const sz = z + shift[2];
+  if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(sz))
+    throw fieldInput('A wind panel position exceeds numeric range. Use local metres or move the wind origin nearer.');
+  const value = flow.sample(sx, sy, sz, time, sample);
+  if (!value || typeof value !== 'object')
+    throw fieldInput(
+      'Wind sampler returned no flow sample. Return velocity, density and temperature at the sampled point.',
+    );
+  return value;
+}
+
+function windDensity(value: number, label: string): number {
+  if (!(value > 0 && Number.isFinite(value)))
+    throw fieldInput(`${label} has a density of ${value}; supply finite kg/m3 above 0 or set options.density.`);
+  return value;
+}
+
+function checkedWrench(result: ReturnType<Wrench>): ReturnType<Wrench> {
+  if (result.some((vector) => vector.some((value) => !Number.isFinite(Math.fround(value)))))
+    throw fieldInput(
+      "A wind force or torque exceeds the rigid solver's numeric range. Reduce wind speed, density or collider scale.",
+    );
+  return result;
 }
 
 /** The inverse-square falloff at a share `s` of the radius: 1 / (1 + 2 s)^2. */

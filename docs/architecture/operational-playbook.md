@@ -11867,3 +11867,12 @@ twiddle products. The published URL keeps Wasm and the worker script as separate
 test loads both from an application build, starts two helpers and checks the library build's external Wasm asset.
 The solver and renderer test carries the placed gust through the signed wind cell to rooted clumps on both backends.
 The independent Vindeby vertical co-coherence remains outside the model's seed spread.
+
+### AERO-01 signed fields and native traction
+
+WindForce samples collider-panel positions in the wind's signed origin. The rigid kernel gives fallback bounds
+in the collider frame, including the surface centre's offset. The native backend partitions the implicit load
+probes, with f64x2 traction and torque pairs and ordered reduction. The coupled proof covers 4,291 panels and
+279 thousand panel calls in five steps. Both packaged assets and real helper startup are checked in Chromium.
+The AirSolver and RigidSolver keep their existing world contracts. The paper mobile verifies the live load
+through rope constraints and renderer poses on WebGPU and WebGL2.

@@ -18,7 +18,8 @@ type NativePhaseSolver =
   | { readonly subject: 'Cloud projection'; readonly phaseExport: 'cloud_projection_thread_phase' }
   | { readonly subject: 'Airborne'; readonly phaseExport: 'airborne_thread_phase' }
   | { readonly subject: 'Swimmer'; readonly phaseExport: 'swim_thread_phase' }
-  | { readonly subject: 'Plant sway'; readonly phaseExport: 'vegetation_thread_phase' };
+  | { readonly subject: 'Plant sway'; readonly phaseExport: 'vegetation_thread_phase' }
+  | { readonly subject: 'Wind traction'; readonly phaseExport: 'wind_traction_thread_phase' };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 
@@ -66,6 +67,7 @@ const phaseLabel = {
   Airborne: 'parcel',
   Swimmer: 'hydrodynamic',
   'Plant sway': 'modal response',
+  'Wind traction': 'surface load',
 } as const;
 
 function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {

@@ -13541,6 +13541,24 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+AERO-01 checked the split against Sighard F. Hoerner, [Fluid-Dynamic Drag](https://home.hvl.no/ansatte/gste/ftp/MarinLab_files/Litteratur/Hoerner_1965_Fluid-dynamic_drag.pdf)
+(1965), ch. II pp. 2-1 and 2-4 onward for tangential skin drag and ch. III pp. 3-12 to 3-16 for normal and oblique plate
+loads. The local sine law and coefficients remain approximations for panel traction. The rigid kernel evaluates
+bounds at a body pose that cancels the collider's relative position and rotation. The approximation preserves the local
+bounds' centre. The Wasm path sums forces in panel order to preserve the centre-of-mass torque. Workers divide the 13
+finite-difference probes of the implicit load.
+
+Elmar Achenbach, [Experiments on the flow past spheres at very high Reynolds numbers](https://doi.org/10.1017/S0022112072000874)
+(1972), §3 and Fig. 4 provide independent drag measurements for a 200 mm polished sphere. `aero01-sphere-measured.mjs`
+scores the original hollow strain-gauge symbols reproduced in Guillaume Dupeux et al. (2011), Fig. 4c. The readout
+uses three source pixels (0.00935 Cd) and the text endpoint uses a 0.005 rounding allowance. The condition inputs
+use recorded geometry and air conditions matched by Reynolds number because per-marker tunnel settings are
+unavailable. Total measurement uncertainty remains unavailable. Subcritical predictions run 48–61% high. All eleven
+plateau and recovery observations miss. [Dupeux et al., Football curves](https://doi.org/10.1016/j.jfluidstructs.2011.03.022).
+
+The AVIARY-5 test authors new folded panels in Margo and uses 80 g/m² stock to set paper mass from area. A native
+rope joint bears each crane. The shape refers to a museum object. [Smithsonian Colorful Origami Crane](https://www.si.edu/object/colorful-origami-crane%3Aacm_2011.0004.0081).
+
 ### The surf zone (SEA-05, `@margoengine/physics/surf`, 2026-11-26)
 
 `packages/physics/src/surf/index.ts` (`SurfSolver`), with the forcing field, the `sea` and `periodic` sides and the wave-stirred

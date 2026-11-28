@@ -14,6 +14,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
   {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/wind-traction-kernel.wasm',
+    label: 'wind-traction-kernel.wasm',
+    kind: 'Rust SIMD wind traction and torque',
+    measure: 'file',
+    when: 'WindForce.create() with one thread; native panel loads for the implicit rigid-body wrench',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/wind-traction-kernel-shared.wasm',
+    label: 'wind-traction-kernel-shared.wasm',
+    kind: 'Shared Rust SIMD wind traction and torque',
+    measure: 'file',
+    when: 'WindForce.create() with multiple threads; independent native wrench probes',
+  },
+  {
     package: '@margoengine/weather',
     file: 'packages/weather/dist/mann-fft.wasm',
     label: 'mann-fft.wasm',

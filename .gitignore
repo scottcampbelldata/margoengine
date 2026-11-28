@@ -15,6 +15,7 @@ packages/physics/orbit-kernel/target/
 packages/physics/school-kernel/target/
 packages/physics/vegetation-kernel/target/
 packages/weather/mann-fft/target/
+packages/physics/wind-traction-kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/
 packages/sciviz/kernel/target/

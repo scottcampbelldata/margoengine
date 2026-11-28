@@ -15563,6 +15563,12 @@
       "commit": "atmo02-native-mann-fft",
       "reason": "ATMO-02: Weather turbulence grows 1,753 to 5,597 B gzip (cap 1,965 to 5,853), and boundary-layer grows 3,408 to 6,278 (cap 3,664 to 6,534) because it uses the same MannBox implementation. The optional native planner and coded event code share the existing data model. Splitting the public API would duplicate box synthesis and exact-byte checks. Wasm and the helper are separate assets. The new worker is 832 B gzip, with a 1,088 B ceiling.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "aero01-native-wind-traction",
+      "reason": "AERO-01: the measured Physics entry goes from 983,721 to 988,651 B gzip, below its existing 1,013,233 B cap. Its base goes from 102,161 to 106,949 B, increasing the base cap from 104,696 to 110,158 B. WindForce uses the same panel sampling and held-load path for scalar and native traction; a second public entry would duplicate the rigid and wind adapter and break its single attachment path. The rigid Wasm chunk stays 880,916 B gzip. The two separate optional wind Wasm binaries each cost 1,165 B gzip and load on demand. Core and Stage gain no bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16420,7 +16426,7 @@
     "@margoengine/optics/screens": 4501,
     "@margoengine/optics/spectrum": 1478,
     "@margoengine/physics": 1013233,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 104696,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 110158,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 907344,
     "@margoengine/physics/accretion": 5366,
     "@margoengine/physics/aeolian": 5256,

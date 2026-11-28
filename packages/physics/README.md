@@ -831,7 +831,7 @@ drag.remove();
 
 ## Explosions and wind
 
-`explosion(physics, center, {impulse, radius, falloff = 'linear', lift = 0, filter})` gives every dynamic body within `radius` an impulse away from `center` at its centre of mass, scaled by the falloff (`'linear'` to nothing at the radius, `'inverse-square'` or `'none'`), with `lift` adding an upward share; it returns the bodies it pushed. `new WindForce(physics, {velocity, density, drag = 1.17, friction = 0.004, region, filter})` loads every dynamic body in `region` each step from its shape (AERO-01): each collider's surface is cut into panels (boxes, spheres, capsules, cylinders, cones, convex hulls and triangle meshes as themselves; other shapes as the box of their bounds), and each panel the air meets takes the flat-plate normal force `drag` sin(a) times the dynamic pressure 1/2 rho |w|^2 times its area, a the angle at which the air w (relative to the moving panel, so a spinning body feels its spin) meets it, plus skin friction `friction` along the surface. Summed about the centre of mass they give drag, the lift of an inclined surface and the moment of uneven loads (a gust that hits the top of a box harder tips it). `velocity` is a vector, a function of the point and the time (gusts, swirls), or a shared flow field of `@margoengine/math/fields` (a `Wind`, such as the atmosphere solver's), sampled at each body's centre at the world's time (`stepCount * fixedTimestep`, or a `PhysicsWorld`'s tick when an `AirSolver` steps it: the clock the rest of a scene shares) and in the world's frame (a field whose `cell` is `[0, 0, 0]`). `density` defaults to the flow field's at each body, or else the standard atmosphere's at the body's height (`standardDensity(y)` of `@margoengine/math/atmosphere`, y metres above sea level: 1.225 kg/m3 at 0, 0.736 at 5 km). The load is held on each body as a force through that step only and taken off exactly after it (in a world, through `bodyForces`), so a body the wind holds up keeps its height and keeps its own `addForce` to the bit when the wind stops, and it is taken implicitly in the body's motion (the drag of the speed the step ends with), so a sheet of paper in a gale follows the wind without overshooting it at 60 steps a second. A heavy body is slower to follow than a light one, a sleeping body is woken only by a wind that would push it a tenth of a metre a second squared, and `remove()` stops it. It was called `WindField` until 2026-11-25; that name still works and is deprecated, since `WindField` is the wind itself in `@margoengine/weather`.
+`explosion(physics, center, {impulse, radius, falloff = 'linear', lift = 0, filter})` gives every dynamic body within `radius` an impulse away from `center` at its centre of mass, scaled by the falloff (`'linear'` to nothing at the radius, `'inverse-square'` or `'none'`), with `lift` adding an upward share; it returns the bodies it pushed. `new WindForce(physics, {velocity, density, drag = 1.17, friction = 0.004, region, filter})` loads every dynamic body in `region` each step from its shape (AERO-01): each collider's surface is cut into panels (boxes, spheres, capsules, cylinders, cones, convex hulls and triangle meshes as themselves; other shapes as the box of their bounds), and each panel the air meets takes the flat-plate normal force `drag` sin(a) times the dynamic pressure 1/2 rho |w|^2 times its area, a the angle at which the air w (relative to the moving panel, so a spinning body feels its spin) meets it, plus skin friction `friction` along the surface. Summed about the centre of mass they give drag, the lift of an inclined surface and the moment of uneven loads (a gust that hits the top of a box harder tips it). `velocity` is a vector, a function of the point and the time (gusts, swirls), or a shared flow field of `@margoengine/math/fields` (a `Wind`, such as the atmosphere solver's), sampled at each panel at the world's time (`stepCount * fixedTimestep`, or a `PhysicsWorld`'s tick when an `AirSolver` steps it: the clock the rest of a scene shares) and in the field's local frame. The rigid and wind origins default to `[0, 0, 0]`. `density` defaults to the flow field's at each body, or else the standard atmosphere's at the body's height (`standardDensity(y)` of `@margoengine/math/atmosphere`, y metres above sea level: 1.225 kg/m3 at 0, 0.736 at 5 km). The load is held on each body as a force through that step only and taken off exactly after it (in a world, through `bodyForces`), so a body the wind holds up keeps its height and keeps its own `addForce` to the bit when the wind stops, and it is taken implicitly in the body's motion (the drag of the speed the step ends with), so a sheet of paper in a gale follows the wind without overshooting it at 60 steps a second. A heavy body is slower to follow than a light one, a sleeping body is woken only by a wind that would push it a tenth of a metre a second squared, and `remove()` stops it. It was called `WindField` until 2026-11-25; that name still works and is deprecated, since `WindField` is the wind itself in `@margoengine/weather`.
 
 ```ts
 import {explosion, Physics, WindForce} from 'margoengine/physics';
@@ -845,6 +845,32 @@ const wind = new WindForce(physics, {velocity: (_point, time) => [0, 0, 4 + 2 * 
 for (let i = 0; i < 60; i++) physics.step();
 console.log(crate.linearVelocity);
 wind.remove();
+```
+
+### Native wind traction (AERO-01)
+
+The scalar constructor stays synchronous. `WindForce.create(physics, options, {threads, signal})` loads the optional native
+traction evaluator. Choose 1 (the default), 2 or 4 participants. The caller counts as one. Workers split the implicit
+force-and-torque probes, which reduce in panel order. `workCounts()` gives cumulative probe, panel and SIMD pair counts
+for each participant. `remove()` and `using` release the load and its workers. An optional `AbortSignal` cancels loading.
+
+When reading a floating-origin `Wind`, give `frame` the rigid solver's current signed cell and cell size. In a
+`PhysicsWorld` use `{cellSize: world.cellSize, get cell() { return world.cellOf('rigid'); }}`. Each sample is converted
+from body-local world metres into the wind cell before calling the field. Positions for a standalone vector or callback
+stay in the rigid frame. Pass `density` when it is prescribed, or supply it with each wind sample.
+
+```ts
+import {Physics, WindForce} from '@margoengine/physics';
+
+await Physics.load();
+using physics = new Physics(null);
+physics.gravity = [0, 0, 0];
+const panel = physics.addBody(null, {
+  colliders: {shape: 'box', halfExtents: [0.01, 0.4, 0.6], mass: 1},
+});
+using wind = await WindForce.create(physics, {velocity: [4, 0, 0], density: 1.2}, {threads: 2});
+physics.step();
+console.log(panel.linearVelocity[0] > 0, wind.workCounts()?.probes); // true 13
 ```
 
 ### Gravity fields, updrafts and vortices

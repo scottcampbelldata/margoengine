@@ -6946,3 +6946,11 @@ The default grid's transform count is reported by `turbulence-native.test.js`. T
 starts two helpers from a production consumer and verifies the emitted assets. `plant-gust.browser.mjs` reproduces
 a gust travelling across three rooted clumps, with exactly 30 simulation frames between first motion on each.
 The independent Vindeby vertical co-coherence error remains open. [Measurement and method](../clean-room.md#the-frameworks-wind-log-law-boundary-layer-and-mann-turbulence-atmo-01-atmo-02-margoengineweatherboundary-layer-and-turbulence-2026-11-25).
+
+### AERO-01 wind traction on suspended geometry
+
+The optional native wind load produces the scalar solver's six accepted load components with exact snapshot
+replay. The 1,219-panel packaged Chromium case starts three helpers. Both draw backends show sequential motion
+of the two rope-suspended paper cranes as a real gust reaches them. The original flypast remains open.
+The measured sphere coefficient still exceeds all eleven held-out plateau and recovery observations.
+[Research and evidence](../clean-room.md#aerodynamic-loads-from-shape-aero-01-windforce-in-margoenginephysics-2026-11-25).

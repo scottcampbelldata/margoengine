@@ -676,6 +676,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'wind-traction-kernel',
+    crate: 'packages/physics/wind-traction-kernel',
+    blueprint: 'packages/physics/src/aero/wind-traction-kernel.wasm',
+    script: 'packages/physics/scripts/build-wind-traction-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'wind-traction-kernel-shared',
+    crate: 'packages/physics/wind-traction-kernel',
+    blueprint: 'packages/physics/src/aero/wind-traction-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-wind-traction-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'vegetation-kernel-shared',
     crate: 'packages/physics/vegetation-kernel',
     blueprint: 'packages/physics/src/vegetation-kernel-shared.wasm',
