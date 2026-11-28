@@ -3304,3 +3304,14 @@ Layered light, surveyed allometry, species-specific growth and mortality calibra
 - Point 8 (a9332e0abb). `packages/physics/scripts/bio04-ageing-measured.mjs` compares independent Rapa Nui copper and Milan carbon-steel coupon losses. At years one and three, predicted copper losses are 1.26 and 2.83 µm against 2.10 and 3.75 µm measured. Milan predicts 5.28 µm against 6.92 µm at ten months, with first-year weather as a proxy. [Measured limits](limits.md#bio-04-measured-copper-and-carbon-steel-coupon-losses)
 
 Spatial pitting and runoff streaks, laboratory appearance calibration, predictive site immersion current and biological supply remain open. The row stays REOPENED at four points.
+
+### SPACE-02 Celestial ephemeris and rotation
+
+#### SPACE-02 four-point pass
+
+- Point 5 (bb86ef47c6). `packages/physics/tests/coupling/celestial.test.js` checks signed cells across restore, foreign aligned f64 fields, invalid layout, rejected epoch and nonfinite ephemeris. It compares the full accepted snapshot and native work receipt before and after rejection.
+- Point 6 (bb86ef47c6). `packages/physics/tests/coupling/celestial-workers.test.js` checks eight Table 1 rows against the scalar formula at 100 epochs and exact world replay with 1, 2 and 4 participants. `packages/physics/tests/celestial-workers.browser.mjs` checks three concurrent Chromium helpers, with eight paired planet rows and 48 Newton updates per accepted analytic epoch.
+- Point 7 (bb86ef47c6). `packages/physics/tests/celestial-film.browser.mjs` drives slope-aware collectors from registered native solar insolation. At 14.20° Sun elevation the true-tracking aperture is 69.00% shaded and the corrected aperture is clear, confirmed by independent rays and actual shadow-map pixels. Both renderers repeat the whole accepted snapshot and raw RGBA through seek.
+- Point 8 (bb86ef47c6). `packages/physics/scripts/space02-celestial-measured.mjs` compares independently surveyed grazing eclipses with no fitted parameters. The model gives 65.75 s against 18.1 s at Cape Range and 168 s against 13.7 s at Stephenville. Both Stephenville contacts miss camera brackets. [Measured limits](limits.md#space-02-measured-eclipse-contacts-near-the-edge-of-totality)
+
+High-precision apparent limbs and eclipse contact times, full Earth-orientation terms, two-way sea coupling and the original SOLARFIELD shots remain open. The row stays REOPENED at four points.
