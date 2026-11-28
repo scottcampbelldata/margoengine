@@ -50,6 +50,32 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### SEA-14 four-point pass
+
+- Point 5 (f5005a1986). `packages/physics/tests/entry.test.js` checks coded mesh, configuration and input
+  refusals with their fixes. `packages/physics/tests/coupling/entry.test.js` checks an invalid pressure query
+  on the second body, a finite load outside the rigid Float32 range, held forces, cavity, wakes and foam,
+  and recovery. It checks the crown threshold with local density and exact replay across a signed rebase.
+- Point 6 (f5005a1986). `packages/physics/tests/coupling/entry-profile-workers.test.js` compares scalar and
+  native 1/2/4 snapshots, loads, events and sources on 322- and 1,066-triangle moving-body cases.
+  `packages/physics/tests/entry-profile-workers.browser.mjs` joins three real nested helpers in packaged
+  Chromium. Eighty cuts in the 1,066-triangle case dispatch 42,640 SIMD triangle pairs and 24,056 paired
+  fan projections, with accepted hash 12039c63a4e3ce6f. The oblique odd-cut fixture also matches scalar.
+- Point 7 (f5005a1986). `packages/water/test/entry-film.browser.mjs` renders the real crown and seal of a
+  124 mm coated sphere at 64.583 and 214.583 ms. Accepted world state, the full 672×416 frame and replay
+  match within each renderer byte for byte. Disabling just ShotSplash leaves the physics hash and remote
+  water unchanged. The crown and seal contribute 1,076 and 2,109 pixels above the water in the camera.
+- Point 8 (f5005a1986). `docs/limits.md` records the axisymmetric section projection, fixed-width crown
+  closure, deep seal and jet calibration, and absent resolved sheets, surface seal and bubble pinch-off.
+  `packages/physics/tests/entry.test.js` checks the exact cone wetted radius and Archimedes draft.
+  The technical tank check leaves the original film shots open.
+- Point 2 stays open. `packages/physics/scripts/sea14-entry-measured.mjs` uses published inputs only
+  and keeps Speirs and Antolik outcomes outside the model. Speirs’s impulse through descending
+  half-peak is 0.04520 versus 0.067 ± 0.003 observed. The 1 kHz resampling fails to close the gap.
+  The pulse’s descending half-peak is 1.98 ms modelled against about 4.3 ± 1 ms read from the
+  figure. Antolik’s first-radius impulse is 0.01823 versus 0.01560 observed (+16.8%). Neither
+  comparison validates the later oblique, high-Weber-number or exit regimes.
+
 ### SEA-13 four-point pass
 
 - Point 5 (96d21889b9). `packages/physics/tests/coupling/foam.test.js` verifies that a late invalid face and
