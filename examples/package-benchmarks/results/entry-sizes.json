@@ -1,5 +1,5 @@
 {
-  "commit": "2f82b9e5c5",
+  "commit": "f204a4135a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -6400,8 +6400,8 @@
         "gzip": 9387
       },
       "./soft-mesh": {
-        "raw": 229039,
-        "gzip": 73100
+        "raw": 229050,
+        "gzip": 73101
       },
       "./interactivity": {
         "raw": 48540,
@@ -14556,12 +14556,12 @@
         "gzip": 2796
       },
       "./threemf-evaluate": {
-        "raw": 86369,
-        "gzip": 31261
+        "raw": 86564,
+        "gzip": 31356
       },
       "./threemf-boolean": {
-        "raw": 38765,
-        "gzip": 14709
+        "raw": 38959,
+        "gzip": 14791
       },
       "./threemf-displacement": {
         "raw": 42154,
@@ -14696,8 +14696,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 221596,
-        "gzip": 69321
+        "raw": 221662,
+        "gzip": 69336
       },
       "./atlas": {
         "raw": 4364,
@@ -14712,8 +14712,8 @@
         "gzip": 4761
       },
       "./batched": {
-        "raw": 142276,
-        "gzip": 43951
+        "raw": 142342,
+        "gzip": 43969
       },
       "./batched-lod": {
         "raw": 9653,
@@ -14756,8 +14756,8 @@
         "gzip": 2654
       },
       "./serialization": {
-        "raw": 144211,
-        "gzip": 46354
+        "raw": 144277,
+        "gzip": 46370
       },
       "./transmission-layers": {
         "raw": 4629,
@@ -14768,8 +14768,8 @@
         "gzip": 3858
       },
       "./fake-shadows": {
-        "raw": 122467,
-        "gzip": 38443
+        "raw": 122533,
+        "gzip": 38461
       },
       "./retroreflection": {
         "raw": 3388,
@@ -14800,8 +14800,8 @@
         "gzip": 20225
       },
       "./portal": {
-        "raw": 97040,
-        "gzip": 29845
+        "raw": 97106,
+        "gzip": 29863
       }
     },
     "@margoengine/math": {
@@ -15022,16 +15022,16 @@
         "gzip": 30193
       },
       "./modeling": {
-        "raw": 107309,
-        "gzip": 36110
+        "raw": 107735,
+        "gzip": 36260
       },
       "./geometry": {
         "raw": 42924,
         "gzip": 15325
       },
       "./boolean-exact": {
-        "raw": 29604,
-        "gzip": 11258
+        "raw": 34443,
+        "gzip": 12908
       },
       "./modifiers": {
         "raw": 23233,
@@ -15062,16 +15062,16 @@
         "gzip": 5299
       },
       "./boolean-batch": {
-        "raw": 30484,
-        "gzip": 11412
+        "raw": 35320,
+        "gzip": 13069
       },
       "./repair": {
         "raw": 26486,
         "gzip": 9659
       },
       "./hull": {
-        "raw": 35217,
-        "gzip": 12956
+        "raw": 40053,
+        "gzip": 14655
       }
     },
     "@margoengine/mixer": {
@@ -15340,8 +15340,8 @@
         "gzip": 11152
       },
       "./soft": {
-        "raw": 316781,
-        "gzip": 166016
+        "raw": 324058,
+        "gzip": 169565
       },
       "./tissue": {
         "raw": 7410,
@@ -17176,8 +17176,8 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 82427,
-        "gzip": 26866
+        "raw": 82783,
+        "gzip": 26926
       },
       "./base": {
         "raw": 31696,
@@ -17200,8 +17200,8 @@
         "gzip": 1977
       },
       "./fog": {
-        "raw": 9805,
-        "gzip": 4452
+        "raw": 9951,
+        "gzip": 4490
       },
       "./reflection": {
         "raw": 3154,
@@ -17280,8 +17280,8 @@
         "gzip": 1720
       },
       "./scenes": {
-        "raw": 85820,
-        "gzip": 27866
+        "raw": 86176,
+        "gzip": 27924
       },
       "./scene-kits": {
         "raw": 7029,
@@ -17300,8 +17300,8 @@
         "gzip": 3554
       },
       "./look": {
-        "raw": 9382,
-        "gzip": 3755
+        "raw": 9589,
+        "gzip": 3770
       },
       "./settings": {
         "raw": 28347,
@@ -18116,8 +18116,8 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 129759,
-        "gzip": 39674
+        "raw": 130514,
+        "gzip": 39947
       },
       "./base": {
         "raw": 44854,
@@ -18164,8 +18164,8 @@
         "gzip": 2485
       },
       "./lit": {
-        "raw": 4967,
-        "gzip": 2280
+        "raw": 5739,
+        "gzip": 2551
       },
       "./depth-collide": {
         "raw": 4074,
@@ -18244,12 +18244,12 @@
         "gzip": 12923
       },
       "./smoke": {
-        "raw": 11475,
-        "gzip": 4395
+        "raw": 11824,
+        "gzip": 4470
       },
       "./fire-front": {
-        "raw": 28769,
-        "gzip": 10489
+        "raw": 29254,
+        "gzip": 10563
       },
       "./solid": {
         "raw": 9698,
@@ -18722,8 +18722,8 @@
         "gzip": 6689
       },
       "./liquid": {
-        "raw": 131389,
-        "gzip": 41188
+        "raw": 152112,
+        "gzip": 46262
       },
       "./ships": {
         "raw": 27739,
@@ -18800,8 +18800,8 @@
         "gzip": 2636
       },
       "./drive": {
-        "raw": 29599,
-        "gzip": 9417
+        "raw": 29711,
+        "gzip": 9463
       },
       "./synoptic": {
         "raw": 1954,
@@ -19981,13 +19981,13 @@
     "@margoengine/physics/soft": {
       "entry": "./soft",
       "base": {
-        "raw": 172370,
-        "gzip": 56703
+        "raw": 177734,
+        "gzip": 58797
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",
-        "raw": 144410,
-        "gzip": 108418,
+        "raw": 146323,
+        "gzip": 109941,
         "loadedBy": "`await SoftBodies.attach(physics)`, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
