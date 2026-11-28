@@ -469,7 +469,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | EARTH-07 | Aeolian transport | physics/aeolian | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 32c933e9d0 |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
-| EARTH-10 | Lava flow | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 3a35fac405 |
+| EARTH-10 | Lava flow | partial | Codex | BUILDING (codex/physics-earth-10-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing 3a35fac405 |
 | ICE-01 | Snowpack | physics/snowpack and weather/avalanche | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7f5ad4a8d2 |
 | ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 096242cb21 |
 | ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7dbf9e06ee |
