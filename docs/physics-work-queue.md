@@ -485,7 +485,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | REOPENED (4/8 at 897e9aa010, points 5–8, [evidence](physics-solver-audit.md#hydro-04-four-point-pass)), prior landing dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Claude | CLAIMED (Fauld film) |
 | HYDRO-06 | Groundwater and springs | native aquifer assembly and live spring-to-shallow-water release | Codex | REOPENED (4/8 at 507df10bf7, points 5–8, [evidence](physics-solver-audit.md#hydro-06-four-point-pass)), prior landing b6e01ceb4c |
-| ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | BUILDING (codex/physics-atmo-05-four-point; four-point pass; [audit](physics-solver-audit.md)), landed 80aa218baa |
+| ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | REOPENED (4/8 at e56545a625, points 5–8, [evidence](physics-solver-audit.md#atmo-05-four-point-pass)) |
 | ATMO-06 | Airborne particle transport | physics/airborne and environment/density-volume | Codex | REOPENED (4/8 at a65111cd3a, points 5–8, [evidence](physics-solver-audit.md#atmo-06-four-point-pass)), prior landing 965fab2df7 |
 | ATMO-07 | Lightning and atmospheric electricity | physics/lightning and Sky LightningBolt | Codex | REOPENED (4/8 at 6bcaf278f3, points 5–8, [evidence](physics-solver-audit.md#atmo-07-four-point-pass)), prior landing 51ccc096bc |
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | REOPENED (4/8 at e2dee8854c, points 5–8, [evidence](physics-solver-audit.md#atmo-08-four-point-pass)), prior landing 80679b25b4 |

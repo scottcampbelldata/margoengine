@@ -3205,3 +3205,14 @@ Free-axis coning, full 3D plate tumble, natural shape presets, extended Reynolds
 - Point 8 (507df10bf7). `packages/physics/scripts/hydro06-glass-beads-measured.mjs` scores independent reported discharge with measured tank geometry, conductivity and metered rainfall. At 195 s the solver gives 4.69 mL/s, against 7.50 mL/s observed, and its 0.5 mL/s crossing is about 15 s early. The separate outlet-aligned 4 mm measurements also exceed the modeled rise under input and grid sensitivity. [Measured limits](limits.md#groundwater-and-springs-hydro-06)
 
 Unsaturated recharge transit, multilayer and confined transient response, wells and reciprocal spring exchange remain open for the unconfined world solver. The row stays REOPENED at four points.
+
+### ATMO-05 Tropical cyclones and large vortices
+
+#### ATMO-05 four-point pass
+
+- Point 5 (e56545a625). `packages/physics/tests/coupling/vortices.test.js` checks signed cells and exact restore. Invalid late depth, misaligned foreign memory and an invalid extreme-pressure sample preserve the accepted forcing, loads, probes and caller output.
+- Point 6 (e56545a625). `packages/physics/tests/coupling/vortex-water-workers.test.js` compares five prescribed profiles and exact signed wet/dry output with the scalar path and 1, 2 and 4 native participants. `packages/physics/tests/vortex-water-workers.browser.mjs` observes three Chromium helpers, 247 rows, 182 wet cells, 728 pressure faces evaluated in SIMD pairs and 182 wind samples.
+- Point 7 (e56545a625). `packages/water/test/cyclone-film.browser.mjs` draws a real native storm-driven shallow-water shelf. Pressure and boundary forcing add 0.719 m at the surveyed shore and wind adds another 1.885 m. The inland gauge reaches 1.789 m deep with wind and stays dry in both controls. Each renderer independently reproduces full state and RGBA.
+- Point 8 (e56545a625). `packages/physics/scripts/atmo05-storm-measured.mjs` initializes Isabel from NOAA B-deck pressure and track fields and compares independent dropsonde and marine drag measurements. The modeled 1 km tangential speed is 47.757 m/s against 76 ± 6 m/s observed. The four high-wind stress samples exceed the independent Powell intervals. [Measured limits](limits.md#atmo-05-accepted-storm-forcing-and-observations)
+
+Dynamic inflow and eyewall structure, reciprocal air–water feedback, remaining package coupling and the CY-14 film shot remain open. The row stays REOPENED at four points.
