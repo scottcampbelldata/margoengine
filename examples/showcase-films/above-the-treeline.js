@@ -1,11 +1,14 @@
 import { BiomeWorld, defineBiome } from '@margoengine/biomes';
 import { BiomeView } from '@margoengine/biomes/view';
 import { alpineTreelineGraph } from '@margoengine/biomes/treeline';
-import { PbrMaterial } from '@margoengine/core';
+import { Geometry, PbrMaterial } from '@margoengine/core';
 import { DOF } from '@margoengine/dof';
 import { GTAO } from '@margoengine/post/gtao';
 import { loadGLTF } from '@margoengine/gltf/pbr';
+import { SURFACES } from '@margoengine/materials/presets';
+import { FORB_COLORS, forb } from '@margoengine/procedural/forbs';
 import { libraryParts } from '@margoengine/scenes/library';
+import { Scatter } from '@margoengine/scatter';
 import { GrassScatter } from '@margoengine/scatter/grass';
 import { Sky } from '@margoengine/sky';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
@@ -306,14 +309,32 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     origin: [center[0] - 19, center[2] - 22],
     resolution: 128,
   });
+  const random = rng(9112);
+  const heroes = [
+    ['granite-a', -507, -495, 0.82, 0.4],
+    ['granite-e', -505.2, -499, 0.5, 2.1],
+    ['granite-b', -515, -486, 0.7, 4.0],
+    ['granite-c', -501.7, -496.7, 0.42, 5.3],
+  ];
+  const cobbles = [];
+  for (let i = 0; i < 85; i++) cobbles.push([-526 + random() * 41, -517 + random() * 43, 0.06 + random() ** 3 * 0.28]);
+  // Grass thins toward each stone: none under it, full cover a little way out, where rain shed off the rock and its
+  // shade let the sward close again (Scatter clearings).
+  const clearings = [
+    ...heroes.map(([, x, z, scale]) => ({ center: [x, z], radius: 0.62 * scale, falloff: 0.3 + 0.55 * scale })),
+    ...cobbles.map(([x, z, r]) => ({ center: [x, z], radius: 0.7 * r, falloff: 1.6 * r + 0.05 })),
+  ];
+  const fineBounds = [center[0] - 19, center[2] - 22, center[0] + 19, center[2] + 22];
   // A closed subalpine sward (Festuca and Deschampsia bunchgrass, 60 to 90 percent cover): a short dense undercoat that
   // hides the soil, green tussocks through it, and cured straw from last season standing in the tussocks.
+  // Each blade differs in hue, some yellow, tips die back and the low sun glows through them (measured leaf colour and
+  // transmittance, GrassShape hue, yellow, tipBrown and transmittance); living leaves have a waxy sheen.
   const grasses = [
-    { color: '#5f6a3a', count: 90000, height: 0.2, width: 0.011, radius: 0.09, seed: 113, blades: 12, dry: 0.15 },
-    { color: '#737847', count: 12500, height: 0.56, width: 0.016, radius: 0.11, seed: 279, blades: 14, dry: 0.2 },
-    { color: '#ac9060', count: 4200, height: 0.7, width: 0.012, radius: 0.13, seed: 721, blades: 10, dry: 0.55 },
+    { color: '#5f6a3a', count: 90000, height: 0.2, width: 0.011, radius: 0.09, seed: 113, blades: 12, dry: 0.15, gloss: 0.5 },
+    { color: '#737847', count: 12500, height: 0.56, width: 0.016, radius: 0.11, seed: 279, blades: 14, dry: 0.2, gloss: 0.52 },
+    { color: '#ac9060', count: 4200, height: 0.7, width: 0.012, radius: 0.13, seed: 721, blades: 10, dry: 0.55, gloss: 0.7 },
   ];
-  for (const { color, count, height, width, radius, seed, blades, dry } of grasses) {
+  for (const { color, count, height, width, radius, seed, blades, dry, gloss } of grasses) {
     GrassScatter.attach(engine, {
       center,
       area,
@@ -327,23 +348,144 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
       scale: [0.53, 1.07],
       wind: [0.76, -0.43, 0.54, 8.8],
       maxSlope: 31,
-      material: new PbrMaterial({ color, roughness: 0.84, doubleSided: true }),
+      material: new PbrMaterial({ color, roughness: gloss, doubleSided: true }),
       blades: { rootShade: 0.56, translucency: 0.56, widen: 0.65 },
       variation: { hue: 0.036, value: 0.29 },
-      grass: { height, width, radius, blades, dry, lean: 0.49, heightVariance: 0.53, segments: [6, 3, 1] },
+      clearings,
+      grass: {
+        height,
+        width,
+        radius,
+        blades,
+        dry,
+        lean: 0.49,
+        heightVariance: 0.53,
+        segments: [6, 3, 1],
+        hue: 0.03,
+        yellow: 0.2,
+        tipBrown: 0.35,
+      },
     });
+  }
+  // Litter: last season's cured leaves lying in mats between the tussocks and dead flowering stalks standing in them.
+  const dead = [
+    { count: 9000, seed: 433, grass: { height: 0.32, width: 0.009, blades: 12, radius: 0.13, lean: 0.93, tussock: 0.15 } },
+    { count: 2600, seed: 571, grass: { height: 0.45, width: 0.0035, blades: 3, radius: 0.05, lean: 0.14, tussock: 0 } },
+  ];
+  for (const { count, seed, grass } of dead)
+    GrassScatter.attach(engine, {
+      center,
+      area,
+      count,
+      seed,
+      heightmap: () => fine.texture,
+      lod: [8, 19, 59],
+      lodFade: 2,
+      edgeShrink: 4,
+      sink: 0.02,
+      scale: [0.6, 1.2],
+      wind: [0.76, -0.43, 0.3, 8.8],
+      maxSlope: 31,
+      clearings,
+      clumps: { size: 1.7, cover: 0.48 },
+      material: new PbrMaterial({ color: [...SURFACES.dryGrass.color], roughness: 0.75, doubleSided: true }),
+      blades: { rootShade: 0.45, translucency: 0.35, widen: 0.65 },
+      variation: { hue: 0.02, value: 0.25 },
+      grass: { ...grass, dry: 1, tipBrown: 0, yellow: 0, heightVariance: 0.5, segments: [5, 3, 1] },
+    });
+  // Gravel and small stones through the turf, laid along the slope and half buried.
+  const pebble = buildBoulder(
+    { kind: 'boulder', position: [0, 0, 0], radius: 0.12, cliff: 0 },
+    { seed: 4242, cell: 0.02, embed: 0.3 },
+  ).geometry;
+  Scatter.attach(engine, pebble, {
+    center,
+    area,
+    count: 2400,
+    seed: 905,
+    heightmap: () => fine.texture,
+    lod: [9, 20, 45],
+    lodFade: 2,
+    scale: [0.15, 0.7],
+    alignToGround: 0.85,
+    sink: 0.012,
+    maxSlope: 35,
+    clumps: { size: 2.3, cover: 0.42 },
+    material: new PbrMaterial({ color: SURFACES.granite.color.map((v) => v * 0.5), roughness: 0.86 }),
+    variation: { hue: 0.03, value: 0.3 },
+  });
+  // Moss and dark crumbs of soil gathered at each boulder's base, thinning outward (inside clearings), so the stones
+  // sit in the ground.
+  const moss = forb('campion', { heads: 0, seed: 7, scale: 0.42 }).parts[0];
+  for (const [i, [, x, z, scale]] of heroes.entries())
+    Scatter.attach(engine, moss.rings.map((g) => new Geometry(g.positions, g.normals, g.indices)), {
+      center: [x, 0, z],
+      area: [3.4 * scale + 1, 3.4 * scale + 1],
+      bounds: fineBounds,
+      heightmap: () => fine.texture,
+      count: 420,
+      seed: 61 + i,
+      lod: [9, 20, 45],
+      lodFade: 2,
+      scale: [0.5, 1.3],
+      alignToGround: 0.7,
+      sink: 0.015,
+      clearings: [{ center: [x, z], radius: 0.6 * scale, falloff: 0.55 * scale + 0.25, inside: true }],
+      clumps: { size: 0.5, cover: 0.62 },
+      material: new PbrMaterial({ color: FORB_COLORS.leaf.map((v) => v * 0.7), roughness: 0.8 }),
+      variation: { hue: 0.05, value: 0.35 },
+    });
+
+  // Alpine wildflowers over the meadow, each kind in its own drifts (procedural forbs, measured petal colours): American
+  // bistort, heartleaf arnica, alpine aster, Parry's gentian and moss campion cushions.
+  const fieldBounds = [-650, -585, -410, -345];
+  const field = TerrainHeightmap.attach(engine, (x, z) => world.heightAt(x, z), {
+    size: [fieldBounds[2] - fieldBounds[0], fieldBounds[3] - fieldBounds[1]],
+    origin: [fieldBounds[0], fieldBounds[1]],
+    resolution: 768,
+  });
+  const flowers = [
+    ['bistort', 160000, 31, { size: 11, cover: 0.55 }],
+    ['arnica', 110000, 32, { size: 7, cover: 0.45 }],
+    ['aster', 90000, 33, { size: 6, cover: 0.42 }],
+    ['gentian', 60000, 34, { size: 9, cover: 0.4 }],
+    ['campion', 40000, 35, { size: 5, cover: 0.38 }],
+  ];
+  for (const [species, count, seed, clumps] of flowers) {
+    const plant = forb(species, { seed });
+    for (const part of plant.parts)
+      Scatter.attach(
+        engine,
+        part.rings.map((g) => new Geometry(g.positions, g.normals, g.indices)),
+        {
+          center: [(fieldBounds[0] + fieldBounds[2]) / 2, 0, (fieldBounds[1] + fieldBounds[3]) / 2],
+          area: [fieldBounds[2] - fieldBounds[0], fieldBounds[3] - fieldBounds[1]],
+          bounds: fieldBounds,
+          heightmap: () => field.texture,
+          count,
+          seed,
+          clumps,
+          clearings,
+          minHeight: altitude + 8,
+          maxHeight: line + 110,
+          maxSlope: 30,
+          lod: [10, 32, 120],
+          lodFade: 2,
+          edgeShrink: 12,
+          scale: [1.1, 1.7],
+          sink: 0.01,
+          reach: plant.reach,
+          sway: { height: plant.top },
+          wind: [0.76, -0.43, 0.3, 8.8],
+          material: new PbrMaterial({ color: [...part.color], roughness: part.roughness, doubleSided: true }),
+          variation: { hue: part.name === 'foliage' ? 0.03 : 0.015, value: 0.18 },
+        },
+      );
   }
 
   // Fallen granite: the four large blocks are photographed boulders (treeline-rocks/hero in the asset library, about
   // 11,000 to 27,000 triangles each with their 2k maps); the cobbles around them are closed fracture-cell meshes shaded
   // per pixel as granite with lichen on top.
-  const random = rng(9112);
-  const heroes = [
-    ['granite-a', -507, -495, 0.82, 0.4],
-    ['granite-e', -505.2, -499, 0.5, 2.1],
-    ['granite-b', -515, -486, 0.7, 4.0],
-    ['granite-c', -501.7, -496.7, 0.42, 5.3],
-  ];
   const signal = AbortSignal.timeout(30000);
   const boulders = await Promise.all(
     heroes.map(async ([name, x, z, scale, turn]) => {
@@ -361,8 +503,6 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     cracks: 0.45,
     scale: 0.9,
   });
-  const cobbles = [];
-  for (let i = 0; i < 85; i++) cobbles.push([-526 + random() * 41, -517 + random() * 43, 0.06 + random() ** 3 * 0.28]);
   for (const [i, [x, z, r]] of cobbles.entries()) {
     const block = buildBoulder(
       { kind: 'boulder', position: [x, world.heightAt(x, z), z], radius: r, cliff: 0 },
