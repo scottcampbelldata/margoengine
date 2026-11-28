@@ -15943,7 +15943,7 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ### Linux (Intel UHD, Mesa): three GPU suites not finished
 
-**Status:** open: voxel and the root browser suites ran on 2026-11-28 but 12 steps did not fit the heat budget, and the
+**Status:** open, deferred (Scott: ignore for now): the 2026-11-28 run left 12 steps over the heat budget, and the
 voxel path tracer is excluded on this hardware (hardware check).
 
 - **What (2026-10-28, main b92998d6):** on the Ubuntu test server (Intel N100 with Intel UHD, Chromium on Mesa's Vulkan
