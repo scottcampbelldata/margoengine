@@ -1,6 +1,6 @@
 {
-  "commit": "a70c9f8bfd",
-  "dirty": true,
+  "commit": "8d0541325a",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 61848,
@@ -84,8 +84,12 @@
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 58410,
-        "gzip": 20326
+        "raw": 68432,
+        "gzip": 24513
+      },
+      "./ik": {
+        "raw": 9756,
+        "gzip": 4497
       },
       "./ccd": {
         "raw": 15427,
@@ -104,12 +108,12 @@
         "gzip": 1963
       },
       "./warping": {
-        "raw": 10913,
-        "gzip": 4525
+        "raw": 17775,
+        "gzip": 7679
       },
       "./fbik": {
-        "raw": 12190,
-        "gzip": 5222
+        "raw": 20540,
+        "gzip": 8900
       },
       "./motion-matching": {
         "raw": 16416,
@@ -120,8 +124,8 @@
         "gzip": 1639
       },
       "./spline-ik": {
-        "raw": 7240,
-        "gzip": 3288
+        "raw": 14102,
+        "gzip": 6390
       },
       "./layers": {
         "raw": 36067,
@@ -238,12 +242,12 @@
     },
     "@margoengine/behavior": {
       ".": {
-        "raw": 27225,
-        "gzip": 9791
+        "raw": 27241,
+        "gzip": 9796
       },
       "./steering": {
-        "raw": 11770,
-        "gzip": 4736
+        "raw": 11786,
+        "gzip": 4738
       },
       "./perception": {
         "raw": 9303,
@@ -304,8 +308,8 @@
         "gzip": 2920
       },
       "./presets": {
-        "raw": 10132,
-        "gzip": 3087
+        "raw": 10217,
+        "gzip": 3136
       },
       "./region": {
         "raw": 9800,
@@ -337,7 +341,7 @@
       },
       "./settings": {
         "raw": 15101,
-        "gzip": 6346
+        "gzip": 6348
       },
       "./relief": {
         "raw": 12872,
@@ -361,7 +365,7 @@
       },
       "./view": {
         "raw": 43394,
-        "gzip": 16794
+        "gzip": 16795
       },
       "./rivers": {
         "raw": 8833,
@@ -1514,8 +1518,8 @@
         "gzip": 29914
       },
       "./threemf": {
-        "raw": 125164,
-        "gzip": 44577
+        "raw": 127495,
+        "gzip": 45513
       },
       "./model": {
         "raw": 25194,
@@ -1878,6 +1882,10 @@
       "./animator": {
         "raw": 35,
         "gzip": 55
+      },
+      "./animator/ik": {
+        "raw": 38,
+        "gzip": 58
       },
       "./animator/ccd": {
         "raw": 39,
@@ -4794,6 +4802,14 @@
       "./rigging/joint-limits": {
         "raw": 47,
         "gzip": 67
+      },
+      "./rigging/anatomy": {
+        "raw": 42,
+        "gzip": 62
+      },
+      "./rigging/anatomy/human": {
+        "raw": 48,
+        "gzip": 68
       },
       "./rigging/swim": {
         "raw": 39,
@@ -14811,6 +14827,10 @@
         "raw": 826,
         "gzip": 392
       },
+      "./bench": {
+        "raw": 4754,
+        "gzip": 2076
+      },
       "./overlays": {
         "raw": 4595,
         "gzip": 2065
@@ -14940,8 +14960,8 @@
         "gzip": 11266
       },
       "./presets": {
-        "raw": 23517,
-        "gzip": 7220
+        "raw": 23513,
+        "gzip": 7219
       },
       "./settings": {
         "raw": 56745,
@@ -15519,15 +15539,15 @@
     "@margoengine/physics": {
       ".": {
         "raw": 1533440,
-        "gzip": 992317
+        "gzip": 992316
       },
       "./decomposition": {
         "raw": 26988,
         "gzip": 11152
       },
       "./soft": {
-        "raw": 342314,
-        "gzip": 181566
+        "raw": 356074,
+        "gzip": 188159
       },
       "./tissue": {
         "raw": 7410,
@@ -15570,16 +15590,16 @@
         "gzip": 16106
       },
       "./rail": {
-        "raw": 30922,
-        "gzip": 12230
+        "raw": 30991,
+        "gzip": 12267
       },
       "./seismic": {
         "raw": 12828,
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24660,
-        "gzip": 9092
+        "raw": 24693,
+        "gzip": 9107
       },
       "./explosive": {
         "raw": 41746,
@@ -15598,8 +15618,8 @@
         "gzip": 6377
       },
       "./clouds": {
-        "raw": 31735,
-        "gzip": 11585
+        "raw": 31804,
+        "gzip": 11625
       },
       "./ageing": {
         "raw": 9179,
@@ -15610,8 +15630,8 @@
         "gzip": 5110
       },
       "./room-sound": {
-        "raw": 23644,
-        "gzip": 9125
+        "raw": 23677,
+        "gzip": 9137
       },
       "./modal-sound": {
         "raw": 23950,
@@ -15627,7 +15647,7 @@
       },
       "./flight": {
         "raw": 33768,
-        "gzip": 12800
+        "gzip": 12799
       },
       "./waves": {
         "raw": 17096,
@@ -15651,15 +15671,15 @@
       },
       "./seakeeping": {
         "raw": 113171,
-        "gzip": 42697
+        "gzip": 42698
       },
       "./celestial": {
-        "raw": 20211,
-        "gzip": 9482
+        "raw": 20227,
+        "gzip": 9486
       },
       "./life": {
-        "raw": 26259,
-        "gzip": 10280
+        "raw": 26328,
+        "gzip": 10317
       },
       "./crush": {
         "raw": 59905,
@@ -15678,12 +15698,12 @@
         "gzip": 4432
       },
       "./schooling": {
-        "raw": 12254,
-        "gzip": 4846
+        "raw": 12270,
+        "gzip": 4860
       },
       "./vegetation": {
-        "raw": 33767,
-        "gzip": 12756
+        "raw": 33836,
+        "gzip": 12793
       },
       "./tracers": {
         "raw": 46886,
@@ -15710,12 +15730,12 @@
         "gzip": 36541
       },
       "./loads": {
-        "raw": 196453,
-        "gzip": 72082
+        "raw": 202704,
+        "gzip": 74569
       },
       "./surge": {
-        "raw": 9446,
-        "gzip": 4478
+        "raw": 9374,
+        "gzip": 4428
       },
       "./ice": {
         "raw": 6791,
@@ -15734,24 +15754,24 @@
         "gzip": 15193
       },
       "./viscoplastic": {
-        "raw": 23097,
-        "gzip": 8802
+        "raw": 23166,
+        "gzip": 8840
       },
       "./tsunami": {
-        "raw": 23715,
-        "gzip": 9137
+        "raw": 23784,
+        "gzip": 9174
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18496,
-        "gzip": 7165
+        "raw": 18565,
+        "gzip": 7205
       },
       "./drainage-fog": {
-        "raw": 20242,
-        "gzip": 8000
+        "raw": 20311,
+        "gzip": 8035
       },
       "./vortices": {
         "raw": 13162,
@@ -15762,12 +15782,12 @@
         "gzip": 4916
       },
       "./airborne": {
-        "raw": 28115,
-        "gzip": 11108
+        "raw": 28184,
+        "gzip": 11148
       },
       "./aeolian": {
-        "raw": 23155,
-        "gzip": 8950
+        "raw": 23224,
+        "gzip": 8989
       },
       "./groundwater": {
         "raw": 15172,
@@ -15778,28 +15798,28 @@
         "gzip": 7681
       },
       "./landscape": {
-        "raw": 19819,
-        "gzip": 7713
+        "raw": 19888,
+        "gzip": 7752
       },
       "./sediment": {
-        "raw": 21494,
-        "gzip": 8021
+        "raw": 21563,
+        "gzip": 8057
       },
       "./underwater": {
-        "raw": 20650,
-        "gzip": 8222
+        "raw": 20719,
+        "gzip": 8257
       },
       "./orbit": {
-        "raw": 17410,
-        "gzip": 6886
+        "raw": 17479,
+        "gzip": 6925
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25644,
-        "gzip": 9846
+        "raw": 25677,
+        "gzip": 9862
       },
       "./dfsph": {
         "raw": 19974,
@@ -15822,8 +15842,8 @@
         "gzip": 16406
       },
       "./boundary-layer": {
-        "raw": 14301,
-        "gzip": 5666
+        "raw": 14370,
+        "gzip": 5705
       }
     },
     "@margoengine/physics2d": {
@@ -16018,8 +16038,8 @@
         "gzip": 7412
       },
       "./caustics": {
-        "raw": 33237,
-        "gzip": 11140
+        "raw": 33888,
+        "gzip": 11409
       },
       "./heat-haze": {
         "raw": 40178,
@@ -16504,24 +16524,32 @@
         "gzip": 8106
       },
       "./ik": {
-        "raw": 10648,
-        "gzip": 4623
+        "raw": 12476,
+        "gzip": 5436
       },
       "./contact": {
-        "raw": 34121,
-        "gzip": 13167
+        "raw": 34331,
+        "gzip": 13256
       },
       "./joint-limits": {
         "raw": 3169,
         "gzip": 1514
+      },
+      "./anatomy": {
+        "raw": 25960,
+        "gzip": 10086
+      },
+      "./anatomy/human": {
+        "raw": 61528,
+        "gzip": 21609
       },
       "./swim": {
         "raw": 4490,
         "gzip": 2106
       },
       "./retarget": {
-        "raw": 10549,
-        "gzip": 4021
+        "raw": 10582,
+        "gzip": 4032
       },
       "./hulls": {
         "raw": 6633,
@@ -16564,8 +16592,8 @@
         "gzip": 11143
       },
       "./vrm-constraints": {
-        "raw": 7243,
-        "gzip": 2994
+        "raw": 7276,
+        "gzip": 3002
       },
       "./vrma": {
         "raw": 18060,
@@ -16576,8 +16604,8 @@
         "gzip": 8062
       },
       "./pose-tracking": {
-        "raw": 14505,
-        "gzip": 5340
+        "raw": 14538,
+        "gzip": 5349
       },
       "./hands": {
         "raw": 15198,
@@ -16768,12 +16796,12 @@
         "gzip": 1402
       },
       "./grass": {
-        "raw": 5810,
-        "gzip": 2627
+        "raw": 6889,
+        "gzip": 3047
       },
       "./velocity": {
-        "raw": 9199,
-        "gzip": 3768
+        "raw": 9680,
+        "gzip": 3961
       },
       "./read": {
         "raw": 6393,
@@ -17126,8 +17154,8 @@
         "gzip": 7923
       },
       "./provenance": {
-        "raw": 74205,
-        "gzip": 30741
+        "raw": 74168,
+        "gzip": 30730
       },
       "./amr": {
         "raw": 82811,
@@ -17446,8 +17474,8 @@
         "gzip": 10441
       },
       "./ephemeris": {
-        "raw": 3446,
-        "gzip": 1985
+        "raw": 3462,
+        "gzip": 1989
       },
       "./lightning-glow": {
         "raw": 13276,
@@ -17790,8 +17818,8 @@
         "gzip": 1332
       },
       "./bench": {
-        "raw": 36767,
-        "gzip": 13599
+        "raw": 37248,
+        "gzip": 13779
       }
     },
     "@margoengine/taa": {
@@ -18466,8 +18494,8 @@
         "gzip": 12041
       },
       "./flocking": {
-        "raw": 53833,
-        "gzip": 16673
+        "raw": 54197,
+        "gzip": 16807
       }
     },
     "@margoengine/video": {
@@ -18864,8 +18892,8 @@
         "gzip": 4421
       },
       "./caustics": {
-        "raw": 19773,
-        "gzip": 6395
+        "raw": 20456,
+        "gzip": 6703
       },
       "./ripples": {
         "raw": 32301,
@@ -18900,8 +18928,8 @@
         "gzip": 3732
       },
       "./underwater": {
-        "raw": 24702,
-        "gzip": 9071
+        "raw": 25487,
+        "gzip": 9415
       },
       "./rivers": {
         "raw": 11240,
@@ -18932,8 +18960,8 @@
         "gzip": 6689
       },
       "./liquid": {
-        "raw": 154877,
-        "gzip": 47309
+        "raw": 155695,
+        "gzip": 47706
       },
       "./ships": {
         "raw": 27739,
@@ -19030,8 +19058,8 @@
         "gzip": 5928
       },
       "./lens": {
-        "raw": 9388,
-        "gzip": 4075
+        "raw": 10086,
+        "gzip": 4398
       },
       "./cover": {
         "raw": 4030,
@@ -19044,6 +19072,10 @@
       "dist/workers/mann-fft.js": {
         "raw": 1599,
         "gzip": 832
+      },
+      "dist/workers/surface-energy.js": {
+        "raw": 1321,
+        "gzip": 654
       }
     },
     "@margoengine/webgl2-compat": {
@@ -19351,9 +19383,9 @@
       "brotli": 8489
     },
     "packages/physics/dist/solver-phase-thread.js": {
-      "raw": 1604,
-      "gzip": 777,
-      "brotli": 674
+      "raw": 1587,
+      "gzip": 766,
+      "brotli": 661
     },
     "packages/physics/dist/terramechanics-kernel.wasm": {
       "raw": 40423,
@@ -19555,6 +19587,16 @@
       "gzip": 919,
       "brotli": 851
     },
+    "packages/physics/dist/wing-lattice-kernel.wasm": {
+      "raw": 6542,
+      "gzip": 2860,
+      "brotli": 2576
+    },
+    "packages/physics/dist/wing-lattice-kernel-shared.wasm": {
+      "raw": 6542,
+      "gzip": 2860,
+      "brotli": 2576
+    },
     "packages/physics/dist/room-sound-kernel.wasm": {
       "raw": 2717,
       "gzip": 1393,
@@ -19705,6 +19747,21 @@
       "gzip": 832,
       "brotli": 699
     },
+    "packages/weather/dist/surface-energy-kernel.wasm": {
+      "raw": 7688,
+      "gzip": 2934,
+      "brotli": 2638
+    },
+    "packages/weather/dist/surface-energy-kernel-shared.wasm": {
+      "raw": 7688,
+      "gzip": 2934,
+      "brotli": 2638
+    },
+    "packages/weather/dist/workers/surface-energy.js": {
+      "raw": 1321,
+      "gzip": 654,
+      "brotli": 561
+    },
     "packages/compute/dist/onnx-kernel.wasm": {
       "raw": 862375,
       "gzip": 306118,
@@ -19851,9 +19908,9 @@
       "brotli": 13443
     },
     "packages/physics/dist/index.js": {
-      "raw": 1532133,
-      "gzip": 990130,
-      "brotli": 961259
+      "raw": 1538231,
+      "gzip": 994299,
+      "brotli": 966685
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -20144,31 +20201,6 @@
       "raw": 1558039,
       "gzip": 574912,
       "brotli": 424250
-    },
-    "packages/weather/dist/surface-energy-kernel.wasm": {
-      "raw": 7688,
-      "gzip": 2934,
-      "brotli": 2638
-    },
-    "packages/weather/dist/surface-energy-kernel-shared.wasm": {
-      "raw": 7688,
-      "gzip": 2934,
-      "brotli": 2638
-    },
-    "packages/weather/dist/workers/surface-energy.js": {
-      "raw": 1321,
-      "gzip": 654,
-      "brotli": 561
-    },
-    "packages/physics/dist/wing-lattice-kernel.wasm": {
-      "raw": 6542,
-      "gzip": 2860,
-      "brotli": 2576
-    },
-    "packages/physics/dist/wing-lattice-kernel-shared.wasm": {
-      "raw": 6542,
-      "gzip": 2860,
-      "brotli": 2576
     }
   },
   "splits": {
@@ -20280,13 +20312,13 @@
     "@margoengine/physics/soft": {
       "entry": "./soft",
       "base": {
-        "raw": 181776,
-        "gzip": 60132
+        "raw": 191136,
+        "gzip": 63624
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",
-        "raw": 160537,
-        "gzip": 120618,
+        "raw": 164937,
+        "gzip": 123952,
         "loadedBy": "`await SoftBodies.attach(physics)`, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

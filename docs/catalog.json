@@ -2365,8 +2365,10 @@
       "addFootPlacement",
       "addLookAt",
       "addRootMotion",
+      "anatomyOf",
       "blend1D",
       "blend2D",
+      "setAnatomy",
       "solveTwoBoneIK"
     ],
     "category": "Animation and interaction"

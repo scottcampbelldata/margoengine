@@ -1,6 +1,6 @@
 {
-  "commit": "a70c9f8bfd",
-  "dirty": true,
+  "commit": "8d0541325a",
+  "dirty": false,
   "browser": "msedge 158.0.4370.45 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
