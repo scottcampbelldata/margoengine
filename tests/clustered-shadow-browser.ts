@@ -16,6 +16,7 @@ import { LightBounce } from '../packages/clustered/dist/bounce.js';
 import { Terrain } from '../packages/terrain/dist/index.js';
 import { parseGLTFAsync } from '../packages/gltf/dist/pbr.js';
 import { Material, createMesh, install } from '../packages/materials/dist/index.js';
+import { RawMesh, RawShaderMaterial, RawShaders } from '../packages/shader/dist/raw.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -59,7 +60,7 @@ type Config = {
    * `'materials'` and `'coated'` a `@margoengine/materials` `createMesh` with a standard `Material` (`'coated'`:
    * clearcoat 1). `'not added'` makes the plain quad and leaves it out of the bounce.
    */
-  patchModel?: boolean | 'not added' | 'installed' | 'materials' | 'coated';
+  patchModel?: boolean | 'not added' | 'installed' | 'materials' | 'coated' | 'raw' | 'raw depth';
   /** The two rooms' wall (`roomsWall`'s box) as a gltf/pbr model added to the bounce (`bounce.add`), KB-BOUNCE-OCCLUDE1. */
   wallModel?: boolean;
 };
@@ -275,7 +276,33 @@ async function scene(config: Config) {
     patchModel = model;
     bounce?.add(model);
   }
-  if (config.patchModel === 'materials' || config.patchModel === 'coated') {
+  if (config.patchModel === 'raw' || config.patchModel === 'raw depth') {
+    // The same quad drawn by a raw WGSL shader (`@margoengine/shader/raw`), its capture entry returning albedo 0.8;
+    // 'raw depth' leaves the entry out, so the quad gives the capture its depth alone.
+    const raw = RawShaders.attach(engine),
+      material = new RawShaderMaterial({
+        vertexShader: `struct Out {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) normal:vec3f}
+@vertex fn vertex(a:Attributes)->Out {let w=mesh.world*vec4f(a.position,1);return Out(camera.viewProjection*w,w.xyz,normalize(mesh.normal*a.normal));}
+@fragment fn capture(i:Out)->MargoCapture {return margoCapture(MargoMaterial(i.world,i.normal,camera.position-i.world,vec3f(0.8),0.0,1.0,vec3f(0)));}
+@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(0.8,0.8,0.8,1);}`,
+        fragmentEntry: 'fragment',
+        cull: 'none',
+        ...(config.patchModel === 'raw' ? { captureEntry: 'capture' } : {}),
+      });
+    raw.add(
+      new RawMesh({
+        material,
+        attributes: {
+          position: { data: [-1, 0, 0, 1, 0, 0, 1, 0, 2, -1, 0, 2], type: 'vec3f' },
+          normal: { data: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], type: 'vec3f' },
+        },
+        index: [0, 2, 1, 0, 3, 2],
+      }),
+    );
+    await raw.ready();
+    patchModel = raw;
+    bounce?.add(raw);
+  } else if (config.patchModel === 'materials' || config.patchModel === 'coated') {
     // The same quad as patchGLTF, drawn by @margoengine/materials (a gltf/pbr model underneath, with its capture hook).
     const mesh = createMesh(
       engine,

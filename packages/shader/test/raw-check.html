@@ -7,6 +7,7 @@ import {planeGeometry} from '/packages/geometry/dist/index.js';
 import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {GTAO,SSAO,SSGI,SSR} from '/packages/post/dist/index.js';
+import {SceneTargets} from '/packages/post/dist/mrt.js';
 import {Picking} from '/packages/selection/dist/index.js';
 import {ComputePass,storage,vec4} from '/packages/shader/dist/index.js';
 import {RawMesh,RawPicking,RawShaderMaterial,RawShaders} from '/packages/shader/dist/raw.js';
@@ -92,6 +93,8 @@ const scenarios={
   ssrOwn:s=>mirror(s,true),
   ssrDepth:s=>mirror(s,false),
   ssgiOwn:s=>bounce(s,true),
+  mrtOwn:s=>targetsScene(s,true),
+  mrtDepth:s=>targetsScene(s,false),
   ssgiDepth:s=>bounce(s,false),
   // A raw mesh with captureEntry added to an effect whose capture takes no MargoMaterial reports it (SSAO has no capture).
   captureWrong:s=>{const material=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(1)','vec3f(1)',0,1,'vec3f(0)'),fragmentEntry:'fragment',captureEntry:'capture'});return {threw:(()=>{try{material.captureCode(new RawMesh({material,attributes:quad(),index}),{declarations:()=>'',targets:[],begin(){}});return false;}catch(e){return e.code==='unsupported';}})()};},
@@ -168,6 +171,17 @@ function bounce(s,own){
   const ssgi=SSGI.attach(s.engine);ssgi.add(s.raw);
   s.engine.camera.position=[0,0.5,3];s.engine.camera.target=[0,-0.8,0];
   s.after=async()=>({floor:s.pixel([0,-1,-1.2])});
+}
+// A raw floor of base colour (0.2, 0.6, 0.9) in SceneTargets: with its capture its pixel holds that albedo and the
+// normal up; without it nothing is written there.
+function targetsScene(s,own){
+  const floor=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(0.5)','vec3f(0.2,0.6,0.9)',0,0.5,'vec3f(0)'),fragmentEntry:'fragment',...(own?{captureEntry:'capture'}:{})});
+  s.raw.add(new RawMesh({material:floor,attributes:flat(-1,-3,3),index}));
+  const targets=SceneTargets.attach(s.engine,{outputs:{albedo:{wgsl:'vec4f(t.albedo.rgb,1)',format:'rgba8unorm'},normal:{wgsl:'vec4f(t.normal*0.5+0.5,1)',format:'rgba8unorm'}}});
+  targets.add(s.raw);
+  s.engine.camera.position=[0,1,3];s.engine.camera.target=[0,-1,0];
+  const texel=async(name,[x,y])=>{const texture=targets.texture(name),rect=s.engine.canvas.getBoundingClientRect(),px=Math.floor(x*texture.width/rect.width),py=Math.floor(y*texture.height/rect.height),buffer=s.device.createBuffer({size:256,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=s.device.createCommandEncoder();e.copyTextureToBuffer({texture,origin:[px,py]},{buffer,bytesPerRow:256},[1,1]);s.device.queue.submit([e.finish()]);await buffer.mapAsync(GPUMapMode.READ);const v=[...new Uint8Array(buffer.getMappedRange().slice(0,4))];buffer.unmap();buffer.destroy();return v;};
+  s.after=async()=>{const at=s.pixel([0,-1,0]);return {albedo:await texel('albedo',at),normal:await texel('normal',at)};};
 }
 async function pickScene(s,z=0){
   const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),m=x=>solid(s,{vertexShader:paint('vec3f(1)')},{attributes:quad(0.5,z),matrix:translate(x,0,0)}),left=m(-0.6),right=m(0.6);

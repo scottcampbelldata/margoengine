@@ -178,6 +178,13 @@ export function bounceModelMeshes(
 // view's eye, the shader's own Frame (`f` in gltf/pbr, `frame` in terrain); a shader with neither writes nothing.
 const pbrSurface = /struct Surface\s*\{\s*base:vec4f/;
 function bounceModelTail(code: string): string {
+  // `@margoengine/shader/raw` meshes with `captureEntry` (`bounce.add(raw)`): the surface their entry returns.
+  if (/struct MargoMaterial\s*\{/.test(code))
+    return `
+var<private> margoPosition:vec3f;
+struct MargoCapture {@location(0) bounce:vec4f}
+fn margoCapture(m:MargoMaterial)->MargoCapture {margoPosition=m.position;return MargoCapture(vec4f(m.base*(1.0-m.metal),length(m.position-camera.position)));}
+`;
   const eye = /var<uniform>\s*f\s*:\s*Frame/.test(code)
       ? 'f.eye.xyz'
       : /var<uniform>\s*frame\s*:\s*Frame/.test(code)
@@ -484,7 +491,7 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
     return this;
   }
   /**
-   * Makes a gltf/pbr model, a `@margoengine/materials` mesh, terrain or voxel renderer reflect the bounce: its own
+   * Makes a gltf/pbr model, a `@margoengine/materials` mesh, terrain, voxel renderer or a raw mesh with `captureEntry` (`@margoengine/shader/raw`) reflect the bounce: its own
    * materials (maps, alpha mask, instances, skinning, clearcoat) are drawn into every capture after the core meshes. Returns a remover; a model not added still receives
    * the bounce but reflects none. Adding or removing captures every source again.
    */

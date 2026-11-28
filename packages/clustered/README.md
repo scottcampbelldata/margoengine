@@ -444,7 +444,7 @@ colours and intensities are read every frame, so a flicker or a dimmer has no la
 source moves, round robin, or 120 frames after its last readback. WebGPU and the WebGL2 layer from its half-float tier (the LDR tier would clamp
 distances: coded `unsupported`). The capture draws core's meshes with the frame's own lit shader, so Snow and every
 other surface hook are in it. `bounce.add(model)` adds a gltf/pbr model, a `@margoengine/materials` mesh
-(`createMesh`), a `Terrain` or anything else with the capture hook SSR uses (`setCapture`): its own materials (maps,
+(`createMesh`), a `Terrain`, a raw mesh with `captureEntry` (`@margoengine/shader/raw`; base colour and metalness from its `MargoMaterial`, one without the entry is depth only and reflects nothing) or anything else with the capture hook SSR uses (`setCapture`): its own materials (maps,
 alpha mask, instances, skinning) are drawn into every capture after the core meshes, depth tested against them, so a
 glTF floor bounces as a core floor does (the GPU check matches them exactly), and adding or removing one captures every
 source again. A clearcoat, a materials `Material`'s or a glTF one drawn by `materials.install`, keeps the base layer's

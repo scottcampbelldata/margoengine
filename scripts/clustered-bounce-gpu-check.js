@@ -147,6 +147,8 @@ try {
     ['materials', 1],
     ['coated', 0.96],
     ['installed', 0.96],
+    // A raw WGSL quad (@margoengine/shader/raw) whose captureEntry returns albedo 0.8: as the core patch.
+    ['raw', 1],
   ]) {
     await call('scene', { ...patchScene({}), meshes: ['patchWall'], patchModel: kind });
     const settledKind = await call('settle', 30),
@@ -176,6 +178,17 @@ try {
       );
     });
   }
+
+  // The raw quad without captureEntry gives the capture its depth alone, so it reflects nothing.
+  await call('scene', { ...patchScene({}), meshes: ['patchWall'], patchModel: 'raw depth' });
+  await call('settle', 30);
+  const rawDepthOn = await call('probe', points, wall);
+  results.rawDepth = heights.map((_, i) => rawDepthOn[i][0] - off[i][0]);
+  check(
+    'a raw patch without captureEntry reflects nothing',
+    results.rawDepth.every((b, i) => Math.abs(b) < 0.01 * (on[i][0] - off[i][0])),
+    { bounce: results.rawDepth },
+  );
 
   // KB-BOUNCE-TERMS1: the same spot projecting a red | blue image (linear) bounces the colours it casts. Its direct light
   // on the floor is red on +x and blue on -x (the image's u runs along the spot camera's x, here -x); the bounce at a

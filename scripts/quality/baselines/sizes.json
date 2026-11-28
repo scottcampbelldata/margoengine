@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21612804,
+  "total": 21612825,
   "history": [
     {
       "date": "2026-10-24",
@@ -15246,6 +15246,12 @@
       "date": "2026-11-27",
       "commit": "sea-06-coastal-render-source",
       "reason": "Physics/tsunami grows from 5524 to 6193 B gzip and its ceiling from 5780 to 6449 B. The public coast reader exposes the same accepted shoreline and discharge, and validation reports coded fixes. A split requires another import and connection to every solver's cell geometry and state. The two optional kernel variants each move from 6294 to 6807 B gzip for finite-state checks, bounded CFL work and scale-safe travel times. Core and Stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-a-raw-capture",
+      "reason": "LightBounce draws raw meshes with captureEntry from their MargoMaterial (three.js parity row 15): clustered/bounce 15818 to 15839 B; the 21 B are one WGSL branch that a split could not hold",
+      "grew": 1
     }
   ],
   "items": {
@@ -15427,7 +15433,7 @@
     "@margoengine/clustered/area": 14762,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 4349,
-    "@margoengine/clustered/bounce": 15818,
+    "@margoengine/clustered/bounce": 15839,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/contact": 6296,
     "@margoengine/clustered/cube-projector": 4716,

@@ -130,6 +130,8 @@ const sunVisibility = (code: string, position: string, normal: string): string =
   code.includes('fn shadowLit(') ? `dot(shadowLit(vec3f(1),${position},${normal}),${luminance})` : '1.0';
 // gltf/pbr and materials shaders: their PBR `Surface` (water declares a `Surface` of its own, position first).
 const pbrSurface = /struct Surface \{\s*base:vec4f\b/;
+// `@margoengine/shader/raw` code with a `captureEntry` declares the surface its entry returns (`sceneTargets.add(raw)`).
+const rawMaterial = /struct MargoMaterial\s*\{/;
 // Terrain's, lit scatter's and water's capture hook (SSR's contract for shaders without the PBR Surface): their Frame
 // starts with camera and eye (terrain writes `{camera`, core's lit shader, which scatter extends, `{ camera`) and names
 // the unit direction toward the sun `light` (terrain, core) or `sun` (water).
@@ -280,7 +282,11 @@ export class SceneTargets implements EnginePlugin {
         if (out === undefined) {
           let capture: string;
           const light = frameLight(code);
-          if (pbrSurface.test(code))
+          // `@margoengine/shader/raw` meshes with `captureEntry` return their own surface; they carry no sun, so `t.light`
+          // is zero and `t.shadow` 1 for them.
+          if (rawMaterial.test(code))
+            capture = `fn margoCapture(m:MargoMaterial)->MargoCapture {margoPosition=m.position;return margoTargets(TargetSurface(m.position,normalize(m.normal),vec4f(m.base,1),m.rough,m.metal,1.0,vec3f(0),camera.position,1.0,vec3f(0),${flag}));}\n`;
+          else if (pbrSurface.test(code))
             capture = `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {_=k;_=v;return margoTargets(TargetSurface(margoPosition,s.n,s.base,s.roughness,s.metal,s.occlusion,s.emissive,f.eye.xyz,${sunVisibility(code, 'margoPosition', 's.n')},f.light.xyz,${flag}));}\n`;
           else if (light)
             // Terrain returns `margoSSR(n, v, base, metal, rough)` as a MargoSSR: the same outputs under that name.
@@ -290,7 +296,7 @@ export class SceneTargets implements EnginePlugin {
           else
             throw margoError(
               'unsupported',
-              'SceneTargets captures gltf/pbr surfaces, terrain, lit scatters and water only; add gltf/pbr models, materials meshes, a Terrain, a lit Scatter or a Water',
+              'SceneTargets captures gltf/pbr surfaces, terrain, lit scatters, water and raw meshes with captureEntry only; add gltf/pbr models, materials meshes, a Terrain, a lit Scatter, a Water or a RawShaders',
             );
           if (cache.size >= 64) cache.clear();
           out = 'var<private> margoPosition:vec3f;\n' + this.code + capture;

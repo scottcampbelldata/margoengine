@@ -1024,7 +1024,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     if (!/fn\s+margoCapture\s*\(\s*\w+\s*:\s*MargoMaterial\s*\)/.test(declarations))
       throw new MargoError(
         'unsupported',
-        `RawShaderMaterial ${this.name}: this effect's capture takes no MargoMaterial; add raw meshes with captureEntry to SSR or SSGI`,
+        `RawShaderMaterial ${this.name}: this effect's capture takes no MargoMaterial; add raw meshes with captureEntry to SSR, SSGI, SceneTargets or LightBounce`,
       );
     return this.prelude(mesh, true) + declarations + '\n' + (this.fragmentCode ?? this.vertexCode);
   }
@@ -1189,8 +1189,14 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
         },
       };
     const entry = e;
-    // A pass without depth compiles at once, as a post stage must draw its first frame.
-    if (typeof device.createRenderPipelineAsync !== 'function' || (c && !depth)) {
+    // A pass without depth compiles at once, as a post stage must draw its first frame; so does a material capture, which
+    // LightBounce takes once per source and would keep without the mesh while its pipeline compiled.
+    if (
+      typeof device.createRenderPipelineAsync !== 'function' ||
+      (c && !depth) ||
+      kind === 'capture' ||
+      kind === 'captureDepth'
+    ) {
       entry.pipeline = device.createRenderPipeline(descriptor);
       entry.state = 'ready';
       this.compiled++;
@@ -2027,6 +2033,10 @@ export class RawShaders implements EnginePlugin {
   private readonly velocityStates = new Map<object, VelocityState>();
   private readonly beforeData = new Float32Array(36);
   private capture?: RawCapture;
+  /** Camera blocks per capture pass of this frame's encoder, and the encoder they were written for. */
+  private readonly captureCameras: GPUBuffer[] = [];
+  private captureEncoder?: GPUCommandEncoder;
+  private readonly captureSlots = new Map<GPURenderPassEncoder, number>();
   private readonly disposers = new Set<() => void>();
   /** @internal The latest pass token (see `nextPass`). */
   get pass(): number {
@@ -2154,7 +2164,10 @@ export class RawShaders implements EnginePlugin {
     this.camera?.destroy();
     this.camera = undefined;
     for (const key of [...this.velocityStates.keys()]) this.releaseVelocity(key);
-    for (const buffer of [...this.shadowCameras, ...this.localCameras]) buffer?.destroy();
+    for (const buffer of [...this.shadowCameras, ...this.localCameras, ...this.captureCameras]) buffer?.destroy();
+    this.captureCameras.length = 0;
+    this.captureEncoder = undefined;
+    this.captureSlots.clear();
     this.shadowCameras.length = this.shadowWritten.length = 0;
     this.localCameras.length = this.localWritten.length = 0;
     this.localEncoder = undefined;
@@ -2319,13 +2332,14 @@ export class RawShaders implements EnginePlugin {
     if (!hook || c.backend !== 'webgpu' || !device || !engine || c.device !== device) return;
     const token = this.nextPass(),
       draws: Draw[] = [];
-    let camera: GPUBuffer | undefined;
+    let camera: GPUBuffer | undefined, pass: GPURenderPassEncoder | undefined;
     for (const mesh of this.meshes) {
       const material = mesh.material;
       if (!mesh.visible || material.transparent || !material.depthWrite) continue;
       const world = mesh.worldMatrix(engine);
       if (!world || mesh.culled(world, c.camera.matrix)) continue;
-      camera ??= this.writeCamera(c);
+      pass ??= hook.begin();
+      camera ??= this.captureCamera(c, device, pass);
       const call = mesh.upload(device, camera, world);
       if (!call) continue;
       const kind = material.captureName ? 'capture' : 'captureDepth',
@@ -2333,7 +2347,31 @@ export class RawShaders implements EnginePlugin {
         pipeline = material.pipeline(this, gpu, device, mesh, kind, c, 'greater-equal', undefined, hook);
       if (pipeline) draws.push({ mesh, pipeline, gpu, call, distance: 0 });
     }
-    if (draws.length) drawList(hook.begin(), draws);
+    if (pass) drawList(pass, draws);
+  }
+  /**
+   * The camera block of one capture pass. A capture may look from elsewhere than the view (LightBounce draws from each
+   * light, once per cube face, in one encoder), and the colour pass's block is written once a frame, so each capture
+   * pass of an encoder has a block of its own.
+   */
+  private captureCamera(c: RawPassContext, device: GPUDevice, pass: GPURenderPassEncoder): GPUBuffer {
+    if (this.captureEncoder !== c.encoder) {
+      this.captureEncoder = c.encoder;
+      this.captureSlots.clear();
+    }
+    let slot = this.captureSlots.get(pass);
+    const fresh = slot === undefined;
+    if (slot === undefined) this.captureSlots.set(pass, (slot = this.captureSlots.size));
+    const camera = (this.captureCameras[slot] ??= this.cameraBuffer(device));
+    if (fresh) {
+      const encoding = c.format.includes('float') ? 0 : c.format.endsWith('-srgb') ? 2 : 1;
+      device.queue.writeBuffer(
+        camera,
+        0,
+        this.cameraBlock(c.camera, c.camera.matrix, c.width, c.height, c.delta, encoding, viewRect(c)),
+      );
+    }
+    return camera;
   }
   /**
    * The `TAAVelocityPass` contract of `@margoengine/taa` (`taa.add(raw)`): opaque meshes whose material has

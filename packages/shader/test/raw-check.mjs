@@ -208,6 +208,17 @@ try {
   console.log('ssgi floor', bounced, 'against', unlit);
   assert.ok(bounced[0] >= unlit[0] + 6 && bounced[0] - bounced[1] >= unlit[0] - unlit[1] + 6, `the raw floor takes the red bounce: ${bounced} against ${unlit}`);
   console.log('ok ssgi');
+  // SceneTargets: the raw floor writes its own albedo and normal only with its capture entry.
+  const tOwn = await scene('mrtOwn');
+  await clear();
+  const tDepth = await scene('mrtDepth');
+  await clear();
+  console.log('scene targets albedo', tOwn.albedo, 'normal', tOwn.normal, 'without', tDepth.albedo, tDepth.normal);
+  const close = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 2);
+  assert.ok(close(tOwn.albedo, [51, 153, 230, 255]), `SceneTargets albedo from the raw capture: ${tOwn.albedo}`);
+  assert.ok(close(tOwn.normal, [128, 255, 128, 255]), `SceneTargets normal from the raw capture: ${tOwn.normal}`);
+  assert.ok(close(tDepth.albedo, [0, 0, 0, 0]), `nothing written without the entry: ${tDepth.albedo}`);
+  console.log('ok scene targets');
   assert.deepEqual((await scene('captureWrong')).threw, true, 'captureWrong');
   await clear();
   console.log('ok captureWrong');

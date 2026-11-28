@@ -1139,7 +1139,7 @@ fn margoCapture(m:MargoMaterial)->MargoCapture {return MargoCapture(vec4f(m.base
       h.view.begin(h.index++);
       raw.draw(h.view.c, 'capture', null, null);
     },
-    (e) => e.code === 'unsupported' && /captureEntry to SSR or SSGI/.test(e.message),
+    (e) => e.code === 'unsupported' && /captureEntry to SSR, SSGI, SceneTargets or LightBounce/.test(e.message),
   );
   assert.throws(() => material({ captureEntry: 'missing' }), /has no @fragment fn missing/);
   const first = new RawShaderMaterial({
