@@ -171,7 +171,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js rigging",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/rigging-browser.mjs",
+    "test:browser": "npm run build && node tests/rigging-browser.mjs && cd ../.. && node packages/rigging/tests/ik-reach-sheet.browser.mjs",
     "prepack": "npm run build",
     "test:mtoon:browser": "cd ../.. && node packages/rigging/tests/mtoon-light.browser.mjs && node packages/rigging/tests/mtoon-replica.browser.mjs && node packages/rigging/tests/mtoon-matcap.browser.mjs && node packages/rigging/tests/mtoon-uv.browser.mjs && node packages/rigging/tests/mtoon-uv-animation.browser.mjs && node packages/rigging/tests/mtoon-uv-shadow.browser.mjs && node packages/rigging/tests/mtoon-expressions.browser.mjs && node packages/rigging/tests/mtoon-local-rim.browser.mjs && node packages/rigging/tests/mtoon-gbuffer.browser.mjs && node packages/rigging/tests/mtoon-outline.browser.mjs && node packages/rigging/tests/mtoon-avatar.browser.mjs && node packages/rigging/tests/mtoon-avatar.browser.mjs --vrm1",
     "test:strand-springs:browser": "cd ../.. && node packages/rigging/tests/strand-springs.browser.mjs",

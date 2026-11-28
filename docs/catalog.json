@@ -977,6 +977,7 @@
       "materialGraphOutput",
       "materialLobes",
       "materialShader",
+      "materialSurfaceHooks",
       "nodeMaterial",
       "noteEngine",
       "packAtlas",
