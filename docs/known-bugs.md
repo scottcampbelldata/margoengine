@@ -299,7 +299,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   conifers have, judged on whole-scene frames. A planner-sized job across procedural and biomes.
 - **Progress (step A, 2026-11-28):** `@margoengine/procedural/broadleaves`, `/broadleaf-species` and
   `/broadleaf-settings` build the oak, beech and alder with limbs, shed inner branches, alpha-cut leaf cards and three
-  levels (`test/broadleaves.test.js`); biomes does not draw them yet (step B), nor the sync default (step C).
+  levels (`test/broadleaves.test.js`).
+- **Progress (step B, 2026-11-28):** biomes draws `procedural:broadleaf` and the oak, beech and alder keys from
+  `/broadleaves` (white canopy over its atlas; the seasons scale it by the tinted mean leaf colour, hue kept when a
+  tint would pass 1). FG-16 frames on WebGPU and the WebGL2 layer now show limbs, sky through the crowns and ragged
+  outlines. Judged beside open-grown summer Quercus robur photographs (Wikimedia Commons), still open: (1) the crowns
+  read too open and spindly, limbs showing where a summer oak shows a broad, mostly closed dome on a short bole, so the
+  plan's hull-gap band (0.25 to 0.45, never measured on photos) is likely too high; (2) the leaves read near black
+  where the photos are a fresh mid green; (3) the far imposters are dark round blobs (KB-PROCEDURAL-OAKIMPOSTER1);
+  (4) one mature oak takes about 0.5 s to grow (plan bound 30 ms; move the loop to `trees-kernel` or cut the work).
+  The sync default (step C) is not done.
 
 ### Fixed 2026-11-28: a meadow seen from a few metres up showed the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
 

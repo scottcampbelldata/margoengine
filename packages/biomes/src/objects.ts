@@ -295,6 +295,9 @@ const OBJECT_LOD_DETAIL = [2, 1, 0] as const;
 
 type Procedural = typeof import('@margoengine/procedural');
 type Conifers = typeof import('@margoengine/procedural/conifers');
+type Broadleaves = typeof import('@margoengine/procedural/broadleaves');
+/** The optional tree generators a key may need, loaded only when one names them. */
+type Trees = { conifers?: Conifers; broadleaves?: Broadleaves };
 type Data = { positions: ArrayLike<number>; normals: ArrayLike<number>; indices: ArrayLike<number> };
 type Kind = keyof typeof OBJECT_LOOKS;
 /** The options with no default value. */
@@ -308,6 +311,11 @@ type Part = {
   kind: Kind;
   blades?: boolean;
   textures?: ScatterTextures;
+  /**
+   * The mean linear colour a textured part's image carries under its white `color` (a broadleaf's leaf atlas): the
+   * seasons tint such a part by the ratio of the tinted mean to the mean, which is exact at the mean.
+   */
+  mean?: readonly [number, number, number];
 };
 type Modules = {
   tiles: typeof import('@margoengine/scatter/tiles');
@@ -318,6 +326,8 @@ type Modules = {
   core: typeof import('@margoengine/core');
   /** Loaded only when a species, detail or snag key names a conifer of `@margoengine/procedural/conifers`. */
   conifers?: Conifers;
+  /** Loaded only when a species or detail key names a broadleaf of `@margoengine/procedural/broadleaves`. */
+  broadleaves?: Broadleaves;
 };
 
 /** Whether a detail key draws as GrassScatter blades: `procedural:grass` that the `meshes` registry leaves alone. */
@@ -337,9 +347,10 @@ function partsOf(
   p: Procedural,
   make: (data: Data) => Geometry,
   meshes?: Readonly<Record<string, readonly BiomeMeshPart[]>>,
-  conifers?: Conifers,
+  trees: Trees = {},
   seed = 1,
 ): Part[] {
+  const { conifers, broadleaves } = trees;
   const own = meshes && Object.hasOwn(meshes, key) ? meshes[key] : undefined;
   if (own)
     return own.map((part) => ({
@@ -393,6 +404,30 @@ function partsOf(
               color: [1, 1, 1] as const,
               kind: 'foliage' as const,
               textures: levels.textures,
+            },
+          ]
+        : []),
+    ];
+  }
+  const broadleaf = broadleaves?.parseBroadleafKey(name);
+  if (broadleaves && broadleaf) {
+    // An oak, beech or alder grown with limbs and leaf-spray cards (KB-PROCEDURAL-OAKBLOB1): near and middle meshes and,
+    // for a leafed tree, the imposter in the far ring. The canopy draws white: its leaf colour is in the atlas image.
+    const levels = broadleaves.broadleafLevels(broadleaf.species, {
+        age: broadleaf.age,
+        condition: broadleaf.condition,
+      }),
+      all = (list: readonly [Data, Data, Data]) => list.map(make) as unknown as [Geometry, Geometry, Geometry];
+    return [
+      { geometry: all(levels.trunk), color: broadleaves.BROADLEAF_SPECIES[broadleaf.species].bark, kind: 'bark' },
+      ...(levels.textures
+        ? [
+            {
+              geometry: all(levels.canopy),
+              color: [1, 1, 1] as const,
+              kind: 'foliage' as const,
+              textures: levels.textures,
+              mean: broadleaves.BROADLEAF_SPECIES[broadleaf.species].leaves,
             },
           ]
         : []),
@@ -487,11 +522,11 @@ function formsOf(
   p: Procedural,
   make: (data: Data) => Geometry,
   meshes?: Readonly<Record<string, readonly BiomeMeshPart[]>>,
-  conifers?: Conifers,
+  trees: Trees = {},
 ): Part[][] {
   if (key !== 'procedural:rock' || (meshes && Object.hasOwn(meshes, key)))
-    return [partsOf(key, p, make, meshes, conifers)];
-  return Array.from({ length: ROCK_FORM_COUNT }, (_, i) => partsOf(key, p, make, meshes, conifers, i + 1));
+    return [partsOf(key, p, make, meshes, trees)];
+  return Array.from({ length: ROCK_FORM_COUNT }, (_, i) => partsOf(key, p, make, meshes, trees, i + 1));
 }
 
 /**
@@ -547,7 +582,11 @@ export class BiomeObjects implements Disposable {
   readonly #placement: BiomePlacement;
   readonly #options: Required<Omit<BiomeObjectsOptions, Optional>> & Pick<BiomeObjectsOptions, Optional>;
   /** Foliage materials that follow the seasons, with their base colours, and the seasons listener's remover. */
-  readonly #seasonal: { material: PbrMaterial; base: readonly [number, number, number] }[] = [];
+  readonly #seasonal: {
+    material: PbrMaterial;
+    base: readonly [number, number, number];
+    mean?: readonly [number, number, number];
+  }[] = [];
   #offSeasons?: () => void;
   readonly #modules: Modules;
   /** Per species key: its ScatterTiles (one per mesh part of each form) and the distance it is drawn within. */
@@ -619,18 +658,23 @@ export class BiomeObjects implements Disposable {
       );
     // The scene attached from: the scatter parts register there, whichever scene is active once the imports are in.
     const held = captureScene(engine);
-    const [tiles, scatter, procedural, core, { parseConiferKey }] = await Promise.all([
+    const [tiles, scatter, procedural, core, { parseConiferKey }, { parseBroadleafKey }] = await Promise.all([
       import('@margoengine/scatter/tiles'),
       import('@margoengine/scatter'),
       import('@margoengine/procedural'),
       import('@margoengine/core'),
       import('@margoengine/procedural/conifer-species'),
+      import('@margoengine/procedural/broadleaf-species'),
     ]);
     // The conifer meshes load only when a key names one that the registry does not replace.
     const own = options.meshes ?? {},
       keys = [...placement.species.map((s) => s.mesh), ...placement.details.map((d) => d.mesh)],
       conifers = keys.some((k) => !Object.hasOwn(own, k) && parseConiferKey(k))
         ? await import('@margoengine/procedural/conifers')
+        : undefined,
+      // So do the broadleaf meshes (an oak, beech or alder key, `procedural:broadleaf` among them).
+      broadleaves = keys.some((k) => !Object.hasOwn(own, k) && parseBroadleafKey(k))
+        ? await import('@margoengine/procedural/broadleaves')
         : undefined,
       grass = placement.details.some((d) => isBladeGrass(d.mesh, own))
         ? await import('@margoengine/scatter/grass')
@@ -641,13 +685,14 @@ export class BiomeObjects implements Disposable {
       procedural,
       core,
       ...(conifers ? { conifers } : {}),
+      ...(broadleaves ? { broadleaves } : {}),
       ...(grass ? { grass } : {}),
     });
     held.run(() => objects.#build());
     if (objects.#seasonal.length) {
       // Each `seasons.set` and each change of the placement's world (climate, heights, biomes) re-tints the foliage.
       const retint = () => {
-          for (const { material, base } of objects.#seasonal) material.set({ color: objects.#tint(base) });
+          for (const { material, base, mean } of objects.#seasonal) material.set({ color: objects.#tint(base, mean) });
         },
         offSet = options.seasons!.onChange(retint),
         offWorld = placement.onChange(retint);
@@ -729,13 +774,7 @@ export class BiomeObjects implements Disposable {
           all: ScatterTiles[] = [],
           heads: ScatterTiles[] = [],
           feet: (Foot | undefined)[] = [];
-        for (const form of formsOf(
-          key,
-          this.#modules.procedural,
-          this.#make,
-          this.#options.meshes,
-          this.#modules.conifers,
-        )) {
+        for (const form of formsOf(key, this.#modules.procedural, this.#make, this.#options.meshes, this.#modules)) {
           const list: ScatterTiles[] = [],
             // The form's height at scale 1, over all its parts, so a trunk and its crown shade as one tree.
             height = Math.max(0, ...form.map((part) => meshTop(part.geometry))),
@@ -754,7 +793,7 @@ export class BiomeObjects implements Disposable {
                 lod: [r * 0.15, r * 0.4, r],
                 lodFade: 0,
                 // Lit by the engine's sun and sky and shadowed by an attached Shadows, like the terrain under it.
-                material: this.#material(part.color, seasonal && part.kind === 'foliage'),
+                material: this.#material(part.color, seasonal && part.kind === 'foliage', part.mean),
                 // Each object its own tint; leaves shade as clusters (a few vertex operations, shadows unchanged).
                 ...OBJECT_LOOKS[part.kind],
                 maxSlope: 90,
@@ -788,7 +827,7 @@ export class BiomeObjects implements Disposable {
       const blades = this.#modules.grass && isBladeGrass(d.mesh, this.#options.meshes ?? {}),
         parts: Part[] = blades
           ? []
-          : partsOf(d.mesh, this.#modules.procedural, this.#make, this.#options.meshes, this.#modules.conifers),
+          : partsOf(d.mesh, this.#modules.procedural, this.#make, this.#options.meshes, this.#modules),
         area = 2 * detailRadius,
         entry = {
           id: d.id,
@@ -855,17 +894,28 @@ export class BiomeObjects implements Disposable {
    * A rough, double-sided PBR material of a part's colour (linear RGB); a `seasonal` one takes the seasons' tint and is
    * kept to follow them.
    */
-  #material(color: readonly [number, number, number], seasonal = false) {
+  #material(color: readonly [number, number, number], seasonal = false, mean?: readonly [number, number, number]) {
     if (!seasonal) return new this.#modules.core.PbrMaterial({ color, roughness: 0.85 });
-    const material = new this.#modules.core.PbrMaterial({ color: this.#tint(color), roughness: 0.85 });
-    this.#seasonal.push({ material, base: color });
+    const material = new this.#modules.core.PbrMaterial({ color: this.#tint(color, mean), roughness: 0.85 });
+    this.#seasonal.push({ material, base: color, mean });
     return material;
   }
 
-  /** A base colour under the season state at the centre of `bounds`. */
-  #tint(base: readonly [number, number, number]): [number, number, number] {
-    const [x0, z0, x1, z1] = this.#options.bounds;
-    return this.#options.seasons!.colorAt(base, (x0 + x1) / 2, (z0 + z1) / 2);
+  /**
+   * A base colour under the season state at the centre of `bounds`; with the `mean` colour of a part's image, the base
+   * scaled by the tinted mean over the mean, so a textured canopy turns as a leaf of its mean colour would.
+   */
+  #tint(base: readonly [number, number, number], mean?: readonly [number, number, number]): [number, number, number] {
+    const [x0, z0, x1, z1] = this.#options.bounds,
+      x = (x0 + x1) / 2,
+      z = (z0 + z1) / 2;
+    if (!mean) return this.#options.seasons!.colorAt(base, x, z);
+    const tinted = this.#options.seasons!.colorAt(mean, x, z);
+    // A material factor is at most 1, so a tint brighter than the mean in some channel (autumn yellow) keeps its hue
+    // at the largest factor that fits: the canopy turns the right colour, at most as bright as its summer atlas.
+    const ratio = tinted.map((c, i) => (mean[i] > 0 ? c / mean[i] : 1)),
+      fit = Math.max(1, ...ratio.map((r, i) => r * base[i]));
+    return base.map((c, i) => (c * ratio[i]) / fit) as [number, number, number];
   }
 
   /** Foliage materials that follow the seasons (with `seasons` set): one per seasonal species part and detail. */

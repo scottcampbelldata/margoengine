@@ -93,12 +93,27 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
     );
     return { trunk, canopy };
   };
-  const broadleaf = tree('broadleaf', (detail) => procedural.generateTreeMesh('broadleaf', { detail })),
-    birch = tree('birch', (detail) => procedural.generateBirchMesh({ detail })),
+  // procedural:broadleaf is the grown English oak (KB-PROCEDURAL-OAKBLOB1): its levels, near and middle meshes and the
+  // imposter cards, the canopy white over its leaf atlas with an alpha cut-out.
+  const { broadleafLevels } = await import('@margoengine/procedural/broadleaves'),
+    oak = broadleafLevels('english-oak'),
+    broadleaf = { trunk: byMesh.get('broadleaf')[0], canopy: byMesh.get('broadleaf')[1] };
+  assert.deepEqual(
+    triangles(broadleaf.trunk),
+    oak.trunk.map((m) => m.indices.length / 3),
+    'broadleaf trunk: the oak levels',
+  );
+  assert.deepEqual(
+    triangles(broadleaf.canopy),
+    oak.canopy.map((m) => m.indices.length / 3),
+    'broadleaf canopy: the oak levels',
+  );
+  assert.ok(broadleaf.canopy.options.textures?.baseColor, 'the oak canopy draws its leaf atlas');
+  assert.equal(triangles(broadleaf.canopy)[2], 72, 'three imposter cards in the far ring');
+  const birch = tree('birch', (detail) => procedural.generateBirchMesh({ detail })),
     conifer = tree('conifer', (detail) => procedural.generateTreeMesh('conifer', { detail }));
   tree('palm', (detail) => procedural.generatePalmMesh({ detail }));
   tree('acacia', (detail) => procedural.generateAcaciaMesh({ detail }));
-  assert.deepEqual(triangles(broadleaf.canopy), [6240, 3180, 400]);
   for (const [key, wood, leaves] of [
     ['shrub', 'generateShrubStemsMesh', 'generateShrubMesh'],
     ['tundra-shrub', 'generateTundraShrubStemsMesh', 'generateTundraShrubMesh'],
@@ -132,13 +147,14 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
   // luma 0.115).
   const color = (part) => [...part.options.material.data.slice(0, 3)].map((c) => +c.toFixed(4)),
     luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b,
-    greens = [broadleaf, birch, conifer].map((t) => color(t.canopy));
+    greens = [birch, conifer].map((t) => color(t.canopy));
   assert.deepEqual(greens, [
-    [0.14, 0.3, 0.05],
     [0.26, 0.36, 0.07],
     [0.04, 0.17, 0.07],
   ]);
-  assert.ok(luma(greens[0]) > 0.162 && luma(greens[1]) > 0.162 && luma(greens[2]) > 0.115, `brighter: ${greens}`);
+  assert.ok(luma(greens[0]) > 0.162 && luma(greens[1]) > 0.115, `brighter: ${greens}`);
+  // The oak's colour is in its atlas: the canopy material is white.
+  assert.deepEqual(color(broadleaf.canopy), [1, 1, 1]);
   objects.dispose();
 });
 
@@ -174,7 +190,15 @@ test('seasons tint the foliage of seasonal species only, follow seasons.set, and
     bounds = [-128, -128, 128, 128],
     color = (part) => [...part.options.material.data.slice(0, 3)],
     near = (a, b) => a.every((c, i) => Math.abs(c - b[i]) < 1e-6),
-    leaf = [0.14, 0.3, 0.05],
+    // The oak canopy is white over its leaf atlas (KB-PROCEDURAL-OAKBLOB1): the seasons scale it by the tinted mean leaf
+    // colour over the mean, so it turns as a leaf of that colour does.
+    mean = (await import('@margoengine/procedural/broadleaf-species')).BROADLEAF_SPECIES['english-oak'].leaves,
+    white = [1, 1, 1],
+    tint = () => {
+      const r = seasons.colorAt(mean, 0, 0).map((c, k) => c / mean[k]),
+        fit = Math.max(1, ...r);
+      return r.map((c) => c / fit);
+    },
     other = await BiomeWorld.create({ size: [256, 256], biomes: [forest], height: { field: () => 1000 } });
   await assert.rejects(
     BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds, seasons: {} }),
@@ -196,8 +220,8 @@ test('seasons tint the foliage of seasonal species only, follow seasons.set, and
     [ta, tc, tb, td] = tinted.casters;
   assert.equal(plain.seasonalMaterials.length, 0);
   assert.equal(tinted.seasonalMaterials.length, 1);
-  assert.ok(near(color(pc), leaf));
-  assert.ok(near(color(tc), seasons.colorAt(leaf, 0, 0)) && !near(color(tc), leaf), `winter ${color(tc)}`);
+  assert.ok(near(color(pc), white));
+  assert.ok(near(color(tc), tint()) && !near(color(tc), white), `winter ${color(tc)}`);
   for (const [p, t] of [
     [pa, ta],
     [pb, tb],
@@ -206,17 +230,17 @@ test('seasons tint the foliage of seasonal species only, follow seasons.set, and
     assert.deepEqual(color(t), color(p));
   const winter = color(tc);
   seasons.set({ dayOfYear: 200 });
-  assert.ok(near(color(tc), seasons.colorAt(leaf, 0, 0)) && !near(color(tc), winter), `summer ${color(tc)}`);
+  assert.ok(near(color(tc), tint()) && !near(color(tc), winter), `summer ${color(tc)}`);
   // A colder world re-tints the foliage without seasons.set.
   const summer = color(tc);
   world.update({ climate: { equatorTemperature: -5, poleTemperature: -40 } });
-  assert.ok(near(color(tc), seasons.colorAt(leaf, 0, 0)) && !near(color(tc), summer), `colder ${color(tc)}`);
+  assert.ok(near(color(tc), tint()) && !near(color(tc), summer), `colder ${color(tc)}`);
   const colder = color(tc);
   tinted.dispose();
   assert.equal(changes.size, 0, 'dispose removes the world listener');
   world.update({ climate: {} });
   seasons.set({ dayOfYear: 200 });
-  assert.ok(!near(seasons.colorAt(leaf, 0, 0), colder), 'the world and seasons moved on');
+  assert.ok(!near(tint(), colder), 'the world and seasons moved on');
   assert.ok(near(color(tc), colder), 'a disposed BiomeObjects no longer follows the seasons');
   plain.dispose();
 });
