@@ -103,6 +103,19 @@ export interface TurnedOptions {
     axis?: PartAxis;
 }
 
+export interface WingOptions {
+    span?: number;
+    rootChord?: number;
+    tipChord?: number;
+    thickness?: number;
+    sweep?: number;
+    dihedral?: number;
+    curve?: number;
+    sections?: number;
+    stations?: number;
+    caps?: boolean;
+}
+
 export function arrowGeometry(options?: ArrowOptions): GeometryData;
 
 export function chamferBoxGeometry(width: number, height: number, depth: number, options?: ChamferBoxOptions): GeometryData;
@@ -110,6 +123,8 @@ export function chamferBoxGeometry(width: number, height: number, depth: number,
 export function gridSheetGeometry(nu: number, nv: number, fn: (u: number, v: number) => P3, options?: GridSheetOptions): GeometryData;
 
 export function helixGeometry(options?: HelixOptions): GeometryData;
+
+export function nacaThickness(x: number, thickness: number): number;
 
 export function pipeGeometry(points: readonly P3[], radius: number, options?: PipeOptions): GeometryData;
 
@@ -133,6 +148,8 @@ export function scaleMarksGeometry(options?: ScaleMarksOptions): GeometryData;
 export function strokeGeometry(segments: readonly (readonly [P2, P2])[], width: number, options?: StrokeOptions): GeometryData;
 
 export function turnedGeometry(profile: readonly P2[], options?: TurnedOptions): GeometryData;
+
+export function wingGeometry(options?: WingOptions): GeometryData;
 
 // Not exported from this entry, but used by the exports above:
 

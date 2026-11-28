@@ -4,6 +4,8 @@ import { sweepGeometry } from '@margoengine/geometry/sweep';
 import type { GeometryData } from '@margoengine/geometry';
 import type { TriangleSet } from './grids.js';
 import type { Bounds } from './layer.js';
+import { SRGBToLinear } from '@margoengine/math';
+import { linearToOklab, oklabToLinear } from './oklab.js';
 import { rangeError } from '../../shared/errors.js';
 
 /** A finite polyline in data units, including the last point again for a closed line. */
@@ -207,6 +209,212 @@ export function streamMeshTriangles(mesh: StreamMesh, options: { readonly signal
     }
   }
   return { positions, normals, values, cells, bounds };
+}
+
+/** A steady velocity field: the velocity at a point, in data units per unit time. */
+export type VelocityField = (point: readonly [number, number, number]) => ArrayLike<number> | null;
+
+/** Controls for {@link traceStreamPath}. */
+export interface StreamTraceOptions {
+  /** Largest time step; also the first one tried. Default 0.1. */
+  readonly maxStep?: number;
+  /** Most accepted steps. Default 4000. */
+  readonly maxSteps?: number;
+  /** Local error allowed per step, absolute plus relative to the position (Hairer, Norsett, Wanner, eq. II.4.10). Default 1e-7. */
+  readonly tolerance?: number;
+  /** Stop on leaving this box, [xmin, xmax, ymin, ymax, zmin, zmax]; the last point lies on the face crossed. Default none. */
+  readonly bounds?: readonly [number, number, number, number, number, number];
+  /** Stop after this much path length. Default unlimited. */
+  readonly maxLength?: number;
+  /** Stop where the speed falls below this. Default 1e-9. */
+  readonly minSpeed?: number;
+  /** Trace backward in time. Default false. */
+  readonly backward?: boolean;
+  /** Cancels between steps. Default absent. */
+  readonly signal?: AbortSignal;
+}
+
+/** A traced path: positions, the local speed as its scalar, and the time at each point. */
+export interface StreamTrace extends StreamPath {
+  readonly positions: Float64Array;
+  readonly scalar: Float64Array;
+  readonly times: Float64Array;
+}
+
+// Dormand, Prince 1980, "A family of embedded Runge-Kutta formulae", J. Comput. Appl. Math. 6(1):19-26: the RK5(4)7M
+// pair, first same as last, coefficients as in Hairer, Norsett, Wanner 1993, "Solving Ordinary Differential
+// Equations I", table II.5.2.
+const DP_A: readonly (readonly number[])[] = [
+  [],
+  [1 / 5],
+  [3 / 40, 9 / 40],
+  [44 / 45, -56 / 15, 32 / 9],
+  [19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729],
+  [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656],
+  [35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84],
+];
+// Fifth-order weights minus the embedded fourth-order ones: the local error estimate.
+const DP_E = [71 / 57600, 0, -71 / 16695, 71 / 1920, -17253 / 339200, 22 / 525, -1 / 40];
+
+/**
+ * A streamline of a steady field from `seed`, by the adaptive Dormand-Prince 5(4) method with the standard step
+ * controller (safety 0.9, growth between 0.2 and 5). Stops on leaving `bounds` (the crossing is found on the cubic
+ * Hermite interpolant of the last step, so the path ends on the face), at `maxLength`, below `minSpeed`, where the
+ * field returns null or a non-finite velocity, or after `maxSteps`. The scalar is the local speed, ready for
+ * {@link streamTubeGeometry} and {@link streamTubeColors}.
+ *
+ * ```js
+ * const swirl = ([x, y, z]) => [1, -z, y];
+ * const path = traceStreamPath(swirl, [0, 0.5, 0], { bounds: [0, 6, -2, 2, -2, 2] });
+ * const tube = streamTubeGeometry(path, { radius: 0.05 });
+ * ```
+ */
+export function traceStreamPath(
+  field: VelocityField,
+  seed: readonly [number, number, number],
+  options: StreamTraceOptions = {},
+): StreamTrace {
+  options.signal?.throwIfAborted();
+  const hMax = options.maxStep ?? 0.1,
+    maxSteps = options.maxSteps ?? 4000,
+    tol = options.tolerance ?? 1e-7,
+    maxLength = options.maxLength ?? Infinity,
+    minSpeed = options.minSpeed ?? 1e-9,
+    sign = options.backward ? -1 : 1,
+    box = options.bounds;
+  if (typeof field !== 'function') throw rangeError('Stream trace needs a velocity function', 'sciviz');
+  if (!(hMax > 0 && hMax < Infinity) || !Number.isSafeInteger(maxSteps) || maxSteps < 1 || !(tol > 0 && tol < 1) ||
+    !(maxLength > 0) || !(minSpeed >= 0 && minSpeed < Infinity))
+    throw rangeError(
+      'Stream trace needs a positive finite maxStep, tolerance in (0, 1), whole maxSteps of at least 1, positive maxLength and finite minSpeed of at least 0',
+      'sciviz',
+    );
+  if (!seed || seed.length !== 3 || ![0, 1, 2].every((c) => Number.isFinite(seed[c])))
+    throw rangeError('Stream trace seed must be three finite numbers', 'sciviz');
+  if (box && (box.length !== 6 || ![0, 2, 4].every((c) => Number.isFinite(box[c]) && Number.isFinite(box[c + 1]) && box[c] < box[c + 1])))
+    throw rangeError('Stream trace bounds must be [xmin, xmax, ymin, ymax, zmin, zmax], each min below its max', 'sciviz');
+  const inside = (p: readonly number[]) => !box || [0, 1, 2].every((c) => p[c] >= box[2 * c] && p[c] <= box[2 * c + 1]);
+  const velocity = (p: readonly number[]): number[] | null => {
+    const v = field([p[0], p[1], p[2]]);
+    if (!v || v.length < 3) return null;
+    const out = [sign * v[0], sign * v[1], sign * v[2]];
+    return out.every(Number.isFinite) ? out : null;
+  };
+  const points: number[] = [], speeds: number[] = [], times: number[] = [];
+  const keep = (q: readonly number[], v: readonly number[], time: number) => {
+    points.push(q[0], q[1], q[2]);
+    speeds.push(Math.hypot(v[0], v[1], v[2]));
+    times.push(sign * time);
+  };
+  let p = [seed[0], seed[1], seed[2]], f = velocity(p), t = 0, length = 0, h = hMax;
+  if (f && inside(p)) keep(p, f, 0);
+  const k: number[][] = new Array(7);
+  for (let n = 0; f && points.length && n < maxSteps && speeds[speeds.length - 1] >= minSpeed && length < maxLength; n++) {
+    options.signal?.throwIfAborted();
+    let q: number[] | null = null, fq: number[] | null = null, used = h;
+    for (let tries = 0; tries < 64 && !q; tries++) {
+      used = h;
+      k[0] = f;
+      let s = 1;
+      for (; s < 7; s++) {
+        const a = DP_A[s],
+          v = velocity(p.map((c, i) => c + used * a.reduce((sum, w, j) => sum + w * k[j][i], 0)));
+        if (!v) break;
+        k[s] = v;
+      }
+      if (s < 7) {
+        h = used / 4;
+        continue;
+      }
+      // The seventh stage is evaluated at the fifth-order solution (first same as last).
+      const next = p.map((c, i) => c + used * DP_A[6].reduce((sum, w, j) => sum + w * k[j][i], 0));
+      let err = 0;
+      for (let i = 0; i < 3; i++) {
+        const e = used * DP_E.reduce((sum, w, j) => sum + w * k[j][i], 0);
+        err += (e / (tol + tol * Math.max(Math.abs(p[i]), Math.abs(next[i])))) ** 2;
+      }
+      err = Math.sqrt(err / 3);
+      const factor = Math.min(5, Math.max(0.2, 0.9 * Math.max(err, 1e-10) ** -0.2));
+      if (err <= 1) (q = next), (fq = k[6]);
+      h = Math.min(hMax, used * (err <= 1 ? factor : Math.min(1, factor)));
+    }
+    if (!q || !fq) break;
+    let fraction = 1, last = false;
+    if (!inside(q)) {
+      // The face crossing, by bisection on the step's cubic Hermite interpolant (Hairer et al. section II.6).
+      const a = p, b = q, fa = f, fb = fq;
+      const at = (s: number) =>
+        a.map((c, i) => {
+          const s2 = s * s, s3 = s2 * s;
+          return (2 * s3 - 3 * s2 + 1) * c + (s3 - 2 * s2 + s) * used * fa[i] + (3 * s2 - 2 * s3) * b[i] + (s3 - s2) * used * fb[i];
+        });
+      let lo = 0, hi = 1;
+      for (let it = 0; it < 52; it++) {
+        const mid = (lo + hi) / 2;
+        if (inside(at(mid))) lo = mid;
+        else hi = mid;
+      }
+      fraction = hi;
+      q = at(hi).map((c, i) => Math.min(box![2 * i + 1], Math.max(box![2 * i], c)));
+      fq = velocity(q);
+      last = true;
+      if (!fq) break;
+    }
+    const piece = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]);
+    if (!(piece > 0)) break;
+    t += fraction * used;
+    length += piece;
+    keep(q, fq, t);
+    p = q;
+    f = fq;
+    if (last) break;
+  }
+  return { positions: Float64Array.from(points), scalar: Float64Array.from(speeds), times: Float64Array.from(times) };
+}
+
+/** Controls for {@link streamTubeColors}. */
+export interface StreamColorOptions {
+  /** Scalar mapped to the first and last colour. Default the mesh's own value range. */
+  readonly range?: readonly [number, number];
+  /** Colour stops, encoded sRGB `[r, g, b]` 0 to 1 or `#rrggbb`, spaced evenly and blended in OKLab. At least two. */
+  readonly colors: readonly (string | readonly [number, number, number])[];
+}
+
+/**
+ * Linear rgba vertex colours for a stream mesh (four per vertex), its scalar mapped through `colors`. Blending in
+ * OKLab (Ottosson 2020) keeps the lightness steps even, so speed reads as brightness. Put the result in the mesh's
+ * `colors` to draw it with any vertex colour material.
+ *
+ * ```js
+ * const tube = streamTubeGeometry(path, { radius: 0.05 });
+ * const colors = streamTubeColors(tube, { range: [1, 2], colors: ['#21587a', '#5ee3d6'] });
+ * ```
+ */
+export function streamTubeColors(mesh: { readonly values: ArrayLike<number> }, options: StreamColorOptions): Float32Array {
+  const values = mesh?.values;
+  if (!values || typeof values.length !== 'number') throw rangeError('Stream colours need a mesh with values', 'sciviz');
+  const stops = (options?.colors ?? []).map((c) => {
+    const rgb = typeof c === 'string' && /^#[\da-f]{6}$/i.test(c)
+      ? [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16) / 255)
+      : Array.isArray(c) && c.length === 3 && c.every((v) => Number.isFinite(v) && v >= 0 && v <= 1) ? c : null;
+    if (!rgb) throw rangeError('Stream colours must be #rrggbb or [r, g, b] in 0 to 1', 'sciviz');
+    return linearToOklab(SRGBToLinear(rgb[0]), SRGBToLinear(rgb[1]), SRGBToLinear(rgb[2]));
+  });
+  if (stops.length < 2) throw rangeError('Stream colours need at least two colours', 'sciviz');
+  let [lo, hi] = options.range ?? [Infinity, -Infinity];
+  if (!options.range) for (let i = 0; i < values.length; i++) (lo = Math.min(lo, values[i])), (hi = Math.max(hi, values[i]));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) throw rangeError('Stream colour range must be finite', 'sciviz');
+  const out = new Float32Array(values.length * 4);
+  for (let i = 0; i < values.length; i++) {
+    const x = hi > lo ? Math.min(1, Math.max(0, (values[i] - lo) / (hi - lo))) : 0,
+      at = x * (stops.length - 1),
+      j = Math.min(stops.length - 2, Math.floor(at)),
+      f = at - j,
+      lab = [0, 1, 2].map((c) => stops[j][c] * (1 - f) + stops[j + 1][c] * f),
+      rgb = oklabToLinear(lab[0], lab[1], lab[2]);
+    out.set([Math.max(0, rgb[0]), Math.max(0, rgb[1]), Math.max(0, rgb[2]), 1], i * 4);
+  }
+  return out;
 }
 
 /** Ribbon with signed twist integral d(angle)/ds = streamwiseVorticity / (2 speed), in physical units. */

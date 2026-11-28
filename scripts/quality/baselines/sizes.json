@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22077813,
+  "total": 22079759,
   "history": [
     {
       "date": "2026-10-24",
@@ -17178,7 +17178,7 @@
     "@margoengine/sciviz/tetvolume": 7286,
     "@margoengine/sciviz/themes": 20011,
     "@margoengine/sciviz/transfer": 6744,
-    "@margoengine/sciviz/tubes": 2789,
+    "@margoengine/sciviz/tubes": 4735,
     "@margoengine/sciviz/views": 5042,
     "@margoengine/sciviz/volume-quality": 9632,
     "@margoengine/sciviz/vtk": 6744,

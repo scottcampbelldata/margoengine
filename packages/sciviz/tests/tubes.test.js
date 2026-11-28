@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { streamTubeGeometry, streamRibbonGeometry, streamMeshTriangles } from '@margoengine/sciviz/tubes';
+import { streamTubeGeometry, streamRibbonGeometry, streamMeshTriangles, traceStreamPath, streamTubeColors } from '@margoengine/sciviz/tubes';
 
 const close = (a, b, epsilon = 2e-6) => assert.ok(Math.abs(a - b) < epsilon, `${a} != ${b}`);
 const straight = { positions: new Float64Array([0, 0, 0, 2, 0, 0]), scalar: [3, 9] };
@@ -115,4 +115,44 @@ test('existing scientific mesh renderer adapter keeps every corner normal/value 
   mesh.indices[0] = mesh.values.length; assert.throws(() => streamMeshTriangles(mesh), /https:/);
   const reason = { cancel: true };
   assert.throws(() => streamMeshTriangles(mesh, { signal: AbortSignal.abort(reason) }), (e) => e === reason);
+});
+
+test('traceStreamPath follows an exact helix and ends on the box face it leaves', () => {
+  // v = (1, -z, y): x = t, (y, z) turns at unit rate on its circle. Exact: y = r cos t, z = r sin t for seed (0, r, 0).
+  const r = 0.5, path = traceStreamPath(([, y, z]) => [1, -z, y], [0, r, 0], { bounds: [0, 6, -2, 2, -2, 2], maxStep: 0.4 });
+  const n = path.scalar.length;
+  assert.ok(n > 10 && n < 200, String(n));
+  for (let i = 0; i < n; i++) {
+    const t = path.times[i], [x, y, z] = path.positions.subarray(i * 3, i * 3 + 3);
+    close(x, t, 1e-6);
+    close(y, r * Math.cos(t), 1e-5);
+    close(z, r * Math.sin(t), 1e-5);
+    close(path.scalar[i], Math.hypot(1, r), 1e-5);
+  }
+  close(path.positions[(n - 1) * 3], 6, 1e-9);
+  const back = traceStreamPath(([, y, z]) => [1, -z, y], [3, r, 0], { backward: true, bounds: [0, 6, -2, 2, -2, 2] });
+  close(back.positions[back.positions.length - 3], 0, 1e-9);
+  close(back.times[back.times.length - 1], -3, 1e-6);
+  // A stagnation point stops the trace; a null velocity (outside the data) stops it too.
+  const sink = traceStreamPath(([x]) => [-x, 0, 0], [1, 0, 0], { minSpeed: 1e-3, maxStep: 1 });
+  assert.ok(sink.scalar[sink.scalar.length - 1] < 1e-3 * 1.0001 + 1e-3);
+  const edge = traceStreamPath(([x]) => (x < 2 ? [1, 0, 0] : null), [0, 0, 0]);
+  assert.ok(edge.positions[edge.positions.length - 3] <= 2);
+  assert.throws(() => traceStreamPath(() => [1, 0, 0], [0, 0, Number.NaN]), RangeError);
+  assert.throws(() => traceStreamPath(() => [1, 0, 0], [0, 0, 0], { bounds: [1, 0, 0, 1, 0, 1] }), RangeError);
+  const tube = streamTubeGeometry(path, { radius: 0.05 });
+  valid(tube);
+});
+
+test('streamTubeColors maps speed through OKLab stops to linear rgba', () => {
+  const mesh = { values: [0, 0.5, 1, 2] };
+  const c = streamTubeColors(mesh, { range: [0, 1], colors: ['#000000', '#ffffff'] });
+  assert.equal(c.length, 16);
+  close(c[0], 0, 1e-6);
+  close(c[8], 1, 1e-5);
+  close(c[12], 1, 1e-5);
+  close(c[3], 1);
+  // OKLab midpoint of black and white has lightness 0.5, which is linear 0.125.
+  close(c[4], 0.125, 1e-4);
+  assert.throws(() => streamTubeColors(mesh, { colors: ['#fff'] }), RangeError);
 });

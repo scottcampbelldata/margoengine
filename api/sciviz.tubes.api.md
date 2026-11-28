@@ -5,6 +5,11 @@
 ```ts
 import { GeometryData } from "@margoengine/geometry";
 
+export interface StreamColorOptions {
+    readonly range?: readonly [number, number];
+    readonly colors: readonly (string | readonly [number, number, number])[];
+}
+
 export interface StreamMesh extends GeometryData {
     readonly values: Float32Array;
 }
@@ -27,11 +32,30 @@ export interface StreamSweepOptions {
     readonly signal?: AbortSignal;
 }
 
+export interface StreamTrace extends StreamPath {
+    readonly positions: Float64Array;
+    readonly scalar: Float64Array;
+    readonly times: Float64Array;
+}
+
+export interface StreamTraceOptions {
+    readonly maxStep?: number;
+    readonly maxSteps?: number;
+    readonly tolerance?: number;
+    readonly bounds?: readonly [number, number, number, number, number, number];
+    readonly maxLength?: number;
+    readonly minSpeed?: number;
+    readonly backward?: boolean;
+    readonly signal?: AbortSignal;
+}
+
 export interface StreamTubeOptions extends StreamSweepOptions {
     readonly radius?: number | ArrayLike<number>;
     readonly sides?: number;
     readonly caps?: boolean;
 }
+
+export type VelocityField = (point: readonly [number, number, number]) => ArrayLike<number> | null;
 
 export function streamMeshTriangles(mesh: StreamMesh, options?: {
     readonly signal?: AbortSignal;
@@ -39,7 +63,13 @@ export function streamMeshTriangles(mesh: StreamMesh, options?: {
 
 export function streamRibbonGeometry(path: StreamPath, options?: StreamRibbonOptions): StreamMesh;
 
+export function streamTubeColors(mesh: {
+    readonly values: ArrayLike<number>;
+}, options: StreamColorOptions): Float32Array;
+
 export function streamTubeGeometry(path: StreamPath, options?: StreamTubeOptions): StreamMesh;
+
+export function traceStreamPath(field: VelocityField, seed: readonly [number, number, number], options?: StreamTraceOptions): StreamTrace;
 
 // Not exported from this entry, but used by the exports above:
 

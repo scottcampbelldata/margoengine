@@ -20,6 +20,8 @@ import {
   scaleMarksGeometry,
   strokeGeometry,
   turnedGeometry,
+  nacaThickness,
+  wingGeometry,
 } from '@margoengine/geometry/parts';
 import { applyMatrix4, extractGroups, mergeGeometries, mergeVertices, toNonIndexed } from '@margoengine/geometry/utils';
 import { lerp } from '@margoengine/math/vec3';
@@ -580,4 +582,27 @@ test('prismGeometry bevelHeight: a chamfer of different width and height', () =>
   const frustum = (0.05 / 3) * (1.8 ** 2 + 4 + 1.8 * 2);
   close(volume(p), 4 * 0.9 + 2 * frustum, 1e-5);
   assert.throws(() => prismGeometry(square, 1, { bevel: 0.1, bevelHeight: 0.5 }), RangeError);
+});
+
+test('wingGeometry: a closed NACA wing whose volume matches the section area times the span', () => {
+  // The closed trailing edge NACA section's area, integrated exactly: 10 t (0.2969 2/3 - 0.126/2 - 0.3516/3 + 0.2843/4 - 0.1036/5) c^2.
+  const w = wingGeometry({ span: 2, rootChord: 1, thickness: 0.12, sections: 256, stations: 2 });
+  assertClosed(w);
+  assertOutward(w);
+  close(volume(w), 2 * 10 * 0.12 * ((0.2969 * 2) / 3 - 0.126 / 2 - 0.3516 / 3 + 0.2843 / 4 - 0.1036 / 5), 5e-5);
+  close(nacaThickness(0.3, 0.12), 0.06002, 1e-4);
+  close(nacaThickness(1, 0.12), 0, 1e-9);
+  const swept = wingGeometry({ span: 3, rootChord: 1.5, tipChord: 1, sweep: 0.4, dihedral: 0.1, curve: 2 });
+  assertClosed(swept);
+  assertOutward(swept);
+  let tipX = -Infinity, tipY = -Infinity;
+  for (let i = 0; i < swept.positions.length; i += 3)
+    if (Math.abs(swept.positions[i + 2]) > 1.4999) {
+      tipX = Math.max(tipX, swept.positions[i]);
+      tipY = Math.max(tipY, swept.positions[i + 1]);
+    }
+  close(tipX, 0.4 + 1, 1e-5);
+  assert.ok(tipY > 0.1 && tipY < 0.1 + 0.07, String(tipY));
+  assert.throws(() => wingGeometry({ thickness: 0.5 }), RangeError);
+  assert.throws(() => wingGeometry({ sweep: Number.NaN }), RangeError);
 });

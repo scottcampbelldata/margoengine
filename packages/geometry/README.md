@@ -83,7 +83,7 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 | `GeometryBuilder`, `placeGeometry`, `tintGeometry`, `placementMatrix`, `parseColor` from `@margoengine/geometry/builder` |
-| `turnedGeometry`, `pipeGeometry`, `helixGeometry`, `ribbonGeometry`, `prismGeometry`, `chamferBoxGeometry`, `ringSectorGeometry`, `scaleMarksGeometry`, `strokeGeometry`, `arrowGeometry`, `gridSheetGeometry`, `rotationMinimizingFrames` from `@margoengine/geometry/parts` |
+| `turnedGeometry`, `pipeGeometry`, `helixGeometry`, `ribbonGeometry`, `prismGeometry`, `chamferBoxGeometry`, `ringSectorGeometry`, `scaleMarksGeometry`, `strokeGeometry`, `arrowGeometry`, `gridSheetGeometry`, `wingGeometry`, `nacaThickness`, `rotationMinimizingFrames` from `@margoengine/geometry/parts` |
 
 ## Smaller entries
 
@@ -745,7 +745,7 @@ const red = tintGeometry(post, '#b3402a');
 ```ts
 import {
   arrowGeometry, chamferBoxGeometry, gridSheetGeometry, helixGeometry, pipeGeometry, prismGeometry, ribbonGeometry,
-  ringSectorGeometry, scaleMarksGeometry, strokeGeometry, turnedGeometry,
+  ringSectorGeometry, scaleMarksGeometry, strokeGeometry, turnedGeometry, wingGeometry,
 } from 'margoengine/geometry/parts';
 
 // A turned knob: [radius, height] pairs; corners sharper than 30 degrees stay sharp.
@@ -773,7 +773,15 @@ const dial = scaleMarksGeometry({kind: 'radial', count: 41, radius: 0.1, sweep: 
 const lines = strokeGeometry([[[-1, 0], [1, 0]], [[0, -1], [0, 1]]], 0.004, {axis: 'z'});
 const arrow = arrowGeometry({length: 0.5});
 const dune = gridSheetGeometry(64, 64, (u, v) => [u * 10 - 5, Math.sin(u * 6) * 0.3, v * 10 - 5]);
+// A tapered NACA 0013 wing, 3 m span, gull curve.
+const wing = wingGeometry({span: 3, rootChord: 1.5, tipChord: 1, thickness: 0.13, sweep: 0.4, dihedral: 0.1, curve: 2});
 ```
+
+- `wingGeometry({span = 2, rootChord = 1, tipChord = rootChord, thickness = 0.12, sweep = 0, dihedral = 0, curve = 1, sections = 48, stations = 32, caps = true})`:
+  NACA four-digit symmetric sections (Abbott, von Doenhoff 1959; the closed trailing edge coefficient -0.1036), cosine
+  spaced round the nose, lofted along z from -span/2 to span/2 with the leading edge at x 0. Chord, sweep (+x) and
+  dihedral (+y) follow `|z / (span / 2)| ** curve`; flat tip caps. `nacaThickness(x, t)` is the half thickness at chord
+  fraction x.
 
 - `turnedGeometry(profile, {segments = 48, start = 0, sweep = 2 pi, caps = true, crease = 30, axis = 'y'})`: a profile
   running up at positive radius faces outward; a loop (last point equal to the first) makes a ring; ends off the axis

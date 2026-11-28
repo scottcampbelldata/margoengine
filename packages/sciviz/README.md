@@ -1255,6 +1255,35 @@ const ribbon = streamRibbonGeometry(path, {
 console.log(tube.positions.length / 3, ribbon.indices.length / 3, layer.triangles);
 ```
 
+### Tracing paths and colouring tubes
+
+`traceStreamPath(field, seed, options)` traces a streamline of any steady field given as a function
+`([x, y, z]) => [u, v, w]` (return null outside the data) with the adaptive Dormand-Prince 5(4) pair
+(Dormand, Prince 1980) and the standard step controller. Options: `maxStep` (0.1, time units), `tolerance`
+(1e-7 per step, absolute plus relative), `maxSteps` (4000), `bounds` (none; `[xmin, xmax, ymin, ymax, zmin, zmax]`,
+the path ends on the face it crosses, found on the step's cubic Hermite interpolant), `maxLength` (unlimited),
+`minSpeed` (1e-9), `backward` (false) and `signal`. It returns `{ positions, scalar, times }` with the local speed as
+`scalar`, ready for `streamTubeGeometry`. `streamTubeColors(mesh, { colors, range })` maps a stream mesh's values
+through two or more sRGB stops (`#rrggbb` or `[r, g, b]` 0 to 1), blended in OKLab so speed reads as even steps of
+lightness, to linear rgba per vertex (`range` defaults to the mesh's own). Put them in the mesh's `colors` and draw it
+with any vertex colour material, such as `@margoengine/materials` `createMesh`.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Material, createMesh } from '@margoengine/materials';
+import { streamTubeColors, streamTubeGeometry, traceStreamPath } from '@margoengine/sciviz/tubes';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const swirl = ([, y, z]: readonly [number, number, number]) => [1, -z, y];
+const path = traceStreamPath(swirl, [0, 0.5, 0], { bounds: [0, 6, -2, 2, -2, 2] });
+const tube = streamTubeGeometry(path, { radius: 0.05, sides: 14 });
+const colors = streamTubeColors(tube, { colors: ['#1d5677', '#62e6d8'] });
+createMesh(engine, { ...tube, colors }, new Material({ roughness: 0.3 }));
+```
+
+[The Streamtubes](../../demos/the-streamtubes/) traces a paired wingtip wake this way and draws it with
+materials, studio/bench shadows and a `wingGeometry` wing from geometry/parts.
+
 [North Atlantic wind paths](../../examples/sciviz-tubes.html) shows tubes and ribbons on the same frozen
 public-domain NOAA daily mean winds as the wind and LIC pages. Radius and colour encode measured speed;
 the horizontal field has zero streamwise curl. Width is explicitly exaggerated and is not a measured diameter.

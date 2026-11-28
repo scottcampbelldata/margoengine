@@ -20418,3 +20418,34 @@ Margo's own: a centre vertex per cell, shared only by its own fan, so its choice
 midpoint of the diagonal whose mean height is nearer the cubic height at the centre, following the morphed corners;
 the projections read the interpolated surface normal while the structure normal only shades (terrain
 test/grid.test.js, test/teeth.browser.mjs, test/rock-projection.test.js).
+
+## G04 sciviz flow views: stream tracing, tube colours and the wing part (2026-11-28)
+
+`@margoengine/sciviz/tubes` `traceStreamPath` and `streamTubeColors`, `@margoengine/geometry/parts` `wingGeometry` and
+`nacaThickness`, written from the papers and standards below; no other engine's code was read.
+
+- J. R. Dormand and P. J. Prince, "A family of embedded Runge-Kutta formulae", J. Comput. Appl. Math. 6(1):19-26, 1980,
+  https://doi.org/10.1016/0771-050X(80)90013-3 (the RK5(4)7M pair, first same as last, used for every step).
+- E. Hairer, S. P. Norsett and G. Wanner, Solving Ordinary Differential Equations I, 2nd ed., Springer 1993, sections
+  II.4 to II.6 (the mixed absolute and relative error norm, the step controller with safety 0.9 and growth 0.2 to 5,
+  and the cubic Hermite interpolant that places the path's end on the box face it crosses).
+- D. Stalling and H.-C. Hege, "Fast and Resolution Independent Line Integral Convolution", SIGGRAPH 1995,
+  https://doi.org/10.1145/218380.218448 (streamlines integrated with an error controlled Runge-Kutta scheme rather than
+  fixed Euler steps; the same choice here for tubes).
+- B. Jobard and W. Lefer, "Creating Evenly-Spaced Streamlines of Arbitrary Density", Visualization in Scientific
+  Computing 1997, https://doi.org/10.1007/978-3-7091-6876-9_5 (seeding and stopping streamlines by separation; sciviz/flow
+  seeds follow it, the tubes take explicit seeds).
+- B. Cabral and L. Leedom, "Imaging Vector Fields Using Line Integral Convolution", SIGGRAPH 1993,
+  https://doi.org/10.1145/166117.166151 (the LIC entry the flow views share).
+- M. Zockler, D. Stalling and H.-C. Hege, "Interactive Visualization of 3D-Vector Fields Using Illuminated
+  Streamlines", IEEE Visualization 1996, https://doi.org/10.1109/VISUAL.1996.567777 (lit lines read depth and twist;
+  here a lit tube surface with shadows does the same).
+- B. Ottosson, "A perceptual color space for image processing" (OKLab), 2020, https://bottosson.github.io/posts/oklab/
+  (stops blended in OKLab so speed steps read as even lightness steps).
+- I. H. Abbott and A. E. von Doenhoff, Theory of Wing Sections, Dover 1959, section 6.4, and E. N. Jacobs, K. E. Ward
+  and R. M. Pinkerton, "The characteristics of 78 related airfoil sections from tests in the variable-density wind
+  tunnel", NACA Report 460, 1933 (the four-digit thickness polynomial; -0.1036 closes the trailing edge).
+
+Margo's own: the Hermite bisection to the face and the spanwise exponent shared by chord, sweep and dihedral. Tests:
+sciviz tests/tubes.test.js (an exact helix to 1e-5, the face crossing to 1e-9, OKLab midpoints) and geometry
+tests/builder-parts.test.js (closed, outward, the exact section area times the span).

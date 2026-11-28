@@ -891,3 +891,81 @@ export function gridSheetGeometry(
 ): GeometryData {
   return new GeometryBuilder({ weld: false }).grid(nu, nv, fn, options).data();
 }
+
+/** Options of {@link wingGeometry}. */
+export interface WingOptions {
+  /** Tip to tip span along z, centred on z 0. Default 2. */
+  span?: number;
+  /** Chord at the centre, along +x from the leading edge at x 0. Default 1. */
+  rootChord?: number;
+  /** Chord at each tip. Default `rootChord`. */
+  tipChord?: number;
+  /** NACA four-digit symmetric thickness as a fraction of the chord (0.12 is a NACA 0012), up to 0.4. Default 0.12. */
+  thickness?: number;
+  /** Leading edge moved aft (+x) at the tips. Default 0. */
+  sweep?: number;
+  /** Tips raised (+y). Default 0. */
+  dihedral?: number;
+  /**
+   * Exponent of the spanwise curve the chord, sweep and dihedral follow from the centre (0) to a tip (1). Default 1,
+   * straight; 2 rounds the planform toward the tips.
+   */
+  curve?: number;
+  /** Points around each section, cosine spaced so the nose stays round. Default 48. */
+  sections?: number;
+  /** Spanwise intervals. Default 32. */
+  stations?: number;
+  /** Close the tips with flat caps. Default true. */
+  caps?: boolean;
+}
+
+/** NACA four-digit half thickness at chord fraction x (0 to 1), with the closed trailing edge coefficient -0.1036. */
+export function nacaThickness(x: number, thickness: number): number {
+  const s = Math.sqrt(Math.max(0, x));
+  return 5 * thickness * (0.2969 * s - 0.126 * x - 0.3516 * x * x + 0.2843 * x ** 3 - 0.1036 * x ** 4);
+}
+
+/**
+ * A straight or tapered wing: NACA four-digit symmetric sections (Abbott, von Doenhoff 1959, "Theory of Wing
+ * Sections", section 6.4; Jacobs, Ward, Pinkerton 1933, NACA Report 460) lofted along z, with sweep, dihedral and flat
+ * tip caps. Smooth over the skin, sharp at the trailing edge and the tips.
+ *
+ * ```js
+ * const wing = wingGeometry({ span: 3, rootChord: 1.5, tipChord: 1, thickness: 0.13, sweep: 0.4, curve: 2 });
+ * ```
+ */
+export function wingGeometry(options: WingOptions = {}): GeometryData {
+  const span = positive(options.span ?? 2, 'wingGeometry span'),
+    root = positive(options.rootChord ?? 1, 'wingGeometry rootChord'),
+    tip = positive(options.tipChord ?? root, 'wingGeometry tipChord'),
+    thickness = positive(options.thickness ?? 0.12, 'wingGeometry thickness'),
+    sweep = options.sweep ?? 0,
+    dihedral = options.dihedral ?? 0,
+    curve = positive(options.curve ?? 1, 'wingGeometry curve'),
+    around = whole(options.sections ?? 48, 8, 'wingGeometry sections'),
+    stations = whole(options.stations ?? 32, 1, 'wingGeometry stations');
+  if (!Number.isFinite(sweep) || !Number.isFinite(dihedral))
+    throw new RangeError('wingGeometry sweep and dihedral must be finite numbers');
+  if (thickness > 0.4) throw new RangeError('wingGeometry thickness must be at most 0.4 of the chord');
+  const half = around / 2;
+  const loop = (z: number): MutableVec3[] => {
+    const k = (Math.abs(z) / (span / 2)) ** curve,
+      chord = root + (tip - root) * k;
+    const points: MutableVec3[] = [];
+    // From the trailing edge over the upper side to the nose, then back under it: x = (1 + cos t) / 2.
+    for (let i = 0; i < around; i++) {
+      const x = 0.5 + 0.5 * Math.cos((i / half) * Math.PI),
+        y = nacaThickness(x, thickness) * chord * (i < half ? 1 : -1);
+      points.push([sweep * k + x * chord, dihedral * k + y, z]);
+    }
+    return points;
+  };
+  const builder = new GeometryBuilder({ smooth: 40 });
+  const rows = Array.from({ length: stations + 1 }, (_, j) => loop(-span / 2 + (span * j) / stations));
+  for (let j = 0; j < stations; j++) builder.strip(rows[j], rows[j + 1], { closed: true });
+  if (options.caps ?? true) {
+    builder.polygon(rows[0], { flip: true });
+    builder.polygon(rows[stations]);
+  }
+  return builder.data();
+}
