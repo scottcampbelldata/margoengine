@@ -31,9 +31,17 @@ const materials = {
   printed: new PbrMaterial({ color: '#b5622c', roughness: 0.5, metalness: 0 }),
   active: new PbrMaterial({ color: '#e9a640', roughness: 0.45, metalness: 0 }),
   travel: new PbrMaterial({ color: '#3f8aa6', roughness: 0.6, metalness: 0 }),
+  // The silicone sock over the heater block.
+  sock: new PbrMaterial({ color: '#27415a', roughness: 0.7, metalness: 0 }),
 };
 const paths = new Map();
-let bench, solids, part = 0, layer = 0, playing = false, since = 0, stopFrame;
+// The hotend: its parts take their metals by node name; the sock is silicone.
+const headFinish = {
+  nozzle: { finish: 'machined', metal: 'brass', roughness: 0.28 },
+  'heat-break': { finish: 'machined', metal: 'stainlessSteel', roughness: 0.3 },
+  'heatsink-core': { finish: 'machined', metal: 'aluminium', roughness: 0.4 },
+};
+let bench, cad, head, solids, part = 0, layer = 0, playing = false, since = 0, stopFrame;
 
 // One mesh per layer for its beads and one for its travel, built once per part when its G-code is first shown.
 function toolpaths(index) {
@@ -54,6 +62,7 @@ function toolpaths(index) {
     return layers.map((entry) => ({
       z: entry.z,
       moves: entry.extrusion.length / 6,
+      end: Array.from(entry.extrusion.slice(-3)),
       beads: mesh(entry.extrusion, bead, materials.printed),
       travel: mesh(entry.travel, thread, materials.travel),
     }));
@@ -74,6 +83,7 @@ async function show() {
   });
   solids.forEach((solid, index) => (solid.visible = index === part));
   const active = layers[layer], shape = facts[part];
+  seat(active);
   slider.value = String(layer + 1);
   id('layer-readout').value = layer + 1 + ' / ' + layers.length;
   id('height').value = active.z.toFixed(2) + ' mm';
@@ -92,6 +102,14 @@ async function show() {
   });
   bench.request();
   performance.mark('print-layer-applied');
+}
+
+// The nozzle tip rests on the last bead the layer lays, in the same frame as the toolpaths (file millimetres to bench
+// metres: x stays, y goes to -z and z goes up, from the file's centre over the print side of the plate).
+function seat(entry) {
+  if (!head) return;
+  const end = entry.end;
+  head.setPosition([printX - 0.06 + end[0] * 0.001, plate + end[2] * 0.001 + 0.0001, 0.06 - end[1] * 0.001]);
 }
 
 function switchPlay(active) {
@@ -137,7 +155,7 @@ async function start() {
     orbit: { target: [0, 0.045, 0], minDistance: 0.08, maxDistance: 1.2 },
     onError: fail,
   });
-  CadBench.attach(bench.engine, { deck: { size: [0.26, 0.16], thickness: plate }, casters: bench });
+  cad = CadBench.attach(bench.engine, { deck: { size: [0.26, 0.16], thickness: plate }, casters: bench });
   const model = await loadGLTF(bench.engine, new URL('./assets/kites.glb', import.meta.url), { extensions: [meshopt, quantized], signal });
   model.root.setPosition([solidX, plate, 0]);
   solids = model.meshes;
@@ -145,8 +163,15 @@ async function start() {
     solid.setMaterial(materials.printed);
     bench.add(solid, { fit: false });
   }
+  const hotend = await loadGLTF(bench.engine, new URL('./assets/printhead.glb', import.meta.url), { extensions: [meshopt, quantized], signal });
+  head = hotend.root;
+  for (const [index, piece] of hotend.meshes.entries()) {
+    const given = hotend.nodes[index].name;
+    if (given === 'sock') piece.setMaterial(materials.sock), bench.add(piece, { fit: false });
+    else cad.show(piece, headFinish[given] ?? { finish: 'machined', metal: 'aluminium', roughness: 0.34 });
+  }
   await show();
-  await bench.fit({ bounds: { min: [-0.085, plate, -0.035], max: [0.09, plate + 0.02, 0.035] }, fill: 0.8 });
+  await bench.fit({ bounds: { min: [-0.085, plate, -0.035], max: [0.09, plate + 0.034, 0.035] }, fill: 0.8 });
   bench.orbit.saveState();
   sizes.addEventListener('click', (event) => {
     const button = event.target.closest('[data-part]');

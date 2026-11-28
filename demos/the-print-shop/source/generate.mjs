@@ -72,3 +72,27 @@ await output('kites.glb',glb);
 const facts=packed.map(({diameter,volume,filament,length,layers})=>({diameter,volume,filament,length,layers:layers.length}));
 await writeFile(new URL('./facts.json',import.meta.url),JSON.stringify(facts,null,1)+String.fromCharCode(10));
 console.log(JSON.stringify({glbBytes:glb.byteLength,models:facts}));
+
+// The print head: a hotend modelled on the standard 0.4 mm kit, tip at the origin, Y up, in metres. Brass nozzle (a
+// revolved profile with its bore), a silicone sock over the heater block, the stainless heat break and ten aluminium
+// cooling fins; the page gives each node its metal.
+const {revolve,box,cylinder:post}=model;
+const up=[0,1,0];
+const nozzleProfile=[[.0002,0],[.0006,0],[.0027,.0032],[.0035,.0036],[.0035,.0083],[.0030,.0083],[.0030,.0125],[.0015,.0125],[.0015,.0050],[.0002,.0010]]
+  .map(([x,y])=>[x,y,0]);
+const heads=[
+  revolve('nozzle',{name:'nozzle-profile',start:nozzleProfile[0],normal:[0,0,1],
+    segments:[...nozzleProfile.slice(1),nozzleProfile[0]].map(to=>({kind:'line',to}))},{origin:[0,0,0],direction:up}),
+  box('sock',[.022,.0143,.019],frameOf([-.011,.0072,-.0095],[0,0,1],[1,0,0])),
+  post('heat-break',.003,.0305,frameOf([0,.0215,0],up,[1,0,0])),
+  post('heatsink-core',.0045,.019,frameOf([0,.0285,0],up,[1,0,0])),
+  ...Array.from({length:10},(_,i)=>post('fin-'+i,.0112,.001,frameOf([0,.0285+i*.002,0],up,[1,0,0]))),
+];
+for(const body of heads)assert.equal(checkBody(body).length,0,body.name);
+const {meshes:headMeshes}=meshBodies(heads,{deflection:.000012,angle:.14});
+assert.ok(headMeshes.every(mesh=>mesh.failures.length===0));
+const headNodes=heads.map((body,i)=>({name:body.name,
+  geometry:{positions:Array.from(headMeshes[i].positions,p=>+p.toFixed(7)),normals:Array.from(headMeshes[i].normals,n=>+n.toFixed(6)),indices:Array.from(headMeshes[i].indices)}}));
+const {glb:headGlb}=await compressMeshopt(exportGLB({nodes:headNodes},{generator:'Margo Engine the-print-shop hotend'}),{normalBits:16});
+await output('printhead.glb',headGlb);
+console.log(JSON.stringify({printheadBytes:headGlb.byteLength}));
