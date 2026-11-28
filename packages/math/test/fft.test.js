@@ -115,7 +115,7 @@ test('the written-out radix-2 stage gives the generic stage bits, -0 inputs incl
     return x.map((v) => v * (inverse ? 1 / n : 1));
   };
   let seed = 7;
-  const next = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648 - 0.5) * 8;
+  const next = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2147483648 - 0.5) * 8;
   for (const n of [2, 4, 8, 16, 48, 256, 240, 1024])
     for (const inverse of [false, true])
       for (const fill of ['random', 'signed zeros']) {

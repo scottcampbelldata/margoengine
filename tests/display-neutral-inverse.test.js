@@ -14,7 +14,7 @@ const top = 1 - (0.24 * 0.24) / (neutralWhite - 0.56);
 
 test('pbrNeutralInverse undoes pbrNeutral below display white', () => {
   let seed = 7;
-  const next = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) ** 3 * 8;
+  const next = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2147483648) ** 3 * 8;
   let worst = 0;
   for (let k = 0; k < 20000; k++) {
     const c = [next(), next(), next()],

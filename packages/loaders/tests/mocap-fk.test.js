@@ -10,7 +10,7 @@ import { Skeleton, applyKeyframeClip, createKeyframeClip } from '../../animation
 
 const ORDERS = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX'];
 let seed = 7;
-const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 2 - 1;
+const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2147483648) * 2 - 1;
 
 /** A chain of joints that uses every Euler order, a 6-channel joint below the root and End Sites, `frames` frames. */
 function file(frames) {
