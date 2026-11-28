@@ -40,7 +40,7 @@ export function bindWakeFft(module: WebAssembly.Module, nx: number, nz: number):
     typeof buffer !== 'function' ||
     typeof transform !== 'function'
   )
-    throw new MargoError('failed', 'Rebuild the wake FFT asset with its memory and transform exports.');
+    throw new MargoError('failed', 'You must rebuild the wake FFT asset with its memory and transform exports.');
   if (nx !== nx >>> 0 || nz !== nz >>> 0 || init(nx, nz) !== 0)
     throw new MargoError('state', 'Use an even wake FFT width and lengths of 4 to 4096 with factors 2, 3 and 5.');
   const spatial = nx * nz,

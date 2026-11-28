@@ -145,7 +145,7 @@ test('SEA-04 writes a bounded deterministic layout-1 region and clears old rows'
   assert.deepEqual(diagnose(movingCrest(0, 1), capped), diagnose(movingCrest(0, 1), signalRegion(2)));
   assert.throws(
     () => diagnose(state, new Float64Array(9)),
-    (error) => error.code === 'state' && /Match the breaking grid/.test(error.message),
+    (error) => error.code === 'state' && /must match the breaking grid/.test(error.message),
   );
   const unchanged = state.height.slice();
   assert.throws(

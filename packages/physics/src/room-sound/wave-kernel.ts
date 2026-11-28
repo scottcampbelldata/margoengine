@@ -53,7 +53,7 @@ function accept(status: number): void {
       'Acoustic pressure exceeds finite range. Reduce the initial pressure or source amplitude.',
     );
   if (status !== 0)
-    throw new MargoError('failed', 'Invalid acoustic stencil job. Rebuild or serve the matching room sound assets.');
+    throw new MargoError('failed', 'Invalid acoustic stencil job. You must rebuild or serve the matching room sound assets.');
 }
 
 export function bindRoomWaveKernel(
@@ -83,7 +83,7 @@ export function bindRoomWaveKernel(
     typeof phase !== 'function' ||
     typeof finish !== 'function'
   )
-    throw new MargoError('failed', 'Rebuild the room sound Wasm with its matching stack and pressure stencil exports.');
+    throw new MargoError('failed', 'You must rebuild the room sound Wasm with its matching stack and pressure stencil exports.');
   pointer.value = leaderStack;
   const address = job.byteOffset;
   if (pool) {
@@ -137,7 +137,7 @@ export function bindRoomWaveKernel(
         if (seen !== samples || pairs !== perSample * samples)
           throw new MargoError(
             'failed',
-            'Native workers missed acoustic cells. Rebuild the matching room sound assets.',
+            'Native workers missed acoustic cells. You must rebuild the matching room sound assets.',
           );
         return { samples: seen, pairs };
       });

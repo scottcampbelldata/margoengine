@@ -120,7 +120,7 @@ export function bakeWakeWaterplane(mesh: HullMesh, waterline: number, options: W
   )
     throw new MargoError(
       'state',
-      'Bake a finite reference waterline with positive panel spacing and a whole row limit.',
+      'You must bake a finite reference waterline with positive panel spacing and a whole row limit.',
     );
 
   const strips = cutStrips(cutLines(requireWakeHullMesh(mesh), waterline), maxPanelSize);

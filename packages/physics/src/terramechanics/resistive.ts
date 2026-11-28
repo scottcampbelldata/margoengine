@@ -126,24 +126,24 @@ export class ResistiveSoil implements Solver<ResistiveSoilParams> {
     bedVertexCount(this.terrain);
     this.cellSize = params.cellSize ?? 4096;
     if (!Number.isFinite(this.cellSize) || this.cellSize <= 0)
-      throw new MargoError('state', 'Invalid resistive soil cell size. Supply positive finite metres.');
+      throw new MargoError('state', 'Invalid resistive soil cell size. You must supply positive finite metres.');
     if (params.coefficients.length !== 9 || !params.coefficients.every(Number.isFinite))
       throw new MargoError(
         'state',
-        'Invalid soil stress profile. Supply the nine finite Fourier coefficients in N/m³.',
+        'Invalid soil stress profile. You must supply the nine finite Fourier coefficients in N/m³.',
       );
     const seen = new Set<number>();
     let sampleCount = 0;
     this.bodies = params.bodies.map(({ row, strips }) => {
       if (!Number.isSafeInteger(row) || row < 0 || seen.has(row) || !strips.length)
-        throw new MargoError('state', 'Invalid resistive soil body binding. Supply unique body rows with strips.');
+        throw new MargoError('state', 'Invalid resistive soil body binding. You must supply unique body rows with strips.');
       seen.add(row);
       const resolved = strips.map(stripOf);
       for (const strip of resolved) sampleCount += strip.count;
       return { row, strips: resolved };
     });
     if (!sampleCount || sampleCount > MAX_SAMPLES)
-      throw new MargoError('state', 'Invalid resistive soil work size. Configure 1–65,536 strip samples.');
+      throw new MargoError('state', 'Invalid resistive soil work size. You must configure 1–65,536 strip samples.');
     const rows = bodyRowsOf(host, 'ResistiveSoil', [...seen]);
     this.forces = host.allocate('resistive-soil-forces', rows * FORCE_WORDS * 8, 'f64', 1);
     this.coefficients = host.allocate('resistive-soil-coefficients', 9 * 8, 'f64', 1);

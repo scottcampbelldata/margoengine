@@ -76,7 +76,7 @@ const sample = (heights: Float32Array, n: number, u: number, v: number): number 
 /** Replaces `from`, a line of the terrain's own shader (shader.ts), and fails rather than draw without it. */
 const swap = (code: string, from: string, to: string): string => {
   if (!code.includes(from))
-    throw new MargoError('unsupported', 'Terrain far ring found no "' + from + '" in the terrain shader');
+    throw new MargoError('unsupported', 'Terrain far ring found no "' + from + '" in the terrain shader; use matching versions of @margoengine/terrain');
   return code.replace(from, to);
 };
 

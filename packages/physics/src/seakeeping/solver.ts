@@ -675,7 +675,7 @@ export class HullSolver implements Solver<HullParams> {
       )
         throw new MargoError(
           'state',
-          'Bake a nonempty reference waterplane with finite XZ coordinates and positive areas.',
+          'You must bake a nonempty reference waterplane with finite XZ coordinates and positive areas.',
         );
       return { plane: { waterline: plane.waterline, nodes: nodes.slice() }, radius };
     });
@@ -719,7 +719,7 @@ export class HullSolver implements Solver<HullParams> {
         )
           throw new MargoError(
             'state',
-            'Bake nonempty finite wake points with nonnegative depths and nonzero signed areas.',
+            'You must bake nonempty finite wake points with nonnegative depths and nonzero signed areas.',
           );
         const row = rows;
         rows += nodes.length / 4;
@@ -1255,12 +1255,12 @@ export class HullSolver implements Solver<HullParams> {
       if (baked && Math.abs(baked.plane.waterline - waterline) > 2e-6 * Math.max(1, Math.abs(waterline)))
         throw new MargoError(
           'state',
-          'Rebake the wake waterplane for the hull’s current reference mass and sea density.',
+          'You must rebake the wake waterplane for the hull’s current reference mass and sea density.',
         );
       if (points && Math.abs(points.geometry.waterline - waterline) > 2e-6 * Math.max(1, Math.abs(waterline)))
         throw new MargoError(
           'state',
-          'Rebake the point wake panels for the hull’s current reference mass and sea density.',
+          'You must rebake the point wake panels for the hull’s current reference mass and sea density.',
         );
       const sections =
         !baked || this.wakeAdvance || this.submergedWakeSource ? hullSections(hull.mesh, waterline, this.stations) : [];

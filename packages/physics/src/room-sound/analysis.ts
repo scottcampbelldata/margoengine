@@ -7,7 +7,7 @@ import { MargoError } from '@margoengine/math/errors';
 export function roomEnergyDecay(pressure: ArrayLike<number>): Float64Array {
   const length = pressure?.length;
   if (!Number.isSafeInteger(length) || length < 0)
-    throw new MargoError('state', 'Supply an array of finite pressure samples for the room energy decay.');
+    throw new MargoError('state', 'You must supply an array of finite pressure samples for the room energy decay.');
   let out: Float64Array;
   try {
     out = new Float64Array(length);

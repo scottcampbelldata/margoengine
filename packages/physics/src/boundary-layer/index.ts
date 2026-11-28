@@ -426,11 +426,11 @@ export class BoundaryLayerSolver implements Solver<BoundaryLayerOptions>, Wind {
     for (let at = 0; at < result.length; at += RECEIPT_WORDS) {
       const rows = result[at]!;
       if (result[at + 1]! > rows || result[at + 2]! > rows)
-        throw new MargoError('failed', 'Invalid boundary-layer work count. Rebuild the wind kernels.');
+        throw new MargoError('failed', 'Invalid boundary-layer work count. You must rebuild the wind kernels.');
       visited += rows;
     }
     if (visited !== n)
-      throw new MargoError('failed', 'Wind workers missed grid rows. Rebuild the boundary-layer assets.');
+      throw new MargoError('failed', 'Wind workers missed grid rows. You must rebuild the boundary-layer assets.');
     floats(host, output).set(floats(host, candidate));
     floats(host, clock)[0] = time;
     accepted.set(result);

@@ -115,7 +115,7 @@ export function bakeWakeAdvancePoints(
   )
     throw new MargoError(
       'state',
-      'Bake a finite reference waterline, increasing depth edges from zero, and one positive panel size per interval.',
+      'You must bake a finite reference waterline, increasing depth edges from zero, and one positive panel size per interval.',
     );
   const { vertices, indices } = requireWakeHullMesh(mesh);
   const point = (i: number): Point => [vertices[3 * i]!, vertices[3 * i + 1]!, vertices[3 * i + 2]!];

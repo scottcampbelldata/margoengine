@@ -191,7 +191,7 @@ export function parsePointSources(
       ra = view.getFloat32(o, true),
       dec = view.getFloat32(o + 4, true);
     if (!(ra >= 0 && ra <= 360 && dec >= -90 && dec <= 90))
-      throw new MargoError('failed', `Point source ${i + 1} lies off the sky (RA ${ra}, Dec ${dec})`);
+      throw new MargoError('failed', `Point source ${i + 1} lies off the sky (RA ${ra}, Dec ${dec}); right ascension must be 0 to 360 and declination -90 to 90 degrees`);
     galacticDirection(ra, dec, positions, i * 3);
     positions[i * 3] *= radius;
     positions[i * 3 + 1] *= radius;

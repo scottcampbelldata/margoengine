@@ -672,7 +672,7 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
         if (!wave) continue;
         const sample = samples[side];
         if (!Number.isFinite(sample?.surface) || !Number.isFinite(sample?.outwardVelocity))
-          throw new MargoError('state', 'Return finite surface altitude and outward velocity from each incoming wave.');
+          throw new MargoError('state', 'You must return finite surface altitude and outward velocity from each incoming wave.');
         const at = 3 * side;
         boundary[at] = 1;
         boundary[at + 1] = sample!.surface;

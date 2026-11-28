@@ -25,7 +25,7 @@ export function bindMannFft(module: WebAssembly.Module, cells: MannFftCells) {
     typeof buffer !== 'function' ||
     typeof transform !== 'function'
   )
-    throw new MargoError('failed', 'Rebuild the Mann FFT asset with its private memory and three ABI functions.');
+    throw new MargoError('failed', 'You must rebuild the Mann FFT asset with its private memory and three ABI functions.');
   if (cells.some((n) => n !== n >>> 0) || init(...cells) !== 0)
     throw new MargoError('failed', 'Use a smaller Mann FFT grid with integer lengths whose factors are 2, 3 and 5.');
   const words = 2 * cells[0] * cells[1] * cells[2];

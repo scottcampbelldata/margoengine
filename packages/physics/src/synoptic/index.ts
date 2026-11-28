@@ -167,7 +167,7 @@ type Layers = {
 };
 
 function bad(message: string): never {
-  throw new MargoError('state', `Invalid synoptic settings. ${message}`);
+  throw new MargoError('state', `Invalid synoptic settings; ${message.charAt(0).toLowerCase()}${message.slice(1)}`);
 }
 
 function number(value: number, label: string, min = -Infinity): number {
@@ -330,7 +330,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
         ? this.shared
         : this.plain;
     if (!native)
-      throw new MargoError('failed', 'The shared synoptic kernel is unavailable. Attach to a plain-memory world.');
+      throw new MargoError('failed', 'The shared synoptic kernel is unavailable. You must attach to a plain-memory world.');
     this.host = host;
     const stack = host.allocate('synoptic-stack', STACK_BYTES, 'u8', SYNOPTIC_LAYOUT);
     this.kernel = new WebAssembly.Instance(native, { env: { memory: host.memory } }).exports as Native;
@@ -340,7 +340,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
       typeof this.kernel.filter_orography !== 'function' ||
       !(this.kernel.__stack_pointer instanceof WebAssembly.Global)
     )
-      throw new MargoError('failed', 'Synoptic kernel layout differs. Rebuild both native variants.');
+      throw new MargoError('failed', 'Synoptic kernel layout differs. You must rebuild both native variants.');
     this.kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     const area = (label: string, words: number) => host.allocate(label, words * 8, 'f64', SYNOPTIC_LAYOUT);
     this.data = area('synoptic-prognostics', 5 * count);

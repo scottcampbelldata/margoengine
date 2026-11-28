@@ -330,7 +330,7 @@ export function tidalLevel(
   const { mean = 0, ramp = 0 } = options;
   if (!Number.isFinite(mean) || !(ramp >= 0 && Number.isFinite(ramp)))
     throw new RangeError(
-      `A tide's mean is finite metres and its ramp finite seconds, 0 or more (got ${mean}, ${ramp}).`,
+      `A tide's mean must be finite metres and its ramp finite seconds, 0 or more (got ${mean}, ${ramp}).`,
     );
   const lines = constituents.map((c) => {
     const period =

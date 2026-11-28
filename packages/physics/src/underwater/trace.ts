@@ -146,7 +146,7 @@ export function initializeRay(profile: Float64Array, ray: AcousticRayOptions): r
   if (!(speed > 0) || !Number.isFinite(speed) || !Number.isFinite(slowness))
     throw new MargoError(
       'state',
-      'Acoustic launch speed is outside numeric range. Specify a representable sound speed.',
+      'Acoustic launch speed is outside numeric range. You must specify a representable sound speed.',
     );
   return [layer, 0, depth, vertical, slowness, 0, 0, frequency, speed, epsilon, 0, epsilon, 1, 0, 0, pressure, 0];
 }

@@ -102,7 +102,7 @@ export function bakeWakeHullMask(mesh: HullMesh, grid: WakeHullMaskGrid, transfo
   )
     throw new MargoError(
       'state',
-      'Match the finite wake grid, increasing depth faces, origin and optional binary wet mask.',
+      'You must match the finite wake grid, increasing depth faces, origin and optional binary wet mask.',
     );
 
   const welded = weldMesh(vertices, indices, 3, 0);
@@ -121,7 +121,7 @@ export function bakeWakeHullMask(mesh: HullMesh, grid: WakeHullMaskGrid, transfo
   if ([xs, ys, zs].some((axis) => axis.some((v, i) => !Number.isFinite(v) || (i > 0 && v <= axis[i - 1]!))))
     throw new MargoError(
       'state',
-      'Space hull-mask cell centres at resolvable, finite distances in the wake origin cell.',
+      'You must space hull-mask cell centres at resolvable, finite distances in the wake origin cell.',
     );
 
   const rays = new Map<number, number[]>();

@@ -105,7 +105,7 @@ export function materialInfo(name: MaterialName): MaterialInfo {
       const r = (table as Readonly<Record<string, MeasuredMetal | MeasuredDielectric | MeasuredSurface>>)[name];
       return Object.freeze({ kind, provenance: r.provenance, citation: SOURCES[r.source], row: r });
     }
-  throw new RangeError(`Unknown material '${name}'`);
+  throw new RangeError(`Unknown material '${name}'; use a name from the materials library`);
 }
 
 /** Every library material as a preset at its default roughness, by name: `materials.gold`, `materials.limestone`. */

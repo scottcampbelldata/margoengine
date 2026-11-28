@@ -738,7 +738,7 @@ export class PhysicsWorld {
       },
       bodyRows: (atLeast) => {
         if (atLeast !== undefined && !(Number.isInteger(atLeast) && atLeast > 0))
-          throw new RangeError(`Body rows are a whole number above 0 (got ${atLeast}).`);
+          throw new RangeError(`Body rows must be a whole number above 0 (got ${atLeast}).`);
         if (this.rows === undefined) {
           if (atLeast === undefined)
             throw new MargoError(

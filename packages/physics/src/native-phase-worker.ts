@@ -10,7 +10,7 @@ function run(start: NativePhaseWorkerStart): void {
     const stack = exports.__stack_pointer;
     const kernelPhase = exports[start.phaseExport];
     if (!(stack instanceof WebAssembly.Global) || typeof kernelPhase !== 'function') {
-      throw new Error(`Missing native worker export ${start.phaseExport}. Rebuild the solver's shared Wasm kernel.`);
+      throw new Error(`Missing native worker export ${start.phaseExport}. You must rebuild the solver's shared Wasm kernel.`);
     }
     stack.value = start.stackTop;
     phase = kernelPhase as NativePhase;

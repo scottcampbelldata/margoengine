@@ -601,12 +601,12 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
     near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
   const known = (id: string, from: string, what: string) => {
     if (!seen.has(id) && !table.joints.some((joint) => joint.id === id))
-      throw new RangeError(`${from}: ${what} "${id}" is not a joint of the ${table.id} table`);
+      throw new RangeError(`${from}: ${what} "${id}" is not a joint of the ${table.id} table; use one of its joint ids`);
   };
   for (const joint of table.joints) {
     const at = `${table.id} joint ${joint?.id}`;
     if (!joint || typeof joint.id !== 'string' || !joint.id) throw new TypeError('Every joint needs a nonempty id');
-    if (seen.has(joint.id)) throw new RangeError(`${at}: the id is used twice`);
+    if (seen.has(joint.id)) throw new RangeError(`${at}: the id is used twice; give each its own id`);
     if (joint.parent !== null && !seen.has(joint.parent))
       throw new RangeError(`${at}: its parent "${joint.parent}" must come before it in the table`);
     if (joint.parent === null && seen.size) throw new RangeError(`${at}: only the first joint may have no parent`);
@@ -626,9 +626,9 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
             throw new RangeError(`${at}: ${name} needs 0 <= normal <= structural <= 180 degrees`);
           for (const row of end.rows) {
             if (!Object.hasOwn(table.sources, row.source))
-              throw new RangeError(`${at}: ${name} names the source "${row.source}", which the table does not list`);
+              throw new RangeError(`${at}: ${name} names the source "${row.source}", which the table does not list; add it to the table's sources or use a listed one`);
             if (!['dataset', 'print', 'online', 'recalled'].includes(row.provenance))
-              throw new RangeError(`${at}: ${name} has the unknown provenance "${String(row.provenance)}"`);
+              throw new RangeError(`${at}: ${name} has the unknown provenance "${String(row.provenance)}"; use dataset, print, online or recalled`);
             if (row.provenance === 'dataset' && !row.file)
               throw new RangeError(`${at}: ${name} is a dataset row and must name its data file`);
           }
@@ -660,7 +660,7 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
   const regions = new Set<string>();
   for (const region of table.regions) {
     const at = `${table.id} region ${region.id}`;
-    if (regions.has(region.id)) throw new RangeError(`${at}: the id is used twice`);
+    if (regions.has(region.id)) throw new RangeError(`${at}: the id is used twice; give each region its own id`);
     regions.add(region.id);
     const first = seen.get(region.joints[0]);
     if (!first?.dofs) throw new RangeError(`${at}: needs at least one joint with motions`);
@@ -675,7 +675,7 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
   }
   for (const joint of table.joints)
     if (joint.region && !regions.has(joint.region))
-      throw new RangeError(`${table.id} joint ${joint.id}: region "${joint.region}" is not in the table`);
+      throw new RangeError(`${table.id} joint ${joint.id}: region "${joint.region}" is not in the table; use a region id the table lists`);
   const frame = table.frame;
   for (const pair of [...frame.pairs, ...frame.ahead]) for (const id of pair) known(id, `${table.id} frame`, 'joint');
   for (const id of [...frame.top, ...frame.bottom]) known(id, `${table.id} frame`, 'joint');
@@ -687,7 +687,7 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
   for (const norm of [...table.proportions, ...table.segments, ...table.couplings])
     for (const row of norm.rows)
       if (!Object.hasOwn(table.sources, row.source))
-        throw new RangeError(`${table.id} ${norm.id}: source "${row.source}" is not listed`);
+        throw new RangeError(`${table.id} ${norm.id}: source "${row.source}" is not listed; add it to the table's sources`);
   return Object.freeze(table);
 }
 
@@ -918,7 +918,7 @@ function poseOf(rig: RigPose | readonly RigJoint[]): { names: string[]; parents:
   for (let i = 0; i < n; i++) {
     const p = pose.parents[i];
     if (!Number.isInteger(p) || p < -1 || p >= n || p === i)
-      throw new RangeError(`Bone ${pose.names[i]} has the invalid parent ${p}`);
+      throw new RangeError(`Bone ${pose.names[i]} has the invalid parent ${p}; a parent is -1 or the index of another bone`);
     const at = i * 10 + 3,
       l = Math.hypot(rest[at], rest[at + 1], rest[at + 2], rest[at + 3]);
     if (!(l > 0) || !rest.subarray(i * 10, i * 10 + 10).every(Number.isFinite))
@@ -988,16 +988,16 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
     preset = found.preset;
     for (const [id, bone] of found.joints) if (specs.has(id)) bones.set(id, bone);
   } else if (options.preset !== undefined)
-    throw new RangeError(`No bones of this rig match the "${options.preset}" naming of the ${species.id} table`);
+    throw new RangeError(`No bones of this rig match the "${options.preset}" naming of the ${species.id} table; use a rig whose bones follow it or pass options.map`);
   for (const [id, ref] of Object.entries(options.map ?? {})) {
-    if (!specs.has(id)) throw new RangeError(`options.map: "${id}" is not a joint of the ${species.id} table`);
+    if (!specs.has(id)) throw new RangeError(`options.map: "${id}" is not a joint of the ${species.id} table; use one of its joint ids`);
     if (ref === null) {
       bones.delete(id);
       continue;
     }
     const bone = typeof ref === 'number' ? ref : names.indexOf(ref);
     if (!Number.isInteger(bone) || bone < 0 || bone >= n)
-      throw new RangeError(`options.map.${id}: this rig has no bone ${String(ref)}`);
+      throw new RangeError(`options.map.${id}: this rig has no bone ${String(ref)}; use a bone index or a bone name the rig lists`);
     bones.set(id, bone);
   }
   for (const [id, degrees] of Object.entries(options.roll ?? {}))
@@ -1721,7 +1721,7 @@ export function ikLimits(
   return chain.map((item) => {
     const bone = typeof item === 'number' ? item : body.names.indexOf(item);
     if (!Number.isInteger(bone) || bone < 0 || bone >= body.names.length)
-      throw new RangeError(`ikLimits: this rig has no bone ${String(item)}`);
+      throw new RangeError(`ikLimits: this rig has no bone ${String(item)}; use a bone index or a bone name the rig lists`);
     const joint = body.joints.find((candidate) => candidate.bone === bone);
     return joint?.limited ? { joint: bone, ...shaped(joint, tier) } : null;
   });
@@ -1782,7 +1782,7 @@ export function kinematicsLimits(
   return bones.map((item) => {
     const bone = typeof item === 'number' ? item : body.names.indexOf(item);
     if (!Number.isInteger(bone) || bone < 0 || bone >= body.names.length)
-      throw new RangeError(`kinematicsLimits: this rig has no bone ${String(item)}`);
+      throw new RangeError(`kinematicsLimits: this rig has no bone ${String(item)}; use a bone index or a bone name the rig lists`);
     const joint = body.joints.find((candidate) => candidate.bone === bone);
     if (!joint?.limited) return null;
     const r = range(joint, tier);

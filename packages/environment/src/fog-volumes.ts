@@ -191,7 +191,7 @@ export class FogGrid implements VolumetricMediumSource {
     color: Vec3 = [1, 1, 1],
   ) {
     if (!source || typeof source.writeColumnData !== 'function')
-      throw new TypeError('Invalid fog grid source. Supply an attached DrainageFog solver or a FogColumnSource.');
+      throw new TypeError('Invalid fog grid source. You must supply an attached DrainageFog solver or a FogColumnSource.');
     if (!vec3(color, 0, 1)) throw new RangeError('Invalid fog grid color. Use three linear albedo values in [0, 1].');
     this.color = [...color];
   }
@@ -229,7 +229,7 @@ fn fogMedium(p:vec3f)->vec4f {
       !(dx > 0 && dz > 0 && [1 / dx, 1 / dz, x, z, revision].every(finite))
     )
       throw new RangeError(
-        'Invalid fog grid geometry. Supply positive column counts and spacing and finite origin and revision.',
+        'Invalid fog grid geometry. You must supply positive column counts and spacing and finite origin and revision.',
       );
     if (size > Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize))
       throw new RangeError('Fog grid exceeds this device storage size. Use fewer fog columns or coarser spacing.');

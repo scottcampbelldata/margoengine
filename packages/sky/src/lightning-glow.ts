@@ -339,7 +339,7 @@ export class LightningGlow implements EnginePlugin {
   private validate(): Required<Omit<LightningGlowOptions, 'bolt' | 'depth'>> {
     const o = this.options;
     if (typeof o !== 'object' || o === null || typeof o.bolt?.channelOf !== 'function')
-      throw new MargoError('state', 'Attach LightningGlow with a LightningBolt in the bolt option.');
+      throw new MargoError('state', 'You must attach LightningGlow with a LightningBolt in the bolt option.');
     if (o.bolt.options.field)
       throw new MargoError('state', 'LightningGlow follows weather strikes; attach it to a bolt without a field.');
     if (typeof o.depth !== 'function')

@@ -215,7 +215,7 @@ function inputField(field: FieldDescriptor | undefined, unit: string): FieldDesc
   if (!field.name || field.unit !== unit || (field.centring !== 'vertex' && field.centring !== 'cell'))
     throw new MargoError(
       'state',
-      `Invalid landscape field ${field.name}. Supply a named cell or vertex field in ${unit}.`,
+      `Invalid landscape field ${field.name}. You must supply a named cell or vertex field in ${unit}.`,
     );
   return { ...field };
 }
@@ -230,7 +230,7 @@ async function readModule(file: URL, signal?: AbortSignal): Promise<WebAssembly.
   }
   const response = await fetch(file, { signal });
   if (!response.ok) {
-    throw new MargoError('failed', `Landscape kernel HTTP ${response.status}. Serve the matching landscape Wasm file.`);
+    throw new MargoError('failed', `Landscape kernel HTTP ${response.status}. You must serve the matching landscape Wasm file.`);
   }
   return WebAssembly.compile(await response.arrayBuffer());
 }
@@ -276,7 +276,7 @@ function readInput(source: FieldDescriptor, port: Port, state: State, cell: Cell
   ) {
     throw new MargoError(
       'state',
-      `Invalid landscape port ${source.name}. Publish one layout-1 scalar in each matching grid location.`,
+      `Invalid landscape port ${source.name}. You must publish one layout-1 scalar in each matching grid location.`,
     );
   }
   const values = regionWords(state.host.memory, region);
@@ -463,7 +463,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as NativeKernel;
     const pointer = kernel.__stack_pointer;
     if (!(pointer instanceof WebAssembly.Global))
-      throw new MargoError('failed', 'Landscape Wasm has no stack pointer. Rebuild both landscape assets.');
+      throw new MargoError('failed', 'Landscape Wasm has no stack pointer. You must rebuild both landscape assets.');
     pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
 
     const edges = params.outlets;
@@ -606,7 +606,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     ) {
       throw new MargoError(
         'state',
-        'Invalid landscape bed port. Place the matching TerrainBed and landscape grid in one cell.',
+        'Invalid landscape bed port. You must place the matching TerrainBed and landscape grid in one cell.',
       );
     }
     const interval = checked('geological step', dt * state.timeScale, Number.MIN_VALUE);

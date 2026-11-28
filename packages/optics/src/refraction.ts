@@ -171,7 +171,7 @@ export function prismDeviation(apex: number, incidence: number, n: number): Pris
 export function minimumDeviation(apex: number, n: number): number {
   checkPositive('minimumDeviation', 'n', n);
   const s = n * Math.sin(apex / 2);
-  if (s > 1) throw new RangeError(`minimumDeviation: no ray passes a ${apex} rad prism of index ${n}`);
+  if (s > 1) throw new RangeError(`minimumDeviation: no ray passes a ${apex} rad prism of index ${n}; use a smaller apex angle or a lower index`);
   return 2 * Math.asin(s) - apex;
 }
 

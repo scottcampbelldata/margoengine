@@ -180,7 +180,7 @@ export function makeCutPieces(
       if (automatic) return null;
       throw new MargoError(
         'failed',
-        'The cut creates an unrepresentable rest basis. Move it away from a vertex or edge.',
+        'The cut creates an unrepresentable rest basis. You must move it away from a vertex or edge.',
       );
     }
     if (
@@ -194,7 +194,7 @@ export function makeCutPieces(
       if (automatic) return null;
       throw new MargoError(
         'failed',
-        'The cut creates an unrepresentable fragment mass. Move the plane away from a vertex or edge.',
+        'The cut creates an unrepresentable fragment mass. You must move the plane away from a vertex or edge.',
       );
     }
     const desc = make(rest);

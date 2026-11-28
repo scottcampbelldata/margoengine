@@ -93,7 +93,7 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
   if (bodyRow !== undefined && (!Number.isSafeInteger(bodyRow) || bodyRow < 0 || opts.cell !== undefined))
     throw new RangeError('Invalid mounted drop receiver. Use a live body row and omit the plane origin cell.');
   if (opts.followRotation && bodyRow === undefined)
-    throw new RangeError('Rotating drop receiver has no mount. Supply the receiving film body row.');
+    throw new RangeError('Rotating drop receiver has no mount. You must supply the receiving film body row.');
   if (opts.captureEdges && !opts.followRotation)
     throw new RangeError('Wet edge capture needs a swept contact frame. Enable followRotation on the receiver.');
   return {

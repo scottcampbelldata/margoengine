@@ -810,7 +810,7 @@ export function wattGovernorEquilibrium(omega: number, spec: WattGovernorSpec): 
     const p = positive(spec.pickoff, 'Pickoff'),
       l = positive(spec.link, 'Link length'),
       joint: V2 = [p * sin, p * cos];
-    if (!(joint[0] <= l)) throw new RangeError('The link is too short to reach the spindle at this speed.');
+    if (!(joint[0] <= l)) throw new RangeError('The link is too short to reach the spindle at this speed. Raise the link length or reduce the pickoff arm or the speed.');
     out.joint = joint;
     out.sleeve = joint[1] + Math.sqrt(l * l - joint[0] * joint[0]);
   }

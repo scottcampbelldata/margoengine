@@ -812,7 +812,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       const inward = number('impact speed', impacts[i + 4]!, 0);
       const normal: Vec3 = swept ? [impacts[i + 5]!, impacts[i + 6]!, impacts[i + 7]!] : frame.n;
       if (swept && !(Math.abs(dot(normal, normal) - 1) <= 64 * Number.EPSILON))
-        throw new RangeError('Invalid swept impact normal. Publish a unit normal in world axes.');
+        throw new RangeError('Invalid swept impact normal. You must publish a unit normal in world axes.');
       if (u > s.spacing * s.nx || v > s.spacing * s.ny)
         throw new RangeError('Thin-film impact is outside the patch. Use coordinates inside the UV extent.');
       const j = this.spread(s, rates, u, v, r, volume / (s.area * dt));
@@ -823,7 +823,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
           ? [impacts[i + 8]!, impacts[i + 9]!, impacts[i + 10]!]
           : minus(position(frame, u, v), frame.center);
         if (!lever.every(Number.isFinite))
-          throw new RangeError('Invalid swept impact lever arm. Publish a finite offset from the body centre.');
+          throw new RangeError('Invalid swept impact lever arm. You must publish a finite offset from the body centre.');
         force = plus(force, reaction);
         torque = plus(torque, cross(lever, reaction));
       }

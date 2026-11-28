@@ -151,7 +151,7 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
     return WebAssembly.compile(await readFile(url, { signal }));
   }
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new MargoError('failed', 'Seismic kernel is unavailable. Serve both optional Wasm assets.');
+  if (!response.ok) throw new MargoError('failed', 'Seismic kernel is unavailable. You must serve both optional Wasm assets.');
   return WebAssembly.compile(await response.arrayBuffer());
 }
 
@@ -257,7 +257,7 @@ export class SeismicGround implements Solver<SeismicParams> {
     const stack = host.allocate('seismic-stack', STACK_BYTES, 'u8', SEISMIC_LAYOUT);
     this.kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as Native;
     if (!(this.kernel.__stack_pointer instanceof WebAssembly.Global) || typeof this.kernel.seismic_step !== 'function')
-      throw new MargoError('failed', 'Unexpected seismic kernel ABI. Rebuild both optional Wasm assets.');
+      throw new MargoError('failed', 'Unexpected seismic kernel ABI. You must rebuild both optional Wasm assets.');
     this.kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     this.elastic = host.allocate('seismic-wave', KERNEL_FIELDS * this.count * 8, 'f64', SEISMIC_LAYOUT);
     this.surface = host.allocate('seismic-ground-motion', this.width * SURFACE_WORDS * 8, 'f64', SEISMIC_LAYOUT);
@@ -269,7 +269,7 @@ export class SeismicGround implements Solver<SeismicParams> {
   private source(source: SeismicSource): Source {
     const [x, z] = source.position;
     if (!(x >= 0 && x <= this.width * this.dx && z >= 0 && z <= this.depth * this.dz))
-      throw new RangeError('Seismic source lies outside the section. Move it into the grid.');
+      throw new RangeError('Seismic source lies outside the section. You must move it into the grid.');
     return {
       normal: this.weights(x / this.dx - 0.5, z / this.dz - 0.5),
       shear: this.weights(x / this.dx - 1, z / this.dz - 1),
@@ -299,7 +299,7 @@ export class SeismicGround implements Solver<SeismicParams> {
 
   private site(site: SeismicSite): Site {
     if (!(site.x >= 0 && site.x <= this.width * this.dx))
-      throw new RangeError('Seismic receiver lies outside the section. Place it over the grid.');
+      throw new RangeError('Seismic receiver lies outside the section. You must place it over the grid.');
     const omega = site.frequency === undefined ? 0 : 2 * Math.PI * positive(site.frequency, 'building frequency');
     const ratio = finite(site.dampingRatio ?? 0.05, 'building damping ratio');
     if (ratio < 0) throw new RangeError('Seismic building damping cannot be negative. Pass a nonnegative ratio.');

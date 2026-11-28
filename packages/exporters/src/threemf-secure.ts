@@ -72,7 +72,7 @@ const SECURE = 'http://schemas.microsoft.com/3dmanufacturing/securecontent/2019/
   UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
 const fail = (message: string): never => {
-  throw new RangeError(`3MF secure content ${message}`);
+  throw new RangeError(`3MF secure content ${message}; check it against ThreeMFSecureContent`);
 };
 const base64 = (bytes: Uint8Array, what: string): string => {
   if (!(bytes instanceof Uint8Array)) throw new TypeError(`3MF secure content ${what} must be bytes`);

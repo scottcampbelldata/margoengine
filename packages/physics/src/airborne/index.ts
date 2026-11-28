@@ -665,7 +665,7 @@ export class AirborneParticles implements Solver<AirborneParams> {
       if (!sampled || !sampled.velocity)
         throw new MargoError(
           'state',
-          'Airborne wind returned no velocity. Return an air FlowSample with finite velocity, temperature and density.',
+          'Airborne wind returned no velocity. You must return an air FlowSample with finite velocity, temperature and density.',
         );
       const temperature = range(sampled.temperature, 'sample temperature in K', 200, 340);
       const density = range(sampled.density, 'sample density', 0.05, 3);

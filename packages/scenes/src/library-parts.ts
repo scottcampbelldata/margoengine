@@ -114,7 +114,7 @@ export async function libraryParts(
   }
   const budgets = options.foliageTriangles;
   if (budgets !== undefined && (!Array.isArray(budgets) || budgets.length !== 3))
-    throw new TypeError('libraryParts foliageTriangles takes three triangle budgets: [near, middle, far]');
+    throw new TypeError('libraryParts foliageTriangles must hold three triangle budgets: [near, middle, far]');
   const get = options.fetch ?? (globalThis.fetch as unknown as NonNullable<LibraryMeshOptions['fetch']>),
     init = options.signal ? { signal: options.signal } : {},
     response = await get(url, init);

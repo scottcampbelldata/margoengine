@@ -298,7 +298,7 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
   step(_context: StepContext, dt: number): void {
     const data = this.#state();
     if (!Number.isFinite(dt) || dt <= 0)
-      throw new MargoError('state', 'Invalid underwater acoustic interval. Advance by positive finite seconds.');
+      throw new MargoError('state', 'Invalid underwater acoustic interval. You must advance by positive finite seconds.');
     const { memory, n, settings, profile, rays, scratch, native, work } = data;
     const [surface, bottom, absorption] = words(memory, settings);
     const layers = words(memory, profile);
@@ -324,7 +324,7 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
         );
       totals[field] = sum;
     }
-    if (totals[0] !== n) throw new MargoError('failed', 'Acoustic tracing missed ray rows. Rebuild the native kernel.');
+    if (totals[0] !== n) throw new MargoError('failed', 'Acoustic tracing missed ray rows. You must rebuild the native kernel.');
     this.#publish(data, layers, next, absorption!);
     state.set(next);
     work.set(receipt);

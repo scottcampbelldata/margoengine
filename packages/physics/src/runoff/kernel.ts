@@ -35,7 +35,7 @@ async function readAsset(url: URL, signal?: AbortSignal): Promise<WebAssembly.Mo
   }
   const response = await fetch(url, { signal });
   if (!response.ok)
-    throw new MargoError('failed', `Runoff kernel returned HTTP ${response.status}. Serve the runoff Wasm asset.`);
+    throw new MargoError('failed', `Runoff kernel returned HTTP ${response.status}. You must serve the runoff Wasm asset.`);
   return WebAssembly.compile(await response.arrayBuffer());
 }
 
@@ -69,7 +69,7 @@ export function instantiateRunoff(host: SolverHost, builds: RunoffBuilds): Runof
   const exports = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as RunoffKernel;
   const pointer = exports.__stack_pointer;
   if (!(pointer instanceof WebAssembly.Global))
-    throw new MargoError('failed', 'Runoff Wasm has no instance stack pointer. Rebuild the runoff kernel assets.');
+    throw new MargoError('failed', 'Runoff Wasm has no instance stack pointer. You must rebuild the runoff kernel assets.');
   pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
   return exports;
 }

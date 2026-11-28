@@ -27,6 +27,6 @@ export function entryCavityRows(memory: WebAssembly.Memory, port: Port, capacity
     region.layout !== ENTRY_CAVITY_LAYOUT ||
     region.byteLength !== capacity * ENTRY_CAVITY_WORDS * Float64Array.BYTES_PER_ELEMENT
   )
-    throw new MargoError('state', 'Connect the layout-1 EntrySolver cavity field with the same rigid capacity as HullSolver.');
+    throw new MargoError('state', 'You must connect the layout-1 EntrySolver cavity field with the same rigid capacity as HullSolver.');
   return regionWords(region.memory ?? memory, region) as Float64Array;
 }

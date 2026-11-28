@@ -759,7 +759,7 @@ export class SwimSolver implements Solver<SwimParams> {
       if (!sampled?.normal)
         throw new MargoError(
           'state',
-          'The swimmer surface sample has no normal. Return a SeaSurfaceSample with an upward normal.',
+          'The swimmer surface sample has no normal. You must return a SeaSurfaceSample with an upward normal.',
         );
       const { height, normal } = sampled;
       const nx = normal[0],
@@ -801,7 +801,7 @@ export class SwimSolver implements Solver<SwimParams> {
       if (!first?.velocity)
         throw new MargoError(
           'state',
-          'The swimmer water sample has no velocity. Return a finite three-component flow.',
+          'The swimmer water sample has no velocity. You must return a finite three-component flow.',
         );
       const u = finite(first.velocity[0], 'water velocity');
       const v = finite(first.velocity[1], 'water velocity');
@@ -819,7 +819,7 @@ export class SwimSolver implements Solver<SwimParams> {
         if (!second?.velocity)
           throw new MargoError(
             'state',
-            'The next swimmer water sample has no velocity. Return a finite three-component flow.',
+            'The next swimmer water sample has no velocity. You must return a finite three-component flow.',
           );
         if (finite(second.density, 'water density', 0) > 0) {
           result[offset + 3] = (finite(second.velocity[0], 'water velocity') - u) / dt;

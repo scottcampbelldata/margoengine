@@ -220,7 +220,7 @@ function nativeStatus(status: number): void {
     throw fogInput('Drainage fog cannot advance its stable interval. Reduce secondsPerSecond or use larger cells.');
   throw new MargoError(
     'failed',
-    'Drainage fog kernel rejected the private phase layout. Rebuild both Wasm assets with the solver.',
+    'Drainage fog kernel rejected the private phase layout. You must rebuild both Wasm assets with the solver.',
   );
 }
 
@@ -306,7 +306,7 @@ function workerResult(s: State): DrainageFogWorkCounts {
       worker.resolvedRows !== worker.settledRows ||
       worker.simdPairs * 2 > worker.resolvedRows
     )
-      throw new MargoError('failed', 'Drainage fog worker returned an invalid work count. Rebuild the native assets.');
+      throw new MargoError('failed', 'Drainage fog worker returned an invalid work count. You must rebuild the native assets.');
     workers.push(worker);
     resolvedRows += worker.resolvedRows;
     sourceRows += worker.sourceRows;
@@ -315,7 +315,7 @@ function workerResult(s: State): DrainageFogWorkCounts {
     simdPairs += worker.simdPairs;
   }
   if (publishedRows !== s.count || resolvedRows % s.count !== 0)
-    throw new MargoError('failed', 'Drainage fog worker missed grid columns. Rebuild the native assets.');
+    throw new MargoError('failed', 'Drainage fog worker missed grid columns. You must rebuild the native assets.');
   return { workers, threads: workers.length, resolvedRows, sourceRows, settledRows, publishedRows, simdPairs };
 }
 
@@ -349,7 +349,7 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
   if (!response.ok)
     throw new MargoError(
       'failed',
-      'Drainage fog Wasm could not be loaded. Serve the optional entry with both Wasm assets.',
+      'Drainage fog Wasm could not be loaded. You must serve the optional entry with both Wasm assets.',
     );
   return WebAssembly.compile(await response.arrayBuffer());
 }
@@ -491,7 +491,7 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       typeof kernel.fog_step !== 'function' ||
       typeof kernel.fog_thread_phase !== 'function'
     )
-      throw new MargoError('failed', 'Drainage fog has an invalid Wasm layout. Rebuild the slot-free native variants.');
+      throw new MargoError('failed', 'Drainage fog has an invalid Wasm layout. You must rebuild the slot-free native variants.');
     kernel.__stack_pointer.value = stack;
     const allocate = (label: string, size: number): Region => host.allocate(`fog-${label}`, 8 * size, 'f64', LAYOUT);
     const s: State = {

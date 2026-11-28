@@ -54,7 +54,7 @@ async function compile(asset: URL, signal?: AbortSignal): Promise<WebAssembly.Mo
       if (!response.ok)
         throw new MargoError(
           'failed',
-          `Cloud projection request returned HTTP ${response.status}. Serve the matching cloud Wasm asset.`,
+          `Cloud projection request returned HTTP ${response.status}. You must serve the matching cloud Wasm asset.`,
         );
       bytes = await response.arrayBuffer();
     }
@@ -141,7 +141,7 @@ export class CloudProjection {
       typeof exports.cloud_projection_apply !== 'function' ||
       typeof exports.cloud_projection_thread_phase !== 'function'
     )
-      throw new MargoError('failed', 'Cloud projection Wasm exports are missing. Rebuild the cloud projection assets.');
+      throw new MargoError('failed', 'Cloud projection Wasm exports are missing. You must rebuild the cloud projection assets.');
     stack.value = top;
     new Uint32Array(host.memory.buffer, job.byteOffset, JOB_WORDS).set([0, 0, 0, receipts.byteOffset, nx, ny, nz, 0]);
     const pool = this.pool;
@@ -191,11 +191,11 @@ export class CloudProjection {
       const rows = counts[i]!;
       const paired = counts[i + 1]!;
       if (paired > rows || paired % 2 !== 0)
-        throw new MargoError('failed', 'Cloud projection reported invalid SIMD work. Rebuild the cloud assets.');
+        throw new MargoError('failed', 'Cloud projection reported invalid SIMD work. You must rebuild the cloud assets.');
       visited += rows;
     }
     if (visited !== cells)
-      throw new MargoError('failed', 'Cloud projection missed pressure cells. Rebuild the cloud assets.');
+      throw new MargoError('failed', 'Cloud projection missed pressure cells. You must rebuild the cloud assets.');
     for (let i = 0; i < counts.length; i++) this.totals[i]! += counts[i]!;
     this.applications++;
   }

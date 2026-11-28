@@ -439,6 +439,19 @@ export const entries = [
     fix: 'Pass finite numbers in the units the README gives for that function, above 0 where the message asks for it.',
   },
   {
+    id: 'cameras',
+    title: '@margoengine/cameras/shots: blending between two framed views',
+    kind: 'family',
+    messages: [
+      'ShotBlend rate must be a finite number above 0; see https://margoengine.com/errors#cameras',
+      'ShotBlend delta must be a finite number of seconds >= 0; see https://margoengine.com/errors#cameras',
+      'ShotBlend width and height must be above 0; see https://margoengine.com/errors#cameras',
+    ],
+    cause:
+      'ShotBlend eases a camera between two framed shots. Its rate (how fast the blend follows its goal), the frame time passed to update() and the view size are numbers the maths divides by or scales with, so a rate that is not above 0, a negative or non-finite delta, or a view with no width or height is refused before the camera moves.',
+    fix: 'Pass a finite rate above 0 (the default is 15), a frame time in seconds that is 0 or more, and the real width and height of the view in pixels.',
+  },
+  {
     id: 'mesh-debug-view',
     title: '@margoengine/inspector/mesh-debug: options, device and mesh size',
     kind: 'family',

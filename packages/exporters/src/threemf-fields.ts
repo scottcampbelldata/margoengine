@@ -166,7 +166,7 @@ export interface FieldContext {
 type Types = Record<string, ThreeMFValueType>;
 
 const fail = (message: string): never => {
-  throw new RangeError(`3MF ${message}`);
+  throw new RangeError(`3MF ${message}; check the option against its type in the threemf entry`);
 };
 const IDENTIFIER = /^[A-Za-z0-9_]+$/;
 const NCNAME = /^[A-Za-z_][A-Za-z0-9_.-]*$/;

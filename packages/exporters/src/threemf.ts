@@ -185,7 +185,7 @@ export interface ThreeMFSlices {
 /** Layers checked against the extension's rules, each contour a point list without a repeated end. */
 function checkSlices({ layers, bottom = 0, meshResolution = 'fullres', separatePart }: ThreeMFSlices, open: boolean) {
   const fail = (message: string): never => {
-    throw new RangeError(`3MF slices ${message}`);
+    throw new RangeError(`3MF slices ${message}; check it against ThreeMFSlices`);
   };
   if (!Array.isArray(layers) || !layers.length) fail('need at least one layer');
   if (!Number.isFinite(bottom)) fail('bottom must be a number');
@@ -507,10 +507,10 @@ function ratioRow(ratios: ThreeMFRatios, count: number): string {
 /** A composite checked, and its constant ratios too. */
 function checkComposite({ materials, ratios }: ThreeMFComposite): ThreeMFComposite {
   if (!Array.isArray(materials) || materials.length < 2)
-    throw new RangeError('3MF composite materials mix two or more materials');
+    throw new RangeError('3MF composite materials must mix two or more materials');
   const checked = (materials as readonly ThreeMFConstituent[]).map(({ name, color }) => {
     if (typeof name !== 'string' || !name) throw new TypeError('3MF composite materials each need a name');
-    if (!isMixColor(color)) throw new RangeError("3MF composite material colours are '#RRGGBB' or '#RRGGBBAA'");
+    if (!isMixColor(color)) throw new RangeError("3MF composite material colours must be '#RRGGBB' or '#RRGGBBAA'");
     return { name, color: color.toUpperCase() };
   });
   if (typeof ratios !== 'function') ratioRow(ratios, checked.length);
@@ -549,7 +549,7 @@ function checkLattice(lattice: ThreeMFLattice) {
     points = Math.floor((positions?.length ?? 0) / 3),
     point = (index: number): boolean => Number.isInteger(index) && index >= 0 && index < points,
     fail = (message: string): never => {
-      throw new RangeError(`3MF lattice ${message}`);
+      throw new RangeError(`3MF lattice ${message}; check it against ThreeMFLattice`);
     };
   if (!points || positions.length % 3 || !Array.from(positions).every(Number.isFinite))
     fail('positions need three finite numbers for each point');
@@ -1654,7 +1654,7 @@ export async function export3MF(
     const given = uuid === randomUUID ? randomUUID() : uuid({ element, name, index });
     if (typeof given !== 'string' || !UUID.test(given))
       throw new RangeError('3MF production uuid must return a lower-case UUID in the 8-4-4-4-12 form');
-    if (uuids.has(given)) throw new RangeError(`3MF production uuid ${given} is given twice`);
+    if (uuids.has(given)) throw new RangeError(`3MF production uuid ${given} is given twice; each uuid must be unique`);
     uuids.add(given);
     return ` ${attribute}="${given}"`;
   };
@@ -1735,7 +1735,7 @@ export async function export3MF(
           "3MF writes boolean operations on a node's own object; use assembly: false or 'components'",
         );
       if (info.slices || info.alternatives)
-        throw new RangeError('3MF a boolean shape takes no slices or alternatives on the same node');
+        throw new RangeError('3MF a boolean shape takes no slices or alternatives on the same node; remove them from it');
       for (const { operation = 'union', operands } of info.steps) {
         if (!OPERATIONS.includes(operation))
           throw new RangeError(`3MF boolean operation must be one of ${OPERATIONS.join(', ')}`);
@@ -1754,7 +1754,7 @@ export async function export3MF(
         throw new RangeError('3MF displacement takes no volume, level set, lattice or slices on the same node');
     }
     if (info.levelSet && (info.lattice || info.slices))
-      throw new RangeError('3MF level sets take no lattice or slices on the same node');
+      throw new RangeError('3MF level sets take no lattice or slices on the same node; remove them from it');
     if (info.slices && together)
       throw new RangeError("3MF writes slices for a node's own object; use assembly: false or 'components'");
     if (info.lattice) {
@@ -1767,18 +1767,18 @@ export async function export3MF(
     if (resolutions.some((r) => r !== undefined && !RESOLUTIONS.includes(r)))
       throw new RangeError(`3MF model resolution must be one of ${RESOLUTIONS.join(', ')}`);
     if (info.modelResolution !== undefined || info.alternatives) {
-      if (!production) throw new RangeError('3MF alternatives and model resolutions are in the production extension');
+      if (!production) throw new RangeError('3MF alternatives and model resolutions need the production extension; set the production option');
       if (together)
         throw new RangeError("3MF alternatives stand for a node's own object; use assembly: false or 'components'");
     }
     if (info.itemPartNumber !== undefined) {
       if (type === 'other')
-        throw new RangeError('3MF keeps an other object out of the build, so it has no build item for itemPartNumber');
+        throw new RangeError('3MF keeps an other object out of the build, so it has no build item for itemPartNumber; remove itemPartNumber or choose another object type');
       if (!ownItems)
         throw new RangeError(
           '3MF writes this scene as one build item; give its itemPartNumber in the options, or use assembly: false',
         );
-      if (itemNumber !== undefined) throw new RangeError('3MF itemPartNumber is given twice for one build item');
+      if (itemNumber !== undefined) throw new RangeError('3MF itemPartNumber is given twice for one build item; give it in the node or in the options, not both');
     }
     return info;
   };
@@ -2030,7 +2030,7 @@ export async function export3MF(
       vertices: string[] = [],
       faces: string[] = [];
     if (checked && (checked.clipping || checked.representation))
-      throw new RangeError('3MF a lattice that a function names takes no clipping or representation mesh');
+      throw new RangeError('3MF a lattice that a function names takes no clipping or representation mesh; remove them');
     for (const { geometry, world } of drawn) {
       const weld: Weld = { vertices: [], known: new Map() },
         first = vertices.length,
@@ -2172,7 +2172,7 @@ export async function export3MF(
       [placement[2], placement[6], placement[8], placement[9], placement[10] - 1].some((v) => v !== 0)
     )
       throw new RangeError(
-        '3MF layers stay level: a sliced node may turn about the up axis, move and scale across the bed, not tilt or change its height',
+        '3MF layers stay level: a sliced node may turn about the up axis, move and scale across the bed, not tilt or change its height; keep its transform level',
       );
     const parts = drawn.map((item): Part => {
       const { positions } = item.geometry,

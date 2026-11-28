@@ -189,7 +189,7 @@ function scalarGrid(option: string, value: GridNumber, count: number) {
   if (value?.length !== count)
     throw new MargoError(
       'state',
-      `Invalid runoff ${option} length. Supply one number or exactly ${count} cell values.`,
+      `Invalid runoff ${option} length. You must supply one number or exactly ${count} cell values.`,
     );
   return (index: number) => value[index]!;
 }
@@ -289,7 +289,7 @@ function inputWords(memory: WebAssembly.Memory, port: Port) {
     return new Float32Array(buffer, region.byteOffset, region.byteLength / Float32Array.BYTES_PER_ELEMENT);
   throw new MargoError(
     'state',
-    `Invalid runoff input ${port.field}. Publish layout-1 f32 or f64 words in the documented units.`,
+    `Invalid runoff input ${port.field}. You must publish layout-1 f32 or f64 words in the documented units.`,
   );
 }
 
@@ -534,7 +534,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
         if (values.length !== count || !context.cell.every((cell, axis) => cell === boundRain.cell[axis]))
           throw new MargoError(
             'state',
-            `Invalid runoff rain grid. Publish one scalar or ${count} grid words in the same world cell.`,
+            `Invalid runoff rain grid. You must publish one scalar or ${count} grid words in the same world cell.`,
           );
         for (let i = 0; i < count; i++) rain[i] = numberIn('rain field', values[i]!);
       }
@@ -560,7 +560,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       if (values.length !== 3)
         throw new MargoError(
           'state',
-          'Invalid runoff surface energy port. Publish ATMO-09 evaporation, melt and runoff as three words.',
+          'Invalid runoff surface energy port. You must publish ATMO-09 evaporation, melt and runoff as three words.',
         );
       evaporation = numberIn('surface evaporation', values[0]!, -Infinity) / 1000;
       melt = numberIn('snowmelt', values[1]!) / 1000;
@@ -635,7 +635,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     const state = this.requireState();
     const { count, nx, nz } = state.shape;
     if (!Number.isInteger(i) || !Number.isInteger(j) || i < 0 || i >= nx || j < 0 || j >= nz)
-      throw new MargoError('state', 'Invalid runoff cell. Supply a column and row in the configured grid.');
+      throw new MargoError('state', 'Invalid runoff cell. You must supply a column and row in the configured grid.');
     const index = i + nx * j;
     const values = floats(state, state.storage);
     return {

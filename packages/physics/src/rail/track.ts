@@ -63,7 +63,7 @@ const vectorBlend = (a: RailPoint, b: RailPoint, t: number): RailPoint => [
 function normalise(vector: RailPoint): RailPoint {
   const length = hypot(...vector);
   if (!(length >= EPS && Number.isFinite(length)))
-    throw new MargoError('state', 'Supply track stations with a finite nonzero tangent.');
+    throw new MargoError('state', 'You must supply track stations with a finite nonzero tangent.');
   return [vector[0] / length, vector[1] / length, vector[2] / length]; // float division: unit vector
 }
 
@@ -192,12 +192,12 @@ export function railRouteAtSwitches(
     const previous = result.at(-1);
     const entrance = section.stations[0]!;
     if (previous && hypot(...diff(previous.centre, entrance.centre)) > EPS)
-      throw new MargoError('state', 'Join turnout sections at a common centreline station.');
+      throw new MargoError('state', 'You must join turnout sections at a common centreline station.');
     result.push(...section.stations.slice(previous ? 1 : 0));
     visited.add(name);
     const next: string | undefined = switches[name] ?? section.next?.[0];
     if (next !== undefined && !section.next?.includes(next))
-      throw new MargoError('state', 'Select an authored outgoing rail section at the turnout.');
+      throw new MargoError('state', 'You must select an authored outgoing rail section at the turnout.');
     name = next;
   }
   return new RailRoute(result);

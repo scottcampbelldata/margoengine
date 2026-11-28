@@ -582,7 +582,7 @@ export class SedimentTransport implements Solver<SedimentParams> {
     }
 
     if (!(dt > 0 && Number.isFinite(dt)))
-      throw new MargoError('state', 'Invalid sediment interval. Advance the world by positive finite time.');
+      throw new MargoError('state', 'Invalid sediment interval. You must advance the world by positive finite time.');
     const columns = floats(state, state.candidateColumns);
     const available = floats(state, state.candidateAvailable);
     const budget = floats(state, state.candidateBudget);
@@ -641,7 +641,7 @@ export class SedimentTransport implements Solver<SedimentParams> {
     const nx = geometry.columns;
     const nz = geometry.rows;
     if (cells !== n || faces !== (nx + 1) * nz + nx * (nz + 1))
-      throw new MargoError('failed', 'Sediment workers missed grid proposals. Rebuild the native assets.');
+      throw new MargoError('failed', 'Sediment workers missed grid proposals. You must rebuild the native assets.');
     state.work.set(receipts);
     floats(state, state.columns).set(columns);
     floats(state, state.available).set(available);

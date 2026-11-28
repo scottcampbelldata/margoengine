@@ -79,7 +79,7 @@ export function railCreepForce({
 }: RailCreep): readonly [number, number];
 export function railCreepForce(input: RailCreep): readonly [number, number] {
   if (input?.slip?.length !== 2 || !input.adhesion)
-    throw new MargoError('state', 'Supply two rail slip velocities and one rail adhesion record.');
+    throw new MargoError('state', 'You must supply two rail slip velocities and one rail adhesion record.');
   const slip = [
     railNumber(input.slip[0], 'longitudinal slip velocity in metres per second'),
     railNumber(input.slip[1], 'lateral slip velocity in metres per second'),

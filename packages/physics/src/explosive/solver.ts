@@ -816,7 +816,7 @@ export class ExplosionSolver implements Solver<ExplosionParams> {
       const stack = host.allocate('explosive-stack', STACK_BYTES, 'u8', EXPLOSION_LAYOUT);
       const native = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as unknown as Native;
       if (!(native.__stack_pointer instanceof WebAssembly.Global) || typeof native.fly !== 'function')
-        throw new MargoError('failed', 'Unexpected explosive kernel ABI. Rebuild both native assets.');
+        throw new MargoError('failed', 'Unexpected explosive kernel ABI. You must rebuild both native assets.');
       native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
       this.native = native;
       if (this.threadCount > 1) {

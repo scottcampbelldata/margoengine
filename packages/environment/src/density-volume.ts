@@ -518,7 +518,7 @@ export class CloudDensityVolume extends DensityVolume {
     if (centre.some((value) => !finite(Math.fround(value)) || !finite(Math.fround(value / cellSize))))
       throw new MargoError(
         'state',
-        'Cloud grid origin exceeds shader coordinates. Move the grid to a local render origin.',
+        'Cloud grid origin exceeds shader coordinates. You must move the grid to a local render origin.',
       );
     super({ voxelSize: cellSize, origin: centre, density });
     this.grid = {
@@ -558,7 +558,7 @@ export class CloudDensityVolume extends DensityVolume {
     )
       throw new MargoError(
         'state',
-        'Invalid cloud water. Supply one finite nonnegative Float32 ratio per grid cell with representable extinction.',
+        'Invalid cloud water. You must supply one finite nonnegative Float32 ratio per grid cell with representable extinction.',
       );
     this.clear();
     for (let z = 0; z < nz; z++) {
@@ -656,7 +656,7 @@ export class SeaSprayDensityVolume extends DensityVolume {
     }
     const parcels = this.source.readParticles();
     if (!Array.isArray(parcels))
-      throw new MargoError('state', 'Invalid sea spray frame. Return the accepted airborne parcels as an array.');
+      throw new MargoError('state', 'Invalid sea spray frame. You must return the accepted airborne parcels as an array.');
 
     const positions: number[] = [];
     const weights: number[] = [];

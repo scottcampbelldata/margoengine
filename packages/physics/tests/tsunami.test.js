@@ -298,7 +298,7 @@ test('TsunamiSolver refuses a misplaced or nonfinite incoming boundary before pu
   const previous = tsunami.sample(0, 0);
   assert.throws(() => world.advance(1), {
     code: 'state',
-    message: /Return finite surface altitude and outward velocity/,
+    message: /must return finite surface altitude and outward velocity/,
   });
   assert.equal(world.tick, 0);
   assert.deepEqual(tsunami.sample(0, 0), previous);

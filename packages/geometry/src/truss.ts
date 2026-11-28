@@ -100,7 +100,7 @@ export function trussGeometry(options: TrussOptions = {}): GeometryData {
     );
   const pattern = options.pattern ?? 'warren';
   if (pattern !== 'warren' && pattern !== 'pratt' && pattern !== 'x')
-    throw new RangeError(`trussGeometry: unknown pattern ${String(pattern)}`);
+    throw new RangeError(`trussGeometry: unknown pattern ${String(pattern)}; use 'warren', 'pratt' or 'x'`);
 
   // Corner k at panel point i: the section scales linearly from the foot to `taper` at the top.
   const corner = (k: number, i: number): Point => {

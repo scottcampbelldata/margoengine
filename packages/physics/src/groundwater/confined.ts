@@ -253,7 +253,7 @@ export function solveConfinedFlow(input: ConfinedFlowInput): ConfinedFlow {
   const target = tolerance * Math.max(scale, Number.MIN_VALUE);
   while (norm() > target) {
     if (iterations++ >= maxIterations)
-      throw new MargoError('failed', `The confined flow solve did not converge in ${maxIterations} iterations.`);
+      throw new MargoError('failed', `The confined flow solve did not converge in ${maxIterations} iterations; increase maxIterations.`);
     multiply(p, q);
     let pq = 0;
     for (let i = 0; i < n; i++) pq += p[i]! * q[i]!;

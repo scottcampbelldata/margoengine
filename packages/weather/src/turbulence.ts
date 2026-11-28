@@ -120,7 +120,7 @@ function resolveMann(options: MannBoxOptions): MannConfiguration {
     size.length !== 3 ||
     ![size[0], size[1], size[2]].every((extent) => extent > 0 && Number.isFinite(extent))
   )
-    throw new MargoError('state', 'Invalid Mann box size. Supply three positive finite extents in metres.');
+    throw new MargoError('state', 'Invalid Mann box size. You must supply three positive finite extents in metres.');
   if (!(lengthScale > 0 && Number.isFinite(lengthScale) && sigma > 0 && Number.isFinite(sigma)))
     throw new MargoError(
       'state',
@@ -296,7 +296,7 @@ export class MannBox {
    */
   sample(x: number, y: number, z: number, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
     if (![x, y, z].every(Number.isFinite))
-      throw new MargoError('state', 'Invalid Mann sample position. Supply finite metres in the box frame.');
+      throw new MargoError('state', 'Invalid Mann sample position. You must supply finite metres in the box frame.');
     const [nx, ny, nz] = this.cells;
     const [sx, sy, sz] = this.size;
     const fx = wrappedCell(x, sx, nx);

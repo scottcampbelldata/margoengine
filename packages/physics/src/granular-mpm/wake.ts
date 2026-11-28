@@ -38,7 +38,7 @@ export class GranularWake {
     if (!wake || wake.tick <= this.words(this.ledger)[0]!) return this.zero;
     const region = wake.region;
     if (region.layout !== SWIM_WAKE_LAYOUT || region.type !== 'f64' || region.byteLength % (8 * SWIM_WAKE_WORDS))
-      throw new MargoError('state', 'Connect the layout-1 swim wake impulse port.');
+      throw new MargoError('state', 'You must connect the layout-1 swim wake impulse port.');
     const source = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
     const intoSolver = this.offset(wake.cell, context.cell);
     const intoBed = this.offset(context.cell, this.bed.cell);

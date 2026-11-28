@@ -113,7 +113,6 @@ export type MeshDebugViewSettings = Readonly<
 >;
 type Rgb = [number, number, number];
 
-const help = 'mesh-debug-view';
 const defaults = {
   mode: 'wireframe',
   multiply: null,
@@ -138,7 +137,7 @@ function rgb(value: unknown, name: string): Rgb {
     const hex = hexColor(value);
     if (hex >= 0) return [16, 8, 0].map((shift) => toLinear(((hex >> shift) & 255) / 255)) as Rgb;
   } else if (Array.isArray(value) && value.length === 3 && value.every(unit)) return [value[0], value[1], value[2]];
-  throw typeError(`MeshDebugView ${name} must be '#rgb', '#rrggbb' or three linear numbers in 0..1`, help);
+  throw typeError(`MeshDebugView ${name} must be '#rgb', '#rrggbb' or three linear numbers in 0..1`, 'mesh-debug-view');
 }
 
 /** Linear colour of the generated material hue `index` (0 up): golden-ratio hue steps, every second one darker. */
@@ -324,38 +323,38 @@ export class MeshDebugView implements EnginePlugin {
    * @throws TypeError or RangeError for an unknown option or an invalid value; MargoError `'disposed'`.
    */
   set(options: MeshDebugViewOptions): this {
-    if (this.disposed) throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', help);
+    if (this.disposed) throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', 'mesh-debug-view');
     if (!options || typeof options !== 'object')
-      throw typeError('MeshDebugView options must be an object; pass { mode: ... }', help);
+      throw typeError('MeshDebugView options must be an object; pass { mode: ... }', 'mesh-debug-view');
     for (const key of Object.keys(options))
       if (!Object.hasOwn(defaults, key))
-        throw typeError(`MeshDebugView has no option '${key}'; use ${Object.keys(defaults).join(', ')}`, help);
+        throw typeError(`MeshDebugView has no option '${key}'; use ${Object.keys(defaults).join(', ')}`, 'mesh-debug-view');
     const given = Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)),
       s = { ...defaults, ...this.settings, ...given } as Required<MeshDebugViewOptions>,
       multiply = options.multiply === undefined ? this.multiplied : options.multiply;
-    if (!modes.includes(s.mode)) throw typeError(`MeshDebugView mode must be one of ${modes.join(', ')}`, help);
+    if (!modes.includes(s.mode)) throw typeError(`MeshDebugView mode must be one of ${modes.join(', ')}`, 'mesh-debug-view');
     if (multiply !== null && typeof multiply !== 'boolean')
-      throw typeError('MeshDebugView multiply must be true, false or null', help);
-    if (typeof s.enabled !== 'boolean') throw typeError('MeshDebugView enabled must be true or false', help);
+      throw typeError('MeshDebugView multiply must be true, false or null', 'mesh-debug-view');
+    if (typeof s.enabled !== 'boolean') throw typeError('MeshDebugView enabled must be true or false', 'mesh-debug-view');
     const range = (key: 'wireWidth' | 'vertexRadius' | 'uvScale' | 'specularPower', low: number, high: number) => {
       const v = s[key];
       if (!(typeof v === 'number' && v >= low && v <= high))
-        throw rangeError(`MeshDebugView ${key} must be a number from ${low} to ${high}`, help);
+        throw rangeError(`MeshDebugView ${key} must be a number from ${low} to ${high}`, 'mesh-debug-view');
     };
     range('wireWidth', 0, 64);
     range('vertexRadius', 0, 64);
     range('uvScale', 1e-6, 4096);
     range('specularPower', 1, 10000);
     if (!Array.isArray(s.uvColors) || s.uvColors.length !== 2)
-      throw typeError('MeshDebugView uvColors must be two colours', help);
+      throw typeError('MeshDebugView uvColors must be two colours', 'mesh-debug-view');
     if (!Array.isArray(s.materialColors) || s.materialColors.length > 4096)
-      throw typeError('MeshDebugView materialColors must be an array of at most 4096 colours', help);
+      throw typeError('MeshDebugView materialColors must be an array of at most 4096 colours', 'mesh-debug-view');
     let meshes = s.meshes as MeshHandle[] | null;
     if (given.meshes !== undefined && given.meshes !== null) {
       const list = typeof given.meshes === 'object' && Symbol.iterator in (given.meshes as object);
       meshes = list ? [...(given.meshes as Iterable<MeshHandle>)] : null;
       if (!meshes || !meshes.every((m) => m && typeof m === 'object' && typeof (m as unknown as Mesh).id === 'number'))
-        throw typeError('MeshDebugView meshes must be a list of meshes or null', help);
+        throw typeError('MeshDebugView meshes must be a list of meshes or null', 'mesh-debug-view');
       Object.freeze(meshes);
     }
     const colors = {
@@ -384,13 +383,13 @@ export class MeshDebugView implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.disposed) throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', help);
+    if (this.disposed) throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', 'mesh-debug-view');
     const limits = engine.gpu?.limits as (GPUSupportedLimits & { maxStorageBuffersInVertexStage?: number }) | undefined;
     if (!limits || limits.maxStorageBuffersInVertexStage === 0)
       throw fault(
         'unsupported',
         'MeshDebugView reads vertices from storage buffers; create the engine on WebGPU or the WebGL2 compatibility layer',
-        help,
+        'mesh-debug-view',
       );
     this.engine = engine;
   }
@@ -437,7 +436,7 @@ export class MeshDebugView implements EnginePlugin {
       if (bytes.byteLength > Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize))
         throw rangeError(
           `MeshDebugView needs a ${bytes.byteLength}-byte storage buffer, over this device's limit; split the mesh or leave it out of meshes`,
-          help,
+          'mesh-debug-view',
         );
       if (held) retire(device, held.buffer);
       const buffer = device.createBuffer({

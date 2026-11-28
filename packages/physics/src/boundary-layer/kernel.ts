@@ -26,7 +26,7 @@ async function compile(asset: URL, signal?: AbortSignal): Promise<WebAssembly.Mo
       if (!response.ok)
         throw new MargoError(
           'failed',
-          `Boundary-layer kernel request returned HTTP ${response.status}. Serve the matching wind Wasm asset.`,
+          `Boundary-layer kernel request returned HTTP ${response.status}. You must serve the matching wind Wasm asset.`,
         );
       module = await WebAssembly.compile(await response.arrayBuffer());
     }
@@ -62,7 +62,7 @@ export function bindWind(host: SolverHost, module: WebAssembly.Module): Boundary
   const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
   const stack = exports.__stack_pointer;
   if (!(stack instanceof WebAssembly.Global))
-    throw new MargoError('failed', 'Wind Wasm has no stack pointer. Rebuild the boundary-layer assets.');
+    throw new MargoError('failed', 'Wind Wasm has no stack pointer. You must rebuild the boundary-layer assets.');
   stack.value = top;
   return exports as unknown as BoundaryLayerKernel;
 }

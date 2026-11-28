@@ -266,7 +266,7 @@ export class CadBench {
    * @throws TypeError for a mesh without geometry or after dispose; what {@link cadFinish} throws.
    */
   show(source: Mesh | Geometry, options: CadShowOptions = {}): CadPart {
-    if (this.disposed) throw new TypeError('This CadBench is disposed');
+    if (this.disposed) throw new TypeError('This CadBench is disposed; create a new CadBench');
     const { finish = 'machined', shadow = true } = options,
       material = this.material(finish, options),
       created = !isMesh(source),

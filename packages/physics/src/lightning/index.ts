@@ -438,7 +438,7 @@ export class LightningSolver implements Solver<LightningParams> {
       !(this.native.__stack_pointer instanceof WebAssembly.Global) ||
       typeof this.native.relax_potential !== 'function'
     )
-      throw new MargoError('failed', 'Unexpected lightning kernel ABI. Rebuild both native assets.');
+      throw new MargoError('failed', 'Unexpected lightning kernel ABI. You must rebuild both native assets.');
     this.native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     const reserve = (name: string, words: number) => host.allocate(name, words * 8, 'f64', LIGHTNING_LAYOUT);
     this.potential = reserve('potential', this.volume);
@@ -525,7 +525,7 @@ export class LightningSolver implements Solver<LightningParams> {
         if (!(floor < top))
           throw new MargoError(
             'state',
-            'Lightning cloud plane reaches the bed. Raise the cloud plane above the terrain.',
+            'Lightning cloud plane reaches the bed. You must raise the cloud plane above the terrain.',
           );
         ground[z * nx + x] = floor;
         for (let y = 0; y < ny; y++) {

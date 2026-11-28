@@ -245,7 +245,7 @@ export class WrappedRopeSolver implements Solver<WrappedRopeSolverParams> {
     if (!source || source.type !== 'f32' || source.byteLength / (4 * BODY_WORDS) !== rows)
       throw new MargoError(
         'state',
-        'Couple the wrapped rope with a RigidSolver whose bodies field matches its body rows.',
+        'You must couple the wrapped rope with a RigidSolver whose bodies field matches its body rows.',
       );
     const bodies = new Float32Array((source.memory ?? host.memory).buffer, source.byteOffset, source.byteLength / 4),
       state = this.words(this.state),

@@ -141,7 +141,7 @@ async function compile(shared: boolean): Promise<WebAssembly.Module> {
     if (!response.ok)
       throw new MargoError(
         'failed',
-        'Serve the GPU cloth CPU kernel (cloth-kernel.wasm) from its package URL. See https://margoengine.com/errors#gpu-cloth',
+        'You must serve the GPU cloth CPU kernel (cloth-kernel.wasm) from its package URL. See https://margoengine.com/errors#gpu-cloth',
       );
     return response.headers.get('content-type')?.split(';')[0] === 'application/wasm'
       ? await WebAssembly.compileStreaming(response)
@@ -221,7 +221,7 @@ export class ClothKernel {
     if (!(this.exports.__stack_pointer instanceof WebAssembly.Global))
       throw new MargoError(
         'failed',
-        'Build cloth-kernel.wasm with its exported stack pointer. See https://margoengine.com/errors#gpu-cloth',
+        'cloth-kernel.wasm must export its stack pointer; rebuild it. See https://margoengine.com/errors#gpu-cloth',
       );
     this.exports.__stack_pointer.value = STACK;
     const u = this.u32('header', HEADER_WORDS);

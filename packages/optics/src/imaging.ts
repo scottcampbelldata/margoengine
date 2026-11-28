@@ -192,7 +192,7 @@ export function designFresnelLens(options: FresnelLensOptions): FresnelLens {
     radius: centerRadius + ringWidth * rings,
     trace(distance, i) {
       const facet = facets[i];
-      if (!facet) throw new RangeError(`FresnelLens.trace: no facet ${i}`);
+      if (!facet) throw new RangeError(`FresnelLens.trace: no facet ${i}; pass an index from 0 to ${facets.length - 1}`);
       const entry = facet.entry,
         incident = Math.atan2(entry, distance),
         t = inside(entry, distance);

@@ -376,7 +376,7 @@ function fieldSegments(frame: LightningBoltFieldFrame): Float32Array {
     channel.byteLength % (CHANNEL_STRIDE * f32) !== 0 ||
     channel.byteLength > memory.buffer.byteLength - channel.byteOffset
   )
-    throw new MargoError('state', 'Read the live layout-1 f32 channel region from the lightning arena.');
+    throw new MargoError('state', 'You must read the live layout-1 f32 channel region from the lightning arena.');
   if (!(finiteF32(core) && core >= 0 && finiteF32(glow) && glow >= 0))
     throw new MargoError('state', 'Give physical lightning core and glow finite nonnegative radiance levels.');
   if (
@@ -482,7 +482,7 @@ export class LightningBolt implements EnginePlugin {
       typeof options.weather !== 'object' ||
       options.weather === null
     )
-      throw new MargoError('state', 'Attach LightningBolt with a Weather in the weather option.');
+      throw new MargoError('state', 'You must attach LightningBolt with a Weather in the weather option.');
     for (const [k, v] of [
       ['coreRadiance', options.coreRadiance],
       ['glowRadiance', options.glowRadiance],

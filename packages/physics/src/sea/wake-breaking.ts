@@ -96,7 +96,7 @@ export function writeWakeBreaking(
   )
     throw new MargoError(
       'state',
-      'Match the breaking grid, finite wake step and current to the layout-1 crest region.',
+      'You must match the breaking grid, finite wake step and current to the layout-1 crest region.',
     );
   for (const input of [previous, height, potential, surfacePressure, damping]) {
     if (

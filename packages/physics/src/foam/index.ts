@@ -317,7 +317,7 @@ export class FoamSolver implements Solver<FoamParams> {
         wakeBreaking.kind !== WAKE_BREAKING_FIELD.kind ||
         wakeBreaking.unit !== 'SI'
       )
-        throw foamError('state', 'Connect the wake’s SI breaking crest field to FoamSolver.');
+        throw foamError('state', 'You must connect the wake’s SI breaking crest field to FoamSolver.');
       this.wakeBreaking = Object.freeze({ ...wakeBreaking });
     }
   }
@@ -757,7 +757,7 @@ export class FoamSolver implements Solver<FoamParams> {
       capacity < 0 ||
       context.cell.some((value, i) => value !== port.cell[i])
     )
-      throw foamError('state', 'Connect the layout-1 f64 breaking crest field in the foam grid’s world cell.');
+      throw foamError('state', 'You must connect the layout-1 f64 breaking crest field in the foam grid’s world cell.');
     const crest = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
     const [written, detected, spacing] = crest;
     if (
@@ -768,7 +768,7 @@ export class FoamSolver implements Solver<FoamParams> {
       detected! < written! ||
       !(spacing! > 0 && Number.isFinite(spacing))
     )
-      throw foamError('state', 'Connect a breaking crest producer with valid row counts and finite cell spacing.');
+      throw foamError('state', 'You must connect a breaking crest producer with valid row counts and finite cell spacing.');
     const fraction = Math.min(1, (spacing! / this.h) * (spacing! / this.h));
     const newTick = clock[2] !== port.tick;
     for (let row = 0; row < written!; row++) {

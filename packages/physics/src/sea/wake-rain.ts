@@ -89,7 +89,7 @@ function dropSource(drop: WakeRainDrop, grid: WakeSourceGrid, dt: number): SeaSo
   // The physical footprint is the drop's projected disk. One cell of support resolves an unresolved disk.
   const radius = Math.max(diameter / 2, dx);
   if (x - radius < x0 || x + radius > x0 + nx * dx || z - radius < z0 || z + radius > z0 + nz * dx)
-    throw new MargoError('state', 'Place the rain impact and its complete pressure footprint inside the wake grid.');
+    throw new MargoError('state', 'You must place the rain impact and its complete pressure footprint inside the wake grid.');
   const volume = (PI / 6) * diameter * diameter * diameter;
   const impulse = density * volume * fallSpeed;
   // Reuse the actual wake quadrature with zero volume and no pressure destination to query only its area.
@@ -126,7 +126,7 @@ export function wakeRainEquivalentDrop(
   const fallSpeed = Math.sqrt((2 * energyFlux) / (rainDensity * volumeFlux));
   const diameter = pow((6 * volume) / PI, 1 / 3);
   if (!(diameter > 0 && Number.isFinite(diameter) && Number.isFinite(fallSpeed)))
-    throw new MargoError('state', 'Scale the rain flux and impact count to a finite representative drop.');
+    throw new MargoError('state', 'You must scale the rain flux and impact count to a finite representative drop.');
   return { x, z, diameter, fallSpeed, density: rainDensity };
 }
 
@@ -147,7 +147,7 @@ export function wakeRainSources({
     ) ||
     !(Number.isFinite(metresPerCell) && metresPerCell > 0)
   )
-    throw new MargoError('state', 'Supply a precipitation sampler, integer origin cells and a finite cell length.');
+    throw new MargoError('state', 'You must supply a precipitation sampler, integer origin cells and a finite cell length.');
   const offset = cell.map((value, i) => (value - precipitation.cell[i]!) * metresPerCell);
   if (!offset.every(Number.isFinite))
     throw new MargoError('state', 'Place the precipitation field within finite offsets of the wake cell.');
