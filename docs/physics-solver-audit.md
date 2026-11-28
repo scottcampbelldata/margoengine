@@ -52,22 +52,22 @@ them; the rest is a record of what a stronger solver would need.
 
 ### SPACE-01 four-point pass
 
-- Point 5. `orbit.test.js` checks Kepler position and velocity near eccentricity one, extreme circular
+- Point 5. `06bda264b7`. `orbit.test.js` checks Kepler position and velocity near eccentricity one, extreme circular
   scales, finite inverse-square forces from tiny and huge separations, and coded input corrections.
   `orbit-threads.test.js` checks that a late singular stage preserves accepted bodies, clock and work.
-- Point 6. `orbit-threads.test.js` and `orbit-threads.browser.mjs` check accepted native snapshots
+- Point 6. `06bda264b7`. `orbit-threads.test.js` and `orbit-threads.browser.mjs` check accepted native snapshots
   across Plain and Shared Wasm and actual shared workers. The mixed layouts exercise massless rows,
   ordered J2 and atmosphere, signed origin-cell shifts, replay and exact partition work. Chromium starts
   three nested helpers. Four native lanes execute 18,432 source contributions over four force sweeps of
   513 bodies, with 18,288 shared distances in serial and 18,432 independently computed in parallel.
-- Point 7. `orbit-surface.browser.mjs` draws three live gravitating bodies from the registry on
+- Point 7. `06bda264b7`. `orbit-surface.browser.mjs` draws three live gravitating bodies from the registry on
   WebGPU and WebGL2. A fixed camera watches 221 line segments, three body meshes and labels over
   2.066 physical days. Both renderers change 4,814 pixels. The accepted field follows the independent
   triangular relative equilibrium within 6.17 m across 9.60 billion m and replays exactly.
-- Point 8. The Physics README and `docs/limits.md` record fixed encounter substeps, Newtonian gravity,
+- Point 8. `06bda264b7`. The Physics README and `docs/limits.md` record fixed encounter substeps, Newtonian gravity,
   an exponential atmosphere and the scope of the bound Kepler helper and authored disk.
 
-- Point 2 remains open. `space01-three-body.mjs` matches the exact unequal-mass triangular solution and
+- Point 2 remains open. `06bda264b7`. `space01-three-body.mjs` matches the exact unequal-mass triangular solution and
   the first three published Burrau close passes at a finer fixed step. It records the coarse energy
   failure and leaves the later encounter open. `space01-apollo-measured.mjs` compares four independent
   October 2020 Apache Point normal points. The geometric range residuals run from −9.86 to +218.18 m
