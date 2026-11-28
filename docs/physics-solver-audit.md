@@ -50,6 +50,32 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### BIO-01 four-point pass
+
+- Point 5. `bio01-acceptance.test.js` covers distinct flow-origin translation, signed publication, and a finite input
+  pair whose derived acceleration overflows. The invalid sample leaves the accepted pose intact. The native tests
+  cover rejecting a nonfinite modal discriminant. `coupling/vegetation.test.js` drives the first rigid contact and
+  trunk release from a frame-zero snapshot and checks exact replay.
+- Point 6. `vegetation-threads.test.js` and `vegetation-threads.browser.mjs` compare plain/shared serial
+  and four-partition acceptance, including signed origins, already failed plants and exact replay. The large case
+  integrates 4,099 plants and counts 8,198 SIMD pairs. Isolated Chromium starts three actual helpers. The raw native
+  comparison covers 56,160 rows and keeps accepted state when a later partition rejects an overflowing discriminant.
+  The same browser test starts three helpers from a Vite production build and verifies the shipped Wasm bytes.
+- Point 7. `scatter/test/plant-surge.browser.mjs` binds actual SEA-02 water velocities into `PlantSway` and
+  renders its accepted output through the existing GrassScatter and PlantMotion route. Shallow and deep stem tips
+  travel 21.74 cm and 1.52 cm. The shallow visible crest travels 13.88 pixels while its root stays planted.
+  WebGPU and WebGL2 reproduce accepted state and held/replayed frame bytes. This is a fixed-camera BS-1/BB-2
+  technical cutaway. The original shots, anemone contact and large bending remain open.
+- Point 8. The Physics and Scatter READMEs and `docs/limits.md` document the two-mode geometry, signed origin,
+  ordered native acceptance, attached rigid adapter, the measured comparisons and the limits of the cutaway.
+- Point 2 remains open. `bio01-sway-measured.mjs` compares held-out tree ringdowns. The nominal stripped and
+  intact estimates are 11.93 and 7.10 rad/s versus 11.4 ± 0.5 and 3.78 ± 0.09 rad/s observed. The paired intact
+  stem misses even with geometry and static stiffness sensitivity choices. `bio01-blade-measured.mjs` predicts
+  9.51 and 195.73 mm of peak-to-peak excursion for two blades measured at 5.0 and 175.0 mm. Both remain outside
+  the ±2 mm resolution estimate across the tested input sensitivity. Shape and known loading limitations are
+  documented. The observed sways and excursions are not forcing or fit inputs.
+  [Spatz et al.](https://doi.org/10.3732/ajb.94.10.1603) · [Luhar and Nepf](https://doi.org/10.1016/j.jfluidstructs.2015.11.007)
+
 ### LIFE-03 four-point pass
 
 - Point 5. `850df734e6`. `life03-acceptance.test.js` verifies the production feedback frequency against the fast-envelope

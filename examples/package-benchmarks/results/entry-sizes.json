@@ -15446,8 +15446,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24406,
-        "gzip": 8966
+        "raw": 24516,
+        "gzip": 9005
       },
       "./explosive": {
         "raw": 41750,
@@ -15466,8 +15466,8 @@
         "gzip": 6377
       },
       "./clouds": {
-        "raw": 31518,
-        "gzip": 11481
+        "raw": 31627,
+        "gzip": 11523
       },
       "./ageing": {
         "raw": 9179,
@@ -15526,8 +15526,8 @@
         "gzip": 9482
       },
       "./life": {
-        "raw": 26041,
-        "gzip": 10176
+        "raw": 26151,
+        "gzip": 10214
       },
       "./crush": {
         "raw": 59895,
@@ -15550,8 +15550,8 @@
         "gzip": 4846
       },
       "./vegetation": {
-        "raw": 24918,
-        "gzip": 9667
+        "raw": 33659,
+        "gzip": 12687
       },
       "./tracers": {
         "raw": 46886,
@@ -15602,20 +15602,20 @@
         "gzip": 15193
       },
       "./viscoplastic": {
-        "raw": 22879,
-        "gzip": 8693
+        "raw": 22989,
+        "gzip": 8737
       },
       "./tsunami": {
-        "raw": 23497,
-        "gzip": 9036
+        "raw": 23607,
+        "gzip": 9077
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18238,
-        "gzip": 7051
+        "raw": 18388,
+        "gzip": 7105
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15630,12 +15630,12 @@
         "gzip": 4916
       },
       "./airborne": {
-        "raw": 27897,
-        "gzip": 11005
+        "raw": 28007,
+        "gzip": 11050
       },
       "./boundary-layer": {
-        "raw": 14083,
-        "gzip": 5562
+        "raw": 14193,
+        "gzip": 5604
       },
       "./aeolian": {
         "raw": 11986,
@@ -15646,28 +15646,28 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19601,
-        "gzip": 7614
+        "raw": 19711,
+        "gzip": 7653
       },
       "./sediment": {
-        "raw": 21276,
-        "gzip": 7913
+        "raw": 21386,
+        "gzip": 7963
       },
       "./underwater": {
-        "raw": 20432,
-        "gzip": 8117
+        "raw": 20542,
+        "gzip": 8163
       },
       "./orbit": {
-        "raw": 17192,
-        "gzip": 6772
+        "raw": 17302,
+        "gzip": 6820
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25390,
-        "gzip": 9715
+        "raw": 25500,
+        "gzip": 9762
       },
       "./dfsph": {
         "raw": 19974,
@@ -19295,8 +19295,8 @@
       "brotli": 1483
     },
     "packages/physics/dist/solver-phase-thread.js": {
-      "raw": 1592,
-      "gzip": 765,
+      "raw": 1587,
+      "gzip": 767,
       "brotli": 667
     },
     "packages/physics/dist/cloth-kernel.wasm": {
@@ -19470,14 +19470,14 @@
       "brotli": 4458
     },
     "packages/physics/dist/vegetation-kernel.wasm": {
-      "raw": 6456,
-      "gzip": 2226,
-      "brotli": 1955
+      "raw": 7951,
+      "gzip": 2974,
+      "brotli": 2613
     },
     "packages/physics/dist/vegetation-kernel-shared.wasm": {
-      "raw": 6456,
-      "gzip": 2226,
-      "brotli": 1955
+      "raw": 7951,
+      "gzip": 2974,
+      "brotli": 2613
     },
     "packages/physics/dist/school-kernel.wasm": {
       "raw": 8622,

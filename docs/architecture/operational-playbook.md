@@ -11833,3 +11833,11 @@ A shared world can split ordinary and passive-reaction rows across workers. The 
 committing all fields. World-cell metadata comes directly from the swimmer's host. A reciprocal passive-load
 fixture verifies the shallow-water impulse and the BB-7 cutaway renders the accepted fin-to-sediment transfer
 through the final settled bed on both renderers.
+
+### BIO-01 signed field sampling and plant worker phases
+
+Rooted plants translate station positions into the supplied air or water origin cell before sampling. The caller
+computes the input differences at the world clock and gives each native worker a disjoint candidate interval.
+Only complete, checked modal state is copied to the field backing. Placement, shape and displacement use the same
+physical Scatter adapter in the fixed-camera sea-surge fixture. Signed origin, rejected calculation, worker replay,
+frame-zero rigid activation and both renderers have scoped tests.

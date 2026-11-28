@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { cos, exp, sin } from '@margoengine/math/pinned';
 
 /** Physical properties and optional initial motion of one rooted plant. */
@@ -76,13 +77,13 @@ const forceNodes = [
 
 function nonnegative(value: number, name: string): number {
   if (!Number.isFinite(value) || value < 0)
-    throw new RangeError(name + ' must be finite and nonnegative; pass a quantity within range.');
+    throw new MargoError('state', name + ' must be finite and nonnegative; pass a quantity within range.');
   return value;
 }
 
 function positive(value: number, name: string): number {
   if (!Number.isFinite(value) || !(value > 0))
-    throw new RangeError(name + ' must be finite and positive; pass a quantity within range.');
+    throw new MargoError('state', name + ' must be finite and positive; pass a quantity within range.');
   return value;
 }
 
@@ -173,7 +174,8 @@ function frequencies(m: number[], k: number[]): readonly [number, number] {
     !(kScale / mScale > 0) ||
     !Number.isFinite(kScale / mScale)
   )
-    throw new RangeError(
+    throw new MargoError(
+      'state',
       'Plant modal mass and stiffness must be finite and positive definite; check stem dimensions and material.',
     );
   return [
@@ -184,12 +186,15 @@ function frequencies(m: number[], k: number[]): readonly [number, number] {
 
 export function preparePlant(plant: PlantSwayPlant, modes: readonly [Mode, Mode], water: boolean) {
   if (!plant || typeof plant !== 'object' || plant.root?.length !== 3 || !Array.from(plant.root).every(Number.isFinite))
-    throw new TypeError('A plant needs three finite root coordinates; pass its position in the solver origin.');
+    throw new MargoError(
+      'state',
+      'A plant needs three finite root coordinates; pass its position in the solver origin.',
+    );
   const h = positive(plant.height, 'Plant height');
   const r0 = positive(plant.baseDiameter, 'Plant base diameter') / 2;
   const r1 = nonnegative(plant.tipDiameter ?? plant.baseDiameter, 'Plant tip diameter') / 2;
   const hollow = nonnegative(plant.hollowRatio ?? 0, 'Plant hollow ratio');
-  if (hollow >= 1) throw new RangeError('Plant hollow ratio leaves no material; pass a ratio below one.');
+  if (hollow >= 1) throw new MargoError('state', 'Plant hollow ratio leaves no material; pass a ratio below one.');
   const e = positive(plant.youngModulus, 'Plant Young’s modulus');
   const density = positive(plant.density, 'Plant tissue density');
   const cd = nonnegative(plant.dragCoefficient ?? 1, 'Plant drag coefficient');
@@ -204,7 +209,8 @@ export function preparePlant(plant: PlantSwayPlant, modes: readonly [Mode, Mode]
   const inertia = (r: number) => outerArea(r) * r * r * inertiaFactor;
   const crown = plant.crown;
   const start = crown ? nonnegative(crown.base, 'Crown base height') / h : 0;
-  if (crown && !(start < 1)) throw new RangeError('Crown base is at or above the tip; put it below the stem height.');
+  if (crown && !(start < 1))
+    throw new MargoError('state', 'Crown base is at or above the tip; put it below the stem height.');
   const crownMass = crown ? nonnegative(crown.mass, 'Crown mass') : 0;
   const crownArea = crown ? nonnegative(crown.area, 'Crown drag area') : 0;
   const crownVolume = crown ? nonnegative(crown.displacedVolume ?? 0, 'Crown displaced volume') : 0;
@@ -281,7 +287,8 @@ export function preparePlant(plant: PlantSwayPlant, modes: readonly [Mode, Mode]
     (plant.initialVelocity !== undefined && plant.initialVelocity.length !== 4) ||
     [...initial, ...model, ...stations, ...sections].some((value) => !Number.isFinite(value))
   )
-    throw new RangeError(
+    throw new MargoError(
+      'state',
       'Plant model values exceed the numeric range; use finite geometry, material and four components per initial vector.',
     );
   return { root: Array.from(plant.root), model, stations, sections, angular, initial };

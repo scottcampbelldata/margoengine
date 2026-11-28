@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21769860,
+  "total": 21772970,
   "history": [
     {
       "date": "2026-10-24",
@@ -15539,6 +15539,12 @@
       "commit": "d64468c4a8",
       "reason": "geometry builder and parts entries; utils keeps colours",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "bio01-native-plant-workers",
+      "reason": "BIO-01: the Physics vegetation entry measures 9,667 to 12,687 B gzip (ceiling 9,958 to 13,068). The additional code translates signed flow origins and accepts Rust SIMD worker results atomically. A second optional entry would repeat the kernel and state bindings. The shared optional worker is visible to downstream build tools. Core and Stage gain no bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16470,7 +16476,7 @@
     "@margoengine/physics/tracers": 17877,
     "@margoengine/physics/tsunami": 9278,
     "@margoengine/physics/underwater": 8284,
-    "@margoengine/physics/vegetation": 9958,
+    "@margoengine/physics/vegetation": 13068,
     "@margoengine/physics/viscoplastic": 8826,
     "@margoengine/physics/vortices": 5453,
     "@margoengine/physics/waves": 7804,

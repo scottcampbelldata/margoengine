@@ -72,10 +72,10 @@ unsafe fn plant(
     dt: f64,
     gravity: f64,
     tick: f64,
-) -> u32 {
+) -> Result<u32, u32> {
     unsafe {
         if *state.add(9) != 0.0 {
-            return 0;
+            return Ok(0);
         }
         let mut m00 = *model;
         let mut m01 = *model.add(1);
@@ -113,15 +113,19 @@ unsafe fn plant(
             || !md.is_finite()
             || !kd.is_finite()
         {
-            return 1;
+            return Err(1);
         }
         let mixed = m00 * k11 + m11 * k00 - 2.0 * m01 * k01;
-        let radicand = (mixed * mixed - 4.0 * md * kd).max(0.0);
+        let discriminant = mixed * mixed - 4.0 * md * kd;
+        if !discriminant.is_finite() {
+            return Err(2);
+        }
+        let radicand = discriminant.max(0.0);
         let omega = sqrt((mixed + sqrt(radicand)) / (2.0 * md));
         let steps =
             f64x2_extract_lane::<0>(f64x2_ceil(f64x2_splat(dt * omega / PHASE_STEP))).max(1.0);
         if !omega.is_finite() || omega <= 0.0 || steps > 4_294_967_295.0 {
-            return 2;
+            return Err(2);
         }
         let h = dt / steps;
         let half = h * 0.5;
@@ -140,7 +144,9 @@ unsafe fn plant(
         let mut base_moment = 0.0;
         let mut status = 0.0;
         let mut height = 0.0;
+        let mut midpoint_substeps = 0;
         for _ in 0..steps as u32 {
+            midpoint_substeps += 1;
             let mut c00 = *model.add(6);
             let mut c01 = *model.add(7);
             let mut c11 = *model.add(8);
@@ -166,7 +172,7 @@ unsafe fn plant(
             let a11 = m11 + half * c11 + quarter * k11;
             let ad = a00 * a11 - a01 * a01;
             if !ad.is_finite() || !(ad > 0.0) {
-                return 2;
+                return Err(2);
             }
             let rhs0 = f64x2_add(
                 mix(v0, m00, v1, m01),
@@ -187,19 +193,19 @@ unsafe fn plant(
                 || !length(v0).is_finite()
                 || !length(v1).is_finite()
             {
-                return 2;
+                return Err(2);
             }
             base_moment = length(mix(q0, *model.add(11), q1, *model.add(12)));
             let root_ratio = base_moment * *model.add(13);
             if !root_ratio.is_finite() {
-                return 2;
+                return Err(2);
             }
             let mut stem_ratio = 0.0;
             for i in 0..SECTIONS {
                 let a = sections.add(i * SECTION_WORDS);
                 let local = length(mix(q0, *a.add(1), q1, *a.add(2)));
                 if !local.is_finite() {
-                    return 2;
+                    return Err(2);
                 }
                 if local > stem_ratio {
                     stem_ratio = local;
@@ -227,8 +233,84 @@ unsafe fn plant(
         *state.add(10) = if status != 0.0 { height } else { 0.0 };
         *state.add(11) = base_moment;
         *state.add(12) = if status != 0.0 { tick } else { -1.0 };
+        Ok(midpoint_substeps)
     }
-    0
+}
+
+#[repr(C)]
+struct Job {
+    models: *const f64,
+    stations: *const f64,
+    sections: *const f64,
+    samples: *const f64,
+    current: *const f64,
+    work: *mut f64,
+    impulses: *const f64,
+    count: usize,
+    receipts: *mut f64,
+    reserved: u32,
+    dt: f64,
+    gravity: f64,
+    tick: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<Job>() == 64);
+const MAX_EXACT_SUBSTEPS: u64 = 4_503_599_627_370_495;
+
+#[derive(Default)]
+struct Work {
+    integrated: usize,
+    substeps: u64,
+}
+
+impl Job {
+    fn valid(&self) -> bool {
+        !self.models.is_null()
+            && !self.stations.is_null()
+            && !self.sections.is_null()
+            && !self.samples.is_null()
+            && !self.current.is_null()
+            && !self.work.is_null()
+            && self.count <= isize::MAX as usize / (STATIONS * STATION_WORDS * size_of::<f64>())
+            && self.dt > 0.0
+            && self.dt.is_finite()
+            && self.gravity.is_finite()
+            && self.tick.is_finite()
+    }
+
+    /// Each participant copies and updates only its private candidate
+    /// rows. The accepted state stays constant through the host's join.
+    unsafe fn candidate(&self, start: usize, end: usize) -> Result<Work, u32> {
+        let mut actual = Work::default();
+        unsafe {
+            let first = start * STATE_WORDS;
+            ptr::copy_nonoverlapping(
+                self.current.add(first),
+                self.work.add(first),
+                (end - start) * STATE_WORDS,
+            );
+            for i in start..end {
+                let steps = plant(
+                    self.models.add(i * MODEL_WORDS),
+                    self.stations.add(i * STATIONS * STATION_WORDS),
+                    self.sections.add(i * SECTIONS * SECTION_WORDS),
+                    self.samples.add(i * STATIONS * SAMPLE_WORDS),
+                    self.work.add(i * STATE_WORDS),
+                    if self.impulses.is_null() {
+                        self.impulses
+                    } else {
+                        self.impulses.add(i * 4)
+                    },
+                    self.dt,
+                    self.gravity,
+                    self.tick,
+                )?;
+                actual.integrated += usize::from(steps > 0);
+                actual.substeps += u64::from(steps);
+            }
+        }
+        Ok(actual)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -246,29 +328,70 @@ pub unsafe extern "C" fn vegetation_step(
     gravity: f64,
     tick: f64,
 ) -> u32 {
+    let job = Job {
+        models,
+        stations,
+        sections,
+        samples,
+        current,
+        work,
+        impulses,
+        count,
+        receipts: ptr::null_mut(),
+        reserved: 0,
+        dt,
+        gravity,
+        tick,
+    };
+    if !job.valid() {
+        return 2;
+    }
     unsafe {
-        ptr::copy_nonoverlapping(current, work, count * STATE_WORDS);
-        for i in 0..count {
-            let status = plant(
-                models.add(i * MODEL_WORDS),
-                stations.add(i * STATIONS * STATION_WORDS),
-                sections.add(i * SECTIONS * SECTION_WORDS),
-                samples.add(i * STATIONS * SAMPLE_WORDS),
-                work.add(i * STATE_WORDS),
-                if impulses.is_null() {
-                    impulses
-                } else {
-                    impulses.add(i * 4)
-                },
-                dt,
-                gravity,
-                tick,
-            );
-            if status != 0 {
-                return status;
-            }
+        if let Err(status) = job.candidate(0, count) {
+            return status;
         }
         ptr::copy_nonoverlapping(work, current, count * STATE_WORDS);
     }
     0
+}
+
+unsafe fn apply(job: *const Job, part: u32, parts: u32) -> Result<(), u32> {
+    let job = unsafe { job.as_ref() }.ok_or(2u32)?;
+    if part >= parts || !job.valid() {
+        return Err(2);
+    }
+    let count = job.count as u64;
+    let start = (u64::from(part) * count / u64::from(parts)) as usize;
+    let end = ((u64::from(part) + 1) * count / u64::from(parts)) as usize;
+    let actual = unsafe { job.candidate(start, end)? };
+    if actual.substeps > MAX_EXACT_SUBSTEPS {
+        return Err(2);
+    }
+    if !job.receipts.is_null() {
+        unsafe {
+            let receipt = job.receipts.add(3 * part as usize);
+            receipt.write((end - start) as f64);
+            receipt.add(1).write(actual.integrated as f64);
+            receipt.add(2).write(actual.substeps as f64);
+        }
+    }
+    Ok(())
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn vegetation_apply(job: *const Job) -> u32 {
+    unsafe { apply(job, 0, 1) }.err().unwrap_or(0)
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn vegetation_thread_phase(
+    job: *const Job,
+    stage: u32,
+    part: u32,
+    parts: u32,
+) -> u32 {
+    if stage != 0 {
+        return 2;
+    }
+    unsafe { apply(job, part, parts) }.err().unwrap_or(0)
 }

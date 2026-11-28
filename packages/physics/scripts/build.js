@@ -14,16 +14,26 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 // build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
 const dist = distDir(root);
-const exposeOptionalWasmUrl = {
-  name: 'expose-optional-wasm-url',
+const exposeOptionalUrls = {
+  name: 'expose-optional-urls',
   renderChunk(code) {
-    if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm') && !code.includes('wake-fft.wasm'))
+    if (
+      !code.includes('-kernel.wasm') &&
+      !code.includes('-kernel-shared.wasm') &&
+      !code.includes('wake-fft.wasm') &&
+      !code.includes('solver-phase-thread.js')
+    )
       return null;
     return {
-      code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
-        '',
-      ),
+      code: code
+        .replace(
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          '',
+        )
+        .replace(
+          /(new Worker\s*\(\s*new URL\(\s*)\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/solver-phase-thread\.js["'])/g,
+          '$1',
+        ),
       map: null,
     };
   },
@@ -36,7 +46,7 @@ await build({
   configFile: false,
   publicDir: false,
   logLevel: 'warn',
-  plugins: [exposeOptionalWasmUrl],
+  plugins: [exposeOptionalUrls],
   build: {
     outDir: dist,
     emptyOutDir: true,

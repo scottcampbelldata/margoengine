@@ -15816,6 +15816,17 @@ Taper, a hollow section and a distributed crown enter the mass and stiffness int
 The coupling test `packages/physics/tests/coupling/vegetation.test.js` checks two uniform-beam frequencies, midpoint
 energy and phase, a travelling gust, an attenuating Airy wave, rupture and uprooting, and bit-identical replay.
 
+The worker extension splits independent modal integrations. Each participant writes only candidate rows. The
+caller checks an ordered receipt before accepting the unchanged midpoint equations. The native discriminant
+must be finite before a negative-roundoff clamp, so a failed worker cannot publish a fabricated frequency.
+
+H. Spatz, F. Brüchert and J. Pfisterer, “Multiple resonance damping or how do trees escape dangerously large
+oscillations?” (2007), provides independent paired stem and intact-tree ringdowns and static elastic measurements.
+M. Luhar and H. M. Nepf, “Wave-induced dynamics of flexible blades” (2016), provides flume forcing, geometry and
+elastic stiffness separately from the measured tip excursions. Equivalent cross-section and waveform assumptions
+are reported in the diagnostic scripts and limits. [Tree experiment](https://doi.org/10.3732/ajb.94.10.1603) ·
+[Blade experiment](https://doi.org/10.1016/j.jfluidstructs.2015.11.007)
+
 Scatter reads those same modal coordinates in the colour, depth and shadow vertex stages. For a horizontal
 offset `d(y)`, (x',y',z') = (x+d_x(y),y,z+d_z(y)); the inverse-transpose Jacobian changes only the normal's
 y component, to `n_y - dot(n_xz, slope)`. See Alan H. Barr, *Global and local deformations of solid primitives*,

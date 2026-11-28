@@ -1197,3 +1197,5 @@ wind on mapped roots. Set the mesh pivot at the root and match its scaled tip he
 To compose an existing burn or flood treatment, pass its `PlantStateSource` as `states` to `PlantMotion`.
 Use `hideFailed: true` to remove a failed standing instance when detached geometry is drawn by the rigid body. This
 hides the entire instance, so a visible stump needs its own mesh.
+
+For submerged plants, pass the same `SpectralSea.water` to `PlantSway` as `flow`. The fixed-camera seagrass check runs with `npm run test:gpu:plant-surge -w @margoengine/scatter`. It compares two rooted clumps one wavelength apart at different depths. The submitted poses match the accepted sway field, the shallow clump bends farther in the solved orbital flow, and both WebGPU and WebGL2 reproduce the held and restored frames. The fixture exercises the small-displacement beam regime described by Luhar and Nepf. [Luhar and Nepf (2016)](https://doi.org/10.1016/j.jfluidstructs.2015.11.007), [FHWA HEC-25, Chapter 5](https://www.govinfo.gov/content/pkg/GOVPUB-TD2-PURL-gpo161099/pdf/GOVPUB-TD2-PURL-gpo161099.pdf)

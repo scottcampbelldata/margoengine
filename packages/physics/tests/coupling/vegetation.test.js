@@ -208,6 +208,7 @@ test('PlantRigidSolver transfers a rigid impact, activates a detached trunk and 
       plants: [{ root: plant.root, height: plant.height, standing, fragments: [{ body: released, baseHeight: 0 }] }],
     })
     .couple([rigid.id, sway.id], 'staggered');
+  const frameZero = world.takeSnapshot();
   world.advance(2);
   const before = world.takeSnapshot();
   world.advance(20);
@@ -221,4 +222,9 @@ test('PlantRigidSolver transfers a rigid impact, activates a detached trunk and 
   assert.equal(released.enabled, false);
   world.advance(20);
   assert.equal(world.hash(), after, 'the impact and release replay exactly');
+  world.restoreSnapshot(frameZero.bytes);
+  assert.equal(standing.enabled, true);
+  assert.equal(released.enabled, false);
+  world.advance(20);
+  assert.equal(world.hash(), after, 'the accumulator and trunk release replay from frame zero');
 });

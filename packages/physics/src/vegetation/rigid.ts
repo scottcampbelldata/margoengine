@@ -115,7 +115,8 @@ export class PlantRigidSolver extends RigidSolver implements Solver<PlantRigidOp
   }
 
   override init(host: SolverHost, options: PlantRigidOptions): void {
-    if (!options.plants.length) throw new RangeError('PlantRigidSolver needs plants in the source solver order.');
+    if (!options || !Array.isArray(options.plants) || options.plants.length === 0)
+      throw new MargoError('state', 'PlantRigidSolver needs a plant list. Pass bindings in the source solver order.');
     const all = new Set<PhysicsBody>();
     const bindBody = (body: PhysicsBody, enabled: boolean) => {
       if (
@@ -126,7 +127,8 @@ export class PlantRigidSolver extends RigidSolver implements Solver<PlantRigidOp
         !body.colliders.every((collider) => options.physics.colliderOf(collider.handle) === collider) ||
         all.has(body)
       )
-        throw new RangeError(
+        throw new MargoError(
+          'state',
           'Plant rigid bindings need distinct enabled fixed proxies and disabled dynamic fragments in this world.',
         );
       all.add(body);
@@ -138,12 +140,12 @@ export class PlantRigidSolver extends RigidSolver implements Solver<PlantRigidOp
         plant.root.length !== 3 ||
         !plant.root.every(Number.isFinite)
       )
-        throw new RangeError('A rigid plant proxy needs a finite root and positive height.');
+        throw new MargoError('state', 'A rigid plant proxy needs a finite root and positive height.');
       bindBody(plant.standing, true);
       const fragments = new Map<number, PhysicsBody>();
       for (const { body, baseHeight } of plant.fragments) {
         if (!Number.isFinite(baseHeight) || baseHeight < 0 || baseHeight >= plant.height || fragments.has(baseHeight))
-          throw new RangeError('Rigid plant fragments need distinct base heights below the tip.');
+          throw new MargoError('state', 'Rigid plant fragments need distinct base heights below the tip.');
         bindBody(body, false);
         fragments.set(baseHeight, body);
       }
@@ -235,7 +237,7 @@ export class PlantRigidSolver extends RigidSolver implements Solver<PlantRigidOp
   override exportPorts(tick: number): readonly Port[] {
     return [
       ...super.exportPorts(tick),
-      { field: this.#impulse.name, region: this.#output!, tick, cell: [0, 0, 0] as const },
+      { field: this.#impulse.name, region: this.#output!, tick, cell: this.#host!.cell },
     ];
   }
 

@@ -48,14 +48,16 @@ function run(start: NativePhaseWorkerStart): void {
 const node = (globalThis as { process?: { versions?: { node?: string } } }).process?.versions?.node;
 if (typeof node === 'string') {
   const name = 'node:worker_threads';
-  const { parentPort } = (await import(/* @vite-ignore */ /* webpackIgnore: true */ name)) as {
-    parentPort: {
-      once(event: 'message', listener: (message: NativePhaseWorkerStart) => void): void;
-      postMessage(message: string): void;
-    } | null;
+  type ParentPort = {
+    once(event: 'message', listener: (message: NativePhaseWorkerStart) => void): void;
+    postMessage(message: string): void;
   };
-  parentPort?.once('message', run);
-  parentPort?.postMessage('ready');
+  void (import(/* @vite-ignore */ /* webpackIgnore: true */ name) as Promise<{ parentPort: ParentPort | null }>).then(
+    ({ parentPort }) => {
+      parentPort?.once('message', run);
+      parentPort?.postMessage('ready');
+    },
+  );
 } else {
   const worker = globalThis as unknown as {
     onmessage: (event: MessageEvent<MessagePort>) => void;

@@ -1,8 +1,8 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
-import { canShareMemory, STACK_BYTES } from './world/memory.js';
 import { BASE_RATE, RATE_LEVELS } from './world/solver.js';
 import type {
+  Cell,
   FieldDescriptor,
   Port,
   RateLevel,
@@ -25,7 +25,9 @@ import {
   STATION_WORDS,
   stemModes,
 } from './vegetation/model.js';
+import { PlantSwayPhase, type PlantSwayWorkCounts } from './vegetation/phase.js';
 
+export type { PlantSwayWorkerWork, PlantSwayWorkCounts } from './vegetation/phase.js';
 export { PLANT_IMPULSE_WORDS, PLANT_SWAY_WORDS, type PlantSwayPlant } from './vegetation/model.js';
 export {
   PlantRigidSolver,
@@ -38,6 +40,8 @@ export {
 export interface PlantSwayLoadOptions {
   /** Solver ID and field name prefix. Defaults to 'plant-sway'. */
   readonly id?: string;
+  /** Number of native partitions including the caller. Defaults to one. */
+  readonly threads?: number;
   /** Cancels the kernel load. */
   readonly signal?: AbortSignal;
 }
@@ -45,8 +49,10 @@ export interface PlantSwayLoadOptions {
 export interface PlantSwayOptions {
   /** Rooted plants in port order. */
   readonly plants: readonly PlantSwayPlant[];
-  /** Air or water of the same origin cell. Omit it for free mechanical response in still vacuum. */
+  /** Air or water sampled in its origin cell. Omit it for free mechanical response in still vacuum. */
   readonly flow?: FlowField;
+  /** Side of each world origin cell in metres. Defaults to 4096. */
+  readonly cellSize?: number;
 }
 /** Continuous small-angle pose at a point on a plant above its root. */
 export interface PlantSwaySample {
@@ -58,30 +64,11 @@ export interface PlantSwaySample {
   readonly slope: readonly [number, number];
 }
 
-interface Kernel {
-  vegetation_step(
-    models: number,
-    stations: number,
-    sections: number,
-    samples: number,
-    current: number,
-    work: number,
-    impulses: number,
-    count: number,
-    dt: number,
-    buoyancyGravity: number,
-    tick: number,
-  ): number;
-}
-interface KernelBuilds {
-  readonly plain: WebAssembly.Module;
-  readonly shared?: WebAssembly.Module;
-}
 interface State {
   readonly host: SolverHost;
-  readonly kernel: Kernel;
   readonly count: number;
   readonly flow: FlowField | undefined;
+  readonly cellSize: number;
   readonly modes: ReturnType<typeof stemModes>;
   readonly settings: Region;
   readonly roots: Region;
@@ -98,72 +85,12 @@ interface State {
 }
 
 const SAMPLE_WORDS = 5;
-const CENTRE = [0, 0, 0] as const;
 const LAYOUT = 1;
 const F64 = Float64Array.BYTES_PER_ELEMENT;
 const PHASE_STEP = 0.34641016151377546; // sqrt(0.12)
 
 function words(memory: WebAssembly.Memory, region: Region): Float64Array {
   return new Float64Array(memory.buffer, region.byteOffset, region.byteLength / F64);
-}
-
-async function loadKernel(signal?: AbortSignal): Promise<KernelBuilds> {
-  signal?.throwIfAborted();
-  const [plain, shared] = await Promise.all([
-    compileKernel(new URL(/* @vite-ignore */ './vegetation-kernel.wasm?no-inline', import.meta.url), signal),
-    canShareMemory()
-      ? compileKernel(new URL(/* @vite-ignore */ './vegetation-kernel-shared.wasm?no-inline', import.meta.url), signal)
-      : undefined,
-  ]);
-  return { plain, shared };
-}
-
-async function compileKernel(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  try {
-    let bytes: BufferSource;
-    if (url.protocol === 'file:') {
-      url.search = '';
-      const fs = 'node:fs/promises';
-      const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ fs);
-      bytes = await readFile(url, { signal });
-    } else {
-      const response = await fetch(url, { signal });
-      if (!response.ok)
-        throw new MargoError(
-          'failed',
-          'Vegetation kernel request failed; serve the vegetation Wasm asset with the app.',
-        );
-      bytes = await response.arrayBuffer();
-    }
-    signal?.throwIfAborted();
-    const module = await WebAssembly.compile(bytes);
-    signal?.throwIfAborted();
-    return module;
-  } catch (cause) {
-    signal?.throwIfAborted();
-    if (cause instanceof MargoError) throw cause;
-    throw Object.assign(
-      new MargoError(
-        'failed',
-        'Vegetation Wasm could not load; use a SIMD-capable runtime and serve the vegetation Wasm asset.',
-      ),
-      { cause },
-    );
-  }
-}
-
-function instantiateKernel(host: SolverHost, builds: KernelBuilds): Kernel {
-  const shared = typeof SharedArrayBuffer !== 'undefined' && host.memory.buffer instanceof SharedArrayBuffer;
-  const module = shared ? builds.shared : builds.plain;
-  if (!module)
-    throw new MargoError('unsupported', 'Shared vegetation Wasm is unavailable. Use plain world memory on this host.');
-  const stack = host.allocate('vegetation-kernel-stack', STACK_BYTES + 8, 'u8', 1);
-  const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
-  const pointer = exports.__stack_pointer;
-  if (!(pointer instanceof WebAssembly.Global))
-    throw new MargoError('failed', 'Vegetation Wasm has no stack pointer. Run the vegetation kernel build.');
-  pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
-  return exports as unknown as Kernel;
 }
 
 function checkFlow(flow: FlowField | undefined): void {
@@ -173,9 +100,12 @@ function checkFlow(flow: FlowField | undefined): void {
     (flow.medium !== 'air' && flow.medium !== 'water') ||
     typeof flow.sample !== 'function' ||
     flow.cell?.length !== 3 ||
-    !Array.from(flow.cell).every(Number.isSafeInteger)
+    !Array.from(flow.cell).every((axis) => Number.isInteger(axis) && axis >= -2147483648 && axis <= 2147483647)
   )
-    throw new TypeError('PlantSway flow is invalid; provide an air or water FlowField in the same origin cell.');
+    throw new MargoError(
+      'state',
+      'PlantSway flow is invalid; provide an air or water FlowField with a signed origin cell.',
+    );
 }
 
 function checkSample(sample: FlowSample): void {
@@ -188,7 +118,7 @@ function checkSample(sample: FlowSample): void {
     !Number.isFinite(sample.density) ||
     sample.density < 0
   )
-    throw new RangeError('PlantSway flow sample is invalid; return finite velocity and nonnegative density.');
+    throw new MargoError('state', 'PlantSway flow sample is invalid; return finite velocity and nonnegative density.');
 }
 
 /**
@@ -202,13 +132,16 @@ export class PlantSway implements Solver<PlantSwayOptions> {
   readonly swayField: FieldDescriptor;
   /** Generalized modal impulse contributions [first x,z, second x,z] in N s, in plant order. */
   readonly impulseField: FieldDescriptor;
-  readonly #builds: KernelBuilds;
+  readonly #phase: PlantSwayPhase;
+  #acceptedWork: PlantSwayWorkCounts;
+  #disposed = false;
   #data: State | undefined;
   #impulse: Region | undefined;
 
-  private constructor(id: string, builds: KernelBuilds) {
+  private constructor(id: string, phase: PlantSwayPhase) {
     this.id = id;
-    this.#builds = builds;
+    this.#phase = phase;
+    this.#acceptedWork = phase.workCounts();
     this.impulseField = Object.freeze({
       name: id + '/impulses',
       kind: 'particleSet',
@@ -227,10 +160,23 @@ export class PlantSway implements Solver<PlantSwayOptions> {
 
   /** Loads the optional vegetation Wasm without mutating a world. */
   static async load(options: PlantSwayLoadOptions = {}): Promise<PlantSway> {
+    if (!options || typeof options !== 'object' || Array.isArray(options))
+      throw new MargoError('state', 'Plant load options must be an object. Pass PlantSwayLoadOptions or omit it.');
     const id = options.id ?? 'plant-sway';
     if (typeof id !== 'string' || id.trim() === '' || id.trim() !== id)
-      throw new RangeError('PlantSway solver ID is invalid; pass a nonempty ID without outer whitespace.');
-    return new PlantSway(id, await loadKernel(options.signal));
+      throw new MargoError('state', 'PlantSway solver ID is invalid; pass a nonempty ID without outer whitespace.');
+    return new PlantSway(id, await PlantSwayPhase.load(options));
+  }
+
+  [Symbol.dispose](): void {
+    this.#disposed = true;
+    this.#phase[Symbol.dispose]();
+  }
+
+  /** Actual native work performed for the last accepted tick. */
+  workCounts(): PlantSwayWorkCounts {
+    const work = this.#acceptedWork;
+    return { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   /** Describes the modal fields and rate derived from the highest dry natural frequency. */
@@ -251,9 +197,21 @@ export class PlantSway implements Solver<PlantSwayOptions> {
 
   /** Allocates the modal matrices, quadrature stations, inputs and output port in the arena. */
   init(host: SolverHost, options: PlantSwayOptions): void {
+    if (this.#disposed) throw new MargoError('disposed', 'PlantSway is disposed. Load a fresh solver to add plants.');
     if (this.#data)
       throw new MargoError('attached', 'PlantSway is already attached; load a fresh solver for a second world.');
+    if (!options || !Array.isArray(options.plants))
+      throw new MargoError(
+        'state',
+        'PlantSway needs an ordered list of plants. Pass a plants array in the world options.',
+      );
     const count = options.plants.length;
+    const cellSize = options.cellSize ?? 4096;
+    if (!(cellSize > 0 && Number.isFinite(cellSize)))
+      throw new MargoError(
+        'state',
+        'Plant origin cells need a finite positive size. Pass the PhysicsWorld cell size in metres.',
+      );
     // Includes owned state, work arrays and both registry mirrors of the two ports.
     const perPlant =
       3 +
@@ -264,14 +222,15 @@ export class PlantSway implements Solver<PlantSwayOptions> {
       4 * PLANT_SWAY_WORDS +
       3 * PLANT_IMPULSE_WORDS;
     if (count === 0 || !Number.isSafeInteger(count) || count * perPlant * F64 > 0xffffffff)
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'PlantSway cannot allocate that many plants; supply a nonempty list that fits the Wasm arena.',
       );
     const flow = options.flow;
     checkFlow(flow);
     const modes = stemModes();
     const prepared = Array.from(options.plants, (plant) => preparePlant(plant, modes, flow?.medium === 'water'));
-    const kernel = instantiateKernel(host, this.#builds);
+    this.#phase.bind(host);
     const allocate = (name: string, length: number) => host.allocate(name, F64 * length, 'f64', LAYOUT);
     const settings = allocate('plant-motion-settings-' + count, 1);
     const roots = allocate('plant-roots', count * 3);
@@ -306,9 +265,9 @@ export class PlantSway implements Solver<PlantSwayOptions> {
     words(host.memory, settings)[0] = level;
     this.#data = {
       host,
-      kernel,
       count,
       flow,
+      cellSize,
       modes,
       settings,
       roots,
@@ -335,7 +294,8 @@ export class PlantSway implements Solver<PlantSwayOptions> {
         source.layout !== LAYOUT ||
         source.byteLength !== data.count * PLANT_IMPULSE_WORDS * F64)
     )
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'Plant impulse layout does not match the plant set; publish four f64 impulse values per plant.',
       );
     this.#impulse = source;
@@ -344,11 +304,12 @@ export class PlantSway implements Solver<PlantSwayOptions> {
   /** Samples the flow at the dyadic clock, then solves mass, stiffness and drag together. */
   step(context: StepContext, dt: number): void {
     const data = this.#state();
-    if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('PlantSway step duration must be finite and positive.');
+    if (!Number.isFinite(dt) || dt <= 0)
+      throw new MargoError('state', 'PlantSway step duration is invalid. Advance with a finite positive world step.');
     const source = this.#impulse;
     this.#impulse = undefined;
     if (data.flow) this.#sample(data, data.flow, context, dt);
-    const status = data.kernel.vegetation_step(
+    const status = this.#phase.apply(
       data.models.byteOffset,
       data.stationGeometry.byteOffset,
       data.sections.byteOffset,
@@ -371,14 +332,22 @@ export class PlantSway implements Solver<PlantSwayOptions> {
         'failed',
         'Plant motion exceeds the numeric range; check flow values, impulses and physical scales.',
       );
+    const work = this.#phase.workCounts();
+    words(data.host.memory, data.sway).set(words(data.host.memory, data.work));
+    this.#acceptedWork = work;
+  }
+
+  /** The current origin of plant roots and their published fields, in signed world cells. */
+  get cell(): Cell {
+    return this.#state().host.cell;
   }
 
   /** Publishes the modal state and receives impulse contributions through the same set ordering. */
   exportPorts(tick: number): readonly Port[] {
     const data = this.#state();
     return [
-      { field: this.swayField.name, region: data.sway, tick, cell: CENTRE },
-      { field: this.impulseField.name, region: data.zeroImpulse, tick, cell: CENTRE },
+      { field: this.swayField.name, region: data.sway, tick, cell: data.host.cell },
+      { field: this.impulseField.name, region: data.zeroImpulse, tick, cell: data.host.cell },
     ];
   }
 
@@ -408,12 +377,13 @@ export class PlantSway implements Solver<PlantSwayOptions> {
   /** Decomposes a horizontal impulse at height into the two modal impulse pairs. */
   projectImpulse(plant: number, height: number, x: number, z: number): readonly [number, number, number, number] {
     const data = this.#plant(plant);
-    if (!Number.isFinite(x) || !Number.isFinite(z)) throw new RangeError('Plant impulse components must be finite.');
+    if (!Number.isFinite(x) || !Number.isFinite(z))
+      throw new MargoError('state', 'Plant impulse components are invalid. Pass finite X and Z impulses in N s.');
     if (height === 0) return [0, 0, 0, 0];
     const [a, b] = this.#at(data, plant, height);
     const impulse = [a[0] * x, a[0] * z, b[0] * x, b[0] * z] as const;
     if (!impulse.every(Number.isFinite))
-      throw new RangeError('Plant modal impulse exceeds the numeric range. Reduce the impulse magnitude.');
+      throw new MargoError('state', 'Plant modal impulse exceeds the numeric range. Reduce the impulse magnitude.');
     return impulse;
   }
 
@@ -433,6 +403,7 @@ export class PlantSway implements Solver<PlantSwayOptions> {
   }
 
   #state(): State {
+    if (this.#disposed) throw new MargoError('disposed', 'PlantSway is disposed. Load a fresh solver to add plants.');
     if (!this.#data) throw new MargoError('state', 'PlantSway has no plants; add it to a PhysicsWorld first.');
     return this.#data;
   }
@@ -440,24 +411,27 @@ export class PlantSway implements Solver<PlantSwayOptions> {
   #plant(index: number): State {
     const data = this.#state();
     if (!Number.isSafeInteger(index) || index < 0 || index >= data.count)
-      throw new RangeError('Plant index is outside the list; use an index passed into the world.');
+      throw new MargoError('state', 'Plant index is outside the list; use an index passed into the world.');
     return data;
   }
 
   #at(data: State, plant: number, height: number) {
     const h = words(data.host.memory, data.models)[plant * MODEL_WORDS + 9]!;
     if (!Number.isFinite(height) || height < 0 || height > h)
-      throw new RangeError('Plant sample height is outside the stem; use a height from zero to its tip.');
+      throw new MargoError('state', 'Plant sample height is outside the stem; use a height from zero to its tip.');
     return modeValues(data.modes, height / h);
   }
 
   #sample(data: State, flow: FlowField, context: StepContext, dt: number): void {
-    if (flow.cell.some((cell, axis) => cell !== context.cell[axis]))
-      throw new MargoError('state', 'PlantSway and its flow use different origins; supply a co-located FlowField.');
+    checkFlow(flow);
+    const flowCell = flow.cell;
+    const offset = [0, 1, 2].map((axis) => (context.cell[axis]! - flowCell[axis]!) * data.cellSize);
     const out: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
     const start = context.tick * dt;
     const middle = start + 0.5 * dt;
     const end = start + dt;
+    if (![start, middle, end].every(Number.isFinite))
+      throw new MargoError('state', 'Plant flow sample time exceeds finite seconds. Advance at the world clock rate.');
     const buffer = data.sampleScratch;
     buffer.fill(0);
     for (let i = 0; i < data.count; i++) {
@@ -472,11 +446,12 @@ export class PlantSway implements Solver<PlantSwayOptions> {
         if (stations[s + 3] === 0 && stations[s + 4] === 0 && stations[s + 5] === 0) continue;
         const a = stations[s + 1]!;
         const b = stations[s + 2]!;
-        const x = roots[i * 3]! + a * states[t]! + b * states[t + 2]!;
-        const y = roots[i * 3 + 1]! + stations[s]!;
-        const z = roots[i * 3 + 2]! + a * states[t + 1]! + b * states[t + 3]!;
+        const x = roots[i * 3]! + a * states[t]! + b * states[t + 2]! + offset[0]!;
+        const y = roots[i * 3 + 1]! + stations[s]! + offset[1]!;
+        const z = roots[i * 3 + 2]! + a * states[t + 1]! + b * states[t + 3]! + offset[2]!;
         if (![x, y, z].every(Number.isFinite))
-          throw new RangeError(
+          throw new MargoError(
+            'state',
             'Plant flow sample position exceeds the numeric range. Use local roots and finite deflections.',
           );
         const j = (i * STATIONS + n) * SAMPLE_WORDS;
@@ -491,8 +466,15 @@ export class PlantSway implements Solver<PlantSwayOptions> {
         const [ux, , uz] = before.velocity;
         const after = flow.sample(x, y, z, end, out);
         checkSample(after);
-        buffer[j + 2] = (after.velocity[0] - ux) / dt;
-        buffer[j + 3] = (after.velocity[2] - uz) / dt;
+        const ax = (after.velocity[0] - ux) / dt,
+          az = (after.velocity[2] - uz) / dt;
+        if (!Number.isFinite(ax) || !Number.isFinite(az))
+          throw new MargoError(
+            'state',
+            'Plant flow acceleration exceeds finite SI units. Return physically scaled flow velocities.',
+          );
+        buffer[j + 2] = ax;
+        buffer[j + 3] = az;
       }
     }
     words(data.host.memory, data.samples).set(buffer);

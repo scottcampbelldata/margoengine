@@ -41,6 +41,7 @@
     "test:gpu:orbit-threads": "cd ../.. && node packages/physics/tests/orbit-threads.browser.mjs",
     "test:gpu:sediment-surface": "cd ../.. && node packages/physics/tests/sediment-surface.browser.mjs && node packages/physics/tests/sediment-surface.browser.mjs --compat",
     "test:gpu:sediment-threads": "cd ../.. && node packages/physics/tests/sediment-threads.browser.mjs",
+    "test:gpu:vegetation-threads": "cd ../.. && node packages/physics/tests/vegetation-threads.browser.mjs",
     "test:gpu:swim-threads": "cd ../.. && node packages/physics/tests/swim-threads.browser.mjs",
     "test:gpu:airborne-threads": "cd ../.. && node packages/physics/tests/airborne-threads.browser.mjs",
     "test:gpu:cloud-projection-threads": "cd ../.. && node packages/physics/tests/cloud-projection-threads.browser.mjs",

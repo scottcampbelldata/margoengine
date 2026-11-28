@@ -42,10 +42,13 @@ export class PlantSway implements Solver<PlantSwayOptions> {
     readonly impulseField: FieldDescriptor;
     private constructor();
     static load(options?: PlantSwayLoadOptions): Promise<PlantSway>;
+    [Symbol.dispose](): void;
+    workCounts(): PlantSwayWorkCounts;
     describe(): SolverDescription;
     init(host: SolverHost, options: PlantSwayOptions): void;
     importPorts(_tick: number): void;
     step(context: StepContext, dt: number): void;
+    get cell(): Cell;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
@@ -57,12 +60,14 @@ export class PlantSway implements Solver<PlantSwayOptions> {
 
 export interface PlantSwayLoadOptions {
     readonly id?: string;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
 export interface PlantSwayOptions {
     readonly plants: readonly PlantSwayPlant[];
     readonly flow?: FlowField;
+    readonly cellSize?: number;
 }
 
 export interface PlantSwayPlant {
@@ -93,6 +98,18 @@ export interface PlantSwaySample {
     readonly displacement: readonly [number, number];
     readonly velocity: readonly [number, number];
     readonly slope: readonly [number, number];
+}
+
+export interface PlantSwayWorkCounts extends PlantSwayWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly PlantSwayWorkerWork[];
+}
+
+export interface PlantSwayWorkerWork {
+    readonly plants: number;
+    readonly integratedPlants: number;
+    readonly midpointSubsteps: number;
+    readonly simdModePairs: number;
 }
 
 // Not exported from this entry, but used by the exports above:

@@ -336,7 +336,7 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 import { BoundaryLayerWind } from '@margoengine/weather/boundary-layer';
 
 const breeze = new BoundaryLayerWind({ speed: 6, roughness: 0.03, turbulence: false });
-const sway = await PlantSway.load();
+using sway = await PlantSway.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(sway, {
   flow: breeze,
   plants: [{ root: [0, 0, 0], height: 1.5, baseDiameter: 0.035,
@@ -344,10 +344,11 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(sway, {
 });
 world.advance(60);
 const tip = sway.sample(0, 1.5);
-console.log(tip.displacement, sway.dryFrequencies(0));
+console.log(tip.displacement, sway.dryFrequencies(0), sway.workCounts());
 ```
 
-Each root is a position in the solver's origin cell, and the stem starts along +Y. A plant without a crown is all stem.
+Each root is a position in `sway.cell`, and the stem starts along +Y. `cellSize` defaults to 4096 m.
+Pass your world's cell size when a flow field and the plants use different origins. A plant without a crown is all stem.
 With no flow, the model reproduces free mechanical response. The tip diameter defaults to the base diameter,
 `hollowRatio` to zero, and the stem drag coefficient to one. The added-mass coefficient defaults to one in water and
 zero in air. Initial motion and internal damping default to zero. A crown can add distributed mass and projected drag
@@ -366,7 +367,7 @@ fragments use the monitored section heights `height * index / 8` for index 1–7
 and colliders extending along local +Y. Both bodies must exist before the world starts. If a fragment matches the
 failure height, it takes the failed stem segment's orientation and velocity and the standing proxy is disabled.
 Use `world.couple([rigid.id, sway.id], 'staggered')` to send that step's rigid contact load to the plant, then take
-the first coupled snapshot after stepping at least once. The rigid solver and plant need the same origin.
+a snapshot whenever needed, including at frame zero. The rigid solver and plant use the same origin.
 
 ```ts
 import { Physics, type ColliderOptions } from '@margoengine/physics';
@@ -375,7 +376,7 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 
 await Physics.load();
 const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
-const sway = await PlantSway.load();
+using sway = await PlantSway.load();
 const plant = { root: [0, 0, 0] as const, height: 1.6, baseDiameter: 0.08,
   density: 700, youngModulus: 1.2e8, anchorMoment: 0.5 };
 const colliders: ColliderOptions = { shape: 'box', halfExtents: [0.04, 0.8, 0.04], offset: [0, 0.8, 0] };
@@ -395,6 +396,11 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] }
 world.advance(20);
 console.log(trunk.enabled, trunk.position);
 ```
+
+`PlantSway.load({ threads: 4 })` integrates the same modal system in four native partitions in a shared world.
+Use an isolated world Worker for browser threading. The default is one. Read `workCounts()` for the last accepted
+tick's standing plants, midpoint substeps and SIMD mode work. Positions and fields use the host's signed cell.
+A rejected native calculation keeps the last accepted poses. Dispose the sway solver when finished.
 
 ## A car in nine lines
 

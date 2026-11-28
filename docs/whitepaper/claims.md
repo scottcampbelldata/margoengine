@@ -6930,3 +6930,11 @@ The native worker fixtures verify exact acceptance and far-origin rewind and cou
 absolute residual. `environment/tests/swim-sediment.browser.mjs` draws the accepted fin stroke and the downstream
 sand. Both renderers reproduce a settled bed with zero net volume change. The independent trout comparison in
 `life03-swim-measured.mjs` keeps cruise-speed misses open.
+
+### Rooted plant work receipts and live orbital sway (BIO-01)
+
+`bio01-acceptance.test.js` tests distant signed cells and finite velocities with an overflowing acceleration.
+`vegetation-threads.test.js` and `vegetation-threads.browser.mjs` compare accepted state across worker counts
+and count 8,198 SIMD pairs for 4,099 plants. `scatter/test/plant-surge.browser.mjs` verifies the live sea orbital
+input and accepted seagrass pose on both renderers. Tip excursions are 21.74 cm and 1.52 cm at the two depths
+with anchored roots and exact replay. Measured tree and wet-blade validation remain open.

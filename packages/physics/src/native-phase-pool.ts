@@ -17,7 +17,8 @@ type NativePhaseSolver =
   | { readonly subject: 'Boundary-layer wind'; readonly phaseExport: 'boundary_layer_thread_phase' }
   | { readonly subject: 'Cloud projection'; readonly phaseExport: 'cloud_projection_thread_phase' }
   | { readonly subject: 'Airborne'; readonly phaseExport: 'airborne_thread_phase' }
-  | { readonly subject: 'Swimmer'; readonly phaseExport: 'swim_thread_phase' };
+  | { readonly subject: 'Swimmer'; readonly phaseExport: 'swim_thread_phase' }
+  | { readonly subject: 'Plant sway'; readonly phaseExport: 'vegetation_thread_phase' };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 
@@ -64,6 +65,7 @@ const phaseLabel = {
   'Cloud projection': 'matrix',
   Airborne: 'parcel',
   Swimmer: 'hydrodynamic',
+  'Plant sway': 'modal response',
 } as const;
 
 function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {
@@ -92,9 +94,11 @@ function assertThreadEnvironment(subject: NativePhaseSolver['subject']): void {
 }
 
 async function startWorker(): Promise<ThreadWorker> {
-  const url = new URL(/* @vite-ignore */ './solver-phase-thread.js', import.meta.url);
   if (typeof Worker === 'function') {
-    const worker = new Worker(url, { type: 'module' });
+    // The Physics builder exposes this static URL to consumer bundlers.
+    const worker = new Worker(new URL(/* @vite-ignore */ './solver-phase-thread.js', import.meta.url), {
+      type: 'module',
+    });
     // Chromium can defer a nested Worker's startup message while its owner
     // waits. Connect a port during async boot so the later bind can wake it.
     const { port1, port2 } = new MessageChannel();
@@ -129,6 +133,7 @@ async function startWorker(): Promise<ThreadWorker> {
     };
   };
   // The entry is a packaged ES module. Do not inherit eval, test, or REPL flags from its host.
+  const url = new URL(/* @vite-ignore */ './solver-phase-thread.js', import.meta.url);
   const worker = new NodeWorker(url, { execArgv: [] });
   return {
     post: (message) => worker.postMessage(message),
