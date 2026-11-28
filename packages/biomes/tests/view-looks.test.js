@@ -61,3 +61,15 @@ test('regression: the needles and dry-grass grounds are measured litter, not ora
   const [r, , b] = MATERIALS.needles.color.map(linear);
   assert.ok(b / r > 0.36 && b / r < 0.44, `needles blue over red ${b / r}`);
 });
+
+test('firn is a summer snowfield: visible reflectance 0.7, darker and warmer than fresh snow', () => {
+  // Brock, Willis and Sharp 2000 (aged wet snow and firn about 0.5 broadband); Wiscombe and Warren 1980 (the visible
+  // stays higher); Warren and Wiscombe 1980 and Painter et al. 2007 (dust lowers and warms the visible).
+  const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const firn = MATERIALS.firn.color.map(linear),
+    snow = MATERIALS.snow.color.map(linear),
+    luma = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  assert.ok(Math.abs(luma(firn) - 0.68) < 0.02, `firn reflects ${luma(firn)}`);
+  assert.ok(luma(snow) > luma(firn) + 0.15, 'fresh snow is brighter');
+  assert.ok(firn[0] > firn[2], 'dust warms it');
+});

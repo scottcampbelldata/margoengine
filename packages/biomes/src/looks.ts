@@ -67,6 +67,17 @@ export const MATERIALS: Readonly<Record<string, MaterialLook>> = Object.freeze({
   // snow surfaces (Lacroix et al. 2008, Journal of Glaciology 54(187), 753-762,
   // https://doi.org/10.3189/002214308786570863). Until 2026-11-28 the bump was 0.35, about 35 mm.
   snow: { color: [0.95, 0.96, 0.99], detail: 0.1, bump: 0.09, macro: 0.15 },
+  // firn: the old, wet, dusty snow of a summer snowfield, its visible reflectance 0.7 (linear 0.70, 0.68, 0.645, the
+  // dust warming it). Fresh snow reflects about 0.9 and aged wet snow and firn about 0.5 over the whole solar spectrum
+  // (B. W. Brock, I. C. Willis and M. J. Sharp, "Measurement and parameterization of albedo variations at Haut Glacier
+  // d'Arolla, Switzerland", Journal of Glaciology 46(155), 675-688, 2000, https://doi.org/10.3189/172756500781832675);
+  // grain growth darkens mainly the near infrared, so the visible stays higher (W. J. Wiscombe and S. G. Warren, "A
+  // model for the spectral albedo of snow. I: Pure snow", J. Atmos. Sci. 37(12), 2712-2733, 1980,
+  // https://doi.org/10.1175/1520-0469(1980)037<2712:AMFTSA>2.0.CO;2), and mineral dust lowers the visible and tints it
+  // (S. G. Warren and W. J. Wiscombe, part II, the same volume, 2734-2745; T. H. Painter et al., "Impact of disturbed
+  // desert soils on duration of mountain snow cover", Geophysical Research Letters 34, L12502, 2007,
+  // https://doi.org/10.1029/2007GL030284, Colorado's San Juan Mountains). Sun cups make its relief rougher than snow's.
+  firn: { color: [0.854, 0.846, 0.828], detail: 0.16, bump: 0.2, macro: 0.3 },
   tundra: { color: [0.54, 0.5, 0.34], detail: 0.35, bump: 0.3, macro: 0.2 },
   heather: { color: [0.52, 0.36, 0.4], detail: 0.35, bump: 0.3, macro: 0.2 },
   canopy: { color: [0.12, 0.2, 0.08], detail: 0.3, bump: 0.2, macro: 0.4 },

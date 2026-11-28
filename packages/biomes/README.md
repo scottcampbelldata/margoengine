@@ -360,6 +360,26 @@ S. E. Hamran, J. Kohler, S. Roques, F. Rémy and M. Dechambre, "In situ measurem
 laser profiler", Journal of Glaciology 54(187), 753-762, 2008, https://doi.org/10.3189/002214308786570863). A larger
 `bump` in your own table draws rougher snow.
 
+`firn` is a summer snowfield's old, wet, dusty snow: visible reflectance 0.7 against fresh snow's 0.95 (aged wet snow
+and firn reflect about 0.5 over the whole solar spectrum, Brock, Willis and Sharp 2000; grain growth darkens mainly the
+near infrared, Wiscombe and Warren 1980; dust lowers and warms the visible, Warren and Wiscombe 1980, Painter et al.
+2007). It counts as mineral ground, so seasonal tints leave it alone. Lay it where snow lasts into summer: high, on
+gentler slopes and in hollows.
+
+```js
+import { defineBiome } from '@margoengine/biomes';
+
+const tundra = defineBiome({
+  id: 'summit-tundra',
+  climate: { height: [3600, null] },
+  ground: [
+    { material: 'tundra' },
+    { material: 'firn', height: [3750, null], slope: [null, 34], curvature: [null, -0.002], weight: 2 },
+  ],
+});
+console.log(tundra.ground[1].material); // firn
+```
+
 ```js
 import { biomeMaterials } from '@margoengine/biomes/view';
 

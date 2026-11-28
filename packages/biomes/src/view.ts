@@ -83,7 +83,7 @@ export function disturbanceResponse(
 }
 
 /** Ground materials that are bare ground, not plant cover: seasons leave them alone. */
-const MINERAL = ['rock', 'scree', 'gravel', 'sand', 'red-sand', 'mud', 'snow', 'laterite'];
+const MINERAL = ['rock', 'scree', 'gravel', 'sand', 'red-sand', 'mud', 'snow', 'firn', 'laterite'];
 
 /** The plant cover ground materials of biomes with `tint.seasonal`, and the canopy when any biome has it. */
 function seasonalGround(biomes: readonly BiomeDefinition[], materials: readonly string[]): Set<string> {
@@ -503,7 +503,7 @@ export function terrainColorsFor(
   const keys = groundMaterials(world.biomes),
     linear = (key: string) => look(key, materials).color.map(srgbToLinear) as unknown as [number, number, number],
     pick = (want: readonly string[], fallback: string) => keys.find((k) => want.includes(k)) ?? fallback,
-    plants = keys.filter((k) => !['rock', 'scree', 'gravel', 'sand', 'red-sand', 'mud', 'snow'].includes(k));
+    plants = keys.filter((k) => !['rock', 'scree', 'gravel', 'sand', 'red-sand', 'mud', 'snow', 'firn'].includes(k));
   return {
     sand: linear(pick(['sand', 'red-sand', 'mud', 'gravel'], 'sand')),
     meadow: [linear(plants[0] ?? 'grass'), linear(plants[1] ?? plants[0] ?? 'meadow')],
