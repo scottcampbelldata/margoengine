@@ -33,10 +33,13 @@ fn fogBelowLight(down:f32,x:f32)->vec3f {
 // integral is R^3 u / (a^2 sqrt(a^2 + u^2)). The caller ends the path 2 / density from the eye: the haze's light comes
 // from there (airlight weighted by e^(-density t) has its mean at 1 / density).
 ${fireTrackWgsl('fireHaze', (part) => `fog[${part ? 4 : 3}u+2u*i]`)}@fragment fn fogFragment(i:Vertex)->@location(0) vec4f {
- let d=textureLoad(sceneDepth,vec2i(i.position.xy),0);if(d<=0.0){discard;}
- let p=frame.inverse*vec4f(i.uv*vec2f(2,-2)+vec2f(-1,1),d,1);let world=p.xyz/p.w;let offset=world-frame.eye.xyz;
+ let d=textureLoad(sceneDepth,vec2i(i.position.xy),0);let bare=d<=0.0;
+ let p=frame.inverse*vec4f(i.uv*vec2f(2,-2)+vec2f(-1,1),select(d,1e-6,bare),1);let world=p.xyz/p.w;let offset=world-frame.eye.xyz;
+ // Nothing drawn: above the horizon the sky stays; below it the ray meets ground past the scene's end, hazed fully.
+ if(bare&&offset.y>=0.0){discard;}
  let distance=length(offset);var optical=max(0.0,distance-fog[0].y)*fog[0].x*(1.0+max(-world.y,0.0)*fog[0].w);
  if(fog[2].x>0.0){let a=(frame.eye.y-fog[2].y)*fog[2].x;let k=(world.y-frame.eye.y)*fog[2].x;optical=optical*exp(-a)*select((1.0-exp(-k))/k,1.0-0.5*k,abs(k)<1e-3);}
+ if(bare){optical=1e4;}
  if(optical<=0.0){discard;}
  let x=select(optical*optical,optical,fog[0].z>0.5);let opacity=1.0-exp(-x);
  // shortcut: homogeneous distance haze, use volumetric scattering for local weather and light shafts.
@@ -45,7 +48,7 @@ ${fireTrackWgsl('fireHaze', (part) => `fog[${part ? 4 : 3}u+2u*i]`)}@fragment fn
  if(frame.moonColor.w>0.0&&frame.clouds.x>0.0){let under=(overcastLight(1.0)*(${(9 / 7).toFixed(6)}*(1.0+2.0*max(ray.y,0.0))/3.0)+vec3f(0.006,0.01,0.02)*frame.moonColor.w)*(1.0-clamp(frame.sun.w,0.0,1.0));color=mix(color,under,clamp(frame.clouds.x,0.0,1.0));}
  color=color*exp2(frame.settings.y);}
  if(ray.y<0.0){color*=fogBelowLight(-ray.y,x);}
- if(fog[3].w>0.0){color+=fireHaze(frame.eye.xz,mix(frame.eye.xz,world.xz,min(1.0,2.0/max(fog[0].x*distance,1e-6))));}
+ if(fog[3].w>0.0&&!bare){color+=fireHaze(frame.eye.xz,mix(frame.eye.xz,world.xz,min(1.0,2.0/max(fog[0].x*distance,1e-6))));}
  if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=toDisplay(color);}return vec4f(color,opacity);
 }`;
 /**

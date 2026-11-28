@@ -13,7 +13,7 @@ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webg
 engine.stop();
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
-engine.createMesh().setGeometry(box(60000,1,60000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,-25000]);
+const ground=engine.createMesh().setGeometry(box(60000,1,60000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,-25000]);
 const sky=Sky.attach(engine,{hours:10,timeScale:0,fog:{falloff:'exp',start:0,density:0.02}});
 await sky.ready;
 const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
@@ -34,5 +34,14 @@ window.check={async run(decay){
  return {compat:isCompatDevice(device),error:error?.message??null,errors:errors.splice(0),width:post.sceneTexture.width,height:post.sceneTexture.height,
   flat:Array.from(flat),lit:Array.from(lit),camera:{eye,target,fov,aspect:post.sceneTexture.width/post.sceneTexture.height}};
 }};
+// Above the Treeline look round 5: where the scene ends before the horizon, the sky below it showed its own horizon
+// colour, not the fog's (a flat band under the far ranges). Nothing drawn below the horizon now takes the fog to infinity.
+window.check.bare=async(color)=>{
+ device.pushErrorScope('validation');
+ ground.setPosition([0,0,1e6]);sky.options.fog.lightDecay=[0,0,0];sky.options.fog.color=color;await frame();const fogged=await frame();
+ sky.options.fog.color=undefined;sky.options.fog.density=0;await frame();const clear=await frame();
+ const error=await device.popErrorScope();
+ return {error:error?.message??null,errors:errors.splice(0),fogged:Array.from(fogged),clear:Array.from(clear)};
+};
 window.ready=true;
 </script></body></html>

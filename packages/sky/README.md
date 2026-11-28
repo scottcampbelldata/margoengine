@@ -1158,6 +1158,11 @@ const level = fogOpticalDepth(haze, 800, 80, 80);   // a level view at the base:
 console.log(down < level);
 ```
 
+A pixel below the horizon that nothing was drawn on (the scene ends before the horizon, as a terrain does past its
+far plane or its edge) takes the fog at infinity, its colour times the `lightDecay` factor for a hidden ground, so the
+world's end shows as haze, not as the sky's own horizon colour (KB-SKY-BAREBELOW1). The sky above the horizon is the
+sky's.
+
 `lightDecay` (red, green and blue, per unit optical depth, default `[0, 0, 0]`) darkens the haze a ray meets below the
 horizon: it lies deeper in the layer, lit by e^(-k tau) of the light at the eye at a vertical optical depth tau under
 it (the two-stream diffusion mode of an absorbing haze, Meador and Weaver 1980). A ray down at sine d of optical depth x

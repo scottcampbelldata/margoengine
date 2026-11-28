@@ -47,6 +47,9 @@
 // mixes toward the ground after them, so every configuration whose code carries the environment WGSL changed text; no
 // command and no buffer write changed, and only the environment's rows below the horizon draw differently (the deck
 // under clouds, the ground at night).
+// Recorded again with KB-SKY-BAREBELOW1 (2026-11-28, Above the Treeline): a pixel nothing was drawn on below the
+// horizon takes the fog to infinity (the ground past the scene's end, hidden), so fog and fogColour changed text; no
+// command and no buffer write changed, and only those pixels draw differently.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

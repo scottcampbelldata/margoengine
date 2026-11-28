@@ -1,6 +1,9 @@
 // KB-SKY-HAZEBELOW1 on a real GPU (run from the repository root after building packages; MARGO_COMPAT=1 for the WebGL2
 // layer):
 //   node scripts/run-with-timeout.mjs -- node packages/sky/test/fog-below-check.mjs
+// Then the same view with the ground gone and a fog colour of its own (Above the Treeline look round 5, a flat band
+// where the world ended before the horizon): every pixel below the horizon takes the fog's colour, as ground hidden at
+// infinity does, and the sky above it is the sky's.
 // A wide ground 1 km under the eye, hidden fully by thick haze in the sky's colour. Without fog.lightDecay every ground
 // pixel down a column took the horizon's radiance, so a fully hazed far ground drew as one flat colour (the ridge-smoke
 // shot's far ground past the world edge, 2026-11-27). With it each pixel takes that colour times the CPU mirror
@@ -78,6 +81,31 @@ try {
   assert.ok(columnSpread < 2e-3, `the flat haze varies down the middle column: ${columnSpread}`);
   // With it each pixel takes its own ray's share, to the precision of the half-float capture.
   assert.ok(worst < 4e-3, `haze below the horizon off the CPU mirror by ${worst}`);
+  const color = [0.31, 0.45, 0.61],
+    bare = await page.evaluate((c) => window.check.bare(c), color);
+  assert.equal(bare.error, null);
+  assert.deepEqual(bare.errors, []);
+  let below = 0,
+    above = 0,
+    off = 0;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const nx = ((x + 0.5) / width) * 2 - 1,
+        ny = 1 - ((y + 0.5) / height) * 2,
+        ray = norm([0, 1, 2].map((i) => forward[i] + right[i] * nx * t * camera.aspect + up[i] * ny * t)),
+        p = (y * width + x) * 4;
+      if (Math.abs(ray[1]) < 0.01) continue;
+      if (ray[1] < 0) {
+        for (let c = 0; c < 3; c++) off = Math.max(off, Math.abs(bare.fogged[p + c] - color[c]) / color[c]);
+        below++;
+      } else {
+        for (let c = 0; c < 3; c++) assert.ok(Math.abs(bare.fogged[p + c] - bare.clear[p + c]) <= 1e-3 * bare.clear[p + c] + 1e-6, `sky ${x},${y}`);
+        above++;
+      }
+    }
+  console.log(`bare: ${below} pixels below the horizon off the fog colour by ${off.toExponential(2)}, ${above} sky pixels`);
+  assert.ok(below > width * height * 0.2 && above > width * 4, `bare: ${below} below, ${above} above`);
+  assert.ok(off < 4e-3, `nothing drawn below the horizon is not the fog colour (off by ${off})`);
   assert.deepEqual(pageErrors, []);
   console.log('sky fog below the horizon check passed');
 } finally {

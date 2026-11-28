@@ -362,7 +362,8 @@ test('distance fog borrows scene depth, caches resources and rebinds after resiz
   h.frame();
   assert.equal(h.counts.render, before.render + 2);
   const fog = () => h.pipelines.findLast((p) => p.fragment?.entryPoint === 'fogFragment');
-  assert.match(fog().fragment.module.code, /if\(d<=0.0\)\{discard;/);
+  // The sky above the horizon is left alone; a bare pixel below it is fogged to infinity (KB-SKY-BAREBELOW1).
+  assert.match(fog().fragment.module.code, /let bare=d<=0\.0;[^]*if\(bare&&offset\.y>=0\.0\)\{discard;/);
   assert.equal(fog().fragment.targets[0].blend.color.dstFactor, 'one-minus-src-alpha');
   const cached = { ...h.counts };
   for (let i = 0; i < 20; i++) h.frame();
