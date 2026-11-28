@@ -181,7 +181,10 @@ const shader = (hdr: boolean) => `${fullscreen}${displayShader}${lensWGSL}
  let field=lens_field(at.xy/dimensions.y,lens[0],lens[1]);
  if(field.z>0.0){let offset=field.xy*lens[0].z*lens[1].x*vec2f(dimensions.y/dimensions.x,1);
   color=textureSampleLevel(scene,filtering,clamp(uv+offset,vec2f(0),vec2f(1)),0.0);
-  color=vec4f(color.rgb*(1.0-0.08*field.z)+vec3f(max(0.0,-field.x-field.y)*0.08),color.a);
+  // The glint is light the drop adds, so on a transparent canvas it covers by its own luminance (Porter and Duff
+  // 1984); an opaque pixel keeps alpha 1.
+  let glint=max(0.0,-field.x-field.y)*0.08;
+  color=vec4f(color.rgb*(1.0-0.08*field.z)+vec3f(glint),color.a+(1.0-color.a)*min(glint,1.0));
  }
  return vec4f(${hdr ? 'color.rgb' : 'toDisplay(color.rgb)'},color.a);
 }`;

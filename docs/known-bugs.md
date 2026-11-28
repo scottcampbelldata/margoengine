@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
+
+- **Repro:** `packages/post/test/alpha-rim-browser.mjs`, "lens drops over nothing": `LensDrops` alone on a
+  `TransparentCanvas` with an empty scene put light on 1,783 pixels whose coverage was 0.
+- **Cause:** the composite added the glint (up to 0.08 and more where drops overlap) to the premultiplied colour and
+  kept the sampled alpha, 0 where the scene holds nothing. The test's coverage reading missed it too: over a white page
+  added light clips at white and reads as covered.
+- **Fix:** the glint covers by its own luminance, alpha = a + (1 - a) glint (Porter and Duff 1984,
+  https://graphics.pixar.com/library/Compositing/paper.pdf), so an opaque pixel keeps alpha 1 and its colour is
+  unchanged. The test now reads coverage from a grey page. 1,893 pixels covered, none bare, the same on WebGPU and the
+  WebGL2 layer (RTX A6000).
+- **Regression:** that test.
+
 ### Fixed 2026-11-28: a BiomeView meadow drew its grass as sparse tufts on bare ground (KB-BIOMES-SPARSEGRASS1, biomes)
 
 - **Repro (before):** `node packages/biomes/tests/meadow-grass-check.mjs`: a temperate grassland from 0.9 m up, grass

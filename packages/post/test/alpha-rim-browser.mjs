@@ -159,6 +159,19 @@ await postBrowser(
           }
           this.engine = engine;
         },
+        // Raindrops on the lens over an empty canvas (KB-WEATHER-LENSGLINT1): the glint is all the frame holds.
+        async drops() {
+          const engine = await Engine.create(document.querySelector('canvas'), {
+            backend: 'webgpu',
+            camera: { position: [0, 0, 3.2], target: [0, 0, 0] },
+          });
+          engine.stop();
+          TransparentCanvas.attach(engine);
+          await LensDrops.attach(engine, { wetness: 1, radius: 0.06, speed: 0, streaks: 1, time: 0 });
+          engine.render({ delta: 1 / 60 });
+          await engine.gpu.queue.onSubmittedWorkDone();
+          this.engine = engine;
+        },
         // A liquid over nothing (KB-WATER-LIQUIDALPHA1): one ball of liquid before the empty canvas, or two blobs of
         // particles meeting head on so that whitewater flies clear of them.
         async liquid(absorption, spray) {
@@ -265,10 +278,11 @@ await postBrowser(
     const read = async () => {
       await page.evaluate(() => window.t.page('#000'));
       const black = await shot();
-      await page.evaluate(() => window.t.page('#fff'));
-      const white = await shot();
+      // Coverage from a grey page: over a white one, light added without coverage clips at white and reads as covered.
+      await page.evaluate(() => window.t.page('#808080'));
+      const grey = await shot();
       await page.evaluate(() => window.t.dispose());
-      const alpha = (i) => 1 - (white.data[i] - black.data[i]) / 255;
+      const alpha = (i) => 1 - (grey.data[i] - black.data[i]) / 128;
       let covered = 0,
         bare = 0;
       for (let i = 0; i < black.data.length; i += 4) {
@@ -294,6 +308,12 @@ await postBrowser(
     for (const [name, result] of Object.entries({ dense, clear, spray }))
       assert.equal(result.bare, 0, `${name}: ${result.bare} pixels add light and cover nothing`);
     console.log('ok ParticleLiquid over empty pixels covers by what it reflects and absorbs');
+    await page.evaluate(() => window.t.drops());
+    const drops = await read();
+    console.log(`lens drops over nothing: ${JSON.stringify(drops)}`);
+    assert.ok(drops.covered > 100, `lens drops: ${JSON.stringify(drops)}`);
+    assert.equal(drops.bare, 0, `lens drops: ${drops.bare} pixels add light and cover nothing`);
+    console.log('ok LensDrops over empty pixels covers by its glint');
     // Under water the view ends in the water itself, so the water covers the canvas where the scene holds nothing.
     await page.evaluate(() => window.t.under());
     const under = await read();

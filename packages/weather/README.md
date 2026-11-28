@@ -1087,7 +1087,7 @@ desired film frame before rendering.
 
 ## Rain on the lens
 
-`LensDrops.attach(engine, options)` (from `margoengine/weather/lens`, WebGPU or the WebGL2 compatibility layer, needs `@margoengine/post`) refracts drops and downward streaks over the finished picture as a stage of the scene's `PostStack`. A scene that already has a `PostStack` (bloom, water, a camera effect) gets the lens as one more HDR stage, after its last HDR effect; a scene without one gets a stack that goes when the lens does. `lens.dispose()` takes the lens out of the stack. Options: `wetness` (0 to 1, default 0.6), `radius`, `speed`, `distortion`, `streaks`, `seed`, `enabled` and `time`.
+`LensDrops.attach(engine, options)` (from `margoengine/weather/lens`, WebGPU or the WebGL2 compatibility layer, needs `@margoengine/post`) refracts drops and downward streaks over the finished picture as a stage of the scene's `PostStack`. A scene that already has a `PostStack` (bloom, water, a camera effect) gets the lens as one more HDR stage, after its last HDR effect; a scene without one gets a stack that goes when the lens does. `lens.dispose()` takes the lens out of the stack. Options: `wetness` (0 to 1, default 0.6), `radius`, `speed`, `distortion`, `streaks`, `seed`, `enabled` and `time`. On a `TransparentCanvas` a drop's glint over an empty pixel covers it by the light it adds.
 
 ```ts
 import { Engine } from 'margoengine/core';

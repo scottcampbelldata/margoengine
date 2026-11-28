@@ -12007,8 +12007,9 @@ Water's liquid, underwater and caustics composites, post's SurfaceCaustics and w
 on a premultiplied canvas. Evidence: `packages/post/test/alpha-rim-browser.mjs` on WebGPU and the WebGL2 layer (RTX
 A6000); `packages/post/test/straight-display.test.js` scans every package for the pattern. `ParticleLiquid` and
 `Underwater` also write the coverage their medium makes, so empty pixels they fill are not see-through
-(KB-WATER-LIQUIDALPHA1): the same test's liquid and underwater cases. Missing: other GPUs and XR on a transparent
-canvas.
+(KB-WATER-LIQUIDALPHA1): the same test's liquid and underwater cases. `LensDrops` writes the coverage of its glint
+(KB-WEATHER-LENSGLINT1): the same test's lens case, which, like the others, reads coverage from a grey page because
+added light clips on a white one. Missing: other GPUs and XR on a transparent canvas.
 
 
 ### AERO-03 native wing lattice
