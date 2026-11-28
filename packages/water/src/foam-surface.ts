@@ -20,6 +20,7 @@ export interface SeaFoamGridSource {
   copyCoverage(out: Float32Array): void;
 }
 
+/** What `SeaFoamSurface` needs to light a Water surface with accepted foam. */
 export interface SeaFoamSurfaceOptions {
   /** The Water surface on the same engine to light with the accepted foam. */
   readonly surface: Water;

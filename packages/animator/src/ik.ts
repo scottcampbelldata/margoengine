@@ -58,6 +58,11 @@ export function solveTwoBoneIK(
     ankle: root.map((v, i) => v + axis[i] * reach) as [number, number, number],
   };
 }
+/**
+ * The shortest-arc rotation turning direction `from` onto direction `to`, as a unit quaternion `[x, y, z, w]`. The
+ * vectors need not be unit length. Opposite directions turn half a turn about an axis perpendicular to `from`. Throws a
+ * `RangeError` when either vector is (nearly) zero.
+ */
 export function rotationBetween(from: Vec3, to: Vec3): number[] {
   const aLength = Math.hypot(...from),
     bLength = Math.hypot(...to);

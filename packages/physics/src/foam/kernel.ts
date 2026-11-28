@@ -9,6 +9,7 @@ const JOB = 16;
 const CONTROL = 64;
 const WORK_WORDS = 6;
 
+/** Work one participant (the caller or a helper worker) did in the foam transport kernel, counted in the units below. */
 export interface FoamTransportWorkerWork {
   /** X sweep lines visited over all CFL substeps. */
   readonly xLines: number;
@@ -24,9 +25,13 @@ export interface FoamTransportWorkerWork {
   readonly clampPairs: number;
 }
 
+/** Work counts of the foam transport kernel: the totals over every participant, with each participant's own share in `workers`. */
 export interface FoamTransportWorkCounts extends FoamTransportWorkerWork {
+  /** Participants that shared the sweeps, the caller included. */
   readonly threads: number;
+  /** CFL substeps the transported interval was cut into. */
   readonly substeps: number;
+  /** Each participant's counts, the caller first. */
   readonly workers: readonly FoamTransportWorkerWork[];
 }
 

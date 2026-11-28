@@ -12,6 +12,7 @@ const JOB = 16;
 const CONTROL = 80;
 const WORK_WORDS = 6;
 
+/** Work one participant (the caller or a helper worker) did in the entry profile kernel, counted in the units below. */
 export interface EntryProfileWorkerWork {
   /** Raw vertices projected onto the section normal, once per profile on the lead participant. */
   readonly projectedVertices: number;
@@ -27,9 +28,13 @@ export interface EntryProfileWorkerWork {
   readonly fanPairs: number;
 }
 
+/** Work counts of the entry profile kernel: the totals over every participant, with each participant's own share in `workers`. */
 export interface EntryProfileWorkCounts extends EntryProfileWorkerWork {
+  /** Section profiles the kernel has built since its last `resetWork()`. */
   readonly profiles: number;
+  /** Participants that shared the work, the caller included (1, 2 or 4). */
   readonly threads: number;
+  /** Each participant's counts, the caller first. */
   readonly workers: readonly EntryProfileWorkerWork[];
 }
 

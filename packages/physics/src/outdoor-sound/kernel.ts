@@ -10,6 +10,7 @@ const OUTPUT_WORDS = 10;
 const WORK_WORDS = 4;
 const WORD = Float64Array.BYTES_PER_ELEMENT;
 
+/** Work one participant (the caller or a helper worker) did in the outdoor sound kernel, counted in the units below. */
 export interface OutdoorSoundWorkerWork {
   /** Complete acoustic paths integrated by this participant. */
   readonly links: number;
@@ -21,8 +22,11 @@ export interface OutdoorSoundWorkerWork {
   readonly coefficientSets: number;
 }
 
+/** Work counts of the outdoor sound kernel: the totals over every participant, with each participant's own share in `workers`. */
 export interface OutdoorSoundWorkCounts extends OutdoorSoundWorkerWork {
+  /** Participants that shared the links, the caller included. */
   readonly threads: number;
+  /** Each participant's counts, the caller first. */
   readonly workers: readonly OutdoorSoundWorkerWork[];
 }
 

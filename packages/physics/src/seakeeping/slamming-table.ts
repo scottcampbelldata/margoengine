@@ -1,6 +1,7 @@
 import type { SlamStation } from './slamming.js';
 import type { HullMesh } from './wetted.js';
 
+/** Settings of the hull slamming bake. Every option has a default. */
 export interface HullSlammingOptions {
   /** Water density in kg/m³. Default 1025. */
   readonly density?: number;
@@ -10,6 +11,7 @@ export interface HullSlammingOptions {
   readonly levels?: number;
   /** Total native participants, including the caller. Default 1. */
   readonly threads?: 1 | 2 | 4;
+  /** Cancels the bake; it rejects with the signal's reason. */
   readonly signal?: AbortSignal;
 }
 
