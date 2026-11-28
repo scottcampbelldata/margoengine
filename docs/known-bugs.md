@@ -292,6 +292,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   no fog.
 - **Regression:** `packages/weather/tests/air-load.test.js` ("the fires' sight is the sky fog's own 2 / density").
 
+### Open 2026-11-27: the water draws flat grey below its surface in the floating example (KB-WATER-UNDERGREY1, water)
+
+- **Repro:** `examples/floating.html` on WebGPU, camera above the swell: the parts of the floating bodies below the
+  surface and the water around them are one flat grey, with no depth fade, refraction or tint of the body under it.
+- **Cause:** not traced. The floating physics draws nothing there (`LoadSolver` only moves the bodies); the colour is
+  the `Water` surface pass's underwater and transmission look, which belongs to the ocean lane.
+- **For:** the ocean lane (`packages/water`). Noted by the SEA-12 lane, which does not change water rendering.
+
 ### Fixed 2026-11-27: booleans refused a solid holding a triangle with no area (KB-BOOL-FLAT1, mesh-edit)
 
 - **Repro:** `batchBooleanMeshes` on a closed box with one edge split on one side and closed by a triangle whose

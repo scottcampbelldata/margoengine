@@ -5227,9 +5227,9 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
 
 #### Float any body in one call (`floating`)
 
-`floating(physics, bodies, options?)` reads each body's own colliders and returns the `LoadSolver` bodies that float
-it, so buoyancy, drag and the righting moment come from the same shapes as its contacts and its mass. A boat of a box
-hull and a mast rides at its Archimedes draft:
+`await floating(physics, bodies, options?)` reads each body's own colliders and returns the `LoadSolver` bodies that
+float it, so buoyancy, drag and the righting moment come from the same shapes as its contacts and its mass, and the waves
+it makes damp its heave and roll. A boat of a box hull and a mast rides at its Archimedes draft:
 
 ```ts
 import { Physics } from '@margoengine/physics';
@@ -5239,7 +5239,7 @@ import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
 await Physics.load(); const physics = new Physics(null, { fixedTimestep: 1 / 60 });
 const boat = physics.addBody(null, { position: [0, 0.04, 0], colliders: [{ shape: 'box', halfExtents: [1, 0.2, 0.5], density: 400 }, { shape: 'cylinder', radius: 0.05, halfHeight: 0.6, offset: [0, 0.8, 0], density: 400 }] });
 const sea = new SpectralSea({ waves: { frequencies: Float64Array.of(1), directions: Float64Array.of(0), energy: new Float64Array(1), depth: 20, density: 1000 } });
-new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(new LoadSolver(), { sea, bodies: floating(physics, boat) }).advance(600);
+new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(new LoadSolver(), { sea, bodies: await floating(physics, boat, { sea }) }).advance(600);
 console.log(Math.abs(boat.mass / 1000 / 2 - (0.2 - boat.position[1])) < 0.003); physics[Symbol.dispose](); // true: draft = mass / (rho A)
 ```
 
@@ -5258,6 +5258,17 @@ console.log(Math.abs(boat.mass / 1000 / 2 - (0.2 - boat.position[1])) < 0.003); 
   pressure over every box, hull, mesh, cylinder and cone entry, so a wave shorter than the body heaves and pitches it
   (spheres and capsules have no surface tier and stay compact; the sea needs a `pressure`). The colliders are read at
   the call; call `floating` again for a new solver after a collider changes.
+- **Waves it makes (`radiation`):** a moving float makes waves that carry its energy away, so a dropped body's heave and
+  roll die out. Each wet part is panelled at its own shape and the SEA-08 panel method (`bakeHullPanels`, linear
+  potential flow with the free-surface Green function) gives its 6 x 6 added mass and damping at the body's still-water
+  draft, in its attitude at the call; the coupled passive fit (Cummins 1962; Perez and Fossen 2008) becomes the body's
+  `coupledRadiation`. `'fast'` (default): about 80 wet panels and 12 frequencies, a few seconds a body; `'fine'`: about
+  320 panels and 24 frequencies, a minute or two; `'none'`: the shape's deep-water added mass and no waves (and the only
+  tier that takes `addedInertia`). Validated on Kramer et al.'s (2021) measured sphere: the fine tier's damped period is
+  within 0.2 % of the measured 0.76 s and its heave coefficients within 2 % of WAMIT's; the fast tier within 1 % and 6 %
+  (`tests/loads-floating-radiation.test.js`). Pass `sea` so the bake uses the water's density (default 1025 kg/m³), and
+  `gravity` when the world's is not 9.81; `signal` stops a bake. Every body bakes on its own: for many identical crates,
+  float one and give its twins its entries with their own `row` (`{ ...entry, row: twin.row }`).
 - **No energy from the step:** the displaced water is taken at the pose the rigid step makes energy-neutral, (s - 1) /
   (2 s) of the step on for its s substeps, so an undamped float heaves and rolls at constant amplitude at 60 steps a
   second (it grew 20 % a cycle when taken at the step's start, KB-LOADS-HEAVEGAIN1).
@@ -5282,7 +5293,7 @@ await Physics.load(); const physics = new Physics(null, { fixedTimestep: 1 / 60 
 const buoy = physics.addBody(null, { colliders: { shape: 'cylinder', radius: 0.4, halfHeight: 0.5, density: 300 } });
 const sea = new SpectralSea({ waves: { frequencies: Float64Array.of(1), directions: Float64Array.of(0), energy: new Float64Array(1), depth: 20, density: 1000 } });
 const loads = new LoadSolver();
-new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(loads, { sea, bodies: floating(physics, buoy) }).advance(1);
+new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(loads, { sea, bodies: await floating(physics, buoy, { radiation: 'none' }) }).advance(1);
 console.log(loads.bodyLoad(0).wet, loads.debugRender().vertices.length > 0); physics[Symbol.dispose](); // 0.5 true
 ```
 

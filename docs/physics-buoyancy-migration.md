@@ -10,7 +10,8 @@ height a frame late. In Margo the body keeps its own colliders and one call floa
 // three.js: per sphere, per frame, the height read back under its centre and the sphere eased toward it.
 // Margo: the body's own colliders, buoyancy from the displaced volume, drag and the righting moment, every step.
 const loads = new LoadSolver();
-world.add(loads, { sea: seaSurface(ripples), bodies: floating(physics, [ball, crate, boat]) });
+const sea = seaSurface(ripples);
+world.add(loads, { sea, bodies: await floating(physics, [ball, crate, boat], { sea }) });
 ```
 
 - `seaSurface` (`@margoengine/water/sea-state`) turns the `Water`, `FFTOcean` or `Ripples` (`cpu: true`) you draw into

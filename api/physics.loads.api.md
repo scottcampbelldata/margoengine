@@ -28,6 +28,17 @@ export interface EquivalentEllipsoid {
     volume: number;
 }
 
+export const FLOATING_RADIATION_TIERS: {
+    readonly fast: {
+        readonly panels: 80;
+        readonly frequencies: 12;
+    };
+    readonly fine: {
+        readonly panels: 320;
+        readonly frequencies: 24;
+    };
+};
+
 export const FLOATING_SIDES = 64;
 
 export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
@@ -106,6 +117,9 @@ export interface FloatingBody {
         readonly handle: number;
         readonly shape: string;
     }[];
+    readonly mass: number;
+    readonly centerOfMass: readonly [number, number, number];
+    readonly rotation: readonly [number, number, number, number];
 }
 
 export interface FloatingOptions {
@@ -114,7 +128,15 @@ export interface FloatingOptions {
     readonly windage?: number;
     readonly addedInertia?: LoadBody['addedInertia'];
     readonly pressureModel?: LoadBody['pressureModel'];
+    readonly radiation?: FloatingRadiation;
+    readonly sea?: {
+        readonly density?: number;
+    };
+    readonly gravity?: number;
+    readonly signal?: AbortSignal;
 }
+
+export type FloatingRadiation = 'fast' | 'fine' | 'none';
 
 export interface FloatingWorld {
     readonly kernel: {
@@ -758,7 +780,7 @@ export function equivalentEllipsoid(mesh: {
 
 export function finiteQuayPointSource(name: string): FieldDescriptor;
 
-export function floating(physics: FloatingWorld, bodies: FloatingBody | readonly FloatingBody[], options?: FloatingOptions): LoadBody[];
+export function floating(physics: FloatingWorld, bodies: FloatingBody | readonly FloatingBody[], options?: FloatingOptions): Promise<LoadBody[]>;
 
 export function floodBlockageExchange(input: FloodBlockageInput): FloodBlockageExchange;
 

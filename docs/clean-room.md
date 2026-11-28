@@ -19106,3 +19106,26 @@ Written from these papers; no engine's or companion code was read.
   the band, section 5.3.6 on why the two instruments differ.
 - Clamp: two pinned columns half a cell either side of the clamp's edge hold the slope level at the edge (a central
   difference), checked on a finite difference beam, where a column at the edge and one behind it lengthen it by half a cell.
+
+## SEA-12 wave radiation of floating bodies (`floating` `radiation`, 2026-11-27)
+
+Margo's own design from the following public sources; no engine's or library's source was read. The panel method itself
+is SEA-08's (`bakeHullPanels`, its sources listed under SEA-08) and was consumed unchanged.
+
+- M. B. Kramer, J. Andersen, S. Thomas, F. B. Bendixen, H. Bingham, R. Read, N. Holk, E. Ransley, S. Brown, Y.-H. Yu,
+  T. T. Tran, J. Davidson, C. Horvath, C.-E. Janson, K. Nielsen and C. Eskilsson, *Highly accurate experimental heave
+  decay tests with a floating sphere: a public benchmark dataset for model validation of fluid-structure interaction*,
+  Energies 14(2), 269 (2021), https://doi.org/10.3390/en14020269 . Tables 1, 2 and A2 (the sphere, its inertia, the
+  measured period Te0 = 0.76 s and WAMIT's A33, B33 and decay rate) and section 4 (how far the linear and RANS models
+  sit from the measurements); the test reads these numbers only.
+- W. E. Cummins, *The impulse response function and ship motions*, Schiffstechnik 9 (1962) 101-109: the radiation
+  force as infinite-frequency added mass plus a convolution memory.
+- T. Perez and T. I. Fossen, *Time- vs. frequency-domain identification of parametric radiation force models for marine
+  structures at zero speed*, Modeling, Identification and Control 29(1) (2008) 1-19,
+  https://doi.org/10.4173/mic.2008.1.1 : the passive rational fit `coupledRadiationProfile` already makes.
+- J. N. Newman, *Marine Hydrodynamics* (MIT Press, 1977), §6.16-6.18: added mass, damping and the free decay of a
+  floating body; the decay rate B / (2 (m + A)) of the constant-coefficient model the test compares against.
+- T. Moller and B. Trumbore, *Fast, minimum storage ray-triangle intersection*, Journal of Graphics Tools 2(1) (1997)
+  21-28, https://doi.org/10.1080/10867651.1997.10487468 : the ray cast that re-panels a detailed hull as its star.
+- The inscribed polyhedron of a sphere, capsule, cylinder or cone is scaled to the shape's own volume so it floats at
+  the shape's draft (an inscribed polygon of n sides holds (n / 2 pi) sin(2 pi / n) of the circle's area).

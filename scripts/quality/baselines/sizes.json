@@ -15193,6 +15193,12 @@
       "commit": "HEAD",
       "reason": "Four environment EXR ceilings follow KB-EXR-INTEROPID1: the readers take colorInteropID and the ACES container flag (exr-tiled 8,106 to 8,823 B, load 10,860 to 11,576, loaders 11,130 to 11,843, exr-codecs worker 2,557 to 3,314). A correctness fix on the decode path; a lazy split would add a request to every EXR load.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea12-radiation",
+      "reason": "@margoengine/physics/loads 68,905 to 72,069 B gzip (both measured on this tree), ceiling 67,285 to 74,232 B: SEA-12 floating() gives every floating body the damping of the waves it makes by default, panelling each wet part at its own shape (sphere, box, capsule, cylinder, cone, a hull's or mesh's own triangles or the star of a detailed one) and baking it with the SEA-08 panel method into coupled radiation memory. The panel solve itself stays a lazy Wasm import; the bytes are the panel meshes, the draft and band and the turn back into the body's frame. A separate entry would make every floating scene import two entries for the default. Core and Stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16068,7 +16074,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 67285,
+    "@margoengine/physics/loads": 74232,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,

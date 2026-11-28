@@ -14,6 +14,7 @@ export {
   type FloatingWorld,
   FLOATING_SIDES,
 } from './floating.js';
+export { FLOATING_RADIATION_TIERS, type FloatingRadiation } from './floating-radiation.js';
 export * from './free-hull-wake.js';
 export * from './morison.js';
 export * from './prescribed-wake.js';

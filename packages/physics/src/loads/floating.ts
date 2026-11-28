@@ -10,6 +10,16 @@
 // Sensors and disabled colliders displace nothing. Half spaces, height fields and voxel grids, and rounded colliders
 // (border radius above 0), are refused with a coded error naming the fix.
 import { invalidLoad } from './errors.js';
+import {
+  bodyRadiation,
+  boxMesh,
+  capsuleMesh,
+  type FloatingRadiation,
+  type RadiationPart,
+  ownPanelMesh,
+  roundPanelMesh,
+  sphereMesh,
+} from './floating-radiation.js';
 import type { LoadBody } from './solver.js';
 
 type Vec3 = [number, number, number];
@@ -21,6 +31,12 @@ export interface FloatingBody {
   readonly valid: boolean;
   readonly row: number;
   readonly colliders: readonly { readonly handle: number; readonly shape: string }[];
+  /** Mass in kg; with its centre of mass and rotation it sets the still-water draft the radiation is baked at. */
+  readonly mass: number;
+  /** Centre of mass in the body's frame, m. */
+  readonly centerOfMass: readonly [number, number, number];
+  /** Rotation [x, y, z, w]: the attitude the body floats at. */
+  readonly rotation: readonly [number, number, number, number];
 }
 
 /** What {@link floating} reads of the world the bodies are in: a `Physics`. */
@@ -44,6 +60,19 @@ export interface FloatingOptions {
    * capsules stay `'compact'`, which has no surface tier); default `'compact'`, the local water plane.
    */
   readonly pressureModel?: LoadBody['pressureModel'];
+  /**
+   * Wave radiation, the damping a moving float gets from the waves it makes: `'fast'` (default, about 80 wet panels and 12
+   * frequencies a part), `'fine'` (about 320 panels and 24 frequencies) or `'none'` (the shape's deep-water added mass
+   * and no waves). Each wet part is baked by the SEA-08 panel method at the body's still-water draft in its attitude at
+   * the call, and stepped as the LoadSolver's `coupledRadiation`.
+   */
+  readonly radiation?: FloatingRadiation;
+  /** The water the bodies float in, for its density (default 1025 kg/m³): pass the LoadSolver's `sea`. */
+  readonly sea?: { readonly density?: number };
+  /** Gravity for the radiation bake, m/s² (default 9.81); match the world's. */
+  readonly gravity?: number;
+  /** Stops a radiation bake. */
+  readonly signal?: AbortSignal;
 }
 
 /** Sides of the prism or pyramid a cylinder or cone floats as. */
@@ -53,17 +82,18 @@ const NONE = 0xffffffff,
   OFF = 2;
 
 /**
- * The {@link LoadSolver} bodies that float these rigid bodies, from their own colliders:
- * `world.add(new LoadSolver(), {sea, bodies: floating(physics, [boat, crate])})`. Read at the call: a collider changed later
- * floats as it was until `floating` is called again for a new solver.
+ * The {@link LoadSolver} bodies that float these rigid bodies, from their own colliders, with the damping of the waves
+ * they make: `world.add(new LoadSolver(), {sea, bodies: await floating(physics, [boat, crate], {sea})})`. Read at the
+ * call: a collider changed later floats as it was until `floating` is called again for a new solver.
  * @throws MargoError `unsupported` (errors#hydrodynamic-loads) for a body of another world or removed, one with no solid
- *   collider, a half space, height field, voxel grid or open mesh, or a rounded collider.
+ *   collider, a half space, height field, voxel grid or open mesh, or a rounded collider; with radiation, a body too heavy
+ *   to float, or `addedInertia` (radiation brings its own).
  */
-export function floating(
+export async function floating(
   physics: FloatingWorld,
   bodies: FloatingBody | readonly FloatingBody[],
   options: FloatingOptions = {},
-): LoadBody[] {
+): Promise<LoadBody[]> {
   const list = Array.isArray(bodies) ? (bodies as readonly FloatingBody[]) : [bodies as FloatingBody],
     c = physics.kernel.columns,
     own = new Set(physics.getBodies()),
@@ -76,11 +106,20 @@ export function floating(
   };
   if (options.pressureModel !== undefined && options.pressureModel !== 'compact' && options.pressureModel !== 'surface')
     throw invalidLoad("Invalid pressure model; choose 'compact' or 'surface'.");
-  const surface = options.pressureModel === 'surface';
+  const surface = options.pressureModel === 'surface',
+    radiation = options.radiation ?? 'fast';
+  if (radiation !== 'fast' && radiation !== 'fine' && radiation !== 'none')
+    throw invalidLoad("Invalid radiation; choose 'fast', 'fine' or 'none'.");
+  if (radiation !== 'none' && options.addedInertia !== undefined)
+    throw invalidLoad("Radiation brings the water's added inertia; drop addedInertia, or use radiation: 'none'.");
+  const density = options.sea?.density ?? 1025;
+  if (!(density > 0 && Number.isFinite(density))) throw invalidLoad('Use a sea of finite positive density.');
+  const baked: Promise<void>[] = [];
   for (const body of list) {
     if (!body?.valid || !own.has(body))
       throw invalidLoad('floating takes live bodies of this Physics; pass bodies physics.addBody returned.');
-    const before = out.length;
+    const before = out.length,
+      parts: RadiationPart[] = [];
     for (const collider of body.colliders) {
       const row = collider.handle;
       if (c.colliderFlags[row]! & (SENSOR | OFF)) continue;
@@ -91,17 +130,45 @@ export function floating(
         );
       if (c.colliderShape[row] === 5)
         for (let child = c.colliderHull[row]!; child !== NONE; child = c.colliderNext[child]!)
-          part(c, child, body.row, extra, surface, out);
-      else part(c, row, body.row, extra, surface, out);
+          part(c, child, body.row, extra, surface, out, parts);
+      else part(c, row, body.row, extra, surface, out, parts);
     }
     if (out.length === before)
       throw invalidLoad('This body has no solid collider to float; add one, or leave the body out.');
+    if (radiation === 'none') continue;
+    // Read the body now: one moved while another bakes keeps the pose it had at the call.
+    const { mass, centerOfMass, rotation } = body;
+    baked.push(
+      bodyRadiation(
+        parts,
+        mass,
+        centerOfMass,
+        rotation,
+        density,
+        radiation,
+        options.gravity ?? 9.81,
+        options.signal,
+      ).then((profiles) =>
+        profiles.forEach((profile, k) => {
+          if (profile) out[before + k] = { ...out[before + k]!, coupledRadiation: profile };
+        }),
+      ),
+    );
   }
+  await Promise.all(baked);
   return out;
 }
 
 /** One collider row (or compound child) as a load body, its pose in the body's frame. */
-function part(c: Columns, row: number, bodyRow: number, extra: object, surface: boolean, out: LoadBody[]): void {
+function part(
+  c: Columns,
+  row: number,
+  bodyRow: number,
+  extra: object,
+  surface: boolean,
+  out: LoadBody[],
+  parts: RadiationPart[],
+): void {
   const shape = c.colliderShape[row]!,
     a = c.colliderA[row]!,
     b = c.colliderB[row]!,
@@ -120,31 +187,62 @@ function part(c: Columns, row: number, bodyRow: number, extra: object, surface: 
     );
   const turned = q[0] !== 0 || q[1] !== 0 || q[2] !== 0;
   const at = { row: bodyRow, centre, ...(turned && { rotation: q }), ...extra };
+  // The part's panel mesh, made in the collider's frame and set at its pose in the body's.
+  const panel = (make: (edge: number) => { vertices: Float64Array; indices: Uint32Array }) =>
+    parts.push({ mesh: (edge) => place(make(edge), centre, q) });
   switch (shape) {
     case 0:
       out.push({ ...at, shape: { sphere: a } });
+      panel((edge) => sphereMesh(a, edge));
       return;
     case 1:
       out.push({ ...at, shape: { box: [a, b, d] }, ...(surface && { pressureModel: 'surface' as const }) });
+      panel((edge) => boxMesh([a, b, d], edge));
       return;
     case 2:
       // A capsule of radius 0 is a segment: no volume, nothing to float.
-      if (a > 0) out.push({ ...at, shape: { capsule: { radius: a, halfHeight: b } } });
+      if (a > 0) {
+        out.push({ ...at, shape: { capsule: { radius: a, halfHeight: b } } });
+        panel((edge) => capsuleMesh(a, b, edge));
+      }
       return;
     case 3:
-      out.push(meshBody(hullMesh(c, c.colliderHull[row]!), centre, q, bodyRow, extra, surface));
+    case 4: {
+      const entry = meshBody(
+        shape === 3 ? hullMesh(c, c.colliderHull[row]!) : triangleMesh(c, c.colliderHull[row]!),
+        centre,
+        q,
+        bodyRow,
+        extra,
+        surface,
+      );
+      out.push(entry);
+      // The entry's mesh is in the body's frame already; its own triangles are refined to the panel edge.
+      const own = (entry.shape as { mesh: { vertices: Float64Array; indices: Uint32Array } }).mesh;
+      parts.push({ mesh: (edge) => ownPanelMesh(own, edge) });
       return;
-    case 4:
-      out.push(meshBody(triangleMesh(c, c.colliderHull[row]!), centre, q, bodyRow, extra, surface));
-      return;
+    }
     case 6:
     case 7:
       out.push(meshBody(roundMesh(a, b, shape === 7), centre, q, bodyRow, extra, surface));
+      panel((edge) => roundPanelMesh(a, b, shape === 7, edge));
       return;
   }
   throw invalidLoad(
     'This collider has no closed volume to float; give the body a solid collider (box, hull, closed mesh).',
   );
+}
+
+/** A mesh in the collider's frame, set at the collider's pose in the body's frame. */
+function place<M extends { vertices: Float64Array }>(mesh: M, centre: Vec3, q: Quat): M {
+  const v = mesh.vertices;
+  for (let i = 0; i < v.length; i += 3) {
+    const p = rotate(q, v[i]!, v[i + 1]!, v[i + 2]!);
+    v[i] = p[0] + centre[0];
+    v[i + 1] = p[1] + centre[1];
+    v[i + 2] = p[2] + centre[2];
+  }
+  return mesh;
 }
 
 /** A mesh in the collider's frame, placed in the body's frame (a mesh shape carries its pose in its vertices). */
@@ -156,14 +254,12 @@ function meshBody(
   extra: object,
   surface: boolean,
 ): LoadBody {
-  const v = mesh.vertices;
-  for (let i = 0; i < v.length; i += 3) {
-    const p = rotate(q, v[i]!, v[i + 1]!, v[i + 2]!);
-    v[i] = p[0] + centre[0];
-    v[i + 1] = p[1] + centre[1];
-    v[i + 2] = p[2] + centre[2];
-  }
-  return { row, shape: { mesh }, ...extra, ...(surface && { pressureModel: 'surface' as const }) };
+  return {
+    row,
+    shape: { mesh: place(mesh, centre, q) },
+    ...extra,
+    ...(surface && { pressureModel: 'surface' as const }),
+  };
 }
 
 /** A convex hull's faces, fanned into triangles wound outward (its half-edges run counter-clockwise from outside). */

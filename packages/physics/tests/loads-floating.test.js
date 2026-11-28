@@ -1,4 +1,4 @@
-// One-call floating (SEA-12, parity bar P12): `floating(physics, body)` turns a body's own colliders into LoadSolver
+// One-call floating (SEA-12, parity bar P12): `await floating(physics, body)` turns a body's own colliders into LoadSolver
 // bodies. Every solid collider kind floats at its closed-form Archimedes draft (a box, a sphere, a capsule on its side, a
 // cylinder, a cone, a convex hull, a closed triangle mesh, a compound and a turned collider); an upright cylinder takes
 // the wall-sided metacentric moment; a box heaves and rolls at its natural periods; bodyLoad reports the centre of
@@ -40,13 +40,13 @@ function water(level = () => 0) {
   };
 }
 
-function scene(specs, options = {}, sea = water()) {
+async function scene(specs, options = {}, sea = water()) {
   const physics = new Physics(null, { fixedTimestep: 1 / RATE, gravity: [0, -G, 0] }),
     bodies = specs.map((spec) => physics.addBody(null, spec)),
     loads = new LoadSolver(),
     world = new PhysicsWorld({ rate: { num: RATE, den: 1 }, gravity: [0, -G, 0] })
       .add(new RigidSolver(), { physics })
-      .add(loads, { sea, bodies: floating(physics, bodies, options), level: 2 }) // 240 Hz: 60 Hz times 2^2
+      .add(loads, { sea, bodies: await floating(physics, bodies, { radiation: 'none', ...options }), level: 2 }) // 240 Hz: 60 Hz times 2^2
       .couple(['loads', 'rigid'], 'staggered');
   return { physics, bodies, loads, world };
 }
@@ -54,7 +54,7 @@ function scene(specs, options = {}, sea = water()) {
 const cap = (r, d) => (Math.PI * d * d * (3 * r - d)) / 3;
 const segment = (r, d) => r * r * Math.acos((r - d) / r) - (r - d) * Math.sqrt(2 * r * d - d * d);
 
-test('SEA-12 floating() floats every solid collider kind at its closed-form Archimedes draft', () => {
+test('SEA-12 floating() floats every solid collider kind at its closed-form Archimedes draft', async () => {
   const [hx, hy, hz] = [0.5, 0.25, 0.4];
   const r = 0.3;
   const a = 0.35; // the diamond hull's half diagonal
@@ -103,11 +103,14 @@ test('SEA-12 floating() floats every solid collider kind at its closed-form Arch
     ],
   ];
   for (const [name, collider, y, volume] of cases) {
-    const { physics, loads, world } = scene([{ position: [0, y, 0], colliders: { ...collider, mass: RHO * volume } }]);
+    const { physics, loads, world } = await scene([
+      { position: [0, y, 0], colliders: { ...collider, mass: RHO * volume } },
+    ]);
     world.advance(1);
     const load = loads.bodyLoad(0);
     let submerged = 0;
-    for (let i = 0; i < floating(physics, physics.getBodies()).length; i++) submerged += loads.bodyLoad(i).submerged;
+    for (let i = 0; i < (await floating(physics, physics.getBodies(), { radiation: 'none' })).length; i++)
+      submerged += loads.bodyLoad(i).submerged;
     assert.ok(load.active, name);
     // The rigid port carries the pose in float32: 2^-22 m on these heights, so 1e-5 of the draft.
     close(submerged, volume, 1e-5, `${name} displaced volume`);
@@ -116,8 +119,8 @@ test('SEA-12 floating() floats every solid collider kind at its closed-form Arch
   }
 });
 
-test("SEA-12 floating() with pressureModel 'surface' integrates the water's pressure over boxes and cylinders", () => {
-  const { physics, loads, world } = scene(
+test("SEA-12 floating() with pressureModel 'surface' integrates the water's pressure over boxes and cylinders", async () => {
+  const { physics, loads, world } = await scene(
     [
       { position: [0, 0.25 - 0.2, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.25, 0.4], mass: 160 } },
       { position: [3, 0.4 - 0.3, 0], colliders: { shape: 'cylinder', radius: 0.25, halfHeight: 0.4, mass: 50 } },
@@ -132,11 +135,11 @@ test("SEA-12 floating() with pressureModel 'surface' integrates the water's pres
     close(loads.bodyLoad(i).buoyancy[1], RHO * G * volume, 1e-5, `entry ${i} buoyancy`);
     assert.ok(Math.abs(loads.bodyLoad(i).buoyancy[0]) < 1e-6 * RHO * G * volume);
   });
-  assert.throws(() => floating(physics, physics.getBodies(), { pressureModel: 'panel' }), { code: 'unsupported' });
+  await assert.rejects(floating(physics, physics.getBodies(), { pressureModel: 'panel' }), { code: 'unsupported' });
   physics[Symbol.dispose]();
 });
 
-test('SEA-12 a cylinder floats on its side within the bound its 64-sided section sets', () => {
+test('SEA-12 a cylinder floats on its side within the bound its 64-sided section sets', async () => {
   const r = 0.25,
     h = 0.5;
   const n = FLOATING_SIDES,
@@ -146,7 +149,7 @@ test('SEA-12 a cylinder floats on its side within the bound its 64-sided section
   const deviation = Math.max(R - r, r - R * Math.cos(Math.PI / n));
   for (const d of [0.25, 0.1, 0.4]) {
     const volume = segment(r, d) * 2 * h;
-    const { physics, loads, world } = scene([
+    const { physics, loads, world } = await scene([
       {
         position: [0, r - d, 0],
         colliders: {
@@ -166,7 +169,7 @@ test('SEA-12 a cylinder floats on its side within the bound its 64-sided section
   }
 });
 
-test("SEA-12 an upright cylinder takes the wall-sided righting moment of its waterplane's metacentric height", () => {
+test("SEA-12 an upright cylinder takes the wall-sided righting moment of its waterplane's metacentric height", async () => {
   const r = 0.3,
     hh = 0.5,
     T = 0.4;
@@ -191,7 +194,7 @@ test("SEA-12 an upright cylinder takes the wall-sided righting moment of its wat
     KG = hh, // the solid cylinder's centre of mass is its centre, hh above the keel
     GM = KB + BM - KG;
   for (const heel of [0.002, 0.05]) {
-    const { physics, bodies, loads, world } = scene(
+    const { physics, bodies, loads, world } = await scene(
       [
         {
           position: [0, hh - T, 0],
@@ -218,7 +221,7 @@ test("SEA-12 an upright cylinder takes the wall-sided righting moment of its wat
   }
 });
 
-test('SEA-12 a floating box heaves at 2 pi sqrt(m (1 + C_A) / (rho g A_wp)) and rolls at 2 pi sqrt(I / (m g GM))', () => {
+test('SEA-12 a floating box heaves at 2 pi sqrt(m (1 + C_A) / (rho g A_wp)) and rolls at 2 pi sqrt(I / (m g GM))', async () => {
   const [hx, hy, hz] = [0.6, 0.2, 0.3],
     T = 0.15,
     m = RHO * 4 * hx * hz * T;
@@ -234,7 +237,7 @@ test('SEA-12 a floating box heaves at 2 pi sqrt(m (1 + C_A) / (rho g A_wp)) and 
   // Heave: start 1 cm deep, no drag. The solver's added mass is Lamb's for the box's equivalent ellipsoid, times the wet
   // fraction; at the mean draft it is C_A rho V = C_A m.
   {
-    const { physics, bodies, world } = scene(
+    const { physics, bodies, world } = await scene(
       [{ position: [0, hy - T - 0.01, 0], colliders: { shape: 'box', halfExtents: [hx, hy, hz], mass: m } }],
       { drag: 0, spinDrag: 0 },
     );
@@ -255,7 +258,7 @@ test('SEA-12 a floating box heaves at 2 pi sqrt(m (1 + C_A) / (rho g A_wp)) and 
   // Roll about x: half-beam hz, 0.03 rad, no drag and no rotational added inertia (the default).
   {
     const heel = 0.03;
-    const { physics, bodies, world } = scene(
+    const { physics, bodies, world } = await scene(
       [
         {
           position: [0, hy - T, 0],
@@ -282,7 +285,7 @@ test('SEA-12 a floating box heaves at 2 pi sqrt(m (1 + C_A) / (rho g A_wp)) and 
   }
 });
 
-test('SEA-12 an undamped floating box neither gains nor loses heave or roll amplitude at 60 steps a second (KB-LOADS-HEAVEGAIN1)', () => {
+test('SEA-12 an undamped floating box neither gains nor loses heave or roll amplitude at 60 steps a second (KB-LOADS-HEAVEGAIN1)', async () => {
   // Loads taken at the start of the step fed the motion: the heave amplitude grew 20 % a cycle at 60 steps a second (1.8 %
   // at 240). Taken (s - 1) / (2 s) of the step on, a restoring load is energy-neutral for the rigid step's substeps.
   const [hx, hy, hz] = [1, 0.2, 0.5],
@@ -296,7 +299,10 @@ test('SEA-12 an undamped floating box neither gains nor loses heave or roll ampl
       }),
       world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] })
         .add(new RigidSolver(), { physics })
-        .add(new LoadSolver(), { sea: water(), bodies: floating(physics, body, { drag: 0, spinDrag: 0 }) })
+        .add(new LoadSolver(), {
+          sea: water(),
+          bodies: await floating(physics, body, { drag: 0, spinDrag: 0, radiation: 'none' }),
+        })
         .couple(['loads', 'rigid'], 'staggered');
     const swing = () => (heel ? 2 * Math.atan2(body.rotation[0], body.rotation[3]) : body.position[1] - (hy - 0.16));
     const peaks = [];
@@ -317,11 +323,11 @@ test('SEA-12 an undamped floating box neither gains nor loses heave or roll ampl
   }
 });
 
-test('SEA-12 bodyLoad reports the closed-form centre of buoyancy of a box and of a hull', () => {
+test('SEA-12 bodyLoad reports the closed-form centre of buoyancy of a box and of a hull', async () => {
   const a = 0.35,
     L = 0.6,
     d = 0.21;
-  const { physics, loads, world } = scene([
+  const { physics, loads, world } = await scene([
     { position: [2, 0.25 - 0.1, -1], colliders: { shape: 'box', halfExtents: [0.5, 0.25, 0.4], mass: 1 } },
     {
       position: [-2, a - d, 1],
@@ -345,9 +351,9 @@ test('SEA-12 bodyLoad reports the closed-form centre of buoyancy of a box and of
   physics[Symbol.dispose]();
 });
 
-test('SEA-12 debugRender draws the submerged edges below the water and the waterline on a wave', () => {
+test('SEA-12 debugRender draws the submerged edges below the water and the waterline on a wave', async () => {
   const level = (x) => 0.05 * Math.sin(x);
-  const { physics, loads, world } = scene(
+  const { physics, loads, world } = await scene(
     [
       { position: [0, -0.1, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.25, 0.4], mass: 300 } },
       { position: [3, 0, 0], colliders: { shape: 'sphere', radius: 0.3, mass: 50 } },
@@ -369,7 +375,7 @@ test('SEA-12 debugRender draws the submerged edges below the water and the water
   physics[Symbol.dispose]();
 });
 
-test('SEA-12 a floating scene of every kind replays to the same hash, and after a snapshot', () => {
+test('SEA-12 a floating scene of every kind replays to the same hash, and after a snapshot', async () => {
   const run = () =>
     scene([
       {
@@ -381,8 +387,8 @@ test('SEA-12 a floating scene of every kind replays to the same hash, and after 
       { position: [-1.2, 0.2, 0], colliders: { shape: 'cone', radius: 0.25, halfHeight: 0.3, mass: 12 } },
       { position: [0, 0.2, 1.2], colliders: { shape: 'cylinder', radius: 0.2, halfHeight: 0.3, mass: 25 } },
     ]);
-  const one = run(),
-    two = run();
+  const one = await run(),
+    two = await run();
   one.world.advance(120);
   two.world.advance(120);
   assert.equal(one.world.hash(), two.world.hash());
@@ -396,7 +402,7 @@ test('SEA-12 a floating scene of every kind replays to the same hash, and after 
   two.physics[Symbol.dispose]();
 });
 
-test('SEA-12 floating() refuses what has no closed volume, naming the fix', () => {
+test('SEA-12 floating() refuses what has no closed volume, naming the fix', async () => {
   const physics = new Physics(null, { fixedTimestep: 1 / 60 });
   const ground = physics.addBody(null, {
     type: 'fixed',
@@ -411,12 +417,9 @@ test('SEA-12 floating() refuses what has no closed volume, naming the fix', () =
     [rounded, /rounded collider/],
     [sensor, /no solid collider/],
   ])
-    assert.throws(
-      () => floating(physics, body),
-      (error) => error.code === 'unsupported' && words.test(error.message),
-    );
+    await assert.rejects(floating(physics, body), (error) => error.code === 'unsupported' && words.test(error.message));
   const other = new Physics(null, { fixedTimestep: 1 / 60 });
-  assert.throws(() => floating(physics, other.addBody(null, { colliders: { shape: 'sphere', radius: 1 } })), {
+  await assert.rejects(floating(physics, other.addBody(null, { colliders: { shape: 'sphere', radius: 1 } })), {
     code: 'unsupported',
   });
   const loads = new LoadSolver();

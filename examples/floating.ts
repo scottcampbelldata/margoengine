@@ -189,9 +189,11 @@ try {
     .add(new RigidSolver(), { physics })
     .add(loads, {
       sea,
-      bodies: floating(
+      // Each body also gets the damping of the waves it makes (the fast panel tier, baked here once).
+      bodies: await floating(
         physics,
         bodies.map(({ body }) => body),
+        { sea },
       ),
     })
     .couple(['loads', 'rigid'], 'staggered');
