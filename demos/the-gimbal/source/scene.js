@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { gimbalPose } from './kinematics.js';
+import { gimbalPose } from './mechanism.js';
 import { prepareGimbal } from './model.js';
 
 const canvas=document.querySelector('#scene');

@@ -1,7 +1,7 @@
 import { applyMatrix4, cylinderGeometry, latheGeometry, mergeGeometries } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
-import { assemblyAngles, orbitRadius, teeth } from './kinematics.js';
+import { assemblyAngles, orbitRadius, teeth } from './mechanism.js';
 import { gearOutline } from './profiles.js';
 
 const tau=Math.PI*2;

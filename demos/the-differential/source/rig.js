@@ -3,7 +3,7 @@ import { cylinderGeometry, latheGeometry } from '@margoengine/geometry/primitive
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { toGeometry } from '@margoengine/geometry/utils';
 import { axisAngleToQuaternion } from '@margoengine/math/quat';
-import { sideTeeth, pinionTeeth } from './kinematics.js';
+import { sideTeeth, pinionTeeth } from './mechanism.js';
 
 const tau = Math.PI * 2;
 const Y = [0, 1, 0];

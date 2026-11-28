@@ -1,6 +1,6 @@
 import { createMesh, Material } from '@margoengine/materials';
 import { batch, box, flight, MeshData, mix, origin, studio, tint, trough, turn, upright, waterBucket, world } from './geometry.js';
-import { incline, phaseInTurn, pitch, run, shaftRadius, tau } from './screw.js';
+import { incline, phaseInTurn, pitch, run, shaftRadius, tau } from './mechanism.js';
 
 function bench(add,mats) {
   add(studio(),mats.sweep,'Blue-grey studio cyclorama','floor');

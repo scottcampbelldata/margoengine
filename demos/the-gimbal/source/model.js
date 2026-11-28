@@ -4,7 +4,7 @@ import {
   sphereGeometry, torusGeometry,
 } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
-import { mountAxis } from './kinematics.js';
+import { mountAxis } from './mechanism.js';
 
 const height=.353;
 const vertical=[0,1,0], axial=[0,0,1], crosswise=[1,0,0];

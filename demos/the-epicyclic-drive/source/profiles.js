@@ -1,4 +1,4 @@
-import { moduleSize, pressureAngle } from './kinematics.js';
+import { moduleSize, pressureAngle } from './mechanism.js';
 
 const tau=Math.PI*2;
 const pitchInvolute=Math.tan(pressureAngle)-pressureAngle;

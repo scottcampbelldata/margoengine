@@ -2,7 +2,7 @@ import { Engine } from '@margoengine/core';
 import { worldToScreen } from '@margoengine/math';
 import { Shadows } from '@margoengine/shadows';
 import { buildScrew } from './machine.js';
-import { litersPerTurn,phaseInTurn,phaseRate,pitch,read,tau } from './screw.js';
+import { litersPerTurn,phaseInTurn,phaseRate,pitch,read,tau } from './mechanism.js';
 
 const canvas=document.getElementById('scene');
 const loading=document.getElementById('loading');

@@ -1,7 +1,7 @@
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { cylinderGeometry, latheGeometry } from '@margoengine/geometry/primitives';
 import { applyMatrix4, mergeGeometries } from '@margoengine/geometry/utils';
-import { across, lead, pitch, run, shellRadius, shaftRadius, tau, vertical, wetSection } from './screw.js';
+import { across, lead, pitch, run, shellRadius, shaftRadius, tau, vertical, wetSection } from './mechanism.js';
 
 export const origin = [0,.234,0];
 export const world = ([x,y,z]) => [x*across-y*vertical,origin[1]+x*vertical+y*across,z];

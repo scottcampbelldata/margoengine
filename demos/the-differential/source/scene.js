@@ -1,7 +1,7 @@
 import { Engine } from '@margoengine/core';
 import { EnvironmentLighting } from '@margoengine/environment';
 import { Shadows } from '@margoengine/shadows';
-import { carrierRpm, gearPose, pinionTeeth, speeds } from './kinematics.js';
+import { carrierRpm, gearPose, pinionTeeth, speeds } from './mechanism.js';
 import { makeRig } from './rig.js';
 import { frameDelta } from './clock.js';
 
