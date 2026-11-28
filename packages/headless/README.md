@@ -736,11 +736,11 @@ ground is one stratum, as before. Bounds unchanged. The timber-valley blowup rea
 ground brighter than lit, which one surface under one light cannot be) and shadowTint 0.036 b*: its masks held
 different surfaces.
 
-```js
+```ts
 import { albedoOf, shadowTint } from '@margoengine/headless/look';
 const size = 64,
-  plane = (v) => ({ width: size, height: size, data: new Uint8Array(size * size).fill(v) }),
-  half = (left) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => ((i % size < 32) === left ? 255 : 0)) }),
+  plane = (v: number) => ({ width: size, height: size, data: new Uint8Array(size * size).fill(v) }),
+  half = (left: boolean) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => ((i % size < 32) === left ? 255 : 0)) }),
   frame = { width: size, height: size, data: new Uint8Array(size * size * 4) };
 for (let i = 0; i < size * size; i++) frame.data.set(i % size < 32 ? [214, 180, 130, 255] : [92, 88, 96, 255], i * 4);
 const albedo = albedoOf(frame, { 'albedo-r': plane(180), 'albedo-g': plane(150), 'albedo-b': plane(110) });
@@ -756,10 +756,10 @@ standard error: the pixels' with one frame, and with more the larger of that and
 (Schmeiser 1982), since neighbouring frames see much the same ground; `detail.frames` counts them. A shot asks for this
 with `probePool: {frames, step}` (docs/shots.md), and `checkShot` reads a probe's `precise` and `pool`.
 
-```js
+```ts
 import { groundSample, shadowTint } from '@margoengine/headless/look';
 const size = 32,
-  half = (left) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => ((i % size < 16) === left ? 255 : 0)) }),
+  half = (left: boolean) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => ((i % size < 16) === left ? 255 : 0)) }),
   frame = { width: size, height: size, data: new Uint8Array(size * size * 4).fill(60) },
   // One 8-bit colour, but in the floats the shadow's blue is 0.4 of a code higher: a cooler shadow.
   precise = () => ({ width: size, height: size, data: Float32Array.from({ length: size * size * 3 }, (_, i) => (60 + (i % 3 === 2 ? ((i / 3) % size < 16 ? -0.2 : 0.2) : 0)) / 255) }),
