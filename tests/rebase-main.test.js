@@ -388,3 +388,20 @@ test('a branch whose errors page already matches its entries gets no extra commi
   assert.equal(result.status, 0, result.stderr);
   assert.equal(repo.git('log', '--format=%s').trim(), 'work\nupstream\nbase');
 });
+
+test('a sizes.json ceiling raised without its total gets the total summed, in its own commit (KB-SIZES-TOTAL1)', (t) => {
+  // The work side raises one ceiling and leaves the total as it was, as hand edits did on main; git merges it cleanly.
+  const stale = sizes({ a: 10, b: 20 }).replace('"b": 20', '"b": 25');
+  const repo = repository(t, {
+    'docs/a.md': ['a\n', 'a upstream\n', 'a\n'],
+    [SIZES]: [sizes({ a: 10, b: 20 }), sizes({ a: 10, b: 20 }), stale],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /held a stale total/);
+  const merged = JSON.parse(repo.read(SIZES));
+  assert.deepEqual(merged.items, { a: 10, b: 25 });
+  assert.equal(merged.total, 35);
+  assert.equal(repo.read(SIZES), sizes({ a: 10, b: 25 }), 'only the total line changes');
+  assert.equal(repo.git('log', '-1', '--format=%s').trim(), 'chore: quality baseline totals match their items');
+});

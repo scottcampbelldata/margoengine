@@ -14,10 +14,10 @@
 // untouched for git rebase, which stops for you as before. The pre-push hook is not involved.
 //   npm run rebase:main
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { mergeApiSurfaceRows } from './api-report-scope.mjs';
-import { historyMissing, historyRepeated } from './quality/ratchet.js';
+import { historyMissing, historyRepeated, staleTotal } from './quality/ratchet.js';
 import { conflictMarkers } from './support/conflict-markers.mjs';
 
 const SIZES = 'scripts/quality/baselines/sizes.json';
@@ -285,6 +285,38 @@ function refreshSizesPage() {
   console.log('rebase:main: site/sizes.html was stale for its records; built again and committed');
 }
 
+/**
+ * A quality baseline's `total` must be the sum of its items (tests/integration-json.test.js). A commit that raised a
+ * ceiling by hand in sizes.json without the total, which git merges without a conflict, left main's total stale several
+ * times on 2026-11-27 and 28 (KB-SIZES-TOTAL1). Every stale total is set to its items' sum here, as its own commit; only the
+ * `"total": N` line changes, so the file keeps its layout.
+ */
+function refreshBaselineTotals() {
+  const dir = resolve(root, 'scripts/quality/baselines');
+  if (!existsSync(dir)) return;
+  const fixed = [];
+  for (const name of readdirSync(dir)
+    .filter((file) => file.endsWith('.json'))
+    .sort()) {
+    const file = join(dir, name),
+      text = readFileSync(file, 'utf8');
+    const sum = staleTotal(JSON.parse(text));
+    if (sum === undefined) continue;
+    writeFileSync(file, text.replace(/^([ \t]*"total":[ \t]*)-?\d+/m, `$1${sum}`));
+    fixed.push(`scripts/quality/baselines/${name}`);
+  }
+  if (!fixed.length) return;
+  git(['add', '--', ...fixed]);
+  if (git(['diff', '--cached', '--quiet'], { allowFail: true }).status === 0) return;
+  const commit = commitTree(
+    rev('HEAD'),
+    git(['write-tree']).stdout.trim(),
+    'chore: quality baseline totals match their items\n',
+  );
+  git(['update-ref', '-m', 'rebase:main: baseline totals', 'HEAD', commit]);
+  console.log(`rebase:main: ${fixed.join(', ')} held a stale total; set to the sum of its items and committed`);
+}
+
 function main() {
   root = git(['rev-parse', '--show-toplevel']).stdout.trim();
   if (!rebasing() && !existsSync(ledger())) {
@@ -317,6 +349,7 @@ function main() {
   if (existsSync(ledger())) regenerate();
   refreshErrorsPage();
   refreshSizesPage();
+  refreshBaselineTotals();
   const markers = conflictMarkers(root);
   if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
   // The commits to push must not delete or revert on a mass scale (the ff88a70e7 sync); a failure stops before "push".
