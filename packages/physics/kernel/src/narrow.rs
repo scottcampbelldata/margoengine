@@ -777,6 +777,42 @@ impl World {
         }
     }
 
+    /// Pair `row`'s points found again from the bodies' poses now, within the reach of the `left` seconds still to go in the
+    /// step: a strike piece's (strike.rs). The pair is one `threadable` allows, of two bodies that are dynamic or fixed, and it was
+    /// listed this step, so it meets and is solved; it writes its own row alone, as on a narrow-phase thread. Each new point
+    /// carries what the point it continues had (`store_manifold`), scaled by `ratio`, this piece over the last. A pair found
+    /// apart keeps its row with no points, and its bodies wake next step (`PAIR_WAKES`). A pair whose old points touched or held
+    /// a load is marked `PAIR_STRUCK` for the step's events.
+    pub(crate) fn refresh_pair(&mut self, row: usize, left: f32, ratio: f32) {
+        let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
+        let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
+        let held = self.uu(PAIR_CONTACTS, row) as usize;
+        let touched = (0..held).any(|k| {
+            let at = row * MANIFOLD + k;
+            self.s(CONTACT_SEPARATION, at) <= 0.0 || self.s(CONTACT_NORMAL_IMPULSE, at) > 0.0
+        });
+        if touched {
+            self.set_u(PAIR_FLAGS, row, self.uu(PAIR_FLAGS, row) | PAIR_STRUCK);
+        }
+        let mut manifold = Manifold::new();
+        manifold.held_count = held;
+        for k in 0..held {
+            manifold.held[k] = self.uu(CONTACT_ID, row * MANIFOLD + k);
+        }
+        manifold.feature = self.uu(PAIR_FEATURE, row);
+        let limit = self.contact_limit(a, b, left);
+        self.collide(a, b, limit, &mut manifold);
+        self.set_u(PAIR_FEATURE, row, if manifold.count > 0 { manifold.feature } else { 0 });
+        if manifold.count == 0 {
+            self.drop_pair_contacts(row, body_a, body_b, true);
+            self.set_s(PAIR_REL_ROT_W, row, 0.0);
+        }
+        self.store_manifold(row, body_a, body_b, &manifold, ratio);
+        if self.header().recycle > 0.0 && manifold.count > 0 {
+            self.remember_poses(row, body_a, body_b);
+        }
+    }
+
     /// The pose of body `b` in body `a`'s frame, and the unit quaternion's dot with another, for contact recycling.
     fn relative_pose(&self, a: usize, b: usize) -> (V3, Q) {
         let (qa, qb) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));

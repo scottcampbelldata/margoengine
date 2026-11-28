@@ -105,6 +105,36 @@ test('1,000 bullets at 300 m/s never pass a thin wall, a mesh or a height field 
   console.log(record.join('; '));
 });
 
+test('a spinning bar striking a free plate is knocked sideways as on a step fine enough to find its points again', () => {
+  // KB-PHYS-CCDKNOCK1: bullet 64 of seed 9 alone with the dynamic plate. Contacts found once a step missed the corners it
+  // turned into, so it left at 45 m/s by default; strike pieces cut its island's substeps at the strikes.
+  const knock = (parts) => {
+    const fine = parts > 1 ? { fixedTimestep: 1 / 60 / parts, substeps: 1, adaptiveSubsteps: false } : {};
+    const physics = new Physics(null, { gravity: [0, 0, 0], ...fine }),
+      next = random(9);
+    physics.addBody(null, {
+      type: 'dynamic',
+      position: [10, 0, 0],
+      colliders: { shape: 'box', halfExtents: [0.01, 6, 6], density: 1e7 },
+    });
+    let bar;
+    for (let i = 0; i <= 64; i++) {
+      const options = {
+        position: [next() * 4, next() * 8 - 4, next() * 8 - 4],
+        linearVelocity: [300, 0, 0],
+        angularVelocity: [next() * 50, next() * 50, next() * 50],
+        colliders: { shape: 'box', halfExtents: [0.02, 0.02, 0.06], density: 7800 },
+        ccd: true,
+      };
+      if (i === 64) bar = physics.addBody(null, options);
+    }
+    for (let step = 0; step < 3 * parts; step++) physics.step();
+    return Math.hypot(bar.linearVelocity[1], bar.linearVelocity[2]);
+  };
+  const [ours, fine] = [knock(1), knock(32768)];
+  assert.ok(Math.abs(ours - fine) <= 0.1 * fine, `knocked at ${ours} m/s against ${fine} on a fine step`);
+});
+
 test('ccd stops bullets on a moving kinematic wall and on a free dynamic plate', () => {
   for (const type of ['kinematicVelocity', 'dynamic']) {
     const physics = new Physics(null, { gravity: [0, 0, 0] }),
@@ -129,8 +159,8 @@ test('ccd stops bullets on a moving kinematic wall and on a free dynamic plate',
         }),
       );
     // A bullet fails when it crosses the wall's middle plane inside its face (6 m, plus the bullet's own reach). One that a
-    // rebound sends round the wall's edge crosses the plane outside the face: no tunnel (at seed 9 one is knocked to 39 m/s
-    // sideways and passes the dynamic plate's edge at 8.9 m).
+    // rebound sends round the wall's edge crosses the plane outside the face: no tunnel (at seed 9 rebounds knock bullets
+    // sideways at up to about 70 m/s, and one can pass round the dynamic plate's edge).
     const reach = 6 + Math.hypot(0.02, 0.02, 0.06);
     let plane = wall.position[0],
       was = bodies.map((body) => [...body.position]);

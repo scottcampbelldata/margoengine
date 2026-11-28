@@ -195,7 +195,11 @@ impl World {
             if flags & PAIR_IS_PART != 0 {
                 continue;
             }
-            let mut now = flags & PAIR_OVERLAP != 0;
+            let mut now = flags & (PAIR_OVERLAP | PAIR_STRUCK) != 0;
+            if flags & PAIR_STRUCK != 0 {
+                self.set_u(PAIR_FLAGS, row, flags & !PAIR_STRUCK);
+            }
+            let flags = flags & !PAIR_STRUCK;
             // A mesh pair speaks for its parts.
             let mut part = row as u32;
             while part != NONE {

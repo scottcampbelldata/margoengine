@@ -1001,6 +1001,9 @@ pub const PAIR_WAKES: u32 = 32;
 /// (`collide_pairwise`) found it does not close this substep, so the pass and not the contact solve strikes it when it does.
 /// 32 is a mesh part's own bit (mesh.rs).
 pub const PAIR_STRIKE_LATER: u32 = 64;
+/// Set by a strike piece that found the pair again (strike.rs): the points it replaced touched or held a load, so the step's
+/// events count the pair as touching though its last piece's points are apart (a bullet that struck and left within a step).
+pub const PAIR_STRUCK: u32 = 128;
 
 // Top bits of an event's first word, over the collider's row.
 pub const EVENT_STARTED: u32 = 1 << 31;

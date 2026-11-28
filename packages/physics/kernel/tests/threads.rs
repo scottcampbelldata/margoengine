@@ -171,6 +171,19 @@ fn scene(w: &mut World) {
     }
     w.set_v(POSITION_X, plate as usize, v3(6.0, 0.011, -2.0));
     w.set_v(ANGULAR_X, plate as usize, v3(0.0, 2.0, 0.0));
+    // Two free plates, each struck by spinning bars with continuous collision at 300 m/s: their islands cut their substeps at
+    // the strikes and find their points again (strike.rs, KB-PHYS-CCDKNOCK1).
+    for (k, z) in [-20.0f32, -26.0].into_iter().enumerate() {
+        let target = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(target, SHAPE_BOX, [0.01, 2.0, 2.0], [0.0; 3], IDENTITY, 1e5).unwrap();
+        w.set_v(POSITION_X, target as usize, v3(40.0, 4.0, z));
+        for i in 0..3 {
+            let bar = dynamic(w, SHAPE_BOX, [0.02, 0.02, 0.06], v3(34.0 + i as f32, 3.0 + 0.7 * i as f32, z - 0.5 + 0.4 * i as f32));
+            w.set_u(FLAGS, bar as usize, w.flags(bar as usize) | CCD);
+            w.set_v(LINEAR_X, bar as usize, v3(300.0, 0.0, 0.0));
+            w.set_v(ANGULAR_X, bar as usize, v3(30.0 + 7.0 * k as f32, 11.0 * i as f32, 23.0));
+        }
+    }
 }
 
 #[test]

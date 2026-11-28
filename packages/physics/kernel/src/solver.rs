@@ -328,11 +328,6 @@ impl World {
             if count == 0 {
                 continue;
             }
-            let normal = self.v(PAIR_NORMAL_X, row);
-            let tangent = tangent_of(normal);
-            let other = normal.cross(tangent);
-            self.set_v(PAIR_TANGENT_X, row, tangent);
-            let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
             // Fixed and kinematic bodies take no push anyway, and a body must never be a wall to its floor.
             let (rank_a, rank_b) = (self.s(DOMINANCE, a), self.s(DOMINANCE, b));
             let rule = if self.flags(a) & KIND != DYNAMIC || self.flags(b) & KIND != DYNAMIC {
@@ -345,20 +340,7 @@ impl World {
                 0
             };
             self.set_u(PAIR_FLAGS, row, self.uu(PAIR_FLAGS, row) & !(PAIR_A_RULES | PAIR_B_RULES) | rule);
-            let (body_a, body_b) = self.pair_moving(row, a, b);
-            for k in 0..count {
-                let at = row * MANIFOLD + k;
-                let (arm_a, arm_b) = (rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)), rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
-                self.set_v(CONTACT_ARM_A_X, at, arm_a);
-                self.set_v(CONTACT_ARM_B_X, at, arm_b);
-                let mass = |d: V3| {
-                    let give = body_a.give(d, arm_a) + body_b.give(d, arm_b);
-                    if give > 0.0 { 1.0 / give } else { 0.0 }
-                };
-                self.set_s(CONTACT_NORMAL_MASS, at, mass(normal));
-                self.set_s(CONTACT_TANGENT_MASS, at, mass(tangent));
-                self.set_s(CONTACT_OTHER_MASS, at, mass(other));
-            }
+            self.prepare_rows(row, a, b);
             self.set_s(PAIR_FORCE, row, 0.0);
             self.set_u(PAIR_PATCH_NEXT, row, row as u32);
             self.set_u(PAIR_PATCH_TAIL, row, 1);
@@ -372,6 +354,30 @@ impl World {
         }
         // What a solve called on its own (a test of the warm start, say) works on: the pairs just listed. A step sets its own.
         self.window = self.whole_window();
+    }
+
+    /// Pair `row`'s tangent, and its points' arms and effective masses, from the bodies' poses now: once a step from where it
+    /// begins, and again each time a strike piece finds the pair's points again (strike.rs).
+    pub(crate) fn prepare_rows(&mut self, row: usize, a: usize, b: usize) {
+        let normal = self.v(PAIR_NORMAL_X, row);
+        let tangent = tangent_of(normal);
+        let other = normal.cross(tangent);
+        self.set_v(PAIR_TANGENT_X, row, tangent);
+        let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
+        let (body_a, body_b) = self.pair_moving(row, a, b);
+        for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
+            let at = row * MANIFOLD + k;
+            let (arm_a, arm_b) = (rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)), rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
+            self.set_v(CONTACT_ARM_A_X, at, arm_a);
+            self.set_v(CONTACT_ARM_B_X, at, arm_b);
+            let mass = |d: V3| {
+                let give = body_a.give(d, arm_a) + body_b.give(d, arm_b);
+                if give > 0.0 { 1.0 / give } else { 0.0 }
+            };
+            self.set_s(CONTACT_NORMAL_MASS, at, mass(normal));
+            self.set_s(CONTACT_TANGENT_MASS, at, mass(tangent));
+            self.set_s(CONTACT_OTHER_MASS, at, mass(other));
+        }
     }
 
     /// Whether body `at` has more than one collider.
@@ -582,7 +588,7 @@ impl World {
     }
 
     /// The gaps of pair `row`'s points from where its bodies are now, as `normal_rows` reads them at substep `turn`.
-    fn point_gaps(&self, row: usize, a: usize, b: usize, h: f32, turn: usize) -> [f32; MANIFOLD] {
+    pub(crate) fn point_gaps(&self, row: usize, a: usize, b: usize, h: f32, turn: usize) -> [f32; MANIFOLD] {
         let (center_a, center_b) = (self.pose_center(a), self.pose_center(b));
         let (rotation_a, rotation_b) = (self.pose_rotation(a), self.pose_rotation(b));
         let normal = self.v(PAIR_NORMAL_X, row);
@@ -944,6 +950,10 @@ impl World {
         };
         for i in self.window.pairs.0..self.window.pairs.1 {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
+            // A strike piece that found a listed pair apart leaves it no points (strike.rs).
+            if self.uu(PAIR_CONTACTS, row) == 0 {
+                continue;
+            }
             let (a, b) = self.pair_bodies(row as u32);
             if least > 0 && self.extra_of(a).max(self.extra_of(b)) < least {
                 continue;

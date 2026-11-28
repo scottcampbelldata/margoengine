@@ -125,6 +125,23 @@ impl World {
         }
     }
 
+    /// The thinnest of body `at`'s solid pieces (`thickness`), infinite for a body with none, and the farthest any of them
+    /// reaches from its centre of mass, as the CCD pass reads them.
+    pub(crate) fn thin_and_reach(&self, at: usize) -> (f32, f32) {
+        let (mut thin, mut reach) = (f32::INFINITY, 0.0f32);
+        let mut c = self.uu(FIRST_COLLIDER, at);
+        while c != NONE {
+            if self.uu(COLLIDER_FLAGS, c as usize) & (COLLIDER_SENSOR | COLLIDER_OFF) == 0 {
+                self.each_piece(c as usize, &mut |piece| {
+                    thin = thin.min(self.thickness(piece));
+                    reach = reach.max(self.collider_reach_of(piece));
+                });
+            }
+            c = self.uu(COLLIDER_NEXT, c as usize);
+        }
+        (thin, reach)
+    }
+
     /// How thick a convex piece is: the least distance from its centre to its surface. Zero for a mesh, which is no piece.
     fn thickness(&self, c: usize) -> f32 {
         let size = self.v(COLLIDER_A, c);

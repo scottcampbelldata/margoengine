@@ -783,7 +783,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/headless/tests/look-clean.test.js`, "(KB-SCATTER-FRINGEVEL1)" (80 pixels reached before,
   768 now).
 
-### Open 2026-11-28: a spinning bullet's strike at 300 m/s throws it sideways by a speed that follows the substeps, as substeps reuse the step's contacts (KB-PHYS-CCDKNOCK1, physics kernel, contacts)
+### Fixed 2026-11-28: a spinning bullet's strike at 300 m/s throws it sideways by a speed that follows the substeps, as substeps reuse the step's contacts (KB-PHYS-CCDKNOCK1, physics kernel, contacts)
 
 - **Repro:** `packages/physics/tests/next-ccd.test.js`'s dynamic plate scene, seed 9, bullet 64 alone with the plate (a 4 x 4 x
   12 cm steel box at 300 m/s, spinning at about 30 rad/s, ccd on, no gravity): after the strike it leaves at 45.4 m/s along the
@@ -801,11 +801,38 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   tests/oracle.js) shares the method and the behaviour: at 1/60 s its knock runs 2.8, 11.3, 10.4, 10.5, 14.7, 14.7, 25.4,
   49.7 and 71.9 m/s at 1 to 512 solver iterations, and its fine-step limit is about 91 m/s (91.3 and 91.8 at 1/61,440 and
   1/245,760 s, rebounding at 16 to 17 m/s where the kernel's inelastic point leaves at 2 m/s).
-- **Fix plan:** refresh the manifold of a pair between substeps once one of its bodies has turned past a bound since its
-  points were found (the arc of its reach, a fraction of its thinnest piece), so a tumbling body meets the corners it turns
-  into. A design change in the narrow phase and the solver's per-step pair plan (warm starts, threaded narrow-phase runs of
-  b770cbb14c, events), so a planner first. Bar: the default step within 10 percent of the converged 64 m/s, and the knock
-  settling as substeps rise; tests/joints, stability webs, golden replays and the narrow phase's bit-for-bit thread test held.
+- **Fix plan, tried (planner, 2026-11-28):** finding the points again between substeps is the same as stepping at dt/8 with
+  one substep, and it lands the bar flat: 0.68 m/s at 8 substeps, 57 m/s only at 4,096. The strike is five impacts within
+  3 ms, the first two 24 microseconds apart at up to 3,900 rad/s, all inside 1.5 default substeps, so they must be met in
+  time order; and the default's 45.4 m/s was luck, as bullets 10, 100 and 150 left at 0.28, 4.98 and 0.16 m/s.
+- **Fix (lane P, 2026-11-28):** strike pieces (`kernel/src/strike.rs`, from `solve_island`): an island with a dynamic CCD body
+  cuts each substep at the time its CCD pairs may next touch (conservative advancement: the least gap of their points, at
+  least 2 percent of the thinnest CCD piece, over the normal speed plus each body's spin across the normal times its reach;
+  a ball's spin about its centre and a revolved shape's about its axis do not count), and from the first cut to the step's
+  end every piece finds the island's pairs again (`narrow.rs` `refresh_pair`) and remakes their rows (`solver.rs`
+  `prepare_rows`), each new point carrying what the point it continues held. A pair whose replaced points touched is marked
+  `PAIR_STRUCK` for the step's events. An island that never cuts runs its substeps as before, to the bit. Knock at 8, 16, 32
+  and 64 substeps against the kernel's fine step (1 substep at 1/(60 x 32,768) s): bullet 64 60.9, 62.5, 62.2, 62.2 against
+  63.2 m/s (before 44.3, 24.7, 10.7, 17.6); bullet 10 63.7 against 63.1 (before 0.28); bullet 100 69.9 against 72.5 (4.98);
+  bullet 150 63.1 against 61.3 (0.16). Islands with a joint, coupling or multibody, a kinematic body, or a mesh, compound,
+  filtered or modified pair take no pieces yet: KB-PHYS-CCDKNOCK2.
+- **Regression:** `packages/physics/kernel/tests/strike.rs` (the four bullets within 10 percent of the fine step; bullet 64
+  within 10 percent at 8 to 64 substeps; a CCD cylinder rolling at 30 m/s steps bit for bit as one without CCD, so it takes
+  no piece), `kernel/tests/threads.rs` (two plates struck by spinning CCD bars, the same bits on 1, 2, 4 and 8 threads).
+
+### Open 2026-11-28: a tumbling CCD body in an island with a joint, a kinematic body or a mesh still strikes on the step's points (KB-PHYS-CCDKNOCK2, physics kernel, contacts)
+
+- **Repro:** the KB-PHYS-CCDKNOCK1 scene (`kernel/tests/strike.rs`, bullet 64 of seed 9) with the plate as a two-triangle mesh,
+  as a kinematic body, or with the bar on a joint: `strike_bound` gives such an island no pieces, so it strikes on the step's
+  points, as KB-PHYS-CCDKNOCK1 measured before its fix (not measured again on these variants).
+- **Cause:** strike pieces (`kernel/src/strike.rs`) find a pair's points again on the island's own thread, so they take only
+  pairs that write their own row (`threadable`: no mesh or compound pair, which makes and frees parts, and no filtered pair,
+  which calls out) and no contact modifier; a kinematic body is read at the step's stages, not between them; and a joint,
+  coupling or multibody would need its carried impulses scaled to each piece and its stamps claimed per piece. Those islands
+  run their substeps whole.
+- **Needed to close:** the narrow phase's part pairs found on an island (or the struck pair's parts found again on the world
+  between pieces), kinematic poses read at a piece's time into its substep, and the joints' and multibodies' scaling, each
+  with the same bar as KB-PHYS-CCDKNOCK1 and the threads test held.
 
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
 

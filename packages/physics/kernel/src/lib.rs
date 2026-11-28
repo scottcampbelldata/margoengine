@@ -37,6 +37,7 @@ pub mod smooth;
 pub mod solver;
 pub mod tilt;
 pub mod soup;
+pub mod strike;
 pub mod tree;
 pub mod voxel;
 pub mod world;

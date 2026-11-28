@@ -276,7 +276,11 @@ impl World {
         self.rescale_warm(level, extra);
         let (raw, damping) = (self.header().contact_hertz, self.header().contact_damping);
         let stiffness = soft(if raw * hi > 0.25 { 0.25 / hi } else { raw }, damping, hi);
-        self.run_substeps(hi, count, stiffness, &mut inner, true);
+        // An island where a body with continuous collision may strike cuts its substeps at the times of impact (strike.rs).
+        match self.strike_bound(dt) {
+            Some(bound) => self.run_strikes(dt, hi, count, bound, &mut inner),
+            None => self.run_substeps(hi, count, stiffness, &mut inner, true),
+        }
         self.keep_level(level, extra);
     }
 
@@ -346,80 +350,85 @@ impl World {
     /// read at the pose of the substep's stage (see `Window`), and leaves moving them to `integrate_kinematics`.
     fn run_substeps(&mut self, h: f32, substeps: u32, stiffness: Soft, inner: &mut f64, staged: bool) {
         for substep in 0..substeps {
-            self.window.substep = substep;
-            if staged {
-                self.window.kin = Some(substep);
-            }
-            self.integrate_velocities(h);
-            tick(self, 10, inner);
-            self.hold_multibodies();
-            self.refresh_joints(h, true);
-            let shifts = self.collide_pairwise(h, substep as usize);
-            self.note_approach();
-            self.warm_start();
-            self.warm_start_joints();
-            self.warm_start_couplings();
-            // An island that asks for e extra passes takes the last iterations + e of iterations + most, so it runs as a world of
-            // iterations + e would and the pushing pass stays the last for all. `least` is the fewest extra passes a row's
-            // island must ask for to join a pass.
-            let (passes, most) = (self.header().iterations, self.header().extra_passes);
-            // Only a settling pass teaches the warm start what a joint carries.
-            if passes < 2 {
-                self.solve_joints(h, stiffness, Pass::Settle, 0, 2 - passes);
-            }
-            // Any u32 is a valid count, as on Rapier: the sum saturates instead of wrapping to a few passes.
-            let all = passes.saturating_add(most);
-            // How many relaxing passes follow: as many as pushing ones unless the world sets a count (Rapier's
-            // `num_internal_stabilization_iterations`).
-            let relaxes = match self.header().stabilization {
-                NONE => all.max(1),
-                set => set,
-            };
-            for pass in 1..=all {
-                let least = most.saturating_add(1).saturating_sub(pass);
-                // The couplings go first: each is solved on what the joints' locks let it move (couplings.rs, `Locks`), and the
-                // joints' path solve that follows takes back the rest of its push. A coordinates row reads the joints' own
-                // coordinates and goes after them, as before.
-                self.solve_couplings(h, pass == all, false);
-                self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
-                self.solve_couplings(h, pass == all, true);
-                // With no relaxing pass the last pushing one is the last word, and friction is always solved in it.
-                self.solve_contacts(h, stiffness, true, substep as usize, least, relaxes == 0 && pass == all);
-            }
-            self.spring_multibodies(h);
-            self.clamp_speeds();
-            tick(self, 9, inner);
-            self.integrate_poses(h, substep, substeps);
-            self.shift_poses(&shifts);
-            if staged {
-                self.window.kin = Some(substep + 1);
-            }
-            self.refresh_turned_contacts();
-            self.track_couplings(h);
-            self.fk_multibodies(h);
-            self.tally_drift(h);
-            self.refresh_joints(h, false);
-            tick(self, 10, inner);
-            // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
-            // what it leaves is speed no force gave (a pyramid of 14 rows or more rocks for good). An island with e extra
-            // passes relaxes iterations + e times, at least once, so it still runs as a world of iterations + e would: it takes
-            // the last of them, and `least` is the fewest extra passes that ask for a pass `need` from the end.
-            for pass in 1..=relaxes {
-                let need = relaxes - (pass - 1);
-                // A count the world sets is every island's, with no gate by its extra passes.
-                let least = if need <= 1 || self.header().stabilization != NONE { 0 } else { need.saturating_sub(passes) };
-                self.solve_joints(h, stiffness, Pass::Relax, least, u32::MAX);
-                self.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
-            }
-            self.solve_impacts(substep as usize);
-            self.end_strikes(&shifts);
-            self.project_multibodies();
-            self.clamp_speeds();
-            tick(self, 9, inner);
+            self.run_substep(h, substep, substeps, stiffness, inner, staged);
         }
         if staged {
             self.window.kin = None;
         }
+    }
+
+    /// Substep `substep` of `substeps`, of length `h`: a whole one, or a strike piece of one (strike.rs).
+    pub(crate) fn run_substep(&mut self, h: f32, substep: u32, substeps: u32, stiffness: Soft, inner: &mut f64, staged: bool) {
+        self.window.substep = substep;
+        if staged {
+            self.window.kin = Some(substep);
+        }
+        self.integrate_velocities(h);
+        tick(self, 10, inner);
+        self.hold_multibodies();
+        self.refresh_joints(h, true);
+        let shifts = self.collide_pairwise(h, substep as usize);
+        self.note_approach();
+        self.warm_start();
+        self.warm_start_joints();
+        self.warm_start_couplings();
+        // An island that asks for e extra passes takes the last iterations + e of iterations + most, so it runs as a world of
+        // iterations + e would and the pushing pass stays the last for all. `least` is the fewest extra passes a row's
+        // island must ask for to join a pass.
+        let (passes, most) = (self.header().iterations, self.header().extra_passes);
+        // Only a settling pass teaches the warm start what a joint carries.
+        if passes < 2 {
+            self.solve_joints(h, stiffness, Pass::Settle, 0, 2 - passes);
+        }
+        // Any u32 is a valid count, as on Rapier: the sum saturates instead of wrapping to a few passes.
+        let all = passes.saturating_add(most);
+        // How many relaxing passes follow: as many as pushing ones unless the world sets a count (Rapier's
+        // `num_internal_stabilization_iterations`).
+        let relaxes = match self.header().stabilization {
+            NONE => all.max(1),
+            set => set,
+        };
+        for pass in 1..=all {
+            let least = most.saturating_add(1).saturating_sub(pass);
+            // The couplings go first: each is solved on what the joints' locks let it move (couplings.rs, `Locks`), and the
+            // joints' path solve that follows takes back the rest of its push. A coordinates row reads the joints' own
+            // coordinates and goes after them, as before.
+            self.solve_couplings(h, pass == all, false);
+            self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
+            self.solve_couplings(h, pass == all, true);
+            // With no relaxing pass the last pushing one is the last word, and friction is always solved in it.
+            self.solve_contacts(h, stiffness, true, substep as usize, least, relaxes == 0 && pass == all);
+        }
+        self.spring_multibodies(h);
+        self.clamp_speeds();
+        tick(self, 9, inner);
+        self.integrate_poses(h, substep, substeps);
+        self.shift_poses(&shifts);
+        if staged {
+            self.window.kin = Some(substep + 1);
+        }
+        self.refresh_turned_contacts();
+        self.track_couplings(h);
+        self.fk_multibodies(h);
+        self.tally_drift(h);
+        self.refresh_joints(h, false);
+        tick(self, 10, inner);
+        // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
+        // what it leaves is speed no force gave (a pyramid of 14 rows or more rocks for good). An island with e extra
+        // passes relaxes iterations + e times, at least once, so it still runs as a world of iterations + e would: it takes
+        // the last of them, and `least` is the fewest extra passes that ask for a pass `need` from the end.
+        for pass in 1..=relaxes {
+            let need = relaxes - (pass - 1);
+            // A count the world sets is every island's, with no gate by its extra passes.
+            let least = if need <= 1 || self.header().stabilization != NONE { 0 } else { need.saturating_sub(passes) };
+            self.solve_joints(h, stiffness, Pass::Relax, least, u32::MAX);
+            self.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
+        }
+        self.solve_impacts(substep as usize);
+        self.end_strikes(&shifts);
+        self.project_multibodies();
+        self.clamp_speeds();
+        tick(self, 9, inner);
     }
 
     /// The window on one group of the step's lists: island `group`'s runs of pairs, joints and couplings and its bodies, or, for the
