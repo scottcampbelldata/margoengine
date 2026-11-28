@@ -596,6 +596,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/humans/test/anatomy-defaults.test.js`.
 
 ### Open 2026-11-28: a Character Creator ring finger rests 12.8 degrees past its supination stop (KB-RIG-RINGROLL1, rigging)
+- **Learned 2026-11-28:** the pose sheet's held and played rows read many fingers at exactly the stop (MCP supination
+  -10.0, CMC1 pronation 40.0) because those rows pass through `clampPose`, which pins a value past the stop at the
+  stop; the raw clip (`anatomy: {limits: false}`) reads past it (idle: MCP4 supination -10.5 to -11.6, talk -12.5; CMC1
+  pronation up to 53.7). So the checker is reading true; the cause stays the zero this row names.
 
 - **Repro:** `addPerson` on the Fauld cast's Character Creator old man (`civ_old_man.glb`), then
   `jointAngles(person.body, person.body.rest)`: `l_metacarpophalangeal_4` and `r_` read flexion 2.6, abduction 9.7,
@@ -610,6 +614,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   source for the angle first.
 
 ### Open 2026-11-28: Character Creator thumbs are held up to 22 degrees off the walk clip (KB-RIG-THUMB1, rigging)
+- **Learned 2026-11-28:** the pose sheet's held and played rows read many fingers at exactly the stop (MCP supination
+  -10.0, CMC1 pronation 40.0) because those rows pass through `clampPose`, which pins a value past the stop at the
+  stop; the raw clip (`anatomy: {limits: false}`) reads past it (idle: MCP4 supination -10.5 to -11.6, talk -12.5; CMC1
+  pronation up to 53.7). So the checker is reading true; the cause stays the zero this row names.
 
 - **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `r_carpometacarpal_1` reads
   pronation 54.4 and `l_` 47.6 against a 40 degree stop, and the rest pose already reads abduction 39.1 and rotation
@@ -619,6 +627,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Until then:** `anatomy: {map}` can leave the thumbs out, or `roll` can turn them by hand.
 
 ### Open 2026-11-28: a Character Creator collarbone is held up to 11 degrees off the walk clip (KB-RIG-CLAVICLE1, rigging)
+- **Learned 2026-11-28:** on the old man's raw walk the collarbone reads depression -13.0 to -13.5, protraction up to
+  9.1 and anterior rotation -5.1 to -5.8 from its A pose rest, all three what a rest collarbone raised and drawn back
+  with a 60 degree arm gives. Ludewig et al. 2009 (bone pins, https://pmc.ncbi.nlm.nih.gov/articles/PMC2657311/): from
+  30 to 120 degrees of humeral elevation the clavicle rises 11 to 17 degrees and retracts 23 to 39, and rests at 5.9
+  elevation and 19.2 retraction (Table I); its posterior rotation (31) comes mostly late, as Inman 1944 says. A trial
+  that turned the rest frame by those rates times the rest arm's elevation from the body's down read 3.0 elevation and
+  -8.0 protraction at 45 degrees on the code-built body as meant, but failed `anatomy.test.js` ("one posture gives one
+  skeleton whatever the rest") and the Animator hook test: that body's collarbone does not rise with its arm, so a rig
+  may or may not model the rhythm. Next: take the correction from the rig itself (the rest collarbone's direction in
+  the thorax against Ludewig's resting values), capped by the rhythm, and compose it as one swing so the twist reads 0
+  (two turns in a row read -0.8 anterior rotation at 90 degrees).
 
 - **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `l_sternoclavicular` depression
   -25.9 degrees and `r_` -15.3, against stops of 15 and 13.3. On the fitted body the left collarbone is held at -15,
