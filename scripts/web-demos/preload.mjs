@@ -25,13 +25,44 @@ function chunk(base, files) {
   return same.length === 1 ? same[0] : undefined;
 }
 
+// The two hint forms: the WebGL2 one preloads every chunk in its list (`for(const href of [...])`); the physics one
+// preloads one of two wasm loader chunks, picked by whether the browser validates a SIMD module (`[...][simd?0:1]`).
+const loopList = /for\(const href of (\[[^\]]*\])\)/;
+const pickList = /link\.href=(\[[^\]]*\])\[simd\?0:1\]/;
+
+/** The chunk list in a preload script, and whether it is the one-of-two SIMD pick. */
+function listOf(script) {
+  const loop = loopList.exec(script);
+  if (loop) return { list: loop[1], pick: false };
+  const pick = pickList.exec(script);
+  if (pick) return { list: pick[1], pick: true };
+  throw new Error("webgl2-preload: no chunk list in the script");
+}
+
 /** The chunk names a preload script points at with their build hash taken off: `./assets/errors-DkwPZuAq.js` is `errors`. */
 export function preloadBases(script) {
-  const list = /for\(const href of (\[[^\]]*\])\)/.exec(script);
-  if (!list) throw new Error("webgl2-preload: no chunk list in the script");
-  return JSON.parse(list[1]).map(
+  return JSON.parse(listOf(script).list).map(
     (href) => /^\.\/assets\/(.+)-[A-Za-z0-9_-]{8}\.js$/.exec(href)?.[1] ?? href,
   );
+}
+
+/**
+ * The SIMD pick rewritten 1:1: each entry at its new name, in its place, the rest of the script as it was. Its index
+ * picks by position, so no entry may be dropped or added and no import closure is followed.
+ */
+function rewritePick(script, files) {
+  const { list } = listOf(script),
+    bases = preloadBases(script),
+    found = bases.map((base) => chunk(base, files)),
+    missing = bases.findIndex((_, i) => !found[i]);
+  if (missing >= 0)
+    throw new Error(`webgl2-preload: no single built chunk named ${bases[missing]}`);
+  const text = script.replace(
+    list,
+    JSON.stringify(found.map((file) => `./assets/${file}`)),
+  );
+  const hash = createHash("sha256").update(text).digest("hex").slice(0, 8);
+  return { name: `inline-${hash}.js`, text };
 }
 
 /** The chunks a built chunk's `text` imports statically (`import"./x.js"`, `from"./x.js"`); `import("./x.js")` is not. */
@@ -50,6 +81,7 @@ export function staticImports(text) {
  * none of the names is built.
  */
 export function rewritePreload(script, files, read) {
+  if (listOf(script).pick) return rewritePick(script, files);
   const bases = preloadBases(script),
     found = bases.map((base) => chunk(base, files)),
     missing = bases.filter((_, i) => !found[i]);

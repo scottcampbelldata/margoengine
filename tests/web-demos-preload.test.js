@@ -114,6 +114,33 @@ test("an inline- preload script is rewritten from the static imports of the chun
   );
 });
 
+// Bullet through paper's inline-a958432c.js is the physics hint: it preloads one of two wasm loader chunks, picked by a
+// SIMD check, `[...][simd?0:1]`. preloadBases knew only the WebGL2 `for(const href of` list and the build stopped with
+// "no chunk list in the script". The pick is rewritten 1:1 in place: no closure, still two entries, the rest unchanged.
+test("the SIMD wasm pick is rewritten entry for entry, keeping its own text", () => {
+  const old =
+    '{const simd=WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11]));const link=document.createElement("link");link.rel="modulepreload";link.crossOrigin="anonymous";link.href=["./assets/wasm-BUaQ0k_I-CUxBz20P.js","./assets/wasm-scalar-CYyg2lOO-BNGbuITl.js"][simd?0:1];document.head.append(link);}';
+  assert.deepEqual(preloadBases(old), ["wasm-BUaQ0k_I", "wasm-scalar-CYyg2lOO"]);
+  const files = [
+    "index-AAAAaaaa.js",
+    "wasm-BUaQ0k_I-BBBBbbbb.js",
+    "wasm-scalar-CYyg2lOO-CCCCcccc.js",
+    "wasm-threads-vwFwQvVL-DDDDdddd.js",
+  ];
+  const next = rewritePreload(old, files, () => 'import"./index-AAAAaaaa.js";');
+  assert.equal(
+    next.text,
+    old
+      .replace("wasm-BUaQ0k_I-CUxBz20P", "wasm-BUaQ0k_I-BBBBbbbb")
+      .replace("wasm-scalar-CYyg2lOO-BNGbuITl", "wasm-scalar-CYyg2lOO-CCCCcccc"),
+  );
+  assert.match(`<script src="./assets/${next.name}"></script>`, preloadTag);
+  assert.throws(
+    () => rewritePreload(old, ["wasm-BUaQ0k_I-BBBBbbbb.js"], () => ""),
+    /no single built chunk named wasm-scalar-CYyg2lOO/,
+  );
+});
+
 // The rewrite above dropped readback-Cf9k53gF-DiYXj9wd.js: its inner hash belongs to the prebuilt package and changed
 // with it, so the name with that hash matched nothing although readback-BaGYuNDt-yw5WeuF6.js was built.
 test("a package chunk whose inner hash changed is found by the name before its hashes", () => {
