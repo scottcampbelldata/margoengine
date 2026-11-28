@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { frameView, openBench } from '../dist/bench.js';
+import { Engine, TransformStore } from '@margoengine/core/extension';
+import { box } from '@margoengine/core';
+import { addSubject, frameView, openBench, subjectBox } from '../dist/bench.js';
 
 const canvas = () => ({ getContext() {}, clientWidth: 100, clientHeight: 50, width: 0, height: 0, dataset: {} });
 
@@ -79,4 +81,32 @@ test('frameView frames a wide flat subject by its width on a tall view and rejec
   assert.throws(() => frameView({ fov: 40, position: [0, 0, 0], target: [0, 0, 0] }, { min: [0, 0, 0], max: [1, 1, 1] }), RangeError);
   assert.throws(() => frameView({ fov: 40, position: [0, 5, 0], target: [0, 0, 0] }, { min: [0, 0, 0], max: [1, 1, 1] }), RangeError);
   assert.throws(() => frameView(camera, { min: [0, 0, 0], max: [Infinity, 1, 1] }), RangeError);
+});
+
+test('a mesh added with fit: false stays out of the auto-fit box, so a big floor does not swamp the subject', async () => {
+  using e = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, await TransformStore.create(16), {
+    backend: 'webgl2',
+    add() {},
+    remove() {},
+    render() {},
+    dispose() {},
+  });
+  const floor = e.createMesh().setGeometry(box()).setScale([140, 0.12, 140]),
+    subject = e.createMesh().setGeometry(box()).setPosition([0, 0.5, 0]),
+    subjects = new Set(),
+    removeFloor = addSubject(subjects, floor, false);
+  addSubject(subjects, subject, true);
+  assert.equal(subjects.size, 1, 'the excluded floor is not registered');
+  const found = await subjectBox(subjects);
+  assert.ok(found.max[0] - found.min[0] < 1.5 && found.max[2] - found.min[2] < 1.5, 'the box is the 1 m subject, not the 140 m floor');
+  const camera = { fov: 35, position: [-1.87, 6.02, 7.72], target: [0, 0.16, 0] },
+    framed = frameView(camera, found, 0.8, 1.6),
+    swamped = frameView(camera, (await subjectBox([floor, subject])), 0.8, 1.6);
+  assert.ok(Math.hypot(...framed.position.map((v, a) => v - framed.target[a])) < 8, 'the camera comes in on the subject');
+  assert.ok(Math.hypot(...swamped.position.map((v, a) => v - swamped.target[a])) > 100, 'counting the floor would pull the camera far out');
+  removeFloor();
+  const removeSubject = addSubject(subjects, subject, true);
+  removeSubject();
+  assert.equal(subjects.size, 0, 'a remover takes the mesh out of the set');
+  assert.equal(await subjectBox(subjects), null, 'an empty set has no box');
 });

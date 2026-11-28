@@ -378,6 +378,8 @@ const bench = await openBench(document.querySelector('canvas')!, {orbit: true});
 const product = bench.engine.createMesh().setGeometry(box())
   .setMaterial(new PbrMaterial({color: '#c84f2c', roughness: 0.45})).setPosition([0, 0.5, 0]);
 bench.add(product); // casts into the shadow map and the contact shadow
+// A big floor still casts and receives, but the auto-fit frames the product, not the floor:
+bench.add(bench.engine.createMesh().setGeometry(box()).setScale([140, 0.1, 140]).setPosition([0, -0.05, 0]), {fit: false});
 await bench.ready(); // first frame drawn, data-ready set
 let turn = 0;
 const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5), 0]));
@@ -404,8 +406,8 @@ const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5
 
 `bench.frame(callback)` runs `callback(delta, time)` before every frame until its remover runs; `bench.request()`
 draws one frame on the next animation frame (requests merge); `bench.render()` draws now and resolves when the GPU
-finished; `bench.add(mesh, {shadow, contact, static})` registers a caster with both shadows and makes it part of the
-subject; `bench.fit({fill, bounds})` moves the camera (and the orbit target) along its view direction until every corner
+finished; `bench.add(mesh, {shadow, contact, static, fit})` registers a caster with both shadows and makes it part of the
+subject (`fit: false` keeps a large floor or room shell out of the auto-fit box; the bench's own backdrop never counts, and `bench.fit({bounds})` overrides the box); `bench.fit({fill, bounds})` moves the camera (and the orbit target) along its view direction until every corner
 of the subject's world box sits inside `fill` of each half of the view, a box fit tighter than a bounding sphere, and
 raises `camera.far` when needed (`frameView(camera, box, fill, aspect)` is the same sum on plain numbers); `bench.fail(reason)`
 marks the error and stops frames. A page that keeps its own room passes `backdrop: false`, and one that keeps its own

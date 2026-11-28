@@ -41,6 +41,7 @@ export interface BenchAddOptions {
     shadow?: boolean;
     contact?: boolean;
     static?: boolean;
+    fit?: boolean;
 }
 
 export interface BenchEnvironment {
@@ -104,6 +105,8 @@ export interface FrameViewCamera {
     up?: Vec3;
 }
 
+export function addSubject(subjects: Set<MeshHandle>, mesh: MeshHandle | ContactSource, framed: boolean): () => void;
+
 export function frameView(camera: FrameViewCamera, box: {
     min: Vec3;
     max: Vec3;
@@ -114,6 +117,11 @@ export function frameView(camera: FrameViewCamera, box: {
 };
 
 export function openBench(canvas: HTMLCanvasElement, options?: BenchOptions): Promise<Bench>;
+
+export function subjectBox(meshes: Iterable<MeshHandle>): Promise<{
+    min: Vec3;
+    max: Vec3;
+} | null>;
 
 // Not exported from this entry, but used by the exports above:
 

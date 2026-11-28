@@ -37,6 +37,8 @@ window.check={
   const target=document.querySelector('#fit');
   const framed=await openBench(target,{backend:compat?'webgl2':'auto',pixelRatio:1,onError:e=>errors.push(String(e?.message??e))});
   framed.add(framed.engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#c84f2c',roughness:.45})).setPosition([0,.5,0]));
+  // A 140 m floor that stays out of the fit: the 1 m box must still be framed, not the floor.
+  framed.add(framed.engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#808080',roughness:.8})).setPosition([0,-.06,0]).setScale([140,.12,140]),{fit:false});
   await waitForPipelines(()=>framed.render(0));
   await framed.ready();
   const camera=framed.engine.camera,view={target:[...camera.target],position:[...camera.position]};

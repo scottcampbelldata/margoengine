@@ -83,7 +83,7 @@ export interface BenchOptions {
   /** Ground truth ambient occlusion (Jimenez et al. 2016). Default false. */
   ao?: GTAOOptions | boolean;
   /**
-   * Frames the subject (every mesh passed to {@link Bench.add}) on {@link Bench.ready}: the camera keeps its view
+   * Frames the subject (every mesh passed to {@link Bench.add} without `fit: false`) on {@link Bench.ready}: the camera keeps its view
    * direction and moves so the subject's world box fills `fill` of the narrower half of the view. Default true when
    * `camera` is not passed, false when it is (that camera is kept as given).
    */
@@ -98,7 +98,7 @@ export interface BenchOptions {
 
 /** How {@link Bench.fit} frames the subject. */
 export interface BenchFitOptions {
-  /** World box to frame. Default the world box of every mesh passed to {@link Bench.add}. */
+  /** World box to frame. Default the world box of every mesh passed to {@link Bench.add} without `fit: false`. */
   bounds?: { min: Vec3; max: Vec3 };
   /** Share of the view's narrower half-extent the box reaches, 0.1..1. Default 0.8. */
   fill?: number;
@@ -112,6 +112,11 @@ export interface BenchAddOptions {
   contact?: boolean;
   /** The shadow map treats it as still. Default false. */
   static?: boolean;
+  /**
+   * Counts toward the auto-fit box (see {@link BenchOptions.fit}). Default true for a subject, false for the bench's own
+   * backdrop mesh. Pass false for a large floor or a room shell so it does not swamp the framing of the subject.
+   */
+  fit?: boolean;
 }
 
 /** What {@link openBench} opened. */
@@ -219,6 +224,33 @@ export function frameView(
     position: centre.map((v, a) => v + w[a] * distance) as [number, number, number],
     far: distance + reach,
   };
+}
+
+/** The world box of every mesh in `meshes` that has a geometry; null when none does. What {@link Bench.fit} frames by default. */
+export async function subjectBox(meshes: Iterable<MeshHandle>): Promise<{ min: Vec3; max: Vec3 } | null> {
+  const { worldBounds } = await import('@margoengine/scene/helpers');
+  const min: [number, number, number] = [Infinity, Infinity, Infinity],
+    max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (const mesh of meshes) {
+    const part = worldBounds(mesh);
+    if (part)
+      for (let a = 0; a < 3; a++) {
+        min[a] = Math.min(min[a], part.min[a]);
+        max[a] = Math.max(max[a], part.max[a]);
+      }
+  }
+  return Number.isFinite(min[0]) ? { min, max } : null;
+}
+
+/**
+ * Registers `mesh` in the set the auto-fit frames, unless `framed` is false; returns its remover. The set is what
+ * {@link Bench.add} keeps, so a large floor added with `fit: false` never reaches {@link subjectBox}.
+ */
+export function addSubject(subjects: Set<MeshHandle>, mesh: MeshHandle | ContactSource, framed: boolean): () => void {
+  if (!framed || !('id' in mesh)) return () => {};
+  const handle = mesh as unknown as MeshHandle;
+  subjects.add(handle);
+  return () => subjects.delete(handle);
 }
 
 const frameBox = (
@@ -455,20 +487,9 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
     if (!(fill >= 0.1 && fill <= 1)) throw rangeError('Invalid fit; fill must be 0.1..1', 'arguments');
     let box = settings.bounds;
     if (!box) {
-      if (!subjects.size) return false;
-      const { worldBounds } = await import('@margoengine/scene/helpers');
-      const min: [number, number, number] = [Infinity, Infinity, Infinity],
-        max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
-      for (const mesh of subjects) {
-        const part = worldBounds(mesh);
-        if (part)
-          for (let a = 0; a < 3; a++) {
-            min[a] = Math.min(min[a], part.min[a]);
-            max[a] = Math.max(max[a], part.max[a]);
-          }
-      }
-      if (!Number.isFinite(min[0])) return false;
-      box = { min, max };
+      const found = await subjectBox(subjects);
+      if (!found) return false;
+      box = found;
     }
     if (![...box.min, ...box.max].every(Number.isFinite) || box.min.some((v, i) => v > box.max[i]))
       throw rangeError('Invalid fit; bounds need finite min <= max', 'arguments');
@@ -524,12 +545,9 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
     get failed() {
       return failed;
     },
-    add(mesh, { shadow = true, contact: casts = true, static: still = false } = {}) {
+    add(mesh, { shadow = true, contact: casts = true, static: still = false, fit: framed = mesh !== backdrop?.mesh } = {}) {
       const removers: (() => void)[] = [];
-      if ('id' in (mesh as object)) {
-        subjects.add(mesh as MeshHandle);
-        removers.push(() => subjects.delete(mesh as MeshHandle));
-      }
+      removers.push(addSubject(subjects, mesh, framed));
       if (shadow && shadows && 'id' in (mesh as object))
         removers.push(shadows.add(mesh as MeshHandle, { static: still }));
       if (casts && contact) removers.push(contact.add(mesh));
