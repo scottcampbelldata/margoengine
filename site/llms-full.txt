@@ -16592,6 +16592,25 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: warmUp makes ten-thousand-trees take 33 s instead of 18 s to start on the WebGL2 layer (KB-QUALITY-WARMSERIAL1, quality, webgl2-compat)
+
+- **Repro:** a paired A/B of `scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2`, the build of
+  7bcf8d002b^ (no warmUp) and of 7bcf8d002b (warmUp) taking turns, 4 rounds each on the loaded workstation: time to
+  ready 17.7, 17.7, 17.9, 19.3 s before and 33.2, 34.7, 39.7, 51.9 s after (minimum 17.7 against 33.2 s, far past the
+  round-to-round spread). The pictures are the same; long tasks total about 10 s before (one of 9.3 s) and 9 to 29 s
+  after (none over 0.7 s).
+- **Cause:** warmUp (`packages/quality/src/warm.ts`) stops each warm frame at the first pipeline that does not exist,
+  waits for that one pipeline's async compile, then renders the frame again: 45 rounds, one pipeline at a time. On the
+  layer each async pipeline also waits for a warm draw and a fence before it resolves, and every round runs the frame's
+  CPU compute passes again. A CPU profile of the after build: 18 s of the 28 s start is the main thread idle, waiting
+  on single links; the synchronous path it replaced linked all of them side by side (KB-COMPAT-SYNCLINK1) in one
+  9.3 s task.
+- **Fix needed:** keep the page responsive and link side by side, with the same pipelines and pictures. Two routes to
+  plan: the layer's queue holds a command buffer whose programs have not linked (as it already holds compute work
+  until the compute runtime loads) and runs it once they have, so the synchronous first frame no longer blocks and
+  warmUp is not needed on the layer; or warmUp discovers every pipeline of a frame per round on a device whose
+  synchronous creation does not block (the layer links in the background) and waits for them together.
+
 ### Fixed 2026-11-28: nine entries of animator, rigging, scatter and biomes were over their size ceilings (KB-SIZE-SPLINEANATOMY1, sizes)
 
 - **Repro:** `npm run quality -- --gate=sizes` on main 4a49e5bd0e: `animator`, `animator/warping`, `animator/fbik`,
