@@ -1,3 +1,4 @@
+import { LineBatch } from '@margoengine/lines/batch';
 import { Material } from '@margoengine/materials';
 import { color,deep,landEnd,mix } from './coast.js';
 import { bed,channelDepth,distanceAt,farZ,fractionAt,interfaceY,leftX,mouthX,nearZ,planScale,position,seaX,surface } from './estuary.js';
@@ -121,41 +122,24 @@ function travel(path,t){
   return [x[a]+f*(x[b]-x[a]),s[a]+f*(s[b]-s[a])];
 }
 
-function tracerMesh(){
-  const count=77,g={
-    positions:new Float32Array(count*12),normals:new Float32Array(count*12),
-    colors:new Float32Array(count*16),indices:new Uint16Array(count*6),
-  };
-  for(let i=0;i<count;i++){
-    const a=4*i;
-    g.indices.set([a,a+1,a+2,a+2,a+1,a+3],6*i);
-    for(let k=0;k<4;k++)g.normals[3*(a+k)+(i<48?2:1)]=1;
-  }
-  return g;
+// Tracer streaks are line segments a fixed number of screen pixels wide (@margoengine/lines/batch), so they read at
+// any zoom: 48 on the cut face at their depths in the fresh layer, 29 on the surface. Each fades in at its tail.
+const tracerCount=77;
+function tracerLines(){
+  return {positions:new Float32Array(tracerCount*6),colors:new Float32Array(tracerCount*8)};
 }
 function updateTraces(g,path,t){
-  const count=g.positions.length/12;
-  for(let i=0;i<count;i++){
+  for(let i=0;i<tracerCount;i++){
     const f=(((i*47)%81)/81+72*t/path.duration)%1;
     const [x,s]=travel(path,path.duration*f);
     const depth=.16+.70*((i*13%73)/72);
     const streak=.003+.007*Math.sin(i*3.95)**2;
-    const opacity=Math.sin(Math.PI*f)**.35*(i<48?.55:.44);
-    const k=4*i;
-    const y=surface-(surface-bed)*s*depth;
-    if(i<48){
-      const z=front+.0013;
-      point(g,k,x-streak,y-.00091,z,air,0);
-      point(g,k+1,x+streak,y-.00061,z,air,opacity);
-      point(g,k+2,x-streak,y+.00049,z,air,0);
-      point(g,k+3,x+streak,y+.00045,z,air,opacity);
-    }else{
-      const z=farZ+.012+(nearZ-farZ-.023)*((i*19%31)/30);
-      point(g,k,x-streak,surface+.0008,z+.0015,air,0);
-      point(g,k+1,x+streak,surface+.0008,z+.00085,air,opacity);
-      point(g,k+2,x-streak,surface+.0008,z-.0015,air,0);
-      point(g,k+3,x+streak,surface+.0008,z-.00085,air,opacity);
-    }
+    const opacity=Math.sin(Math.PI*f)**.35*(i<48?.9:.75);
+    const onFace=i<48;
+    const y=onFace?surface-(surface-bed)*s*depth:surface+.0008;
+    const z=onFace?front+.0013:farZ+.012+(nearZ-farZ-.023)*((i*19%31)/30);
+    g.positions.set([x-streak,y,z,x+streak,y,z],6*i);
+    g.colors.set([...air,0,...air,opacity],8*i);
   }
 }
 
@@ -176,15 +160,14 @@ function specks(){
   return g;
 }
 
-export function makeWater(add,initial){
+export function makeWater(add,initial,batches){
   const lowerWidth=total-counts[0];
   const topcap=top(),frontUpper=shape(total,5,false),frontLower=shape(lowerWidth,5,false);
-  const seam=shape(lowerWidth,2,false),tracers=tracerMesh(),east=endcap(true),west=endcap(false);
+  const seam=shape(lowerWidth,2,false),tracers=tracerLines(),east=endcap(true),west=endcap(false);
   const mats={
     cut:new Material({shading:'basic',color:'#dcebe2'}),
     top:new Material({color:'#c9e6de',roughness:.23}),
     seam:new Material({shading:'basic',color:'#e1f0e6',transparent:true,opacity:.63,depthWrite:false}),
-    trace:new Material({shading:'basic',color:'#d9f2e6',transparent:true,opacity:.86,depthWrite:false,doubleSided:true}),
     rock:new Material({shading:'basic',color:'#d1b297'}),
   };
   let path=advection(initial);
@@ -197,7 +180,7 @@ export function makeWater(add,initial){
   add(specks(),mats.rock,'Granular inclusions in the sediment cut');
   const up=add(frontUpper,mats.cut,'Fresh upper layer section'),low=add(frontLower,mats.cut,'Saltwater intrusion section');
   const edge=add(seam,mats.seam,'Calculated layer interface',undefined,4);
-  const glints=add(tracers,mats.trace,'Freshwater advection tracers',undefined,5);
+  const glints=batches.add(new LineBatch({...tracers,width:2.5}));
   let old=initial,lastTime=0;
   return {
     update(model,t){
@@ -212,10 +195,10 @@ export function makeWater(add,initial){
       }
       if(model!==old||t!==lastTime){
         updateTraces(tracers,path,t);
-        glints.setGeometry(tracers,{start:0,count:tracers.positions.length/3});
+        glints.updateSegments(0,tracers.positions,tracers.colors);
       }
       old=model;lastTime=t;
     },
-    dispose(){for(const m of Object.values(mats))m.dispose();},
+    dispose(){glints.dispose();for(const m of Object.values(mats))m.dispose();},
   };
 }

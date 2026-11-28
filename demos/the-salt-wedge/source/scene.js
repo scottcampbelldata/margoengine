@@ -1,4 +1,5 @@
 import { Engine } from '@margoengine/core';
+import { LineBatches } from '@margoengine/lines/batch';
 import { createMesh } from '@margoengine/materials';
 import { worldToScreen } from '@margoengine/math';
 import { Shadows } from '@margoengine/shadows';
@@ -142,7 +143,7 @@ async function initialize(installCompatibility){
     if(shadow)shadows.add(mesh,{static:true,castShadow:shadow==='cast'});
     return mesh;
   };
-  choose();motion();coast=makeCoast(add);water=makeWater(add,model);draw();
+  choose();motion();coast=makeCoast(add);water=makeWater(add,model,LineBatches.attach(engine));draw();
   await engine.gpu.queue.onSubmittedWorkDone();
   await new Promise(requestAnimationFrame);
   if(controller.signal.aborted)return;
