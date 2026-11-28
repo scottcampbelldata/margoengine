@@ -1,5 +1,5 @@
 {
-  "commit": "d0ab6b740c",
+  "commit": "002a07166a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -372,8 +372,8 @@
         "gzip": 4348
       },
       "./objects": {
-        "raw": 15240,
-        "gzip": 5825
+        "raw": 15312,
+        "gzip": 5855
       },
       "./editor": {
         "raw": 9511,
@@ -808,8 +808,8 @@
         "gzip": 1009
       },
       "./bounce": {
-        "raw": 39448,
-        "gzip": 15775
+        "raw": 39738,
+        "gzip": 15839
       },
       "./groups": {
         "raw": 2855,
@@ -14572,12 +14572,12 @@
         "gzip": 2796
       },
       "./threemf-evaluate": {
-        "raw": 88643,
-        "gzip": 32027
+        "raw": 89424,
+        "gzip": 32222
       },
       "./threemf-boolean": {
-        "raw": 38959,
-        "gzip": 14791
+        "raw": 38970,
+        "gzip": 14793
       },
       "./threemf-displacement": {
         "raw": 42154,
@@ -14588,8 +14588,8 @@
         "gzip": 8677
       },
       "./threemf-volumetric": {
-        "raw": 66313,
-        "gzip": 24361
+        "raw": 66962,
+        "gzip": 24526
       },
       "./threemf-lattice": {
         "raw": 56178,
@@ -14816,8 +14816,8 @@
         "gzip": 20460
       },
       "./interior-mapping": {
-        "raw": 98523,
-        "gzip": 31075
+        "raw": 11972,
+        "gzip": 4837
       },
       "./portal": {
         "raw": 97106,
@@ -15050,8 +15050,8 @@
         "gzip": 15338
       },
       "./boolean-exact": {
-        "raw": 42381,
-        "gzip": 15780
+        "raw": 45358,
+        "gzip": 16879
       },
       "./modifiers": {
         "raw": 23252,
@@ -15082,16 +15082,16 @@
         "gzip": 5310
       },
       "./boolean-batch": {
-        "raw": 43329,
-        "gzip": 15979
+        "raw": 46305,
+        "gzip": 17078
       },
       "./repair": {
         "raw": 26505,
         "gzip": 9670
       },
       "./hull": {
-        "raw": 48069,
-        "gzip": 17577
+        "raw": 51045,
+        "gzip": 18663
       }
     },
     "@margoengine/mixer": {
@@ -15752,8 +15752,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 176727,
-        "gzip": 48445
+        "raw": 177334,
+        "gzip": 48587
       },
       "./bloom": {
         "raw": 24092,
@@ -15780,24 +15780,24 @@
         "gzip": 5268
       },
       "./ssr": {
-        "raw": 44380,
-        "gzip": 14671
+        "raw": 44644,
+        "gzip": 14748
       },
       "./gtao": {
         "raw": 52203,
         "gzip": 15337
       },
       "./rt-reflections": {
-        "raw": 49232,
-        "gzip": 16376
+        "raw": 49496,
+        "gzip": 16453
       },
       "./rt-gi": {
-        "raw": 47585,
-        "gzip": 15729
+        "raw": 47928,
+        "gzip": 15808
       },
       "./ssgi": {
-        "raw": 43691,
-        "gzip": 14221
+        "raw": 44034,
+        "gzip": 14304
       },
       "./motion-blur": {
         "raw": 25549,
@@ -15832,12 +15832,12 @@
         "gzip": 7132
       },
       "./mrt": {
-        "raw": 13018,
-        "gzip": 5149
+        "raw": 13337,
+        "gzip": 5241
       },
       "./depth": {
-        "raw": 13728,
-        "gzip": 5264
+        "raw": 14047,
+        "gzip": 5357
       },
       "./contact-shadows": {
         "raw": 20798,
@@ -15880,8 +15880,8 @@
         "gzip": 7157
       },
       "./pixelate": {
-        "raw": 32796,
-        "gzip": 11020
+        "raw": 33117,
+        "gzip": 11112
       },
       "./halftone": {
         "raw": 20593,
@@ -15892,8 +15892,8 @@
         "gzip": 7882
       },
       "./curvature": {
-        "raw": 33466,
-        "gzip": 11206
+        "raw": 33787,
+        "gzip": 11298
       },
       "./ascii": {
         "raw": 24556,
@@ -15916,8 +15916,8 @@
         "gzip": 9782
       },
       "./depth-downsample": {
-        "raw": 20379,
-        "gzip": 7512
+        "raw": 20698,
+        "gzip": 7607
       },
       "./trail": {
         "raw": 8962,
@@ -16674,8 +16674,8 @@
         "gzip": 8132
       },
       "./timber-valley": {
-        "raw": 15143,
-        "gzip": 6150
+        "raw": 15450,
+        "gzip": 6288
       },
       "./fauld-tunnels": {
         "raw": 53120,
@@ -16696,8 +16696,8 @@
         "gzip": 1169
       },
       ".": {
-        "raw": 187137,
-        "gzip": 67162
+        "raw": 187509,
+        "gzip": 67266
       },
       "./bricks": {
         "raw": 72646,
@@ -16968,8 +16968,8 @@
         "gzip": 5294
       },
       "./a11y": {
-        "raw": 15976,
-        "gzip": 6534
+        "raw": 16485,
+        "gzip": 6722
       },
       "./progressive": {
         "raw": 14897,
@@ -17076,12 +17076,12 @@
         "gzip": 9409
       },
       "./raw": {
-        "raw": 48671,
-        "gzip": 16642
+        "raw": 52306,
+        "gzip": 17547
       },
       "./black-hole": {
-        "raw": 74831,
-        "gzip": 26467
+        "raw": 78466,
+        "gzip": 27405
       },
       "./effects": {
         "raw": 22356,
@@ -17104,8 +17104,8 @@
         "gzip": 5786
       },
       "./pass": {
-        "raw": 35752,
-        "gzip": 12896
+        "raw": 36089,
+        "gzip": 13005
       },
       "./utils": {
         "raw": 17365,
@@ -17116,8 +17116,8 @@
         "gzip": 3286
       },
       "./serialization": {
-        "raw": 64002,
-        "gzip": 21756
+        "raw": 65857,
+        "gzip": 22271
       },
       "./compute-volume": {
         "raw": 10993,
@@ -17136,16 +17136,16 @@
         "gzip": 18252
       },
       "./glsl-material": {
-        "raw": 119283,
-        "gzip": 40348
+        "raw": 121150,
+        "gzip": 40844
       },
       "./glsl-pass": {
-        "raw": 126722,
-        "gzip": 43128
+        "raw": 130357,
+        "gzip": 44045
       },
       "./shadertoy": {
-        "raw": 157228,
-        "gzip": 52404
+        "raw": 160865,
+        "gzip": 53317
       }
     },
     "@margoengine/shadows": {
@@ -18682,8 +18682,8 @@
         "gzip": 6395
       },
       "./ripples": {
-        "raw": 30253,
-        "gzip": 9951
+        "raw": 32291,
+        "gzip": 10515
       },
       "./wake": {
         "raw": 8342,
@@ -18742,8 +18742,8 @@
         "gzip": 6689
       },
       "./liquid": {
-        "raw": 152112,
-        "gzip": 46262
+        "raw": 154841,
+        "gzip": 47297
       },
       "./ships": {
         "raw": 27739,
@@ -18854,8 +18854,8 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 419450,
-        "gzip": 128573
+        "raw": 419669,
+        "gzip": 128640
       },
       "./adapter": {
         "raw": 1861,
@@ -18866,8 +18866,8 @@
         "gzip": 49317
       },
       "./device": {
-        "raw": 418668,
-        "gzip": 128736
+        "raw": 418887,
+        "gzip": 128809
       },
       "./glsl": {
         "raw": 157991,
@@ -18878,8 +18878,8 @@
         "gzip": 27135
       },
       "./xr": {
-        "raw": 418718,
-        "gzip": 128642
+        "raw": 418937,
+        "gzip": 128621
       },
       "./preview": {
         "raw": 8266,
@@ -18898,8 +18898,8 @@
         "gzip": 3861
       },
       "./tiers": {
-        "raw": 420231,
-        "gzip": 128432
+        "raw": 420450,
+        "gzip": 128507
       }
     },
     "@margoengine/wfc": {
@@ -19906,14 +19906,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 317394,
-        "gzip": 96171,
+        "raw": 317613,
+        "gzip": 96241,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime and read-back",
         "raw": 102055,
-        "gzip": 32863,
+        "gzip": 32862,
         "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
       }
     },

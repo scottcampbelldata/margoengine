@@ -25,7 +25,7 @@
   <main id="main" class="sizes">
     <section class="sizes-intro">
       <h1>Package sizes</h1>
-      <p class="section-lede">Every number on this page was measured from the build of commit <code>d0ab6b740c</code>, when this page was generated. Raw is minified ES2022 code; min+gzip is the same code gzipped. Each entry is bundled on its own with other packages left external, because your app shares them. Workers and Wasm that load later are <a href="#loaded-later">listed with the call that loads each</a>.</p>
+      <p class="section-lede">Every number on this page was measured from the build of commit <code>002a07166a</code>, when this page was generated. Raw is minified ES2022 code; min+gzip is the same code gzipped. Each entry is bundled on its own with other packages left external, because your app shares them. Workers and Wasm that load later are <a href="#loaded-later">listed with the call that loads each</a>.</p>
       <div class="budget">
         <h2 id="core-stage">Core + stage</h2>
         <p class="budget-figure"><strong>25,149 B</strong> min+gzip, limit 25,150 B</p>
@@ -337,8 +337,8 @@
   <caption class="sr-only">Entries measured as a base and a lazy part, in bytes</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Part</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Note</th></tr></thead>
 <tbody>
-<tr><th scope="row"><code>@margoengine/webgl2-compat</code></th><td>Base: everything the first call of <code>install()</code> loads, without the lazy part</td><td class="num">317,394</td><td class="num">96,171</td><td>Limit 73,000 B</td></tr>
-<tr><th scope="row"><code>@margoengine/webgl2-compat</code></th><td>Lazy: compute runtime and read-back</td><td class="num">102,055</td><td class="num">32,863</td><td>the first compute pipeline or texture read-back on the layer (import() in device/device.ts)</td></tr>
+<tr><th scope="row"><code>@margoengine/webgl2-compat</code></th><td>Base: everything the first call of <code>install()</code> loads, without the lazy part</td><td class="num">317,613</td><td class="num">96,241</td><td>Limit 73,000 B</td></tr>
+<tr><th scope="row"><code>@margoengine/webgl2-compat</code></th><td>Lazy: compute runtime and read-back</td><td class="num">102,055</td><td class="num">32,862</td><td>the first compute pipeline or texture read-back on the layer (import() in device/device.ts)</td></tr>
 <tr><th scope="row"><code>@margoengine/points/las</code></th><td>Base: everything a plain <code>.las</code> file loads, without the lazy part</td><td class="num">14,564</td><td class="num">5,973</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/points/las</code></th><td>Lazy: LAZ decoder</td><td class="num">26,452</td><td class="num">8,496</td><td>the first compressed file, unless the caller passes its own decoder (import() in las.ts)</td></tr>
 <tr><th scope="row"><code>@margoengine/sky/volumetric-clouds</code></th><td>Base: everything the clouds load without a hurricane, without the lazy part</td><td class="num">33,700</td><td class="num">12,027</td><td></td></tr>
@@ -3437,18 +3437,18 @@
 <tr><td><code>./knobs</code></td><td class="num">4,589</td><td class="num">2,181</td></tr>
 </tbody>
 <tbody data-package="@margoengine/webgl2-compat">
-<tr><th scope="rowgroup" rowspan="12"><a href="./catalog/#webgl2-compat">@margoengine/webgl2-compat</a></th><td><code>root</code></td><td class="num">419,450</td><td class="num">128,573</td><td rowspan="12"><code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="12"><a href="./catalog/#webgl2-compat">@margoengine/webgl2-compat</a></th><td><code>root</code></td><td class="num">419,669</td><td class="num">128,640</td><td rowspan="12"><code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./adapter</code></td><td class="num">1,861</td><td class="num">958</td></tr>
 <tr><td><code>./compute</code></td><td class="num">168,966</td><td class="num">49,317</td></tr>
-<tr><td><code>./device</code></td><td class="num">418,668</td><td class="num">128,736</td></tr>
+<tr><td><code>./device</code></td><td class="num">418,887</td><td class="num">128,809</td></tr>
 <tr><td><code>./glsl</code></td><td class="num">157,991</td><td class="num">46,170</td></tr>
 <tr><td><code>./wgsl</code></td><td class="num">95,384</td><td class="num">27,135</td></tr>
-<tr><td><code>./xr</code></td><td class="num">418,718</td><td class="num">128,642</td></tr>
+<tr><td><code>./xr</code></td><td class="num">418,937</td><td class="num">128,621</td></tr>
 <tr><td><code>./preview</code></td><td class="num">8,266</td><td class="num">3,580</td></tr>
 <tr><td><code>./pick</code></td><td class="num">12,461</td><td class="num">4,978</td></tr>
 <tr><td><code>./restore</code></td><td class="num">1,923</td><td class="num">896</td></tr>
 <tr><td><code>./auto</code></td><td class="num">8,899</td><td class="num">3,861</td></tr>
-<tr><td><code>./tiers</code></td><td class="num">420,231</td><td class="num">128,432</td></tr>
+<tr><td><code>./tiers</code></td><td class="num">420,450</td><td class="num">128,507</td></tr>
 </tbody>
 <tbody data-package="@margoengine/worker">
 <tr><th scope="rowgroup" rowspan="5"><a href="./catalog/#worker">@margoengine/worker</a></th><td><code>root</code></td><td class="num">7,387</td><td class="num">2,595</td><td rowspan="5"><code>@margoengine/core</code></td></tr>
@@ -3575,11 +3575,11 @@
 <tr><td><code>./vtk-legacy</code></td><td class="num">19,327</td><td class="num">6,939</td></tr>
 <tr><td><code>./geo</code></td><td class="num">35,046</td><td class="num">12,012</td></tr>
 <tr><td><code>./threemf-beams</code></td><td class="num">6,027</td><td class="num">2,796</td></tr>
-<tr><td><code>./threemf-evaluate</code></td><td class="num">88,643</td><td class="num">32,027</td></tr>
-<tr><td><code>./threemf-boolean</code></td><td class="num">38,959</td><td class="num">14,791</td></tr>
+<tr><td><code>./threemf-evaluate</code></td><td class="num">89,424</td><td class="num">32,222</td></tr>
+<tr><td><code>./threemf-boolean</code></td><td class="num">38,970</td><td class="num">14,793</td></tr>
 <tr><td><code>./threemf-displacement</code></td><td class="num">42,154</td><td class="num">16,051</td></tr>
 <tr><td><code>./threemf-secure</code></td><td class="num">21,531</td><td class="num">8,677</td></tr>
-<tr><td><code>./threemf-volumetric</code></td><td class="num">66,313</td><td class="num">24,361</td></tr>
+<tr><td><code>./threemf-volumetric</code></td><td class="num">66,962</td><td class="num">24,526</td></tr>
 <tr><td><code>./threemf-lattice</code></td><td class="num">56,178</td><td class="num">19,369</td></tr>
 <tr><td><code>./mmcif</code></td><td class="num">7,204</td><td class="num">3,259</td></tr>
 <tr><td><code>./dae-kinematics</code></td><td class="num">54,048</td><td class="num">18,959</td></tr>
@@ -3827,7 +3827,7 @@
 <tr><td><code>./soot</code></td><td class="num">34,082</td><td class="num">11,266</td></tr>
 <tr><td><code>./presets</code></td><td class="num">412</td><td class="num">276</td></tr>
 <tr><td><code>./settings</code></td><td class="num">56,745</td><td class="num">20,460</td></tr>
-<tr><td><code>./interior-mapping</code></td><td class="num">98,523</td><td class="num">31,075</td></tr>
+<tr><td><code>./interior-mapping</code></td><td class="num">11,972</td><td class="num">4,837</td></tr>
 <tr><td><code>./portal</code></td><td class="num">97,106</td><td class="num">29,863</td></tr>
 </tbody>
 <tbody data-package="@margoengine/shader">
@@ -3835,24 +3835,24 @@
 <tr><td><code>./noise</code></td><td class="num">14,102</td><td class="num">5,282</td></tr>
 <tr><td><code>./graph</code></td><td class="num">40,797</td><td class="num">14,528</td></tr>
 <tr><td><code>./readback</code></td><td class="num">23,986</td><td class="num">9,409</td></tr>
-<tr><td><code>./raw</code></td><td class="num">48,671</td><td class="num">16,642</td></tr>
-<tr><td><code>./black-hole</code></td><td class="num">74,831</td><td class="num">26,467</td></tr>
+<tr><td><code>./raw</code></td><td class="num">52,306</td><td class="num">17,547</td></tr>
+<tr><td><code>./black-hole</code></td><td class="num">78,466</td><td class="num">27,405</td></tr>
 <tr><td><code>./effects</code></td><td class="num">22,356</td><td class="num">9,074</td></tr>
 <tr><td><code>./editor</code></td><td class="num">75,457</td><td class="num">25,095</td></tr>
 <tr><td><code>./compute-texture</code></td><td class="num">10,854</td><td class="num">4,529</td></tr>
 <tr><td><code>./lighting</code></td><td class="num">29,177</td><td class="num">10,502</td></tr>
 <tr><td><code>./deform</code></td><td class="num">14,089</td><td class="num">5,786</td></tr>
-<tr><td><code>./pass</code></td><td class="num">35,752</td><td class="num">12,896</td></tr>
+<tr><td><code>./pass</code></td><td class="num">36,089</td><td class="num">13,005</td></tr>
 <tr><td><code>./utils</code></td><td class="num">17,365</td><td class="num">7,108</td></tr>
 <tr><td><code>./subgroups</code></td><td class="num">7,654</td><td class="num">3,286</td></tr>
-<tr><td><code>./serialization</code></td><td class="num">64,002</td><td class="num">21,756</td></tr>
+<tr><td><code>./serialization</code></td><td class="num">65,857</td><td class="num">22,271</td></tr>
 <tr><td><code>./compute-volume</code></td><td class="num">10,993</td><td class="num">4,705</td></tr>
 <tr><td><code>./editor-pass</code></td><td class="num">102,268</td><td class="num">34,055</td></tr>
 <tr><td><code>./texture-array</code></td><td class="num">6,894</td><td class="num">3,186</td></tr>
 <tr><td><code>./glsl</code></td><td class="num">52,151</td><td class="num">18,252</td></tr>
-<tr><td><code>./glsl-material</code></td><td class="num">119,283</td><td class="num">40,348</td></tr>
-<tr><td><code>./glsl-pass</code></td><td class="num">126,722</td><td class="num">43,128</td></tr>
-<tr><td><code>./shadertoy</code></td><td class="num">157,228</td><td class="num">52,404</td></tr>
+<tr><td><code>./glsl-material</code></td><td class="num">121,150</td><td class="num">40,844</td></tr>
+<tr><td><code>./glsl-pass</code></td><td class="num">130,357</td><td class="num">44,045</td></tr>
+<tr><td><code>./shadertoy</code></td><td class="num">160,865</td><td class="num">53,317</td></tr>
 </tbody>
 <tbody data-package="@margoengine/environment">
 <tr><th scope="rowgroup" rowspan="24"><a href="./catalog/#environment">@margoengine/environment</a></th><td><code>root</code></td><td class="num">101,651</td><td class="num">32,197</td><td rowspan="24"><code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
@@ -3900,7 +3900,7 @@
 <tr><td><code>./layers</code></td><td class="num">4,865</td><td class="num">2,056</td></tr>
 <tr><td><code>./contact</code></td><td class="num">17,915</td><td class="num">6,172</td></tr>
 <tr><td><code>./line</code></td><td class="num">1,982</td><td class="num">1,009</td></tr>
-<tr><td><code>./bounce</code></td><td class="num">39,448</td><td class="num">15,775</td></tr>
+<tr><td><code>./bounce</code></td><td class="num">39,738</td><td class="num">15,839</td></tr>
 <tr><td><code>./groups</code></td><td class="num">2,855</td><td class="num">1,075</td></tr>
 </tbody>
 <tbody data-package="@margoengine/shadows">
@@ -4194,18 +4194,18 @@
   <caption class="sr-only">Post-processing: bytes per package entry</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Entry</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Peers on</th></tr></thead>
 <tbody data-package="@margoengine/post">
-<tr><th scope="rowgroup" rowspan="48"><a href="./catalog/#post">@margoengine/post</a></th><td><code>root</code></td><td class="num">176,727</td><td class="num">48,445</td><td rowspan="48"><code>@margoengine/bvh</code> (optional), <code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="48"><a href="./catalog/#post">@margoengine/post</a></th><td><code>root</code></td><td class="num">177,334</td><td class="num">48,587</td><td rowspan="48"><code>@margoengine/bvh</code> (optional), <code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./bloom</code></td><td class="num">24,092</td><td class="num">8,225</td></tr>
 <tr><td><code>./ssao</code></td><td class="num">38,657</td><td class="num">11,740</td></tr>
 <tr><td><code>./scene-fade</code></td><td class="num">7,282</td><td class="num">3,091</td></tr>
 <tr><td><code>./stack</code></td><td class="num">14,281</td><td class="num">5,118</td></tr>
 <tr><td><code>./fxaa</code></td><td class="num">13,237</td><td class="num">4,838</td></tr>
 <tr><td><code>./decals</code></td><td class="num">12,902</td><td class="num">5,268</td></tr>
-<tr><td><code>./ssr</code></td><td class="num">44,380</td><td class="num">14,671</td></tr>
+<tr><td><code>./ssr</code></td><td class="num">44,644</td><td class="num">14,748</td></tr>
 <tr><td><code>./gtao</code></td><td class="num">52,203</td><td class="num">15,337</td></tr>
-<tr><td><code>./rt-reflections</code></td><td class="num">49,232</td><td class="num">16,376</td></tr>
-<tr><td><code>./rt-gi</code></td><td class="num">47,585</td><td class="num">15,729</td></tr>
-<tr><td><code>./ssgi</code></td><td class="num">43,691</td><td class="num">14,221</td></tr>
+<tr><td><code>./rt-reflections</code></td><td class="num">49,496</td><td class="num">16,453</td></tr>
+<tr><td><code>./rt-gi</code></td><td class="num">47,928</td><td class="num">15,808</td></tr>
+<tr><td><code>./ssgi</code></td><td class="num">44,034</td><td class="num">14,304</td></tr>
 <tr><td><code>./motion-blur</code></td><td class="num">25,549</td><td class="num">8,768</td></tr>
 <tr><td><code>./lens-flare</code></td><td class="num">25,130</td><td class="num">9,015</td></tr>
 <tr><td><code>./image</code></td><td class="num">42,870</td><td class="num">14,036</td></tr>
@@ -4214,8 +4214,8 @@
 <tr><td><code>./afterimage</code></td><td class="num">20,480</td><td class="num">6,992</td></tr>
 <tr><td><code>./accumulate</code></td><td class="num">21,652</td><td class="num">7,228</td></tr>
 <tr><td><code>./outline</code></td><td class="num">20,147</td><td class="num">7,132</td></tr>
-<tr><td><code>./mrt</code></td><td class="num">13,018</td><td class="num">5,149</td></tr>
-<tr><td><code>./depth</code></td><td class="num">13,728</td><td class="num">5,264</td></tr>
+<tr><td><code>./mrt</code></td><td class="num">13,337</td><td class="num">5,241</td></tr>
+<tr><td><code>./depth</code></td><td class="num">14,047</td><td class="num">5,357</td></tr>
 <tr><td><code>./contact-shadows</code></td><td class="num">20,798</td><td class="num">7,412</td></tr>
 <tr><td><code>./caustics</code></td><td class="num">33,237</td><td class="num">11,140</td></tr>
 <tr><td><code>./heat-haze</code></td><td class="num">35,024</td><td class="num">12,918</td></tr>
@@ -4226,16 +4226,16 @@
 <tr><td><code>./material-decals</code></td><td class="num">26,348</td><td class="num">9,580</td></tr>
 <tr><td><code>./selective-bloom</code></td><td class="num">36,374</td><td class="num">11,387</td></tr>
 <tr><td><code>./mask</code></td><td class="num">20,709</td><td class="num">7,157</td></tr>
-<tr><td><code>./pixelate</code></td><td class="num">32,796</td><td class="num">11,020</td></tr>
+<tr><td><code>./pixelate</code></td><td class="num">33,117</td><td class="num">11,112</td></tr>
 <tr><td><code>./halftone</code></td><td class="num">20,593</td><td class="num">7,197</td></tr>
 <tr><td><code>./stylize</code></td><td class="num">22,153</td><td class="num">7,882</td></tr>
-<tr><td><code>./curvature</code></td><td class="num">33,466</td><td class="num">11,206</td></tr>
+<tr><td><code>./curvature</code></td><td class="num">33,787</td><td class="num">11,298</td></tr>
 <tr><td><code>./ascii</code></td><td class="num">24,556</td><td class="num">8,991</td></tr>
 <tr><td><code>./overlays</code></td><td class="num">30,962</td><td class="num">10,865</td></tr>
 <tr><td><code>./kawase-blur</code></td><td class="num">23,795</td><td class="num">8,548</td></tr>
 <tr><td><code>./color-average</code></td><td class="num">22,593</td><td class="num">8,107</td></tr>
 <tr><td><code>./lut1d</code></td><td class="num">27,198</td><td class="num">9,782</td></tr>
-<tr><td><code>./depth-downsample</code></td><td class="num">20,379</td><td class="num">7,512</td></tr>
+<tr><td><code>./depth-downsample</code></td><td class="num">20,698</td><td class="num">7,607</td></tr>
 <tr><td><code>./trail</code></td><td class="num">8,962</td><td class="num">3,510</td></tr>
 <tr><td><code>./render-graph</code></td><td class="num">22,571</td><td class="num">7,795</td></tr>
 <tr><td><code>./mesh-blend</code></td><td class="num">30,779</td><td class="num">10,509</td></tr>
@@ -4333,7 +4333,7 @@
 <tr><td><code>./rivers</code></td><td class="num">8,833</td><td class="num">4,193</td></tr>
 <tr><td><code>./cover</code></td><td class="num">7,456</td><td class="num">3,539</td></tr>
 <tr><td><code>./far</code></td><td class="num">9,107</td><td class="num">4,348</td></tr>
-<tr><td><code>./objects</code></td><td class="num">15,240</td><td class="num">5,825</td></tr>
+<tr><td><code>./objects</code></td><td class="num">15,312</td><td class="num">5,855</td></tr>
 <tr><td><code>./editor</code></td><td class="num">9,511</td><td class="num">4,178</td></tr>
 <tr><td><code>./placement</code></td><td class="num">33,388</td><td class="num">13,266</td></tr>
 <tr><td><code>./stats</code></td><td class="num">5,941</td><td class="num">2,499</td></tr>
@@ -4432,7 +4432,7 @@
 <tr><td><code>./fft</code></td><td class="num">32,501</td><td class="num">11,826</td></tr>
 <tr><td><code>./query</code></td><td class="num">10,440</td><td class="num">4,421</td></tr>
 <tr><td><code>./caustics</code></td><td class="num">19,773</td><td class="num">6,395</td></tr>
-<tr><td><code>./ripples</code></td><td class="num">30,253</td><td class="num">9,951</td></tr>
+<tr><td><code>./ripples</code></td><td class="num">32,291</td><td class="num">10,515</td></tr>
 <tr><td><code>./wake</code></td><td class="num">8,342</td><td class="num">3,264</td></tr>
 <tr><td><code>./flow</code></td><td class="num">7,349</td><td class="num">2,995</td></tr>
 <tr><td><code>./bodies</code></td><td class="num">10,105</td><td class="num">4,123</td></tr>
@@ -4447,7 +4447,7 @@
 <tr><td><code>./breaking</code></td><td class="num">7,579</td><td class="num">3,537</td></tr>
 <tr><td><code>./sea-state</code></td><td class="num">3,285</td><td class="num">1,694</td></tr>
 <tr><td><code>./settings</code></td><td class="num">17,120</td><td class="num">6,689</td></tr>
-<tr><td><code>./liquid</code></td><td class="num">152,112</td><td class="num">46,262</td></tr>
+<tr><td><code>./liquid</code></td><td class="num">154,841</td><td class="num">47,297</td></tr>
 <tr><td><code>./ships</code></td><td class="num">27,739</td><td class="num">10,973</td></tr>
 <tr><td><code>./ice</code></td><td class="num">34,635</td><td class="num">13,297</td></tr>
 <tr><td><code>./splash</code></td><td class="num">14,004</td><td class="num">5,893</td></tr>
@@ -4478,7 +4478,7 @@
 <tr><td><code>./fauld-countryside</code></td><td class="num">20,796</td><td class="num">8,170</td></tr>
 <tr><td><code>./fauld-blast</code></td><td class="num">25,001</td><td class="num">9,858</td></tr>
 <tr><td><code>./fauld-crater</code></td><td class="num">20,735</td><td class="num">8,132</td></tr>
-<tr><td><code>./timber-valley</code></td><td class="num">15,143</td><td class="num">6,150</td></tr>
+<tr><td><code>./timber-valley</code></td><td class="num">15,450</td><td class="num">6,288</td></tr>
 <tr><td><code>./fauld-tunnels</code></td><td class="num">53,120</td><td class="num">13,498</td></tr>
 <tr><td><code>./library</code></td><td class="num">11,642</td><td class="num">4,464</td></tr>
 <tr><td><code>./shot-settings</code></td><td class="num">3,327</td><td class="num">1,462</td></tr>
@@ -5175,7 +5175,7 @@
 <tr><th scope="rowgroup" rowspan="14"><a href="./catalog/#mesh-edit">@margoengine/mesh-edit</a></th><td><code>root</code></td><td class="num">93,624</td><td class="num">30,205</td><td rowspan="14"><code>@margoengine/core</code> (optional), <code>@margoengine/gltf</code> (optional)<br>Installs <code>@margoengine/bvh</code>, <code>@margoengine/math</code>, <code>@margoengine/geometry</code></td></tr>
 <tr><td><code>./modeling</code></td><td class="num">107,754</td><td class="num">36,275</td></tr>
 <tr><td><code>./geometry</code></td><td class="num">42,943</td><td class="num">15,338</td></tr>
-<tr><td><code>./boolean-exact</code></td><td class="num">42,381</td><td class="num">15,780</td></tr>
+<tr><td><code>./boolean-exact</code></td><td class="num">45,358</td><td class="num">16,879</td></tr>
 <tr><td><code>./modifiers</code></td><td class="num">23,252</td><td class="num">8,367</td></tr>
 <tr><td><code>./remesh</code></td><td class="num">25,650</td><td class="num">9,688</td></tr>
 <tr><td><code>./sculpt</code></td><td class="num">24,031</td><td class="num">9,000</td></tr>
@@ -5183,9 +5183,9 @@
 <tr><td><code>./bake</code></td><td class="num">11,721</td><td class="num">4,833</td></tr>
 <tr><td><code>./weights</code></td><td class="num">9,903</td><td class="num">3,790</td></tr>
 <tr><td><code>./section</code></td><td class="num">13,632</td><td class="num">5,310</td></tr>
-<tr><td><code>./boolean-batch</code></td><td class="num">43,329</td><td class="num">15,979</td></tr>
+<tr><td><code>./boolean-batch</code></td><td class="num">46,305</td><td class="num">17,078</td></tr>
 <tr><td><code>./repair</code></td><td class="num">26,505</td><td class="num">9,670</td></tr>
-<tr><td><code>./hull</code></td><td class="num">48,069</td><td class="num">17,577</td></tr>
+<tr><td><code>./hull</code></td><td class="num">51,045</td><td class="num">18,663</td></tr>
 </tbody>
 <tbody data-package="@margoengine/scene">
 <tr><th scope="rowgroup" rowspan="11"><a href="./catalog/#scene">@margoengine/scene</a></th><td><code>root</code></td><td class="num">3,557</td><td class="num">1,718</td><td rowspan="11"><code>@margoengine/animation</code> (optional), <code>@margoengine/core</code>, <code>@margoengine/gltf</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
@@ -5234,7 +5234,7 @@
 </tbody>
 <tbody data-package="@margoengine/sciviz">
 <tr><th scope="rowgroup" rowspan="84"><a href="./catalog/#sciviz">@margoengine/sciviz</a></th><td><code>./bench</code></td><td class="num">2,552</td><td class="num">1,169</td><td rowspan="84"><code>@margoengine/core</code><br>Installs <code>@margoengine/compute</code>, <code>@margoengine/controls</code>, <code>@margoengine/exporters</code>, <code>@margoengine/labels</code>, <code>@margoengine/lines</code>, <code>@margoengine/loaders</code>, <code>@margoengine/math</code>, <code>@margoengine/points</code>, <code>@margoengine/geometry</code>, <code>@margoengine/sky</code>, <code>@margoengine/decoders</code>, <code>@margoengine/terrain</code>, <code>@margoengine/tiles</code>, <code>@margoengine/headless</code>, <code>@margoengine/worker</code></td></tr>
-<tr><td><code>root</code></td><td class="num">187,137</td><td class="num">67,162</td></tr>
+<tr><td><code>root</code></td><td class="num">187,509</td><td class="num">67,266</td></tr>
 <tr><td><code>./bricks</code></td><td class="num">72,646</td><td class="num">29,696</td></tr>
 <tr><td><code>./colormaps</code></td><td class="num">49,514</td><td class="num">22,260</td></tr>
 <tr><td><code>./formats</code></td><td class="num">54,921</td><td class="num">20,569</td></tr>
@@ -5302,7 +5302,7 @@
 <tr><td><code>./aggregate</code></td><td class="num">69,844</td><td class="num">29,817</td></tr>
 <tr><td><code>./views</code></td><td class="num">12,621</td><td class="num">4,829</td></tr>
 <tr><td><code>./share</code></td><td class="num">13,517</td><td class="num">5,294</td></tr>
-<tr><td><code>./a11y</code></td><td class="num">15,976</td><td class="num">6,534</td></tr>
+<tr><td><code>./a11y</code></td><td class="num">16,485</td><td class="num">6,722</td></tr>
 <tr><td><code>./progressive</code></td><td class="num">14,897</td><td class="num">5,252</td></tr>
 <tr><td><code>./temporal</code></td><td class="num">10,038</td><td class="num">3,955</td></tr>
 <tr><td><code>./density</code></td><td class="num">12,860</td><td class="num">4,837</td></tr>
