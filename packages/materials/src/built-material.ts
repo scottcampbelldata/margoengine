@@ -1049,8 +1049,19 @@ function clipShader(code: string, group: number): string {
   const out = sectionShader(code, group, 199, 'materialClip');
   return out.replace(surfaceAnchor, clipStatement('materialClip') + surfaceAnchor);
 }
+/**
+ * Whether `m` takes the physical-maps shader. A transmissive material also takes it when a base map or a feature can
+ * vary its colour across the surface: that shader's tint draw reads the surface, since KHR_materials_transmission tints
+ * the transmitted light by the whole base colour, baseColorTexture included (KB-MAT-TINTMAP1). The plain tint draw
+ * multiplies by one constant colour.
+ */
 function mapped(m: Material): boolean {
-  return !!m.physical && (m.physical.length > 12 || mapSlots.slice(5).some((k) => m[k] != null));
+  return (
+    !!m.physical &&
+    (m.physical.length > 12 ||
+      mapSlots.slice(5).some((k) => m[k] != null) ||
+      (!!m.volume && (mapSlots.slice(0, 5).some((k) => m[k] != null) || m['added'].length > 0)))
+  );
 }
 function mapPlan(m: Material) {
   const textures: { texture: Texture; srgb: boolean; fallback: number }[] = [],

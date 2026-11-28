@@ -890,7 +890,10 @@ or share packed textures. `Texture.options.colorSpace` overrides the defaults in
 
 These maps work with geometry groups, instancing, glTF export and device restoration. Glass uses the maps in both
 the tinted-background path and the optional `Transmission` refraction pass (the class of
-`@margoengine/gltf/transmission`, re-exported here). Disposing the last mesh using a
+`@margoengine/gltf/transmission`, re-exported here). The light a transmissive material passes is tinted by its whole
+base colour, `color` times `map` (and any `layered()` layer), as KHR_materials_transmission specifies (Khronos,
+2020-2022, <https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_transmission>), so
+red stained glass tints what is behind it red whether the red is in the factor or the texture. Disposing the last mesh using a
 material releases its map uniform buffers; textures remain caller-owned.
 
 ## Dispersion

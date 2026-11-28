@@ -43,6 +43,7 @@
     "test:gpu:physical-maps": "cd ../.. && node scripts/physical-material-maps-gpu-check.js",
     "test:gpu:sheen-albedo": "cd ../.. && node scripts/sheen-albedo-gpu-check.js",
     "test:gpu:transmission-layers": "cd ../.. && node packages/materials/test/transmission-background-browser.mjs",
+    "test:gpu:tint-map": "cd ../.. && node packages/materials/test/tint-map-browser.mjs && node packages/materials/test/tint-map-browser.mjs --compat",
     "test:gpu:fur": "cd ../.. && node packages/materials/test/fur-browser.mjs",
     "test:gpu:plugins": "cd ../.. && node packages/materials/test/plugins-browser.mjs",
     "test:gpu:native-glass": "cd ../.. && node packages/materials/test/native-glass-browser.mjs && node packages/materials/test/native-glass-browser.mjs --compat",

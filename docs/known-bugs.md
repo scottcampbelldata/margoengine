@@ -37,16 +37,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fixed:** the error names the object and `parse3MFEvaluated`. Regression:
   `packages/loaders/tests/threemf-materials.test.js`.
 
-### Open 2026-11-27: a transmissive material ignores its colour map in the light it passes (KB-MAT-TINTMAP1, materials)
+### Fixed 2026-11-27: a transmissive material ignored its colour map in the light it passed (KB-MAT-TINTMAP1, materials)
 
 - **Repro:** on a #cccccc background draw a quad with `new Material({ transmission: 1, roughness: 0.5, ...o })` and
-  read the middle pixel. `color: [1, 0, 0, 1]` gives (203, 2, 2); `map` set to a red texel gives (203, 202, 202), the
-  same as no colour at all, and so does a red `layered()` layer. Adding `new Transmission()` changed no value in that
-  scene. The Consortium's `multiprop-translucent.3mf` therefore draws without its two picture layers. glTF's
-  KHR_materials_transmission tints transmitted light by the whole base colour, texture included.
-- **Cause:** in the tinted-background path the tint is one constant, `color` x transmission x volume attenuation
-  (`Material.tint`, `packages/materials/src/built-material.ts`), so no per-pixel colour reaches it. Why the scene with
-  the pass reads the same is not established.
+  read the middle pixel. `color: [1, 0, 0, 1]` gave (202, 2, 2); `map` set to a red texel gave (202, 202, 202), the
+  same as no colour at all, and so did a red `layered()` layer, with or without `new Transmission()`. The Consortium's
+  `multiprop-translucent.3mf` therefore drew without its two picture layers. KHR_materials_transmission tints the
+  transmitted light by the whole base colour, baseColorTexture included.
+- **Cause:** only a material with a physical map (slot 5 and up) took the physical-maps shader, whose tint draw reads
+  the surface. A transmissive material with only a base map, or with a feature such as `layered()`, kept gltf/pbr's
+  frame-only tint draw, one constant `color` x transmission x volume attenuation (`Material.tint`). The pass rows read
+  the same because the opaque capture holds only the background there.
+- **Fixed:** a transmissive material with a base map (slots 0 to 4) or any feature takes the physical-maps shader too
+  (`mapped`, `packages/materials/src/built-material.ts`), so its tint draw multiplies by the surface's base colour and
+  transmission. Regression: `packages/materials/test/tint-map-browser.mjs` (20 rows: colour, map, map with a
+  transmission map, layer and none; two-draw and dual-source; with and without the pass), WebGPU and MARGO_COMPAT=1.
 
 ### Fixed 2026-11-27: a JPEG 2000 stream with a marker of 0xFF30 to 0xFF3F was refused as cut (KB-J2K-BAREMARKER1, decoders)
 
